@@ -41,11 +41,9 @@ export default async function ReportsPage() {
 
   return (
     <AppShell>
-      <DesktopOnly locale="zh" />
-      <div className="hidden lg:block">
-        <PageHeader title={t.title} description={t.description} />
-        <ReportsView entries={entries} bookings={bookings} units={units} leaseContracts={leaseContracts} saleContracts={saleContracts} saleSchedules={saleSchedules} locale="zh" />
-      </div>
+      {/* MACOS-STYLE: all content visible on every screen size, no DesktopOnly guard */}
+      <PageHeader title={t.title} description={t.description} />
+      <ReportsView entries={entries} bookings={bookings} units={units} leaseContracts={leaseContracts} saleContracts={saleContracts} saleSchedules={saleSchedules} locale="zh" />
     </AppShell>
   );
 }

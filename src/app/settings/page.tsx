@@ -16,11 +16,9 @@ export default async function SettingsPage() {
 
   return (
     <AppShell>
-      <DesktopOnly locale="zh" />
-      <div className="hidden lg:block">
-        <PageHeader title={t.title} description={t.description} />
-        <SettingsView buildings={(buildings as BuildingRow[]) ?? []} locale="zh" />
-      </div>
+      {/* MACOS-STYLE: all content visible on every screen size */}
+      <PageHeader title={t.title} description={t.description} />
+      <SettingsView buildings={(buildings as BuildingRow[]) ?? []} locale="zh" />
     </AppShell>
   );
 }

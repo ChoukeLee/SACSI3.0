@@ -2,60 +2,67 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── macOS design tokens ── */
 :root {
   color-scheme: light;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
 }
 
+/* ── SF Pro font stack — Apple native rendering ── */
 body {
   min-height: 100dvh;
-  background: #FAFAF8;
-  color: #1A1D20;
+  background: #F5F5F7;
+  color: #1D1D1F;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   letter-spacing: -0.01em;
 }
 
 ::selection {
-  background: #B85C00;
+  background: #0070E0;
   color: #ffffff;
 }
 
+/* ── Focus ring: Apple-style subtle blue glow ── */
 *:focus-visible {
-  outline: 1.5px solid #B85C00;
+  outline: 2px solid #0070E0;
   outline-offset: 2px;
-  border-radius: 3px;
+  border-radius: 4px;
 }
-
 @media (pointer: coarse) {
   *:focus-visible { outline: none; }
 }
 
+/* ── Scrollbar: thin, minimal ── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #CBD2D9; border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: #D2D2D7; border-radius: 2px; }
 
 @layer components {
+  /* Scroll hint gradient for overflow containers */
   .scroll-hint-x {
     background:
       linear-gradient(to right, white 30%, rgba(255,255,255,0)),
-      linear-gradient(to right, rgba(0,0,0,0.04), white 70%) 100% 0,
-      linear-gradient(to right, rgba(0,0,0,0.05), rgba(255,255,255,0));
+      linear-gradient(to right, rgba(0,0,0,0.03), white 70%) 100% 0,
+      linear-gradient(to right, rgba(0,0,0,0.04), rgba(255,255,255,0));
     background-repeat: no-repeat;
     background-size: 40px 100%, 40px 100%, 14px 100%;
     background-attachment: local, local, scroll;
   }
 }
 
+/* ── Form base ── */
 button, input, select, textarea { font: inherit; }
 
 @layer base {
-  input, select, textarea { @apply text-base; }
-  @media (min-width: 640px) { input, select, textarea { @apply text-sm; } }
-  button, a, [role="button"] { @apply cursor-pointer; }
+  input, select, textarea { font-size: 16px; }
+  @media (min-width: 640px) { input, select, textarea { font-size: 14px; } }
+  button, a, [role="button"] { cursor: pointer; }
   @media (pointer: coarse) {
-    button:active, a:active, [role="button"]:active { opacity: 0.65; }
+    button:active, a:active, [role="button"]:active { opacity: 0.6; }
   }
 }
 
