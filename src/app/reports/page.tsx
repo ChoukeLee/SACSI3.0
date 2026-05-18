@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { ReportsView } from "@/features/reports";
+import { DesktopOnly } from "@/features/mobile";
 import type { LedgerEntryRow, DailyBookingRow, UnitRow, LeaseContractRow, SaleContractRow, SalePaymentScheduleRow } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -40,16 +41,11 @@ export default async function ReportsPage() {
 
   return (
     <AppShell>
-      <PageHeader title={t.title} description={t.description} />
-      <ReportsView
-        entries={entries}
-        bookings={bookings}
-        units={units}
-        leaseContracts={leaseContracts}
-        saleContracts={saleContracts}
-        saleSchedules={saleSchedules}
-        locale="zh"
-      />
+      <DesktopOnly locale="zh" />
+      <div className="hidden lg:block">
+        <PageHeader title={t.title} description={t.description} />
+        <ReportsView entries={entries} bookings={bookings} units={units} leaseContracts={leaseContracts} saleContracts={saleContracts} saleSchedules={saleSchedules} locale="zh" />
+      </div>
     </AppShell>
   );
 }

@@ -4,7 +4,8 @@ import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { DailyCalendar } from "@/features/daily-rentals";
-import type { UnitRow, DailyBookingRow } from "@/types/database";
+import { MobileDailyCards } from "@/features/mobile";
+import type { UnitRow, DailyBookingRow, CustomerRow, PaymentRow } from "@/types/database";
 import type { CustomerSummary } from "@/features/daily-rentals/calendar";
 
 export const dynamic = "force-dynamic";
@@ -63,22 +64,38 @@ export default async function DailyRentalsPage() {
 
   return (
     <AppShell>
-      <PageHeader title={t.title} description={t.description} />
-      <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard title={t.metrics[0][0]} value={t.metrics[0][1]} caption={t.metrics[0][2]} />
-        <MetricCard title={t.metrics[1][0]} value={t.metrics[1][1]} caption={t.metrics[1][2]} accent="green" />
-        <MetricCard title={t.metrics[2][0]} value={t.metrics[2][1]} caption={t.metrics[2][2]} accent="ink" />
-      </div>
-      <section className="mt-8">
-        <DailyCalendar
+      {/* UX-REFACTOR: Mobile card view — lightweight field ops */}
+      <div className="lg:hidden">
+        <PageHeader title={t.title} description={t.description} />
+        <MobileDailyCards
           dailyUnits={dailyUnits}
           bookings={bookings}
-          customers={customers}
+          customers={customers as unknown as CustomerRow[]}
+          payments={payments as unknown as PaymentRow[]}
           cleaningTasks={cleaningTasks}
-          payments={payments}
           locale="zh"
         />
-      </section>
+      </div>
+
+      {/* Desktop calendar — full admin view */}
+      <div className="hidden lg:block">
+        <PageHeader title={t.title} description={t.description} />
+        <div className="grid gap-4 md:grid-cols-3">
+          <MetricCard title={t.metrics[0][0]} value={t.metrics[0][1]} caption={t.metrics[0][2]} />
+          <MetricCard title={t.metrics[1][0]} value={t.metrics[1][1]} caption={t.metrics[1][2]} accent="green" />
+          <MetricCard title={t.metrics[2][0]} value={t.metrics[2][1]} caption={t.metrics[2][2]} accent="ink" />
+        </div>
+        <section className="mt-8">
+          <DailyCalendar
+            dailyUnits={dailyUnits}
+            bookings={bookings}
+            customers={customers}
+            cleaningTasks={cleaningTasks}
+            payments={payments}
+            locale="zh"
+          />
+        </section>
+      </div>
     </AppShell>
   );
 }

@@ -618,6 +618,21 @@ export const dictionaries = {
         total: "合计",
         signature: "签字"
       }
+    },
+    mobile: {
+      today: "今日房态",
+      occupied: "占用中",
+      checkingOut: "今日退房",
+      cleaning: "待保洁",
+      needTopUp: "需补缴",
+      reminders: "重要提醒",
+      allClear: "今日无事，一切正常",
+      desktopOnly: "请在电脑端使用完整功能",
+      desktopOnlyHint: "手机端仅支持查阅和简单操作",
+      workbench: "工作台",
+      daily: "日租",
+      units: "房源",
+      profile: "我的"
     }
   },
   fr: {
@@ -1230,6 +1245,21 @@ export const dictionaries = {
         total: "Total",
         signature: "Signature"
       }
+    },
+    mobile: {
+      today: "Aujourd'hui",
+      occupied: "Occupé",
+      checkingOut: "Départ",
+      cleaning: "Ménage",
+      needTopUp: "À régler",
+      reminders: "Rappels",
+      allClear: "Rien à signaler",
+      desktopOnly: "Veuillez utiliser la version bureau",
+      desktopOnlyHint: "Mobile: consultation et actions simples",
+      workbench: "Accueil",
+      daily: "Jour",
+      units: "Lots",
+      profile: "Moi"
     }
   }
 } as const;

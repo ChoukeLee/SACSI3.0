@@ -150,30 +150,30 @@ export function AppShell({
         <main className="px-4 py-6 pb-20 sm:px-6 lg:pb-6 lg:px-8">{children}</main>
       </div>
 
-      {/* Mobile bottom navigation — UX-REFACTOR: safe-area padding, larger touch targets */}
+      {/* Mobile bottom navigation — UX-REFACTOR: 4-item core nav for field ops, safe-area */}
       <nav className="fixed inset-x-0 bottom-0 z-sticky border-t border-black/10 bg-white/95 backdrop-blur lg:hidden" aria-label="移动端导航" style={{ paddingBottom: "var(--safe-bottom)" }}>
-        <div className="flex items-center justify-around px-1 py-1">
+        <div className="flex items-center justify-around px-2 py-1">
           {[
-            { key: "dashboard", href: "/", icon: Home },
-            { key: "dailyRentals", href: "/daily-rentals", icon: CalendarDays },
-            { key: "dailyOccupancy", href: "/daily-rentals/overview", icon: BarChart3 },
-            { key: "finance", href: "/finance", icon: Banknote },
+            { key: "workbench", href: "/", icon: Home },
+            { key: "daily", href: "/daily-rentals", icon: CalendarDays },
             { key: "units", href: "/units", icon: Building2 },
+            { key: "profile", href: "/customers", icon: Users },
           ].map(item => {
             const Icon = item.icon;
             const active = isActive(item.href);
+            const mobileT = dictionaries[locale].mobile;
             return (
               <Link
                 key={item.key}
                 href={routeFor(locale, item.href)}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 min-h-[48px] min-w-[56px] px-1 text-[10px] font-medium transition-colors duration-fast rounded-lg",
+                  "flex flex-col items-center justify-center gap-0.5 min-h-[52px] min-w-[64px] px-1 text-[10px] font-semibold transition-colors duration-fast rounded-xl",
                   active ? "text-brand-orange-500 bg-brand-orange-50/50" : "text-brand-ink-400 active:bg-brand-ink-50"
                 )}
                 aria-current={active ? "page" : undefined}
               >
-                <Icon className="h-5 w-5" aria-hidden />
-                <span className="leading-none">{t.nav[item.key as keyof typeof t.nav]}</span>
+                <Icon className="h-6 w-6" aria-hidden />
+                <span className="leading-none">{mobileT[item.key as keyof typeof mobileT]}</span>
               </Link>
             );
           })}
