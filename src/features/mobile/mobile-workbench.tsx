@@ -112,7 +112,7 @@ export function MobileWorkbench({ dailyUnits, bookings, customers, payments, cle
       {/* Need top-up */}
       {todayData.needTopUp.length > 0 && (
         <div className={cn(cardClass, "border-amber-200 bg-amber-50/50")}>
-          <h2 className="text-sm font-bold text-amber-800 mb-3">⚠ {t.needTopUp} ({todayData.needTopUp.length})</h2>
+          <h2 className="text-sm font-semibold text-brand-ink-700 mb-3 flex items-center gap-1.5"><AlertTriangle className="h-4 w-4 text-brand-accent" />{t.needTopUp} ({todayData.needTopUp.length})</h2>
           {todayData.needTopUp.map((r, i) => (
             <div key={i} className="flex items-center justify-between text-sm">
               <span className="font-semibold">{r.unitNo} {r.customer}</span>

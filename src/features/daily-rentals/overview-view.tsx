@@ -274,7 +274,7 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-brand-ink-300">{t.shareTitle}</h3>
           <button onClick={handleCopy} className="rounded-md px-2 py-1 text-xs font-medium text-brand-orange-500 hover:bg-brand-orange-50 transition-colors duration-fast">
-            {copied ? "✓" : <Copy className="inline h-3 w-3" />} {t.copy}
+            {copied ? <Check className="inline h-3.5 w-3.5 text-brand-green" /> : <Copy className="inline h-3 w-3" />} {t.copy}
           </button>
         </div>
         <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-brand-ink-700">{buildShareText()}</pre>

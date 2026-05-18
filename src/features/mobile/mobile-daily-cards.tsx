@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Phone } from "lucide-react";
+import { Phone, Check } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
@@ -138,7 +138,7 @@ export function MobileDailyCards({ dailyUnits, bookings, customers, payments, cl
                     onClick={() => handleMarkCleaning(r.cleaningTask!.id)}
                     className="mt-2 w-full rounded-lg bg-sky-600 py-2 text-xs font-semibold text-white active:bg-sky-700 transition-colors duration-fast"
                   >
-                    ✓ {dr.cleaning.markComplete}
+                    <Check className="inline h-3.5 w-3.5 mr-1" />{dr.cleaning.markComplete}
                   </button>
                 )}
               </div>

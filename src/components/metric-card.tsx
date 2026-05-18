@@ -1,45 +1,22 @@
 import { cn } from "@/lib/utils";
 
-const accentClasses = {
-  orange: "border-l-brand-orange-500",
-  green: "border-l-brand-green-500",
-  ink: "border-l-brand-ink-500",
-};
-
-const accentBg = {
-  orange: "bg-brand-orange-50",
-  green: "bg-brand-green-50",
-  ink: "bg-brand-ink-50",
-};
-
+/* REFINED: minimal accent strip, generous padding, refined typography */
 export function MetricCard({
-  title,
-  value,
-  caption,
-  accent = "orange",
+  title, value, caption, accent = "accent",
 }: {
-  title: string;
-  value: string;
-  caption: string;
-  accent?: keyof typeof accentClasses;
+  title: string; value: string; caption: string;
+  accent?: "accent" | "green" | "ink" | "orange";
 }) {
+  const barColor: Record<string, string> = {
+    accent: "border-brand-accent", orange: "border-brand-accent",
+    green: "border-brand-green",
+    ink: "border-brand-ink-700",
+  };
   return (
-    <div
-      className={cn(
-        "group rounded-lg border border-black/10 border-l-[3px] bg-white p-4 shadow-card transition-shadow duration-normal hover:shadow-panel",
-        accentClasses[accent]
-      )}
-    >
-      <p className="text-xs font-medium tracking-wide text-brand-ink-500 uppercase">
-        {title}
-      </p>
-      <p className="mt-1.5 text-2xl font-bold tracking-tight text-brand-ink-900">
-        {value}
-      </p>
-      <div className="mt-2 flex items-center gap-1.5">
-        <span className={cn("h-1.5 w-1.5 rounded-full", accentBg[accent])} />
-        <p className="text-xs leading-relaxed text-brand-ink-500">{caption}</p>
-      </div>
+    <div className={cn("rounded-lg border border-brand-ink-100 bg-white px-5 py-4 shadow-soft border-l-[3px]", barColor[accent])}>
+      <p className="text-[11px] font-medium uppercase tracking-widen text-brand-ink-400">{title}</p>
+      <p className="mt-2 text-[28px] font-semibold tracking-tighten text-brand-ink-900">{value}</p>
+      <p className="mt-1.5 text-[13px] text-brand-ink-400">{caption}</p>
     </div>
   );
 }
