@@ -145,9 +145,39 @@ export function AppShell({
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+        {/* Page content — PERF: pb-16 reserves space for mobile bottom nav */}
+        <main className="px-4 py-6 pb-20 sm:px-6 lg:pb-6 lg:px-8">{children}</main>
       </div>
+
+      {/* Mobile bottom navigation — visible only on small screens */}
+      <nav className="fixed inset-x-0 bottom-0 z-sticky border-t border-black/10 bg-white/95 backdrop-blur lg:hidden" aria-label="移动端导航">
+        <div className="flex items-center justify-around px-2 py-1 safe-bottom">
+          {[
+            { key: "dashboard", href: "/", icon: Home },
+            { key: "dailyRentals", href: "/daily-rentals", icon: CalendarDays },
+            { key: "dailyOccupancy", href: "/daily-rentals/overview", icon: BarChart3 },
+            { key: "finance", href: "/finance", icon: Banknote },
+            { key: "units", href: "/units", icon: Building2 },
+          ].map(item => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.key}
+                href={routeFor(locale, item.href)}
+                className={cn(
+                  "flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-medium transition-colors duration-fast min-w-[48px]",
+                  active ? "text-brand-orange-500" : "text-brand-ink-400"
+                )}
+                aria-current={active ? "page" : undefined}
+              >
+                <Icon className="h-5 w-5" aria-hidden />
+                <span className="leading-none">{t.nav[item.key as keyof typeof t.nav]}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }
