@@ -1,0 +1,52 @@
+import { AppShell } from "@/components/app-shell";
+import { MetricCard } from "@/components/metric-card";
+import { PageHeader } from "@/components/page-header";
+import { dictionaries } from "@/lib/i18n";
+import { createClient } from "@/lib/supabase/server";
+import { SaleList } from "@/features/sales";
+import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow } from "@/types/database";
+
+export const dynamic = "force-dynamic";
+
+export default async function SalesPage() {
+  const t = dictionaries.zh.sales;
+  const supabase = await createClient();
+
+  const { data: building } = await supabase.from("buildings").select("id").eq("code", "SASCI11").single();
+  const buildingId = building?.id;
+
+  let contracts: SaleContractRow[] = [];
+  let schedules: SalePaymentScheduleRow[] = [];
+  let units: UnitRow[] = [];
+  let customers: CustomerRow[] = [];
+  let payments: PaymentRow[] = [];
+
+  if (buildingId) {
+    const [contractsRes, schedulesRes, unitsRes, customersRes, paymentsRes] = await Promise.all([
+      supabase.from("sale_contracts").select("*").order("signed_date", { ascending: false }).limit(200),
+      supabase.from("sale_payment_schedule").select("*").order("installment_no").limit(500),
+      supabase.from("units").select("*").eq("building_id", buildingId).order("unit_no"),
+      supabase.from("customers").select("*").order("name"),
+      supabase.from("payments").select("*").eq("source_type", "sale").order("payment_date", { ascending: false }).limit(500),
+    ]);
+    if (!contractsRes.error) contracts = contractsRes.data;
+    if (!schedulesRes.error) schedules = schedulesRes.data;
+    if (!unitsRes.error) units = unitsRes.data;
+    if (!customersRes.error) customers = customersRes.data;
+    if (!paymentsRes.error) payments = paymentsRes.data;
+  }
+
+  return (
+    <AppShell>
+      <PageHeader title={t.title} description={t.description} />
+      <div className="grid gap-4 md:grid-cols-3">
+        {t.metrics.map(([title, value, caption], i) => (
+          <MetricCard key={title} title={title} value={value} caption={caption} accent={i === 1 ? "green" : i === 2 ? "ink" : "orange"} />
+        ))}
+      </div>
+      <section className="mt-8">
+        <SaleList contracts={contracts} schedules={schedules} units={units} customers={customers} payments={payments} locale="zh" />
+      </section>
+    </AppShell>
+  );
+}

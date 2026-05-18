@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design tokens ── */
+:root {
+  color-scheme: light;
+  --color-bg: #f7f8f5;
+  --color-surface: #ffffff;
+  --color-border: #e2e8f0;
+  --color-text-primary: #1f2933;
+  --color-text-secondary: #64748b;
+  --color-text-muted: #94a3b8;
+  --color-accent: #E06F00;
+  --color-danger: #dc2626;
+  --color-success: #009E60;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --font-mono: "SF Mono", "Cascadia Code", "Consolas", monospace;
+}
+
+/* ── Base ── */
+body {
+  min-height: 100vh;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* ── Selection ── */
+::selection {
+  background: #E06F00;
+  color: #ffffff;
+}
+
+/* ── Focus ring: consistent global default ── */
+*:focus-visible {
+  outline: 2px solid #E06F00;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ── Form elements ── */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+/* Ensure minimum touch target for all interactive elements */
+@layer base {
+  button, a, [role="button"], select, input[type="checkbox"], input[type="radio"] {
+    @apply cursor-pointer;
+  }
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Print styles ── */
+@media print {
+  body { background: white; }
+  .no-print { display: none !important; }
+}

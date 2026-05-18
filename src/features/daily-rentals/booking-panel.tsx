@@ -1,0 +1,326 @@
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
+import { X, Check, UserX, Printer, DollarSign, Percent } from "lucide-react";
+import type { Locale } from "@/lib/i18n";
+import { dictionaries } from "@/lib/i18n";
+import { formatXof, cn } from "@/lib/utils";
+import { StatusBadge } from "@/components/status-badge";
+import type { UnitRow, DailyBookingRow } from "@/types/database";
+import type { CustomerSummary } from "./calendar";
+import { printDailyReceipt } from "@/features/print";
+import { calculateBilling } from "./billing";
+import {
+  createBooking, confirmBooking, checkIn, checkOut, completeCleaning, extendStay, cancelBooking,
+  recordSupplementaryPayment, applyDiscount,
+} from "./actions";
+
+interface BookingPanelProps {
+  booking: DailyBookingRow | null; unitId: string | null; defaultDate?: string;
+  units: UnitRow[]; customers: CustomerSummary[];
+  cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean; completed_at?: string | null }[];
+  payments: { id: string; source_id: string; amount: number; payment_date: string }[];
+  locale: Locale; onClose: () => void; onChanged: () => void;
+}
+
+export function BookingPanel({ booking, unitId, defaultDate, units, customers, cleaningTasks, payments, locale, onClose, onChanged }: BookingPanelProps) {
+  const t = dictionaries[locale].dailyRentals;
+  const isNew = !booking;
+
+  const [newCustomerId, setNewCustomerId] = useState("");
+  const [newCheckIn, setNewCheckIn] = useState(defaultDate ?? "");
+  const [newCheckOut, setNewCheckOut] = useState("");
+  /* UX-FIX: number inputs use string state so user can clear to empty, not forced to keep trailing digit.
+     Converted to number with parseInt/parseFloat only at submit time. */
+  const [newNightlyPrice, setNewNightlyPrice] = useState("40000");
+  const [newCheckoutMode, setNewCheckoutMode] = useState<"fixed" | "open">("fixed");
+  const [newNotes, setNewNotes] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const [prepaidAmount, setPrepaidAmount] = useState("");
+  const [suppAmount, setSuppAmount] = useState("");
+  const [finalAmount, setFinalAmount] = useState("");
+  const [actualCheckOut, setActualCheckOut] = useState(new Date().toISOString().slice(0, 10));
+  const [discountAmount, setDiscountAmount] = useState("");
+  const [discountReason, setDiscountReason] = useState("");
+  const [extendDays, setExtendDays] = useState("1");
+  const [actionError, setActionError] = useState("");
+
+  useEffect(() => {
+    if (defaultDate) { setNewCheckIn(defaultDate); const nextDay = new Date(defaultDate); nextDay.setDate(nextDay.getDate() + 1); setNewCheckOut(nextDay.toISOString().slice(0, 10)); }
+  }, [defaultDate]);
+
+  useEffect(() => {
+    if (booking) { setFinalAmount(String(booking.final_amount_xof ?? booking.total_amount_xof)); }
+  }, [booking]);
+
+  const selectedUnit = unitId ? units.find((u) => u.id === unitId) : null;
+  const bookingPayments = useMemo(() => payments.filter(p => p.source_id === booking?.id), [payments, booking]);
+  const totalPaid = bookingPayments.reduce((s, p) => s + Number(p.amount), 0);
+
+  const newNights = useMemo(() => {
+    if (!newCheckIn || !newCheckOut) return 0;
+    return Math.max(0, Math.ceil((new Date(newCheckOut).getTime() - new Date(newCheckIn).getTime()) / (1000 * 60 * 60 * 24)));
+  }, [newCheckIn, newCheckOut]);
+
+  const newTotal = newNights * (parseInt(newNightlyPrice, 10) || 0);
+  const bookingCustomer = booking ? customers.find((c) => c.id === booking.customer_id) : null;
+  const relatedCleaningTask = booking ? cleaningTasks.find((t) => t.daily_booking_id === booking.id) : null;
+  const billing = booking ? calculateBilling(booking) : null;
+
+  const toN = (s: string) => parseInt(s, 10) || 0;
+
+  const handleCreate = async () => {
+    if (!newCustomerId) { setError(t.booking.noCustomer); return; }
+    if (newCheckoutMode === "fixed" && newNights <= 0) { setError("Invalid date range."); return; }
+    setSaving(true); setError("");
+    const result = await createBooking({
+      unitId: unitId!, customerId: newCustomerId, checkIn: newCheckIn,
+      checkOut: newCheckoutMode === "fixed" ? newCheckOut : undefined,
+      checkoutMode: newCheckoutMode, nightlyPriceXof: toN(newNightlyPrice) || 40000,
+      notes: newNotes || undefined,
+    });
+    setSaving(false);
+    if (result.success) { onChanged(); onClose(); }
+    else setError(result.error ?? "Failed");
+  };
+
+  const handleCheckIn = async () => {
+    const prepay = toN(prepaidAmount);
+    // Open-ended can check in without prepay; fixed requires at least partial
+    if (booking?.checkout_mode !== "open" && prepay <= 0) { setActionError(t.booking.prepaidWarning); return; }
+    setSaving(true); const result = await checkIn(booking!.id, prepay);
+    setSaving(false); if (!result.success) setActionError(result.error ?? "Failed"); else { onChanged(); onClose(); }
+  };
+
+  const handleCheckOut = async () => {
+    setSaving(true);
+    const disc = toN(discountAmount);
+    const fin = toN(finalAmount);
+    const result = await checkOut(booking!.id, {
+      finalAmount: fin || undefined,
+      actualCheckOut: booking?.checkout_mode === "open" ? actualCheckOut : undefined,
+      discountAmount: disc || undefined,
+      discountReason: discountReason || undefined,
+    });
+    setSaving(false); if (!result.success) setActionError(result.error ?? "Failed"); else { onChanged(); onClose(); }
+  };
+
+  const handleSuppPayment = async () => {
+    const amt = toN(suppAmount);
+    if (amt <= 0) return;
+    setSaving(true); const result = await recordSupplementaryPayment({ bookingId: booking!.id, amount: amt });
+    setSaving(false); if (result.success) { onChanged(); setSuppAmount(""); } else setActionError(result.error ?? "Failed");
+  };
+
+  const handleDiscount = async () => {
+    const amt = toN(discountAmount);
+    if (amt <= 0) return;
+    setSaving(true); const result = await applyDiscount({ bookingId: booking!.id, amount: amt, reason: discountReason || "手动优惠" });
+    setSaving(false); if (result.success) { onChanged(); setDiscountAmount(""); setDiscountReason(""); } else setActionError(result.error ?? "Failed");
+  };
+
+  const handleExtend = async () => {
+    const days = toN(extendDays) || 1;
+    const extraAmount = Math.round(Number(booking!.nightly_price_xof) * days);
+    setSaving(true);
+    const result = await extendStay(booking!.id, booking!.check_out ?? "", days, extraAmount);
+    setSaving(false); if (!result.success) setActionError(result.error ?? "Failed"); else { onChanged(); onClose(); }
+  };
+
+  /* UX-FIX: unified design tokens for all form inputs — rounded-lg, brand-ink colors, consistent focus ring */
+  const inputClass = "w-full rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm text-brand-ink-900 transition-all duration-fast hover:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
+  const labelClass = "block text-[10px] font-semibold uppercase tracking-wider text-brand-ink-300 mb-1";
+  const btnClass = "inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-fast disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500";
+
+  return (
+    <>
+      <div className="fixed inset-0 z-overlay bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-black/10 bg-white shadow-panel" role="dialog" aria-label={isNew ? t.booking.newBooking : t.booking.title}>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-black/10 bg-white/95 px-5 py-4 backdrop-blur">
+          <div>
+            <h3 className="text-base font-bold text-brand-ink-900">{isNew ? t.booking.newBooking : t.booking.title}</h3>
+            {selectedUnit && <p className="text-sm text-brand-ink-500">{selectedUnit.unit_no} ({selectedUnit.floor_label})</p>}
+          </div>
+          <button onClick={onClose} className="rounded-lg p-2 text-brand-ink-300 hover:bg-brand-ink-50 hover:text-brand-ink-700 transition-colors duration-fast" aria-label={locale === "zh" ? "关闭" : "Fermer"}>
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-5 py-5">
+          {/* ── New Booking ── */}
+          {isNew && (<>
+            <div>
+              <label className={labelClass}>{t.booking.customer}</label>
+              <select value={newCustomerId} onChange={e => setNewCustomerId(e.target.value)} className={inputClass}>
+                <option value="">{t.booking.noCustomer}</option>
+                {customers.filter(c => !c.is_blacklisted).map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ""}</option>)}
+              </select>
+            </div>
+            {/* UX-FIX: mode toggle now uses i18n keys instead of hardcoded Chinese */}
+            <div>
+              <label className={labelClass}>{t.checkoutModeLabel}</label>
+              <div className="flex gap-2">
+                <button onClick={() => setNewCheckoutMode("fixed")} className={cn("flex-1 rounded-lg border px-3 py-2.5 text-xs font-medium transition-all duration-fast", newCheckoutMode === "fixed" ? "border-brand-orange-500 bg-brand-orange-50 text-brand-orange-600" : "border-black/10 bg-white text-brand-ink-500 hover:bg-brand-ink-50")}>{t.fixedCheckout}</button>
+                <button onClick={() => setNewCheckoutMode("open")} className={cn("flex-1 rounded-lg border px-3 py-2.5 text-xs font-medium transition-all duration-fast", newCheckoutMode === "open" ? "border-brand-orange-500 bg-brand-orange-50 text-brand-orange-600" : "border-black/10 bg-white text-brand-ink-500 hover:bg-brand-ink-50")}>{t.openCheckout}</button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className={labelClass}>{t.booking.checkInDate}</label><input type="date" value={newCheckIn} onChange={e => setNewCheckIn(e.target.value)} className={inputClass} /></div>
+              {newCheckoutMode === "fixed" && <div><label className={labelClass}>{t.booking.checkOutDate}</label><input type="date" value={newCheckOut} onChange={e => setNewCheckOut(e.target.value)} className={inputClass} /></div>}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className={labelClass}>{t.booking.nightlyPrice}</label><input type="number" value={newNightlyPrice} onChange={e => setNewNightlyPrice(e.target.value)} className={inputClass} /></div>
+              <div><label className={labelClass}>{t.booking.totalAmount}</label><p className="mt-2 text-lg font-bold text-brand-ink-900">{newCheckoutMode === "fixed" ? `${newNights} ${t.booking.nights} = ${formatXof(newTotal)}` : `${t.booking.nights}×${newNightlyPrice.toLocaleString()} ${locale === "zh" ? "起" : "min"}`}</p></div>
+            </div>
+            <div><label className={labelClass}>{t.booking.notes}</label><textarea value={newNotes} onChange={e => setNewNotes(e.target.value)} rows={2} className={inputClass} /></div>
+            {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+            <button onClick={handleCreate} disabled={saving} className="w-full rounded-lg bg-brand-orange-500 py-2.5 text-sm font-semibold text-white hover:bg-brand-orange-600 disabled:opacity-50 transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500">{saving ? "..." : t.booking.newBooking}</button>
+          </>)}
+
+          {/* ── Booking Detail ── */}
+          {booking && (<>
+            <div className="flex items-start justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 bg-amber-50 text-amber-700 ring-amber-200">{t.bookingStatus[booking.status as keyof typeof t.bookingStatus] ?? booking.status}</span>
+                {/* UX-FIX: open-ended badge uses amber (design system) instead of wild purple */}
+                <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", booking.checkout_mode === "open" ? "bg-amber-100 text-amber-700" : "bg-brand-ink-100 text-brand-ink-500")}>{booking.checkout_mode === "open" ? t.openEndedBadge : t.fixedBadge}</span>
+              </div>
+              <button onClick={() => printDailyReceipt({ booking, unit: selectedUnit ?? null, customer: null }, locale)} className="rounded-lg p-1.5 text-brand-ink-300 hover:bg-brand-ink-50 hover:text-brand-orange-500 transition-colors duration-fast" aria-label={dictionaries[locale].settings.print.print}>
+                <Printer className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="text-right text-sm"><p className="font-semibold text-brand-ink-900">{bookingCustomer?.name ?? booking.customer_id.slice(0, 8)}</p>{bookingCustomer?.phone && <p className="text-xs text-brand-ink-300">{bookingCustomer.phone}</p>}</div>
+
+            {/* UX-FIX: dates box uses i18n key for open mode label */}
+            <div className="grid grid-cols-2 gap-3 rounded-lg bg-brand-ink-50 p-3 text-sm">
+              <div><p className="text-[10px] text-brand-ink-300">{t.booking.checkInDate}</p><p className="font-semibold text-brand-ink-900">{booking.check_in}</p></div>
+              <div><p className="text-[10px] text-brand-ink-300">{booking.checkout_mode === "open" ? t.actualCheckOutDate : t.booking.checkOutDate}</p><p className="font-semibold text-brand-ink-900">{booking.checkout_mode === "open" ? (booking.actual_check_out ?? "—") : booking.check_out}</p></div>
+            </div>
+
+            {/* UX-FIX: billing summary now uses i18n keys for labels */}
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between"><span className="text-brand-ink-500">{t.booking.nightlyPrice}</span><span>{formatXof(Number(booking.nightly_price_xof))}</span></div>
+              {billing && (
+                <>
+                  <div className="flex justify-between"><span className="text-brand-ink-500">{t.booking.nights}</span><span>{billing.nights}{locale === "zh" ? "晚" : " nuits"}</span></div>
+                  <div className="flex justify-between"><span className="text-brand-ink-500">{t.billing.grossAmount}</span><span>{formatXof(billing.grossAmount)}</span></div>
+                  {billing.discount > 0 && <div className="flex justify-between text-emerald-600"><span>{t.billing.discount}</span><span>-{formatXof(billing.discount)}</span></div>}
+                  <div className="flex justify-between border-t border-black/10 pt-1 font-semibold"><span>{t.billing.finalAmount}</span><span>{formatXof(billing.finalAmount)}</span></div>
+                  <div className="flex justify-between"><span className="text-brand-ink-500">{t.billing.paid}</span><span>{formatXof(totalPaid)}</span></div>
+                  {billing.outstanding > 0 && <div className="flex justify-between text-red-600 font-semibold"><span>{t.billing.outstanding}</span><span>{formatXof(billing.outstanding)}</span></div>}
+                </>
+              )}
+            </div>
+
+            {/* UX-FIX: monthly discount hint now uses i18n with variable substitution */}
+            {billing?.eligibleForMonthlyDiscount && billing.outstanding > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+                <Percent className="inline h-3.5 w-3.5 mr-1" />
+                {t.monthlyDiscountHint.replace("{nights}", String(billing.nights)).replace("{gross}", formatXof(billing.grossAmount))}
+              </div>
+            )}
+
+            {booking.notes && <p className="text-xs text-brand-ink-400">{locale === "zh" ? "备注" : "Note"}: {booking.notes}</p>}
+
+            {/* Cleaning task */}
+            {relatedCleaningTask && (
+              <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-sky-700">{t.cleaning.title}: {relatedCleaningTask.is_completed ? t.cleaning.completed : t.cleaning.pending}</span>
+                  {!relatedCleaningTask.is_completed && (
+                    <button onClick={() => { setSaving(true); completeCleaning(relatedCleaningTask.id).then(() => { setSaving(false); onChanged(); onClose(); }); }} disabled={saving} className="rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50 transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-sky-600">
+                      <Check className="inline h-3 w-3 mr-1" />{t.cleaning.markComplete}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Actions by status */}
+            <div className="space-y-2">
+              {booking.status === "pending_review" && (
+                <div className="flex gap-2">
+                  <button onClick={() => { setSaving(true); confirmBooking(booking.id).then(r => { setSaving(false); if (r.success) { onChanged(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className={cn(btnClass, "flex-1 bg-blue-600 text-white hover:bg-blue-700")}>{t.booking.confirmBooking}</button>
+                  <button onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { onChanged(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className={cn(btnClass, "border border-red-300 bg-white text-red-600 hover:bg-red-50")}><UserX className="h-4 w-4" />{t.booking.cancelBooking}</button>
+                </div>
+              )}
+
+              {booking.status === "confirmed" && (
+                <div className="space-y-2">
+                  <div><label className={labelClass}>{t.booking.prepaidAmount} *</label><input type="number" value={prepaidAmount} onChange={e => setPrepaidAmount(e.target.value)} className={inputClass} /><p className="mt-0.5 text-xs text-brand-ink-300">{t.booking.prepaidWarning}</p></div>
+                  <div className="flex gap-2">
+                    <button onClick={handleCheckIn} disabled={saving} className={cn(btnClass, "flex-1 bg-brand-orange-500 text-white hover:bg-brand-orange-600")}>{t.booking.checkIn}</button>
+                    <button onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { onChanged(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className={cn(btnClass, "border border-red-300 bg-white text-red-600 hover:bg-red-50")}>{t.booking.cancelBooking}</button>
+                  </div>
+                </div>
+              )}
+
+              {booking.status === "checked_in" && (
+                <div className="space-y-3">
+                  {/* UX-FIX: supplementary payment section — i18n labels, consistent spacing */}
+                  <div className="rounded-lg border border-black/10 bg-brand-ink-50 p-3">
+                    <label className={labelClass}>{t.supplementaryPayment}</label>
+                    <div className="flex items-center gap-2">
+                      <input type="number" value={suppAmount} onChange={e => setSuppAmount(e.target.value)} className={inputClass} placeholder={t.booking.totalAmount} />
+                      <button onClick={handleSuppPayment} disabled={saving || (parseInt(suppAmount,10)||0) <= 0} className="shrink-0 rounded-lg bg-brand-orange-500 px-4 py-2.5 text-xs font-semibold text-white hover:bg-brand-orange-600 disabled:opacity-50 transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-brand-orange-500"><DollarSign className="inline h-3 w-3 mr-1" />{locale === "zh" ? "收款" : "Payer"}</button>
+                    </div>
+                    {bookingPayments.length > 0 && (
+                      <ul className="mt-2 space-y-0.5 text-xs text-brand-ink-500">
+                        {bookingPayments.map(p => <li key={p.id} className="flex justify-between">{p.payment_date} <span className="font-semibold">{formatXof(Number(p.amount))}</span></li>)}
+                      </ul>
+                    )}
+                  </div>
+
+                  {/* UX-FIX: discount section — i18n labels */}
+                  <div className="rounded-lg border border-dashed border-black/15 p-3">
+                    <label className={labelClass}>{t.discount}</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="number" value={discountAmount} onChange={e => setDiscountAmount(e.target.value)} className={inputClass} placeholder={t.discountAmount} />
+                      <input type="text" value={discountReason} onChange={e => setDiscountReason(e.target.value)} className={inputClass} placeholder={t.discountReason} />
+                    </div>
+                    <button onClick={handleDiscount} disabled={saving || (parseInt(discountAmount,10)||0) <= 0} className="mt-2 w-full rounded-lg border border-black/10 py-2 text-xs font-medium text-brand-ink-700 hover:bg-brand-ink-50 transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-brand-orange-500"><Percent className="inline h-3 w-3 mr-1" />{t.applyDiscount}</button>
+                  </div>
+
+                  {/* Extend stay (fixed mode only) */}
+                  {booking.checkout_mode === "fixed" && (
+                    <div className="rounded-lg border border-black/10 bg-brand-ink-50 p-3">
+                      <label className={labelClass}>{t.booking.extendStay}</label>
+                      <div className="flex items-center gap-2">
+                        <input type="number" min={1} value={extendDays} onChange={e => setExtendDays(e.target.value)} className="w-16 rounded-lg border border-black/10 px-2 py-2 text-sm transition-all duration-fast hover:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30" />
+                        <span className="text-xs text-brand-ink-500">{t.booking.nights} +{formatXof(Number(booking.nightly_price_xof) * (parseInt(extendDays,10)||1))}</span>
+                        <button onClick={handleExtend} disabled={saving} className="rounded-lg bg-brand-ink-100 px-3 py-2 text-xs font-medium text-brand-ink-700 hover:bg-brand-ink-200 disabled:opacity-50 transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-brand-orange-500">{t.booking.extendStay}</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Checkout */}
+                  <div>
+                    {/* UX-FIX: actual checkout date uses i18n key */}
+                    {booking.checkout_mode === "open" && (
+                      <div className="mb-2">
+                        <label className={labelClass}>{t.actualCheckOutDate}</label>
+                        <input type="date" value={actualCheckOut} onChange={e => setActualCheckOut(e.target.value)} className={inputClass} />
+                      </div>
+                    )}
+                    <label className={labelClass}>{t.booking.calculatedTotal}</label>
+                    <input type="number" value={finalAmount} onChange={e => setFinalAmount(e.target.value)} className={inputClass} />
+                  </div>
+                  {/* UX-FIX: green button now uses emerald brand tokens */}
+                  <button onClick={handleCheckOut} disabled={saving} className={cn(btnClass, "w-full bg-emerald-600 text-white hover:bg-emerald-700")}><Check className="h-4 w-4" />{t.booking.confirmCheckOut} — {formatXof(parseInt(finalAmount,10)||0)}</button>
+                </div>
+              )}
+
+              {booking.status === "checked_out" && (
+                <div className="rounded-lg bg-brand-ink-50 p-3 text-center text-sm text-brand-ink-500">{t.bookingStatus.checked_out}{relatedCleaningTask && !relatedCleaningTask.is_completed && <p className="mt-1 text-xs text-sky-600">{t.cleaning.pending}</p>}</div>
+              )}
+            </div>
+            {actionError && <p className="text-sm text-red-600" role="alert">{actionError}</p>}
+          </>)}
+        </div>
+      </div>
+    </>
+  );
+}

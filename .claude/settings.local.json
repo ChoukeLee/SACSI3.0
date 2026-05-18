@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl *)",
+      "Bash(grep -oP 'error[^<]{0,100}')",
+      "Bash(npm run *)"
+    ]
+  }
+}
