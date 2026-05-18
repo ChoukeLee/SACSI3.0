@@ -137,7 +137,8 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   return (
     <>
       <div className="fixed inset-0 z-overlay bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-black/10 bg-white shadow-panel" role="dialog" aria-label={isNew ? t.booking.newBooking : t.booking.title}>
+      {/* UX-REFACTOR: fullscreen on mobile (max-w-full), slide-over on desktop (max-w-md) */}
+      <div className="fixed inset-y-0 right-0 z-panel w-full max-w-full overflow-auto border-l border-black/10 bg-white shadow-panel lg:max-w-md" role="dialog" aria-label={isNew ? t.booking.newBooking : t.booking.title}>
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-black/10 bg-white/95 px-5 py-4 backdrop-blur">
           <div>
             <h3 className="text-base font-bold text-brand-ink-900">{isNew ? t.booking.newBooking : t.booking.title}</h3>

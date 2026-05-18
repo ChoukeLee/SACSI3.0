@@ -109,36 +109,36 @@ export function AppShell({
 
       {/* Main content */}
       <div className="lg:pl-60">
-        {/* Header */}
+        {/* Header — UX-REFACTOR: compact on mobile (h-12), normal on desktop */}
         <header className="sticky top-0 z-sticky border-b border-black/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
-          <div className="flex min-h-14 items-center justify-between px-4 sm:px-6 lg:px-8">
-            {/* Building indicator */}
+          <div className="flex h-12 items-center justify-between px-3 sm:px-6 lg:h-14 lg:px-8">
+            {/* Building indicator — UX-REFACTOR: abbreviated on mobile */}
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-ink-300">
+              <p className="hidden text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-ink-300 sm:block">
                 {t.currentBuilding}
               </p>
-              <p className="text-sm font-semibold leading-tight text-brand-ink-900">
-                SASCI11 / 11#
+              <p className="text-xs font-semibold leading-none text-brand-ink-900 sm:text-sm sm:leading-tight">
+                11#公寓
               </p>
             </div>
 
-            {/* Right section */}
-            <div className="flex items-center gap-2 text-sm text-brand-ink-500 sm:gap-3">
+            {/* Right section — UX-REFACTOR: compact on mobile */}
+            <div className="flex items-center gap-1.5 text-brand-ink-500 sm:gap-3">
               <NotificationBell notifications={notifications} locale={locale} />
 
-              {/* Language switcher */}
-              <span className="text-xs font-medium">{t.language}</span>
+              {/* Language switcher — icon-only on mobile */}
               <Link
-                className="rounded-md px-2 py-1 text-xs font-semibold text-brand-orange-500 transition-colors duration-fast hover:bg-brand-orange-50"
+                className="rounded-md px-1.5 py-1 text-xs font-semibold text-brand-orange-500 transition-colors duration-fast hover:bg-brand-orange-50 sm:px-2"
                 href={routeFor(otherLocale, "/")}
               >
-                {t.otherLanguage}
+                <span className="hidden sm:inline">{locale === "zh" ? "中文" : "Français"}</span>
+                <span className="sm:hidden">{otherLocale.toUpperCase()}</span>
+                <span className="ml-0.5 text-brand-ink-300">|</span>
+                <span className="ml-0.5">{locale === "zh" ? "FR" : "中"}</span>
               </Link>
 
-              <span className="h-5 w-px bg-black/10" aria-hidden />
-
-              {/* Role badge */}
-              <span className="inline-flex items-center rounded-full bg-brand-orange-50 px-2.5 py-1 text-xs font-semibold text-brand-orange-600">
+              {/* Role badge — hidden on smallest screens */}
+              <span className="hidden rounded-full bg-brand-orange-50 px-2 py-0.5 text-[10px] font-semibold text-brand-orange-600 sm:inline-flex sm:px-2.5 sm:text-xs">
                 {roleLabel}
               </span>
             </div>
@@ -149,9 +149,9 @@ export function AppShell({
         <main className="px-4 py-6 pb-20 sm:px-6 lg:pb-6 lg:px-8">{children}</main>
       </div>
 
-      {/* Mobile bottom navigation — visible only on small screens */}
-      <nav className="fixed inset-x-0 bottom-0 z-sticky border-t border-black/10 bg-white/95 backdrop-blur lg:hidden" aria-label="移动端导航">
-        <div className="flex items-center justify-around px-2 py-1 safe-bottom">
+      {/* Mobile bottom navigation — UX-REFACTOR: safe-area padding, larger touch targets */}
+      <nav className="fixed inset-x-0 bottom-0 z-sticky border-t border-black/10 bg-white/95 backdrop-blur lg:hidden" aria-label="移动端导航" style={{ paddingBottom: "var(--safe-bottom)" }}>
+        <div className="flex items-center justify-around px-1 py-1">
           {[
             { key: "dashboard", href: "/", icon: Home },
             { key: "dailyRentals", href: "/daily-rentals", icon: CalendarDays },
@@ -166,8 +166,8 @@ export function AppShell({
                 key={item.key}
                 href={routeFor(locale, item.href)}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-medium transition-colors duration-fast min-w-[48px]",
-                  active ? "text-brand-orange-500" : "text-brand-ink-400"
+                  "flex flex-col items-center justify-center gap-0.5 min-h-[48px] min-w-[56px] px-1 text-[10px] font-medium transition-colors duration-fast rounded-lg",
+                  active ? "text-brand-orange-500 bg-brand-orange-50/50" : "text-brand-ink-400 active:bg-brand-ink-50"
                 )}
                 aria-current={active ? "page" : undefined}
               >

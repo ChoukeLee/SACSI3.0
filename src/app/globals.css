@@ -18,11 +18,15 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --font-mono: "SF Mono", "Cascadia Code", "Consolas", monospace;
+  /* UX-REFACTOR: safe-area tokens for iPhone notch / home indicator */
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
 }
 
 /* ── Base ── */
 body {
   min-height: 100vh;
+  min-height: 100dvh; /* UX-FIX: dynamic viewport height for mobile browsers */
   background: var(--color-bg);
   color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
@@ -43,6 +47,13 @@ body {
   border-radius: 4px;
 }
 
+/* UX-REFACTOR: remove desktop focus rings on touch devices (they persist after tap) */
+@media (pointer: coarse) {
+  *:focus-visible {
+    outline: none;
+  }
+}
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar {
   width: 6px;
@@ -59,6 +70,19 @@ body {
   background: #94a3b8;
 }
 
+/* UX-REFACTOR: horizontal scroll indicator — gradient shadow on right edge of overflow containers */
+@layer components {
+  .scroll-hint-x {
+    background:
+      linear-gradient(to right, white 30%, rgba(255,255,255,0)),
+      linear-gradient(to right, rgba(0,0,0,0.06), white 70%) 100% 0,
+      linear-gradient(to right, rgba(0,0,0,0.08), rgba(255,255,255,0));
+    background-repeat: no-repeat;
+    background-size: 40px 100%, 40px 100%, 14px 100%;
+    background-attachment: local, local, scroll;
+  }
+}
+
 /* ── Form elements ── */
 button,
 input,
@@ -67,11 +91,33 @@ textarea {
   font: inherit;
 }
 
-/* Ensure minimum touch target for all interactive elements */
+/* UX-REFACTOR: prevent iOS zoom on input focus (16px minimum) */
 @layer base {
+  input, select, textarea {
+    @apply text-base;
+  }
+  @media (min-width: 640px) {
+    input, select, textarea {
+      @apply text-sm;
+    }
+  }
+
   button, a, [role="button"], select, input[type="checkbox"], input[type="radio"] {
     @apply cursor-pointer;
   }
+
+  /* UX-REFACTOR: global active state for touch devices */
+  @media (pointer: coarse) {
+    button:active, a:active, [role="button"]:active {
+      opacity: 0.7;
+    }
+  }
+}
+
+/* UX-REFACTOR: horizontal scrollable containers preserve vertical scroll */
+[data-scroll-x] {
+  touch-action: pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ── Reduced motion ── */

@@ -33,7 +33,7 @@ const BOOKING_COLORS: Record<string, string> = {
 const MAINTENANCE_STATUSES = new Set(["available", "reserved", "daily_occupied", "cleaning_pending"]);
 
 /* PERF: single shared empty cell class — avoids cn() call per empty cell */
-const EMPTY_CELL = "group flex h-10 cursor-pointer items-center justify-center border-b border-r border-black/5 transition-colors duration-fast hover:bg-brand-orange-50 focus-visible:bg-brand-orange-50 focus-visible:outline-none";
+const EMPTY_CELL = "group flex h-11 cursor-pointer items-center justify-center border-b border-r border-black/5 transition-colors duration-fast hover:bg-brand-orange-50 focus-visible:bg-brand-orange-50 focus-visible:outline-none";
 
 const NAV_BTN = "rounded-lg border border-black/10 bg-white p-2 text-brand-ink-500 transition-all duration-fast hover:bg-brand-ink-50 hover:text-brand-ink-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500";
 
@@ -132,8 +132,8 @@ export function DailyCalendar({ dailyUnits, bookings, customers, cleaningTasks, 
         </div>
       </div>
 
-      {/* Calendar grid */}
-      <div className="overflow-auto rounded-lg border border-black/10 bg-white shadow-card" style={{ maxHeight: "calc(100vh - 200px)" }}>
+      {/* Calendar grid — UX-REFACTOR: scroll-hint-x shows gradient on overflow, data-scroll-x preserves vertical scroll */}
+      <div className="overflow-auto rounded-lg border border-black/10 bg-white shadow-card scroll-hint-x" style={{ maxHeight: "calc(100vh - 200px)" }} data-scroll-x>
         <div className="grid" style={{ gridTemplateColumns: `64px repeat(${daysInMonth.length}, 64px)` }} role="grid" aria-label={t.calendar.room}>
           {/* Header row */}
           <div className="sticky left-0 top-0 z-30 flex h-8 items-center justify-center border-b border-r border-black/10 bg-brand-ink-100 text-[10px] font-semibold uppercase tracking-wider text-brand-ink-500" role="columnheader">{t.calendar.room}</div>
@@ -157,7 +157,7 @@ export function DailyCalendar({ dailyUnits, bookings, customers, cleaningTasks, 
           {/* Room rows */}
           {dailyUnits.map(unit => (
             <div key={unit.id} className="contents" role="row">
-              <div className="sticky left-0 z-10 flex h-10 items-center justify-center border-b border-r border-black/10 bg-brand-ink-50 text-xs font-semibold text-brand-ink-900" role="rowheader">{unit.unit_no}</div>
+              <div className="sticky left-0 z-10 flex h-11 items-center justify-center border-b border-r border-black/10 bg-brand-ink-50 text-xs font-semibold text-brand-ink-900" role="rowheader">{unit.unit_no}</div>
               {daysInMonth.map(date => {
                 const dateStr = date.toISOString().slice(0, 10);
                 /* PERF: O(1) Map lookup instead of O(n) array scan */
@@ -167,7 +167,7 @@ export function DailyCalendar({ dailyUnits, bookings, customers, cleaningTasks, 
                 const unitStatus = unitStatusMap.get(unit.id);
 
                 if (unitStatus) {
-                  return <div key={dateStr} className="flex h-10 items-center justify-center border-b border-r border-black/5 bg-red-50 text-[9px] font-medium text-red-600" title={statusLabels[unitStatus as UnitStatus]} role="gridcell">{statusLabels[unitStatus as UnitStatus].slice(0, 2)}</div>;
+                  return <div key={dateStr} className="flex h-11 items-center justify-center border-b border-r border-black/5 bg-red-50 text-[9px] font-medium text-red-600" title={statusLabels[unitStatus as UnitStatus]} role="gridcell">{statusLabels[unitStatus as UnitStatus].slice(0, 2)}</div>;
                 }
 
                 if (booking) {
@@ -182,7 +182,7 @@ export function DailyCalendar({ dailyUnits, bookings, customers, cleaningTasks, 
                   const abbr = abbrMap.get(booking.customer_id) ?? "?";
                   return (
                     <div key={dateStr}
-                      className={`flex h-10 items-center justify-center text-[10px] font-medium cursor-pointer border-b border-r border-black/5 ${colorClass} ${isStart ? "rounded-l" : ""} ${isEnd ? "rounded-r" : ""}`}
+                      className={`flex h-11 items-center justify-center text-[10px] font-medium cursor-pointer border-b border-r border-black/5 active:opacity-80 ${colorClass} ${isStart ? "rounded-l" : ""} ${isEnd ? "rounded-r" : ""}`}
                       onClick={() => { setSelectedBookingId(booking.id); setNewBookingUnitId(null); setNewBookingDate(null); }}
                       title={`${abbr} — ${booking.check_in} → ${booking.checkout_mode === "open" ? "?" : booking.check_out}`}
                       role="gridcell" tabIndex={0} aria-label={`${abbr} ${booking.check_in}`}
