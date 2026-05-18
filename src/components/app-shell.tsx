@@ -50,7 +50,8 @@ export function AppShell({
   const isActive = (href: string) => {
     const localized = routeFor(locale, href);
     if (href === "/") return pathname === "/" || pathname === "/fr";
-    return pathname === localized || pathname.startsWith(localized + "/");
+    /* UX-FIX: exact match only — prevents /daily-rentals matching /daily-rentals/overview */
+    return pathname === localized;
   };
 
   return (
