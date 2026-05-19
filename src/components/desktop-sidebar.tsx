@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Banknote, BarChart3, Building2, CalendarDays, FileSignature, Home, Settings, Users,
+  Banknote, BarChart3, Building2, CalendarDays, FileSignature, Home, LayoutDashboard, Settings, Users,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -19,6 +19,7 @@ const navItems = [
   { key: "sales", href: "/sales", icon: Building2 },
   { key: "customers", href: "/customers", icon: Users },
   { key: "finance", href: "/finance", icon: Banknote },
+  { key: "management", href: "/management", icon: LayoutDashboard },
   { key: "reports", href: "/reports", icon: BarChart3 },
   { key: "settings", href: "/settings", icon: Settings },
 ] as const;

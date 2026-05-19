@@ -32,6 +32,7 @@ const desktop: Record<Locale, DesktopNavLabels> = {
       finance: "财务",
       reports: "报表",
       settings: "设置",
+      management: "经营驾驶舱",
     },
   },
   fr: {
@@ -49,6 +50,7 @@ const desktop: Record<Locale, DesktopNavLabels> = {
       finance: "Finance",
       reports: "Rapports",
       settings: "Parametres",
+      management: "Direction",
     },
   },
 };

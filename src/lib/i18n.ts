@@ -45,7 +45,8 @@ export const dictionaries = {
         customers: "客户",
         finance: "财务",
         reports: "报表",
-        settings: "设置"
+        settings: "设置",
+        management: "经营驾驶舱"
       }
     },
     statuses: {
@@ -708,6 +709,44 @@ export const dictionaries = {
         noAvailable: "暂无空闲房间",
         noReserved: "暂无已预订房间",
       },
+    },
+    management: {
+      title: "经营驾驶舱",
+      description: "管理层视角：楼栋房源状态、财务概况与风险提醒。数据来自现有业务表，不做额外汇总存储。",
+      allBuildings: "全部楼栋",
+      sections: {
+        buildingStatus: "楼栋房源状态",
+        financeOverview: "本月财务概况",
+        riskAlerts: "风险提醒",
+        roomMatrix: "房态矩阵",
+      },
+      statuses: {
+        sold: "已售",
+        leased: "长租中",
+        dailyOccupied: "日租中",
+        reserved: "已预订",
+        cleaningPending: "待保洁",
+        maintenance: "维修/锁定",
+        available: "空闲",
+      },
+      finance: {
+        income: "本月收入",
+        expense: "本月支出",
+        net: "本月净额",
+        dailyRental: "日租收入",
+        leaseRent: "长租收入",
+        sale: "出售收入",
+        depositLiability: "押金/负债流入",
+      },
+      risks: {
+        cleaningPending: "待保洁房间",
+        maintenanceLocked: "维修/锁定房间",
+        leaseExpiring: "30天内到期长租",
+        saleInstallments: "未完成出售分期",
+        none: "暂无风险项",
+        rooms: "间",
+        contracts: "份合同",
+      },
     }
   },
   fr: {
@@ -747,7 +786,8 @@ export const dictionaries = {
         customers: "Clients",
         finance: "Finance",
         reports: "Rapports",
-        settings: "Parametres"
+        settings: "Parametres",
+        management: "Direction"
       }
     },
     statuses: {
@@ -1409,6 +1449,44 @@ export const dictionaries = {
         noRooms: "Aucune chambre disponible",
         noAvailable: "Aucune chambre disponible",
         noReserved: "Aucune chambre reservee",
+      },
+    },
+    management: {
+      title: "Tableau de direction",
+      description: "Vue direction : etat des lots par immeuble, resume financier et alertes. Donnees issues des tables metier existantes.",
+      allBuildings: "Tous les immeubles",
+      sections: {
+        buildingStatus: "Etat des lots",
+        financeOverview: "Resume financier du mois",
+        riskAlerts: "Alertes",
+        roomMatrix: "Matrice des lots",
+      },
+      statuses: {
+        sold: "Vendu",
+        leased: "Loue LT",
+        dailyOccupied: "Occupe jour",
+        reserved: "Reserve",
+        cleaningPending: "Menage",
+        maintenance: "Maintenance",
+        available: "Disponible",
+      },
+      finance: {
+        income: "Revenus du mois",
+        expense: "Depenses du mois",
+        net: "Net du mois",
+        dailyRental: "Location jour",
+        leaseRent: "Location longue",
+        sale: "Vente",
+        depositLiability: "Depot / Passif",
+      },
+      risks: {
+        cleaningPending: "Chambres a nettoyer",
+        maintenanceLocked: "Chambres en maintenance",
+        leaseExpiring: "Baux expirant sous 30 j",
+        saleInstallments: "Echeances de vente impayees",
+        none: "Aucune alerte",
+        rooms: "chambres",
+        contracts: "contrats",
       },
     }
   }
