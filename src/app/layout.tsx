@@ -24,9 +24,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {children}
         </AppShellWrapper>
         <script defer dangerouslySetInnerHTML={{ __html: `
-          if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+          if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(reg){reg.unregister()})});
-            window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js')});
           }
         `}} />
       </body>

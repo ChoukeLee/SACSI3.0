@@ -27,18 +27,9 @@ const navItems: { key: NavKey; href: string; icon: typeof Home }[] = [
   { key: "settings", href: "/settings", icon: Settings },
 ];
 
-/** Which nav keys each role can see. */
-const roleNav: Record<UserRole, NavKey[]> = {
-  admin:       navItems.map((item) => item.key),
-  boss:        ["dashboard","units","dailyRentals","dailyOccupancy","leases","sales","customers","management","reports"],
-  finance:     ["dashboard","units","dailyRentals","dailyOccupancy","leases","sales","customers","finance","management","reports"],
-  front_desk:  ["dashboard","units","dailyRentals","dailyOccupancy","leases","sales","customers"],
-};
-
 export function DesktopSidebar({ locale, userRole }: { locale: Locale; userRole?: UserRole }) {
   const pathname = usePathname();
   const labels = getDesktopNavLabels(locale);
-  const allowedKeys = userRole === "admin" ? navItems.map((item) => item.key) : userRole ? roleNav[userRole] : [];
 
   const isActive = (href: string) => {
     const localized = routeFor(locale, href);
@@ -46,7 +37,8 @@ export function DesktopSidebar({ locale, userRole }: { locale: Locale; userRole?
     return pathname === localized;
   };
 
-  const visibleItems = navItems.filter(item => allowedKeys.includes(item.key));
+  // Keep all desktop entry points visible. Page/server-action guards still enforce access.
+  const visibleItems = navItems;
 
   return (
     <aside className="fixed inset-y-0 left-0 z-sticky hidden w-56 bg-white border-r border-brand-warm-400 lg:flex lg:flex-col">
