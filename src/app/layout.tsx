@@ -3,6 +3,8 @@ import { AppShellWrapper } from "@/components/app-shell-wrapper";
 import { getCurrentUser } from "@/lib/auth";
 import "./globals.css";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "SACIS 3.0 | 科建地产房屋管理系统",
   description: "11#公寓首期业务管理系统",
