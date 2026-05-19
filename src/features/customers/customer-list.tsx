@@ -5,6 +5,7 @@ import { Search, Plus, AlertTriangle, UserX, UserCheck, GitMerge, X, ChevronDown
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import type { CustomerRow } from "@/types/database";
 import {
   createCustomer,
@@ -185,7 +186,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
         <div className="flex items-center gap-2">
           <button
             disabled
-            className="inline-flex items-center gap-1.5 rounded border border-brand-warm-400 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink-300"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-brand-warm-400 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink-300"
             title={t.actions.mergePlaceholder}
           >
             <GitMerge className="h-3.5 w-3.5" />
@@ -193,7 +194,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
           </button>
           <button
             onClick={openAdd}
-            className="inline-flex items-center gap-1.5 rounded bg-brand-orange px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-ink-700"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-[100ms] hover:bg-brand-ink-700 active:scale-[0.98]"
           >
             <Plus className="h-3.5 w-3.5" />
             {t.actions.add}
@@ -216,7 +217,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
           <p className="text-sm text-brand-ink-300">{t.empty}</p>
           <button
             onClick={openAdd}
-            className="inline-flex items-center gap-1.5 rounded bg-brand-orange px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-ink-700"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-[100ms] hover:bg-brand-ink-700 active:scale-[0.98]"
           >
             <Plus className="h-3.5 w-3.5" />
             {t.actions.add}
@@ -225,7 +226,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
       ) : (
         <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-card">
           <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="bg-brand-warm-50 text-xs uppercase tracking-wide text-brand-ink-400">
+            <thead className="border-b border-brand-warm-400 bg-brand-warm-50 text-[11px] font-semibold uppercase tracking-wider text-brand-ink-500">
               <tr>
                 <th className="px-4 py-3">{t.fields.name}</th>
                 <th className="px-4 py-3">{t.fields.phone}</th>
@@ -242,7 +243,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
                     "cursor-pointer transition",
                     c.is_blacklisted
                       ? "bg-brand-red-50/50 hover:bg-brand-red-50"
-                      : "hover:bg-brand-orange-50/50",
+                      : "hover:bg-brand-warm-100",
                     selectedId === c.id && "ring-1 ring-inset ring-brand-orange-500"
                   )}
                   onClick={() => {
@@ -300,8 +301,8 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
       {/* Add/Edit Form Panel */}
       {isFormOpen && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setFormMode(null)} />
-          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
+          <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setFormMode(null)} />
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-400 bg-white px-5 py-4">
               <h3 className="text-lg font-bold text-brand-ink-900">
                 {formMode.type === "add" ? t.actions.add : t.actions.edit}
@@ -403,7 +404,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="inline-flex items-center gap-1.5 rounded bg-brand-orange px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-ink-700 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded bg-brand-ink-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-ink-700 disabled:opacity-50"
                 >
                   {saving ? "..." : t.actions.save}
                 </button>
@@ -505,8 +506,8 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
       {/* Blacklist form panel */}
       {isBlacklistOpen && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setBlacklistPanelId(null)} />
-          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-sm overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
+          <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setBlacklistPanelId(null)} />
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-sm overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-400 bg-white px-5 py-4">
               <h3 className="text-lg font-bold text-brand-ink-900">{t.blacklist.add}</h3>
               <button

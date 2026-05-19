@@ -24,38 +24,17 @@ export function MobileStatsBar({
   onTabChange,
   locale,
 }: MobileStatsBarProps) {
-  const t = dictionaries[locale].mobile.stats;
   const tabs = dictionaries[locale].mobile.tabs;
 
-  const items: { key: RoomDisplayStatus; count: number; label: string; colorClass: string }[] = [
-    {
-      key: "occupied",
-      count: occupiedCount,
-      label: tabs.occupied,
-      colorClass: "text-brand-orange",
-    },
-    {
-      key: "checking_out_today",
-      count: checkingOutCount,
-      label: tabs.checkingOut,
-      colorClass: "text-brand-amber-600",
-    },
-    {
-      key: "cleaning",
-      count: cleaningCount,
-      label: tabs.cleaning,
-      colorClass: "text-brand-sky-600",
-    },
-    {
-      key: "available",
-      count: availableCount,
-      label: tabs.all,
-      colorClass: "text-brand-green-600",
-    },
+  const items: { key: RoomDisplayStatus; count: number; label: string; accentClass: string }[] = [
+    { key: "occupied", count: occupiedCount, label: tabs.occupied, accentClass: "text-brand-orange" },
+    { key: "checking_out_today", count: checkingOutCount, label: tabs.checkingOut, accentClass: "text-brand-amber-600" },
+    { key: "cleaning", count: cleaningCount, label: tabs.cleaning, accentClass: "text-brand-sky-600" },
+    { key: "available", count: availableCount, label: tabs.all, accentClass: "text-brand-green-600" },
   ];
 
   return (
-    <div className="grid grid-cols-4 gap-2">
+    <div className="grid grid-cols-4 gap-1.5">
       {items.map((item) => {
         const isActive = activeTab === item.key;
         return (
@@ -64,26 +43,24 @@ export function MobileStatsBar({
             type="button"
             onClick={() => onTabChange(item.key)}
             className={cn(
-              "flex flex-col items-center justify-center rounded-xl px-2 py-2.5 text-center transition-colors duration-fast",
+              "flex flex-col items-center justify-center rounded-xl px-1.5 py-2.5 text-center select-none",
+              "transition-colors duration-[100ms]",
+              "active:scale-95",
               isActive
                 ? "bg-white border border-brand-warm-400 shadow-card"
-                : "bg-transparent border border-transparent active:bg-brand-warm-100",
+                : "border border-transparent active:bg-brand-warm-100"
             )}
           >
-            <span
-              className={cn(
-                "text-lg font-bold leading-none",
-                isActive ? item.colorClass : "text-brand-ink-500",
-              )}
-            >
+            <span className={cn(
+              "text-lg font-bold leading-none tabular-nums",
+              isActive ? item.accentClass : "text-brand-ink-600"
+            )}>
               {item.count}
             </span>
-            <span
-              className={cn(
-                "text-[10px] font-medium mt-0.5",
-                isActive ? "text-brand-ink-600" : "text-brand-ink-400",
-              )}
-            >
+            <span className={cn(
+              "text-[10px] font-medium mt-0.5 leading-tight",
+              isActive ? "text-brand-ink-600" : "text-brand-ink-400"
+            )}>
               {item.label}
             </span>
           </button>

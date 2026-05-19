@@ -5,6 +5,7 @@ import { Plus, X, DollarSign, FileText, CalendarPlus, TrendingUp } from "lucide-
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow } from "@/types/database";
 import {
   createSaleContract,
@@ -156,16 +157,12 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
   const inputClass = "w-full rounded border border-brand-warm-400 bg-white px-3 py-2 text-sm text-brand-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
   const labelClass = "block text-xs font-semibold uppercase tracking-wide text-brand-ink-400 mb-1";
 
-  const statusColor: Record<string, string> = {
-    draft: "bg-brand-warm-200 text-brand-ink-500", active: "bg-brand-green-100 text-brand-green-700",
-    terminated: "bg-brand-red-100 text-brand-red-700", expired: "bg-brand-amber-100 text-brand-amber-700",
+  const statusVariant: Record<string, "neutral" | "success" | "danger" | "warning"> = {
+    draft: "neutral", active: "success", terminated: "danger", expired: "warning",
   };
 
-  const schedStatusColor: Record<string, string> = {
-    pending: "bg-brand-warm-200 text-brand-ink-500",
-    paid: "bg-brand-green-100 text-brand-green-700",
-    overdue: "bg-brand-red-100 text-brand-red-700",
-    cancelled: "bg-brand-warm-50 text-brand-ink-300",
+  const schedStatusVariant: Record<string, "neutral" | "success" | "danger" | "default"> = {
+    pending: "neutral", paid: "success", overdue: "danger", cancelled: "default",
   };
 
   return (
@@ -174,12 +171,12 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           {["all", "active", "terminated"].map((s) => (
-            <button key={s} onClick={() => setStatusFilter(s)} className={cn("rounded px-3 py-1 text-xs font-medium transition", statusFilter === s ? "bg-brand-ink-900 text-white" : "border border-brand-warm-400 bg-white text-brand-ink-500 hover:bg-brand-warm-50")}>
+            <button key={s} onClick={() => setStatusFilter(s)} className={cn("rounded-lg px-3 py-1 text-xs font-medium transition-colors duration-[100ms]", statusFilter === s ? "bg-brand-ink-900 text-white" : "border border-brand-warm-400 bg-white text-brand-ink-500 hover:bg-brand-warm-100")}>
               {s === "all" ? (locale === "fr" ? "Tous" : "全部") : t.contractStatus[s as keyof typeof t.contractStatus]}
             </button>
           ))}
         </div>
-        <button onClick={() => { resetNewForm(); setPanel("new"); }} className="inline-flex items-center gap-1.5 rounded bg-brand-orange px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-ink-700">
+        <button onClick={() => { resetNewForm(); setPanel("new"); }} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-[100ms] hover:bg-brand-ink-700 active:scale-[0.98]">
           <Plus className="h-3.5 w-3.5" />{t.form.newContract}
         </button>
       </div>
@@ -192,7 +189,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
       ) : (
         <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-card">
           <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="bg-brand-warm-50 text-xs uppercase tracking-wide text-brand-ink-400">
+            <thead className="border-b border-brand-warm-400 bg-brand-warm-50 text-[11px] font-semibold uppercase tracking-wider text-brand-ink-500">
               <tr>
                 <th className="px-4 py-3">{t.form.contractNo}</th>
                 <th className="px-4 py-3">{t.form.unit}</th>
@@ -201,7 +198,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
                 <th className="px-4 py-3">{t.form.totalAmount}</th>
                 <th className="px-4 py-3">{t.form.paymentPlan}</th>
                 <th className="px-4 py-3">{t.installment.progress}</th>
-                <th className="px-4 py-3">状态</th>
+                <th className="px-4 py-3">{t.form.statusLabel}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-warm-400">
@@ -214,7 +211,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
                   ? Math.round((paidSchedules.length / cSchedules.length) * 100)
                   : 0;
                 return (
-                  <tr key={c.id} className="cursor-pointer transition hover:bg-brand-orange-50/50" onClick={() => { setSelectedId(c.id); setPanel("detail"); setError(""); }}>
+                  <tr key={c.id} className="cursor-pointer transition hover:bg-brand-warm-100" onClick={() => { setSelectedId(c.id); setPanel("detail"); setError(""); }}>
                     <td className="px-4 py-3 font-semibold text-brand-ink-900">{c.contract_no}</td>
                     <td className="px-4 py-3 text-brand-ink-500">{unit?.unit_no ?? "-"}</td>
                     <td className="px-4 py-3 text-brand-ink-500">{cust?.name ?? "-"}</td>
@@ -230,7 +227,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={cn("inline-flex rounded px-2 py-0.5 text-xs font-semibold", statusColor[c.status])}>{t.contractStatus[c.status as keyof typeof t.contractStatus]}</span>
+                      <Badge variant={statusVariant[c.status]}>{t.contractStatus[c.status as keyof typeof t.contractStatus]}</Badge>
                     </td>
                   </tr>
                 );
@@ -243,8 +240,8 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
       {/* ── New Contract Panel ── */}
       {panel === "new" && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setPanel(null)} />
-          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
+          <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setPanel(null)} />
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-400 bg-white px-5 py-4">
               <h3 className="text-lg font-bold text-brand-ink-900">{t.form.newContract}</h3>
               <button onClick={() => setPanel(null)} className="rounded p-1 text-brand-ink-300 hover:bg-brand-warm-100"><X className="h-5 w-5" /></button>
@@ -277,7 +274,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
                 <label className="flex items-center gap-2 text-sm pt-5"><input type="checkbox" checked={fCommissionPaid} onChange={(e) => setFCommissionPaid(e.target.checked)} className="h-4 w-4 rounded border-brand-warm-400" />{t.form.agencyCommissionPaid}</label>
               </div>
               {error && <p className="text-sm text-brand-red-600">{error}</p>}
-              <button onClick={handleCreate} disabled={saving} className="w-full rounded bg-brand-orange py-2.5 text-sm font-semibold text-white hover:bg-brand-ink-700 disabled:opacity-50">{saving ? "..." : t.form.newContract}</button>
+              <button onClick={handleCreate} disabled={saving} className="w-full rounded bg-brand-ink-900 py-2.5 text-sm font-semibold text-white hover:bg-brand-ink-700 disabled:opacity-50">{saving ? "..." : t.form.newContract}</button>
             </div>
           </div>
         </>
@@ -286,12 +283,12 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
       {/* ── Detail Panel ── */}
       {panel === "detail" && selected && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setPanel(null)} />
-          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
+          <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setPanel(null)} />
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-400 bg-white px-5 py-4">
               <div>
                 <h3 className="text-lg font-bold text-brand-ink-900">{selected.contract_no}</h3>
-                <span className={cn("inline-flex rounded px-2 py-0.5 text-xs font-semibold", statusColor[selected.status])}>{t.contractStatus[selected.status as keyof typeof t.contractStatus]}</span>
+                <Badge variant={statusVariant[selected.status]}>{t.contractStatus[selected.status as keyof typeof t.contractStatus]}</Badge>
               </div>
               <button onClick={() => setPanel(null)} className="rounded p-1 text-brand-ink-300 hover:bg-brand-warm-100"><X className="h-5 w-5" /></button>
             </div>
@@ -331,9 +328,9 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
                         <span className="font-medium text-brand-ink-600">#{s.installment_no}</span>
                         <span className="text-brand-ink-400">{s.due_date}</span>
                         <span className="font-semibold">{formatXof(Number(s.amount_xof))}</span>
-                        <span className={cn("inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold", schedStatusColor[s.status])}>
+                        <Badge variant={schedStatusVariant[s.status]} size="sm">
                           {t.installment[s.status as keyof typeof t.installment] ?? s.status}
-                        </span>
+                        </Badge>
                       </li>
                     ))}
                   </ul>
@@ -354,7 +351,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
                       <div><label className="text-xs text-brand-ink-400">{t.payment.paymentDate}</label><input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className={inputClass} /></div>
                     </div>
                     <div><label className="text-xs text-brand-ink-400">{t.payment.receiptNo}</label><input type="text" value={payReceiptNo} onChange={(e) => setPayReceiptNo(e.target.value)} className={inputClass} /></div>
-                    <button onClick={handleRecordPayment} disabled={saving} className="w-full rounded bg-brand-orange py-1.5 text-xs font-semibold text-white hover:bg-brand-ink-700 disabled:opacity-50"><DollarSign className="mr-1 inline h-3 w-3" />{t.payment.record}</button>
+                    <button onClick={handleRecordPayment} disabled={saving} className="w-full rounded bg-brand-ink-900 py-1.5 text-xs font-semibold text-white hover:bg-brand-ink-700 disabled:opacity-50"><DollarSign className="mr-1 inline h-3 w-3" />{t.payment.record}</button>
                   </div>
                 )}
 
@@ -366,7 +363,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
                       <div><label className="text-xs text-brand-ink-400">{t.installment.dueDate}</label><input type="date" value={flexDueDate} onChange={(e) => setFlexDueDate(e.target.value)} className={inputClass} /></div>
                       <div><label className="text-xs text-brand-ink-400">{t.installment.amount}</label><input type="number" value={flexAmount} onChange={(e) => setFlexAmount(Number(e.target.value))} className={inputClass} /></div>
                     </div>
-                    <button onClick={handleAddFlexInstallment} disabled={saving} className="w-full rounded border border-brand-warm-400 py-1 text-xs font-medium text-brand-ink-600 hover:bg-brand-warm-50 disabled:opacity-50">添加</button>
+                    <button onClick={handleAddFlexInstallment} disabled={saving} className="w-full rounded-lg border border-brand-warm-400 py-1.5 text-xs font-medium text-brand-ink-600 hover:bg-brand-warm-100 disabled:opacity-50 transition-colors duration-[100ms]">{t.form.addSchedule}</button>
                   </div>
                 )}
               </div>
@@ -388,7 +385,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
                       <div><label className="text-xs text-brand-ink-400">{t.form.transferDate}</label><input type="date" value={trDate} onChange={(e) => setTrDate(e.target.value)} className={inputClass} /></div>
                       <div><label className="text-xs text-brand-ink-400">{t.form.titleCertificateNo}</label><input type="text" value={trCertNo} onChange={(e) => setTrCertNo(e.target.value)} className={inputClass} /></div>
                     </div>
-                    <button onClick={handleTransferUpdate} disabled={saving} className="w-full rounded border border-brand-warm-400 py-1.5 text-xs font-medium text-brand-ink-600 hover:bg-brand-warm-50 disabled:opacity-50">{saving ? "..." : "更新过户状态"}</button>
+                    <button onClick={handleTransferUpdate} disabled={saving} className="w-full rounded-lg border border-brand-warm-400 py-1.5 text-xs font-medium text-brand-ink-600 hover:bg-brand-warm-100 disabled:opacity-50 transition-colors duration-[100ms]">{saving ? "..." : t.form.updateTransfer}</button>
                   </div>
                 </div>
               )}

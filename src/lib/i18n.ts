@@ -298,7 +298,11 @@ export const dictionaries = {
         noUnit: "请选择房源",
         noCustomer: "请选择客户",
         unitOccupied: "该房源已有生效中的长租合同",
-        contractNoRequired: "请输入合同编号"
+        contractNoRequired: "请输入合同编号",
+        statusLabel: "状态",
+        depositPaid: "✓已收",
+        depositUnpaid: "未收",
+        activateContract: "激活合同",
       },
       payment: {
         title: "租金收款",
@@ -375,7 +379,10 @@ export const dictionaries = {
         notes: "备注",
         noUnit: "请选择可售房源",
         noCustomer: "请选择客户",
-        contractNoRequired: "请输入合同编号"
+        contractNoRequired: "请输入合同编号",
+        statusLabel: "状态",
+        addSchedule: "添加",
+        updateTransfer: "更新过户状态",
       },
       installment: {
         title: "分期付款计划",
@@ -992,7 +999,11 @@ export const dictionaries = {
         noUnit: "Choisir un logement",
         noCustomer: "Choisir un client",
         unitOccupied: "Ce logement a deja un contrat de location actif",
-        contractNoRequired: "Le numero de contrat est obligatoire"
+        contractNoRequired: "Le numero de contrat est obligatoire",
+        statusLabel: "Statut",
+        depositPaid: "✓Recu",
+        depositUnpaid: "Non recu",
+        activateContract: "Activer le contrat",
       },
       payment: {
         title: "Encaissement loyer",
@@ -1069,7 +1080,10 @@ export const dictionaries = {
         notes: "Remarques",
         noUnit: "Choisir un lot disponible",
         noCustomer: "Choisir un client",
-        contractNoRequired: "Le numero de contrat est obligatoire"
+        contractNoRequired: "Le numero de contrat est obligatoire",
+        statusLabel: "Statut",
+        addSchedule: "Ajouter",
+        updateTransfer: "MAJ transfert",
       },
       installment: {
         title: "Echeancier de paiement",

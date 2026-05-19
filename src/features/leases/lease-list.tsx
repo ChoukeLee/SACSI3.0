@@ -5,6 +5,7 @@ import { Plus, X, AlertTriangle, FileText, DollarSign, LogOut, Printer } from "l
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
 import { printLeaseContract } from "@/features/print";
@@ -213,11 +214,11 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
     "w-full rounded border border-brand-warm-400 bg-white px-3 py-2 text-sm text-brand-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
   const labelClass = "block text-xs font-semibold uppercase tracking-wide text-brand-ink-400 mb-1";
 
-  const statusColor: Record<string, string> = {
-    draft: "bg-brand-warm-200 text-brand-ink-500",
-    active: "bg-brand-green-100 text-brand-green-700",
-    terminated: "bg-brand-red-100 text-brand-red-700",
-    expired: "bg-brand-amber-100 text-brand-amber-700",
+  const statusVariant: Record<string, "neutral" | "success" | "danger" | "warning"> = {
+    draft: "neutral",
+    active: "success",
+    terminated: "danger",
+    expired: "warning",
   };
 
   return (
@@ -230,10 +231,10 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
               key={s}
               onClick={() => setStatusFilter(s)}
               className={cn(
-                "rounded px-3 py-1 text-xs font-medium transition",
+                "rounded-lg px-3 py-1 text-xs font-medium transition-colors duration-[100ms]",
                 statusFilter === s
                   ? "bg-brand-ink-900 text-white"
-                  : "border border-brand-warm-400 bg-white text-brand-ink-500 hover:bg-brand-warm-50"
+                  : "border border-brand-warm-400 bg-white text-brand-ink-500 hover:bg-brand-warm-100"
               )}
             >
               {s === "all" ? (locale === "fr" ? "Tous" : "全部") : t.contractStatus[s as keyof typeof t.contractStatus]}
@@ -242,7 +243,7 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
         </div>
         <button
           onClick={openNew}
-          className="inline-flex items-center gap-1.5 rounded bg-brand-orange px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-ink-700"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-[100ms] hover:bg-brand-ink-700 active:scale-[0.98]"
         >
           <Plus className="h-3.5 w-3.5" />
           {t.form.newContract}
@@ -257,7 +258,7 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
       ) : (
         <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-card">
           <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="bg-brand-warm-50 text-xs uppercase tracking-wide text-brand-ink-400">
+            <thead className="border-b border-brand-warm-400 bg-brand-warm-50 text-[11px] font-semibold uppercase tracking-wider text-brand-ink-500">
               <tr>
                 <th className="px-4 py-3">{t.form.contractNo}</th>
                 <th className="px-4 py-3">{t.form.unit}</th>
@@ -265,7 +266,7 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
                 <th className="px-4 py-3">{t.form.startDate}</th>
                 <th className="px-4 py-3">{t.form.expectedEndDate}</th>
                 <th className="px-4 py-3">{t.form.monthlyRent}</th>
-                <th className="px-4 py-3">状态</th>
+                <th className="px-4 py-3">{t.form.statusLabel}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-warm-400">
@@ -275,7 +276,7 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
                 return (
                   <tr
                     key={c.id}
-                    className="cursor-pointer transition hover:bg-brand-orange-50/50"
+                    className="cursor-pointer transition hover:bg-brand-warm-100"
                     onClick={() => openDetail(c.id)}
                   >
                     <td className="px-4 py-3 font-semibold text-brand-ink-900">{c.contract_no}</td>
@@ -285,9 +286,9 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
                     <td className="px-4 py-3 text-brand-ink-500">{c.expected_end_date}</td>
                     <td className="px-4 py-3 text-brand-ink-500">{formatXof(Number(c.monthly_rent_xof))}</td>
                     <td className="px-4 py-3">
-                      <span className={cn("inline-flex rounded px-2 py-0.5 text-xs font-semibold", statusColor[c.status])}>
+                      <Badge variant={statusVariant[c.status]}>
                         {t.contractStatus[c.status as keyof typeof t.contractStatus]}
-                      </span>
+                      </Badge>
                     </td>
                   </tr>
                 );
@@ -303,8 +304,8 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
       {/* ── New Contract Panel ── */}
       {panel === "new" && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setPanel(null)} />
-          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
+          <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setPanel(null)} />
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-400 bg-white px-5 py-4">
               <h3 className="text-lg font-bold text-brand-ink-900">{t.form.newContract}</h3>
               <button onClick={() => setPanel(null)} className="rounded p-1 text-brand-ink-300 hover:bg-brand-warm-100"><X className="h-5 w-5" /></button>
@@ -349,14 +350,14 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
               </label>
               <div><label className={labelClass}>{t.form.signerName}</label><input type="text" value={fSigner} onChange={(e) => setFSigner(e.target.value)} className={inputClass} /></div>
               <div>
-                <label className={labelClass}>状态</label>
+                <label className={labelClass}>{t.form.statusLabel}</label>
                 <select value={fStatus} onChange={(e) => setFStatus(e.target.value as ContractStatus)} className={inputClass}>
                   <option value="draft">{t.contractStatus.draft}</option>
                   <option value="active">{t.contractStatus.active}</option>
                 </select>
               </div>
               {error && <p className="text-sm text-brand-red-600">{error}</p>}
-              <button onClick={handleCreate} disabled={saving} className="w-full rounded bg-brand-orange py-2.5 text-sm font-semibold text-white hover:bg-brand-ink-700 disabled:opacity-50">{saving ? "..." : t.form.newContract}</button>
+              <button onClick={handleCreate} disabled={saving} className="w-full rounded bg-brand-ink-900 py-2.5 text-sm font-semibold text-white hover:bg-brand-ink-700 disabled:opacity-50">{saving ? "..." : t.form.newContract}</button>
             </div>
           </div>
         </>
@@ -365,12 +366,12 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
       {/* ── Detail Panel ── */}
       {panel === "detail" && selected && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setPanel(null)} />
-          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
+          <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setPanel(null)} />
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-400 bg-white px-5 py-4">
               <div>
                 <h3 className="text-lg font-bold text-brand-ink-900">{selected.contract_no}</h3>
-                <span className={cn("inline-flex rounded px-2 py-0.5 text-xs font-semibold", statusColor[selected.status])}>{t.contractStatus[selected.status as keyof typeof t.contractStatus]}</span>
+                <Badge variant={statusVariant[selected.status]}>{t.contractStatus[selected.status as keyof typeof t.contractStatus]}</Badge>
               </div>
               <div className="flex items-center gap-1">
                 <button
@@ -393,14 +394,14 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
                 {selected.actual_end_date && <div><dt className="text-xs text-brand-ink-300">{t.form.actualEndDate}</dt><dd>{selected.actual_end_date}</dd></div>}
                 <div><dt className="text-xs text-brand-ink-300">{t.form.paymentCycle}</dt><dd>{t.paymentCycle[selected.payment_cycle as keyof typeof t.paymentCycle]} / {selected.payment_day}号</dd></div>
                 <div><dt className="text-xs text-brand-ink-300">{t.form.monthlyRent}</dt><dd className="font-semibold">{formatXof(Number(selected.monthly_rent_xof))}</dd></div>
-                <div><dt className="text-xs text-brand-ink-300">{t.form.deposit}</dt><dd>{formatXof(Number(selected.deposit_amount_xof))} {selected.deposit_received ? "✓已收" : "未收"}</dd></div>
+                <div><dt className="text-xs text-brand-ink-300">{t.form.deposit}</dt><dd>{formatXof(Number(selected.deposit_amount_xof))} {selected.deposit_received ? t.form.depositPaid : t.form.depositUnpaid}</dd></div>
                 {selected.rent_free_days > 0 && <div><dt className="text-xs text-brand-ink-300">{t.form.rentFreeDays}</dt><dd>{selected.rent_free_days}天</dd></div>}
                 {selected.signer_name && <div><dt className="text-xs text-brand-ink-300">{t.form.signerName}</dt><dd>{selected.signer_name}</dd></div>}
               </dl>
 
               {/* Actions */}
               {selected.status === "draft" && (
-                <button onClick={() => handleActivate(selected.id)} disabled={saving} className="w-full rounded bg-brand-green-500 py-2 text-sm font-semibold text-white hover:bg-brand-green-600 disabled:opacity-50">{saving ? "..." : "激活合同"}</button>
+                <button onClick={() => handleActivate(selected.id)} disabled={saving} className="w-full rounded bg-brand-green-500 py-2 text-sm font-semibold text-white hover:bg-brand-green-600 disabled:opacity-50">{saving ? "..." : t.form.activateContract}</button>
               )}
               {selected.status === "active" && (
                 <div className="flex gap-2">
@@ -439,7 +440,7 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
                       <div><label className="text-xs text-brand-ink-400">{t.payment.receiptNo}</label><input type="text" value={payReceiptNo} onChange={(e) => setPayReceiptNo(e.target.value)} className={inputClass} /></div>
                       <div><label className="text-xs text-brand-ink-400">{t.payment.coveringMonths}</label><input type="number" min={1} value={payMonths} onChange={(e) => setPayMonths(Number(e.target.value))} className={inputClass} /></div>
                     </div>
-                    <button onClick={handleRecordPayment} disabled={saving} className="w-full rounded bg-brand-orange py-1.5 text-xs font-semibold text-white hover:bg-brand-ink-700 disabled:opacity-50"><DollarSign className="mr-1 inline h-3 w-3" />{t.payment.record}</button>
+                    <button onClick={handleRecordPayment} disabled={saving} className="w-full rounded bg-brand-ink-900 py-1.5 text-xs font-semibold text-white hover:bg-brand-ink-700 disabled:opacity-50"><DollarSign className="mr-1 inline h-3 w-3" />{t.payment.record}</button>
                   </div>
                 )}
               </div>
@@ -453,8 +454,8 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
       {/* ── Move-out Settlement Panel ── */}
       {panel === "moveout" && selected && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setPanel(null)} />
-          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
+          <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setPanel(null)} />
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-400 bg-white px-5 py-4">
               <h3 className="text-lg font-bold text-brand-ink-900">{t.settlement.title}</h3>
               <button onClick={() => setPanel(null)} className="rounded p-1 text-brand-ink-300 hover:bg-brand-warm-100"><X className="h-5 w-5" /></button>

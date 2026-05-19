@@ -57,7 +57,7 @@ body {
   @media (min-width: 640px) { input, select, textarea { font-size: 14px; } }
   button, a, [role="button"] { cursor: pointer; }
   @media (pointer: coarse) {
-    button:active, a:active, [role="button"]:active { opacity: 0.6; }
+    button:active, a:active, [role="button"]:active { opacity: 0.8; }
   }
 }
 

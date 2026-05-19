@@ -32,11 +32,7 @@ function displayStatusToUnitStatus(status: RoomState["displayStatus"]): UnitStat
 }
 
 export function MobileRoomCard({
-  room,
-  locale,
-  onPress,
-  onCheckOut,
-  onCompleteCleaning,
+  room, locale, onPress, onCheckOut, onCompleteCleaning,
 }: MobileRoomCardProps) {
   const t = dictionaries[locale].mobile;
   const unitStatus = displayStatusToUnitStatus(room.displayStatus);
@@ -44,24 +40,28 @@ export function MobileRoomCard({
   const isCheckingOut = room.displayStatus === "checking_out_today";
   const isOccupied = room.displayStatus === "occupied" || isCheckingOut;
   const isCleaning = room.displayStatus === "cleaning";
+  const hasOutstanding = room.billing && room.billing.outstanding > 0;
 
   return (
     <button
       type="button"
       onClick={() => onPress(room)}
       className={cn(
-        "w-full rounded-xl border bg-white p-3.5 shadow-card text-left transition-colors duration-fast active:bg-brand-warm-50",
+        "w-full rounded-xl border bg-white p-3.5 shadow-card text-left",
+        "transition-colors duration-[100ms] active:bg-brand-warm-50",
         isCheckingOut
-          ? "border-brand-amber-200 bg-brand-amber-50/50"
+          ? "border-amber-200 bg-amber-50/40"
           : isCleaning
-            ? "border-brand-sky-200 bg-brand-sky-50/50"
-            : "border-brand-warm-400",
+            ? "border-sky-200 bg-sky-50/40"
+            : hasOutstanding
+              ? "border-red-200 bg-red-50/30"
+              : "border-brand-warm-400"
       )}
     >
-      <div className="flex items-start justify-between">
-        {/* Room number — visual center */}
-        <div className="flex items-baseline gap-2">
-          <span className="font-mono text-xl font-bold leading-none text-brand-ink-900">
+      {/* Top row: room number + status + chevron */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="font-mono text-xl font-bold leading-none text-brand-ink-900 tabular-nums">
             {room.unit.unit_no}
           </span>
           <StatusBadge status={unitStatus} locale={locale} />
@@ -69,12 +69,12 @@ export function MobileRoomCard({
         <ArrowRight className="h-4 w-4 text-brand-ink-300 shrink-0 mt-0.5" />
       </div>
 
-      {/* Secondary info row */}
+      {/* Guest & stay info */}
       {(room.customer || room.booking) && (
-        <div className="mt-2 flex items-center justify-between">
-          <div className="min-w-0">
+        <div className="mt-2.5 flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
             {room.customer && (
-              <p className="text-xs font-medium text-brand-ink-700 truncate">
+              <p className="text-[13px] font-semibold text-brand-ink-800 truncate">
                 {room.customer.name}
               </p>
             )}
@@ -97,47 +97,50 @@ export function MobileRoomCard({
         </div>
       )}
 
-      {/* Billing alert — only when outstanding > 0 */}
-      {room.billing && room.billing.outstanding > 0 && (
-        <div className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-brand-red-600">
-          <CreditCard className="h-3 w-3" />
+      {/* Outstanding balance alert */}
+      {hasOutstanding && (
+        <div className="mt-2.5 flex items-center gap-1.5 rounded-md bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-brand-red-600">
+          <CreditCard className="h-3.5 w-3.5 shrink-0" />
           <span>
-            {locale === "zh" ? "欠费 " : "Dû "}{formatXof(room.billing.outstanding)}
+            {locale === "zh" ? "欠费 " : "Dû "}{formatXof(room.billing!.outstanding)}
           </span>
         </div>
       )}
 
-      {/* Cleaning room: no billing info needed */}
+      {/* Cleaning pending note */}
       {isCleaning && (
-        <div className="mt-2 text-[11px] text-brand-ink-400">
-          {locale === "zh" ? "退房后等待保洁" : "En attente de ménage"}
+        <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-brand-ink-400">
+          <span className="h-1.5 w-1.5 rounded-full bg-brand-sky-400" />
+          {locale === "zh" ? "退房后等待保洁" : "En attente de menage"}
         </div>
       )}
 
       {/* Quick action buttons */}
-      <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
-        {isOccupied && onCheckOut && (
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => onCheckOut(room)}
-            className="flex-1 justify-center text-xs min-h-[36px]"
-          >
-            {t.roomCard.checkOut}
-          </Button>
-        )}
-        {isCleaning && onCompleteCleaning && room.cleaningTask && (
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => onCompleteCleaning(room)}
-            className="flex-1 justify-center text-xs min-h-[36px]"
-          >
-            <Check className="inline h-3.5 w-3.5 mr-1" />
-            {t.roomCard.cleaningDone}
-          </Button>
-        )}
-      </div>
+      {(isOccupied || isCleaning) && (
+        <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
+          {isOccupied && onCheckOut && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => onCheckOut(room)}
+              className="flex-1 justify-center min-h-[38px]"
+            >
+              {t.roomCard.checkOut}
+            </Button>
+          )}
+          {isCleaning && onCompleteCleaning && room.cleaningTask && (
+            <Button
+              variant="accent"
+              size="sm"
+              onClick={() => onCompleteCleaning(room)}
+              className="flex-1 justify-center min-h-[38px]"
+            >
+              <Check className="h-3.5 w-3.5" />
+              {t.roomCard.cleaningDone}
+            </Button>
+          )}
+        </div>
+      )}
     </button>
   );
 }
