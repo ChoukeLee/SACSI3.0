@@ -15,6 +15,7 @@ type NavKey = "dashboard" | "units" | "dailyRentals" | "dailyOccupancy" | "lease
 
 const navItems: { key: NavKey; href: string; icon: typeof Home }[] = [
   { key: "dashboard", href: "/", icon: Home },
+  { key: "management", href: "/management", icon: LayoutDashboard },
   { key: "units", href: "/units", icon: Building2 },
   { key: "dailyRentals", href: "/daily-rentals", icon: CalendarDays },
   { key: "dailyOccupancy", href: "/daily-rentals/overview", icon: BarChart3 },
@@ -22,14 +23,13 @@ const navItems: { key: NavKey; href: string; icon: typeof Home }[] = [
   { key: "sales", href: "/sales", icon: Building2 },
   { key: "customers", href: "/customers", icon: Users },
   { key: "finance", href: "/finance", icon: Banknote },
-  { key: "management", href: "/management", icon: LayoutDashboard },
   { key: "reports", href: "/reports", icon: BarChart3 },
   { key: "settings", href: "/settings", icon: Settings },
 ];
 
 /** Which nav keys each role can see. */
 const roleNav: Record<UserRole, NavKey[]> = {
-  admin:       ["dashboard","units","dailyRentals","dailyOccupancy","leases","sales","customers","finance","management","reports","settings"],
+  admin:       navItems.map((item) => item.key),
   boss:        ["dashboard","units","dailyRentals","dailyOccupancy","leases","sales","customers","management","reports"],
   finance:     ["dashboard","units","dailyRentals","dailyOccupancy","leases","sales","customers","finance","management","reports"],
   front_desk:  ["dashboard","units","dailyRentals","dailyOccupancy","leases","sales","customers"],
@@ -38,7 +38,7 @@ const roleNav: Record<UserRole, NavKey[]> = {
 export function DesktopSidebar({ locale, userRole }: { locale: Locale; userRole?: UserRole }) {
   const pathname = usePathname();
   const labels = getDesktopNavLabels(locale);
-  const allowedKeys = userRole ? roleNav[userRole] : [];
+  const allowedKeys = userRole === "admin" ? navItems.map((item) => item.key) : userRole ? roleNav[userRole] : [];
 
   const isActive = (href: string) => {
     const localized = routeFor(locale, href);
