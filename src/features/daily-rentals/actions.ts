@@ -44,7 +44,7 @@ export async function checkConflicts(
     for (const b of overlapping) {
       const bCheckOut = b.checkout_mode === "open" ? "9999-12-31" : (b.check_out ?? b.check_in);
       if (checkIn < bCheckOut) {
-        return { hasConflict: true, reason: "doubleBooked" };
+        return { hasConflict: true, reason: `doubleBooked: ${b.check_in} → ${b.checkout_mode === "open" ? "?" : (b.check_out ?? "?")}` };
       }
     }
   }

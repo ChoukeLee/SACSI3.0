@@ -21,8 +21,8 @@ interface CalendarProps {
 }
 
 const BOOKING_COLORS: Record<string, string> = {
-  pending_review: "bg-brand-amber-100 text-brand-amber-700",
-  confirmed: "bg-brand-sky-100 text-brand-sky-700",
+  pending_review: "bg-amber-200 text-amber-900",
+  confirmed: "bg-sky-200 text-sky-900",
   checked_in_fixed: "bg-brand-orange-200 text-brand-orange-800",
   checked_in_open: "bg-brand-amber-200 text-brand-amber-800",
   checked_out: "bg-brand-warm-100 text-brand-ink-500",
