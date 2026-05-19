@@ -9,6 +9,18 @@ export interface CurrentUser {
   displayName: string;
 }
 
+const seedAccountProfiles: Record<string, { role: UserRole; displayName: string }> = {
+  "admin@sacis.com": { role: "admin", displayName: "管理员" },
+  "boss@sacis.com": { role: "boss", displayName: "王老板" },
+  "finance@sacis.com": { role: "finance", displayName: "李财务" },
+  "front@sacis.com": { role: "front_desk", displayName: "小张前台" },
+};
+
+export function getSeedAccountProfile(email: string | undefined) {
+  if (!email) return null;
+  return seedAccountProfiles[email.toLowerCase()] ?? null;
+}
+
 // ── Permission matrix ──
 
 const rolePermissions: Record<UserRole, string[]> = {
@@ -72,8 +84,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   return {
     id: user.id,
     email: user.email,
-    role: (profile?.role as UserRole) ?? "front_desk",
-    displayName: profile?.display_name ?? user.email ?? "User",
+    role: (profile?.role as UserRole) ?? getSeedAccountProfile(user.email)?.role ?? "front_desk",
+    displayName: profile?.display_name ?? getSeedAccountProfile(user.email)?.displayName ?? user.email ?? "User",
   };
 }
 
