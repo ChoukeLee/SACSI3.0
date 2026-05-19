@@ -45,7 +45,7 @@ export function AppShell({
               </Link>
               {roleLabel && (
                 <span className="hidden rounded-full bg-brand-orange-50 px-2.5 py-0.5 text-[10px] font-semibold text-brand-orange-600 ring-1 ring-inset ring-brand-orange-200/50 sm:inline-flex">
-                  {roleLabel}
+                  {userDisplayName ? `${roleLabel} · ${userDisplayName}` : roleLabel}
                 </span>
               )}
               {userRole && (
