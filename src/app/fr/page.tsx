@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AppShell } from "@/components/app-shell";
+
 import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { dictionaries, routeFor } from "@/lib/i18n";
@@ -8,8 +8,9 @@ export default function FrenchDashboardPage() {
   const t = dictionaries.fr.dashboard;
 
   return (
-    <AppShell locale="fr">
-      <PageHeader title={t.title} description={t.description} />
+      <>
+
+<><PageHeader title={t.title} description={t.description} />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard title={t.metrics.mainUnits[0]} value={t.metrics.mainUnits[1]} caption={t.metrics.mainUnits[2]} />
         <MetricCard title={t.metrics.dailyUnits[0]} value={t.metrics.dailyUnits[1]} caption={t.metrics.dailyUnits[2]} accent="green" />
@@ -36,6 +37,7 @@ export default function FrenchDashboardPage() {
           </Link>
         ))}
       </section>
-    </AppShell>
-  );
+
+      </>
+</>);
 }

@@ -1,4 +1,4 @@
-import { AppShell } from "@/components/app-shell";
+
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -19,9 +19,11 @@ export default async function FrenchCustomersPage() {
   if (error) console.error("Failed to fetch customers:", error);
 
   return (
-    <AppShell locale="fr">
-      <PageHeader title={t.title} description={t.description} />
+      <>
+
+<><PageHeader title={t.title} description={t.description} />
       <CustomerList customers={(customers as CustomerRow[]) ?? []} locale="fr" />
-    </AppShell>
-  );
+
+      </>
+</>);
 }

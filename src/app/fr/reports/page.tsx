@@ -1,4 +1,4 @@
-import { AppShell } from "@/components/app-shell";
+
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -39,8 +39,9 @@ export default async function FrenchReportsPage() {
   }
 
   return (
-    <AppShell locale="fr">
-      <PageHeader title={t.title} description={t.description} />
+      <>
+
+<><PageHeader title={t.title} description={t.description} />
       <ReportsView
         entries={entries}
         bookings={bookings}
@@ -50,6 +51,7 @@ export default async function FrenchReportsPage() {
         saleSchedules={saleSchedules}
         locale="fr"
       />
-    </AppShell>
-  );
+
+      </>
+</>);
 }

@@ -1,4 +1,4 @@
-import { AppShell } from "@/components/app-shell";
+
 import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
@@ -60,8 +60,9 @@ export default async function FrenchDailyRentalsPage() {
   }
 
   return (
-    <AppShell locale="fr">
-      <PageHeader title={t.title} description={t.description} />
+      <>
+
+<><PageHeader title={t.title} description={t.description} />
       <div className="grid gap-4 md:grid-cols-3">
         {t.metrics.map(([title, value, caption], index) => (
           <MetricCard
@@ -83,6 +84,7 @@ export default async function FrenchDailyRentalsPage() {
           locale="fr"
         />
       </section>
-    </AppShell>
-  );
+
+      </>
+</>);
 }

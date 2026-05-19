@@ -1,4 +1,4 @@
-import { AppShell } from "@/components/app-shell";
+
 import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
@@ -37,8 +37,9 @@ export default async function SalesPage() {
   }
 
   return (
-    <AppShell>
-      <PageHeader title={t.title} description={t.description} />
+      <>
+
+<><PageHeader title={t.title} description={t.description} />
       <div className="grid gap-4 md:grid-cols-3">
         {t.metrics.map(([title, value, caption], i) => (
           <MetricCard key={title} title={title} value={value} caption={caption} accent={i === 1 ? "green" : i === 2 ? "ink" : "orange"} />
@@ -47,6 +48,7 @@ export default async function SalesPage() {
       <section className="mt-8">
         <SaleList contracts={contracts} schedules={schedules} units={units} customers={customers} payments={payments} locale="zh" />
       </section>
-    </AppShell>
-  );
+
+      </>
+</>);
 }

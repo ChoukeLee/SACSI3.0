@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { AppShell } from "@/components/app-shell";
 import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { moduleCards } from "@/features/seed/initial-data";
@@ -11,12 +10,10 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-
   const [notifRes, buildingRes] = await Promise.all([
     supabase.from("notifications").select("id, title, body, read_at, created_at, due_at").order("created_at", { ascending: false }).limit(30),
     supabase.from("buildings").select("id").eq("code", "SASCI11").single(),
   ]);
-
   const buildingId = buildingRes.data?.id;
   const notifications = (notifRes.data ?? []) as { id: string; title: string; body: string; read_at: string | null; created_at: string; due_at: string | null }[];
 
@@ -45,15 +42,12 @@ export default async function DashboardPage() {
   }
 
   return (
-    <AppShell notifications={notifications}>
-      {/* UX-REFACTOR: Mobile workbench — lightweight field ops view */}
+    <>
       <div className="lg:hidden">
         <MobileWorkbench dailyUnits={dailyUnits} bookings={bookings} customers={customers} payments={payments} cleaningTasks={cleaningTasks} notifications={notifications} locale="zh" />
       </div>
-
-      {/* Desktop dashboard — full admin view */}
       <div className="hidden lg:block">
-        <PageHeader title="11#公寓运营仪表盘" description="首期只启用 11#公寓，但所有数据结构保留多楼栋扩展字段。这里先承载日租、长租、出售三条业务线的总览入口。" />
+        <PageHeader title="11#公寓运营仪表盘" description="首期只启用 11#公寓，但所有数据结构保留多楼栋扩展字段。" />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard title="主楼房源" value="72户" caption="1-12F，每层 101-106" />
           <MetricCard title="日租房源" value="21间" caption="固定房间，统一 40,000 XOF/晚" accent="green" />
@@ -71,6 +65,6 @@ export default async function DashboardPage() {
           ))}
         </section>
       </div>
-    </AppShell>
+    </>
   );
 }

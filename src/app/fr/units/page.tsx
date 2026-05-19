@@ -1,4 +1,4 @@
-import { AppShell } from "@/components/app-shell";
+
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -73,14 +73,16 @@ export default async function FrenchUnitsPage() {
   }
 
   return (
-    <AppShell locale="fr">
-      <PageHeader title={t.title} description={t.description} />
+      <>
+
+<><PageHeader title={t.title} description={t.description} />
       <UnitList
         units={units}
         businessFlagsMap={businessFlagsMap}
         auditLogsMap={auditLogsMap}
         locale="fr"
       />
-    </AppShell>
-  );
+
+      </>
+</>);
 }
