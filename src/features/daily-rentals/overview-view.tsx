@@ -113,23 +113,7 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
     const occupied = roomRows.filter(r => r.booking);
     if (occupied.length > 0) {
       text += `\n${locale === "zh" ? "占用" : "Occupé"}: ${occupied.length}\n`;
-      for (const r of occupied) {
-        const abbr = r.customer?.name?.slice(0, 6) ?? "?";
-        const b = r.billing;
-        text += `${r.unit.unit_no} ${abbr}`;
-        text += `, ${locale === "zh" ? "入住" : "Arrivée"} ${r.booking?.check_in}`;
-        if (r.booking?.checkout_mode === "fixed" && r.booking?.check_out) {
-          text += `, ${locale === "zh" ? "预计退房" : "Départ prévu"} ${r.booking.check_out}`;
-        } else {
-          text += `, ${locale === "zh" ? "未定离店" : "Départ ouvert"}`;
-        }
-        if (b) {
-          text += `, ${locale === "zh" ? "已住" : "Nuits"} ${b.nights}`;
-          text += `, ${locale === "zh" ? "已收" : "Payé"} ${b.paid.toLocaleString()}`;
-          if (b.outstanding > 0) text += `, ${locale === "zh" ? "待补" : "Dû"} ${b.outstanding.toLocaleString()}`;
-        }
-        text += "\n";
-      }
+      text += `${occupied.map(r => r.unit.unit_no).join(", ")}\n`;
     }
 
     const checkingOut = roomRows.filter(r => r.booking?.checkout_mode === "fixed" && r.booking?.check_out === selectedDate);
