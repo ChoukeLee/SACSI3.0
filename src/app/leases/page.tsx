@@ -6,7 +6,7 @@ import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { LeaseList } from "@/features/leases";
 import { DesktopOnly } from "@/features/mobile";
-import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow } from "@/types/database";
+import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
@@ -25,18 +25,21 @@ export default async function LeasesPage() {
   let units: UnitRow[] = [];
   let customers: CustomerRow[] = [];
   let payments: PaymentRow[] = [];
+  let receivables: ReceivableRow[] = [];
 
   if (buildingId) {
-    const [contractsRes, unitsRes, customersRes, paymentsRes] = await Promise.all([
+    const [contractsRes, unitsRes, customersRes, paymentsRes, receivablesRes] = await Promise.all([
       supabase.from("lease_contracts").select("*").order("start_date", { ascending: false }).limit(200),
       supabase.from("units").select("*").eq("building_id", buildingId).order("unit_no"),
       supabase.from("customers").select("*").order("name"),
       supabase.from("payments").select("*").in("source_type", ["lease_rent", "lease_deposit"]).order("payment_date", { ascending: false }).limit(500),
+      supabase.from("receivables").select("*").in("source_type", ["lease_contract"]).order("due_date", { ascending: false }).limit(1000),
     ]);
     if (!contractsRes.error) contracts = contractsRes.data;
     if (!unitsRes.error) units = unitsRes.data;
     if (!customersRes.error) customers = customersRes.data;
     if (!paymentsRes.error) payments = paymentsRes.data;
+    if (!receivablesRes.error) receivables = receivablesRes.data;
   }
 
   return (
@@ -52,7 +55,7 @@ export default async function LeasesPage() {
           ))}
         </div>
         <section className="mt-8">
-          <LeaseList contracts={contracts} units={units} customers={customers} payments={payments} locale="zh" />
+          <LeaseList contracts={contracts} units={units} customers={customers} payments={payments} receivables={receivables} locale="zh" />
         </section>
       </div>
     </>

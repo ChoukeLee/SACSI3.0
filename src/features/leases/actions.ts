@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth, requireRole } from "@/lib/auth";
-import type { LeaseContractRow } from "@/types/database";
+import { computeStatus } from "@/lib/repositories/receivable-repo";
+import type { LeaseContractRow, ReceivableRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
 import {
-  createReceivable, syncReceivablesForSource, cancelReceivablesForSource,
+  createReceivable, cancelReceivablesForSource,
 } from "@/features/finance/receivables";
 
 // ── Permission guards ──
@@ -15,6 +16,132 @@ async function guardLeaseWrite() {
   if (user.role === "boss") throw new Error("Boss role is read-only.");
 }
 async function guardLeaseFinance() { await requireRole("admin", "finance"); }
+
+// ── Cycle multiplier ──
+const CYCLE_MULTIPLIER: Record<string, number> = {
+  monthly: 1,
+  quarterly: 3,
+  semiannual: 6,
+  annual: 12,
+};
+
+// ── Generate lease rent receivables ──
+
+export async function generateLeaseReceivables(
+  contractId: string,
+): Promise<{ success: boolean; count: number; error?: string }> {
+  await guardLeaseWrite();
+  const supabase = await createClient();
+
+  const { data: contract } = await supabase
+    .from("lease_contracts")
+    .select("*, unit:units(id, unit_no, building_id)")
+    .eq("id", contractId)
+    .single();
+  if (!contract) return { success: false, count: 0, error: "Contract not found." };
+
+  const monthlyRent = Number(contract.monthly_rent_xof);
+  const multiplier = CYCLE_MULTIPLIER[contract.payment_cycle] ?? 1;
+  const amountXof = multiplier * monthlyRent;
+  const startDate = new Date(contract.start_date);
+  const endDate = new Date(contract.expected_end_date);
+
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    return { success: false, count: 0, error: "Invalid contract dates." };
+  }
+
+  // Get existing receivables for this contract to avoid duplicates
+  const { data: existing } = await supabase
+    .from("receivables")
+    .select("due_date, category")
+    .eq("source_type", "lease_contract")
+    .eq("source_id", contractId)
+    .eq("category", "lease_rent")
+    .neq("status", "cancelled");
+  const existingDueDates = new Set((existing ?? []).map(r => r.due_date));
+
+  const unit = (contract as any).unit as { id: string; unit_no: string; building_id: string } | null;
+  const unitNo = unit?.unit_no ?? "";
+  const buildingId = unit?.building_id ?? contract.unit?.building_id ?? null;
+  const customerId = contract.customer_id as string;
+  const unitId = contract.unit_id as string;
+
+  let count = 0;
+  let cursor = new Date(startDate);
+  cursor.setDate(1); // normalize to first of month for iteration
+
+  while (cursor <= endDate) {
+    // Build the due_date: year-month-paymentDay (clamped to last day of month)
+    const y = cursor.getFullYear();
+    const m = cursor.getMonth();
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    const day = Math.min(contract.payment_day, lastDay);
+    const dueDate = `${y}-${String(m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+    // Only insert if due_date is >= start_date and <= expected_end_date
+    if (dueDate >= contract.start_date && dueDate <= contract.expected_end_date) {
+      if (!existingDueDates.has(dueDate)) {
+        await createReceivable({
+          building_id: buildingId,
+          unit_id: unitId,
+          customer_id: customerId,
+          source_type: "lease_contract",
+          source_id: contractId,
+          category: "lease_rent",
+          title: `长租租金 ${unitNo} ${y}-${String(m + 1).padStart(2, "0")}`,
+          due_date: dueDate,
+          amount_xof: amountXof,
+          paid_amount_xof: 0,
+          status: "pending",
+          currency: "XOF",
+        });
+        count++;
+      }
+    }
+
+    // Advance cursor by cycle months
+    cursor = new Date(y, m + multiplier, 1);
+    // Safety break for very long contracts
+    if (cursor.getFullYear() > startDate.getFullYear() + 50) break;
+  }
+
+  // Update statuses for past-due receivables
+  await syncContractReceivableStatuses(contractId);
+
+  await supabase.from("audit_logs").insert({
+    action: "generate_receivables",
+    entity_type: "lease_contract",
+    entity_id: contractId,
+    metadata: { count, payment_cycle: contract.payment_cycle, amount_xof: amountXof },
+  });
+
+  revalidatePath("/leases");
+  revalidatePath("/fr/leases");
+  return { success: true, count };
+}
+
+/** Sync all receivable statuses for a contract based on current date. */
+async function syncContractReceivableStatuses(contractId: string) {
+  const supabase = await createClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data: receivables } = await supabase
+    .from("receivables")
+    .select("*")
+    .eq("source_type", "lease_contract")
+    .eq("source_id", contractId)
+    .eq("category", "lease_rent")
+    .neq("status", "cancelled");
+
+  if (!receivables) return;
+
+  for (const r of receivables) {
+    const newStatus = computeStatus(Number(r.amount_xof), Number(r.paid_amount_xof), r.due_date);
+    if (newStatus !== r.status) {
+      await supabase.from("receivables").update({ status: newStatus }).eq("id", r.id);
+    }
+  }
+}
 
 // ── Create contract ──
 
@@ -93,9 +220,11 @@ export async function createLeaseContract(input: {
     return { success: false, error: error.message };
   }
 
-  // If active, update unit status
+  // If active, update unit status and generate receivables
   if (targetStatus === "active") {
     await supabase.from("units").update({ status: "leased" }).eq("id", input.unitId);
+    // Generate rent receivables (don't block on failure)
+    await generateLeaseReceivables(data.id);
   }
 
   // If deposit received, record payment + ledger + receivable
@@ -125,7 +254,6 @@ export async function createLeaseContract(input: {
       description: `押金 lease=${data.id}`,
     });
 
-    // Receivable for deposit (marked paid since already received)
     const { data: unit } = await supabase.from("units").select("building_id").eq("id", input.unitId).single();
     await createReceivable({
       building_id: unit?.building_id ?? null,
@@ -156,7 +284,7 @@ export async function createLeaseContract(input: {
   return { success: true, data };
 }
 
-// ── Status transitions ──
+// ── Activate contract ──
 
 export async function activateContract(
   contractId: string
@@ -194,10 +322,18 @@ export async function activateContract(
     metadata: {},
   });
 
+  // Generate rent receivables
+  const genResult = await generateLeaseReceivables(contractId);
+  if (!genResult.success) {
+    console.warn("generateLeaseReceivables failed:", genResult.error);
+  }
+
   revalidatePath("/leases");
   revalidatePath("/fr/leases");
   return { success: true };
 }
+
+// ── Terminate contract ──
 
 export async function terminateContract(
   contractId: string
@@ -233,7 +369,81 @@ export async function terminateContract(
   return { success: true };
 }
 
-// ── Rent payment ──
+// ── Pay a specific receivable (full payment only) ──
+
+export async function recordReceivablePayment(input: {
+  receivableId: string;
+  paymentDate: string;
+  receiptNo?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  await guardLeaseFinance();
+
+  const supabase = await createClient();
+
+  const { data: receivable } = await supabase
+    .from("receivables")
+    .select("*")
+    .eq("id", input.receivableId)
+    .single();
+  if (!receivable) return { success: false, error: "Receivable not found." };
+  if (receivable.status === "cancelled") return { success: false, error: "Receivable is cancelled." };
+  if (receivable.status === "paid") return { success: false, error: "Receivable is already paid." };
+
+  const outstanding = Number(receivable.amount_xof) - Number(receivable.paid_amount_xof);
+  if (outstanding <= 0) return { success: false, error: "Nothing outstanding." };
+
+  const amount = outstanding;
+
+  // Record payment
+  const { data: payment } = await supabase
+    .from("payments")
+    .insert({
+      customer_id: receivable.customer_id,
+      unit_id: receivable.unit_id,
+      source_type: receivable.source_type,
+      source_id: receivable.source_id,
+      payment_date: input.paymentDate,
+      amount,
+      currency: "XOF",
+      exchange_rate_to_xof: 1,
+      receipt_no: input.receiptNo ?? null,
+    })
+    .select("id")
+    .single();
+
+  // Ledger entry
+  await supabase.from("ledger_entries").insert({
+    building_id: receivable.building_id,
+    unit_id: receivable.unit_id,
+    payment_id: payment?.id,
+    entry_date: input.paymentDate,
+    direction: "income",
+    category: receivable.category,
+    amount_xof: amount,
+    description: `收款 receivable=${receivable.id} ${receivable.title}`,
+  });
+
+  // Update receivable
+  const newPaid = Number(receivable.paid_amount_xof) + amount;
+  const newStatus = computeStatus(Number(receivable.amount_xof), newPaid, receivable.due_date);
+  await supabase
+    .from("receivables")
+    .update({ paid_amount_xof: newPaid, status: newStatus })
+    .eq("id", receivable.id);
+
+  await supabase.from("audit_logs").insert({
+    action: "payment",
+    entity_type: "receivable",
+    entity_id: receivable.id,
+    metadata: { amount, date: input.paymentDate, receipt_no: input.receiptNo },
+  });
+
+  revalidatePath("/leases");
+  revalidatePath("/fr/leases");
+  return { success: true };
+}
+
+// ── Legacy rent payment (kept for backward compat) ──
 
 export async function recordRentPayment(input: {
   contractId: string;
@@ -313,7 +523,7 @@ export async function recordRentPayment(input: {
   return { success: true };
 }
 
-// ── Move-out settlement ──
+// ── Move-out settlement (enhanced) ──
 
 export async function processMoveOut(input: {
   contractId: string;
@@ -322,17 +532,24 @@ export async function processMoveOut(input: {
   utilityCleared: boolean;
   depositDeductionXof: number;
   depositRefundXof: number;
+  notes?: string;
 }): Promise<{ success: boolean; error?: string }> {
   await guardLeaseFinance();
   const supabase = await createClient();
 
   const { data: contract } = await supabase
     .from("lease_contracts")
-    .select("id, unit_id, customer_id, deposit_amount_xof")
+    .select("id, unit_id, customer_id, deposit_amount_xof, deposit_received")
     .eq("id", input.contractId)
     .in("status", ["active", "expired"])
     .single();
   if (!contract) return { success: false, error: "Contract not found or cannot be settled." };
+
+  const depositAmount = Number(contract.deposit_amount_xof);
+  const deduction = input.depositDeductionXof;
+  const refund = Math.max(0, depositAmount - deduction);
+  const totalDue = input.unpaidRentXof;
+  const totalRefund = refund;
 
   // Collect unpaid rent if any
   if (input.unpaidRentXof > 0) {
@@ -361,7 +578,6 @@ export async function processMoveOut(input: {
       description: `退租结算未付租金 lease=${input.contractId}`,
     });
 
-    // Create receivable for the collected unpaid rent
     const { data: unit } = await supabase.from("units").select("building_id").eq("id", contract.unit_id).single();
     await createReceivable({
       building_id: unit?.building_id ?? null,
@@ -379,7 +595,7 @@ export async function processMoveOut(input: {
     });
   }
 
-  // Refund deposit (partial or full)
+  // Refund deposit
   if (input.depositRefundXof > 0) {
     await supabase.from("ledger_entries").insert({
       unit_id: contract.unit_id,
@@ -387,9 +603,37 @@ export async function processMoveOut(input: {
       direction: "liability_out",
       category: "lease_deposit",
       amount_xof: input.depositRefundXof,
-      description: `退还押金 lease=${input.contractId}${input.depositDeductionXof > 0 ? ` (扣除 ${input.depositDeductionXof})` : ""}`,
+      description: `退还押金 lease=${input.contractId}${deduction > 0 ? ` (扣除 ${deduction})` : ""}`,
     });
   }
+
+  // Deposit deduction → income
+  if (deduction > 0) {
+    await supabase.from("ledger_entries").insert({
+      unit_id: contract.unit_id,
+      entry_date: input.actualEndDate,
+      direction: "income",
+      category: "other_income",
+      amount_xof: deduction,
+      description: `押金扣除 lease=${input.contractId}`,
+    });
+  }
+
+  // Write lease_settlements record
+  await supabase.from("lease_settlements").insert({
+    lease_contract_id: input.contractId,
+    unit_id: contract.unit_id,
+    customer_id: contract.customer_id,
+    actual_end_date: input.actualEndDate,
+    unpaid_rent_xof: input.unpaidRentXof,
+    utility_cleared: input.utilityCleared,
+    deposit_amount_xof: depositAmount,
+    deposit_deduction_xof: deduction,
+    deposit_refund_xof: refund,
+    total_due_xof: totalDue,
+    total_refund_xof: totalRefund,
+    notes: input.notes ?? null,
+  });
 
   // Update contract
   await supabase
@@ -403,6 +647,29 @@ export async function processMoveOut(input: {
   // Update unit status
   await supabase.from("units").update({ status: "available" }).eq("id", contract.unit_id);
 
+  // Cancel future unpaid lease_rent receivables
+  const { data: futureReceivables } = await supabase
+    .from("receivables")
+    .select("id, amount_xof, paid_amount_xof, due_date, status")
+    .eq("source_type", "lease_contract")
+    .eq("source_id", input.contractId)
+    .eq("category", "lease_rent")
+    .neq("status", "cancelled");
+
+  if (futureReceivables) {
+    for (const r of futureReceivables) {
+      if (r.due_date > input.actualEndDate) {
+        const unpaid = Number(r.amount_xof) - Number(r.paid_amount_xof);
+        if (unpaid > 0 || r.status !== "paid") {
+          await supabase.from("receivables").update({
+            status: "cancelled",
+            notes: `合同退租 ${input.actualEndDate}，后续应收取消`,
+          }).eq("id", r.id);
+        }
+      }
+    }
+  }
+
   await supabase.from("audit_logs").insert({
     action: "move_out",
     entity_type: "lease_contract",
@@ -410,8 +677,8 @@ export async function processMoveOut(input: {
     metadata: {
       actual_end_date: input.actualEndDate,
       unpaid_rent: input.unpaidRentXof,
-      deposit_deduction: input.depositDeductionXof,
-      deposit_refund: input.depositRefundXof,
+      deposit_deduction: deduction,
+      deposit_refund: refund,
       utility_cleared: input.utilityCleared,
     },
   });
@@ -445,9 +712,7 @@ export async function generateOverdueReminders(
 
   for (const contract of contracts) {
     const paymentDay = contract.payment_day;
-    // Check if overdue (today's day > paymentDay means this month's payment missed)
     const isOverdue = todayDay > paymentDay;
-    // Check if due within 7 days
     const diff = paymentDay - todayDay;
     const isDueSoon = diff >= 0 && diff <= 7;
 
@@ -459,16 +724,75 @@ export async function generateOverdueReminders(
         ? `合同 ${contract.contract_no} 本月付款日 ${paymentDay} 号已过，请尽快催缴。`
         : `合同 ${contract.contract_no} 付款日 ${paymentDay} 号，还有 ${diff} 天。`;
 
-      await supabase.from("notifications").insert({
-        building_id: buildingId,
-        title,
-        body,
-        channel: "in_app",
-        due_at: isOverdue ? today : weekLaterStr,
-      });
-      count++;
+      // Check for existing notification to avoid duplicates
+      const { data: existingNotif } = await supabase
+        .from("notifications")
+        .select("id")
+        .eq("title", title)
+        .gte("created_at", today)
+        .limit(1);
+
+      if (!existingNotif || existingNotif.length === 0) {
+        await supabase.from("notifications").insert({
+          building_id: buildingId,
+          title,
+          body,
+          channel: "in_app",
+          due_at: isOverdue ? today : weekLaterStr,
+        });
+        count++;
+      }
+    }
+  }
+
+  // Also check overdue receivables → generate notifications
+  const { data: overdueReceivables } = await supabase
+    .from("receivables")
+    .select("id, title, due_date, unit_id, customer_id, contract:lease_contracts!inner(contract_no)")
+    .eq("source_type", "lease_contract")
+    .eq("category", "lease_rent")
+    .neq("status", "cancelled")
+    .neq("status", "paid")
+    .lt("due_date", today);
+
+  if (overdueReceivables) {
+    for (const r of overdueReceivables) {
+      const contractNo = (r as any).contract?.contract_no ?? "";
+      const title = `租金逾期 — ${contractNo}`;
+      const { data: existingNotif } = await supabase
+        .from("notifications")
+        .select("id")
+        .eq("title", title)
+        .gte("created_at", today)
+        .limit(1);
+
+      if (!existingNotif || existingNotif.length === 0) {
+        await supabase.from("notifications").insert({
+          building_id: buildingId,
+          title,
+          body: `应收 ${r.title} 逾期未付，截止日期 ${r.due_date}`,
+          channel: "in_app",
+          due_at: today,
+        });
+        count++;
+      }
     }
   }
 
   return { success: true, count };
+}
+
+// ── Get receivables for a contract (read-only, used in UI) ──
+
+export async function getContractReceivables(
+  contractId: string
+): Promise<ReceivableRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("receivables")
+    .select("*")
+    .eq("source_type", "lease_contract")
+    .eq("source_id", contractId)
+    .order("due_date");
+  return data ?? [];
 }

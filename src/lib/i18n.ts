@@ -336,7 +336,28 @@ export const dictionaries = {
         overdue: "已逾期",
         daysLeft: "剩余天数",
         sendReminder: "发送提醒"
-      }
+      },
+      receivable: {
+        title: "租金应收列表",
+        generate: "生成应收",
+        generated: "已生成 {count} 条应收",
+        none: "暂无应收记录，请先生成应收",
+        dueDate: "应收日期",
+        amount: "应收金额",
+        paid: "已收金额",
+        outstanding: "未收金额",
+        status: "状态",
+        overdueDays: "逾期天数",
+        collect: "收款",
+        fullPaymentNote: "长租必须全额付清该笔应收",
+      },
+      risk: {
+        outstandingTotal: "未收总额",
+        overdueTotal: "逾期总额",
+        depositStatus: "押金状态",
+        expiringSoon: "合同即将到期",
+        noRisk: "暂无风险",
+      },
     },
     sales: {
       title: "出售业务",
@@ -1170,7 +1191,28 @@ export const dictionaries = {
         overdue: "En retard",
         daysLeft: "Jours restants",
         sendReminder: "Envoyer rappel"
-      }
+      },
+      receivable: {
+        title: "Echeancier des loyers",
+        generate: "Generer echeances",
+        generated: "{count} echeances generees",
+        none: "Aucune echeance. Veuillez generer les echeances.",
+        dueDate: "Echeance",
+        amount: "Montant du",
+        paid: "Paye",
+        outstanding: "Impaye",
+        status: "Statut",
+        overdueDays: "Jours retard",
+        collect: "Encaisser",
+        fullPaymentNote: "Le loyer doit etre paye en totalite",
+      },
+      risk: {
+        outstandingTotal: "Total impaye",
+        overdueTotal: "Total retard",
+        depositStatus: "Statut caution",
+        expiringSoon: "Expiration proche",
+        noRisk: "Aucun risque",
+      },
     },
     sales: {
       title: "Vente",

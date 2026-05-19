@@ -1,19 +1,20 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo } from "react";
-import { Plus, X, AlertTriangle, FileText, DollarSign, LogOut, Printer } from "lucide-react";
+import { Plus, X, AlertTriangle, FileText, DollarSign, LogOut, Printer, RefreshCw } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow } from "@/types/database";
+import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
 import { printLeaseContract } from "@/features/print";
 import {
   createLeaseContract,
   activateContract,
   terminateContract,
-  recordRentPayment,
+  recordReceivablePayment,
+  generateLeaseReceivables,
   processMoveOut,
 } from "./actions";
 
@@ -22,6 +23,7 @@ interface LeaseListProps {
   units: UnitRow[];
   customers: CustomerRow[];
   payments: PaymentRow[];
+  receivables: ReceivableRow[];
   locale: Locale;
 }
 
@@ -29,13 +31,14 @@ type PanelType = "new" | "detail" | "moveout" | null;
 
 const paymentCycles = ["monthly", "quarterly", "semiannual", "annual"];
 
-export function LeaseList({ contracts, units, customers, payments, locale }: LeaseListProps) {
+export function LeaseList({ contracts, units, customers, payments, receivables, locale }: LeaseListProps) {
   const t = dictionaries[locale].leases;
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [panel, setPanel] = useState<PanelType>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [genMsg, setGenMsg] = useState("");
 
   // New contract form
   const [fContractNo, setFContractNo] = useState("");
@@ -52,11 +55,10 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
   const [fSigner, setFSigner] = useState("");
   const [fStatus, setFStatus] = useState<ContractStatus>("draft");
 
-  // Payment form
-  const [payAmount, setPayAmount] = useState(0);
+  // Payment form (receivable-based)
+  const [payReceivableId, setPayReceivableId] = useState<string | null>(null);
   const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10));
   const [payReceiptNo, setPayReceiptNo] = useState("");
-  const [payMonths, setPayMonths] = useState(1);
 
   // Move-out form
   const [moEndDate, setMoEndDate] = useState(new Date().toISOString().slice(0, 10));
@@ -73,16 +75,57 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
   const selected = selectedId ? contracts.find((c) => c.id === selectedId) : null;
   const selectedUnit = selected ? units.find((u) => u.id === selected.unit_id) : null;
   const selectedCustomer = selected ? customers.find((c) => c.id === selected.customer_id) : null;
+
+  // Receivables for selected contract
+  const contractReceivables = useMemo(
+    () => selectedId
+      ? receivables.filter(r => r.source_type === "lease_contract" && r.source_id === selectedId && r.status !== "cancelled")
+      : [],
+    [receivables, selectedId],
+  );
+
+  // Contract payment history
   const contractPayments = useMemo(
-    () => (selectedId ? payments.filter((p) => p.source_id === selectedId) : []),
-    [payments, selectedId]
+    () => selectedId ? payments.filter((p) => p.source_id === selectedId) : [],
+    [payments, selectedId],
   );
   const totalPaid = contractPayments.reduce((s, p) => s + Number(p.amount), 0);
 
+  // Receivable stats for selected contract
+  const receivableStats = useMemo(() => {
+    let totalRec = 0, totalPd = 0, overdue = 0;
+    const today = new Date().toISOString().slice(0, 10);
+    for (const r of contractReceivables) {
+      totalRec += Number(r.amount_xof);
+      totalPd += Number(r.paid_amount_xof);
+      const os = Number(r.amount_xof) - Number(r.paid_amount_xof);
+      if (os > 0 && (r.status === "overdue" || r.due_date < today)) {
+        overdue += os;
+      }
+    }
+    return { totalReceivable: totalRec, totalPaid: totalPd, outstanding: totalRec - totalPd, overdue };
+  }, [contractReceivables]);
+
+  // Contract expiry risk
+  const contractRisk = useMemo(() => {
+    if (!selected || selected.status !== "active") return { expiringSoon: false, daysLeft: 0 };
+    const today = new Date();
+    const endDate = new Date(selected.expected_end_date);
+    const diff = Math.floor((endDate.getTime() - today.getTime()) / 86400000);
+    return { expiringSoon: diff <= 30 && diff >= 0, daysLeft: Math.max(0, diff) };
+  }, [selected]);
+
   const availableUnits = useMemo(
     () => units.filter((u) => u.kind === "apartment" && u.status === "available"),
-    [units]
+    [units],
   );
+
+  const overdueDays = (r: ReceivableRow) => {
+    if (r.status === "paid" || r.status === "cancelled") return null;
+    const today = new Date().toISOString().slice(0, 10);
+    if (r.due_date >= today) return null;
+    return Math.floor((Date.now() - new Date(r.due_date).getTime()) / 86400000);
+  };
 
   const resetNewForm = () => {
     setFContractNo("");
@@ -111,9 +154,12 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
     setSelectedId(id);
     setPanel("detail");
     setError("");
-    const c = contracts.find((c) => c.id === id);
+    setGenMsg("");
+    setPayReceivableId(null);
+    const c = contracts.find((cc) => cc.id === id);
     if (c) {
-      setPayAmount(Number(c.monthly_rent_xof));
+      setPayDate(new Date().toISOString().slice(0, 10));
+      setPayReceiptNo("");
       setMoUnpaid(0);
       setMoDeduction(0);
       setMoRefund(Number(c.deposit_amount_xof));
@@ -123,10 +169,20 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
   const openMoveOut = (id: string) => {
     setSelectedId(id);
     setPanel("moveout");
-    const c = contracts.find((c) => c.id === id);
+    const c = contracts.find((cc) => cc.id === id);
     if (c) {
       setMoEndDate(new Date().toISOString().slice(0, 10));
-      setMoUnpaid(0);
+      // Pre-fill unpaid from outstanding receivables
+      let unpaid = 0;
+      const today = new Date().toISOString().slice(0, 10);
+      const cRecs = receivables.filter(r =>
+        r.source_type === "lease_contract" && r.source_id === id &&
+        r.status !== "cancelled" && r.status !== "paid"
+      );
+      for (const r of cRecs) {
+        unpaid += Number(r.amount_xof) - Number(r.paid_amount_xof);
+      }
+      setMoUnpaid(unpaid);
       setMoUtility(false);
       setMoDeduction(0);
       setMoRefund(Number(c.deposit_amount_xof));
@@ -168,6 +224,7 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
     const result = await activateContract(id);
     setSaving(false);
     if (!result.success) setError(result.error ?? "Failed");
+    else setGenMsg(locale === "zh" ? "合同已激活，应收已自动生成" : "Contrat active, echeances generees");
   };
 
   const handleTerminate = async (id: string) => {
@@ -177,20 +234,34 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
     if (!result.success) setError(result.error ?? "Failed");
   };
 
-  const handleRecordPayment = async () => {
-    if (!selectedId || payAmount <= 0) return;
+  const handleGenerateReceivables = async (id: string) => {
+    setSaving(true);
+    setGenMsg("");
+    const result = await generateLeaseReceivables(id);
+    setSaving(false);
+    if (result.success) {
+      setGenMsg(t.receivable.generated.replace("{count}", String(result.count)));
+    } else {
+      setError(result.error ?? "Failed");
+    }
+  };
+
+  const handleCollectReceivable = async () => {
+    if (!payReceivableId) return;
     setSaving(true);
     setError("");
-    const result = await recordRentPayment({
-      contractId: selectedId,
-      amount: payAmount,
+    const result = await recordReceivablePayment({
+      receivableId: payReceivableId,
       paymentDate: payDate,
       receiptNo: payReceiptNo || undefined,
-      coveringMonths: payMonths,
     });
     setSaving(false);
-    if (!result.success) setError(result.error ?? "Failed");
-    else setPayAmount(0);
+    if (result.success) {
+      setPayReceivableId(null);
+      setPayReceiptNo("");
+    } else {
+      setError(result.error ?? "Failed");
+    }
   };
 
   const handleMoveOut = async () => {
@@ -219,6 +290,29 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
     active: "success",
     terminated: "danger",
     expired: "warning",
+  };
+
+  const STATUS_STYLES: Record<string, string> = {
+    pending:   "bg-brand-warm-100 text-brand-ink-600",
+    partial:   "bg-brand-amber-100 text-amber-700",
+    paid:      "bg-brand-green-100 text-brand-green-700",
+    overdue:   "bg-brand-red-100 text-brand-red-700",
+    cancelled: "bg-brand-warm-50 text-brand-ink-300 line-through",
+  };
+
+  const ROW_BG: Record<string, string> = {
+    overdue:   "bg-brand-red-50/30",
+    partial:   "bg-brand-amber-50/30",
+    paid:      "",
+    pending:   "",
+    cancelled: "opacity-60",
+  };
+
+  const statusLabel = (status: string) => {
+    const labels: Record<string, string> = locale === "zh"
+      ? { pending: "待收", partial: "部分", paid: "已收", overdue: "逾期", cancelled: "已取消" }
+      : { pending: "Attente", partial: "Partiel", paid: "Paye", overdue: "Retard", cancelled: "Annule" };
+    return labels[status] ?? status;
   };
 
   return (
@@ -323,7 +417,7 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
                 <label className={labelClass}>{t.form.customer} *</label>
                 <select value={fCustomerId} onChange={(e) => setFCustomerId(e.target.value)} className={inputClass}>
                   <option value="">{t.form.noCustomer}</option>
-                  {customers.filter((c) => !c.is_blacklisted).map((c) => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ""}</option>)}
+                  {customers.filter((cc) => !cc.is_blacklisted).map((cc) => <option key={cc.id} value={cc.id}>{cc.name} {cc.phone ? `(${cc.phone})` : ""}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -408,11 +502,140 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
                   <button onClick={() => openMoveOut(selected.id)} className="flex-1 rounded bg-brand-amber-500 py-2 text-sm font-semibold text-white hover:bg-brand-amber-600"><LogOut className="mr-1 inline h-4 w-4" />{t.settlement.moveOut}</button>
                 </div>
               )}
+              {genMsg && <p className="text-xs text-brand-green-600 font-medium">{genMsg}</p>}
 
-              {/* Payment history + new payment */}
+              {/* Risk indicators */}
+              {selected.status === "active" && (
+                <div className="border-t border-brand-warm-400 pt-4">
+                  <h4 className="text-sm font-bold text-brand-ink-900 flex items-center gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 text-brand-orange" />
+                    {locale === "zh" ? "风险概览" : "Apercu des risques"}
+                  </h4>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                    <div className={cn("rounded border px-3 py-2", receivableStats.outstanding > 0 ? "border-brand-orange-200 bg-brand-orange-50" : "border-brand-green-200 bg-brand-green-50")}>
+                      <p className="text-brand-ink-400">{t.risk.outstandingTotal}</p>
+                      <p className={cn("font-bold tabular-nums", receivableStats.outstanding > 0 ? "text-brand-orange-700" : "text-brand-green-700")}>{formatXof(receivableStats.outstanding)}</p>
+                    </div>
+                    <div className={cn("rounded border px-3 py-2", receivableStats.overdue > 0 ? "border-brand-red-200 bg-brand-red-50" : "border-brand-green-200 bg-brand-green-50")}>
+                      <p className="text-brand-ink-400">{t.risk.overdueTotal}</p>
+                      <p className={cn("font-bold tabular-nums", receivableStats.overdue > 0 ? "text-brand-red-700" : "text-brand-green-700")}>{formatXof(receivableStats.overdue)}</p>
+                    </div>
+                    <div className={cn("rounded border px-3 py-2", !selected.deposit_received ? "border-brand-red-200 bg-brand-red-50" : "border-brand-green-200 bg-brand-green-50")}>
+                      <p className="text-brand-ink-400">{t.risk.depositStatus}</p>
+                      <p className={cn("text-xs font-medium", selected.deposit_received ? "text-brand-green-700" : "text-brand-red-600")}>
+                        {selected.deposit_received ? t.form.depositPaid : t.form.depositUnpaid}
+                      </p>
+                    </div>
+                    <div className={cn("rounded border px-3 py-2", contractRisk.expiringSoon ? "border-brand-amber-200 bg-brand-amber-50" : "border-brand-green-200 bg-brand-green-50")}>
+                      <p className="text-brand-ink-400">{t.risk.expiringSoon}</p>
+                      <p className={cn("text-xs font-medium", contractRisk.expiringSoon ? "text-brand-amber-700" : "text-brand-green-700")}>
+                        {contractRisk.expiringSoon ? `${contractRisk.daysLeft} ${locale === "zh" ? "天后到期" : "j restants"}` : (locale === "zh" ? "否" : "Non")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Receivable list for this contract */}
               <div className="border-t border-brand-warm-400 pt-4">
-                <h4 className="text-sm font-bold text-brand-ink-900">{t.payment.title}</h4>
-                {contractPayments.length > 0 ? (
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-bold text-brand-ink-900">{t.receivable.title}</h4>
+                  {selected.status === "active" && (
+                    <button
+                      onClick={() => handleGenerateReceivables(selected.id)}
+                      disabled={saving}
+                      className="inline-flex items-center gap-1 rounded border border-brand-warm-400 px-2 py-1 text-[10px] font-medium text-brand-ink-500 hover:bg-brand-warm-100 disabled:opacity-40"
+                    >
+                      <RefreshCw className="h-3 w-3" />{t.receivable.generate}
+                    </button>
+                  )}
+                </div>
+
+                {contractReceivables.length === 0 ? (
+                  <p className="text-xs text-brand-ink-300">{t.receivable.none}</p>
+                ) : (
+                  <div className="overflow-hidden rounded-lg border border-brand-warm-400 text-xs">
+                    <table className="w-full">
+                      <thead className="bg-brand-warm-50 text-[10px] uppercase text-brand-ink-400">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left">{t.receivable.dueDate}</th>
+                          <th className="px-2 py-1.5 text-right">{t.receivable.amount}</th>
+                          <th className="px-2 py-1.5 text-right">{t.receivable.paid}</th>
+                          <th className="px-2 py-1.5 text-right">{t.receivable.outstanding}</th>
+                          <th className="px-2 py-1.5 text-center">{t.receivable.status}</th>
+                          <th className="px-2 py-1.5"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-brand-warm-400">
+                        {contractReceivables.map(r => {
+                          const os = Number(r.amount_xof) - Number(r.paid_amount_xof);
+                          const od = overdueDays(r);
+                          const isPaying = payReceivableId === r.id;
+                          return (
+                            <tr key={r.id} className={cn("transition-colors", ROW_BG[r.status])}>
+                              <td className="px-2 py-1.5 text-brand-ink-600 whitespace-nowrap">
+                                {r.due_date}
+                                {od !== null && od > 0 && <span className="ml-1 text-[10px] text-brand-red-500">+{od}</span>}
+                              </td>
+                              <td className="px-2 py-1.5 text-right tabular-nums">{formatXof(Number(r.amount_xof))}</td>
+                              <td className="px-2 py-1.5 text-right tabular-nums text-brand-green-600">{formatXof(Number(r.paid_amount_xof))}</td>
+                              <td className={cn("px-2 py-1.5 text-right tabular-nums font-semibold", os > 0 ? "text-brand-red-600" : "text-brand-green-600")}>{formatXof(os)}</td>
+                              <td className="px-2 py-1.5 text-center">
+                                <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold", STATUS_STYLES[r.status])}>{statusLabel(r.status)}</span>
+                              </td>
+                              <td className="px-2 py-1.5">
+                                {os > 0 && selected.status === "active" && (
+                                  isPaying ? (
+                                    <span className="text-[10px] text-brand-ink-300">{locale === "zh" ? "收款中..." : "En cours..."}</span>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        setPayReceivableId(r.id);
+                                        setPayDate(new Date().toISOString().slice(0, 10));
+                                        setPayReceiptNo("");
+                                        setError("");
+                                      }}
+                                      className="rounded bg-brand-ink-900 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-brand-ink-700"
+                                    >
+                                      <DollarSign className="mr-0.5 inline h-3 w-3" />{t.receivable.collect}
+                                    </button>
+                                  )
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Receivable payment form */}
+              {payReceivableId && (() => {
+                const selectedRec = contractReceivables.find(r => r.id === payReceivableId);
+                const outstanding = selectedRec ? Number(selectedRec.amount_xof) - Number(selectedRec.paid_amount_xof) : 0;
+                return (
+                  <div className="rounded border border-brand-orange-200 bg-brand-orange-50 p-3 space-y-2">
+                    <p className="text-xs font-medium text-brand-ink-700">
+                      {t.receivable.fullPaymentNote}: <span className="text-brand-orange-700">{formatXof(outstanding)}</span>
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><label className="text-[10px] text-brand-ink-400">{t.payment.paymentDate}</label><input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className={cn(inputClass, "text-xs py-1.5")} /></div>
+                      <div><label className="text-[10px] text-brand-ink-400">{t.payment.receiptNo}</label><input type="text" value={payReceiptNo} onChange={(e) => setPayReceiptNo(e.target.value)} className={cn(inputClass, "text-xs py-1.5")} /></div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => setPayReceivableId(null)} className="flex-1 rounded border border-brand-warm-400 py-1.5 text-xs font-medium text-brand-ink-500 hover:bg-brand-warm-50">{locale === "zh" ? "取消" : "Annuler"}</button>
+                      <button onClick={handleCollectReceivable} disabled={saving} className="flex-1 rounded bg-brand-ink-900 py-1.5 text-xs font-semibold text-white hover:bg-brand-ink-700 disabled:opacity-50">{saving ? "..." : t.payment.record}</button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Payment history */}
+              {contractPayments.length > 0 && (
+                <div className="border-t border-brand-warm-400 pt-4">
+                  <h4 className="text-sm font-bold text-brand-ink-900">{t.payment.title}</h4>
                   <ul className="mt-2 space-y-1.5 text-xs">
                     {contractPayments.map((p) => (
                       <li key={p.id} className="flex justify-between text-brand-ink-500">
@@ -425,25 +648,8 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
                       <span>{formatXof(totalPaid)}</span>
                     </li>
                   </ul>
-                ) : (
-                  <p className="mt-1 text-xs text-brand-ink-300">暂无收款记录</p>
-                )}
-
-                {/* Record new payment */}
-                {selected.status === "active" && (
-                  <div className="mt-3 space-y-2 rounded border border-brand-warm-400 bg-brand-warm-50 p-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div><label className="text-xs text-brand-ink-400">{t.payment.amount}</label><input type="number" value={payAmount} onChange={(e) => setPayAmount(Number(e.target.value))} className={inputClass} /></div>
-                      <div><label className="text-xs text-brand-ink-400">{t.payment.paymentDate}</label><input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className={inputClass} /></div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div><label className="text-xs text-brand-ink-400">{t.payment.receiptNo}</label><input type="text" value={payReceiptNo} onChange={(e) => setPayReceiptNo(e.target.value)} className={inputClass} /></div>
-                      <div><label className="text-xs text-brand-ink-400">{t.payment.coveringMonths}</label><input type="number" min={1} value={payMonths} onChange={(e) => setPayMonths(Number(e.target.value))} className={inputClass} /></div>
-                    </div>
-                    <button onClick={handleRecordPayment} disabled={saving} className="w-full rounded bg-brand-ink-900 py-1.5 text-xs font-semibold text-white hover:bg-brand-ink-700 disabled:opacity-50"><DollarSign className="mr-1 inline h-3 w-3" />{t.payment.record}</button>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {error && <p className="text-sm text-brand-red-600">{error}</p>}
             </div>
@@ -465,6 +671,7 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
 
               <div><label className={labelClass}>{t.form.actualEndDate}</label><input type="date" value={moEndDate} onChange={(e) => setMoEndDate(e.target.value)} className={inputClass} /></div>
               <div><label className={labelClass}>{t.settlement.unpaidRent}</label><input type="number" value={moUnpaid} onChange={(e) => setMoUnpaid(Number(e.target.value))} className={inputClass} /></div>
+              <p className="text-[10px] -mt-2 text-brand-ink-300">{locale === "zh" ? "已自动填入当前未结清应收总额，可手动调整" : "Pre-rempli avec les impayes, ajustable"}</p>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={moUtility} onChange={(e) => setMoUtility(e.target.checked)} className="h-4 w-4 rounded border-brand-warm-400" />
                 {t.settlement.utilityCleared}
@@ -486,7 +693,9 @@ export function LeaseList({ contracts, units, customers, payments, locale }: Lea
                   </div>
                 )}
               </div>
-              <p className="text-xs text-brand-ink-300">{t.settlement.settlementNote}</p>
+              <p className="text-xs text-brand-ink-300">
+                {locale === "zh" ? "退租后房间恢复为空闲，未来未收应收自动取消" : "Le lot redevient disponible, les echeances futures annulees"}
+              </p>
               {error && <p className="text-sm text-brand-red-600">{error}</p>}
               <button onClick={handleMoveOut} disabled={saving} className="w-full rounded bg-brand-amber-500 py-2.5 text-sm font-semibold text-white hover:bg-brand-amber-600 disabled:opacity-50">
                 <FileText className="mr-1 inline h-4 w-4" />{t.settlement.generateSettlement}

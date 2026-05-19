@@ -253,3 +253,25 @@ export interface ReceivableRow {
 
 export type ReceivableInsert = Omit<ReceivableRow, "id" | "created_at" | "updated_at">;
 export type ReceivableUpdate = Partial<ReceivableInsert>;
+
+// ── Lease Settlements ──
+
+export interface LeaseSettlementRow {
+  id: string;
+  lease_contract_id: string;
+  unit_id: string;
+  customer_id: string;
+  actual_end_date: string;
+  unpaid_rent_xof: number;
+  utility_cleared: boolean;
+  deposit_amount_xof: number;
+  deposit_deduction_xof: number;
+  deposit_refund_xof: number;
+  total_due_xof: number;
+  total_refund_xof: number;
+  notes: string | null;
+  created_at: string;
+}
+
+export type LeaseSettlementInsert = Omit<LeaseSettlementRow, "id" | "created_at">;
+export type LeaseSettlementUpdate = Partial<LeaseSettlementInsert>;
