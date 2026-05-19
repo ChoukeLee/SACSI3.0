@@ -1,12 +1,12 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo } from "react";
-import { Plus, X, DollarSign, FileText, CalendarPlus, TrendingUp } from "lucide-react";
+import { Plus, X, DollarSign, FileText, CalendarPlus, TrendingUp, AlertTriangle } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow } from "@/types/database";
+import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import {
   createSaleContract,
   recordSalePayment,
@@ -21,12 +21,13 @@ interface SaleListProps {
   units: UnitRow[];
   customers: CustomerRow[];
   payments: PaymentRow[];
+  receivables: ReceivableRow[];
   locale: Locale;
 }
 
 type PanelType = "new" | "detail" | null;
 
-export function SaleList({ contracts, schedules, units, customers, payments, locale }: SaleListProps) {
+export function SaleList({ contracts, schedules, units, customers, payments, receivables, locale }: SaleListProps) {
   const t = dictionaries[locale].sales;
   const [statusFilter, setStatusFilter] = useState("all");
   const [panel, setPanel] = useState<PanelType>(null);
@@ -73,23 +74,73 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
   const selected = selectedId ? contracts.find((c) => c.id === selectedId) : null;
   const selectedUnit = selected ? units.find((u) => u.id === selected.unit_id) : null;
   const selectedCustomer = selected ? customers.find((c) => c.id === selected.customer_id) : null;
+
   const contractSchedules = useMemo(
     () => (selectedId ? schedules.filter((s) => s.sale_contract_id === selectedId).sort((a, b) => a.installment_no - b.installment_no) : []),
-    [schedules, selectedId]
+    [schedules, selectedId],
   );
+
+  const contractReceivables = useMemo(
+    () => selectedId
+      ? receivables.filter(r => r.source_type === "sale_contract" && r.source_id === selectedId && r.status !== "cancelled")
+      : [],
+    [receivables, selectedId],
+  );
+
   const contractPayments = useMemo(
     () => (selectedId ? payments.filter((p) => p.source_id === selectedId) : []),
-    [payments, selectedId]
+    [payments, selectedId],
   );
-  const totalPaid = contractPayments.reduce((s, p) => s + Number(p.amount), 0);
+
+  // Compute paid from receivables (more accurate than raw payments)
+  const { totalPaidRec, totalReceivableRec, totalOverdueRec } = useMemo(() => {
+    let paid = 0, total = 0, overdue = 0;
+    const today = new Date().toISOString().slice(0, 10);
+    for (const r of contractReceivables) {
+      total += Number(r.amount_xof);
+      paid += Number(r.paid_amount_xof);
+      const os = Number(r.amount_xof) - Number(r.paid_amount_xof);
+      if (os > 0 && (r.status === "overdue" || r.due_date < today)) {
+        overdue += os;
+      }
+    }
+    return { totalPaidRec: paid, totalReceivableRec: total, totalOverdueRec: overdue };
+  }, [contractReceivables]);
+
+  const totalPaidPayments = contractPayments.reduce((s, p) => s + Number(p.amount), 0);
+
+  // Compute per-contract receivable stats for list view
+  const contractReceivableMap = useMemo(() => {
+    const map = new Map<string, { paid: number; total: number; overdue: number }>();
+    for (const r of receivables) {
+      if (r.source_type !== "sale_contract" || r.status === "cancelled") continue;
+      const cid = r.source_id!;
+      let s = map.get(cid);
+      if (!s) { s = { paid: 0, total: 0, overdue: 0 }; map.set(cid, s); }
+      s.total += Number(r.amount_xof);
+      s.paid += Number(r.paid_amount_xof);
+      const os = Number(r.amount_xof) - Number(r.paid_amount_xof);
+      const today = new Date().toISOString().slice(0, 10);
+      if (os > 0 && (r.status === "overdue" || r.due_date < today)) {
+        s.overdue += os;
+      }
+    }
+    return map;
+  }, [receivables]);
 
   const sellableUnits = useMemo(
     () => units.filter((u) => {
       const hasFlag = u.kind === "apartment" || u.kind === "parking";
       return hasFlag && (u.status === "available" || u.status === "sold");
     }),
-    [units]
+    [units],
   );
+
+  const overdueDays = (dueDate: string) => {
+    const today = new Date().toISOString().slice(0, 10);
+    if (dueDate >= today) return null;
+    return Math.floor((Date.now() - new Date(dueDate).getTime()) / 86400000);
+  };
 
   const resetNewForm = () => {
     setFContractNo(""); setFUnitId(""); setFCustomerId("");
@@ -117,14 +168,40 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
   };
 
   const handleRecordPayment = async () => {
-    if (!payScheduleId || payAmount <= 0) return;
+    if (!payScheduleId) return;
+    // Client-side validation
+    const selectedSchedule = contractSchedules.find(s => s.id === payScheduleId);
+    if (!selectedSchedule) return;
+    if (payAmount <= 0) { setError(t.paymentValidation.positiveRequired); return; }
+
+    // Find matching receivable for validation
+    const matchingRec = contractReceivables.find(r =>
+      r.due_date === selectedSchedule.due_date &&
+      Number(r.amount_xof) === Number(selectedSchedule.amount_xof)
+    );
+    if (matchingRec) {
+      const unpaid = Number(matchingRec.amount_xof) - Number(matchingRec.paid_amount_xof);
+      if (unpaid <= 0) { setError(t.paymentValidation.alreadyPaid); return; }
+      if (payAmount > unpaid) { setError(t.paymentValidation.amountExceeds); return; }
+    }
+    // Pre-fill to exact unpaid amount
+    const amount = matchingRec
+      ? Number(matchingRec.amount_xof) - Number(matchingRec.paid_amount_xof)
+      : payAmount;
+
     setSaving(true); setError("");
     const result = await recordSalePayment({
       contractId: selectedId!, scheduleId: payScheduleId,
-      amount: payAmount, paymentDate: payDate, receiptNo: payReceiptNo || undefined,
+      amount, paymentDate: payDate, receiptNo: payReceiptNo || undefined,
     });
     setSaving(false);
-    if (!result.success) setError(result.error ?? "Failed");
+    if (result.success) {
+      setPayScheduleId("");
+      setPayAmount(0);
+      setPayReceiptNo("");
+    } else {
+      setError(result.error ?? "Failed");
+    }
   };
 
   const handleAddFlexInstallment = async () => {
@@ -148,7 +225,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
 
   const handleTerminate = async () => {
     setSaving(true);
-    const result = await terminateSaleContract(selectedId!, termReason || "买方违约");
+    const result = await terminateSaleContract(selectedId!, termReason || (locale === "zh" ? "买方违约" : "Defaut acheteur"));
     setSaving(false);
     if (result.success) setPanel(null);
     else setError(result.error ?? "Failed");
@@ -163,6 +240,13 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
 
   const schedStatusVariant: Record<string, "neutral" | "success" | "danger" | "default"> = {
     pending: "neutral", paid: "success", overdue: "danger", cancelled: "default",
+  };
+
+  const schedStatusLabel = (s: string) => {
+    const labels: Record<string, string> = locale === "zh"
+      ? { pending: "待付", paid: "已付", overdue: "逾期", cancelled: "已取消" }
+      : { pending: "Attente", paid: "Paye", overdue: "Retard", cancelled: "Annule" };
+    return labels[s] ?? s;
   };
 
   return (
@@ -188,45 +272,51 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-card">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="border-b border-brand-warm-400 bg-brand-warm-50 text-[11px] font-semibold uppercase tracking-wider text-brand-ink-500">
               <tr>
-                <th className="px-4 py-3">{t.form.contractNo}</th>
-                <th className="px-4 py-3">{t.form.unit}</th>
-                <th className="px-4 py-3">{t.form.customer}</th>
-                <th className="px-4 py-3">{t.form.signedDate}</th>
-                <th className="px-4 py-3">{t.form.totalAmount}</th>
-                <th className="px-4 py-3">{t.form.paymentPlan}</th>
-                <th className="px-4 py-3">{t.installment.progress}</th>
-                <th className="px-4 py-3">{t.form.statusLabel}</th>
+                <th className="px-3 py-3">{t.form.contractNo}</th>
+                <th className="px-3 py-3">{t.form.unit}</th>
+                <th className="px-3 py-3">{t.form.customer}</th>
+                <th className="px-3 py-3">{t.form.signedDate}</th>
+                <th className="px-3 py-3">{t.form.totalAmount}</th>
+                <th className="px-3 py-3">{t.form.paymentPlan}</th>
+                <th className="px-3 py-3">{t.overview.collectionRate}</th>
+                <th className="px-3 py-3">{t.overview.overdueAmount}</th>
+                <th className="px-3 py-3">{t.form.transferStatus}</th>
+                <th className="px-3 py-3">{t.form.statusLabel}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-warm-400">
               {filtered.map((c) => {
                 const unit = units.find((u) => u.id === c.unit_id);
                 const cust = customers.find((cu) => cu.id === c.customer_id);
-                const cSchedules = schedules.filter((s) => s.sale_contract_id === c.id);
-                const paidSchedules = cSchedules.filter((s) => s.status === "paid");
-                const progress = cSchedules.length > 0
-                  ? Math.round((paidSchedules.length / cSchedules.length) * 100)
-                  : 0;
+                const recStats = contractReceivableMap.get(c.id);
+                const paid = recStats?.paid ?? 0;
+                const total = recStats?.total ?? Number(c.total_amount_xof);
+                const overdue = recStats?.overdue ?? 0;
+                const rate = total > 0 ? Math.round((paid / total) * 100) : 0;
                 return (
                   <tr key={c.id} className="cursor-pointer transition hover:bg-brand-warm-100" onClick={() => { setSelectedId(c.id); setPanel("detail"); setError(""); }}>
-                    <td className="px-4 py-3 font-semibold text-brand-ink-900">{c.contract_no}</td>
-                    <td className="px-4 py-3 text-brand-ink-500">{unit?.unit_no ?? "-"}</td>
-                    <td className="px-4 py-3 text-brand-ink-500">{cust?.name ?? "-"}</td>
-                    <td className="px-4 py-3 text-brand-ink-500">{c.signed_date}</td>
-                    <td className="px-4 py-3 text-brand-ink-500">{formatXof(Number(c.total_amount_xof))}</td>
-                    <td className="px-4 py-3 text-xs">{t.paymentPlan[c.payment_plan_type as keyof typeof t.paymentPlan]}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 font-semibold text-brand-ink-900">{c.contract_no}</td>
+                    <td className="px-3 py-3 text-brand-ink-500">{unit?.unit_no ?? "-"}</td>
+                    <td className="px-3 py-3 text-brand-ink-500">{cust?.name ?? "-"}</td>
+                    <td className="px-3 py-3 text-brand-ink-500">{c.signed_date}</td>
+                    <td className="px-3 py-3 text-brand-ink-500 font-medium">{formatXof(Number(c.total_amount_xof))}</td>
+                    <td className="px-3 py-3 text-xs">{t.paymentPlan[c.payment_plan_type as keyof typeof t.paymentPlan]}</td>
+                    <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-brand-warm-200">
-                          <div className="h-full rounded-full bg-brand-green-500" style={{ width: `${progress}%` }} />
+                        <div className="h-1.5 w-14 overflow-hidden rounded-full bg-brand-warm-200">
+                          <div className={cn("h-full rounded-full", rate >= 100 ? "bg-brand-green-500" : rate >= 50 ? "bg-brand-orange" : "bg-brand-red-400")} style={{ width: `${rate}%` }} />
                         </div>
-                        <span className="text-xs text-brand-ink-400">{progress}%</span>
+                        <span className={cn("text-xs font-medium tabular-nums", rate >= 100 ? "text-brand-green-700" : "text-brand-ink-500")}>{rate}%</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className={cn("px-3 py-3 text-xs font-medium tabular-nums", overdue > 0 ? "text-brand-red-600" : "text-brand-ink-300")}>
+                      {overdue > 0 ? formatXof(overdue) : "—"}
+                    </td>
+                    <td className="px-3 py-3 text-xs">{t.transferStatus[c.transfer_status as keyof typeof t.transferStatus]}</td>
+                    <td className="px-3 py-3">
                       <Badge variant={statusVariant[c.status]}>{t.contractStatus[c.status as keyof typeof t.contractStatus]}</Badge>
                     </td>
                   </tr>
@@ -249,7 +339,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
             <div className="space-y-4 px-5 py-5">
               <div><label className={labelClass}>{t.form.contractNo} *</label><input type="text" value={fContractNo} onChange={(e) => setFContractNo(e.target.value)} className={inputClass} /></div>
               <div><label className={labelClass}>{t.form.unit} *</label><select value={fUnitId} onChange={(e) => setFUnitId(e.target.value)} className={inputClass}><option value="">{t.form.noUnit}</option>{sellableUnits.map(u => <option key={u.id} value={u.id}>{u.unit_no} — {u.kind}</option>)}</select></div>
-              <div><label className={labelClass}>{t.form.customer} *</label><select value={fCustomerId} onChange={(e) => setFCustomerId(e.target.value)} className={inputClass}><option value="">{t.form.noCustomer}</option>{customers.filter(c => !c.is_blacklisted).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+              <div><label className={labelClass}>{t.form.customer} *</label><select value={fCustomerId} onChange={(e) => setFCustomerId(e.target.value)} className={inputClass}><option value="">{t.form.noCustomer}</option>{customers.filter(cc => !cc.is_blacklisted).map(cc => <option key={cc.id} value={cc.id}>{cc.name}</option>)}</select></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className={labelClass}>{t.form.signedDate}</label><input type="date" value={fSignedDate} onChange={(e) => setFSignedDate(e.target.value)} className={inputClass} /></div>
                 <div><label className={labelClass}>{t.form.totalAmount}</label><input type="number" value={fTotalAmount} onChange={(e) => setFTotalAmount(Number(e.target.value))} className={inputClass} /></div>
@@ -293,6 +383,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
               <button onClick={() => setPanel(null)} className="rounded p-1 text-brand-ink-300 hover:bg-brand-warm-100"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4 px-5 py-5">
+              {/* Contract info */}
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 <div><dt className="text-xs text-brand-ink-300">{t.form.unit}</dt><dd className="font-medium">{selectedUnit?.unit_no} — {selectedUnit?.kind}</dd></div>
                 <div><dt className="text-xs text-brand-ink-300">{t.form.customer}</dt><dd className="font-medium">{selectedCustomer?.name}</dd></div>
@@ -305,14 +396,47 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
                 {selected.agent_name && <div><dt className="text-xs text-brand-ink-300">{t.form.agentName}</dt><dd>{selected.agent_name}</dd></div>}
               </dl>
 
-              {/* Payment progress bar */}
-              <div>
-                <div className="flex justify-between text-xs text-brand-ink-400 mb-1">
-                  <span>{t.payment.totalPaid}: {formatXof(totalPaid)}</span>
-                  <span>{t.payment.remaining}: {formatXof(Math.max(0, Number(selected.total_amount_xof) - totalPaid))}</span>
+              {/* Payment overview */}
+              <div className="border-t border-brand-warm-400 pt-4">
+                <h4 className="text-sm font-bold text-brand-ink-900 flex items-center gap-1.5">
+                  <TrendingUp className="h-3.5 w-3.5 text-brand-orange" />{t.overview.title}
+                </h4>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded border border-brand-warm-400 bg-white px-3 py-2">
+                    <p className="text-brand-ink-400">{t.overview.totalPrice}</p>
+                    <p className="font-bold tabular-nums text-brand-ink-900">{formatXof(Number(selected.total_amount_xof))}</p>
+                  </div>
+                  <div className="rounded border border-brand-green-200 bg-brand-green-50 px-3 py-2">
+                    <p className="text-brand-ink-400">{t.overview.paidAmount}</p>
+                    <p className="font-bold tabular-nums text-brand-green-700">{formatXof(totalPaidRec || totalPaidPayments)}</p>
+                  </div>
+                  <div className={cn("rounded border px-3 py-2", (totalReceivableRec - totalPaidRec) > 0 ? "border-brand-orange-200 bg-brand-orange-50" : "border-brand-green-200 bg-brand-green-50")}>
+                    <p className="text-brand-ink-400">{t.overview.unpaidAmount}</p>
+                    <p className={cn("font-bold tabular-nums", (totalReceivableRec - totalPaidRec) > 0 ? "text-brand-orange-700" : "text-brand-green-700")}>
+                      {formatXof(Math.max(0, totalReceivableRec - totalPaidRec))}
+                    </p>
+                  </div>
+                  <div className={cn("rounded border px-3 py-2", totalOverdueRec > 0 ? "border-brand-red-200 bg-brand-red-50" : "border-brand-green-200 bg-brand-green-50")}>
+                    <p className="text-brand-ink-400">{t.overview.overdueAmount}</p>
+                    <p className={cn("font-bold tabular-nums", totalOverdueRec > 0 ? "text-brand-red-700" : "text-brand-green-700")}>
+                      {totalOverdueRec > 0 ? formatXof(totalOverdueRec) : "—"}
+                    </p>
+                  </div>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-brand-warm-200">
-                  <div className="h-full rounded-full bg-brand-orange transition" style={{ width: `${Math.min(100, Math.round((totalPaid / Number(selected.total_amount_xof)) * 100))}%` }} />
+                {/* Progress bar */}
+                <div className="mt-2">
+                  <div className="flex justify-between text-[10px] text-brand-ink-400 mb-1">
+                    <span>{t.overview.collectionRate}</span>
+                    <span className="tabular-nums font-medium">
+                      {totalReceivableRec > 0 ? Math.round((totalPaidRec / totalReceivableRec) * 100) : 0}%
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-brand-warm-200">
+                    <div
+                      className={cn("h-full rounded-full transition-all", totalPaidRec >= totalReceivableRec ? "bg-brand-green-500" : "bg-brand-orange")}
+                      style={{ width: `${totalReceivableRec > 0 ? Math.min(100, Math.round((totalPaidRec / totalReceivableRec) * 100)) : 0}%` }}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -320,38 +444,101 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
               <div className="border-t border-brand-warm-400 pt-4">
                 <h4 className="text-sm font-bold text-brand-ink-900">{t.installment.title}</h4>
                 {contractSchedules.length === 0 ? (
-                  <p className="mt-1 text-xs text-brand-ink-300">暂无分期计划</p>
+                  <p className="mt-1 text-xs text-brand-ink-300">{locale === "zh" ? "暂无分期计划" : "Aucun echeancier"}</p>
                 ) : (
-                  <ul className="mt-2 space-y-1.5">
-                    {contractSchedules.map((s) => (
-                      <li key={s.id} className="flex items-center justify-between rounded border border-brand-warm-400 bg-brand-warm-50 px-3 py-2 text-xs">
-                        <span className="font-medium text-brand-ink-600">#{s.installment_no}</span>
-                        <span className="text-brand-ink-400">{s.due_date}</span>
-                        <span className="font-semibold">{formatXof(Number(s.amount_xof))}</span>
-                        <Badge variant={schedStatusVariant[s.status]} size="sm">
-                          {t.installment[s.status as keyof typeof t.installment] ?? s.status}
-                        </Badge>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="mt-2 space-y-1.5">
+                    {contractSchedules.map((s) => {
+                      const matchingRec = contractReceivables.find(r =>
+                        r.due_date === s.due_date && Number(r.amount_xof) === Number(s.amount_xof)
+                      );
+                      const recPaid = matchingRec ? Number(matchingRec.paid_amount_xof) : (s.status === "paid" ? Number(s.amount_xof) : 0);
+                      const recUnpaid = Number(s.amount_xof) - recPaid;
+                      const od = overdueDays(s.due_date);
+                      const isOverdue = s.status === "overdue" || (od !== null && od > 0 && s.status !== "paid");
+                      return (
+                        <div
+                          key={s.id}
+                          className={cn(
+                            "flex items-center justify-between rounded border px-3 py-2 text-xs gap-1",
+                            isOverdue ? "border-brand-red-200 bg-brand-red-50/50" :
+                            s.status === "paid" ? "border-brand-green-200 bg-brand-green-50/50" :
+                            "border-brand-warm-400 bg-brand-warm-50",
+                          )}
+                        >
+                          <span className="font-medium text-brand-ink-600 min-w-[24px]">#{s.installment_no}</span>
+                          <span className={cn("text-brand-ink-400 min-w-[72px]", isOverdue && "text-brand-red-600")}>
+                            {s.due_date}
+                            {od !== null && od > 0 && <span className="ml-1 text-[9px] text-brand-red-500">+{od}</span>}
+                          </span>
+                          <span className="font-semibold tabular-nums min-w-[80px] text-right">{formatXof(Number(s.amount_xof))}</span>
+                          {matchingRec && (
+                            <>
+                              <span className="tabular-nums text-brand-green-600 min-w-[80px] text-right">{formatXof(recPaid)}</span>
+                              <span className={cn("tabular-nums font-semibold min-w-[80px] text-right", recUnpaid > 0 ? "text-brand-red-600" : "text-brand-green-600")}>
+                                {formatXof(recUnpaid)}
+                              </span>
+                            </>
+                          )}
+                          <Badge variant={schedStatusVariant[s.status]} size="sm">
+                            {schedStatusLabel(s.status)}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
 
                 {/* Record payment */}
-                {selected.status === "active" && contractSchedules.some(s => s.status === "pending") && (
+                {selected.status === "active" && contractSchedules.some(s => s.status === "pending" || s.status === "overdue") && (
                   <div className="mt-3 space-y-2 rounded border border-brand-warm-400 bg-brand-warm-50 p-3">
                     <div>
                       <label className="text-xs text-brand-ink-400">{t.payment.selectInstallment}</label>
-                      <select value={payScheduleId} onChange={(e) => { setPayScheduleId(e.target.value); const s = contractSchedules.find(i => i.id === e.target.value); if (s) setPayAmount(Number(s.amount_xof)); }} className={inputClass}>
+                      <select
+                        value={payScheduleId}
+                        onChange={(e) => {
+                          setPayScheduleId(e.target.value);
+                          if (!e.target.value) { setPayAmount(0); return; }
+                          const s = contractSchedules.find(i => i.id === e.target.value);
+                          if (s) {
+                            const matchingRec = contractReceivables.find(r =>
+                              r.due_date === s.due_date && Number(r.amount_xof) === Number(s.amount_xof)
+                            );
+                            const unpaid = matchingRec
+                              ? Number(matchingRec.amount_xof) - Number(matchingRec.paid_amount_xof)
+                              : Number(s.amount_xof);
+                            setPayAmount(unpaid);
+                          }
+                        }}
+                        className={inputClass}
+                      >
                         <option value="">-</option>
-                        {contractSchedules.filter(s => s.status === "pending").map(s => <option key={s.id} value={s.id}>#{s.installment_no} — {formatXof(Number(s.amount_xof))} ({s.due_date})</option>)}
+                        {contractSchedules.filter(s => s.status !== "paid" && s.status !== "cancelled").map(s => {
+                          const matchingRec = contractReceivables.find(r =>
+                            r.due_date === s.due_date && Number(r.amount_xof) === Number(s.amount_xof)
+                          );
+                          const unpaid = matchingRec
+                            ? Number(matchingRec.amount_xof) - Number(matchingRec.paid_amount_xof)
+                            : Number(s.amount_xof);
+                          return (
+                            <option key={s.id} value={s.id}>
+                              #{s.installment_no} — {formatXof(Number(s.amount_xof))} ({locale === "zh" ? "未收" : "du"}: {formatXof(unpaid)}) {s.due_date}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div><label className="text-xs text-brand-ink-400">{t.payment.amount}</label><input type="number" value={payAmount} onChange={(e) => setPayAmount(Number(e.target.value))} className={inputClass} /></div>
-                      <div><label className="text-xs text-brand-ink-400">{t.payment.paymentDate}</label><input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className={inputClass} /></div>
-                    </div>
-                    <div><label className="text-xs text-brand-ink-400">{t.payment.receiptNo}</label><input type="text" value={payReceiptNo} onChange={(e) => setPayReceiptNo(e.target.value)} className={inputClass} /></div>
-                    <button onClick={handleRecordPayment} disabled={saving} className="w-full rounded bg-brand-ink-900 py-1.5 text-xs font-semibold text-white hover:bg-brand-ink-700 disabled:opacity-50"><DollarSign className="mr-1 inline h-3 w-3" />{t.payment.record}</button>
+                    {payScheduleId && (
+                      <>
+                        <div className="rounded bg-white px-2 py-1 text-xs text-brand-ink-500">
+                          {locale === "zh" ? "金额自动填入未收金额（全额收款）" : "Montant auto-rempli (paiement total)"}: <span className="font-bold text-brand-ink-900">{formatXof(payAmount)}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div><label className="text-xs text-brand-ink-400">{t.payment.paymentDate}</label><input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className={inputClass} /></div>
+                          <div><label className="text-xs text-brand-ink-400">{t.payment.receiptNo}</label><input type="text" value={payReceiptNo} onChange={(e) => setPayReceiptNo(e.target.value)} className={inputClass} /></div>
+                        </div>
+                        <button onClick={handleRecordPayment} disabled={saving} className="w-full rounded bg-brand-ink-900 py-1.5 text-xs font-semibold text-white hover:bg-brand-ink-700 disabled:opacity-50"><DollarSign className="mr-1 inline h-3 w-3" />{t.payment.record}</button>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -371,7 +558,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
               {/* Transfer status update */}
               {selected.status === "active" && (
                 <div className="border-t border-brand-warm-400 pt-4">
-                  <h4 className="text-sm font-bold text-brand-ink-900">过户跟进</h4>
+                  <h4 className="text-sm font-bold text-brand-ink-900">{locale === "zh" ? "过户跟进" : "Suivi transfert"}</h4>
                   <div className="mt-2 space-y-2">
                     <div>
                       <label className="text-xs text-brand-ink-400">{t.form.transferStatus}</label>
@@ -405,7 +592,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, loc
               {/* Terminate */}
               {selected.status === "active" && (
                 <div className="border-t border-brand-warm-400 pt-4">
-                  <h4 className="text-sm font-bold text-brand-red-600">{t.terminate.title}</h4>
+                  <h4 className="text-sm font-bold text-brand-red-600 flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" />{t.terminate.title}</h4>
                   <p className="text-xs text-brand-ink-400 mt-1">{t.terminate.description}</p>
                   <div className="mt-2 space-y-2">
                     <div><label className="text-xs text-brand-ink-400">{t.terminate.reason}</label><input type="text" value={termReason} onChange={(e) => setTermReason(e.target.value)} className={inputClass} /></div>

@@ -434,7 +434,20 @@ export const dictionaries = {
         confirm: "确认终止合同",
         description: "终止后房源恢复可售状态，已收款项保留记录。",
         reason: "终止原因"
-      }
+      },
+      overview: {
+        title: "回款概览",
+        totalPrice: "合同总价",
+        paidAmount: "已收金额",
+        unpaidAmount: "未收金额",
+        overdueAmount: "逾期金额",
+        collectionRate: "回款率",
+      },
+      paymentValidation: {
+        amountExceeds: "金额不能超过未收金额",
+        alreadyPaid: "该期已付清",
+        positiveRequired: "金额必须大于0",
+      },
     },
     customers: {
       title: "客户档案",
@@ -1289,7 +1302,20 @@ export const dictionaries = {
         confirm: "Confirmer resiliation",
         description: "Le lot redevient disponible. Les paiements restent enregistres.",
         reason: "Motif"
-      }
+      },
+      overview: {
+        title: "Apercu des encaissements",
+        totalPrice: "Prix total",
+        paidAmount: "Montant encaisse",
+        unpaidAmount: "Montant impaye",
+        overdueAmount: "Montant en retard",
+        collectionRate: "Taux d'encaissement",
+      },
+      paymentValidation: {
+        amountExceeds: "Le montant ne peut pas depasser le du",
+        alreadyPaid: "Cette echeance est deja payee",
+        positiveRequired: "Le montant doit etre positif",
+      },
     },
     customers: {
       title: "Dossiers clients",

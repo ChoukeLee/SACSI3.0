@@ -5,4 +5,5 @@ export {
   addFlexibleInstallment,
   updateTransferStatus,
   terminateSaleContract,
+  syncSaleOverdueStatuses,
 } from "./actions";
