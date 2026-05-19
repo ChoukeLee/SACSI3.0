@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -21,13 +20,11 @@ export function AppShell({
   const labels = getDesktopNavLabels(locale);
   const otherLocale: Locale = locale === "zh" ? "fr" : "zh";
   const roleLabel = userRole ? labels.roles[userRole] : "";
-  const router = useRouter();
 
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.replace("/login");
-    router.refresh();
+    window.location.href = "/login";
   };
 
   return (
