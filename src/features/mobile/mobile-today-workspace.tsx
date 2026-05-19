@@ -109,7 +109,7 @@ export function MobileTodayWorkspace({
     setActionLoading(true);
     try {
       await checkOut(checkoutTarget.booking.id, {});
-      router.refresh();
+      router.replace(window.location.pathname + window.location.search);
     } catch (e) {
       console.error("Checkout failed:", e);
     } finally {
@@ -123,7 +123,7 @@ export function MobileTodayWorkspace({
     setActionLoading(true);
     try {
       await completeCleaning(cleaningTarget.cleaningTask.id);
-      router.refresh();
+      router.replace(window.location.pathname + window.location.search);
     } catch (e) {
       console.error("Cleaning completion failed:", e);
     } finally {

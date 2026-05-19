@@ -30,7 +30,13 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   const t = dictionaries[locale].dailyRentals;
   const router = useRouter();
   const isNew = !booking;
-  const refresh = () => { router.refresh(); onChanged(); };
+
+  // router.refresh() (soft RSC re-fetch) can fail to propagate new bookings
+  // to the calendar grid. Hard navigation to current path guarantees fresh data.
+  const refresh = () => {
+    router.replace(window.location.pathname + window.location.search);
+    onChanged();
+  };
 
   const [newCustomerId, setNewCustomerId] = useState("");
   const [newCheckIn, setNewCheckIn] = useState(defaultDate ?? "");
