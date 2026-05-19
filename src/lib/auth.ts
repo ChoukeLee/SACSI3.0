@@ -35,7 +35,7 @@ const rolePermissions: Record<UserRole, string[]> = {
   ],
   finance: [
     "units:read",
-    "customers:read",
+    "customers:read", "customers:write",
     "daily_rentals:read",
     "leases:read",
     "sales:read",
@@ -44,11 +44,11 @@ const rolePermissions: Record<UserRole, string[]> = {
     "settings:read",
   ],
   front_desk: [
-    "units:read",
+    "units:read", "units:write",
     "customers:read", "customers:write",
     "daily_rentals:read", "daily_rentals:write",
-    "leases:read", "leases:write",
-    "sales:read", "sales:write",
+    "leases:read",
+    "sales:read",
     "finance:read",
     "reports:read",
     "settings:read",
@@ -61,17 +61,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
-
-  // In development without auth, return a default admin user so the app is fully functional.
-  // Replace with null return when auth UI (login page) is implemented.
-  if (!user) {
-    return {
-      id: "dev-user",
-      email: "dev@localhost",
-      role: "admin",
-      displayName: "管理员",
-    };
-  }
+  if (!user) return null;
 
   const { data: profile } = await supabase
     .from("user_profiles")
@@ -111,4 +101,28 @@ export async function requireRole(...roles: UserRole[]): Promise<CurrentUser> {
     throw new Error(`Role required: ${roles.join(" or ")}`);
   }
   return user;
+}
+
+// ── Page access ──
+
+/** Roles that can access each route section. */
+const pageAccess: Record<string, UserRole[]> = {
+  management: ["admin", "boss", "finance"],
+  finance: ["admin", "boss", "finance"],
+  settings: ["admin"],
+  reports: ["admin", "boss", "finance"],
+  "daily-rentals": ["admin", "front_desk", "finance", "boss"],
+  leases: ["admin", "front_desk", "finance", "boss"],
+  sales: ["admin", "front_desk", "finance", "boss"],
+  customers: ["admin", "front_desk", "finance", "boss"],
+};
+
+/**
+ * Check if a role can access a page section.
+ * Returns the user if permitted, otherwise null.
+ */
+export function canAccessPage(role: UserRole, section: string): boolean {
+  const allowed = pageAccess[section];
+  if (!allowed) return true; // unknown sections default to open
+  return allowed.includes(role);
 }

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { AppShellWrapper } from "@/components/app-shell-wrapper";
+import { getCurrentUser } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,13 +12,15 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: "#C96F2D" };
 
-/* PERF: AppShellWrapper in root layout — sidebar/header/nav persist across ALL page navigations.
-   Previously each page.tsx wrapped itself in <AppShell>, causing full unmount/remount on every click. */
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const user = await getCurrentUser();
+
   return (
     <html lang="zh-CN">
       <body>
-        <AppShellWrapper>{children}</AppShellWrapper>
+        <AppShellWrapper userRole={user?.role} userDisplayName={user?.displayName}>
+          {children}
+        </AppShellWrapper>
         <script defer dangerouslySetInnerHTML={{ __html: `
           if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
             navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(reg){reg.unregister()})});

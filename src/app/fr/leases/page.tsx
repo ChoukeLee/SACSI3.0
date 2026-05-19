@@ -1,6 +1,8 @@
 import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { LeaseList } from "@/features/leases";
 import { DesktopOnly } from "@/features/mobile";
@@ -9,6 +11,10 @@ import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow } from "@/types
 export const dynamic = "force-dynamic";
 
 export default async function FrenchLeasesPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (!["admin","front_desk","finance","boss"].includes(user.role)) redirect("/");
+
   const t = dictionaries.fr.leases;
   const supabase = await createClient();
 

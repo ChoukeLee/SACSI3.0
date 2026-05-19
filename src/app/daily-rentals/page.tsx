@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
 import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
@@ -10,6 +12,10 @@ import type { CustomerSummary } from "@/features/daily-rentals/calendar";
 export const dynamic = "force-dynamic";
 
 export default async function DailyRentalsPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (!["admin", "front_desk", "finance", "boss"].includes(user.role)) redirect("/");
+
   const t = dictionaries.zh.dailyRentals;
   const supabase = await createClient();
   const { data: building } = await supabase.from("buildings").select("id").eq("code", "SASCI11").single();

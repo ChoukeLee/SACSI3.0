@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ManagementDashboard } from "@/features/management";
 import type {
@@ -8,6 +10,10 @@ import type {
 export const dynamic = "force-dynamic";
 
 export default async function ManagementPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (!["admin", "boss", "finance"].includes(user.role)) redirect("/");
+
   const supabase = await createClient();
 
   const [

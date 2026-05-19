@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireRole } from "@/lib/auth";
 import { convertToXof } from "@/lib/currency";
 import type { LedgerEntryRow } from "@/types/database";
 import type { CurrencyCode } from "@/types/domain";
@@ -21,6 +22,8 @@ export async function addLedgerEntry(input: {
   description?: string;
   receiptNo?: string;
 }): Promise<{ success: boolean; data?: LedgerEntryRow; error?: string }> {
+  await requireRole("admin", "finance");
+
   const supabase = await createClient();
 
   const amountXof = convertToXof(input.amount, input.currency, input.exchangeRateToXof);
@@ -44,7 +47,6 @@ export async function addLedgerEntry(input: {
 
   if (error) return { success: false, error: error.message };
 
-  // Also record as standalone payment if receipt_no is provided (for manual entries)
   if (input.receiptNo && (input.direction === "income" || input.direction === "liability_in")) {
     await supabase.from("payments").insert({
       source_type: "manual",
@@ -68,7 +70,3 @@ export async function addLedgerEntry(input: {
   revalidatePath("/fr/finance");
   return { success: true, data };
 }
-
-// ── CSV export (basic, client-side) ──
-// Not a server action — pure string builder, kept separate from "use server" exports.
-// Callers can use: buildLedgerCsv(entries) then trigger download client-side.

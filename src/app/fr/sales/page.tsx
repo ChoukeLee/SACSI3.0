@@ -1,6 +1,8 @@
 import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SaleList } from "@/features/sales";
 import { DesktopOnly } from "@/features/mobile";
@@ -9,6 +11,10 @@ import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, Pay
 export const dynamic = "force-dynamic";
 
 export default async function FrenchSalesPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (!["admin","front_desk","finance","boss"].includes(user.role)) redirect("/");
+
   const t = dictionaries.fr.sales;
   const supabase = await createClient();
 

@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import type { UserRole } from "@/lib/auth";
@@ -8,25 +10,31 @@ import { NotificationBell } from "@/features/notifications";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { getDesktopNavLabels } from "@/lib/nav-labels";
+import { createClient } from "@/lib/supabase/client";
 
 export function AppShell({
-  children, locale = "zh", userRole, notifications = [],
+  children, locale = "zh", userRole, userDisplayName, notifications = [],
 }: {
-  children: React.ReactNode; locale?: Locale; userRole?: UserRole;
+  children: React.ReactNode; locale?: Locale; userRole?: UserRole; userDisplayName?: string;
   notifications?: { id: string; title: string; body: string; read_at: string | null; created_at: string; due_at: string | null }[];
 }) {
   const labels = getDesktopNavLabels(locale);
   const otherLocale: Locale = locale === "zh" ? "fr" : "zh";
-  const roleLabel = userRole ? labels.roles[userRole] : labels.roles.admin;
+  const roleLabel = userRole ? labels.roles[userRole] : "";
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.replace("/login");
+    router.refresh();
+  };
 
   return (
     <div className="min-h-screen bg-brand-warm">
-      {/* Desktop sidebar — self-contained client component, uses usePathname internally */}
-      <DesktopSidebar locale={locale} />
+      <DesktopSidebar locale={locale} userRole={userRole} />
 
-      {/* Main area */}
       <div className="lg:pl-56">
-        {/* Header — no backdrop-blur for GPU perf, solid bg */}
         <header className="sticky top-0 z-sticky border-b border-brand-warm-400 bg-white">
           <div className="flex h-11 items-center justify-between px-4 sm:px-6 lg:px-8">
             <p className="text-[12px] font-medium text-brand-ink-500">{labels.building}</p>
@@ -38,19 +46,28 @@ export function AppShell({
               >
                 {otherLocale.toUpperCase()}
               </Link>
-              <span className="hidden rounded-full bg-brand-orange-50 px-2.5 py-0.5 text-[10px] font-semibold text-brand-orange-600 ring-1 ring-inset ring-brand-orange-200/50 sm:inline-flex">
-                {roleLabel}
-              </span>
+              {roleLabel && (
+                <span className="hidden rounded-full bg-brand-orange-50 px-2.5 py-0.5 text-[10px] font-semibold text-brand-orange-600 ring-1 ring-inset ring-brand-orange-200/50 sm:inline-flex">
+                  {roleLabel}
+                </span>
+              )}
+              {userRole && (
+                <button
+                  onClick={handleLogout}
+                  className="rounded-md p-1.5 text-brand-ink-400 hover:bg-brand-warm-100 hover:text-brand-red-500 transition-colors duration-[100ms]"
+                  title={locale === "zh" ? "登出" : "Deconnexion"}
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           </div>
         </header>
 
-        {/* Page content */}
         <main className="px-4 py-5 pb-20 sm:px-6 lg:px-8 lg:py-7">{children}</main>
       </div>
 
-      {/* Mobile bottom nav — self-contained client component */}
-      <MobileBottomNav locale={locale} />
+      <MobileBottomNav locale={locale} userRole={userRole} />
     </div>
   );
 }

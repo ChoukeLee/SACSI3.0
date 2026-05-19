@@ -2,12 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireRole } from "@/lib/auth";
+import { requireAuth, requireRole } from "@/lib/auth";
 import type { SaleContractRow, SalePaymentScheduleRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
 import {
   createReceivable, syncReceivablesForSource, cancelReceivablesForSource,
 } from "@/features/finance/receivables";
+
+// ── Permission guards ──
+async function guardSaleWrite() {
+  const user = await requireAuth();
+  if (user.role === "boss" || user.role === "finance") throw new Error("Only admin or front_desk can modify sales.");
+}
+async function guardSaleFinance() { await requireRole("admin", "finance"); }
 
 // ── Create sale contract ──
 
@@ -25,6 +32,7 @@ export async function createSaleContract(input: {
   agencyCommissionXof?: number;
   agencyCommissionPaid?: boolean;
 }): Promise<{ success: boolean; data?: SaleContractRow; error?: string }> {
+  await guardSaleWrite();
   const supabase = await createClient();
 
   if (!input.contractNo.trim()) {
@@ -158,6 +166,7 @@ export async function recordSalePayment(input: {
   paymentDate: string;
   receiptNo?: string;
 }): Promise<{ success: boolean; error?: string }> {
+  await guardSaleFinance();
   if (input.amount <= 0) return { success: false, error: "Amount must be positive." };
 
   const supabase = await createClient();

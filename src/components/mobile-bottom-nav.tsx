@@ -15,7 +15,7 @@ const mobileTabs = [
   { key: "profile" as const, href: "/customers", icon: Users },
 ];
 
-export function MobileBottomNav({ locale }: { locale: Locale }) {
+export function MobileBottomNav({ locale, userRole: _userRole }: { locale: Locale; userRole?: string }) {
   const pathname = usePathname();
   const labels = getMobileNavLabels(locale);
 

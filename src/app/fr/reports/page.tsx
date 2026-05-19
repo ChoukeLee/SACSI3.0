@@ -1,5 +1,7 @@
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ReportsView } from "@/features/reports";
 import { DesktopOnly } from "@/features/mobile";
@@ -8,6 +10,10 @@ import type { LedgerEntryRow, DailyBookingRow, UnitRow, LeaseContractRow, SaleCo
 export const dynamic = "force-dynamic";
 
 export default async function FrenchReportsPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (!["admin","boss","finance"].includes(user.role)) redirect("/");
+
   const t = dictionaries.fr.reports;
   const supabase = await createClient();
 

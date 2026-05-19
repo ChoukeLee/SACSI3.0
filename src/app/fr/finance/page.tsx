@@ -1,6 +1,8 @@
 import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { LedgerList } from "@/features/finance";
 import { ReceivableList } from "@/features/finance/receivable-list";
@@ -11,6 +13,10 @@ import type { LedgerEntryRow, ReceivableRow } from "@/types/database";
 export const dynamic = "force-dynamic";
 
 export default async function FrenchFinancePage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (!["admin","boss","finance"].includes(user.role)) redirect("/");
+
   const t = dictionaries.fr.finance;
   const supabase = await createClient();
 

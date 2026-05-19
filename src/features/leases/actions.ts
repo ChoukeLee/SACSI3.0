@@ -9,6 +9,13 @@ import {
   createReceivable, syncReceivablesForSource, cancelReceivablesForSource,
 } from "@/features/finance/receivables";
 
+// ── Permission guards ──
+async function guardLeaseWrite() {
+  const user = await requireAuth();
+  if (user.role === "boss") throw new Error("Boss role is read-only.");
+}
+async function guardLeaseFinance() { await requireRole("admin", "finance"); }
+
 // ── Create contract ──
 
 export async function createLeaseContract(input: {
@@ -26,6 +33,7 @@ export async function createLeaseContract(input: {
   signerName?: string;
   status?: ContractStatus;
 }): Promise<{ success: boolean; data?: LeaseContractRow; error?: string }> {
+  await guardLeaseWrite();
   const supabase = await createClient();
 
   if (!input.contractNo.trim()) {
@@ -153,6 +161,7 @@ export async function createLeaseContract(input: {
 export async function activateContract(
   contractId: string
 ): Promise<{ success: boolean; error?: string }> {
+  await guardLeaseWrite();
   const supabase = await createClient();
 
   const { data: contract } = await supabase
@@ -233,6 +242,7 @@ export async function recordRentPayment(input: {
   receiptNo?: string;
   coveringMonths?: number;
 }): Promise<{ success: boolean; error?: string }> {
+  await guardLeaseFinance();
   if (input.amount <= 0) {
     return { success: false, error: "Amount must be positive." };
   }
@@ -313,6 +323,7 @@ export async function processMoveOut(input: {
   depositDeductionXof: number;
   depositRefundXof: number;
 }): Promise<{ success: boolean; error?: string }> {
+  await guardLeaseFinance();
   const supabase = await createClient();
 
   const { data: contract } = await supabase

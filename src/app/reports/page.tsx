@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -8,6 +10,10 @@ import type { LedgerEntryRow, DailyBookingRow, UnitRow, LeaseContractRow, SaleCo
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (!["admin", "boss", "finance"].includes(user.role)) redirect("/");
+
   const t = dictionaries.zh.reports;
   const supabase = await createClient();
 
