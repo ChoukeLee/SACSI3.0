@@ -30,7 +30,7 @@ export function DesktopSidebar({ locale }: { locale: Locale }) {
   const isActive = (href: string) => {
     const localized = routeFor(locale, href);
     if (href === "/") return pathname === "/" || pathname === "/fr";
-    return pathname === localized || pathname.startsWith(localized + "/");
+    return pathname === localized;
   };
 
   return (
