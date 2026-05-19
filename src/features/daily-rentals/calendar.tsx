@@ -20,22 +20,20 @@ interface CalendarProps {
   locale: Locale;
 }
 
-/* PERF: booking color classes as module-level constant — avoids object allocation every render */
 const BOOKING_COLORS: Record<string, string> = {
-  pending_review: "bg-amber-100 text-amber-800",
-  confirmed: "bg-blue-100 text-blue-800",
-  checked_in_fixed: "bg-orange-200 text-orange-900",
-  checked_in_open: "bg-amber-200 text-amber-900",
-  checked_out: "bg-brand-ink-100 text-brand-ink-500",
-  cancelled: "bg-brand-ink-50 text-brand-ink-300",
+  pending_review: "bg-brand-amber-100 text-brand-amber-700",
+  confirmed: "bg-brand-sky-100 text-brand-sky-700",
+  checked_in_fixed: "bg-brand-orange-200 text-brand-orange-800",
+  checked_in_open: "bg-brand-amber-200 text-brand-amber-800",
+  checked_out: "bg-brand-warm-100 text-brand-ink-500",
+  cancelled: "bg-brand-warm-50 text-brand-ink-300",
 };
 
 const MAINTENANCE_STATUSES = new Set(["available", "reserved", "daily_occupied", "cleaning_pending"]);
 
-/* PERF: single shared empty cell class — avoids cn() call per empty cell */
-const EMPTY_CELL = "group flex h-11 cursor-pointer items-center justify-center border-b border-r border-black/5 transition-colors duration-fast hover:bg-brand-orange-50 focus-visible:bg-brand-orange-50 focus-visible:outline-none";
+const EMPTY_CELL = "group flex h-11 cursor-pointer items-center justify-center border-b border-r border-brand-warm-400 transition-colors duration-fast hover:bg-brand-orange-50 focus-visible:bg-brand-orange-50 focus-visible:outline-none";
 
-const NAV_BTN = "rounded-lg border border-black/10 bg-white p-2 text-brand-ink-500 transition-all duration-fast hover:bg-brand-ink-50 hover:text-brand-ink-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500";
+const NAV_BTN = "rounded-lg border border-brand-warm-400 bg-white p-2 text-brand-ink-500 transition-all duration-fast hover:bg-brand-warm-50 hover:text-brand-ink-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange";
 
 export function DailyCalendar({ dailyUnits, bookings, customers, cleaningTasks, payments, locale }: CalendarProps) {
   const t = dictionaries[locale].dailyRentals;
@@ -46,7 +44,6 @@ export function DailyCalendar({ dailyUnits, bookings, customers, cleaningTasks, 
   const [newBookingDate, setNewBookingDate] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
-  /* PERF: pre-compute date strings once per month change, avoid toISOString in render loop */
   const { dayStrings, daysInMonth } = useMemo(() => {
     const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
     const days: Date[] = [];
@@ -63,7 +60,6 @@ export function DailyCalendar({ dailyUnits, bookings, customers, cleaningTasks, 
 
   const { todayStr, tomorrowStr } = dayStrings;
 
-  /* PERF: O(1) booking lookup — build Map<unitId, Map<dateStr, booking>> once, not per cell */
   const bookingMap = useMemo(() => {
     const map = new Map<string, Map<string, DailyBookingRow>>();
     for (const b of bookings) {
@@ -83,14 +79,12 @@ export function DailyCalendar({ dailyUnits, bookings, customers, cleaningTasks, 
     return map;
   }, [bookings, todayStr, tomorrowStr]);
 
-  /* PERF: O(1) customer abbreviation lookup — Map<id, abbr> pre-built once */
   const abbrMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const c of customers) map.set(c.id, c.name.length > 3 ? c.name.slice(0, 3) : c.name);
     return map;
   }, [customers]);
 
-  /* PERF: pre-compute unit status flags — avoid array.includes per cell */
   const unitStatusMap = useMemo(() => {
     const map = new Map<string, string | null>();
     for (const u of dailyUnits) map.set(u.id, MAINTENANCE_STATUSES.has(u.status) ? null : u.status);
@@ -122,30 +116,30 @@ export function DailyCalendar({ dailyUnits, bookings, customers, cleaningTasks, 
           <button onClick={() => goToMonth(-1)} className={NAV_BTN} aria-label={t.calendar.prevMonth}><ChevronLeft className="h-4 w-4" /></button>
           <h3 className="text-base font-bold text-brand-ink-900">{monthLabel}</h3>
           <button onClick={() => goToMonth(1)} className={NAV_BTN} aria-label={t.calendar.nextMonth}><ChevronRight className="h-4 w-4" /></button>
-          <button onClick={goToToday} className="rounded-lg border border-black/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink-500 transition-all duration-fast hover:bg-brand-ink-50 focus-visible:outline-2 focus-visible:outline-brand-orange-500">{t.calendar.today}</button>
+          <button onClick={goToToday} className="rounded-lg border border-brand-warm-400 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink-500 transition-all duration-fast hover:bg-brand-warm-50 focus-visible:outline-2 focus-visible:outline-brand-orange">{t.calendar.today}</button>
         </div>
         <div className="hidden items-center gap-3 text-xs text-brand-ink-500 sm:flex">
-          <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-100 border border-emerald-300" />{t.calendar.legendAvailable}</span>
-          <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-100 border border-amber-300" />{t.calendar.legendReserved}</span>
-          <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-orange-200 border border-orange-400" />{t.calendar.legendBooked}</span>
-          <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-100 border border-red-300" />{t.calendar.legendMaintenance}</span>
+          <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand-green-100 border border-brand-green-300" />{t.calendar.legendAvailable}</span>
+          <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand-amber-100 border border-brand-amber-300" />{t.calendar.legendReserved}</span>
+          <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand-orange-200 border border-brand-orange-400" />{t.calendar.legendBooked}</span>
+          <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand-red-100 border border-brand-red-300" />{t.calendar.legendMaintenance}</span>
         </div>
       </div>
 
-      {/* Calendar grid — UX-REFACTOR: scroll-hint-x shows gradient on overflow, data-scroll-x preserves vertical scroll */}
-      <div className="overflow-auto rounded-lg border border-black/10 bg-white shadow-card scroll-hint-x" style={{ maxHeight: "calc(100vh - 200px)" }} data-scroll-x>
+      {/* Calendar grid */}
+      <div className="overflow-auto rounded-xl border border-brand-warm-400 bg-white shadow-card scroll-hint-x" style={{ maxHeight: "calc(100vh - 200px)" }} data-scroll-x>
         <div className="grid" style={{ gridTemplateColumns: `64px repeat(${daysInMonth.length}, 64px)` }} role="grid" aria-label={t.calendar.room}>
           {/* Header row */}
-          <div className="sticky left-0 top-0 z-30 flex h-8 items-center justify-center border-b border-r border-black/10 bg-brand-ink-100 text-[10px] font-semibold uppercase tracking-wider text-brand-ink-500" role="columnheader">{t.calendar.room}</div>
+          <div className="sticky left-0 top-0 z-30 flex h-8 items-center justify-center border-b border-r border-brand-warm-400 bg-brand-warm-100 text-[10px] font-semibold uppercase tracking-wider text-brand-ink-400" role="columnheader">{t.calendar.room}</div>
           {daysInMonth.map(date => {
             const dateStr = date.toISOString().slice(0, 10);
             const isToday = dateStr === todayStr;
             const isWeekend = date.getDay() === 0 || date.getDay() === 6;
             return (
               <div key={dateStr} className={cn(
-                "sticky top-0 z-20 flex h-8 flex-col items-center justify-center border-b border-r border-black/10 text-[10px]",
-                isToday && "bg-brand-orange-50 font-bold text-brand-orange-500",
-                isWeekend && !isToday && "bg-brand-ink-50 text-brand-ink-300",
+                "sticky top-0 z-20 flex h-8 flex-col items-center justify-center border-b border-r border-brand-warm-400 text-[10px]",
+                isToday && "bg-brand-orange-50 font-bold text-brand-orange-700",
+                isWeekend && !isToday && "bg-brand-warm-50 text-brand-ink-300",
                 !isToday && !isWeekend && "bg-white text-brand-ink-500"
               )} role="columnheader">
                 <span>{date.getDate()}</span>
@@ -157,21 +151,18 @@ export function DailyCalendar({ dailyUnits, bookings, customers, cleaningTasks, 
           {/* Room rows */}
           {dailyUnits.map(unit => (
             <div key={unit.id} className="contents" role="row">
-              <div className="sticky left-0 z-10 flex h-11 items-center justify-center border-b border-r border-black/10 bg-brand-ink-50 text-xs font-semibold text-brand-ink-900" role="rowheader">{unit.unit_no}</div>
+              <div className="sticky left-0 z-10 flex h-11 items-center justify-center border-b border-r border-brand-warm-400 bg-brand-warm-50 text-xs font-semibold text-brand-ink-900" role="rowheader">{unit.unit_no}</div>
               {daysInMonth.map(date => {
                 const dateStr = date.toISOString().slice(0, 10);
-                /* PERF: O(1) Map lookup instead of O(n) array scan */
                 const unitBM = bookingMap.get(unit.id);
                 const booking = unitBM?.get(dateStr) ?? null;
-                /* PERF: O(1) pre-computed status lookup */
                 const unitStatus = unitStatusMap.get(unit.id);
 
                 if (unitStatus) {
-                  return <div key={dateStr} className="flex h-11 items-center justify-center border-b border-r border-black/5 bg-red-50 text-[9px] font-medium text-red-600" title={statusLabels[unitStatus as UnitStatus]} role="gridcell">{statusLabels[unitStatus as UnitStatus].slice(0, 2)}</div>;
+                  return <div key={dateStr} className="flex h-11 items-center justify-center border-b border-r border-brand-warm-400 bg-brand-red-50 text-[9px] font-medium text-brand-red-600" title={statusLabels[unitStatus as UnitStatus]} role="gridcell">{statusLabels[unitStatus as UnitStatus].slice(0, 2)}</div>;
                 }
 
                 if (booking) {
-                  /* PERF: inline style computation avoids function call overhead per cell */
                   const isStart = dateStr === booking.check_in;
                   const status = booking.status;
                   let colorClass: string;
@@ -182,7 +173,7 @@ export function DailyCalendar({ dailyUnits, bookings, customers, cleaningTasks, 
                   const abbr = abbrMap.get(booking.customer_id) ?? "?";
                   return (
                     <div key={dateStr}
-                      className={`flex h-11 items-center justify-center text-[10px] font-medium cursor-pointer border-b border-r border-black/5 active:opacity-80 ${colorClass} ${isStart ? "rounded-l" : ""} ${isEnd ? "rounded-r" : ""}`}
+                      className={`flex h-11 items-center justify-center text-[10px] font-medium cursor-pointer border-b border-r border-brand-warm-400 active:opacity-80 ${colorClass} ${isStart ? "rounded-l" : ""} ${isEnd ? "rounded-r" : ""}`}
                       onClick={() => { setSelectedBookingId(booking.id); setNewBookingUnitId(null); setNewBookingDate(null); }}
                       title={`${abbr} — ${booking.check_in} → ${booking.checkout_mode === "open" ? "?" : booking.check_out}`}
                       role="gridcell" tabIndex={0} aria-label={`${abbr} ${booking.check_in}`}
@@ -199,7 +190,7 @@ export function DailyCalendar({ dailyUnits, bookings, customers, cleaningTasks, 
                     role="gridcell" tabIndex={0} aria-label={`${unit.unit_no} ${dateStr}`}
                     onKeyDown={e => { if (e.key === "Enter") { setNewBookingUnitId(unit.id); setNewBookingDate(dateStr); setSelectedBookingId(null); } }}
                   >
-                    <Plus className="hidden h-3 w-3 text-brand-orange-500 group-hover:block group-focus-visible:block" />
+                    <Plus className="hidden h-3 w-3 text-brand-orange group-hover:block group-focus-visible:block" />
                   </div>
                 );
               })}

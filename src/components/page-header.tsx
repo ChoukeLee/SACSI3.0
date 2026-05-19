@@ -1,4 +1,3 @@
-/* REFINED: cleaner hierarchy, more white space, restrained description */
 export function PageHeader({
   title, description, action,
 }: {
@@ -7,7 +6,7 @@ export function PageHeader({
   return (
     <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h1 className="text-xl font-semibold tracking-tighten text-brand-ink-900 sm:text-2xl">{title}</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-brand-ink-900 sm:text-2xl">{title}</h1>
         <p className="mt-1.5 max-w-2xl text-[14px] leading-relaxed text-brand-ink-400">{description}</p>
       </div>
       {action && <div className="shrink-0">{action}</div>}

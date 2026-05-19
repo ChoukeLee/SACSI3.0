@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo } from "react";
 import { Search, Plus, AlertTriangle, UserX, UserCheck, GitMerge, X, ChevronDown } from "lucide-react";
@@ -151,8 +151,8 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
   };
 
   const inputClass =
-    "w-full rounded border border-black/15 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-orange/30";
-  const labelClass = "block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1";
+    "w-full rounded border border-brand-warm-400 bg-white px-3 py-2 text-sm text-brand-ink-900 placeholder:text-brand-ink-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
+  const labelClass = "block text-xs font-semibold uppercase tracking-wide text-brand-ink-400 mb-1";
 
   const isFormOpen = formMode !== null;
   const isBlacklistOpen = blacklistPanelId !== null;
@@ -163,21 +163,21 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-brand-ink-300" />
             <input
               type="text"
               placeholder={t.searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-56 rounded border border-black/15 bg-white py-1.5 pl-8 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-orange/30"
+              className="w-56 rounded border border-brand-warm-400 bg-white py-1.5 pl-8 pr-3 text-sm text-brand-ink-600 placeholder:text-brand-ink-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30"
             />
           </div>
-          <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-brand-ink-500">
             <input
               type="checkbox"
               checked={showBlacklistedOnly}
               onChange={(e) => setShowBlacklistedOnly(e.target.checked)}
-              className="h-3.5 w-3.5 rounded border-slate-300 text-red-600 focus:ring-red-500"
+              className="h-3.5 w-3.5 rounded border-brand-warm-400 text-brand-red-600 focus:ring-brand-red-500"
             />
             {t.blacklist.title}
           </label>
@@ -185,7 +185,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
         <div className="flex items-center gap-2">
           <button
             disabled
-            className="inline-flex items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-1.5 text-xs font-medium text-slate-400"
+            className="inline-flex items-center gap-1.5 rounded border border-brand-warm-400 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink-300"
             title={t.actions.mergePlaceholder}
           >
             <GitMerge className="h-3.5 w-3.5" />
@@ -193,7 +193,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
           </button>
           <button
             onClick={openAdd}
-            className="inline-flex items-center gap-1.5 rounded bg-brand-orange px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-orange-600"
+            className="inline-flex items-center gap-1.5 rounded bg-brand-orange px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-ink-700"
           >
             <Plus className="h-3.5 w-3.5" />
             {t.actions.add}
@@ -203,29 +203,29 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
 
       {/* Blacklist warning banner */}
       {selected?.is_blacklisted && (
-        <div className="mb-4 flex items-center gap-2 rounded border border-red-200 bg-red-50 px-4 py-2.5 text-sm">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
-          <span className="font-semibold text-red-700">{t.blacklist.warnTitle}</span>
-          <span className="text-red-600">— {t.blacklist.warnMessage}</span>
+        <div className="mb-4 flex items-center gap-2 rounded border border-brand-red-200 bg-brand-red-50 px-4 py-2.5 text-sm">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-brand-red-600" />
+          <span className="font-semibold text-brand-red-700">{t.blacklist.warnTitle}</span>
+          <span className="text-brand-red-600">— {t.blacklist.warnMessage}</span>
         </div>
       )}
 
       {/* Table / Empty */}
       {filtered.length === 0 && !isFormOpen ? (
-        <div className="flex flex-col items-center gap-3 rounded-md border border-black/10 bg-white py-16 shadow-soft">
-          <p className="text-sm text-slate-400">{t.empty}</p>
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-brand-warm-400 bg-white py-16 shadow-card">
+          <p className="text-sm text-brand-ink-300">{t.empty}</p>
           <button
             onClick={openAdd}
-            className="inline-flex items-center gap-1.5 rounded bg-brand-orange px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-orange-600"
+            className="inline-flex items-center gap-1.5 rounded bg-brand-orange px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-ink-700"
           >
             <Plus className="h-3.5 w-3.5" />
             {t.actions.add}
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-md border border-black/10 bg-white shadow-soft">
+        <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-card">
           <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <thead className="bg-brand-warm-50 text-xs uppercase tracking-wide text-brand-ink-400">
               <tr>
                 <th className="px-4 py-3">{t.fields.name}</th>
                 <th className="px-4 py-3">{t.fields.phone}</th>
@@ -234,16 +234,16 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
                 <th className="px-4 py-3 sr-only">{t.actions.edit}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-black/10">
+            <tbody className="divide-y divide-brand-warm-400">
               {filtered.map((c) => (
                 <tr
                   key={c.id}
                   className={cn(
                     "cursor-pointer transition",
                     c.is_blacklisted
-                      ? "bg-red-50/50 hover:bg-red-50"
-                      : "hover:bg-orange-50/50",
-                    selectedId === c.id && "ring-1 ring-inset ring-brand-orange"
+                      ? "bg-brand-red-50/50 hover:bg-brand-red-50"
+                      : "hover:bg-brand-orange-50/50",
+                    selectedId === c.id && "ring-1 ring-inset ring-brand-orange-500"
                   )}
                   onClick={() => {
                     setSelectedId(selectedId === c.id ? null : c.id);
@@ -252,27 +252,27 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
                   }}
                 >
                   <td className="px-4 py-3">
-                    <span className="font-semibold text-brand-ink">{c.name}</span>
+                    <span className="font-semibold text-brand-ink-900">{c.name}</span>
                     {c.gender && (
-                      <span className="ml-1.5 text-xs text-slate-400">
+                      <span className="ml-1.5 text-xs text-brand-ink-300">
                         {t.gender[c.gender as keyof typeof t.gender] ?? c.gender}
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{c.phone ?? "-"}</td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-4 py-3 text-brand-ink-500">{c.phone ?? "-"}</td>
+                  <td className="px-4 py-3 text-brand-ink-500">
                     {c.document_type
                       ? t.documentTypes[c.document_type as keyof typeof t.documentTypes] ?? c.document_type
                       : "-"}
                   </td>
                   <td className="px-4 py-3">
                     {c.is_blacklisted ? (
-                      <span className="inline-flex items-center gap-1 rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                      <span className="inline-flex items-center gap-1 rounded bg-brand-red-100 px-2 py-0.5 text-xs font-semibold text-brand-red-700">
                         <AlertTriangle className="h-3 w-3" />
                         {c.blacklist_permanent ? t.blacklist.permanent : t.blacklist.temporary}
                       </span>
                     ) : (
-                      <span className="text-xs text-slate-400">-</span>
+                      <span className="text-xs text-brand-ink-300">-</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -281,7 +281,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
                         e.stopPropagation();
                         openEdit(c);
                       }}
-                      className="text-xs font-medium text-brand-orange transition hover:underline"
+                      className="text-xs font-medium text-brand-orange-600 transition hover:underline"
                     >
                       {t.actions.edit}
                     </button>
@@ -293,7 +293,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
         </div>
       )}
 
-      <p className="mt-3 text-xs text-slate-400">
+      <p className="mt-3 text-xs text-brand-ink-300">
         {filtered.length} / {customers.length} {locale === "fr" ? "clients" : "位客户"}
       </p>
 
@@ -301,14 +301,14 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
       {isFormOpen && (
         <>
           <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setFormMode(null)} />
-          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-auto border-l border-black/10 bg-white shadow-xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-black/10 bg-white px-5 py-4">
-              <h3 className="text-lg font-bold text-brand-ink">
+          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-400 bg-white px-5 py-4">
+              <h3 className="text-lg font-bold text-brand-ink-900">
                 {formMode.type === "add" ? t.actions.add : t.actions.edit}
               </h3>
               <button
                 onClick={() => setFormMode(null)}
-                className="rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                className="rounded p-1 text-brand-ink-300 transition hover:bg-brand-warm-100 hover:text-brand-ink-500"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -368,7 +368,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
                     formMode.type === "edit" ? "留空则不修改" : t.fields.documentNumber
                   }
                 />
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-1 text-xs text-brand-ink-300">
                   {formMode.type === "edit" ? "留空则保持原证件号不变" : "证件号将加密存储"}
                 </p>
               </div>
@@ -397,19 +397,19 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
                 />
               </div>
 
-              {formError && <p className="text-sm text-red-600">{formError}</p>}
+              {formError && <p className="text-sm text-brand-red-600">{formError}</p>}
 
               <div className="flex items-center gap-3 pt-2">
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="inline-flex items-center gap-1.5 rounded bg-brand-orange px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded bg-brand-orange px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-ink-700 disabled:opacity-50"
                 >
                   {saving ? "..." : t.actions.save}
                 </button>
                 <button
                   onClick={() => setFormMode(null)}
-                  className="rounded px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
+                  className="rounded px-4 py-2 text-sm font-medium text-brand-ink-500 transition hover:bg-brand-warm-100"
                 >
                   {t.actions.cancel}
                 </button>
@@ -421,46 +421,46 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
 
       {/* Selected row detail + blacklist controls */}
       {selected && !isFormOpen && !isBlacklistOpen && (
-        <div className="mt-4 rounded-md border border-black/10 bg-white p-4 shadow-soft">
+        <div className="mt-4 rounded-xl border border-brand-warm-400 bg-white p-4 shadow-card">
           <div className="flex items-start justify-between">
             <div className="space-y-1 text-sm">
               <p>
-                <span className="text-slate-400">{t.fields.name}:</span>{" "}
-                <span className="font-semibold text-brand-ink">{selected.name}</span>
+                <span className="text-brand-ink-300">{t.fields.name}:</span>{" "}
+                <span className="font-semibold text-brand-ink-900">{selected.name}</span>
               </p>
               {selected.gender && (
                 <p>
-                  <span className="text-slate-400">{t.fields.gender}:</span>{" "}
+                  <span className="text-brand-ink-300">{t.fields.gender}:</span>{" "}
                   {t.gender[selected.gender as keyof typeof t.gender] ?? selected.gender}
                 </p>
               )}
               {selected.phone && (
                 <p>
-                  <span className="text-slate-400">{t.fields.phone}:</span> {selected.phone}
+                  <span className="text-brand-ink-300">{t.fields.phone}:</span> {selected.phone}
                 </p>
               )}
               {selected.document_type && (
                 <p>
-                  <span className="text-slate-400">{t.fields.documentType}:</span>{" "}
+                  <span className="text-brand-ink-300">{t.fields.documentType}:</span>{" "}
                   {t.documentTypes[selected.document_type as keyof typeof t.documentTypes] ??
                     selected.document_type}
                 </p>
               )}
               {selected.notes && (
                 <p>
-                  <span className="text-slate-400">{t.fields.notes}:</span> {selected.notes}
+                  <span className="text-brand-ink-300">{t.fields.notes}:</span> {selected.notes}
                 </p>
               )}
               {selected.is_blacklisted && (
-                <div className="mt-2 rounded border border-red-200 bg-red-50 p-3">
-                  <p className="text-xs font-semibold text-red-700">{t.blacklist.title}</p>
+                <div className="mt-2 rounded border border-brand-red-200 bg-brand-red-50 p-3">
+                  <p className="text-xs font-semibold text-brand-red-700">{t.blacklist.title}</p>
                   {selected.blacklist_reason && (
-                    <p className="text-xs text-red-600">
+                    <p className="text-xs text-brand-red-600">
                       {t.blacklist.reason}: {selected.blacklist_reason}
                     </p>
                   )}
                   {selected.blacklist_date && (
-                    <p className="text-xs text-red-600">
+                    <p className="text-xs text-brand-red-600">
                       {t.blacklist.date}: {selected.blacklist_date}
                     </p>
                   )}
@@ -470,7 +470,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => openEdit(selected)}
-                className="rounded border border-black/15 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                className="rounded border border-brand-warm-400 px-3 py-1.5 text-xs font-medium text-brand-ink-600 transition hover:bg-brand-warm-50"
               >
                 {t.actions.edit}
               </button>
@@ -478,7 +478,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
                 <button
                   onClick={() => handleUnblacklist(selected.id)}
                   disabled={blSaving}
-                  className="inline-flex items-center gap-1.5 rounded border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded border border-brand-green-200 bg-brand-green-50 px-3 py-1.5 text-xs font-medium text-brand-green-700 transition hover:bg-brand-green-100 disabled:opacity-50"
                 >
                   <UserCheck className="h-3.5 w-3.5" />
                   {t.blacklist.remove}
@@ -491,7 +491,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
                     setBlPermanent(true);
                     setBlError("");
                   }}
-                  className="inline-flex items-center gap-1.5 rounded border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100"
+                  className="inline-flex items-center gap-1.5 rounded border border-brand-red-200 bg-brand-red-50 px-3 py-1.5 text-xs font-medium text-brand-red-700 transition hover:bg-brand-red-100"
                 >
                   <UserX className="h-3.5 w-3.5" />
                   {t.blacklist.add}
@@ -506,12 +506,12 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
       {isBlacklistOpen && (
         <>
           <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setBlacklistPanelId(null)} />
-          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-sm overflow-auto border-l border-black/10 bg-white shadow-xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-black/10 bg-white px-5 py-4">
-              <h3 className="text-lg font-bold text-brand-ink">{t.blacklist.add}</h3>
+          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-sm overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-400 bg-white px-5 py-4">
+              <h3 className="text-lg font-bold text-brand-ink-900">{t.blacklist.add}</h3>
               <button
                 onClick={() => setBlacklistPanelId(null)}
-                className="rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                className="rounded p-1 text-brand-ink-300 transition hover:bg-brand-warm-100 hover:text-brand-ink-500"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -527,28 +527,28 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
                   placeholder={t.blacklist.reason}
                 />
               </div>
-              <label className="flex items-center gap-2 text-sm text-slate-700">
+              <label className="flex items-center gap-2 text-sm text-brand-ink-600">
                 <input
                   type="checkbox"
                   checked={blPermanent}
                   onChange={(e) => setBlPermanent(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-brand-orange focus:ring-brand-orange"
+                  className="h-4 w-4 rounded border-brand-warm-400 text-brand-orange-600 focus:ring-brand-orange-500"
                 />
                 {t.blacklist.permanent}
               </label>
-              {blError && <p className="text-sm text-red-600">{blError}</p>}
+              {blError && <p className="text-sm text-brand-red-600">{blError}</p>}
               <div className="flex items-center gap-3 pt-2">
                 <button
                   onClick={handleBlacklist}
                   disabled={blSaving}
-                  className="inline-flex items-center gap-1.5 rounded bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded bg-brand-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-red-600 disabled:opacity-50"
                 >
                   <UserX className="h-4 w-4" />
                   {blSaving ? "..." : t.blacklist.add}
                 </button>
                 <button
                   onClick={() => setBlacklistPanelId(null)}
-                  className="rounded px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
+                  className="rounded px-4 py-2 text-sm font-medium text-brand-ink-500 transition hover:bg-brand-warm-100"
                 >
                   {t.actions.cancel}
                 </button>

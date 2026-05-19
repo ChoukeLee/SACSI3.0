@@ -5,62 +5,97 @@ const config: Config = {
   darkMode: "class",
   theme: {
     extend: {
-      /* ── macOS-style palette: cool+warm grays, system-blue accent, soft tones ── */
       colors: {
         brand: {
-          /* Accent — macOS system blue (#007AFF family) */
-          blue: {
-            DEFAULT: "#0070E0",
-            "50": "#F0F7FF",
-            "100": "#DBECFE",
-            "200": "#B8D8FD",
-            "500": "#0070E0",
-            "600": "#0059B3",
-            "700": "#004C99",
+          /* Accent — warm Côte d'Ivoire orange, used sparingly */
+          orange: {
+            DEFAULT: "#C96F2D",
+            "50": "#FDF8F3",
+            "100": "#FBE9DA",
+            "200": "#F5CFAD",
+            "300": "#E8A86F",
+            "400": "#D98B44",
+            "500": "#C96F2D",
+            "600": "#A85A24",
+            "700": "#87461C",
           },
-          /* Surface — warm-adjacent grays (macOS sidebar / window bg) */
-          surface: {
-            DEFAULT: "#F5F5F7",
-            "50": "#FAFAFA",
-            "100": "#F0F0F3",
-            "200": "#E8E8ED",
-            "300": "#DCDCE2",
+          /* Surface — warm stone: Swiss spa / private bank */
+          warm: {
+            DEFAULT: "#F7F6F2",
+            "50": "#FAFAF8",
+            "100": "#F5F4EF",
+            "200": "#EFEEE8",
+            "300": "#E6E4DA",
+            "400": "#DDDAD0",
+            "500": "#C8C3B7",
+            "600": "#A8A294",
+            "700": "#7D7769",
           },
-          /* Ink — Apple text grays, never pure black */
+          /* Ink — warm near-black, never pure #000 */
           ink: {
-            DEFAULT: "#1D1D1F",
-            "50": "#FAFAFA",
-            "100": "#F5F5F7",
-            "200": "#E8E8ED",
-            "300": "#D2D2D7",
-            "400": "#AEAEB2",
-            "500": "#86868B",
-            "600": "#6E6E73",
-            "700": "#3A3A3C",
-            "800": "#2C2C2E",
-            "900": "#1D1D1F",
+            DEFAULT: "#1D1D1B",
+            "50": "#FAFAF8",
+            "100": "#F5F4EF",
+            "200": "#EFEEE8",
+            "300": "#8A8D84",
+            "400": "#6B6E66",
+            "500": "#5F625A",
+            "600": "#4A4C45",
+            "700": "#363830",
+            "800": "#282921",
+            "900": "#1D1D1B",
           },
-          /* Semantic — Apple-style soft tints */
-          green: { DEFAULT: "#34C759", "50": "#F0FDF4", "100": "#DCFCE7" },
-          red: { DEFAULT: "#FF3B30", "50": "#FFF5F5", "100": "#FEE2E2" },
-          amber: { DEFAULT: "#FF9500", "50": "#FFFBF0", "100": "#FFF3D6" },
-          sky: { DEFAULT: "#5AC8FA", "50": "#F0FAFF", "100": "#E0F4FE" },
+          /* Semantic — muted, professional */
+          green: {
+            DEFAULT: "#4A6B4A",
+            "50": "#F2F7F2",
+            "100": "#E0EDE0",
+            "200": "#B8D4B8",
+            "500": "#4A6B4A",
+            "600": "#3A563A",
+            "700": "#2B412B",
+          },
+          red: {
+            DEFAULT: "#8B3A3A",
+            "50": "#FBF6F6",
+            "100": "#F2E0E0",
+            "200": "#E0B8B8",
+            "500": "#8B3A3A",
+            "600": "#6E2E2E",
+            "700": "#522323",
+          },
+          amber: {
+            DEFAULT: "#8B6914",
+            "50": "#FDFAF2",
+            "100": "#F9F0D5",
+            "200": "#F0DB9A",
+            "500": "#8B6914",
+            "600": "#6E5310",
+            "700": "#523E0C",
+          },
+          sky: {
+            DEFAULT: "#4A6B7D",
+            "50": "#F4F7F9",
+            "100": "#E0EAF0",
+            "200": "#B8CFDA",
+            "500": "#4A6B7D",
+            "600": "#3A5564",
+            "700": "#2B404B",
+          },
         },
       },
-      /* ── macOS shadows: barely-there elevation ── */
       boxShadow: {
-        "soft": "0 1px 3px 0 rgba(0,0,0,0.04)",
-        "card": "0 2px 8px 0 rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.03)",
-        "panel": "0 8px 32px 0 rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.04)",
-        "dropdown": "0 4px 16px 0 rgba(0,0,0,0.06), 0 0 0 0.5px rgba(0,0,0,0.04)",
+        "soft": "0 1px 2px 0 rgba(0,0,0,0.03)",
+        "card": "0 1px 3px 0 rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04)",
+        "panel": "0 8px 32px 0 rgba(0,0,0,0.06), 0 0 0 0.5px rgba(0,0,0,0.04)",
+        "dropdown": "0 4px 16px 0 rgba(0,0,0,0.05), 0 0 0 0.5px rgba(0,0,0,0.04)",
       },
-      /* ── Border radius: Apple continuous curves ── */
       borderRadius: {
         "sm": "6px",
         "md": "8px",
-        "lg": "12px",
-        "xl": "16px",
-        "2xl": "20px",
+        "lg": "10px",
+        "xl": "14px",
+        "2xl": "18px",
       },
       zIndex: {
         "base": "0", "sticky": "10", "dropdown": "20",

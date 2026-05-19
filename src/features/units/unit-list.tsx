@@ -77,10 +77,10 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
           onKindChange={setSelectedKind} onBusinessChange={setSelectedBusiness}
         />
         <div className="flex items-center gap-2">
-          <button disabled className="inline-flex items-center gap-1.5 rounded-lg border border-black/10 bg-white px-3 py-2 text-xs font-medium text-brand-ink-300 transition-colors duration-fast">
+          <button disabled className="inline-flex items-center gap-1.5 rounded-lg border border-brand-warm-400 bg-white px-3 py-2 text-xs font-medium text-brand-ink-300 transition-colors duration-fast">
             <Upload className="h-3.5 w-3.5" />{t.actions.import}
           </button>
-          <button disabled className="inline-flex items-center gap-1.5 rounded-lg border border-black/10 bg-white px-3 py-2 text-xs font-medium text-brand-ink-300 transition-colors duration-fast">
+          <button disabled className="inline-flex items-center gap-1.5 rounded-lg border border-brand-warm-400 bg-white px-3 py-2 text-xs font-medium text-brand-ink-300 transition-colors duration-fast">
             <Download className="h-3.5 w-3.5" />{t.actions.export}
           </button>
         </div>
@@ -88,8 +88,8 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
 
       {/* Empty state */}
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-black/10 bg-white py-20 shadow-card">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-ink-50">
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-brand-warm-400 bg-white py-20 shadow-card">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-warm-50">
             <Building2 className="h-6 w-6 text-brand-ink-300" />
           </div>
           <div className="text-center">
@@ -100,11 +100,11 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-black/10 bg-white shadow-card">
+        <div className="overflow-hidden rounded-lg border border-brand-warm-400 bg-white shadow-card">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead>
-                <tr className="border-b border-black/10 bg-brand-ink-50">
+                <tr className="border-b border-brand-warm-400 bg-brand-warm-50">
                   {t.headers.map((h) => (
                     <th key={h} className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-brand-ink-500">
                       {h}
@@ -113,7 +113,7 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
                   <th className="sr-only px-4 py-3">{t.actions.viewDetail}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black/5">
+              <tbody className="divide-y divide-brand-warm-400">
                 {filtered.map((unit) => {
                   const flags = businessFlagsMap[unit.id] ?? [];
                   const enabledFlags = flags.filter((f) => f.is_enabled);

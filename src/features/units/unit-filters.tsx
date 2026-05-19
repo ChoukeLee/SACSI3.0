@@ -26,7 +26,7 @@ const kindOptions: (UnitKind | "all")[] = ["all", "apartment", "parking", "store
 const businessOptions: (BusinessType | "all")[] = ["all", "daily_rental", "long_lease", "sale"];
 
 const selectClass =
-  "h-9 rounded-md border border-black/10 bg-white px-2.5 text-xs font-medium text-brand-ink-700 transition-all duration-fast hover:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
+  "h-9 rounded-md border border-brand-warm-400 bg-white px-2.5 text-xs font-medium text-brand-ink-700 transition-all duration-fast hover:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
 
 export function UnitFilters({
   locale, selectedFloor, selectedStatus, selectedKind, selectedBusiness,

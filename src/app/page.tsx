@@ -56,10 +56,19 @@ export default async function DashboardPage() {
         </div>
         <section className="mt-8 grid gap-4 lg:grid-cols-2">
           {moduleCards.map((card) => (
-            <Link key={card.href} href={card.href} className="rounded-md border border-black/10 bg-white p-5 shadow-soft transition hover:-translate-y-0.5 hover:border-brand-orange">
+            <Link
+              key={card.href}
+              href={card.href}
+              className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-card transition hover:-translate-y-0.5 hover:border-brand-orange-400"
+            >
               <div className="flex items-start justify-between gap-4">
-                <div><h3 className="text-lg font-bold text-brand-ink">{card.title}</h3><p className="mt-2 text-sm leading-6 text-slate-600">{card.description}</p></div>
-                <span className="rounded bg-orange-50 px-2.5 py-1 text-xs font-semibold text-brand-orange">{card.metric}</span>
+                <div>
+                  <h3 className="text-lg font-bold text-brand-ink-900">{card.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-brand-ink-500">{card.description}</p>
+                </div>
+                <span className="rounded-lg bg-brand-orange-50 px-2.5 py-1 text-xs font-semibold text-brand-orange-700">
+                  {card.metric}
+                </span>
               </div>
             </Link>
           ))}

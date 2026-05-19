@@ -5,6 +5,7 @@ import { Phone, Check } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
 import type { DailyBookingRow, UnitRow, CustomerRow, PaymentRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
@@ -57,7 +58,7 @@ export function MobileDailyCards({ dailyUnits, bookings, customers, payments, cl
     await completeCleaning(taskId);
   };
 
-  const cardClass = "rounded-xl border border-black/10 bg-white p-4 shadow-card";
+  const cardClass = "rounded-xl border border-brand-warm-400 bg-white p-4 shadow-card";
 
   if (roomCards.length === 0) {
     return <div className="py-16 text-center text-sm text-brand-ink-300">{dr.calendar.noRooms}</div>;
@@ -81,7 +82,7 @@ export function MobileDailyCards({ dailyUnits, bookings, customers, payments, cl
                     <div className="text-right">
                       <p className="text-sm font-semibold text-brand-ink-700">{r.customer.name.slice(0, 8)}</p>
                       {r.customer.phone && (
-                        <a href={`tel:${r.customer.phone}`} className="inline-flex items-center gap-1 text-xs text-brand-orange-500 active:opacity-70">
+                        <a href={`tel:${r.customer.phone}`} className="inline-flex items-center gap-1 text-xs text-brand-orange active:opacity-70">
                           <Phone className="h-3 w-3" />{r.customer.phone}
                         </a>
                       )}
@@ -90,17 +91,17 @@ export function MobileDailyCards({ dailyUnits, bookings, customers, payments, cl
                 </div>
 
                 {r.booking && r.billing && (
-                  <div className="grid grid-cols-3 gap-2 rounded-lg bg-brand-ink-50 p-2 text-center text-xs">
+                  <div className="grid grid-cols-3 gap-2 rounded-lg bg-brand-warm-50 p-2 text-center text-xs">
                     <div><p className="text-brand-ink-300">{dr.booking.nights}</p><p className="font-bold text-brand-ink-700">{r.billing.nights}</p></div>
-                    <div><p className="text-brand-ink-300">{locale === "zh" ? "已收" : "Payé"}</p><p className="font-bold text-emerald-700">{formatXof(r.totalPaid)}</p></div>
-                    <div><p className="text-brand-ink-300">{locale === "zh" ? "欠费" : "Dû"}</p><p className={cn("font-bold", r.billing.outstanding > 0 ? "text-red-600" : "text-emerald-600")}>{formatXof(r.billing.outstanding)}</p></div>
+                    <div><p className="text-brand-ink-300">{locale === "zh" ? "已收" : "Payé"}</p><p className="font-bold text-brand-green-700">{formatXof(r.totalPaid)}</p></div>
+                    <div><p className="text-brand-ink-300">{locale === "zh" ? "欠费" : "Dû"}</p><p className={cn("font-bold", r.billing.outstanding > 0 ? "text-brand-red-600" : "text-brand-green-600")}>{formatXof(r.billing.outstanding)}</p></div>
                   </div>
                 )}
 
                 {r.booking && (
                   <div className="mt-2 text-xs text-brand-ink-500">
                     {r.booking.check_in} → {r.booking.checkout_mode === "open"
-                      ? <span className="text-amber-600 font-medium">{locale === "zh" ? "未定" : "?"}</span>
+                      ? <span className="text-brand-amber-600 font-medium">{locale === "zh" ? "未定" : "?"}</span>
                       : r.booking.check_out}
                   </div>
                 )}
@@ -116,7 +117,7 @@ export function MobileDailyCards({ dailyUnits, bookings, customers, payments, cl
           <h2 className="text-xs font-bold uppercase tracking-wider text-brand-ink-400 mb-2">{locale === "zh" ? "预订中" : "Réservé"} · {reserved.length}</h2>
           <div className="flex flex-wrap gap-2">
             {reserved.map((r, i) => (
-              <span key={i} className="rounded-lg border border-black/10 bg-white px-3 py-2 text-xs font-mono font-semibold text-brand-ink-500 shadow-card">{r.unit.unit_no}</span>
+              <span key={i} className="rounded-lg border border-brand-warm-400 bg-white px-3 py-2 text-xs font-mono font-semibold text-brand-ink-500 shadow-card">{r.unit.unit_no}</span>
             ))}
           </div>
         </div>
@@ -128,18 +129,20 @@ export function MobileDailyCards({ dailyUnits, bookings, customers, payments, cl
           <h2 className="text-xs font-bold uppercase tracking-wider text-brand-ink-400 mb-2">{t.cleaning} · {cleaning.length}</h2>
           <div className="space-y-2">
             {cleaning.map((r, i) => (
-              <div key={i} className={cn(cardClass, "border-sky-200 bg-sky-50/50")}>
+              <div key={i} className={cn(cardClass, "border-brand-sky-200 bg-brand-sky-50/50")}>
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-base font-bold text-brand-ink-900">{r.unit.unit_no}</span>
                   <StatusBadge status="cleaning_pending" locale={locale} />
                 </div>
                 {r.cleaningTask && (
-                  <button
+                  <Button
+                    variant="primary"
+                    size="sm"
                     onClick={() => handleMarkCleaning(r.cleaningTask!.id)}
-                    className="mt-2 w-full rounded-lg bg-sky-600 py-2 text-xs font-semibold text-white active:bg-sky-700 transition-colors duration-fast"
+                    className="mt-2 w-full"
                   >
                     <Check className="inline h-3.5 w-3.5 mr-1" />{dr.cleaning.markComplete}
-                  </button>
+                  </Button>
                 )}
               </div>
             ))}
@@ -153,7 +156,7 @@ export function MobileDailyCards({ dailyUnits, bookings, customers, payments, cl
           <h2 className="text-xs font-bold uppercase tracking-wider text-brand-ink-400 mb-2">{locale === "zh" ? "空闲" : "Disponible"} · {available.length}</h2>
           <div className="flex flex-wrap gap-2">
             {available.map((r, i) => (
-              <span key={i} className="rounded-lg border border-black/10 bg-white px-3 py-2 text-xs font-mono font-semibold text-brand-ink-500 shadow-card">{r.unit.unit_no}</span>
+              <span key={i} className="rounded-lg border border-brand-warm-400 bg-white px-3 py-2 text-xs font-mono font-semibold text-brand-ink-500 shadow-card">{r.unit.unit_no}</span>
             ))}
           </div>
         </div>

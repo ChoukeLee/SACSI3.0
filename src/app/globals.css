@@ -2,18 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── macOS design tokens ── */
 :root {
   color-scheme: light;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
 }
 
-/* ── SF Pro font stack — Apple native rendering ── */
 body {
   min-height: 100dvh;
-  background: #F5F5F7;
-  color: #1D1D1F;
+  background: #F7F6F2;
+  color: #1D1D1B;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -22,13 +20,13 @@ body {
 }
 
 ::selection {
-  background: #0070E0;
+  background: #C96F2D;
   color: #ffffff;
 }
 
-/* ── Focus ring: Apple-style subtle blue glow ── */
+/* Focus ring: subtle warm, hidden on touch */
 *:focus-visible {
-  outline: 2px solid #0070E0;
+  outline: 2px solid #C96F2D;
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -36,13 +34,12 @@ body {
   *:focus-visible { outline: none; }
 }
 
-/* ── Scrollbar: thin, minimal ── */
+/* Scrollbar */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #D2D2D7; border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: #C8C3B7; border-radius: 2px; }
 
 @layer components {
-  /* Scroll hint gradient for overflow containers */
   .scroll-hint-x {
     background:
       linear-gradient(to right, white 30%, rgba(255,255,255,0)),
@@ -54,10 +51,8 @@ body {
   }
 }
 
-/* ── Form base ── */
-button, input, select, textarea { font: inherit; }
-
 @layer base {
+  button, input, select, textarea { font: inherit; }
   input, select, textarea { font-size: 16px; }
   @media (min-width: 640px) { input, select, textarea { font-size: 14px; } }
   button, a, [role="button"] { cursor: pointer; }

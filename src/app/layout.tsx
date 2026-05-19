@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, statusBarStyle: "default", title: "SACIS 3.0" },
 };
 
-export const viewport: Viewport = { themeColor: "#F77F00" };
+export const viewport: Viewport = { themeColor: "#C96F2D" };
 
 /* PERF: AppShellWrapper in root layout — sidebar/header/nav persist across ALL page navigations.
    Previously each page.tsx wrapped itself in <AppShell>, causing full unmount/remount on every click. */

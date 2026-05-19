@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 
-/* REFINED: minimal accent strip, generous padding, refined typography */
 export function MetricCard({
   title, value, caption, accent = "accent",
 }: {
@@ -8,14 +7,15 @@ export function MetricCard({
   accent?: "accent" | "green" | "ink" | "orange";
 }) {
   const barColor: Record<string, string> = {
-    accent: "border-brand-accent", orange: "border-brand-accent",
-    green: "border-brand-green",
+    accent: "border-brand-orange",
+    orange: "border-brand-orange",
+    green: "border-brand-green-500",
     ink: "border-brand-ink-700",
   };
   return (
-    <div className={cn("rounded-lg border border-brand-ink-100 bg-white px-5 py-4 shadow-soft border-l-[3px]", barColor[accent])}>
-      <p className="text-[11px] font-medium uppercase tracking-widen text-brand-ink-400">{title}</p>
-      <p className="mt-2 text-[28px] font-semibold tracking-tighten text-brand-ink-900">{value}</p>
+    <div className={cn("rounded-xl border border-brand-warm-400 bg-white px-5 py-4 shadow-card border-l-[3px]", barColor[accent])}>
+      <p className="text-[11px] font-medium uppercase tracking-wider text-brand-ink-300">{title}</p>
+      <p className="mt-2 text-[28px] font-semibold tracking-tight text-brand-ink-900">{value}</p>
       <p className="mt-1.5 text-[13px] text-brand-ink-400">{caption}</p>
     </div>
   );
