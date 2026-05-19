@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuth, requireRole } from "@/lib/auth";
 import type { LeaseContractRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
+import {
+  createReceivable, syncReceivablesForSource, cancelReceivablesForSource,
+} from "@/features/finance/receivables";
 
 // ── Create contract ──
 
@@ -87,7 +90,7 @@ export async function createLeaseContract(input: {
     await supabase.from("units").update({ status: "leased" }).eq("id", input.unitId);
   }
 
-  // If deposit received, record payment + ledger
+  // If deposit received, record payment + ledger + receivable
   if (input.depositReceived && input.depositAmountXof > 0) {
     const { data: payment } = await supabase
       .from("payments")
@@ -112,6 +115,23 @@ export async function createLeaseContract(input: {
       category: "lease_deposit",
       amount_xof: input.depositAmountXof,
       description: `押金 lease=${data.id}`,
+    });
+
+    // Receivable for deposit (marked paid since already received)
+    const { data: unit } = await supabase.from("units").select("building_id").eq("id", input.unitId).single();
+    await createReceivable({
+      building_id: unit?.building_id ?? null,
+      unit_id: input.unitId,
+      customer_id: input.customerId,
+      source_type: "lease_contract",
+      source_id: data.id,
+      category: "lease_deposit",
+      title: `押金 ${input.contractNo.trim()}`,
+      due_date: input.startDate,
+      amount_xof: input.depositAmountXof,
+      paid_amount_xof: input.depositAmountXof,
+      status: "paid",
+      currency: "XOF",
     });
   }
 
@@ -197,6 +217,8 @@ export async function terminateContract(
     metadata: {},
   });
 
+  await cancelReceivablesForSource("lease_contract", contractId);
+
   revalidatePath("/leases");
   revalidatePath("/fr/leases");
   return { success: true };
@@ -259,6 +281,23 @@ export async function recordRentPayment(input: {
     metadata: { amount: input.amount, date: input.paymentDate, receipt_no: input.receiptNo },
   });
 
+  // Create/update receivable for this rent payment (v1: one receivable per payment)
+  const { data: unit } = await supabase.from("units").select("building_id").eq("id", contract.unit_id).single();
+  await createReceivable({
+    building_id: unit?.building_id ?? null,
+    unit_id: contract.unit_id,
+    customer_id: contract.customer_id,
+    source_type: "lease_contract",
+    source_id: input.contractId,
+    category: "lease_rent",
+    title: `长租租金 ${input.paymentDate}`,
+    due_date: input.paymentDate,
+    amount_xof: input.amount,
+    paid_amount_xof: input.amount,
+    status: "paid",
+    currency: "XOF",
+  });
+
   revalidatePath("/leases");
   revalidatePath("/fr/leases");
   return { success: true };
@@ -309,6 +348,23 @@ export async function processMoveOut(input: {
       category: "lease_rent",
       amount_xof: input.unpaidRentXof,
       description: `退租结算未付租金 lease=${input.contractId}`,
+    });
+
+    // Create receivable for the collected unpaid rent
+    const { data: unit } = await supabase.from("units").select("building_id").eq("id", contract.unit_id).single();
+    await createReceivable({
+      building_id: unit?.building_id ?? null,
+      unit_id: contract.unit_id,
+      customer_id: contract.customer_id,
+      source_type: "lease_contract",
+      source_id: input.contractId,
+      category: "lease_rent",
+      title: `退租结算 ${input.actualEndDate}`,
+      due_date: input.actualEndDate,
+      amount_xof: input.unpaidRentXof,
+      paid_amount_xof: input.unpaidRentXof,
+      status: "paid",
+      currency: "XOF",
     });
   }
 

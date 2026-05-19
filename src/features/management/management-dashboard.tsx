@@ -11,7 +11,7 @@ import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import type {
   BuildingRow, UnitRow, DailyBookingRow, LeaseContractRow,
-  SaleContractRow, SalePaymentScheduleRow, LedgerEntryRow,
+  SaleContractRow, SalePaymentScheduleRow, LedgerEntryRow, ReceivableRow,
 } from "@/types/database";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -39,6 +39,7 @@ interface Props {
   saleSchedules: SalePaymentScheduleRow[];
   cleaningTasks: { unit_id: string; is_completed: boolean }[];
   ledgerEntries: LedgerEntryRow[];
+  receivables: ReceivableRow[];
   locale: Locale;
 }
 
@@ -116,7 +117,7 @@ function computeUnitState(
 
 export function ManagementDashboard({
   buildings, units, dailyBookings, leaseContracts, saleContracts,
-  saleSchedules, cleaningTasks, ledgerEntries, locale,
+  saleSchedules, cleaningTasks, ledgerEntries, receivables, locale,
 }: Props) {
   const t = dictionaries[locale].management;
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("__all__");
@@ -183,6 +184,21 @@ export function ManagementDashboard({
 
     return { income, expense, net: income - expense, dailyRental, leaseRent, sale, deposit };
   }, [ledgerEntries]);
+
+  // Receivables summary
+  const receivableStats = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    let totalRec = 0, totalPaid = 0, totalOverdue = 0;
+    for (const r of receivables) {
+      if (r.status === "cancelled") continue;
+      totalRec += Number(r.amount_xof);
+      totalPaid += Number(r.paid_amount_xof);
+      if (r.status === "overdue" || (Number(r.paid_amount_xof) < Number(r.amount_xof) && r.due_date < today)) {
+        totalOverdue += Number(r.amount_xof) - Number(r.paid_amount_xof);
+      }
+    }
+    return { totalRec, totalPaid, outstanding: totalRec - totalPaid, totalOverdue };
+  }, [receivables]);
 
   // Risks
   const risks = useMemo(() => {
@@ -297,6 +313,27 @@ export function ManagementDashboard({
             <div className="flex justify-between"><span>{t.finance.depositLiability}</span><span className="font-semibold">{formatXof(finance.deposit)}</span></div>
           </div>
         </Card>
+      </div>
+
+      {/* Section 3.5: Receivables summary */}
+      <SectionTitle>{locale === "zh" ? "应收账款" : "Comptes clients"}</SectionTitle>
+      <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-lg border border-brand-warm-400 bg-white px-4 py-3 border-l-[3px] border-brand-ink-700">
+          <p className="text-[10px] text-brand-ink-300">{locale === "zh" ? "应收总额" : "Total dû"}</p>
+          <p className="text-lg font-bold tabular-nums text-brand-ink-900">{formatXof(receivableStats.totalRec)}</p>
+        </div>
+        <div className="rounded-lg border border-brand-warm-400 bg-white px-4 py-3 border-l-[3px] border-brand-green-500">
+          <p className="text-[10px] text-brand-ink-300">{locale === "zh" ? "已收总额" : "Total payé"}</p>
+          <p className="text-lg font-bold tabular-nums text-brand-green-700">{formatXof(receivableStats.totalPaid)}</p>
+        </div>
+        <div className="rounded-lg border border-brand-warm-400 bg-white px-4 py-3 border-l-[3px] border-brand-orange">
+          <p className="text-[10px] text-brand-ink-300">{locale === "zh" ? "未收总额" : "Restant dû"}</p>
+          <p className="text-lg font-bold tabular-nums text-brand-orange-700">{formatXof(receivableStats.outstanding)}</p>
+        </div>
+        <div className="rounded-lg border border-brand-warm-400 bg-white px-4 py-3 border-l-[3px] border-brand-red-500">
+          <p className="text-[10px] text-brand-ink-300">{locale === "zh" ? "逾期总额" : "Total retard"}</p>
+          <p className="text-lg font-bold tabular-nums text-brand-red-700">{formatXof(receivableStats.totalOverdue)}</p>
+        </div>
       </div>
 
       {/* Section 4: Risk alerts */}

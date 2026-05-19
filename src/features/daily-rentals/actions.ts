@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth, requireRole } from "@/lib/auth";
 import type { DailyBookingRow } from "@/types/database";
+import {
+  createReceivable, syncReceivablesForSource,
+  updateReceivableAmount, cancelReceivablesForSource,
+} from "@/features/finance/receivables";
 
 // ── Permission guards ──
 async function guardWrite() {
@@ -117,6 +121,23 @@ export async function createBooking(input: {
     metadata: { unit_id: input.unitId, customer_id: input.customerId, check_in: input.checkIn, checkout_mode: mode },
   });
 
+  // Create receivable for this booking
+  const { data: unit } = await supabase.from("units").select("building_id").eq("id", input.unitId).single();
+  await createReceivable({
+    building_id: unit?.building_id ?? null,
+    unit_id: input.unitId,
+    customer_id: input.customerId,
+    source_type: "daily_booking",
+    source_id: data.id,
+    category: "daily_rental",
+    title: `日租 ${data.check_in}`,
+    due_date: input.checkIn,
+    amount_xof: totalAmount,
+    paid_amount_xof: 0,
+    status: "pending",
+    currency: "XOF",
+  });
+
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
@@ -173,6 +194,11 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
     metadata: { prepaid_amount: prepaidAmount, checkout_mode: booking.checkout_mode },
   });
 
+  // Sync receivable
+  if (prepaidAmount > 0) {
+    await syncReceivablesForSource("daily_booking", bookingId);
+  }
+
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
@@ -216,6 +242,8 @@ export async function recordSupplementaryPayment(input: {
     action: "supplementary_payment", entity_type: "daily_booking", entity_id: input.bookingId,
     metadata: { amount: input.amount, total_prepaid: newPrepaid },
   });
+
+  await syncReceivablesForSource("daily_booking", input.bookingId);
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
@@ -286,6 +314,14 @@ export async function checkOut(bookingId: string, input: {
     action: "check_out", entity_type: "daily_booking", entity_id: bookingId,
     metadata: { final_amount: finalAmount, actual_check_out: actualCheckOut, discount: input.discountAmount ?? 0 },
   });
+
+  // Sync receivable: update amount for open bookings, then sync paid amount
+  const { data: receivables } = await supabase.from("receivables")
+    .select("id").eq("source_type", "daily_booking").eq("source_id", bookingId).limit(1);
+  if (receivables && receivables.length > 0) {
+    await updateReceivableAmount(receivables[0].id, finalAmount);
+  }
+  await syncReceivablesForSource("daily_booking", bookingId);
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
@@ -380,6 +416,7 @@ export async function cancelBooking(bookingId: string): Promise<{ success: boole
   await supabase.from("daily_bookings").update({ status: "cancelled" }).eq("id", bookingId);
   await supabase.from("units").update({ status: "available" }).eq("id", booking.unit_id);
   await supabase.from("audit_logs").insert({ action: "cancel", entity_type: "daily_booking", entity_id: bookingId, metadata: {} });
+  await cancelReceivablesForSource("daily_booking", bookingId);
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");

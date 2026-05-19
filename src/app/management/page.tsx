@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ManagementDashboard } from "@/features/management";
 import type {
   BuildingRow, UnitRow, DailyBookingRow, LeaseContractRow,
-  SaleContractRow, SalePaymentScheduleRow, LedgerEntryRow,
+  SaleContractRow, SalePaymentScheduleRow, LedgerEntryRow, ReceivableRow,
 } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +19,7 @@ export default async function ManagementPage() {
     { data: saleSchedules },
     { data: ledgerEntries },
     { data: cleaningTasks },
+    { data: receivables },
   ] = await Promise.all([
     supabase.from("buildings").select("*").eq("is_active", true).order("code"),
     supabase.from("units").select("*").order("unit_no"),
@@ -28,6 +29,7 @@ export default async function ManagementPage() {
     supabase.from("sale_payment_schedule").select("*").order("due_date", { ascending: false }).limit(1000),
     supabase.from("ledger_entries").select("*").order("entry_date", { ascending: false }).limit(2000),
     supabase.from("cleaning_tasks").select("id, unit_id, is_completed"),
+    supabase.from("receivables").select("*").order("due_date", { ascending: false }).limit(1000),
   ]);
 
   return (
@@ -40,6 +42,7 @@ export default async function ManagementPage() {
       saleSchedules={(saleSchedules ?? []) as SalePaymentScheduleRow[]}
       cleaningTasks={(cleaningTasks ?? []) as { unit_id: string; is_completed: boolean }[]}
       ledgerEntries={(ledgerEntries ?? []) as LedgerEntryRow[]}
+      receivables={(receivables ?? []) as ReceivableRow[]}
       locale="zh"
     />
   );

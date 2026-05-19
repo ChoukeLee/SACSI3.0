@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
 import type { SaleContractRow, SalePaymentScheduleRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
+import {
+  createReceivable, syncReceivablesForSource, cancelReceivablesForSource,
+} from "@/features/finance/receivables";
 
 // ── Create sale contract ──
 
@@ -74,8 +77,25 @@ export async function createSaleContract(input: {
   // Update unit status to sold
   await supabase.from("units").update({ status: "sold" }).eq("id", input.unitId);
 
-  // If lump sum and zero installments needed, record full payment immediately
-  // (user records manually for installment plans)
+  // Create receivables from the payment schedule
+  const { data: unit } = await supabase.from("units").select("building_id").eq("id", input.unitId).single();
+  for (const inst of schedule) {
+    const category = input.paymentPlanType === "lump_sum" ? "sale_lump_sum" as const : "sale_installment" as const;
+    await createReceivable({
+      building_id: unit?.building_id ?? null,
+      unit_id: input.unitId,
+      customer_id: input.customerId,
+      source_type: "sale_contract",
+      source_id: contract.id,
+      category,
+      title: `出售 ${input.contractNo} #${inst.installment_no}`,
+      due_date: inst.due_date,
+      amount_xof: inst.amount_xof,
+      paid_amount_xof: 0,
+      status: "pending",
+      currency: "XOF",
+    });
+  }
 
   await supabase.from("audit_logs").insert({
     action: "create",
@@ -197,6 +217,8 @@ export async function recordSalePayment(input: {
     metadata: { amount: input.amount, schedule_id: input.scheduleId, receipt_no: input.receiptNo },
   });
 
+  await syncReceivablesForSource("sale_contract", input.contractId);
+
   revalidatePath("/sales");
   revalidatePath("/fr/sales");
   return { success: true };
@@ -223,6 +245,27 @@ export async function addFlexibleInstallment(input: {
     .select("*")
     .single();
   if (error) return { success: false, error: error.message };
+
+  // Create receivable for this flexible installment
+  const { data: contract } = await supabase.from("sale_contracts")
+    .select("unit_id, customer_id, contract_no").eq("id", input.contractId).single();
+  if (contract) {
+    const { data: unit } = await supabase.from("units").select("building_id").eq("id", contract.unit_id).single();
+    await createReceivable({
+      building_id: unit?.building_id ?? null,
+      unit_id: contract.unit_id,
+      customer_id: contract.customer_id,
+      source_type: "sale_contract",
+      source_id: input.contractId,
+      category: "sale_installment",
+      title: `出售 ${contract.contract_no} #${input.installmentNo}`,
+      due_date: input.dueDate,
+      amount_xof: input.amountXof,
+      paid_amount_xof: 0,
+      status: "pending",
+      currency: "XOF",
+    });
+  }
 
   revalidatePath("/sales");
   revalidatePath("/fr/sales");
@@ -291,6 +334,8 @@ export async function terminateSaleContract(
     entity_id: contractId,
     metadata: { reason },
   });
+
+  await cancelReceivablesForSource("sale_contract", contractId);
 
   revalidatePath("/sales");
   revalidatePath("/fr/sales");

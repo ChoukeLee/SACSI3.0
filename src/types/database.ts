@@ -225,3 +225,31 @@ export interface CleaningTaskRow {
 
 export type CleaningTaskInsert = Omit<CleaningTaskRow, "id" | "created_at">;
 export type CleaningTaskUpdate = Partial<CleaningTaskInsert>;
+
+// ── Receivables ──
+
+export type ReceivableSourceType = "daily_booking" | "lease_contract" | "sale_contract" | "manual";
+export type ReceivableCategory = "daily_rental" | "lease_rent" | "lease_deposit" | "sale_installment" | "sale_lump_sum" | "other";
+export type ReceivableStatus = "pending" | "partial" | "paid" | "overdue" | "cancelled";
+
+export interface ReceivableRow {
+  id: string;
+  building_id: string | null;
+  unit_id: string | null;
+  customer_id: string | null;
+  source_type: ReceivableSourceType;
+  source_id: string | null;
+  category: ReceivableCategory;
+  title: string;
+  due_date: string;
+  amount_xof: number;
+  paid_amount_xof: number;
+  status: ReceivableStatus;
+  currency: string;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ReceivableInsert = Omit<ReceivableRow, "id" | "created_at" | "updated_at">;
+export type ReceivableUpdate = Partial<ReceivableInsert>;
