@@ -38,7 +38,7 @@ export function computeRoomStates(
 ): RoomState[] {
   return dailyUnits.map((unit) => {
     // Find active checked-in booking covering today
-    const activeBooking =
+    const dateMatchedActiveBooking =
       bookings.find(
         (b) =>
           b.unit_id === unit.id &&
@@ -46,6 +46,12 @@ export function computeRoomStates(
           b.check_in <= todayStr &&
           (b.checkout_mode === "open" || (b.check_out != null && b.check_out >= todayStr)),
       ) ?? null;
+    const currentCheckedInBooking =
+      dateMatchedActiveBooking ??
+      (unit.status === "daily_occupied"
+        ? bookings.find((b) => b.unit_id === unit.id && b.status === "checked_in") ?? null
+        : null);
+    const activeBooking = dateMatchedActiveBooking ?? currentCheckedInBooking;
 
     // Find pending/confirmed booking (not yet checked in) — for same-day turnover visibility
     const pendingBooking =

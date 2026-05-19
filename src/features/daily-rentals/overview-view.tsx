@@ -37,7 +37,7 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
   const unitStatusMap = useMemo(() => {
     const map: Record<string, { booking: DailyBookingRow | null; status: string; unit: UnitRow }> = {};
     for (const unit of dailyUnits) {
-      const booking = activeBookings.find(b => {
+      const dateMatchedBooking = activeBookings.find(b => {
         if (b.unit_id !== unit.id) return false;
         const checkIn = b.check_in;
         // fixed checkout: departure date is still an occupied night
@@ -49,6 +49,12 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
         const openEnd = b.actual_check_out ?? "9999-12-31";
         return selectedDate >= checkIn && selectedDate < openEnd;
       }) ?? null;
+      const checkedInBooking = dateMatchedBooking ?? (
+        unit.status === "daily_occupied"
+          ? activeBookings.find(b => b.unit_id === unit.id && b.status === "checked_in") ?? null
+          : null
+      );
+      const booking = dateMatchedBooking ?? checkedInBooking;
 
       let displayStatus = unit.status;
       if (booking?.status === "checked_in") {
