@@ -11,6 +11,8 @@ import { Card } from "@/components/ui/card";
 import type { DailyBookingRow, UnitRow, CustomerRow, PaymentRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import { calculateBilling } from "./billing";
+import type { DailyRoomDisplayStatus } from "./room-status";
+import { buildDailyRoomStateMap } from "./room-status";
 
 const BILLING_MODE_ZH: Record<string, string> = { fixed: "固定离店", open: "开放式入住" };
 const BILLING_MODE_FR: Record<string, string> = { fixed: "Départ fixe", open: "Séjour ouvert" };
@@ -29,55 +31,15 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [copied, setCopied] = useState(false);
 
-  const activeBookings = useMemo(() =>
-    bookings.filter(b => b.status === "checked_in" || b.status === "confirmed" || b.status === "pending_review"),
-    [bookings]
+  const stateMap = useMemo(
+    () => buildDailyRoomStateMap({ dailyUnits, dateStr: selectedDate, bookings, cleaningTasks }),
+    [dailyUnits, selectedDate, bookings, cleaningTasks],
   );
-
-  const unitStatusMap = useMemo(() => {
-    const map: Record<string, { booking: DailyBookingRow | null; status: string; unit: UnitRow }> = {};
-    for (const unit of dailyUnits) {
-      const dateMatchedBooking = activeBookings.find(b => {
-        if (b.unit_id !== unit.id) return false;
-        const checkIn = b.check_in;
-        // fixed checkout: departure date is still an occupied night
-        // open-ended: actual_check_out means they've already left, so use <
-        if (b.checkout_mode === "fixed") {
-          const fixedEnd = b.check_out ?? checkIn;
-          return selectedDate >= checkIn && selectedDate <= fixedEnd;
-        }
-        const openEnd = b.actual_check_out ?? "9999-12-31";
-        return selectedDate >= checkIn && selectedDate < openEnd;
-      }) ?? null;
-      const checkedInBooking = dateMatchedBooking ?? (
-        unit.status === "daily_occupied"
-          ? activeBookings.find(b => b.unit_id === unit.id && b.status === "checked_in") ?? null
-          : null
-      );
-      const booking = dateMatchedBooking ?? checkedInBooking;
-
-      let displayStatus = unit.status;
-      if (booking?.status === "checked_in") {
-        displayStatus = "daily_occupied";
-      } else if (booking?.status === "confirmed" || booking?.status === "pending_review") {
-        displayStatus = "reserved";
-      } else if (unit.status === "cleaning_pending") {
-        displayStatus = "cleaning_pending";
-      } else if (unit.status === "maintenance" || unit.status === "locked") {
-        displayStatus = unit.status;
-      } else {
-        displayStatus = "available";
-      }
-
-      map[unit.id] = { booking, status: displayStatus, unit };
-    }
-    return map;
-  }, [dailyUnits, activeBookings, selectedDate]);
 
   const roomRows = useMemo(() => {
     return dailyUnits.map(unit => {
-      const info = unitStatusMap[unit.id];
-      const booking = info?.booking;
+      const state = stateMap.get(unit.id)!;
+      const booking = state.booking;
       const customer = booking ? customers.find(c => c.id === booking.customer_id) : null;
       const billing = booking ? calculateBilling(booking, selectedDate) : null;
       const unitPayments = booking ? payments.filter(p => p.source_id === booking.id) : [];
@@ -89,15 +51,16 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
         customer,
         billing,
         totalPaid,
-        status: info?.status ?? unit.status,
+        status: state.status,
+        isCheckoutDay: state.isCheckoutDay,
       };
     });
-  }, [dailyUnits, unitStatusMap, customers, payments, selectedDate]);
+  }, [dailyUnits, stateMap, customers, payments, selectedDate]);
 
   const summary = useMemo(() => {
-    const occupied = roomRows.filter(r => r.status === "daily_occupied").length;
-    const checkoutsToday = roomRows.filter(r => r.booking?.checkout_mode === "fixed" && r.booking?.check_out === selectedDate).length;
-    const cleaning = roomRows.filter(r => r.status === "cleaning_pending").length;
+    const occupied = roomRows.filter(r => r.status === "occupied" || r.status === "checking_out_today").length;
+    const checkoutsToday = roomRows.filter(r => r.isCheckoutDay).length;
+    const cleaning = roomRows.filter(r => r.status === "cleaning").length;
     const available = roomRows.filter(r => r.status === "available").length;
     const openEnded = roomRows.filter(r => r.booking?.checkout_mode === "open").length;
     const outstanding = roomRows.filter(r => (r.billing?.outstanding ?? 0) > 0).length;
@@ -110,18 +73,18 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
     );
     let text = `11# ${locale === "zh" ? "日租房态" : "Occupation journalière"} ${dateFormatted}\n`;
 
-    const occupied = roomRows.filter(r => r.booking);
+    const occupied = roomRows.filter(r => r.status === "occupied" || r.status === "checking_out_today" || r.status === "reserved");
     if (occupied.length > 0) {
       text += `\n${locale === "zh" ? "占用" : "Occupé"}: ${occupied.length}\n`;
       text += `${occupied.map(r => r.unit.unit_no).join(", ")}\n`;
     }
 
-    const checkingOut = roomRows.filter(r => r.booking?.checkout_mode === "fixed" && r.booking?.check_out === selectedDate);
+    const checkingOut = roomRows.filter(r => r.isCheckoutDay);
     if (checkingOut.length > 0) {
       text += `\n${locale === "zh" ? "今日退房" : "Départ aujourd'hui"}: ${checkingOut.map(r => r.unit.unit_no).join(", ")}\n`;
     }
 
-    const cleaning = roomRows.filter(r => r.status === "cleaning_pending");
+    const cleaning = roomRows.filter(r => r.status === "cleaning");
     if (cleaning.length > 0) {
       text += `\n${locale === "zh" ? "待保洁" : "Ménage requis"}: ${cleaning.map(r => r.unit.unit_no).join(", ")}\n`;
     }
@@ -215,9 +178,10 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
                 return (
                   <tr key={row.unit.id} className={cn(
                     "transition-colors duration-fast",
-                    row.status === "daily_occupied" && "bg-brand-orange-50/40",
+                    (row.status === "occupied" || row.status === "checking_out_today") && "bg-brand-orange-50/40",
                     row.status === "reserved" && "bg-brand-amber-50/40",
-                    row.status === "cleaning_pending" && "bg-brand-sky-50/40",
+                    row.status === "cleaning" && "bg-brand-sky-50/40",
+                    (row.status === "maintenance" || row.status === "locked") && "bg-brand-red-50/40",
                   )}>
                     <td className="px-3 py-2.5 font-mono text-sm font-semibold text-brand-ink-900">{row.unit.unit_no}</td>
                     <td className="px-3 py-2.5">
@@ -229,7 +193,7 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
                           )}
                         </div>
                       ) : (
-                        <StatusBadge status={row.status as UnitStatus} locale={locale} />
+                        <StatusBadge status={statusToUnitStatus(row.status)} locale={locale} />
                       )}
                     </td>
                     <td className="px-3 py-2.5 text-xs text-brand-ink-500">{row.booking?.check_in ?? "-"}</td>
@@ -272,6 +236,24 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
       </Card>
     </div>
   );
+}
+
+function statusToUnitStatus(s: DailyRoomDisplayStatus): UnitStatus {
+  switch (s) {
+    case "occupied":
+    case "checking_out_today":
+      return "daily_occupied";
+    case "reserved":
+      return "reserved";
+    case "cleaning":
+      return "cleaning_pending";
+    case "maintenance":
+      return "maintenance";
+    case "locked":
+      return "locked";
+    default:
+      return "available";
+  }
 }
 
 function SummaryCard({ label, value, bg }: { label: string; value: number; bg: string }) {

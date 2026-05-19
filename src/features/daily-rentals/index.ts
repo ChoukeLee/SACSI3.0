@@ -11,8 +11,10 @@ export {
   checkConflicts,
 } from "./actions";
 export {
-  getCellStatus,
+  getDailyRoomStateForDate,
+  buildDailyRoomStateMap,
   getBookingColorClass,
   buildBookingMap,
-} from "./cell-status";
-export type { CellStatusType, CellStatus } from "./cell-status";
+} from "./room-status";
+export type { DailyRoomDisplayStatus, DailyRoomStateForDate } from "./room-status";
+export { STATUS_COLORS } from "./room-status";

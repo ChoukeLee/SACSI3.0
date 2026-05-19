@@ -1,14 +1,12 @@
 import type { UnitRow, DailyBookingRow, CustomerRow } from "@/types/database";
 import type { BillingResult } from "@/features/daily-rentals/billing";
 import { calculateBilling } from "@/features/daily-rentals/billing";
+import {
+  getDailyRoomStateForDate,
+  type DailyRoomDisplayStatus,
+} from "@/features/daily-rentals/room-status";
 
-export type RoomDisplayStatus =
-  | "occupied"
-  | "checking_out_today"
-  | "reserved"
-  | "cleaning"
-  | "available"
-  | "other";
+export type RoomDisplayStatus = DailyRoomDisplayStatus;
 
 export interface RoomState {
   unit: UnitRow;
@@ -21,12 +19,11 @@ export interface RoomState {
 }
 
 /**
- * Compute room state for all daily-rental units.
- * Pure function — no side effects, safe for useMemo.
+ * Compute room state for all daily-rental units on today's date.
+ * Delegates to the unified getDailyRoomStateForDate for status logic,
+ * then enriches with customer, billing, and payment data.
  *
- * Priority: checked_in > pending_review/confirmed ("reserved") > cleaning > available > other
- * This ensures same-day turnover (morning checkout → afternoon check-in) is visible:
- * after creating a new booking (pending_review/confirmed), the room shows as "已预订".
+ * Priority: checked_in > pending_review/confirmed > cleaning > available > maintenance/locked
  */
 export function computeRoomStates(
   dailyUnits: UnitRow[],
@@ -37,72 +34,31 @@ export function computeRoomStates(
   todayStr: string,
 ): RoomState[] {
   return dailyUnits.map((unit) => {
-    // Find active checked-in booking covering today
-    const dateMatchedActiveBooking =
-      bookings.find(
-        (b) =>
-          b.unit_id === unit.id &&
-          b.status === "checked_in" &&
-          b.check_in <= todayStr &&
-          (b.checkout_mode === "open" || (b.check_out != null && b.check_out >= todayStr)),
-      ) ?? null;
-    const currentCheckedInBooking =
-      dateMatchedActiveBooking ??
-      (unit.status === "daily_occupied"
-        ? bookings.find((b) => b.unit_id === unit.id && b.status === "checked_in") ?? null
-        : null);
-    const activeBooking = dateMatchedActiveBooking ?? currentCheckedInBooking;
-
-    // Find pending/confirmed booking (not yet checked in) — for same-day turnover visibility
-    const pendingBooking =
-      bookings.find(
-        (b) =>
-          b.unit_id === unit.id &&
-          (b.status === "pending_review" || b.status === "confirmed") &&
-          b.check_in <= todayStr &&
-          (b.checkout_mode === "open" || (b.check_out != null && b.check_out >= todayStr)),
-      ) ?? null;
-
-    const booking = activeBooking ?? pendingBooking;
-    const isReserved = !activeBooking && pendingBooking !== null;
+    const state = getDailyRoomStateForDate({ unit, dateStr: todayStr, bookings, cleaningTasks });
+    const booking = state.booking;
 
     const customer = booking
       ? (customers.find((c) => c.id === booking.customer_id) ?? null)
       : null;
 
-    const billing = activeBooking ? calculateBilling(activeBooking, todayStr) : null;
+    const billing = booking && booking.status === "checked_in"
+      ? calculateBilling(booking, todayStr)
+      : null;
 
     const cleaningTask =
       cleaningTasks.find((t) => t.unit_id === unit.id && !t.is_completed) ?? null;
 
-    const unitPayments = activeBooking
-      ? payments.filter((p) => p.source_id === activeBooking.id)
+    const unitPayments = booking
+      ? payments.filter((p) => p.source_id === booking.id)
       : [];
     const totalPaid = unitPayments.reduce((s, p) => s + Number(p.amount), 0);
 
-    // Determine display status
-    let displayStatus: RoomDisplayStatus;
-    if (activeBooking) {
-      const isCheckingOutToday =
-        activeBooking.checkout_mode === "fixed" &&
-        activeBooking.check_out === todayStr;
-      displayStatus = isCheckingOutToday ? "checking_out_today" : "occupied";
-    } else if (isReserved) {
-      displayStatus = "reserved";
-    } else if (cleaningTask) {
-      displayStatus = "cleaning";
-    } else if (unit.status === "available") {
-      displayStatus = "available";
-    } else {
-      displayStatus = "other";
-    }
-
-    return { unit, booking, customer, billing, cleaningTask, displayStatus, totalPaid };
+    return { unit, booking, customer, billing, cleaningTask, displayStatus: state.status, totalPaid };
   });
 }
 
 export function getOccupiedRooms(states: RoomState[]): RoomState[] {
-  return states.filter((s) => s.displayStatus === "occupied");
+  return states.filter((s) => s.displayStatus === "occupied" || s.displayStatus === "checking_out_today");
 }
 
 export function getTodayCheckouts(states: RoomState[]): RoomState[] {
@@ -122,7 +78,9 @@ export function getAvailableRooms(states: RoomState[]): RoomState[] {
 }
 
 export function getOtherRooms(states: RoomState[]): RoomState[] {
-  return states.filter((s) => s.displayStatus === "other");
+  return states.filter(
+    (s) => s.displayStatus === "maintenance" || s.displayStatus === "locked",
+  );
 }
 
 /** All rooms with active bookings, pending reservations, or cleaning tasks */

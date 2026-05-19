@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import { BookingPanel } from "./booking-panel";
-import { buildBookingMap, getBookingColorClass } from "./cell-status";
+import { buildBookingMap, getBookingColorClass } from "./room-status";
 
 export interface CustomerSummary {
   id: string; name: string; phone: string | null; is_blacklisted: boolean;

@@ -224,7 +224,8 @@ function EmptyState({
     reserved: empty.noReserved,
     cleaning: empty.noCleaning,
     available: empty.noRooms,
-    other: empty.noRooms,
+    maintenance: empty.noRooms,
+    locked: empty.noRooms,
   };
 
   return (
