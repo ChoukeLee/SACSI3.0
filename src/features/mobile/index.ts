@@ -10,6 +10,7 @@ export {
   computeRoomStates,
   getOccupiedRooms,
   getTodayCheckouts,
+  getReservedRooms,
   getCleaningRooms,
   getAvailableRooms,
   getOtherRooms,

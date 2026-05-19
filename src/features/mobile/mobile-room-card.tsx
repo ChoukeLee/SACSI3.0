@@ -22,6 +22,8 @@ function displayStatusToUnitStatus(status: RoomState["displayStatus"]): UnitStat
     case "occupied":
     case "checking_out_today":
       return "daily_occupied";
+    case "reserved":
+      return "reserved";
     case "cleaning":
       return "cleaning_pending";
     case "available":
@@ -39,6 +41,7 @@ export function MobileRoomCard({
 
   const isCheckingOut = room.displayStatus === "checking_out_today";
   const isOccupied = room.displayStatus === "occupied" || isCheckingOut;
+  const isReserved = room.displayStatus === "reserved";
   const isCleaning = room.displayStatus === "cleaning";
   const hasOutstanding = room.billing && room.billing.outstanding > 0;
 
@@ -51,11 +54,13 @@ export function MobileRoomCard({
         "transition-colors duration-[100ms] active:bg-brand-warm-50",
         isCheckingOut
           ? "border-amber-200 bg-amber-50/40"
-          : isCleaning
-            ? "border-sky-200 bg-sky-50/40"
-            : hasOutstanding
-              ? "border-red-200 bg-red-50/30"
-              : "border-brand-warm-400"
+          : isReserved
+            ? "border-amber-200 bg-amber-50/30"
+            : isCleaning
+              ? "border-sky-200 bg-sky-50/40"
+              : hasOutstanding
+                ? "border-red-200 bg-red-50/30"
+                : "border-brand-warm-400"
       )}
     >
       {/* Top row: room number + status + chevron */}
@@ -112,6 +117,17 @@ export function MobileRoomCard({
         <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-brand-ink-400">
           <span className="h-1.5 w-1.5 rounded-full bg-brand-sky-400" />
           {locale === "zh" ? "退房后等待保洁" : "En attente de menage"}
+        </div>
+      )}
+
+      {/* Reserved pending note */}
+      {isReserved && room.booking && (
+        <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-brand-amber-700">
+          <span className="h-1.5 w-1.5 rounded-full bg-brand-amber-500" />
+          {locale === "zh" ? "预计入住 " : "Arrivee prevue "}{room.booking.check_in}
+          {room.booking.check_out && (
+            <span> → {room.booking.check_out}</span>
+          )}
         </div>
       )}
 

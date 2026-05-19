@@ -706,6 +706,7 @@ export const dictionaries = {
         noCleaning: "暂无待保洁房间",
         noRooms: "暂无房间数据",
         noAvailable: "暂无空闲房间",
+        noReserved: "暂无已预订房间",
       },
     }
   },
@@ -1407,6 +1408,7 @@ export const dictionaries = {
         noCleaning: "Aucun ménage en attente",
         noRooms: "Aucune chambre disponible",
         noAvailable: "Aucune chambre disponible",
+        noReserved: "Aucune chambre reservee",
       },
     }
   }

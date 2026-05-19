@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { X, Check, UserX, Printer, DollarSign, Percent } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
@@ -27,7 +28,9 @@ interface BookingPanelProps {
 
 export function BookingPanel({ booking, unitId, defaultDate, units, customers, cleaningTasks, payments, locale, onClose, onChanged }: BookingPanelProps) {
   const t = dictionaries[locale].dailyRentals;
+  const router = useRouter();
   const isNew = !booking;
+  const refresh = () => { router.refresh(); onChanged(); };
 
   const [newCustomerId, setNewCustomerId] = useState("");
   const [newCheckIn, setNewCheckIn] = useState(defaultDate ?? "");
@@ -85,7 +88,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
       notes: newNotes || undefined,
     });
     setSaving(false);
-    if (result.success) { onChanged(); onClose(); }
+    if (result.success) { refresh(); onClose(); }
     else setError(result.error ?? "Failed");
   };
 
@@ -93,7 +96,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
     const prepay = toN(prepaidAmount);
     if (booking?.checkout_mode !== "open" && prepay <= 0) { setActionError(t.booking.prepaidWarning); return; }
     setSaving(true); const result = await checkIn(booking!.id, prepay);
-    setSaving(false); if (!result.success) setActionError(result.error ?? "Failed"); else { onChanged(); onClose(); }
+    setSaving(false); if (!result.success) setActionError(result.error ?? "Failed"); else { refresh(); onClose(); }
   };
 
   const handleCheckOut = async () => {
@@ -106,21 +109,21 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
       discountAmount: disc || undefined,
       discountReason: discountReason || undefined,
     });
-    setSaving(false); if (!result.success) setActionError(result.error ?? "Failed"); else { onChanged(); onClose(); }
+    setSaving(false); if (!result.success) setActionError(result.error ?? "Failed"); else { refresh(); onClose(); }
   };
 
   const handleSuppPayment = async () => {
     const amt = toN(suppAmount);
     if (amt <= 0) return;
     setSaving(true); const result = await recordSupplementaryPayment({ bookingId: booking!.id, amount: amt });
-    setSaving(false); if (result.success) { onChanged(); setSuppAmount(""); } else setActionError(result.error ?? "Failed");
+    setSaving(false); if (result.success) { refresh(); setSuppAmount(""); } else setActionError(result.error ?? "Failed");
   };
 
   const handleDiscount = async () => {
     const amt = toN(discountAmount);
     if (amt <= 0) return;
     setSaving(true); const result = await applyDiscount({ bookingId: booking!.id, amount: amt, reason: discountReason || "手动优惠" });
-    setSaving(false); if (result.success) { onChanged(); setDiscountAmount(""); setDiscountReason(""); } else setActionError(result.error ?? "Failed");
+    setSaving(false); if (result.success) { refresh(); setDiscountAmount(""); setDiscountReason(""); } else setActionError(result.error ?? "Failed");
   };
 
   const handleExtend = async () => {
@@ -128,7 +131,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
     const extraAmount = Math.round(Number(booking!.nightly_price_xof) * days);
     setSaving(true);
     const result = await extendStay(booking!.id, booking!.check_out ?? "", days, extraAmount);
-    setSaving(false); if (!result.success) setActionError(result.error ?? "Failed"); else { onChanged(); onClose(); }
+    setSaving(false); if (!result.success) setActionError(result.error ?? "Failed"); else { refresh(); onClose(); }
   };
 
   return (
@@ -225,7 +228,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-brand-sky-700">{t.cleaning.title}: {relatedCleaningTask.is_completed ? t.cleaning.completed : t.cleaning.pending}</span>
                   {!relatedCleaningTask.is_completed && (
-                    <Button variant="primary" size="sm" onClick={() => { setSaving(true); completeCleaning(relatedCleaningTask.id).then(() => { setSaving(false); onChanged(); onClose(); }); }} disabled={saving}>
+                    <Button variant="primary" size="sm" onClick={() => { setSaving(true); completeCleaning(relatedCleaningTask.id).then(() => { setSaving(false); refresh(); onClose(); }); }} disabled={saving}>
                       <Check className="h-3 w-3" />{t.cleaning.markComplete}
                     </Button>
                   )}
@@ -237,8 +240,8 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
             <div className="space-y-2">
               {booking.status === "pending_review" && (
                 <div className="flex gap-2">
-                  <Button variant="primary" onClick={() => { setSaving(true); confirmBooking(booking.id).then(r => { setSaving(false); if (r.success) { onChanged(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className="flex-1">{t.booking.confirmBooking}</Button>
-                  <Button variant="danger-secondary" onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { onChanged(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className="flex-1"><UserX className="h-4 w-4" />{t.booking.cancelBooking}</Button>
+                  <Button variant="primary" onClick={() => { setSaving(true); confirmBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className="flex-1">{t.booking.confirmBooking}</Button>
+                  <Button variant="danger-secondary" onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className="flex-1"><UserX className="h-4 w-4" />{t.booking.cancelBooking}</Button>
                 </div>
               )}
 
@@ -247,7 +250,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                   <div><label className={labelClass}>{t.booking.prepaidAmount} *</label><input type="number" value={prepaidAmount} onChange={e => setPrepaidAmount(e.target.value)} className={inputClass} /><p className="mt-0.5 text-xs text-brand-ink-300">{t.booking.prepaidWarning}</p></div>
                   <div className="flex gap-2">
                     <Button variant="primary" onClick={handleCheckIn} disabled={saving} className="flex-1">{t.booking.checkIn}</Button>
-                    <Button variant="danger-secondary" onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { onChanged(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className="flex-1">{t.booking.cancelBooking}</Button>
+                    <Button variant="danger-secondary" onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className="flex-1">{t.booking.cancelBooking}</Button>
                   </div>
                 </div>
               )}

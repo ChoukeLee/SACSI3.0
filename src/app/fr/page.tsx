@@ -27,7 +27,7 @@ export default async function FrenchDashboardPage() {
   if (buildingId) {
     const [unitsRes, bookingsRes, customersRes, paymentsRes, cleaningRes] = await Promise.all([
       supabase.from("units").select("*, unit_business_flags!inner(business_type, is_enabled)").eq("building_id", buildingId).eq("unit_business_flags.business_type", "daily_rental").eq("unit_business_flags.is_enabled", true).order("unit_no"),
-      supabase.from("daily_bookings").select("*").in("status", ["confirmed", "checked_in", "checked_out"]).order("check_in", { ascending: false }).limit(200),
+      supabase.from("daily_bookings").select("*").in("status", ["pending_review", "confirmed", "checked_in", "checked_out"]).order("check_in", { ascending: false }).limit(200),
       supabase.from("customers").select("id, name, phone, is_blacklisted").order("name"),
       supabase.from("payments").select("*").eq("source_type", "daily_booking").order("payment_date", { ascending: false }).limit(200),
       supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed"),

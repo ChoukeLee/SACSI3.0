@@ -117,6 +117,7 @@ export async function createBooking(input: {
     metadata: { unit_id: input.unitId, customer_id: input.customerId, check_in: input.checkIn, checkout_mode: mode },
   });
 
+  revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
   return { success: true, data };
@@ -128,6 +129,7 @@ export async function confirmBooking(bookingId: string): Promise<{ success: bool
   const { error } = await supabase.from("daily_bookings").update({ status: "confirmed" }).eq("id", bookingId).eq("status", "pending_review");
   if (error) return { success: false, error: error.message };
   await supabase.from("audit_logs").insert({ action: "confirm", entity_type: "daily_booking", entity_id: bookingId, metadata: {} });
+  revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
   return { success: true };
@@ -171,6 +173,7 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
     metadata: { prepaid_amount: prepaidAmount, checkout_mode: booking.checkout_mode },
   });
 
+  revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
   return { success: true };
@@ -214,6 +217,7 @@ export async function recordSupplementaryPayment(input: {
     metadata: { amount: input.amount, total_prepaid: newPrepaid },
   });
 
+  revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
   return { success: true };
@@ -283,6 +287,7 @@ export async function checkOut(bookingId: string, input: {
     metadata: { final_amount: finalAmount, actual_check_out: actualCheckOut, discount: input.discountAmount ?? 0 },
   });
 
+  revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
   return { success: true };
@@ -311,6 +316,7 @@ export async function applyDiscount(input: {
     metadata: { discount: gross, reason: input.reason },
   });
 
+  revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
   return { success: true };
@@ -324,6 +330,7 @@ export async function completeCleaning(taskId: string): Promise<{ success: boole
   if (task.is_completed) return { success: false, error: "Task already completed." };
   await supabase.from("cleaning_tasks").update({ is_completed: true, completed_at: new Date().toISOString() }).eq("id", taskId);
   await supabase.from("units").update({ status: "available" }).eq("id", task.unit_id);
+  revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
   return { success: true };
@@ -357,6 +364,7 @@ export async function extendStay(bookingId: string, newCheckOut: string, extraNi
     metadata: { extra_nights: extraNights, extra_amount: extraAmount },
   });
 
+  revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
   return { success: true };
@@ -372,6 +380,7 @@ export async function cancelBooking(bookingId: string): Promise<{ success: boole
   await supabase.from("daily_bookings").update({ status: "cancelled" }).eq("id", bookingId);
   await supabase.from("units").update({ status: "available" }).eq("id", booking.unit_id);
   await supabase.from("audit_logs").insert({ action: "cancel", entity_type: "daily_booking", entity_id: bookingId, metadata: {} });
+  revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
   return { success: true };

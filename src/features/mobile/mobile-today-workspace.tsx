@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { BedDouble } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
@@ -13,6 +14,7 @@ import {
   computeRoomStates,
   getOccupiedRooms,
   getTodayCheckouts,
+  getReservedRooms,
   getCleaningRooms,
   getAvailableRooms,
   getAllActiveRooms,
@@ -41,6 +43,7 @@ export function MobileTodayWorkspace({
   buildingName = "SASCI11",
 }: MobileTodayWorkspaceProps) {
   const t = dictionaries[locale].mobile;
+  const router = useRouter();
   const todayStr = new Date().toISOString().slice(0, 10);
 
   const roomStates = useMemo(
@@ -50,10 +53,12 @@ export function MobileTodayWorkspace({
 
   const occupied = useMemo(() => getOccupiedRooms(roomStates), [roomStates]);
   const todayCheckouts = useMemo(() => getTodayCheckouts(roomStates), [roomStates]);
+  const reserved = useMemo(() => getReservedRooms(roomStates), [roomStates]);
   const cleaning = useMemo(() => getCleaningRooms(roomStates), [roomStates]);
   const available = useMemo(() => getAvailableRooms(roomStates), [roomStates]);
 
-  const occupiedCount = occupied.length + todayCheckouts.length;
+  // Occupied tab includes both checked-in guests and pending reservations
+  const occupiedCount = occupied.length + todayCheckouts.length + reserved.length;
   const checkingOutCount = todayCheckouts.length;
   const cleaningCount = cleaning.length;
   const availableCount = available.length;
@@ -68,17 +73,18 @@ export function MobileTodayWorkspace({
   const filteredRooms = useMemo(() => {
     switch (activeTab) {
       case "occupied":
-        return occupied;
+        // Show both checked-in and reserved together, reserved last
+        return [...occupied, ...todayCheckouts, ...reserved];
       case "checking_out_today":
         return todayCheckouts;
       case "cleaning":
         return cleaning;
       case "available":
-        return [...todayCheckouts, ...occupied, ...cleaning, ...available];
+        return [...todayCheckouts, ...occupied, ...reserved, ...cleaning, ...available];
       default:
         return [];
     }
-  }, [activeTab, occupied, todayCheckouts, cleaning, available]);
+  }, [activeTab, occupied, todayCheckouts, reserved, cleaning, available]);
 
   const handleCardPress = useCallback((room: RoomState) => {
     setSelectedRoom(room);
@@ -103,26 +109,28 @@ export function MobileTodayWorkspace({
     setActionLoading(true);
     try {
       await checkOut(checkoutTarget.booking.id, {});
+      router.refresh();
     } catch (e) {
       console.error("Checkout failed:", e);
     } finally {
       setActionLoading(false);
       setCheckoutTarget(null);
     }
-  }, [checkoutTarget]);
+  }, [checkoutTarget, router]);
 
   const executeCleaning = useCallback(async () => {
     if (!cleaningTarget?.cleaningTask) return;
     setActionLoading(true);
     try {
       await completeCleaning(cleaningTarget.cleaningTask.id);
+      router.refresh();
     } catch (e) {
       console.error("Cleaning completion failed:", e);
     } finally {
       setActionLoading(false);
       setCleaningTarget(null);
     }
-  }, [cleaningTarget]);
+  }, [cleaningTarget, router]);
 
   const todayFormatted = new Date().toLocaleDateString(
     locale === "fr" ? "fr-FR" : "zh-CN",
@@ -213,6 +221,7 @@ function EmptyState({
   const message: Record<RoomDisplayStatus, string> = {
     occupied: empty.noOccupied,
     checking_out_today: empty.noCheckouts,
+    reserved: empty.noReserved,
     cleaning: empty.noCleaning,
     available: empty.noRooms,
     other: empty.noRooms,

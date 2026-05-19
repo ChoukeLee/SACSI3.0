@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   X, Phone, Copy, Check, ChevronRight, CreditCard,
   Wrench, Lock, Unlock, CalendarPlus, DoorOpen,
@@ -21,6 +22,8 @@ function displayStatusToUnitStatus(s: RoomState["displayStatus"]): UnitStatus {
     case "occupied":
     case "checking_out_today":
       return "daily_occupied";
+    case "reserved":
+      return "reserved";
     case "cleaning":
       return "cleaning_pending";
     case "available":
@@ -49,6 +52,7 @@ type DrawerAction =
 
 export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDrawerProps) {
   const t = dictionaries[locale].mobile;
+  const router = useRouter();
   const [action, setAction] = useState<DrawerAction>(null);
   const [loading, setLoading] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -123,6 +127,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
         await extendStay(room.booking.id, extendDate, extraNights, extraAmount);
       }
       resetState();
+      router.refresh();
       onClose();
     } catch (e) {
       console.error("Action failed:", e);
