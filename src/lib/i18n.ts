@@ -46,7 +46,8 @@ export const dictionaries = {
         finance: "财务",
         reports: "报表",
         settings: "设置",
-        management: "经营驾驶舱"
+        management: "经营驾驶舱",
+        documents: "单据中心"
       }
     },
     statuses: {
@@ -914,7 +915,8 @@ export const dictionaries = {
         finance: "Finance",
         reports: "Rapports",
         settings: "Parametres",
-        management: "Direction"
+        management: "Direction",
+        documents: "Documents"
       }
     },
     statuses: {
