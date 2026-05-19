@@ -1,4 +1,3 @@
-
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -15,12 +14,14 @@ export default async function SettingsPage() {
   const { data: buildings } = await supabase.from("buildings").select("*").order("code");
 
   return (
-      <>
-
-      {/* MACOS-STYLE: all content visible on every screen size */}
-<><PageHeader title={t.title} description={t.description} />
-      <SettingsView buildings={(buildings as BuildingRow[]) ?? []} locale="zh" />
-
-      </>
-</>);
+    <>
+      <div className="lg:hidden">
+        <DesktopOnly locale="zh" />
+      </div>
+      <div className="hidden lg:block">
+        <PageHeader title={t.title} description={t.description} />
+        <SettingsView buildings={(buildings as BuildingRow[]) ?? []} locale="zh" />
+      </div>
+    </>
+  );
 }

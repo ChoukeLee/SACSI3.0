@@ -1,9 +1,9 @@
-
 import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { LeaseList } from "@/features/leases";
+import { DesktopOnly } from "@/features/mobile";
 import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -34,18 +34,21 @@ export default async function FrenchLeasesPage() {
   }
 
   return (
-      <>
-
-<><PageHeader title={t.title} description={t.description} />
-      <div className="grid gap-4 md:grid-cols-3">
-        {t.metrics.map(([title, value, caption], i) => (
-          <MetricCard key={title} title={title} value={value} caption={caption} accent={i === 1 ? "green" : i === 2 ? "ink" : "orange"} />
-        ))}
+    <>
+      <div className="lg:hidden">
+        <DesktopOnly locale="fr" />
       </div>
-      <section className="mt-8">
-        <LeaseList contracts={contracts} units={units} customers={customers} payments={payments} locale="fr" />
-      </section>
-
-      </>
-</>);
+      <div className="hidden lg:block">
+        <PageHeader title={t.title} description={t.description} />
+        <div className="grid gap-4 md:grid-cols-3">
+          {t.metrics.map(([title, value, caption], i) => (
+            <MetricCard key={title} title={title} value={value} caption={caption} accent={i === 1 ? "green" : i === 2 ? "ink" : "orange"} />
+          ))}
+        </div>
+        <section className="mt-8">
+          <LeaseList contracts={contracts} units={units} customers={customers} payments={payments} locale="fr" />
+        </section>
+      </div>
+    </>
+  );
 }

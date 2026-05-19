@@ -126,6 +126,12 @@ export function AppShell({
             const Icon = item.icon;
             const active = isActive(item.href);
             const mobileT = dictionaries[locale].mobile;
+            const navLabel: string = String(
+              item.key === "workbench" ? mobileT.workbench :
+              item.key === "daily" ? mobileT.daily :
+              item.key === "units" ? mobileT.units :
+              mobileT.profile
+            );
             return (
               <Link
                 key={item.key}
@@ -139,7 +145,7 @@ export function AppShell({
                 aria-current={active ? "page" : undefined}
               >
                 <Icon className={cn("h-6 w-6", active ? "opacity-100" : "opacity-50")} aria-hidden />
-                <span className="leading-none">{mobileT[item.key as keyof typeof mobileT]}</span>
+                <span className="leading-none">{navLabel}</span>
               </Link>
             );
           })}
