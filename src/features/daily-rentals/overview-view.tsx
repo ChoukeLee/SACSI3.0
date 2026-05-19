@@ -40,8 +40,14 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
       const booking = activeBookings.find(b => {
         if (b.unit_id !== unit.id) return false;
         const checkIn = b.check_in;
-        const checkOut = b.checkout_mode === "open" ? (b.actual_check_out ?? "9999-12-31") : (b.check_out ?? checkIn);
-        return selectedDate >= checkIn && selectedDate < checkOut;
+        // fixed checkout: departure date is still an occupied night
+        // open-ended: actual_check_out means they've already left, so use <
+        if (b.checkout_mode === "fixed") {
+          const fixedEnd = b.check_out ?? checkIn;
+          return selectedDate >= checkIn && selectedDate <= fixedEnd;
+        }
+        const openEnd = b.actual_check_out ?? "9999-12-31";
+        return selectedDate >= checkIn && selectedDate < openEnd;
       }) ?? null;
 
       let displayStatus = unit.status;

@@ -33,7 +33,7 @@ export function MobileWorkbench({ dailyUnits, bookings, customers, payments, cle
     for (const unit of dailyUnits) {
       const b = bookings.find(b => b.unit_id === unit.id && b.status === "checked_in" &&
         b.check_in <= todayStr &&
-        (b.checkout_mode === "open" || (b.check_out && b.check_out > todayStr)));
+        (b.checkout_mode === "open" || (b.check_out && b.check_out >= todayStr)));
       if (b) {
         const billing = calculateBilling(b, todayStr);
         const cust = customers.find(c => c.id === b.customer_id);

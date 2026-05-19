@@ -32,7 +32,7 @@ export function MobileDailyCards({ dailyUnits, bookings, customers, payments, cl
         b.unit_id === unit.id &&
         (b.status === "checked_in" || b.status === "confirmed") &&
         b.check_in <= todayStr &&
-        (b.checkout_mode === "open" || (b.check_out && b.check_out > todayStr))
+        (b.checkout_mode === "open" || (b.check_out && b.check_out >= todayStr))
       );
       const cust = b ? customers.find(c => c.id === b.customer_id) : null;
       const billing = b ? calculateBilling(b, todayStr) : null;

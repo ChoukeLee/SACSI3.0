@@ -68,7 +68,9 @@ export function DailyCalendar({ dailyUnits, bookings, customers, cleaningTasks, 
         ? (b.actual_check_out ?? tomorrowStr)
         : (b.check_out ?? todayStr);
       const start = new Date(b.check_in);
+      // fixed checkout: include the departure date as an occupied night
       const end = new Date(bCheckOut);
+      if (b.checkout_mode === "fixed") end.setDate(end.getDate() + 1);
       const cursor = new Date(start);
       while (cursor < end) {
         const ds = cursor.toISOString().slice(0, 10);
@@ -169,7 +171,7 @@ export function DailyCalendar({ dailyUnits, bookings, customers, cleaningTasks, 
                   if (status === "checked_in" && booking.checkout_mode === "open") colorClass = BOOKING_COLORS.checked_in_open;
                   else if (status === "checked_in") colorClass = BOOKING_COLORS.checked_in_fixed;
                   else colorClass = BOOKING_COLORS[status] ?? BOOKING_COLORS.pending_review;
-                  const isEnd = booking.checkout_mode !== "open" && booking.check_out && dateStr === (() => { const d = new Date(booking.check_out!); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); })();
+                  const isEnd = booking.checkout_mode !== "open" && booking.check_out && dateStr === booking.check_out;
                   const abbr = abbrMap.get(booking.customer_id) ?? "?";
                   return (
                     <div key={dateStr}
