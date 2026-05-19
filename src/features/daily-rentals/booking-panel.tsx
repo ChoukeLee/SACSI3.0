@@ -34,7 +34,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   // router.refresh() (soft RSC re-fetch) can fail to propagate new bookings
   // to the calendar grid. Hard navigation to current path guarantees fresh data.
   const refresh = () => {
-    router.replace(window.location.pathname + window.location.search);
+    router.replace(window.location.pathname + window.location.search + (window.location.search ? '&' : '?') + '_t=' + Date.now());
     onChanged();
   };
 

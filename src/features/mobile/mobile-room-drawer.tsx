@@ -127,7 +127,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
         await extendStay(room.booking.id, extendDate, extraNights, extraAmount);
       }
       resetState();
-      router.replace(window.location.pathname + window.location.search);
+      router.replace(window.location.pathname + window.location.search + (window.location.search ? '&' : '?') + '_t=' + Date.now());
       onClose();
     } catch (e) {
       console.error("Action failed:", e);

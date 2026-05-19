@@ -109,7 +109,7 @@ export function MobileTodayWorkspace({
     setActionLoading(true);
     try {
       await checkOut(checkoutTarget.booking.id, {});
-      router.replace(window.location.pathname + window.location.search);
+      router.replace(window.location.pathname + window.location.search + (window.location.search ? '&' : '?') + '_t=' + Date.now());
     } catch (e) {
       console.error("Checkout failed:", e);
     } finally {
@@ -123,7 +123,7 @@ export function MobileTodayWorkspace({
     setActionLoading(true);
     try {
       await completeCleaning(cleaningTarget.cleaningTask.id);
-      router.replace(window.location.pathname + window.location.search);
+      router.replace(window.location.pathname + window.location.search + (window.location.search ? '&' : '?') + '_t=' + Date.now());
     } catch (e) {
       console.error("Cleaning completion failed:", e);
     } finally {
