@@ -28,7 +28,7 @@ export default async function FrenchDailyOverviewPage() {
         .eq("unit_business_flags.is_enabled", true)
         .order("unit_no"),
       supabase.from("daily_bookings").select("*")
-        .in("status", ["confirmed", "checked_in", "checked_out"])
+        .in("status", ["pending_review", "confirmed", "checked_in", "checked_out"])
         .order("check_in", { ascending: false }).limit(500),
       supabase.from("customers").select("id, name, phone, is_blacklisted").order("name"),
       supabase.from("payments").select("*").eq("source_type", "daily_booking").order("payment_date", { ascending: false }).limit(500),

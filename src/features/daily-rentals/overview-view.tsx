@@ -30,7 +30,7 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
   const [copied, setCopied] = useState(false);
 
   const activeBookings = useMemo(() =>
-    bookings.filter(b => b.status === "checked_in" || b.status === "confirmed"),
+    bookings.filter(b => b.status === "checked_in" || b.status === "confirmed" || b.status === "pending_review"),
     [bookings]
   );
 
@@ -51,8 +51,10 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
       }) ?? null;
 
       let displayStatus = unit.status;
-      if (booking) {
+      if (booking?.status === "checked_in") {
         displayStatus = "daily_occupied";
+      } else if (booking?.status === "confirmed" || booking?.status === "pending_review") {
+        displayStatus = "reserved";
       } else if (unit.status === "cleaning_pending") {
         displayStatus = "cleaning_pending";
       } else if (unit.status === "maintenance" || unit.status === "locked") {
@@ -224,12 +226,18 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
                   <tr key={row.unit.id} className={cn(
                     "transition-colors duration-fast",
                     row.status === "daily_occupied" && "bg-brand-orange-50/40",
+                    row.status === "reserved" && "bg-brand-amber-50/40",
                     row.status === "cleaning_pending" && "bg-brand-sky-50/40",
                   )}>
                     <td className="px-3 py-2.5 font-mono text-sm font-semibold text-brand-ink-900">{row.unit.unit_no}</td>
                     <td className="px-3 py-2.5">
                       {row.booking ? (
-                        <span className="text-sm font-medium text-brand-ink-700">{row.customer?.name?.slice(0, 8) ?? "?"}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-brand-ink-700">{row.customer?.name?.slice(0, 8) ?? "?"}</span>
+                          {row.booking.status !== "checked_in" && (
+                            <StatusBadge status="reserved" locale={locale} />
+                          )}
+                        </div>
                       ) : (
                         <StatusBadge status={row.status as UnitStatus} locale={locale} />
                       )}

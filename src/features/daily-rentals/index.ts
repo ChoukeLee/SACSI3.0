@@ -10,3 +10,9 @@ export {
   recordSupplementaryPayment, applyDiscount,
   checkConflicts,
 } from "./actions";
+export {
+  getCellStatus,
+  getBookingColorClass,
+  buildBookingMap,
+} from "./cell-status";
+export type { CellStatusType, CellStatus } from "./cell-status";

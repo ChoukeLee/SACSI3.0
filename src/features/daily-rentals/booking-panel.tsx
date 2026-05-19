@@ -24,9 +24,10 @@ interface BookingPanelProps {
   cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean; completed_at?: string | null }[];
   payments: { id: string; source_id: string; amount: number; payment_date: string }[];
   locale: Locale; onClose: () => void; onChanged: () => void;
+  onBookingCreated?: (booking: DailyBookingRow) => void;
 }
 
-export function BookingPanel({ booking, unitId, defaultDate, units, customers, cleaningTasks, payments, locale, onClose, onChanged }: BookingPanelProps) {
+export function BookingPanel({ booking, unitId, defaultDate, units, customers, cleaningTasks, payments, locale, onClose, onChanged, onBookingCreated }: BookingPanelProps) {
   const t = dictionaries[locale].dailyRentals;
   const router = useRouter();
   const isNew = !booking;
@@ -94,7 +95,10 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
       notes: newNotes || undefined,
     });
     setSaving(false);
-    if (result.success) { refresh(); onClose(); }
+    if (result.success) {
+      if (result.data) onBookingCreated?.(result.data);
+      refresh(); onClose();
+    }
     else setError(result.error ?? "Failed");
   };
 
