@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "./confirm-dialog";
 import type { RoomState } from "./room-state";
 import type { UnitStatus } from "@/types/domain";
-import { checkOut, recordSupplementaryPayment, completeCleaning } from "@/features/daily-rentals/actions";
+import { checkOut, recordSupplementaryPayment, completeCleaning, extendStay } from "@/features/daily-rentals/actions";
 import { updateUnitStatus } from "@/features/units/actions";
 
 function displayStatusToUnitStatus(s: RoomState["displayStatus"]): UnitStatus {
@@ -52,6 +52,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
   const [action, setAction] = useState<DrawerAction>(null);
   const [loading, setLoading] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
+  const [extendDate, setExtendDate] = useState("");
   const [phoneCopied, setPhoneCopied] = useState(false);
   const [showMore, setShowMore] = useState(false);
 
@@ -59,6 +60,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
     setAction(null);
     setLoading(false);
     setPaymentAmount("");
+    setExtendDate("");
     setShowMore(false);
   }, []);
 
@@ -112,6 +114,13 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
         await updateUnitStatus(room.unit.id, "locked");
       } else if (action.type === "markAvailable") {
         await updateUnitStatus(room.unit.id, "available");
+      } else if (action.type === "extendStay" && room.booking && extendDate) {
+        const currentCheckOut = room.booking.check_out ?? new Date().toISOString().slice(0, 10);
+        const newDate = new Date(extendDate);
+        const oldDate = new Date(currentCheckOut);
+        const extraNights = Math.max(1, Math.ceil((newDate.getTime() - oldDate.getTime()) / (1000 * 60 * 60 * 24)));
+        const extraAmount = Math.round(extraNights * Number(room.booking.nightly_price_xof));
+        await extendStay(room.booking.id, extendDate, extraNights, extraAmount);
       }
       resetState();
       onClose();
@@ -260,6 +269,38 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                     size="sm"
                     onClick={executeAction}
                     disabled={loading || !paymentAmount || Number(paymentAmount) <= 0}
+                  >
+                    {actionLabels.save}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Extend stay input (when extend action active) */}
+            {action?.type === "extendStay" && room.booking && (
+              <div className="rounded-xl border border-brand-sky-200 bg-brand-sky-50 p-3.5">
+                <p className="text-xs font-semibold text-brand-ink-700 mb-2">
+                  {actionLabels.extendStayDesc}
+                </p>
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <label className="text-[10px] text-brand-ink-400 block mb-1">
+                      {locale === "zh" ? "新离店日期" : "Nouvelle date départ"}
+                    </label>
+                    <input
+                      type="date"
+                      value={extendDate}
+                      onChange={(e) => setExtendDate(e.target.value)}
+                      min={room.booking.check_out ?? new Date().toISOString().slice(0, 10)}
+                      className="w-full rounded-lg border border-brand-warm-400 px-3 py-2 text-sm bg-white text-brand-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-orange/30"
+                      autoFocus
+                    />
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={executeAction}
+                    disabled={loading || !extendDate}
                   >
                     {actionLabels.save}
                   </Button>
