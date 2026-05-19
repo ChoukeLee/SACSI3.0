@@ -122,24 +122,30 @@ export function ManagementDashboard({
   const t = dictionaries[locale].management;
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("__all__");
 
+  // Room matrix & status counts only include apartments (exclude parking/storefront/office)
+  const residentialUnits = useMemo(
+    () => units.filter(u => u.kind === "apartment"),
+    [units],
+  );
+
   const activeBuildings = useMemo(
     () => buildings.filter(b => b.is_active),
     [buildings],
   );
 
-  // Filter by building
+  // Filter by building (apartments only)
   const filteredUnits = useMemo(() => {
-    if (selectedBuildingId === "__all__") return units;
-    return units.filter(u => u.building_id === selectedBuildingId);
-  }, [units, selectedBuildingId]);
+    if (selectedBuildingId === "__all__") return residentialUnits;
+    return residentialUnits.filter(u => u.building_id === selectedBuildingId);
+  }, [residentialUnits, selectedBuildingId]);
 
   const buildingUnits = useMemo(() => {
     const map = new Map<string, UnitRow[]>();
     for (const b of activeBuildings) {
-      map.set(b.id, units.filter(u => u.building_id === b.id));
+      map.set(b.id, residentialUnits.filter(u => u.building_id === b.id));
     }
     return map;
-  }, [activeBuildings, units]);
+  }, [activeBuildings, residentialUnits]);
 
   // Compute unit states
   const unitStates = useMemo(
