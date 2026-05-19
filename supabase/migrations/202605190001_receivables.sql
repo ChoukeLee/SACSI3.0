@@ -51,7 +51,7 @@ do $$
 begin
   if not exists (
     select 1 from pg_policies
-    where policname = 'Allow authenticated select on receivables'
+    where policyname = 'Allow authenticated select on receivables'
       and tablename = 'receivables'
   ) then
     create policy "Allow authenticated select on receivables"
@@ -62,7 +62,7 @@ begin
 
   if not exists (
     select 1 from pg_policies
-    where policname = 'Allow authenticated insert on receivables'
+    where policyname = 'Allow authenticated insert on receivables'
       and tablename = 'receivables'
   ) then
     create policy "Allow authenticated insert on receivables"
@@ -73,7 +73,7 @@ begin
 
   if not exists (
     select 1 from pg_policies
-    where policname = 'Allow authenticated update on receivables'
+    where policyname = 'Allow authenticated update on receivables'
       and tablename = 'receivables'
   ) then
     create policy "Allow authenticated update on receivables"
