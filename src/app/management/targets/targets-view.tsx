@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Trash2, Save, TrendingUp, TrendingDown } from "lucide-react";
 import { cn, formatXof } from "@/lib/utils";
 import { computeKpiData, KPI_DEFINITIONS } from "@/features/management/kpi-service";
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function TargetsView({ targets, receivables, units, bookings, leases, sales, locale, userRole }: Props) {
+  const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [formMetric, setFormMetric] = useState("monthly_receivable");
   const [formValue, setFormValue] = useState("");
@@ -68,7 +70,7 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ period_type: formPeriod, period_start: start, period_end: end, metric_key: formMetric, target_value: Number(formValue), unit: KPI_DEFINITIONS.find(d => d.key === formMetric)?.unit ?? "%", scope_type: "global" }),
       });
-      if (resp.ok) { setShowForm(false); setFormMsg(""); }
+      if (resp.ok) { setShowForm(false); setFormMsg(""); setFormValue(""); router.refresh(); }
       else setFormMsg("保存失败");
     } catch { setFormMsg("网络错误"); }
     setSaving(false);
@@ -76,7 +78,8 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
 
   const handleDelete = async (id: string) => {
     if (!canEdit) return;
-    await fetch(`/api/targets?id=${id}`, { method: "DELETE" });
+    const resp = await fetch(`/api/targets?id=${id}`, { method: "DELETE" });
+    if (resp.ok) router.refresh();
   };
 
   return (

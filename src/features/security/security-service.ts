@@ -2,10 +2,17 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
-import type { SecurityCheckItem } from "./security-types";
+import type { BackupResult, SecurityCheckItem } from "./security-types";
 
 function csvLine(fields: (string|number|null|undefined)[]): string {
   return fields.map(f => { const s = String(f??""); return s.includes(",")||s.includes('"') ? `"${s.replace(/"/g,'""')}"` : s; }).join(",");
+}
+
+function backupValue(value: unknown): string | number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number" || typeof value === "string") return value;
+  if (typeof value === "boolean") return value ? "true" : "false";
+  return JSON.stringify(value);
 }
 
 export async function runSecurityCheck(): Promise<SecurityCheckItem[]> {
@@ -46,27 +53,35 @@ export async function runSecurityCheck(): Promise<SecurityCheckItem[]> {
   return checks;
 }
 
-export async function downloadBackup(): Promise<string> {
+export async function downloadBackup(): Promise<BackupResult> {
   const supabase = await createClient();
   const tables = ["units", "customers", "daily_bookings", "lease_contracts", "sale_contracts", "sale_payment_schedule", "receivables", "payments", "ledger_entries", "system_settings", "business_targets", "audit_logs"];
   let totalRows = 0;
+  let tableCount = 0;
+  const sections: string[] = [];
+  const blockedColumns = new Set(["encrypted_document_no", "password", "token", "session", "service_role_key"]);
 
   for (const table of tables) {
     try {
       const { data } = await supabase.from(table).select("*").limit(500);
       if (!data || data.length === 0) continue;
-      const keys = Object.keys(data[0]).filter(k => !["encrypted_document_no"].includes(k));
-      const rows = [csvLine(keys), ...data.map((row: any) => csvLine(keys.map(k => row[k])))];
-      const csv = rows.join("\n");
-      // Each table becomes a separate download
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      // Server action can't trigger download. Return summary instead.
+      const keys = Object.keys(data[0]).filter(k => !blockedColumns.has(k.toLowerCase()));
+      sections.push(`# table: ${table}`);
+      sections.push(csvLine(keys));
+      sections.push(...(data as Record<string, unknown>[]).map((row) => csvLine(keys.map(k => backupValue(row[k])))));
+      sections.push("");
       totalRows += data.length;
+      tableCount++;
     } catch { /* skip unavailable tables */ }
   }
 
   // Write audit log
   try { await supabase.from("audit_logs").insert({ action: "backup", entity_type: "system", entity_id: null, metadata: { tables, total_rows: totalRows } }); } catch {}
 
-  return `已生成 ${tables.length} 表备份，共 ${totalRows} 条记录（服务端限制 500 条/表）`;
+  return {
+    filename: `sacis_backup_${new Date().toISOString().slice(0, 10)}.csv`,
+    csv: sections.join("\n"),
+    tableCount,
+    rowCount: totalRows,
+  };
 }

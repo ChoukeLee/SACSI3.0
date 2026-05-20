@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Banknote, BarChart3, BedDouble, Bell, Building2, CalendarDays, FileSignature, FileText, Home, LayoutDashboard, Settings, ShieldCheck, Users,
+  ArrowUpDown, Banknote, BarChart3, BedDouble, Bell, Building2, CalendarDays, FileSignature, FileText, Home, Layers, LayoutDashboard, Settings, ShieldCheck, Users,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -11,7 +11,7 @@ import { getDesktopNavLabels } from "@/lib/nav-labels";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/auth";
 
-type NavKey = "dashboard" | "units" | "dailyRentals" | "dailyOccupancy" | "leases" | "sales" | "customers" | "finance" | "management" | "reports" | "settings" | "documents" | "todos" | "dataQuality" | "frontDesk";
+type NavKey = "dashboard" | "units" | "dailyRentals" | "dailyOccupancy" | "leases" | "sales" | "customers" | "finance" | "management" | "reports" | "settings" | "documents" | "todos" | "dataQuality" | "frontDesk" | "dataExchange" | "bulkActions";
 
 const navItems: { key: NavKey; href: string; icon: typeof Home }[] = [
   { key: "dashboard", href: "/", icon: Home },
@@ -28,6 +28,8 @@ const navItems: { key: NavKey; href: string; icon: typeof Home }[] = [
   { key: "documents", href: "/documents", icon: FileText },
   { key: "reports", href: "/reports", icon: BarChart3 },
   { key: "dataQuality", href: "/data-quality", icon: ShieldCheck },
+  { key: "dataExchange", href: "/data-exchange", icon: ArrowUpDown },
+  { key: "bulkActions", href: "/bulk-actions", icon: Layers },
   { key: "settings", href: "/settings", icon: Settings },
 ];
 

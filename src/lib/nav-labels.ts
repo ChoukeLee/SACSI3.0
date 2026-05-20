@@ -37,6 +37,8 @@ const desktop: Record<Locale, DesktopNavLabels> = {
       todos: "通知待办",
       dataQuality: "数据质量",
       frontDesk: "前台工作台",
+      dataExchange: "导入导出",
+      bulkActions: "批量操作",
     },
   },
   fr: {
@@ -59,6 +61,8 @@ const desktop: Record<Locale, DesktopNavLabels> = {
       todos: "Taches",
       dataQuality: "Qualite",
       frontDesk: "Accueil",
+      dataExchange: "Echange",
+      bulkActions: "Actions",
     },
   },
 };

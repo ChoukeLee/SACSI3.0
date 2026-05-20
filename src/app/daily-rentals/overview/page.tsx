@@ -1,6 +1,8 @@
 
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
+import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { OverviewView } from "@/features/daily-rentals/overview-view";
 import type { UnitRow, DailyBookingRow, CustomerRow, PaymentRow } from "@/types/database";
@@ -8,6 +10,10 @@ import type { UnitRow, DailyBookingRow, CustomerRow, PaymentRow } from "@/types/
 export const dynamic = "force-dynamic";
 
 export default async function DailyOverviewPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (!["admin", "front_desk", "finance", "boss"].includes(user.role)) redirect("/");
+
   const t = dictionaries.zh.dailyOccupancy;
   const supabase = await createClient();
 

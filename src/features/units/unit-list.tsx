@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Upload, Building2 } from "lucide-react";
+import Link from "next/link";
+import { Download, Upload, Building2, Eye } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
-import { dictionaries } from "@/lib/i18n";
+import { dictionaries, routeFor } from "@/lib/i18n";
 import { StatusBadge } from "@/components/status-badge";
 import { UnitFilters } from "./unit-filters";
 import { UnitDetailPanel } from "./unit-detail-panel";
@@ -145,9 +146,19 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
                           : "-"}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className="text-xs font-medium text-brand-orange-500 transition-colors duration-fast group-hover:underline">
-                          {t.actions.viewDetail} →
-                        </span>
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            href={routeFor(locale, `/units/${unit.id}`)}
+                            onClick={e => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 rounded bg-brand-ink-900 px-2 py-1 text-[10px] font-semibold text-white hover:bg-brand-ink-700"
+                          >
+                            <Eye className="h-3 w-3" />
+                            {locale === "zh" ? "档案" : "Profil"}
+                          </Link>
+                          <span className="text-xs font-medium text-brand-orange-500 transition-colors duration-fast group-hover:underline">
+                            {t.actions.viewDetail} →
+                          </span>
+                        </div>
                       </td>
                     </tr>
                   );

@@ -1,9 +1,10 @@
 ﻿"use client";
 
 import { useState, useMemo } from "react";
-import { Search, Plus, AlertTriangle, UserX, UserCheck, GitMerge, X, ChevronDown } from "lucide-react";
+import Link from "next/link";
+import { Search, Plus, AlertTriangle, UserX, UserCheck, GitMerge, X, ChevronDown, Eye } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
-import { dictionaries } from "@/lib/i18n";
+import { dictionaries, routeFor } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import type { CustomerRow } from "@/types/database";
@@ -469,6 +470,13 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
               )}
             </div>
             <div className="flex items-center gap-2">
+              <Link
+                href={routeFor(locale, `/customers/${selected.id}`)}
+                className="inline-flex items-center gap-1 rounded bg-brand-ink-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-ink-700"
+              >
+                <Eye className="h-3.5 w-3.5" />
+                {locale === "zh" ? "查看档案" : "Profil"}
+              </Link>
               <button
                 onClick={() => openEdit(selected)}
                 className="rounded border border-brand-warm-400 px-3 py-1.5 text-xs font-medium text-brand-ink-600 transition hover:bg-brand-warm-50"

@@ -24,8 +24,17 @@ export function SecurityCenter({ locale }: Props) {
   const handleBackup = async () => {
     setBackupLoading(true); setBackupMsg("");
     try {
-      const msg = await downloadBackup();
-      setBackupMsg(msg);
+      const backup = await downloadBackup();
+      const blob = new Blob([backup.csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = backup.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      setBackupMsg(locale === "zh"
+        ? `已导出 ${backup.tableCount} 张表，共 ${backup.rowCount} 条记录`
+        : `${backup.tableCount} tables, ${backup.rowCount} lignes exportees`);
     } catch { setBackupMsg(locale === "zh" ? "备份失败" : "Echec"); }
     setBackupLoading(false);
   };

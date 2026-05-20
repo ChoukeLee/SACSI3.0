@@ -8,6 +8,7 @@ import type { UserRole } from "@/lib/auth";
 import { NotificationBell } from "@/features/notifications";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { GlobalSearch } from "@/features/search";
 import { getDesktopNavLabels } from "@/lib/nav-labels";
 import { createClient } from "@/lib/supabase/client";
 
@@ -34,7 +35,12 @@ export function AppShell({
       <div className="lg:pl-56">
         <header className="sticky top-0 z-sticky border-b border-brand-warm-400 bg-white">
           <div className="flex h-11 items-center justify-between px-4 sm:px-6 lg:px-8">
-            <p className="text-[12px] font-medium text-brand-ink-500">{labels.building}</p>
+            <div className="flex items-center gap-3 flex-1">
+              <p className="text-[12px] font-medium text-brand-ink-500 hidden sm:block">{labels.building}</p>
+              <div className="flex-1 flex justify-center sm:justify-start">
+                <GlobalSearch locale={locale} />
+              </div>
+            </div>
             <div className="flex items-center gap-2 sm:gap-3">
               <NotificationBell notifications={notifications} locale={locale} />
               <Link

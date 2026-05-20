@@ -4,3 +4,10 @@ export interface SecurityCheckItem {
   detail: string;
   status: "pass" | "warn" | "fail";
 }
+
+export interface BackupResult {
+  filename: string;
+  csv: string;
+  tableCount: number;
+  rowCount: number;
+}
