@@ -14,7 +14,7 @@ import { QualityDashboardWidget } from "@/features/data-quality";
 import type { QualityIssue } from "@/features/data-quality/quality-types";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
-import { formatXof, cn } from "@/lib/utils";
+import { formatXof, cn, sortUnits } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
@@ -37,6 +37,13 @@ export type MgmtStatus =
 interface UnitState {
   unit: UnitRow;
   status: MgmtStatus;
+}
+
+interface FloorGroup {
+  key: string;
+  label: string;
+  sortValue: number;
+  states: UnitState[];
 }
 
 interface Props {
@@ -64,6 +71,53 @@ const STATUS_CELL: Record<MgmtStatus, string> = {
   maintenance:      "bg-brand-red-100 text-brand-red-700",
   available:        "bg-brand-green-100 text-brand-green-700 border-brand-green-300",
 };
+
+function firstNumber(value: string | null | undefined): number | null {
+  const match = String(value ?? "").match(/\d+/);
+  return match ? Number(match[0]) : null;
+}
+
+function getUnitFloorValue(unit: UnitRow): number | null {
+  const floorFromLabel = firstNumber(unit.floor_label);
+  if (floorFromLabel !== null) return floorFromLabel;
+
+  const unitNo = firstNumber(unit.unit_no);
+  if (unitNo === null) return null;
+  if (unitNo >= 100) return Math.floor(unitNo / 100);
+  return unitNo;
+}
+
+function groupStatesByFloor(states: UnitState[], locale: Locale): FloorGroup[] {
+  const groups = new Map<string, FloorGroup>();
+
+  for (const state of states) {
+    const floor = getUnitFloorValue(state.unit);
+    const key = floor === null ? "__unknown__" : String(floor);
+    const label = floor === null
+      ? (locale === "zh" ? "未分层" : "Sans étage")
+      : (locale === "zh" ? `${floor}层` : `Étage ${floor}`);
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        label,
+        sortValue: floor ?? Number.MAX_SAFE_INTEGER,
+        states: [],
+      });
+    }
+
+    groups.get(key)!.states.push(state);
+  }
+
+  return [...groups.values()]
+    .map(group => ({
+      ...group,
+      states: sortUnits(group.states.map(s => s.unit))
+        .map(unit => group.states.find(s => s.unit.id === unit.id)!)
+        .filter(Boolean),
+    }))
+    .sort((a, b) => a.sortValue - b.sortValue);
+}
 
 // ── Compute unit snapshot status ───────────────────────────────────────
 
@@ -314,21 +368,38 @@ export function ManagementDashboard({
       <div className="mb-8 space-y-6">
         {(selectedBuildingId === "__all__" ? activeBuildings : activeBuildings.filter(b => b.id === selectedBuildingId)).map(building => {
           const bUnits = buildingUnits.get(building.id) ?? [];
-          const bStates = bUnits.map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks));
+          const bStates = sortUnits(bUnits).map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks));
+          const floorGroups = groupStatesByFloor(bStates, locale);
           return (
-            <Card key={building.id} padding="sm">
-              <h4 className="mb-2 text-xs font-semibold text-brand-ink-600">{building.display_name}</h4>
-              <div className="flex flex-wrap gap-1.5">
-                {bStates.map(s => (
-                  <div
-                    key={s.unit.id}
-                    className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded text-[9px] font-semibold",
-                      STATUS_CELL[s.status],
-                    )}
-                    title={`${s.unit.unit_no} — ${t.statuses[s.status]}`}
-                  >
-                    {s.unit.unit_no}
+            <Card key={building.id} padding="sm" className="overflow-hidden">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h4 className="text-sm font-bold text-brand-ink-800">{building.display_name}</h4>
+                <span className="rounded-full bg-brand-warm-100 px-2.5 py-1 text-[10px] font-semibold text-brand-ink-400">
+                  {bStates.length} {locale === "zh" ? "间" : "unités"}
+                </span>
+              </div>
+              <div className="space-y-2.5">
+                {floorGroups.map(group => (
+                  <div key={group.key} className="grid gap-2 sm:grid-cols-[56px_1fr] sm:items-start">
+                    <div className="flex h-9 items-center text-[11px] font-semibold text-brand-ink-400 sm:justify-end">
+                      {group.label}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {group.states.map(s => (
+                        <Link
+                          key={s.unit.id}
+                          href={routeFor(locale, `/units/${s.unit.id}`)}
+                          className={cn(
+                            "flex h-9 min-w-[42px] items-center justify-center rounded-md border px-2 font-mono text-[11px] font-bold leading-none shadow-sm transition-all duration-fast hover:-translate-y-0.5 hover:shadow-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange",
+                            STATUS_CELL[s.status],
+                          )}
+                          title={`${s.unit.unit_no} — ${t.statuses[s.status]}`}
+                          aria-label={`${s.unit.unit_no} — ${t.statuses[s.status]}`}
+                        >
+                          {s.unit.unit_no}
+                        </Link>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
