@@ -21,8 +21,13 @@ export function MobileBottomNav({ locale, userRole: _userRole }: { locale: Local
 
   const isActive = (href: string) => {
     const localized = routeFor(locale, href);
-    if (href === "/") return pathname === "/" || pathname === "/fr";
-    return pathname === localized;
+    if (href === "/") return pathname === "/" || pathname === "/fr" || pathname === "/front-desk" || pathname === "/fr/front-desk";
+    return pathname === localized || pathname.startsWith(localized);
+  };
+
+  const resolveHref = (href: string) => {
+    if (href === "/" && _userRole === "front_desk") return routeFor(locale, "/front-desk");
+    return routeFor(locale, href);
   };
 
   return (
@@ -39,7 +44,7 @@ export function MobileBottomNav({ locale, userRole: _userRole }: { locale: Local
           return (
             <Link
               key={item.key}
-              href={routeFor(locale, item.href)}
+              href={resolveHref(item.href)}
               className={cn(
                 "relative flex flex-col items-center justify-center gap-0.5 min-h-[52px] min-w-[72px] px-1",
                 "text-[11px] font-semibold select-none rounded-lg",
@@ -51,7 +56,6 @@ export function MobileBottomNav({ locale, userRole: _userRole }: { locale: Local
               )}
               aria-current={active ? "page" : undefined}
             >
-              {/* Active indicator bar */}
               {active && (
                 <span className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full bg-brand-orange" />
               )}

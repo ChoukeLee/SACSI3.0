@@ -1,10 +1,9 @@
 import type { Locale } from "@/lib/i18n";
 
-/** Slim nav-only labels — avoids bundling the full 1400-line dictionary into client nav components. */
-
 export interface DesktopNavLabels {
   brand: string;
   building: string;
+  groups: Record<string, string>;
   nav: Record<string, string>;
   roles: Record<string, string>;
 }
@@ -21,55 +20,75 @@ const desktop: Record<Locale, DesktopNavLabels> = {
     brand: "科建地产",
     building: "SASCI11 · 11#",
     roles: { admin: "管理员", boss: "老板", finance: "财务", front_desk: "前台" },
+    groups: {
+      home: "首页",
+      assets: "房源资产",
+      business: "租售业务",
+      financeCenter: "财务中心",
+      operations: "运营中心",
+      systemTools: "系统工具",
+    },
     nav: {
-      dashboard: "仪表盘",
-      units: "11#房源",
-      dailyRentals: "日租",
-      dailyOccupancy: "日租占用",
-      leases: "长租",
-      sales: "出售",
-      customers: "客户",
-      finance: "财务",
-      reports: "报表",
-      settings: "设置",
+      workbench: "工作台",
       management: "经营驾驶舱",
-      documents: "单据中心",
-      todos: "通知待办",
+      units: "房源总览",
+      roomMatrix: "房态矩阵",
+      dailyRentals: "日租业务",
+      leases: "长租业务",
+      sales: "出售业务",
+      customers: "客户档案",
+      finance: "应收与收款",
+      reports: "财务报表",
+      todos: "待办提醒",
+      documents: "单据打印",
       dataQuality: "数据质量",
-      frontDesk: "前台工作台",
+      auditLogs: "审计日志",
       dataExchange: "导入导出",
       bulkActions: "批量操作",
+      targets: "经营目标",
+      settings: "系统设置",
+      security: "安全备份",
     },
   },
   fr: {
     brand: "Kejian Immobilier",
     building: "SASCI11 · Phase 1",
     roles: { admin: "Administrateur", boss: "Proprietaire", finance: "Comptable", front_desk: "Reception" },
+    groups: {
+      home: "Accueil",
+      assets: "Patrimoine",
+      business: "Activites",
+      financeCenter: "Finance",
+      operations: "Operations",
+      systemTools: "Outils",
+    },
     nav: {
-      dashboard: "Tableau de bord",
-      units: "Lots 11#",
-      dailyRentals: "Location jour",
-      dailyOccupancy: "Occupation jour",
-      leases: "Location longue",
-      sales: "Vente",
-      customers: "Clients",
-      finance: "Finance",
-      reports: "Rapports",
-      settings: "Parametres",
+      workbench: "Tableau de bord",
       management: "Direction",
-      documents: "Documents",
+      units: "Lots",
+      roomMatrix: "Matrice lots",
+      dailyRentals: "Location jour",
+      leases: "Baux",
+      sales: "Ventes",
+      customers: "Clients",
+      finance: "Creances",
+      reports: "Rapports",
       todos: "Taches",
+      documents: "Documents",
       dataQuality: "Qualite",
-      frontDesk: "Accueil",
+      auditLogs: "Audit",
       dataExchange: "Echange",
       bulkActions: "Actions",
+      targets: "Objectifs",
+      settings: "Parametres",
+      security: "Securite",
     },
   },
 };
 
 const mobile: Record<Locale, MobileNavLabels> = {
-  zh: { workbench: "工作台", daily: "日租", units: "房源", profile: "我的" },
-  fr: { workbench: "Accueil", daily: "Jour", units: "Lots", profile: "Moi" },
+  zh: { workbench: "工作台", daily: "日租", units: "房源", profile: "客户" },
+  fr: { workbench: "Accueil", daily: "Jour", units: "Lots", profile: "Clients" },
 };
 
 export function getDesktopNavLabels(locale: Locale): DesktopNavLabels {
