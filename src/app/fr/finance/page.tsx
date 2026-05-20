@@ -1,4 +1,3 @@
-import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { redirect } from "next/navigation";
@@ -52,12 +51,8 @@ export default async function FrenchFinancePage() {
       </div>
       <div className="hidden lg:block">
         <PageHeader title={t.title} description={t.description} />
-        <div className="grid gap-4 md:grid-cols-3">
-          {t.metrics.map(([title, value, caption], i) => (
-            <MetricCard key={title} title={title} value={value} caption={caption} accent={i === 1 ? "green" : i === 2 ? "ink" : "orange"} />
-          ))}
-        </div>
-        <section className="mt-8">
+        <p className="text-xs text-brand-ink-400 mt-2 mb-6">Finance : XOF/CNY · recu requis · rapports en XOF</p>
+        <section>
           <FinanceTabs
             ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale="fr" />}
             receivables={<ReceivableList receivables={receivables} units={units} customers={customers} buildings={buildings} locale="fr" />}

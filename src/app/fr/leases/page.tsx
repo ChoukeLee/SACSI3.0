@@ -1,4 +1,3 @@
-import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { redirect } from "next/navigation";
@@ -50,12 +49,8 @@ export default async function FrenchLeasesPage() {
       </div>
       <div className="hidden lg:block">
         <PageHeader title={t.title} description={t.description} />
-        <div className="grid gap-4 md:grid-cols-3">
-          {t.metrics.map(([title, value, caption], i) => (
-            <MetricCard key={title} title={title} value={value} caption={caption} accent={i === 1 ? "green" : i === 2 ? "ink" : "orange"} />
-          ))}
-        </div>
-        <section className="mt-8">
+        <p className="text-xs text-brand-ink-400 mt-2 mb-6">Location longue : tarification par typologie · mensuel/trimestre/semestre/annuel · sortie automatique</p>
+        <section>
           <LeaseList contracts={contracts} units={units} customers={customers} payments={payments} receivables={receivables} locale="fr" />
         </section>
       </div>

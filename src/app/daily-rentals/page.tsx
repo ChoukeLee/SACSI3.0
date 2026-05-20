@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -51,12 +50,8 @@ export default async function DailyRentalsPage() {
       </div>
       <div className="hidden lg:block">
         <PageHeader title={t.title} description={t.description} />
-        <div className="grid gap-4 md:grid-cols-3">
-          <MetricCard title={t.metrics[0][0]} value={t.metrics[0][1]} caption={t.metrics[0][2]} />
-          <MetricCard title={t.metrics[1][0]} value={t.metrics[1][1]} caption={t.metrics[1][2]} accent="green" />
-          <MetricCard title={t.metrics[2][0]} value={t.metrics[2][1]} caption={t.metrics[2][2]} accent="ink" />
-        </div>
-        <section className="mt-8">
+        <p className="text-xs text-brand-ink-400 mt-2 mb-6">日租规则：21间固定房源 · 40,000 XOF/晚 · 至少预付部分金额，不可离店后付款</p>
+        <section>
           <DailyCalendar dailyUnits={dailyUnits} bookings={bookings} customers={customers} cleaningTasks={cleaningTasks} payments={payments} locale="zh" />
         </section>
       </div>

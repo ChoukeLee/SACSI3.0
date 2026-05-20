@@ -1,5 +1,4 @@
 
-import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { redirect } from "next/navigation";
@@ -65,18 +64,8 @@ export default async function FrenchDailyRentalsPage() {
       <>
 
 <><PageHeader title={t.title} description={t.description} />
-      <div className="grid gap-4 md:grid-cols-3">
-        {t.metrics.map(([title, value, caption], index) => (
-          <MetricCard
-            key={title}
-            title={title}
-            value={value}
-            caption={caption}
-            accent={index === 1 ? "green" : index === 2 ? "ink" : "orange"}
-          />
-        ))}
-      </div>
-      <section className="mt-8">
+      <p className="text-xs text-brand-ink-400 mt-2 mb-6">Location jour : 21 chambres fixes · 40 000 XOF/nuit · paiement anticipe obligatoire</p>
+      <section>
         <DailyCalendar
           dailyUnits={dailyUnits}
           bookings={bookings}
