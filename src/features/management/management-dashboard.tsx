@@ -15,8 +15,6 @@ import type { QualityIssue } from "@/features/data-quality/quality-types";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
 import { formatXof, cn, sortUnits } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
-import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import type {
   BuildingRow, UnitRow, DailyBookingRow, LeaseContractRow,
@@ -62,14 +60,14 @@ interface Props {
 
 // ── Status color map for room matrix ───────────────────────────────────
 
-const STATUS_CELL: Record<MgmtStatus, string> = {
-  sold:             "bg-brand-ink-500 text-white",
-  leased:           "bg-indigo-100 text-indigo-800 border-indigo-300",
-  dailyOccupied:    "bg-brand-orange-200 text-brand-orange-800",
-  reserved:         "bg-amber-200 text-amber-900",
-  cleaningPending:  "bg-brand-sky-100 text-brand-sky-700",
-  maintenance:      "bg-brand-red-100 text-brand-red-700",
-  available:        "bg-brand-green-100 text-brand-green-700 border-brand-green-300",
+const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; label: string }> = {
+  sold:             { bg: "bg-brand-ink-100 text-brand-ink-600 border-brand-ink-200", dot: "bg-brand-ink-600", label: "bg-brand-ink-500 text-white" },
+  leased:           { bg: "bg-indigo-50 text-indigo-700 border-indigo-200", dot: "bg-indigo-500", label: "bg-indigo-100 text-indigo-800" },
+  dailyOccupied:    { bg: "bg-brand-orange-50 text-brand-orange-700 border-brand-orange-200", dot: "bg-brand-orange-500", label: "bg-brand-orange-100 text-brand-orange-800" },
+  reserved:         { bg: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", label: "bg-amber-100 text-amber-800" },
+  cleaningPending:  { bg: "bg-brand-sky-50 text-brand-sky-700 border-brand-sky-200", dot: "bg-brand-sky-500", label: "bg-brand-sky-100 text-brand-sky-700" },
+  maintenance:      { bg: "bg-brand-red-50 text-brand-red-600 border-brand-red-200", dot: "bg-brand-red-500", label: "bg-brand-red-100 text-brand-red-700" },
+  available:        { bg: "bg-brand-green-50 text-brand-green-700 border-brand-green-200", dot: "bg-brand-green-500", label: "bg-brand-green-100 text-brand-green-700" },
 };
 
 function firstNumber(value: string | null | undefined): number | null {
@@ -353,66 +351,88 @@ export function ManagementDashboard({
 
       {/* Section 1: Status summary */}
       <SectionTitle>{t.sections.buildingStatus} — {buildingName}</SectionTitle>
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
-        <MiniStat label={t.statuses.sold} value={counts.sold} color="bg-brand-ink-500 text-white" />
-        <MiniStat label={t.statuses.leased} value={counts.leased} color="bg-indigo-100 text-indigo-800" />
-        <MiniStat label={t.statuses.dailyOccupied} value={counts.dailyOccupied} color="bg-brand-orange-100 text-brand-orange-800" />
-        <MiniStat label={t.statuses.reserved} value={counts.reserved} color="bg-amber-100 text-amber-800" />
-        <MiniStat label={t.statuses.cleaningPending} value={counts.cleaningPending} color="bg-brand-sky-100 text-brand-sky-700" />
-        <MiniStat label={t.statuses.maintenance} value={counts.maintenance} color="bg-brand-red-100 text-brand-red-700" />
-        <MiniStat label={t.statuses.available} value={counts.available} color="bg-brand-green-100 text-brand-green-700" />
+      <div className="mb-8 flex flex-wrap gap-1.5 sm:gap-2">
+        {(Object.keys(counts) as MgmtStatus[]).map(s => (
+          <div key={s} className={cn(
+            "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+            STATUS_CELL[s].label,
+          )}>
+            <span className="tabular-nums font-bold">{counts[s]}</span>
+            <span className="opacity-80">{t.statuses[s]}</span>
+          </div>
+        ))}
       </div>
 
       {/* Section 2: Room matrix */}
       <SectionTitle>{t.sections.roomMatrix}</SectionTitle>
-      <div className="mb-8 space-y-6">
+      <div className="mb-8 space-y-8">
         {(selectedBuildingId === "__all__" ? activeBuildings : activeBuildings.filter(b => b.id === selectedBuildingId)).map(building => {
           const bUnits = buildingUnits.get(building.id) ?? [];
           const bStates = sortUnits(bUnits).map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks));
           const floorGroups = groupStatesByFloor(bStates, locale);
           return (
-            <Card key={building.id} padding="sm" className="overflow-hidden">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h4 className="text-sm font-bold text-brand-ink-800">{building.display_name}</h4>
-                <span className="rounded-full bg-brand-warm-100 px-2.5 py-1 text-[10px] font-semibold text-brand-ink-400">
+            <div key={building.id} className="rounded-xl border border-brand-warm-300 bg-white shadow-card overflow-hidden">
+              {/* Building header */}
+              <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-brand-warm-100 bg-brand-warm-50/50">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-brand-orange" />
+                  <h4 className="text-sm font-bold text-brand-ink-800">{building.display_name}</h4>
+                </div>
+                <span className="rounded-full bg-brand-warm-200 px-2.5 py-0.5 text-[10px] font-semibold text-brand-ink-400">
                   {bStates.length} {locale === "zh" ? "间" : "unités"}
                 </span>
               </div>
-              <div className="space-y-2.5">
-                {floorGroups.map(group => (
-                  <div key={group.key} className="grid gap-2 sm:grid-cols-[56px_1fr] sm:items-start">
-                    <div className="flex h-9 items-center text-[11px] font-semibold text-brand-ink-400 sm:justify-end">
-                      {group.label}
+
+              {/* Room grid */}
+              <div className="px-5 py-4">
+                <div className="space-y-3">
+                  {floorGroups.map(group => (
+                    <div key={group.key}>
+                      {/* Floor label */}
+                      <div className="mb-1.5 flex items-center gap-2">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-brand-ink-300">
+                          {group.label}
+                        </span>
+                        <span className="h-px flex-1 bg-brand-warm-200" />
+                      </div>
+                      {/* Room cells */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {group.states.map(s => {
+                          const st = STATUS_CELL[s.status];
+                          return (
+                            <Link
+                              key={s.unit.id}
+                              href={routeFor(locale, `/units/${s.unit.id}`)}
+                              className={cn(
+                                "relative flex h-10 w-10 items-center justify-center rounded-lg border font-mono text-[11px] font-bold leading-none transition-all duration-150",
+                                "hover:-translate-y-0.5 hover:shadow-md active:scale-95",
+                                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange",
+                                st.bg,
+                              )}
+                              title={`${s.unit.unit_no} — ${t.statuses[s.status]}`}
+                              aria-label={`${s.unit.unit_no} — ${t.statuses[s.status]}`}
+                            >
+                              <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full opacity-70" />
+                              {s.unit.unit_no}
+                            </Link>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {group.states.map(s => (
-                        <Link
-                          key={s.unit.id}
-                          href={routeFor(locale, `/units/${s.unit.id}`)}
-                          className={cn(
-                            "flex h-9 min-w-[42px] items-center justify-center rounded-md border px-2 font-mono text-[11px] font-bold leading-none shadow-sm transition-all duration-fast hover:-translate-y-0.5 hover:shadow-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange",
-                            STATUS_CELL[s.status],
-                          )}
-                          title={`${s.unit.unit_no} — ${t.statuses[s.status]}`}
-                          aria-label={`${s.unit.unit_no} — ${t.statuses[s.status]}`}
-                        >
-                          {s.unit.unit_no}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-              {/* Legend */}
-              <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-brand-ink-400">
-                {Object.entries(t.statuses).map(([key, label]) => (
-                  <span key={key} className="flex items-center gap-1">
-                    <span className={cn("inline-block h-2 w-2 rounded-sm", STATUS_CELL[key as MgmtStatus]?.split(" ")[0])} />
-                    {label}
+
+              {/* Compact legend */}
+              <div className="flex flex-wrap gap-x-3 gap-y-1.5 px-5 py-2.5 border-t border-brand-warm-100 bg-brand-warm-50/30 text-[10px] text-brand-ink-400">
+                {(Object.keys(t.statuses) as MgmtStatus[]).map(s => (
+                  <span key={s} className="flex items-center gap-1.5">
+                    <span className={cn("h-2 w-2 rounded-sm", STATUS_CELL[s].dot)} />
+                    {t.statuses[s]}
                   </span>
                 ))}
               </div>
-            </Card>
+            </div>
           );
         })}
       </div>
@@ -644,7 +664,7 @@ export function ManagementDashboard({
 // ── Sub-components ─────────────────────────────────────────────────────
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="mb-3 text-sm font-semibold text-brand-ink-700">{children}</h2>;
+  return <h2 className="mb-4 text-[13px] font-semibold text-brand-ink-600">{children}</h2>;
 }
 
 function BuildingTab({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
@@ -660,15 +680,6 @@ function BuildingTab({ active, onClick, label }: { active: boolean; onClick: () 
     >
       {label}
     </button>
-  );
-}
-
-function MiniStat({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className={cn("rounded-lg border border-brand-warm-400 px-3 py-2.5 text-center", color)}>
-      <p className="text-[10px] opacity-70">{label}</p>
-      <p className="text-lg font-bold tabular-nums">{value}</p>
-    </div>
   );
 }
 
@@ -691,14 +702,17 @@ function RiskCard({ icon: Icon, label, value, warn, detail }: {
   icon: typeof AlertTriangle; label: string; value: string; warn: boolean; detail?: string;
 }) {
   return (
-    <Card padding="sm" className={warn ? "border-brand-red-300 bg-brand-red-50/30" : ""}>
+    <div className={cn(
+      "rounded-xl border p-4 transition-colors",
+      warn ? "border-brand-red-200 bg-brand-red-50/40" : "border-brand-warm-300 bg-white",
+    )}>
       <div className="flex items-center gap-2">
         <Icon className={cn("h-4 w-4", warn ? "text-brand-red-500" : "text-brand-ink-300")} />
         <span className="text-xs font-medium text-brand-ink-600">{label}</span>
       </div>
-      <p className={cn("mt-1 text-lg font-bold tabular-nums", warn ? "text-brand-red-700" : "text-brand-ink-400")}>{value}</p>
-      {detail && <p className="mt-0.5 text-[10px] text-brand-ink-300 truncate">{detail}</p>}
-    </Card>
+      <p className={cn("mt-1.5 text-xl font-bold tabular-nums", warn ? "text-brand-red-700" : "text-brand-ink-700")}>{value}</p>
+      {detail && <p className="mt-0.5 text-[10px] text-brand-ink-400 truncate">{detail}</p>}
+    </div>
   );
 }
 
