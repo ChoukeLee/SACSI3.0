@@ -479,7 +479,7 @@ export function ManagementDashboard({
 
       {/* Section 3: Finance KPI cards — current month */}
       <SectionTitle>{t.sections.financeOverview}</SectionTitle>
-      <div className="mb-8 grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-7">
+      <div className="mb-8 grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-7">
         <MiniStat2 label={t.cockpit.receivableThisMonth} value={formatXof(receivableMonthStats.totalReceivable)} accent="ink" />
         <MiniStat2 label={t.cockpit.paidThisMonth} value={formatXof(receivableMonthStats.totalPaid)} accent="green" />
         <MiniStat2 label={t.cockpit.outstandingThisMonth} value={formatXof(receivableMonthStats.outstanding)} accent="orange" />
@@ -493,7 +493,7 @@ export function ManagementDashboard({
       {receivableByBiz.length > 0 && (
         <>
           <SectionTitle>{t.sections.receivableByBusiness}</SectionTitle>
-          <div className="mb-8 overflow-x-auto rounded-xl border border-brand-warm-400 bg-white">
+          <div className="mb-8 overflow-x-auto rounded-xl border border-brand-warm-300 bg-white shadow-natural">
             <table className="w-full min-w-[400px] text-left text-xs">
               <thead className="bg-brand-warm-50 text-[10px] font-semibold uppercase text-brand-ink-400">
                 <tr>
@@ -533,7 +533,7 @@ export function ManagementDashboard({
 
       {/* Section 4: By building breakdown */}
       <SectionTitle>{t.sections.receivableByBuilding}</SectionTitle>
-      <div className="mb-8 overflow-x-auto rounded-xl border border-brand-warm-400 bg-white">
+      <div className="mb-8 overflow-x-auto rounded-xl border border-brand-warm-300 bg-white shadow-natural">
         <table className="w-full min-w-[800px] text-left text-xs">
           <thead className="bg-brand-warm-50 text-[10px] font-semibold uppercase text-brand-ink-400">
             <tr>
@@ -731,8 +731,8 @@ function MiniStat2({ label, value, accent }: { label: string; value: string; acc
     red: "border-brand-red-500",
   };
   return (
-    <div className={cn("rounded-lg border border-brand-warm-400 bg-white px-3 py-2 border-l-[3px]", borderColor[accent] ?? "border-brand-ink-700")}>
-      <p className="text-[10px] text-brand-ink-300">{label}</p>
+    <div className={cn("rounded-lg border border-brand-warm-300 bg-white px-3 py-2 border-l-[3px] shadow-natural", borderColor[accent] ?? "border-brand-ink-700")}>
+      <p className="text-[10px] text-brand-ink-400">{label}</p>
       <p className="text-sm font-bold tabular-nums text-brand-ink-900">{value}</p>
     </div>
   );

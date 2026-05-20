@@ -200,7 +200,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
       {filtered.length === 0 ? (
         <Card variant="subtle" className="py-10 text-center text-sm text-brand-ink-300">{t.empty}</Card>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-brand-warm-400 bg-white">
+        <div className="overflow-x-auto rounded-xl border border-brand-warm-300 bg-white shadow-natural">
           <table className="w-full min-w-[900px] text-left text-xs">
             <thead>
               <tr className="border-b border-brand-warm-400 bg-brand-warm-50">
@@ -269,8 +269,8 @@ function MiniCard({ label, value, accent }: { label: string; value: string; acce
     orange: "border-brand-orange", red: "border-brand-red-500",
   };
   return (
-    <div className={cn("rounded-lg border border-brand-warm-400 bg-white px-3 py-2.5 border-l-[3px]", borderColor[accent] ?? "border-brand-ink-700")}>
-      <p className="text-[10px] text-brand-ink-300">{label}</p>
+    <div className={cn("rounded-lg border border-brand-warm-300 bg-white px-3 py-2.5 border-l-[3px] shadow-natural", borderColor[accent] ?? "border-brand-ink-700")}>
+      <p className="text-[10px] text-brand-ink-400">{label}</p>
       <p className="text-sm font-bold tabular-nums text-brand-ink-900">{value}</p>
     </div>
   );

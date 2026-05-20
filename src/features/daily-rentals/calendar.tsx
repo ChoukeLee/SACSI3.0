@@ -110,16 +110,16 @@ export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers,
           <button onClick={goToToday} className="rounded-lg border border-brand-warm-400 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink-500 transition-all duration-fast hover:bg-brand-warm-50 focus-visible:outline-2 focus-visible:outline-brand-orange">{t.calendar.today}</button>
         </div>
         <div className="hidden items-center gap-3 text-xs text-brand-ink-500 sm:flex">
-          <Legend color="bg-brand-green-100 border-brand-green-300" label={t.calendar.legendAvailable} />
-          <Legend color="bg-amber-200 border-amber-300" label={t.calendar.legendReserved} />
-          <Legend color="bg-brand-orange-200 border-brand-orange-400" label={t.calendar.legendBooked} />
-          <Legend color="bg-brand-red-100 border-brand-red-300" label={t.calendar.legendMaintenance} />
-          <Legend color="bg-brand-sky-100 border-brand-sky-300" label={t.cleaning.pending} />
+          <Legend color="bg-brand-green-100" label={t.calendar.legendAvailable} />
+          <Legend color="bg-amber-100" label={t.calendar.legendReserved} />
+          <Legend color="bg-brand-orange-100" label={t.calendar.legendBooked} />
+          <Legend color="bg-brand-red-100" label={t.calendar.legendMaintenance} />
+          <Legend color="bg-brand-green-50" label={t.cleaning.pending} />
         </div>
       </div>
 
       {/* Calendar grid */}
-      <div className="overflow-auto rounded-xl border border-brand-warm-400 bg-white shadow-natural scroll-hint-x" style={{ maxHeight: "calc(100vh - 200px)" }} data-scroll-x>
+      <div className="overflow-auto rounded-xl border border-brand-warm-300 bg-white shadow-natural scroll-hint-x" style={{ maxHeight: "calc(100vh - 200px)" }} data-scroll-x>
         <div className="grid" style={{ gridTemplateColumns: `64px repeat(${daysInMonth.length}, 64px)` }} role="grid" aria-label={t.calendar.room}>
           {/* Header row */}
           <div className="sticky left-0 top-0 z-30 flex h-8 items-center justify-center border-b border-r border-brand-warm-400 bg-brand-warm-100 text-[10px] font-semibold uppercase tracking-wider text-brand-ink-400" role="columnheader">{t.calendar.room}</div>
@@ -230,7 +230,7 @@ export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers,
 function Legend({ color, label }: { color: string; label: string }) {
   return (
     <span className="flex items-center gap-1">
-      <span className={cn("inline-block h-2.5 w-2.5 rounded-sm border", color)} />
+      <span className={cn("inline-block h-2.5 w-2.5 rounded-sm ring-1 ring-inset ring-black/5", color)} />
       {label}
     </span>
   );
