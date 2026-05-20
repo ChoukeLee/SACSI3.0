@@ -413,7 +413,7 @@ export function ManagementDashboard({
           for (const s of bStates) bCounts[s.status] = (bCounts[s.status] ?? 0) + 1;
 
           return (
-            <div key={building.id} className="rounded-xl border border-brand-warm-300 bg-white shadow-card overflow-hidden">
+            <div key={building.id} className="rounded-xl border border-brand-warm-300 bg-white shadow-natural overflow-hidden">
               {/* Building header: name + counts + legend */}
               <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-2.5 border-b border-brand-warm-100 bg-brand-warm-50/60">
                 <div className="flex items-center gap-2">

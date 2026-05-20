@@ -98,7 +98,7 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
 
       {/* ── Export Tab ── */}
       {tab === "export" && (
-        <div className="rounded-xl border border-brand-warm-300 bg-white p-5 shadow-card space-y-4">
+        <div className="rounded-xl border border-brand-warm-300 bg-white p-5 shadow-natural space-y-4">
           <div>
             <label className="block text-xs font-semibold text-brand-ink-400 mb-1.5">{locale === "zh" ? "数据类型" : "Type"}</label>
             <select value={expType} onChange={e => setExpType(e.target.value as ExportDataType)} className={cn(btn, "w-full sm:w-64")}>
@@ -115,7 +115,7 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
 
       {/* ── Import Tab ── */}
       {tab === "import" && (
-        <div className="rounded-xl border border-brand-warm-300 bg-white p-5 shadow-card space-y-4">
+        <div className="rounded-xl border border-brand-warm-300 bg-white p-5 shadow-natural space-y-4">
           <div className="flex flex-wrap items-end gap-3">
             <div>
               <label className="block text-xs font-semibold text-brand-ink-400 mb-1.5">{locale === "zh" ? "数据类型" : "Type"}</label>

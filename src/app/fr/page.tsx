@@ -96,7 +96,7 @@ export default async function FrenchDashboardPage() {
             <Link
               key={href}
               href={routeFor("fr", href)}
-              className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-card transition hover:-translate-y-0.5 hover:border-brand-orange-400"
+              className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-natural transition hover:-translate-y-0.5 hover:border-brand-orange-400"
             >
               <div className="flex items-start justify-between gap-4">
                 <div>

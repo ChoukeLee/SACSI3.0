@@ -93,7 +93,7 @@ export function QualityCenter({ issues, locale }: Props) {
 
       {/* Issues */}
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-brand-warm-400 bg-white py-16 text-center text-sm shadow-card">
+        <div className="rounded-xl border border-brand-warm-400 bg-white py-16 text-center text-sm shadow-natural">
           <ShieldAlert className="mx-auto h-8 w-8 mb-3 text-brand-green-400" />
           <p className="text-brand-green-600 font-medium">{locale === "zh" ? "数据质量良好，未发现异常" : "Donnees saines, aucune anomalie"}</p>
           <p className="text-brand-ink-300 text-xs mt-1">{locale === "zh" ? `共扫描 ${issues.length} 条规则` : `${issues.length} regles verifiees`}</p>
@@ -106,7 +106,7 @@ export function QualityCenter({ issues, locale }: Props) {
               <div
                 key={i.id}
                 className={cn(
-                  "rounded-lg border border-brand-warm-400 border-l-[4px] bg-white shadow-card overflow-hidden",
+                  "rounded-lg border border-brand-warm-400 border-l-[4px] bg-white shadow-natural overflow-hidden",
                   SEVERITY_STYLES[i.severity],
                 )}
               >

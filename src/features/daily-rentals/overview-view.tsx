@@ -162,7 +162,7 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
       </div>
 
       {/* Room table */}
-      <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-card">
+      <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-natural">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead>

@@ -31,7 +31,7 @@ export function SystemSettingsPanel({ settings, isAdmin, locale }: Props) {
   };
 
   return (
-    <section className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-card">
+    <section className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-natural">
       <div className="flex items-center gap-2 mb-4">
         <Settings2 className="h-5 w-5 text-brand-orange-600" />
         <h3 className="text-base font-bold text-brand-ink-900">{locale === "zh" ? "系统配置" : "Configuration"}</h3>

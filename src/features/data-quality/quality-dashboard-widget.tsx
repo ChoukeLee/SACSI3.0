@@ -23,7 +23,7 @@ export function QualityDashboardWidget({ issues, locale, variant = "dashboard" }
     if (issues.length === 0) return null;
     const top = issues.slice(0, 5);
     return (
-      <div className="rounded-xl border border-brand-warm-400 bg-white shadow-card overflow-hidden">
+      <div className="rounded-xl border border-brand-warm-400 bg-white shadow-natural overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b border-brand-warm-200 bg-brand-warm-50/50">
           <h3 className="text-sm font-bold text-brand-ink-900 flex items-center gap-2">
             <ShieldAlert className="h-4 w-4 text-brand-orange" />
@@ -53,7 +53,7 @@ export function QualityDashboardWidget({ issues, locale, variant = "dashboard" }
 
   // Management variant: data health card
   return (
-    <div className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-card">
+    <div className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-natural">
       <div className="flex items-center gap-2 mb-3">
         <ShieldAlert className="h-5 w-5 text-brand-orange" />
         <h3 className="text-sm font-bold text-brand-ink-900">{locale === "zh" ? "数据健康" : "Sante donnees"}</h3>

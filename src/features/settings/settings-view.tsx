@@ -48,7 +48,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
   return (
     <div className="space-y-8">
       {/* 1. Buildings */}
-      <section className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-card">
+      <section className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-natural">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Building2 className="h-5 w-5 text-brand-orange-600" />
@@ -123,7 +123,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
       </section>
 
       {/* 2. Pricing */}
-      <section className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-card">
+      <section className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-natural">
         <div className="flex items-center gap-2 mb-4">
           <Tag className="h-5 w-5 text-brand-orange-600" />
           <h3 className="text-base font-bold text-brand-ink-900">{t.pricing.title}</h3>
@@ -150,7 +150,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
       </section>
 
       {/* 3. Company Info */}
-      <section className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-card">
+      <section className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-natural">
         <div className="flex items-center gap-2 mb-4">
           <Building className="h-5 w-5 text-brand-orange-600" />
           <h3 className="text-base font-bold text-brand-ink-900">{t.company.title}</h3>
@@ -165,7 +165,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
       </section>
 
       {/* 4. Language */}
-      <section className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-card">
+      <section className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-natural">
         <div className="flex items-center gap-2 mb-4">
           <Languages className="h-5 w-5 text-brand-orange-600" />
           <h3 className="text-base font-bold text-brand-ink-900">{t.language.title}</h3>
@@ -179,7 +179,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
       </section>
 
       {/* 5. Dark Mode */}
-      <section className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-card">
+      <section className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-natural">
         <div className="flex items-center gap-2 mb-4">
           <Moon className="h-5 w-5 text-brand-orange-600" />
           <h3 className="text-base font-bold text-brand-ink-900">{t.darkMode.title}</h3>
@@ -190,7 +190,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
       </section>
 
       {/* 6. Audit Logs */}
-      <section className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-card">
+      <section className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-natural">
         <div className="flex items-center gap-2 mb-4">
           <ShieldCheck className="h-5 w-5 text-brand-orange-600" />
           <h3 className="text-base font-bold text-brand-ink-900">

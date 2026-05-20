@@ -47,7 +47,7 @@ export function MobileStatsBar({
               "transition-colors duration-[100ms]",
               "active:scale-95",
               isActive
-                ? "bg-white border border-brand-warm-400 shadow-card"
+                ? "bg-white border border-brand-warm-400 shadow-natural"
                 : "border border-transparent active:bg-brand-warm-100"
             )}
           >

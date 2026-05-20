@@ -113,7 +113,7 @@ export function UnitProfileView({ data, locale, userRole }: Props) {
   return (
     <div className="max-w-4xl mx-auto space-y-4">
       {/* Header */}
-      <div className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-card">
+      <div className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-natural">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">

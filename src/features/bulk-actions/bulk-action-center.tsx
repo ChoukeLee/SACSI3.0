@@ -87,7 +87,7 @@ export function BulkActionCenter({ locale, userRole }: Props) {
   return (
     <div className="max-w-4xl mx-auto space-y-4">
       {/* Operation selector */}
-      <div className="rounded-xl border border-brand-warm-300 bg-white p-5 shadow-card space-y-3">
+      <div className="rounded-xl border border-brand-warm-300 bg-white p-5 shadow-natural space-y-3">
         <label className="block text-xs font-semibold text-brand-ink-400">{L.selectAction}</label>
         <select
           value={actionType}
@@ -137,7 +137,7 @@ export function BulkActionCenter({ locale, userRole }: Props) {
 
       {/* Preview */}
       {preview && status !== "done" && (
-        <div className="rounded-xl border border-brand-warm-300 bg-white p-5 shadow-card space-y-3">
+        <div className="rounded-xl border border-brand-warm-300 bg-white p-5 shadow-natural space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-brand-ink-900">{L.preview}</h3>
             <div className="flex gap-3 text-xs">
@@ -203,7 +203,7 @@ export function BulkActionCenter({ locale, userRole }: Props) {
 
       {/* Result */}
       {result && (
-        <div className={cn("rounded-xl border p-5 shadow-card space-y-2", result.success ? "bg-brand-green-50 border-brand-green-200" : "bg-brand-amber-50 border-brand-amber-200")}>
+        <div className={cn("rounded-xl border p-5 shadow-natural space-y-2", result.success ? "bg-brand-green-50 border-brand-green-200" : "bg-brand-amber-50 border-brand-amber-200")}>
           <h3 className="text-sm font-bold flex items-center gap-2">
             {result.success ? <Check className="h-4 w-4 text-brand-green-600" /> : <AlertTriangle className="h-4 w-4 text-amber-600" />}
             {L.done}
@@ -224,7 +224,7 @@ export function BulkActionCenter({ locale, userRole }: Props) {
 
       {/* Empty */}
       {status === "idle" && !preview && (
-        <div className="rounded-xl border border-brand-warm-300 bg-white py-16 text-center text-sm text-brand-ink-300 shadow-card">
+        <div className="rounded-xl border border-brand-warm-300 bg-white py-16 text-center text-sm text-brand-ink-300 shadow-natural">
           {L.noResults}
         </div>
       )}

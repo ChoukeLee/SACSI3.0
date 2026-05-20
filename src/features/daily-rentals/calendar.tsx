@@ -119,7 +119,7 @@ export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers,
       </div>
 
       {/* Calendar grid */}
-      <div className="overflow-auto rounded-xl border border-brand-warm-400 bg-white shadow-card scroll-hint-x" style={{ maxHeight: "calc(100vh - 200px)" }} data-scroll-x>
+      <div className="overflow-auto rounded-xl border border-brand-warm-400 bg-white shadow-natural scroll-hint-x" style={{ maxHeight: "calc(100vh - 200px)" }} data-scroll-x>
         <div className="grid" style={{ gridTemplateColumns: `64px repeat(${daysInMonth.length}, 64px)` }} role="grid" aria-label={t.calendar.room}>
           {/* Header row */}
           <div className="sticky left-0 top-0 z-30 flex h-8 items-center justify-center border-b border-r border-brand-warm-400 bg-brand-warm-100 text-[10px] font-semibold uppercase tracking-wider text-brand-ink-400" role="columnheader">{t.calendar.room}</div>

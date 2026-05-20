@@ -49,7 +49,7 @@ export function SecurityCenter({ locale }: Props) {
   return (
     <div className="max-w-3xl space-y-4">
       {/* Security checks */}
-      <div className="rounded-xl border border-brand-warm-300 bg-white p-5 shadow-card space-y-3">
+      <div className="rounded-xl border border-brand-warm-300 bg-white p-5 shadow-natural space-y-3">
         <div className="flex items-center gap-2"><Shield className="h-5 w-5 text-brand-orange-600" /><h3 className="text-base font-bold text-brand-ink-900">{L.title}</h3></div>
         <button onClick={handleCheck} disabled={loading}
           className="rounded-lg bg-brand-ink-900 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-ink-700 disabled:opacity-50 inline-flex items-center gap-2">
@@ -71,7 +71,7 @@ export function SecurityCenter({ locale }: Props) {
       </div>
 
       {/* Backup */}
-      <div className="rounded-xl border border-brand-warm-300 bg-white p-5 shadow-card space-y-3">
+      <div className="rounded-xl border border-brand-warm-300 bg-white p-5 shadow-natural space-y-3">
         <div className="flex items-center gap-2"><Download className="h-5 w-5 text-brand-orange-600" /><h3 className="text-base font-bold text-brand-ink-900">{locale === "zh" ? "数据备份" : "Sauvegarde"}</h3></div>
         <p className="text-xs text-brand-ink-400">{L.backupDesc}</p>
         <button onClick={handleBackup} disabled={backupLoading}

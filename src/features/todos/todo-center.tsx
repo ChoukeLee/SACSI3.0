@@ -102,7 +102,7 @@ export function TodoCenter({ todos, locale }: Props) {
 
       {/* Todo list */}
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-brand-warm-400 bg-white py-16 text-center text-sm text-brand-ink-300 shadow-card">
+        <div className="rounded-xl border border-brand-warm-400 bg-white py-16 text-center text-sm text-brand-ink-300 shadow-natural">
           <Bell className="mx-auto h-8 w-8 mb-3 text-brand-ink-200" />
           {locale === "zh" ? "暂无待办事项" : "Aucune tache"}
         </div>
@@ -113,7 +113,7 @@ export function TodoCenter({ todos, locale }: Props) {
               key={todo.id}
               href={routeFor(locale, todo.href)}
               className={cn(
-                "flex items-center gap-4 rounded-lg border border-brand-warm-400 border-l-[4px] bg-white px-4 py-3 shadow-card transition-all hover:-translate-y-0.5 hover:border-brand-orange-400",
+                "flex items-center gap-4 rounded-lg border border-brand-warm-400 border-l-[4px] bg-white px-4 py-3 shadow-natural transition-all hover:-translate-y-0.5 hover:border-brand-orange-400",
                 PRIORITY_STYLES[todo.priority] || PRIORITY_STYLES.medium,
               )}
             >

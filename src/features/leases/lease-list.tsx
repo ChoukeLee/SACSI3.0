@@ -346,11 +346,11 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-brand-warm-400 bg-white py-16 shadow-card">
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-brand-warm-400 bg-white py-16 shadow-natural">
           <p className="text-sm text-brand-ink-300">{t.empty}</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-card">
+        <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-natural">
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="border-b border-brand-warm-400 bg-brand-warm-50 text-[11px] font-semibold uppercase tracking-wider text-brand-ink-500">
               <tr>

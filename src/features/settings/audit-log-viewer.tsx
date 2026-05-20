@@ -167,11 +167,11 @@ export function AuditLogViewer({ logs, locale }: Props) {
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-brand-warm-400 bg-white py-16 text-center text-sm text-brand-ink-300 shadow-card">
+        <div className="rounded-xl border border-brand-warm-400 bg-white py-16 text-center text-sm text-brand-ink-300 shadow-natural">
           {locale === "zh" ? "暂无审计日志" : "Aucun log d'audit"}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-card">
+        <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-natural">
           <table className="w-full min-w-[800px] text-left text-xs">
             <thead className="border-b border-brand-warm-400 bg-brand-warm-50 text-[10px] font-semibold uppercase tracking-wider text-brand-ink-500">
               <tr>

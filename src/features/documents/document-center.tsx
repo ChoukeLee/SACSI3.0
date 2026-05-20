@@ -112,11 +112,11 @@ export function DocumentCenter({ documents, locale }: Props) {
         {/* Document list */}
         <div className={cn("flex-1 min-w-0", previewed && "hidden lg:block")}>
           {filtered.length === 0 ? (
-            <div className="rounded-xl border border-brand-warm-400 bg-white py-16 text-center text-sm text-brand-ink-300 shadow-card">
+            <div className="rounded-xl border border-brand-warm-400 bg-white py-16 text-center text-sm text-brand-ink-300 shadow-natural">
               {locale === "zh" ? "暂无符合条件的单据" : "Aucun document"}
             </div>
           ) : (
-            <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-card">
+            <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-natural">
               <table className="w-full min-w-[700px] text-left text-xs">
                 <thead className="border-b border-brand-warm-400 bg-brand-warm-50 text-[10px] font-semibold uppercase tracking-wider text-brand-ink-500">
                   <tr>
@@ -179,7 +179,7 @@ export function DocumentCenter({ documents, locale }: Props) {
 
         {/* Preview panel */}
         {previewed && (
-          <div className="w-[380px] shrink-0 rounded-xl border border-brand-warm-400 bg-white shadow-card flex flex-col">
+          <div className="w-[380px] shrink-0 rounded-xl border border-brand-warm-400 bg-white shadow-natural flex flex-col">
             <div className="flex items-center justify-between border-b border-brand-warm-400 px-4 py-3">
               <h3 className="text-sm font-bold text-brand-ink-900 flex items-center gap-1.5">
                 <FileText className="h-4 w-4 text-brand-orange" />

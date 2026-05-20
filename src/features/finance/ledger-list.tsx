@@ -161,11 +161,11 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-brand-warm-400 bg-white py-16 shadow-card">
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-brand-warm-400 bg-white py-16 shadow-natural">
           <p className="text-sm text-brand-ink-300">{t.empty}</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-card">
+        <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-natural">
           <table className="w-full min-w-[800px] text-left text-sm">
             <thead className="bg-brand-warm-50 text-xs uppercase tracking-wide text-brand-ink-400">
               <tr>

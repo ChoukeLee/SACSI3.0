@@ -214,7 +214,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
 
       {/* Table / Empty */}
       {filtered.length === 0 && !isFormOpen ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-brand-warm-400 bg-white py-16 shadow-card">
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-brand-warm-400 bg-white py-16 shadow-natural">
           <p className="text-sm text-brand-ink-300">{t.empty}</p>
           <button
             onClick={openAdd}
@@ -225,7 +225,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-card">
+        <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-natural">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="border-b border-brand-warm-400 bg-brand-warm-50 text-[11px] font-semibold uppercase tracking-wider text-brand-ink-500">
               <tr>
@@ -423,7 +423,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
 
       {/* Selected row detail + blacklist controls */}
       {selected && !isFormOpen && !isBlacklistOpen && (
-        <div className="mt-4 rounded-xl border border-brand-warm-400 bg-white p-4 shadow-card">
+        <div className="mt-4 rounded-xl border border-brand-warm-400 bg-white p-4 shadow-natural">
           <div className="flex items-start justify-between">
             <div className="space-y-1 text-sm">
               <p>
