@@ -75,48 +75,55 @@ interface Props {
 //
 // bg: room cell  dot: legend  pill: summary badge  ring: depth
 
-const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string; ring: string }> = {
+const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string; ring: string; stripe: string }> = {
   sold: {
-    bg:   "bg-slate-200 text-slate-700 border-slate-300",
-    dot:  "bg-slate-500",
+    bg:   "bg-slate-600 text-white border-slate-700 shadow-slate-200",
+    dot:  "bg-slate-600",
     pill: "bg-slate-100 text-slate-700 border-slate-300",
     ring: "",
+    stripe: "bg-slate-700",
   },
   leased: {
-    bg:   "bg-amber-200 text-amber-800 border-amber-300",
-    dot:  "bg-amber-500",
-    pill: "bg-amber-100 text-amber-800 border-amber-300",
+    bg:   "bg-indigo-600 text-white border-indigo-700 shadow-indigo-200",
+    dot:  "bg-indigo-600",
+    pill: "bg-indigo-50 text-indigo-700 border-indigo-200",
     ring: "",
+    stripe: "bg-indigo-800",
   },
   dailyOccupied: {
-    bg:   "bg-orange-200 text-orange-800 border-orange-400",
+    bg:   "bg-orange-500 text-white border-orange-600 shadow-orange-200",
     dot:  "bg-orange-500",
-    pill: "bg-orange-100 text-orange-800 border-orange-400",
-    ring: "ring-1 ring-inset ring-orange-400/40",
+    pill: "bg-orange-50 text-orange-700 border-orange-200",
+    ring: "ring-1 ring-inset ring-orange-300/50",
+    stripe: "bg-orange-700",
   },
   reserved: {
-    bg:   "bg-blue-200 text-blue-800 border-blue-300",
-    dot:  "bg-blue-500",
-    pill: "bg-blue-100 text-blue-800 border-blue-300",
+    bg:   "bg-sky-500 text-white border-sky-600 shadow-sky-200",
+    dot:  "bg-sky-500",
+    pill: "bg-sky-50 text-sky-700 border-sky-200",
     ring: "",
+    stripe: "bg-sky-700",
   },
   cleaningPending: {
-    bg:   "bg-cyan-200 text-cyan-800 border-cyan-300",
-    dot:  "bg-cyan-500",
-    pill: "bg-cyan-100 text-cyan-800 border-cyan-300",
+    bg:   "bg-teal-500 text-white border-teal-600 shadow-teal-200",
+    dot:  "bg-teal-500",
+    pill: "bg-teal-50 text-teal-700 border-teal-200",
     ring: "",
+    stripe: "bg-teal-700",
   },
   maintenance: {
-    bg:   "bg-red-200 text-red-700 border-red-300",
-    dot:  "bg-red-500",
-    pill: "bg-red-100 text-red-700 border-red-300",
+    bg:   "bg-rose-500 text-white border-rose-600 shadow-rose-200",
+    dot:  "bg-rose-500",
+    pill: "bg-rose-50 text-rose-700 border-rose-200",
     ring: "",
+    stripe: "bg-rose-700",
   },
   available: {
-    bg:   "bg-emerald-200 text-emerald-800 border-emerald-300",
+    bg:   "bg-emerald-500 text-white border-emerald-600 shadow-emerald-200",
     dot:  "bg-emerald-500",
-    pill: "bg-emerald-100 text-emerald-800 border-emerald-300",
+    pill: "bg-emerald-50 text-emerald-700 border-emerald-200",
     ring: "",
+    stripe: "bg-emerald-700",
   },
 };
 
@@ -300,14 +307,14 @@ export function ManagementDashboard({
     : activeBuildings.find(b => b.id === selectedBuildingId)?.display_name ?? "";
 
   return (
-    <div className="-my-6 bg-slate-50/70">
-      <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8 py-6">
+    <div className="-my-6 bg-[#f5f7fb]">
+      <div className="mx-auto max-w-[1360px] px-4 py-5 sm:px-6 lg:px-8">
 
         <PageHeader title={t.title} description={t.description} />
 
         {/* ── Building selector — segmented control ── */}
-        <div className="mb-6">
-          <div className="inline-flex rounded-xl bg-slate-100 p-1 gap-0.5 flex-wrap">
+        <div className="mb-5">
+          <div className="inline-flex flex-wrap gap-0.5 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
             <SegmentedTab
               active={selectedBuildingId === "__all__"}
               onClick={() => setSelectedBuildingId("__all__")}
@@ -325,53 +332,64 @@ export function ManagementDashboard({
         </div>
 
         {/* ── Section 1: Core KPI Summary ── */}
-        <div className="mb-8 grid gap-4 grid-cols-2 lg:grid-cols-4">
-          <KPICard
-            label={t.cockpit.receivableThisMonth}
-            value={formatXof(receivableMonthStats.totalReceivable)}
-            variant="neutral"
-          />
-          <KPICard
-            label={t.cockpit.paidThisMonth}
-            value={formatXof(receivableMonthStats.totalPaid)}
-            variant="positive"
-          />
-          <KPICard
-            label={t.cockpit.outstandingThisMonth}
-            value={formatXof(receivableMonthStats.outstanding)}
-            variant="warning"
-          />
-          <KPICard
-            label={t.cockpit.overdueThisMonth}
-            value={formatXof(receivableMonthStats.overdue)}
-            variant="danger"
-          />
-        </div>
+        <div className="mb-7 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.85fr)]">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <SectionLabel compact>{t.sections.financeOverview}</SectionLabel>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                {monthPrefix}
+              </span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <KPICard
+                label={t.cockpit.receivableThisMonth}
+                value={formatXof(receivableMonthStats.totalReceivable)}
+                variant="neutral"
+              />
+              <KPICard
+                label={t.cockpit.paidThisMonth}
+                value={formatXof(receivableMonthStats.totalPaid)}
+                variant="positive"
+              />
+              <KPICard
+                label={t.cockpit.outstandingThisMonth}
+                value={formatXof(receivableMonthStats.outstanding)}
+                variant="warning"
+              />
+              <KPICard
+                label={t.cockpit.overdueThisMonth}
+                value={formatXof(receivableMonthStats.overdue)}
+                variant="danger"
+              />
+            </div>
+          </div>
 
-        {/* ── Section 2: Risk alerts ── */}
-        <SectionLabel>{t.sections.riskAlerts}</SectionLabel>
-        {hasAnyRisk ? (
-          <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <RiskAlert label={t.risks.cleaningPending} value={risks.cleaning} unit={t.risks.rooms} active={risks.cleaning > 0} />
-            <RiskAlert label={t.risks.maintenanceLocked} value={risks.maintenance} unit={t.risks.rooms} active={risks.maintenance > 0} />
-            <RiskAlert label={t.risks.leaseExpiring} value={risks.leaseExpiring.length} unit={t.risks.contracts} active={risks.leaseExpiring.length > 0} />
-            <RiskAlert label={t.risks.saleInstallments} value={risks.saleWithPending.length} unit={t.risks.contracts} active={risks.saleWithPending.length > 0} />
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <SectionLabel compact>{t.sections.riskAlerts}</SectionLabel>
+            {hasAnyRisk ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                <RiskAlert label={t.risks.cleaningPending} value={risks.cleaning} unit={t.risks.rooms} active={risks.cleaning > 0} compact />
+                <RiskAlert label={t.risks.maintenanceLocked} value={risks.maintenance} unit={t.risks.rooms} active={risks.maintenance > 0} compact />
+                <RiskAlert label={t.risks.leaseExpiring} value={risks.leaseExpiring.length} unit={t.risks.contracts} active={risks.leaseExpiring.length > 0} compact />
+                <RiskAlert label={t.risks.saleInstallments} value={risks.saleWithPending.length} unit={t.risks.contracts} active={risks.saleWithPending.length > 0} compact />
+              </div>
+            ) : (
+              <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                <p className="text-xs font-semibold text-emerald-700">{t.risks.none}</p>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="mb-8 flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50/70 px-5 py-4">
-            <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
-            <p className="text-sm font-medium text-emerald-700">{t.risks.none}</p>
-          </div>
-        )}
+        </div>
 
         {/* ── Section 3: Status pills + Room matrix ── */}
         <SectionLabel>{t.sections.buildingStatus} — {buildingName}</SectionLabel>
 
         {/* Status summary pills */}
-        <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           {(Object.keys(counts) as MgmtStatus[]).map(s => (
             <div key={s} className={cn(
-              "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold",
+              "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold shadow-sm",
               STATUS_CELL[s].pill,
             )}>
               <span className="tabular-nums">{counts[s]}</span>
@@ -391,19 +409,20 @@ export function ManagementDashboard({
             for (const s of bStates) bCounts[s.status] = (bCounts[s.status] ?? 0) + 1;
 
             return (
-              <div key={building.id} className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              <div key={building.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 {/* Building header */}
-                <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 border-b border-slate-100 bg-slate-50/60">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
                   <div className="flex items-center gap-2.5">
-                    <h4 className="text-sm font-bold text-slate-800">{building.display_name}</h4>
-                    <span className="rounded-full bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                    <span className="h-2.5 w-2.5 rounded-full bg-brand-orange" />
+                    <h4 className="text-base font-bold text-slate-900">{building.display_name}</h4>
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
                       {bStates.length} {locale === "zh" ? "间" : "unités"}
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px]">
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
                     {(Object.keys(t.statuses) as MgmtStatus[]).filter(s => (bCounts[s] ?? 0) > 0).map(s => (
                       <span key={s} className="flex items-center gap-1.5 text-slate-500">
-                        <span className={cn("h-2 w-2 rounded-sm", STATUS_CELL[s].dot)} />
+                        <span className={cn("h-2.5 w-2.5 rounded-full", STATUS_CELL[s].dot)} />
                         {t.statuses[s]}
                         <span className="tabular-nums text-slate-400">{(bCounts[s] ?? 0)}</span>
                       </span>
@@ -412,14 +431,14 @@ export function ManagementDashboard({
                 </div>
 
                 {/* Floor groups */}
-                <div className="px-4 py-3.5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div className="bg-slate-50/50 px-4 py-4">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                     {floorGroups.map(group => (
-                      <div key={group.key} className="rounded-lg border border-slate-100 bg-white p-3">
-                        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      <div key={group.key} className="rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                        <p className="mb-2.5 text-[11px] font-bold text-slate-500">
                           {group.label}
                         </p>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-2">
                           {group.states.map(s => {
                             const st = STATUS_CELL[s.status];
                             return (
@@ -427,11 +446,10 @@ export function ManagementDashboard({
                                 key={s.unit.id}
                                 href={routeFor(locale, `/units/${s.unit.id}`)}
                                 className={cn(
-                                  "flex h-11 w-11 items-center justify-center rounded-lg",
-                                  "border",
+                                  "relative flex h-12 min-w-12 items-center justify-center overflow-hidden rounded-xl border px-2",
                                   "font-mono text-xs font-bold leading-none",
                                   "shadow-sm transition-all duration-150",
-                                  "hover:-translate-y-0.5 hover:shadow-md active:scale-95",
+                                  "hover:-translate-y-0.5 hover:shadow-lg active:scale-95",
                                   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange",
                                   st.bg,
                                   st.ring,
@@ -439,7 +457,8 @@ export function ManagementDashboard({
                                 title={`${s.unit.unit_no} — ${t.statuses[s.status]}`}
                                 aria-label={`${s.unit.unit_no} — ${t.statuses[s.status]}`}
                               >
-                                {s.unit.unit_no}
+                                <span className={cn("absolute inset-x-0 top-0 h-1", st.stripe)} />
+                                <span className="relative z-10">{s.unit.unit_no}</span>
                               </Link>
                             );
                           })}
@@ -686,9 +705,12 @@ export function ManagementDashboard({
 
 // ── Sub-components ─────────────────────────────────────────────────────
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function SectionLabel({ children, compact = false }: { children: React.ReactNode; compact?: boolean }) {
   return (
-    <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
+    <h2 className={cn(
+      "text-xs font-semibold uppercase tracking-wider text-slate-500",
+      compact ? "mb-0" : "mb-4",
+    )}>
       {children}
     </h2>
   );
@@ -699,10 +721,10 @@ function SegmentedTab({ active, onClick, label }: { active: boolean; onClick: ()
     <button
       onClick={onClick}
       className={cn(
-        "rounded-lg px-4 py-2 text-sm font-medium transition-all duration-fast",
+        "rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-fast",
         active
-          ? "bg-white text-slate-900 shadow-sm"
-          : "text-slate-500 hover:text-slate-700",
+          ? "bg-slate-900 text-white shadow-sm"
+          : "text-slate-500 hover:bg-slate-100 hover:text-slate-800",
       )}
     >
       {label}
@@ -722,13 +744,13 @@ function KPICard({ label, value, variant }: {
   };
   const s = styles[variant];
   return (
-    <div className={cn("rounded-xl border bg-white shadow-sm overflow-hidden", s.bg)}>
-      <div className="px-5 py-4">
+    <div className={cn("overflow-hidden rounded-xl border bg-white", s.bg)}>
+      <div className="px-3.5 py-3">
         <div className="flex items-center gap-2 mb-1.5">
           <span className={cn("h-1.5 w-1.5 rounded-full", s.dot)} />
-          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">{label}</p>
+          <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
         </div>
-        <p className={cn("text-[26px] font-semibold tracking-tight tabular-nums", s.text)}>
+        <p className={cn("truncate text-xl font-bold tracking-tight tabular-nums", s.text)}>
           {value}
         </p>
       </div>
@@ -760,17 +782,18 @@ function FinanceCard({ label, value, icon: Icon, tone }: {
   );
 }
 
-function RiskAlert({ label, value, unit, active }: {
-  label: string; value: number; unit: string; active: boolean;
+function RiskAlert({ label, value, unit, active, compact = false }: {
+  label: string; value: number; unit: string; active: boolean; compact?: boolean;
 }) {
   return (
     <div className={cn(
-      "rounded-xl border px-4 py-3.5 transition-colors",
+      "rounded-xl border transition-colors",
+      compact ? "px-3 py-2.5" : "px-4 py-3.5",
       active
-        ? "border-red-200 bg-red-50/60"
+        ? "border-red-200 bg-red-50"
         : "border-slate-200 bg-white",
     )}>
-      <div className="flex items-center gap-2 mb-1.5">
+      <div className="mb-1.5 flex items-center gap-2">
         {active && <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />}
         <span className={cn(
           "text-[11px] font-medium uppercase tracking-wider",
@@ -780,7 +803,7 @@ function RiskAlert({ label, value, unit, active }: {
         </span>
       </div>
       <p className={cn(
-        "text-xl font-bold tabular-nums",
+        compact ? "text-lg font-bold tabular-nums" : "text-xl font-bold tabular-nums",
         active ? "text-red-700" : "text-slate-400",
       )}>
         {value} <span className="text-sm font-normal">{unit}</span>
