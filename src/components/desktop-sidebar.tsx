@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ArrowUpDown, Banknote, BarChart3, BedDouble, Bell, Building2,
-  CalendarDays, FileSignature, FileText, Home, Layers,
+  CalendarDays, FileSignature, FileText, Layers,
   LayoutDashboard, Settings, Shield, ShieldCheck, Target, Users,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
@@ -15,12 +15,12 @@ import type { UserRole } from "@/lib/auth";
 
 // ── Types ──
 
-type NavKey = "workbench" | "management" | "units" | "roomMatrix" | "dailyRentals" | "leases" | "sales" | "customers" | "finance" | "reports" | "todos" | "documents" | "dataQuality" | "auditLogs" | "dataExchange" | "bulkActions" | "targets" | "settings" | "security";
+type NavKey = "management" | "units" | "roomMatrix" | "dailyRentals" | "leases" | "sales" | "customers" | "finance" | "reports" | "todos" | "documents" | "dataQuality" | "auditLogs" | "dataExchange" | "bulkActions" | "targets" | "settings" | "security";
 
 interface NavItem {
   key: NavKey;
   href: string;
-  icon: typeof Home;
+  icon: typeof LayoutDashboard;
   activeMatch?: string; // path prefix to match for active state
 }
 
@@ -37,7 +37,6 @@ const allGroups: NavGroup[] = [
     key: "home",
     roles: ["admin", "boss", "finance", "front_desk"],
     items: [
-      { key: "workbench", href: "/", icon: Home },
       { key: "management", href: "/management", icon: LayoutDashboard },
     ],
   },
@@ -98,7 +97,7 @@ const FINANCE_HIDDEN_KEYS = new Set<NavKey>(["management", "dailyRentals", "room
 const FINANCE_EXTRA_HIDDEN = new Set<NavKey>(["leases", "sales"]);
 
 const FRONT_DESK_VISIBLE_GROUPS = new Set(["home", "assets", "business", "operations"]);
-const FRONT_DESK_VISIBLE_KEYS = new Set<NavKey>(["workbench", "roomMatrix", "units", "dailyRentals", "customers", "todos", "documents"]);
+const FRONT_DESK_VISIBLE_KEYS = new Set<NavKey>(["roomMatrix", "units", "dailyRentals", "customers", "todos", "documents"]);
 
 function filterGroups(groups: NavGroup[], role?: UserRole): NavGroup[] {
   if (!role) return [];
@@ -162,9 +161,6 @@ export function DesktopSidebar({ locale, userRole }: { locale: Locale; userRole?
   };
 
   const resolveHref = (item: NavItem) => {
-    if (item.key === "workbench" && userRole === "front_desk") {
-      return routeFor(locale, "/front-desk");
-    }
     return routeFor(locale, item.href);
   };
 

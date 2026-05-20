@@ -18,7 +18,6 @@ import type { QualityIssue } from "@/features/data-quality/quality-types";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
 import { formatXof, cn, sortUnits } from "@/lib/utils";
-import { PageHeader } from "@/components/page-header";
 import type {
   BuildingRow, UnitRow, DailyBookingRow, LeaseContractRow,
   SaleContractRow, SalePaymentScheduleRow, LedgerEntryRow, ReceivableRow,
@@ -310,7 +309,17 @@ export function ManagementDashboard({
     <div className="-my-6 bg-[#f5f7fb]">
       <div className="mx-auto flex max-w-[1360px] flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
 
-        <PageHeader title={t.title} description={t.description} />
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-950">{t.title}</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              {locale === "zh" ? "财务状况与房间状态总览" : "Finance et statut des logements"}
+            </p>
+          </div>
+          <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500 shadow-sm">
+            {monthPrefix}
+          </span>
+        </div>
 
         {/* ── Building selector — segmented control ── */}
         <div>
@@ -332,7 +341,7 @@ export function ManagementDashboard({
         </div>
 
         {/* ── Section 1: Core KPI Summary ── */}
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.85fr)]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(420px,0.8fr)]">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-natural">
             <div className="mb-3 flex items-center justify-between gap-3">
               <SectionLabel compact>{t.sections.financeOverview}</SectionLabel>
@@ -365,20 +374,17 @@ export function ManagementDashboard({
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-natural">
-            <SectionLabel compact>{t.sections.riskAlerts}</SectionLabel>
-            {hasAnyRisk ? (
-              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-                <RiskAlert label={t.risks.cleaningPending} value={risks.cleaning} unit={t.risks.rooms} active={risks.cleaning > 0} compact />
-                <RiskAlert label={t.risks.maintenanceLocked} value={risks.maintenance} unit={t.risks.rooms} active={risks.maintenance > 0} compact />
-                <RiskAlert label={t.risks.leaseExpiring} value={risks.leaseExpiring.length} unit={t.risks.contracts} active={risks.leaseExpiring.length > 0} compact />
-                <RiskAlert label={t.risks.saleInstallments} value={risks.saleWithPending.length} unit={t.risks.contracts} active={risks.saleWithPending.length > 0} compact />
-              </div>
-            ) : (
-              <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                <p className="text-xs font-semibold text-emerald-700">{t.risks.none}</p>
-              </div>
-            )}
+            <SectionLabel compact>{t.sections.buildingStatus}</SectionLabel>
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {(["sold", "leased", "dailyOccupied", "available", "cleaningPending", "maintenance"] as MgmtStatus[]).map(s => (
+                <StatusSummaryCard
+                  key={s}
+                  label={t.statuses[s]}
+                  value={counts[s]}
+                  status={s}
+                />
+              ))}
+            </div>
           </div>
         </div>
 
@@ -784,6 +790,19 @@ function RoomStatusCard({
         </p>
       </div>
     </Link>
+  );
+}
+
+function StatusSummaryCard({ label, value, status }: { label: string; value: number; status: MgmtStatus }) {
+  const styles = ROOM_CARD[status];
+  return (
+    <div className={cn("rounded-2xl border px-3 py-3", styles.card)}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-bold opacity-90">{label}</span>
+        <span className={cn("h-2 w-2 rounded-full", styles.dot)} />
+      </div>
+      <p className="mt-2 text-2xl font-black tabular-nums">{value}</p>
+    </div>
   );
 }
 
