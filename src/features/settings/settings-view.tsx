@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X, Building2, Tag, Building, Languages, Moon } from "lucide-react";
+import { Plus, X, Building2, Tag, Building, Languages, Moon, ShieldCheck } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -187,6 +187,29 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
         <button disabled className="rounded border border-brand-warm-400 px-4 py-1.5 text-xs font-medium text-brand-ink-300">
           {t.darkMode.placeholder}
         </button>
+      </section>
+
+      {/* 6. Audit Logs */}
+      <section className="rounded-xl border border-brand-warm-400 bg-white p-5 shadow-card">
+        <div className="flex items-center gap-2 mb-4">
+          <ShieldCheck className="h-5 w-5 text-brand-orange-600" />
+          <h3 className="text-base font-bold text-brand-ink-900">
+            {locale === "zh" ? "审计日志" : "Journal d'audit"}
+          </h3>
+        </div>
+        <p className="text-xs text-brand-ink-400 mb-3">
+          {locale === "zh"
+            ? "查看系统关键操作的变更历史：谁在什么时候创建、修改、删除了什么。仅管理员和老板可见。"
+            : "Historique des operations cles : qui a fait quoi, quand et sur quel objet. Admin et proprietaire uniquement."
+          }
+        </p>
+        <Link
+          href={routeFor(locale, "/settings/audit-logs")}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink-900 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-ink-700 transition-colors"
+        >
+          <ShieldCheck className="h-3.5 w-3.5" />
+          {locale === "zh" ? "查看审计日志" : "Voir le journal"}
+        </Link>
       </section>
     </div>
   );

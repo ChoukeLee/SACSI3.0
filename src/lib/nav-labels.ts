@@ -34,6 +34,9 @@ const desktop: Record<Locale, DesktopNavLabels> = {
       settings: "设置",
       management: "经营驾驶舱",
       documents: "单据中心",
+      todos: "通知待办",
+      dataQuality: "数据质量",
+      frontDesk: "前台工作台",
     },
   },
   fr: {
@@ -53,6 +56,9 @@ const desktop: Record<Locale, DesktopNavLabels> = {
       settings: "Parametres",
       management: "Direction",
       documents: "Documents",
+      todos: "Taches",
+      dataQuality: "Qualite",
+      frontDesk: "Accueil",
     },
   },
 };

@@ -47,7 +47,8 @@ export const dictionaries = {
         reports: "报表",
         settings: "设置",
         management: "经营驾驶舱",
-        documents: "单据中心"
+        documents: "单据中心",
+        todos: "通知待办"
       }
     },
     statuses: {
@@ -916,7 +917,8 @@ export const dictionaries = {
         reports: "Rapports",
         settings: "Parametres",
         management: "Direction",
-        documents: "Documents"
+        documents: "Documents",
+        todos: "Taches"
       }
     },
     statuses: {

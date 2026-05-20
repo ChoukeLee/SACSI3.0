@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function FrenchSettingsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!["admin"].includes(user.role)) redirect("/");
+  if (!["admin", "boss"].includes(user.role)) redirect("/");
 
   const t = dictionaries.fr.settings;
   const supabase = await createClient();

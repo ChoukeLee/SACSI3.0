@@ -1,14 +1,23 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { dictionaries, routeFor } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { MobileWorkbench } from "@/features/mobile";
-import type { UnitRow, DailyBookingRow, CustomerRow, PaymentRow } from "@/types/database";
+import { TodoDashboardWidget, computeTodos } from "@/features/todos";
+import type { TodoRole } from "@/features/todos/todo-types";
+import type {
+  UnitRow, DailyBookingRow, CustomerRow, PaymentRow,
+  LeaseContractRow, SaleContractRow, ReceivableRow,
+} from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
 export default async function FrenchDashboardPage() {
+  const user = await getCurrentUser();
+  if (user?.role === "front_desk") redirect("/fr/front-desk");
   const t = dictionaries.fr.dashboard;
   const supabase = await createClient();
   const [notifRes, buildingRes] = await Promise.all([
@@ -24,13 +33,25 @@ export default async function FrenchDashboardPage() {
   let payments: PaymentRow[] = [];
   let cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[] = [];
 
+  let leaseContracts: LeaseContractRow[] = [];
+  let saleContracts: SaleContractRow[] = [];
+  let receivables: ReceivableRow[] = [];
+  let allUnits: UnitRow[] = [];
+  let allCustomers: CustomerRow[] = [];
+
   if (buildingId) {
-    const [unitsRes, bookingsRes, customersRes, paymentsRes, cleaningRes] = await Promise.all([
+    const [unitsRes, bookingsRes, customersRes, paymentsRes, cleaningRes,
+      leaseRes, saleRes, recRes, allUnitsRes, allCustRes] = await Promise.all([
       supabase.from("units").select("*, unit_business_flags!inner(business_type, is_enabled)").eq("building_id", buildingId).eq("unit_business_flags.business_type", "daily_rental").eq("unit_business_flags.is_enabled", true).order("unit_no"),
       supabase.from("daily_bookings").select("*").in("status", ["pending_review", "confirmed", "checked_in", "checked_out"]).order("check_in", { ascending: false }).limit(200),
       supabase.from("customers").select("id, name, phone, is_blacklisted").order("name"),
       supabase.from("payments").select("*").eq("source_type", "daily_booking").order("payment_date", { ascending: false }).limit(200),
       supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed"),
+      supabase.from("lease_contracts").select("*").eq("status", "active").limit(100),
+      supabase.from("sale_contracts").select("*").eq("status", "active").limit(100),
+      supabase.from("receivables").select("*").order("due_date", { ascending: false }).limit(500),
+      supabase.from("units").select("id, unit_no, building_id"),
+      supabase.from("customers").select("id, name, phone"),
     ]);
     if (!unitsRes.error) dailyUnits = ((unitsRes.data as unknown as UnitRow[]) ?? []).sort((a, b) => {
       const af = parseInt(a.floor_label); const bf = parseInt(b.floor_label);
@@ -40,7 +61,23 @@ export default async function FrenchDashboardPage() {
     if (!customersRes.error) customers = (customersRes.data as CustomerRow[]) ?? [];
     if (!paymentsRes.error) payments = (paymentsRes.data as PaymentRow[]) ?? [];
     if (!cleaningRes.error) cleaningTasks = cleaningRes.data ?? [];
+    if (!leaseRes.error) leaseContracts = leaseRes.data ?? [];
+    if (!saleRes.error) saleContracts = saleRes.data ?? [];
+    if (!recRes.error) receivables = recRes.data ?? [];
+    if (!allUnitsRes.error) allUnits = (allUnitsRes.data as unknown as UnitRow[]) ?? [];
+    if (!allCustRes.error) allCustomers = (allCustRes.data as unknown as CustomerRow[]) ?? [];
   }
+
+  const role = (user?.role ?? "front_desk") as TodoRole;
+  const dashboardTodos = computeTodos({
+    dailyBookings: bookings,
+    leaseContracts,
+    saleContracts,
+    receivables,
+    units: allUnits,
+    customers: allCustomers,
+    targetRole: role,
+  });
 
   return (
     <>
@@ -74,6 +111,10 @@ export default async function FrenchDashboardPage() {
               </div>
             </Link>
           ))}
+        </section>
+
+        <section className="mt-8">
+          <TodoDashboardWidget todos={dashboardTodos} locale="fr" />
         </section>
       </div>
     </>

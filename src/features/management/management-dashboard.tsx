@@ -10,6 +10,8 @@ import {
   getOverdueReceivables,
   getOutstandingReceivables,
 } from "@/features/finance/receivable-summary";
+import { QualityDashboardWidget } from "@/features/data-quality";
+import type { QualityIssue } from "@/features/data-quality/quality-types";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
@@ -47,6 +49,7 @@ interface Props {
   cleaningTasks: { unit_id: string; is_completed: boolean }[];
   ledgerEntries: LedgerEntryRow[];
   receivables: ReceivableRow[];
+  qualityIssues?: QualityIssue[];
   locale: Locale;
 }
 
@@ -124,7 +127,7 @@ function computeUnitState(
 
 export function ManagementDashboard({
   buildings, units, dailyBookings, leaseContracts, saleContracts,
-  saleSchedules, cleaningTasks, ledgerEntries, receivables, locale,
+  saleSchedules, cleaningTasks, ledgerEntries, receivables, qualityIssues, locale,
 }: Props) {
   const t = dictionaries[locale].management;
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("__all__");
@@ -514,6 +517,13 @@ export function ManagementDashboard({
           )}
         </div>
       </div>
+
+      {/* Section 5.5: Data health */}
+      {qualityIssues && qualityIssues.length > 0 && (
+        <div className="mb-8">
+          <QualityDashboardWidget issues={qualityIssues} locale={locale} variant="management" />
+        </div>
+      )}
 
       {/* Section 6: Risk alerts */}
       <SectionTitle>{t.sections.riskAlerts}</SectionTitle>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Banknote, BarChart3, Building2, CalendarDays, FileSignature, FileText, Home, LayoutDashboard, Settings, Users,
+  Banknote, BarChart3, BedDouble, Bell, Building2, CalendarDays, FileSignature, FileText, Home, LayoutDashboard, Settings, ShieldCheck, Users,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -11,20 +11,23 @@ import { getDesktopNavLabels } from "@/lib/nav-labels";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/auth";
 
-type NavKey = "dashboard" | "units" | "dailyRentals" | "dailyOccupancy" | "leases" | "sales" | "customers" | "finance" | "management" | "reports" | "settings" | "documents";
+type NavKey = "dashboard" | "units" | "dailyRentals" | "dailyOccupancy" | "leases" | "sales" | "customers" | "finance" | "management" | "reports" | "settings" | "documents" | "todos" | "dataQuality" | "frontDesk";
 
 const navItems: { key: NavKey; href: string; icon: typeof Home }[] = [
   { key: "dashboard", href: "/", icon: Home },
   { key: "management", href: "/management", icon: LayoutDashboard },
   { key: "units", href: "/units", icon: Building2 },
   { key: "dailyRentals", href: "/daily-rentals", icon: CalendarDays },
+  { key: "frontDesk", href: "/front-desk", icon: BedDouble },
   { key: "dailyOccupancy", href: "/daily-rentals/overview", icon: BarChart3 },
   { key: "leases", href: "/leases", icon: FileSignature },
   { key: "sales", href: "/sales", icon: Building2 },
   { key: "customers", href: "/customers", icon: Users },
   { key: "finance", href: "/finance", icon: Banknote },
+  { key: "todos", href: "/todos", icon: Bell },
   { key: "documents", href: "/documents", icon: FileText },
   { key: "reports", href: "/reports", icon: BarChart3 },
+  { key: "dataQuality", href: "/data-quality", icon: ShieldCheck },
   { key: "settings", href: "/settings", icon: Settings },
 ];
 

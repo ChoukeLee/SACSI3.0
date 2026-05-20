@@ -2,9 +2,12 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ManagementDashboard } from "@/features/management";
+import { runQualityChecks } from "@/features/data-quality";
+import type { QualityIssue } from "@/features/data-quality/quality-types";
 import type {
   BuildingRow, UnitRow, DailyBookingRow, LeaseContractRow,
   SaleContractRow, SalePaymentScheduleRow, LedgerEntryRow, ReceivableRow,
+  PaymentRow, CustomerRow,
 } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +28,8 @@ export default async function ManagementPage() {
     { data: ledgerEntries },
     { data: cleaningTasks },
     { data: receivables },
+    { data: payments },
+    { data: customers },
   ] = await Promise.all([
     supabase.from("buildings").select("*").eq("is_active", true).order("code"),
     supabase.from("units").select("*").order("unit_no"),
@@ -35,7 +40,21 @@ export default async function ManagementPage() {
     supabase.from("ledger_entries").select("*").order("entry_date", { ascending: false }).limit(2000),
     supabase.from("cleaning_tasks").select("id, unit_id, is_completed"),
     supabase.from("receivables").select("*").order("due_date", { ascending: false }).limit(1000),
+    supabase.from("payments").select("*").order("payment_date", { ascending: false }).limit(1000),
+    supabase.from("customers").select("*").order("name").limit(500),
   ]);
+
+  // Quality checks
+  const qualityIssues = runQualityChecks({
+    units: (units ?? []) as UnitRow[],
+    customers: (customers ?? []) as CustomerRow[],
+    dailyBookings: (dailyBookings ?? []) as DailyBookingRow[],
+    leaseContracts: (leaseContracts ?? []) as LeaseContractRow[],
+    saleContracts: (saleContracts ?? []) as SaleContractRow[],
+    saleSchedules: (saleSchedules ?? []) as SalePaymentScheduleRow[],
+    receivables: (receivables ?? []) as ReceivableRow[],
+    payments: (payments ?? []) as PaymentRow[],
+  }, user.role as "admin" | "boss" | "finance" | "front_desk");
 
   return (
     <ManagementDashboard
@@ -48,6 +67,7 @@ export default async function ManagementPage() {
       cleaningTasks={(cleaningTasks ?? []) as { unit_id: string; is_completed: boolean }[]}
       ledgerEntries={(ledgerEntries ?? []) as LedgerEntryRow[]}
       receivables={(receivables ?? []) as ReceivableRow[]}
+      qualityIssues={qualityIssues}
       locale="zh"
     />
   );
