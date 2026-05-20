@@ -58,46 +58,53 @@ interface Props {
   locale: Locale;
 }
 
-// ── Status colour map — light tint + coloured border + dark label ──────
-// bg: room cell (light background, coloured left border, ink text)
-// dot: legend swatch (solid square)
-// pill: status-count badge in summary row
+// ── Status visual system — bg tint · left-accent border · text weight ──
+// Visual weight: sold + dailyOccupied = heavier (ring-inset),
+//                leased + reserved = medium, cleaning + available = light.
+// bg:  room cell face    dot: legend swatch    pill: summary badge
 
-const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string }> = {
+const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string; ring: string }> = {
   sold: {
-    bg: "bg-stone-100 text-stone-700 border-l-stone-400",
-    dot: "bg-stone-500",
-    pill: "bg-stone-100 text-stone-700 border-stone-300",
+    bg:   "bg-slate-100 text-slate-700 border-l-slate-400",
+    dot:  "bg-slate-500",
+    pill: "bg-slate-100 text-slate-700 border-slate-300",
+    ring: "ring-1 ring-inset ring-slate-200",
   },
   leased: {
-    bg: "bg-blue-50 text-blue-700 border-l-blue-400",
-    dot: "bg-blue-500",
-    pill: "bg-blue-50 text-blue-700 border-blue-200",
+    bg:   "bg-sky-50 text-sky-700 border-l-sky-400",
+    dot:  "bg-sky-500",
+    pill: "bg-sky-50 text-sky-700 border-sky-200",
+    ring: "ring-1 ring-inset ring-sky-200",
   },
   dailyOccupied: {
-    bg: "bg-brand-orange-50 text-brand-orange-700 border-l-brand-orange-400",
-    dot: "bg-brand-orange-500",
-    pill: "bg-brand-orange-50 text-brand-orange-700 border-brand-orange-200",
+    bg:   "bg-brand-orange-100 text-brand-orange-800 border-l-brand-orange-500",
+    dot:  "bg-brand-orange-500",
+    pill: "bg-brand-orange-100 text-brand-orange-800 border-brand-orange-300",
+    ring: "ring-1 ring-inset ring-brand-orange-200",
   },
   reserved: {
-    bg: "bg-amber-50 text-amber-700 border-l-amber-400",
-    dot: "bg-amber-500",
-    pill: "bg-amber-50 text-amber-700 border-amber-200",
+    bg:   "bg-amber-100 text-amber-800 border-l-amber-500",
+    dot:  "bg-amber-500",
+    pill: "bg-amber-100 text-amber-800 border-amber-300",
+    ring: "",
   },
   cleaningPending: {
-    bg: "bg-cyan-50 text-cyan-700 border-l-cyan-400",
-    dot: "bg-cyan-500",
-    pill: "bg-cyan-50 text-cyan-700 border-cyan-200",
+    bg:   "bg-teal-50 text-teal-700 border-l-teal-400",
+    dot:  "bg-teal-500",
+    pill: "bg-teal-50 text-teal-700 border-teal-200",
+    ring: "",
   },
   maintenance: {
-    bg: "bg-rose-50 text-rose-700 border-l-rose-400",
-    dot: "bg-rose-500",
-    pill: "bg-rose-50 text-rose-700 border-rose-200",
+    bg:   "bg-rose-100 text-rose-700 border-l-rose-500",
+    dot:  "bg-rose-500",
+    pill: "bg-rose-100 text-rose-700 border-rose-300",
+    ring: "",
   },
   available: {
-    bg: "bg-emerald-50 text-emerald-700 border-l-emerald-400",
-    dot: "bg-emerald-500",
+    bg:   "bg-emerald-50 text-emerald-700 border-l-emerald-400",
+    dot:  "bg-emerald-500",
     pill: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    ring: "",
   },
 };
 
@@ -444,13 +451,14 @@ export function ManagementDashboard({
                               key={s.unit.id}
                               href={routeFor(locale, `/units/${s.unit.id}`)}
                               className={cn(
-                                "flex h-9 w-9 items-center justify-center rounded-r-md rounded-l-md",
+                                "flex h-9 w-9 items-center justify-center rounded-md",
                                 "border border-brand-warm-200 border-l-[3px]",
                                 "font-mono text-[11px] font-bold leading-none",
                                 "shadow-sm transition-all duration-150",
                                 "hover:-translate-y-0.5 hover:shadow-md active:scale-95",
                                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange",
                                 st.bg,
+                                st.ring,
                               )}
                               title={`${s.unit.unit_no} — ${t.statuses[s.status]}`}
                               aria-label={`${s.unit.unit_no} — ${t.statuses[s.status]}`}
