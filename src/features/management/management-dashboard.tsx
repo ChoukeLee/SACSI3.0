@@ -308,12 +308,12 @@ export function ManagementDashboard({
 
   return (
     <div className="-my-6 bg-[#f5f7fb]">
-      <div className="mx-auto max-w-[1360px] px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-[1360px] flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
 
         <PageHeader title={t.title} description={t.description} />
 
         {/* ── Building selector — segmented control ── */}
-        <div className="mb-5">
+        <div>
           <div className="inline-flex flex-wrap gap-0.5 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
             <SegmentedTab
               active={selectedBuildingId === "__all__"}
@@ -332,8 +332,8 @@ export function ManagementDashboard({
         </div>
 
         {/* ── Section 1: Core KPI Summary ── */}
-        <div className="mb-7 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.85fr)]">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.85fr)]">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-natural">
             <div className="mb-3 flex items-center justify-between gap-3">
               <SectionLabel compact>{t.sections.financeOverview}</SectionLabel>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
@@ -364,7 +364,7 @@ export function ManagementDashboard({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-natural">
             <SectionLabel compact>{t.sections.riskAlerts}</SectionLabel>
             {hasAnyRisk ? (
               <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
@@ -382,24 +382,30 @@ export function ManagementDashboard({
           </div>
         </div>
 
-        {/* ── Section 3: Status pills + Room matrix ── */}
-        <SectionLabel>{t.sections.buildingStatus} — {buildingName}</SectionLabel>
-
-        {/* Status summary pills */}
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          {(Object.keys(counts) as MgmtStatus[]).map(s => (
-            <div key={s} className={cn(
-              "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold shadow-sm",
-              STATUS_CELL[s].pill,
-            )}>
-              <span className="tabular-nums">{counts[s]}</span>
-              <span className="opacity-75 font-normal">{t.statuses[s]}</span>
-            </div>
-          ))}
+        {/* Section 3: shadcn-style room status board */}
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <SectionLabel compact>{t.sections.buildingStatus} - {buildingName}</SectionLabel>
+            <p className="mt-1 text-xs text-slate-500">
+              {locale === "zh" ? "????????????????????????" : "Statut par etage, cliquez pour ouvrir le dossier."}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {(Object.keys(counts) as MgmtStatus[]).map(s => (
+              <div key={s} className={cn(
+                "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold shadow-sm",
+                STATUS_CELL[s].pill,
+              )}>
+                <span className={cn("h-2 w-2 rounded-full", STATUS_CELL[s].dot)} />
+                <span className="tabular-nums">{counts[s]}</span>
+                <span className="opacity-75 font-normal">{t.statuses[s]}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Room matrix */}
-        <div className="mb-10 space-y-5">
+        <div className="space-y-5">
           {(selectedBuildingId === "__all__" ? activeBuildings : activeBuildings.filter(b => b.id === selectedBuildingId)).map(building => {
             const bUnits = buildingUnits.get(building.id) ?? [];
             const bStates = sortUnits(bUnits).map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks));
@@ -431,35 +437,26 @@ export function ManagementDashboard({
                 </div>
 
                 {/* Floor groups */}
-                <div className="bg-slate-50/50 px-4 py-4">
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                <div className="bg-slate-50/60 px-4 py-4">
+                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
                     {floorGroups.map(group => (
-                      <div key={group.key} className="rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-                        <p className="mb-2.5 text-[11px] font-bold text-slate-500">
-                          {group.label}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
+                      <div key={group.key} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                        <div className="mb-3 flex items-center justify-between">
+                          <p className="text-[11px] font-bold text-slate-500">{group.label}</p>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                            {group.states.length}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                           {group.states.map(s => {
-                            const st = STATUS_CELL[s.status];
                             return (
-                              <Link
+                              <RoomStatusCard
                                 key={s.unit.id}
+                                state={s}
+                                statusLabel={t.statuses[s.status]}
                                 href={routeFor(locale, `/units/${s.unit.id}`)}
-                                className={cn(
-                                  "relative flex h-12 min-w-12 items-center justify-center overflow-hidden rounded-xl border px-2",
-                                  "font-mono text-xs font-bold leading-none",
-                                  "shadow-sm transition-all duration-150",
-                                  "hover:-translate-y-0.5 hover:shadow-lg active:scale-95",
-                                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange",
-                                  st.bg,
-                                  st.ring,
-                                )}
-                                title={`${s.unit.unit_no} — ${t.statuses[s.status]}`}
-                                aria-label={`${s.unit.unit_no} — ${t.statuses[s.status]}`}
-                              >
-                                <span className={cn("absolute inset-x-0 top-0 h-1", st.stripe)} />
-                                <span className="relative z-10">{s.unit.unit_no}</span>
-                              </Link>
+                                locale={locale}
+                              />
                             );
                           })}
                         </div>
@@ -704,6 +701,91 @@ export function ManagementDashboard({
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────
+
+const ROOM_CARD: Record<MgmtStatus, { card: string; badge: string; dot: string; action: string }> = {
+  sold: {
+    card: "border-slate-300 bg-slate-700 text-white",
+    badge: "bg-white text-slate-800",
+    dot: "bg-slate-300",
+    action: "bg-white/15 text-white ring-white/20",
+  },
+  leased: {
+    card: "border-indigo-300 bg-indigo-600 text-white",
+    badge: "bg-white text-indigo-700",
+    dot: "bg-indigo-200",
+    action: "bg-white/15 text-white ring-white/20",
+  },
+  dailyOccupied: {
+    card: "border-orange-300 bg-orange-500 text-white",
+    badge: "bg-white text-orange-700",
+    dot: "bg-orange-200",
+    action: "bg-white/15 text-white ring-white/20",
+  },
+  reserved: {
+    card: "border-sky-300 bg-sky-500 text-white",
+    badge: "bg-white text-sky-700",
+    dot: "bg-sky-200",
+    action: "bg-white/15 text-white ring-white/20",
+  },
+  cleaningPending: {
+    card: "border-cyan-300 bg-cyan-500 text-white",
+    badge: "bg-white text-cyan-700",
+    dot: "bg-cyan-200",
+    action: "bg-white/15 text-white ring-white/20",
+  },
+  maintenance: {
+    card: "border-rose-300 bg-rose-500 text-white",
+    badge: "bg-white text-rose-700",
+    dot: "bg-rose-200",
+    action: "bg-white/15 text-white ring-white/20",
+  },
+  available: {
+    card: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    badge: "bg-emerald-600 text-white",
+    dot: "bg-emerald-500",
+    action: "bg-white/80 text-emerald-700 ring-emerald-200",
+  },
+};
+
+function RoomStatusCard({
+  state, statusLabel, href, locale,
+}: {
+  state: UnitState;
+  statusLabel: string;
+  href: string;
+  locale: Locale;
+}) {
+  const styles = ROOM_CARD[state.status];
+  const roomText = locale === "zh" ? "房间档案" : "Dossier";
+
+  return (
+    <Link
+      href={href}
+      title={`${state.unit.unit_no} - ${statusLabel}`}
+      aria-label={`${state.unit.unit_no} - ${statusLabel}`}
+      className={cn(
+        "group relative flex min-h-[92px] flex-col justify-between overflow-hidden rounded-2xl border p-3 shadow-sm",
+        "transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lifted active:scale-[0.98]",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange",
+        styles.card,
+      )}
+    >
+      <span className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(135deg,rgba(255,255,255,0.16),transparent_55%)] opacity-70" />
+      <div className="relative z-10 flex items-start justify-between gap-2">
+        <span className={cn("rounded-full px-2.5 py-1 font-mono text-xs font-black shadow-sm", styles.badge)}>
+          {state.unit.unit_no}
+        </span>
+        <span className={cn("mt-1 h-2 w-2 rounded-full", styles.dot)} />
+      </div>
+      <div className="relative z-10">
+        <p className="truncate text-[11px] font-bold">{statusLabel}</p>
+        <p className={cn("mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset", styles.action)}>
+          {roomText}
+        </p>
+      </div>
+    </Link>
+  );
+}
 
 function SectionLabel({ children, compact = false }: { children: React.ReactNode; compact?: boolean }) {
   return (
