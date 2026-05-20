@@ -1,7 +1,5 @@
 
 import { redirect } from "next/navigation";
-import { PageHeader } from "@/components/page-header";
-import { dictionaries } from "@/lib/i18n";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
@@ -15,7 +13,6 @@ export default async function DailyOverviewPage() {
   if (!user) redirect("/login");
   if (!["admin", "front_desk", "finance", "boss"].includes(user.role)) redirect("/");
 
-  const t = dictionaries.zh.dailyOccupancy;
   const supabase = await createClient();
 
   const { data: building } = await supabase.from("buildings").select("id").eq("code", "SASCI11").single();
@@ -51,7 +48,10 @@ export default async function DailyOverviewPage() {
 
   return (
     <>
-      <PageHeader title={t.title} description={t.description} />
+      <div className="mb-5">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-950">房态矩阵</h1>
+        <p className="mt-1 text-sm text-slate-500">当天群发内容、房间状态和费用状态集中在一个操作视图中。</p>
+      </div>
       <OverviewView
         dailyUnits={dailyUnits}
         bookings={bookings}

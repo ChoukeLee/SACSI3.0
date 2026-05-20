@@ -76,6 +76,31 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const selectedUnit = selected ? units.find((u) => u.id === selected.unit_id) : null;
   const selectedCustomer = selected ? customers.find((c) => c.id === selected.customer_id) : null;
 
+  const dashboardStats = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const active = contracts.filter((c) => c.status === "active");
+    const expiring = active.filter((c) => {
+      const days = Math.floor((new Date(c.expected_end_date).getTime() - Date.now()) / 86400000);
+      return days >= 0 && days <= 30;
+    }).length;
+    let due = 0;
+    let overdue = 0;
+    for (const r of receivables) {
+      if (r.source_type !== "lease_contract" || r.status === "cancelled") continue;
+      const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
+      if (outstanding <= 0) continue;
+      due += outstanding;
+      if (r.status === "overdue" || r.due_date < today) overdue += outstanding;
+    }
+    return {
+      active: active.length,
+      rent: active.reduce((sum, c) => sum + Number(c.monthly_rent_xof), 0),
+      expiring,
+      due,
+      overdue,
+    };
+  }, [contracts, receivables]);
+
   // Receivables for selected contract
   const contractReceivables = useMemo(
     () => selectedId
@@ -316,7 +341,51 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   };
 
   return (
-    <div>
+    <div className="space-y-5">
+      <div className="grid gap-3 md:grid-cols-5">
+        <LeaseMetric label={locale === "zh" ? "生效合同" : "Actifs"} value={`${dashboardStats.active}`} tone="slate" />
+        <LeaseMetric label={locale === "zh" ? "月租规模" : "Loyer/mois"} value={formatXof(dashboardStats.rent)} tone="green" />
+        <LeaseMetric label={locale === "zh" ? "30天到期" : "30 jours"} value={`${dashboardStats.expiring}`} tone="amber" />
+        <LeaseMetric label={locale === "zh" ? "待收账款" : "A recevoir"} value={formatXof(dashboardStats.due)} tone="sky" />
+        <LeaseMetric label={locale === "zh" ? "逾期金额" : "Retard"} value={formatXof(dashboardStats.overdue)} tone="rose" />
+      </div>
+
+      {contracts.length > 0 && (
+        <div className="grid gap-3 xl:grid-cols-3">
+          {contracts.slice(0, 6).map((contract) => {
+            const unit = units.find((u) => u.id === contract.unit_id);
+            const customer = customers.find((c) => c.id === contract.customer_id);
+            return (
+              <button
+                key={contract.id}
+                onClick={() => openDetail(contract.id)}
+                className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-natural transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-panel"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-mono text-lg font-black text-slate-950">{unit?.unit_no ?? "-"}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">{customer?.name ?? "-"}</p>
+                  </div>
+                  <Badge variant={statusVariant[contract.status]}>
+                    {t.contractStatus[contract.status as keyof typeof t.contractStatus]}
+                  </Badge>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-xl bg-slate-50 p-2">
+                    <p className="text-slate-400">{locale === "zh" ? "月租" : "Loyer"}</p>
+                    <p className="font-bold text-slate-900">{formatXof(Number(contract.monthly_rent_xof))}</p>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-2">
+                    <p className="text-slate-400">{locale === "zh" ? "到期" : "Fin"}</p>
+                    <p className="font-bold text-slate-900">{contract.expected_end_date}</p>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
@@ -704,6 +773,23 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function LeaseMetric({ label, value, tone }: { label: string; value: string; tone: "slate" | "green" | "amber" | "sky" | "rose" }) {
+  const toneClass = {
+    slate: "border-slate-200 bg-white text-slate-950",
+    green: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    amber: "border-amber-200 bg-amber-50 text-amber-900",
+    sky: "border-sky-200 bg-sky-50 text-sky-900",
+    rose: "border-rose-200 bg-rose-50 text-rose-900",
+  }[tone];
+
+  return (
+    <div className={cn("rounded-2xl border p-4 shadow-natural", toneClass)}>
+      <p className="text-xs font-bold text-slate-500">{label}</p>
+      <p className="mt-2 truncate text-xl font-black tabular-nums">{value}</p>
     </div>
   );
 }

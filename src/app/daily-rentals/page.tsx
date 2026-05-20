@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
@@ -45,16 +44,29 @@ export default async function DailyRentalsPage() {
   return (
     <>
       <div className="lg:hidden">
-        <PageHeader title={t.title} description={t.description} />
+        <CompactPageTitle title={t.title} description={t.description} />
         <MobileDailyCards dailyUnits={dailyUnits} bookings={bookings} customers={customers as unknown as CustomerRow[]} payments={payments as unknown as PaymentRow[]} cleaningTasks={cleaningTasks} locale="zh" />
       </div>
       <div className="hidden lg:block">
-        <PageHeader title={t.title} description={t.description} />
-        <p className="text-xs text-brand-ink-400 mt-2 mb-6">日租规则：21间固定房源 · 40,000 XOF/晚 · 至少预付部分金额，不可离店后付款</p>
+        <CompactPageTitle title={t.title} description="21间固定日租房源，按日期直接办理预订、入住、退房和保洁。" />
         <section>
           <DailyCalendar dailyUnits={dailyUnits} bookings={bookings} customers={customers} cleaningTasks={cleaningTasks} payments={payments} locale="zh" />
         </section>
       </div>
     </>
+  );
+}
+
+function CompactPageTitle({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-950">{title}</h1>
+        <p className="mt-1 text-sm text-slate-500">{description}</p>
+      </div>
+      <span className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-700">
+        40,000 XOF/晚
+      </span>
+    </div>
   );
 }

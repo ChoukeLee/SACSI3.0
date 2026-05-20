@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
@@ -51,8 +50,10 @@ export default async function SalesPage() {
         <DesktopOnly locale="zh" />
       </div>
       <div className="hidden lg:block">
-        <PageHeader title={t.title} description={t.description} />
-        <p className="text-xs text-brand-ink-400 mt-2 mb-6">出售规则：房源/车位可售 · 一次性/固定分期/灵活分期 · 合同终止后恢复可售</p>
+        <div className="mb-5">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">{t.title}</h1>
+          <p className="mt-1 text-sm text-slate-500">围绕出售合同、回款进度、过户状态和分期风险组织信息。</p>
+        </div>
         <section>
           <SaleList contracts={contracts} schedules={schedules} units={units} customers={customers} payments={payments} receivables={receivables} locale="zh" />
         </section>

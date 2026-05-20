@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Building2, Eye } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
 import { UnitFilters } from "./unit-filters";
 import { UnitDetailPanel } from "./unit-detail-panel";
@@ -35,7 +36,7 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
   const t = dictionaries[locale].units;
   const [selectedFloor, setSelectedFloor] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
-  const [selectedKind, setSelectedKind] = useState("all");
+  const [selectedKind, setSelectedKind] = useState("apartment");
   const [selectedBusiness, setSelectedBusiness] = useState("all");
   const [detailUnitId, setDetailUnitId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -64,11 +65,32 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
   }, [units, selectedFloor, selectedStatus, selectedKind, selectedBusiness, businessFlagsMap]);
 
   const detailUnit = detailUnitId ? units.find((u) => u.id === detailUnitId) : null;
+  const apartmentUnits = useMemo(() => units.filter(u => u.kind === "apartment"), [units]);
+  const summary = useMemo(() => {
+    const source = selectedKind === "all" ? units : filtered;
+    return {
+      apartments: apartmentUnits.length,
+      sold: source.filter(u => u.status === "sold").length,
+      leased: source.filter(u => u.status === "leased").length,
+      daily: source.filter(u => u.status === "daily_occupied" || u.status === "reserved").length,
+      available: source.filter(u => u.status === "available").length,
+      nonApartment: units.filter(u => u.kind !== "apartment").length,
+    };
+  }, [units, filtered, selectedKind, apartmentUnits.length]);
 
   return (
     <div>
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <AssetMetric label={locale === "zh" ? "住宿房源" : "Appartements"} value={summary.apartments} tone="ink" />
+        <AssetMetric label={dictionaries[locale].statuses.sold} value={summary.sold} tone="slate" />
+        <AssetMetric label={dictionaries[locale].statuses.leased} value={summary.leased} tone="indigo" />
+        <AssetMetric label={locale === "zh" ? "日租/预订" : "Jour"} value={summary.daily} tone="orange" />
+        <AssetMetric label={dictionaries[locale].statuses.available} value={summary.available} tone="green" />
+        <AssetMetric label={locale === "zh" ? "非住宿资产" : "Autres actifs"} value={summary.nonApartment} tone="sky" />
+      </div>
+
       {/* Toolbar */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-natural">
         <UnitFilters
           locale={locale}
           selectedFloor={selectedFloor} selectedStatus={selectedStatus}
@@ -178,6 +200,23 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
           onStatusChanged={() => setRefreshKey((k) => k + 1)}
         />
       )}
+    </div>
+  );
+}
+
+function AssetMetric({ label, value, tone }: { label: string; value: number; tone: "ink" | "slate" | "indigo" | "orange" | "green" | "sky" }) {
+  const styles = {
+    ink: "border-slate-200 bg-white text-slate-950",
+    slate: "border-slate-200 bg-slate-50 text-slate-700",
+    indigo: "border-indigo-200 bg-indigo-50 text-indigo-700",
+    orange: "border-orange-200 bg-orange-50 text-orange-700",
+    green: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    sky: "border-sky-200 bg-sky-50 text-sky-700",
+  }[tone];
+  return (
+    <div className={cn("rounded-2xl border px-4 py-3 shadow-sm", styles)}>
+      <p className="text-[11px] font-bold text-current opacity-70">{label}</p>
+      <p className="mt-1 text-2xl font-black tabular-nums">{value}</p>
     </div>
   );
 }

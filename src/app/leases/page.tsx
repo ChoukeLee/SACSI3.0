@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
@@ -48,8 +47,10 @@ export default async function LeasesPage() {
         <DesktopOnly locale="zh" />
       </div>
       <div className="hidden lg:block">
-        <PageHeader title={t.title} description={t.description} />
-        <p className="text-xs text-brand-ink-400 mt-2 mb-6">长租规则：按户型定价 · 支持月/季/半年/年付 · 退租结算自动生成</p>
+        <div className="mb-5">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">{t.title}</h1>
+          <p className="mt-1 text-sm text-slate-500">按房间、租客、合同和应收账款组织长租经营信息。</p>
+        </div>
         <section>
           <LeaseList contracts={contracts} units={units} customers={customers} payments={payments} receivables={receivables} locale="zh" />
         </section>

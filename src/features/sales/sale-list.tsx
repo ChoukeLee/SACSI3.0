@@ -75,6 +75,29 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const selectedUnit = selected ? units.find((u) => u.id === selected.unit_id) : null;
   const selectedCustomer = selected ? customers.find((c) => c.id === selected.customer_id) : null;
 
+  const dashboardStats = useMemo(() => {
+    const active = contracts.filter((c) => c.status === "active");
+    let received = 0;
+    let receivable = 0;
+    let overdue = 0;
+    const today = new Date().toISOString().slice(0, 10);
+    for (const r of receivables) {
+      if (r.source_type !== "sale_contract" || r.status === "cancelled") continue;
+      received += Number(r.paid_amount_xof);
+      receivable += Number(r.amount_xof);
+      const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
+      if (outstanding > 0 && (r.status === "overdue" || r.due_date < today)) overdue += outstanding;
+    }
+    return {
+      active: active.length,
+      total: active.reduce((sum, c) => sum + Number(c.total_amount_xof), 0),
+      received,
+      receivable,
+      overdue,
+      transferDone: active.filter((c) => c.transfer_status === "completed").length,
+    };
+  }, [contracts, receivables]);
+
   const contractSchedules = useMemo(
     () => (selectedId ? schedules.filter((s) => s.sale_contract_id === selectedId).sort((a, b) => a.installment_no - b.installment_no) : []),
     [schedules, selectedId],
@@ -250,7 +273,53 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   };
 
   return (
-    <div>
+    <div className="space-y-5">
+      <div className="grid gap-3 md:grid-cols-5">
+        <SaleMetric label={locale === "zh" ? "生效出售" : "Ventes"} value={`${dashboardStats.active}`} tone="slate" />
+        <SaleMetric label={locale === "zh" ? "合同总额" : "Montant"} value={formatXof(dashboardStats.total)} tone="amber" />
+        <SaleMetric label={locale === "zh" ? "已回款" : "Encaisse"} value={formatXof(dashboardStats.received)} tone="green" />
+        <SaleMetric label={locale === "zh" ? "逾期回款" : "Retard"} value={formatXof(dashboardStats.overdue)} tone="rose" />
+        <SaleMetric label={locale === "zh" ? "已过户" : "Transferts"} value={`${dashboardStats.transferDone}`} tone="sky" />
+      </div>
+
+      {contracts.length > 0 && (
+        <div className="grid gap-3 xl:grid-cols-3">
+          {contracts.slice(0, 6).map((contract) => {
+            const unit = units.find((u) => u.id === contract.unit_id);
+            const customer = customers.find((c) => c.id === contract.customer_id);
+            const recStats = contractReceivableMap.get(contract.id);
+            const paid = recStats?.paid ?? 0;
+            const total = recStats?.total ?? Number(contract.total_amount_xof);
+            const rate = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
+            return (
+              <button
+                key={contract.id}
+                onClick={() => { setSelectedId(contract.id); setPanel("detail"); setError(""); }}
+                className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-natural transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-panel"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-mono text-lg font-black text-slate-950">{unit?.unit_no ?? "-"}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">{customer?.name ?? "-"}</p>
+                  </div>
+                  <Badge variant={statusVariant[contract.status]}>{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
+                </div>
+                <div className="mt-4">
+                  <div className="mb-1 flex items-center justify-between text-xs font-bold text-slate-500">
+                    <span>{locale === "zh" ? "回款进度" : "Paiement"}</span>
+                    <span>{rate}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full rounded-full bg-slate-950" style={{ width: `${rate}%` }} />
+                  </div>
+                  <p className="mt-2 text-xs font-bold text-slate-900">{formatXof(Number(contract.total_amount_xof))}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
@@ -606,6 +675,23 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function SaleMetric({ label, value, tone }: { label: string; value: string; tone: "slate" | "green" | "amber" | "sky" | "rose" }) {
+  const toneClass = {
+    slate: "border-slate-200 bg-white text-slate-950",
+    green: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    amber: "border-amber-200 bg-amber-50 text-amber-900",
+    sky: "border-sky-200 bg-sky-50 text-sky-900",
+    rose: "border-rose-200 bg-rose-50 text-rose-900",
+  }[tone];
+
+  return (
+    <div className={cn("rounded-2xl border p-4 shadow-natural", toneClass)}>
+      <p className="text-xs font-bold text-slate-500">{label}</p>
+      <p className="mt-2 truncate text-xl font-black tabular-nums">{value}</p>
     </div>
   );
 }

@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { CustomerList } from "@/features/customers";
@@ -15,19 +14,28 @@ export default async function CustomersPage() {
   const t = dictionaries.zh.customers;
   const supabase = await createClient();
 
-  const { data: customers, error } = await supabase
-    .from("customers")
-    .select("*")
-    .order("name");
+  const [customersRes, leaseRes, saleRes, dailyRes] = await Promise.all([
+    supabase.from("customers").select("*").order("name"),
+    supabase.from("lease_contracts").select("customer_id").limit(1000),
+    supabase.from("sale_contracts").select("customer_id").limit(1000),
+    supabase.from("daily_bookings").select("customer_id").limit(1000),
+  ]);
 
-  if (error) console.error("Failed to fetch customers:", error);
+  if (customersRes.error) console.error("Failed to fetch customers:", customersRes.error);
+
+  const customerSegments = {
+    leaseCustomerIds: [...new Set((leaseRes.data ?? []).map((row) => row.customer_id).filter(Boolean))],
+    saleCustomerIds: [...new Set((saleRes.data ?? []).map((row) => row.customer_id).filter(Boolean))],
+    dailyCustomerIds: [...new Set((dailyRes.data ?? []).map((row) => row.customer_id).filter(Boolean))],
+  };
 
   return (
-      <>
-
-<><PageHeader title={t.title} description={t.description} />
-      <CustomerList customers={(customers as CustomerRow[]) ?? []} locale="zh" />
-
-      </>
-</>);
+    <>
+      <div className="mb-5">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-950">{t.title}</h1>
+        <p className="mt-1 text-sm text-slate-500">长期客户、购房客户与日租住客分层查看，减少高频操作时的信息噪音。</p>
+      </div>
+      <CustomerList customers={(customersRes.data as CustomerRow[]) ?? []} customerSegments={customerSegments} locale="zh" />
+    </>
+  );
 }

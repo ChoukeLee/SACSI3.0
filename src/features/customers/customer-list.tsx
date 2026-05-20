@@ -7,6 +7,7 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { CustomerRow } from "@/types/database";
 import {
   createCustomer,
@@ -17,15 +18,21 @@ import {
 
 interface CustomerListProps {
   customers: CustomerRow[];
+  customerSegments?: {
+    leaseCustomerIds: string[];
+    saleCustomerIds: string[];
+    dailyCustomerIds: string[];
+  };
   locale: Locale;
 }
 
 type FormMode = { type: "add" } | { type: "edit"; customer: CustomerRow } | null;
+type CustomerSegment = "core" | "daily" | "blacklisted" | "all";
 
-export function CustomerList({ customers, locale }: CustomerListProps) {
+export function CustomerList({ customers, customerSegments, locale }: CustomerListProps) {
   const t = dictionaries[locale].customers;
   const [search, setSearch] = useState("");
-  const [showBlacklistedOnly, setShowBlacklistedOnly] = useState(false);
+  const [segment, setSegment] = useState<CustomerSegment>("core");
   const [formMode, setFormMode] = useState<FormMode>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [blacklistPanelId, setBlacklistPanelId] = useState<string | null>(null);
@@ -46,13 +53,30 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
   const [blError, setBlError] = useState("");
   const [blSaving, setBlSaving] = useState(false);
 
+  const segmentSets = useMemo(() => {
+    const lease = new Set(customerSegments?.leaseCustomerIds ?? []);
+    const sale = new Set(customerSegments?.saleCustomerIds ?? []);
+    const daily = new Set(customerSegments?.dailyCustomerIds ?? []);
+    const core = new Set([...lease, ...sale]);
+    return { lease, sale, daily, core };
+  }, [customerSegments]);
+
+  const stats = useMemo(() => ({
+    core: customers.filter((c) => segmentSets.core.has(c.id)).length,
+    daily: customers.filter((c) => segmentSets.daily.has(c.id) && !segmentSets.core.has(c.id)).length,
+    blacklisted: customers.filter((c) => c.is_blacklisted).length,
+    all: customers.length,
+  }), [customers, segmentSets]);
+
   const filtered = useMemo(() => {
     return customers.filter((c) => {
-      if (showBlacklistedOnly && !c.is_blacklisted) return false;
+      if (segment === "core" && !segmentSets.core.has(c.id)) return false;
+      if (segment === "daily" && (!segmentSets.daily.has(c.id) || segmentSets.core.has(c.id))) return false;
+      if (segment === "blacklisted" && !c.is_blacklisted) return false;
       if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
-  }, [customers, search, showBlacklistedOnly]);
+  }, [customers, search, segment, segmentSets]);
 
   const selected = selectedId ? customers.find((c) => c.id === selectedId) : null;
 
@@ -160,10 +184,36 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
   const isBlacklistOpen = blacklistPanelId !== null;
 
   return (
-    <div>
+    <div className="space-y-5">
+      <div className="grid gap-3 md:grid-cols-4">
+        <CustomerStat label={locale === "zh" ? "长期/购房客户" : "Clients stables"} value={stats.core} tone="slate" />
+        <CustomerStat label={locale === "zh" ? "仅日租住客" : "Sejour court"} value={stats.daily} tone="sky" />
+        <CustomerStat label={t.blacklist.title} value={stats.blacklisted} tone="rose" />
+        <CustomerStat label={locale === "zh" ? "客户总数" : "Total"} value={stats.all} tone="emerald" />
+      </div>
+
       {/* Toolbar */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-natural xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          {([
+            ["core", locale === "zh" ? "长期/购房" : "Stable", stats.core],
+            ["daily", locale === "zh" ? "日租住客" : "Journalier", stats.daily],
+            ["blacklisted", t.blacklist.title, stats.blacklisted],
+            ["all", locale === "zh" ? "全部" : "Tous", stats.all],
+          ] as const).map(([key, label, count]) => (
+            <button
+              key={key}
+              onClick={() => setSegment(key)}
+              className={cn(
+                "rounded-xl px-3 py-2 text-xs font-bold transition",
+                segment === key
+                  ? "bg-slate-950 text-white shadow-sm"
+                  : "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-white",
+              )}
+            >
+              {label} <span className="ml-1 tabular-nums opacity-70">{count}</span>
+            </button>
+          ))}
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-brand-ink-300" />
             <input
@@ -171,35 +221,28 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
               placeholder={t.searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-56 rounded border border-brand-warm-400 bg-white py-1.5 pl-8 pr-3 text-sm text-brand-ink-600 placeholder:text-brand-ink-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30"
+              className="h-9 w-64 rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
             />
           </div>
-          <label className="flex items-center gap-1.5 text-xs font-medium text-brand-ink-500">
-            <input
-              type="checkbox"
-              checked={showBlacklistedOnly}
-              onChange={(e) => setShowBlacklistedOnly(e.target.checked)}
-              className="h-3.5 w-3.5 rounded border-brand-warm-400 text-brand-red-600 focus:ring-brand-red-500"
-            />
-            {t.blacklist.title}
-          </label>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             disabled
-            className="inline-flex items-center gap-1.5 rounded-lg border border-brand-warm-400 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink-300"
             title={t.actions.mergePlaceholder}
           >
             <GitMerge className="h-3.5 w-3.5" />
             {t.actions.merge}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={openAdd}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-[100ms] hover:bg-brand-ink-700 active:scale-[0.98]"
+            variant="primary"
+            size="sm"
           >
             <Plus className="h-3.5 w-3.5" />
             {t.actions.add}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -225,7 +268,7 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-natural">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-natural">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="border-b border-brand-warm-400 bg-brand-warm-50 text-[11px] font-semibold uppercase tracking-wider text-brand-ink-500">
               <tr>
@@ -566,6 +609,22 @@ export function CustomerList({ customers, locale }: CustomerListProps) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function CustomerStat({ label, value, tone }: { label: string; value: number; tone: "slate" | "sky" | "rose" | "emerald" }) {
+  const toneClass = {
+    slate: "border-slate-200 bg-white text-slate-950",
+    sky: "border-sky-200 bg-sky-50 text-sky-900",
+    rose: "border-rose-200 bg-rose-50 text-rose-900",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  }[tone];
+
+  return (
+    <div className={cn("rounded-2xl border p-4 shadow-natural", toneClass)}>
+      <p className="text-xs font-bold text-slate-500">{label}</p>
+      <p className="mt-2 text-2xl font-black tabular-nums">{value}</p>
     </div>
   );
 }
