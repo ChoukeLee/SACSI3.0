@@ -58,23 +58,23 @@ interface Props {
   locale: Locale;
 }
 
-// ── Status visual system — bg tint · left-accent border · text weight ──
-// Visual weight: sold + dailyOccupied = heavier (ring-inset),
-//                leased + reserved = medium, cleaning + available = light.
-// bg:  room cell face    dot: legend swatch    pill: summary badge
+// ── Status visual system — earth-tone Natural palette ─────────────────
+// Inspired by warm paper, clay, stone, moss, and sand.
+// Heavier statuses (sold, daily) use ring-inset for depth.
+// bg: room cell  dot: legend  pill: summary badge  ring: inset depth
 
 const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string; ring: string }> = {
   sold: {
-    bg:   "bg-slate-100 text-slate-700 border-l-slate-400",
-    dot:  "bg-slate-500",
-    pill: "bg-slate-100 text-slate-700 border-slate-300",
-    ring: "ring-1 ring-inset ring-slate-200",
+    bg:   "bg-stone-100 text-stone-700 border-l-stone-400",
+    dot:  "bg-stone-500",
+    pill: "bg-stone-100 text-stone-700 border-stone-300",
+    ring: "ring-1 ring-inset ring-stone-200",
   },
   leased: {
-    bg:   "bg-sky-50 text-sky-700 border-l-sky-400",
-    dot:  "bg-sky-500",
-    pill: "bg-sky-50 text-sky-700 border-sky-200",
-    ring: "ring-1 ring-inset ring-sky-200",
+    bg:   "bg-brand-warm-200 text-brand-ink-600 border-l-brand-warm-500",
+    dot:  "bg-brand-warm-500",
+    pill: "bg-brand-warm-100 text-brand-ink-600 border-brand-warm-300",
+    ring: "ring-1 ring-inset ring-brand-warm-300",
   },
   dailyOccupied: {
     bg:   "bg-brand-orange-100 text-brand-orange-800 border-l-brand-orange-500",
@@ -89,21 +89,21 @@ const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string; r
     ring: "",
   },
   cleaningPending: {
-    bg:   "bg-teal-50 text-teal-700 border-l-teal-400",
-    dot:  "bg-teal-500",
-    pill: "bg-teal-50 text-teal-700 border-teal-200",
+    bg:   "bg-brand-green-50 text-brand-green-700 border-l-brand-green-400",
+    dot:  "bg-brand-green-500",
+    pill: "bg-brand-green-50 text-brand-green-700 border-brand-green-200",
     ring: "",
   },
   maintenance: {
-    bg:   "bg-rose-100 text-rose-700 border-l-rose-500",
-    dot:  "bg-rose-500",
-    pill: "bg-rose-100 text-rose-700 border-rose-300",
+    bg:   "bg-brand-red-50 text-brand-red-700 border-l-brand-red-400",
+    dot:  "bg-brand-red-500",
+    pill: "bg-brand-red-50 text-brand-red-700 border-brand-red-200",
     ring: "",
   },
   available: {
-    bg:   "bg-emerald-50 text-emerald-700 border-l-emerald-400",
-    dot:  "bg-emerald-500",
-    pill: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    bg:   "bg-brand-green-100 text-brand-green-800 border-l-brand-green-500",
+    dot:  "bg-brand-green-500",
+    pill: "bg-brand-green-100 text-brand-green-800 border-brand-green-300",
     ring: "",
   },
 };

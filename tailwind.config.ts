@@ -89,6 +89,7 @@ const config: Config = {
         "card": "0 1px 3px 0 rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04)",
         "panel": "0 8px 32px 0 rgba(0,0,0,0.06), 0 0 0 0.5px rgba(0,0,0,0.04)",
         "dropdown": "0 4px 16px 0 rgba(0,0,0,0.05), 0 0 0 0.5px rgba(0,0,0,0.04)",
+        "natural": "0 1px 2px 0 rgba(89,67,41,0.04), 0 2px 6px 0 rgba(89,67,41,0.03)",
       },
       borderRadius: {
         "sm": "6px",
