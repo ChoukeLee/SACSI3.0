@@ -58,17 +58,47 @@ interface Props {
   locale: Locale;
 }
 
-// ── Status color map for room matrix ───────────────────────────────────
-// bg: cell face, dot: legend swatch, pill: status-count badge
+// ── Status colour map — light tint + coloured border + dark label ──────
+// bg: room cell (light background, coloured left border, ink text)
+// dot: legend swatch (solid square)
+// pill: status-count badge in summary row
 
 const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string }> = {
-  sold:             { bg: "bg-brand-ink-800 text-white border-brand-ink-700",          dot: "bg-brand-ink-700",    pill: "bg-brand-ink-500 text-white" },
-  leased:           { bg: "bg-indigo-600 text-white border-indigo-500",                dot: "bg-indigo-500",       pill: "bg-indigo-100 text-indigo-800" },
-  dailyOccupied:    { bg: "bg-brand-orange-500 text-white border-brand-orange-400",    dot: "bg-brand-orange-500",  pill: "bg-brand-orange-100 text-brand-orange-800" },
-  reserved:         { bg: "bg-amber-500 text-white border-amber-400",                  dot: "bg-amber-500",        pill: "bg-amber-100 text-amber-800" },
-  cleaningPending:  { bg: "bg-brand-sky-500 text-white border-brand-sky-400",          dot: "bg-brand-sky-600",    pill: "bg-brand-sky-100 text-brand-sky-700" },
-  maintenance:      { bg: "bg-brand-red-500 text-white border-brand-red-400",          dot: "bg-brand-red-500",    pill: "bg-brand-red-100 text-brand-red-700" },
-  available:        { bg: "bg-brand-green-600 text-white border-brand-green-500",      dot: "bg-brand-green-600",  pill: "bg-brand-green-100 text-brand-green-700" },
+  sold: {
+    bg: "bg-stone-100 text-stone-700 border-l-stone-400",
+    dot: "bg-stone-500",
+    pill: "bg-stone-100 text-stone-700 border-stone-300",
+  },
+  leased: {
+    bg: "bg-blue-50 text-blue-700 border-l-blue-400",
+    dot: "bg-blue-500",
+    pill: "bg-blue-50 text-blue-700 border-blue-200",
+  },
+  dailyOccupied: {
+    bg: "bg-brand-orange-50 text-brand-orange-700 border-l-brand-orange-400",
+    dot: "bg-brand-orange-500",
+    pill: "bg-brand-orange-50 text-brand-orange-700 border-brand-orange-200",
+  },
+  reserved: {
+    bg: "bg-amber-50 text-amber-700 border-l-amber-400",
+    dot: "bg-amber-500",
+    pill: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+  cleaningPending: {
+    bg: "bg-cyan-50 text-cyan-700 border-l-cyan-400",
+    dot: "bg-cyan-500",
+    pill: "bg-cyan-50 text-cyan-700 border-cyan-200",
+  },
+  maintenance: {
+    bg: "bg-rose-50 text-rose-700 border-l-rose-400",
+    dot: "bg-rose-500",
+    pill: "bg-rose-50 text-rose-700 border-rose-200",
+  },
+  available: {
+    bg: "bg-emerald-50 text-emerald-700 border-l-emerald-400",
+    dot: "bg-emerald-500",
+    pill: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
 };
 
 function firstNumber(value: string | null | undefined): number | null {
@@ -414,7 +444,9 @@ export function ManagementDashboard({
                               key={s.unit.id}
                               href={routeFor(locale, `/units/${s.unit.id}`)}
                               className={cn(
-                                "flex h-9 w-9 items-center justify-center rounded-md border-2 font-mono text-[11px] font-bold leading-none",
+                                "flex h-9 w-9 items-center justify-center rounded-r-md rounded-l-md",
+                                "border border-brand-warm-200 border-l-[3px]",
+                                "font-mono text-[11px] font-bold leading-none",
                                 "shadow-sm transition-all duration-150",
                                 "hover:-translate-y-0.5 hover:shadow-md active:scale-95",
                                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange",
