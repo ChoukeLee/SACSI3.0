@@ -8,7 +8,7 @@
   --safe-top: env(safe-area-inset-top, 0px);
 
   /* Design tokens — mirrors tailwind.config.ts brand palette */
-  --color-bg: #F9F7F3;
+  --color-bg: #F4F6FA;
   --color-surface: #FFFFFF;
   --color-border: #E6E4DA;
   --color-border-light: #EFEEE8;
@@ -38,13 +38,15 @@
 
 body {
   min-height: 100dvh;
-  background: var(--color-bg);
+  background:
+    radial-gradient(circle at 12% -8%, rgba(201,111,45,0.08), transparent 28rem),
+    linear-gradient(180deg, #F8FAFC 0%, var(--color-bg) 42%, #F1F4F8 100%);
   color: var(--color-text);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 ::selection {
@@ -63,9 +65,10 @@ body {
 }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #C8C3B7; border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
 
 @layer components {
   .scroll-hint-x {
@@ -83,19 +86,19 @@ body {
     @apply w-full text-left;
   }
   .data-table thead {
-    @apply border-b border-brand-warm-300;
+    @apply border-b border-slate-200 bg-slate-50/80;
   }
   .data-table th {
-    @apply px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-brand-ink-400;
+    @apply px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500;
   }
   .data-table td {
-    @apply px-3 py-2.5 text-[13px] text-brand-ink-700 border-b border-brand-warm-100;
+    @apply border-b border-slate-100 px-3 py-2.5 text-[13px] text-slate-700;
   }
   .data-table tbody tr {
     @apply transition-colors duration-fast;
   }
   .data-table tbody tr:hover {
-    @apply bg-brand-warm-50;
+    @apply bg-orange-50/40;
   }
   .data-table .num {
     @apply tabular-nums text-right;
@@ -103,16 +106,28 @@ body {
 
   /* Shared stat card — no side-stripe, uses top-border instead */
   .stat-card {
-    @apply rounded-xl border border-brand-warm-300 bg-white shadow-natural px-5 py-4;
+    @apply rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-natural;
   }
   .stat-card .stat-label {
-    @apply text-[11px] font-medium uppercase tracking-wider text-brand-ink-400;
+    @apply text-[11px] font-semibold uppercase tracking-wider text-slate-500;
   }
   .stat-card .stat-value {
-    @apply mt-1.5 text-[26px] font-semibold tracking-tight text-brand-ink-900 tabular-nums;
+    @apply mt-1.5 text-2xl font-bold tracking-tight text-slate-950 tabular-nums;
   }
   .stat-card .stat-caption {
-    @apply mt-1.5 text-[13px] text-brand-ink-400;
+    @apply mt-1.5 text-[13px] text-slate-500;
+  }
+
+  .surface-panel {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-natural;
+  }
+
+  .filter-chip {
+    @apply rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50;
+  }
+
+  .page-rule {
+    @apply border-b border-slate-200;
   }
 
   /* Page section spacing */

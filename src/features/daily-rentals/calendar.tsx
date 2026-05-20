@@ -23,9 +23,9 @@ interface CalendarProps {
 
 const MAINTENANCE_STATUSES = new Set(["available", "reserved", "daily_occupied", "cleaning_pending"]);
 
-const EMPTY_CELL = "group flex h-11 cursor-pointer items-center justify-center border-b border-r border-brand-warm-400 transition-colors duration-fast hover:bg-brand-orange-50 focus-visible:bg-brand-orange-50 focus-visible:outline-none";
+const EMPTY_CELL = "group flex h-11 cursor-pointer items-center justify-center border-b border-r border-slate-200 bg-white transition-colors duration-fast hover:bg-orange-50 focus-visible:bg-orange-50 focus-visible:outline-none";
 
-const NAV_BTN = "rounded-lg border border-brand-warm-400 bg-white p-2 text-brand-ink-500 transition-all duration-fast hover:bg-brand-warm-50 hover:text-brand-ink-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange";
+const NAV_BTN = "rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition-all duration-fast hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange";
 
 export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers, cleaningTasks, payments, locale }: CalendarProps) {
   const t = dictionaries[locale].dailyRentals;
@@ -120,12 +120,12 @@ export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers,
   return (
     <div>
       {/* Month navigation */}
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-natural">
         <div className="flex items-center gap-2">
           <button onClick={() => goToMonth(-1)} className={NAV_BTN} aria-label={t.calendar.prevMonth}><ChevronLeft className="h-4 w-4" /></button>
-          <h3 className="text-base font-bold text-brand-ink-900">{monthLabel}</h3>
+          <h3 className="text-base font-bold text-slate-950">{monthLabel}</h3>
           <button onClick={() => goToMonth(1)} className={NAV_BTN} aria-label={t.calendar.nextMonth}><ChevronRight className="h-4 w-4" /></button>
-          <button onClick={goToToday} className="rounded-lg border border-brand-warm-400 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink-500 transition-all duration-fast hover:bg-brand-warm-50 focus-visible:outline-2 focus-visible:outline-brand-orange">{t.calendar.today}</button>
+          <button onClick={goToToday} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 shadow-sm transition-all duration-fast hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-brand-orange">{t.calendar.today}</button>
         </div>
         <div className="hidden items-center gap-3 text-xs text-brand-ink-500 sm:flex">
           <Legend color="bg-brand-green-100" label={t.calendar.legendAvailable} />
@@ -137,7 +137,7 @@ export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers,
       </div>
 
       {/* Quick stats bar — today snapshot */}
-      <div className="mb-4 grid grid-cols-3 sm:grid-cols-6 gap-2">
+      <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
         <QuickStat label={locale === "zh" ? "今日到达" : "Arrivees"} value={todayStats.arriving} color="text-brand-sky-700" bg="bg-brand-sky-50 border-brand-sky-200" />
         <QuickStat label={locale === "zh" ? "今日离开" : "Departs"} value={todayStats.departing} color="text-brand-amber-700" bg="bg-brand-amber-50 border-brand-amber-200" />
         <QuickStat label={locale === "zh" ? "占用中" : "Occupes"} value={todayStats.occupied} color="text-brand-orange-700" bg="bg-brand-orange-50 border-brand-orange-200" />
@@ -147,20 +147,20 @@ export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers,
       </div>
 
       {/* Calendar grid */}
-      <div className="overflow-auto rounded-xl border border-brand-warm-300 bg-white shadow-natural scroll-hint-x" style={{ maxHeight: "calc(100vh - 200px)" }} data-scroll-x>
+      <div className="scroll-hint-x overflow-auto rounded-2xl border border-slate-200 bg-white shadow-natural" style={{ maxHeight: "calc(100vh - 220px)" }} data-scroll-x>
         <div className="grid" style={{ gridTemplateColumns: `64px repeat(${daysInMonth.length}, 64px)` }} role="grid" aria-label={t.calendar.room}>
           {/* Header row */}
-          <div className="sticky left-0 top-0 z-30 flex h-8 items-center justify-center border-b border-r border-brand-warm-400 bg-brand-warm-100 text-[10px] font-semibold uppercase tracking-wider text-brand-ink-400" role="columnheader">{t.calendar.room}</div>
+          <div className="sticky left-0 top-0 z-30 flex h-9 items-center justify-center border-b border-r border-slate-200 bg-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-500" role="columnheader">{t.calendar.room}</div>
           {daysInMonth.map(date => {
             const dateStr = toDateStr(date);
             const isToday = dateStr === todayStr;
             const isWeekend = date.getDay() === 0 || date.getDay() === 6;
             return (
               <div key={dateStr} className={cn(
-                "sticky top-0 z-20 flex h-8 flex-col items-center justify-center border-b border-r border-brand-warm-400 text-[10px]",
-                isToday && "bg-brand-orange-50 font-bold text-brand-orange-700",
-                isWeekend && !isToday && "bg-brand-warm-50 text-brand-ink-300",
-                !isToday && !isWeekend && "bg-white text-brand-ink-500"
+                "sticky top-0 z-20 flex h-9 flex-col items-center justify-center border-b border-r border-slate-200 text-[10px]",
+                isToday && "bg-orange-50 font-bold text-orange-700",
+                isWeekend && !isToday && "bg-slate-50 text-slate-400",
+                !isToday && !isWeekend && "bg-white text-slate-600"
               )} role="columnheader">
                 <span>{date.getDate()}</span>
                 <span className="text-[8px] opacity-60">{date.toLocaleDateString(localeStr, { weekday: "short" })}</span>
@@ -174,7 +174,7 @@ export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers,
             const hasCleaning = unitCleaningMap.get(unit.id) === true;
             return (
             <div key={unit.id} className="contents" role="row">
-              <div className="sticky left-0 z-10 flex h-11 items-center justify-center border-b border-r border-brand-warm-400 bg-brand-warm-50 text-xs font-semibold text-brand-ink-900" role="rowheader">{unit.unit_no}</div>
+              <div className="sticky left-0 z-10 flex h-11 items-center justify-center border-b border-r border-slate-200 bg-slate-50 text-xs font-bold text-slate-950" role="rowheader">{unit.unit_no}</div>
               {daysInMonth.map(date => {
                 const dateStr = toDateStr(date);
                 const booking = unitBM?.get(dateStr) ?? null;
@@ -182,7 +182,7 @@ export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers,
 
                 // 1. Maintenance / locked
                 if (isMaintenance) {
-                  return <div key={dateStr} className="flex h-11 items-center justify-center border-b border-r border-brand-warm-400 bg-brand-red-50 text-[9px] font-medium text-brand-red-600" title={statusLabels[unit.status as UnitStatus]} role="gridcell">{statusLabels[unit.status as UnitStatus]?.slice(0, 2)}</div>;
+                  return <div key={dateStr} className="flex h-11 items-center justify-center border-b border-r border-slate-200 bg-red-50 text-[9px] font-bold text-red-600" title={statusLabels[unit.status as UnitStatus]} role="gridcell">{statusLabels[unit.status as UnitStatus]?.slice(0, 2)}</div>;
                 }
 
                 // 2. Active booking
@@ -193,7 +193,7 @@ export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers,
                   const abbr = abbrMap.get(booking.customer_id) ?? "?";
                   return (
                     <div key={dateStr}
-                      className={`flex h-11 items-center justify-center text-[10px] font-medium cursor-pointer border-b border-r border-brand-warm-400 active:opacity-80 ${colorClass} ${isStart ? "rounded-l" : ""} ${isEnd ? "rounded-r" : ""}`}
+                      className={`flex h-11 items-center justify-center border-b border-r border-slate-200 text-[10px] font-bold cursor-pointer active:opacity-80 ${colorClass} ${isStart ? "rounded-l" : ""} ${isEnd ? "rounded-r" : ""}`}
                       onClick={() => { setSelectedBookingId(booking.id); setNewBookingUnitId(null); setNewBookingDate(null); }}
                       title={isStart ? `${abbr} — ${booking.check_in} → ${booking.checkout_mode === "open" ? "?" : booking.check_out}` : abbr}
                       role="gridcell" tabIndex={0} aria-label={`${abbr} ${booking.check_in}`}
@@ -208,7 +208,7 @@ export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers,
                 if (booking && booking.status === "checked_out") {
                   return (
                     <div key={dateStr}
-                      className="flex h-11 items-center justify-center text-[10px] cursor-pointer border-b border-r border-brand-warm-400 bg-brand-warm-50 text-brand-ink-300"
+                      className="flex h-11 cursor-pointer items-center justify-center border-b border-r border-slate-200 bg-slate-50 text-[10px] text-slate-400"
                       onClick={() => { setSelectedBookingId(booking.id); setNewBookingUnitId(null); setNewBookingDate(null); }}
                       role="gridcell" tabIndex={0}
                       onKeyDown={e => { if (e.key === "Enter") { setSelectedBookingId(booking.id); setNewBookingUnitId(null); setNewBookingDate(null); } }}
@@ -220,7 +220,7 @@ export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers,
 
                 // 4. Cleaning pending (no active booking)
                 if (hasCleaning || unit.status === "cleaning_pending") {
-                  return <div key={dateStr} className="flex h-11 items-center justify-center border-b border-r border-brand-warm-400 bg-brand-sky-50 text-[9px] font-medium text-brand-sky-600" title={t.cleaning.pending} role="gridcell">{t.cleaning.pending.slice(0, 2)}</div>;
+                  return <div key={dateStr} className="flex h-11 items-center justify-center border-b border-r border-slate-200 bg-cyan-50 text-[9px] font-bold text-cyan-700" title={t.cleaning.pending} role="gridcell">{t.cleaning.pending.slice(0, 2)}</div>;
                 }
 
                 // 5. Available
@@ -257,7 +257,7 @@ export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers,
 
 function QuickStat({ label, value, color, bg }: { label: string; value: number; color: string; bg: string }) {
   return (
-    <div className={cn("rounded-lg border px-3 py-2 text-center", bg)}>
+    <div className={cn("rounded-2xl border px-3 py-2 text-center shadow-sm", bg)}>
       <p className="text-[10px] font-semibold uppercase tracking-wider opacity-70">{label}</p>
       <p className={cn("mt-0.5 text-lg font-bold tabular-nums", color)}>{value}</p>
     </div>

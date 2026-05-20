@@ -93,20 +93,20 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-brand-warm-400 bg-white shadow-natural">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-natural">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
+            <table className="data-table min-w-[760px] text-sm">
               <thead>
-                <tr className="border-b border-brand-warm-400 bg-brand-warm-50">
+                <tr>
                   {t.headers.map((h) => (
-                    <th key={h} className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-brand-ink-500">
+                    <th key={h} className="px-4 py-3">
                       {h}
                     </th>
                   ))}
                   <th className="sr-only px-4 py-3">{t.actions.viewDetail}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-brand-warm-400">
+              <tbody>
                 {filtered.map((unit) => {
                   const flags = businessFlagsMap[unit.id] ?? [];
                   const enabledFlags = flags.filter((f) => f.is_enabled);
@@ -117,22 +117,22 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
                       tabIndex={0}
                       role="button"
                       aria-label={`${unit.unit_no} — ${t.actions.viewDetail}`}
-                      className="cursor-pointer transition-colors duration-fast hover:bg-brand-orange-50/40 focus-visible:bg-brand-orange-50/60 focus-visible:outline-none"
+                      className="cursor-pointer transition-colors duration-fast hover:bg-orange-50/60 focus-visible:bg-orange-50/70 focus-visible:outline-none"
                       onClick={() => setDetailUnitId(unit.id)}
                       onKeyDown={(e) => { if (e.key === "Enter") setDetailUnitId(unit.id); }}
                     >
                       <td className="px-4 py-3">
-                        <span className="font-mono text-sm font-semibold text-brand-ink-900">{unit.unit_no}</span>
+                        <span className="font-mono text-sm font-bold text-slate-950">{unit.unit_no}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-brand-ink-500">{unit.floor_label}</td>
-                      <td className="px-4 py-3 text-sm text-brand-ink-500">{t.kinds[unit.kind]}</td>
+                      <td className="px-4 py-3 text-sm text-slate-500">{unit.floor_label}</td>
+                      <td className="px-4 py-3 text-sm text-slate-500">{t.kinds[unit.kind]}</td>
                       <td className="px-4 py-3">
                         <StatusBadge status={unit.status} locale={locale} />
                       </td>
-                      <td className="px-4 py-3 text-sm text-brand-ink-500">
+                      <td className="px-4 py-3 text-sm text-slate-500">
                         {enabledFlags.map((f) => t.businessTypes[f.business_type]).join(" / ") || "-"}
                       </td>
-                      <td className="px-4 py-3 text-sm tabular-nums text-brand-ink-500">
+                      <td className="px-4 py-3 text-sm tabular-nums text-slate-500">
                         {dailyFlag?.default_price_xof != null
                           ? Number(dailyFlag.default_price_xof).toLocaleString()
                           : "-"}
@@ -142,12 +142,12 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
                           <Link
                             href={routeFor(locale, `/units/${unit.id}`)}
                             onClick={e => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 rounded bg-brand-ink-900 px-2 py-1 text-[10px] font-semibold text-white hover:bg-brand-ink-700"
+                            className="inline-flex items-center gap-1 rounded-lg bg-slate-950 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-sm hover:bg-slate-800"
                           >
                             <Eye className="h-3 w-3" />
                             {locale === "zh" ? "档案" : "Profil"}
                           </Link>
-                          <span className="text-xs font-medium text-brand-orange-500 transition-colors duration-fast group-hover:underline">
+                          <span className="text-xs font-semibold text-orange-600 transition-colors duration-fast group-hover:underline">
                             {t.actions.viewDetail} →
                           </span>
                         </div>

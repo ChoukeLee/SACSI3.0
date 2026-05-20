@@ -240,15 +240,15 @@ function resolveCalendarCheckOut(
 export function getBookingColorClass(booking: DailyBookingRow): string {
   // Aligned with Natural Professional STATUS_CELL earth-tone palette
   if (booking.status === "checked_in") {
-    return "bg-brand-orange-100 text-brand-orange-800";
+    return "bg-orange-500 text-white";
   }
   if (booking.status === "confirmed" || booking.status === "pending_review") {
-    return "bg-amber-100 text-amber-800";
+    return "bg-sky-500 text-white";
   }
   if (booking.status === "checked_out") {
-    return "bg-brand-warm-100 text-brand-ink-500";
+    return "bg-slate-100 text-slate-500";
   }
-  return "bg-brand-warm-50 text-brand-ink-300";
+  return "bg-slate-50 text-slate-400";
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────

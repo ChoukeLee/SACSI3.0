@@ -133,7 +133,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
     URL.revokeObjectURL(url);
   };
 
-  const filterBtn = "rounded-lg border border-brand-warm-400 px-2.5 py-1 text-[11px] font-medium transition-all duration-fast bg-white";
+  const filterBtn = "rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 shadow-sm transition-all duration-fast hover:border-slate-300 hover:bg-slate-50";
 
   const resolveBuildingName = (r: ReceivableRow) => {
     const bid = r.building_id ?? unitBuildingMap.get(r.unit_id ?? "") ?? null;
@@ -157,7 +157,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
       </div>
 
       {/* Filters */}
-      <div className="mb-4 flex flex-wrap gap-2 items-center">
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-natural">
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={filterBtn}>
           <option value="all">{t.filters.status}: {t.filters.all}</option>
           {Object.entries(t.statuses).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -187,11 +187,11 @@ export function ReceivableList({ receivables, units, customers, buildings, local
         <button
           onClick={handleExportCsv}
           disabled={filtered.length === 0}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-brand-warm-400 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink-600 hover:bg-brand-warm-50 disabled:opacity-40"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-950 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-slate-800 disabled:opacity-40"
         >
           <Download className="h-3.5 w-3.5" />{t.export.csv}
         </button>
-        <span className="text-xs text-brand-ink-300">
+        <span className="text-xs font-semibold text-slate-400">
           {filtered.length} {locale === "zh" ? "条" : "lignes"}
         </span>
       </div>
@@ -200,10 +200,10 @@ export function ReceivableList({ receivables, units, customers, buildings, local
       {filtered.length === 0 ? (
         <Card variant="subtle" className="py-10 text-center text-sm text-brand-ink-300">{t.empty}</Card>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-brand-warm-300 bg-white shadow-natural">
-          <table className="w-full min-w-[900px] text-left text-xs">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-natural">
+          <table className="data-table min-w-[900px] text-xs">
             <thead>
-              <tr className="border-b border-brand-warm-400 bg-brand-warm-50">
+              <tr>
                 <th className="px-2 py-2.5 text-[10px] font-semibold uppercase text-brand-ink-400">{t.columns.dueDate}</th>
                 <th className="px-2 py-2.5 text-[10px] font-semibold uppercase text-brand-ink-400">{t.columns.building}</th>
                 <th className="px-2 py-2.5 text-[10px] font-semibold uppercase text-brand-ink-400">{t.columns.unit}</th>

@@ -93,11 +93,12 @@ const config: Config = {
         },
       },
       boxShadow: {
-        "soft": "0 1px 2px 0 rgba(0,0,0,0.03)",
-        "card": "0 1px 3px 0 rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04)",
-        "panel": "0 8px 32px 0 rgba(0,0,0,0.06), 0 0 0 0.5px rgba(0,0,0,0.04)",
-        "dropdown": "0 4px 16px 0 rgba(0,0,0,0.05), 0 0 0 0.5px rgba(0,0,0,0.04)",
-        "natural": "0 1px 2px 0 rgba(89,67,41,0.04), 0 2px 6px 0 rgba(89,67,41,0.03)",
+        "soft": "0 1px 2px 0 rgba(15,23,42,0.05)",
+        "card": "0 1px 2px rgba(15,23,42,0.05), 0 10px 28px -24px rgba(15,23,42,0.35)",
+        "panel": "0 20px 48px -24px rgba(15,23,42,0.32), 0 0 0 1px rgba(15,23,42,0.04)",
+        "dropdown": "0 12px 28px -18px rgba(15,23,42,0.28), 0 0 0 1px rgba(15,23,42,0.05)",
+        "natural": "0 1px 2px rgba(15,23,42,0.05), 0 14px 34px -30px rgba(89,67,41,0.45)",
+        "lifted": "0 18px 44px -34px rgba(15,23,42,0.45)",
       },
       borderRadius: {
         "sm": "6px",
