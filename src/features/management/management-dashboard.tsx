@@ -58,52 +58,59 @@ interface Props {
   locale: Locale;
 }
 
-// ── Status visual system — earth-tone Natural palette ─────────────────
-// Inspired by warm paper, clay, stone, moss, and sand.
-// Heavier statuses (sold, daily) use ring-inset for depth.
+// ── Status visual system — operational state map ─────────────────────
+// Room cells are operational identifiers, not decorative elements.
+// Each status has a distinct, scannable background colour at 200-300 level.
+// sold: warm stone gray (permanent, no action)
+// leased: warm clay/earth (occupied long-term)
+// dailyOccupied: terracotta orange (active use)
+// reserved: muted gold (pending arrival)
+// cleaningPending: steel blue (service required)
+// maintenance: rust red (blocked)
+// available: moss green (ready for use)
 // bg: room cell  dot: legend  pill: summary badge  ring: inset depth
 
 const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string; ring: string }> = {
   sold: {
-    bg:   "bg-stone-100 text-stone-700",
+    bg:   "bg-stone-300 text-stone-700",
     dot:  "bg-stone-500",
-    pill: "bg-stone-100 text-stone-700 border-stone-300",
-    ring: "ring-1 ring-inset ring-stone-200",
+    pill: "bg-stone-200 text-stone-700 border-stone-300",
+    ring: "",
   },
   leased: {
-    bg:   "bg-brand-warm-200 text-brand-ink-600",
+    bg:   "bg-brand-warm-300 text-brand-ink-800",
     dot:  "bg-brand-warm-500",
-    pill: "bg-brand-warm-100 text-brand-ink-600 border-brand-warm-300",
-    ring: "ring-1 ring-inset ring-brand-warm-300",
+    pill: "bg-brand-warm-200 text-brand-ink-700 border-brand-warm-300",
+    ring: "",
   },
   dailyOccupied: {
-    bg:   "bg-brand-orange-100 text-brand-orange-800",
+    bg:   "bg-brand-orange-200 text-brand-orange-800",
     dot:  "bg-brand-orange-500",
-    pill: "bg-brand-orange-100 text-brand-orange-800 border-brand-orange-300",
-    ring: "ring-1 ring-inset ring-brand-orange-200",
+    pill: "bg-brand-orange-200 text-brand-orange-800 border-brand-orange-300",
+    ring: "ring-1 ring-inset ring-brand-orange-300/40",
   },
   reserved: {
-    bg:   "bg-amber-100 text-amber-800",
+    bg:   "bg-amber-200 text-amber-800",
     dot:  "bg-amber-500",
-    pill: "bg-amber-100 text-amber-800 border-amber-300",
+    pill: "bg-amber-200 text-amber-800 border-amber-300",
     ring: "",
   },
   cleaningPending: {
-    bg:   "bg-brand-green-50 text-brand-green-700",
-    dot:  "bg-brand-green-500",
-    pill: "bg-brand-green-50 text-brand-green-700 border-brand-green-200",
+    bg:   "bg-brand-sky-200 text-brand-sky-800",
+    dot:  "bg-brand-sky-500",
+    pill: "bg-brand-sky-200 text-brand-sky-800 border-brand-sky-200",
     ring: "",
   },
   maintenance: {
-    bg:   "bg-brand-red-50 text-brand-red-700",
+    bg:   "bg-brand-red-200 text-brand-red-700",
     dot:  "bg-brand-red-500",
-    pill: "bg-brand-red-50 text-brand-red-700 border-brand-red-200",
+    pill: "bg-brand-red-200 text-brand-red-700 border-brand-red-200",
     ring: "",
   },
   available: {
-    bg:   "bg-brand-green-100 text-brand-green-800",
+    bg:   "bg-brand-green-200 text-brand-green-700",
     dot:  "bg-brand-green-500",
-    pill: "bg-brand-green-100 text-brand-green-800 border-brand-green-300",
+    pill: "bg-brand-green-200 text-brand-green-700 border-brand-green-300",
     ring: "",
   },
 };
