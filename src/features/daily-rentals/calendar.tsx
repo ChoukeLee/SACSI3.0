@@ -61,11 +61,11 @@ export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers,
     };
   }, [currentMonth]);
 
-  const { todayStr } = dayStrings;
+  const { todayStr, tomorrowStr } = dayStrings;
 
   const bookingMap = useMemo(
-    () => buildBookingMap(bookings, visibleEndExclusiveStr),
-    [bookings, visibleEndExclusiveStr],
+    () => buildBookingMap(bookings, { todayStr, tomorrowStr, visibleEndExclusiveStr }),
+    [bookings, todayStr, tomorrowStr, visibleEndExclusiveStr],
   );
 
   const abbrMap = useMemo(() => {

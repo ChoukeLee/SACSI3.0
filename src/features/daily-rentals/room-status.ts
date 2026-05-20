@@ -129,17 +129,34 @@ export function buildDailyRoomStateMap(params: {
 
 // ── Booking map builder (calendar grid) ─────────────────────────────────
 
+interface BuildBookingMapOptions {
+  todayStr: string;
+  tomorrowStr: string;
+  visibleEndExclusiveStr: string;
+}
+
 /**
  * Build a booking lookup map: unitId → dateStr → booking.
+ *
+ * Calendar visual rules for OPEN bookings (no fixed check_out):
+ *   - checked_in + no actual_check_out → from check_in to TODAY (not beyond)
+ *   - pending_review / confirmed + open → just check_in day (one cell)
+ *   - checked_out + open + actual_check_out → full recorded range
  *
  * Active statuses (checked_in, confirmed, pending_review) are processed
  * LAST so they overwrite inactive ones (checked_out) on overlapping dates.
  * Cancelled bookings are excluded.
+ *
+ * NOTE: this only affects calendar rendering.
+ * Business occupancy (coversDate) is NOT affected — open bookings still
+ * count as occupying indefinitely for conflict detection and overview.
  */
 export function buildBookingMap(
   bookings: DailyBookingRow[],
-  visibleEndExclusiveStr: string,
+  options: BuildBookingMapOptions,
 ): Map<string, Map<string, DailyBookingRow>> {
+  const { todayStr } = options;
+
   const sorted = [...bookings].sort((a, b) => {
     const pa = ACTIVE_PRIORITY[a.status] ?? 0;
     const pb = ACTIVE_PRIORITY[b.status] ?? 0;
@@ -152,11 +169,7 @@ export function buildBookingMap(
     if (b.status === "cancelled") continue;
     if (!map.has(b.unit_id)) map.set(b.unit_id, new Map());
 
-    const checkOut: string =
-      b.checkout_mode === "open"
-        ? (b.actual_check_out ?? visibleEndExclusiveStr)
-        : (b.check_out ?? b.check_in);
-
+    const checkOut: string = resolveCalendarCheckOut(b, options);
     const start = toUtcDate(b.check_in);
     const end = toUtcDate(checkOut);
     if (b.checkout_mode === "fixed") end.setUTCDate(end.getUTCDate() + 1);
@@ -169,6 +182,59 @@ export function buildBookingMap(
   }
 
   return map;
+}
+
+/**
+ * Compute the calendar display end date for a single booking.
+ *
+ * OPEN mode rules (calendar only — does NOT affect coversDate):
+ *   - checked_in + actual_check_out set   → check_in … actual_check_out
+ *   - checked_in + actual_check_out null  → check_in … today (inclusive)
+ *   - pending_review / confirmed + open   → check_in only (one cell)
+ *   - checked_out + open + actual_check_out → full recorded range
+ *   - checked_out + open + no actual      → check_in only (fallback)
+ */
+function resolveCalendarCheckOut(
+  b: DailyBookingRow,
+  opts: BuildBookingMapOptions,
+): string {
+  const { todayStr, visibleEndExclusiveStr } = opts;
+
+  if (b.checkout_mode !== "open") {
+    // Fixed: strictly bounded by check_out
+    return b.check_out ?? b.check_in;
+  }
+
+  // ── Open mode: visual-only rules ──
+
+  // checked_in with actual_check_out → show the recorded range
+  if (b.status === "checked_in" && b.actual_check_out) {
+    return b.actual_check_out;
+  }
+
+  // checked_in without actual_check_out → from check_in to today (inclusive)
+  if (b.status === "checked_in") {
+    // "today" inclusive: we want to show today's cell, so end = tomorrow
+    return b.check_in <= todayStr ? opts.tomorrowStr : b.check_in;
+  }
+
+  // pending_review / confirmed → just the check_in day (one cell)
+  if (b.status === "pending_review" || b.status === "confirmed") {
+    return b.check_in;
+  }
+
+  // checked_out with actual_check_out → recorded range
+  if (b.status === "checked_out" && b.actual_check_out) {
+    return b.actual_check_out;
+  }
+
+  // checked_out without actual → just check_in (one cell, as historical record)
+  if (b.status === "checked_out") {
+    return b.check_in;
+  }
+
+  // Fallback: check_in day only
+  return b.check_in;
 }
 
 export function getBookingColorClass(booking: DailyBookingRow): string {
