@@ -139,8 +139,8 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
   ];
 
   const statBox = (l: string, v: string, a: string) => {
-    const c: Record<string,string>={green:"border-brand-green-500 bg-green-50",red:"border-brand-red-500 bg-red-50",ink:"border-brand-ink-700",orange:"border-brand-orange bg-orange-50"};
-    return <div className={cn("rounded-lg border-l-[3px] border-brand-warm-300 bg-white px-3 py-2.5",c[a]??"")}><p className="text-[10px] text-brand-ink-300">{l}</p><p className="text-sm font-bold tabular-nums text-brand-ink-900">{v}</p></div>;
+    const c: Record<string,string>={green:"bg-brand-green-500",red:"bg-brand-red-500",ink:"bg-brand-ink-700",orange:"bg-brand-orange"};
+    return <div className="rounded-lg border border-brand-warm-300 bg-white shadow-natural overflow-hidden"><div className={cn("h-[3px]",c[a]??"bg-brand-ink-700")} /><div className="px-3 py-2.5"><p className="text-[10px] text-brand-ink-300">{l}</p><p className="text-sm font-bold tabular-nums text-brand-ink-900">{v}</p></div></div>;
   };
 
   return (

@@ -38,6 +38,7 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
   const [endDate, setEndDate] = useState("");
   const [dirFilter, setDirFilter] = useState("all");
   const [catFilter, setCatFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [showNewEntry, setShowNewEntry] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -59,9 +60,16 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
       if (endDate && e.entry_date > endDate) return false;
       if (dirFilter !== "all" && e.direction !== dirFilter) return false;
       if (catFilter !== "all" && e.category !== catFilter) return false;
+      if (search) {
+        const s = search.toLowerCase();
+        const desc = (e.description ?? "").toLowerCase();
+        const unit = units.find(u => u.id === e.unit_id);
+        const unitNo = (unit?.unit_no ?? "").toLowerCase();
+        if (!desc.includes(s) && !unitNo.includes(s)) return false;
+      }
       return true;
     });
-  }, [entries, startDate, endDate, dirFilter, catFilter]);
+  }, [entries, startDate, endDate, dirFilter, catFilter, search, units]);
 
   const summary = useMemo(() => {
     let income = 0;
@@ -148,6 +156,13 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
             <option value="all">{t.filters.category}: {t.filters.all}</option>
             {allCategories.map(c => <option key={c} value={c}>{t.categories[c as keyof typeof t.categories]}</option>)}
           </select>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={locale === "zh" ? "搜索描述/房号..." : "Rechercher description, chambre..."}
+            className="rounded border border-brand-warm-400 px-2.5 py-1.5 text-xs w-48"
+          />
         </div>
         <div className="flex items-center gap-2">
           <button onClick={handleExportCsv} disabled={filtered.length === 0} className="inline-flex items-center gap-1.5 rounded border border-brand-warm-400 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink-600 hover:bg-brand-warm-50 disabled:opacity-40">
@@ -190,10 +205,10 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
                       <span>{t.categories[e.category as keyof typeof t.categories] ?? e.category}</span>
                       {unit && <span className="ml-1 text-brand-ink-300">({unit.unit_no})</span>}
                     </td>
-                    <td className={cn("px-4 py-3 text-sm font-semibold", e.direction === "expense" || e.direction === "liability_out" ? "text-brand-red-700" : "text-brand-green-700")}>
-                      {e.direction === "expense" || e.direction === "liability_out" ? "-" : ""}{Number(e.amount_xof).toLocaleString()}
+                    <td className={cn("px-4 py-3 text-sm font-semibold tabular-nums", e.direction === "expense" || e.direction === "liability_out" ? "text-brand-red-700" : "text-brand-green-700")}>
+                      {e.direction === "expense" || e.direction === "liability_out" ? "-" : ""}{formatXof(Number(e.amount_xof))}
                     </td>
-                    <td className="px-4 py-3 text-sm text-brand-ink-400">{e.amount_cny != null ? Number(e.amount_cny).toLocaleString() : "-"}</td>
+                    <td className="px-4 py-3 text-sm text-brand-ink-400 tabular-nums">{e.amount_cny != null ? Number(e.amount_cny).toLocaleString() : "-"}</td>
                     <td className="px-4 py-3 text-xs text-brand-ink-400 max-w-[200px] truncate">{e.description ?? "-"}</td>
                   </tr>
                 );

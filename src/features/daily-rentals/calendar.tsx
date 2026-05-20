@@ -95,6 +95,24 @@ export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers,
     setCurrentMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   }, []);
 
+  // Quick stats for today
+  const todayStats = useMemo(() => {
+    const today = todayStr;
+    let arriving = 0; let departing = 0; let occupied = 0;
+    for (const unit of dailyUnits) {
+      const unitBM = bookingMap.get(unit.id);
+      const todayBooking = unitBM?.get(today) ?? null;
+      if (todayBooking && todayBooking.status !== "checked_out") {
+        if (todayBooking.check_in === today) arriving++;
+        else if (todayBooking.checkout_mode === "fixed" && todayBooking.check_out === today) departing++;
+        else occupied++;
+      }
+    }
+    const maintenance = dailyUnits.filter(u => !MAINTENANCE_STATUSES.has(u.status)).length;
+    const available = dailyUnits.length - arriving - departing - occupied - maintenance;
+    return { arriving, departing, occupied, maintenance, available, total: dailyUnits.length };
+  }, [dailyUnits, bookingMap, todayStr]);
+
   if (dailyUnits.length === 0) {
     return <div className="flex flex-col items-center gap-3 py-16 text-center"><p className="text-sm text-brand-ink-300">{t.calendar.noRooms}</p></div>;
   }
@@ -116,6 +134,16 @@ export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers,
           <Legend color="bg-brand-red-100" label={t.calendar.legendMaintenance} />
           <Legend color="bg-brand-green-50" label={t.cleaning.pending} />
         </div>
+      </div>
+
+      {/* Quick stats bar — today snapshot */}
+      <div className="mb-4 grid grid-cols-3 sm:grid-cols-6 gap-2">
+        <QuickStat label={locale === "zh" ? "今日到达" : "Arrivees"} value={todayStats.arriving} color="text-brand-sky-700" bg="bg-brand-sky-50 border-brand-sky-200" />
+        <QuickStat label={locale === "zh" ? "今日离开" : "Departs"} value={todayStats.departing} color="text-brand-amber-700" bg="bg-brand-amber-50 border-brand-amber-200" />
+        <QuickStat label={locale === "zh" ? "占用中" : "Occupes"} value={todayStats.occupied} color="text-brand-orange-700" bg="bg-brand-orange-50 border-brand-orange-200" />
+        <QuickStat label={locale === "zh" ? "维修" : "Maintenance"} value={todayStats.maintenance} color="text-brand-red-700" bg="bg-brand-red-50 border-brand-red-200" />
+        <QuickStat label={locale === "zh" ? "空闲" : "Libres"} value={todayStats.available} color="text-brand-green-700" bg="bg-brand-green-50 border-brand-green-200" />
+        <QuickStat label={locale === "zh" ? "总房源" : "Total"} value={todayStats.total} color="text-brand-ink-700" bg="bg-brand-warm-100 border-brand-warm-200" />
       </div>
 
       {/* Calendar grid */}
@@ -223,6 +251,15 @@ export function DailyCalendar({ dailyUnits, bookings: serverBookings, customers,
           onBookingCreated={(b) => setOptimisticBookings(prev => [b, ...prev])}
         />
       )}
+    </div>
+  );
+}
+
+function QuickStat({ label, value, color, bg }: { label: string; value: number; color: string; bg: string }) {
+  return (
+    <div className={cn("rounded-lg border px-3 py-2 text-center", bg)}>
+      <p className="text-[10px] font-semibold uppercase tracking-wider opacity-70">{label}</p>
+      <p className={cn("mt-0.5 text-lg font-bold tabular-nums", color)}>{value}</p>
     </div>
   );
 }

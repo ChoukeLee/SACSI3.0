@@ -265,13 +265,10 @@ export function ReceivableList({ receivables, units, customers, buildings, local
 
 function MiniCard({ label, value, accent }: { label: string; value: string; accent: string }) {
   const borderColor: Record<string, string> = {
-    ink: "border-brand-ink-700", green: "border-brand-green-500",
-    orange: "border-brand-orange", red: "border-brand-red-500",
+    ink: "bg-brand-ink-700", green: "bg-brand-green-500",
+    orange: "bg-brand-orange", red: "bg-brand-red-500",
   };
   return (
-    <div className={cn("rounded-lg border border-brand-warm-300 bg-white px-3 py-2.5 border-l-[3px] shadow-natural", borderColor[accent] ?? "border-brand-ink-700")}>
-      <p className="text-[10px] text-brand-ink-400">{label}</p>
-      <p className="text-sm font-bold tabular-nums text-brand-ink-900">{value}</p>
-    </div>
+    <div className="rounded-lg border border-brand-warm-300 bg-white shadow-natural overflow-hidden"><div className={cn("h-[3px]", borderColor[accent] ?? "bg-brand-ink-700")} /><div className="px-3 py-2.5"><p className="text-[10px] text-brand-ink-400">{label}</p><p className="text-sm font-bold tabular-nums text-brand-ink-900">{value}</p></div></div>
   );
 }

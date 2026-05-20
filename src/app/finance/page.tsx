@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
 import { LedgerList } from "@/features/finance";
 import { ReceivableList } from "@/features/finance/receivable-list";
-import { DesktopOnly } from "@/features/mobile";
 import { FinanceTabs } from "@/features/finance/finance-tabs";
 import type { LedgerEntryRow, ReceivableRow, BuildingRow } from "@/types/database";
 
@@ -46,20 +45,15 @@ export default async function FinancePage() {
 
   return (
     <>
-      <div className="lg:hidden">
-        <DesktopOnly locale="zh" />
-      </div>
-      <div className="hidden lg:block">
-        <PageHeader title={t.title} description={t.description} />
-        <p className="text-xs text-brand-ink-400 mt-2 mb-6">财务规则：XOF/CNY双币种 · 收据编号必留 · 报表统一换算 XOF</p>
-        <section>
-          <FinanceTabs
-            ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale="zh" />}
-            receivables={<ReceivableList receivables={receivables} units={units} customers={customers} buildings={buildings} locale="zh" />}
-            locale="zh"
-          />
-        </section>
-      </div>
+      <PageHeader title={t.title} description={t.description} />
+      <p className="text-xs text-brand-ink-400 mt-2 mb-6">财务规则：XOF/CNY双币种 · 收据编号必留 · 报表统一换算 XOF</p>
+      <section>
+        <FinanceTabs
+          ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale="zh" />}
+          receivables={<ReceivableList receivables={receivables} units={units} customers={customers} buildings={buildings} locale="zh" />}
+          locale="zh"
+        />
+      </section>
     </>
   );
 }

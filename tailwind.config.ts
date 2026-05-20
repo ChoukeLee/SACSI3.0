@@ -34,9 +34,9 @@ const config: Config = {
           /* Ink — warm near-black, never pure #000 */
           ink: {
             DEFAULT: "#1D1D1B",
-            "50": "#FAFAF8",
-            "100": "#F5F4EF",
-            "200": "#EFEEE8",
+            "50": "#F4F4F2",
+            "100": "#E8E8E4",
+            "200": "#D1D1CC",
             "300": "#8A8D84",
             "400": "#6B6E66",
             "500": "#5F625A",

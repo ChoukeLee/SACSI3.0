@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Download, Upload, Building2, Eye } from "lucide-react";
+import { Building2, Eye } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
 import { StatusBadge } from "@/components/status-badge";
@@ -77,14 +77,6 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
           onFloorChange={setSelectedFloor} onStatusChange={setSelectedStatus}
           onKindChange={setSelectedKind} onBusinessChange={setSelectedBusiness}
         />
-        <div className="flex items-center gap-2">
-          <button disabled className="inline-flex items-center gap-1.5 rounded-lg border border-brand-warm-400 bg-white px-3 py-2 text-xs font-medium text-brand-ink-300 transition-colors duration-fast">
-            <Upload className="h-3.5 w-3.5" />{t.actions.import}
-          </button>
-          <button disabled className="inline-flex items-center gap-1.5 rounded-lg border border-brand-warm-400 bg-white px-3 py-2 text-xs font-medium text-brand-ink-300 transition-colors duration-fast">
-            <Download className="h-3.5 w-3.5" />{t.actions.export}
-          </button>
-        </div>
       </div>
 
       {/* Empty state */}

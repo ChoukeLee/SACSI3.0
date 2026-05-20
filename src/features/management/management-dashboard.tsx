@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Download } from "lucide-react";
+import { AlertTriangle, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
 import {
   calculateReceivableSummary,
   calculateReceivableByBusinessType,
@@ -65,43 +65,43 @@ interface Props {
 
 const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string; ring: string }> = {
   sold: {
-    bg:   "bg-stone-100 text-stone-700 border-l-stone-400",
+    bg:   "bg-stone-100 text-stone-700",
     dot:  "bg-stone-500",
     pill: "bg-stone-100 text-stone-700 border-stone-300",
     ring: "ring-1 ring-inset ring-stone-200",
   },
   leased: {
-    bg:   "bg-brand-warm-200 text-brand-ink-600 border-l-brand-warm-500",
+    bg:   "bg-brand-warm-200 text-brand-ink-600",
     dot:  "bg-brand-warm-500",
     pill: "bg-brand-warm-100 text-brand-ink-600 border-brand-warm-300",
     ring: "ring-1 ring-inset ring-brand-warm-300",
   },
   dailyOccupied: {
-    bg:   "bg-brand-orange-100 text-brand-orange-800 border-l-brand-orange-500",
+    bg:   "bg-brand-orange-100 text-brand-orange-800",
     dot:  "bg-brand-orange-500",
     pill: "bg-brand-orange-100 text-brand-orange-800 border-brand-orange-300",
     ring: "ring-1 ring-inset ring-brand-orange-200",
   },
   reserved: {
-    bg:   "bg-amber-100 text-amber-800 border-l-amber-500",
+    bg:   "bg-amber-100 text-amber-800",
     dot:  "bg-amber-500",
     pill: "bg-amber-100 text-amber-800 border-amber-300",
     ring: "",
   },
   cleaningPending: {
-    bg:   "bg-brand-green-50 text-brand-green-700 border-l-brand-green-400",
+    bg:   "bg-brand-green-50 text-brand-green-700",
     dot:  "bg-brand-green-500",
     pill: "bg-brand-green-50 text-brand-green-700 border-brand-green-200",
     ring: "",
   },
   maintenance: {
-    bg:   "bg-brand-red-50 text-brand-red-700 border-l-brand-red-400",
+    bg:   "bg-brand-red-50 text-brand-red-700",
     dot:  "bg-brand-red-500",
     pill: "bg-brand-red-50 text-brand-red-700 border-brand-red-200",
     ring: "",
   },
   available: {
-    bg:   "bg-brand-green-100 text-brand-green-800 border-l-brand-green-500",
+    bg:   "bg-brand-green-100 text-brand-green-800",
     dot:  "bg-brand-green-500",
     pill: "bg-brand-green-100 text-brand-green-800 border-brand-green-300",
     ring: "",
@@ -362,6 +362,8 @@ export function ManagementDashboard({
     return { cleaning, maintenance, leaseExpiring, saleWithPending };
   }, [unitStates, leaseContracts, saleContracts, saleSchedules]);
 
+  const [showDetailTables, setShowDetailTables] = useState(false);
+
   const buildingName = selectedBuildingId === "__all__"
     ? t.allBuildings
     : activeBuildings.find(b => b.id === selectedBuildingId)?.display_name ?? "";
@@ -387,7 +389,41 @@ export function ManagementDashboard({
         ))}
       </div>
 
-      {/* Section 1: Status summary + legend */}
+      {/* Section 1: Risk alerts — moved to top for immediate visibility */}
+      <SectionTitle>{t.sections.riskAlerts}</SectionTitle>
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <RiskCard
+          icon={AlertTriangle}
+          label={t.risks.cleaningPending}
+          value={`${risks.cleaning} ${t.risks.rooms}`}
+          warn={risks.cleaning > 0}
+        />
+        <RiskCard
+          icon={AlertTriangle}
+          label={t.risks.maintenanceLocked}
+          value={`${risks.maintenance} ${t.risks.rooms}`}
+          warn={risks.maintenance > 0}
+        />
+        <RiskCard
+          icon={AlertTriangle}
+          label={t.risks.leaseExpiring}
+          value={`${risks.leaseExpiring.length} ${t.risks.contracts}`}
+          warn={risks.leaseExpiring.length > 0}
+          detail={risks.leaseExpiring.map(l => l.contract_no).join(", ")}
+        />
+        <RiskCard
+          icon={AlertTriangle}
+          label={t.risks.saleInstallments}
+          value={`${risks.saleWithPending.length} ${t.risks.contracts}`}
+          warn={risks.saleWithPending.length > 0}
+          detail={risks.saleWithPending.map(s => s.contract_no).join(", ")}
+        />
+      </div>
+      {(risks.cleaning === 0 && risks.maintenance === 0 && risks.leaseExpiring.length === 0 && risks.saleWithPending.length === 0) && (
+        <p className="mb-6 text-sm text-brand-green-600 font-medium">{t.risks.none}</p>
+      )}
+
+      {/* Section 2: Status summary + legend */}
       <SectionTitle>{t.sections.buildingStatus} — {buildingName}</SectionTitle>
       <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1.5">
         {(Object.keys(counts) as MgmtStatus[]).map(s => (
@@ -401,20 +437,18 @@ export function ManagementDashboard({
         ))}
       </div>
 
-      {/* Section 2: Room matrix */}
+      {/* Section 3: Room matrix */}
       <div className="mb-8 space-y-6">
         {(selectedBuildingId === "__all__" ? activeBuildings : activeBuildings.filter(b => b.id === selectedBuildingId)).map(building => {
           const bUnits = buildingUnits.get(building.id) ?? [];
           const bStates = sortUnits(bUnits).map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks));
           const floorGroups = groupStatesByFloor(bStates, locale);
 
-          // Per-building counts
           const bCounts: Record<string, number> = {};
           for (const s of bStates) bCounts[s.status] = (bCounts[s.status] ?? 0) + 1;
 
           return (
             <div key={building.id} className="rounded-xl border border-brand-warm-300 bg-white shadow-natural overflow-hidden">
-              {/* Building header: name + counts + legend */}
               <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-2.5 border-b border-brand-warm-100 bg-brand-warm-50/60">
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-brand-orange" />
@@ -423,7 +457,6 @@ export function ManagementDashboard({
                     {bStates.length} {locale === "zh" ? "间" : "unités"}
                   </span>
                 </div>
-                {/* Inline legend — visible at the same time as room cells */}
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px]">
                   {(Object.keys(t.statuses) as MgmtStatus[]).filter(s => (bCounts[s] ?? 0) > 0).map(s => (
                     <span key={s} className="flex items-center gap-1.5 text-brand-ink-500">
@@ -434,8 +467,6 @@ export function ManagementDashboard({
                   ))}
                 </div>
               </div>
-
-              {/* Room cells — floors in compact responsive grid */}
               <div className="px-4 py-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {floorGroups.map(group => (
@@ -451,8 +482,8 @@ export function ManagementDashboard({
                               key={s.unit.id}
                               href={routeFor(locale, `/units/${s.unit.id}`)}
                               className={cn(
-                                "flex h-9 w-9 items-center justify-center rounded-md",
-                                "border border-brand-warm-200 border-l-[3px]",
+                                "flex h-10 w-10 items-center justify-center rounded-md",
+                                "border border-brand-warm-200",
                                 "font-mono text-[11px] font-bold leading-none",
                                 "shadow-sm transition-all duration-150",
                                 "hover:-translate-y-0.5 hover:shadow-md active:scale-95",
@@ -477,95 +508,13 @@ export function ManagementDashboard({
         })}
       </div>
 
-      {/* Section 3: Finance KPI cards — current month */}
+      {/* Section 4: Finance KPI cards — reduced to 4 key metrics */}
       <SectionTitle>{t.sections.financeOverview}</SectionTitle>
-      <div className="mb-8 grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-7">
+      <div className="mb-6 grid gap-3 grid-cols-2 lg:grid-cols-4">
         <MiniStat2 label={t.cockpit.receivableThisMonth} value={formatXof(receivableMonthStats.totalReceivable)} accent="ink" />
         <MiniStat2 label={t.cockpit.paidThisMonth} value={formatXof(receivableMonthStats.totalPaid)} accent="green" />
         <MiniStat2 label={t.cockpit.outstandingThisMonth} value={formatXof(receivableMonthStats.outstanding)} accent="orange" />
         <MiniStat2 label={t.cockpit.overdueThisMonth} value={formatXof(receivableMonthStats.overdue)} accent="red" />
-        <MiniStat2 label={t.cockpit.incomeThisMonth} value={formatXof(finance.income)} accent="green" />
-        <MiniStat2 label={t.cockpit.expenseThisMonth} value={formatXof(finance.expense)} accent="orange" />
-        <MiniStat2 label={t.cockpit.netThisMonth} value={formatXof(finance.net)} accent="ink" />
-      </div>
-
-      {/* Section 3.5: By business type breakdown */}
-      {receivableByBiz.length > 0 && (
-        <>
-          <SectionTitle>{t.sections.receivableByBusiness}</SectionTitle>
-          <div className="mb-8 overflow-x-auto rounded-xl border border-brand-warm-300 bg-white shadow-natural">
-            <table className="w-full min-w-[400px] text-left text-xs">
-              <thead className="bg-brand-warm-50 text-[10px] font-semibold uppercase text-brand-ink-400">
-                <tr>
-                  <th className="px-3 py-2">{locale === "zh" ? "业务类型" : "Type"}</th>
-                  <th className="px-3 py-2 text-right">{t.cockpit.receivable}</th>
-                  <th className="px-3 py-2 text-right">{t.cockpit.paid}</th>
-                  <th className="px-3 py-2 text-right">{t.cockpit.outstanding}</th>
-                  <th className="px-3 py-2 text-right">{t.cockpit.overdue}</th>
-                  <th className="px-3 py-2 text-right">{t.cockpit.collectionRate}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-brand-warm-400">
-                {receivableByBiz.map(biz => {
-                  const rate = biz.totalReceivable > 0 ? (biz.totalPaid / biz.totalReceivable * 100) : 0;
-                  const bizLabels: Record<string, string> = {
-                    daily_booking: t.cockpit.dailyRental,
-                    lease_contract: t.cockpit.leaseRental,
-                    sale_contract: t.cockpit.sale,
-                    manual: t.cockpit.other,
-                  };
-                  return (
-                    <tr key={biz.businessType} className="transition-colors hover:bg-brand-warm-50">
-                      <td className="px-3 py-2 font-medium text-brand-ink-700">{bizLabels[biz.businessType] ?? biz.businessType}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-brand-ink-600">{formatXof(biz.totalReceivable)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-brand-green-600">{formatXof(biz.totalPaid)}</td>
-                      <td className={cn("px-3 py-2 text-right tabular-nums font-medium", biz.outstanding > 0 ? "text-brand-red-600" : "text-brand-green-600")}>{formatXof(biz.outstanding)}</td>
-                      <td className={cn("px-3 py-2 text-right tabular-nums", biz.overdue > 0 ? "text-brand-red-600 font-medium" : "text-brand-ink-300")}>{formatXof(biz.overdue)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-brand-ink-500">{rate.toFixed(1)}%</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-
-      {/* Section 4: By building breakdown */}
-      <SectionTitle>{t.sections.receivableByBuilding}</SectionTitle>
-      <div className="mb-8 overflow-x-auto rounded-xl border border-brand-warm-300 bg-white shadow-natural">
-        <table className="w-full min-w-[800px] text-left text-xs">
-          <thead className="bg-brand-warm-50 text-[10px] font-semibold uppercase text-brand-ink-400">
-            <tr>
-              <th className="px-3 py-2">{t.cockpit.building}</th>
-              <th className="px-3 py-2 text-right">{t.cockpit.totalUnits}</th>
-              <th className="px-3 py-2 text-right">{t.cockpit.receivable}</th>
-              <th className="px-3 py-2 text-right">{t.cockpit.paid}</th>
-              <th className="px-3 py-2 text-right">{t.cockpit.outstanding}</th>
-              <th className="px-3 py-2 text-right">{t.cockpit.overdue}</th>
-              <th className="px-3 py-2 text-right">{t.cockpit.income}</th>
-              <th className="px-3 py-2 text-right">{t.cockpit.expense}</th>
-              <th className="px-3 py-2 text-right">{t.cockpit.net}</th>
-              <th className="px-3 py-2 text-right">{t.cockpit.collectionRate}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-brand-warm-400">
-            {receivableByBldg.map(b => (
-              <tr key={b.buildingId ?? "__unassigned__"} className="transition-colors hover:bg-brand-warm-50">
-                <td className="px-3 py-2 font-medium text-brand-ink-700">{b.buildingName === "unassigned" ? t.cockpit.unassigned : b.buildingName}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-brand-ink-500">{b.totalUnits || "—"}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-brand-ink-600">{formatXof(b.totalReceivable)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-brand-green-600">{formatXof(b.totalPaid)}</td>
-                <td className={cn("px-3 py-2 text-right tabular-nums font-medium", b.outstanding > 0 ? "text-brand-red-600" : "text-brand-green-600")}>{formatXof(b.outstanding)}</td>
-                <td className={cn("px-3 py-2 text-right tabular-nums", b.overdue > 0 ? "text-brand-red-600 font-medium" : "text-brand-ink-300")}>{formatXof(b.overdue)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-brand-green-600">{formatXof(b.income)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-brand-red-500">{formatXof(b.expense)}</td>
-                <td className={cn("px-3 py-2 text-right tabular-nums font-medium", b.net >= 0 ? "text-brand-green-700" : "text-brand-red-700")}>{formatXof(b.net)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-brand-ink-500">{(b.collectionRate * 100).toFixed(1)}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
 
       {/* Section 5: Risk leaderboards */}
@@ -649,49 +598,106 @@ export function ManagementDashboard({
         </div>
       </div>
 
-      {/* Section 5.5: Data health */}
+      {/* Section 6: Data quality — only if issues exist */}
       {qualityIssues && qualityIssues.length > 0 && (
         <div className="mb-8">
           <QualityDashboardWidget issues={qualityIssues} locale={locale} variant="management" />
         </div>
       )}
 
-      {/* Section 6: Risk alerts */}
-      <SectionTitle>{t.sections.riskAlerts}</SectionTitle>
-      <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <RiskCard
-          icon={AlertTriangle}
-          label={t.risks.cleaningPending}
-          value={`${risks.cleaning} ${t.risks.rooms}`}
-          warn={risks.cleaning > 0}
-        />
-        <RiskCard
-          icon={AlertTriangle}
-          label={t.risks.maintenanceLocked}
-          value={`${risks.maintenance} ${t.risks.rooms}`}
-          warn={risks.maintenance > 0}
-        />
-        <RiskCard
-          icon={AlertTriangle}
-          label={t.risks.leaseExpiring}
-          value={`${risks.leaseExpiring.length} ${t.risks.contracts}`}
-          warn={risks.leaseExpiring.length > 0}
-          detail={risks.leaseExpiring.map(l => l.contract_no).join(", ")}
-        />
-        <RiskCard
-          icon={AlertTriangle}
-          label={t.risks.saleInstallments}
-          value={`${risks.saleWithPending.length} ${t.risks.contracts}`}
-          warn={risks.saleWithPending.length > 0}
-          detail={risks.saleWithPending.map(s => s.contract_no).join(", ")}
-        />
-      </div>
-      {(risks.cleaning === 0 && risks.maintenance === 0 && risks.leaseExpiring.length === 0 && risks.saleWithPending.length === 0) && (
-        <p className="text-sm text-brand-green-600 font-medium">{t.risks.none}</p>
+      {/* Section 7: By business type — collapsible */}
+      {receivableByBiz.length > 0 && (
+        <div className="mb-6">
+          <button
+            onClick={() => setShowDetailTables(!showDetailTables)}
+            className="flex items-center gap-2 mb-3 text-[13px] font-semibold text-brand-ink-600 hover:text-brand-ink-800 transition-colors"
+          >
+            {t.sections.receivableByBusiness}
+            {showDetailTables ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+          {showDetailTables && (
+            <div className="overflow-x-auto rounded-xl border border-brand-warm-300 bg-white shadow-natural">
+              <table className="w-full min-w-[400px] text-left text-xs">
+                <thead className="bg-brand-warm-50 text-[10px] font-semibold uppercase text-brand-ink-400">
+                  <tr>
+                    <th className="px-3 py-2">{locale === "zh" ? "业务类型" : "Type"}</th>
+                    <th className="px-3 py-2 text-right">{t.cockpit.receivable}</th>
+                    <th className="px-3 py-2 text-right">{t.cockpit.paid}</th>
+                    <th className="px-3 py-2 text-right">{t.cockpit.outstanding}</th>
+                    <th className="px-3 py-2 text-right">{t.cockpit.overdue}</th>
+                    <th className="px-3 py-2 text-right">{t.cockpit.collectionRate}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-brand-warm-400">
+                  {receivableByBiz.map(biz => {
+                    const rate = biz.totalReceivable > 0 ? (biz.totalPaid / biz.totalReceivable * 100) : 0;
+                    const bizLabels: Record<string, string> = {
+                      daily_booking: t.cockpit.dailyRental,
+                      lease_contract: t.cockpit.leaseRental,
+                      sale_contract: t.cockpit.sale,
+                      manual: t.cockpit.other,
+                    };
+                    return (
+                      <tr key={biz.businessType} className="transition-colors hover:bg-brand-warm-50">
+                        <td className="px-3 py-2 font-medium text-brand-ink-700">{bizLabels[biz.businessType] ?? biz.businessType}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-brand-ink-600">{formatXof(biz.totalReceivable)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-brand-green-600">{formatXof(biz.totalPaid)}</td>
+                        <td className={cn("px-3 py-2 text-right tabular-nums font-medium", biz.outstanding > 0 ? "text-brand-red-600" : "text-brand-green-600")}>{formatXof(biz.outstanding)}</td>
+                        <td className={cn("px-3 py-2 text-right tabular-nums", biz.overdue > 0 ? "text-brand-red-600 font-medium" : "text-brand-ink-300")}>{formatXof(biz.overdue)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-brand-ink-500">{rate.toFixed(1)}%</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
 
+      {/* Section 8: By building breakdown — collapsible, hidden by default */}
+      <div className="mb-8">
+        <button
+          onClick={() => setShowDetailTables(!showDetailTables)}
+          className="flex items-center gap-2 mb-3 text-[13px] font-semibold text-brand-ink-600 hover:text-brand-ink-800 transition-colors"
+        >
+          {t.sections.receivableByBuilding}
+          {showDetailTables ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
+        {showDetailTables && (
+          <div className="overflow-x-auto rounded-xl border border-brand-warm-300 bg-white shadow-natural">
+            <table className="w-full min-w-[800px] text-left text-xs">
+              <thead className="bg-brand-warm-50 text-[10px] font-semibold uppercase text-brand-ink-400">
+                <tr>
+                  <th className="px-3 py-2">{t.cockpit.building}</th>
+                  <th className="px-3 py-2 text-right">{t.cockpit.totalUnits}</th>
+                  <th className="px-3 py-2 text-right">{t.cockpit.receivable}</th>
+                  <th className="px-3 py-2 text-right">{t.cockpit.paid}</th>
+                  <th className="px-3 py-2 text-right">{t.cockpit.outstanding}</th>
+                  <th className="px-3 py-2 text-right">{t.cockpit.overdue}</th>
+                  <th className="px-3 py-2 text-right">{t.cockpit.collectionRate}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-brand-warm-400">
+                {receivableByBldg.map(b => (
+                  <tr key={b.buildingId ?? "__unassigned__"} className="transition-colors hover:bg-brand-warm-50">
+                    <td className="px-3 py-2 font-medium text-brand-ink-700">{b.buildingName === "unassigned" ? t.cockpit.unassigned : b.buildingName}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-brand-ink-500">{b.totalUnits || "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-brand-ink-600">{formatXof(b.totalReceivable)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-brand-green-600">{formatXof(b.totalPaid)}</td>
+                    <td className={cn("px-3 py-2 text-right tabular-nums font-medium", b.outstanding > 0 ? "text-brand-red-600" : "text-brand-green-600")}>{formatXof(b.outstanding)}</td>
+                    <td className={cn("px-3 py-2 text-right tabular-nums", b.overdue > 0 ? "text-brand-red-600 font-medium" : "text-brand-ink-300")}>{formatXof(b.overdue)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-brand-ink-500">{(b.collectionRate * 100).toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Quick links */}
-      <div className="mt-8 flex flex-wrap gap-2 text-xs text-brand-ink-400">
+      <div className="flex flex-wrap gap-2 text-xs text-brand-ink-400">
         <QuickLink href="/daily-rentals/overview" locale={locale} label={dictionaries[locale].shell.nav.dailyOccupancy ?? ""} />
         <QuickLink href="/leases" locale={locale} label={dictionaries[locale].shell.nav.leases ?? ""} />
         <QuickLink href="/sales" locale={locale} label={dictionaries[locale].shell.nav.sales ?? ""} />
@@ -724,16 +730,19 @@ function BuildingTab({ active, onClick, label }: { active: boolean; onClick: () 
 }
 
 function MiniStat2({ label, value, accent }: { label: string; value: string; accent: string }) {
-  const borderColor: Record<string, string> = {
-    ink: "border-brand-ink-700",
-    green: "border-brand-green-500",
-    orange: "border-brand-orange",
-    red: "border-brand-red-500",
+  const accentBg: Record<string, string> = {
+    ink: "bg-brand-ink-700",
+    green: "bg-brand-green-500",
+    orange: "bg-brand-orange",
+    red: "bg-brand-red-500",
   };
   return (
-    <div className={cn("rounded-lg border border-brand-warm-300 bg-white px-3 py-2 border-l-[3px] shadow-natural", borderColor[accent] ?? "border-brand-ink-700")}>
-      <p className="text-[10px] text-brand-ink-400">{label}</p>
-      <p className="text-sm font-bold tabular-nums text-brand-ink-900">{value}</p>
+    <div className="rounded-lg border border-brand-warm-300 bg-white shadow-natural overflow-hidden">
+      <div className={cn("h-[3px]", accentBg[accent] ?? "bg-brand-ink-700")} />
+      <div className="px-3 py-2">
+        <p className="text-[10px] text-brand-ink-400">{label}</p>
+        <p className="text-sm font-bold tabular-nums text-brand-ink-900">{value}</p>
+      </div>
     </div>
   );
 }

@@ -14,9 +14,14 @@ interface Props {
 }
 
 const SEVERITY_STYLES: Record<QualitySeverity, string> = {
-  high: "border-l-brand-red-500 bg-brand-red-50/30",
-  medium: "border-l-brand-amber-500 bg-brand-amber-50/20",
-  low: "border-l-brand-sky-400 bg-white",
+  high: "bg-brand-red-50/30",
+  medium: "bg-brand-amber-50/20",
+  low: "bg-white",
+};
+const SEVERITY_DOT: Record<QualitySeverity, string> = {
+  high: "bg-brand-red-500",
+  medium: "bg-brand-amber-500",
+  low: "bg-brand-sky-400",
 };
 
 const CATEGORY_LABELS: Record<Locale, Record<QualityCategory, string>> = {
@@ -106,12 +111,12 @@ export function QualityCenter({ issues, locale }: Props) {
               <div
                 key={i.id}
                 className={cn(
-                  "rounded-lg border border-brand-warm-400 border-l-[4px] bg-white shadow-natural overflow-hidden",
+                  "rounded-lg border border-brand-warm-400 bg-white shadow-natural overflow-hidden",
                   SEVERITY_STYLES[i.severity],
                 )}
               >
                 <div
-                  className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-brand-warm-50/50"
+                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-brand-warm-50/50"
                   onClick={() => setExpandedId(expanded ? null : i.id)}
                 >
                   <AlertTriangle className={cn("h-5 w-5 shrink-0", i.severity === "high" ? "text-brand-red-500" : i.severity === "medium" ? "text-brand-amber-500" : "text-brand-sky-400")} />
@@ -165,15 +170,15 @@ export function QualityCenter({ issues, locale }: Props) {
 
 function Pill({ label, value, accent }: { label: string; value: number; accent: string }) {
   const colors: Record<string, string> = {
-    ink: "border-brand-ink-700 bg-brand-ink-50 text-brand-ink-800",
-    red: "border-brand-red-500 bg-brand-red-50 text-brand-red-700",
-    orange: "border-brand-orange bg-brand-orange-50 text-brand-orange-700",
-    sky: "border-brand-sky-500 bg-brand-sky-50 text-brand-sky-700",
+    ink: "bg-brand-ink-700",
+    red: "bg-brand-red-500",
+    orange: "bg-brand-orange",
+    sky: "bg-brand-sky-500",
   };
   return (
-    <div className={cn("rounded-lg border-l-[3px] border-brand-warm-400 bg-white px-3 py-2", colors[accent] ?? "")}>
+    <div className="rounded-lg border border-brand-warm-400 bg-white shadow-natural overflow-hidden"><div className={cn("h-[3px]", colors[accent] ?? "bg-brand-ink-700")} /><div className="px-3 py-2">
       <p className="text-[10px] text-brand-ink-300">{label}</p>
       <p className="text-lg font-bold tabular-nums">{value}</p>
-    </div>
+    </div></div>
   );
 }

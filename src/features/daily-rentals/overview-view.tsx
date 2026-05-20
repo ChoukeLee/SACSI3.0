@@ -187,7 +187,7 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
                     <td className="px-3 py-2.5">
                       {row.booking ? (
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-brand-ink-700">{row.customer?.name?.slice(0, 8) ?? "?"}</span>
+                          <span className="text-sm font-medium text-brand-ink-700" title={row.customer?.name ?? undefined}>{row.customer?.name?.slice(0, 8) ?? "?"}</span>
                           {row.booking.status !== "checked_in" && (
                             <StatusBadge status="reserved" locale={locale} />
                           )}
@@ -207,13 +207,13 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
                       {row.booking ? (locale === "zh" ? BILLING_MODE_ZH[row.booking.checkout_mode] : BILLING_MODE_FR[row.booking.checkout_mode]) : "-"}
                     </td>
                     <td className="px-3 py-2.5 text-xs tabular-nums font-medium text-brand-ink-600">
-                      {b ? b.paid.toLocaleString() : "-"}
+                      {b ? formatXof(b.paid) : "-"}
                     </td>
                     <td className="px-3 py-2.5 text-xs tabular-nums text-brand-ink-600">
-                      {b ? b.finalAmount.toLocaleString() : "-"}
+                      {b ? formatXof(b.finalAmount) : "-"}
                     </td>
                     <td className={cn("px-3 py-2.5 text-xs tabular-nums font-semibold", b && b.outstanding > 0 ? "text-brand-red-600" : "text-brand-green-600")}>
-                      {b ? (b.outstanding > 0 ? b.outstanding.toLocaleString() : "0") : "-"}
+                      {b ? (b.outstanding > 0 ? formatXof(b.outstanding) : "0") : "-"}
                     </td>
                     <td className="px-3 py-2.5 text-xs text-brand-ink-300 max-w-[120px] truncate">{row.booking?.notes ?? ""}</td>
                   </tr>

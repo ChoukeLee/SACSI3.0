@@ -50,9 +50,8 @@ export default async function DailyOverviewPage() {
   }
 
   return (
-      <>
-
-<><PageHeader title={t.title} description={t.description} />
+    <>
+      <PageHeader title={t.title} description={t.description} />
       <OverviewView
         dailyUnits={dailyUnits}
         bookings={bookings}
@@ -61,7 +60,6 @@ export default async function DailyOverviewPage() {
         cleaningTasks={cleaningTasks}
         locale="zh"
       />
-
-      </>
-</>);
+    </>
+  );
 }

@@ -13,10 +13,10 @@ interface Props {
   locale: Locale;
 }
 
-const PRIORITY_STYLES: Record<TodoPriority, string> = {
-  high: "border-l-brand-red-500 bg-brand-red-50/30",
-  medium: "border-l-brand-amber-500 bg-brand-amber-50/20",
-  low: "border-l-brand-sky-400 bg-white",
+const PRIORITY_DOT: Record<TodoPriority, string> = {
+  high: "bg-brand-red-500",
+  medium: "bg-brand-amber-500",
+  low: "bg-brand-sky-400",
 };
 
 const SOURCE_LABELS: Record<Locale, Record<TodoSource, string>> = {
@@ -112,11 +112,9 @@ export function TodoCenter({ todos, locale }: Props) {
             <Link
               key={todo.id}
               href={routeFor(locale, todo.href)}
-              className={cn(
-                "flex items-center gap-4 rounded-lg border border-brand-warm-400 border-l-[4px] bg-white px-4 py-3 shadow-natural transition-all hover:-translate-y-0.5 hover:border-brand-orange-400",
-                PRIORITY_STYLES[todo.priority] || PRIORITY_STYLES.medium,
-              )}
+              className="flex items-center gap-4 rounded-lg border border-brand-warm-400 bg-white px-4 py-3 shadow-natural transition-all hover:-translate-y-0.5 hover:border-brand-orange-400"
             >
+              <div className={cn("shrink-0 h-3 w-3 rounded-full", PRIORITY_DOT[todo.priority] || PRIORITY_DOT.medium)} />
               <div className="shrink-0">
                 {todo.priority === "high" ? (
                   <AlertTriangle className="h-5 w-5 text-brand-red-500" />
@@ -154,14 +152,17 @@ export function TodoCenter({ todos, locale }: Props) {
 
 function StatPill({ label, value, accent }: { label: string; value: number; accent: string }) {
   const colors: Record<string, string> = {
-    ink: "border-brand-ink-700 bg-brand-ink-50 text-brand-ink-800",
-    red: "border-brand-red-500 bg-brand-red-50 text-brand-red-700",
-    orange: "border-brand-orange bg-brand-orange-50 text-brand-orange-700",
+    ink: "bg-brand-ink-700",
+    red: "bg-brand-red-500",
+    orange: "bg-brand-orange",
   };
   return (
-    <div className={cn("rounded-lg border-l-[3px] border-brand-warm-400 bg-white px-3 py-2", colors[accent] ?? "")}>
-      <p className="text-[10px] text-brand-ink-300">{label}</p>
-      <p className="text-lg font-bold tabular-nums">{value}</p>
+    <div className="rounded-lg border border-brand-warm-400 bg-white shadow-natural overflow-hidden">
+      <div className={cn("h-[3px]", colors[accent] ?? "bg-brand-ink-700")} />
+      <div className="px-3 py-2">
+        <p className="text-[10px] text-brand-ink-300">{label}</p>
+        <p className="text-lg font-bold tabular-nums text-brand-ink-900">{value}</p>
+      </div>
     </div>
   );
 }

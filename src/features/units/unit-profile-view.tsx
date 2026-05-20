@@ -344,6 +344,6 @@ export function UnitProfileView({ data, locale, userRole }: Props) {
 }
 
 function StatBox({ label, value, accent }: { label: string; value: string; accent: string }) {
-  const c: Record<string, string> = { ink: "border-brand-ink-700", green: "border-brand-green-500", red: "border-brand-red-500" };
-  return <div className={cn("rounded-lg border border-brand-warm-300 bg-white px-3 py-2.5 border-l-[3px]", c[accent] ?? "border-brand-ink-700")}><p className="text-[10px] text-brand-ink-300">{label}</p><p className="text-sm font-bold tabular-nums text-brand-ink-900">{value}</p></div>;
+  const c: Record<string, string> = { ink: "bg-brand-ink-700", green: "bg-brand-green-500", red: "bg-brand-red-500" };
+  return <div className="rounded-lg border border-brand-warm-300 bg-white shadow-natural overflow-hidden"><div className={cn("h-[3px]", c[accent] ?? "bg-brand-ink-700")} /><div className="px-3 py-2.5"><p className="text-[10px] text-brand-ink-300">{label}</p><p className="text-sm font-bold tabular-nums text-brand-ink-900">{value}</p></div></div>;
 }

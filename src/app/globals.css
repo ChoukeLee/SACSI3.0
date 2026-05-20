@@ -6,12 +6,40 @@
   color-scheme: light;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
+
+  /* Design tokens — mirrors tailwind.config.ts brand palette */
+  --color-bg: #F9F7F3;
+  --color-surface: #FFFFFF;
+  --color-border: #E6E4DA;
+  --color-border-light: #EFEEE8;
+  --color-text: #1D1D1B;
+  --color-text-secondary: #6B6E66;
+  --color-text-muted: #8A8D84;
+  --color-accent: #C96F2D;
+  --color-accent-light: #FDF8F3;
+  --color-success: #4A6B4A;
+  --color-danger: #8B3A3A;
+  --color-warning: #8B6914;
+  --color-info: #4A6B7D;
+
+  /* Typography scale */
+  --text-xs: 0.6875rem;    /* 11px — minimum label size */
+  --text-sm: 0.8125rem;    /* 13px — body small */
+  --text-base: 0.875rem;   /* 14px — body */
+  --text-lg: 1.125rem;     /* 18px — section heading */
+  --text-xl: 1.25rem;      /* 20px — page title */
+  --text-2xl: 1.5rem;      /* 24px — KPI value */
+
+  /* Spacing scale */
+  --space-section-sm: 1rem;
+  --space-section-md: 1.5rem;
+  --space-section-lg: 2rem;
 }
 
 body {
   min-height: 100dvh;
-  background: #F9F7F3;
-  color: #1D1D1B;
+  background: var(--color-bg);
+  color: var(--color-text);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -20,13 +48,13 @@ body {
 }
 
 ::selection {
-  background: #C96F2D;
+  background: var(--color-accent);
   color: #ffffff;
 }
 
 /* Focus ring: subtle warm, hidden on touch */
 *:focus-visible {
-  outline: 2px solid #C96F2D;
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -49,6 +77,48 @@ body {
     background-size: 40px 100%, 40px 100%, 14px 100%;
     background-attachment: local, local, scroll;
   }
+
+  /* Shared data table style — used across all pages */
+  .data-table {
+    @apply w-full text-left;
+  }
+  .data-table thead {
+    @apply border-b border-brand-warm-300;
+  }
+  .data-table th {
+    @apply px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-brand-ink-400;
+  }
+  .data-table td {
+    @apply px-3 py-2.5 text-[13px] text-brand-ink-700 border-b border-brand-warm-100;
+  }
+  .data-table tbody tr {
+    @apply transition-colors duration-fast;
+  }
+  .data-table tbody tr:hover {
+    @apply bg-brand-warm-50;
+  }
+  .data-table .num {
+    @apply tabular-nums text-right;
+  }
+
+  /* Shared stat card — no side-stripe, uses top-border instead */
+  .stat-card {
+    @apply rounded-xl border border-brand-warm-300 bg-white shadow-natural px-5 py-4;
+  }
+  .stat-card .stat-label {
+    @apply text-[11px] font-medium uppercase tracking-wider text-brand-ink-400;
+  }
+  .stat-card .stat-value {
+    @apply mt-1.5 text-[26px] font-semibold tracking-tight text-brand-ink-900 tabular-nums;
+  }
+  .stat-card .stat-caption {
+    @apply mt-1.5 text-[13px] text-brand-ink-400;
+  }
+
+  /* Page section spacing */
+  .page-section-sm { @apply mb-4; }
+  .page-section-md { @apply mb-6; }
+  .page-section-lg { @apply mb-8; }
 }
 
 @layer base {
@@ -74,6 +144,16 @@ body {
 }
 
 @media print {
-  body { background: white; }
+  body {
+    background: white !important;
+    color: black !important;
+  }
   .no-print { display: none !important; }
+  nav, aside, header, .mobile-nav { display: none !important; }
+  main { padding: 0 !important; margin: 0 !important; max-width: none !important; }
+  .shadow-natural, .shadow-card, .shadow-panel, .shadow-dropdown { box-shadow: none !important; }
+  .border, .border-l, .border-r, .border-t, .border-b { border-color: #ddd !important; }
+  button, .button { display: none !important; }
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
 }
