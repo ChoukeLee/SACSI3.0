@@ -16,11 +16,11 @@ export function Card({ className, variant = "default", padding = "md", children,
   return (
     <div
       className={cn(
-        "rounded-xl border bg-white shadow-card",
+        "rounded-xl border bg-white shadow-natural",
         paddingMap[padding],
-        variant === "default" && "border-brand-warm-400",
-        variant === "subtle" && "border-brand-warm-400 bg-brand-warm-50",
-        variant === "dashed" && "border-dashed border-brand-warm-500 bg-brand-warm-50",
+        variant === "default" && "border-brand-warm-300",
+        variant === "subtle" && "border-brand-warm-300 bg-brand-warm-50/80",
+        variant === "dashed" && "border-dashed border-brand-warm-400 bg-brand-warm-50/60",
         className
       )}
       {...props}
