@@ -59,15 +59,16 @@ interface Props {
 }
 
 // ── Status color map for room matrix ───────────────────────────────────
+// bg: cell face, dot: legend swatch, pill: status-count badge
 
-const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; label: string }> = {
-  sold:             { bg: "bg-brand-ink-100 text-brand-ink-600 border-brand-ink-200", dot: "bg-brand-ink-600", label: "bg-brand-ink-500 text-white" },
-  leased:           { bg: "bg-indigo-50 text-indigo-700 border-indigo-200", dot: "bg-indigo-500", label: "bg-indigo-100 text-indigo-800" },
-  dailyOccupied:    { bg: "bg-brand-orange-50 text-brand-orange-700 border-brand-orange-200", dot: "bg-brand-orange-500", label: "bg-brand-orange-100 text-brand-orange-800" },
-  reserved:         { bg: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", label: "bg-amber-100 text-amber-800" },
-  cleaningPending:  { bg: "bg-brand-sky-50 text-brand-sky-700 border-brand-sky-200", dot: "bg-brand-sky-500", label: "bg-brand-sky-100 text-brand-sky-700" },
-  maintenance:      { bg: "bg-brand-red-50 text-brand-red-600 border-brand-red-200", dot: "bg-brand-red-500", label: "bg-brand-red-100 text-brand-red-700" },
-  available:        { bg: "bg-brand-green-50 text-brand-green-700 border-brand-green-200", dot: "bg-brand-green-500", label: "bg-brand-green-100 text-brand-green-700" },
+const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string }> = {
+  sold:             { bg: "bg-brand-ink-800 text-white border-brand-ink-700",          dot: "bg-brand-ink-700",    pill: "bg-brand-ink-500 text-white" },
+  leased:           { bg: "bg-indigo-600 text-white border-indigo-500",                dot: "bg-indigo-500",       pill: "bg-indigo-100 text-indigo-800" },
+  dailyOccupied:    { bg: "bg-brand-orange-500 text-white border-brand-orange-400",    dot: "bg-brand-orange-500",  pill: "bg-brand-orange-100 text-brand-orange-800" },
+  reserved:         { bg: "bg-amber-500 text-white border-amber-400",                  dot: "bg-amber-500",        pill: "bg-amber-100 text-amber-800" },
+  cleaningPending:  { bg: "bg-brand-sky-500 text-white border-brand-sky-400",          dot: "bg-brand-sky-600",    pill: "bg-brand-sky-100 text-brand-sky-700" },
+  maintenance:      { bg: "bg-brand-red-500 text-white border-brand-red-400",          dot: "bg-brand-red-500",    pill: "bg-brand-red-100 text-brand-red-700" },
+  available:        { bg: "bg-brand-green-600 text-white border-brand-green-500",      dot: "bg-brand-green-600",  pill: "bg-brand-green-100 text-brand-green-700" },
 };
 
 function firstNumber(value: string | null | undefined): number | null {
@@ -349,13 +350,13 @@ export function ManagementDashboard({
         ))}
       </div>
 
-      {/* Section 1: Status summary */}
+      {/* Section 1: Status summary + legend */}
       <SectionTitle>{t.sections.buildingStatus} — {buildingName}</SectionTitle>
-      <div className="mb-8 flex flex-wrap gap-1.5 sm:gap-2">
+      <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1.5">
         {(Object.keys(counts) as MgmtStatus[]).map(s => (
           <div key={s} className={cn(
-            "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-            STATUS_CELL[s].label,
+            "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium",
+            STATUS_CELL[s].pill,
           )}>
             <span className="tabular-nums font-bold">{counts[s]}</span>
             <span className="opacity-80">{t.statuses[s]}</span>
@@ -364,38 +365,47 @@ export function ManagementDashboard({
       </div>
 
       {/* Section 2: Room matrix */}
-      <SectionTitle>{t.sections.roomMatrix}</SectionTitle>
-      <div className="mb-8 space-y-8">
+      <div className="mb-8 space-y-6">
         {(selectedBuildingId === "__all__" ? activeBuildings : activeBuildings.filter(b => b.id === selectedBuildingId)).map(building => {
           const bUnits = buildingUnits.get(building.id) ?? [];
           const bStates = sortUnits(bUnits).map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks));
           const floorGroups = groupStatesByFloor(bStates, locale);
+
+          // Per-building counts
+          const bCounts: Record<string, number> = {};
+          for (const s of bStates) bCounts[s.status] = (bCounts[s.status] ?? 0) + 1;
+
           return (
             <div key={building.id} className="rounded-xl border border-brand-warm-300 bg-white shadow-card overflow-hidden">
-              {/* Building header */}
-              <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-brand-warm-100 bg-brand-warm-50/50">
+              {/* Building header: name + counts + legend */}
+              <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-2.5 border-b border-brand-warm-100 bg-brand-warm-50/60">
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-brand-orange" />
-                  <h4 className="text-sm font-bold text-brand-ink-800">{building.display_name}</h4>
+                  <span className="h-2.5 w-2.5 rounded-full bg-brand-orange" />
+                  <h4 className="text-[13px] font-bold text-brand-ink-800">{building.display_name}</h4>
+                  <span className="rounded-full bg-white border border-brand-warm-200 px-2 py-0 text-[10px] font-semibold text-brand-ink-400">
+                    {bStates.length} {locale === "zh" ? "间" : "unités"}
+                  </span>
                 </div>
-                <span className="rounded-full bg-brand-warm-200 px-2.5 py-0.5 text-[10px] font-semibold text-brand-ink-400">
-                  {bStates.length} {locale === "zh" ? "间" : "unités"}
-                </span>
+                {/* Inline legend — visible at the same time as room cells */}
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px]">
+                  {(Object.keys(t.statuses) as MgmtStatus[]).filter(s => (bCounts[s] ?? 0) > 0).map(s => (
+                    <span key={s} className="flex items-center gap-1.5 text-brand-ink-500">
+                      <span className={cn("h-2 w-2 rounded-sm", STATUS_CELL[s].dot)} />
+                      {t.statuses[s]}
+                      <span className="tabular-nums text-brand-ink-300">{(bCounts[s] ?? 0)}</span>
+                    </span>
+                  ))}
+                </div>
               </div>
 
-              {/* Room grid */}
-              <div className="px-5 py-4">
-                <div className="space-y-3">
+              {/* Room cells — floors in compact responsive grid */}
+              <div className="px-4 py-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {floorGroups.map(group => (
-                    <div key={group.key}>
-                      {/* Floor label */}
-                      <div className="mb-1.5 flex items-center gap-2">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-brand-ink-300">
-                          {group.label}
-                        </span>
-                        <span className="h-px flex-1 bg-brand-warm-200" />
-                      </div>
-                      {/* Room cells */}
+                    <div key={group.key} className="rounded-lg border border-brand-warm-200 bg-brand-warm-50/30 p-2.5">
+                      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-brand-ink-300">
+                        {group.label}
+                      </p>
                       <div className="flex flex-wrap gap-1.5">
                         {group.states.map(s => {
                           const st = STATUS_CELL[s.status];
@@ -404,7 +414,8 @@ export function ManagementDashboard({
                               key={s.unit.id}
                               href={routeFor(locale, `/units/${s.unit.id}`)}
                               className={cn(
-                                "relative flex h-10 w-10 items-center justify-center rounded-lg border font-mono text-[11px] font-bold leading-none transition-all duration-150",
+                                "flex h-9 w-9 items-center justify-center rounded-md border-2 font-mono text-[11px] font-bold leading-none",
+                                "shadow-sm transition-all duration-150",
                                 "hover:-translate-y-0.5 hover:shadow-md active:scale-95",
                                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange",
                                 st.bg,
@@ -412,7 +423,6 @@ export function ManagementDashboard({
                               title={`${s.unit.unit_no} — ${t.statuses[s.status]}`}
                               aria-label={`${s.unit.unit_no} — ${t.statuses[s.status]}`}
                             >
-                              <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full opacity-70" />
                               {s.unit.unit_no}
                             </Link>
                           );
@@ -421,16 +431,6 @@ export function ManagementDashboard({
                     </div>
                   ))}
                 </div>
-              </div>
-
-              {/* Compact legend */}
-              <div className="flex flex-wrap gap-x-3 gap-y-1.5 px-5 py-2.5 border-t border-brand-warm-100 bg-brand-warm-50/30 text-[10px] text-brand-ink-400">
-                {(Object.keys(t.statuses) as MgmtStatus[]).map(s => (
-                  <span key={s} className="flex items-center gap-1.5">
-                    <span className={cn("h-2 w-2 rounded-sm", STATUS_CELL[s].dot)} />
-                    {t.statuses[s]}
-                  </span>
-                ))}
               </div>
             </div>
           );
