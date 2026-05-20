@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { sortUnits } from "@/lib/utils";
 import { ManagementDashboard } from "@/features/management";
 import { runQualityChecks } from "@/features/data-quality";
 import type { QualityIssue } from "@/features/data-quality/quality-types";
@@ -59,7 +60,7 @@ export default async function ManagementPage() {
   return (
     <ManagementDashboard
       buildings={(buildings ?? []) as BuildingRow[]}
-      units={(units ?? []) as UnitRow[]}
+      units={sortUnits((units ?? []) as UnitRow[])}
       dailyBookings={(dailyBookings ?? []) as DailyBookingRow[]}
       leaseContracts={(leaseContracts ?? []) as LeaseContractRow[]}
       saleContracts={(saleContracts ?? []) as SaleContractRow[]}

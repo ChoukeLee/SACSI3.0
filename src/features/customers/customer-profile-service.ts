@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { sortUnits } from "@/lib/utils";
 import type {
   CustomerRow, DailyBookingRow, LeaseContractRow, SaleContractRow,
   ReceivableRow, PaymentRow, UnitRow
@@ -44,7 +45,7 @@ export async function fetchCustomerProfile(customerId: string): Promise<Customer
   for (const b of (dailyBookings ?? [])) unitIds.add(b.unit_id);
   for (const l of (leaseContracts ?? [])) l.unit_id && unitIds.add(l.unit_id);
   for (const s of (saleContracts ?? [])) s.unit_id && unitIds.add(s.unit_id);
-  const relevantUnits = (units ?? []).filter(u => unitIds.has(u.id));
+  const relevantUnits = sortUnits((units ?? []).filter(u => unitIds.has(u.id)));
 
   return {
     customer: customer as CustomerRow,

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
+import { sortUnits } from "@/lib/utils";
 import type { SearchResult, SearchResultType, SearchResults } from "./search-types";
 import type { UserRole } from "@/lib/auth";
 
@@ -75,8 +76,8 @@ export async function globalSearch(query: string): Promise<SearchResults> {
 
   // ── Units ──
   if (permitted.includes("unit")) {
-    const { data } = await supabase.from("units").select("id, unit_no, floor_label, kind, status").or(`unit_no.ilike.${like},floor_label.ilike.${like}`).order("unit_no").limit(MAX_PER_TYPE);
-    for (const u of (data ?? [])) {
+    const { data } = await supabase.from("units").select("id, unit_no, floor_label, kind, status").or(`unit_no.ilike.${like},floor_label.ilike.${like}`).limit(200);
+    for (const u of sortUnits(data ?? []).slice(0, MAX_PER_TYPE)) {
       results.push(result("unit", u.unit_no, `${u.floor_label}F · ${u.kind}`, `房源 · ${u.status}`, `/units/${u.id}`, exactBonus(q, u.unit_no), u.id, u.unit_no));
     }
   }

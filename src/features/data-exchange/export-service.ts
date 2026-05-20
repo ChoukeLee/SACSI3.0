@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { sortUnits } from "@/lib/utils";
 import type { ExportDataType } from "./data-exchange-types";
 
 function csvLine(fields: (string | number | null | undefined)[]): string {
@@ -38,7 +39,7 @@ export async function exportData(type: ExportDataType, filters?: { dateFrom?: st
       let q = supabase.from("units").select("unit_no, building_id, floor_label, kind, status, area_sqm, layout, furnishing, notes").order("unit_no").limit(2000);
       const { data } = await q;
       rows.push(header);
-      for (const u of (data ?? [])) rows.push(csvLine([u.unit_no, u.building_id, u.floor_label, u.kind, u.status, u.area_sqm, u.layout, u.furnishing, u.notes]));
+      for (const u of sortUnits(data ?? [])) rows.push(csvLine([u.unit_no, u.building_id, u.floor_label, u.kind, u.status, u.area_sqm, u.layout, u.furnishing, u.notes]));
       break;
     }
     case "customers": {

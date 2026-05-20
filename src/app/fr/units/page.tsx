@@ -4,6 +4,7 @@ import { dictionaries } from "@/lib/i18n";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { sortUnits } from "@/lib/utils";
 import { UnitList } from "@/features/units";
 import type { UnitRow, UnitBusinessFlagRow } from "@/types/database";
 
@@ -34,14 +35,7 @@ export default async function FrenchUnitsPage() {
       supabase.from("unit_business_flags").select("*"),
     ]);
 
-    if (!unitsRes.error) units = unitsRes.data.sort((a, b) => {
-      const aNum = parseInt(a.unit_no, 10);
-      const bNum = parseInt(b.unit_no, 10);
-      if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
-      if (!isNaN(aNum)) return -1;
-      if (!isNaN(bNum)) return 1;
-      return a.unit_no.localeCompare(b.unit_no);
-    });
+    if (!unitsRes.error) units = sortUnits(unitsRes.data);
     if (!flagsRes.error) flags = flagsRes.data;
   }
 

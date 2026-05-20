@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { sortUnits } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { DesktopOnly } from "@/features/mobile";
 import { QualityCenter, runQualityChecks } from "@/features/data-quality";
@@ -35,7 +36,7 @@ export default async function FrenchDataQualityPage() {
   ]);
 
   const issues = runQualityChecks({
-    units: (units ?? []) as UnitRow[],
+    units: sortUnits((units ?? []) as UnitRow[]),
     customers: (customers ?? []) as CustomerRow[],
     dailyBookings: (dailyBookings ?? []) as DailyBookingRow[],
     leaseContracts: (leaseContracts ?? []) as LeaseContractRow[],

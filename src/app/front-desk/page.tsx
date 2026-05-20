@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { sortUnits } from "@/lib/utils";
 import { FrontDeskWorkspace } from "@/features/front-desk";
 import type { UnitRow, DailyBookingRow, CustomerRow, PaymentRow } from "@/types/database";
 
@@ -29,10 +30,7 @@ export default async function FrontDeskPage() {
       supabase.from("payments").select("*").eq("source_type", "daily_booking").order("payment_date", { ascending: false }).limit(500),
       supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed"),
     ]);
-    if (!unitsRes.error) dailyUnits = ((unitsRes.data as unknown as UnitRow[]) ?? []).sort((a: UnitRow, b: UnitRow) => {
-      const af = parseInt(a.floor_label); const bf = parseInt(b.floor_label);
-      return af !== bf ? af - bf : parseInt(a.unit_no) - parseInt(b.unit_no);
-    });
+    if (!unitsRes.error) dailyUnits = sortUnits(((unitsRes.data as unknown as UnitRow[]) ?? []));
     if (!bookingsRes.error) bookings = (bookingsRes.data as DailyBookingRow[]) ?? [];
     if (!customersRes.error) customers = (customersRes.data as CustomerRow[]) ?? [];
     if (!paymentsRes.error) payments = (paymentsRes.data as PaymentRow[]) ?? [];

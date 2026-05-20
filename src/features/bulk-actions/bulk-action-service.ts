@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
+import { sortUnits } from "@/lib/utils";
 import { writeAuditLog } from "@/lib/audit";
 import { createReceivable, cancelReceivablesForSource } from "@/features/finance/receivables";
 import type { BulkActionType, BulkPreview, PreviewRow, BulkResult } from "./bulk-action-types";
@@ -46,7 +47,7 @@ export async function buildPreview(action: BulkActionType, ids: string[], extra?
     case "unit_change_status": {
       const targetStatus = extra?.targetStatus ?? "available";
       const { data: units } = await supabase.from("units").select("*").order("unit_no").limit(500);
-      for (const u of (units ?? [])) {
+      for (const u of sortUnits(units ?? [])) {
         if (ids.length > 0 && !ids.includes(u.id)) continue;
         unitIds.add(u.id);
         // Safety checks

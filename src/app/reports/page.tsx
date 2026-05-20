@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
+import { sortUnits } from "@/lib/utils";
 import { ReportsView } from "@/features/reports";
 import { DesktopOnly } from "@/features/mobile";
 import type {
@@ -39,7 +40,7 @@ export default async function ReportsPage() {
       supabase.from("customers").select("*").order("name").limit(500),
     ]);
     if(!r[0].error) entries=r[0].data; if(!r[1].error) bookings=r[1].data;
-    if(!r[2].error) units=r[2].data; if(!r[3].error) leaseContracts=r[3].data;
+    if(!r[2].error) units=sortUnits(r[2].data); if(!r[3].error) leaseContracts=r[3].data;
     if(!r[4].error) saleContracts=r[4].data; if(!r[5].error) saleSchedules=r[5].data;
     if(!r[6].error) receivables=r[6].data; if(!r[7].error) payments=r[7].data;
     if(!r[8].error) customers=r[8].data;

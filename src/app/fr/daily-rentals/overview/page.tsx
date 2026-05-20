@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { sortUnits } from "@/lib/utils";
 import { OverviewView } from "@/features/daily-rentals/overview-view";
 import type { UnitRow, DailyBookingRow, CustomerRow, PaymentRow } from "@/types/database";
 
@@ -41,12 +42,7 @@ export default async function FrenchDailyOverviewPage() {
       supabase.from("cleaning_tasks").select("id, unit_id, is_completed"),
     ]);
 
-    if (!unitsRes.error) dailyUnits = ((unitsRes.data as unknown as UnitRow[]) ?? []).sort((a, b) => {
-      const aFloor = parseInt(a.floor_label, 10);
-      const bFloor = parseInt(b.floor_label, 10);
-      if (aFloor !== bFloor) return aFloor - bFloor;
-      return parseInt(a.unit_no, 10) - parseInt(b.unit_no, 10);
-    });
+    if (!unitsRes.error) dailyUnits = sortUnits(((unitsRes.data as unknown as UnitRow[]) ?? []));
     if (!bookingsRes.error) bookings = (bookingsRes.data as DailyBookingRow[]) ?? [];
     if (!customersRes.error) customers = (customersRes.data as CustomerRow[]) ?? [];
     if (!paymentsRes.error) payments = (paymentsRes.data as PaymentRow[]) ?? [];

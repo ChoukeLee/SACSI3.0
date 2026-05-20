@@ -12,3 +12,35 @@ export function formatXof(amount: number) {
     maximumFractionDigits: 0
   }).format(amount);
 }
+
+function firstNumber(value: string | null | undefined): number | null {
+  const match = String(value ?? "").match(/\d+/);
+  return match ? Number(match[0]) : null;
+}
+
+export function compareUnitNo(a: string | null | undefined, b: string | null | undefined) {
+  const aText = String(a ?? "");
+  const bText = String(b ?? "");
+  const aNum = firstNumber(aText);
+  const bNum = firstNumber(bText);
+
+  if (aNum !== null && bNum !== null && aNum !== bNum) return aNum - bNum;
+  if (aNum !== null && bNum === null) return -1;
+  if (aNum === null && bNum !== null) return 1;
+
+  return aText.localeCompare(bText, undefined, { numeric: true, sensitivity: "base" });
+}
+
+export function compareUnits<T extends { unit_no: string | null; floor_label?: string | null }>(a: T, b: T) {
+  const roomOrder = compareUnitNo(a.unit_no, b.unit_no);
+  if (roomOrder !== 0) return roomOrder;
+
+  const aFloor = firstNumber(a.floor_label);
+  const bFloor = firstNumber(b.floor_label);
+  if (aFloor !== null && bFloor !== null && aFloor !== bFloor) return aFloor - bFloor;
+  return String(a.floor_label ?? "").localeCompare(String(b.floor_label ?? ""), undefined, { numeric: true, sensitivity: "base" });
+}
+
+export function sortUnits<T extends { unit_no: string | null; floor_label?: string | null }>(units: T[]): T[] {
+  return [...units].sort(compareUnits);
+}

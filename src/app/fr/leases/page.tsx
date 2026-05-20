@@ -4,6 +4,7 @@ import { dictionaries } from "@/lib/i18n";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { sortUnits } from "@/lib/utils";
 import { LeaseList } from "@/features/leases";
 import { DesktopOnly } from "@/features/mobile";
 import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
@@ -36,7 +37,7 @@ export default async function FrenchLeasesPage() {
       supabase.from("receivables").select("*").in("source_type", ["lease_contract"]).order("due_date", { ascending: false }).limit(1000),
     ]);
     if (!contractsRes.error) contracts = contractsRes.data;
-    if (!unitsRes.error) units = unitsRes.data;
+    if (!unitsRes.error) units = sortUnits(unitsRes.data);
     if (!customersRes.error) customers = customersRes.data;
     if (!paymentsRes.error) payments = paymentsRes.data;
     if (!receivablesRes.error) receivables = receivablesRes.data;

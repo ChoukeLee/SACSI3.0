@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
+import { sortUnits } from "@/lib/utils";
 import { UnitList } from "@/features/units";
 import type { UnitRow, UnitBusinessFlagRow } from "@/types/database";
 import type { BusinessType } from "@/types/domain";
@@ -37,15 +38,7 @@ export default async function UnitsPage() {
     ]);
 
     if (unitsRes.error) console.error("Failed to fetch units:", unitsRes.error);
-    else units = unitsRes.data.sort((a, b) => {
-      const aNum = parseInt(a.unit_no, 10);
-      const bNum = parseInt(b.unit_no, 10);
-      // Numeric unit_no (rooms) sort by number; non-numeric (parking G-01) sort after
-      if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
-      if (!isNaN(aNum)) return -1;
-      if (!isNaN(bNum)) return 1;
-      return a.unit_no.localeCompare(b.unit_no);
-    });
+    else units = sortUnits(unitsRes.data);
 
     if (flagsRes.error) console.error("Failed to fetch business flags:", flagsRes.error);
     else flags = flagsRes.data;

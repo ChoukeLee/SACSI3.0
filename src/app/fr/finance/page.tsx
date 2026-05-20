@@ -4,6 +4,7 @@ import { dictionaries } from "@/lib/i18n";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { sortUnits } from "@/lib/utils";
 import { LedgerList } from "@/features/finance";
 import { ReceivableList } from "@/features/finance/receivable-list";
 import { DesktopOnly } from "@/features/mobile";
@@ -38,7 +39,7 @@ export default async function FrenchFinancePage() {
       supabase.from("buildings").select("*").eq("is_active", true).order("code"),
     ]);
     if (!entriesRes.error) entries = entriesRes.data;
-    if (!unitsRes.error) units = unitsRes.data;
+    if (!unitsRes.error) units = sortUnits(unitsRes.data);
     if (!receivablesRes.error) receivables = receivablesRes.data;
     if (!customersRes.error) customers = customersRes.data;
     if (!buildingsRes.error) buildings = buildingsRes.data;

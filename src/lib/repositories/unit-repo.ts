@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UnitRow, UnitInsert, UnitUpdate, UnitBusinessFlagRow } from "@/types/database";
 import type { UnitStatus, BusinessType } from "@/types/domain";
+import { sortUnits } from "@/lib/utils";
 
 export function createUnitRepo(client: SupabaseClient) {
   const table = () => client.from("units");
@@ -18,7 +19,7 @@ export function createUnitRepo(client: SupabaseClient) {
       if (opts?.status) query = query.eq("status", opts.status);
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      return sortUnits(data);
     },
 
     async getByBuildingCode(
@@ -35,7 +36,7 @@ export function createUnitRepo(client: SupabaseClient) {
       if (opts?.status) query = query.eq("status", opts.status);
       const { data, error } = await query;
       if (error) throw error;
-      return data as unknown as UnitRow[];
+      return sortUnits(data as unknown as UnitRow[]);
     },
 
     async getById(id: string): Promise<UnitRow | null> {
@@ -117,7 +118,7 @@ export function createUnitRepo(client: SupabaseClient) {
         .eq("unit_business_flags.is_enabled", true)
         .order("unit_no");
       if (error) throw error;
-      return data as unknown as UnitRow[];
+      return sortUnits(data as unknown as UnitRow[]);
     },
 
     async setBusinessFlag(
@@ -143,7 +144,7 @@ export function createUnitRepo(client: SupabaseClient) {
         .eq("building_id", buildingId)
         .order("unit_no");
       if (error) throw error;
-      return data as unknown as UnitRow[];
+      return sortUnits(data as unknown as UnitRow[]);
     },
 
     async getDailyRentalUnits(buildingId: string): Promise<UnitRow[]> {

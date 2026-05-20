@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { dictionaries, routeFor } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
+import { sortUnits } from "@/lib/utils";
 import { MobileWorkbench } from "@/features/mobile";
 import { TodoDashboardWidget, computeTodos } from "@/features/todos";
 import type { TodoRole } from "@/features/todos/todo-types";
@@ -53,10 +54,7 @@ export default async function FrenchDashboardPage() {
       supabase.from("units").select("id, unit_no, building_id"),
       supabase.from("customers").select("id, name, phone"),
     ]);
-    if (!unitsRes.error) dailyUnits = ((unitsRes.data as unknown as UnitRow[]) ?? []).sort((a, b) => {
-      const af = parseInt(a.floor_label); const bf = parseInt(b.floor_label);
-      return af !== bf ? af - bf : parseInt(a.unit_no) - parseInt(b.unit_no);
-    });
+    if (!unitsRes.error) dailyUnits = sortUnits(((unitsRes.data as unknown as UnitRow[]) ?? []));
     if (!bookingsRes.error) bookings = (bookingsRes.data as DailyBookingRow[]) ?? [];
     if (!customersRes.error) customers = (customersRes.data as CustomerRow[]) ?? [];
     if (!paymentsRes.error) payments = (paymentsRes.data as PaymentRow[]) ?? [];
@@ -64,7 +62,7 @@ export default async function FrenchDashboardPage() {
     if (!leaseRes.error) leaseContracts = leaseRes.data ?? [];
     if (!saleRes.error) saleContracts = saleRes.data ?? [];
     if (!recRes.error) receivables = recRes.data ?? [];
-    if (!allUnitsRes.error) allUnits = (allUnitsRes.data as unknown as UnitRow[]) ?? [];
+    if (!allUnitsRes.error) allUnits = sortUnits((allUnitsRes.data as unknown as UnitRow[]) ?? []);
     if (!allCustRes.error) allCustomers = (allCustRes.data as unknown as CustomerRow[]) ?? [];
   }
 

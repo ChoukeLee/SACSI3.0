@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { moduleCards } from "@/features/seed/initial-data";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
+import { sortUnits } from "@/lib/utils";
 import { MobileWorkbench } from "@/features/mobile";
 import { TodoDashboardWidget, computeTodos } from "@/features/todos";
 import { QualityDashboardWidget, runQualityChecks } from "@/features/data-quality";
@@ -61,10 +62,7 @@ export default async function DashboardPage() {
       supabase.from("payments").select("*").order("payment_date", { ascending: false }).limit(500),
       supabase.from("sale_payment_schedule").select("*").limit(500),
     ]);
-    if (!unitsRes.error) dailyUnits = ((unitsRes.data as unknown as UnitRow[]) ?? []).sort((a, b) => {
-      const af = parseInt(a.floor_label); const bf = parseInt(b.floor_label);
-      return af !== bf ? af - bf : parseInt(a.unit_no) - parseInt(b.unit_no);
-    });
+    if (!unitsRes.error) dailyUnits = sortUnits(((unitsRes.data as unknown as UnitRow[]) ?? []));
     if (!bookingsRes.error) bookings = (bookingsRes.data as DailyBookingRow[]) ?? [];
     if (!customersRes.error) customers = (customersRes.data as CustomerRow[]) ?? [];
     if (!paymentsRes.error) payments = (paymentsRes.data as PaymentRow[]) ?? [];
@@ -72,7 +70,7 @@ export default async function DashboardPage() {
     if (!leaseRes.error) leaseContracts = leaseRes.data ?? [];
     if (!saleRes.error) saleContracts = saleRes.data ?? [];
     if (!recRes.error) receivables = recRes.data ?? [];
-    if (!allUnitsRes.error) allUnits = (allUnitsRes.data as unknown as UnitRow[]) ?? [];
+    if (!allUnitsRes.error) allUnits = sortUnits((allUnitsRes.data as unknown as UnitRow[]) ?? []);
     if (!allCustRes.error) allCustomers = (allCustRes.data as unknown as CustomerRow[]) ?? [];
     if (!paymentsAllRes.error) paymentsAll = (paymentsAllRes.data as unknown as PaymentRow[]) ?? [];
     if (!schedRes.error) saleSchedules = (schedRes.data as unknown as SalePaymentScheduleRow[]) ?? [];
