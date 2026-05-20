@@ -117,17 +117,17 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
     <div>
       {/* Summary cards */}
       <div className="mb-4 grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-brand-green-200 bg-brand-green-50 p-4">
-          <div className="flex items-center gap-2 text-sm text-brand-green-700"><TrendingUp className="h-4 w-4" />{t.summary.totalIncome}</div>
-          <p className="mt-1 text-2xl font-bold text-brand-green-800">{formatXof(summary.income)}</p>
+        <div className="rounded-xl border border-brand-green-200 bg-brand-green-50 p-4 shadow-natural">
+          <div className="flex items-center gap-2 text-xs font-medium text-brand-green-700"><TrendingUp className="h-4 w-4" />{t.summary.totalIncome}</div>
+          <p className="mt-1 text-xl font-bold tabular-nums text-brand-green-800">{formatXof(summary.income)}</p>
         </div>
-        <div className="rounded-xl border border-brand-red-200 bg-brand-red-50 p-4">
-          <div className="flex items-center gap-2 text-sm text-brand-red-700"><TrendingDown className="h-4 w-4" />{t.summary.totalExpense}</div>
-          <p className="mt-1 text-2xl font-bold text-brand-red-800">{formatXof(summary.expense)}</p>
+        <div className="rounded-xl border border-brand-red-200 bg-brand-red-50 p-4 shadow-natural">
+          <div className="flex items-center gap-2 text-xs font-medium text-brand-red-700"><TrendingDown className="h-4 w-4" />{t.summary.totalExpense}</div>
+          <p className="mt-1 text-xl font-bold tabular-nums text-brand-red-800">{formatXof(summary.expense)}</p>
         </div>
-        <div className={cn("rounded-xl border p-4", summary.net >= 0 ? "border-brand-sky-200 bg-brand-sky-50" : "border-brand-amber-200 bg-brand-amber-50")}>
-          <div className="flex items-center gap-2 text-sm text-brand-ink-500"><Wallet className="h-4 w-4" />{t.summary.netBalance}</div>
-          <p className={cn("mt-1 text-2xl font-bold", summary.net >= 0 ? "text-brand-sky-800" : "text-brand-amber-800")}>{formatXof(summary.net)}</p>
+        <div className={cn("rounded-xl border p-4 shadow-natural", summary.net >= 0 ? "border-brand-green-200 bg-brand-green-50" : "border-brand-amber-200 bg-brand-amber-50")}>
+          <div className="flex items-center gap-2 text-xs font-medium text-brand-ink-500"><Wallet className="h-4 w-4" />{t.summary.netBalance}</div>
+          <p className={cn("mt-1 text-xl font-bold tabular-nums", summary.net >= 0 ? "text-brand-green-800" : "text-brand-amber-800")}>{formatXof(summary.net)}</p>
         </div>
       </div>
 

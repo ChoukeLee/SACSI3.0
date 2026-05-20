@@ -238,13 +238,12 @@ function resolveCalendarCheckOut(
 }
 
 export function getBookingColorClass(booking: DailyBookingRow): string {
+  // Aligned with Natural Professional STATUS_CELL earth-tone palette
   if (booking.status === "checked_in") {
-    return booking.checkout_mode === "open"
-      ? "bg-brand-amber-200 text-brand-amber-800"
-      : STATUS_COLORS.occupied;
+    return "bg-brand-orange-100 text-brand-orange-800";
   }
   if (booking.status === "confirmed" || booking.status === "pending_review") {
-    return STATUS_COLORS.reserved;
+    return "bg-amber-100 text-amber-800";
   }
   if (booking.status === "checked_out") {
     return "bg-brand-warm-100 text-brand-ink-500";
