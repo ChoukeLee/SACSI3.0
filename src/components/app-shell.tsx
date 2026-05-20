@@ -67,7 +67,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="px-4 py-5 pb-20 sm:px-6 lg:px-8 lg:py-7">{children}</main>
+        <main className="px-4 py-5 pb-20 sm:px-6 lg:px-8 lg:py-7 max-w-[1440px] mx-auto">{children}</main>
       </div>
 
       <MobileBottomNav locale={locale} userRole={userRole} />
