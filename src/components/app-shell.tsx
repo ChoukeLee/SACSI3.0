@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -18,6 +19,7 @@ export function AppShell({
   children: React.ReactNode; locale?: Locale; userRole?: UserRole; userDisplayName?: string;
   notifications?: { id: string; title: string; body: string; read_at: string | null; created_at: string; due_at: string | null }[];
 }) {
+  const pathname = usePathname();
   const labels = getDesktopNavLabels(locale);
   const otherLocale: Locale = locale === "zh" ? "fr" : "zh";
   const roleLabel = userRole ? labels.roles[userRole] : "";
@@ -45,13 +47,13 @@ export function AppShell({
               <NotificationBell notifications={notifications} locale={locale} />
               <Link
                 className="rounded-xl border border-brand-warm-300 bg-white px-3 py-1.5 text-[11px] font-bold text-brand-ink-900 shadow-sm transition-colors duration-[100ms] hover:border-brand-orange-200 hover:bg-brand-orange-50 active:scale-95"
-                href={routeFor(otherLocale, "/")}
+                href={routeFor(otherLocale, pathname)}
               >
                 {otherLocale.toUpperCase()}
               </Link>
               {roleLabel && (
                 <span className="hidden rounded-full bg-brand-orange-50 px-3 py-1 text-[11px] font-bold text-brand-orange-800 ring-1 ring-inset ring-brand-orange-200 sm:inline-flex">
-                  {userDisplayName ? `${roleLabel} · ${userDisplayName}` : roleLabel}
+                  {userDisplayName || roleLabel}
                 </span>
               )}
               {userRole && (

@@ -1751,6 +1751,8 @@ export const dictionaries = {
 } as const;
 
 export function routeFor(locale: Locale, href: string) {
-  if (locale === "zh") return href;
-  return href === "/" ? "/fr" : `/fr${href}`;
+  // Strip existing locale prefix first
+  const path = href.startsWith("/fr/") ? href.slice(3) : href === "/fr" ? "/" : href;
+  if (locale === "zh") return path;
+  return path === "/" ? "/fr" : `/fr${path}`;
 }
