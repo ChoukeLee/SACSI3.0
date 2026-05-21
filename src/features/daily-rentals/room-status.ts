@@ -215,12 +215,12 @@ function resolveCalendarCheckOut(
   // checked_in without actual_check_out → from check_in to today (inclusive)
   if (b.status === "checked_in") {
     // "today" inclusive: we want to show today's cell, so end = tomorrow
-    return b.check_in <= todayStr ? opts.tomorrowStr : b.check_in;
+    return b.check_in <= todayStr ? opts.tomorrowStr : addDays(b.check_in, 1);
   }
 
   // pending_review / confirmed → just the check_in day (one cell)
   if (b.status === "pending_review" || b.status === "confirmed") {
-    return b.check_in;
+    return addDays(b.check_in, 1);
   }
 
   // checked_out with actual_check_out → recorded range
@@ -230,11 +230,11 @@ function resolveCalendarCheckOut(
 
   // checked_out without actual → just check_in (one cell, as historical record)
   if (b.status === "checked_out") {
-    return b.check_in;
+    return addDays(b.check_in, 1);
   }
 
   // Fallback: check_in day only
-  return b.check_in;
+  return addDays(b.check_in, 1);
 }
 
 export function getBookingColorClass(booking: DailyBookingRow): string {
@@ -273,4 +273,10 @@ function toUtcDate(s: string): Date {
 
 function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+function addDays(dateStr: string, days: number): string {
+  const date = toUtcDate(dateStr);
+  date.setUTCDate(date.getUTCDate() + days);
+  return toDateStr(date);
 }
