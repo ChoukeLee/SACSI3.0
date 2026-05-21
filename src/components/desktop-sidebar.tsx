@@ -144,17 +144,16 @@ export function DesktopSidebar({ locale, userRole }: { locale: Locale; userRole?
   const visibleGroups = filterGroups(allGroups, userRole);
 
   const isActive = (item: NavItem) => {
+    const matchesPath = (target: string, exact = false) => {
+      if (exact) return pathname === target;
+      return pathname === target || pathname.startsWith(`${target}/`);
+    };
+
     if (item.activeMatch) {
       const prefix = routeFor(locale, item.activeMatch);
-      if (prefix === "/settings" && pathname === "/settings") return true;
-      if (prefix === "/settings" && pathname.startsWith("/settings/") && item.key !== "settings") {
-        // Only match if this specific item matches the prefix
-        return item.activeMatch === "/settings/audit-logs" ? pathname.startsWith(routeFor(locale, "/settings/audit-logs"))
-          : item.activeMatch === "/settings/security" ? pathname.startsWith(routeFor(locale, "/settings/security"))
-          : pathname.startsWith(prefix);
-      }
-      return pathname.startsWith(prefix);
+      return matchesPath(prefix, item.key === "settings");
     }
+
     const localized = routeFor(locale, item.href);
     if (item.href === "/") return pathname === "/" || pathname === "/fr";
     return pathname === localized;
