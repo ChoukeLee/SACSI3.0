@@ -51,7 +51,7 @@ export function MobileRoomCard({
       onClick={() => onPress(room)}
       className={cn(
         "w-full rounded-xl border bg-white p-3.5 shadow-natural text-left",
-        "transition-colors duration-[100ms] active:bg-brand-warm-50",
+        "transition-colors duration-[100ms] active:bg-slate-50",
         isCheckingOut
           ? "border-amber-200 bg-amber-50/40"
           : isReserved
@@ -60,18 +60,18 @@ export function MobileRoomCard({
               ? "border-sky-200 bg-sky-50/40"
               : hasOutstanding
                 ? "border-red-200 bg-red-50/30"
-                : "border-brand-warm-400"
+                : "border-slate-200"
       )}
     >
       {/* Top row: room number + status + chevron */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
-          <span className="font-mono text-xl font-bold leading-none text-brand-ink-900 tabular-nums">
+          <span className="font-mono text-xl font-black leading-none text-slate-950 tabular-nums">
             {room.unit.unit_no}
           </span>
           <StatusBadge status={unitStatus} locale={locale} />
         </div>
-        <ArrowRight className="h-4 w-4 text-brand-ink-300 shrink-0 mt-0.5" />
+        <ArrowRight className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
       </div>
 
       {/* Guest & stay info */}
@@ -79,12 +79,12 @@ export function MobileRoomCard({
         <div className="mt-2.5 flex items-center justify-between gap-2">
           <div className="min-w-0 flex-1">
             {room.customer && (
-              <p className="text-[13px] font-semibold text-brand-ink-800 truncate">
+              <p className="text-[13px] font-semibold text-slate-900 truncate">
                 {room.customer.name}
               </p>
             )}
             {room.booking && (
-              <p className="text-[11px] text-brand-ink-400 mt-0.5">
+              <p className="text-[11px] text-slate-500 mt-0.5">
                 {room.booking.check_in}
                 {room.booking.checkout_mode === "open"
                   ? ` · ${t.drawer.openEnded}`
@@ -114,7 +114,7 @@ export function MobileRoomCard({
 
       {/* Cleaning pending note */}
       {isCleaning && (
-        <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-brand-ink-400">
+        <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-slate-500">
           <span className="h-1.5 w-1.5 rounded-full bg-brand-sky-400" />
           {locale === "zh" ? "退房后等待保洁" : "En attente de menage"}
         </div>

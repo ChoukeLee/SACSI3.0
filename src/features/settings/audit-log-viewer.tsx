@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { Fragment, useState, useMemo } from "react";
 import { Search, ChevronDown, ChevronUp, Clock, User, Tag, FileText, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/lib/i18n";
@@ -106,7 +106,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
     });
   }, [logs, dateFrom, dateTo, actionFilter, entityFilter, search, actionLabels, entityLabels]);
 
-  const filterBtn = "rounded-lg border border-brand-warm-400 px-2.5 py-1 text-[11px] font-medium transition-all duration-fast bg-white";
+  const filterBtn = "rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50";
 
   const formatTime = (iso: string) => {
     const d = new Date(iso);
@@ -114,7 +114,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
   };
 
   const renderDiff = (before: Record<string, unknown> | null, after: Record<string, unknown> | null) => {
-    if (!before && !after) return <p className="text-xs text-brand-ink-300">{locale === "zh" ? "无变更数据" : "Aucune donnee"}</p>;
+    if (!before && !after) return <p className="text-xs font-semibold text-slate-400">{locale === "zh" ? "无变更数据" : "Aucune donnee"}</p>;
     const allKeys = new Set([...(before ? Object.keys(before) : []), ...(after ? Object.keys(after) : [])]);
     return (
       <div className="text-xs space-y-1">
@@ -124,11 +124,11 @@ export function AuditLogViewer({ logs, locale }: Props) {
           const changed = JSON.stringify(bVal) !== JSON.stringify(aVal);
           return (
             <div key={k} className={cn("flex gap-2", changed && "font-medium")}>
-              <span className="text-brand-ink-400 min-w-[100px]">{k}</span>
-              <span className={cn("text-brand-ink-300 line-through", !changed && "no-underline")}>
+              <span className="text-slate-500 min-w-[100px]">{k}</span>
+              <span className={cn("text-slate-400 line-through", !changed && "no-underline")}>
                 {bVal != null ? String(bVal) : "—"}
               </span>
-              {changed && <span className="text-brand-ink-900">→ <span className="text-brand-orange-700">{aVal != null ? String(aVal) : "—"}</span></span>}
+              {changed && <span className="text-slate-950">→ <span className="text-brand-orange-700">{aVal != null ? String(aVal) : "—"}</span></span>}
             </div>
           );
         })}
@@ -142,7 +142,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
       <div className="mb-4 flex flex-wrap gap-2 items-center">
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
           className={cn(filterBtn, "w-[130px]")} />
-        <span className="text-xs text-brand-ink-300">—</span>
+        <span className="text-xs font-semibold text-slate-400">—</span>
         <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
           className={cn(filterBtn, "w-[130px]")} />
         <select value={actionFilter} onChange={e => setActionFilter(e.target.value)} className={filterBtn}>
@@ -154,26 +154,26 @@ export function AuditLogViewer({ logs, locale }: Props) {
           {uniqueEntities.map(e => <option key={e} value={e}>{entityLabels[e] ?? e}</option>)}
         </select>
         <div className="relative flex-1 min-w-[160px] max-w-[280px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-brand-ink-300" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
           <input type="text" value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={locale === "zh" ? "搜索房号/客户/合同..." : "Rechercher..."}
-            className="w-full rounded-lg border border-brand-warm-400 pl-8 pr-3 py-1.5 text-xs text-brand-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30" />
+            className="w-full rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
         </div>
-        <span className="text-xs text-brand-ink-300 ml-auto tabular-nums">
+        <span className="text-xs font-semibold text-slate-400 ml-auto tabular-nums">
           {filtered.length} / {logs.length} {locale === "zh" ? "条" : "lignes"}
         </span>
       </div>
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-brand-warm-400 bg-white py-16 text-center text-sm text-brand-ink-300 shadow-natural">
+        <div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm font-semibold text-slate-400 shadow-natural">
           {locale === "zh" ? "暂无审计日志" : "Aucun log d'audit"}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-natural">
-          <table className="w-full min-w-[800px] text-left text-xs">
-            <thead className="border-b border-brand-warm-400 bg-brand-warm-50 text-[10px] font-semibold uppercase tracking-wider text-brand-ink-500">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-natural">
+          <table className="data-table min-w-[800px]">
+            <thead className="border-b border-slate-200 bg-slate-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
               <tr>
                 <th className="px-3 py-2.5 w-[150px]">
                   <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{locale === "zh" ? "时间" : "Date"}</span>
@@ -191,71 +191,70 @@ export function AuditLogViewer({ logs, locale }: Props) {
                 <th className="px-3 py-2.5 w-[40px]"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-brand-warm-400">
+            <tbody className="divide-y divide-slate-100">
               {filtered.map(l => {
                 const expanded = expandedId === l.id;
                 return (
-                  <>
+                  <Fragment key={l.id}>
                     <tr
-                      key={l.id}
                       className={cn(
-                        "transition-colors cursor-pointer hover:bg-brand-warm-50",
+                        "transition-colors cursor-pointer hover:bg-slate-50/80",
                         expanded && "bg-brand-orange-50/30",
                       )}
                       onClick={() => setExpandedId(expanded ? null : l.id)}
                     >
-                      <td className="px-3 py-2 text-brand-ink-400 font-mono text-[10px] whitespace-nowrap">
+                      <td className="px-3 py-2 text-slate-500 font-mono text-[10px] whitespace-nowrap">
                         {formatTime(l.created_at)}
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-medium text-brand-ink-700">
+                          <span className="font-medium text-slate-800">
                             {l.actor_email ?? l.actor_id?.slice(0, 8) ?? "—"}
                           </span>
                           {l.actor_role && (
-                            <span className="rounded bg-brand-warm-100 px-1 py-0 text-[9px] text-brand-ink-400">
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold text-slate-500 ring-1 ring-inset ring-slate-200">
                               {roleLabels[l.actor_role] ?? l.actor_role}
                             </span>
                           )}
                         </div>
                       </td>
                       <td className="px-3 py-2">
-                        <span className="rounded bg-brand-warm-100 px-1.5 py-0.5 text-[10px] font-medium text-brand-ink-600">
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
                           {actionLabels[l.action] ?? l.action}
                         </span>
                       </td>
                       <td className="px-3 py-2">
-                        <span className="text-[10px] text-brand-ink-400">
+                        <span className="text-[10px] text-slate-500">
                           {entityLabels[l.entity_type] ?? l.entity_type}
-                          {l.entity_label && <span className="ml-1 text-brand-ink-600">· {l.entity_label}</span>}
+                          {l.entity_label && <span className="ml-1 text-slate-700">· {l.entity_label}</span>}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-brand-ink-500 max-w-[200px] truncate">
+                      <td className="px-3 py-2 text-slate-600 max-w-[200px] truncate">
                         {l.entity_id ? `${l.entity_id.slice(0, 8)}...` : "—"}
                       </td>
                       <td className="px-3 py-2">
-                        <button className="rounded p-1 text-brand-ink-300 hover:text-brand-orange">
+                        <button className="rounded p-1 text-slate-400 hover:text-brand-orange">
                           {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                         </button>
                       </td>
                     </tr>
                     {expanded && (
-                      <tr key={`${l.id}-detail`} className="bg-brand-warm-50/50">
+                      <tr key={`${l.id}-detail`} className="bg-slate-50/80">
                         <td colSpan={6} className="px-6 py-3">
                           <div className="grid grid-cols-2 gap-4 text-xs">
                             <div>
-                              <p className="font-semibold text-brand-ink-700 mb-1.5 flex items-center gap-1">
+                              <p className="font-semibold text-slate-800 mb-1.5 flex items-center gap-1">
                                 <Eye className="h-3 w-3" />{locale === "zh" ? "变更前" : "Avant"}
                               </p>
-                              <div className="rounded border border-brand-warm-400 bg-white p-2">
+                              <div className="rounded-xl border border-slate-200 bg-white p-2">
                                 {renderDiff(null, l.before_data ? l.before_data : l.metadata)}
                               </div>
                             </div>
                             <div>
-                              <p className="font-semibold text-brand-ink-700 mb-1.5 flex items-center gap-1">
+                              <p className="font-semibold text-slate-800 mb-1.5 flex items-center gap-1">
                                 <Eye className="h-3 w-3" />{locale === "zh" ? "变更后 / 元数据" : "Apres / Metadonnees"}
                               </p>
-                              <div className="rounded border border-brand-warm-400 bg-white p-2">
+                              <div className="rounded-xl border border-slate-200 bg-white p-2">
                                 {renderDiff(l.before_data, l.after_data ?? l.metadata)}
                               </div>
                             </div>
@@ -263,7 +262,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>

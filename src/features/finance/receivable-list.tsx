@@ -5,7 +5,6 @@ import { Download } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
 import {
   calculateReceivableSummary,
   buildReceivableCsv,
@@ -29,11 +28,11 @@ interface Props {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  pending:   "bg-brand-warm-100 text-brand-ink-600",
+  pending:   "bg-slate-100 text-slate-700",
   partial:   "bg-brand-amber-100 text-amber-700",
   paid:      "bg-brand-green-100 text-brand-green-700",
   overdue:   "bg-brand-red-100 text-brand-red-700",
-  cancelled: "bg-brand-warm-50 text-brand-ink-300 line-through",
+  cancelled: "bg-slate-50 text-slate-400 line-through",
 };
 
 const ROW_BG: Record<string, string> = {
@@ -133,7 +132,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
     URL.revokeObjectURL(url);
   };
 
-  const filterBtn = "rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 shadow-sm transition-all duration-fast hover:border-slate-300 hover:bg-slate-50";
+  const filterBtn = "rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all duration-fast hover:border-slate-300 hover:bg-slate-50 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20";
 
   const resolveBuildingName = (r: ReceivableRow) => {
     const bid = r.building_id ?? unitBuildingMap.get(r.unit_id ?? "") ?? null;
@@ -144,7 +143,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
   return (
     <div>
       {/* Summary cards */}
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <MiniCard label={t.summary.totalReceivable} value={formatXof(summary.totalReceivable)} accent="ink" />
         <MiniCard label={t.summary.totalPaid} value={formatXof(summary.totalPaid)} accent="green" />
         <MiniCard label={t.summary.totalOutstanding} value={formatXof(summary.outstanding)} accent="orange" />
@@ -174,20 +173,20 @@ export function ReceivableList({ receivables, units, customers, buildings, local
         <input
           type="date" value={dateFrom}
           onChange={e => setDateFrom(e.target.value)}
-          className={cn(filterBtn, "w-[130px]")}
+          className={cn(filterBtn, "w-[150px]")}
           title={locale === "zh" ? "起始日期" : "Date debut"}
         />
-        <span className="text-xs text-brand-ink-300">—</span>
+        <span className="text-xs font-semibold text-slate-400">-</span>
         <input
           type="date" value={dateTo}
           onChange={e => setDateTo(e.target.value)}
-          className={cn(filterBtn, "w-[130px]")}
+          className={cn(filterBtn, "w-[150px]")}
           title={locale === "zh" ? "结束日期" : "Date fin"}
         />
         <button
           onClick={handleExportCsv}
           disabled={filtered.length === 0}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-950 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-slate-800 disabled:opacity-40"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-40"
         >
           <Download className="h-3.5 w-3.5" />{t.export.csv}
         </button>
@@ -198,65 +197,67 @@ export function ReceivableList({ receivables, units, customers, buildings, local
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <Card variant="subtle" className="py-10 text-center text-sm text-brand-ink-300">{t.empty}</Card>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white py-16 shadow-natural">
+          <p className="text-sm font-semibold text-slate-400">{t.empty}</p>
+        </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-natural">
-          <table className="data-table min-w-[900px] text-xs">
-            <thead>
-              <tr>
-                <th className="px-2 py-2.5 text-[10px] font-semibold uppercase text-brand-ink-400">{t.columns.dueDate}</th>
-                <th className="px-2 py-2.5 text-[10px] font-semibold uppercase text-brand-ink-400">{t.columns.building}</th>
-                <th className="px-2 py-2.5 text-[10px] font-semibold uppercase text-brand-ink-400">{t.columns.unit}</th>
-                <th className="px-2 py-2.5 text-[10px] font-semibold uppercase text-brand-ink-400">{t.columns.customer}</th>
-                <th className="px-2 py-2.5 text-[10px] font-semibold uppercase text-brand-ink-400">{t.columns.sourceType}</th>
-                <th className="px-2 py-2.5 text-[10px] font-semibold uppercase text-brand-ink-400">{t.columns.title}</th>
-                <th className="px-2 py-2.5 text-right text-[10px] font-semibold uppercase text-brand-ink-400">{t.columns.amount}</th>
-                <th className="px-2 py-2.5 text-right text-[10px] font-semibold uppercase text-brand-ink-400">{t.columns.paid}</th>
-                <th className="px-2 py-2.5 text-right text-[10px] font-semibold uppercase text-brand-ink-400">{t.columns.outstanding}</th>
-                <th className="px-2 py-2.5 text-[10px] font-semibold uppercase text-brand-ink-400">{t.columns.status}</th>
-                <th className="px-2 py-2.5 text-right text-[10px] font-semibold uppercase text-brand-ink-400">{t.columns.overdueDays}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-brand-warm-400">
-              {filtered.map(r => {
-                const os = Number(r.amount_xof) - Number(r.paid_amount_xof);
-                const od = overdueDays(r);
-                return (
-                  <tr key={r.id} className={cn("transition-colors duration-fast", ROW_BG[r.status])}>
-                    <td className="px-2 py-2 text-brand-ink-600 whitespace-nowrap">
-                      {r.due_date}
-                    </td>
-                    <td className="px-2 py-2 text-xs text-brand-ink-500 whitespace-nowrap">{resolveBuildingName(r)}</td>
-                    <td className="px-2 py-2 font-mono text-brand-ink-700">{unitMap.get(r.unit_id ?? "") ?? "—"}</td>
-                    <td className="px-2 py-2 text-brand-ink-600 max-w-[80px] truncate">{customerMap.get(r.customer_id ?? "")?.slice(0, 6) ?? "—"}</td>
-                    <td className="px-2 py-2">
-                      <span className="text-[10px] rounded bg-brand-warm-100 px-1.5 py-0.5 text-brand-ink-500">
-                        {t.sourceTypes[r.source_type as keyof typeof t.sourceTypes] ?? r.source_type}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2 text-brand-ink-600 max-w-[120px] truncate">{r.title}</td>
-                    <td className="px-2 py-2 text-right font-medium tabular-nums text-brand-ink-700">{formatXof(Number(r.amount_xof))}</td>
-                    <td className="px-2 py-2 text-right tabular-nums text-brand-green-600">{formatXof(Number(r.paid_amount_xof))}</td>
-                    <td className={cn("px-2 py-2 text-right tabular-nums font-semibold", os > 0 ? "text-brand-red-600" : "text-brand-green-600")}>{formatXof(os)}</td>
-                    <td className="px-2 py-2">
-                      <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", STATUS_STYLES[r.status])}>
-                        {t.statuses[r.status as keyof typeof t.statuses] ?? r.status}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2 text-right tabular-nums">
-                      {od !== null && od > 0 ? (
-                        <span className="text-brand-red-600 font-medium">+{od}</span>
-                      ) : od !== null && od === 0 ? (
-                        <span className="text-brand-ink-300">0</span>
-                      ) : (
-                        <span className="text-brand-ink-200">—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-natural">
+          <div className="overflow-x-auto">
+            <table className="data-table min-w-[980px] text-sm">
+              <thead>
+                <tr>
+                  <th className="px-4 py-3">{t.columns.dueDate}</th>
+                  <th className="px-4 py-3">{t.columns.building}</th>
+                  <th className="px-4 py-3">{t.columns.unit}</th>
+                  <th className="px-4 py-3">{t.columns.customer}</th>
+                  <th className="px-4 py-3">{t.columns.sourceType}</th>
+                  <th className="px-4 py-3">{t.columns.title}</th>
+                  <th className="px-4 py-3 text-right">{t.columns.amount}</th>
+                  <th className="px-4 py-3 text-right">{t.columns.paid}</th>
+                  <th className="px-4 py-3 text-right">{t.columns.outstanding}</th>
+                  <th className="px-4 py-3">{t.columns.status}</th>
+                  <th className="px-4 py-3 text-right">{t.columns.overdueDays}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(r => {
+                  const os = Number(r.amount_xof) - Number(r.paid_amount_xof);
+                  const od = overdueDays(r);
+                  return (
+                    <tr key={r.id} className={cn("transition-colors duration-fast hover:bg-slate-50/80", ROW_BG[r.status])}>
+                      <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{r.due_date}</td>
+                      <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{resolveBuildingName(r)}</td>
+                      <td className="px-4 py-3 font-mono text-sm font-bold text-slate-950">{unitMap.get(r.unit_id ?? "") ?? "-"}</td>
+                      <td className="max-w-[120px] truncate px-4 py-3 text-sm text-slate-700">{customerMap.get(r.customer_id ?? "") ?? "-"}</td>
+                      <td className="px-4 py-3">
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">
+                          {t.sourceTypes[r.source_type as keyof typeof t.sourceTypes] ?? r.source_type}
+                        </span>
+                      </td>
+                      <td className="max-w-[180px] truncate px-4 py-3 text-sm text-slate-700">{r.title}</td>
+                      <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-800">{formatXof(Number(r.amount_xof))}</td>
+                      <td className="px-4 py-3 text-right text-sm tabular-nums text-brand-green-600">{formatXof(Number(r.paid_amount_xof))}</td>
+                      <td className={cn("px-4 py-3 text-right text-sm tabular-nums font-semibold", os > 0 ? "text-brand-red-600" : "text-brand-green-600")}>{formatXof(os)}</td>
+                      <td className="px-4 py-3">
+                        <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", STATUS_STYLES[r.status])}>
+                          {t.statuses[r.status as keyof typeof t.statuses] ?? r.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {od !== null && od > 0 ? (
+                          <span className="text-brand-red-600 font-medium">+{od}</span>
+                        ) : od !== null && od === 0 ? (
+                          <span className="text-slate-400">0</span>
+                        ) : (
+                          <span className="text-slate-300">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
@@ -264,11 +265,18 @@ export function ReceivableList({ receivables, units, customers, buildings, local
 }
 
 function MiniCard({ label, value, accent }: { label: string; value: string; accent: string }) {
-  const borderColor: Record<string, string> = {
-    ink: "bg-brand-ink-700", green: "bg-brand-green-500",
-    orange: "bg-brand-orange", red: "bg-brand-red-500",
-  };
+  const styles = accent === "ink"
+    ? "border-slate-200 bg-white text-slate-950"
+    : accent === "green"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : accent === "orange"
+        ? "border-orange-200 bg-orange-50 text-orange-700"
+        : "border-red-200 bg-red-50 text-red-700";
+
   return (
-    <div className="rounded-lg border border-brand-warm-300 bg-white shadow-natural overflow-hidden"><div className={cn("h-[3px]", borderColor[accent] ?? "bg-brand-ink-700")} /><div className="px-3 py-2.5"><p className="text-[10px] text-brand-ink-400">{label}</p><p className="text-sm font-bold tabular-nums text-brand-ink-900">{value}</p></div></div>
+    <div className={cn("rounded-2xl border px-4 py-3 shadow-sm", styles)}>
+      <p className="text-[11px] font-bold text-current opacity-70">{label}</p>
+      <p className="mt-1 text-2xl font-black tabular-nums">{value}</p>
+    </div>
   );
 }

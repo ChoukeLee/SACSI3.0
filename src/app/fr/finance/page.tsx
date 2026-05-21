@@ -46,7 +46,6 @@ export default async function FrenchFinancePage() {
   return (
     <>
       <PageHeader title={t.title} description={t.description} />
-      <p className="text-xs text-brand-ink-400 mt-2 mb-6">Finance : XOF/CNY · recu requis · rapports en XOF</p>
       <section>
         <FinanceTabs
           ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale="fr" />}

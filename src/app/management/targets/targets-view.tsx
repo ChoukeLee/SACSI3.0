@@ -92,9 +92,9 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
           const rate = target ? (def.isPercentage ? Math.min(100, Math.round((current / Number(target.target_value)) * 100)) : Math.min(100, Math.round((current / Number(target.target_value)) * 100))) : null;
           const displayVal = def.key.endsWith("_max") ? current : current;
           return (
-            <div key={def.key} className="rounded-lg border border-brand-warm-300 bg-white p-3">
-              <p className="text-[10px] text-brand-ink-400">{locale === "zh" ? def.labelZh : def.labelFr}</p>
-              <p className="text-lg font-bold tabular-nums text-brand-ink-900">
+            <div key={def.key} className="rounded-lg border border-slate-200 bg-white p-3">
+              <p className="text-[10px] text-slate-500">{locale === "zh" ? def.labelZh : def.labelFr}</p>
+              <p className="text-lg font-black tabular-nums text-slate-950">
                 {def.isPercentage ? `${displayVal}%` : formatXof(displayVal)}
               </p>
               {target ? (
@@ -102,13 +102,13 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
                   <div className="h-1.5 rounded-full bg-brand-warm-200">
                     <div className={cn("h-full rounded-full", (rate ?? 0) >= 100 ? "bg-brand-green-500" : (rate ?? 0) >= 70 ? "bg-brand-orange" : "bg-brand-red-400")} style={{ width: `${Math.min(100, rate ?? 0)}%` }} />
                   </div>
-                  <p className="text-[9px] text-brand-ink-300 mt-0.5">
+                  <p className="text-[9px] text-slate-400 mt-0.5">
                     {locale === "zh" ? "目标" : "Cible"}: {def.isPercentage ? `${target.target_value}%` : formatXof(Number(target.target_value))}
                     {" · "}{rate}%
                   </p>
                 </div>
               ) : (
-                <p className="text-[9px] text-brand-ink-300 mt-1">{locale === "zh" ? "未设置目标" : "Pas d'objectif"}</p>
+                <p className="text-[9px] text-slate-400 mt-1">{locale === "zh" ? "未设置目标" : "Pas d'objectif"}</p>
               )}
             </div>
           );
@@ -117,32 +117,32 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
 
       {/* Targets list */}
       {canEdit && (
-        <div className="rounded-xl border border-brand-warm-300 bg-white p-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-brand-ink-900">{locale === "zh" ? "目标管理" : "Objectifs"}</h3>
-            <button onClick={() => setShowForm(!showForm)} className="rounded-lg bg-brand-ink-900 px-3 py-1.5 text-xs font-semibold text-white"><Plus className="inline h-3 w-3 mr-1" />{locale === "zh" ? "新增" : "Ajouter"}</button>
+            <h3 className="text-sm font-bold text-slate-950">{locale === "zh" ? "目标管理" : "Objectifs"}</h3>
+            <button onClick={() => setShowForm(!showForm)} className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white"><Plus className="inline h-3 w-3 mr-1" />{locale === "zh" ? "新增" : "Ajouter"}</button>
           </div>
 
           {showForm && (
             <div className="mb-3 rounded border border-brand-orange-200 bg-brand-orange-50 p-3 space-y-2">
-              <select value={formPeriod} onChange={e => setFormPeriod(e.target.value)} className="w-full rounded border border-brand-warm-400 px-3 py-1.5 text-sm">
+              <select value={formPeriod} onChange={e => setFormPeriod(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-sm">
                 <option value="monthly">{locale === "zh" ? "月度" : "Mensuel"}</option>
                 <option value="quarterly">{locale === "zh" ? "季度" : "Trimestre"}</option>
                 <option value="yearly">{locale === "zh" ? "年度" : "Annuel"}</option>
               </select>
-              <select value={formMetric} onChange={e => setFormMetric(e.target.value)} className="w-full rounded border border-brand-warm-400 px-3 py-1.5 text-sm">
+              <select value={formMetric} onChange={e => setFormMetric(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-sm">
                 {KPI_DEFINITIONS.map(d => <option key={d.key} value={d.key}>{locale === "zh" ? d.labelZh : d.labelFr}</option>)}
               </select>
-              <input type="number" value={formValue} onChange={e => setFormValue(e.target.value)} placeholder={locale === "zh" ? "目标值" : "Valeur"} className="w-full rounded border border-brand-warm-400 px-3 py-1.5 text-sm" />
+              <input type="number" value={formValue} onChange={e => setFormValue(e.target.value)} placeholder={locale === "zh" ? "目标值" : "Valeur"} className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-sm" />
               {formMsg && <p className="text-xs text-brand-red-600">{formMsg}</p>}
-              <button onClick={handleSave} disabled={saving} className="rounded-lg bg-brand-ink-900 px-4 py-1.5 text-xs font-semibold text-white"><Save className="inline h-3 w-3 mr-1" />{locale === "zh" ? "保存" : "OK"}</button>
+              <button onClick={handleSave} disabled={saving} className="rounded-lg bg-slate-950 px-4 py-1.5 text-xs font-semibold text-white"><Save className="inline h-3 w-3 mr-1" />{locale === "zh" ? "保存" : "OK"}</button>
             </div>
           )}
 
           {targets.length === 0 ? (
-            <p className="text-xs text-brand-ink-300">{locale === "zh" ? "暂无目标" : "Aucun"}</p>
+            <p className="text-xs text-slate-400">{locale === "zh" ? "暂无目标" : "Aucun"}</p>
           ) : (
-            <table className="w-full text-xs"><thead className="text-[10px] uppercase text-brand-ink-400"><tr><th className="px-2 py-1">{locale === "zh" ? "指标" : "KPI"}</th><th className="px-2 py-1">{locale === "zh" ? "期间" : "Periode"}</th><th className="px-2 py-1 text-right">{locale === "zh" ? "目标值" : "Cible"}</th><th className="px-2 py-1"></th></tr></thead>
+            <table className="w-full text-xs"><thead className="text-[10px] uppercase text-slate-500"><tr><th className="px-2 py-1">{locale === "zh" ? "指标" : "KPI"}</th><th className="px-2 py-1">{locale === "zh" ? "期间" : "Periode"}</th><th className="px-2 py-1 text-right">{locale === "zh" ? "目标值" : "Cible"}</th><th className="px-2 py-1"></th></tr></thead>
             <tbody className="divide-y divide-brand-warm-200">
               {targets.map(t => {
                 const def = KPI_DEFINITIONS.find(d => d.key === t.metric_key);

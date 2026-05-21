@@ -55,7 +55,7 @@ export function QualityCenter({ issues, locale }: Props) {
   const financeIssues = issues.filter(i => i.category === "finance").length;
   const unitIssues = issues.filter(i => i.category === "unit").length;
 
-  const filterBtn = "rounded-lg border border-brand-warm-400 px-2.5 py-1 text-[11px] font-medium transition-all duration-fast bg-white";
+  const filterBtn = "rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50";
 
   const sevBadge = (s: QualitySeverity) => {
     const st: Record<QualitySeverity, string> = { high: "bg-brand-red-100 text-brand-red-700", medium: "bg-brand-amber-100 text-amber-700", low: "bg-brand-sky-100 text-brand-sky-700" };
@@ -88,20 +88,20 @@ export function QualityCenter({ issues, locale }: Props) {
           {(Object.entries(catLabels) as [QualityCategory, string][]).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <div className="relative flex-1 min-w-[160px] max-w-[300px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-brand-ink-300" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder={locale === "zh" ? "搜索异常..." : "Rechercher..."}
-            className="w-full rounded-lg border border-brand-warm-400 pl-8 pr-3 py-1.5 text-xs text-brand-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30" />
+            className="w-full rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
         </div>
-        <span className="text-xs text-brand-ink-300 ml-auto">{filtered.length} {locale === "zh" ? "条" : "lignes"}</span>
+        <span className="text-xs font-semibold text-slate-400 ml-auto">{filtered.length} {locale === "zh" ? "条" : "lignes"}</span>
       </div>
 
       {/* Issues */}
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-brand-warm-400 bg-white py-16 text-center text-sm shadow-natural">
+        <div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm shadow-natural">
           <ShieldAlert className="mx-auto h-8 w-8 mb-3 text-brand-green-400" />
           <p className="text-brand-green-600 font-medium">{locale === "zh" ? "数据质量良好，未发现异常" : "Donnees saines, aucune anomalie"}</p>
-          <p className="text-brand-ink-300 text-xs mt-1">{locale === "zh" ? `共扫描 ${issues.length} 条规则` : `${issues.length} regles verifiees`}</p>
+          <p className="text-slate-400 text-xs mt-1">{locale === "zh" ? `共扫描 ${issues.length} 条规则` : `${issues.length} regles verifiees`}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -111,50 +111,50 @@ export function QualityCenter({ issues, locale }: Props) {
               <div
                 key={i.id}
                 className={cn(
-                  "rounded-lg border border-brand-warm-400 bg-white shadow-natural overflow-hidden",
+                  "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-natural",
                   SEVERITY_STYLES[i.severity],
                 )}
               >
                 <div
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-brand-warm-50/50"
+                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50/80"
                   onClick={() => setExpandedId(expanded ? null : i.id)}
                 >
                   <AlertTriangle className={cn("h-5 w-5 shrink-0", i.severity === "high" ? "text-brand-red-500" : i.severity === "medium" ? "text-brand-amber-500" : "text-brand-sky-400")} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-[10px] rounded bg-brand-warm-100 px-1.5 py-0 text-brand-ink-500">{catLabels[i.category]}</span>
+                      <span className="text-[10px] rounded-full bg-slate-100 px-2 py-0.5 text-slate-600 ring-1 ring-inset ring-slate-200">{catLabels[i.category]}</span>
                       {sevBadge(i.severity)}
                     </div>
-                    <p className="text-sm font-semibold text-brand-ink-900 truncate">{i.title}</p>
-                    <p className="text-xs text-brand-ink-400 truncate">
+                    <p className="text-sm font-bold text-slate-950 truncate">{i.title}</p>
+                    <p className="text-xs text-slate-500 truncate">
                       {i.entityLabel}
-                      <span className="ml-2 text-brand-ink-300">{i.detectedAt}</span>
+                      <span className="ml-2 text-slate-400">{i.detectedAt}</span>
                     </p>
                   </div>
                   <div className="shrink-0 flex items-center gap-2">
                     {i.href && (
                       <Link href={routeFor(locale, i.href)} onClick={e => e.stopPropagation()}
-                        className="rounded bg-brand-ink-900 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-brand-ink-700">
+                        className="rounded-xl bg-slate-950 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm transition hover:bg-slate-800">
                         {locale === "zh" ? "查看" : "Voir"} <ArrowRight className="inline h-3 w-3 ml-0.5" />
                       </Link>
                     )}
-                    {expanded ? <ChevronUp className="h-4 w-4 text-brand-ink-300" /> : <ChevronDown className="h-4 w-4 text-brand-ink-300" />}
+                    {expanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
                   </div>
                 </div>
                 {expanded && (
-                  <div className="border-t border-brand-warm-200 px-4 py-3 bg-brand-warm-50/30 space-y-2 text-xs">
+                  <div className="border-t border-slate-100 px-4 py-3 bg-slate-50/70 space-y-2 text-xs">
                     <div>
-                      <span className="font-semibold text-brand-ink-700">{locale === "zh" ? "描述" : "Description"}: </span>
-                      <span className="text-brand-ink-500">{i.description}</span>
+                      <span className="font-semibold text-slate-800">{locale === "zh" ? "描述" : "Description"}: </span>
+                      <span className="text-slate-600">{i.description}</span>
                     </div>
                     <div>
-                      <span className="font-semibold text-brand-ink-700">{locale === "zh" ? "建议" : "Action"}: </span>
+                      <span className="font-semibold text-slate-800">{locale === "zh" ? "建议" : "Action"}: </span>
                       <span className="text-brand-orange-700">{i.suggestedAction}</span>
                     </div>
                     {i.relatedEntities.length > 0 && (
                       <div>
-                        <span className="font-semibold text-brand-ink-700">{locale === "zh" ? "关联实体" : "Lies"}: </span>
-                        <span className="text-brand-ink-400 font-mono">{i.relatedEntities.map(e => e.slice(0, 8)).join(", ")}</span>
+                        <span className="font-semibold text-slate-800">{locale === "zh" ? "关联实体" : "Lies"}: </span>
+                        <span className="text-slate-500 font-mono">{i.relatedEntities.map(e => e.slice(0, 8)).join(", ")}</span>
                       </div>
                     )}
                   </div>
@@ -170,15 +170,15 @@ export function QualityCenter({ issues, locale }: Props) {
 
 function Pill({ label, value, accent }: { label: string; value: number; accent: string }) {
   const colors: Record<string, string> = {
-    ink: "bg-brand-ink-700",
+    ink: "bg-slate-800",
     red: "bg-brand-red-500",
     orange: "bg-brand-orange",
     sky: "bg-brand-sky-500",
   };
   return (
-    <div className="rounded-lg border border-brand-warm-400 bg-white shadow-natural overflow-hidden"><div className={cn("h-[3px]", colors[accent] ?? "bg-brand-ink-700")} /><div className="px-3 py-2">
-      <p className="text-[10px] text-brand-ink-300">{label}</p>
-      <p className="text-lg font-bold tabular-nums">{value}</p>
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-natural"><div className={cn("h-[3px]", colors[accent] ?? "bg-slate-800")} /><div className="px-3 py-2">
+      <p className="text-[10px] font-semibold text-slate-400">{label}</p>
+      <p className="text-lg font-black tabular-nums">{value}</p>
     </div></div>
   );
 }

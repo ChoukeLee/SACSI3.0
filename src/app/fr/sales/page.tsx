@@ -52,7 +52,6 @@ export default async function FrenchSalesPage() {
       </div>
       <div className="hidden lg:block">
         <PageHeader title={t.title} description={t.description} />
-        <p className="text-xs text-brand-ink-400 mt-2 mb-6">Vente : lots / parkings · comptant / fixe / flexible · contrat restaurable</p>
         <section>
           <SaleList contracts={contracts} schedules={schedules} units={units} customers={customers} payments={payments} receivables={receivables} locale="fr" />
         </section>

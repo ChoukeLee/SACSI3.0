@@ -16,11 +16,15 @@ export function FinanceTabs({ ledger, receivables, locale }: Props) {
 
   return (
     <div>
-      <div className="mb-4 flex gap-1 rounded-lg border border-brand-warm-400 bg-brand-warm-50 p-1 w-fit">
+      <div className="mb-4 flex gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 w-fit">
         <TabBtn active={tab === "ledger"} onClick={() => setTab("ledger")} label={t.ledger} />
         <TabBtn active={tab === "receivables"} onClick={() => setTab("receivables")} label={t.receivables} />
       </div>
-      {tab === "ledger" ? ledger : receivables}
+      {tab === "ledger" ? (
+        <div key="finance-ledger-panel">{ledger}</div>
+      ) : (
+        <div key="finance-receivables-panel">{receivables}</div>
+      )}
     </div>
   );
 }
@@ -29,10 +33,10 @@ function TabBtn({ active, onClick, label }: { active: boolean; onClick: () => vo
   return (
     <button
       onClick={onClick}
-      className={`rounded-md px-3 py-1.5 text-[13px] font-medium transition-all duration-fast ${
+      className={`rounded-md px-3 py-1.5 text-[13px] font-semibold transition-all duration-fast ${
         active
-          ? "bg-white text-brand-ink-900 shadow-sm"
-          : "text-brand-ink-400 hover:text-brand-ink-600"
+          ? "bg-white text-slate-950 shadow-sm"
+          : "text-slate-500 hover:text-slate-900"
       }`}
     >
       {label}

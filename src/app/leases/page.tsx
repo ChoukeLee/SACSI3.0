@@ -47,10 +47,6 @@ export default async function LeasesPage() {
         <DesktopOnly locale="zh" />
       </div>
       <div className="hidden lg:block">
-        <div className="mb-5">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-950">{t.title}</h1>
-          <p className="mt-1 text-sm text-slate-500">按房间、租客、合同和应收账款组织长租经营信息。</p>
-        </div>
         <section>
           <LeaseList contracts={contracts} units={units} customers={customers} payments={payments} receivables={receivables} locale="zh" />
         </section>

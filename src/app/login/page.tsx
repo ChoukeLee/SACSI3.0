@@ -21,28 +21,28 @@ export default async function LoginPage({
           <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-orange shadow-sm">
             <span className="text-sm font-bold text-white">S</span>
           </div>
-          <h1 className="text-lg font-bold text-brand-ink-900">SACIS 3.0</h1>
-          <p className="mt-1 text-sm text-brand-ink-400">科建地产房屋管理系统</p>
+          <h1 className="text-base font-black text-slate-950">SACIS 3.0</h1>
+          <p className="mt-1 text-sm text-slate-500">科建地产房屋管理系统</p>
         </div>
 
         <form action={login} className="space-y-4">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-brand-ink-500">邮箱</label>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">邮箱</label>
             <input
               type="email"
               name="email"
               placeholder="admin@sacis.com"
               required
-              className="w-full rounded-lg border border-brand-warm-400 bg-white px-3 py-2.5 text-sm text-brand-ink-900 placeholder:text-brand-ink-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-brand-ink-500">密码</label>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">密码</label>
             <input
               type="password"
               name="password"
               required
-              className="w-full rounded-lg border border-brand-warm-400 bg-white px-3 py-2.5 text-sm text-brand-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30"
             />
           </div>
 

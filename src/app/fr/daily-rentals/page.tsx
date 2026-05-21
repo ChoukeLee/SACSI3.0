@@ -64,7 +64,6 @@ export default async function FrenchDailyRentalsPage() {
       <>
 
 <><PageHeader title={t.title} description={t.description} />
-      <p className="text-xs text-brand-ink-400 mt-2 mb-6">Location jour : 21 chambres fixes · 40 000 XOF/nuit · paiement anticipe obligatoire</p>
       <section>
         <DailyCalendar
           dailyUnits={dailyUnits}

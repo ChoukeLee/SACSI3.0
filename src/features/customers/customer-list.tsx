@@ -177,8 +177,8 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
   };
 
   const inputClass =
-    "w-full rounded border border-brand-warm-400 bg-white px-3 py-2 text-sm text-brand-ink-900 placeholder:text-brand-ink-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
-  const labelClass = "block text-xs font-semibold uppercase tracking-wide text-brand-ink-400 mb-1";
+    "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
+  const labelClass = "block text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 mb-1";
 
   const isFormOpen = formMode !== null;
   const isBlacklistOpen = blacklistPanelId !== null;
@@ -215,7 +215,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
             </button>
           ))}
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-brand-ink-300" />
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder={t.searchPlaceholder}
@@ -257,20 +257,20 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
 
       {/* Table / Empty */}
       {filtered.length === 0 && !isFormOpen ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-brand-warm-400 bg-white py-16 shadow-natural">
-          <p className="text-sm text-brand-ink-300">{t.empty}</p>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white py-16 shadow-natural">
+          <p className="text-sm text-slate-400">{t.empty}</p>
           <button
             onClick={openAdd}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-[100ms] hover:bg-brand-ink-700 active:scale-[0.98]"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-[100ms] hover:bg-slate-800 active:scale-[0.98]"
           >
             <Plus className="h-3.5 w-3.5" />
             {t.actions.add}
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-natural">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-brand-warm-400 bg-brand-warm-50 text-[11px] font-semibold uppercase tracking-wider text-brand-ink-500">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-natural">
+          <table className="data-table min-w-[640px]">
+            <thead className="border-b border-slate-200 bg-slate-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
               <tr>
                 <th className="px-4 py-3">{t.fields.name}</th>
                 <th className="px-4 py-3">{t.fields.phone}</th>
@@ -279,7 +279,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                 <th className="px-4 py-3 sr-only">{t.actions.edit}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-brand-warm-400">
+            <tbody className="divide-y divide-slate-100">
               {filtered.map((c) => (
                 <tr
                   key={c.id}
@@ -287,7 +287,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                     "cursor-pointer transition",
                     c.is_blacklisted
                       ? "bg-brand-red-50/50 hover:bg-brand-red-50"
-                      : "hover:bg-brand-warm-100",
+                      : "hover:bg-slate-50/80",
                     selectedId === c.id && "ring-1 ring-inset ring-brand-orange-500"
                   )}
                   onClick={() => {
@@ -297,15 +297,15 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                   }}
                 >
                   <td className="px-4 py-3">
-                    <span className="font-semibold text-brand-ink-900">{c.name}</span>
+                    <span className="font-semibold text-slate-950">{c.name}</span>
                     {c.gender && (
-                      <span className="ml-1.5 text-xs text-brand-ink-300">
+                      <span className="ml-1.5 text-xs text-slate-400">
                         {t.gender[c.gender as keyof typeof t.gender] ?? c.gender}
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-brand-ink-500">{c.phone ?? "-"}</td>
-                  <td className="px-4 py-3 text-brand-ink-500">
+                  <td className="px-4 py-3 text-slate-600">{c.phone ?? "-"}</td>
+                  <td className="px-4 py-3 text-slate-600">
                     {c.document_type
                       ? t.documentTypes[c.document_type as keyof typeof t.documentTypes] ?? c.document_type
                       : "-"}
@@ -317,7 +317,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                         {c.blacklist_permanent ? t.blacklist.permanent : t.blacklist.temporary}
                       </span>
                     ) : (
-                      <span className="text-xs text-brand-ink-300">-</span>
+                      <span className="text-xs text-slate-400">-</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -326,7 +326,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                         e.stopPropagation();
                         openEdit(c);
                       }}
-                      className="text-xs font-medium text-brand-orange-600 transition hover:underline"
+                      className="text-xs font-semibold text-brand-orange-600 transition hover:underline"
                     >
                       {t.actions.edit}
                     </button>
@@ -338,7 +338,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
         </div>
       )}
 
-      <p className="mt-3 text-xs text-brand-ink-300">
+      <p className="mt-3 text-xs text-slate-400">
         {filtered.length} / {customers.length} {locale === "fr" ? "clients" : "位客户"}
       </p>
 
@@ -346,14 +346,14 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
       {isFormOpen && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setFormMode(null)} />
-          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-400 bg-white px-5 py-4">
-              <h3 className="text-lg font-bold text-brand-ink-900">
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-slate-200 bg-white shadow-panel">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
+              <h3 className="text-base font-black text-slate-950">
                 {formMode.type === "add" ? t.actions.add : t.actions.edit}
               </h3>
               <button
                 onClick={() => setFormMode(null)}
-                className="rounded p-1 text-brand-ink-300 transition hover:bg-brand-warm-100 hover:text-brand-ink-500"
+                className="rounded p-1 text-slate-400 transition hover:bg-slate-50/80 hover:text-slate-600"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -413,7 +413,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                     formMode.type === "edit" ? "留空则不修改" : t.fields.documentNumber
                   }
                 />
-                <p className="mt-1 text-xs text-brand-ink-300">
+                <p className="mt-1 text-xs text-slate-400">
                   {formMode.type === "edit" ? "留空则保持原证件号不变" : "证件号将加密存储"}
                 </p>
               </div>
@@ -448,13 +448,13 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="inline-flex items-center gap-1.5 rounded bg-brand-ink-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-ink-700 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
                 >
                   {saving ? "..." : t.actions.save}
                 </button>
                 <button
                   onClick={() => setFormMode(null)}
-                  className="rounded px-4 py-2 text-sm font-medium text-brand-ink-500 transition hover:bg-brand-warm-100"
+                  className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50/80"
                 >
                   {t.actions.cancel}
                 </button>
@@ -466,34 +466,34 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
 
       {/* Selected row detail + blacklist controls */}
       {selected && !isFormOpen && !isBlacklistOpen && (
-        <div className="mt-4 rounded-xl border border-brand-warm-400 bg-white p-4 shadow-natural">
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-natural">
           <div className="flex items-start justify-between">
             <div className="space-y-1 text-sm">
               <p>
-                <span className="text-brand-ink-300">{t.fields.name}:</span>{" "}
-                <span className="font-semibold text-brand-ink-900">{selected.name}</span>
+                <span className="text-slate-400">{t.fields.name}:</span>{" "}
+                <span className="font-semibold text-slate-950">{selected.name}</span>
               </p>
               {selected.gender && (
                 <p>
-                  <span className="text-brand-ink-300">{t.fields.gender}:</span>{" "}
+                  <span className="text-slate-400">{t.fields.gender}:</span>{" "}
                   {t.gender[selected.gender as keyof typeof t.gender] ?? selected.gender}
                 </p>
               )}
               {selected.phone && (
                 <p>
-                  <span className="text-brand-ink-300">{t.fields.phone}:</span> {selected.phone}
+                  <span className="text-slate-400">{t.fields.phone}:</span> {selected.phone}
                 </p>
               )}
               {selected.document_type && (
                 <p>
-                  <span className="text-brand-ink-300">{t.fields.documentType}:</span>{" "}
+                  <span className="text-slate-400">{t.fields.documentType}:</span>{" "}
                   {t.documentTypes[selected.document_type as keyof typeof t.documentTypes] ??
                     selected.document_type}
                 </p>
               )}
               {selected.notes && (
                 <p>
-                  <span className="text-brand-ink-300">{t.fields.notes}:</span> {selected.notes}
+                  <span className="text-slate-400">{t.fields.notes}:</span> {selected.notes}
                 </p>
               )}
               {selected.is_blacklisted && (
@@ -515,14 +515,14 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
             <div className="flex items-center gap-2">
               <Link
                 href={routeFor(locale, `/customers/${selected.id}`)}
-                className="inline-flex items-center gap-1 rounded bg-brand-ink-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-ink-700"
+                className="inline-flex items-center gap-1 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800"
               >
                 <Eye className="h-3.5 w-3.5" />
                 {locale === "zh" ? "查看档案" : "Profil"}
               </Link>
               <button
                 onClick={() => openEdit(selected)}
-                className="rounded border border-brand-warm-400 px-3 py-1.5 text-xs font-medium text-brand-ink-600 transition hover:bg-brand-warm-50"
+                className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50/80"
               >
                 {t.actions.edit}
               </button>
@@ -530,7 +530,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                 <button
                   onClick={() => handleUnblacklist(selected.id)}
                   disabled={blSaving}
-                  className="inline-flex items-center gap-1.5 rounded border border-brand-green-200 bg-brand-green-50 px-3 py-1.5 text-xs font-medium text-brand-green-700 transition hover:bg-brand-green-100 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded border border-brand-green-200 bg-brand-green-50 px-3 py-1.5 text-xs font-semibold text-brand-green-700 transition hover:bg-brand-green-100 disabled:opacity-50"
                 >
                   <UserCheck className="h-3.5 w-3.5" />
                   {t.blacklist.remove}
@@ -543,7 +543,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                     setBlPermanent(true);
                     setBlError("");
                   }}
-                  className="inline-flex items-center gap-1.5 rounded border border-brand-red-200 bg-brand-red-50 px-3 py-1.5 text-xs font-medium text-brand-red-700 transition hover:bg-brand-red-100"
+                  className="inline-flex items-center gap-1.5 rounded border border-brand-red-200 bg-brand-red-50 px-3 py-1.5 text-xs font-semibold text-brand-red-700 transition hover:bg-brand-red-100"
                 >
                   <UserX className="h-3.5 w-3.5" />
                   {t.blacklist.add}
@@ -558,12 +558,12 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
       {isBlacklistOpen && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setBlacklistPanelId(null)} />
-          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-sm overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-400 bg-white px-5 py-4">
-              <h3 className="text-lg font-bold text-brand-ink-900">{t.blacklist.add}</h3>
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-sm overflow-auto border-l border-slate-200 bg-white shadow-panel">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
+              <h3 className="text-base font-black text-slate-950">{t.blacklist.add}</h3>
               <button
                 onClick={() => setBlacklistPanelId(null)}
-                className="rounded p-1 text-brand-ink-300 transition hover:bg-brand-warm-100 hover:text-brand-ink-500"
+                className="rounded p-1 text-slate-400 transition hover:bg-slate-50/80 hover:text-slate-600"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -579,12 +579,12 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                   placeholder={t.blacklist.reason}
                 />
               </div>
-              <label className="flex items-center gap-2 text-sm text-brand-ink-600">
+              <label className="flex items-center gap-2 text-sm text-slate-700">
                 <input
                   type="checkbox"
                   checked={blPermanent}
                   onChange={(e) => setBlPermanent(e.target.checked)}
-                  className="h-4 w-4 rounded border-brand-warm-400 text-brand-orange-600 focus:ring-brand-orange-500"
+                  className="h-4 w-4 rounded border-slate-200 text-brand-orange-600 focus:ring-brand-orange-500"
                 />
                 {t.blacklist.permanent}
               </label>
@@ -600,7 +600,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                 </button>
                 <button
                   onClick={() => setBlacklistPanelId(null)}
-                  className="rounded px-4 py-2 text-sm font-medium text-brand-ink-500 transition hover:bg-brand-warm-100"
+                  className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50/80"
                 >
                   {t.actions.cancel}
                 </button>

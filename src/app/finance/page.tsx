@@ -46,7 +46,6 @@ export default async function FinancePage() {
   return (
     <>
       <PageHeader title={t.title} description={t.description} />
-      <p className="text-xs text-brand-ink-400 mt-2 mb-6">财务规则：XOF/CNY双币种 · 收据编号必留 · 报表统一换算 XOF</p>
       <section>
         <FinanceTabs
           ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale="zh" />}

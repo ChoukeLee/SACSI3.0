@@ -15,7 +15,7 @@ export default async function FrenchCustomerProfilePage({ params }: { params: Pr
   if (!profile) notFound();
 
   return (
-    <div className="min-h-screen bg-brand-warm-50 py-6 px-4">
+    <div className="min-h-screen bg-slate-50 py-6 px-4">
       <CustomerProfileView data={profile} locale="fr" userRole={user.role} />
     </div>
   );

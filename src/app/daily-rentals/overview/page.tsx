@@ -48,10 +48,6 @@ export default async function DailyOverviewPage() {
 
   return (
     <>
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950">房态矩阵</h1>
-        <p className="mt-1 text-sm text-slate-500">当天群发内容、房间状态和费用状态集中在一个操作视图中。</p>
-      </div>
       <OverviewView
         dailyUnits={dailyUnits}
         bookings={bookings}

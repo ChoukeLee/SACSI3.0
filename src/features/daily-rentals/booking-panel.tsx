@@ -81,8 +81,8 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
 
   const toN = (s: string) => parseInt(s, 10) || 0;
 
-  const inputClass = "w-full rounded-lg border border-brand-warm-400 bg-white px-3 py-2.5 text-sm text-brand-ink-900 transition-all duration-fast hover:border-brand-warm-500 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
-  const labelClass = "block text-[10px] font-semibold uppercase tracking-wider text-brand-ink-300 mb-1";
+  const inputClass = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 transition-all duration-fast hover:border-brand-warm-500 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
+  const labelClass = "block text-[10px] font-black uppercase tracking-[0.14em] text-slate-400 mb-1";
 
   const handleCreate = async () => {
     if (!newCustomerId) { setError(t.booking.noCustomer); return; }
@@ -147,11 +147,11 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   return (
     <>
       <div className="fixed inset-0 z-overlay bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-panel w-full max-w-full overflow-auto border-l border-brand-warm-400 bg-white shadow-panel lg:max-w-md" role="dialog" aria-label={isNew ? t.booking.newBooking : t.booking.title}>
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-400 bg-white/95 px-5 py-4 backdrop-blur">
+      <div className="fixed inset-y-0 right-0 z-panel w-full max-w-full overflow-auto border-l border-slate-200 bg-white shadow-panel lg:max-w-md" role="dialog" aria-label={isNew ? t.booking.newBooking : t.booking.title}>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur">
           <div>
-            <h3 className="text-base font-bold text-brand-ink-900">{isNew ? t.booking.newBooking : t.booking.title}</h3>
-            {selectedUnit && <p className="text-sm text-brand-ink-500">{selectedUnit.unit_no} ({selectedUnit.floor_label})</p>}
+            <h3 className="text-sm font-black text-slate-950">{isNew ? t.booking.newBooking : t.booking.title}</h3>
+            {selectedUnit && <p className="text-sm text-slate-600">{selectedUnit.unit_no} ({selectedUnit.floor_label})</p>}
           </div>
           <Button variant="icon" size="icon" onClick={onClose} aria-label={locale === "zh" ? "关闭" : "Fermer"}>
             <X className="h-5 w-5" />
@@ -171,8 +171,8 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
             <div>
               <label className={labelClass}>{t.checkoutModeLabel}</label>
               <div className="flex gap-2">
-                <button onClick={() => setNewCheckoutMode("fixed")} className={cn("flex-1 rounded-lg border px-3 py-2.5 text-xs font-medium transition-all duration-fast", newCheckoutMode === "fixed" ? "border-brand-orange bg-brand-orange-50 text-brand-orange-700" : "border-brand-warm-400 bg-white text-brand-ink-500 hover:bg-brand-warm-50")}>{t.fixedCheckout}</button>
-                <button onClick={() => setNewCheckoutMode("open")} className={cn("flex-1 rounded-lg border px-3 py-2.5 text-xs font-medium transition-all duration-fast", newCheckoutMode === "open" ? "border-brand-orange bg-brand-orange-50 text-brand-orange-700" : "border-brand-warm-400 bg-white text-brand-ink-500 hover:bg-brand-warm-50")}>{t.openCheckout}</button>
+                <button onClick={() => setNewCheckoutMode("fixed")} className={cn("flex-1 rounded-lg border px-3 py-2.5 text-xs font-semibold transition-all duration-fast", newCheckoutMode === "fixed" ? "border-brand-orange bg-brand-orange-50 text-brand-orange-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50")}>{t.fixedCheckout}</button>
+                <button onClick={() => setNewCheckoutMode("open")} className={cn("flex-1 rounded-lg border px-3 py-2.5 text-xs font-semibold transition-all duration-fast", newCheckoutMode === "open" ? "border-brand-orange bg-brand-orange-50 text-brand-orange-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50")}>{t.openCheckout}</button>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -181,7 +181,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div><label className={labelClass}>{t.booking.nightlyPrice}</label><input type="number" value={newNightlyPrice} onChange={e => setNewNightlyPrice(e.target.value)} className={inputClass} /></div>
-              <div><label className={labelClass}>{t.booking.totalAmount}</label><p className="mt-2 text-lg font-bold text-brand-ink-900">{newCheckoutMode === "fixed" ? `${newNights} ${t.booking.nights} = ${formatXof(newTotal)}` : `${t.booking.nights}×${newNightlyPrice.toLocaleString()} ${locale === "zh" ? "起" : "min"}`}</p></div>
+              <div><label className={labelClass}>{t.booking.totalAmount}</label><p className="mt-2 text-base font-black text-slate-950">{newCheckoutMode === "fixed" ? `${newNights} ${t.booking.nights} = ${formatXof(newTotal)}` : `${t.booking.nights}×${newNightlyPrice.toLocaleString()} ${locale === "zh" ? "起" : "min"}`}</p></div>
             </div>
             <div><label className={labelClass}>{t.booking.notes}</label><textarea value={newNotes} onChange={e => setNewNotes(e.target.value)} rows={2} className={inputClass} /></div>
             {error && <p className="text-sm text-brand-red-600" role="alert">{error}</p>}
@@ -195,29 +195,29 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
             <div className="flex items-start justify-between">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 bg-brand-amber-50 text-brand-amber-700 ring-brand-amber-200">{t.bookingStatus[booking.status as keyof typeof t.bookingStatus] ?? booking.status}</span>
-                <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", booking.checkout_mode === "open" ? "bg-brand-amber-100 text-brand-amber-700" : "bg-brand-warm-100 text-brand-ink-500")}>{booking.checkout_mode === "open" ? t.openEndedBadge : t.fixedBadge}</span>
+                <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", booking.checkout_mode === "open" ? "bg-brand-amber-100 text-brand-amber-700" : "bg-slate-100 text-slate-600")}>{booking.checkout_mode === "open" ? t.openEndedBadge : t.fixedBadge}</span>
               </div>
               <Button variant="icon" size="icon" onClick={() => printDailyReceipt({ booking, unit: selectedUnit ?? null, customer: null }, locale)} aria-label={dictionaries[locale].settings.print.print}>
                 <Printer className="h-4 w-4" />
               </Button>
             </div>
 
-            <div className="text-right text-sm"><p className="font-semibold text-brand-ink-900">{bookingCustomer?.name ?? booking.customer_id.slice(0, 8)}</p>{bookingCustomer?.phone && <p className="text-xs text-brand-ink-300">{bookingCustomer.phone}</p>}</div>
+            <div className="text-right text-sm"><p className="font-semibold text-slate-950">{bookingCustomer?.name ?? booking.customer_id.slice(0, 8)}</p>{bookingCustomer?.phone && <p className="text-xs text-slate-400">{bookingCustomer.phone}</p>}</div>
 
-            <div className="grid grid-cols-2 gap-3 rounded-lg bg-brand-warm-50 p-3 text-sm">
-              <div><p className="text-[10px] text-brand-ink-300">{t.booking.checkInDate}</p><p className="font-semibold text-brand-ink-900">{booking.check_in}</p></div>
-              <div><p className="text-[10px] text-brand-ink-300">{booking.checkout_mode === "open" ? t.actualCheckOutDate : t.booking.checkOutDate}</p><p className="font-semibold text-brand-ink-900">{booking.checkout_mode === "open" ? (booking.actual_check_out ?? "—") : booking.check_out}</p></div>
+            <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+              <div><p className="text-[10px] text-slate-400">{t.booking.checkInDate}</p><p className="font-semibold text-slate-950">{booking.check_in}</p></div>
+              <div><p className="text-[10px] text-slate-400">{booking.checkout_mode === "open" ? t.actualCheckOutDate : t.booking.checkOutDate}</p><p className="font-semibold text-slate-950">{booking.checkout_mode === "open" ? (booking.actual_check_out ?? "—") : booking.check_out}</p></div>
             </div>
 
             <div className="space-y-1.5 text-sm">
-              <div className="flex justify-between"><span className="text-brand-ink-500">{t.booking.nightlyPrice}</span><span>{formatXof(Number(booking.nightly_price_xof))}</span></div>
+              <div className="flex justify-between"><span className="text-slate-600">{t.booking.nightlyPrice}</span><span>{formatXof(Number(booking.nightly_price_xof))}</span></div>
               {billing && (
                 <>
-                  <div className="flex justify-between"><span className="text-brand-ink-500">{t.booking.nights}</span><span>{billing.nights}{locale === "zh" ? "晚" : " nuits"}</span></div>
-                  <div className="flex justify-between"><span className="text-brand-ink-500">{t.billing.grossAmount}</span><span>{formatXof(billing.grossAmount)}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-600">{t.booking.nights}</span><span>{billing.nights}{locale === "zh" ? "晚" : " nuits"}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-600">{t.billing.grossAmount}</span><span>{formatXof(billing.grossAmount)}</span></div>
                   {billing.discount > 0 && <div className="flex justify-between text-brand-green-600"><span>{t.billing.discount}</span><span>-{formatXof(billing.discount)}</span></div>}
-                  <div className="flex justify-between border-t border-brand-warm-400 pt-1 font-semibold"><span>{t.billing.finalAmount}</span><span>{formatXof(billing.finalAmount)}</span></div>
-                  <div className="flex justify-between"><span className="text-brand-ink-500">{t.billing.paid}</span><span>{formatXof(totalPaid)}</span></div>
+                  <div className="flex justify-between border-t border-slate-200 pt-1 font-semibold"><span>{t.billing.finalAmount}</span><span>{formatXof(billing.finalAmount)}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-600">{t.billing.paid}</span><span>{formatXof(totalPaid)}</span></div>
                   {billing.outstanding > 0 && <div className="flex justify-between text-brand-red-600 font-semibold"><span>{t.billing.outstanding}</span><span>{formatXof(billing.outstanding)}</span></div>}
                 </>
               )}
@@ -230,7 +230,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
               </div>
             )}
 
-            {booking.notes && <p className="text-xs text-brand-ink-400">{locale === "zh" ? "备注" : "Note"}: {booking.notes}</p>}
+            {booking.notes && <p className="text-xs text-slate-500">{locale === "zh" ? "备注" : "Note"}: {booking.notes}</p>}
 
             {/* Cleaning task */}
             {relatedCleaningTask && (
@@ -257,7 +257,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
 
               {booking.status === "confirmed" && (
                 <div className="space-y-2">
-                  <div><label className={labelClass}>{t.booking.prepaidAmount} *</label><input type="number" value={prepaidAmount} onChange={e => setPrepaidAmount(e.target.value)} className={inputClass} /><p className="mt-0.5 text-xs text-brand-ink-300">{t.booking.prepaidWarning}</p></div>
+                  <div><label className={labelClass}>{t.booking.prepaidAmount} *</label><input type="number" value={prepaidAmount} onChange={e => setPrepaidAmount(e.target.value)} className={inputClass} /><p className="mt-0.5 text-xs text-slate-400">{t.booking.prepaidWarning}</p></div>
                   <div className="flex gap-2">
                     <Button variant="primary" onClick={handleCheckIn} disabled={saving} className="flex-1">{t.booking.checkIn}</Button>
                     <Button variant="danger-secondary" onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className="flex-1">{t.booking.cancelBooking}</Button>
@@ -267,14 +267,14 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
 
               {booking.status === "checked_in" && (
                 <div className="space-y-3">
-                  <div className="rounded-lg border border-brand-warm-400 bg-brand-warm-50 p-3">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                     <label className={labelClass}>{t.supplementaryPayment}</label>
                     <div className="flex items-center gap-2">
                       <input type="number" value={suppAmount} onChange={e => setSuppAmount(e.target.value)} className={inputClass} placeholder={t.booking.totalAmount} />
                       <Button variant="primary" size="sm" onClick={handleSuppPayment} disabled={saving || (parseInt(suppAmount,10)||0) <= 0} className="shrink-0"><DollarSign className="h-3 w-3" />{locale === "zh" ? "收款" : "Payer"}</Button>
                     </div>
                     {bookingPayments.length > 0 && (
-                      <ul className="mt-2 space-y-0.5 text-xs text-brand-ink-500">
+                      <ul className="mt-2 space-y-0.5 text-xs text-slate-600">
                         {bookingPayments.map(p => <li key={p.id} className="flex justify-between">{p.payment_date} <span className="font-semibold">{formatXof(Number(p.amount))}</span></li>)}
                       </ul>
                     )}
@@ -290,11 +290,11 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                   </div>
 
                   {booking.checkout_mode === "fixed" && (
-                    <div className="rounded-lg border border-brand-warm-400 bg-brand-warm-50 p-3">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                       <label className={labelClass}>{t.booking.extendStay}</label>
                       <div className="flex items-center gap-2">
-                        <input type="number" min={1} value={extendDays} onChange={e => setExtendDays(e.target.value)} className="w-16 rounded-lg border border-brand-warm-400 px-2 py-2 text-sm transition-all duration-fast hover:border-brand-warm-500 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30" />
-                        <span className="text-xs text-brand-ink-500">{t.booking.nights} +{formatXof(Number(booking.nightly_price_xof) * (parseInt(extendDays,10)||1))}</span>
+                        <input type="number" min={1} value={extendDays} onChange={e => setExtendDays(e.target.value)} className="w-16 rounded-lg border border-slate-200 px-2 py-2 text-sm transition-all duration-fast hover:border-brand-warm-500 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30" />
+                        <span className="text-xs text-slate-600">{t.booking.nights} +{formatXof(Number(booking.nightly_price_xof) * (parseInt(extendDays,10)||1))}</span>
                         <Button variant="secondary" size="sm" onClick={handleExtend} disabled={saving}>{t.booking.extendStay}</Button>
                       </div>
                     </div>
@@ -315,7 +315,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
               )}
 
               {booking.status === "checked_out" && (
-                <div className="rounded-lg bg-brand-warm-50 p-3 text-center text-sm text-brand-ink-500">{t.bookingStatus.checked_out}{relatedCleaningTask && !relatedCleaningTask.is_completed && <p className="mt-1 text-xs text-brand-sky-600">{t.cleaning.pending}</p>}</div>
+                <div className="rounded-lg bg-slate-50 p-3 text-center text-sm text-slate-600">{t.bookingStatus.checked_out}{relatedCleaningTask && !relatedCleaningTask.is_completed && <p className="mt-1 text-xs text-brand-sky-600">{t.cleaning.pending}</p>}</div>
               )}
             </div>
             {actionError && <p className="text-sm text-brand-red-600" role="alert">{actionError}</p>}

@@ -47,19 +47,19 @@ export function MobileStatsBar({
               "transition-colors duration-[100ms]",
               "active:scale-95",
               isActive
-                ? "bg-white border border-brand-warm-400 shadow-natural"
-                : "border border-transparent active:bg-brand-warm-100"
+                ? "bg-white border border-slate-200 shadow-natural"
+                : "border border-transparent active:bg-slate-100"
             )}
           >
             <span className={cn(
-              "text-lg font-bold leading-none tabular-nums",
-              isActive ? item.accentClass : "text-brand-ink-600"
+              "text-lg font-black leading-none tabular-nums",
+              isActive ? item.accentClass : "text-slate-700"
             )}>
               {item.count}
             </span>
             <span className={cn(
-              "text-[10px] font-medium mt-0.5 leading-tight",
-              isActive ? "text-brand-ink-600" : "text-brand-ink-400"
+              "text-[10px] font-semibold mt-0.5 leading-tight",
+              isActive ? "text-slate-700" : "text-slate-500"
             )}>
               {item.label}
             </span>

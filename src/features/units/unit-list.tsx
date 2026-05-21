@@ -103,13 +103,13 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
 
       {/* Empty state */}
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-brand-warm-400 bg-white py-20 shadow-natural">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-warm-50">
-            <Building2 className="h-6 w-6 text-brand-ink-300" />
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-slate-200 bg-white py-20 shadow-natural">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-50">
+            <Building2 className="h-6 w-6 text-slate-400" />
           </div>
           <div className="text-center">
-            <p className="text-sm font-medium text-brand-ink-500">{t.empty}</p>
-            <p className="mt-1 text-xs text-brand-ink-300">
+            <p className="text-sm font-semibold text-slate-600">{t.empty}</p>
+            <p className="mt-1 text-xs text-slate-400">
               {locale === "zh" ? "请先在设置中导入楼栋和房间" : "Importez d'abord l'immeuble dans Parametres"}
             </p>
           </div>
@@ -184,7 +184,7 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
       )}
 
       {/* Result count */}
-      <p className="mt-3 text-xs text-brand-ink-300" role="status" aria-live="polite">
+      <p className="mt-3 text-xs text-slate-400" role="status" aria-live="polite">
         {filtered.length} / {units.length} {locale === "fr" ? "lots" : "套房源"}
       </p>
 

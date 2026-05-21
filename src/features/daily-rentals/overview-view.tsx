@@ -155,7 +155,7 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
       </div>
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-6">
-        <SummaryCard label={locale === "zh" ? "总房源" : "Total"} value={summary.total} bg="bg-brand-warm-100 text-brand-ink-700" />
+        <SummaryCard label={locale === "zh" ? "总房源" : "Total"} value={summary.total} bg="bg-slate-100 text-slate-800" />
         <SummaryCard label={locale === "zh" ? "占用" : "Occupe"} value={summary.occupied} bg="bg-brand-orange-50 text-brand-orange-700" />
         <SummaryCard label={locale === "zh" ? "未定离店" : "Ouvert"} value={summary.openEnded} bg="bg-brand-amber-50 text-brand-amber-700" />
         <SummaryCard label={locale === "zh" ? "今日退房" : "Depart"} value={summary.checkoutsToday} bg="bg-brand-sky-50 text-brand-sky-700" />
@@ -284,8 +284,8 @@ function DailyRoomCard({
 function SummaryCard({ label, value, bg }: { label: string; value: number; bg: string }) {
   return (
     <div className={cn("rounded-lg p-3 text-center transition-colors duration-fast", bg)}>
-      <p className="text-[10px] font-semibold uppercase tracking-wider opacity-70">{label}</p>
-      <p className="mt-0.5 text-xl font-bold tabular-nums">{value}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">{label}</p>
+      <p className="mt-0.5 text-xl font-black tabular-nums">{value}</p>
     </div>
   );
 }

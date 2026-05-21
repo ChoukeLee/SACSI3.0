@@ -87,12 +87,12 @@ export function BulkActionCenter({ locale, userRole }: Props) {
   return (
     <div className="max-w-4xl mx-auto space-y-4">
       {/* Operation selector */}
-      <div className="rounded-xl border border-brand-warm-300 bg-white p-5 shadow-natural space-y-3">
-        <label className="block text-xs font-semibold text-brand-ink-400">{L.selectAction}</label>
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-natural space-y-3">
+        <label className="block text-[11px] font-bold text-slate-500">{L.selectAction}</label>
         <select
           value={actionType}
           onChange={e => { setActionType(e.target.value as BulkActionType); reset(); }}
-          className="w-full sm:w-96 rounded-lg border border-brand-warm-400 px-3 py-2 text-sm text-brand-ink-900"
+          className="w-full sm:w-96 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
         >
           <option value="">—</option>
           {(["finance","unit","daily","customer"] as const).filter(c => permittedCategories.includes(c)).map(cat => (
@@ -104,20 +104,20 @@ export function BulkActionCenter({ locale, userRole }: Props) {
           ))}
         </select>
         {selectedDef && (
-          <p className="text-xs text-brand-ink-400">{locale === "zh" ? selectedDef.descZh : selectedDef.descFr}</p>
+          <p className="text-xs text-slate-500">{locale === "zh" ? selectedDef.descZh : selectedDef.descFr}</p>
         )}
 
         {/* Extra params for specific actions */}
         {actionType === "daily_cancel_bookings" && (
           <div><label className="text-[10px] font-semibold text-brand-red-600">{L.reason} *</label>
             <input value={extraReason} onChange={e => setExtraReason(e.target.value)}
-              className="w-full sm:w-64 rounded-lg border border-brand-warm-400 px-3 py-1.5 text-sm" />
+              className="w-full sm:w-64 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
           </div>
         )}
         {actionType === "unit_change_status" && (
-          <div><label className="text-[10px] font-semibold text-brand-ink-400">{L.targetStatus}</label>
+          <div><label className="text-[10px] font-semibold text-slate-500">{L.targetStatus}</label>
             <select value={extraTargetStatus} onChange={e => setExtraTargetStatus(e.target.value)}
-              className="w-full sm:w-48 rounded-lg border border-brand-warm-400 px-3 py-1.5 text-sm">
+              className="w-full sm:w-48 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20">
               <option value="available">{locale === "zh" ? "空闲" : "Dispo"}</option>
               <option value="maintenance">{locale === "zh" ? "维修" : "Maint"}</option>
               <option value="locked">{locale === "zh" ? "锁定" : "Bloque"}</option>
@@ -127,23 +127,23 @@ export function BulkActionCenter({ locale, userRole }: Props) {
 
         <div className="flex gap-2">
           <button onClick={handlePreview} disabled={loading || !actionType}
-            className="rounded-lg bg-brand-ink-900 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-ink-700 disabled:opacity-50 inline-flex items-center gap-2">
+            className="rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.98] disabled:opacity-50 inline-flex items-center gap-2">
             {loading && status === "idle" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />}
             {L.preview}
           </button>
-          <button onClick={reset} className="rounded-lg border border-brand-warm-400 px-4 py-2 text-xs font-medium text-brand-ink-500 hover:bg-brand-warm-100">{L.reset}</button>
+          <button onClick={reset} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">{L.reset}</button>
         </div>
       </div>
 
       {/* Preview */}
       {preview && status !== "done" && (
-        <div className="rounded-xl border border-brand-warm-300 bg-white p-5 shadow-natural space-y-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-natural space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-brand-ink-900">{L.preview}</h3>
+            <h3 className="text-sm font-black text-slate-950">{L.preview}</h3>
             <div className="flex gap-3 text-xs">
               <span className="text-brand-green-600">{L.willChange}: {preview.changeCount}</span>
               <span className="text-amber-600">{L.skipped}: {preview.skipCount}</span>
-              {preview.totalAmount > 0 && <span className="text-brand-ink-500">{L.totalAmount}: {preview.totalAmount.toLocaleString()} XOF</span>}
+              {preview.totalAmount > 0 && <span className="text-slate-600">{L.totalAmount}: {preview.totalAmount.toLocaleString()} XOF</span>}
             </div>
           </div>
 
@@ -157,24 +157,24 @@ export function BulkActionCenter({ locale, userRole }: Props) {
             <button onClick={toggleAll} className="text-brand-orange font-medium hover:underline">
               {checkedIds.size === preview.rows.length ? (locale === "zh" ? "取消全选" : "Desel. tout") : (locale === "zh" ? "全选可操作" : "Tout sel.")}
             </button>
-            <span className="text-brand-ink-300">{L.selected}: {checkedIds.size} / {preview.rows.length}</span>
+            <span className="text-slate-400">{L.selected}: {checkedIds.size} / {preview.rows.length}</span>
           </div>
 
-          <div className="max-h-[300px] overflow-auto rounded-lg border border-brand-warm-200 text-xs">
-            <table className="w-full">
-              <thead className="bg-brand-warm-50 text-[10px] uppercase text-brand-ink-400 sticky top-0"><tr>
+          <div className="max-h-[300px] overflow-auto rounded-xl border border-slate-200 text-xs">
+            <table className="data-table">
+              <thead className="sticky top-0 bg-slate-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"><tr>
                 <th className="px-2 py-1.5 w-8"></th>
                 <th className="px-2 py-1.5 text-left">{locale === "zh" ? "记录" : "Enr."}</th>
                 <th className="px-2 py-1.5 text-left">{locale === "zh" ? "结果" : "Resultat"}</th>
               </tr></thead>
-              <tbody className="divide-y divide-brand-warm-200">
+              <tbody className="divide-y divide-slate-100">
                 {preview.rows.map(r => (
                   <tr key={r.id} className={cn(!r.willChange && "opacity-60")}>
                     <td className="px-2 py-1">
                       <input type="checkbox" checked={checkedIds.has(r.id)} onChange={() => toggleCheck(r.id)} disabled={!r.willChange}
-                        className="h-3.5 w-3.5 rounded border-brand-warm-400" />
+                        className="h-3.5 w-3.5 rounded border-slate-200" />
                     </td>
-                    <td className="px-2 py-1 font-medium text-brand-ink-700">{r.label}</td>
+                    <td className="px-2 py-1 font-medium text-slate-800">{r.label}</td>
                     <td className={cn("px-2 py-1", r.willChange ? "text-brand-green-600" : "text-amber-600")}>
                       {r.willChange ? (locale === "zh" ? "将执行" : "Oui") : r.skipReason}
                     </td>
@@ -194,7 +194,7 @@ export function BulkActionCenter({ locale, userRole }: Props) {
             onClick={handleExecute}
             disabled={loading || checkedIds.size === 0 || (actionType === "daily_cancel_bookings" && !extraReason)}
             className={cn("rounded-lg px-5 py-2.5 text-xs font-semibold text-white disabled:opacity-50 inline-flex items-center gap-2",
-              selectedDef?.dangerous ? "bg-brand-red-600 hover:bg-brand-red-700" : "bg-brand-ink-900 hover:bg-brand-ink-700")}>
+              selectedDef?.dangerous ? "bg-brand-red-600 hover:bg-brand-red-700" : "bg-slate-950 hover:bg-slate-800")}>
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
             {L.execute} ({checkedIds.size})
           </button>
@@ -218,13 +218,13 @@ export function BulkActionCenter({ locale, userRole }: Props) {
               {result.errors.map((e, i) => <p key={i} className="text-brand-red-600">{e}</p>)}
             </div>
           )}
-          <button onClick={reset} className="rounded-lg border border-brand-warm-400 px-4 py-1.5 text-xs font-medium text-brand-ink-500 hover:bg-brand-warm-100">{L.reset}</button>
+          <button onClick={reset} className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">{L.reset}</button>
         </div>
       )}
 
       {/* Empty */}
       {status === "idle" && !preview && (
-        <div className="rounded-xl border border-brand-warm-300 bg-white py-16 text-center text-sm text-brand-ink-300 shadow-natural">
+        <div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm font-semibold text-slate-400 shadow-natural">
           {L.noResults}
         </div>
       )}

@@ -82,15 +82,6 @@ export default async function UnitsPage() {
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-950">{t.title}</h1>
-          <p className="mt-1 text-sm text-slate-500">住宿楼优先展示，车位与门面房可通过资产类型筛选查看。</p>
-        </div>
-        <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500 shadow-sm">
-          11#公寓
-        </span>
-      </div>
       <UnitList
         units={units}
         businessFlagsMap={businessFlagsMap}

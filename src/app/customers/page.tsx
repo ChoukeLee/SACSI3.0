@@ -31,10 +31,6 @@ export default async function CustomersPage() {
 
   return (
     <>
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950">{t.title}</h1>
-        <p className="mt-1 text-sm text-slate-500">长期客户、购房客户与日租住客分层查看，减少高频操作时的信息噪音。</p>
-      </div>
       <CustomerList customers={(customersRes.data as CustomerRow[]) ?? []} customerSegments={customerSegments} locale="zh" />
     </>
   );

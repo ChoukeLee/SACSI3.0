@@ -49,7 +49,6 @@ export default async function FrenchLeasesPage() {
       </div>
       <div className="hidden lg:block">
         <PageHeader title={t.title} description={t.description} />
-        <p className="text-xs text-brand-ink-400 mt-2 mb-6">Location longue : tarification par typologie · mensuel/trimestre/semestre/annuel · sortie automatique</p>
         <section>
           <LeaseList contracts={contracts} units={units} customers={customers} payments={payments} receivables={receivables} locale="fr" />
         </section>

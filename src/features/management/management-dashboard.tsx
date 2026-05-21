@@ -283,18 +283,6 @@ export function ManagementDashboard({
     <div className="-my-6 bg-[#f5f7fb]">
       <div className="mx-auto flex max-w-[1360px] flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
 
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-950">{t.title}</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              {locale === "zh" ? "财务状况与房间状态总览" : "Finance et statut des logements"}
-            </p>
-          </div>
-          <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500 shadow-sm">
-            {monthPrefix}
-          </span>
-        </div>
-
         {/* ── Building selector — segmented control ── */}
         <div>
           <div className="inline-flex flex-wrap gap-0.5 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
@@ -400,7 +388,7 @@ export function ManagementDashboard({
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
                   <div className="flex items-center gap-2.5">
                     <span className="h-2.5 w-2.5 rounded-full bg-brand-orange" />
-                    <h4 className="text-base font-bold text-slate-900">{building.display_name}</h4>
+                    <h4 className="text-sm font-black text-slate-950">{building.display_name}</h4>
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
                       {bStates.length} {locale === "zh" ? "间" : "unités"}
                     </span>
@@ -570,7 +558,7 @@ function StatusSummaryCard({ label, value, status }: { label: string; value: num
 function SectionLabel({ children, compact = false }: { children: React.ReactNode; compact?: boolean }) {
   return (
     <h2 className={cn(
-      "text-xs font-semibold uppercase tracking-wider text-slate-500",
+      "text-[11px] font-black uppercase tracking-[0.14em] text-slate-500",
       compact ? "mb-0" : "mb-4",
     )}>
       {children}
@@ -610,7 +598,7 @@ function KPICard({ label, value, variant }: {
       <div className="flex min-w-0 flex-1 flex-col justify-between px-4 py-3">
         <div className="flex items-center gap-2 mb-1.5">
           <span className={cn("h-1.5 w-1.5 rounded-full", s.dot)} />
-          <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
+          <p className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
         </div>
         <p className={cn("truncate text-[22px] font-black tracking-tight tabular-nums", s.text)}>
           {value}
@@ -634,14 +622,14 @@ function RiskAlert({ label, value, unit, active, compact = false }: {
       <div className="mb-1.5 flex items-center gap-2">
         {active && <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />}
         <span className={cn(
-          "text-[11px] font-medium uppercase tracking-wider",
+          "text-[11px] font-medium uppercase tracking-[0.14em]",
           active ? "text-red-600" : "text-slate-400",
         )}>
           {label}
         </span>
       </div>
       <p className={cn(
-        compact ? "text-lg font-bold tabular-nums" : "text-xl font-bold tabular-nums",
+        compact ? "text-lg font-black tabular-nums" : "text-xl font-black tabular-nums",
         active ? "text-red-700" : "text-slate-400",
       )}>
         {value} <span className="text-sm font-normal">{unit}</span>

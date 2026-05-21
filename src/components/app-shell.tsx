@@ -36,7 +36,7 @@ export function AppShell({
         <header className="sticky top-0 z-sticky border-b border-slate-200 bg-white/90 shadow-[0_1px_2px_rgba(15,23,42,0.04)] backdrop-blur-xl">
           <div className="mx-auto flex h-14 max-w-[1480px] items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex flex-1 items-center gap-4">
-              <p className="hidden text-[12px] font-bold tracking-wide text-slate-600 sm:block">{labels.building}</p>
+              <p className="hidden text-[12px] font-bold tracking-[0.04em] text-slate-600 sm:block">{labels.building}</p>
               <div className="flex-1 flex justify-center sm:justify-start">
                 <GlobalSearch locale={locale} />
               </div>

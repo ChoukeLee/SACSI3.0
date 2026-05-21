@@ -268,8 +268,8 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
     else setError(result.error ?? "Failed");
   };
 
-  const inputClass = "w-full rounded border border-brand-warm-400 bg-white px-3 py-2 text-sm text-brand-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
-  const labelClass = "block text-xs font-semibold uppercase tracking-wide text-brand-ink-400 mb-1";
+  const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
+  const labelClass = "block text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 mb-1";
 
   const statusVariant: Record<string, "neutral" | "success" | "danger" | "warning"> = {
     draft: "neutral", active: "success", terminated: "danger", expired: "warning",
@@ -409,10 +409,10 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
       {panel === "new" && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setPanel(null)} />
-          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-400 bg-white px-5 py-4">
-              <h3 className="text-lg font-bold text-brand-ink-900">{t.form.newContract}</h3>
-              <button onClick={() => setPanel(null)} className="rounded p-1 text-brand-ink-300 hover:bg-brand-warm-100"><X className="h-5 w-5" /></button>
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-slate-200 bg-white shadow-panel">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
+              <h3 className="text-base font-black text-slate-950">{t.form.newContract}</h3>
+              <button onClick={() => setPanel(null)} className="rounded p-1 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4 px-5 py-5">
               <div><label className={labelClass}>{t.form.contractNo} *</label><input type="text" value={fContractNo} onChange={(e) => setFContractNo(e.target.value)} className={inputClass} /></div>
@@ -439,10 +439,10 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className={labelClass}>{t.form.agencyCommission}</label><input type="number" value={fCommission} onChange={(e) => setFCommission(Number(e.target.value))} className={inputClass} /></div>
-                <label className="flex items-center gap-2 text-sm pt-5"><input type="checkbox" checked={fCommissionPaid} onChange={(e) => setFCommissionPaid(e.target.checked)} className="h-4 w-4 rounded border-brand-warm-400" />{t.form.agencyCommissionPaid}</label>
+                <label className="flex items-center gap-2 text-sm pt-5"><input type="checkbox" checked={fCommissionPaid} onChange={(e) => setFCommissionPaid(e.target.checked)} className="h-4 w-4 rounded border-slate-200" />{t.form.agencyCommissionPaid}</label>
               </div>
               {error && <p className="text-sm text-brand-red-600">{error}</p>}
-              <button onClick={handleCreate} disabled={saving} className="w-full rounded bg-brand-ink-900 py-2.5 text-sm font-semibold text-white hover:bg-brand-ink-700 disabled:opacity-50">{saving ? "..." : t.form.newContract}</button>
+              <button onClick={handleCreate} disabled={saving} className="w-full rounded-lg bg-slate-950 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">{saving ? "..." : t.form.newContract}</button>
             </div>
           </div>
         </>
@@ -452,50 +452,50 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
       {panel === "detail" && selected && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setPanel(null)} />
-          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-brand-warm-400 bg-white shadow-panel">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-400 bg-white px-5 py-4">
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-slate-200 bg-white shadow-panel">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
               <div>
-                <h3 className="text-lg font-bold text-brand-ink-900">{selected.contract_no}</h3>
+                <h3 className="text-base font-black text-slate-950">{selected.contract_no}</h3>
                 <Badge variant={statusVariant[selected.status]}>{t.contractStatus[selected.status as keyof typeof t.contractStatus]}</Badge>
               </div>
-              <button onClick={() => setPanel(null)} className="rounded p-1 text-brand-ink-300 hover:bg-brand-warm-100"><X className="h-5 w-5" /></button>
+              <button onClick={() => setPanel(null)} className="rounded p-1 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4 px-5 py-5">
               {/* Contract info */}
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <div><dt className="text-xs text-brand-ink-300">{t.form.unit}</dt><dd className="font-medium">{selectedUnit?.unit_no} — {selectedUnit?.kind}</dd></div>
-                <div><dt className="text-xs text-brand-ink-300">{t.form.customer}</dt><dd className="font-medium">{selectedCustomer?.name}</dd></div>
-                <div><dt className="text-xs text-brand-ink-300">{t.form.signedDate}</dt><dd>{selected.signed_date}</dd></div>
-                <div><dt className="text-xs text-brand-ink-300">{t.form.totalAmount}</dt><dd className="font-semibold">{formatXof(Number(selected.total_amount_xof))}</dd></div>
-                <div><dt className="text-xs text-brand-ink-300">{t.form.paymentPlan}</dt><dd>{t.paymentPlan[selected.payment_plan_type as keyof typeof t.paymentPlan]}</dd></div>
-                <div><dt className="text-xs text-brand-ink-300">{t.form.transferStatus}</dt><dd>{t.transferStatus[selected.transfer_status as keyof typeof t.transferStatus]}</dd></div>
-                {selected.title_certificate_no && <div><dt className="text-xs text-brand-ink-300">{t.form.titleCertificateNo}</dt><dd>{selected.title_certificate_no}</dd></div>}
-                {selected.agency_company && <div><dt className="text-xs text-brand-ink-300">{t.form.agencyCompany}</dt><dd>{selected.agency_company}</dd></div>}
-                {selected.agent_name && <div><dt className="text-xs text-brand-ink-300">{t.form.agentName}</dt><dd>{selected.agent_name}</dd></div>}
+                <div><dt className="text-xs text-slate-400">{t.form.unit}</dt><dd className="font-medium">{selectedUnit?.unit_no} — {selectedUnit?.kind}</dd></div>
+                <div><dt className="text-xs text-slate-400">{t.form.customer}</dt><dd className="font-medium">{selectedCustomer?.name}</dd></div>
+                <div><dt className="text-xs text-slate-400">{t.form.signedDate}</dt><dd>{selected.signed_date}</dd></div>
+                <div><dt className="text-xs text-slate-400">{t.form.totalAmount}</dt><dd className="font-semibold">{formatXof(Number(selected.total_amount_xof))}</dd></div>
+                <div><dt className="text-xs text-slate-400">{t.form.paymentPlan}</dt><dd>{t.paymentPlan[selected.payment_plan_type as keyof typeof t.paymentPlan]}</dd></div>
+                <div><dt className="text-xs text-slate-400">{t.form.transferStatus}</dt><dd>{t.transferStatus[selected.transfer_status as keyof typeof t.transferStatus]}</dd></div>
+                {selected.title_certificate_no && <div><dt className="text-xs text-slate-400">{t.form.titleCertificateNo}</dt><dd>{selected.title_certificate_no}</dd></div>}
+                {selected.agency_company && <div><dt className="text-xs text-slate-400">{t.form.agencyCompany}</dt><dd>{selected.agency_company}</dd></div>}
+                {selected.agent_name && <div><dt className="text-xs text-slate-400">{t.form.agentName}</dt><dd>{selected.agent_name}</dd></div>}
               </dl>
 
               {/* Payment overview */}
-              <div className="border-t border-brand-warm-400 pt-4">
-                <h4 className="text-sm font-bold text-brand-ink-900 flex items-center gap-1.5">
+              <div className="border-t border-slate-200 pt-4">
+                <h4 className="text-sm font-bold text-slate-950 flex items-center gap-1.5">
                   <TrendingUp className="h-3.5 w-3.5 text-brand-orange" />{t.overview.title}
                 </h4>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded border border-brand-warm-400 bg-white px-3 py-2">
-                    <p className="text-brand-ink-400">{t.overview.totalPrice}</p>
-                    <p className="font-bold tabular-nums text-brand-ink-900">{formatXof(Number(selected.total_amount_xof))}</p>
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                    <p className="text-slate-500">{t.overview.totalPrice}</p>
+                    <p className="font-bold tabular-nums text-slate-950">{formatXof(Number(selected.total_amount_xof))}</p>
                   </div>
                   <div className="rounded border border-brand-green-200 bg-brand-green-50 px-3 py-2">
-                    <p className="text-brand-ink-400">{t.overview.paidAmount}</p>
+                    <p className="text-slate-500">{t.overview.paidAmount}</p>
                     <p className="font-bold tabular-nums text-brand-green-700">{formatXof(totalPaidRec || totalPaidPayments)}</p>
                   </div>
                   <div className={cn("rounded border px-3 py-2", (totalReceivableRec - totalPaidRec) > 0 ? "border-brand-orange-200 bg-brand-orange-50" : "border-brand-green-200 bg-brand-green-50")}>
-                    <p className="text-brand-ink-400">{t.overview.unpaidAmount}</p>
+                    <p className="text-slate-500">{t.overview.unpaidAmount}</p>
                     <p className={cn("font-bold tabular-nums", (totalReceivableRec - totalPaidRec) > 0 ? "text-brand-orange-700" : "text-brand-green-700")}>
                       {formatXof(Math.max(0, totalReceivableRec - totalPaidRec))}
                     </p>
                   </div>
                   <div className={cn("rounded border px-3 py-2", totalOverdueRec > 0 ? "border-brand-red-200 bg-brand-red-50" : "border-brand-green-200 bg-brand-green-50")}>
-                    <p className="text-brand-ink-400">{t.overview.overdueAmount}</p>
+                    <p className="text-slate-500">{t.overview.overdueAmount}</p>
                     <p className={cn("font-bold tabular-nums", totalOverdueRec > 0 ? "text-brand-red-700" : "text-brand-green-700")}>
                       {totalOverdueRec > 0 ? formatXof(totalOverdueRec) : "—"}
                     </p>
@@ -503,7 +503,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                 </div>
                 {/* Progress bar */}
                 <div className="mt-2">
-                  <div className="flex justify-between text-[10px] text-brand-ink-400 mb-1">
+                  <div className="flex justify-between text-[10px] text-slate-500 mb-1">
                     <span>{t.overview.collectionRate}</span>
                     <span className="tabular-nums font-medium">
                       {totalReceivableRec > 0 ? Math.round((totalPaidRec / totalReceivableRec) * 100) : 0}%
@@ -519,10 +519,10 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
               </div>
 
               {/* Installment schedule */}
-              <div className="border-t border-brand-warm-400 pt-4">
-                <h4 className="text-sm font-bold text-brand-ink-900">{t.installment.title}</h4>
+              <div className="border-t border-slate-200 pt-4">
+                <h4 className="text-sm font-bold text-slate-950">{t.installment.title}</h4>
                 {contractSchedules.length === 0 ? (
-                  <p className="mt-1 text-xs text-brand-ink-300">{locale === "zh" ? "暂无分期计划" : "Aucun echeancier"}</p>
+                  <p className="mt-1 text-xs text-slate-400">{locale === "zh" ? "暂无分期计划" : "Aucun echeancier"}</p>
                 ) : (
                   <div className="mt-2 space-y-1.5">
                     {contractSchedules.map((s) => {
@@ -540,11 +540,11 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                             "flex items-center justify-between rounded border px-3 py-2 text-xs gap-1",
                             isOverdue ? "border-brand-red-200 bg-brand-red-50/50" :
                             s.status === "paid" ? "border-brand-green-200 bg-brand-green-50/50" :
-                            "border-brand-warm-400 bg-brand-warm-50",
+                            "border-slate-200 bg-slate-50",
                           )}
                         >
-                          <span className="font-medium text-brand-ink-600 min-w-[24px]">#{s.installment_no}</span>
-                          <span className={cn("text-brand-ink-400 min-w-[72px]", isOverdue && "text-brand-red-600")}>
+                          <span className="font-medium text-slate-700 min-w-[24px]">#{s.installment_no}</span>
+                          <span className={cn("text-slate-500 min-w-[72px]", isOverdue && "text-brand-red-600")}>
                             {s.due_date}
                             {od !== null && od > 0 && <span className="ml-1 text-[9px] text-brand-red-500">+{od}</span>}
                           </span>
@@ -568,9 +568,9 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
 
                 {/* Record payment */}
                 {selected.status === "active" && contractSchedules.some(s => s.status === "pending" || s.status === "overdue") && (
-                  <div className="mt-3 space-y-2 rounded border border-brand-warm-400 bg-brand-warm-50 p-3">
+                  <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <div>
-                      <label className="text-xs text-brand-ink-400">{t.payment.selectInstallment}</label>
+                      <label className="text-xs text-slate-500">{t.payment.selectInstallment}</label>
                       <select
                         value={payScheduleId}
                         onChange={(e) => {
@@ -607,14 +607,14 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                     </div>
                     {payScheduleId && (
                       <>
-                        <div className="rounded bg-white px-2 py-1 text-xs text-brand-ink-500">
-                          {locale === "zh" ? "金额自动填入未收金额（全额收款）" : "Montant auto-rempli (paiement total)"}: <span className="font-bold text-brand-ink-900">{formatXof(payAmount)}</span>
+                        <div className="rounded bg-white px-2 py-1 text-xs text-slate-600">
+                          {locale === "zh" ? "金额自动填入未收金额（全额收款）" : "Montant auto-rempli (paiement total)"}: <span className="font-bold text-slate-950">{formatXof(payAmount)}</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
-                          <div><label className="text-xs text-brand-ink-400">{t.payment.paymentDate}</label><input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className={inputClass} /></div>
-                          <div><label className="text-xs text-brand-ink-400">{t.payment.receiptNo}</label><input type="text" value={payReceiptNo} onChange={(e) => setPayReceiptNo(e.target.value)} className={inputClass} /></div>
+                          <div><label className="text-xs text-slate-500">{t.payment.paymentDate}</label><input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className={inputClass} /></div>
+                          <div><label className="text-xs text-slate-500">{t.payment.receiptNo}</label><input type="text" value={payReceiptNo} onChange={(e) => setPayReceiptNo(e.target.value)} className={inputClass} /></div>
                         </div>
-                        <button onClick={handleRecordPayment} disabled={saving} className="w-full rounded bg-brand-ink-900 py-1.5 text-xs font-semibold text-white hover:bg-brand-ink-700 disabled:opacity-50"><DollarSign className="mr-1 inline h-3 w-3" />{t.payment.record}</button>
+                        <button onClick={handleRecordPayment} disabled={saving} className="w-full rounded-lg bg-slate-950 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"><DollarSign className="mr-1 inline h-3 w-3" />{t.payment.record}</button>
                       </>
                     )}
                   </div>
@@ -622,24 +622,24 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
 
                 {/* Add flexible installment */}
                 {selected.status === "active" && selected.payment_plan_type === "flexible_installment" && (
-                  <div className="mt-3 space-y-2 rounded border border-dashed border-brand-warm-400 bg-white p-3">
-                    <h5 className="text-xs font-semibold text-brand-ink-400"><CalendarPlus className="mr-1 inline h-3 w-3" />{t.installment.addInstallment}</h5>
+                  <div className="mt-3 space-y-2 rounded border border-dashed border-slate-200 bg-white p-3">
+                    <h5 className="text-xs font-semibold text-slate-500"><CalendarPlus className="mr-1 inline h-3 w-3" />{t.installment.addInstallment}</h5>
                     <div className="grid grid-cols-2 gap-2">
-                      <div><label className="text-xs text-brand-ink-400">{t.installment.dueDate}</label><input type="date" value={flexDueDate} onChange={(e) => setFlexDueDate(e.target.value)} className={inputClass} /></div>
-                      <div><label className="text-xs text-brand-ink-400">{t.installment.amount}</label><input type="number" value={flexAmount} onChange={(e) => setFlexAmount(Number(e.target.value))} className={inputClass} /></div>
+                      <div><label className="text-xs text-slate-500">{t.installment.dueDate}</label><input type="date" value={flexDueDate} onChange={(e) => setFlexDueDate(e.target.value)} className={inputClass} /></div>
+                      <div><label className="text-xs text-slate-500">{t.installment.amount}</label><input type="number" value={flexAmount} onChange={(e) => setFlexAmount(Number(e.target.value))} className={inputClass} /></div>
                     </div>
-                    <button onClick={handleAddFlexInstallment} disabled={saving} className="w-full rounded-lg border border-brand-warm-400 py-1.5 text-xs font-medium text-brand-ink-600 hover:bg-brand-warm-100 disabled:opacity-50 transition-colors duration-[100ms]">{t.form.addSchedule}</button>
+                    <button onClick={handleAddFlexInstallment} disabled={saving} className="w-full rounded-lg border border-slate-200 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition-colors duration-[100ms]">{t.form.addSchedule}</button>
                   </div>
                 )}
               </div>
 
               {/* Transfer status update */}
               {selected.status === "active" && (
-                <div className="border-t border-brand-warm-400 pt-4">
-                  <h4 className="text-sm font-bold text-brand-ink-900">{locale === "zh" ? "过户跟进" : "Suivi transfert"}</h4>
+                <div className="border-t border-slate-200 pt-4">
+                  <h4 className="text-sm font-bold text-slate-950">{locale === "zh" ? "过户跟进" : "Suivi transfert"}</h4>
                   <div className="mt-2 space-y-2">
                     <div>
-                      <label className="text-xs text-brand-ink-400">{t.form.transferStatus}</label>
+                      <label className="text-xs text-slate-500">{t.form.transferStatus}</label>
                       <select value={trStatus} onChange={(e) => setTrStatus(e.target.value)} className={inputClass}>
                         <option value="not_started">{t.transferStatus.not_started}</option>
                         <option value="in_progress">{t.transferStatus.in_progress}</option>
@@ -647,19 +647,19 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                       </select>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <div><label className="text-xs text-brand-ink-400">{t.form.transferDate}</label><input type="date" value={trDate} onChange={(e) => setTrDate(e.target.value)} className={inputClass} /></div>
-                      <div><label className="text-xs text-brand-ink-400">{t.form.titleCertificateNo}</label><input type="text" value={trCertNo} onChange={(e) => setTrCertNo(e.target.value)} className={inputClass} /></div>
+                      <div><label className="text-xs text-slate-500">{t.form.transferDate}</label><input type="date" value={trDate} onChange={(e) => setTrDate(e.target.value)} className={inputClass} /></div>
+                      <div><label className="text-xs text-slate-500">{t.form.titleCertificateNo}</label><input type="text" value={trCertNo} onChange={(e) => setTrCertNo(e.target.value)} className={inputClass} /></div>
                     </div>
-                    <button onClick={handleTransferUpdate} disabled={saving} className="w-full rounded-lg border border-brand-warm-400 py-1.5 text-xs font-medium text-brand-ink-600 hover:bg-brand-warm-100 disabled:opacity-50 transition-colors duration-[100ms]">{saving ? "..." : t.form.updateTransfer}</button>
+                    <button onClick={handleTransferUpdate} disabled={saving} className="w-full rounded-lg border border-slate-200 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition-colors duration-[100ms]">{saving ? "..." : t.form.updateTransfer}</button>
                   </div>
                 </div>
               )}
 
               {/* Payment history */}
               {contractPayments.length > 0 && (
-                <div className="border-t border-brand-warm-400 pt-4">
-                  <h4 className="text-sm font-bold text-brand-ink-900">{t.payment.title} ({contractPayments.length})</h4>
-                  <ul className="mt-2 space-y-1 text-xs text-brand-ink-500">
+                <div className="border-t border-slate-200 pt-4">
+                  <h4 className="text-sm font-bold text-slate-950">{t.payment.title} ({contractPayments.length})</h4>
+                  <ul className="mt-2 space-y-1 text-xs text-slate-600">
                     {contractPayments.map(p => (
                       <li key={p.id} className="flex justify-between">{p.payment_date}{p.receipt_no ? ` (${p.receipt_no})` : ""} <span className="font-semibold">{formatXof(Number(p.amount))}</span></li>
                     ))}
@@ -669,11 +669,11 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
 
               {/* Terminate */}
               {selected.status === "active" && (
-                <div className="border-t border-brand-warm-400 pt-4">
+                <div className="border-t border-slate-200 pt-4">
                   <h4 className="text-sm font-bold text-brand-red-600 flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" />{t.terminate.title}</h4>
-                  <p className="text-xs text-brand-ink-400 mt-1">{t.terminate.description}</p>
+                  <p className="text-xs text-slate-500 mt-1">{t.terminate.description}</p>
                   <div className="mt-2 space-y-2">
-                    <div><label className="text-xs text-brand-ink-400">{t.terminate.reason}</label><input type="text" value={termReason} onChange={(e) => setTermReason(e.target.value)} className={inputClass} /></div>
+                    <div><label className="text-xs text-slate-500">{t.terminate.reason}</label><input type="text" value={termReason} onChange={(e) => setTermReason(e.target.value)} className={inputClass} /></div>
                     <button onClick={handleTerminate} disabled={saving} className="w-full rounded border border-brand-red-200 bg-brand-red-50 py-1.5 text-xs font-semibold text-brand-red-700 hover:bg-brand-red-100 disabled:opacity-50">{t.terminate.confirm}</button>
                   </div>
                 </div>

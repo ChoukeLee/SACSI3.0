@@ -37,7 +37,7 @@ export function UnitFilters({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+      <label className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
         {t.filters.floor}
       </label>
       <select className={selectClass} value={selectedFloor} onChange={(e) => onFloorChange(e.target.value)}>
@@ -45,7 +45,7 @@ export function UnitFilters({
         {floors.map((f) => <option key={f} value={f}>{f}</option>)}
       </select>
 
-      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+      <label className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
         {t.filters.status}
       </label>
       <select className={selectClass} value={selectedStatus} onChange={(e) => onStatusChange(e.target.value)}>
@@ -55,7 +55,7 @@ export function UnitFilters({
         ))}
       </select>
 
-      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+      <label className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
         {t.filters.kind}
       </label>
       <select className={selectClass} value={selectedKind} onChange={(e) => onKindChange(e.target.value)}>
@@ -65,7 +65,7 @@ export function UnitFilters({
         ))}
       </select>
 
-      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+      <label className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
         {t.filters.business}
       </label>
       <select className={selectClass} value={selectedBusiness} onChange={(e) => onBusinessChange(e.target.value)}>

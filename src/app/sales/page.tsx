@@ -50,10 +50,6 @@ export default async function SalesPage() {
         <DesktopOnly locale="zh" />
       </div>
       <div className="hidden lg:block">
-        <div className="mb-5">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-950">{t.title}</h1>
-          <p className="mt-1 text-sm text-slate-500">围绕出售合同、回款进度、过户状态和分期风险组织信息。</p>
-        </div>
         <section>
           <SaleList contracts={contracts} schedules={schedules} units={units} customers={customers} payments={payments} receivables={receivables} locale="zh" />
         </section>

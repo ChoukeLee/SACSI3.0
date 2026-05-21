@@ -38,7 +38,7 @@ export default async function FrontDeskPage() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-warm-50">
+    <div className="min-h-screen bg-slate-50">
       <div className="px-3 py-3">
         <FrontDeskWorkspace
           dailyUnits={dailyUnits}
