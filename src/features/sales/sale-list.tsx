@@ -71,6 +71,20 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
     return contracts.filter((c) => c.status === statusFilter);
   }, [contracts, statusFilter]);
 
+  const unitMap = useMemo(() => new Map(units.map((u) => [u.id, u])), [units]);
+  const customerMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
+
+  const groupedContracts = useMemo(() => {
+    const grouped = new Map<string, SaleContractRow[]>();
+    for (const contract of filtered) {
+      const unit = unitMap.get(contract.unit_id);
+      const floor = normalizeFloorLabel(unit?.floor_label ?? null, unit?.unit_no ?? "");
+      if (!grouped.has(floor)) grouped.set(floor, []);
+      grouped.get(floor)!.push(contract);
+    }
+    return Array.from(grouped.entries()).sort((a, b) => floorSortValue(a[0]) - floorSortValue(b[0]));
+  }, [filtered, unitMap]);
+
   const selected = selectedId ? contracts.find((c) => c.id === selectedId) : null;
   const selectedUnit = selected ? units.find((u) => u.id === selected.unit_id) : null;
   const selectedCustomer = selected ? customers.find((c) => c.id === selected.customer_id) : null;
@@ -275,126 +289,121 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   return (
     <div className="space-y-5">
       <div className="grid gap-3 md:grid-cols-5">
-        <SaleMetric label={locale === "zh" ? "生效出售" : "Ventes"} value={`${dashboardStats.active}`} tone="slate" />
+        <SaleMetric label={locale === "zh" ? "生效出售" : "Ventes"} value={String(dashboardStats.active)} tone="slate" />
         <SaleMetric label={locale === "zh" ? "合同总额" : "Montant"} value={formatXof(dashboardStats.total)} tone="amber" />
         <SaleMetric label={locale === "zh" ? "已回款" : "Encaisse"} value={formatXof(dashboardStats.received)} tone="green" />
         <SaleMetric label={locale === "zh" ? "逾期回款" : "Retard"} value={formatXof(dashboardStats.overdue)} tone="rose" />
-        <SaleMetric label={locale === "zh" ? "已过户" : "Transferts"} value={`${dashboardStats.transferDone}`} tone="sky" />
+        <SaleMetric label={locale === "zh" ? "已过户" : "Transferts"} value={String(dashboardStats.transferDone)} tone="sky" />
       </div>
 
-      {contracts.length > 0 && (
-        <div className="grid gap-3 xl:grid-cols-3">
-          {contracts.slice(0, 6).map((contract) => {
-            const unit = units.find((u) => u.id === contract.unit_id);
-            const customer = customers.find((c) => c.id === contract.customer_id);
-            const recStats = contractReceivableMap.get(contract.id);
-            const paid = recStats?.paid ?? 0;
-            const total = recStats?.total ?? Number(contract.total_amount_xof);
-            const rate = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
-            return (
-              <button
-                key={contract.id}
-                onClick={() => { setSelectedId(contract.id); setPanel("detail"); setError(""); }}
-                className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-natural transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-panel"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-mono text-lg font-black text-slate-950">{unit?.unit_no ?? "-"}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">{customer?.name ?? "-"}</p>
-                  </div>
-                  <Badge variant={statusVariant[contract.status]}>{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
-                </div>
-                <div className="mt-4">
-                  <div className="mb-1 flex items-center justify-between text-xs font-bold text-slate-500">
-                    <span>{locale === "zh" ? "回款进度" : "Paiement"}</span>
-                    <span>{rate}%</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-slate-950" style={{ width: `${rate}%` }} />
-                  </div>
-                  <p className="mt-2 text-xs font-bold text-slate-900">{formatXof(Number(contract.total_amount_xof))}</p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Toolbar */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-natural sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
           {["all", "active", "terminated"].map((s) => (
-            <button key={s} onClick={() => setStatusFilter(s)} className={cn("rounded-lg px-3 py-1 text-xs font-medium transition-colors duration-[100ms]", statusFilter === s ? "bg-brand-ink-900 text-white" : "border border-brand-warm-400 bg-white text-brand-ink-500 hover:bg-brand-warm-100")}>
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={cn(
+                "rounded-xl px-3 py-1.5 text-xs font-bold transition-colors duration-[100ms]",
+                statusFilter === s
+                  ? "bg-slate-950 text-white"
+                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+              )}
+            >
               {s === "all" ? (locale === "fr" ? "Tous" : "全部") : t.contractStatus[s as keyof typeof t.contractStatus]}
             </button>
           ))}
+          <span className="pl-1 text-xs font-semibold text-slate-400">
+            {filtered.length} / {contracts.length} {locale === "fr" ? "contrats" : "份合同"}
+          </span>
         </div>
-        <button onClick={() => { resetNewForm(); setPanel("new"); }} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-[100ms] hover:bg-brand-ink-700 active:scale-[0.98]">
+        <button
+          onClick={() => { resetNewForm(); setPanel("new"); }}
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors duration-[100ms] hover:bg-slate-800 active:scale-[0.98]"
+        >
           <Plus className="h-3.5 w-3.5" />{t.form.newContract}
         </button>
       </div>
 
-      {/* Table */}
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-brand-warm-400 bg-white py-16 shadow-natural">
-          <p className="text-sm text-brand-ink-300">{t.empty}</p>
+      {groupedContracts.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white py-16 shadow-natural">
+          <p className="text-sm text-slate-400">{t.empty}</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-natural">
-          <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="border-b border-brand-warm-400 bg-brand-warm-50 text-[11px] font-semibold uppercase tracking-wider text-brand-ink-500">
-              <tr>
-                <th className="px-3 py-3">{t.form.contractNo}</th>
-                <th className="px-3 py-3">{t.form.unit}</th>
-                <th className="px-3 py-3">{t.form.customer}</th>
-                <th className="px-3 py-3">{t.form.signedDate}</th>
-                <th className="px-3 py-3">{t.form.totalAmount}</th>
-                <th className="px-3 py-3">{t.form.paymentPlan}</th>
-                <th className="px-3 py-3">{t.overview.collectionRate}</th>
-                <th className="px-3 py-3">{t.overview.overdueAmount}</th>
-                <th className="px-3 py-3">{t.form.transferStatus}</th>
-                <th className="px-3 py-3">{t.form.statusLabel}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-brand-warm-400">
-              {filtered.map((c) => {
-                const unit = units.find((u) => u.id === c.unit_id);
-                const cust = customers.find((cu) => cu.id === c.customer_id);
-                const recStats = contractReceivableMap.get(c.id);
-                const paid = recStats?.paid ?? 0;
-                const total = recStats?.total ?? Number(c.total_amount_xof);
-                const overdue = recStats?.overdue ?? 0;
-                const rate = total > 0 ? Math.round((paid / total) * 100) : 0;
-                return (
-                  <tr key={c.id} className="cursor-pointer transition hover:bg-brand-warm-100" onClick={() => { setSelectedId(c.id); setPanel("detail"); setError(""); }}>
-                    <td className="px-3 py-3 font-semibold text-brand-ink-900">{c.contract_no}</td>
-                    <td className="px-3 py-3 text-brand-ink-500">{unit?.unit_no ?? "-"}</td>
-                    <td className="px-3 py-3 text-brand-ink-500">{cust?.name ?? "-"}</td>
-                    <td className="px-3 py-3 text-brand-ink-500">{c.signed_date}</td>
-                    <td className="px-3 py-3 text-brand-ink-500 font-medium">{formatXof(Number(c.total_amount_xof))}</td>
-                    <td className="px-3 py-3 text-xs">{t.paymentPlan[c.payment_plan_type as keyof typeof t.paymentPlan]}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-14 overflow-hidden rounded-full bg-brand-warm-200">
-                          <div className={cn("h-full rounded-full", rate >= 100 ? "bg-brand-green-500" : rate >= 50 ? "bg-brand-orange" : "bg-brand-red-400")} style={{ width: `${rate}%` }} />
+        <div className="space-y-5">
+          {groupedContracts.map(([floor, floorContracts]) => (
+            <section key={floor} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-natural">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-slate-950" />
+                  <h3 className="text-sm font-black text-slate-950">{floor}</h3>
+                </div>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">
+                  {floorContracts.length} {locale === "fr" ? "contrats" : "份合同"}
+                </span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+                {floorContracts.map((contract) => {
+                  const unit = unitMap.get(contract.unit_id);
+                  const customer = customerMap.get(contract.customer_id);
+                  const recStats = contractReceivableMap.get(contract.id);
+                  const paid = recStats?.paid ?? 0;
+                  const total = recStats?.total ?? Number(contract.total_amount_xof);
+                  const overdue = recStats?.overdue ?? 0;
+                  const rate = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
+                  const outstanding = Math.max(0, total - paid);
+                  const isRisk = overdue > 0 || (contract.status === "active" && contract.transfer_status !== "completed");
+
+                  return (
+                    <button
+                      key={contract.id}
+                      onClick={() => { setSelectedId(contract.id); setPanel("detail"); setError(""); }}
+                      className={cn(
+                        "group flex min-h-[214px] flex-col rounded-2xl border bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-panel",
+                        isRisk ? "border-amber-200 ring-1 ring-amber-100" : "border-slate-200 hover:border-slate-300",
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-mono text-base font-black leading-none text-slate-950">{unit?.unit_no ?? "-"}</p>
+                          <p className="mt-2 truncate text-xs font-black text-slate-700">{customer?.name ?? "-"}</p>
+                          <p className="mt-1 truncate text-[10px] font-semibold text-slate-400">{contract.contract_no}</p>
                         </div>
-                        <span className={cn("text-xs font-medium tabular-nums", rate >= 100 ? "text-brand-green-700" : "text-brand-ink-500")}>{rate}%</span>
+                        <Badge variant={statusVariant[contract.status]}>{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
                       </div>
-                    </td>
-                    <td className={cn("px-3 py-3 text-xs font-medium tabular-nums", overdue > 0 ? "text-brand-red-600" : "text-brand-ink-300")}>
-                      {overdue > 0 ? formatXof(overdue) : "—"}
-                    </td>
-                    <td className="px-3 py-3 text-xs">{t.transferStatus[c.transfer_status as keyof typeof t.transferStatus]}</td>
-                    <td className="px-3 py-3">
-                      <Badge variant={statusVariant[c.status]}>{t.contractStatus[c.status as keyof typeof t.contractStatus]}</Badge>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+
+                      <div className="mt-3">
+                        <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-slate-400">
+                          <span>{locale === "zh" ? "回款进度" : "Paiement"}</span>
+                          <span className="text-slate-700">{rate}%</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                          <div className={cn("h-full rounded-full", rate >= 100 ? "bg-emerald-500" : overdue > 0 ? "bg-rose-500" : "bg-slate-950")} style={{ width: String(rate) + "%" }} />
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                        <SaleCardField label={locale === "zh" ? "总额" : "Total"} value={formatXof(Number(contract.total_amount_xof))} tone="amber" />
+                        <SaleCardField label={locale === "zh" ? "已收" : "Paye"} value={formatXof(paid)} tone="green" />
+                        <SaleCardField label={locale === "zh" ? "待收" : "Solde"} value={formatXof(outstanding)} tone={outstanding > 0 ? "sky" : "green"} />
+                        <SaleCardField label={locale === "zh" ? "逾期" : "Retard"} value={formatXof(overdue)} tone={overdue > 0 ? "rose" : "green"} />
+                      </div>
+
+                      <div className="mt-auto pt-2">
+                        <div className="flex items-center justify-between gap-2 text-[10px] font-semibold text-slate-400">
+                          <span>{locale === "zh" ? "过户" : "Transfert"}</span>
+                          <span className="truncate text-slate-600">{t.transferStatus[contract.transfer_status as keyof typeof t.transferStatus]}</span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
       )}
+
 
       {/* ── New Contract Panel ── */}
       {panel === "new" && (
@@ -677,6 +686,43 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
       )}
     </div>
   );
+}
+
+function SaleCardField({
+  label,
+  value,
+  tone = "slate",
+}: {
+  label: string;
+  value: string;
+  tone?: "slate" | "green" | "amber" | "sky" | "rose";
+}) {
+  const toneClass = {
+    slate: "bg-slate-50 text-slate-950",
+    green: "bg-emerald-50 text-emerald-800",
+    amber: "bg-amber-50 text-amber-800",
+    sky: "bg-sky-50 text-sky-800",
+    rose: "bg-rose-50 text-rose-800",
+  }[tone];
+
+  return (
+    <div className={cn("rounded-lg px-2 py-1.5", toneClass)}>
+      <p className="text-[9px] font-bold text-slate-400">{label}</p>
+      <p className="mt-0.5 break-all text-[10px] font-black leading-tight tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+function normalizeFloorLabel(floorLabel: string | null, unitNo: string): string {
+  if (floorLabel && floorLabel.trim()) return floorLabel.trim().replace("楼", "F");
+  const numeric = Number.parseInt(unitNo, 10);
+  if (Number.isFinite(numeric)) return `${Math.floor(numeric / 100)}F`;
+  return "F";
+}
+
+function floorSortValue(label: string): number {
+  const match = label.match(/\d+/);
+  return match ? Number.parseInt(match[0], 10) : 999;
 }
 
 function SaleMetric({ label, value, tone }: { label: string; value: string; tone: "slate" | "green" | "amber" | "sky" | "rose" }) {
