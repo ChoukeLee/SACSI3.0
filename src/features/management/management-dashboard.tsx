@@ -3,15 +3,11 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
-  AlertTriangle, ArrowRight, ChevronDown, ChevronUp,
+  AlertTriangle, ArrowRight,
   CheckCircle2,
 } from "lucide-react";
 import {
   calculateReceivableSummary,
-  calculateReceivableByBusinessType,
-  calculateReceivableByBuilding,
-  getOverdueReceivables,
-  getOutstandingReceivables,
 } from "@/features/finance/receivable-summary";
 import { QualityDashboardWidget } from "@/features/data-quality";
 import type { QualityIssue } from "@/features/data-quality/quality-types";
@@ -245,14 +241,6 @@ export function ManagementDashboard({
 
   // Receivables
   const receivableMonthStats = useMemo(() => calculateReceivableSummary(receivables, { currentMonth: true }), [receivables]);
-  const receivableByBiz = useMemo(() => calculateReceivableByBusinessType(receivables, { currentMonth: true }), [receivables]);
-  const receivableByBldg = useMemo(
-    () => calculateReceivableByBuilding(receivables, activeBuildings, residentialUnits, ledgerEntries),
-    [receivables, activeBuildings, residentialUnits, ledgerEntries],
-  );
-
-  const overdueTop10 = useMemo(() => getOverdueReceivables(receivables, 10), [receivables]);
-  const outstandingTop10 = useMemo(() => getOutstandingReceivables(receivables, 10), [receivables]);
 
   // Lookups
   const unitMap = useMemo(() => {
@@ -286,8 +274,6 @@ export function ManagementDashboard({
   }, [unitStates, leaseContracts, saleContracts, saleSchedules]);
 
   const hasAnyRisk = risks.cleaning > 0 || risks.maintenance > 0 || risks.leaseExpiring.length > 0 || risks.saleWithPending.length > 0;
-
-  const [showDetailTables, setShowDetailTables] = useState(false);
 
   const buildingName = selectedBuildingId === "__all__"
     ? t.allBuildings
@@ -463,200 +449,10 @@ export function ManagementDashboard({
           })}
         </div>
 
-        {/* ── Section 5: Receivable leaderboards ── */}
-        <div className="mb-8 grid gap-6 lg:grid-cols-2">
-          {/* Overdue top 10 */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="h-2 w-2 rounded-full bg-red-500" />
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                {t.sections.overdueRanking}
-              </h3>
-            </div>
-            {overdueTop10.length === 0 ? (
-              <p className="text-xs text-slate-400 italic">{t.cockpit.noOverdue}</p>
-            ) : (
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-red-50/70 text-[10px] font-semibold uppercase text-red-600">
-                    <tr>
-                      <th className="px-3 py-2.5">{locale === "zh" ? "标题" : "Libelle"}</th>
-                      <th className="px-3 py-2.5">{locale === "zh" ? "应收日期" : "Echeance"}</th>
-                      <th className="px-3 py-2.5 text-right">{t.cockpit.outstanding}</th>
-                      <th className="px-3 py-2.5 text-right">{t.cockpit.overdueDays}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {overdueTop10.map(r => {
-                      const os = Number(r.amount_xof) - Number(r.paid_amount_xof);
-                      const od = Math.floor((Date.now() - new Date(r.due_date).getTime()) / 86400000);
-                      return (
-                        <tr key={r.id} className="transition-colors hover:bg-red-50/30">
-                          <td className="px-3 py-2 text-slate-700 max-w-[140px] truncate">{r.title}</td>
-                          <td className="px-3 py-2 text-slate-400">{r.due_date}</td>
-                          <td className="px-3 py-2 text-right tabular-nums font-semibold text-red-600">{formatXof(os)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums text-red-500 font-medium">+{od}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Outstanding top 10 */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="h-2 w-2 rounded-full bg-amber-500" />
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                {t.sections.outstandingRanking}
-              </h3>
-            </div>
-            {outstandingTop10.length === 0 ? (
-              <p className="text-xs text-slate-400 italic">{t.cockpit.noOutstanding}</p>
-            ) : (
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-amber-50/70 text-[10px] font-semibold uppercase text-amber-700">
-                    <tr>
-                      <th className="px-3 py-2.5">{locale === "zh" ? "标题" : "Libelle"}</th>
-                      <th className="px-3 py-2.5">{locale === "zh" ? "应收日期" : "Echeance"}</th>
-                      <th className="px-3 py-2.5 text-right">{t.cockpit.outstanding}</th>
-                      <th className="px-3 py-2.5 text-right">{locale === "zh" ? "状态" : "Statut"}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {outstandingTop10.map(r => {
-                      const os = Number(r.amount_xof) - Number(r.paid_amount_xof);
-                      const statusLabels: Record<string, string> = locale === "zh"
-                        ? { pending: "待收", partial: "部分", overdue: "逾期" }
-                        : { pending: "Attente", partial: "Partiel", overdue: "Retard" };
-                      const statusStyle: Record<string, string> = {
-                        overdue: "bg-red-100 text-red-700",
-                        partial: "bg-amber-100 text-amber-700",
-                        pending: "bg-slate-100 text-slate-600",
-                      };
-                      return (
-                        <tr key={r.id} className="transition-colors hover:bg-slate-50">
-                          <td className="px-3 py-2 text-slate-700 max-w-[140px] truncate">{r.title}</td>
-                          <td className="px-3 py-2 text-slate-400">{r.due_date}</td>
-                          <td className="px-3 py-2 text-right tabular-nums font-semibold text-amber-700">{formatXof(os)}</td>
-                          <td className="px-3 py-2 text-right">
-                            <span className={cn(
-                              "rounded-full px-2 py-0.5 text-[10px] font-medium",
-                              statusStyle[r.status] ?? "bg-slate-100 text-slate-600",
-                            )}>
-                              {statusLabels[r.status] ?? r.status}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Section 6: Data quality ── */}
-        {qualityIssues && qualityIssues.length > 0 && (
-          <div className="mb-8">
-            <QualityDashboardWidget issues={qualityIssues} locale={locale} variant="management" />
-          </div>
+        {/* Data quality */}
+        {qualityIssues && (
+          <QualityDashboardWidget issues={qualityIssues} locale={locale} variant="management" />
         )}
-
-        {/* ── Section 7: Receivable by business type ── */}
-        {receivableByBiz.length > 0 && (
-          <div className="mb-6">
-            <button
-              onClick={() => setShowDetailTables(!showDetailTables)}
-              className="flex items-center gap-2 mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors"
-            >
-              {t.sections.receivableByBusiness}
-              {showDetailTables ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-            {showDetailTables && (
-              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-                <table className="w-full min-w-[400px] text-left text-xs">
-                  <thead className="bg-slate-50 text-[10px] font-semibold uppercase text-slate-500">
-                    <tr>
-                      <th className="px-3 py-2.5">{locale === "zh" ? "业务类型" : "Type"}</th>
-                      <th className="px-3 py-2.5 text-right">{t.cockpit.receivable}</th>
-                      <th className="px-3 py-2.5 text-right">{t.cockpit.paid}</th>
-                      <th className="px-3 py-2.5 text-right">{t.cockpit.outstanding}</th>
-                      <th className="px-3 py-2.5 text-right">{t.cockpit.overdue}</th>
-                      <th className="px-3 py-2.5 text-right">{t.cockpit.collectionRate}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {receivableByBiz.map(biz => {
-                      const rate = biz.totalReceivable > 0 ? (biz.totalPaid / biz.totalReceivable * 100) : 0;
-                      const bizLabels: Record<string, string> = {
-                        daily_booking: t.cockpit.dailyRental,
-                        lease_contract: t.cockpit.leaseRental,
-                        sale_contract: t.cockpit.sale,
-                        manual: t.cockpit.other,
-                      };
-                      return (
-                        <tr key={biz.businessType} className="transition-colors hover:bg-slate-50">
-                          <td className="px-3 py-2.5 font-medium text-slate-700">{bizLabels[biz.businessType] ?? biz.businessType}</td>
-                          <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">{formatXof(biz.totalReceivable)}</td>
-                          <td className="px-3 py-2.5 text-right tabular-nums text-emerald-600">{formatXof(biz.totalPaid)}</td>
-                          <td className={cn("px-3 py-2.5 text-right tabular-nums font-medium", biz.outstanding > 0 ? "text-red-600" : "text-emerald-600")}>{formatXof(biz.outstanding)}</td>
-                          <td className={cn("px-3 py-2.5 text-right tabular-nums", biz.overdue > 0 ? "text-red-600 font-medium" : "text-slate-300")}>{formatXof(biz.overdue)}</td>
-                          <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{rate.toFixed(1)}%</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Section 8: Receivable by building ── */}
-        <div className="mb-8">
-          <button
-            onClick={() => setShowDetailTables(!showDetailTables)}
-            className="flex items-center gap-2 mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors"
-          >
-            {t.sections.receivableByBuilding}
-            {showDetailTables ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </button>
-          {showDetailTables && (
-            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-              <table className="w-full min-w-[800px] text-left text-xs">
-                <thead className="bg-slate-50 text-[10px] font-semibold uppercase text-slate-500">
-                  <tr>
-                    <th className="px-3 py-2.5">{t.cockpit.building}</th>
-                    <th className="px-3 py-2.5 text-right">{t.cockpit.totalUnits}</th>
-                    <th className="px-3 py-2.5 text-right">{t.cockpit.receivable}</th>
-                    <th className="px-3 py-2.5 text-right">{t.cockpit.paid}</th>
-                    <th className="px-3 py-2.5 text-right">{t.cockpit.outstanding}</th>
-                    <th className="px-3 py-2.5 text-right">{t.cockpit.overdue}</th>
-                    <th className="px-3 py-2.5 text-right">{t.cockpit.collectionRate}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {receivableByBldg.map(b => (
-                    <tr key={b.buildingId ?? "__unassigned__"} className="transition-colors hover:bg-slate-50">
-                      <td className="px-3 py-2.5 font-medium text-slate-700">{b.buildingName === "unassigned" ? t.cockpit.unassigned : b.buildingName}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{b.totalUnits || "—"}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">{formatXof(b.totalReceivable)}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-emerald-600">{formatXof(b.totalPaid)}</td>
-                      <td className={cn("px-3 py-2.5 text-right tabular-nums font-medium", b.outstanding > 0 ? "text-red-600" : "text-emerald-600")}>{formatXof(b.outstanding)}</td>
-                      <td className={cn("px-3 py-2.5 text-right tabular-nums", b.overdue > 0 ? "text-red-600 font-medium" : "text-slate-300")}>{formatXof(b.overdue)}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{(b.collectionRate * 100).toFixed(1)}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
 
         {/* ── Quick links ── */}
         <div className="flex flex-wrap gap-3 text-xs text-slate-400">
