@@ -329,9 +329,9 @@ export function ManagementDashboard({
         </div>
 
         {/* ── Section 1: Core KPI Summary ── */}
-        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.72fr)]">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
+        <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.72fr)]">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-natural">
+            <div className="mb-3 flex items-center justify-between gap-3">
               <SectionLabel compact>{t.sections.financeOverview}</SectionLabel>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
                 {monthPrefix}
@@ -761,7 +761,7 @@ function RoomStatusCard({
 function StatusSummaryCard({ label, value, status }: { label: string; value: number; status: MgmtStatus }) {
   const styles = ROOM_CARD[status];
   return (
-    <div className={cn("rounded-2xl border px-3 py-3", styles.card)}>
+    <div className={cn("min-h-[86px] rounded-2xl border px-3 py-3", styles.card)}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-bold opacity-90">{label}</span>
         <span className={cn("h-2 w-2 rounded-full", styles.dot)} />
@@ -810,13 +810,13 @@ function KPICard({ label, value, variant }: {
   };
   const s = styles[variant];
   return (
-    <div className={cn("flex min-h-[104px] overflow-hidden rounded-2xl border bg-white shadow-sm", s.bg)}>
-      <div className="flex min-w-0 flex-1 flex-col justify-between px-4 py-3.5">
+    <div className={cn("flex min-h-[86px] overflow-hidden rounded-2xl border bg-white shadow-sm", s.bg)}>
+      <div className="flex min-w-0 flex-1 flex-col justify-between px-4 py-3">
         <div className="flex items-center gap-2 mb-1.5">
           <span className={cn("h-1.5 w-1.5 rounded-full", s.dot)} />
           <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
         </div>
-        <p className={cn("truncate text-2xl font-black tracking-tight tabular-nums", s.text)}>
+        <p className={cn("truncate text-[22px] font-black tracking-tight tabular-nums", s.text)}>
           {value}
         </p>
       </div>
