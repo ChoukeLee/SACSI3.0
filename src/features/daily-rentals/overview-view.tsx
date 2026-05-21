@@ -22,7 +22,7 @@ interface OverviewViewProps {
 
 export function OverviewView({ dailyUnits, bookings, customers, payments, cleaningTasks, locale }: OverviewViewProps) {
   const t = dictionaries[locale].dailyOccupancy;
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const selectedDate = new Date().toISOString().slice(0, 10);
   const [copied, setCopied] = useState(false);
 
   const stateMap = useMemo(
@@ -92,7 +92,7 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
 
     const av = roomRows.filter(r => r.status === "available");
     if (av.length > 0) {
-      text += `\n${locale === "zh" ? "空闲" : "Disponible"}: ${av.map(r => r.unit.unit_no).join(", ")}\n`;
+      text += `\n${locale === "zh" ? "可安排入住" : "Disponible"}: ${av.map(r => r.unit.unit_no).join(", ")}\n`;
     }
 
     return text;
@@ -123,15 +123,12 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
           <div className="flex flex-wrap items-center gap-3">
             <div>
               <h3 className="text-sm font-bold text-slate-950">{t.shareTitle}</h3>
-              <p className="mt-0.5 text-xs font-medium text-slate-500">{locale === "zh" ? "群发内容、日期和操作集中在这里。" : "Message, date et actions au meme endroit."}</p>
+              <p className="mt-0.5 text-xs font-medium text-slate-500">{locale === "zh" ? "今日群发内容优先展示，可直接复制。" : "Message du jour pret a copier."}</p>
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-sm font-bold text-slate-900 shadow-sm transition-all duration-fast hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30"
-              />
+              <div className="rounded-lg bg-white px-3 py-1.5 text-sm font-bold text-slate-900 shadow-sm ring-1 ring-slate-200">
+                {new Date(selectedDate).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN")}
+              </div>
               <span className="text-xs font-bold text-slate-500">
                 {new Date(selectedDate).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long" })}
               </span>
