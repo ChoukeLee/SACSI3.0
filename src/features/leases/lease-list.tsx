@@ -72,6 +72,41 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     return contracts.filter((c) => c.status === statusFilter);
   }, [contracts, statusFilter]);
 
+  const unitMap = useMemo(() => new Map(units.map((u) => [u.id, u])), [units]);
+  const customerMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
+
+  const groupedContracts = useMemo(() => {
+    const grouped = new Map<string, LeaseContractRow[]>();
+    for (const contract of filtered) {
+      const unit = unitMap.get(contract.unit_id);
+      const floor = normalizeFloorLabel(unit?.floor_label ?? null, unit?.unit_no ?? "");
+      if (!grouped.has(floor)) grouped.set(floor, []);
+      grouped.get(floor)!.push(contract);
+    }
+    return Array.from(grouped.entries()).sort((a, b) => floorSortValue(a[0]) - floorSortValue(b[0]));
+  }, [filtered, unitMap]);
+
+  const getContractReceivableSummary = (contractId: string) => {
+    const related = receivables.filter((r) => r.source_type === "lease_contract" && r.source_id === contractId && r.status !== "cancelled");
+    const today = new Date().toISOString().slice(0, 10);
+    let total = 0;
+    let paid = 0;
+    let overdue = 0;
+    let nextDue: string | null = null;
+
+    for (const r of related) {
+      const amount = Number(r.amount_xof);
+      const paidAmount = Number(r.paid_amount_xof);
+      const outstanding = Math.max(0, amount - paidAmount);
+      total += amount;
+      paid += paidAmount;
+      if (outstanding > 0 && (r.status === "overdue" || r.due_date < today)) overdue += outstanding;
+      if (outstanding > 0 && (!nextDue || r.due_date < nextDue)) nextDue = r.due_date;
+    }
+
+    return { total, paid, outstanding: Math.max(0, total - paid), overdue, nextDue, count: related.length };
+  };
+
   const selected = selectedId ? contracts.find((c) => c.id === selectedId) : null;
   const selectedUnit = selected ? units.find((u) => u.id === selected.unit_id) : null;
   const selectedCustomer = selected ? customers.find((c) => c.id === selected.customer_id) : null;
@@ -343,126 +378,115 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   return (
     <div className="space-y-5">
       <div className="grid gap-3 md:grid-cols-5">
-        <LeaseMetric label={locale === "zh" ? "生效合同" : "Actifs"} value={`${dashboardStats.active}`} tone="slate" />
+        <LeaseMetric label={locale === "zh" ? "生效合同" : "Actifs"} value={String(dashboardStats.active)} tone="slate" />
         <LeaseMetric label={locale === "zh" ? "月租规模" : "Loyer/mois"} value={formatXof(dashboardStats.rent)} tone="green" />
-        <LeaseMetric label={locale === "zh" ? "30天到期" : "30 jours"} value={`${dashboardStats.expiring}`} tone="amber" />
+        <LeaseMetric label={locale === "zh" ? "30天到期" : "30 jours"} value={String(dashboardStats.expiring)} tone="amber" />
         <LeaseMetric label={locale === "zh" ? "待收账款" : "A recevoir"} value={formatXof(dashboardStats.due)} tone="sky" />
         <LeaseMetric label={locale === "zh" ? "逾期金额" : "Retard"} value={formatXof(dashboardStats.overdue)} tone="rose" />
       </div>
 
-      {contracts.length > 0 && (
-        <div className="grid gap-3 xl:grid-cols-3">
-          {contracts.slice(0, 6).map((contract) => {
-            const unit = units.find((u) => u.id === contract.unit_id);
-            const customer = customers.find((c) => c.id === contract.customer_id);
-            return (
-              <button
-                key={contract.id}
-                onClick={() => openDetail(contract.id)}
-                className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-natural transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-panel"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-mono text-lg font-black text-slate-950">{unit?.unit_no ?? "-"}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">{customer?.name ?? "-"}</p>
-                  </div>
-                  <Badge variant={statusVariant[contract.status]}>
-                    {t.contractStatus[contract.status as keyof typeof t.contractStatus]}
-                  </Badge>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-xl bg-slate-50 p-2">
-                    <p className="text-slate-400">{locale === "zh" ? "月租" : "Loyer"}</p>
-                    <p className="font-bold text-slate-900">{formatXof(Number(contract.monthly_rent_xof))}</p>
-                  </div>
-                  <div className="rounded-xl bg-slate-50 p-2">
-                    <p className="text-slate-400">{locale === "zh" ? "到期" : "Fin"}</p>
-                    <p className="font-bold text-slate-900">{contract.expected_end_date}</p>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Toolbar */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-natural sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
           {["all", "draft", "active", "terminated", "expired"].map((s) => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
               className={cn(
-                "rounded-lg px-3 py-1 text-xs font-medium transition-colors duration-[100ms]",
+                "rounded-xl px-3 py-1.5 text-xs font-bold transition-colors duration-[100ms]",
                 statusFilter === s
-                  ? "bg-brand-ink-900 text-white"
-                  : "border border-brand-warm-400 bg-white text-brand-ink-500 hover:bg-brand-warm-100"
+                  ? "bg-slate-950 text-white"
+                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
               )}
             >
               {s === "all" ? (locale === "fr" ? "Tous" : "全部") : t.contractStatus[s as keyof typeof t.contractStatus]}
             </button>
           ))}
+          <span className="pl-1 text-xs font-semibold text-slate-400">
+            {filtered.length} / {contracts.length} {locale === "fr" ? "contrats" : "份合同"}
+          </span>
         </div>
         <button
           onClick={openNew}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-[100ms] hover:bg-brand-ink-700 active:scale-[0.98]"
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors duration-[100ms] hover:bg-slate-800 active:scale-[0.98]"
         >
           <Plus className="h-3.5 w-3.5" />
           {t.form.newContract}
         </button>
       </div>
 
-      {/* Table */}
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-brand-warm-400 bg-white py-16 shadow-natural">
-          <p className="text-sm text-brand-ink-300">{t.empty}</p>
+      {groupedContracts.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white py-16 shadow-natural">
+          <p className="text-sm text-slate-400">{t.empty}</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-brand-warm-400 bg-white shadow-natural">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-brand-warm-400 bg-brand-warm-50 text-[11px] font-semibold uppercase tracking-wider text-brand-ink-500">
-              <tr>
-                <th className="px-4 py-3">{t.form.contractNo}</th>
-                <th className="px-4 py-3">{t.form.unit}</th>
-                <th className="px-4 py-3">{t.form.customer}</th>
-                <th className="px-4 py-3">{t.form.startDate}</th>
-                <th className="px-4 py-3">{t.form.expectedEndDate}</th>
-                <th className="px-4 py-3">{t.form.monthlyRent}</th>
-                <th className="px-4 py-3">{t.form.statusLabel}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-brand-warm-400">
-              {filtered.map((c) => {
-                const unit = units.find((u) => u.id === c.unit_id);
-                const cust = customers.find((cu) => cu.id === c.customer_id);
-                return (
-                  <tr
-                    key={c.id}
-                    className="cursor-pointer transition hover:bg-brand-warm-100"
-                    onClick={() => openDetail(c.id)}
-                  >
-                    <td className="px-4 py-3 font-semibold text-brand-ink-900">{c.contract_no}</td>
-                    <td className="px-4 py-3 text-brand-ink-500">{unit?.unit_no ?? "-"}</td>
-                    <td className="px-4 py-3 text-brand-ink-500">{cust?.name ?? "-"}</td>
-                    <td className="px-4 py-3 text-brand-ink-500">{c.start_date}</td>
-                    <td className="px-4 py-3 text-brand-ink-500">{c.expected_end_date}</td>
-                    <td className="px-4 py-3 text-brand-ink-500">{formatXof(Number(c.monthly_rent_xof))}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant={statusVariant[c.status]}>
-                        {t.contractStatus[c.status as keyof typeof t.contractStatus]}
-                      </Badge>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="space-y-5">
+          {groupedContracts.map(([floor, floorContracts]) => (
+            <section key={floor} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-natural">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-slate-950" />
+                  <h3 className="text-sm font-black text-slate-950">{floor}</h3>
+                </div>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">
+                  {floorContracts.length} {locale === "fr" ? "contrats" : "份合同"}
+                </span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+                {floorContracts.map((contract) => {
+                  const unit = unitMap.get(contract.unit_id);
+                  const customer = customerMap.get(contract.customer_id);
+                  const summary = getContractReceivableSummary(contract.id);
+                  const daysLeft = Math.floor((new Date(contract.expected_end_date).getTime() - Date.now()) / 86400000);
+                  const isRisk = summary.overdue > 0 || (contract.status === "active" && daysLeft >= 0 && daysLeft <= 30);
+
+                  return (
+                    <button
+                      key={contract.id}
+                      onClick={() => openDetail(contract.id)}
+                      className={cn(
+                        "group flex min-h-[238px] flex-col rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-panel",
+                        isRisk ? "border-amber-200 ring-1 ring-amber-100" : "border-slate-200 hover:border-slate-300",
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-mono text-xl font-black leading-none text-slate-950">{unit?.unit_no ?? "-"}</p>
+                          <p className="mt-2 truncate text-sm font-black text-slate-700">{customer?.name ?? "-"}</p>
+                          <p className="mt-1 truncate text-[11px] font-semibold text-slate-400">{contract.contract_no}</p>
+                        </div>
+                        <Badge variant={statusVariant[contract.status]}>
+                          {t.contractStatus[contract.status as keyof typeof t.contractStatus]}
+                        </Badge>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                        <LeaseCardField label={locale === "zh" ? "月租" : "Loyer"} value={formatXof(Number(contract.monthly_rent_xof))} />
+                        <LeaseCardField label={locale === "zh" ? "押金" : "Depot"} value={formatXof(Number(contract.deposit_amount_xof))} tone={contract.deposit_received ? "green" : "amber"} />
+                        <LeaseCardField label={locale === "zh" ? "起租" : "Debut"} value={contract.start_date} />
+                        <LeaseCardField label={locale === "zh" ? "到期" : "Fin"} value={contract.expected_end_date} tone={daysLeft >= 0 && daysLeft <= 30 ? "amber" : "slate"} />
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                        <LeaseCardField label={locale === "zh" ? "待收" : "Solde"} value={formatXof(summary.outstanding)} tone={summary.outstanding > 0 ? "sky" : "green"} />
+                        <LeaseCardField label={locale === "zh" ? "逾期" : "Retard"} value={formatXof(summary.overdue)} tone={summary.overdue > 0 ? "rose" : "green"} />
+                      </div>
+
+                      <div className="mt-auto pt-3">
+                        <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
+                          <span>{locale === "zh" ? "下一应收" : "Prochaine"}</span>
+                          <span className="text-slate-600">{summary.nextDue ?? "-"}</span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
       )}
-      <p className="mt-3 text-xs text-brand-ink-300">
-        {filtered.length} / {contracts.length} {locale === "fr" ? "contrats" : "份合同"}
-      </p>
+
 
       {/* ── New Contract Panel ── */}
       {panel === "new" && (
@@ -775,6 +799,43 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       )}
     </div>
   );
+}
+
+function LeaseCardField({
+  label,
+  value,
+  tone = "slate",
+}: {
+  label: string;
+  value: string;
+  tone?: "slate" | "green" | "amber" | "sky" | "rose";
+}) {
+  const toneClass = {
+    slate: "bg-slate-50 text-slate-950",
+    green: "bg-emerald-50 text-emerald-800",
+    amber: "bg-amber-50 text-amber-800",
+    sky: "bg-sky-50 text-sky-800",
+    rose: "bg-rose-50 text-rose-800",
+  }[tone];
+
+  return (
+    <div className={cn("rounded-xl px-3 py-2", toneClass)}>
+      <p className="text-[10px] font-bold text-slate-400">{label}</p>
+      <p className="mt-0.5 truncate font-black tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+function normalizeFloorLabel(floorLabel: string | null, unitNo: string): string {
+  if (floorLabel && floorLabel.trim()) return floorLabel.trim().replace("楼", "F");
+  const numeric = Number.parseInt(unitNo, 10);
+  if (Number.isFinite(numeric)) return `${Math.floor(numeric / 100)}F`;
+  return "F";
+}
+
+function floorSortValue(label: string): number {
+  const match = label.match(/\d+/);
+  return match ? Number.parseInt(match[0], 10) : 999;
 }
 
 function LeaseMetric({ label, value, tone }: { label: string; value: string; tone: "slate" | "green" | "amber" | "sky" | "rose" }) {
