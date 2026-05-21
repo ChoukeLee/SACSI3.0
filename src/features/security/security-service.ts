@@ -44,7 +44,7 @@ export async function runSecurityCheck(): Promise<SecurityCheckItem[]> {
   // User role check
   try {
     const { data: profiles } = await supabase.from("user_profiles").select("id, role");
-    const seedRoles: Record<string, string> = { "admin@sacis.com": "admin", "boss@sacis.com": "boss", "finance@sacis.com": "finance", "front@sacis.com": "front_desk" };
+    const seedRoles: Record<string, string> = { "admin@sacsi.com": "admin", "boss@sacsi.com": "boss", "finance@sacsi.com": "finance", "front@sacsi.com": "front_desk" };
     const illegalRoles = (profiles ?? []).filter(p => !["admin","boss","finance","front_desk"].includes(p.role));
     if (illegalRoles.length > 0) checks.push({ id: "user_roles", label: "用户角色", detail: `${illegalRoles.length} 个非法 role`, status: "warn" });
     else checks.push({ id: "user_roles", label: "用户角色", detail: `全部合法 (${(profiles??[]).length} 个)`, status: "pass" });

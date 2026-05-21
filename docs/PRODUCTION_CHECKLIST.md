@@ -25,10 +25,10 @@
 
 | 邮箱 | 角色 | 预期 |
 |---|---|---|
-| admin@sacis.com | admin | 全部权限 |
-| boss@sacis.com | boss | 查看全部，不可写 |
-| finance@sacis.com | finance | 财务/应收/收款操作 |
-| front@sacis.com | front_desk | 前台日租操作 |
+| admin@sacsi.com | admin | 全部权限 |
+| boss@sacsi.com | boss | 查看全部，不可写 |
+| finance@sacsi.com | finance | 财务/应收/收款操作 |
+| front@sacsi.com | front_desk | 前台日租操作 |
 
 ## RLS 检查
 
