@@ -432,7 +432,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 </span>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
                 {floorContracts.map((contract) => {
                   const unit = unitMap.get(contract.unit_id);
                   const customer = customerMap.get(contract.customer_id);
@@ -445,35 +445,35 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                       key={contract.id}
                       onClick={() => openDetail(contract.id)}
                       className={cn(
-                        "group flex min-h-[238px] flex-col rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-panel",
+                        "group flex min-h-[198px] flex-col rounded-2xl border bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-panel",
                         isRisk ? "border-amber-200 ring-1 ring-amber-100" : "border-slate-200 hover:border-slate-300",
                       )}
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-mono text-xl font-black leading-none text-slate-950">{unit?.unit_no ?? "-"}</p>
-                          <p className="mt-2 truncate text-sm font-black text-slate-700">{customer?.name ?? "-"}</p>
-                          <p className="mt-1 truncate text-[11px] font-semibold text-slate-400">{contract.contract_no}</p>
+                          <p className="font-mono text-base font-black leading-none text-slate-950">{unit?.unit_no ?? "-"}</p>
+                          <p className="mt-2 truncate text-xs font-black text-slate-700">{customer?.name ?? "-"}</p>
+                          <p className="mt-1 truncate text-[10px] font-semibold text-slate-400">{contract.contract_no}</p>
                         </div>
                         <Badge variant={statusVariant[contract.status]}>
                           {t.contractStatus[contract.status as keyof typeof t.contractStatus]}
                         </Badge>
                       </div>
 
-                      <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                         <LeaseCardField label={locale === "zh" ? "月租" : "Loyer"} value={formatXof(Number(contract.monthly_rent_xof))} />
                         <LeaseCardField label={locale === "zh" ? "押金" : "Depot"} value={formatXof(Number(contract.deposit_amount_xof))} tone={contract.deposit_received ? "green" : "amber"} />
                         <LeaseCardField label={locale === "zh" ? "起租" : "Debut"} value={contract.start_date} />
                         <LeaseCardField label={locale === "zh" ? "到期" : "Fin"} value={contract.expected_end_date} tone={daysLeft >= 0 && daysLeft <= 30 ? "amber" : "slate"} />
                       </div>
 
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                         <LeaseCardField label={locale === "zh" ? "待收" : "Solde"} value={formatXof(summary.outstanding)} tone={summary.outstanding > 0 ? "sky" : "green"} />
                         <LeaseCardField label={locale === "zh" ? "逾期" : "Retard"} value={formatXof(summary.overdue)} tone={summary.overdue > 0 ? "rose" : "green"} />
                       </div>
 
-                      <div className="mt-auto pt-3">
-                        <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
+                      <div className="mt-auto pt-2">
+                        <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400">
                           <span>{locale === "zh" ? "下一应收" : "Prochaine"}</span>
                           <span className="text-slate-600">{summary.nextDue ?? "-"}</span>
                         </div>
@@ -819,9 +819,9 @@ function LeaseCardField({
   }[tone];
 
   return (
-    <div className={cn("rounded-xl px-3 py-2", toneClass)}>
-      <p className="text-[10px] font-bold text-slate-400">{label}</p>
-      <p className="mt-0.5 truncate font-black tabular-nums">{value}</p>
+    <div className={cn("rounded-lg px-2 py-1.5", toneClass)}>
+      <p className="text-[9px] font-bold text-slate-400">{label}</p>
+      <p className="mt-0.5 text-[10px] font-black tabular-nums leading-tight break-all">{value}</p>
     </div>
   );
 }
