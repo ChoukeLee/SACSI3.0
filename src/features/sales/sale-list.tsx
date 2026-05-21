@@ -262,7 +262,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
 
   const handleTerminate = async () => {
     setSaving(true);
-    const result = await terminateSaleContract(selectedId!, termReason || (locale === "zh" ? "Ã¤Â¹Â°Ã¦â€“Â¹Ã¨Â¿ÂÃ§ÂºÂ¦" : "Defaut acheteur"));
+    const result = await terminateSaleContract(selectedId!, termReason || (locale === "zh" ? "买方违约" : "Defaut acheteur"));
     setSaving(false);
     if (result.success) setPanel(null);
     else setError(result.error ?? "Failed");
@@ -281,7 +281,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
 
   const schedStatusLabel = (s: string) => {
     const labels: Record<string, string> = locale === "zh"
-      ? { pending: "Ã¥Â¾â€¦Ã¤Â»Ëœ", paid: "Ã¥Â·Â²Ã¤Â»Ëœ", overdue: "Ã©â‚¬Â¾Ã¦Å“Å¸", cancelled: "Ã¥Â·Â²Ã¥Ââ€“Ã¦Â¶Ë†" }
+      ? { pending: "待付", paid: "已付", overdue: "逾期", cancelled: "已取消" }
       : { pending: "Attente", paid: "Paye", overdue: "Retard", cancelled: "Annule" };
     return labels[s] ?? s;
   };
@@ -289,11 +289,11 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   return (
     <div className="space-y-5">
       <div className="grid gap-3 md:grid-cols-5">
-        <SaleMetric label={locale === "zh" ? "Ã§â€Å¸Ã¦â€¢Ë†Ã¥â€¡ÂºÃ¥â€Â®" : "Ventes"} value={String(dashboardStats.active)} tone="slate" />
-        <SaleMetric label={locale === "zh" ? "Ã¥ÂË†Ã¥ÂÅ’Ã¦â‚¬Â»Ã©Â¢Â" : "Montant"} value={formatXof(dashboardStats.total)} tone="amber" />
-        <SaleMetric label={locale === "zh" ? "Ã¥Â·Â²Ã¥â€ºÅ¾Ã¦Â¬Â¾" : "Encaisse"} value={formatXof(dashboardStats.received)} tone="green" />
-        <SaleMetric label={locale === "zh" ? "Ã©â‚¬Â¾Ã¦Å“Å¸Ã¥â€ºÅ¾Ã¦Â¬Â¾" : "Retard"} value={formatXof(dashboardStats.overdue)} tone="rose" />
-        <SaleMetric label={locale === "zh" ? "Ã¥Â·Â²Ã¨Â¿â€¡Ã¦Ë†Â·" : "Transferts"} value={String(dashboardStats.transferDone)} tone="sky" />
+        <SaleMetric label={locale === "zh" ? "生效出售" : "Ventes"} value={String(dashboardStats.active)} tone="slate" />
+        <SaleMetric label={locale === "zh" ? "合同总额" : "Montant"} value={formatXof(dashboardStats.total)} tone="amber" />
+        <SaleMetric label={locale === "zh" ? "已回款" : "Encaisse"} value={formatXof(dashboardStats.received)} tone="green" />
+        <SaleMetric label={locale === "zh" ? "逾期回款" : "Retard"} value={formatXof(dashboardStats.overdue)} tone="rose" />
+        <SaleMetric label={locale === "zh" ? "已过户" : "Transferts"} value={String(dashboardStats.transferDone)} tone="sky" />
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-natural sm:flex-row sm:items-center sm:justify-between">
@@ -309,11 +309,11 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                   : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
               )}
             >
-              {s === "all" ? (locale === "fr" ? "Tous" : "Ã¥â€¦Â¨Ã©Æ’Â¨") : t.contractStatus[s as keyof typeof t.contractStatus]}
+              {s === "all" ? (locale === "fr" ? "Tous" : "全部") : t.contractStatus[s as keyof typeof t.contractStatus]}
             </button>
           ))}
           <span className="pl-1 text-xs font-semibold text-slate-400">
-            {filtered.length} / {contracts.length} {locale === "fr" ? "contrats" : "Ã¤Â»Â½Ã¥ÂË†Ã¥ÂÅ’"}
+            {filtered.length} / {contracts.length} {locale === "fr" ? "contrats" : "份合同"}
           </span>
         </div>
         <button
@@ -338,7 +338,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                   <h3 className="text-sm font-black text-slate-950">{floor}</h3>
                 </div>
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">
-                  {floorContracts.length} {locale === "fr" ? "contrats" : "Ã¤Â»Â½Ã¥ÂË†Ã¥ÂÅ’"}
+                  {floorContracts.length} {locale === "fr" ? "contrats" : "份合同"}
                 </span>
               </div>
 
@@ -374,7 +374,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
 
                       <div className="mt-3">
                         <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-slate-400">
-                          <span>{locale === "zh" ? "Ã¥â€ºÅ¾Ã¦Â¬Â¾Ã¨Â¿â€ºÃ¥ÂºÂ¦" : "Paiement"}</span>
+                          <span>{locale === "zh" ? "回款进度" : "Paiement"}</span>
                           <span className="text-slate-700">{rate}%</span>
                         </div>
                         <div className="h-2 overflow-hidden rounded-full bg-slate-100">
@@ -383,15 +383,15 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                       </div>
 
                       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                        <SaleCardField label={locale === "zh" ? "Ã¦â‚¬Â»Ã©Â¢Â" : "Total"} value={formatXof(Number(contract.total_amount_xof))} tone="amber" />
-                        <SaleCardField label={locale === "zh" ? "Ã¥Â·Â²Ã¦â€Â¶" : "Paye"} value={formatXof(paid)} tone="green" />
-                        <SaleCardField label={locale === "zh" ? "Ã¥Â¾â€¦Ã¦â€Â¶" : "Solde"} value={formatXof(outstanding)} tone={outstanding > 0 ? "sky" : "green"} />
-                        <SaleCardField label={locale === "zh" ? "Ã©â‚¬Â¾Ã¦Å“Å¸" : "Retard"} value={formatXof(overdue)} tone={overdue > 0 ? "rose" : "green"} />
+                        <SaleCardField label={locale === "zh" ? "总额" : "Total"} value={formatXof(Number(contract.total_amount_xof))} tone="amber" />
+                        <SaleCardField label={locale === "zh" ? "已收" : "Paye"} value={formatXof(paid)} tone="green" />
+                        <SaleCardField label={locale === "zh" ? "待收" : "Solde"} value={formatXof(outstanding)} tone={outstanding > 0 ? "sky" : "green"} />
+                        <SaleCardField label={locale === "zh" ? "逾期" : "Retard"} value={formatXof(overdue)} tone={overdue > 0 ? "rose" : "green"} />
                       </div>
 
                       <div className="mt-auto pt-2">
                         <div className="flex items-center justify-between gap-2 text-[10px] font-semibold text-slate-400">
-                          <span>{locale === "zh" ? "Ã¨Â¿â€¡Ã¦Ë†Â·" : "Transfert"}</span>
+                          <span>{locale === "zh" ? "过户" : "Transfert"}</span>
                           <span className="truncate text-slate-600">{t.transferStatus[contract.transfer_status as keyof typeof t.transferStatus]}</span>
                         </div>
                       </div>
@@ -405,7 +405,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
       )}
 
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ New Contract Panel Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── New Contract Panel ── */}
       {panel === "new" && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setPanel(null)} />
@@ -416,7 +416,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
             </div>
             <div className="space-y-4 px-5 py-5">
               <div><label className={labelClass}>{t.form.contractNo} *</label><input type="text" value={fContractNo} onChange={(e) => setFContractNo(e.target.value)} className={inputClass} /></div>
-              <div><label className={labelClass}>{t.form.unit} *</label><select value={fUnitId} onChange={(e) => setFUnitId(e.target.value)} className={inputClass}><option value="">{t.form.noUnit}</option>{sellableUnits.map(u => <option key={u.id} value={u.id}>{u.unit_no} Ã¢â‚¬â€ {u.kind}</option>)}</select></div>
+              <div><label className={labelClass}>{t.form.unit} *</label><select value={fUnitId} onChange={(e) => setFUnitId(e.target.value)} className={inputClass}><option value="">{t.form.noUnit}</option>{sellableUnits.map(u => <option key={u.id} value={u.id}>{u.unit_no} — {u.kind}</option>)}</select></div>
               <div><label className={labelClass}>{t.form.customer} *</label><select value={fCustomerId} onChange={(e) => setFCustomerId(e.target.value)} className={inputClass}><option value="">{t.form.noCustomer}</option>{customers.filter(cc => !cc.is_blacklisted).map(cc => <option key={cc.id} value={cc.id}>{cc.name}</option>)}</select></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className={labelClass}>{t.form.signedDate}</label><input type="date" value={fSignedDate} onChange={(e) => setFSignedDate(e.target.value)} className={inputClass} /></div>
@@ -448,7 +448,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
         </>
       )}
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ Detail Panel Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── Detail Panel ── */}
       {panel === "detail" && selected && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setPanel(null)} />
@@ -463,7 +463,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
             <div className="space-y-4 px-5 py-5">
               {/* Contract info */}
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <div><dt className="text-xs text-slate-400">{t.form.unit}</dt><dd className="font-medium">{selectedUnit?.unit_no} Ã¢â‚¬â€ {selectedUnit?.kind}</dd></div>
+                <div><dt className="text-xs text-slate-400">{t.form.unit}</dt><dd className="font-medium">{selectedUnit?.unit_no} — {selectedUnit?.kind}</dd></div>
                 <div><dt className="text-xs text-slate-400">{t.form.customer}</dt><dd className="font-medium">{selectedCustomer?.name}</dd></div>
                 <div><dt className="text-xs text-slate-400">{t.form.signedDate}</dt><dd>{selected.signed_date}</dd></div>
                 <div><dt className="text-xs text-slate-400">{t.form.totalAmount}</dt><dd className="font-semibold">{formatXof(Number(selected.total_amount_xof))}</dd></div>
@@ -497,7 +497,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                   <div className={cn("rounded border px-3 py-2", totalOverdueRec > 0 ? "border-brand-red-200 bg-brand-red-50" : "border-brand-green-200 bg-brand-green-50")}>
                     <p className="text-slate-500">{t.overview.overdueAmount}</p>
                     <p className={cn("font-bold tabular-nums", totalOverdueRec > 0 ? "text-brand-red-700" : "text-brand-green-700")}>
-                      {totalOverdueRec > 0 ? formatXof(totalOverdueRec) : "Ã¢â‚¬â€"}
+                      {totalOverdueRec > 0 ? formatXof(totalOverdueRec) : "—"}
                     </p>
                   </div>
                 </div>
@@ -522,7 +522,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
               <div className="border-t border-slate-200 pt-4">
                 <h4 className="text-sm font-bold text-slate-950">{t.installment.title}</h4>
                 {contractSchedules.length === 0 ? (
-                  <p className="mt-1 text-xs text-slate-400">{locale === "zh" ? "Ã¦Å¡â€šÃ¦â€”Â Ã¥Ë†â€ Ã¦Å“Å¸Ã¨Â®Â¡Ã¥Ë†â€™" : "Aucun echeancier"}</p>
+                  <p className="mt-1 text-xs text-slate-400">{locale === "zh" ? "暂无分期计划" : "Aucun echeancier"}</p>
                 ) : (
                   <div className="mt-2 space-y-1.5">
                     {contractSchedules.map((s) => {
@@ -599,7 +599,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                             : Number(s.amount_xof);
                           return (
                             <option key={s.id} value={s.id}>
-                              #{s.installment_no} Ã¢â‚¬â€ {formatXof(Number(s.amount_xof))} ({locale === "zh" ? "Ã¦Å“ÂªÃ¦â€Â¶" : "du"}: {formatXof(unpaid)}) {s.due_date}
+                              #{s.installment_no} — {formatXof(Number(s.amount_xof))} ({locale === "zh" ? "未收" : "du"}: {formatXof(unpaid)}) {s.due_date}
                             </option>
                           );
                         })}
@@ -608,7 +608,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                     {payScheduleId && (
                       <>
                         <div className="rounded bg-white px-2 py-1 text-xs text-slate-600">
-                          {locale === "zh" ? "Ã©â€¡â€˜Ã©Â¢ÂÃ¨â€¡ÂªÃ¥Å Â¨Ã¥Â¡Â«Ã¥â€¦Â¥Ã¦Å“ÂªÃ¦â€Â¶Ã©â€¡â€˜Ã©Â¢ÂÃ¯Â¼Ë†Ã¥â€¦Â¨Ã©Â¢ÂÃ¦â€Â¶Ã¦Â¬Â¾Ã¯Â¼â€°" : "Montant auto-rempli (paiement total)"}: <span className="font-bold text-slate-950">{formatXof(payAmount)}</span>
+                          {locale === "zh" ? "金额自动填入未收金额（全额收款）" : "Montant auto-rempli (paiement total)"}: <span className="font-bold text-slate-950">{formatXof(payAmount)}</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div><label className="text-xs text-slate-500">{t.payment.paymentDate}</label><input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className={inputClass} /></div>
@@ -636,7 +636,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
               {/* Transfer status update */}
               {selected.status === "active" && (
                 <div className="border-t border-slate-200 pt-4">
-                  <h4 className="text-sm font-bold text-slate-950">{locale === "zh" ? "Ã¨Â¿â€¡Ã¦Ë†Â·Ã¨Â·Å¸Ã¨Â¿â€º" : "Suivi transfert"}</h4>
+                  <h4 className="text-sm font-bold text-slate-950">{locale === "zh" ? "过户跟进" : "Suivi transfert"}</h4>
                   <div className="mt-2 space-y-2">
                     <div>
                       <label className="text-xs text-slate-500">{t.form.transferStatus}</label>
@@ -698,11 +698,11 @@ function SaleCardField({
   tone?: "slate" | "green" | "amber" | "sky" | "rose";
 }) {
   const toneClass = {
-    slate: "bg-brand-neutral-50 text-brand-neutral-950",
-    green: "bg-brand-green-50 text-brand-green-800",
-    amber: "bg-brand-amber-50 text-brand-amber-700",
-    sky: "bg-brand-sky-50 text-brand-sky-700",
-    rose: "bg-brand-red-50 text-brand-red-800",
+    slate: "bg-slate-50 text-slate-950",
+    green: "bg-emerald-50 text-brand-green-800",
+    amber: "bg-brand-amber-50 text-brand-amber-800",
+    sky: "bg-brand-sky-50 text-brand-sky-800",
+    rose: "bg-rose-50 text-rose-800",
   }[tone];
 
   return (
@@ -714,7 +714,7 @@ function SaleCardField({
 }
 
 function normalizeFloorLabel(floorLabel: string | null, unitNo: string): string {
-  if (floorLabel && floorLabel.trim()) return floorLabel.trim().replace("Ã¦Â¥Â¼", "F");
+  if (floorLabel && floorLabel.trim()) return floorLabel.trim().replace("楼", "F");
   const numeric = Number.parseInt(unitNo, 10);
   if (Number.isFinite(numeric)) return `${Math.floor(numeric / 100)}F`;
   return "F";
@@ -727,11 +727,11 @@ function floorSortValue(label: string): number {
 
 function SaleMetric({ label, value, tone }: { label: string; value: string; tone: "slate" | "green" | "amber" | "sky" | "rose" }) {
   const toneClass = {
-    slate: "border-brand-neutral-200 bg-white text-brand-neutral-950",
-    green: "border-brand-green-200 bg-brand-green-50 text-brand-green-900",
+    slate: "border-slate-200 bg-white text-slate-950",
+    green: "border-emerald-200 bg-brand-green-50 text-brand-green-900",
     amber: "border-brand-amber-200 bg-brand-amber-50 text-brand-amber-900",
     sky: "border-brand-sky-200 bg-brand-sky-50 text-brand-sky-900",
-    rose: "border-brand-red-200 bg-brand-red-50 text-brand-red-900",
+    rose: "border-rose-200 bg-rose-50 text-rose-900",
   }[tone];
 
   return (

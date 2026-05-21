@@ -13,14 +13,14 @@ const TYPE_ICONS: Record<SearchResultType, typeof Search> = {
   payment: DollarSign, document: FileText,
 };
 const TYPE_LABELS: Record<SearchResultType, Record<string, string>> = {
-  customer: { zh: "å®¢æˆ·", fr: "Client" },
-  unit: { zh: "æˆ¿æº", fr: "Logement" },
-  daily_booking: { zh: "æ—¥ç§Ÿ", fr: "Jour" },
-  lease: { zh: "é•¿ç§Ÿ", fr: "Location" },
-  sale: { zh: "å‡ºå”®", fr: "Vente" },
-  receivable: { zh: "åº”æ”¶", fr: "Creance" },
-  payment: { zh: "æ”¶æ¬¾", fr: "Paiement" },
-  document: { zh: "å•æ®", fr: "Document" },
+  customer: { zh: "客户", fr: "Client" },
+  unit: { zh: "房源", fr: "Logement" },
+  daily_booking: { zh: "日租", fr: "Jour" },
+  lease: { zh: "长租", fr: "Location" },
+  sale: { zh: "出售", fr: "Vente" },
+  receivable: { zh: "应收", fr: "Creance" },
+  payment: { zh: "收款", fr: "Paiement" },
+  document: { zh: "单据", fr: "Document" },
 };
 
 export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
@@ -86,7 +86,7 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
         className="hidden sm:flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
       >
         <Search className="h-3.5 w-3.5" />
-        <span className="hidden lg:inline">{locale === "zh" ? "æœç´¢..." : "Rechercher..."}</span>
+        <span className="hidden lg:inline">{locale === "zh" ? "搜索..." : "Rechercher..."}</span>
         <kbd className="hidden lg:inline rounded-xl border border-slate-200 bg-white px-1.5 py-0 text-[10px] font-mono text-slate-400">Ctrl+K</kbd>
       </button>
       {/* Mobile search icon */}
@@ -122,7 +122,7 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={locale === "zh" ? "æœç´¢å®¢æˆ·ã€æˆ¿æºã€åˆåŒã€åº”æ”¶..." : "Rechercher client, chambre, contrat..."}
+            placeholder={locale === "zh" ? "搜索客户、房源、合同、应收..." : "Rechercher client, chambre, contrat..."}
             className="flex-1 text-sm text-slate-950 placeholder:text-slate-400 bg-transparent outline-none"
           />
           {loading && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
@@ -135,13 +135,13 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
         <div className="max-h-[360px] overflow-auto">
           {query.length < 2 ? (
             <div className="py-12 text-center text-sm text-slate-400">
-              {locale === "zh" ? "è¾“å…¥è‡³å°‘ 2 ä¸ªå­—ç¬¦å¼€å§‹æœç´¢" : "Tapez au moins 2 caracteres"}
+              {locale === "zh" ? "输入至少 2 个字符开始搜索" : "Tapez au moins 2 caracteres"}
             </div>
           ) : loading ? (
             <div className="py-8 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-slate-400" /></div>
           ) : results.length === 0 ? (
             <div className="py-12 text-center text-sm text-slate-400">
-              {locale === "zh" ? "æ— æœç´¢ç»“æžœ" : "Aucun resultat"}
+              {locale === "zh" ? "无搜索结果" : "Aucun resultat"}
             </div>
           ) : (
             [...grouped.entries()].map(([type, items]) => (
@@ -165,15 +165,15 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-slate-900 truncate">{r.title}</p>
                         <p className="text-xs text-slate-500 truncate">
-                          {r.subtitle && <span>{r.subtitle} Â· </span>}
+                          {r.subtitle && <span>{r.subtitle} · </span>}
                           {r.description}
-                          {r.amount > 0 && <span className="ml-1">Â· {formatXof(r.amount)}</span>}
+                          {r.amount > 0 && <span className="ml-1">· {formatXof(r.amount)}</span>}
                         </p>
                       </div>
                       {r.status && (
                         <span className={cn("shrink-0 rounded-full px-1.5 py-0 text-[9px] font-semibold",
-                          r.status === "active" || r.status === "paid" || r.status === "checked_in" ? "bg-brand-green-100 text-green-700" :
-                          r.status === "overdue" || r.status === "cancelled" ? "bg-brand-red-100 text-red-700" :
+                          r.status === "active" || r.status === "paid" || r.status === "checked_in" ? "bg-brand-green-100 text-brand-green-700" :
+                          r.status === "overdue" || r.status === "cancelled" ? "bg-brand-red-100 text-brand-red-700" :
                           "bg-slate-100 text-slate-600"
                         )}>{r.status}</span>
                       )}
@@ -187,9 +187,9 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
 
         {/* Footer */}
         <div className="flex items-center gap-3 px-4 py-2 border-t border-brand-neutral-200 text-[10px] text-slate-400">
-          <span>â†‘â†“ {locale === "zh" ? "å¯¼èˆª" : "Nav"}</span>
-          <span>â†µ {locale === "zh" ? "é€‰æ‹©" : "Sel"}</span>
-          <span>Esc {locale === "zh" ? "å…³é—­" : "Fermer"}</span>
+          <span>↑↓ {locale === "zh" ? "导航" : "Nav"}</span>
+          <span>↵ {locale === "zh" ? "选择" : "Sel"}</span>
+          <span>Esc {locale === "zh" ? "关闭" : "Fermer"}</span>
         </div>
       </div>
     </div>

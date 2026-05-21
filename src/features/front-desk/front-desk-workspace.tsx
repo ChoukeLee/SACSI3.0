@@ -37,7 +37,7 @@ type MainTab = "checkins" | "occupied" | "checkouts" | "pending";
 export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, cleaningTasks, locale, buildingName = "SASCI11" }: Props) {
   const router = useRouter();
   const t = locale === "zh"
-    ? { today: "ä»Šæ—¥", checkins: "ä»Šæ—¥å…¥ä½", occupied: "å½“å‰åœ¨ä½", checkouts: "ä»Šæ—¥é€€æˆ¿", pending: "å¾…ç¡®è®¤", newBooking: "æ–°å»ºé¢„è®¢", checkin: "åŠžç†å…¥ä½", checkout: "é€€æˆ¿", payment: "æ”¶æ¬¾", cancel: "å–æ¶ˆ", confirm: "ç¡®è®¤é¢„è®¢", roomStatus: "æˆ¿æ€", copyShare: "å¤åˆ¶å‘ç¾¤", copied: "å·²å¤åˆ¶", allCopy: "å…¨éƒ¨å‘é€", room: "æˆ¿", guest: "å®¢", nights: "æ™š", prepaid: "å·²ä»˜", due: "å¾…ä»˜", date: "æ—¥æœŸ", amount: "é‡‘é¢", receiptNo: "æ”¶æ®å·", reason: "åŽŸå› ", save: "ä¿å­˜", loading: "å¤„ç†ä¸­...", success: "æˆåŠŸ", error: "å¤±è´¥", noData: "æš‚æ— æ•°æ®", newBookingDesc: "æ–°å»ºæ—¥ç§Ÿé¢„è®¢", checkinDesc: "ç¡®è®¤åŠžç†å…¥ä½ï¼Ÿ", checkoutDesc: "ç¡®è®¤é€€æˆ¿ï¼Ÿé€€æˆ¿åŽæˆ¿é—´è¿›å…¥ä¿æ´", cancelDesc: "ç¡®è®¤å–æ¶ˆé¢„è®¢ï¼Ÿ", paymentDesc: "è¾“å…¥è¡¥ç¼´é‡‘é¢", copyDesc: "å¤åˆ¶ä»Šæ—¥æˆ¿æ€åˆ°å‰ªè´´æ¿", available: "ç©ºé—²", reserved: "é¢„è®¢", occupiedLabel: "å ç”¨", cleaning: "ä¿æ´", maintenance: "ç»´ä¿®", locked: "é”å®š", noPhone: "æ— ç”µè¯", modalTitle: "æ“ä½œ", closeModal: "å…³é—­", }
+    ? { today: "今日", checkins: "今日入住", occupied: "当前在住", checkouts: "今日退房", pending: "待确认", newBooking: "新建预订", checkin: "办理入住", checkout: "退房", payment: "收款", cancel: "取消", confirm: "确认预订", roomStatus: "房态", copyShare: "复制发群", copied: "已复制", allCopy: "全部发送", room: "房", guest: "客", nights: "晚", prepaid: "已付", due: "待付", date: "日期", amount: "金额", receiptNo: "收据号", reason: "原因", save: "保存", loading: "处理中...", success: "成功", error: "失败", noData: "暂无数据", newBookingDesc: "新建日租预订", checkinDesc: "确认办理入住？", checkoutDesc: "确认退房？退房后房间进入保洁", cancelDesc: "确认取消预订？", paymentDesc: "输入补缴金额", copyDesc: "复制今日房态到剪贴板", available: "空闲", reserved: "预订", occupiedLabel: "占用", cleaning: "保洁", maintenance: "维修", locked: "锁定", noPhone: "无电话", modalTitle: "操作", closeModal: "关闭", }
     : { today: "Aujourd'hui", checkins: "Arrivees", occupied: "Occupes", checkouts: "Departs", pending: "A confirmer", newBooking: "Reserver", checkin: "Arrivee", checkout: "Depart", payment: "Paiement", cancel: "Annuler", confirm: "Confirmer", roomStatus: "Chambres", copyShare: "Copier", copied: "Copie", allCopy: "Tout", room: "Ch", guest: "Cli", nights: "n", prepaid: "Paye", due: "Du", date: "Date", amount: "Montant", receiptNo: "Recu", reason: "Motif", save: "OK", loading: "...", success: "OK", error: "Erreur", noData: "Aucun", newBookingDesc: "Nouvelle reservation", checkinDesc: "Confirmer l'arrivee?", checkoutDesc: "Confirmer le depart?", cancelDesc: "Annuler la reservation?", paymentDesc: "Saisir le montant", copyDesc: "Copier l'etat des chambres", available: "Dispo", reserved: "Reserve", occupiedLabel: "Occupe", cleaning: "Menage", maintenance: "Maint", locked: "Bloque", noPhone: "Sans tel", modalTitle: "Action", closeModal: "Fermer", }
   ;
 
@@ -71,30 +71,30 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
   const [msg, setMsg] = useState("");
   const [copied, setCopied] = useState(false);
 
-  // â”€â”€ Copy share content â”€â”€
+  // ── Copy share content ──
   const handleCopyShare = useCallback(() => {
     const lines: string[] = [];
     const dateStr = new Date().toLocaleDateString(locale === "zh" ? "zh-CN" : "fr-FR", { weekday: "short", year: "numeric", month: "2-digit", day: "2-digit" });
-    lines.push(`SACIS3.0 ${buildingName} â€” ${dateStr}`);
+    lines.push(`SACIS3.0 ${buildingName} — ${dateStr}`);
     lines.push("");
 
     if (occupied.length > 0) {
-      lines.push(locale === "zh" ? `ã€å ç”¨ä¸­ ${occupied.length}é—´ã€‘` : `ã€${occupied.length} occupeesã€‘`);
+      lines.push(locale === "zh" ? `【占用中 ${occupied.length}间】` : `【${occupied.length} occupees】`);
       for (const r of occupied) lines.push(`${r.unit.unit_no}`);
       lines.push("");
     }
     if (todayCheckouts.length > 0) {
-      lines.push(locale === "zh" ? `ã€ä»Šæ—¥é€€æˆ¿ ${todayCheckouts.length}é—´ã€‘` : `ã€${todayCheckouts.length} departsã€‘`);
+      lines.push(locale === "zh" ? `【今日退房 ${todayCheckouts.length}间】` : `【${todayCheckouts.length} departs】`);
       for (const r of todayCheckouts) lines.push(`${r.unit.unit_no}`);
       lines.push("");
     }
     if (cleaning.length > 0) {
-      lines.push(locale === "zh" ? `ã€å¾…ä¿æ´ ${cleaning.length}é—´ã€‘` : `ã€${cleaning.length} menagesã€‘`);
+      lines.push(locale === "zh" ? `【待保洁 ${cleaning.length}间】` : `【${cleaning.length} menages】`);
       for (const r of cleaning) lines.push(`${r.unit.unit_no}`);
       lines.push("");
     }
     if (available.length > 0) {
-      lines.push(locale === "zh" ? `ã€ç©ºé—² ${available.length}é—´ã€‘` : `ã€${available.length} dispoã€‘`);
+      lines.push(locale === "zh" ? `【空闲 ${available.length}间】` : `【${available.length} dispo】`);
       lines.push("");
     }
 
@@ -104,7 +104,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
     });
   }, [occupied, todayCheckouts, cleaning, available, locale, buildingName]);
 
-  // â”€â”€ Room color â”€â”€
+  // ── Room color ──
   const roomColor = (rs: RoomState) => {
     switch (rs.displayStatus) {
       case "occupied": return "bg-brand-orange-100 text-brand-orange-700 border-brand-orange-300";
@@ -116,7 +116,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
     }
   };
 
-  // â”€â”€ Action handlers â”€â”€
+  // ── Action handlers ──
   const openRoomAction = (room: RoomState, action: PopupAction) => {
     setSelectedRoom(room);
     setPopupAction(action);
@@ -167,7 +167,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
 
   const btnClass = "flex items-center justify-center gap-1.5 rounded-xl px-3 py-3 text-xs font-semibold active:scale-95 transition-all";
 
-  // â”€â”€ Render â”€â”€
+  // ── Render ──
   return (
     <div className="max-w-lg mx-auto pb-8">
       {/* Header */}
@@ -207,7 +207,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
         </button>
       </div>
 
-      {/* Room matrix â€” apartments only, compact */}
+      {/* Room matrix — apartments only, compact */}
       <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3">
         <h3 className="text-[11px] font-bold text-slate-600 mb-2">{t.roomStatus} ({roomStates.length})</h3>
         <div className="flex flex-wrap gap-1.5">
@@ -219,7 +219,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
                 "flex h-8 w-8 items-center justify-center rounded text-[9px] font-semibold border transition-all active:scale-90",
                 roomColor(rs),
               )}
-              title={`${rs.unit.unit_no} â€” ${rs.customer?.name ?? ""}`}
+              title={`${rs.unit.unit_no} — ${rs.customer?.name ?? ""}`}
             >
               {rs.unit.unit_no}
             </button>
@@ -227,9 +227,9 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
         </div>
         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-slate-500">
           <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-brand-green-500" />{t.available} ({available.length})</span>
-          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-brand-orange-500" />{t.occupied} ({occupied.length})</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-brand-red-500" />{t.occupied} ({occupied.length})</span>
           <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-brand-amber-500" />{t.checkouts} ({todayCheckouts.length})</span>
-          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-brand-sky-500" />{t.reserved} ({reserved.length})</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-brand-sky-400" />{t.reserved} ({reserved.length})</span>
         </div>
       </div>
 
@@ -260,19 +260,19 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-slate-900 truncate">{cust?.name ?? "?"}</p>
                   <p className="text-[10px] text-slate-500 truncate">
-                    {b.check_in} Â· {nights}{locale === "zh" ? "æ™š" : "n"} Â· {formatXof(Number(b.total_amount_xof))}
-                    {cust?.phone && <span className="ml-1">Â· {cust.phone}</span>}
+                    {b.check_in} · {nights}{locale === "zh" ? "晚" : "n"} · {formatXof(Number(b.total_amount_xof))}
+                    {cust?.phone && <span className="ml-1">· {cust.phone}</span>}
                   </p>
                 </div>
                 <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold",
-                  b.status === "checked_in" ? "bg-brand-orange-100 text-brand-orange-700" :
+                  b.status === "checked_in" ? "bg-brand-red-100 text-brand-red-700" :
                   b.status === "confirmed" ? "bg-brand-sky-100 text-brand-sky-700" :
                   b.status === "pending_review" ? "bg-brand-amber-100 text-brand-amber-700" :
                   "bg-slate-100 text-slate-500"
                 )}>
-                  {b.status === "checked_in" ? (locale === "zh" ? "åœ¨ä½" : "Occupe") :
-                   b.status === "confirmed" ? (locale === "zh" ? "å·²ç¡®è®¤" : "Confirme") :
-                   b.status === "pending_review" ? (locale === "zh" ? "å¾…å®¡" : "Attente") : b.status}
+                  {b.status === "checked_in" ? (locale === "zh" ? "在住" : "Occupe") :
+                   b.status === "confirmed" ? (locale === "zh" ? "已确认" : "Confirme") :
+                   b.status === "pending_review" ? (locale === "zh" ? "待审" : "Attente") : b.status}
                 </span>
                 <div className="flex gap-1">
                   {b.status === "pending_review" && (
@@ -305,7 +305,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={() => setSelectedRoom(null)}>
           <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-sm max-h-[70vh] overflow-auto shadow-xl border border-slate-200 p-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-slate-950">{selectedRoom.unit.unit_no} Â· {selectedRoom.unit.floor_label}</h3>
+              <h3 className="text-sm font-bold text-slate-950">{selectedRoom.unit.unit_no} · {selectedRoom.unit.floor_label}</h3>
               <button onClick={() => setSelectedRoom(null)} className="p-1 rounded hover:bg-slate-100"><X className="h-4 w-4 text-slate-500" /></button>
             </div>
             {selectedRoom.customer && (
@@ -316,7 +316,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
             )}
             {selectedRoom.booking ? (
               <div className="space-y-1 text-xs mb-3">
-                <p><span className="text-slate-500">{t.date}:</span> {selectedRoom.booking.check_in} â†’ {selectedRoom.booking.check_out ?? (locale === "zh" ? "æœªå®š" : "?")}</p>
+                <p><span className="text-slate-500">{t.date}:</span> {selectedRoom.booking.check_in} → {selectedRoom.booking.check_out ?? (locale === "zh" ? "未定" : "?")}</p>
                 <p><span className="text-slate-500">{t.amount}:</span> {formatXof(Number(selectedRoom.booking.total_amount_xof))}</p>
                 <p><span className="text-slate-500">{t.prepaid}:</span> <span className="text-brand-green-600">{formatXof(selectedRoom.totalPaid)}</span></p>
                 {selectedRoom.billing && selectedRoom.billing.finalAmount > selectedRoom.totalPaid && (
@@ -353,7 +353,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
           <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-sm shadow-xl border border-slate-200 p-4" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-bold text-slate-950 mb-3">
               {popupAction === "checkin" ? t.checkin : popupAction === "checkout" ? t.checkout : popupAction === "payment" ? t.payment : popupAction === "cancel" ? t.cancel : t.confirm}
-              {" â€” "}{selectedRoom.unit.unit_no}
+              {" — "}{selectedRoom.unit.unit_no}
             </h3>
             <p className="text-xs text-slate-600 mb-3">
               {popupAction === "checkin" ? t.checkinDesc : popupAction === "checkout" ? t.checkoutDesc : popupAction === "payment" ? t.paymentDesc : popupAction === "cancel" ? t.cancelDesc : t.confirm}

@@ -19,7 +19,7 @@ import type {
   SaleContractRow, SalePaymentScheduleRow, LedgerEntryRow, ReceivableRow,
 } from "@/types/database";
 
-// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Types ──────────────────────────────────────────────────────────────
 
 export type MgmtStatus =
   | "sold"
@@ -56,17 +56,17 @@ interface Props {
   locale: Locale;
 }
 
-// â”€â”€ Status colour system â€” operational state identifiers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Status colour system — operational state identifiers ──────────────
 // Each status has a distinct, scannable background colour.
 // Cells must be distinguishable at a glance from across the room.
 // Uses Tailwind native palette for stronger colour differentiation:
-//   sold    â†’ slate   (neutral, permanent, no action)
-//   leased  â†’ amber   (occupied long-term, warm)
-//   daily   â†’ orange  (active use, energetic)
-//   reserve â†’ blue    (pending arrival, calm)
-//   clean   â†’ cyan    (service required, distinct from blue)
-//   maint   â†’ red     (blocked, attention)
-//   avail   â†’ emerald (ready, positive)
+//   sold    → slate   (neutral, permanent, no action)
+//   leased  → amber   (occupied long-term, warm)
+//   daily   → orange  (active use, energetic)
+//   reserve → blue    (pending arrival, calm)
+//   clean   → cyan    (service required, distinct from blue)
+//   maint   → red     (blocked, attention)
+//   avail   → emerald (ready, positive)
 //
 // bg: room cell  dot: legend  pill: summary badge  ring: depth
 
@@ -79,11 +79,11 @@ const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string; r
     stripe: "bg-slate-700",
   },
   leased: {
-    bg:   "bg-indigo-600 text-white border-indigo-700 shadow-indigo-200",
-    dot:  "bg-indigo-600",
-    pill: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    bg:   "bg-brand-sky-600 text-white border-brand-sky-700 shadow-brand-sky-200",
+    dot:  "bg-brand-sky-600",
+    pill: "bg-brand-sky-50 text-brand-sky-700 border-brand-sky-200",
     ring: "",
-    stripe: "bg-indigo-800",
+    stripe: "bg-brand-sky-700",
   },
   dailyOccupied: {
     bg:   "bg-brand-orange-500 text-white border-brand-orange-600 shadow-brand-orange-200",
@@ -100,29 +100,29 @@ const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string; r
     stripe: "bg-brand-sky-700",
   },
   cleaningPending: {
-    bg:   "bg-teal-500 text-white border-teal-600 shadow-teal-200",
-    dot:  "bg-teal-500",
-    pill: "bg-teal-50 text-teal-700 border-teal-200",
+    bg:   "bg-brand-green-500 text-white border-brand-green-600 shadow-brand-green-200",
+    dot:  "bg-brand-green-500",
+    pill: "bg-brand-green-50 text-brand-green-700 border-brand-green-200",
     ring: "",
-    stripe: "bg-teal-700",
+    stripe: "bg-brand-green-700",
   },
   maintenance: {
-    bg:   "bg-rose-500 text-white border-rose-600 shadow-rose-200",
-    dot:  "bg-rose-500",
-    pill: "bg-rose-50 text-rose-700 border-rose-200",
+    bg:   "bg-brand-red-500 text-white border-brand-red-600 shadow-brand-red-200",
+    dot:  "bg-brand-red-500",
+    pill: "bg-brand-red-50 text-brand-red-700 border-brand-red-200",
     ring: "",
-    stripe: "bg-rose-700",
+    stripe: "bg-brand-red-700",
   },
   available: {
-    bg:   "bg-emerald-500 text-white border-emerald-600 shadow-emerald-200",
-    dot:  "bg-emerald-500",
-    pill: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    bg:   "bg-brand-green-500 text-white border-brand-green-600 shadow-brand-green-200",
+    dot:  "bg-brand-green-500",
+    pill: "bg-brand-green-50 text-brand-green-700 border-brand-green-200",
     ring: "",
-    stripe: "bg-emerald-700",
+    stripe: "bg-brand-green-700",
   },
 };
 
-// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Helpers ────────────────────────────────────────────────────────────
 
 function firstNumber(value: string | null | undefined): number | null {
   const match = String(value ?? "").match(/\d+/);
@@ -144,8 +144,8 @@ function groupStatesByFloor(states: UnitState[], locale: Locale): FloorGroup[] {
     const floor = getUnitFloorValue(state.unit);
     const key = floor === null ? "__unknown__" : String(floor);
     const label = floor === null
-      ? (locale === "zh" ? "æœªåˆ†å±‚" : "Sans Ã©tage")
-      : (locale === "zh" ? `${floor}å±‚` : `Ã‰tage ${floor}`);
+      ? (locale === "zh" ? "未分层" : "Sans étage")
+      : (locale === "zh" ? `${floor}层` : `Étage ${floor}`);
     if (!groups.has(key)) {
       groups.set(key, { key, label, sortValue: floor ?? Number.MAX_SAFE_INTEGER, states: [] });
     }
@@ -161,7 +161,7 @@ function groupStatesByFloor(states: UnitState[], locale: Locale): FloorGroup[] {
     .sort((a, b) => a.sortValue - b.sortValue);
 }
 
-// â”€â”€ Compute unit snapshot status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Compute unit snapshot status ───────────────────────────────────────
 
 function computeUnitState(
   unit: UnitRow,
@@ -190,7 +190,7 @@ function computeUnitState(
   return { unit, status: "available" };
 }
 
-// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Component ──────────────────────────────────────────────────────────
 
 export function ManagementDashboard({
   buildings, units, dailyBookings, leaseContracts, saleContracts,
@@ -235,7 +235,7 @@ export function ManagementDashboard({
     return c;
   }, [unitStates]);
 
-  // Finance â€” current month
+  // Finance — current month
   const now = new Date();
   const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
@@ -283,7 +283,7 @@ export function ManagementDashboard({
     <div className="-my-6 bg-[#f5f7fb]">
       <div className="mx-auto flex max-w-[1360px] flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
 
-        {/* â”€â”€ Building selector â€” segmented control â”€â”€ */}
+        {/* ── Building selector — segmented control ── */}
         <div>
           <div className="inline-flex flex-wrap gap-0.5 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
             <SegmentedTab
@@ -302,7 +302,7 @@ export function ManagementDashboard({
           </div>
         </div>
 
-        {/* â”€â”€ Section 1: Core KPI Summary â”€â”€ */}
+        {/* ── Section 1: Core KPI Summary ── */}
         <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.72fr)]">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-natural">
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -355,7 +355,7 @@ export function ManagementDashboard({
           <div>
             <SectionLabel compact>{t.sections.buildingStatus} - {buildingName}</SectionLabel>
             <p className="mt-1 text-xs text-slate-500">
-              {locale === "zh" ? "æŒ‰æ¥¼å±‚æŸ¥çœ‹æˆ¿é—´çŠ¶æ€ï¼Œç‚¹å‡»æˆ¿é—´å¯æ‰“å¼€å¯¹åº”æ¡£æ¡ˆã€‚" : "Statut par etage, cliquez pour ouvrir le dossier."}
+              {locale === "zh" ? "按楼层查看房间状态，点击房间可打开对应档案。" : "Statut par etage, cliquez pour ouvrir le dossier."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -390,7 +390,7 @@ export function ManagementDashboard({
                     <span className="h-2.5 w-2.5 rounded-full bg-brand-orange" />
                     <h4 className="text-sm font-black text-slate-950">{building.display_name}</h4>
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
-                      {bStates.length} {locale === "zh" ? "é—´" : "unitÃ©s"}
+                      {bStates.length} {locale === "zh" ? "间" : "unités"}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
@@ -442,7 +442,7 @@ export function ManagementDashboard({
           <QualityDashboardWidget issues={qualityIssues} locale={locale} variant="management" />
         )}
 
-        {/* â”€â”€ Quick links â”€â”€ */}
+        {/* ── Quick links ── */}
         <div className="flex flex-wrap gap-3 text-xs text-slate-400">
           <QuickLink href="/daily-rentals/overview" locale={locale} label={dictionaries[locale].shell.nav.dailyOccupancy ?? ""} />
           <QuickLink href="/leases" locale={locale} label={dictionaries[locale].shell.nav.leases ?? ""} />
@@ -455,7 +455,7 @@ export function ManagementDashboard({
   );
 }
 
-// â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Sub-components ─────────────────────────────────────────────────────
 
 const ROOM_CARD: Record<MgmtStatus, { card: string; badge: string; dot: string; action: string }> = {
   sold: {
@@ -465,9 +465,9 @@ const ROOM_CARD: Record<MgmtStatus, { card: string; badge: string; dot: string; 
     action: "bg-white/15 text-white ring-white/20",
   },
   leased: {
-    card: "border-indigo-300 bg-indigo-600 text-white",
-    badge: "bg-white text-indigo-700",
-    dot: "bg-indigo-200",
+    card: "border-brand-sky-300 bg-brand-sky-600 text-white",
+    badge: "bg-white text-brand-sky-700",
+    dot: "bg-brand-sky-200",
     action: "bg-white/15 text-white ring-white/20",
   },
   dailyOccupied: {
@@ -495,10 +495,10 @@ const ROOM_CARD: Record<MgmtStatus, { card: string; badge: string; dot: string; 
     action: "bg-white/15 text-white ring-white/20",
   },
   available: {
-    card: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    card: "border-emerald-200 bg-brand-green-50 text-brand-green-900",
     badge: "bg-emerald-600 text-white",
     dot: "bg-emerald-500",
-    action: "bg-white/80 text-emerald-700 ring-emerald-200",
+    action: "bg-white/80 text-brand-green-700 ring-emerald-200",
   },
 };
 
@@ -511,7 +511,7 @@ function RoomStatusCard({
   locale: Locale;
 }) {
   const styles = ROOM_CARD[state.status];
-  const roomText = locale === "zh" ? "æˆ¿é—´æ¡£æ¡ˆ" : "Dossier";
+  const roomText = locale === "zh" ? "房间档案" : "Dossier";
 
   return (
     <Link

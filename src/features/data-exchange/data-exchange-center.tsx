@@ -50,7 +50,7 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
     a.download = `${expType}_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    setExpMsg(locale === "zh" ? `å·²å¯¼å‡º ${csv.split("\n").length - 1} æ¡` : `${csv.split("\n").length - 1} lignes exportees`);
+    setExpMsg(locale === "zh" ? `已导出 ${csv.split("\n").length - 1} 条` : `${csv.split("\n").length - 1} lignes exportees`);
     setExpLoading(false);
   };
 
@@ -91,51 +91,51 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
         {(["export", "import"] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={cn("rounded-md px-4 py-1.5 text-[13px] font-semibold transition-colors", tab === t ? "bg-white text-slate-950 shadow-sm" : "text-slate-500")}>
-            {t === "export" ? (locale === "zh" ? "å¯¼å‡º" : "Export") : (locale === "zh" ? "å¯¼å…¥" : "Import")}
+            {t === "export" ? (locale === "zh" ? "导出" : "Export") : (locale === "zh" ? "导入" : "Import")}
           </button>
         ))}
       </div>
 
-      {/* â”€â”€ Export Tab â”€â”€ */}
+      {/* ── Export Tab ── */}
       {tab === "export" && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-natural space-y-4">
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 mb-1.5">{locale === "zh" ? "æ•°æ®ç±»åž‹" : "Type"}</label>
+            <label className="block text-[11px] font-bold text-slate-500 mb-1.5">{locale === "zh" ? "数据类型" : "Type"}</label>
             <select value={expType} onChange={e => setExpType(e.target.value as ExportDataType)} className={cn(btn, "w-full sm:w-64")}>
               {exportTypes.map(t => <option key={t} value={t}>{exportLabels[t]}</option>)}
             </select>
           </div>
           <button onClick={handleExport} disabled={expLoading} className={cn(primaryBtn, "inline-flex items-center gap-2")}>
             {expLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-            {locale === "zh" ? "å¯¼å‡º CSV" : "Exporter CSV"}
+            {locale === "zh" ? "导出 CSV" : "Exporter CSV"}
           </button>
           {expMsg && <p className="text-xs text-brand-green-600">{expMsg}</p>}
         </div>
       )}
 
-      {/* â”€â”€ Import Tab â”€â”€ */}
+      {/* ── Import Tab ── */}
       {tab === "import" && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-natural space-y-4">
           <div className="flex flex-wrap items-end gap-3">
             <div>
-              <label className="block text-[11px] font-bold text-slate-500 mb-1.5">{locale === "zh" ? "æ•°æ®ç±»åž‹" : "Type"}</label>
+              <label className="block text-[11px] font-bold text-slate-500 mb-1.5">{locale === "zh" ? "数据类型" : "Type"}</label>
               <select value={impType} onChange={e => { setImpType(e.target.value as ImportDataType); setImpResult(null); setImpSubmitResult(null); }} className={cn(btn, "w-full sm:w-48")}>
                 {importTypes.map(t => <option key={t} value={t}>{importLabels[t]}</option>)}
               </select>
             </div>
             <button onClick={handleDownloadTemplate} className={cn(btn, "inline-flex items-center gap-1.5 text-brand-orange-600 border-brand-orange-200 hover:bg-brand-orange-50")}>
-              <Download className="h-3.5 w-3.5" />{locale === "zh" ? "ä¸‹è½½æ¨¡æ¿" : "Modele"}
+              <Download className="h-3.5 w-3.5" />{locale === "zh" ? "下载模板" : "Modele"}
             </button>
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 mb-1.5">{locale === "zh" ? "ç²˜è´´ CSV å†…å®¹" : "Coller CSV"}</label>
+            <label className="block text-[11px] font-bold text-slate-500 mb-1.5">{locale === "zh" ? "粘贴 CSV 内容" : "Coller CSV"}</label>
             <textarea
               value={impText}
               onChange={e => { setImpText(e.target.value); setImpResult(null); setImpSubmitResult(null); }}
               rows={8}
-              placeholder={locale === "zh" ? "å°† CSV å†…å®¹ç²˜è´´åˆ°æ­¤å¤„..." : "Collez le contenu CSV ici..."}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/20"
+              placeholder={locale === "zh" ? "将 CSV 内容粘贴到此处..." : "Collez le contenu CSV ici..."}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
             />
           </div>
 
@@ -143,13 +143,13 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
             <button onClick={handlePreview} disabled={impLoading || !impText.trim()}
               className={cn(primaryBtn, "inline-flex items-center gap-2")}>
               {impLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-              {locale === "zh" ? "é¢„è§ˆæ ¡éªŒ" : "Valider"}
+              {locale === "zh" ? "预览校验" : "Valider"}
             </button>
             {impResult?.canSubmit && (
               <button onClick={handleSubmit} disabled={impLoading}
                 className={cn(primaryBtn, "bg-brand-green-600 hover:bg-brand-green-700 inline-flex items-center gap-2")}>
                 {impLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                {locale === "zh" ? "ç¡®è®¤å¯¼å…¥" : "Importer"}
+                {locale === "zh" ? "确认导入" : "Importer"}
               </button>
             )}
           </div>
@@ -159,17 +159,17 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
             <div className="space-y-2">
               <div className="flex gap-3 text-xs">
                 <span className="text-brand-green-600 flex items-center gap-1"><Check className="h-3 w-3" />{impResult.okCount} OK</span>
-                <span className="text-brand-amber-600 flex items-center gap-1"><AlertTriangle className="h-3 w-3" />{impResult.warnCount} {locale === "zh" ? "è­¦å‘Š" : "alertes"}</span>
-                <span className="text-brand-red-600 flex items-center gap-1"><X className="h-3 w-3" />{impResult.errCount} {locale === "zh" ? "é”™è¯¯" : "erreurs"}</span>
+                <span className="text-brand-amber-600 flex items-center gap-1"><AlertTriangle className="h-3 w-3" />{impResult.warnCount} {locale === "zh" ? "警告" : "alertes"}</span>
+                <span className="text-brand-red-600 flex items-center gap-1"><X className="h-3 w-3" />{impResult.errCount} {locale === "zh" ? "错误" : "erreurs"}</span>
               </div>
-              {impResult.errCount > 0 && <p className="text-xs text-brand-red-600">{locale === "zh" ? "å­˜åœ¨é”™è¯¯è¡Œï¼Œæ— æ³•æäº¤å¯¼å…¥" : "Erreurs detectees, import impossible"}</p>}
+              {impResult.errCount > 0 && <p className="text-xs text-brand-red-600">{locale === "zh" ? "存在错误行，无法提交导入" : "Erreurs detectees, import impossible"}</p>}
 
               <div className="overflow-auto max-h-[300px] rounded-xl border border-slate-200 text-xs">
                 <table className="data-table">
                   <thead className="sticky top-0 bg-slate-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"><tr>
-                    <th className="px-2 py-1.5 text-left">{locale === "zh" ? "è¡Œ" : "#"}</th>
-                    <th className="px-2 py-1.5 text-left">{locale === "zh" ? "æ•°æ®" : "Donnees"}</th>
-                    <th className="px-2 py-1.5 text-left">{locale === "zh" ? "ç»“æžœ" : "Resultat"}</th>
+                    <th className="px-2 py-1.5 text-left">{locale === "zh" ? "行" : "#"}</th>
+                    <th className="px-2 py-1.5 text-left">{locale === "zh" ? "数据" : "Donnees"}</th>
+                    <th className="px-2 py-1.5 text-left">{locale === "zh" ? "结果" : "Resultat"}</th>
                   </tr></thead>
                   <tbody className="divide-y divide-slate-100">
                     {impResult.rows.map(r => (
@@ -188,8 +188,8 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
           {/* Submit result */}
           {impSubmitResult && (
             <div className={cn("rounded-lg p-4 text-sm", impSubmitResult.success ? "bg-brand-green-50 border border-brand-green-200" : "bg-brand-amber-50 border border-brand-amber-200")}>
-              <p className="font-bold">{impSubmitResult.success ? (locale === "zh" ? "å¯¼å…¥æˆåŠŸ" : "Import reussi") : (locale === "zh" ? "å¯¼å…¥å®Œæˆï¼ˆæœ‰é”™è¯¯ï¼‰" : "Import termine (erreurs)")}</p>
-              <p className="text-xs mt-1">{locale === "zh" ? `æˆåŠŸ ${impSubmitResult.inserted} æ¡ï¼Œå¤±è´¥ ${impSubmitResult.errors} æ¡` : `${impSubmitResult.inserted} ok, ${impSubmitResult.errors} erreurs`}</p>
+              <p className="font-bold">{impSubmitResult.success ? (locale === "zh" ? "导入成功" : "Import reussi") : (locale === "zh" ? "导入完成（有错误）" : "Import termine (erreurs)")}</p>
+              <p className="text-xs mt-1">{locale === "zh" ? `成功 ${impSubmitResult.inserted} 条，失败 ${impSubmitResult.errors} 条` : `${impSubmitResult.inserted} ok, ${impSubmitResult.errors} erreurs`}</p>
               {impSubmitResult.messages.length > 0 && (
                 <ul className="mt-2 text-xs space-y-0.5 max-h-[200px] overflow-auto">
                   {impSubmitResult.messages.map((m, i) => <li key={i} className="text-brand-red-600">{m}</li>)}

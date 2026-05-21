@@ -80,6 +80,9 @@ const config: Config = {
             "500": "#DC2626",
             "600": "#B91C1C",
             "700": "#991B1B",
+            "800": "#7F1D1D",
+            "900": "#450A0A",
+            "950": "#2D0505",
           },
           /* Warning — amber for alerts, checkouts, pending */
           amber: {
@@ -92,6 +95,9 @@ const config: Config = {
             "500": "#D97706",
             "600": "#B45309",
             "700": "#92400E",
+            "800": "#78350F",
+            "900": "#451A03",
+            "950": "#2D1002",
           },
           /* Info — calm slate-blue for neutral metadata */
           sky: {
@@ -104,6 +110,9 @@ const config: Config = {
             "500": "#4A6B7D",
             "600": "#3A5564",
             "700": "#2B404B",
+            "800": "#1E2D35",
+            "900": "#121B20",
+            "950": "#0A0F12",
           },
           /* Backward compat alias — maps old warm tokens to neutral */
           warm: {

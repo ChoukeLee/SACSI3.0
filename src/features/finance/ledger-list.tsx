@@ -113,7 +113,7 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
     URL.revokeObjectURL(url);
   };
 
-  const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/20";
+  const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20";
   const labelClass = "block mb-1 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500";
 
   const dirColor: Record<string, string> = {
@@ -134,17 +134,17 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
       <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-natural">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/20" />
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
             <span className="text-xs font-semibold text-slate-400">-</span>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/20" />
-            <select value={dirFilter} onChange={(e) => setDirFilter(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/20">
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
+            <select value={dirFilter} onChange={(e) => setDirFilter(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20">
               <option value="all">{t.filters.direction}: {t.filters.all}</option>
               <option value="income">{t.directions.income}</option>
               <option value="expense">{t.directions.expense}</option>
               <option value="liability_in">{t.directions.liability_in}</option>
               <option value="liability_out">{t.directions.liability_out}</option>
             </select>
-            <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/20">
+            <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20">
               <option value="all">{t.filters.category}: {t.filters.all}</option>
               {allCategories.map(c => <option key={c} value={c}>{t.categories[c as keyof typeof t.categories]}</option>)}
             </select>
@@ -153,7 +153,7 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={locale === "zh" ? "????/??..." : "Rechercher description, chambre..."}
-              className="w-48 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition placeholder:text-slate-400 hover:border-slate-300 hover:bg-slate-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/20"
+              className="w-48 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition placeholder:text-slate-400 hover:border-slate-300 hover:bg-slate-50 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -272,7 +272,7 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
 
 function FinanceMetric({ label, value, tone }: { label: string; value: string; tone: "green" | "red" | "orange" }) {
   const styles = {
-    green: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    green: "border-emerald-200 bg-brand-green-50 text-brand-green-700",
     red: "border-brand-red-200 bg-brand-red-50 text-brand-red-700",
     orange: "border-brand-orange-200 bg-brand-orange-50 text-brand-orange-700",
   }[tone];

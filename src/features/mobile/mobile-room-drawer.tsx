@@ -290,7 +290,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                 <div className="flex gap-2 items-end">
                   <div className="flex-1">
                     <label className="text-[10px] text-slate-500 block mb-1">
-                      {locale === "zh" ? "æ–°ç¦»åº—æ—¥æœŸ" : "Nouvelle date dÃ©part"}
+                      {locale === "zh" ? "新离店日期" : "Nouvelle date départ"}
                     </label>
                     <input
                       type="date"

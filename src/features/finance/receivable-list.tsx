@@ -132,12 +132,12 @@ export function ReceivableList({ receivables, units, customers, buildings, local
     URL.revokeObjectURL(url);
   };
 
-  const filterBtn = "rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all duration-fast hover:border-slate-300 hover:bg-slate-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/20";
+  const filterBtn = "rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all duration-fast hover:border-slate-300 hover:bg-slate-50 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20";
 
   const resolveBuildingName = (r: ReceivableRow) => {
     const bid = r.building_id ?? unitBuildingMap.get(r.unit_id ?? "") ?? null;
-    if (!bid) return "â€”";
-    return buildingMap.get(bid) ?? "â€”";
+    if (!bid) return "—";
+    return buildingMap.get(bid) ?? "—";
   };
 
   return (
@@ -168,20 +168,20 @@ export function ReceivableList({ receivables, units, customers, buildings, local
         <select value={buildingFilter} onChange={e => setBuildingFilter(e.target.value)} className={filterBtn}>
           <option value="all">{t.filters.building}: {t.filters.all}</option>
           {buildings.map(b => <option key={b.id} value={b.id}>{b.display_name || b.code}</option>)}
-          <option value="__unassigned__">{locale === "zh" ? "æœªå½’å±ž" : "Non attribue"}</option>
+          <option value="__unassigned__">{locale === "zh" ? "未归属" : "Non attribue"}</option>
         </select>
         <input
           type="date" value={dateFrom}
           onChange={e => setDateFrom(e.target.value)}
           className={cn(filterBtn, "w-[150px]")}
-          title={locale === "zh" ? "èµ·å§‹æ—¥æœŸ" : "Date debut"}
+          title={locale === "zh" ? "起始日期" : "Date debut"}
         />
         <span className="text-xs font-semibold text-slate-400">-</span>
         <input
           type="date" value={dateTo}
           onChange={e => setDateTo(e.target.value)}
           className={cn(filterBtn, "w-[150px]")}
-          title={locale === "zh" ? "ç»“æŸæ—¥æœŸ" : "Date fin"}
+          title={locale === "zh" ? "结束日期" : "Date fin"}
         />
         <button
           onClick={handleExportCsv}
@@ -191,7 +191,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
           <Download className="h-3.5 w-3.5" />{t.export.csv}
         </button>
         <span className="text-xs font-semibold text-slate-400">
-          {filtered.length} {locale === "zh" ? "æ¡" : "lignes"}
+          {filtered.length} {locale === "zh" ? "条" : "lignes"}
         </span>
       </div>
 
@@ -268,7 +268,7 @@ function MiniCard({ label, value, accent }: { label: string; value: string; acce
   const styles = accent === "ink"
     ? "border-slate-200 bg-white text-slate-950"
     : accent === "green"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      ? "border-emerald-200 bg-brand-green-50 text-brand-green-700"
       : accent === "orange"
         ? "border-brand-orange-200 bg-brand-orange-50 text-brand-orange-700"
         : "border-brand-red-200 bg-brand-red-50 text-brand-red-700";

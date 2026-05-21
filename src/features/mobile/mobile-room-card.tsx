@@ -87,13 +87,13 @@ export function MobileRoomCard({
               <p className="text-[11px] text-slate-500 mt-0.5">
                 {room.booking.check_in}
                 {room.booking.checkout_mode === "open"
-                  ? ` Â· ${t.drawer.openEnded}`
+                  ? ` · ${t.drawer.openEnded}`
                   : room.booking.check_out
-                    ? ` â†’ ${room.booking.check_out}`
+                    ? ` → ${room.booking.check_out}`
                     : ""}
                 {room.billing && (
                   <span className="ml-1.5">
-                    Â· {room.billing.nights}{t.roomCard.nights}
+                    · {room.billing.nights}{t.roomCard.nights}
                   </span>
                 )}
               </p>
@@ -107,7 +107,7 @@ export function MobileRoomCard({
         <div className="mt-2.5 flex items-center gap-1.5 rounded-md bg-brand-red-50 px-2.5 py-1.5 text-xs font-semibold text-brand-red-600">
           <CreditCard className="h-3.5 w-3.5 shrink-0" />
           <span>
-            {locale === "zh" ? "æ¬ è´¹ " : "DÃ» "}{formatXof(room.billing!.outstanding)}
+            {locale === "zh" ? "欠费 " : "Dû "}{formatXof(room.billing!.outstanding)}
           </span>
         </div>
       )}
@@ -116,7 +116,7 @@ export function MobileRoomCard({
       {isCleaning && (
         <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-slate-500">
           <span className="h-1.5 w-1.5 rounded-full bg-brand-sky-400" />
-          {locale === "zh" ? "é€€æˆ¿åŽç­‰å¾…ä¿æ´" : "En attente de menage"}
+          {locale === "zh" ? "退房后等待保洁" : "En attente de menage"}
         </div>
       )}
 
@@ -124,9 +124,9 @@ export function MobileRoomCard({
       {isReserved && room.booking && (
         <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-brand-amber-700">
           <span className="h-1.5 w-1.5 rounded-full bg-brand-amber-500" />
-          {locale === "zh" ? "é¢„è®¡å…¥ä½ " : "Arrivee prevue "}{room.booking.check_in}
+          {locale === "zh" ? "预计入住 " : "Arrivee prevue "}{room.booking.check_in}
           {room.booking.check_out && (
-            <span> â†’ {room.booking.check_out}</span>
+            <span> → {room.booking.check_out}</span>
           )}
         </div>
       )}

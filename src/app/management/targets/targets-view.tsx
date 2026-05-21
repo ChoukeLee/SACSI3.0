@@ -51,7 +51,7 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
   }, [targets]);
 
   const handleSave = async () => {
-    if (!formValue || isNaN(Number(formValue))) { setFormMsg("è¯·è¾“å…¥æœ‰æ•ˆæ•°å€¼"); return; }
+    if (!formValue || isNaN(Number(formValue))) { setFormMsg("请输入有效数值"); return; }
     setSaving(true);
     const now = new Date();
     const start = formPeriod === "monthly"
@@ -71,8 +71,8 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
         body: JSON.stringify({ period_type: formPeriod, period_start: start, period_end: end, metric_key: formMetric, target_value: Number(formValue), unit: KPI_DEFINITIONS.find(d => d.key === formMetric)?.unit ?? "%", scope_type: "global" }),
       });
       if (resp.ok) { setShowForm(false); setFormMsg(""); setFormValue(""); router.refresh(); }
-      else setFormMsg("ä¿å­˜å¤±è´¥");
-    } catch { setFormMsg("ç½‘ç»œé”™è¯¯"); }
+      else setFormMsg("保存失败");
+    } catch { setFormMsg("网络错误"); }
     setSaving(false);
   };
 
@@ -103,12 +103,12 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
                     <div className={cn("h-full rounded-full", (rate ?? 0) >= 100 ? "bg-brand-green-500" : (rate ?? 0) >= 70 ? "bg-brand-orange" : "bg-brand-red-400")} style={{ width: `${Math.min(100, rate ?? 0)}%` }} />
                   </div>
                   <p className="text-[9px] text-slate-400 mt-0.5">
-                    {locale === "zh" ? "ç›®æ ‡" : "Cible"}: {def.isPercentage ? `${target.target_value}%` : formatXof(Number(target.target_value))}
-                    {" Â· "}{rate}%
+                    {locale === "zh" ? "目标" : "Cible"}: {def.isPercentage ? `${target.target_value}%` : formatXof(Number(target.target_value))}
+                    {" · "}{rate}%
                   </p>
                 </div>
               ) : (
-                <p className="text-[9px] text-slate-400 mt-1">{locale === "zh" ? "æœªè®¾ç½®ç›®æ ‡" : "Pas d'objectif"}</p>
+                <p className="text-[9px] text-slate-400 mt-1">{locale === "zh" ? "未设置目标" : "Pas d'objectif"}</p>
               )}
             </div>
           );
@@ -119,30 +119,30 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
       {canEdit && (
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-slate-950">{locale === "zh" ? "ç›®æ ‡ç®¡ç†" : "Objectifs"}</h3>
-            <button onClick={() => setShowForm(!showForm)} className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white"><Plus className="inline h-3 w-3 mr-1" />{locale === "zh" ? "æ–°å¢ž" : "Ajouter"}</button>
+            <h3 className="text-sm font-bold text-slate-950">{locale === "zh" ? "目标管理" : "Objectifs"}</h3>
+            <button onClick={() => setShowForm(!showForm)} className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white"><Plus className="inline h-3 w-3 mr-1" />{locale === "zh" ? "新增" : "Ajouter"}</button>
           </div>
 
           {showForm && (
             <div className="mb-3 rounded border border-brand-orange-200 bg-brand-orange-50 p-3 space-y-2">
               <select value={formPeriod} onChange={e => setFormPeriod(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-sm">
-                <option value="monthly">{locale === "zh" ? "æœˆåº¦" : "Mensuel"}</option>
-                <option value="quarterly">{locale === "zh" ? "å­£åº¦" : "Trimestre"}</option>
-                <option value="yearly">{locale === "zh" ? "å¹´åº¦" : "Annuel"}</option>
+                <option value="monthly">{locale === "zh" ? "月度" : "Mensuel"}</option>
+                <option value="quarterly">{locale === "zh" ? "季度" : "Trimestre"}</option>
+                <option value="yearly">{locale === "zh" ? "年度" : "Annuel"}</option>
               </select>
               <select value={formMetric} onChange={e => setFormMetric(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-sm">
                 {KPI_DEFINITIONS.map(d => <option key={d.key} value={d.key}>{locale === "zh" ? d.labelZh : d.labelFr}</option>)}
               </select>
-              <input type="number" value={formValue} onChange={e => setFormValue(e.target.value)} placeholder={locale === "zh" ? "ç›®æ ‡å€¼" : "Valeur"} className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-sm" />
+              <input type="number" value={formValue} onChange={e => setFormValue(e.target.value)} placeholder={locale === "zh" ? "目标值" : "Valeur"} className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-sm" />
               {formMsg && <p className="text-xs text-brand-red-600">{formMsg}</p>}
-              <button onClick={handleSave} disabled={saving} className="rounded-lg bg-slate-950 px-4 py-1.5 text-xs font-semibold text-white"><Save className="inline h-3 w-3 mr-1" />{locale === "zh" ? "ä¿å­˜" : "OK"}</button>
+              <button onClick={handleSave} disabled={saving} className="rounded-lg bg-slate-950 px-4 py-1.5 text-xs font-semibold text-white"><Save className="inline h-3 w-3 mr-1" />{locale === "zh" ? "保存" : "OK"}</button>
             </div>
           )}
 
           {targets.length === 0 ? (
-            <p className="text-xs text-slate-400">{locale === "zh" ? "æš‚æ— ç›®æ ‡" : "Aucun"}</p>
+            <p className="text-xs text-slate-400">{locale === "zh" ? "暂无目标" : "Aucun"}</p>
           ) : (
-            <table className="w-full text-xs"><thead className="text-[10px] uppercase text-slate-500"><tr><th className="px-2 py-1">{locale === "zh" ? "æŒ‡æ ‡" : "KPI"}</th><th className="px-2 py-1">{locale === "zh" ? "æœŸé—´" : "Periode"}</th><th className="px-2 py-1 text-right">{locale === "zh" ? "ç›®æ ‡å€¼" : "Cible"}</th><th className="px-2 py-1"></th></tr></thead>
+            <table className="w-full text-xs"><thead className="text-[10px] uppercase text-slate-500"><tr><th className="px-2 py-1">{locale === "zh" ? "指标" : "KPI"}</th><th className="px-2 py-1">{locale === "zh" ? "期间" : "Periode"}</th><th className="px-2 py-1 text-right">{locale === "zh" ? "目标值" : "Cible"}</th><th className="px-2 py-1"></th></tr></thead>
             <tbody className="divide-y divide-brand-neutral-200">
               {targets.map(t => {
                 const def = KPI_DEFINITIONS.find(d => d.key === t.metric_key);

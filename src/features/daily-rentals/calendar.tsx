@@ -40,25 +40,25 @@ const NAV_BTN =
 
 const COPY = {
   zh: {
-    noRooms: "æš‚æ— æ—¥ç§Ÿæˆ¿æº",
-    timeline: "é¢„è®¢æ—¶é—´è½´",
-    subtitle: "é»˜è®¤æ˜¾ç¤ºä»Šå¤©é™„è¿‘æ—¥æœŸï¼›ç‚¹å‡»ç©ºç™½æ ¼æ–°å»ºé¢„è®¢ï¼Œç‚¹å‡»è‰²æ¡æŸ¥çœ‹è®¢å•ã€‚",
-    roomType: "æˆ¿é—´ / çŠ¶æ€",
-    allRooms: "å…¨éƒ¨æˆ¿é—´",
-    day: "å¤©",
-    week: "å‘¨",
-    month: "æœˆ",
-    today: "ä»Šå¤©",
-    occupied: "å…¥ä½",
-    maintenance: "ç»´ä¿®",
-    available: "å¯é¢„è®¢",
-    reserved: "é¢„è®¢",
-    cleaning: "å¾…ä¿æ´",
-    openEnded: "æœªå®šç¦»åº—",
-    room: "æˆ¿é—´",
-    floor: "æ¥¼",
-    apartment: "å…¬å¯“",
-    emptyFilter: "å½“å‰ç­›é€‰ä¸‹æ²¡æœ‰æˆ¿é—´",
+    noRooms: "暂无日租房源",
+    timeline: "预订时间轴",
+    subtitle: "默认显示今天附近日期；点击空白格新建预订，点击色条查看订单。",
+    roomType: "房间 / 状态",
+    allRooms: "全部房间",
+    day: "天",
+    week: "周",
+    month: "月",
+    today: "今天",
+    occupied: "入住",
+    maintenance: "维修",
+    available: "可预订",
+    reserved: "预订",
+    cleaning: "待保洁",
+    openEnded: "未定离店",
+    room: "房间",
+    floor: "楼",
+    apartment: "公寓",
+    emptyFilter: "当前筛选下没有房间",
   },
   fr: {
     noRooms: "Aucune chambre journaliere",
@@ -85,14 +85,14 @@ const COPY = {
 
 const UNIT_STATUS_LABELS: Record<Locale, Record<UnitStatus, string>> = {
   zh: {
-    available: "å¯é¢„è®¢",
-    reserved: "å·²é¢„è®¢",
-    daily_occupied: "æ—¥ç§Ÿä¸­",
-    cleaning_pending: "å¾…ä¿æ´",
-    leased: "é•¿ç§Ÿä¸­",
-    sold: "å·²å”®",
-    maintenance: "ç»´ä¿®",
-    locked: "é”å®š",
+    available: "可预订",
+    reserved: "已预订",
+    daily_occupied: "日租中",
+    cleaning_pending: "待保洁",
+    leased: "长租中",
+    sold: "已售",
+    maintenance: "维修",
+    locked: "锁定",
   },
   fr: {
     available: "Disponible",
@@ -108,11 +108,11 @@ const UNIT_STATUS_LABELS: Record<Locale, Record<UnitStatus, string>> = {
 
 const BOOKING_STATUS_LABELS: Record<Locale, Record<string, string>> = {
   zh: {
-    pending_review: "å¾…å®¡æ ¸",
-    confirmed: "å·²ç¡®è®¤",
-    checked_in: "å·²å…¥ä½",
-    checked_out: "å·²é€€æˆ¿",
-    cancelled: "å·²å–æ¶ˆ",
+    pending_review: "待审核",
+    confirmed: "已确认",
+    checked_in: "已入住",
+    checked_out: "已退房",
+    cancelled: "已取消",
   },
   fr: {
     pending_review: "A valider",
@@ -374,7 +374,7 @@ export function DailyCalendar({
                       <div className="min-w-0">
                         <div className="truncate text-[13px] font-black text-slate-950">{copy.room} {unit.unit_no}</div>
                         <div className="mt-0.5 truncate text-[10px] font-semibold text-slate-500">
-                          {statusLabel} Â· {copy.apartment}
+                          {statusLabel} · {copy.apartment}
                         </div>
                       </div>
                     </div>,
@@ -492,8 +492,8 @@ function TimelineCell({
     const tone = getBookingTone(booking.status);
     const name = customer?.name ?? "?";
     const dateRange = booking.checkout_mode === "open"
-      ? `${booking.check_in} â†’ ${copy.openEnded}`
-      : `${booking.check_in} â†’ ${booking.check_out ?? copy.openEnded}`;
+      ? `${booking.check_in} → ${copy.openEnded}`
+      : `${booking.check_in} → ${booking.check_out ?? copy.openEnded}`;
     return (
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
         <button
@@ -504,7 +504,7 @@ function TimelineCell({
             isStart ? "left-2 rounded-l-2xl" : "-left-px rounded-l-none",
             isEnd ? "right-2 rounded-r-2xl" : "-right-px rounded-r-none",
           )}
-          title={`${name} Â· ${dateRange}`}
+          title={`${name} · ${dateRange}`}
           onClick={() => onOpenBooking(booking.id)}
           onKeyDown={(event) => {
             if (event.key === "Enter") onOpenBooking(booking.id);
@@ -590,7 +590,7 @@ function FloorRow({
         className="flex items-center border-b border-slate-200 bg-slate-50 px-4 text-[10px] font-bold text-slate-400"
         style={{ gridColumn: `span ${daysCount}`, height: FLOOR_ROW_HEIGHT }}
       >
-        {copy.floor} Â· {count}
+        {copy.floor} · {count}
       </div>
     </>
   );
@@ -719,7 +719,7 @@ function startOfWeek(date: Date): Date {
 }
 
 function normalizeFloorLabel(floorLabel: string | null, unitNo: string): string {
-  if (floorLabel && floorLabel.trim()) return floorLabel.trim().replace("æ¥¼", "F");
+  if (floorLabel && floorLabel.trim()) return floorLabel.trim().replace("楼", "F");
   const numeric = Number.parseInt(unitNo, 10);
   if (Number.isFinite(numeric)) return `${Math.floor(numeric / 100)}F`;
   return "F";
