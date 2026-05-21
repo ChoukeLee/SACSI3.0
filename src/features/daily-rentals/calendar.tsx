@@ -32,7 +32,7 @@ type RoomFilter = "all" | "available" | "occupied" | "reserved" | "cleaning" | "
 const ROOM_COL_WIDTH = 136;
 const DAY_COL_MIN_WIDTH = 72;
 const DAY_COL_WIDTH = 78;
-const ROW_HEIGHT = 30;
+const ROW_HEIGHT = 60;
 const FLOOR_ROW_HEIGHT = 20;
 const MAINTENANCE_STATUSES = new Set(["available", "reserved", "daily_occupied", "cleaning_pending"]);
 
@@ -371,7 +371,7 @@ export function DailyCalendar({
                       style={{ height: ROW_HEIGHT }}
                       role="rowheader"
                     >
-                      <span className={cn("mr-2 h-6 w-1 rounded-full", roomTone.strip)} />
+                      <span className={cn("mr-2 h-10 w-1.5 rounded-full", roomTone.strip)} />
                       <div className="min-w-0">
                         <div className="truncate text-[11px] font-black leading-3 text-brand-ink-900">{copy.room} {unit.unit_no}</div>
                         <div className="truncate text-[9px] font-semibold leading-3 text-brand-ink-500">
@@ -484,7 +484,7 @@ function TimelineCell({
   if (isMaintenance) {
     return (
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
-        <div className="absolute inset-x-1.5 top-1/2 h-5 -translate-y-1/2 rounded-lg border border-brand-red-200 bg-brand-red-50" />
+        <div className="absolute inset-x-1.5 top-1/2 h-9 -translate-y-1/2 rounded-lg border border-brand-red-200 bg-brand-red-50" />
       </div>
     );
   }
@@ -500,7 +500,7 @@ function TimelineCell({
         <button
           type="button"
           className={cn(
-            "absolute top-1/2 flex h-6 -translate-y-1/2 items-center overflow-hidden px-2 text-left shadow-sm transition-all hover:-translate-y-[54%] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500",
+            "absolute top-1/2 flex h-10 -translate-y-1/2 items-center overflow-hidden px-2 text-left shadow-sm transition-all hover:-translate-y-[54%] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500",
             tone,
             isStart ? "left-2 rounded-l-2xl" : "-left-px rounded-l-none",
             isEnd ? "right-2 rounded-r-2xl" : "-right-px rounded-r-none",
@@ -529,7 +529,7 @@ function TimelineCell({
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
         <button
           type="button"
-          className="absolute inset-x-1.5 top-1/2 h-5 -translate-y-1/2 rounded-lg bg-brand-warm-100 text-[9px] font-bold text-brand-ink-400"
+          className="absolute inset-x-1.5 top-1/2 h-9 -translate-y-1/2 rounded-lg bg-brand-warm-100 text-[9px] font-bold text-brand-ink-400"
           title={customer?.name ?? copy.occupied}
           onClick={() => onOpenBooking(booking.id)}
         >
@@ -542,7 +542,7 @@ function TimelineCell({
   if (hasCleaning || unit.status === "cleaning_pending") {
     return (
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
-        <div className="absolute inset-x-1.5 top-1/2 flex h-5 -translate-y-1/2 items-center justify-center rounded-lg border border-brand-blue-200 bg-brand-blue-50 text-[9px] font-black text-brand-blue-700">
+        <div className="absolute inset-x-1.5 top-1/2 flex h-9 -translate-y-1/2 items-center justify-center rounded-lg border border-brand-blue-200 bg-brand-blue-50 text-[9px] font-black text-brand-blue-700">
           {copy.cleaning}
         </div>
       </div>
