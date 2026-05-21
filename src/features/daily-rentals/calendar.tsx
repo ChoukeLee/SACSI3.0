@@ -29,14 +29,15 @@ interface CalendarProps {
 type ViewMode = "day" | "week" | "month";
 type RoomFilter = "all" | "available" | "occupied" | "reserved" | "cleaning" | "maintenance";
 
-const ROOM_COL_WIDTH = 160;
-const DAY_COL_WIDTH = 86;
-const ROW_HEIGHT = 54;
-const FLOOR_ROW_HEIGHT = 30;
+const ROOM_COL_WIDTH = 136;
+const DAY_COL_MIN_WIDTH = 72;
+const DAY_COL_WIDTH = 78;
+const ROW_HEIGHT = 30;
+const FLOOR_ROW_HEIGHT = 20;
 const MAINTENANCE_STATUSES = new Set(["available", "reserved", "daily_occupied", "cleaning_pending"]);
 
 const NAV_BTN =
-  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all duration-fast hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500";
+  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-brand-warm-300 bg-white text-brand-ink-500 shadow-sm transition-all duration-fast hover:border-brand-orange-200 hover:bg-brand-orange-50 hover:text-brand-orange-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500";
 
 const COPY = {
   zh: {
@@ -249,19 +250,19 @@ export function DailyCalendar({
 
   if (dailyUnits.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-[22px] border border-slate-200 bg-white py-12 text-center shadow-sm">
-        <p className="text-sm text-slate-500">{copy.noRooms}</p>
+      <div className="flex flex-col items-center gap-3 rounded-[22px] border border-brand-warm-300 bg-white py-12 text-center shadow-sm">
+        <p className="text-sm text-brand-ink-500">{copy.noRooms}</p>
       </div>
     );
   }
 
   return (
     <div>
-      <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.08)]">
-        <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
+      <section className="overflow-hidden rounded-[24px] border border-brand-warm-300 bg-white shadow-[0_18px_56px_rgba(88,65,43,0.08)]">
+        <div className="flex flex-col gap-3 border-b border-brand-warm-300 bg-brand-warm-50 px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h2 className="text-xl font-black tracking-tight text-slate-950">{copy.timeline}</h2>
-            <p className="mt-0.5 text-[13px] font-medium text-slate-500">{copy.subtitle}</p>
+            <h2 className="text-xl font-black tracking-tight text-brand-ink-900">{copy.timeline}</h2>
+            <p className="mt-0.5 text-[13px] font-medium text-brand-ink-500">{copy.subtitle}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -272,16 +273,16 @@ export function DailyCalendar({
               label={copy.allRooms}
               count={filterCounts.all}
             />
-            <FilterButton active={roomFilter === "available"} onClick={() => setRoomFilter("available")} color="bg-emerald-400" label={copy.available} count={filterCounts.available} />
-            <FilterButton active={roomFilter === "occupied"} onClick={() => setRoomFilter("occupied")} color="bg-violet-500" label={copy.occupied} count={filterCounts.occupied} />
-            <FilterButton active={roomFilter === "reserved"} onClick={() => setRoomFilter("reserved")} color="bg-brand-amber-400" label={copy.reserved} count={filterCounts.reserved} />
-            <FilterButton active={roomFilter === "cleaning"} onClick={() => setRoomFilter("cleaning")} color="bg-cyan-400" label={copy.cleaning} count={filterCounts.cleaning} />
-            <FilterButton active={roomFilter === "maintenance"} onClick={() => setRoomFilter("maintenance")} color="bg-rose-400" label={copy.maintenance} count={filterCounts.maintenance} />
+            <FilterButton active={roomFilter === "available"} onClick={() => setRoomFilter("available")} color="bg-brand-green-500" label={copy.available} count={filterCounts.available} />
+            <FilterButton active={roomFilter === "occupied"} onClick={() => setRoomFilter("occupied")} color="bg-brand-orange-500" label={copy.occupied} count={filterCounts.occupied} />
+            <FilterButton active={roomFilter === "reserved"} onClick={() => setRoomFilter("reserved")} color="bg-brand-amber-500" label={copy.reserved} count={filterCounts.reserved} />
+            <FilterButton active={roomFilter === "cleaning"} onClick={() => setRoomFilter("cleaning")} color="bg-brand-blue-500" label={copy.cleaning} count={filterCounts.cleaning} />
+            <FilterButton active={roomFilter === "maintenance"} onClick={() => setRoomFilter("maintenance")} color="bg-brand-red-500" label={copy.maintenance} count={filterCounts.maintenance} />
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="inline-flex w-fit rounded-xl border border-slate-200 bg-slate-100 p-1 text-xs font-bold text-slate-500">
+        <div className="flex flex-col gap-3 border-b border-brand-warm-300 bg-white px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="inline-flex w-fit rounded-xl border border-brand-warm-300 bg-brand-warm-100 p-1 text-xs font-bold text-brand-ink-500">
             <ViewButton active={viewMode === "day"} onClick={() => setMode("day")}>{copy.day}</ViewButton>
             <ViewButton active={viewMode === "week"} onClick={() => setMode("week")}>{copy.week}</ViewButton>
             <ViewButton active={viewMode === "month"} onClick={() => setMode("month")}>{copy.month}</ViewButton>
@@ -291,7 +292,7 @@ export function DailyCalendar({
             <button onClick={() => moveRange(-1)} className={NAV_BTN} aria-label="previous range">
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <div className="min-w-[190px] rounded-xl bg-slate-100 px-4 py-1.5 text-center text-sm font-black text-slate-950">
+            <div className="min-w-[190px] rounded-xl bg-brand-warm-100 px-4 py-1.5 text-center text-sm font-black text-brand-ink-900">
               {rangeLabel}
             </div>
             <button onClick={() => moveRange(1)} className={NAV_BTN} aria-label="next range">
@@ -299,23 +300,23 @@ export function DailyCalendar({
             </button>
             <button
               onClick={goToToday}
-              className="h-8 rounded-xl bg-violet-600 px-4 text-sm font-black text-white shadow-lg shadow-violet-200 transition hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
+              className="h-8 rounded-xl bg-brand-orange-500 px-4 text-sm font-black text-white shadow-lg shadow-brand-orange-100 transition hover:bg-brand-orange-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500"
             >
               {copy.today}
             </button>
           </div>
         </div>
 
-        <div ref={scrollRef} className="scroll-hint-x overflow-auto bg-white" style={{ maxHeight: "calc(100vh - 210px)" }} data-scroll-x>
+        <div ref={scrollRef} className="scroll-hint-x overflow-auto bg-white" style={{ maxHeight: "calc(100vh - 178px)" }} data-scroll-x>
           <div
-            className="grid min-w-max"
-            style={{ gridTemplateColumns: `${ROOM_COL_WIDTH}px repeat(${visibleDays.length}, ${DAY_COL_WIDTH}px)` }}
+            className="grid min-w-full"
+            style={{ gridTemplateColumns: `${ROOM_COL_WIDTH}px repeat(${visibleDays.length}, minmax(${DAY_COL_MIN_WIDTH}px, 1fr))` }}
             role="grid"
             aria-label={copy.timeline}
           >
             <div
-              className="sticky left-0 top-0 z-30 flex items-center border-b border-r border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500"
-              style={{ height: 52 }}
+              className="sticky left-0 top-0 z-30 flex items-center border-b border-r border-brand-warm-300 bg-white px-3 text-[10px] font-black uppercase tracking-[0.12em] text-brand-ink-500"
+              style={{ height: 38 }}
             >
               {copy.roomType}
             </div>
@@ -327,24 +328,24 @@ export function DailyCalendar({
                 <div
                   key={dateStr}
                   className={cn(
-                    "sticky top-0 z-20 flex flex-col items-center justify-center border-b border-r border-slate-200 text-xs",
-                    isToday && "bg-violet-50 text-violet-700",
-                    isWeekend && !isToday && "bg-slate-50 text-slate-400",
-                    !isToday && !isWeekend && "bg-white text-slate-500",
+                    "sticky top-0 z-20 flex flex-col items-center justify-center border-b border-r border-brand-warm-300 text-xs",
+                    isToday && "bg-brand-orange-50 text-brand-orange-700",
+                    isWeekend && !isToday && "bg-brand-warm-50 text-brand-ink-400",
+                    !isToday && !isWeekend && "bg-white text-brand-ink-500",
                   )}
-                  style={{ height: 52 }}
+                  style={{ height: 38 }}
                   role="columnheader"
                 >
                   <span className="font-semibold">{date.toLocaleDateString(localeStr, { weekday: "short" })}</span>
-                  <span className="mt-0.5 text-base font-black text-slate-950">{date.getDate()}</span>
-                  {isToday && <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-violet-600" />}
+                  <span className="text-sm font-black text-brand-ink-900">{date.getDate()}</span>
+                  {isToday && <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-brand-orange-500" />}
                 </div>
               );
             })}
 
             {unitsByFloor.length === 0 ? (
               <div
-                className="flex h-24 items-center justify-center text-sm font-semibold text-slate-400"
+                className="flex h-24 items-center justify-center text-sm font-semibold text-brand-ink-400"
                 style={{ gridColumn: `span ${visibleDays.length + 1}` }}
               >
                 {copy.emptyFilter}
@@ -366,14 +367,14 @@ export function DailyCalendar({
                   return [
                     <div
                       key={`${unit.id}-room`}
-                      className="sticky left-0 z-10 flex items-center border-b border-r border-slate-200 bg-white px-4"
+                      className="sticky left-0 z-10 flex items-center border-b border-r border-brand-warm-200 bg-white px-3"
                       style={{ height: ROW_HEIGHT }}
                       role="rowheader"
                     >
-                      <span className={cn("mr-3 h-8 w-1 rounded-full", roomTone.strip)} />
+                      <span className={cn("mr-2 h-6 w-1 rounded-full", roomTone.strip)} />
                       <div className="min-w-0">
-                        <div className="truncate text-[13px] font-black text-slate-950">{copy.room} {unit.unit_no}</div>
-                        <div className="mt-0.5 truncate text-[10px] font-semibold text-slate-500">
+                        <div className="truncate text-[11px] font-black leading-3 text-brand-ink-900">{copy.room} {unit.unit_no}</div>
+                        <div className="truncate text-[9px] font-semibold leading-3 text-brand-ink-500">
                           {statusLabel} · {copy.apartment}
                         </div>
                       </div>
@@ -476,14 +477,14 @@ function TimelineCell({
   onNewBooking: () => void;
 }) {
   const baseCell = cn(
-    "group relative border-b border-r border-slate-100 transition-colors",
-    isToday ? "bg-violet-50/45" : "bg-white",
+    "group relative border-b border-r border-brand-warm-100 transition-colors",
+    isToday ? "bg-brand-orange-50/45" : "bg-white",
   );
 
   if (isMaintenance) {
     return (
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
-        <div className="absolute inset-x-2 top-1/2 h-8 -translate-y-1/2 rounded-xl border border-rose-200 bg-rose-50" />
+        <div className="absolute inset-x-1.5 top-1/2 h-5 -translate-y-1/2 rounded-lg border border-brand-red-200 bg-brand-red-50" />
       </div>
     );
   }
@@ -499,7 +500,7 @@ function TimelineCell({
         <button
           type="button"
           className={cn(
-            "absolute top-1/2 flex h-9 -translate-y-1/2 items-center overflow-hidden px-3 text-left shadow-sm transition-all hover:-translate-y-[54%] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500",
+            "absolute top-1/2 flex h-6 -translate-y-1/2 items-center overflow-hidden px-2 text-left shadow-sm transition-all hover:-translate-y-[54%] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500",
             tone,
             isStart ? "left-2 rounded-l-2xl" : "-left-px rounded-l-none",
             isEnd ? "right-2 rounded-r-2xl" : "-right-px rounded-r-none",
@@ -512,8 +513,8 @@ function TimelineCell({
         >
           {isStart && (
             <span className="min-w-0">
-              <span className="block truncate text-xs font-black leading-4">{name}</span>
-              <span className="block truncate text-[10px] font-semibold opacity-80">
+              <span className="block truncate text-[10px] font-black leading-3">{name}</span>
+              <span className="block truncate text-[8px] font-semibold opacity-85">
                 {bookingLabels[booking.status] ?? booking.status}
               </span>
             </span>
@@ -528,7 +529,7 @@ function TimelineCell({
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
         <button
           type="button"
-          className="absolute inset-x-2 top-1/2 h-8 -translate-y-1/2 rounded-xl bg-slate-100 text-[10px] font-bold text-slate-400"
+          className="absolute inset-x-1.5 top-1/2 h-5 -translate-y-1/2 rounded-lg bg-brand-warm-100 text-[9px] font-bold text-brand-ink-400"
           title={customer?.name ?? copy.occupied}
           onClick={() => onOpenBooking(booking.id)}
         >
@@ -541,7 +542,7 @@ function TimelineCell({
   if (hasCleaning || unit.status === "cleaning_pending") {
     return (
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
-        <div className="absolute inset-x-2 top-1/2 flex h-8 -translate-y-1/2 items-center justify-center rounded-xl border border-cyan-200 bg-cyan-50 text-[10px] font-black text-cyan-700">
+        <div className="absolute inset-x-1.5 top-1/2 flex h-5 -translate-y-1/2 items-center justify-center rounded-lg border border-brand-blue-200 bg-brand-blue-50 text-[9px] font-black text-brand-blue-700">
           {copy.cleaning}
         </div>
       </div>
@@ -553,7 +554,7 @@ function TimelineCell({
       type="button"
       className={cn(
         baseCell,
-        "flex cursor-pointer items-center justify-center hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-violet-500",
+        "flex cursor-pointer items-center justify-center hover:bg-brand-orange-50 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-brand-orange-500",
       )}
       style={{ height: ROW_HEIGHT }}
       aria-label={`${unit.unit_no} ${dateStr}`}
@@ -562,7 +563,7 @@ function TimelineCell({
         if (event.key === "Enter") onNewBooking();
       }}
     >
-      <Plus className="hidden h-4 w-4 text-violet-500 group-hover:block group-focus-visible:block" />
+      <Plus className="hidden h-4 w-4 text-brand-orange-500 group-hover:block group-focus-visible:block" />
     </button>
   );
 }
@@ -581,13 +582,13 @@ function FloorRow({
   return (
     <>
       <div
-        className="sticky left-0 z-10 flex items-center border-b border-r border-slate-200 bg-slate-50 px-4 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"
+        className="sticky left-0 z-10 flex items-center border-b border-r border-brand-warm-200 bg-brand-warm-50 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-brand-ink-500"
         style={{ height: FLOOR_ROW_HEIGHT }}
       >
         {floor}
       </div>
       <div
-        className="flex items-center border-b border-slate-200 bg-slate-50 px-4 text-[10px] font-bold text-slate-400"
+        className="flex items-center border-b border-brand-warm-200 bg-brand-warm-50 px-3 text-[10px] font-bold text-brand-ink-400"
         style={{ gridColumn: `span ${daysCount}`, height: FLOOR_ROW_HEIGHT }}
       >
         {copy.floor} · {count}
@@ -616,13 +617,13 @@ function FilterButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-black shadow-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500",
-        active ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+        "inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-black shadow-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500",
+        active ? "border-brand-orange-500 bg-brand-orange-500 text-white" : "border-brand-warm-300 bg-white text-brand-ink-700 hover:border-brand-orange-200 hover:bg-brand-orange-50",
       )}
     >
       {icon ?? <span className={cn("h-2 w-2 rounded-full", color)} />}
       <span>{label}</span>
-      <span className={cn("tabular-nums", active ? "text-white/80" : "text-slate-400")}>{count}</span>
+      <span className={cn("tabular-nums", active ? "text-white/85" : "text-brand-ink-400")}>{count}</span>
     </button>
   );
 }
@@ -634,7 +635,7 @@ function ViewButton({ active, onClick, children }: { active: boolean; onClick: (
       onClick={onClick}
       className={cn(
         "rounded-lg px-3 py-1.5 transition",
-        active ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-950",
+        active ? "bg-white text-brand-orange-700 shadow-sm" : "text-brand-ink-500 hover:text-brand-ink-900",
       )}
     >
       {children}
@@ -643,18 +644,18 @@ function ViewButton({ active, onClick, children }: { active: boolean; onClick: (
 }
 
 function getBookingTone(status: string): string {
-  if (status === "checked_in") return "bg-violet-600 text-white shadow-violet-200";
-  if (status === "confirmed") return "bg-brand-sky-400 text-white shadow-brand-sky-100";
-  if (status === "pending_review") return "bg-slate-900 text-white shadow-slate-200";
-  return "bg-slate-100 text-slate-500 shadow-slate-100";
+  if (status === "checked_in") return "bg-brand-orange-500 text-white shadow-brand-orange-100";
+  if (status === "confirmed") return "bg-brand-amber-200 text-brand-amber-900 ring-1 ring-inset ring-brand-amber-300 shadow-brand-amber-100";
+  if (status === "pending_review") return "bg-brand-blue-500 text-white shadow-brand-blue-100";
+  return "bg-brand-warm-100 text-brand-ink-500 shadow-brand-warm-200";
 }
 
 function getRoomTone(unit: UnitRow, hasCleaning: boolean, isMaintenance: boolean) {
-  if (isMaintenance) return { strip: "bg-rose-400" };
-  if (hasCleaning || unit.status === "cleaning_pending") return { strip: "bg-cyan-400" };
-  if (unit.status === "reserved") return { strip: "bg-brand-amber-400" };
-  if (unit.status === "daily_occupied") return { strip: "bg-violet-500" };
-  return { strip: "bg-emerald-400" };
+  if (isMaintenance) return { strip: "bg-brand-red-500" };
+  if (hasCleaning || unit.status === "cleaning_pending") return { strip: "bg-brand-blue-500" };
+  if (unit.status === "reserved") return { strip: "bg-brand-amber-500" };
+  if (unit.status === "daily_occupied") return { strip: "bg-brand-orange-500" };
+  return { strip: "bg-brand-green-500" };
 }
 
 function getUnitTimelineStatus(

@@ -18,9 +18,9 @@ export function Card({ className, variant = "default", padding = "md", children,
       className={cn(
         "rounded-2xl border bg-white shadow-natural",
         paddingMap[padding],
-        variant === "default" && "border-slate-200",
-        variant === "subtle" && "border-slate-200 bg-slate-50/80",
-        variant === "dashed" && "border-dashed border-slate-300 bg-slate-50/70",
+        variant === "default" && "border-brand-warm-300",
+        variant === "subtle" && "border-brand-warm-300 bg-brand-warm-50",
+        variant === "dashed" && "border-dashed border-brand-warm-400 bg-brand-warm-50",
         className
       )}
       {...props}

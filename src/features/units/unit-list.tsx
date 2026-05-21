@@ -1,16 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { Building2, Eye } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
-import { dictionaries, routeFor } from "@/lib/i18n";
+import { dictionaries } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { StatusBadge } from "@/components/status-badge";
 import { UnitFilters } from "./unit-filters";
 import { UnitDetailPanel } from "./unit-detail-panel";
 import type { UnitRow } from "@/types/database";
-import type { BusinessType } from "@/types/domain";
+import type { BusinessType, UnitStatus } from "@/types/domain";
 
 interface UnitBusinessFlag {
   business_type: BusinessType;
@@ -81,16 +79,15 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
   return (
     <div>
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-        <AssetMetric label={locale === "zh" ? "住宿房源" : "Appartements"} value={summary.apartments} tone="ink" />
-        <AssetMetric label={dictionaries[locale].statuses.sold} value={summary.sold} tone="slate" />
-        <AssetMetric label={dictionaries[locale].statuses.leased} value={summary.leased} tone="indigo" />
-        <AssetMetric label={locale === "zh" ? "日租/预订" : "Jour"} value={summary.daily} tone="orange" />
-        <AssetMetric label={dictionaries[locale].statuses.available} value={summary.available} tone="green" />
-        <AssetMetric label={locale === "zh" ? "非住宿资产" : "Autres actifs"} value={summary.nonApartment} tone="sky" />
+        <AssetMetric label={locale === "zh" ? "住宿房源" : "Appartements"} value={summary.apartments} tone="total" />
+        <AssetMetric label={dictionaries[locale].statuses.sold} value={summary.sold} tone="sold" />
+        <AssetMetric label={dictionaries[locale].statuses.leased} value={summary.leased} tone="leased" />
+        <AssetMetric label={locale === "zh" ? "日租/预订" : "Jour"} value={summary.daily} tone="daily" />
+        <AssetMetric label={dictionaries[locale].statuses.available} value={summary.available} tone="available" />
+        <AssetMetric label={locale === "zh" ? "非住宿资产" : "Autres actifs"} value={summary.nonApartment} tone="other" />
       </div>
 
-      {/* Toolbar */}
-      <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-natural">
+      <div className="mb-4 rounded-2xl border border-neutral-200 bg-white p-3 shadow-natural">
         <UnitFilters
           locale={locale}
           selectedFloor={selectedFloor} selectedStatus={selectedStatus}
@@ -101,21 +98,20 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
         />
       </div>
 
-      {/* Empty state */}
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-slate-200 bg-white py-20 shadow-natural">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-50">
-            <Building2 className="h-6 w-6 text-slate-400" />
+        <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-neutral-200 bg-white py-20 shadow-natural">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-neutral-50">
+            <Building2 className="h-6 w-6 text-brand-neutral-800" />
           </div>
           <div className="text-center">
-            <p className="text-sm font-semibold text-slate-600">{t.empty}</p>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="text-sm font-semibold text-brand-neutral-950">{t.empty}</p>
+            <p className="mt-1 text-xs font-medium text-brand-neutral-800">
               {locale === "zh" ? "请先在设置中导入楼栋和房间" : "Importez d'abord l'immeuble dans Parametres"}
             </p>
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-natural">
+        <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-natural">
           <div className="overflow-x-auto">
             <table className="data-table min-w-[760px] text-sm">
               <thead>
@@ -138,40 +134,40 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
                       key={unit.id}
                       tabIndex={0}
                       role="button"
-                      aria-label={`${unit.unit_no} — ${t.actions.viewDetail}`}
-                      className="cursor-pointer transition-colors duration-fast hover:bg-orange-50/60 focus-visible:bg-orange-50/70 focus-visible:outline-none"
+                      aria-label={`${unit.unit_no} - ${t.actions.viewDetail}`}
+                      className="cursor-pointer transition-colors duration-fast hover:bg-brand-orange-50/50 focus-visible:bg-brand-orange-50/70 focus-visible:outline-none"
                       onClick={() => setDetailUnitId(unit.id)}
                       onKeyDown={(e) => { if (e.key === "Enter") setDetailUnitId(unit.id); }}
                     >
                       <td className="px-4 py-3">
-                        <span className="font-mono text-sm font-bold text-slate-950">{unit.unit_no}</span>
+                        <span className="font-mono text-sm font-black text-brand-neutral-950">{unit.unit_no}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-slate-500">{unit.floor_label}</td>
-                      <td className="px-4 py-3 text-sm text-slate-500">{t.kinds[unit.kind]}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-brand-neutral-900">{unit.floor_label}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-brand-neutral-900">{t.kinds[unit.kind]}</td>
                       <td className="px-4 py-3">
-                        <StatusBadge status={unit.status} locale={locale} />
+                        <UnitStatusPill status={unit.status} locale={locale} />
                       </td>
-                      <td className="px-4 py-3 text-sm text-slate-500">
+                      <td className="px-4 py-3 text-sm font-medium text-brand-neutral-900">
                         {enabledFlags.map((f) => t.businessTypes[f.business_type]).join(" / ") || "-"}
                       </td>
-                      <td className="px-4 py-3 text-sm tabular-nums text-slate-500">
+                      <td className="px-4 py-3 text-sm font-semibold tabular-nums text-brand-neutral-900">
                         {dailyFlag?.default_price_xof != null
                           ? Number(dailyFlag.default_price_xof).toLocaleString()
                           : "-"}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Link
-                            href={routeFor(locale, `/units/${unit.id}`)}
-                            onClick={e => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 rounded-lg bg-slate-950 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-sm hover:bg-slate-800"
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDetailUnitId(unit.id);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg bg-brand-orange-500 px-3 py-1.5 text-[10px] font-bold text-white shadow-sm transition hover:bg-brand-orange-600"
                           >
                             <Eye className="h-3 w-3" />
-                            {locale === "zh" ? "档案" : "Profil"}
-                          </Link>
-                          <span className="text-xs font-semibold text-brand-orange-600 transition-colors duration-fast group-hover:underline">
-                            {t.actions.viewDetail} →
-                          </span>
+                            {locale === "zh" ? "查看房源" : "Voir"}
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -183,12 +179,10 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
         </div>
       )}
 
-      {/* Result count */}
-      <p className="mt-3 text-xs text-slate-400" role="status" aria-live="polite">
+      <p className="mt-3 text-xs font-medium text-brand-neutral-800" role="status" aria-live="polite">
         {filtered.length} / {units.length} {locale === "fr" ? "lots" : "套房源"}
       </p>
 
-      {/* Detail panel */}
       {detailUnit && (
         <UnitDetailPanel
           key={`${detailUnit.id}-${refreshKey}`}
@@ -204,19 +198,43 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
   );
 }
 
-function AssetMetric({ label, value, tone }: { label: string; value: number; tone: "ink" | "slate" | "indigo" | "orange" | "green" | "sky" }) {
+function AssetMetric({ label, value, tone }: { label: string; value: number; tone: "total" | "sold" | "leased" | "daily" | "available" | "other" }) {
   const styles = {
-    ink: "border-slate-200 bg-white text-slate-950",
-    slate: "border-slate-200 bg-slate-50 text-slate-700",
-    indigo: "border-brand-sky-200 bg-brand-sky-50 text-brand-sky-700",
-    orange: "border-brand-orange-200 bg-brand-orange-50 text-brand-orange-700",
-    green: "border-brand-green-200 bg-brand-green-50 text-brand-green-700",
-    sky: "border-brand-sky-200 bg-brand-sky-50 text-brand-sky-700",
+    total: "border-brand-warm-300 bg-white text-brand-ink-900",
+    sold: "border-brand-warm-300 bg-brand-warm-100 text-brand-ink-800",
+    leased: "border-brand-blue-200 bg-brand-blue-50 text-brand-blue-900",
+    daily: "border-brand-orange-200 bg-brand-orange-50 text-brand-orange-900",
+    available: "border-brand-green-200 bg-brand-green-50 text-brand-green-900",
+    other: "border-brand-warm-300 bg-white text-brand-neutral-700",
   }[tone];
   return (
-    <div className={cn("rounded-2xl border px-4 py-3 shadow-sm", styles)}>
-      <p className="text-[11px] font-bold text-current opacity-70">{label}</p>
-      <p className="mt-1 text-2xl font-black tabular-nums">{value}</p>
+    <div className={cn("overflow-hidden rounded-2xl border px-4 py-3 shadow-sm", styles)}>
+      <p className="text-[11px] font-black text-current opacity-85">{label}</p>
+      <p className="mt-1 text-[26px] font-black leading-none text-current tabular-nums">{value}</p>
     </div>
+  );
+}
+
+function UnitStatusPill({ status, locale }: { status: UnitStatus; locale: Locale }) {
+  const label = dictionaries[locale].statuses[status];
+  const styles: Record<UnitStatus, string> = {
+    sold: "bg-brand-warm-100 text-brand-ink-800 ring-brand-warm-300",
+    leased: "bg-brand-blue-50 text-brand-blue-800 ring-brand-blue-200",
+    daily_occupied: "bg-brand-orange-50 text-brand-orange-800 ring-brand-orange-200",
+    reserved: "bg-brand-orange-100 text-brand-orange-900 ring-brand-orange-300",
+    cleaning_pending: "bg-brand-green-100 text-brand-green-900 ring-brand-green-300",
+    available: "bg-brand-green-50 text-brand-green-800 ring-brand-green-200",
+    maintenance: "bg-brand-red-500 text-white ring-brand-red-600",
+    locked: "bg-white text-brand-neutral-950 ring-brand-neutral-600",
+  };
+
+  return (
+    <span
+      className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-black ring-1 ring-inset", styles[status])}
+      role="status"
+      aria-label={label}
+    >
+      {label}
+    </span>
   );
 }

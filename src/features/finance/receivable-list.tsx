@@ -132,7 +132,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
     URL.revokeObjectURL(url);
   };
 
-  const filterBtn = "rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all duration-fast hover:border-slate-300 hover:bg-slate-50 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20";
+  const filterBtn = "rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all duration-fast hover:border-slate-300 hover:bg-slate-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15";
 
   const resolveBuildingName = (r: ReceivableRow) => {
     const bid = r.building_id ?? unitBuildingMap.get(r.unit_id ?? "") ?? null;
@@ -268,7 +268,7 @@ function MiniCard({ label, value, accent }: { label: string; value: string; acce
   const styles = accent === "ink"
     ? "border-slate-200 bg-white text-slate-950"
     : accent === "green"
-      ? "border-emerald-200 bg-brand-green-50 text-brand-green-700"
+      ? "border-brand-green-200 bg-brand-green-50 text-brand-green-700"
       : accent === "orange"
         ? "border-brand-orange-200 bg-brand-orange-50 text-brand-orange-700"
         : "border-brand-red-200 bg-brand-red-50 text-brand-red-700";

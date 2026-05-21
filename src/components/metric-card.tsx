@@ -10,15 +10,15 @@ export function MetricCard({
     accent: "bg-brand-orange",
     orange: "bg-brand-orange",
     green: "bg-brand-green-500",
-    ink: "bg-slate-800",
+    ink: "bg-brand-neutral-950",
   };
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-natural transition duration-150 hover:-translate-y-0.5 hover:shadow-lifted">
+    <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-natural transition duration-150 hover:-translate-y-0.5 hover:shadow-lifted">
       <div className={cn("h-[3px]", accentColor[accent])} />
       <div className="px-5 py-4">
-        <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">{title}</p>
-        <p className="mt-1.5 text-2xl font-black tracking-tight text-slate-950 tabular-nums">{value}</p>
-        <p className="mt-1.5 text-[13px] leading-5 text-slate-500">{caption}</p>
+        <p className="text-[11px] font-black uppercase tracking-[0.08em] text-brand-neutral-800">{title}</p>
+        <p className="mt-1.5 text-2xl font-black tracking-tight text-brand-neutral-950 tabular-nums">{value}</p>
+        <p className="mt-1.5 text-[13px] leading-5 text-brand-neutral-900">{caption}</p>
       </div>
     </div>
   );

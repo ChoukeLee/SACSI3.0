@@ -25,7 +25,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
   const [bFloors, setBFloors] = useState(6);
   const [bElevators, setBElevators] = useState(0);
 
-  const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20";
+  const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15";
   const labelClass = "block mb-1 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500";
 
   const handleAddBuilding = async () => {

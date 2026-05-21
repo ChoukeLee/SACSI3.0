@@ -164,24 +164,24 @@ export function DesktopSidebar({ locale, userRole }: { locale: Locale; userRole?
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-sticky hidden w-60 border-r border-slate-200 bg-white/95 shadow-[4px_0_24px_-22px_rgba(15,23,42,0.55)] backdrop-blur-xl lg:flex lg:flex-col">
+    <aside className="fixed inset-y-0 left-0 z-sticky hidden w-60 border-r border-brand-warm-300 bg-white/92 shadow-[4px_0_24px_-22px_rgba(36,33,31,0.3)] backdrop-blur-xl lg:flex lg:flex-col">
       {/* Brand */}
       <div className="flex h-16 shrink-0 items-center gap-3 px-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-950 shadow-lifted">
+        <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-brand-orange shadow-lifted">
           <span className="text-[11px] font-bold text-white">S</span>
         </div>
         <div className="leading-tight">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">SACIS 3.0</p>
-          <h1 className="text-sm font-bold tracking-tight text-slate-950">{labels.brand}</h1>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand-neutral-600">SACIS 3.0</p>
+          <h1 className="text-sm font-bold tracking-tight text-brand-ink-900">{labels.brand}</h1>
         </div>
       </div>
 
-      <div className="mx-4 border-t border-slate-200" />
+      <div className="mx-4 border-t border-brand-warm-300" />
 
       <nav className="flex-1 space-y-5 overflow-auto px-3 py-4" aria-label="主导航">
         {visibleGroups.map(group => (
           <div key={group.key}>
-            <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+            <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-brand-neutral-600">
               {labels.groups[group.key]}
             </p>
             <div className="space-y-1">
@@ -197,13 +197,13 @@ export function DesktopSidebar({ locale, userRole }: { locale: Locale; userRole?
                       "transition-all duration-[100ms]",
                       "active:scale-[0.98]",
                       active
-                        ? "bg-slate-950 text-white shadow-lifted"
-                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+                        ? "bg-brand-orange-500 text-white shadow-lifted"
+                        : "text-brand-ink-800 hover:bg-brand-orange-50 hover:text-brand-orange-800"
                     )}
                     aria-current={active ? "page" : undefined}
                   >
                     <Icon
-                      className={cn("h-4 w-4 shrink-0", active ? "text-white" : "text-slate-400")}
+                      className={cn("h-4 w-4 shrink-0", active ? "text-white" : "text-brand-neutral-600")}
                       aria-hidden
                       strokeWidth={active ? 2.5 : 2}
                     />
@@ -216,8 +216,8 @@ export function DesktopSidebar({ locale, userRole }: { locale: Locale; userRole?
         ))}
       </nav>
 
-      <div className="shrink-0 border-t border-slate-200 px-5 py-3">
-        <p className="text-[10px] font-semibold text-slate-400">{labels.building}</p>
+      <div className="shrink-0 border-t border-brand-warm-300 px-5 py-3">
+        <p className="text-[10px] font-semibold text-brand-neutral-600">{labels.building}</p>
       </div>
     </aside>
   );

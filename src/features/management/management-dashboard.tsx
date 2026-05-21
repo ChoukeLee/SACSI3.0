@@ -3,8 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
-  AlertTriangle, ArrowRight,
-  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
 import {
   calculateReceivableSummary,
@@ -72,49 +71,49 @@ interface Props {
 
 const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string; ring: string; stripe: string }> = {
   sold: {
-    bg:   "bg-slate-600 text-white border-slate-700 shadow-slate-200",
-    dot:  "bg-slate-600",
-    pill: "bg-slate-100 text-slate-700 border-slate-300",
+    bg:   "bg-brand-neutral-50 text-brand-neutral-950 border-neutral-200 shadow-slate-100",
+    dot:  "bg-brand-neutral-800",
+    pill: "bg-brand-neutral-50 text-brand-neutral-950 border-neutral-200",
     ring: "",
     stripe: "bg-slate-700",
   },
   leased: {
-    bg:   "bg-brand-sky-600 text-white border-brand-sky-700 shadow-brand-sky-200",
+    bg:   "bg-brand-sky-50 text-brand-sky-800 border-brand-sky-200 shadow-brand-sky-100",
     dot:  "bg-brand-sky-600",
     pill: "bg-brand-sky-50 text-brand-sky-700 border-brand-sky-200",
     ring: "",
     stripe: "bg-brand-sky-700",
   },
   dailyOccupied: {
-    bg:   "bg-brand-orange-500 text-white border-brand-orange-600 shadow-brand-orange-200",
+    bg:   "bg-brand-orange-50 text-brand-orange-800 border-brand-orange-200 shadow-brand-orange-100",
     dot:  "bg-brand-orange-500",
     pill: "bg-brand-orange-50 text-brand-orange-700 border-brand-orange-200",
     ring: "ring-1 ring-inset ring-brand-orange-300/50",
     stripe: "bg-brand-orange-700",
   },
   reserved: {
-    bg:   "bg-brand-sky-500 text-white border-brand-sky-600 shadow-brand-sky-200",
-    dot:  "bg-brand-sky-500",
-    pill: "bg-brand-sky-50 text-brand-sky-700 border-brand-sky-200",
+    bg:   "bg-brand-orange-100 text-brand-orange-800 border-brand-orange-200 shadow-brand-orange-100",
+    dot:  "bg-brand-orange-400",
+    pill: "bg-brand-orange-50 text-brand-orange-700 border-brand-orange-200",
     ring: "",
     stripe: "bg-brand-sky-700",
   },
   cleaningPending: {
-    bg:   "bg-brand-green-500 text-white border-brand-green-600 shadow-brand-green-200",
+    bg:   "bg-brand-green-50 text-brand-green-800 border-brand-green-200 shadow-brand-green-100",
     dot:  "bg-brand-green-500",
     pill: "bg-brand-green-50 text-brand-green-700 border-brand-green-200",
     ring: "",
     stripe: "bg-brand-green-700",
   },
   maintenance: {
-    bg:   "bg-brand-red-500 text-white border-brand-red-600 shadow-brand-red-200",
+    bg:   "bg-brand-red-50 text-brand-red-800 border-brand-red-200 shadow-brand-red-100",
     dot:  "bg-brand-red-500",
     pill: "bg-brand-red-50 text-brand-red-700 border-brand-red-200",
     ring: "",
     stripe: "bg-brand-red-700",
   },
   available: {
-    bg:   "bg-brand-green-500 text-white border-brand-green-600 shadow-brand-green-200",
+    bg:   "bg-brand-green-50 text-brand-green-800 border-brand-green-200 shadow-brand-green-100",
     dot:  "bg-brand-green-500",
     pill: "bg-brand-green-50 text-brand-green-700 border-brand-green-200",
     ring: "",
@@ -280,12 +279,12 @@ export function ManagementDashboard({
     : activeBuildings.find(b => b.id === selectedBuildingId)?.display_name ?? "";
 
   return (
-    <div className="-my-6 bg-[#f5f7fb]">
+    <div className="-my-6 bg-brand-warm-100">
       <div className="mx-auto flex max-w-[1360px] flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
 
         {/* ── Building selector — segmented control ── */}
         <div>
-          <div className="inline-flex flex-wrap gap-0.5 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+          <div className="inline-flex flex-wrap gap-0.5 rounded-2xl border border-brand-warm-300 bg-white p-1 shadow-sm">
             <SegmentedTab
               active={selectedBuildingId === "__all__"}
               onClick={() => setSelectedBuildingId("__all__")}
@@ -442,14 +441,6 @@ export function ManagementDashboard({
           <QualityDashboardWidget issues={qualityIssues} locale={locale} variant="management" />
         )}
 
-        {/* ── Quick links ── */}
-        <div className="flex flex-wrap gap-3 text-xs text-slate-400">
-          <QuickLink href="/daily-rentals/overview" locale={locale} label={dictionaries[locale].shell.nav.dailyOccupancy ?? ""} />
-          <QuickLink href="/leases" locale={locale} label={dictionaries[locale].shell.nav.leases ?? ""} />
-          <QuickLink href="/sales" locale={locale} label={dictionaries[locale].shell.nav.sales ?? ""} />
-          <QuickLink href="/finance" locale={locale} label={dictionaries[locale].shell.nav.finance ?? ""} />
-        </div>
-
       </div>
     </div>
   );
@@ -457,48 +448,55 @@ export function ManagementDashboard({
 
 // ── Sub-components ─────────────────────────────────────────────────────
 
-const ROOM_CARD: Record<MgmtStatus, { card: string; badge: string; dot: string; action: string }> = {
+const ROOM_CARD: Record<MgmtStatus, { card: string; badge: string; dot: string; action: string; summary: string }> = {
   sold: {
-    card: "border-slate-300 bg-slate-700 text-white",
-    badge: "bg-white text-slate-800",
-    dot: "bg-slate-300",
-    action: "bg-white/15 text-white ring-white/20",
+    card: "border-brand-warm-300 bg-brand-warm-100 text-brand-ink-900",
+    badge: "bg-white text-brand-ink-900 ring-1 ring-inset ring-brand-warm-300",
+    dot: "bg-brand-neutral-500",
+    action: "bg-white text-brand-ink-800 ring-brand-warm-300",
+    summary: "border-brand-warm-300 bg-white text-brand-ink-900",
   },
   leased: {
-    card: "border-brand-sky-300 bg-brand-sky-600 text-white",
-    badge: "bg-white text-brand-sky-700",
-    dot: "bg-brand-sky-200",
-    action: "bg-white/15 text-white ring-white/20",
+    card: "border-brand-blue-200 bg-brand-blue-50 text-brand-blue-900",
+    badge: "bg-white text-brand-blue-900 ring-1 ring-inset ring-brand-blue-200",
+    dot: "bg-brand-blue-500",
+    action: "bg-white text-brand-blue-800 ring-brand-blue-200",
+    summary: "border-brand-blue-200 bg-brand-blue-50 text-brand-blue-900",
   },
   dailyOccupied: {
-    card: "border-brand-orange-300 bg-brand-orange-500 text-white",
-    badge: "bg-white text-brand-orange-700",
-    dot: "bg-brand-orange-200",
-    action: "bg-white/15 text-white ring-white/20",
+    card: "border-brand-orange-200 bg-brand-orange-50 text-brand-orange-900",
+    badge: "bg-white text-brand-orange-900 ring-1 ring-inset ring-brand-orange-200",
+    dot: "bg-brand-orange-500",
+    action: "bg-white text-brand-orange-800 ring-brand-orange-200",
+    summary: "border-brand-orange-200 bg-brand-orange-50 text-brand-orange-900",
   },
   reserved: {
-    card: "border-brand-sky-300 bg-brand-sky-500 text-white",
-    badge: "bg-white text-brand-sky-700",
-    dot: "bg-brand-sky-200",
-    action: "bg-white/15 text-white ring-white/20",
+    card: "border-brand-amber-200 bg-brand-amber-50 text-brand-amber-900",
+    badge: "bg-white text-brand-amber-900 ring-1 ring-inset ring-brand-amber-200",
+    dot: "bg-brand-amber-500",
+    action: "bg-white text-brand-amber-800 ring-brand-amber-200",
+    summary: "border-brand-amber-200 bg-brand-amber-50 text-brand-amber-900",
   },
   cleaningPending: {
-    card: "border-cyan-300 bg-cyan-500 text-white",
-    badge: "bg-white text-cyan-700",
-    dot: "bg-cyan-200",
-    action: "bg-white/15 text-white ring-white/20",
+    card: "border-brand-green-200 bg-brand-green-50 text-brand-green-900",
+    badge: "bg-white text-brand-green-900 ring-1 ring-inset ring-brand-green-200",
+    dot: "bg-brand-green-500",
+    action: "bg-white text-brand-green-800 ring-brand-green-200",
+    summary: "border-brand-green-200 bg-brand-green-50 text-brand-green-900",
   },
   maintenance: {
-    card: "border-rose-300 bg-rose-500 text-white",
-    badge: "bg-white text-rose-700",
-    dot: "bg-rose-200",
-    action: "bg-white/15 text-white ring-white/20",
+    card: "border-brand-red-200 bg-brand-red-50 text-brand-red-900",
+    badge: "bg-white text-brand-red-900 ring-1 ring-inset ring-brand-red-200",
+    dot: "bg-brand-red-500",
+    action: "bg-white text-brand-red-800 ring-brand-red-200",
+    summary: "border-brand-red-200 bg-brand-red-50 text-brand-red-900",
   },
   available: {
-    card: "border-emerald-200 bg-brand-green-50 text-brand-green-900",
-    badge: "bg-emerald-600 text-white",
-    dot: "bg-emerald-500",
-    action: "bg-white/80 text-brand-green-700 ring-emerald-200",
+    card: "border-brand-green-200 bg-brand-green-50 text-brand-green-900",
+    badge: "bg-white text-brand-green-900 ring-1 ring-inset ring-brand-green-200",
+    dot: "bg-brand-green-500",
+    action: "bg-white text-brand-green-800 ring-brand-green-200",
+    summary: "border-brand-green-200 bg-brand-green-50 text-brand-green-900",
   },
 };
 
@@ -525,16 +523,15 @@ function RoomStatusCard({
         styles.card,
       )}
     >
-      <span className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(135deg,rgba(255,255,255,0.16),transparent_55%)] opacity-70" />
       <div className="relative z-10 flex items-start justify-between gap-2">
         <span className={cn("rounded-full px-2.5 py-1 font-mono text-xs font-black shadow-sm", styles.badge)}>
           {state.unit.unit_no}
         </span>
-        <span className={cn("mt-1 h-2 w-2 rounded-full", styles.dot)} />
+        <span className={cn("mt-1 h-2.5 w-2.5 rounded-full ring-2 ring-white/25", styles.dot)} />
       </div>
       <div className="relative z-10">
-        <p className="truncate text-[11px] font-bold">{statusLabel}</p>
-        <p className={cn("mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset", styles.action)}>
+        <p className="truncate text-[11px] font-black text-current">{statusLabel}</p>
+        <p className={cn("mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset backdrop-blur", styles.action)}>
           {roomText}
         </p>
       </div>
@@ -545,12 +542,12 @@ function RoomStatusCard({
 function StatusSummaryCard({ label, value, status }: { label: string; value: number; status: MgmtStatus }) {
   const styles = ROOM_CARD[status];
   return (
-    <div className={cn("min-h-[86px] rounded-2xl border px-3 py-3", styles.card)}>
+    <div className={cn("min-h-[92px] rounded-2xl border px-3.5 py-3.5", styles.summary)}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-bold opacity-90">{label}</span>
-        <span className={cn("h-2 w-2 rounded-full", styles.dot)} />
+        <span className="text-[11px] font-black opacity-90">{label}</span>
+        <span className={cn("h-2.5 w-2.5 rounded-full ring-2 ring-white/25", styles.dot)} />
       </div>
-      <p className="mt-2 text-2xl font-black tabular-nums">{value}</p>
+      <p className="mt-2 text-[28px] font-black leading-none text-current tabular-nums">{value}</p>
     </div>
   );
 }
@@ -573,8 +570,8 @@ function SegmentedTab({ active, onClick, label }: { active: boolean; onClick: ()
       className={cn(
         "rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-fast",
         active
-          ? "bg-slate-900 text-white shadow-sm"
-          : "text-slate-500 hover:bg-slate-100 hover:text-slate-800",
+          ? "bg-brand-orange-500 text-white shadow-sm"
+          : "text-brand-neutral-600 hover:bg-brand-orange-50 hover:text-brand-orange-800",
       )}
     >
       {label}
@@ -586,21 +583,22 @@ function KPICard({ label, value, variant }: {
   label: string; value: string;
   variant: "neutral" | "positive" | "warning" | "danger";
 }) {
-  const styles: Record<string, { bg: string; text: string; dot: string }> = {
-    neutral:  { bg: "bg-white border-slate-200", text: "text-slate-900", dot: "bg-slate-400" },
-    positive: { bg: "bg-white border-slate-200", text: "text-emerald-700", dot: "bg-emerald-500" },
-    warning:  { bg: "bg-white border-slate-200", text: "text-brand-amber-700", dot: "bg-brand-amber-500" },
-    danger:   { bg: "bg-white border-slate-200", text: "text-brand-red-700", dot: "bg-brand-red-500" },
+  const styles: Record<string, { bg: string; text: string; dot: string; bar: string }> = {
+    neutral:  { bg: "bg-white border-brand-neutral-600/40", text: "text-brand-neutral-950", dot: "bg-brand-neutral-700", bar: "bg-brand-neutral-950" },
+    positive: { bg: "bg-white border-brand-green-500/40", text: "text-brand-green-700", dot: "bg-brand-green-500", bar: "bg-brand-green-500" },
+    warning:  { bg: "bg-white border-brand-orange-500/40", text: "text-brand-orange-700", dot: "bg-brand-orange-500", bar: "bg-brand-orange-500" },
+    danger:   { bg: "bg-white border-brand-red-500/40", text: "text-brand-red-700", dot: "bg-brand-red-500", bar: "bg-brand-red-500" },
   };
   const s = styles[variant];
   return (
-    <div className={cn("flex min-h-[86px] overflow-hidden rounded-2xl border bg-white shadow-sm", s.bg)}>
+    <div className={cn("flex min-h-[94px] overflow-hidden rounded-2xl border bg-white shadow-sm", s.bg)}>
+      <div className={cn("w-1.5 shrink-0", s.bar)} />
       <div className="flex min-w-0 flex-1 flex-col justify-between px-4 py-3">
         <div className="flex items-center gap-2 mb-1.5">
           <span className={cn("h-1.5 w-1.5 rounded-full", s.dot)} />
-          <p className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
+          <p className="truncate text-[11px] font-bold uppercase tracking-[0.08em] text-brand-neutral-800">{label}</p>
         </div>
-        <p className={cn("truncate text-[22px] font-black tracking-tight tabular-nums", s.text)}>
+        <p className={cn("truncate text-[24px] font-black tracking-tight tabular-nums", s.text)}>
           {value}
         </p>
       </div>
@@ -635,13 +633,5 @@ function RiskAlert({ label, value, unit, active, compact = false }: {
         {value} <span className="text-sm font-normal">{unit}</span>
       </p>
     </div>
-  );
-}
-
-function QuickLink({ href, locale, label }: { href: string; locale: Locale; label: string }) {
-  return (
-    <Link href={routeFor(locale, href)} className="flex items-center gap-1 text-brand-orange hover:underline">
-      {label} <ArrowRight className="h-3 w-3" />
-    </Link>
   );
 }

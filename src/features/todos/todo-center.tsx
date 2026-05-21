@@ -95,7 +95,7 @@ export function TodoCenter({ todos, locale }: Props) {
           <input type="text" value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={locale === "zh" ? "搜索房号/客户..." : "Rechercher..."}
-            className="w-full rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
+            className="w-full rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs text-slate-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15" />
         </div>
         <span className="text-xs font-semibold text-slate-400 ml-auto">{filtered.length} {locale === "zh" ? "条" : "lignes"}</span>
       </div>

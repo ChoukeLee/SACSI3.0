@@ -196,7 +196,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
           <div className="flex flex-wrap gap-1.5">
             <Link href={routeFor(locale, "/daily-rentals")} className="rounded bg-brand-sky-50 px-2.5 py-1.5 text-[10px] font-semibold text-sky-700 hover:bg-sky-100"><BedDouble className="inline h-3 w-3 mr-0.5" />{L.newBooking}</Link>
             <Link href={routeFor(locale, "/leases")} className="rounded bg-brand-green-50 px-2.5 py-1.5 text-[10px] font-semibold text-green-700 hover:bg-green-100"><Home className="inline h-3 w-3 mr-0.5" />{L.newLease}</Link>
-            <Link href={routeFor(locale, "/sales")} className="rounded bg-brand-orange-50 px-2.5 py-1.5 text-[10px] font-semibold text-orange-700 hover:bg-orange-100"><CreditCard className="inline h-3 w-3 mr-0.5" />{L.newSale}</Link>
+            <Link href={routeFor(locale, "/sales")} className="rounded bg-brand-orange-50 px-2.5 py-1.5 text-[10px] font-semibold text-brand-orange-700 hover:bg-brand-orange-100"><CreditCard className="inline h-3 w-3 mr-0.5" />{L.newSale}</Link>
           </div>
         </div>
         {/* Blacklist info */}

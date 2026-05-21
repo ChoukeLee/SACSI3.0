@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { X, Camera, ChevronDown } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
-import { dictionaries } from "@/lib/i18n";
+import { dictionaries, routeFor } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -12,22 +13,28 @@ import type { UnitStatus, BusinessType } from "@/types/domain";
 import { updateUnitStatus } from "./actions";
 
 interface UnitBusinessFlag {
-  business_type: BusinessType; is_enabled: boolean; default_price_xof: number | null;
+  business_type: BusinessType;
+  is_enabled: boolean;
+  default_price_xof: number | null;
 }
 
 interface AuditLogEntry {
-  id: string; action: string; metadata: Record<string, unknown>; created_at: string;
+  id: string;
+  action: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
 }
 
 interface UnitDetailPanelProps {
-  unit: UnitRow; businessFlags: UnitBusinessFlag[]; auditLogs: AuditLogEntry[];
-  locale: Locale; onClose: () => void; onStatusChanged: () => void;
+  unit: UnitRow;
+  businessFlags: UnitBusinessFlag[];
+  auditLogs: AuditLogEntry[];
+  locale: Locale;
+  onClose: () => void;
+  onStatusChanged: () => void;
 }
 
 const manualStatuses: UnitStatus[] = ["available", "maintenance", "locked"];
-
-const inputClass = "w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 transition-all duration-fast hover:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
-const labelClass = "block text-[10px] font-black uppercase tracking-[0.14em] text-slate-400 mb-1";
 
 export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClose, onStatusChanged }: UnitDetailPanelProps) {
   const t = dictionaries[locale].units;
@@ -37,32 +44,48 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
   const [error, setError] = useState("");
 
   const handleStatusChange = async (newStatus: UnitStatus) => {
-    setChanging(true); setError("");
+    setChanging(true);
+    setError("");
     const result = await updateUnitStatus(unit.id, newStatus);
     setChanging(false);
-    if (result.success) { setStatusOpen(false); onStatusChanged(); }
-    else setError(result.error ?? "Failed to update status.");
+    if (result.success) {
+      setStatusOpen(false);
+      onStatusChanged();
+    } else {
+      setError(result.error ?? "Failed to update status.");
+    }
   };
 
   const enabledBusinesses = businessFlags.filter((f) => f.is_enabled);
+  const dailyFlag = enabledBusinesses.find((f) => f.business_type === "daily_rental");
 
   return (
     <>
       <div className="fixed inset-0 z-overlay bg-black/30 backdrop-blur-sm transition-opacity duration-slow" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-slate-200 bg-white shadow-panel" role="dialog" aria-label={t.detail.title}>
-        {/* Header */}
+      <div
+        className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-slate-200 bg-white shadow-panel"
+        role="dialog"
+        aria-label={t.detail.title}
+      >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur">
           <div>
             <h2 className="text-sm font-black text-slate-950">{t.detail.title}</h2>
             <p className="mt-0.5 font-mono text-xs text-slate-400">{unit.code}</p>
           </div>
-          <Button variant="icon" size="icon" onClick={onClose} aria-label="关闭">
-            <X className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link
+              href={routeFor(locale, `/units/${unit.id}`)}
+              className="inline-flex h-9 items-center rounded-xl bg-brand-orange-500 px-3 text-xs font-bold text-white shadow-sm transition hover:bg-brand-orange-600"
+            >
+              {locale === "zh" ? "完整档案" : "Dossier"}
+            </Link>
+            <Button variant="icon" size="icon" onClick={onClose} aria-label={locale === "zh" ? "关闭" : "Fermer"}>
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-5 px-5 py-5">
-          {/* Basic info grid */}
           <dl className="grid grid-cols-2 gap-x-5 gap-y-4 text-sm">
             {[
               [t.detail.building, "11#公寓"],
@@ -72,8 +95,8 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
               [t.detail.area, unit.area_sqm != null ? `${Number(unit.area_sqm).toFixed(2)} ${t.detail.areaUnit}` : t.detail.notSet],
               [t.detail.layout, unit.layout ?? t.detail.notSet],
               [t.detail.furnishing, unit.furnishing ? t.furnishing[unit.furnishing] : t.detail.notSet],
-              ...(enabledBusinesses.some((f) => f.business_type === "daily_rental")
-                ? [[t.detail.dailyPrice, enabledBusinesses.find((f) => f.business_type === "daily_rental")?.default_price_xof ? formatXof(Number(enabledBusinesses.find((f) => f.business_type === "daily_rental")!.default_price_xof)) : t.detail.notSet]]
+              ...(dailyFlag
+                ? [[t.detail.dailyPrice, dailyFlag.default_price_xof ? formatXof(Number(dailyFlag.default_price_xof)) : t.detail.notSet]]
                 : []),
             ].map(([label, value]) => (
               <div key={label as string}>
@@ -85,21 +108,21 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
             ))}
           </dl>
 
-          {/* Business flags */}
           <div>
             <h4 className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">{t.detail.supportedBusiness}</h4>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {enabledBusinesses.length > 0
-                ? enabledBusinesses.map((f) => (
-                    <span key={f.business_type} className="inline-flex rounded-full bg-brand-orange-50 px-2.5 py-0.5 text-xs font-semibold text-brand-orange-600">
-                      {t.businessTypes[f.business_type]}
-                    </span>
-                  ))
-                : <span className="text-xs text-slate-400">—</span>}
+              {enabledBusinesses.length > 0 ? (
+                enabledBusinesses.map((f) => (
+                  <span key={f.business_type} className="inline-flex rounded-full bg-brand-orange-50 px-2.5 py-0.5 text-xs font-semibold text-brand-orange-600">
+                    {t.businessTypes[f.business_type]}
+                  </span>
+                ))
+              ) : (
+                <span className="text-xs text-slate-400">-</span>
+              )}
             </div>
           </div>
 
-          {/* Photos */}
           <div>
             <h4 className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">{t.detail.photos}</h4>
             <div className="mt-2 flex gap-3">
@@ -111,13 +134,11 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
             </div>
           </div>
 
-          {/* Notes */}
           <div>
             <h4 className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">{t.detail.notes}</h4>
             <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{unit.notes ?? t.detail.noNotes}</p>
           </div>
 
-          {/* Status change */}
           <div className="relative">
             <h4 className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">{t.actions.changeStatus}</h4>
             <div className="mt-2">
@@ -147,7 +168,6 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
             {error && <p className="mt-2 text-xs text-red-600" role="alert">{error}</p>}
           </div>
 
-          {/* Status history */}
           <div>
             <h4 className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">{t.detail.statusHistory}</h4>
             {auditLogs.length === 0 ? (
@@ -157,12 +177,17 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
                 {auditLogs.map((log) => (
                   <li key={log.id} className="flex items-center justify-between rounded-md bg-slate-50 px-3 py-2 text-xs">
                     <span className="text-slate-600">
-                      {statusLabels[log.metadata.previous_status as UnitStatus] ?? "—"}
-                      <span className="mx-1 text-slate-400">→</span>
-                      {statusLabels[log.metadata.new_status as UnitStatus] ?? "—"}
+                      {statusLabels[log.metadata.previous_status as UnitStatus] ?? "-"}
+                      <span className="mx-1 text-slate-400">{"->"}</span>
+                      {statusLabels[log.metadata.new_status as UnitStatus] ?? "-"}
                     </span>
                     <span className="text-slate-400">
-                      {new Date(log.created_at).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      {new Date(log.created_at).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </span>
                   </li>
                 ))}

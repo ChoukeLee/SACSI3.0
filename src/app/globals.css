@@ -45,19 +45,19 @@
   --safe-top: env(safe-area-inset-top, 0px);
 
   /* Design tokens — mirrors tailwind.config.ts Ivory Coast palette */
-  --color-bg: #FAFAFA;
+  --color-bg: #F8F5F1;
   --color-surface: #FFFFFF;
-  --color-border: #EEEEEE;
-  --color-border-light: #F5F5F5;
-  --color-text: #1D1D1B;
-  --color-text-secondary: #616161;
-  --color-text-muted: #9E9E9E;
-  --color-accent: #F77F00;
-  --color-accent-light: #FEFAF5;
-  --color-success: #009E60;
-  --color-danger: #DC2626;
-  --color-warning: #D97706;
-  --color-info: #4A6B7D;
+  --color-border: #ECE6DE;
+  --color-border-light: #F3EEE8;
+  --color-text: #24211F;
+  --color-text-secondary: #5F5A55;
+  --color-text-muted: #8E8378;
+  --color-accent: #F45A2A;
+  --color-accent-light: #FFF4EE;
+  --color-success: #0E8F7E;
+  --color-danger: #C74646;
+  --color-warning: #F5A623;
+  --color-info: #58728A;
 
   /* Typography scale — tuned for MiSans CJK readability */
   --text-xs: 0.75rem;      /* 12px — minimum label size */
@@ -75,14 +75,12 @@
 
 body {
   min-height: 100dvh;
-  background:
-    radial-gradient(circle at 12% -8%, rgba(247,127,0,0.05), transparent 28rem),
-    linear-gradient(180deg, #FAFAFA 0%, var(--color-bg) 42%, #F5F5F5 100%);
+  background: var(--color-bg);
   color: var(--color-text);
   font-family: "MiSans", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   font-size: 14px;
   line-height: 1.6;
 }
@@ -105,8 +103,8 @@ body {
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+::-webkit-scrollbar-thumb { background: #D2D0D0; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #A99E9E; }
 
 @layer components {
   .scroll-hint-x {
@@ -124,19 +122,19 @@ body {
     @apply w-full text-left text-xs;
   }
   .data-table thead {
-    @apply border-b border-slate-200 bg-slate-50/90;
+    @apply border-b border-neutral-200 bg-brand-neutral-50;
   }
   .data-table th {
-    @apply px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500;
+    @apply px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-brand-neutral-800;
   }
   .data-table td {
-    @apply border-b border-slate-100 px-3 py-2.5 text-[13px] text-slate-700;
+    @apply border-b border-neutral-200/70 px-3 py-2.5 text-[13px] text-slate-700;
   }
   .data-table tbody tr {
     @apply transition-colors duration-fast;
   }
   .data-table tbody tr:hover {
-    @apply bg-slate-50/80;
+    @apply bg-brand-orange-50/40;
   }
   .data-table .num {
     @apply tabular-nums text-right;
@@ -144,10 +142,10 @@ body {
 
   /* Shared stat card — no side-stripe, uses top-border instead */
   .stat-card {
-    @apply rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-natural;
+    @apply rounded-2xl border border-neutral-200 bg-white px-5 py-4 shadow-natural;
   }
   .stat-card .stat-label {
-    @apply text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500;
+    @apply text-[11px] font-bold uppercase tracking-[0.08em] text-brand-neutral-800;
   }
   .stat-card .stat-value {
     @apply mt-1.5 text-2xl font-bold tracking-tight text-slate-950 tabular-nums;
@@ -157,11 +155,11 @@ body {
   }
 
   .surface-panel {
-    @apply rounded-2xl border border-slate-200 bg-white shadow-natural;
+    @apply rounded-2xl border border-neutral-200 bg-white shadow-natural;
   }
 
   .filter-chip {
-    @apply rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50;
+    @apply rounded-xl border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-neutral-900 shadow-sm transition hover:border-brand-orange-200 hover:bg-brand-orange-50;
   }
 
   .page-rule {

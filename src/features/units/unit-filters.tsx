@@ -26,7 +26,7 @@ const kindOptions: (UnitKind | "all")[] = ["all", "apartment", "parking", "store
 const businessOptions: (BusinessType | "all")[] = ["all", "daily_rental", "long_lease", "sale"];
 
 const selectClass =
-  "h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition-all duration-fast hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
+  "h-9 rounded-xl border border-neutral-200 bg-white px-3 text-xs font-semibold text-brand-neutral-950 shadow-sm transition-all duration-fast hover:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/20";
 
 export function UnitFilters({
   locale, selectedFloor, selectedStatus, selectedKind, selectedBusiness,
@@ -37,7 +37,7 @@ export function UnitFilters({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <label className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+      <label className="text-[10px] font-black uppercase tracking-[0.1em] text-brand-neutral-800">
         {t.filters.floor}
       </label>
       <select className={selectClass} value={selectedFloor} onChange={(e) => onFloorChange(e.target.value)}>
@@ -45,7 +45,7 @@ export function UnitFilters({
         {floors.map((f) => <option key={f} value={f}>{f}</option>)}
       </select>
 
-      <label className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+      <label className="text-[10px] font-black uppercase tracking-[0.1em] text-brand-neutral-800">
         {t.filters.status}
       </label>
       <select className={selectClass} value={selectedStatus} onChange={(e) => onStatusChange(e.target.value)}>
@@ -55,7 +55,7 @@ export function UnitFilters({
         ))}
       </select>
 
-      <label className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+      <label className="text-[10px] font-black uppercase tracking-[0.1em] text-brand-neutral-800">
         {t.filters.kind}
       </label>
       <select className={selectClass} value={selectedKind} onChange={(e) => onKindChange(e.target.value)}>
@@ -65,7 +65,7 @@ export function UnitFilters({
         ))}
       </select>
 
-      <label className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+      <label className="text-[10px] font-black uppercase tracking-[0.1em] text-brand-neutral-800">
         {t.filters.business}
       </label>
       <select className={selectClass} value={selectedBusiness} onChange={(e) => onBusinessChange(e.target.value)}>

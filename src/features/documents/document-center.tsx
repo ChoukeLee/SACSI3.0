@@ -72,7 +72,7 @@ export function DocumentCenter({ documents, locale }: Props) {
   const filterBtn = "rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50";
   const filterBtnActive = "border-brand-orange bg-brand-orange-50 text-brand-orange-700";
 
-  const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20";
+  const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15";
 
   return (
     <div>
@@ -100,7 +100,7 @@ export function DocumentCenter({ documents, locale }: Props) {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={locale === "zh" ? "搜索客户/房号/合同号..." : "Rechercher client/chambre/contrat..."}
-            className="w-full rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+            className="w-full rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs text-slate-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15"
           />
         </div>
         <span className="text-xs font-semibold text-slate-400 ml-auto">

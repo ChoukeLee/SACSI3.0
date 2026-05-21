@@ -221,7 +221,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
               placeholder={t.searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-9 w-64 rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+              className="h-9 w-64 rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15"
             />
           </div>
         </div>
@@ -618,7 +618,7 @@ function CustomerStat({ label, value, tone }: { label: string; value: number; to
     slate: "border-slate-200 bg-white text-slate-950",
     sky: "border-brand-sky-200 bg-brand-sky-50 text-brand-sky-900",
     rose: "border-rose-200 bg-rose-50 text-rose-900",
-    emerald: "border-emerald-200 bg-brand-green-50 text-brand-green-900",
+    emerald: "border-brand-green-200 bg-brand-green-50 text-brand-green-900",
   }[tone];
 
   return (

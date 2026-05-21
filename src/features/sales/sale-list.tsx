@@ -305,8 +305,8 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
               className={cn(
                 "rounded-xl px-3 py-1.5 text-xs font-bold transition-colors duration-[100ms]",
                 statusFilter === s
-                  ? "bg-slate-950 text-white"
-                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  ? "bg-brand-orange-500 text-white"
+                  : "border border-brand-warm-300 bg-white text-brand-neutral-600 hover:bg-brand-orange-50"
               )}
             >
               {s === "all" ? (locale === "fr" ? "Tous" : "全部") : t.contractStatus[s as keyof typeof t.contractStatus]}
@@ -318,7 +318,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
         </div>
         <button
           onClick={() => { resetNewForm(); setPanel("new"); }}
-          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors duration-[100ms] hover:bg-slate-800 active:scale-[0.98]"
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-orange-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors duration-[100ms] hover:bg-brand-orange-600 active:scale-[0.98]"
         >
           <Plus className="h-3.5 w-3.5" />{t.form.newContract}
         </button>
@@ -334,7 +334,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
             <section key={floor} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-natural">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-slate-950" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-brand-orange-500" />
                   <h3 className="text-sm font-black text-slate-950">{floor}</h3>
                 </div>
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">
@@ -360,7 +360,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                       onClick={() => { setSelectedId(contract.id); setPanel("detail"); setError(""); }}
                       className={cn(
                         "group flex min-h-[214px] flex-col rounded-2xl border bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-panel",
-                        isRisk ? "border-brand-amber-200 ring-1 ring-brand-amber-100" : "border-slate-200 hover:border-slate-300",
+                        isRisk ? "border-brand-amber-200 bg-brand-amber-50/40 ring-1 ring-brand-amber-100" : "border-brand-warm-300 hover:border-brand-orange-200",
                       )}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -378,7 +378,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                           <span className="text-slate-700">{rate}%</span>
                         </div>
                         <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                          <div className={cn("h-full rounded-full", rate >= 100 ? "bg-emerald-500" : overdue > 0 ? "bg-rose-500" : "bg-slate-950")} style={{ width: String(rate) + "%" }} />
+                          <div className={cn("h-full rounded-full", rate >= 100 ? "bg-brand-green-500" : overdue > 0 ? "bg-brand-red-500" : "bg-brand-orange-500")} style={{ width: String(rate) + "%" }} />
                         </div>
                       </div>
 
@@ -698,11 +698,11 @@ function SaleCardField({
   tone?: "slate" | "green" | "amber" | "sky" | "rose";
 }) {
   const toneClass = {
-    slate: "bg-slate-50 text-slate-950",
-    green: "bg-emerald-50 text-brand-green-800",
+    slate: "bg-brand-warm-100 text-brand-ink-900",
+    green: "bg-brand-green-50 text-brand-green-800",
     amber: "bg-brand-amber-50 text-brand-amber-800",
-    sky: "bg-brand-sky-50 text-brand-sky-800",
-    rose: "bg-rose-50 text-rose-800",
+    sky: "bg-brand-blue-50 text-brand-blue-800",
+    rose: "bg-brand-red-50 text-brand-red-800",
   }[tone];
 
   return (
@@ -727,11 +727,11 @@ function floorSortValue(label: string): number {
 
 function SaleMetric({ label, value, tone }: { label: string; value: string; tone: "slate" | "green" | "amber" | "sky" | "rose" }) {
   const toneClass = {
-    slate: "border-slate-200 bg-white text-slate-950",
-    green: "border-emerald-200 bg-brand-green-50 text-brand-green-900",
+    slate: "border-brand-warm-300 bg-white text-brand-ink-900",
+    green: "border-brand-green-200 bg-brand-green-50 text-brand-green-900",
     amber: "border-brand-amber-200 bg-brand-amber-50 text-brand-amber-900",
-    sky: "border-brand-sky-200 bg-brand-sky-50 text-brand-sky-900",
-    rose: "border-rose-200 bg-rose-50 text-rose-900",
+    sky: "border-brand-blue-200 bg-brand-blue-50 text-brand-blue-900",
+    rose: "border-brand-red-200 bg-brand-red-50 text-brand-red-900",
   }[tone];
 
   return (

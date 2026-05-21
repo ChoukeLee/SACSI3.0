@@ -92,7 +92,7 @@ export function BulkActionCenter({ locale, userRole }: Props) {
         <select
           value={actionType}
           onChange={e => { setActionType(e.target.value as BulkActionType); reset(); }}
-          className="w-full sm:w-96 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+          className="w-full sm:w-96 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15"
         >
           <option value="">—</option>
           {(["finance","unit","daily","customer"] as const).filter(c => permittedCategories.includes(c)).map(cat => (
@@ -111,13 +111,13 @@ export function BulkActionCenter({ locale, userRole }: Props) {
         {actionType === "daily_cancel_bookings" && (
           <div><label className="text-[10px] font-semibold text-brand-red-600">{L.reason} *</label>
             <input value={extraReason} onChange={e => setExtraReason(e.target.value)}
-              className="w-full sm:w-64 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
+              className="w-full sm:w-64 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15" />
           </div>
         )}
         {actionType === "unit_change_status" && (
           <div><label className="text-[10px] font-semibold text-slate-500">{L.targetStatus}</label>
             <select value={extraTargetStatus} onChange={e => setExtraTargetStatus(e.target.value)}
-              className="w-full sm:w-48 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20">
+              className="w-full sm:w-48 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15">
               <option value="available">{locale === "zh" ? "空闲" : "Dispo"}</option>
               <option value="maintenance">{locale === "zh" ? "维修" : "Maint"}</option>
               <option value="locked">{locale === "zh" ? "锁定" : "Bloque"}</option>

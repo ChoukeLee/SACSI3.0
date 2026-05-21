@@ -24,9 +24,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {children}
         </AppShellWrapper>
         <script defer dangerouslySetInnerHTML={{ __html: `
-          if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(reg){reg.unregister()})});
-          }
+          (function(){
+            if (!('serviceWorker' in navigator)) return;
+            Promise.all([
+              navigator.serviceWorker.getRegistrations().then(function(regs){
+                return Promise.all(regs.map(function(reg){ return reg.unregister(); }));
+              }),
+              'caches' in window
+                ? caches.keys().then(function(keys){ return Promise.all(keys.map(function(key){ return caches.delete(key); })); })
+                : Promise.resolve()
+            ]).then(function(){
+              if (navigator.serviceWorker.controller && !sessionStorage.getItem('sacis-sw-cleaned')) {
+                sessionStorage.setItem('sacis-sw-cleaned', '1');
+                window.location.reload();
+              }
+            }).catch(function(){});
+          })();
         `}} />
       </body>
     </html>
