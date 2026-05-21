@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Bell, X, Check } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
-import { dictionaries } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 interface NotificationRow {
@@ -17,11 +16,21 @@ interface NotificationRow {
 
 interface NotificationBellProps {
   notifications: NotificationRow[];
+  t: {
+    title: string;
+    empty: string;
+    markRead: string;
+    markAllRead: string;
+    unread: string;
+    leaseExpiry: string;
+    rentOverdue: string;
+    saleInstallment: string;
+    dailyCheckout: string;
+  };
   locale: Locale;
 }
 
-export function NotificationBell({ notifications, locale }: NotificationBellProps) {
-  const t = dictionaries[locale].shell.notifications;
+export function NotificationBell({ notifications, t, locale }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState(notifications);
 

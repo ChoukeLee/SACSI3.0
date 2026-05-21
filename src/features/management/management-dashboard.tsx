@@ -10,8 +10,8 @@ import {
 } from "@/features/finance/receivable-summary";
 import { QualityDashboardWidget } from "@/features/data-quality";
 import type { QualityIssue } from "@/features/data-quality/quality-types";
-import type { Locale } from "@/lib/i18n";
-import { dictionaries, routeFor } from "@/lib/i18n";
+import type { Locale, ManagementDict } from "@/lib/i18n";
+import { routeFor } from "@/lib/i18n";
 import { formatXof, cn, sortUnits } from "@/lib/utils";
 import type {
   BuildingRow, UnitRow, DailyBookingRow, LeaseContractRow,
@@ -52,6 +52,7 @@ interface Props {
   ledgerEntries: LedgerEntryRow[];
   receivables: ReceivableRow[];
   qualityIssues?: QualityIssue[];
+  t: ManagementDict;
   locale: Locale;
 }
 
@@ -193,9 +194,8 @@ function computeUnitState(
 
 export function ManagementDashboard({
   buildings, units, dailyBookings, leaseContracts, saleContracts,
-  saleSchedules, cleaningTasks, ledgerEntries, receivables, qualityIssues, locale,
+  saleSchedules, cleaningTasks, ledgerEntries, receivables, qualityIssues, t, locale,
 }: Props) {
-  const t = dictionaries[locale].management;
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("__all__");
 
   const residentialUnits = useMemo(

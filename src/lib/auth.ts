@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 
 export type UserRole = "admin" | "boss" | "finance" | "front_desk";
@@ -69,7 +70,7 @@ const rolePermissions: Record<UserRole, string[]> = {
 
 // ── Auth helpers ──
 
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -87,7 +88,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     role: (profile?.role as UserRole) ?? getSeedAccountProfile(user.email)?.role ?? "front_desk",
     displayName: profile?.display_name ?? getSeedAccountProfile(user.email)?.displayName ?? user.email ?? "User",
   };
-}
+});
 
 export function hasPermission(user: CurrentUser | null, permission: string): boolean {
   if (!user) return false;

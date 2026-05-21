@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
 import { ManagementDashboard } from "@/features/management";
@@ -66,6 +67,7 @@ export default async function FrenchManagementPage() {
       ledgerEntries={(ledgerEntries ?? []) as LedgerEntryRow[]}
       receivables={(receivables ?? []) as ReceivableRow[]}
       qualityIssues={qualityIssues}
+      t={dictionaries.fr.management}
       locale="fr"
     />
   );

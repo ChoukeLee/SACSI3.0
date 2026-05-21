@@ -1,5 +1,3 @@
-import type { Locale } from "@/lib/i18n";
-import { dictionaries } from "@/lib/i18n";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import type { UnitStatus } from "@/types/domain";
 
@@ -14,10 +12,11 @@ const variantMap: Record<UnitStatus, BadgeProps["variant"]> = {
   locked: "outline",
 };
 
-export function StatusBadge({ status, locale = "zh" }: { status: UnitStatus; locale?: Locale }) {
+export function StatusBadge({ status, labels }: { status: UnitStatus; labels: Record<UnitStatus, string> }) {
+  const label = labels[status];
   return (
-    <Badge variant={variantMap[status]} role="status" aria-label={dictionaries[locale].statuses[status]}>
-      {dictionaries[locale].statuses[status]}
+    <Badge variant={variantMap[status]} role="status" aria-label={label}>
+      {label}
     </Badge>
   );
 }

@@ -6,7 +6,6 @@ import { X, Check, UserX, Printer, DollarSign, Percent } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
-import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { UnitRow, DailyBookingRow } from "@/types/database";

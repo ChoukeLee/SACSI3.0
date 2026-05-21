@@ -69,7 +69,7 @@ export function MobileRoomCard({
           <span className="font-mono text-xl font-black leading-none text-slate-950 tabular-nums">
             {room.unit.unit_no}
           </span>
-          <StatusBadge status={unitStatus} locale={locale} />
+          <StatusBadge status={unitStatus} labels={dictionaries[locale].statuses} />
         </div>
         <ArrowRight className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
       </div>

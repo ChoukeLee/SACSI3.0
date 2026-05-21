@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
-import type { Locale } from "@/lib/i18n";
+import type { Locale, ShellDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import type { UserRole } from "@/lib/auth";
 import { NotificationBell } from "@/features/notifications";
@@ -14,10 +14,11 @@ import { getDesktopNavLabels } from "@/lib/nav-labels";
 import { createClient } from "@/lib/supabase/client";
 
 export function AppShell({
-  children, locale = "zh", userRole, userDisplayName, notifications = [],
+  children, locale = "zh", userRole, userDisplayName, notifications = [], notifT,
 }: {
   children: React.ReactNode; locale?: Locale; userRole?: UserRole; userDisplayName?: string;
   notifications?: { id: string; title: string; body: string; read_at: string | null; created_at: string; due_at: string | null }[];
+  notifT: ShellDict["notifications"];
 }) {
   const pathname = usePathname();
   const labels = getDesktopNavLabels(locale);
@@ -44,7 +45,7 @@ export function AppShell({
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
-              <NotificationBell notifications={notifications} locale={locale} />
+              <NotificationBell notifications={notifications} t={notifT} locale={locale} />
               <Link
                 className="rounded-xl border border-brand-warm-300 bg-white px-3 py-1.5 text-[11px] font-bold text-brand-ink-900 shadow-sm transition-colors duration-[100ms] hover:border-brand-orange-200 hover:bg-brand-orange-50 active:scale-95"
                 href={routeFor(otherLocale, pathname)}

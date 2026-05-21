@@ -159,7 +159,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
               <span className="font-mono text-2xl font-bold text-slate-950">
                 {room.unit.unit_no}
               </span>
-              <StatusBadge status={unitStatus} locale={locale} />
+              <StatusBadge status={unitStatus} labels={dictionaries[locale].statuses} />
             </div>
             <button
               onClick={handleClose}
