@@ -71,32 +71,28 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
     return [...groups.entries()].sort(([a], [b]) => Number(a) - Number(b));
   }, [roomRows]);
 
+  const shareRows = useMemo(() => {
+    const occupied = roomRows.filter(r => r.status === "occupied" || r.status === "checking_out_today" || r.status === "reserved");
+    const checkingOut = roomRows.filter(r => r.isCheckoutDay);
+    const cleaning = roomRows.filter(r => r.status === "cleaning");
+    const available = roomRows.filter(r => r.status === "available");
+
+    return [
+      { key: "occupied", label: locale === "zh" ? "占用" : "Occupe", count: occupied.length, units: occupied.map(r => r.unit.unit_no), tone: "bg-orange-50 text-orange-800 ring-orange-200" },
+      { key: "checkout", label: locale === "zh" ? "退房" : "Depart", count: checkingOut.length, units: checkingOut.map(r => r.unit.unit_no), tone: "bg-sky-50 text-sky-800 ring-sky-200" },
+      { key: "cleaning", label: locale === "zh" ? "待保洁" : "Menage", count: cleaning.length, units: cleaning.map(r => r.unit.unit_no), tone: "bg-cyan-50 text-cyan-800 ring-cyan-200" },
+      { key: "available", label: locale === "zh" ? "可安排入住" : "Disponible", count: available.length, units: available.map(r => r.unit.unit_no), tone: "bg-emerald-50 text-emerald-800 ring-emerald-200" },
+    ].filter(row => row.count > 0);
+  }, [roomRows, locale]);
+
   const buildShareText = useCallback(() => {
     let text = `11# ${locale === "zh" ? "日租房态" : "Occupation journaliere"}\n`;
-
-    const occupied = roomRows.filter(r => r.status === "occupied" || r.status === "checking_out_today" || r.status === "reserved");
-    if (occupied.length > 0) {
-      text += `\n${locale === "zh" ? "占用" : "Occupe"}: ${occupied.length}\n`;
-      text += `${occupied.map(r => r.unit.unit_no).join(", ")}\n`;
+    for (const row of shareRows) {
+      text += `\n${row.label}: ${row.count}\n`;
+      text += `${row.units.join(", ")}\n`;
     }
-
-    const checkingOut = roomRows.filter(r => r.isCheckoutDay);
-    if (checkingOut.length > 0) {
-      text += `\n${locale === "zh" ? "退房" : "Depart"}: ${checkingOut.map(r => r.unit.unit_no).join(", ")}\n`;
-    }
-
-    const cleaning = roomRows.filter(r => r.status === "cleaning");
-    if (cleaning.length > 0) {
-      text += `\n${locale === "zh" ? "待保洁" : "Menage requis"}: ${cleaning.map(r => r.unit.unit_no).join(", ")}\n`;
-    }
-
-    const av = roomRows.filter(r => r.status === "available");
-    if (av.length > 0) {
-      text += `\n${locale === "zh" ? "可安排入住" : "Disponible"}: ${av.map(r => r.unit.unit_no).join(", ")}\n`;
-    }
-
     return text;
-  }, [roomRows, locale]);
+  }, [shareRows, locale]);
 
   const handleCopy = async () => {
     const text = buildShareText();
@@ -119,19 +115,16 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
   return (
     <div className="space-y-6">
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-natural">
-        <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-4">
             <div>
-              <h3 className="text-sm font-bold text-slate-950">{t.shareTitle}</h3>
-              <p className="mt-0.5 text-xs font-medium text-slate-500">{locale === "zh" ? "今日群发内容优先展示，可直接复制。" : "Message du jour pret a copier."}</p>
+              <h3 className="text-[15px] font-bold leading-5 text-slate-950">{locale === "zh" ? "今日可发群内容" : t.shareTitle}</h3>
+              <p className="mt-1 text-[13px] font-medium leading-5 text-slate-500">{locale === "zh" ? "房态摘要已按群发格式整理" : "Message du jour pret a copier."}</p>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="rounded-lg bg-white px-3 py-1.5 text-sm font-bold text-slate-900 shadow-sm ring-1 ring-slate-200">
-                {new Date(selectedDate).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN")}
-              </div>
-              <span className="text-xs font-bold text-slate-500">
-                {new Date(selectedDate).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long" })}
-              </span>
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] font-semibold leading-5 text-slate-700">
+              <span>{new Date(selectedDate).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN")}</span>
+              <span className="text-slate-400">/</span>
+              <span>{new Date(selectedDate).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long" })}</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -145,8 +138,19 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
             </Button>
           </div>
         </div>
-        <div className="bg-slate-50/60 px-4 py-4">
-          <pre className="whitespace-pre-wrap break-words rounded-xl border border-slate-200 bg-white p-3 font-mono text-xs leading-relaxed text-slate-800">{buildShareText()}</pre>
+        <div className="space-y-2 bg-slate-50/60 px-5 py-4">
+          <div className="text-[13px] font-semibold leading-5 text-slate-800">11# {locale === "zh" ? "日租房态" : "Occupation journaliere"}</div>
+          <div className="grid gap-2 md:grid-cols-2">
+            {shareRows.map(row => (
+              <div key={row.key} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                <div className="mb-1.5 flex items-center gap-2">
+                  <span className={cn("rounded-full px-2 py-0.5 text-[12px] font-bold leading-4 ring-1 ring-inset", row.tone)}>{row.label}</span>
+                  <span className="text-[13px] font-bold leading-5 text-slate-900">{row.count}</span>
+                </div>
+                <p className="text-[13px] font-medium leading-6 text-slate-700">{row.units.join(", ")}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
