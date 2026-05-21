@@ -5,6 +5,9 @@ const config: Config = {
   darkMode: "class",
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"MiSans"', '-apple-system', 'BlinkMacSystemFont', '"Helvetica Neue"', 'sans-serif'],
+      },
       colors: {
         brand: {
           /* Accent — warm Côte d'Ivoire orange, used sparingly */
