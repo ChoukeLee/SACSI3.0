@@ -7,7 +7,6 @@ import { dictionaries } from "@/lib/i18n";
 import { cn, formatXof } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import type { DailyBookingRow, UnitRow, CustomerRow, PaymentRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import { calculateBilling } from "./billing";
@@ -78,34 +77,31 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
   }, [roomRows]);
 
   const buildShareText = useCallback(() => {
-    const dateFormatted = new Date(selectedDate).toLocaleDateString(
-      locale === "fr" ? "fr-FR" : "zh-CN", { day: "2-digit", month: "2-digit", year: "numeric" }
-    );
-    let text = `11# ${locale === "zh" ? "日租房态" : "Occupation journalière"} ${dateFormatted}\n`;
+    let text = `11# ${locale === "zh" ? "????" : "Occupation journaliere"}\n`;
 
     const occupied = roomRows.filter(r => r.status === "occupied" || r.status === "checking_out_today" || r.status === "reserved");
     if (occupied.length > 0) {
-      text += `\n${locale === "zh" ? "占用" : "Occupé"}: ${occupied.length}\n`;
+      text += `\n${locale === "zh" ? "??" : "Occupe"}: ${occupied.length}\n`;
       text += `${occupied.map(r => r.unit.unit_no).join(", ")}\n`;
     }
 
     const checkingOut = roomRows.filter(r => r.isCheckoutDay);
     if (checkingOut.length > 0) {
-      text += `\n${locale === "zh" ? "今日退房" : "Départ aujourd'hui"}: ${checkingOut.map(r => r.unit.unit_no).join(", ")}\n`;
+      text += `\n${locale === "zh" ? "??" : "Depart"}: ${checkingOut.map(r => r.unit.unit_no).join(", ")}\n`;
     }
 
     const cleaning = roomRows.filter(r => r.status === "cleaning");
     if (cleaning.length > 0) {
-      text += `\n${locale === "zh" ? "待保洁" : "Ménage requis"}: ${cleaning.map(r => r.unit.unit_no).join(", ")}\n`;
+      text += `\n${locale === "zh" ? "???" : "Menage requis"}: ${cleaning.map(r => r.unit.unit_no).join(", ")}\n`;
     }
 
     const av = roomRows.filter(r => r.status === "available");
     if (av.length > 0) {
-      text += `\n${locale === "zh" ? "空闲" : "Disponible"}: ${av.map(r => r.unit.unit_no).join(", ")}\n`;
+      text += `\n${locale === "zh" ? "??" : "Disponible"}: ${av.map(r => r.unit.unit_no).join(", ")}\n`;
     }
 
     return text;
-  }, [roomRows, selectedDate, locale]);
+  }, [roomRows, locale]);
 
   const handleCopy = async () => {
     const text = buildShareText();
@@ -127,53 +123,40 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
 
   return (
     <div className="space-y-6">
-      {/* Date selector + actions */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-natural sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 shadow-sm transition-all duration-fast hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30"
-          />
-          <span className="text-xs font-semibold text-slate-400">
-            {new Date(selectedDate).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long" })}
-          </span>
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-natural">
+        <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-950">{t.shareTitle}</h3>
+              <p className="mt-0.5 text-xs font-medium text-slate-500">{locale === "zh" ? "????????????????" : "Message, date et actions au meme endroit."}</p>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-sm font-bold text-slate-900 shadow-sm transition-all duration-fast hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30"
+              />
+              <span className="text-xs font-bold text-slate-500">
+                {new Date(selectedDate).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long" })}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="primary" size="sm" onClick={handleCopy}>
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? (locale === "zh" ? "???" : "Copie") : t.copy}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => window.print()} className="no-print">
+              <Printer className="h-3.5 w-3.5" />
+              {dictionaries[locale].settings?.print?.print ?? (locale === "zh" ? "??" : "Imprimer")}
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleCopy}
-          >
-            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-            {copied ? (locale === "zh" ? "已复制" : "Copié") : t.copy}
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => window.print()}
-            className="no-print"
-          >
-            <Printer className="h-3.5 w-3.5" />
-            {dictionaries[locale].settings?.print?.print ?? (locale === "zh" ? "打印" : "Imprimer")}
-          </Button>
+        <div className="bg-slate-50/60 px-4 py-4">
+          <pre className="whitespace-pre-wrap break-words rounded-xl border border-slate-200 bg-white p-3 font-mono text-xs leading-relaxed text-slate-800">{buildShareText()}</pre>
         </div>
       </div>
-
-      {/* Summary cards */}
-      <Card variant="dashed" className="border-slate-200 bg-white">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-bold text-slate-950">{t.shareTitle}</h3>
-            <p className="mt-0.5 text-xs text-slate-500">{locale === "zh" ? "今日群发内容优先展示，可直接复制。" : "Message du jour pret a copier."}</p>
-          </div>
-          <Button variant="primary" size="sm" onClick={handleCopy}>
-            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />} {t.copy}
-          </Button>
-        </div>
-        <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-3 font-mono text-xs leading-relaxed text-slate-700">{buildShareText()}</pre>
-      </Card>
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-6">
         <SummaryCard label={locale === "zh" ? "总房源" : "Total"} value={summary.total} bg="bg-brand-warm-100 text-brand-ink-700" />
