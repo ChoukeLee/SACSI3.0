@@ -5,16 +5,11 @@ import { Copy, Printer, Check } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { cn, formatXof } from "@/lib/utils";
-import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import type { DailyBookingRow, UnitRow, CustomerRow, PaymentRow } from "@/types/database";
-import type { UnitStatus } from "@/types/domain";
 import { calculateBilling } from "./billing";
 import type { DailyRoomDisplayStatus } from "./room-status";
 import { buildDailyRoomStateMap } from "./room-status";
-
-const BILLING_MODE_ZH: Record<string, string> = { fixed: "固定离店", open: "开放式入住" };
-const BILLING_MODE_FR: Record<string, string> = { fixed: "Départ fixe", open: "Séjour ouvert" };
 
 interface OverviewViewProps {
   dailyUnits: UnitRow[];
@@ -77,27 +72,27 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
   }, [roomRows]);
 
   const buildShareText = useCallback(() => {
-    let text = `11# ${locale === "zh" ? "????" : "Occupation journaliere"}\n`;
+    let text = `11# ${locale === "zh" ? "日租房态" : "Occupation journaliere"}\n`;
 
     const occupied = roomRows.filter(r => r.status === "occupied" || r.status === "checking_out_today" || r.status === "reserved");
     if (occupied.length > 0) {
-      text += `\n${locale === "zh" ? "??" : "Occupe"}: ${occupied.length}\n`;
+      text += `\n${locale === "zh" ? "占用" : "Occupe"}: ${occupied.length}\n`;
       text += `${occupied.map(r => r.unit.unit_no).join(", ")}\n`;
     }
 
     const checkingOut = roomRows.filter(r => r.isCheckoutDay);
     if (checkingOut.length > 0) {
-      text += `\n${locale === "zh" ? "??" : "Depart"}: ${checkingOut.map(r => r.unit.unit_no).join(", ")}\n`;
+      text += `\n${locale === "zh" ? "退房" : "Depart"}: ${checkingOut.map(r => r.unit.unit_no).join(", ")}\n`;
     }
 
     const cleaning = roomRows.filter(r => r.status === "cleaning");
     if (cleaning.length > 0) {
-      text += `\n${locale === "zh" ? "???" : "Menage requis"}: ${cleaning.map(r => r.unit.unit_no).join(", ")}\n`;
+      text += `\n${locale === "zh" ? "待保洁" : "Menage requis"}: ${cleaning.map(r => r.unit.unit_no).join(", ")}\n`;
     }
 
     const av = roomRows.filter(r => r.status === "available");
     if (av.length > 0) {
-      text += `\n${locale === "zh" ? "??" : "Disponible"}: ${av.map(r => r.unit.unit_no).join(", ")}\n`;
+      text += `\n${locale === "zh" ? "空闲" : "Disponible"}: ${av.map(r => r.unit.unit_no).join(", ")}\n`;
     }
 
     return text;
@@ -128,7 +123,7 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
           <div className="flex flex-wrap items-center gap-3">
             <div>
               <h3 className="text-sm font-bold text-slate-950">{t.shareTitle}</h3>
-              <p className="mt-0.5 text-xs font-medium text-slate-500">{locale === "zh" ? "????????????????" : "Message, date et actions au meme endroit."}</p>
+              <p className="mt-0.5 text-xs font-medium text-slate-500">{locale === "zh" ? "群发内容、日期和操作集中在这里。" : "Message, date et actions au meme endroit."}</p>
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <input
@@ -145,11 +140,11 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
           <div className="flex items-center gap-2">
             <Button variant="primary" size="sm" onClick={handleCopy}>
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? (locale === "zh" ? "???" : "Copie") : t.copy}
+              {copied ? (locale === "zh" ? "已复制" : "Copie") : t.copy}
             </Button>
             <Button variant="secondary" size="sm" onClick={() => window.print()} className="no-print">
               <Printer className="h-3.5 w-3.5" />
-              {dictionaries[locale].settings?.print?.print ?? (locale === "zh" ? "??" : "Imprimer")}
+              {dictionaries[locale].settings?.print?.print ?? (locale === "zh" ? "打印" : "Imprimer")}
             </Button>
           </div>
         </div>
@@ -160,10 +155,10 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-6">
         <SummaryCard label={locale === "zh" ? "总房源" : "Total"} value={summary.total} bg="bg-brand-warm-100 text-brand-ink-700" />
-        <SummaryCard label={locale === "zh" ? "占用" : "Occupé"} value={summary.occupied} bg="bg-brand-orange-50 text-brand-orange-700" />
+        <SummaryCard label={locale === "zh" ? "占用" : "Occupe"} value={summary.occupied} bg="bg-brand-orange-50 text-brand-orange-700" />
         <SummaryCard label={locale === "zh" ? "未定离店" : "Ouvert"} value={summary.openEnded} bg="bg-brand-amber-50 text-brand-amber-700" />
-        <SummaryCard label={locale === "zh" ? "今日退房" : "Départ"} value={summary.checkoutsToday} bg="bg-brand-sky-50 text-brand-sky-700" />
-        <SummaryCard label={locale === "zh" ? "待保洁" : "Ménage"} value={summary.cleaning} bg="bg-brand-sky-50 text-brand-sky-700" />
+        <SummaryCard label={locale === "zh" ? "今日退房" : "Depart"} value={summary.checkoutsToday} bg="bg-brand-sky-50 text-brand-sky-700" />
+        <SummaryCard label={locale === "zh" ? "待保洁" : "Menage"} value={summary.cleaning} bg="bg-brand-sky-50 text-brand-sky-700" />
         <SummaryCard label={locale === "zh" ? "空闲" : "Libre"} value={summary.available} bg="bg-brand-green-50 text-brand-green-700" />
       </div>
 
@@ -189,68 +184,7 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
         </div>
       </div>
 
-      {/* Room table */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-natural">
-        <div className="overflow-x-auto">
-          <table className="data-table min-w-[900px] text-sm">
-            <thead>
-              <tr>
-                {t.headers.map((h: string) => (
-                  <th key={h} className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-brand-ink-400">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-brand-warm-400">
-              {roomRows.map(row => {
-                const b = row.billing;
-                return (
-                  <tr key={row.unit.id} className={cn(
-                    "transition-colors duration-fast",
-                    (row.status === "occupied" || row.status === "checking_out_today") && "bg-brand-orange-50/40",
-                    row.status === "reserved" && "bg-brand-amber-50/40",
-                    row.status === "cleaning" && "bg-brand-sky-50/40",
-                    (row.status === "maintenance" || row.status === "locked") && "bg-brand-red-50/40",
-                  )}>
-                    <td className="px-3 py-2.5 font-mono text-sm font-semibold text-brand-ink-900">{row.unit.unit_no}</td>
-                    <td className="px-3 py-2.5">
-                      {row.booking ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-brand-ink-700" title={row.customer?.name ?? undefined}>{row.customer?.name?.slice(0, 8) ?? "?"}</span>
-                          {row.booking.status !== "checked_in" && (
-                            <StatusBadge status="reserved" locale={locale} />
-                          )}
-                        </div>
-                      ) : (
-                        <StatusBadge status={statusToUnitStatus(row.status)} locale={locale} />
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-brand-ink-500">{row.booking?.check_in ?? "-"}</td>
-                    <td className="px-3 py-2.5 text-xs text-brand-ink-500">
-                      {row.booking?.checkout_mode === "open"
-                        ? <span className="font-medium text-brand-amber-700">{locale === "zh" ? "未定" : "Ouvert"}</span>
-                        : (row.booking?.check_out ?? "-")}
-                    </td>
-                    <td className="px-3 py-2.5 text-center text-xs tabular-nums text-brand-ink-600">{b?.nights ?? "-"}</td>
-                    <td className="px-3 py-2.5 text-xs text-brand-ink-500">
-                      {row.booking ? (locale === "zh" ? BILLING_MODE_ZH[row.booking.checkout_mode] : BILLING_MODE_FR[row.booking.checkout_mode]) : "-"}
-                    </td>
-                    <td className="px-3 py-2.5 text-xs tabular-nums font-medium text-brand-ink-600">
-                      {b ? formatXof(b.paid) : "-"}
-                    </td>
-                    <td className="px-3 py-2.5 text-xs tabular-nums text-brand-ink-600">
-                      {b ? formatXof(b.finalAmount) : "-"}
-                    </td>
-                    <td className={cn("px-3 py-2.5 text-xs tabular-nums font-semibold", b && b.outstanding > 0 ? "text-brand-red-600" : "text-brand-green-600")}>
-                      {b ? (b.outstanding > 0 ? formatXof(b.outstanding) : "0") : "-"}
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-brand-ink-300 max-w-[120px] truncate">{row.booking?.notes ?? ""}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+
 
     </div>
   );
@@ -292,13 +226,13 @@ function DailyRoomCard({
       };
 
   const tone: Record<DailyRoomDisplayStatus, string> = {
-    available: "border-emerald-200 bg-emerald-50 text-emerald-900",
-    occupied: "border-orange-300 bg-orange-100 text-orange-950",
-    checking_out_today: "border-amber-300 bg-amber-100 text-amber-950",
-    reserved: "border-sky-300 bg-sky-100 text-sky-950",
-    cleaning: "border-cyan-300 bg-cyan-100 text-cyan-950",
-    maintenance: "border-rose-300 bg-rose-100 text-rose-950",
-    locked: "border-slate-300 bg-slate-100 text-slate-900",
+    available: "border-sky-100 bg-sky-50 text-slate-900",
+    occupied: "border-blue-300 bg-blue-500 text-white",
+    checking_out_today: "border-blue-400 bg-blue-600 text-white",
+    reserved: "border-amber-100 bg-amber-50 text-slate-900",
+    cleaning: "border-cyan-200 bg-cyan-100 text-cyan-950",
+    maintenance: "border-rose-300 bg-rose-500 text-white",
+    locked: "border-slate-300 bg-slate-500 text-white",
   };
 
   const hasBooking = Boolean(row.booking);
@@ -306,53 +240,44 @@ function DailyRoomCard({
     ? (locale === "zh" ? "未定离店" : "Ouvert")
     : row.booking?.check_out;
   const outstanding = row.billing?.outstanding ?? 0;
+  const guestText = row.customer?.name ?? (hasBooking ? "?" : (locale === "zh" ? "可安排入住" : "Disponible"));
+  const dateText = hasBooking
+    ? `${row.booking?.check_in ?? "-"} -> ${checkoutText ?? "-"}`
+    : (row.unit.layout ?? row.unit.floor_label);
 
   return (
     <div className={cn(
-      "min-h-[92px] rounded-2xl border p-3 shadow-sm ring-1 ring-inset ring-white/50",
+      "group relative flex min-h-[84px] flex-col justify-between overflow-hidden rounded-xl border p-2.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md",
       tone[row.status],
     )}>
-      <div className="flex items-start justify-between gap-2">
-        <span className="rounded-full bg-white/80 px-2 py-1 font-mono text-sm font-black leading-none shadow-sm">
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(135deg,rgba(255,255,255,0.18),transparent_55%)]" />
+      <div className="relative z-10 flex items-start justify-between gap-2">
+        <span className="rounded-full bg-white/90 px-2.5 py-0.5 font-mono text-xs font-black leading-5 text-slate-950 shadow-sm">
           {row.unit.unit_no}
         </span>
-        <span className="rounded-full bg-white/65 px-2 py-0.5 text-[10px] font-bold">
+        <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-black leading-4 text-slate-950 shadow-sm">
           {labelMap[row.status]}
         </span>
       </div>
-      <div className="mt-3 min-h-[28px]">
-        <p className="truncate text-xs font-bold">
-          {row.customer?.name ?? (hasBooking ? "?" : (locale === "zh" ? "可安排入住" : "Disponible"))}
-        </p>
-        <p className="mt-1 truncate text-[10px] font-semibold opacity-70">
-          {hasBooking ? `${row.booking?.check_in ?? "-"} -> ${checkoutText ?? "-"}` : row.unit.layout ?? row.unit.floor_label}
-        </p>
+      <div className="relative z-10 min-w-0">
+        <p className="truncate text-xs font-black">{guestText}</p>
+        <p className="mt-0.5 truncate text-[10px] font-semibold opacity-75">{dateText}</p>
+        <div className="mt-2 flex items-center justify-between gap-2">
+          {outstanding > 0 ? (
+            <span className="truncate text-[10px] font-black text-rose-600">
+              {locale === "zh" ? "待收 " : "Reste "}{formatXof(outstanding)}
+            </span>
+          ) : (
+            <span className="truncate text-[10px] font-bold opacity-65">{locale === "zh" ? "房间档案" : "Dossier"}</span>
+          )}
+          <span className="flex shrink-0 items-center gap-1">
+            <span className="h-5 w-5 rounded-full bg-white/85 shadow-sm" />
+            <span className="h-5 w-5 rounded-full bg-white/70 shadow-sm" />
+          </span>
+        </div>
       </div>
-      {outstanding > 0 && (
-        <p className="mt-2 truncate text-[10px] font-black text-rose-700">
-          {locale === "zh" ? "待收 " : "Reste "}{formatXof(outstanding)}
-        </p>
-      )}
     </div>
   );
-}
-
-function statusToUnitStatus(s: DailyRoomDisplayStatus): UnitStatus {
-  switch (s) {
-    case "occupied":
-    case "checking_out_today":
-      return "daily_occupied";
-    case "reserved":
-      return "reserved";
-    case "cleaning":
-      return "cleaning_pending";
-    case "maintenance":
-      return "maintenance";
-    case "locked":
-      return "locked";
-    default:
-      return "available";
-  }
 }
 
 function SummaryCard({ label, value, bg }: { label: string; value: number; bg: string }) {
