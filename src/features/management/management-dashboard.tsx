@@ -381,7 +381,7 @@ export function ManagementDashboard({
           <div>
             <SectionLabel compact>{t.sections.buildingStatus} - {buildingName}</SectionLabel>
             <p className="mt-1 text-xs text-slate-500">
-              {locale === "zh" ? "????????????????????????" : "Statut par etage, cliquez pour ouvrir le dossier."}
+              {locale === "zh" ? "按楼层查看房间状态，点击房间可打开对应档案。" : "Statut par etage, cliquez pour ouvrir le dossier."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
