@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
@@ -186,20 +186,20 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
   return (
     <div className="space-y-5">
       <div className="grid gap-3 md:grid-cols-4">
-        <CustomerStat label={locale === "zh" ? "长期/购房客户" : "Clients stables"} value={stats.core} tone="slate" />
-        <CustomerStat label={locale === "zh" ? "仅日租住客" : "Sejour court"} value={stats.daily} tone="sky" />
+        <CustomerStat label={locale === "zh" ? "??/????" : "Clients stables"} value={stats.core} tone="slate" />
+        <CustomerStat label={locale === "zh" ? "?????" : "Sejour court"} value={stats.daily} tone="sky" />
         <CustomerStat label={t.blacklist.title} value={stats.blacklisted} tone="rose" />
-        <CustomerStat label={locale === "zh" ? "客户总数" : "Total"} value={stats.all} tone="emerald" />
+        <CustomerStat label={locale === "zh" ? "????" : "Total"} value={stats.all} tone="emerald" />
       </div>
 
       {/* Toolbar */}
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-natural xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           {([
-            ["core", locale === "zh" ? "长期/购房" : "Stable", stats.core],
-            ["daily", locale === "zh" ? "日租住客" : "Journalier", stats.daily],
+            ["core", locale === "zh" ? "??/??" : "Stable", stats.core],
+            ["daily", locale === "zh" ? "????" : "Journalier", stats.daily],
             ["blacklisted", t.blacklist.title, stats.blacklisted],
-            ["all", locale === "zh" ? "全部" : "Tous", stats.all],
+            ["all", locale === "zh" ? "??" : "Tous", stats.all],
           ] as const).map(([key, label, count]) => (
             <button
               key={key}
@@ -221,7 +221,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
               placeholder={t.searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-9 w-64 rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+              className="h-9 w-64 rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30"
             />
           </div>
         </div>
@@ -339,7 +339,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
       )}
 
       <p className="mt-3 text-xs text-slate-400">
-        {filtered.length} / {customers.length} {locale === "fr" ? "clients" : "位客户"}
+        {filtered.length} / {customers.length} {locale === "fr" ? "clients" : "???"}
       </p>
 
       {/* Add/Edit Form Panel */}
@@ -410,11 +410,11 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                   onChange={(e) => setFormDocNo(e.target.value)}
                   className={inputClass}
                   placeholder={
-                    formMode.type === "edit" ? "留空则不修改" : t.fields.documentNumber
+                    formMode.type === "edit" ? "??????" : t.fields.documentNumber
                   }
                 />
                 <p className="mt-1 text-xs text-slate-400">
-                  {formMode.type === "edit" ? "留空则保持原证件号不变" : "证件号将加密存储"}
+                  {formMode.type === "edit" ? "???????????" : "????????"}
                 </p>
               </div>
 
@@ -518,7 +518,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                 className="inline-flex items-center gap-1 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800"
               >
                 <Eye className="h-3.5 w-3.5" />
-                {locale === "zh" ? "查看档案" : "Profil"}
+                {locale === "zh" ? "????" : "Profil"}
               </Link>
               <button
                 onClick={() => openEdit(selected)}
@@ -616,7 +616,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
 function CustomerStat({ label, value, tone }: { label: string; value: number; tone: "slate" | "sky" | "rose" | "emerald" }) {
   const toneClass = {
     slate: "border-slate-200 bg-white text-slate-950",
-    sky: "border-sky-200 bg-sky-50 text-sky-900",
+    sky: "border-brand-sky-200 bg-brand-sky-50 text-brand-sky-900",
     rose: "border-rose-200 bg-rose-50 text-rose-900",
     emerald: "border-emerald-200 bg-emerald-50 text-emerald-900",
   }[tone];

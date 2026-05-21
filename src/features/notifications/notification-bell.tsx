@@ -84,7 +84,7 @@ export function NotificationBell({ notifications, locale }: NotificationBellProp
               {items.length === 0 ? (
                 <p className="px-4 py-8 text-center text-xs text-slate-400">{t.empty}</p>
               ) : (
-                <ul className="divide-y divide-brand-warm-400">
+                <ul className="divide-y divide-brand-neutral-400">
                   {items.map((n) => (
                     <li
                       key={n.id}

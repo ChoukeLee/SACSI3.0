@@ -50,7 +50,7 @@ export function AppShell({
                 {otherLocale.toUpperCase()}
               </Link>
               {roleLabel && (
-                <span className="hidden rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-700 ring-1 ring-inset ring-orange-200 sm:inline-flex">
+                <span className="hidden rounded-full bg-brand-orange-50 px-3 py-1 text-[11px] font-bold text-brand-orange-700 ring-1 ring-inset ring-brand-orange-200 sm:inline-flex">
                   {userDisplayName ? `${roleLabel} · ${userDisplayName}` : roleLabel}
                 </span>
               )}

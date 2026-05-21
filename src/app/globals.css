@@ -44,19 +44,19 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
 
-  /* Design tokens — mirrors tailwind.config.ts brand palette */
-  --color-bg: #F4F6FA;
+  /* Design tokens — mirrors tailwind.config.ts Ivory Coast palette */
+  --color-bg: #FAFAFA;
   --color-surface: #FFFFFF;
-  --color-border: #E6E4DA;
-  --color-border-light: #EFEEE8;
+  --color-border: #EEEEEE;
+  --color-border-light: #F5F5F5;
   --color-text: #1D1D1B;
-  --color-text-secondary: #6B6E66;
-  --color-text-muted: #8A8D84;
-  --color-accent: #C96F2D;
-  --color-accent-light: #FDF8F3;
-  --color-success: #4A6B4A;
-  --color-danger: #8B3A3A;
-  --color-warning: #8B6914;
+  --color-text-secondary: #616161;
+  --color-text-muted: #9E9E9E;
+  --color-accent: #F77F00;
+  --color-accent-light: #FEFAF5;
+  --color-success: #009E60;
+  --color-danger: #DC2626;
+  --color-warning: #D97706;
   --color-info: #4A6B7D;
 
   /* Typography scale — tuned for MiSans CJK readability */
@@ -76,8 +76,8 @@
 body {
   min-height: 100dvh;
   background:
-    radial-gradient(circle at 12% -8%, rgba(201,111,45,0.08), transparent 28rem),
-    linear-gradient(180deg, #F8FAFC 0%, var(--color-bg) 42%, #F1F4F8 100%);
+    radial-gradient(circle at 12% -8%, rgba(247,127,0,0.05), transparent 28rem),
+    linear-gradient(180deg, #FAFAFA 0%, var(--color-bg) 42%, #F5F5F5 100%);
   color: var(--color-text);
   font-family: "MiSans", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;

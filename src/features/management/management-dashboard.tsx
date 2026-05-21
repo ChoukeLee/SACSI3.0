@@ -19,7 +19,7 @@ import type {
   SaleContractRow, SalePaymentScheduleRow, LedgerEntryRow, ReceivableRow,
 } from "@/types/database";
 
-// ── Types ──────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type MgmtStatus =
   | "sold"
@@ -56,17 +56,17 @@ interface Props {
   locale: Locale;
 }
 
-// ── Status colour system — operational state identifiers ──────────────
+// â”€â”€ Status colour system â€” operational state identifiers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Each status has a distinct, scannable background colour.
 // Cells must be distinguishable at a glance from across the room.
 // Uses Tailwind native palette for stronger colour differentiation:
-//   sold    → slate   (neutral, permanent, no action)
-//   leased  → amber   (occupied long-term, warm)
-//   daily   → orange  (active use, energetic)
-//   reserve → blue    (pending arrival, calm)
-//   clean   → cyan    (service required, distinct from blue)
-//   maint   → red     (blocked, attention)
-//   avail   → emerald (ready, positive)
+//   sold    â†’ slate   (neutral, permanent, no action)
+//   leased  â†’ amber   (occupied long-term, warm)
+//   daily   â†’ orange  (active use, energetic)
+//   reserve â†’ blue    (pending arrival, calm)
+//   clean   â†’ cyan    (service required, distinct from blue)
+//   maint   â†’ red     (blocked, attention)
+//   avail   â†’ emerald (ready, positive)
 //
 // bg: room cell  dot: legend  pill: summary badge  ring: depth
 
@@ -86,18 +86,18 @@ const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string; r
     stripe: "bg-indigo-800",
   },
   dailyOccupied: {
-    bg:   "bg-orange-500 text-white border-orange-600 shadow-orange-200",
-    dot:  "bg-orange-500",
-    pill: "bg-orange-50 text-orange-700 border-orange-200",
-    ring: "ring-1 ring-inset ring-orange-300/50",
-    stripe: "bg-orange-700",
+    bg:   "bg-brand-orange-500 text-white border-brand-orange-600 shadow-brand-orange-200",
+    dot:  "bg-brand-orange-500",
+    pill: "bg-brand-orange-50 text-brand-orange-700 border-brand-orange-200",
+    ring: "ring-1 ring-inset ring-brand-orange-300/50",
+    stripe: "bg-brand-orange-700",
   },
   reserved: {
-    bg:   "bg-sky-500 text-white border-sky-600 shadow-sky-200",
-    dot:  "bg-sky-500",
-    pill: "bg-sky-50 text-sky-700 border-sky-200",
+    bg:   "bg-brand-sky-500 text-white border-brand-sky-600 shadow-brand-sky-200",
+    dot:  "bg-brand-sky-500",
+    pill: "bg-brand-sky-50 text-brand-sky-700 border-brand-sky-200",
     ring: "",
-    stripe: "bg-sky-700",
+    stripe: "bg-brand-sky-700",
   },
   cleaningPending: {
     bg:   "bg-teal-500 text-white border-teal-600 shadow-teal-200",
@@ -122,7 +122,7 @@ const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string; r
   },
 };
 
-// ── Helpers ────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function firstNumber(value: string | null | undefined): number | null {
   const match = String(value ?? "").match(/\d+/);
@@ -144,8 +144,8 @@ function groupStatesByFloor(states: UnitState[], locale: Locale): FloorGroup[] {
     const floor = getUnitFloorValue(state.unit);
     const key = floor === null ? "__unknown__" : String(floor);
     const label = floor === null
-      ? (locale === "zh" ? "未分层" : "Sans étage")
-      : (locale === "zh" ? `${floor}层` : `Étage ${floor}`);
+      ? (locale === "zh" ? "æœªåˆ†å±‚" : "Sans Ã©tage")
+      : (locale === "zh" ? `${floor}å±‚` : `Ã‰tage ${floor}`);
     if (!groups.has(key)) {
       groups.set(key, { key, label, sortValue: floor ?? Number.MAX_SAFE_INTEGER, states: [] });
     }
@@ -161,7 +161,7 @@ function groupStatesByFloor(states: UnitState[], locale: Locale): FloorGroup[] {
     .sort((a, b) => a.sortValue - b.sortValue);
 }
 
-// ── Compute unit snapshot status ───────────────────────────────────────
+// â”€â”€ Compute unit snapshot status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function computeUnitState(
   unit: UnitRow,
@@ -190,7 +190,7 @@ function computeUnitState(
   return { unit, status: "available" };
 }
 
-// ── Component ──────────────────────────────────────────────────────────
+// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function ManagementDashboard({
   buildings, units, dailyBookings, leaseContracts, saleContracts,
@@ -235,7 +235,7 @@ export function ManagementDashboard({
     return c;
   }, [unitStates]);
 
-  // Finance — current month
+  // Finance â€” current month
   const now = new Date();
   const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
@@ -283,7 +283,7 @@ export function ManagementDashboard({
     <div className="-my-6 bg-[#f5f7fb]">
       <div className="mx-auto flex max-w-[1360px] flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
 
-        {/* ── Building selector — segmented control ── */}
+        {/* â”€â”€ Building selector â€” segmented control â”€â”€ */}
         <div>
           <div className="inline-flex flex-wrap gap-0.5 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
             <SegmentedTab
@@ -302,7 +302,7 @@ export function ManagementDashboard({
           </div>
         </div>
 
-        {/* ── Section 1: Core KPI Summary ── */}
+        {/* â”€â”€ Section 1: Core KPI Summary â”€â”€ */}
         <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.72fr)]">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-natural">
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -355,7 +355,7 @@ export function ManagementDashboard({
           <div>
             <SectionLabel compact>{t.sections.buildingStatus} - {buildingName}</SectionLabel>
             <p className="mt-1 text-xs text-slate-500">
-              {locale === "zh" ? "按楼层查看房间状态，点击房间可打开对应档案。" : "Statut par etage, cliquez pour ouvrir le dossier."}
+              {locale === "zh" ? "æŒ‰æ¥¼å±‚æŸ¥çœ‹æˆ¿é—´çŠ¶æ€ï¼Œç‚¹å‡»æˆ¿é—´å¯æ‰“å¼€å¯¹åº”æ¡£æ¡ˆã€‚" : "Statut par etage, cliquez pour ouvrir le dossier."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -390,7 +390,7 @@ export function ManagementDashboard({
                     <span className="h-2.5 w-2.5 rounded-full bg-brand-orange" />
                     <h4 className="text-sm font-black text-slate-950">{building.display_name}</h4>
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
-                      {bStates.length} {locale === "zh" ? "间" : "unités"}
+                      {bStates.length} {locale === "zh" ? "é—´" : "unitÃ©s"}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
@@ -442,7 +442,7 @@ export function ManagementDashboard({
           <QualityDashboardWidget issues={qualityIssues} locale={locale} variant="management" />
         )}
 
-        {/* ── Quick links ── */}
+        {/* â”€â”€ Quick links â”€â”€ */}
         <div className="flex flex-wrap gap-3 text-xs text-slate-400">
           <QuickLink href="/daily-rentals/overview" locale={locale} label={dictionaries[locale].shell.nav.dailyOccupancy ?? ""} />
           <QuickLink href="/leases" locale={locale} label={dictionaries[locale].shell.nav.leases ?? ""} />
@@ -455,7 +455,7 @@ export function ManagementDashboard({
   );
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────
+// â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const ROOM_CARD: Record<MgmtStatus, { card: string; badge: string; dot: string; action: string }> = {
   sold: {
@@ -471,15 +471,15 @@ const ROOM_CARD: Record<MgmtStatus, { card: string; badge: string; dot: string; 
     action: "bg-white/15 text-white ring-white/20",
   },
   dailyOccupied: {
-    card: "border-orange-300 bg-orange-500 text-white",
-    badge: "bg-white text-orange-700",
-    dot: "bg-orange-200",
+    card: "border-brand-orange-300 bg-brand-orange-500 text-white",
+    badge: "bg-white text-brand-orange-700",
+    dot: "bg-brand-orange-200",
     action: "bg-white/15 text-white ring-white/20",
   },
   reserved: {
-    card: "border-sky-300 bg-sky-500 text-white",
-    badge: "bg-white text-sky-700",
-    dot: "bg-sky-200",
+    card: "border-brand-sky-300 bg-brand-sky-500 text-white",
+    badge: "bg-white text-brand-sky-700",
+    dot: "bg-brand-sky-200",
     action: "bg-white/15 text-white ring-white/20",
   },
   cleaningPending: {
@@ -511,7 +511,7 @@ function RoomStatusCard({
   locale: Locale;
 }) {
   const styles = ROOM_CARD[state.status];
-  const roomText = locale === "zh" ? "房间档案" : "Dossier";
+  const roomText = locale === "zh" ? "æˆ¿é—´æ¡£æ¡ˆ" : "Dossier";
 
   return (
     <Link
@@ -589,8 +589,8 @@ function KPICard({ label, value, variant }: {
   const styles: Record<string, { bg: string; text: string; dot: string }> = {
     neutral:  { bg: "bg-white border-slate-200", text: "text-slate-900", dot: "bg-slate-400" },
     positive: { bg: "bg-white border-slate-200", text: "text-emerald-700", dot: "bg-emerald-500" },
-    warning:  { bg: "bg-white border-slate-200", text: "text-amber-700", dot: "bg-amber-500" },
-    danger:   { bg: "bg-white border-slate-200", text: "text-red-700", dot: "bg-red-500" },
+    warning:  { bg: "bg-white border-slate-200", text: "text-brand-amber-700", dot: "bg-brand-amber-500" },
+    danger:   { bg: "bg-white border-slate-200", text: "text-brand-red-700", dot: "bg-brand-red-500" },
   };
   const s = styles[variant];
   return (
@@ -616,21 +616,21 @@ function RiskAlert({ label, value, unit, active, compact = false }: {
       "rounded-xl border transition-colors",
       compact ? "px-3 py-2.5" : "px-4 py-3.5",
       active
-        ? "border-red-200 bg-red-50"
+        ? "border-brand-red-200 bg-brand-red-50"
         : "border-slate-200 bg-white",
     )}>
       <div className="mb-1.5 flex items-center gap-2">
-        {active && <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />}
+        {active && <AlertTriangle className="h-4 w-4 text-brand-red-500 shrink-0" />}
         <span className={cn(
           "text-[11px] font-medium uppercase tracking-[0.14em]",
-          active ? "text-red-600" : "text-slate-400",
+          active ? "text-brand-red-600" : "text-slate-400",
         )}>
           {label}
         </span>
       </div>
       <p className={cn(
         compact ? "text-lg font-black tabular-nums" : "text-xl font-black tabular-nums",
-        active ? "text-red-700" : "text-slate-400",
+        active ? "text-brand-red-700" : "text-slate-400",
       )}>
         {value} <span className="text-sm font-normal">{unit}</span>
       </p>

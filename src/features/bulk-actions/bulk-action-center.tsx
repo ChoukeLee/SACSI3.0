@@ -65,23 +65,23 @@ export function BulkActionCenter({ locale, userRole }: Props) {
   const reset = () => { setStatus("idle"); setPreview(null); setResult(null); setCheckedIds(new Set()); };
 
   const L = {
-    title: locale === "zh" ? "批量操作中心" : "Actions en masse",
-    selectAction: locale === "zh" ? "选择操作类型" : "Type d'action",
-    preview: locale === "zh" ? "预览" : "Apercu",
-    execute: locale === "zh" ? "执行" : "Executer",
-    reset: locale === "zh" ? "重置" : "Reinitialiser",
-    selected: locale === "zh" ? "已选" : "Sel.",
-    willChange: locale === "zh" ? "将修改" : "Modif.",
-    skipped: locale === "zh" ? "跳过" : "Sautes",
-    totalAmount: locale === "zh" ? "涉及金额" : "Montant",
-    warnings: locale === "zh" ? "警告" : "Alertes",
-    success: locale === "zh" ? "成功" : "Reussi",
-    failed: locale === "zh" ? "失败" : "Echec",
-    reason: locale === "zh" ? "取消原因" : "Motif",
-    targetStatus: locale === "zh" ? "目标房态" : "Statut cible",
-    confirmWarning: locale === "zh" ? "此操作为危险操作，请确认后执行" : "Action dangereuse, confirmez",
-    noResults: locale === "zh" ? "请先选择操作类型并预览" : "Selectionnez une action",
-    done: locale === "zh" ? "完成" : "Termine",
+    title: locale === "zh" ? "æ‰¹é‡æ“ä½œä¸­å¿ƒ" : "Actions en masse",
+    selectAction: locale === "zh" ? "é€‰æ‹©æ“ä½œç±»åž‹" : "Type d'action",
+    preview: locale === "zh" ? "é¢„è§ˆ" : "Apercu",
+    execute: locale === "zh" ? "æ‰§è¡Œ" : "Executer",
+    reset: locale === "zh" ? "é‡ç½®" : "Reinitialiser",
+    selected: locale === "zh" ? "å·²é€‰" : "Sel.",
+    willChange: locale === "zh" ? "å°†ä¿®æ”¹" : "Modif.",
+    skipped: locale === "zh" ? "è·³è¿‡" : "Sautes",
+    totalAmount: locale === "zh" ? "æ¶‰åŠé‡‘é¢" : "Montant",
+    warnings: locale === "zh" ? "è­¦å‘Š" : "Alertes",
+    success: locale === "zh" ? "æˆåŠŸ" : "Reussi",
+    failed: locale === "zh" ? "å¤±è´¥" : "Echec",
+    reason: locale === "zh" ? "å–æ¶ˆåŽŸå› " : "Motif",
+    targetStatus: locale === "zh" ? "ç›®æ ‡æˆ¿æ€" : "Statut cible",
+    confirmWarning: locale === "zh" ? "æ­¤æ“ä½œä¸ºå±é™©æ“ä½œï¼Œè¯·ç¡®è®¤åŽæ‰§è¡Œ" : "Action dangereuse, confirmez",
+    noResults: locale === "zh" ? "è¯·å…ˆé€‰æ‹©æ“ä½œç±»åž‹å¹¶é¢„è§ˆ" : "Selectionnez une action",
+    done: locale === "zh" ? "å®Œæˆ" : "Termine",
   };
 
   return (
@@ -92,11 +92,11 @@ export function BulkActionCenter({ locale, userRole }: Props) {
         <select
           value={actionType}
           onChange={e => { setActionType(e.target.value as BulkActionType); reset(); }}
-          className="w-full sm:w-96 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+          className="w-full sm:w-96 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/20"
         >
-          <option value="">—</option>
+          <option value="">â€”</option>
           {(["finance","unit","daily","customer"] as const).filter(c => permittedCategories.includes(c)).map(cat => (
-            <optgroup key={cat} label={locale === "zh" ? { finance: "财务", unit: "房源", daily: "日租", customer: "客户" }[cat] : { finance: "Finance", unit: "Logements", daily: "Journalier", customer: "Clients" }[cat]}>
+            <optgroup key={cat} label={locale === "zh" ? { finance: "è´¢åŠ¡", unit: "æˆ¿æº", daily: "æ—¥ç§Ÿ", customer: "å®¢æˆ·" }[cat] : { finance: "Finance", unit: "Logements", daily: "Journalier", customer: "Clients" }[cat]}>
               {permittedActions.filter(a => a.category === cat).map(a => (
                 <option key={a.type} value={a.type}>{locale === "zh" ? a.labelZh : a.labelFr}</option>
               ))}
@@ -111,16 +111,16 @@ export function BulkActionCenter({ locale, userRole }: Props) {
         {actionType === "daily_cancel_bookings" && (
           <div><label className="text-[10px] font-semibold text-brand-red-600">{L.reason} *</label>
             <input value={extraReason} onChange={e => setExtraReason(e.target.value)}
-              className="w-full sm:w-64 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
+              className="w-full sm:w-64 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/20" />
           </div>
         )}
         {actionType === "unit_change_status" && (
           <div><label className="text-[10px] font-semibold text-slate-500">{L.targetStatus}</label>
             <select value={extraTargetStatus} onChange={e => setExtraTargetStatus(e.target.value)}
-              className="w-full sm:w-48 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm transition focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20">
-              <option value="available">{locale === "zh" ? "空闲" : "Dispo"}</option>
-              <option value="maintenance">{locale === "zh" ? "维修" : "Maint"}</option>
-              <option value="locked">{locale === "zh" ? "锁定" : "Bloque"}</option>
+              className="w-full sm:w-48 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/20">
+              <option value="available">{locale === "zh" ? "ç©ºé—²" : "Dispo"}</option>
+              <option value="maintenance">{locale === "zh" ? "ç»´ä¿®" : "Maint"}</option>
+              <option value="locked">{locale === "zh" ? "é”å®š" : "Bloque"}</option>
             </select>
           </div>
         )}
@@ -142,20 +142,20 @@ export function BulkActionCenter({ locale, userRole }: Props) {
             <h3 className="text-sm font-black text-slate-950">{L.preview}</h3>
             <div className="flex gap-3 text-xs">
               <span className="text-brand-green-600">{L.willChange}: {preview.changeCount}</span>
-              <span className="text-amber-600">{L.skipped}: {preview.skipCount}</span>
+              <span className="text-brand-amber-600">{L.skipped}: {preview.skipCount}</span>
               {preview.totalAmount > 0 && <span className="text-slate-600">{L.totalAmount}: {preview.totalAmount.toLocaleString()} XOF</span>}
             </div>
           </div>
 
           {preview.warnings.length > 0 && (
-            <div className="rounded border border-brand-amber-200 bg-brand-amber-50 p-2 text-xs text-amber-700">
+            <div className="rounded border border-brand-amber-200 bg-brand-amber-50 p-2 text-xs text-brand-amber-700">
               {preview.warnings.map((w, i) => <p key={i}><AlertTriangle className="inline h-3 w-3 mr-1" />{w}</p>)}
             </div>
           )}
 
           <div className="flex items-center gap-2 text-xs">
             <button onClick={toggleAll} className="text-brand-orange font-medium hover:underline">
-              {checkedIds.size === preview.rows.length ? (locale === "zh" ? "取消全选" : "Desel. tout") : (locale === "zh" ? "全选可操作" : "Tout sel.")}
+              {checkedIds.size === preview.rows.length ? (locale === "zh" ? "å–æ¶ˆå…¨é€‰" : "Desel. tout") : (locale === "zh" ? "å…¨é€‰å¯æ“ä½œ" : "Tout sel.")}
             </button>
             <span className="text-slate-400">{L.selected}: {checkedIds.size} / {preview.rows.length}</span>
           </div>
@@ -164,8 +164,8 @@ export function BulkActionCenter({ locale, userRole }: Props) {
             <table className="data-table">
               <thead className="sticky top-0 bg-slate-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"><tr>
                 <th className="px-2 py-1.5 w-8"></th>
-                <th className="px-2 py-1.5 text-left">{locale === "zh" ? "记录" : "Enr."}</th>
-                <th className="px-2 py-1.5 text-left">{locale === "zh" ? "结果" : "Resultat"}</th>
+                <th className="px-2 py-1.5 text-left">{locale === "zh" ? "è®°å½•" : "Enr."}</th>
+                <th className="px-2 py-1.5 text-left">{locale === "zh" ? "ç»“æžœ" : "Resultat"}</th>
               </tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {preview.rows.map(r => (
@@ -175,8 +175,8 @@ export function BulkActionCenter({ locale, userRole }: Props) {
                         className="h-3.5 w-3.5 rounded border-slate-200" />
                     </td>
                     <td className="px-2 py-1 font-medium text-slate-800">{r.label}</td>
-                    <td className={cn("px-2 py-1", r.willChange ? "text-brand-green-600" : "text-amber-600")}>
-                      {r.willChange ? (locale === "zh" ? "将执行" : "Oui") : r.skipReason}
+                    <td className={cn("px-2 py-1", r.willChange ? "text-brand-green-600" : "text-brand-amber-600")}>
+                      {r.willChange ? (locale === "zh" ? "å°†æ‰§è¡Œ" : "Oui") : r.skipReason}
                     </td>
                   </tr>
                 ))}
@@ -205,13 +205,13 @@ export function BulkActionCenter({ locale, userRole }: Props) {
       {result && (
         <div className={cn("rounded-xl border p-5 shadow-natural space-y-2", result.success ? "bg-brand-green-50 border-brand-green-200" : "bg-brand-amber-50 border-brand-amber-200")}>
           <h3 className="text-sm font-bold flex items-center gap-2">
-            {result.success ? <Check className="h-4 w-4 text-brand-green-600" /> : <AlertTriangle className="h-4 w-4 text-amber-600" />}
+            {result.success ? <Check className="h-4 w-4 text-brand-green-600" /> : <AlertTriangle className="h-4 w-4 text-brand-amber-600" />}
             {L.done}
           </h3>
           <div className="flex gap-4 text-xs">
             <span className="text-brand-green-600">{L.success}: {result.executed}</span>
             <span className="text-brand-red-600">{L.failed}: {result.failed}</span>
-            <span className="text-amber-600">{L.skipped}: {result.skipped}</span>
+            <span className="text-brand-amber-600">{L.skipped}: {result.skipped}</span>
           </div>
           {result.errors.length > 0 && (
             <div className="max-h-[200px] overflow-auto text-xs space-y-0.5">

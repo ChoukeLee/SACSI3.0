@@ -81,12 +81,12 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
   return (
     <div>
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-        <AssetMetric label={locale === "zh" ? "住宿房源" : "Appartements"} value={summary.apartments} tone="ink" />
+        <AssetMetric label={locale === "zh" ? "ä½å®¿æˆ¿æº" : "Appartements"} value={summary.apartments} tone="ink" />
         <AssetMetric label={dictionaries[locale].statuses.sold} value={summary.sold} tone="slate" />
         <AssetMetric label={dictionaries[locale].statuses.leased} value={summary.leased} tone="indigo" />
-        <AssetMetric label={locale === "zh" ? "日租/预订" : "Jour"} value={summary.daily} tone="orange" />
+        <AssetMetric label={locale === "zh" ? "æ—¥ç§Ÿ/é¢„è®¢" : "Jour"} value={summary.daily} tone="orange" />
         <AssetMetric label={dictionaries[locale].statuses.available} value={summary.available} tone="green" />
-        <AssetMetric label={locale === "zh" ? "非住宿资产" : "Autres actifs"} value={summary.nonApartment} tone="sky" />
+        <AssetMetric label={locale === "zh" ? "éžä½å®¿èµ„äº§" : "Autres actifs"} value={summary.nonApartment} tone="sky" />
       </div>
 
       {/* Toolbar */}
@@ -110,7 +110,7 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
           <div className="text-center">
             <p className="text-sm font-semibold text-slate-600">{t.empty}</p>
             <p className="mt-1 text-xs text-slate-400">
-              {locale === "zh" ? "请先在设置中导入楼栋和房间" : "Importez d'abord l'immeuble dans Parametres"}
+              {locale === "zh" ? "è¯·å…ˆåœ¨è®¾ç½®ä¸­å¯¼å…¥æ¥¼æ ‹å’Œæˆ¿é—´" : "Importez d'abord l'immeuble dans Parametres"}
             </p>
           </div>
         </div>
@@ -138,8 +138,8 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
                       key={unit.id}
                       tabIndex={0}
                       role="button"
-                      aria-label={`${unit.unit_no} — ${t.actions.viewDetail}`}
-                      className="cursor-pointer transition-colors duration-fast hover:bg-orange-50/60 focus-visible:bg-orange-50/70 focus-visible:outline-none"
+                      aria-label={`${unit.unit_no} â€” ${t.actions.viewDetail}`}
+                      className="cursor-pointer transition-colors duration-fast hover:bg-brand-orange-50/60 focus-visible:bg-brand-orange-50/70 focus-visible:outline-none"
                       onClick={() => setDetailUnitId(unit.id)}
                       onKeyDown={(e) => { if (e.key === "Enter") setDetailUnitId(unit.id); }}
                     >
@@ -167,10 +167,10 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
                             className="inline-flex items-center gap-1 rounded-lg bg-slate-950 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-sm hover:bg-slate-800"
                           >
                             <Eye className="h-3 w-3" />
-                            {locale === "zh" ? "档案" : "Profil"}
+                            {locale === "zh" ? "æ¡£æ¡ˆ" : "Profil"}
                           </Link>
-                          <span className="text-xs font-semibold text-orange-600 transition-colors duration-fast group-hover:underline">
-                            {t.actions.viewDetail} →
+                          <span className="text-xs font-semibold text-brand-orange-600 transition-colors duration-fast group-hover:underline">
+                            {t.actions.viewDetail} â†’
                           </span>
                         </div>
                       </td>
@@ -185,7 +185,7 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
 
       {/* Result count */}
       <p className="mt-3 text-xs text-slate-400" role="status" aria-live="polite">
-        {filtered.length} / {units.length} {locale === "fr" ? "lots" : "套房源"}
+        {filtered.length} / {units.length} {locale === "fr" ? "lots" : "å¥—æˆ¿æº"}
       </p>
 
       {/* Detail panel */}
@@ -209,9 +209,9 @@ function AssetMetric({ label, value, tone }: { label: string; value: number; ton
     ink: "border-slate-200 bg-white text-slate-950",
     slate: "border-slate-200 bg-slate-50 text-slate-700",
     indigo: "border-indigo-200 bg-indigo-50 text-indigo-700",
-    orange: "border-orange-200 bg-orange-50 text-orange-700",
+    orange: "border-brand-orange-200 bg-brand-orange-50 text-brand-orange-700",
     green: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    sky: "border-sky-200 bg-sky-50 text-sky-700",
+    sky: "border-brand-sky-200 bg-brand-sky-50 text-brand-sky-700",
   }[tone];
   return (
     <div className={cn("rounded-2xl border px-4 py-3 shadow-sm", styles)}>

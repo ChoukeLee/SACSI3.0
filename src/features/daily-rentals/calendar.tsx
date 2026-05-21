@@ -40,25 +40,25 @@ const NAV_BTN =
 
 const COPY = {
   zh: {
-    noRooms: "暂无日租房源",
-    timeline: "预订时间轴",
-    subtitle: "默认显示今天附近日期；点击空白格新建预订，点击色条查看订单。",
-    roomType: "房间 / 状态",
-    allRooms: "全部房间",
-    day: "天",
-    week: "周",
-    month: "月",
-    today: "今天",
-    occupied: "入住",
-    maintenance: "维修",
-    available: "可预订",
-    reserved: "预订",
-    cleaning: "待保洁",
-    openEnded: "未定离店",
-    room: "房间",
-    floor: "楼",
-    apartment: "公寓",
-    emptyFilter: "当前筛选下没有房间",
+    noRooms: "æš‚æ— æ—¥ç§Ÿæˆ¿æº",
+    timeline: "é¢„è®¢æ—¶é—´è½´",
+    subtitle: "é»˜è®¤æ˜¾ç¤ºä»Šå¤©é™„è¿‘æ—¥æœŸï¼›ç‚¹å‡»ç©ºç™½æ ¼æ–°å»ºé¢„è®¢ï¼Œç‚¹å‡»è‰²æ¡æŸ¥çœ‹è®¢å•ã€‚",
+    roomType: "æˆ¿é—´ / çŠ¶æ€",
+    allRooms: "å…¨éƒ¨æˆ¿é—´",
+    day: "å¤©",
+    week: "å‘¨",
+    month: "æœˆ",
+    today: "ä»Šå¤©",
+    occupied: "å…¥ä½",
+    maintenance: "ç»´ä¿®",
+    available: "å¯é¢„è®¢",
+    reserved: "é¢„è®¢",
+    cleaning: "å¾…ä¿æ´",
+    openEnded: "æœªå®šç¦»åº—",
+    room: "æˆ¿é—´",
+    floor: "æ¥¼",
+    apartment: "å…¬å¯“",
+    emptyFilter: "å½“å‰ç­›é€‰ä¸‹æ²¡æœ‰æˆ¿é—´",
   },
   fr: {
     noRooms: "Aucune chambre journaliere",
@@ -85,14 +85,14 @@ const COPY = {
 
 const UNIT_STATUS_LABELS: Record<Locale, Record<UnitStatus, string>> = {
   zh: {
-    available: "可预订",
-    reserved: "已预订",
-    daily_occupied: "日租中",
-    cleaning_pending: "待保洁",
-    leased: "长租中",
-    sold: "已售",
-    maintenance: "维修",
-    locked: "锁定",
+    available: "å¯é¢„è®¢",
+    reserved: "å·²é¢„è®¢",
+    daily_occupied: "æ—¥ç§Ÿä¸­",
+    cleaning_pending: "å¾…ä¿æ´",
+    leased: "é•¿ç§Ÿä¸­",
+    sold: "å·²å”®",
+    maintenance: "ç»´ä¿®",
+    locked: "é”å®š",
   },
   fr: {
     available: "Disponible",
@@ -108,11 +108,11 @@ const UNIT_STATUS_LABELS: Record<Locale, Record<UnitStatus, string>> = {
 
 const BOOKING_STATUS_LABELS: Record<Locale, Record<string, string>> = {
   zh: {
-    pending_review: "待审核",
-    confirmed: "已确认",
-    checked_in: "已入住",
-    checked_out: "已退房",
-    cancelled: "已取消",
+    pending_review: "å¾…å®¡æ ¸",
+    confirmed: "å·²ç¡®è®¤",
+    checked_in: "å·²å…¥ä½",
+    checked_out: "å·²é€€æˆ¿",
+    cancelled: "å·²å–æ¶ˆ",
   },
   fr: {
     pending_review: "A valider",
@@ -274,7 +274,7 @@ export function DailyCalendar({
             />
             <FilterButton active={roomFilter === "available"} onClick={() => setRoomFilter("available")} color="bg-emerald-400" label={copy.available} count={filterCounts.available} />
             <FilterButton active={roomFilter === "occupied"} onClick={() => setRoomFilter("occupied")} color="bg-violet-500" label={copy.occupied} count={filterCounts.occupied} />
-            <FilterButton active={roomFilter === "reserved"} onClick={() => setRoomFilter("reserved")} color="bg-amber-400" label={copy.reserved} count={filterCounts.reserved} />
+            <FilterButton active={roomFilter === "reserved"} onClick={() => setRoomFilter("reserved")} color="bg-brand-amber-400" label={copy.reserved} count={filterCounts.reserved} />
             <FilterButton active={roomFilter === "cleaning"} onClick={() => setRoomFilter("cleaning")} color="bg-cyan-400" label={copy.cleaning} count={filterCounts.cleaning} />
             <FilterButton active={roomFilter === "maintenance"} onClick={() => setRoomFilter("maintenance")} color="bg-rose-400" label={copy.maintenance} count={filterCounts.maintenance} />
           </div>
@@ -374,7 +374,7 @@ export function DailyCalendar({
                       <div className="min-w-0">
                         <div className="truncate text-[13px] font-black text-slate-950">{copy.room} {unit.unit_no}</div>
                         <div className="mt-0.5 truncate text-[10px] font-semibold text-slate-500">
-                          {statusLabel} · {copy.apartment}
+                          {statusLabel} Â· {copy.apartment}
                         </div>
                       </div>
                     </div>,
@@ -492,8 +492,8 @@ function TimelineCell({
     const tone = getBookingTone(booking.status);
     const name = customer?.name ?? "?";
     const dateRange = booking.checkout_mode === "open"
-      ? `${booking.check_in} → ${copy.openEnded}`
-      : `${booking.check_in} → ${booking.check_out ?? copy.openEnded}`;
+      ? `${booking.check_in} â†’ ${copy.openEnded}`
+      : `${booking.check_in} â†’ ${booking.check_out ?? copy.openEnded}`;
     return (
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
         <button
@@ -504,7 +504,7 @@ function TimelineCell({
             isStart ? "left-2 rounded-l-2xl" : "-left-px rounded-l-none",
             isEnd ? "right-2 rounded-r-2xl" : "-right-px rounded-r-none",
           )}
-          title={`${name} · ${dateRange}`}
+          title={`${name} Â· ${dateRange}`}
           onClick={() => onOpenBooking(booking.id)}
           onKeyDown={(event) => {
             if (event.key === "Enter") onOpenBooking(booking.id);
@@ -590,7 +590,7 @@ function FloorRow({
         className="flex items-center border-b border-slate-200 bg-slate-50 px-4 text-[10px] font-bold text-slate-400"
         style={{ gridColumn: `span ${daysCount}`, height: FLOOR_ROW_HEIGHT }}
       >
-        {copy.floor} · {count}
+        {copy.floor} Â· {count}
       </div>
     </>
   );
@@ -644,7 +644,7 @@ function ViewButton({ active, onClick, children }: { active: boolean; onClick: (
 
 function getBookingTone(status: string): string {
   if (status === "checked_in") return "bg-violet-600 text-white shadow-violet-200";
-  if (status === "confirmed") return "bg-sky-400 text-white shadow-sky-100";
+  if (status === "confirmed") return "bg-brand-sky-400 text-white shadow-brand-sky-100";
   if (status === "pending_review") return "bg-slate-900 text-white shadow-slate-200";
   return "bg-slate-100 text-slate-500 shadow-slate-100";
 }
@@ -652,7 +652,7 @@ function getBookingTone(status: string): string {
 function getRoomTone(unit: UnitRow, hasCleaning: boolean, isMaintenance: boolean) {
   if (isMaintenance) return { strip: "bg-rose-400" };
   if (hasCleaning || unit.status === "cleaning_pending") return { strip: "bg-cyan-400" };
-  if (unit.status === "reserved") return { strip: "bg-amber-400" };
+  if (unit.status === "reserved") return { strip: "bg-brand-amber-400" };
   if (unit.status === "daily_occupied") return { strip: "bg-violet-500" };
   return { strip: "bg-emerald-400" };
 }
@@ -719,7 +719,7 @@ function startOfWeek(date: Date): Date {
 }
 
 function normalizeFloorLabel(floorLabel: string | null, unitNo: string): string {
-  if (floorLabel && floorLabel.trim()) return floorLabel.trim().replace("楼", "F");
+  if (floorLabel && floorLabel.trim()) return floorLabel.trim().replace("æ¥¼", "F");
   const numeric = Number.parseInt(unitNo, 10);
   if (Number.isFinite(numeric)) return `${Math.floor(numeric / 100)}F`;
   return "F";

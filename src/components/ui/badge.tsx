@@ -1,13 +1,13 @@
 import { cn } from "@/lib/utils";
 
 export const badgeVariants = {
-  default: "bg-slate-100 text-slate-700 ring-slate-300/70",
-  accent: "bg-orange-50 text-orange-700 ring-orange-200",
-  success: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  warning: "bg-amber-50 text-amber-700 ring-amber-200",
-  danger: "bg-red-50 text-red-700 ring-red-200",
-  info: "bg-sky-50 text-sky-700 ring-sky-200",
-  neutral: "bg-slate-200 text-slate-600 ring-slate-300",
+  default: "bg-brand-neutral-100 text-brand-neutral-700 ring-brand-neutral-300/70",
+  accent: "bg-brand-orange-50 text-brand-orange-700 ring-brand-orange-200",
+  success: "bg-brand-green-50 text-brand-green-700 ring-brand-green-200",
+  warning: "bg-brand-amber-50 text-brand-amber-700 ring-brand-amber-200",
+  danger: "bg-brand-red-50 text-brand-red-700 ring-brand-red-200",
+  info: "bg-brand-sky-50 text-brand-sky-700 ring-brand-sky-200",
+  neutral: "bg-brand-neutral-200 text-brand-neutral-600 ring-brand-neutral-300",
   outline: "bg-white text-slate-600 ring-slate-300",
 } as const;
 

@@ -284,7 +284,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     const result = await activateContract(id);
     setSaving(false);
     if (!result.success) setError(result.error ?? "Failed");
-    else setGenMsg(locale === "zh" ? "合同已激活，应收已自动生成" : "Contrat active, echeances generees");
+    else setGenMsg(locale === "zh" ? "åˆåŒå·²æ¿€æ´»ï¼Œåº”æ”¶å·²è‡ªåŠ¨ç”Ÿæˆ" : "Contrat active, echeances generees");
   };
 
   const handleTerminate = async (id: string) => {
@@ -354,7 +354,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
   const STATUS_STYLES: Record<string, string> = {
     pending:   "bg-slate-100 text-slate-700",
-    partial:   "bg-brand-amber-100 text-amber-700",
+    partial:   "bg-brand-amber-100 text-brand-amber-700",
     paid:      "bg-brand-green-100 text-brand-green-700",
     overdue:   "bg-brand-red-100 text-brand-red-700",
     cancelled: "bg-slate-50 text-slate-400 line-through",
@@ -370,7 +370,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
   const statusLabel = (status: string) => {
     const labels: Record<string, string> = locale === "zh"
-      ? { pending: "待收", partial: "部分", paid: "已收", overdue: "逾期", cancelled: "已取消" }
+      ? { pending: "å¾…æ”¶", partial: "éƒ¨åˆ†", paid: "å·²æ”¶", overdue: "é€¾æœŸ", cancelled: "å·²å–æ¶ˆ" }
       : { pending: "Attente", partial: "Partiel", paid: "Paye", overdue: "Retard", cancelled: "Annule" };
     return labels[status] ?? status;
   };
@@ -378,11 +378,11 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   return (
     <div className="space-y-5">
       <div className="grid gap-3 md:grid-cols-5">
-        <LeaseMetric label={locale === "zh" ? "生效合同" : "Actifs"} value={String(dashboardStats.active)} tone="slate" />
-        <LeaseMetric label={locale === "zh" ? "月租规模" : "Loyer/mois"} value={formatXof(dashboardStats.rent)} tone="green" />
-        <LeaseMetric label={locale === "zh" ? "30天到期" : "30 jours"} value={String(dashboardStats.expiring)} tone="amber" />
-        <LeaseMetric label={locale === "zh" ? "待收账款" : "A recevoir"} value={formatXof(dashboardStats.due)} tone="sky" />
-        <LeaseMetric label={locale === "zh" ? "逾期金额" : "Retard"} value={formatXof(dashboardStats.overdue)} tone="rose" />
+        <LeaseMetric label={locale === "zh" ? "ç”Ÿæ•ˆåˆåŒ" : "Actifs"} value={String(dashboardStats.active)} tone="slate" />
+        <LeaseMetric label={locale === "zh" ? "æœˆç§Ÿè§„æ¨¡" : "Loyer/mois"} value={formatXof(dashboardStats.rent)} tone="green" />
+        <LeaseMetric label={locale === "zh" ? "30å¤©åˆ°æœŸ" : "30 jours"} value={String(dashboardStats.expiring)} tone="amber" />
+        <LeaseMetric label={locale === "zh" ? "å¾…æ”¶è´¦æ¬¾" : "A recevoir"} value={formatXof(dashboardStats.due)} tone="sky" />
+        <LeaseMetric label={locale === "zh" ? "é€¾æœŸé‡‘é¢" : "Retard"} value={formatXof(dashboardStats.overdue)} tone="rose" />
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-natural sm:flex-row sm:items-center sm:justify-between">
@@ -398,11 +398,11 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                   : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
               )}
             >
-              {s === "all" ? (locale === "fr" ? "Tous" : "全部") : t.contractStatus[s as keyof typeof t.contractStatus]}
+              {s === "all" ? (locale === "fr" ? "Tous" : "å…¨éƒ¨") : t.contractStatus[s as keyof typeof t.contractStatus]}
             </button>
           ))}
           <span className="pl-1 text-xs font-semibold text-slate-400">
-            {filtered.length} / {contracts.length} {locale === "fr" ? "contrats" : "份合同"}
+            {filtered.length} / {contracts.length} {locale === "fr" ? "contrats" : "ä»½åˆåŒ"}
           </span>
         </div>
         <button
@@ -428,7 +428,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                   <h3 className="text-sm font-black text-slate-950">{floor}</h3>
                 </div>
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">
-                  {floorContracts.length} {locale === "fr" ? "contrats" : "份合同"}
+                  {floorContracts.length} {locale === "fr" ? "contrats" : "ä»½åˆåŒ"}
                 </span>
               </div>
 
@@ -446,7 +446,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                       onClick={() => openDetail(contract.id)}
                       className={cn(
                         "group flex min-h-[198px] flex-col rounded-2xl border bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-panel",
-                        isRisk ? "border-amber-200 ring-1 ring-amber-100" : "border-slate-200 hover:border-slate-300",
+                        isRisk ? "border-brand-amber-200 ring-1 ring-brand-amber-100" : "border-slate-200 hover:border-slate-300",
                       )}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -461,20 +461,20 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                       </div>
 
                       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                        <LeaseCardField label={locale === "zh" ? "月租" : "Loyer"} value={formatXof(Number(contract.monthly_rent_xof))} />
-                        <LeaseCardField label={locale === "zh" ? "押金" : "Depot"} value={formatXof(Number(contract.deposit_amount_xof))} tone={contract.deposit_received ? "green" : "amber"} />
-                        <LeaseCardField label={locale === "zh" ? "起租" : "Debut"} value={contract.start_date} />
-                        <LeaseCardField label={locale === "zh" ? "到期" : "Fin"} value={contract.expected_end_date} tone={daysLeft >= 0 && daysLeft <= 30 ? "amber" : "slate"} />
+                        <LeaseCardField label={locale === "zh" ? "æœˆç§Ÿ" : "Loyer"} value={formatXof(Number(contract.monthly_rent_xof))} />
+                        <LeaseCardField label={locale === "zh" ? "æŠ¼é‡‘" : "Depot"} value={formatXof(Number(contract.deposit_amount_xof))} tone={contract.deposit_received ? "green" : "amber"} />
+                        <LeaseCardField label={locale === "zh" ? "èµ·ç§Ÿ" : "Debut"} value={contract.start_date} />
+                        <LeaseCardField label={locale === "zh" ? "åˆ°æœŸ" : "Fin"} value={contract.expected_end_date} tone={daysLeft >= 0 && daysLeft <= 30 ? "amber" : "slate"} />
                       </div>
 
                       <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                        <LeaseCardField label={locale === "zh" ? "待收" : "Solde"} value={formatXof(summary.outstanding)} tone={summary.outstanding > 0 ? "sky" : "green"} />
-                        <LeaseCardField label={locale === "zh" ? "逾期" : "Retard"} value={formatXof(summary.overdue)} tone={summary.overdue > 0 ? "rose" : "green"} />
+                        <LeaseCardField label={locale === "zh" ? "å¾…æ”¶" : "Solde"} value={formatXof(summary.outstanding)} tone={summary.outstanding > 0 ? "sky" : "green"} />
+                        <LeaseCardField label={locale === "zh" ? "é€¾æœŸ" : "Retard"} value={formatXof(summary.overdue)} tone={summary.overdue > 0 ? "rose" : "green"} />
                       </div>
 
                       <div className="mt-auto pt-2">
                         <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400">
-                          <span>{locale === "zh" ? "下一应收" : "Prochaine"}</span>
+                          <span>{locale === "zh" ? "ä¸‹ä¸€åº”æ”¶" : "Prochaine"}</span>
                           <span className="text-slate-600">{summary.nextDue ?? "-"}</span>
                         </div>
                       </div>
@@ -488,7 +488,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       )}
 
 
-      {/* ── New Contract Panel ── */}
+      {/* â”€â”€ New Contract Panel â”€â”€ */}
       {panel === "new" && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setPanel(null)} />
@@ -550,7 +550,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
         </>
       )}
 
-      {/* ── Detail Panel ── */}
+      {/* â”€â”€ Detail Panel â”€â”€ */}
       {panel === "detail" && selected && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setPanel(null)} />
@@ -579,10 +579,10 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 <div><dt className="text-xs text-slate-400">{t.form.startDate}</dt><dd>{selected.start_date}</dd></div>
                 <div><dt className="text-xs text-slate-400">{t.form.expectedEndDate}</dt><dd>{selected.expected_end_date}</dd></div>
                 {selected.actual_end_date && <div><dt className="text-xs text-slate-400">{t.form.actualEndDate}</dt><dd>{selected.actual_end_date}</dd></div>}
-                <div><dt className="text-xs text-slate-400">{t.form.paymentCycle}</dt><dd>{t.paymentCycle[selected.payment_cycle as keyof typeof t.paymentCycle]} / {selected.payment_day}号</dd></div>
+                <div><dt className="text-xs text-slate-400">{t.form.paymentCycle}</dt><dd>{t.paymentCycle[selected.payment_cycle as keyof typeof t.paymentCycle]} / {selected.payment_day}å·</dd></div>
                 <div><dt className="text-xs text-slate-400">{t.form.monthlyRent}</dt><dd className="font-semibold">{formatXof(Number(selected.monthly_rent_xof))}</dd></div>
                 <div><dt className="text-xs text-slate-400">{t.form.deposit}</dt><dd>{formatXof(Number(selected.deposit_amount_xof))} {selected.deposit_received ? t.form.depositPaid : t.form.depositUnpaid}</dd></div>
-                {selected.rent_free_days > 0 && <div><dt className="text-xs text-slate-400">{t.form.rentFreeDays}</dt><dd>{selected.rent_free_days}天</dd></div>}
+                {selected.rent_free_days > 0 && <div><dt className="text-xs text-slate-400">{t.form.rentFreeDays}</dt><dd>{selected.rent_free_days}å¤©</dd></div>}
                 {selected.signer_name && <div><dt className="text-xs text-slate-400">{t.form.signerName}</dt><dd>{selected.signer_name}</dd></div>}
               </dl>
 
@@ -602,7 +602,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 <div className="border-t border-slate-200 pt-4">
                   <h4 className="text-sm font-bold text-slate-950 flex items-center gap-1.5">
                     <AlertTriangle className="h-3.5 w-3.5 text-brand-orange" />
-                    {locale === "zh" ? "风险概览" : "Apercu des risques"}
+                    {locale === "zh" ? "é£Žé™©æ¦‚è§ˆ" : "Apercu des risques"}
                   </h4>
                   <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                     <div className={cn("rounded border px-3 py-2", receivableStats.outstanding > 0 ? "border-brand-orange-200 bg-brand-orange-50" : "border-brand-green-200 bg-brand-green-50")}>
@@ -622,7 +622,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                     <div className={cn("rounded border px-3 py-2", contractRisk.expiringSoon ? "border-brand-amber-200 bg-brand-amber-50" : "border-brand-green-200 bg-brand-green-50")}>
                       <p className="text-slate-500">{t.risk.expiringSoon}</p>
                       <p className={cn("text-xs font-semibold", contractRisk.expiringSoon ? "text-brand-amber-700" : "text-brand-green-700")}>
-                        {contractRisk.expiringSoon ? `${contractRisk.daysLeft} ${locale === "zh" ? "天后到期" : "j restants"}` : (locale === "zh" ? "否" : "Non")}
+                        {contractRisk.expiringSoon ? `${contractRisk.daysLeft} ${locale === "zh" ? "å¤©åŽåˆ°æœŸ" : "j restants"}` : (locale === "zh" ? "å¦" : "Non")}
                       </p>
                     </div>
                   </div>
@@ -679,7 +679,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                               <td className="px-2 py-1.5">
                                 {os > 0 && selected.status === "active" && (
                                   isPaying ? (
-                                    <span className="text-[10px] text-slate-400">{locale === "zh" ? "收款中..." : "En cours..."}</span>
+                                    <span className="text-[10px] text-slate-400">{locale === "zh" ? "æ”¶æ¬¾ä¸­..." : "En cours..."}</span>
                                   ) : (
                                     <button
                                       onClick={() => {
@@ -718,7 +718,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                       <div><label className="text-[10px] text-slate-500">{t.payment.receiptNo}</label><input type="text" value={payReceiptNo} onChange={(e) => setPayReceiptNo(e.target.value)} className={cn(inputClass, "text-xs py-1.5")} /></div>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => setPayReceivableId(null)} className="flex-1 rounded-xl border border-slate-200 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50/80">{locale === "zh" ? "取消" : "Annuler"}</button>
+                      <button onClick={() => setPayReceivableId(null)} className="flex-1 rounded-xl border border-slate-200 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50/80">{locale === "zh" ? "å–æ¶ˆ" : "Annuler"}</button>
                       <button onClick={handleCollectReceivable} disabled={saving} className="flex-1 rounded-lg bg-slate-950 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50">{saving ? "..." : t.payment.record}</button>
                     </div>
                   </div>
@@ -750,7 +750,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
         </>
       )}
 
-      {/* ── Move-out Settlement Panel ── */}
+      {/* â”€â”€ Move-out Settlement Panel â”€â”€ */}
       {panel === "moveout" && selected && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setPanel(null)} />
@@ -760,11 +760,11 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
               <button onClick={() => setPanel(null)} className="rounded p-1 text-slate-400 hover:bg-slate-50/80"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4 px-5 py-5">
-              <p className="text-sm text-slate-600">{selected.contract_no} — {selectedCustomer?.name}</p>
+              <p className="text-sm text-slate-600">{selected.contract_no} â€” {selectedCustomer?.name}</p>
 
               <div><label className={labelClass}>{t.form.actualEndDate}</label><input type="date" value={moEndDate} onChange={(e) => setMoEndDate(e.target.value)} className={inputClass} /></div>
               <div><label className={labelClass}>{t.settlement.unpaidRent}</label><input type="number" value={moUnpaid} onChange={(e) => setMoUnpaid(Number(e.target.value))} className={inputClass} /></div>
-              <p className="text-[10px] -mt-2 text-slate-400">{locale === "zh" ? "已自动填入当前未结清应收总额，可手动调整" : "Pre-rempli avec les impayes, ajustable"}</p>
+              <p className="text-[10px] -mt-2 text-slate-400">{locale === "zh" ? "å·²è‡ªåŠ¨å¡«å…¥å½“å‰æœªç»“æ¸…åº”æ”¶æ€»é¢ï¼Œå¯æ‰‹åŠ¨è°ƒæ•´" : "Pre-rempli avec les impayes, ajustable"}</p>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={moUtility} onChange={(e) => setMoUtility(e.target.checked)} className="h-4 w-4 rounded border-slate-200" />
                 {t.settlement.utilityCleared}
@@ -787,7 +787,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 )}
               </div>
               <p className="text-xs text-slate-400">
-                {locale === "zh" ? "退租后房间恢复为空闲，未来未收应收自动取消" : "Le lot redevient disponible, les echeances futures annulees"}
+                {locale === "zh" ? "é€€ç§ŸåŽæˆ¿é—´æ¢å¤ä¸ºç©ºé—²ï¼Œæœªæ¥æœªæ”¶åº”æ”¶è‡ªåŠ¨å–æ¶ˆ" : "Le lot redevient disponible, les echeances futures annulees"}
               </p>
               {error && <p className="text-sm text-brand-red-600">{error}</p>}
               <button onClick={handleMoveOut} disabled={saving} className="w-full rounded bg-brand-amber-500 py-2.5 text-sm font-semibold text-white hover:bg-brand-amber-600 disabled:opacity-50">
@@ -813,8 +813,8 @@ function LeaseCardField({
   const toneClass = {
     slate: "bg-slate-50 text-slate-950",
     green: "bg-emerald-50 text-emerald-800",
-    amber: "bg-amber-50 text-amber-800",
-    sky: "bg-sky-50 text-sky-800",
+    amber: "bg-brand-amber-50 text-brand-amber-800",
+    sky: "bg-brand-sky-50 text-brand-sky-800",
     rose: "bg-rose-50 text-rose-800",
   }[tone];
 
@@ -827,7 +827,7 @@ function LeaseCardField({
 }
 
 function normalizeFloorLabel(floorLabel: string | null, unitNo: string): string {
-  if (floorLabel && floorLabel.trim()) return floorLabel.trim().replace("楼", "F");
+  if (floorLabel && floorLabel.trim()) return floorLabel.trim().replace("æ¥¼", "F");
   const numeric = Number.parseInt(unitNo, 10);
   if (Number.isFinite(numeric)) return `${Math.floor(numeric / 100)}F`;
   return "F";
@@ -842,8 +842,8 @@ function LeaseMetric({ label, value, tone }: { label: string; value: string; ton
   const toneClass = {
     slate: "border-slate-200 bg-white text-slate-950",
     green: "border-emerald-200 bg-emerald-50 text-emerald-900",
-    amber: "border-amber-200 bg-amber-50 text-amber-900",
-    sky: "border-sky-200 bg-sky-50 text-sky-900",
+    amber: "border-brand-amber-200 bg-brand-amber-50 text-brand-amber-900",
+    sky: "border-brand-sky-200 bg-brand-sky-50 text-brand-sky-900",
     rose: "border-rose-200 bg-rose-50 text-rose-900",
   }[tone];
 

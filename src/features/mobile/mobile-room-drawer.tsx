@@ -150,7 +150,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
         >
           {/* Handle */}
           <div className="flex justify-center pt-3 pb-1">
-            <div className="h-1 w-10 rounded-full bg-brand-warm-400" />
+            <div className="h-1 w-10 rounded-full bg-brand-neutral-400" />
           </div>
 
           {/* Header */}
@@ -215,7 +215,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                   </div>
                 </div>
                 {room.billing && (
-                  <div className="mt-3 pt-3 border-t border-brand-warm-200">
+                  <div className="mt-3 pt-3 border-t border-brand-neutral-200">
                     <div className="flex items-center justify-between text-xs mb-1.5">
                       <span className="text-slate-400">{t.drawer.nights}</span>
                       <span className="font-semibold text-slate-800">{room.billing.nights}</span>
@@ -290,7 +290,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                 <div className="flex gap-2 items-end">
                   <div className="flex-1">
                     <label className="text-[10px] text-slate-500 block mb-1">
-                      {locale === "zh" ? "新离店日期" : "Nouvelle date départ"}
+                      {locale === "zh" ? "æ–°ç¦»åº—æ—¥æœŸ" : "Nouvelle date dÃ©part"}
                     </label>
                     <input
                       type="date"

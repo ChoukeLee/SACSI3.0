@@ -81,7 +81,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
 
   const toN = (s: string) => parseInt(s, 10) || 0;
 
-  const inputClass = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 transition-all duration-fast hover:border-brand-warm-500 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
+  const inputClass = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 transition-all duration-fast hover:border-brand-neutral-500 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
   const labelClass = "block text-[10px] font-black uppercase tracking-[0.14em] text-slate-400 mb-1";
 
   const handleCreate = async () => {
@@ -280,7 +280,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                     )}
                   </div>
 
-                  <div className="rounded-lg border border-dashed border-brand-warm-500 p-3">
+                  <div className="rounded-lg border border-dashed border-brand-neutral-500 p-3">
                     <label className={labelClass}>{t.discount}</label>
                     <div className="grid grid-cols-2 gap-2">
                       <input type="number" value={discountAmount} onChange={e => setDiscountAmount(e.target.value)} className={inputClass} placeholder={t.discountAmount} />
@@ -293,7 +293,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                       <label className={labelClass}>{t.booking.extendStay}</label>
                       <div className="flex items-center gap-2">
-                        <input type="number" min={1} value={extendDays} onChange={e => setExtendDays(e.target.value)} className="w-16 rounded-lg border border-slate-200 px-2 py-2 text-sm transition-all duration-fast hover:border-brand-warm-500 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30" />
+                        <input type="number" min={1} value={extendDays} onChange={e => setExtendDays(e.target.value)} className="w-16 rounded-lg border border-slate-200 px-2 py-2 text-sm transition-all duration-fast hover:border-brand-neutral-500 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30" />
                         <span className="text-xs text-slate-600">{t.booking.nights} +{formatXof(Number(booking.nightly_price_xof) * (parseInt(extendDays,10)||1))}</span>
                         <Button variant="secondary" size="sm" onClick={handleExtend} disabled={saving}>{t.booking.extendStay}</Button>
                       </div>

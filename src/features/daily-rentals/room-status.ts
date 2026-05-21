@@ -1,6 +1,6 @@
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 
-// ── Types ──────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type DailyRoomDisplayStatus =
   | "maintenance"
@@ -18,7 +18,7 @@ export interface DailyRoomStateForDate {
   isCheckoutDay: boolean;
 }
 
-// ── Constants ──────────────────────────────────────────────────────────
+// â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const ACTIVE_PRIORITY: Record<string, number> = {
   checked_in: 3,
@@ -27,27 +27,27 @@ const ACTIVE_PRIORITY: Record<string, number> = {
 };
 
 export const STATUS_COLORS: Record<DailyRoomDisplayStatus, string> = {
-  maintenance:        "bg-brand-red-100 text-brand-red-700",
-  locked:             "bg-brand-red-100 text-brand-red-700",
-  occupied:           "bg-brand-orange-200 text-brand-orange-800",
-  checking_out_today: "bg-brand-amber-200 text-brand-amber-800",
-  reserved:           "bg-amber-200 text-amber-900",
-  cleaning:           "bg-brand-sky-100 text-brand-sky-700",
+  maintenance:        "bg-brand-red-100 text-brand-red-700 border border-brand-red-200",
+  locked:             "bg-brand-neutral-100 text-brand-neutral-600 border border-brand-neutral-300",
+  occupied:           "bg-brand-orange-100 text-brand-orange-800 border border-brand-orange-200",
+  checking_out_today: "bg-brand-amber-100 text-brand-amber-700 border border-brand-amber-200",
+  reserved:           "bg-brand-sky-100 text-brand-sky-700 border border-brand-sky-200",
+  cleaning:           "bg-brand-green-100 text-brand-green-800 border border-brand-green-200",
   available:          "",
 };
 
-// ── Core: single unit × single date ────────────────────────────────────
+// â”€â”€ Core: single unit Ã— single date â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Compute display status for one room on one date.
  *
  * Priority:
- *   1. checked_in booking covering date → occupied / checking_out_today
- *   2. confirmed / pending_review booking covering date → reserved
- *   3. early check-in: unit is daily_occupied + checked_in exists → occupied
- *   4. unit.status = maintenance → maintenance
- *   5. unit.status = locked → locked
- *   6. cleaning pending → cleaning
+ *   1. checked_in booking covering date â†’ occupied / checking_out_today
+ *   2. confirmed / pending_review booking covering date â†’ reserved
+ *   3. early check-in: unit is daily_occupied + checked_in exists â†’ occupied
+ *   4. unit.status = maintenance â†’ maintenance
+ *   5. unit.status = locked â†’ locked
+ *   6. cleaning pending â†’ cleaning
  *   7. available
  */
 export function getDailyRoomStateForDate(params: {
@@ -107,7 +107,7 @@ export function getDailyRoomStateForDate(params: {
   return { unit, status: "available", booking: null, isCheckoutDay: false };
 }
 
-// ── Batch: all units × single date ─────────────────────────────────────
+// â”€â”€ Batch: all units Ã— single date â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Compute display status for all daily-rental units on a single date.
@@ -127,7 +127,7 @@ export function buildDailyRoomStateMap(params: {
   return map;
 }
 
-// ── Booking map builder (calendar grid) ─────────────────────────────────
+// â”€â”€ Booking map builder (calendar grid) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface BuildBookingMapOptions {
   todayStr: string;
@@ -136,19 +136,19 @@ interface BuildBookingMapOptions {
 }
 
 /**
- * Build a booking lookup map: unitId → dateStr → booking.
+ * Build a booking lookup map: unitId â†’ dateStr â†’ booking.
  *
  * Calendar visual rules for OPEN bookings (no fixed check_out):
- *   - checked_in + no actual_check_out → from check_in to TODAY (not beyond)
- *   - pending_review / confirmed + open → just check_in day (one cell)
- *   - checked_out + open + actual_check_out → full recorded range
+ *   - checked_in + no actual_check_out â†’ from check_in to TODAY (not beyond)
+ *   - pending_review / confirmed + open â†’ just check_in day (one cell)
+ *   - checked_out + open + actual_check_out â†’ full recorded range
  *
  * Active statuses (checked_in, confirmed, pending_review) are processed
  * LAST so they overwrite inactive ones (checked_out) on overlapping dates.
  * Cancelled bookings are excluded.
  *
  * NOTE: this only affects calendar rendering.
- * Business occupancy (coversDate) is NOT affected — open bookings still
+ * Business occupancy (coversDate) is NOT affected â€” open bookings still
  * count as occupying indefinitely for conflict detection and overview.
  */
 export function buildBookingMap(
@@ -187,12 +187,12 @@ export function buildBookingMap(
 /**
  * Compute the calendar display end date for a single booking.
  *
- * OPEN mode rules (calendar only — does NOT affect coversDate):
- *   - checked_in + actual_check_out set   → check_in … actual_check_out
- *   - checked_in + actual_check_out null  → check_in … today (inclusive)
- *   - pending_review / confirmed + open   → check_in only (one cell)
- *   - checked_out + open + actual_check_out → full recorded range
- *   - checked_out + open + no actual      → check_in only (fallback)
+ * OPEN mode rules (calendar only â€” does NOT affect coversDate):
+ *   - checked_in + actual_check_out set   â†’ check_in â€¦ actual_check_out
+ *   - checked_in + actual_check_out null  â†’ check_in â€¦ today (inclusive)
+ *   - pending_review / confirmed + open   â†’ check_in only (one cell)
+ *   - checked_out + open + actual_check_out â†’ full recorded range
+ *   - checked_out + open + no actual      â†’ check_in only (fallback)
  */
 function resolveCalendarCheckOut(
   b: DailyBookingRow,
@@ -205,30 +205,30 @@ function resolveCalendarCheckOut(
     return b.check_out ?? b.check_in;
   }
 
-  // ── Open mode: visual-only rules ──
+  // â”€â”€ Open mode: visual-only rules â”€â”€
 
-  // checked_in with actual_check_out → show the recorded range
+  // checked_in with actual_check_out â†’ show the recorded range
   if (b.status === "checked_in" && b.actual_check_out) {
     return b.actual_check_out;
   }
 
-  // checked_in without actual_check_out → from check_in to today (inclusive)
+  // checked_in without actual_check_out â†’ from check_in to today (inclusive)
   if (b.status === "checked_in") {
     // "today" inclusive: we want to show today's cell, so end = tomorrow
     return b.check_in <= todayStr ? opts.tomorrowStr : addDays(b.check_in, 1);
   }
 
-  // pending_review / confirmed → just the check_in day (one cell)
+  // pending_review / confirmed â†’ just the check_in day (one cell)
   if (b.status === "pending_review" || b.status === "confirmed") {
     return addDays(b.check_in, 1);
   }
 
-  // checked_out with actual_check_out → recorded range
+  // checked_out with actual_check_out â†’ recorded range
   if (b.status === "checked_out" && b.actual_check_out) {
     return b.actual_check_out;
   }
 
-  // checked_out without actual → just check_in (one cell, as historical record)
+  // checked_out without actual â†’ just check_in (one cell, as historical record)
   if (b.status === "checked_out") {
     return addDays(b.check_in, 1);
   }
@@ -238,20 +238,19 @@ function resolveCalendarCheckOut(
 }
 
 export function getBookingColorClass(booking: DailyBookingRow): string {
-  // Aligned with Natural Professional STATUS_CELL earth-tone palette
   if (booking.status === "checked_in") {
-    return "bg-orange-500 text-white";
+    return "bg-brand-orange-500 text-white";
   }
   if (booking.status === "confirmed" || booking.status === "pending_review") {
-    return "bg-sky-500 text-white";
+    return "bg-brand-sky-500 text-white";
   }
   if (booking.status === "checked_out") {
-    return "bg-slate-100 text-slate-500";
+    return "bg-brand-neutral-100 text-brand-neutral-500";
   }
-  return "bg-slate-50 text-slate-400";
+  return "bg-brand-neutral-50 text-brand-neutral-400";
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** Does this booking cover the given date? */
 function coversDate(b: DailyBookingRow, dateStr: string): boolean {
