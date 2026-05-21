@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   AlertTriangle, ArrowRight, ChevronDown, ChevronUp,
-  TrendingUp, TrendingDown, CheckCircle2, Banknote,
+  CheckCircle2,
 } from "lucide-react";
 import {
   calculateReceivableSummary,
@@ -243,19 +243,7 @@ export function ManagementDashboard({
   const now = new Date();
   const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-  const finance = useMemo(() => {
-    const monthEntries = ledgerEntries.filter(e => e.entry_date.startsWith(monthPrefix));
-    const income = monthEntries.filter(e => e.direction === "income").reduce((s, e) => s + Number(e.amount_xof), 0);
-    const expense = monthEntries.filter(e => e.direction === "expense").reduce((s, e) => s + Number(e.amount_xof), 0);
-    const dailyRental = monthEntries.filter(e => e.direction === "income" && e.category === "daily_rental").reduce((s, e) => s + Number(e.amount_xof), 0);
-    const leaseRent = monthEntries.filter(e => e.direction === "income" && e.category === "lease_rent").reduce((s, e) => s + Number(e.amount_xof), 0);
-    const sale = monthEntries.filter(e => e.direction === "income" && e.category === "sale").reduce((s, e) => s + Number(e.amount_xof), 0);
-    const deposit = monthEntries.filter(e => e.direction === "liability_in").reduce((s, e) => s + Number(e.amount_xof), 0);
-    return { income, expense, net: income - expense, dailyRental, leaseRent, sale, deposit };
-  }, [ledgerEntries]);
-
   // Receivables
-  const receivableStats = useMemo(() => calculateReceivableSummary(receivables), [receivables]);
   const receivableMonthStats = useMemo(() => calculateReceivableSummary(receivables, { currentMonth: true }), [receivables]);
   const receivableByBiz = useMemo(() => calculateReceivableByBusinessType(receivables, { currentMonth: true }), [receivables]);
   const receivableByBldg = useMemo(
@@ -341,15 +329,15 @@ export function ManagementDashboard({
         </div>
 
         {/* ── Section 1: Core KPI Summary ── */}
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(420px,0.8fr)]">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-natural">
-            <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.72fr)]">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
               <SectionLabel compact>{t.sections.financeOverview}</SectionLabel>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
                 {monthPrefix}
               </span>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2">
               <KPICard
                 label={t.cockpit.receivableThisMonth}
                 value={formatXof(receivableMonthStats.totalReceivable)}
@@ -473,29 +461,6 @@ export function ManagementDashboard({
               </div>
             );
           })}
-        </div>
-
-        {/* ── Section 4: Finance overview ── */}
-        <SectionLabel>{t.sections.financeOverview}</SectionLabel>
-        <div className="mb-8 grid gap-4 grid-cols-2 lg:grid-cols-3">
-          <FinanceCard
-            label={t.finance.income}
-            value={formatXof(finance.income)}
-            icon={TrendingUp}
-            tone="positive"
-          />
-          <FinanceCard
-            label={t.finance.expense}
-            value={formatXof(finance.expense)}
-            icon={TrendingDown}
-            tone="negative"
-          />
-          <FinanceCard
-            label={t.finance.net}
-            value={formatXof(finance.net)}
-            icon={Banknote}
-            tone={finance.net >= 0 ? "positive" : "negative"}
-          />
         </div>
 
         {/* ── Section 5: Receivable leaderboards ── */}
@@ -845,40 +810,16 @@ function KPICard({ label, value, variant }: {
   };
   const s = styles[variant];
   return (
-    <div className={cn("overflow-hidden rounded-xl border bg-white", s.bg)}>
-      <div className="px-3.5 py-3">
+    <div className={cn("flex min-h-[104px] overflow-hidden rounded-2xl border bg-white shadow-sm", s.bg)}>
+      <div className="flex min-w-0 flex-1 flex-col justify-between px-4 py-3.5">
         <div className="flex items-center gap-2 mb-1.5">
           <span className={cn("h-1.5 w-1.5 rounded-full", s.dot)} />
           <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
         </div>
-        <p className={cn("truncate text-xl font-bold tracking-tight tabular-nums", s.text)}>
+        <p className={cn("truncate text-2xl font-black tracking-tight tabular-nums", s.text)}>
           {value}
         </p>
       </div>
-    </div>
-  );
-}
-
-function FinanceCard({ label, value, icon: Icon, tone }: {
-  label: string; value: string;
-  icon: typeof TrendingUp;
-  tone: "positive" | "negative";
-}) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm px-5 py-4">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">{label}</p>
-        <Icon className={cn(
-          "h-4 w-4",
-          tone === "positive" ? "text-emerald-500" : "text-red-400",
-        )} />
-      </div>
-      <p className={cn(
-        "text-[22px] font-semibold tracking-tight tabular-nums",
-        tone === "positive" ? "text-slate-900" : "text-red-600",
-      )}>
-        {value}
-      </p>
     </div>
   );
 }
