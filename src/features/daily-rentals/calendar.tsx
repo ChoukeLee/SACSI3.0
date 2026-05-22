@@ -2,9 +2,9 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, Copy, Plus, Printer, SlidersHorizontal } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Copy, Plus, Printer, SlidersHorizontal, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn, formatXof } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
