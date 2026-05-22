@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import { BookingPanel } from "./booking-panel";
-import { buildBookingMap } from "./room-status";
+import { buildBookingMap, buildDailyRoomStateMap } from "./room-status";
 
 export interface CustomerSummary {
   id: string;
@@ -27,7 +27,7 @@ interface CalendarProps {
 }
 
 type ViewMode = "day" | "week" | "month";
-type RoomFilter = "all" | "available" | "occupied" | "reserved" | "cleaning" | "maintenance";
+type RoomFilter = "all" | "available" | "occupied" | "checkingOutToday" | "openEnded" | "reserved" | "cleaning" | "maintenance";
 
 const ROOM_COL_WIDTH = 136;
 const DAY_COL_MIN_WIDTH = 72;
@@ -190,12 +190,49 @@ export function DailyCalendar({
     return map;
   }, [cleaningTasks]);
 
+  const todayStateMap = useMemo(
+    () => buildDailyRoomStateMap({ dailyUnits, dateStr: todayStr, bookings, cleaningTasks }),
+    [dailyUnits, todayStr, bookings, cleaningTasks],
+  );
+
+  const filterCounts = useMemo(() => {
+    const counts: Record<RoomFilter, number> = {
+      all: dailyUnits.length,
+      available: 0,
+      occupied: 0,
+      checkingOutToday: 0,
+      openEnded: 0,
+      reserved: 0,
+      cleaning: 0,
+      maintenance: 0,
+    };
+    for (const unit of dailyUnits) {
+      const state = todayStateMap.get(unit.id);
+      if (!state) continue;
+      switch (state.status) {
+        case "available": counts.available++; break;
+        case "occupied": counts.occupied++; break;
+        case "checking_out_today": counts.checkingOutToday++; counts.occupied++; break;
+        case "reserved": counts.reserved++; break;
+        case "cleaning": counts.cleaning++; break;
+        case "maintenance":
+        case "locked": counts.maintenance++; break;
+      }
+      if (state.booking?.checkout_mode === "open" && (state.status === "occupied" || state.status === "checking_out_today")) {
+        counts.openEnded++;
+      }
+    }
+    return counts;
+  }, [dailyUnits, todayStateMap]);
+
   const filteredUnits = useMemo(() => {
     return dailyUnits.filter((unit) => {
       if (roomFilter === "all") return true;
-      return getUnitTimelineStatus(unit, visibleDays, bookingMap, unitCleaningMap) === roomFilter;
+      const status = getUnitTimelineStatus(unit, visibleDays, bookingMap, unitCleaningMap, todayStr);
+      if (roomFilter === "occupied") return status === "occupied" || status === "checkingOutToday" || status === "openEnded";
+      return status === roomFilter;
     });
-  }, [bookingMap, dailyUnits, roomFilter, unitCleaningMap, visibleDays]);
+  }, [bookingMap, dailyUnits, roomFilter, unitCleaningMap, visibleDays, todayStr]);
 
   const unitsByFloor = useMemo(() => {
     const grouped = new Map<string, UnitRow[]>();
@@ -206,22 +243,6 @@ export function DailyCalendar({
     }
     return Array.from(grouped.entries()).sort((a, b) => floorSortValue(a[0]) - floorSortValue(b[0]));
   }, [filteredUnits]);
-
-  const filterCounts = useMemo(() => {
-    const counts: Record<RoomFilter, number> = {
-      all: dailyUnits.length,
-      available: 0,
-      occupied: 0,
-      reserved: 0,
-      cleaning: 0,
-      maintenance: 0,
-    };
-
-    for (const unit of dailyUnits) {
-      counts[getUnitTimelineStatus(unit, visibleDays, bookingMap, unitCleaningMap)] += 1;
-    }
-    return counts;
-  }, [bookingMap, dailyUnits, unitCleaningMap, visibleDays]);
 
   const panelBooking = selectedBookingId ? bookings.find((booking) => booking.id === selectedBookingId) ?? null : null;
 
@@ -273,10 +294,12 @@ export function DailyCalendar({
               label={copy.allRooms}
               count={filterCounts.all}
             />
-            <FilterButton active={roomFilter === "available"} onClick={() => setRoomFilter("available")} color="bg-brand-green-500" label={copy.available} count={filterCounts.available} />
             <FilterButton active={roomFilter === "occupied"} onClick={() => setRoomFilter("occupied")} color="bg-brand-orange-500" label={copy.occupied} count={filterCounts.occupied} />
+            <FilterButton active={roomFilter === "checkingOutToday"} onClick={() => setRoomFilter("checkingOutToday")} color="bg-brand-orange-300" label={locale === "zh" ? "今日离店" : "Depart"} count={filterCounts.checkingOutToday} />
+            <FilterButton active={roomFilter === "openEnded"} onClick={() => setRoomFilter("openEnded")} color="bg-brand-orange-400" label={locale === "zh" ? "未定离店" : "Ouvert"} count={filterCounts.openEnded} />
             <FilterButton active={roomFilter === "reserved"} onClick={() => setRoomFilter("reserved")} color="bg-brand-amber-500" label={copy.reserved} count={filterCounts.reserved} />
             <FilterButton active={roomFilter === "cleaning"} onClick={() => setRoomFilter("cleaning")} color="bg-brand-blue-500" label={copy.cleaning} count={filterCounts.cleaning} />
+            <FilterButton active={roomFilter === "available"} onClick={() => setRoomFilter("available")} color="bg-brand-green-500" label={copy.available} count={filterCounts.available} />
             <FilterButton active={roomFilter === "maintenance"} onClick={() => setRoomFilter("maintenance")} color="bg-brand-red-500" label={copy.maintenance} count={filterCounts.maintenance} />
           </div>
         </div>
@@ -663,6 +686,7 @@ function getUnitTimelineStatus(
   visibleDays: Date[],
   bookingMap: Map<string, Map<string, DailyBookingRow>>,
   unitCleaningMap: Map<string, boolean>,
+  todayStr?: string,
 ): Exclude<RoomFilter, "all"> {
   if (!MAINTENANCE_STATUSES.has(unit.status)) return "maintenance";
   if (unitCleaningMap.get(unit.id) === true || unit.status === "cleaning_pending") return "cleaning";
@@ -672,7 +696,11 @@ function getUnitTimelineStatus(
     for (const date of visibleDays) {
       const booking = unitBookings.get(toDateStr(date));
       if (!booking || booking.status === "checked_out") continue;
-      if (booking.status === "checked_in") return "occupied";
+      if (booking.status === "checked_in") {
+        if (booking.checkout_mode === "open") return "openEnded";
+        if (todayStr && booking.check_out === todayStr) return "checkingOutToday";
+        return "occupied";
+      }
       if (booking.status === "confirmed" || booking.status === "pending_review") return "reserved";
     }
   }
