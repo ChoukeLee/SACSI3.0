@@ -240,12 +240,32 @@ export function ManagementDashboard({
     return c;
   }, [unitStates]);
 
-  // Finance — current month
+  // Finance — current month (exclude daily rental, which has its own page)
   const now = new Date();
   const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-  // Receivables
-  const receivableMonthStats = useMemo(() => calculateReceivableSummary(receivables, { currentMonth: true }), [receivables]);
+  const nonDailyReceivables = useMemo(
+    () => receivables.filter(r => r.source_type !== "daily_booking"),
+    [receivables],
+  );
+
+  const receivableMonthStats = useMemo(() => calculateReceivableSummary(nonDailyReceivables, { currentMonth: true }), [nonDailyReceivables]);
+
+  const businessStats = useMemo(() => {
+    const map = new Map<string, { totalReceivable: number; totalPaid: number; outstanding: number; overdue: number }>();
+    const filtered = nonDailyReceivables.filter(r => r.status !== "cancelled" && r.due_date.startsWith(monthPrefix));
+    for (const r of filtered) {
+      const key = r.source_type === "lease_contract" ? "lease" : r.source_type === "sale_contract" ? "sale" : "other";
+      let g = map.get(key);
+      if (!g) { g = { totalReceivable: 0, totalPaid: 0, outstanding: 0, overdue: 0 }; map.set(key, g); }
+      g.totalReceivable += Number(r.amount_xof);
+      g.totalPaid += Number(r.paid_amount_xof);
+      const unpaid = Number(r.amount_xof) - Number(r.paid_amount_xof);
+      if (unpaid > 0 && r.due_date < new Date().toISOString().slice(0, 10)) g.overdue += unpaid;
+    }
+    for (const g of map.values()) g.outstanding = g.totalReceivable - g.totalPaid;
+    return map;
+  }, [nonDailyReceivables, monthPrefix]);
 
   // Lookups
   const unitMap = useMemo(() => {
@@ -316,6 +336,7 @@ export function ManagementDashboard({
                 {monthPrefix}
               </span>
             </div>
+            <p className="mb-3 text-[11px] text-slate-400">{locale === "zh" ? "统计范围：长租 + 售房（日租请前往日租页面查看）" : "Perimetre : bail + vente (journalier sur sa page)"}</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <KPICard
                 label={t.cockpit.receivableThisMonth}
@@ -341,6 +362,46 @@ export function ManagementDashboard({
                 variant="danger"
                 onClick={() => setFinanceDetail("overdue")}
               />
+            </div>
+
+            {/* Business type sub-cards */}
+            <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+              {(() => {
+                const lease = businessStats.get("lease");
+                const sale = businessStats.get("sale");
+                return (
+                  <>
+                    {lease && (
+                      <button type="button" onClick={() => setFinanceDetail("receivable")} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-left transition-all hover:shadow-sm hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-brand-orange-500">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-black text-slate-700">{locale === "zh" ? "长租" : "Bail"}</span>
+                          <span className="text-[11px] font-bold text-slate-400">{locale === "zh" ? `${receivables.filter(r => r.source_type === "lease_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length}笔` : `${receivables.filter(r => r.source_type === "lease_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length} creances`}</span>
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
+                          <span className="font-bold text-slate-900">{locale === "zh" ? "应收" : "Du"} {formatXof(lease.totalReceivable)}</span>
+                          <span className="text-brand-green-700">{locale === "zh" ? "已收" : "Enc"} {formatXof(lease.totalPaid)}</span>
+                          {lease.outstanding > 0 && <span className="text-brand-orange-700">{locale === "zh" ? "未收" : "Impaye"} {formatXof(lease.outstanding)}</span>}
+                          {lease.overdue > 0 && <span className="text-brand-red-600">{locale === "zh" ? "逾期" : "Retard"} {formatXof(lease.overdue)}</span>}
+                        </div>
+                      </button>
+                    )}
+                    {sale && (
+                      <button type="button" onClick={() => setFinanceDetail("receivable")} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-left transition-all hover:shadow-sm hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-brand-orange-500">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-black text-slate-700">{locale === "zh" ? "售房" : "Vente"}</span>
+                          <span className="text-[11px] font-bold text-slate-400">{locale === "zh" ? `${receivables.filter(r => r.source_type === "sale_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length}笔` : `${receivables.filter(r => r.source_type === "sale_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length} creances`}</span>
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
+                          <span className="font-bold text-slate-900">{locale === "zh" ? "应收" : "Du"} {formatXof(sale.totalReceivable)}</span>
+                          <span className="text-brand-green-700">{locale === "zh" ? "已收" : "Enc"} {formatXof(sale.totalPaid)}</span>
+                          {sale.outstanding > 0 && <span className="text-brand-orange-700">{locale === "zh" ? "未收" : "Impaye"} {formatXof(sale.outstanding)}</span>}
+                          {sale.overdue > 0 && <span className="text-brand-red-600">{locale === "zh" ? "逾期" : "Retard"} {formatXof(sale.overdue)}</span>}
+                        </div>
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
 
