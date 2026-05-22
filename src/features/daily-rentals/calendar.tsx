@@ -10,6 +10,7 @@ import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import { BookingPanel } from "./booking-panel";
 import { completeCleaning } from "./actions";
+import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
 import { buildBookingMap, buildDailyRoomStateMap } from "./room-status";
 
 export interface CustomerSummary {
@@ -146,6 +147,8 @@ export function DailyCalendar({
   const [newBookingDate, setNewBookingDate] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [optimisticBookings, setOptimisticBookings] = useState<DailyBookingRow[]>([]);
+  const [cleaningTarget, setCleaningTarget] = useState<{ taskId: string; unitNo: string } | null>(null);
+  const [cleaningLoading, setCleaningLoading] = useState(false);
 
   const bookings = useMemo(() => {
     const seen = new Set(optimisticBookings.map((booking) => booking.id));
@@ -508,7 +511,7 @@ export function DailyCalendar({
                           }}
                           onCompleteCleaning={() => {
                             if (cleaningTaskId) {
-                              completeCleaning(cleaningTaskId).then(() => setTick((t) => t + 1));
+                              setCleaningTarget({ taskId: cleaningTaskId, unitNo: unit.unit_no });
                             }
                           }}
                         />
@@ -543,6 +546,27 @@ export function DailyCalendar({
           onBookingCreated={(booking) => setOptimisticBookings((prev) => [booking, ...prev])}
         />
       )}
+
+      <ConfirmDialog
+        open={cleaningTarget !== null}
+        onClose={() => setCleaningTarget(null)}
+        onConfirm={() => {
+          if (!cleaningTarget) return;
+          setCleaningLoading(true);
+          completeCleaning(cleaningTarget.taskId).then(() => {
+            setCleaningLoading(false);
+            setCleaningTarget(null);
+            setTick((t) => t + 1);
+          });
+        }}
+        title={locale === "zh" ? "完成保洁" : "Menage termine"}
+        description={cleaningTarget
+          ? (locale === "zh" ? `确认 ${cleaningTarget.unitNo} 保洁已完成？` : `Confirmer le menage de ${cleaningTarget.unitNo} ?`)
+          : ""}
+        confirmLabel={locale === "zh" ? "完成保洁" : "Terminer"}
+        locale={locale}
+        loading={cleaningLoading}
+      />
     </div>
   );
 }
