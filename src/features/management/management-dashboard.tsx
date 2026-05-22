@@ -8,6 +8,7 @@ import {
 import {
   calculateReceivableSummary,
 } from "@/features/finance/receivable-summary";
+import { FinanceDetailPanel } from "./finance-detail-panel";
 import { QualityDashboardWidget } from "@/features/data-quality";
 import type { QualityIssue } from "@/features/data-quality/quality-types";
 import type { Locale, ManagementDict } from "@/lib/i18n";
@@ -16,6 +17,7 @@ import { formatXof, cn, sortUnits } from "@/lib/utils";
 import type {
   BuildingRow, UnitRow, DailyBookingRow, LeaseContractRow,
   SaleContractRow, SalePaymentScheduleRow, LedgerEntryRow, ReceivableRow,
+  PaymentRow, CustomerRow,
 } from "@/types/database";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -51,6 +53,8 @@ interface Props {
   cleaningTasks: { unit_id: string; is_completed: boolean }[];
   ledgerEntries: LedgerEntryRow[];
   receivables: ReceivableRow[];
+  payments: PaymentRow[];
+  customers: CustomerRow[];
   qualityIssues?: QualityIssue[];
   t: ManagementDict;
   locale: Locale;
@@ -194,9 +198,11 @@ function computeUnitState(
 
 export function ManagementDashboard({
   buildings, units, dailyBookings, leaseContracts, saleContracts,
-  saleSchedules, cleaningTasks, ledgerEntries, receivables, qualityIssues, t, locale,
+  saleSchedules, cleaningTasks, ledgerEntries, receivables,
+  payments, customers, qualityIssues, t, locale,
 }: Props) {
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("__all__");
+  const [financeDetail, setFinanceDetail] = useState<"receivable" | "collected" | "outstanding" | "overdue" | null>(null);
 
   const residentialUnits = useMemo(
     () => units.filter(u => u.kind === "apartment"),
@@ -315,21 +321,25 @@ export function ManagementDashboard({
                 label={t.cockpit.receivableThisMonth}
                 value={formatXof(receivableMonthStats.totalReceivable)}
                 variant="neutral"
+                onClick={() => setFinanceDetail("receivable")}
               />
               <KPICard
                 label={t.cockpit.paidThisMonth}
                 value={formatXof(receivableMonthStats.totalPaid)}
                 variant="positive"
+                onClick={() => setFinanceDetail("collected")}
               />
               <KPICard
                 label={t.cockpit.outstandingThisMonth}
                 value={formatXof(receivableMonthStats.outstanding)}
                 variant="warning"
+                onClick={() => setFinanceDetail("outstanding")}
               />
               <KPICard
                 label={t.cockpit.overdueThisMonth}
                 value={formatXof(receivableMonthStats.overdue)}
                 variant="danger"
+                onClick={() => setFinanceDetail("overdue")}
               />
             </div>
           </div>
@@ -440,6 +450,18 @@ export function ManagementDashboard({
         {qualityIssues && (
           <QualityDashboardWidget issues={qualityIssues} locale={locale} variant="management" />
         )}
+
+        {/* Finance detail slide-out panel */}
+        <FinanceDetailPanel
+          open={financeDetail}
+          onClose={() => setFinanceDetail(null)}
+          receivables={receivables}
+          payments={payments}
+          units={units}
+          buildings={buildings}
+          customers={customers}
+          locale={locale}
+        />
 
       </div>
     </div>
@@ -579,9 +601,10 @@ function SegmentedTab({ active, onClick, label }: { active: boolean; onClick: ()
   );
 }
 
-function KPICard({ label, value, variant }: {
+function KPICard({ label, value, variant, onClick }: {
   label: string; value: string;
   variant: "neutral" | "positive" | "warning" | "danger";
+  onClick?: () => void;
 }) {
   const styles: Record<string, { bg: string; text: string; dot: string; bar: string }> = {
     neutral:  { bg: "bg-white border-brand-neutral-600/40", text: "text-brand-neutral-950", dot: "bg-brand-neutral-700", bar: "bg-brand-neutral-950" },
@@ -590,8 +613,18 @@ function KPICard({ label, value, variant }: {
     danger:   { bg: "bg-white border-brand-red-500/40", text: "text-brand-red-700", dot: "bg-brand-red-500", bar: "bg-brand-red-500" },
   };
   const s = styles[variant];
+  const isClickable = !!onClick;
   return (
-    <div className={cn("flex min-h-[94px] overflow-hidden rounded-2xl border bg-white shadow-sm", s.bg)}>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!isClickable}
+      className={cn(
+        "flex min-h-[94px] overflow-hidden rounded-2xl border bg-white text-left transition-all duration-fast",
+        s.bg,
+        isClickable && "cursor-pointer hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500",
+      )}
+    >
       <div className={cn("w-1.5 shrink-0", s.bar)} />
       <div className="flex min-w-0 flex-1 flex-col justify-between px-4 py-3">
         <div className="flex items-center gap-2 mb-1.5">
@@ -602,7 +635,7 @@ function KPICard({ label, value, variant }: {
           {value}
         </p>
       </div>
-    </div>
+    </button>
   );
 }
 

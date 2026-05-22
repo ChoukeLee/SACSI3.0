@@ -66,6 +66,8 @@ export default async function FrenchManagementPage() {
       cleaningTasks={(cleaningTasks ?? []) as { unit_id: string; is_completed: boolean }[]}
       ledgerEntries={(ledgerEntries ?? []) as LedgerEntryRow[]}
       receivables={(receivables ?? []) as ReceivableRow[]}
+      payments={(payments ?? []) as PaymentRow[]}
+      customers={(customers ?? []) as CustomerRow[]}
       qualityIssues={qualityIssues}
       t={dictionaries.fr.management}
       locale="fr"
