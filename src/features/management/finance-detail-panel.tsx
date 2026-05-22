@@ -85,17 +85,17 @@ export function FinanceDetailPanel({
 
   const receivableData = useMemo(() => {
     if (!open || open === "collected") return [];
-    let filtered = receivables;
+    let filtered = receivables.filter(r => r.source_type !== "daily_booking");
 
     if (open === "receivable") {
       // 本月应收: due_date in current month, exclude cancelled
-      filtered = receivables.filter(r => r.due_date.startsWith(currentMonthPrefix) && r.status !== "cancelled");
+      filtered = filtered.filter(r => r.due_date.startsWith(currentMonthPrefix) && r.status !== "cancelled");
     } else if (open === "outstanding") {
       // 本月未收: due_date in current month, not paid/cancelled
-      filtered = receivables.filter(r => r.due_date.startsWith(currentMonthPrefix) && r.status !== "paid" && r.status !== "cancelled");
+      filtered = filtered.filter(r => r.due_date.startsWith(currentMonthPrefix) && r.status !== "paid" && r.status !== "cancelled");
     } else if (open === "overdue") {
       // 逾期: dynamic — any unpaid receivable past its due date
-      filtered = receivables.filter(r => {
+      filtered = filtered.filter(r => {
         if (r.status === "cancelled" || r.status === "paid") return false;
         return (Number(r.amount_xof) - Number(r.paid_amount_xof)) > 0 && r.due_date < todayStr;
       });
@@ -107,15 +107,10 @@ export function FinanceDetailPanel({
   const paymentData = useMemo(() => {
     if (open !== "collected") return [];
 
-    const currentMonthPayments = payments.filter(p => p.payment_date.startsWith(currentMonthPrefix));
-
-    // Build a set of receivable source_ids for lookups
-    const receivableSourceIds = new Set(receivables.map(r => r.source_id).filter(Boolean));
-
-    return currentMonthPayments
-      .filter(p => receivableSourceIds.has(p.source_id) || p.source_type !== "daily_booking")
+    return payments
+      .filter(p => p.payment_date.startsWith(currentMonthPrefix) && p.source_type !== "daily_booking")
       .sort((a, b) => b.payment_date.localeCompare(a.payment_date));
-  }, [open, payments, receivables]);
+  }, [open, payments]);
 
   if (!open) return null;
 
