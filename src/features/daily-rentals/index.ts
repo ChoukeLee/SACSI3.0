@@ -7,7 +7,7 @@ export type { BillingResult } from "./billing";
 export {
   createBooking, confirmBooking, checkIn, checkOut,
   completeCleaning, extendStay, cancelBooking,
-  recordSupplementaryPayment, applyDiscount,
+  recordSupplementaryPayment, applyDiscount, deletePayment,
   checkConflicts,
 } from "./actions";
 export {

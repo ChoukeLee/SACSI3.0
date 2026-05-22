@@ -259,6 +259,46 @@ export async function recordSupplementaryPayment(input: {
   return { success: true };
 }
 
+// ── Delete a supplementary payment ──
+export async function deletePayment(paymentId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+
+  const { data: payment } = await supabase.from("payments")
+    .select("id, source_id, source_type, amount, unit_id")
+    .eq("id", paymentId).single();
+  if (!payment) return { success: false, error: "Payment not found." };
+  if (payment.source_type !== "daily_booking" || !payment.source_id) {
+    return { success: false, error: "Only daily booking payments can be deleted here." };
+  }
+
+  const { data: booking } = await supabase.from("daily_bookings")
+    .select("*").eq("id", payment.source_id).single();
+  if (!booking) return { success: false, error: "Booking not found." };
+
+  const newPrepaid = Math.max(0, Number(booking.prepaid_amount_xof) - payment.amount);
+  const billingStatus = booking.status === "checked_out" || newPrepaid >= Number(booking.final_amount_xof ?? booking.total_amount_xof) ? booking.billing_status : "partially_paid";
+
+  await supabase.from("payments").delete().eq("id", paymentId);
+  await supabase.from("ledger_entries").delete().eq("payment_id", paymentId);
+
+  await supabase.from("daily_bookings").update({
+    prepaid_amount_xof: newPrepaid, billing_status: billingStatus,
+  }).eq("id", payment.source_id);
+
+  await supabase.from("audit_logs").insert({
+    action: "payment_deleted", entity_type: "payment", entity_id: paymentId,
+    metadata: { amount: payment.amount, booking_id: payment.source_id, unit_id: payment.unit_id },
+  });
+
+  await syncReceivablesForSource("daily_booking", payment.source_id);
+
+  revalidatePath("/"); revalidatePath("/fr");
+  revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
+  revalidatePath("/management"); revalidatePath("/fr/management");
+
+  return { success: true };
+}
+
 // ── Check-out (supports fixed + open modes with discount) ──
 export async function checkOut(bookingId: string, input: {
   finalAmount?: number; actualCheckOut?: string;

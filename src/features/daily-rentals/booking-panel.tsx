@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { X, Check, UserX, Printer, DollarSign, Percent } from "lucide-react";
+import { X, Check, UserX, Printer, DollarSign, Percent, Trash2 } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
@@ -14,8 +14,9 @@ import { printDailyReceipt } from "@/features/print";
 import { calculateBilling } from "./billing";
 import {
   createBooking, confirmBooking, checkIn, checkOut, completeCleaning, extendStay, cancelBooking,
-  recordSupplementaryPayment, applyDiscount,
+  recordSupplementaryPayment, applyDiscount, deletePayment,
 } from "./actions";
+import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
 
 interface BookingPanelProps {
   booking: DailyBookingRow | null; unitId: string | null; defaultDate?: string;
@@ -55,6 +56,8 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   const [discountReason, setDiscountReason] = useState("");
   const [extendDays, setExtendDays] = useState("1");
   const [actionError, setActionError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; amount: number } | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     if (defaultDate) { setNewCheckIn(defaultDate); const nextDay = new Date(defaultDate); nextDay.setDate(nextDay.getDate() + 1); setNewCheckOut(nextDay.toISOString().slice(0, 10)); }
@@ -274,7 +277,19 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                     </div>
                     {bookingPayments.length > 0 && (
                       <ul className="mt-2 space-y-0.5 text-xs text-slate-600">
-                        {bookingPayments.map(p => <li key={p.id} className="flex justify-between">{p.payment_date} <span className="font-semibold">{formatXof(Number(p.amount))}</span></li>)}
+                        {bookingPayments.map(p => (
+                          <li key={p.id} className="flex items-center justify-between group">
+                            <span>{p.payment_date} <span className="font-semibold">{formatXof(Number(p.amount))}</span></span>
+                            <button
+                              type="button"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity rounded p-0.5 text-slate-400 hover:text-brand-red-600 hover:bg-brand-red-50"
+                              onClick={() => setDeleteTarget({ id: p.id, amount: Number(p.amount) })}
+                              title={locale === "zh" ? "删除此收款" : "Supprimer ce paiement"}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </li>
+                        ))}
                       </ul>
                     )}
                   </div>
@@ -321,6 +336,27 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
           </>)}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          setDeleteLoading(true);
+          deletePayment(deleteTarget.id).then(() => {
+            setDeleteLoading(false);
+            setDeleteTarget(null);
+            refresh();
+          });
+        }}
+        title={locale === "zh" ? "删除收款记录" : "Supprimer le paiement"}
+        description={deleteTarget
+          ? (locale === "zh" ? `确认删除这笔 ${formatXof(deleteTarget.amount)} 的收款？此操作不可撤销。` : `Confirmer la suppression de ce paiement de ${formatXof(deleteTarget.amount)} ? Cette action est irreversible.`)
+          : ""}
+        confirmLabel={locale === "zh" ? "确认删除" : "Supprimer"}
+        locale={locale}
+        loading={deleteLoading}
+      />
     </>
   );
 }
