@@ -269,7 +269,7 @@ export function DailyCalendar({
       { key: "checkout", label: locale === "zh" ? "今日离店" : "Depart", count: checkingOut.length, units: checkingOut.map((u) => u.unit_no), tone: "orange" as const },
       { key: "cleaning", label: locale === "zh" ? "待保洁" : "Menage", count: cleaning.length, units: cleaning.map((u) => u.unit_no), tone: "teal" as const },
       { key: "available", label: locale === "zh" ? "可安排入住" : "Disponible", count: available.length, units: available.map((u) => u.unit_no), tone: "green" as const },
-    ].filter((row) => row.count > 0);
+    ];
   }, [dailyUnits, todayStateMap, locale]);
 
   const handleCopy = useCallback(async () => {
