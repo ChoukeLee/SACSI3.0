@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import { BookingPanel } from "./booking-panel";
+import { completeCleaning } from "./actions";
 import { buildBookingMap, buildDailyRoomStateMap } from "./room-status";
 
 export interface CustomerSummary {
@@ -183,9 +184,9 @@ export function DailyCalendar({
   }, [customers]);
 
   const unitCleaningMap = useMemo(() => {
-    const map = new Map<string, boolean>();
+    const map = new Map<string, string>();
     for (const task of cleaningTasks) {
-      if (!task.is_completed) map.set(task.unit_id, true);
+      if (!task.is_completed) map.set(task.unit_id, task.id);
     }
     return map;
   }, [cleaningTasks]);
@@ -447,7 +448,8 @@ export function DailyCalendar({
                 <FloorRow key={`floor-${floor}`} floor={floor} count={units.length} daysCount={visibleDays.length} copy={copy} />,
                 ...units.flatMap((unit) => {
                   const unitBM = bookingMap.get(unit.id);
-                  const hasCleaning = unitCleaningMap.get(unit.id) === true;
+                  const hasCleaning = unitCleaningMap.has(unit.id);
+                  const cleaningTaskId = unitCleaningMap.get(unit.id);
                   const isMaintenance = !MAINTENANCE_STATUSES.has(unit.status);
                   const roomTone = getRoomTone(unit, hasCleaning, isMaintenance);
                   const statusLabel = isMaintenance
@@ -504,6 +506,11 @@ export function DailyCalendar({
                             setNewBookingDate(dateStr);
                             setSelectedBookingId(null);
                           }}
+                          onCompleteCleaning={() => {
+                            if (cleaningTaskId) {
+                              completeCleaning(cleaningTaskId).then(() => setTick((t) => t + 1));
+                            }
+                          }}
                         />
                       );
                     }),
@@ -554,6 +561,7 @@ function TimelineCell({
   bookingLabels,
   onOpenBooking,
   onNewBooking,
+  onCompleteCleaning,
 }: {
   unit: UnitRow;
   dateStr: string;
@@ -568,6 +576,7 @@ function TimelineCell({
   bookingLabels: Record<string, string>;
   onOpenBooking: (id: string) => void;
   onNewBooking: () => void;
+  onCompleteCleaning?: () => void;
 }) {
   const baseCell = cn(
     "group relative border-b border-r border-brand-warm-100 transition-colors",
@@ -635,9 +644,13 @@ function TimelineCell({
   if (hasCleaning || unit.status === "cleaning_pending") {
     return (
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
-        <div className="absolute inset-x-1.5 top-1/2 flex h-9 -translate-y-1/2 items-center justify-center rounded-lg border border-brand-blue-200 bg-brand-blue-50 text-[9px] font-black text-brand-blue-700">
+        <button
+          type="button"
+          className="absolute inset-x-1.5 top-1/2 flex h-9 -translate-y-1/2 items-center justify-center rounded-lg border border-brand-blue-200 bg-brand-blue-50 text-[9px] font-black text-brand-blue-700 transition-all hover:bg-brand-blue-100 hover:border-brand-blue-300 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500"
+          onClick={() => onCompleteCleaning?.()}
+        >
           {copy.cleaning}
-        </div>
+        </button>
       </div>
     );
   }
@@ -775,11 +788,11 @@ function getUnitTimelineStatus(
   unit: UnitRow,
   visibleDays: Date[],
   bookingMap: Map<string, Map<string, DailyBookingRow>>,
-  unitCleaningMap: Map<string, boolean>,
+  unitCleaningMap: Map<string, string>,
   todayStr?: string,
 ): Exclude<RoomFilter, "all"> {
   if (!MAINTENANCE_STATUSES.has(unit.status)) return "maintenance";
-  if (unitCleaningMap.get(unit.id) === true || unit.status === "cleaning_pending") return "cleaning";
+  if (unitCleaningMap.has(unit.id) || unit.status === "cleaning_pending") return "cleaning";
 
   const unitBookings = bookingMap.get(unit.id);
   if (unitBookings) {
