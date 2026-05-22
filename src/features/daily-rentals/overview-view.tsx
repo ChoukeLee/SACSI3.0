@@ -1,12 +1,17 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { Check, Copy, Printer } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Check, Copy, ExternalLink, Lock, Phone, Printer, Unlock, Wrench } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
-import { dictionaries } from "@/lib/i18n";
+import { dictionaries, routeFor } from "@/lib/i18n";
 import { cn, formatXof } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { CustomerRow, DailyBookingRow, PaymentRow, UnitRow } from "@/types/database";
+import type { UnitStatus } from "@/types/domain";
+import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
+import { updateUnitStatus } from "@/features/units/actions";
 import { calculateBilling } from "./billing";
 import type { DailyRoomDisplayStatus } from "./room-status";
 import { buildDailyRoomStateMap } from "./room-status";
@@ -34,6 +39,31 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
   const t = dictionaries[locale].dailyOccupancy;
   const selectedDate = new Date().toISOString().slice(0, 10);
   const [copied, setCopied] = useState(false);
+  const router = useRouter();
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; row: RoomRow } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{
+    title: string; description: string; status: UnitStatus; unitId: string;
+  } | null>(null);
+
+  // Close context menu on outside click / Escape
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    document.addEventListener("click", close, true);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("click", close, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [contextMenu]);
+
+  const handleStatusChange = async (unitId: string, status: UnitStatus) => {
+    await updateUnitStatus(unitId, status);
+    router.refresh();
+    setConfirmAction(null);
+    setContextMenu(null);
+  };
 
   const stateMap = useMemo(
     () => buildDailyRoomStateMap({ dailyUnits, dateStr: selectedDate, bookings, cleaningTasks }),
@@ -182,13 +212,74 @@ export function OverviewView({ dailyUnits, bookings, customers, payments, cleani
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {rows.map((row) => (
-                  <DailyRoomCard key={row.unit.id} row={row} locale={locale} />
+                  <DailyRoomCard key={row.unit.id} row={row} locale={locale} onContextMenu={(e, r) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, row: r }); }} />
                 ))}
               </div>
             </div>
           ))}
         </div>
       </section>
+
+      {contextMenu && (
+        <RoomContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          row={contextMenu.row}
+          locale={locale}
+          onAction={(action) => {
+            const row = contextMenu.row;
+            switch (action) {
+              case "viewProfile":
+                router.push(routeFor(locale, `/units/${row.unit.id}`));
+                setContextMenu(null);
+                break;
+              case "copyRoomNo":
+                navigator.clipboard.writeText(row.unit.unit_no);
+                setContextMenu(null);
+                break;
+              case "copyPhone":
+                if (row.customer?.phone) navigator.clipboard.writeText(row.customer.phone);
+                setContextMenu(null);
+                break;
+              case "maintenance":
+                setConfirmAction({
+                  title: locale === "zh" ? "标记维修" : "En maintenance",
+                  description: locale === "zh" ? "维修期间房间不可出租" : "La chambre ne sera pas disponible à la location",
+                  status: "maintenance",
+                  unitId: row.unit.id,
+                });
+                break;
+              case "lock":
+                setConfirmAction({
+                  title: locale === "zh" ? "锁定房间" : "Bloquer",
+                  description: locale === "zh" ? "锁定后房间不可出租" : "Chambre bloquée, non disponible à la location",
+                  status: "locked",
+                  unitId: row.unit.id,
+                });
+                break;
+              case "markAvailable":
+                setConfirmAction({
+                  title: locale === "zh" ? "恢复可用" : "Disponible",
+                  description: locale === "zh" ? "房间将重新开放出租" : "La chambre sera de nouveau disponible",
+                  status: "available",
+                  unitId: row.unit.id,
+                });
+                break;
+            }
+          }}
+        />
+      )}
+
+      {confirmAction && (
+        <ConfirmDialog
+          open
+          locale={locale}
+          title={confirmAction.title}
+          description={confirmAction.description}
+          onClose={() => setConfirmAction(null)}
+          onConfirm={() => handleStatusChange(confirmAction.unitId, confirmAction.status)}
+        />
+      )}
     </div>
   );
 }
@@ -232,7 +323,7 @@ function SummaryCard({ label, value, tone }: { label: string; value: number; ton
   );
 }
 
-function DailyRoomCard({ row, locale }: { row: RoomRow; locale: Locale }) {
+function DailyRoomCard({ row, locale, onContextMenu }: { row: RoomRow; locale: Locale; onContextMenu: (e: React.MouseEvent, row: RoomRow) => void }) {
   const labelMap: Record<DailyRoomDisplayStatus, string> = locale === "zh"
     ? {
         available: "空闲",
@@ -274,9 +365,11 @@ function DailyRoomCard({ row, locale }: { row: RoomRow; locale: Locale }) {
     : (row.unit.layout ?? row.unit.floor_label);
 
   return (
-    <div
+    <Link
+      href={routeFor(locale, `/units/${row.unit.id}`)}
+      onContextMenu={(e) => onContextMenu(e, row)}
       className={cn(
-        "group relative flex min-h-[118px] flex-col justify-between overflow-hidden rounded-2xl border p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
+        "group relative flex min-h-[118px] cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
         tone[row.status],
       )}
     >
@@ -307,6 +400,75 @@ function DailyRoomCard({ row, locale }: { row: RoomRow; locale: Locale }) {
           </span>
         </div>
       </div>
+    </Link>
+  );
+}
+
+function RoomContextMenu({ x, y, row, locale, onAction }: {
+  x: number; y: number;
+  row: RoomRow;
+  locale: Locale;
+  onAction: (action: string) => void;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ x, y });
+  const [ready, setReady] = useState(false);
+
+  useLayoutEffect(() => {
+    if (menuRef.current) {
+      const rect = menuRef.current.getBoundingClientRect();
+      setPos({
+        x: Math.min(x, window.innerWidth - rect.width - 8),
+        y: Math.min(y, window.innerHeight - rect.height - 8),
+      });
+    }
+    setReady(true);
+  }, [x, y]);
+
+  const items = useMemo(() => {
+    const list: { key: string; icon: React.ComponentType<{ className?: string }> | null; label: string; danger?: boolean }[] = [
+      { key: "viewProfile", icon: ExternalLink, label: locale === "zh" ? "查看房间档案" : "Voir le dossier" },
+      { key: "copyRoomNo", icon: Copy, label: locale === "zh" ? "复制房间号" : "Copier N°" },
+    ];
+    if (row.customer?.phone) {
+      list.push({ key: "copyPhone", icon: Phone, label: locale === "zh" ? "复制住客电话" : "Copier tél" });
+    }
+    list.push({ key: "separator", icon: null, label: "" });
+    if (row.status !== "maintenance") {
+      list.push({ key: "maintenance", icon: Wrench, label: locale === "zh" ? "标记维修" : "En maintenance" });
+    }
+    if (row.status !== "locked") {
+      list.push({ key: "lock", icon: Lock, label: locale === "zh" ? "锁定房间" : "Bloquer" });
+    }
+    if (row.status === "maintenance" || row.status === "locked") {
+      list.push({ key: "markAvailable", icon: Unlock, label: locale === "zh" ? "恢复可用" : "Disponible" });
+    }
+    return list;
+  }, [row, locale]);
+
+  return (
+    <div
+      ref={menuRef}
+      className={cn(
+        "fixed z-[9999] min-w-[180px] rounded-xl border border-neutral-200 bg-white p-1.5 shadow-panel",
+        !ready && "invisible",
+      )}
+      style={{ left: pos.x, top: pos.y }}
+    >
+      {items.map((item) =>
+        item.key === "separator" ? (
+          <div key="sep" className="my-1 border-t border-neutral-100" />
+        ) : (
+          <button
+            key={item.key}
+            onClick={() => onAction(item.key)}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-neutral-700 transition-colors hover:bg-neutral-100"
+          >
+            {item.icon && <item.icon className="h-4 w-4 shrink-0 text-neutral-400" />}
+            {item.label}
+          </button>
+        ),
+      )}
     </div>
   );
 }
