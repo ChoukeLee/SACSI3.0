@@ -2,9 +2,10 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
-import { ChevronLeft, ChevronRight, Plus, SlidersHorizontal } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Copy, Plus, Printer, SlidersHorizontal } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import { BookingPanel } from "./booking-panel";
@@ -244,6 +245,53 @@ export function DailyCalendar({
     return Array.from(grouped.entries()).sort((a, b) => floorSortValue(a[0]) - floorSortValue(b[0]));
   }, [filteredUnits]);
 
+  const [copied, setCopied] = useState(false);
+
+  const shareRows = useMemo(() => {
+    const occupied = dailyUnits.filter((u) => {
+      const s = todayStateMap.get(u.id);
+      return s && (s.status === "occupied" || s.status === "checking_out_today" || s.status === "reserved");
+    });
+    const checkingOut = dailyUnits.filter((u) => {
+      const s = todayStateMap.get(u.id);
+      return s?.isCheckoutDay;
+    });
+    const cleaning = dailyUnits.filter((u) => {
+      const s = todayStateMap.get(u.id);
+      return s?.status === "cleaning";
+    });
+    const available = dailyUnits.filter((u) => {
+      const s = todayStateMap.get(u.id);
+      return s?.status === "available";
+    });
+    return [
+      { key: "occupied", label: locale === "zh" ? "占用" : "Occupe", count: occupied.length, units: occupied.map((u) => u.unit_no), tone: "dark" as const },
+      { key: "checkout", label: locale === "zh" ? "今日离店" : "Depart", count: checkingOut.length, units: checkingOut.map((u) => u.unit_no), tone: "orange" as const },
+      { key: "cleaning", label: locale === "zh" ? "待保洁" : "Menage", count: cleaning.length, units: cleaning.map((u) => u.unit_no), tone: "teal" as const },
+      { key: "available", label: locale === "zh" ? "可安排入住" : "Disponible", count: available.length, units: available.map((u) => u.unit_no), tone: "green" as const },
+    ].filter((row) => row.count > 0);
+  }, [dailyUnits, todayStateMap, locale]);
+
+  const handleCopy = useCallback(async () => {
+    let text = `11# ${locale === "zh" ? "日租房态" : "Occupation journaliere"}\n`;
+    for (const row of shareRows) {
+      text += `\n${row.label}: ${row.count}\n`;
+      text += `${row.units.join(", ")}\n`;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [shareRows, locale]);
+
   const panelBooking = selectedBookingId ? bookings.find((booking) => booking.id === selectedBookingId) ?? null : null;
 
   useEffect(() => {
@@ -278,7 +326,39 @@ export function DailyCalendar({
   }
 
   return (
-    <div>
+    <div className="space-y-5">
+      <section className="overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-natural">
+        <div className="flex flex-col gap-4 border-b border-neutral-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h3 className="text-base font-black leading-5 text-brand-neutral-950">{locale === "zh" ? "今日可发群内容" : "Message du jour"}</h3>
+            <p className="mt-1 text-sm font-semibold text-brand-neutral-700">
+              {locale === "zh" ? "房态摘要已按群发格式整理，可直接复制。" : "Resume pret a copier."}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="rounded-2xl border border-neutral-200 bg-brand-neutral-50 px-4 py-2 text-sm font-black text-brand-neutral-950">
+              {new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN")}
+              <span className="ml-3 text-brand-neutral-500">
+                {new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long" })}
+              </span>
+            </div>
+            <Button variant="primary" size="sm" onClick={handleCopy}>
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? (locale === "zh" ? "已复制" : "Copie") : (locale === "zh" ? "复制群消息" : "Copier")}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => window.print()} className="no-print">
+              <Printer className="h-3.5 w-3.5" />
+              {locale === "zh" ? "打印" : "Imprimer"}
+            </Button>
+          </div>
+        </div>
+        <div className="grid gap-3 bg-brand-neutral-50/70 px-5 py-4 md:grid-cols-2 xl:grid-cols-4">
+          {shareRows.map((row) => (
+            <ShareCard key={row.key} label={row.label} value={row.count} units={row.units} tone={row.tone} />
+          ))}
+        </div>
+      </section>
+
       <section className="overflow-hidden rounded-[24px] border border-brand-warm-300 bg-white shadow-[0_18px_56px_rgba(88,65,43,0.08)]">
         <div className="flex flex-col gap-3 border-b border-brand-warm-300 bg-brand-warm-50 px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
@@ -617,6 +697,26 @@ function FloorRow({
         {copy.floor} · {count}
       </div>
     </>
+  );
+}
+
+type ShareTone = "dark" | "orange" | "teal" | "green";
+
+function ShareCard({ label, value, units, tone }: { label: string; value: number; units: string[]; tone: ShareTone }) {
+  const styles = {
+    dark: "border-brand-orange-200 bg-brand-orange-50 text-brand-orange-900",
+    orange: "border-brand-amber-200 bg-brand-amber-50 text-brand-amber-900",
+    teal: "border-brand-blue-200 bg-brand-blue-50 text-brand-blue-900",
+    green: "border-brand-green-200 bg-brand-green-50 text-brand-green-900",
+  }[tone];
+  return (
+    <div className={cn("rounded-2xl border px-4 py-3 shadow-sm", styles)}>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs font-black opacity-85">{label}</p>
+        <p className="text-2xl font-black tabular-nums leading-none">{value}</p>
+      </div>
+      <p className="mt-3 min-h-6 text-sm font-black leading-6">{units.join(", ")}</p>
+    </div>
   );
 }
 

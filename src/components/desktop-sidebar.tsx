@@ -15,7 +15,7 @@ import type { UserRole } from "@/lib/auth";
 
 // ── Types ──
 
-type NavKey = "management" | "units" | "roomMatrix" | "dailyRentals" | "leases" | "sales" | "customers" | "finance" | "reports" | "todos" | "documents" | "dataQuality" | "auditLogs" | "dataExchange" | "bulkActions" | "targets" | "settings" | "security";
+type NavKey = "management" | "units" | "dailyRentals" | "leases" | "sales" | "customers" | "finance" | "reports" | "todos" | "documents" | "dataQuality" | "auditLogs" | "dataExchange" | "bulkActions" | "targets" | "settings" | "security";
 
 interface NavItem {
   key: NavKey;
@@ -38,14 +38,7 @@ const allGroups: NavGroup[] = [
     roles: ["admin", "boss", "finance", "front_desk"],
     items: [
       { key: "management", href: "/management", icon: LayoutDashboard },
-    ],
-  },
-  {
-    key: "assets",
-    roles: ["admin", "boss", "front_desk"],
-    items: [
       { key: "units", href: "/units", icon: Building2, activeMatch: "/units" },
-      { key: "roomMatrix", href: "/daily-rentals/overview", icon: BarChart3 },
     ],
   },
   {
@@ -93,11 +86,11 @@ const allGroups: NavGroup[] = [
 
 const BOSS_HIDDEN_KEYS = new Set<NavKey>(["bulkActions"]);
 const FINANCE_VISIBLE_GROUPS = new Set(["home", "business", "financeCenter", "operations", "systemTools"]);
-const FINANCE_HIDDEN_KEYS = new Set<NavKey>(["management", "dailyRentals", "roomMatrix", "bulkActions", "security", "targets", "dataQuality", "settings"]);
+const FINANCE_HIDDEN_KEYS = new Set<NavKey>(["management", "dailyRentals", "bulkActions", "security", "targets", "dataQuality", "settings"]);
 const FINANCE_EXTRA_HIDDEN = new Set<NavKey>(["leases", "sales"]);
 
-const FRONT_DESK_VISIBLE_GROUPS = new Set(["home", "assets", "business", "operations"]);
-const FRONT_DESK_VISIBLE_KEYS = new Set<NavKey>(["roomMatrix", "units", "dailyRentals", "customers", "todos", "documents"]);
+const FRONT_DESK_VISIBLE_GROUPS = new Set(["home", "business", "operations"]);
+const FRONT_DESK_VISIBLE_KEYS = new Set<NavKey>(["management", "units", "dailyRentals", "customers", "todos", "documents"]);
 
 function filterGroups(groups: NavGroup[], role?: UserRole): NavGroup[] {
   if (!role) return [];
@@ -119,7 +112,7 @@ function filterGroups(groups: NavGroup[], role?: UserRole): NavGroup[] {
         items: g.items.filter(i =>
           !FINANCE_HIDDEN_KEYS.has(i.key) &&
           !FINANCE_EXTRA_HIDDEN.has(i.key) &&
-          i.key !== "management" && i.key !== "dailyRentals" && i.key !== "roomMatrix" && i.key !== "dataQuality"
+          i.key !== "management" && i.key !== "dailyRentals" && i.key !== "dataQuality"
         ),
       }))
       .filter(g => g.items.length > 0);

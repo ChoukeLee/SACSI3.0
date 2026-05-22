@@ -22,7 +22,6 @@ const desktop: Record<Locale, DesktopNavLabels> = {
     roles: { admin: "管理员", boss: "老板", finance: "财务", front_desk: "前台" },
     groups: {
       home: "首页",
-      assets: "房源资产",
       business: "租售业务",
       financeCenter: "财务中心",
       operations: "运营中心",
@@ -32,7 +31,6 @@ const desktop: Record<Locale, DesktopNavLabels> = {
       workbench: "工作台",
       management: "经营驾驶舱",
       units: "房源总览",
-      roomMatrix: "房态矩阵",
       dailyRentals: "日租业务",
       leases: "长租业务",
       sales: "出售业务",
@@ -56,7 +54,6 @@ const desktop: Record<Locale, DesktopNavLabels> = {
     roles: { admin: "Administrateur", boss: "Proprietaire", finance: "Comptable", front_desk: "Reception" },
     groups: {
       home: "Accueil",
-      assets: "Patrimoine",
       business: "Activites",
       financeCenter: "Finance",
       operations: "Operations",
@@ -66,7 +63,6 @@ const desktop: Record<Locale, DesktopNavLabels> = {
       workbench: "Tableau de bord",
       management: "Direction",
       units: "Lots",
-      roomMatrix: "Matrice lots",
       dailyRentals: "Location jour",
       leases: "Baux",
       sales: "Ventes",

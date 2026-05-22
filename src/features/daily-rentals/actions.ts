@@ -140,7 +140,8 @@ export async function createBooking(input: {
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
-  revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
+  
+
   return { success: true, data };
 }
 
@@ -152,7 +153,8 @@ export async function confirmBooking(bookingId: string): Promise<{ success: bool
   await supabase.from("audit_logs").insert({ action: "confirm", entity_type: "daily_booking", entity_id: bookingId, metadata: {} });
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
-  revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
+  
+
   return { success: true };
 }
 
@@ -201,7 +203,8 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
-  revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
+  
+
   return { success: true };
 }
 
@@ -247,7 +250,8 @@ export async function recordSupplementaryPayment(input: {
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
-  revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
+  
+
   return { success: true };
 }
 
@@ -325,7 +329,8 @@ export async function checkOut(bookingId: string, input: {
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
-  revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
+  
+
   return { success: true };
 }
 
@@ -354,7 +359,8 @@ export async function applyDiscount(input: {
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
-  revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
+  
+
   return { success: true };
 }
 
@@ -368,7 +374,8 @@ export async function completeCleaning(taskId: string): Promise<{ success: boole
   await supabase.from("units").update({ status: "available" }).eq("id", task.unit_id);
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
-  revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
+  
+
   return { success: true };
 }
 
@@ -402,7 +409,8 @@ export async function extendStay(bookingId: string, newCheckOut: string, extraNi
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
-  revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
+  
+
   return { success: true };
 }
 
@@ -419,6 +427,7 @@ export async function cancelBooking(bookingId: string): Promise<{ success: boole
   await cancelReceivablesForSource("daily_booking", bookingId);
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
-  revalidatePath("/daily-rentals/overview"); revalidatePath("/fr/daily-rentals/overview");
+  
+
   return { success: true };
 }
