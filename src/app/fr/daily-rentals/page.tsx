@@ -19,45 +19,29 @@ export default async function FrenchDailyRentalsPage() {
   const t = dictionaries.fr.dailyRentals;
   const supabase = await createClient();
 
-  const { data: building } = await supabase
-    .from("buildings")
-    .select("id")
-    .eq("code", "SASCI11")
-    .single();
-
-  const buildingId = building?.id;
-
   let dailyUnits: UnitRow[] = [];
   let bookings: DailyBookingRow[] = [];
   let customers: CustomerSummary[] = [];
   let cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[] = [];
   let payments: { id: string; source_id: string; amount: number; payment_date: string }[] = [];
 
-  if (buildingId) {
-    const [unitsRes, bookingsRes, customersRes, cleaningRes, paymentsRes] = await Promise.all([
-      supabase
-        .from("units")
-        .select("*, unit_business_flags!inner(business_type, is_enabled)")
-        .eq("building_id", buildingId)
-        .eq("unit_business_flags.business_type", "daily_rental")
-        .eq("unit_business_flags.is_enabled", true)
-        .order("unit_no"),
-      supabase
-        .from("daily_bookings")
-        .select("*")
-        .in("status", ["pending_review", "confirmed", "checked_in", "checked_out"])
-        .order("check_in", { ascending: false })
-        .limit(500),
-      supabase.from("customers").select("id, name, phone, is_blacklisted").order("name"),
-      supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed"),
-      supabase.from("payments").select("id, source_id, amount, payment_date").eq("source_type", "daily_booking").order("payment_date", { ascending: false }).limit(500),
-    ]);
+  const [buildingRes, customersRes, cleaningRes, paymentsRes, bookingsRes] = await Promise.all([
+    supabase.from("buildings").select("id").eq("code", "SASCI11").single(),
+    supabase.from("customers").select("id, name, phone, is_blacklisted").order("name"),
+    supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed"),
+    supabase.from("payments").select("id, source_id, amount, payment_date").eq("source_type", "daily_booking").order("payment_date", { ascending: false }).limit(500),
+    supabase.from("daily_bookings").select("*").in("status", ["pending_review", "confirmed", "checked_in", "checked_out"]).order("check_in", { ascending: false }).limit(500),
+  ]);
 
-    if (!unitsRes.error) dailyUnits = sortUnits(((unitsRes.data as unknown as UnitRow[]) ?? []));
-    if (!bookingsRes.error) bookings = bookingsRes.data ?? [];
-    if (!customersRes.error) customers = customersRes.data ?? [];
-    if (!cleaningRes.error) cleaningTasks = cleaningRes.data ?? [];
-    if (!paymentsRes.error) payments = paymentsRes.data ?? [];
+  if (!customersRes.error) customers = customersRes.data ?? [];
+  if (!cleaningRes.error) cleaningTasks = cleaningRes.data ?? [];
+  if (!paymentsRes.error) payments = paymentsRes.data ?? [];
+  if (!bookingsRes.error) bookings = bookingsRes.data ?? [];
+
+  const buildingId = buildingRes.data?.id;
+  if (buildingId) {
+    const { data: unitsData, error: unitsErr } = await supabase.from("units").select("*, unit_business_flags!inner(business_type, is_enabled)").eq("building_id", buildingId).eq("unit_business_flags.business_type", "daily_rental").eq("unit_business_flags.is_enabled", true).order("unit_no");
+    if (!unitsErr) dailyUnits = sortUnits(((unitsData as unknown as UnitRow[]) ?? []));
   }
 
   return (

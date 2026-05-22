@@ -73,8 +73,10 @@ const rolePermissions: Record<UserRole, string[]> = {
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return null;
+
+  const user = session.user;
 
   const { data: profile } = await supabase
     .from("user_profiles")

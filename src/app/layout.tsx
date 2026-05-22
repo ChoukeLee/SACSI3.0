@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { AppShellWrapper } from "@/components/app-shell-wrapper";
 import { getCurrentUser } from "@/lib/auth";
 import { dictionaries } from "@/lib/i18n";
+import Loading from "./loading";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +24,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="zh-CN">
       <body>
         <AppShellWrapper userRole={user?.role} userDisplayName={user?.displayName} notifT={dictionaries.zh.shell.notifications} notifTFr={dictionaries.fr.shell.notifications}>
-          {children}
+          <Suspense fallback={<Loading />}>
+            {children}
+          </Suspense>
         </AppShellWrapper>
         <script defer dangerouslySetInnerHTML={{ __html: `
           (function(){

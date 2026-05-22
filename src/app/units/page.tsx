@@ -17,30 +17,22 @@ export default async function UnitsPage() {
   const t = dictionaries.zh.units;
   const supabase = await createClient();
 
-  // Fetch building_id for SASCI11 (primary building for phase 1)
-  const { data: building } = await supabase
-    .from("buildings")
-    .select("id")
-    .eq("code", "SASCI11")
-    .single();
-
-  const buildingId = building?.id;
-
-  // Fetch all units for this building
   let units: UnitRow[] = [];
   let flags: UnitBusinessFlagRow[] = [];
 
+  const [buildingRes, flagsRes] = await Promise.all([
+    supabase.from("buildings").select("id").eq("code", "SASCI11").single(),
+    supabase.from("unit_business_flags").select("*"),
+  ]);
+
+  if (flagsRes.error) console.error("Failed to fetch business flags:", flagsRes.error);
+  else flags = flagsRes.data;
+
+  const buildingId = buildingRes.data?.id;
   if (buildingId) {
-    const [unitsRes, flagsRes] = await Promise.all([
-      supabase.from("units").select("*").eq("building_id", buildingId).order("unit_no"),
-      supabase.from("unit_business_flags").select("*"),
-    ]);
-
-    if (unitsRes.error) console.error("Failed to fetch units:", unitsRes.error);
-    else units = sortUnits(unitsRes.data);
-
-    if (flagsRes.error) console.error("Failed to fetch business flags:", flagsRes.error);
-    else flags = flagsRes.data;
+    const { data: unitsData, error: unitsErr } = await supabase.from("units").select("*").eq("building_id", buildingId).order("unit_no");
+    if (unitsErr) console.error("Failed to fetch units:", unitsErr);
+    else units = sortUnits(unitsData);
   }
 
   // Build business flags map

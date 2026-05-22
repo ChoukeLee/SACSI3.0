@@ -18,25 +18,20 @@ export default async function FrenchUnitsPage() {
   const t = dictionaries.fr.units;
   const supabase = await createClient();
 
-  const { data: building } = await supabase
-    .from("buildings")
-    .select("id")
-    .eq("code", "SASCI11")
-    .single();
-
-  const buildingId = building?.id;
-
   let units: UnitRow[] = [];
   let flags: UnitBusinessFlagRow[] = [];
 
-  if (buildingId) {
-    const [unitsRes, flagsRes] = await Promise.all([
-      supabase.from("units").select("*").eq("building_id", buildingId).order("unit_no"),
-      supabase.from("unit_business_flags").select("*"),
-    ]);
+  const [buildingRes, flagsRes] = await Promise.all([
+    supabase.from("buildings").select("id").eq("code", "SASCI11").single(),
+    supabase.from("unit_business_flags").select("*"),
+  ]);
 
-    if (!unitsRes.error) units = sortUnits(unitsRes.data);
-    if (!flagsRes.error) flags = flagsRes.data;
+  if (!flagsRes.error) flags = flagsRes.data;
+
+  const buildingId = buildingRes.data?.id;
+  if (buildingId) {
+    const { data: unitsData, error: unitsErr } = await supabase.from("units").select("*").eq("building_id", buildingId).order("unit_no");
+    if (!unitsErr) units = sortUnits(unitsData);
   }
 
   const businessFlagsMap: Record<string, UnitBusinessFlagRow[]> = {};
