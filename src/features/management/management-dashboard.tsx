@@ -328,7 +328,7 @@ export function ManagementDashboard({
         </div>
 
         {/* ── Section 1: Core KPI Summary ── */}
-        <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.72fr)]">
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.72fr)]">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-natural">
             <div className="mb-3 flex items-center justify-between gap-3">
               <SectionLabel compact>{t.sections.financeOverview}</SectionLabel>
