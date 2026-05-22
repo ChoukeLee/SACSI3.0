@@ -47,8 +47,9 @@ export function AppShell({
             <div className="flex items-center gap-2 sm:gap-3">
               <NotificationBell notifications={notifications} t={notifT} locale={locale} />
               <Link
-                className="rounded-xl border border-brand-warm-300 bg-white px-3 py-1.5 text-[11px] font-bold text-brand-ink-900 shadow-sm transition-colors duration-[100ms] hover:border-brand-orange-200 hover:bg-brand-orange-50 active:scale-95"
+                className="rounded-xl border border-brand-warm-300 bg-white px-3 py-1.5 text-[11px] font-bold text-brand-ink-900 shadow-sm transition-colors duration-fast hover:border-brand-orange-200 hover:bg-brand-orange-50 active:scale-95"
                 href={routeFor(otherLocale, pathname)}
+                aria-label={locale === "zh" ? "Switch to French" : "切换到中文"}
               >
                 {otherLocale.toUpperCase()}
               </Link>
@@ -59,9 +60,10 @@ export function AppShell({
               )}
               {userRole && (
                 <button
+                  type="button"
                   onClick={handleLogout}
-                  className="rounded-xl p-2 text-brand-neutral-700 transition-colors duration-[100ms] hover:bg-brand-red-50 hover:text-brand-red-600"
-                  title={locale === "zh" ? "登出" : "Deconnexion"}
+                  className="rounded-xl p-2 text-brand-neutral-700 transition-colors duration-fast hover:bg-brand-red-50 hover:text-brand-red-600"
+                  aria-label={locale === "zh" ? "登出" : "Deconnexion"}
                 >
                   <LogOut className="h-3.5 w-3.5" />
                 </button>

@@ -186,8 +186,8 @@ export function DesktopSidebar({ locale, userRole }: { locale: Locale; userRole?
                     href={resolveHref(item)}
                     className={cn(
                       "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold select-none",
-                      "transition-all duration-[100ms]",
-                      "active:scale-[0.98]",
+                      "transition-all duration-fast",
+                      "active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange",
                       active
                         ? "bg-brand-orange-500 text-white shadow-lifted"
                         : "text-brand-ink-800 hover:bg-brand-orange-50 hover:text-brand-orange-800"

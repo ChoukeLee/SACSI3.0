@@ -15,7 +15,6 @@ const PRINT_STYLES = `
   }
   @media print {
     body { padding: 14mm 18mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .no-print { display: none !important; }
   }
   .header { text-align: center; border-bottom: 2px solid #F77F00; padding-bottom: 10px; margin-bottom: 14px; }
   .header .company { font-size: 22px; font-weight: 800; color: #F77F00; letter-spacing: 0.04em; }

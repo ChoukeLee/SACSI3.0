@@ -325,7 +325,9 @@ export async function activateContract(
   // Generate rent receivables
   const genResult = await generateLeaseReceivables(contractId);
   if (!genResult.success) {
-    console.warn("generateLeaseReceivables failed:", genResult.error);
+    if (process.env.NODE_ENV === "development") {
+      console.warn("generateLeaseReceivables failed:", genResult.error);
+    }
   }
 
   revalidatePath("/leases");
