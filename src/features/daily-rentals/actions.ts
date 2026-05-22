@@ -8,6 +8,20 @@ import {
   createReceivable, syncReceivablesForSource,
   updateReceivableAmount, cancelReceivablesForSource,
 } from "@/features/finance/receivables";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+// ── Helpers ──
+
+/** Keep daily_bookings.prepaid_amount_xof in sync with receivable.paid_amount_xof after payment changes. */
+async function syncBookingPrepaid(supabase: SupabaseClient, bookingId: string) {
+  const { data: recs } = await supabase.from("receivables")
+    .select("paid_amount_xof")
+    .eq("source_type", "daily_booking")
+    .eq("source_id", bookingId)
+    .neq("status", "cancelled");
+  const canonicalPaid = (recs ?? []).reduce((s, r) => s + Number(r.paid_amount_xof), 0);
+  await supabase.from("daily_bookings").update({ prepaid_amount_xof: canonicalPaid }).eq("id", bookingId);
+}
 
 // ── Permission guards ──
 async function guardWrite() {
@@ -202,6 +216,7 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
   if (prepaidAmount > 0) {
     await syncReceivablesForSource("daily_booking", bookingId);
   }
+  await syncBookingPrepaid(supabase, bookingId);
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
@@ -250,6 +265,7 @@ export async function recordSupplementaryPayment(input: {
   });
 
   await syncReceivablesForSource("daily_booking", input.bookingId);
+  await syncBookingPrepaid(supabase, input.bookingId);
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
@@ -259,7 +275,7 @@ export async function recordSupplementaryPayment(input: {
   return { success: true };
 }
 
-// ── Delete a supplementary payment ──
+// ── Reverse a supplementary payment ──
 export async function deletePayment(paymentId: string): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
 
@@ -275,22 +291,47 @@ export async function deletePayment(paymentId: string): Promise<{ success: boole
     .select("*").eq("id", payment.source_id).single();
   if (!booking) return { success: false, error: "Booking not found." };
 
-  const newPrepaid = Math.max(0, Number(booking.prepaid_amount_xof) - payment.amount);
-  const billingStatus = booking.status === "checked_out" || newPrepaid >= Number(booking.final_amount_xof ?? booking.total_amount_xof) ? booking.billing_status : "partially_paid";
+  // Soft-delete ledger: insert reversal entries instead of physical DELETE
+  const { data: entries } = await supabase.from("ledger_entries")
+    .select("*").eq("payment_id", paymentId);
+  if (entries && entries.length > 0) {
+    const today = new Date().toISOString().slice(0, 10);
+    const reversals = entries.map(e => {
+      const revDirection =
+        e.direction === "income" ? "expense" :
+        e.direction === "expense" ? "income" :
+        e.direction === "liability_in" ? "liability_out" :
+        e.direction === "liability_out" ? "liability_in" : e.direction;
+      return {
+        unit_id: e.unit_id, building_id: e.building_id,
+        entry_date: today, direction: revDirection, category: e.category,
+        amount_xof: e.amount_xof, amount_cny: e.amount_cny,
+        description: `冲销 payment=${paymentId.slice(0, 8)}`,
+      };
+    });
+    await supabase.from("ledger_entries").insert(reversals);
+  }
 
   await supabase.from("payments").delete().eq("id", paymentId);
-  await supabase.from("ledger_entries").delete().eq("payment_id", paymentId);
-
-  await supabase.from("daily_bookings").update({
-    prepaid_amount_xof: newPrepaid, billing_status: billingStatus,
-  }).eq("id", payment.source_id);
 
   await supabase.from("audit_logs").insert({
-    action: "payment_deleted", entity_type: "payment", entity_id: paymentId,
+    action: "payment_reversed", entity_type: "payment", entity_id: paymentId,
     metadata: { amount: payment.amount, booking_id: payment.source_id, unit_id: payment.unit_id },
   });
 
   await syncReceivablesForSource("daily_booking", payment.source_id);
+  await syncBookingPrepaid(supabase, payment.source_id);
+
+  // Recompute billing_status from canonical prepaid
+  const { data: bookingAfter } = await supabase.from("daily_bookings")
+    .select("prepaid_amount_xof, final_amount_xof, total_amount_xof, status")
+    .eq("id", payment.source_id).single();
+  if (bookingAfter) {
+    const final = Number(bookingAfter.final_amount_xof ?? bookingAfter.total_amount_xof);
+    const prepaid = Number(bookingAfter.prepaid_amount_xof);
+    const billingStatus = bookingAfter.status === "checked_out" || prepaid >= final ? bookingAfter.status === "checked_out" ? "settled" : "prepaid" : "partially_paid";
+    await supabase.from("daily_bookings").update({ billing_status: billingStatus }).eq("id", payment.source_id);
+  }
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
@@ -370,6 +411,7 @@ export async function checkOut(bookingId: string, input: {
     await updateReceivableAmount(receivables[0].id, finalAmount);
   }
   await syncReceivablesForSource("daily_booking", bookingId);
+  await syncBookingPrepaid(supabase, bookingId);
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");

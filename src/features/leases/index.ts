@@ -3,7 +3,6 @@ export {
   createLeaseContract,
   activateContract,
   terminateContract,
-  recordRentPayment,
   recordReceivablePayment,
   processMoveOut,
   generateOverdueReminders,

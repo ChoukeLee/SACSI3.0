@@ -57,6 +57,7 @@ const PANEL_LABELS: Record<DetailType, { zh: { title: string; desc: string }; fr
 };
 
 const now = new Date();
+const todayStr = now.toISOString().slice(0, 10);
 const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
 export function FinanceDetailPanel({
@@ -93,8 +94,11 @@ export function FinanceDetailPanel({
       // 本月未收: due_date in current month, not paid/cancelled
       filtered = receivables.filter(r => r.due_date.startsWith(currentMonthPrefix) && r.status !== "paid" && r.status !== "cancelled");
     } else if (open === "overdue") {
-      // 逾期: status = overdue
-      filtered = receivables.filter(r => r.status === "overdue");
+      // 逾期: dynamic — any unpaid receivable past its due date
+      filtered = receivables.filter(r => {
+        if (r.status === "cancelled" || r.status === "paid") return false;
+        return (Number(r.amount_xof) - Number(r.paid_amount_xof)) > 0 && r.due_date < todayStr;
+      });
     }
 
     return filtered.sort((a, b) => b.due_date.localeCompare(a.due_date));
