@@ -625,7 +625,7 @@ function RoomStatusCard({
 function StatusSummaryCard({ label, value, status }: { label: string; value: number; status: MgmtStatus }) {
   const styles = ROOM_CARD[status];
   return (
-    <div className={cn("min-h-[92px] rounded-2xl border px-3.5 py-3.5", styles.summary)}>
+    <div className={cn("min-h-[94px] rounded-2xl border px-3.5 py-3.5", styles.summary)}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-black opacity-90">{label}</span>
         <span className={cn("h-2.5 w-2.5 rounded-full ring-2 ring-white/25", styles.dot)} />
