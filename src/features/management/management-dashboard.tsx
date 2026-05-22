@@ -681,7 +681,7 @@ function KPICard({ label, value, variant, onClick }: {
       onClick={onClick}
       disabled={!isClickable}
       className={cn(
-        "flex min-h-[94px] overflow-hidden rounded-2xl border bg-white text-left transition-all duration-fast",
+        "appearance-none flex min-h-[94px] overflow-hidden rounded-2xl border bg-white text-left transition-all duration-fast shadow-sm",
         s.bg,
         isClickable && "cursor-pointer hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500",
       )}
