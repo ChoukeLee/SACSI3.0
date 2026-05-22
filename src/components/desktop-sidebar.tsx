@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  ArrowUpDown, Banknote, BarChart3, BedDouble, Bell, Building2,
+  ArrowUpDown, Banknote, BarChart3, Bell, Building2,
   CalendarDays, FileSignature, FileText, Layers,
   LayoutDashboard, Settings, Shield, ShieldCheck, Target, Users,
 } from "lucide-react";
@@ -111,8 +111,7 @@ function filterGroups(groups: NavGroup[], role?: UserRole): NavGroup[] {
         ...g,
         items: g.items.filter(i =>
           !FINANCE_HIDDEN_KEYS.has(i.key) &&
-          !FINANCE_EXTRA_HIDDEN.has(i.key) &&
-          i.key !== "management" && i.key !== "dailyRentals" && i.key !== "dataQuality"
+          !FINANCE_EXTRA_HIDDEN.has(i.key)
         ),
       }))
       .filter(g => g.items.length > 0);

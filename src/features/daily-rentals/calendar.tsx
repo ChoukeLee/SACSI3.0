@@ -35,7 +35,7 @@ const DAY_COL_MIN_WIDTH = 72;
 const DAY_COL_WIDTH = 78;
 const ROW_HEIGHT = 60;
 const FLOOR_ROW_HEIGHT = 20;
-const MAINTENANCE_STATUSES = new Set(["available", "reserved", "daily_occupied", "cleaning_pending"]);
+const MAINTENANCE_STATUSES = new Set(["available", "reserved", "daily_occupied", "cleaning_pending", "leased", "sold"]);
 
 const NAV_BTN =
   "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-brand-warm-300 bg-white text-brand-ink-500 shadow-sm transition-all duration-fast hover:border-brand-orange-200 hover:bg-brand-orange-50 hover:text-brand-orange-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500";
@@ -155,7 +155,7 @@ export function DailyCalendar({
   const todayStr = toDateStr(new Date());
   const tomorrowStr = toDateStr(new Date(Date.now() + 86400000));
 
-  const { visibleDays, visibleEndExclusiveStr, rangeLabel } = useMemo(() => {
+  const { visibleDays, rangeLabel } = useMemo(() => {
     const start = resolveRangeStart(anchorDate, viewMode);
     const end = resolveRangeEnd(anchorDate, viewMode);
     const days: Date[] = [];
@@ -167,14 +167,13 @@ export function DailyCalendar({
 
     return {
       visibleDays: days,
-      visibleEndExclusiveStr: toDateStr(end),
       rangeLabel: formatRangeLabel(days, localeStr, viewMode),
     };
   }, [anchorDate, localeStr, viewMode]);
 
   const bookingMap = useMemo(
-    () => buildBookingMap(bookings, { todayStr, tomorrowStr, visibleEndExclusiveStr }),
-    [bookings, todayStr, tomorrowStr, visibleEndExclusiveStr],
+    () => buildBookingMap(bookings, { todayStr, tomorrowStr }),
+    [bookings, todayStr, tomorrowStr],
   );
 
   const customerMap = useMemo(() => {
@@ -208,23 +207,11 @@ export function DailyCalendar({
       maintenance: 0,
     };
     for (const unit of dailyUnits) {
-      const state = todayStateMap.get(unit.id);
-      if (!state) continue;
-      switch (state.status) {
-        case "available": counts.available++; break;
-        case "occupied": counts.occupied++; break;
-        case "checking_out_today": counts.checkingOutToday++; counts.occupied++; break;
-        case "reserved": counts.reserved++; break;
-        case "cleaning": counts.cleaning++; break;
-        case "maintenance":
-        case "locked": counts.maintenance++; break;
-      }
-      if (state.booking?.checkout_mode === "open" && (state.status === "occupied" || state.status === "checking_out_today")) {
-        counts.openEnded++;
-      }
+      counts[getUnitTimelineStatus(unit, visibleDays, bookingMap, unitCleaningMap, todayStr)]++;
     }
+    counts.occupied += counts.checkingOutToday + counts.openEnded;
     return counts;
-  }, [dailyUnits, todayStateMap]);
+  }, [dailyUnits, visibleDays, bookingMap, unitCleaningMap, todayStr]);
 
   const filteredUnits = useMemo(() => {
     return dailyUnits.filter((unit) => {
@@ -303,7 +290,6 @@ export function DailyCalendar({
   const moveRange = useCallback((direction: -1 | 1) => {
     setAnchorDate((prev) => {
       if (viewMode === "month") return new Date(prev.getFullYear(), prev.getMonth() + direction, 1);
-      if (viewMode === "week") return addDays(prev, direction * 7);
       return addDays(prev, direction * 7);
     });
   }, [viewMode]);
@@ -544,8 +530,9 @@ export function DailyCalendar({
             setSelectedBookingId(null);
             setNewBookingUnitId(null);
             setNewBookingDate(null);
+            setOptimisticBookings([]);
           }}
-          onChanged={() => setTick((t) => t + 1)}
+          onChanged={() => { setTick((t) => t + 1); setOptimisticBookings([]); }}
           onBookingCreated={(booking) => setOptimisticBookings((prev) => [booking, ...prev])}
         />
       )}

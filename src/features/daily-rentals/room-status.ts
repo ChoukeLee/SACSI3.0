@@ -132,7 +132,6 @@ export function buildDailyRoomStateMap(params: {
 interface BuildBookingMapOptions {
   todayStr: string;
   tomorrowStr: string;
-  visibleEndExclusiveStr: string;
 }
 
 /**
@@ -198,7 +197,7 @@ function resolveCalendarCheckOut(
   b: DailyBookingRow,
   opts: BuildBookingMapOptions,
 ): string {
-  const { todayStr, visibleEndExclusiveStr } = opts;
+  const { todayStr } = opts;
 
   if (b.checkout_mode !== "open") {
     // Fixed: strictly bounded by check_out
@@ -263,7 +262,8 @@ function coversDate(b: DailyBookingRow, dateStr: string): boolean {
   }
 
   // fixed: departure date is included (guest occupies until checkout time)
-  if (b.check_out !== null && dateStr > b.check_out) return false;
+  if (b.check_out === null) return dateStr === b.check_in;
+  if (dateStr > b.check_out) return false;
   return true;
 }
 
