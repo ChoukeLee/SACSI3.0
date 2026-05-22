@@ -26,31 +26,31 @@ export function TodoDashboardWidget({ todos, locale, maxItems = 6 }: Props) {
 
   if (todos.length === 0) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-natural text-center">
-        <Bell className="mx-auto h-6 w-6 text-slate-300 mb-2" />
-        <p className="text-sm font-semibold text-slate-400">{locale === "zh" ? "今日暂无待办" : "Aucune tache"}</p>
+      <div className="rounded-2xl border border-brand-warm-200 bg-white p-5 shadow-natural text-center">
+        <Bell className="mx-auto h-6 w-6 text-brand-ink-300 mb-2" />
+        <p className="text-sm font-semibold text-brand-ink-400">{locale === "zh" ? "今日暂无待办" : "Aucune tache"}</p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-natural">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50/80">
-        <h3 className="text-sm font-black text-slate-950 flex items-center gap-2">
+    <div className="overflow-hidden rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-brand-warm-50/80">
+        <h3 className="text-sm font-black text-brand-ink-900 flex items-center gap-2">
           <Bell className="h-4 w-4 text-brand-orange" />
           {locale === "zh" ? "今日待办" : "Aujourd'hui"}
         </h3>
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-brand-ink-500">
           {todos.length} {locale === "zh" ? "条" : "lignes"}
         </span>
       </div>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-brand-warm-100">
         {sorted.map(todo => (
           <Link
             key={todo.id}
             href={routeFor(locale, todo.href)}
             className={cn(
-              "flex items-center gap-3 px-5 py-2.5 transition-colors hover:bg-slate-50/80",
+              "flex items-center gap-3 px-5 py-2.5 transition-colors hover:bg-brand-warm-50/80",
               todo.priority === "high" && "bg-brand-red-50/20",
             )}
           >
@@ -59,22 +59,22 @@ export function TodoDashboardWidget({ todos, locale, maxItems = 6 }: Props) {
             ) : todo.dueDate === new Date().toISOString().slice(0, 10) ? (
               <Clock className="h-4 w-4 shrink-0 text-brand-orange" />
             ) : (
-              <Calendar className="h-4 w-4 shrink-0 text-slate-400" />
+              <Calendar className="h-4 w-4 shrink-0 text-brand-ink-400" />
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-900 truncate">{todo.title}</p>
-              <p className="text-[10px] text-slate-500 truncate">
+              <p className="text-xs font-semibold text-brand-ink-800 truncate">{todo.title}</p>
+              <p className="text-[10px] text-brand-ink-500 truncate">
                 {todo.unitLabel && <span>{todo.unitLabel} · </span>}
                 {todo.customerName}
                 {todo.amount > 0 && <span> · {formatXof(todo.amount)}</span>}
               </p>
             </div>
-            <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />
+            <ArrowRight className="h-3.5 w-3.5 shrink-0 text-brand-ink-300" />
           </Link>
         ))}
       </div>
       {todos.length > maxItems && (
-        <div className="px-5 py-2 border-t border-slate-100 bg-slate-50/70">
+        <div className="px-5 py-2 border-t border-slate-100 bg-brand-warm-50/70">
           <Link
             href={routeFor(locale, "/todos")}
             className="text-xs font-semibold text-brand-orange hover:underline flex items-center gap-1"

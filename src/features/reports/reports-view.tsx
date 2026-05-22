@@ -140,15 +140,15 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
 
   const statBox = (l: string, v: string, a: string, key?: string) => {
     const c: Record<string,string>={green:"bg-brand-green-500",red:"bg-brand-red-500",ink:"bg-slate-800",orange:"bg-brand-orange"};
-    return <div key={key ?? l} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-natural"><div className={cn("h-[3px]",c[a]??"bg-slate-800")} /><div className="px-3 py-2.5"><p className="text-[10px] font-semibold text-slate-400">{l}</p><p className="text-sm font-bold tabular-nums text-slate-950">{v}</p></div></div>;
+    return <div key={key ?? l} className="overflow-hidden rounded-2xl border border-brand-warm-200 bg-white shadow-natural"><div className={cn("h-[3px]",c[a]??"bg-slate-800")} /><div className="px-3 py-2.5"><p className="text-[10px] font-semibold text-brand-ink-400">{l}</p><p className="text-sm font-bold tabular-nums text-brand-ink-900">{v}</p></div></div>;
   };
 
   return (
     <div className="space-y-4">
       {/* Tabs */}
-      <div className="flex gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 overflow-x-auto">
+      <div className="flex gap-1 rounded-xl border border-brand-warm-200 bg-brand-warm-100 p-1 overflow-x-auto">
         {tabs.filter(t => permitted.includes(t.key)).map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} className={cn("shrink-0 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors", tab===t.key?"bg-white text-slate-950 shadow-sm":"text-slate-500")}>
+          <button key={t.key} onClick={() => setTab(t.key)} className={cn("shrink-0 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors", tab===t.key?"bg-white text-brand-ink-900 shadow-sm":"text-brand-ink-500")}>
             {t.label}{t.count !== undefined ? ` (${t.count})` : ""}
           </button>
         ))}
@@ -170,7 +170,7 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
             })}
           </div>
           <button onClick={() => downloadCsv("类型,状态,数量",Object.entries(roomStatusData.statuses).map(([k,v])=>csvLine([k,(locale==="zh"?{available:"空闲",daily_occupied:"日租中",leased:"长租中",sold:"已售"}:{available:"Dispo",daily_occupied:"Occupe",leased:"Loue",sold:"Vendu"})[k]??k,v])),"room_status")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
+            className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
         </div>
       )}
 
@@ -184,9 +184,9 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
             {statBox(locale==="zh"?"逾期":"Retard", formatXof(incomeData.overdue), "red")}
             {statBox(locale==="zh"?"收缴率":"Taux", `${incomeData.rate}%`, incomeData.rate>=80?"green":"orange")}
           </div>
-          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-natural">
-            <table className="data-table"><thead className="bg-slate-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"><tr><th className="px-3 py-2">{locale==="zh"?"业务类型":"Source"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"应收":"Du"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"实收":"Paye"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"收缴率":"Taux"}</th></tr></thead>
-            <tbody className="divide-y divide-slate-100">
+          <div className="overflow-x-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
+            <table className="data-table"><thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr><th className="px-3 py-2">{locale==="zh"?"业务类型":"Source"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"应收":"Du"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"实收":"Paye"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"收缴率":"Taux"}</th></tr></thead>
+            <tbody className="divide-y divide-brand-warm-100">
               {Object.entries(incomeData.bySource).map(([k,v]) => {
                 const labels: Record<string,string> = locale==="zh"?{daily_booking:"日租",lease_contract:"长租",sale_contract:"出售",manual:"手工"}:{daily_booking:"Jour",lease_contract:"LT",sale_contract:"Vente",manual:"Manuel"};
                 return <tr key={k}><td className="px-3 py-2 font-medium">{labels[k]??k}</td><td className="px-3 py-2 text-right">{formatXof(v.rec)}</td><td className="px-3 py-2 text-right text-brand-green-600">{formatXof(v.paid)}</td><td className="px-3 py-2 text-right">{v.rec>0?Math.round(v.paid/v.rec*100):0}%</td></tr>;
@@ -194,22 +194,22 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
             </tbody></table>
           </div>
           <button onClick={() => downloadCsv("业务类型,应收,实收,收缴率",Object.entries(incomeData.bySource).map(([k,v])=>csvLine([k,v.rec,v.paid,`${v.rec>0?Math.round(v.paid/v.rec*100):0}%`])),"income")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
+            className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
         </div>
       )}
 
       {/* ── Overdue ── */}
       {tab === "overdue" && (
         <div className="space-y-2">
-          <div className="flex gap-2 text-xs text-slate-500">{locale==="zh"?"共":"Total"}: {overdueData.length} {locale==="zh"?"条":"lignes"} · {locale==="zh"?"欠费合计":"Impaye"}: {formatXof(overdueData.reduce((s,r)=>s+r.unpaid,0))}</div>
-          {overdueData.length===0 ? <p className="text-sm font-semibold text-slate-400 py-8 text-center">{L.noData}</p> : (
-            <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-natural max-h-[500px]">
-              <table className="data-table"><thead className="sticky top-0 bg-slate-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"><tr><th className="px-3 py-2">{locale==="zh"?"房号":"Ch"}</th><th className="px-3 py-2">{locale==="zh"?"客户":"Client"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"欠费":"Impaye"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"逾期天数":"Jours"}</th><th className="px-3 py-2">{locale==="zh"?"到期":"Echeance"}</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">{overdueData.map(r => <tr key={r.id} className="bg-brand-red-50/20"><td className="px-3 py-2 font-mono">{r.unitNo}</td><td className="px-3 py-2">{r.cust}</td><td className="px-3 py-2 text-right font-semibold text-brand-red-600">{formatXof(r.unpaid)}</td><td className="px-3 py-2 text-right text-brand-red-500">+{r.overdueDays}</td><td className="px-3 py-2">{r.due_date}</td></tr>)}</tbody></table>
+          <div className="flex gap-2 text-xs text-brand-ink-500">{locale==="zh"?"共":"Total"}: {overdueData.length} {locale==="zh"?"条":"lignes"} · {locale==="zh"?"欠费合计":"Impaye"}: {formatXof(overdueData.reduce((s,r)=>s+r.unpaid,0))}</div>
+          {overdueData.length===0 ? <p className="text-sm font-semibold text-brand-ink-400 py-8 text-center">{L.noData}</p> : (
+            <div className="overflow-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural max-h-[500px]">
+              <table className="data-table"><thead className="sticky top-0 bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr><th className="px-3 py-2">{locale==="zh"?"房号":"Ch"}</th><th className="px-3 py-2">{locale==="zh"?"客户":"Client"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"欠费":"Impaye"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"逾期天数":"Jours"}</th><th className="px-3 py-2">{locale==="zh"?"到期":"Echeance"}</th></tr></thead>
+              <tbody className="divide-y divide-brand-warm-100">{overdueData.map(r => <tr key={r.id} className="bg-brand-red-50/20"><td className="px-3 py-2 font-mono">{r.unitNo}</td><td className="px-3 py-2">{r.cust}</td><td className="px-3 py-2 text-right font-semibold text-brand-red-600">{formatXof(r.unpaid)}</td><td className="px-3 py-2 text-right text-brand-red-500">+{r.overdueDays}</td><td className="px-3 py-2">{r.due_date}</td></tr>)}</tbody></table>
             </div>
           )}
           <button onClick={() => downloadCsv("房号,客户,欠费,逾期天数,到期日",overdueData.map(r=>csvLine([r.unitNo,r.cust,r.unpaid,r.overdueDays,r.due_date])),"overdue")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
+            className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
         </div>
       )}
 
@@ -229,7 +229,7 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
             {statBox(locale==="zh"?"开放>3天":"Open>3j", String(dailyData.openLong.length), "red")}
           </div>
           <button onClick={() => downloadCsv("房号,客户,入住日期,状态",dailyData.todayCheckins.map(b=>{const u=units.find(x=>x.id===b.unit_id);return csvLine([u?.unit_no??"",custName(b.customer_id),b.check_in,b.status]);}),"daily_checkins")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
+            className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
         </div>
       )}
 
@@ -248,9 +248,9 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
             {statBox(locale==="zh"?"欠费合同":"Impayes", String(leaseData.leaseOverdue.length), "red")}
             {statBox(locale==="zh"?"已退租":"Term.", String(leaseData.terminated.length), "ink")}
           </div>
-          {leaseData.expiring30d.length>0 && <div className="text-xs"><p className="font-semibold text-slate-800 mb-1">{locale==="zh"?"30天内到期合同":"Expirent sous 30j"}:</p>{leaseData.expiring30d.map(l => <p key={l.id} className="text-slate-600">{l.contract_no} — {l.expected_end_date}</p>)}</div>}
+          {leaseData.expiring30d.length>0 && <div className="text-xs"><p className="font-semibold text-slate-800 mb-1">{locale==="zh"?"30天内到期合同":"Expirent sous 30j"}:</p>{leaseData.expiring30d.map(l => <p key={l.id} className="text-brand-ink-600">{l.contract_no} — {l.expected_end_date}</p>)}</div>}
           <button onClick={() => downloadCsv("合同号,开始,到期,月租,状态",leaseData.active.map(l=>csvLine([l.contract_no,l.start_date,l.expected_end_date,l.monthly_rent_xof,l.status])),"leases")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
+            className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
         </div>
       )}
 
@@ -269,7 +269,7 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
             {statBox(locale==="zh"?"已结清未交付":"Non livre", String(saleData.notDelivered.length), "orange")}
           </div>
           <button onClick={() => downloadCsv("合同号,总价,已收,未收,状态",saleData.active.map(s=>{const p=saleData.active.find(x=>x.id===s.id);const rec=receivables.filter(r=>r.source_id===s.id&&r.status!=="cancelled");const paid=rec.reduce((sum,r)=>sum+Number(r.paid_amount_xof),0);return csvLine([s.contract_no,s.total_amount_xof,paid,Number(s.total_amount_xof)-paid,s.status]);}),"sales")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
+            className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
         </div>
       )}
 
@@ -291,11 +291,11 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
             lines.push(`SACIS3.0 ${locale==="zh"?"日结":"Cloture"} — ${today}`);
             lines.push(`${locale==="zh"?"新预订":"Res"}: ${dailyCloseData.newBookings.length} | ${locale==="zh"?"入住":"Arr"}: ${dailyCloseData.checkins.length} | ${locale==="zh"?"退房":"Dep"}: ${dailyCloseData.checkouts.length} | ${locale==="zh"?"在住":"Occ"}: ${dailyCloseData.inHouse.length} | ${locale==="zh"?"收款":"P"}: ${formatXof(dailyCloseData.todayTotal)}`);
             navigator.clipboard.writeText(lines.join("\n"));
-          }} className="rounded-xl bg-slate-950 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.98] inline-flex items-center gap-1.5">
+          }} className="rounded-xl bg-brand-orange-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-orange-600 active:scale-[0.98] inline-flex items-center gap-1.5">
             {locale==="zh"?"复制日结":"Copier"}
           </button>
           <button onClick={() => downloadCsv("指标,数值",[["新预订",dailyCloseData.newBookings.length],["入住",dailyCloseData.checkins.length],["退房",dailyCloseData.checkouts.length],["在住",dailyCloseData.inHouse.length],["收款",dailyCloseData.todayTotal]].map(r=>csvLine(r)),"daily_close")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 ml-2"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
+            className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 ml-2"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
         </div>
       )}
     </div>

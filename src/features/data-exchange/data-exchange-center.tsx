@@ -81,16 +81,16 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
     URL.revokeObjectURL(url);
   };
 
-  const btn = "rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50";
-  const primaryBtn = "rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.98] disabled:opacity-50";
+  const btn = "rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50";
+  const primaryBtn = "rounded-xl bg-brand-orange-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-orange-600 active:scale-[0.98] disabled:opacity-50";
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
       {/* Tabs */}
-      <div className="flex gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 w-fit">
+      <div className="flex gap-1 rounded-xl border border-brand-warm-200 bg-brand-warm-100 p-1 w-fit">
         {(["export", "import"] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={cn("rounded-md px-4 py-1.5 text-[13px] font-semibold transition-colors", tab === t ? "bg-white text-slate-950 shadow-sm" : "text-slate-500")}>
+            className={cn("rounded-md px-4 py-1.5 text-[13px] font-semibold transition-colors", tab === t ? "bg-white text-brand-ink-900 shadow-sm" : "text-brand-ink-500")}>
             {t === "export" ? (locale === "zh" ? "导出" : "Export") : (locale === "zh" ? "导入" : "Import")}
           </button>
         ))}
@@ -98,9 +98,9 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
 
       {/* ── Export Tab ── */}
       {tab === "export" && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-natural space-y-4">
+        <div className="rounded-2xl border border-brand-warm-200 bg-white p-5 shadow-natural space-y-4">
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 mb-1.5">{locale === "zh" ? "数据类型" : "Type"}</label>
+            <label className="block text-[11px] font-bold text-brand-ink-500 mb-1.5">{locale === "zh" ? "数据类型" : "Type"}</label>
             <select value={expType} onChange={e => setExpType(e.target.value as ExportDataType)} className={cn(btn, "w-full sm:w-64")}>
               {exportTypes.map(t => <option key={t} value={t}>{exportLabels[t]}</option>)}
             </select>
@@ -115,10 +115,10 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
 
       {/* ── Import Tab ── */}
       {tab === "import" && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-natural space-y-4">
+        <div className="rounded-2xl border border-brand-warm-200 bg-white p-5 shadow-natural space-y-4">
           <div className="flex flex-wrap items-end gap-3">
             <div>
-              <label className="block text-[11px] font-bold text-slate-500 mb-1.5">{locale === "zh" ? "数据类型" : "Type"}</label>
+              <label className="block text-[11px] font-bold text-brand-ink-500 mb-1.5">{locale === "zh" ? "数据类型" : "Type"}</label>
               <select value={impType} onChange={e => { setImpType(e.target.value as ImportDataType); setImpResult(null); setImpSubmitResult(null); }} className={cn(btn, "w-full sm:w-48")}>
                 {importTypes.map(t => <option key={t} value={t}>{importLabels[t]}</option>)}
               </select>
@@ -129,13 +129,13 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 mb-1.5">{locale === "zh" ? "粘贴 CSV 内容" : "Coller CSV"}</label>
+            <label className="block text-[11px] font-bold text-brand-ink-500 mb-1.5">{locale === "zh" ? "粘贴 CSV 内容" : "Coller CSV"}</label>
             <textarea
               value={impText}
               onChange={e => { setImpText(e.target.value); setImpResult(null); setImpSubmitResult(null); }}
               rows={8}
               placeholder={locale === "zh" ? "将 CSV 内容粘贴到此处..." : "Collez le contenu CSV ici..."}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15"
+              className="w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-mono text-brand-ink-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15"
             />
           </div>
 
@@ -164,18 +164,18 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
               </div>
               {impResult.errCount > 0 && <p className="text-xs text-brand-red-600">{locale === "zh" ? "存在错误行，无法提交导入" : "Erreurs detectees, import impossible"}</p>}
 
-              <div className="overflow-auto max-h-[300px] rounded-xl border border-slate-200 text-xs">
+              <div className="overflow-auto max-h-[300px] rounded-xl border border-brand-warm-200 text-xs">
                 <table className="data-table">
-                  <thead className="sticky top-0 bg-slate-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"><tr>
+                  <thead className="sticky top-0 bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
                     <th className="px-2 py-1.5 text-left">{locale === "zh" ? "行" : "#"}</th>
                     <th className="px-2 py-1.5 text-left">{locale === "zh" ? "数据" : "Donnees"}</th>
                     <th className="px-2 py-1.5 text-left">{locale === "zh" ? "结果" : "Resultat"}</th>
                   </tr></thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-brand-warm-100">
                     {impResult.rows.map(r => (
                       <tr key={r.row} className={cn(r.status === "error" ? "bg-brand-red-50/30" : r.status === "warning" ? "bg-brand-amber-50/30" : "")}>
                         <td className="px-2 py-1.5 font-mono">{r.row}</td>
-                        <td className="px-2 py-1.5 text-slate-600 max-w-[300px] truncate">{Object.values(r.data).join(", ")}</td>
+                        <td className="px-2 py-1.5 text-brand-ink-600 max-w-[300px] truncate">{Object.values(r.data).join(", ")}</td>
                         <td className={cn("px-2 py-1.5", r.status === "error" ? "text-brand-red-600" : r.status === "warning" ? "text-brand-amber-600" : "text-brand-green-600")}>{r.message}</td>
                       </tr>
                     ))}

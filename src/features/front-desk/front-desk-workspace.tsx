@@ -173,13 +173,13 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div>
-          <p className="text-[13px] font-bold text-slate-950">{buildingName}</p>
-          <p className="text-[10px] text-slate-500">
+          <p className="text-[13px] font-bold text-brand-ink-900">{buildingName}</p>
+          <p className="text-[10px] text-brand-ink-500">
             {new Date().toLocaleDateString(locale === "zh" ? "zh-CN" : "fr-FR", { weekday: "short", month: "short", day: "numeric" })}
           </p>
         </div>
         <button onClick={handleCopyShare}
-          className={cn("flex items-center gap-1 rounded-lg px-3 py-1.5 text-[11px] font-medium transition-colors", copied ? "bg-brand-green-100 text-brand-green-700" : "bg-slate-100 text-slate-600")}>
+          className={cn("flex items-center gap-1 rounded-lg px-3 py-1.5 text-[11px] font-medium transition-colors", copied ? "bg-brand-green-100 text-brand-green-700" : "bg-brand-warm-100 text-brand-ink-600")}>
           {copied ? <ClipboardCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
           {copied ? t.copied : t.copyShare}
         </button>
@@ -187,7 +187,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
 
       {/* Quick action buttons */}
       <div className="grid grid-cols-3 gap-2 mb-4">
-        <button onClick={() => router.push("/daily-rentals")} className={cn(btnClass, "bg-slate-950 text-white")}>
+        <button onClick={() => router.push("/daily-rentals")} className={cn(btnClass, "bg-brand-orange-500 text-white")}>
           <Plus className="h-4 w-4" />{t.newBooking}
         </button>
         <button onClick={() => setMainTab("checkins")} className={cn(btnClass, "bg-brand-sky-50 text-brand-sky-700 border border-brand-sky-200")}>
@@ -199,7 +199,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
         <button onClick={() => setMainTab("occupied")} className={cn(btnClass, "bg-brand-orange-50 text-brand-orange-700 border border-brand-orange-200")}>
           <BedDouble className="h-4 w-4" />{t.occupied} ({occupied.length})
         </button>
-        <button onClick={() => setMainTab("pending")} className={cn(btnClass, "bg-slate-100 text-slate-600 border border-slate-200")}>
+        <button onClick={() => setMainTab("pending")} className={cn(btnClass, "bg-brand-warm-100 text-brand-ink-600 border border-brand-warm-200")}>
           <AlertTriangle className="h-4 w-4" />{t.pending} ({pendingBookings.length})
         </button>
         <button onClick={() => router.push("/daily-rentals")} className={cn(btnClass, "bg-brand-green-50 text-brand-green-700 border border-brand-green-200")}>
@@ -208,8 +208,8 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
       </div>
 
       {/* Room matrix — apartments only, compact */}
-      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3">
-        <h3 className="text-[11px] font-bold text-slate-600 mb-2">{t.roomStatus} ({roomStates.length})</h3>
+      <div className="mb-4 rounded-xl border border-brand-warm-200 bg-white p-3">
+        <h3 className="text-[11px] font-bold text-brand-ink-600 mb-2">{t.roomStatus} ({roomStates.length})</h3>
         <div className="flex flex-wrap gap-1.5">
           {roomStates.map(rs => (
             <button
@@ -225,7 +225,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
             </button>
           ))}
         </div>
-        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-slate-500">
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-brand-ink-500">
           <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-brand-green-500" />{t.available} ({available.length})</span>
           <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-brand-red-500" />{t.occupied} ({occupied.length})</span>
           <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-brand-amber-500" />{t.checkouts} ({todayCheckouts.length})</span>
@@ -234,12 +234,12 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
       </div>
 
       {/* Tab lists */}
-      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+      <div className="rounded-xl border border-brand-warm-200 bg-white overflow-hidden">
         <div className="flex border-b border-brand-neutral-200 text-[11px] font-medium">
           {(["checkins", "occupied", "checkouts", "pending"] as MainTab[]).map(tab => (
             <button key={tab}
               onClick={() => setMainTab(tab)}
-              className={cn("flex-1 py-2.5 text-center transition-colors", mainTab === tab ? "bg-brand-orange-50 text-brand-orange-700 border-b-2 border-brand-orange" : "text-slate-500")}>
+              className={cn("flex-1 py-2.5 text-center transition-colors", mainTab === tab ? "bg-brand-orange-50 text-brand-orange-700 border-b-2 border-brand-orange" : "text-brand-ink-500")}>
               {t[tab]} ({tab === "checkins" ? todayCheckins.length : tab === "occupied" ? occupied.length : tab === "checkouts" ? todayCheckouts.length : pendingBookings.length})
             </button>
           ))}
@@ -258,8 +258,8 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
               <div key={b.id} className="flex items-center gap-2 px-3 py-2.5 text-xs">
                 <span className="font-mono font-bold text-slate-800 min-w-[32px]">{unit?.unit_no ?? "?"}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-slate-900 truncate">{cust?.name ?? "?"}</p>
-                  <p className="text-[10px] text-slate-500 truncate">
+                  <p className="font-medium text-brand-ink-800 truncate">{cust?.name ?? "?"}</p>
+                  <p className="text-[10px] text-brand-ink-500 truncate">
                     {b.check_in} · {nights}{locale === "zh" ? "晚" : "n"} · {formatXof(Number(b.total_amount_xof))}
                     {cust?.phone && <span className="ml-1">· {cust.phone}</span>}
                   </p>
@@ -268,7 +268,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
                   b.status === "checked_in" ? "bg-brand-red-100 text-brand-red-700" :
                   b.status === "confirmed" ? "bg-brand-sky-100 text-brand-sky-700" :
                   b.status === "pending_review" ? "bg-brand-amber-100 text-brand-amber-700" :
-                  "bg-slate-100 text-slate-500"
+                  "bg-brand-warm-100 text-brand-ink-500"
                 )}>
                   {b.status === "checked_in" ? (locale === "zh" ? "在住" : "Occupe") :
                    b.status === "confirmed" ? (locale === "zh" ? "已确认" : "Confirme") :
@@ -295,7 +295,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
             (mainTab === "occupied" && occupied.length === 0 && todayCheckouts.length === 0) ||
             (mainTab === "checkouts" && todayCheckouts.length === 0) ||
             (mainTab === "pending" && pendingBookings.length === 0)) && (
-            <div className="py-10 text-center text-xs text-slate-400">{t.noData}</div>
+            <div className="py-10 text-center text-xs text-brand-ink-400">{t.noData}</div>
           )}
         </div>
       </div>
@@ -303,28 +303,28 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
       {/* Room detail popup */}
       {selectedRoom && !popupAction && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={() => setSelectedRoom(null)}>
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-sm max-h-[70vh] overflow-auto shadow-xl border border-slate-200 p-4" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-sm max-h-[70vh] overflow-auto shadow-xl border border-brand-warm-200 p-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-slate-950">{selectedRoom.unit.unit_no} · {selectedRoom.unit.floor_label}</h3>
-              <button onClick={() => setSelectedRoom(null)} className="p-1 rounded hover:bg-slate-100"><X className="h-4 w-4 text-slate-500" /></button>
+              <h3 className="text-sm font-bold text-brand-ink-900">{selectedRoom.unit.unit_no} · {selectedRoom.unit.floor_label}</h3>
+              <button onClick={() => setSelectedRoom(null)} className="p-1 rounded hover:bg-brand-warm-100"><X className="h-4 w-4 text-brand-ink-500" /></button>
             </div>
             {selectedRoom.customer && (
               <div className="space-y-1 text-xs mb-3">
-                <p className="flex items-center gap-1"><User className="h-3 w-3 text-slate-500" />{selectedRoom.customer.name}</p>
-                {selectedRoom.customer.phone && <p className="flex items-center gap-1"><Phone className="h-3 w-3 text-slate-500" />{selectedRoom.customer.phone}</p>}
+                <p className="flex items-center gap-1"><User className="h-3 w-3 text-brand-ink-500" />{selectedRoom.customer.name}</p>
+                {selectedRoom.customer.phone && <p className="flex items-center gap-1"><Phone className="h-3 w-3 text-brand-ink-500" />{selectedRoom.customer.phone}</p>}
               </div>
             )}
             {selectedRoom.booking ? (
               <div className="space-y-1 text-xs mb-3">
-                <p><span className="text-slate-500">{t.date}:</span> {selectedRoom.booking.check_in} → {selectedRoom.booking.check_out ?? (locale === "zh" ? "未定" : "?")}</p>
-                <p><span className="text-slate-500">{t.amount}:</span> {formatXof(Number(selectedRoom.booking.total_amount_xof))}</p>
-                <p><span className="text-slate-500">{t.prepaid}:</span> <span className="text-brand-green-600">{formatXof(selectedRoom.totalPaid)}</span></p>
+                <p><span className="text-brand-ink-500">{t.date}:</span> {selectedRoom.booking.check_in} → {selectedRoom.booking.check_out ?? (locale === "zh" ? "未定" : "?")}</p>
+                <p><span className="text-brand-ink-500">{t.amount}:</span> {formatXof(Number(selectedRoom.booking.total_amount_xof))}</p>
+                <p><span className="text-brand-ink-500">{t.prepaid}:</span> <span className="text-brand-green-600">{formatXof(selectedRoom.totalPaid)}</span></p>
                 {selectedRoom.billing && selectedRoom.billing.finalAmount > selectedRoom.totalPaid && (
-                  <p><span className="text-slate-500">{t.due}:</span> <span className="text-brand-red-600 font-semibold">{formatXof(selectedRoom.billing.finalAmount - selectedRoom.totalPaid)}</span></p>
+                  <p><span className="text-brand-ink-500">{t.due}:</span> <span className="text-brand-red-600 font-semibold">{formatXof(selectedRoom.billing.finalAmount - selectedRoom.totalPaid)}</span></p>
                 )}
               </div>
             ) : (
-              <p className="text-xs text-slate-400 mb-3">{t.available}</p>
+              <p className="text-xs text-brand-ink-400 mb-3">{t.available}</p>
             )}
             <div className="grid grid-cols-2 gap-2">
               {(!selectedRoom.booking || selectedRoom.booking.status === "pending_review") && (
@@ -350,30 +350,30 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
       {/* Action popup */}
       {popupAction && selectedRoom && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={() => { setPopupAction(null); setSelectedRoom(null); }}>
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-sm shadow-xl border border-slate-200 p-4" onClick={e => e.stopPropagation()}>
-            <h3 className="text-sm font-bold text-slate-950 mb-3">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-sm shadow-xl border border-brand-warm-200 p-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold text-brand-ink-900 mb-3">
               {popupAction === "checkin" ? t.checkin : popupAction === "checkout" ? t.checkout : popupAction === "payment" ? t.payment : popupAction === "cancel" ? t.cancel : t.confirm}
               {" — "}{selectedRoom.unit.unit_no}
             </h3>
-            <p className="text-xs text-slate-600 mb-3">
+            <p className="text-xs text-brand-ink-600 mb-3">
               {popupAction === "checkin" ? t.checkinDesc : popupAction === "checkout" ? t.checkoutDesc : popupAction === "payment" ? t.paymentDesc : popupAction === "cancel" ? t.cancelDesc : t.confirm}
             </p>
 
             {popupAction === "checkin" && (
               <div className="space-y-2 mb-3">
-                <label className="text-[10px] text-slate-500">{t.prepaid}</label>
+                <label className="text-[10px] text-brand-ink-500">{t.prepaid}</label>
                 <input type="number" value={popupAmount} onChange={e => setPopupAmount(Number(e.target.value))}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                  className="w-full rounded-lg border border-brand-warm-200 px-3 py-2 text-sm" />
               </div>
             )}
             {popupAction === "payment" && (
               <div className="space-y-2 mb-3">
-                <label className="text-[10px] text-slate-500">{t.amount}</label>
+                <label className="text-[10px] text-brand-ink-500">{t.amount}</label>
                 <input type="number" value={popupAmount} onChange={e => setPopupAmount(Number(e.target.value))}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                <label className="text-[10px] text-slate-500">{t.receiptNo}</label>
+                  className="w-full rounded-lg border border-brand-warm-200 px-3 py-2 text-sm" />
+                <label className="text-[10px] text-brand-ink-500">{t.receiptNo}</label>
                 <input type="text" value={popupReceiptNo} onChange={e => setPopupReceiptNo(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                  className="w-full rounded-lg border border-brand-warm-200 px-3 py-2 text-sm" />
               </div>
             )}
 
@@ -381,9 +381,9 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
 
             <div className="flex gap-2">
               <button onClick={() => { setPopupAction(null); setSelectedRoom(null); }}
-                className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-semibold text-slate-600">{t.closeModal}</button>
+                className="flex-1 rounded-lg border border-brand-warm-200 py-2.5 text-sm font-semibold text-brand-ink-600">{t.closeModal}</button>
               <button onClick={doAction} disabled={loading}
-                className="flex-1 rounded-lg bg-slate-950 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+                className="flex-1 rounded-lg bg-brand-orange-500 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
                 {loading ? t.loading : popupAction === "checkin" ? t.checkin : popupAction === "checkout" ? t.checkout : popupAction === "payment" ? t.save : popupAction === "cancel" ? t.cancel : t.confirm}
               </button>
             </div>
@@ -393,7 +393,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
 
       {/* Toast for copy */}
       {copied && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-950 text-white rounded-full px-5 py-2 text-xs font-semibold shadow-lg animate-pulse">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-brand-orange-500 text-white rounded-full px-5 py-2 text-xs font-semibold shadow-lg animate-pulse">
           <ClipboardCheck className="inline h-3.5 w-3.5 mr-1" />{t.copied}
         </div>
       )}

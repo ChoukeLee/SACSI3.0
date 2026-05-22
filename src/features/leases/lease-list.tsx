@@ -342,8 +342,8 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   };
 
   const inputClass =
-    "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
-  const labelClass = "block text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 mb-1";
+    "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm text-brand-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
+  const labelClass = "block text-[11px] font-black uppercase tracking-[0.14em] text-brand-ink-500 mb-1";
 
   const statusVariant: Record<string, "neutral" | "success" | "danger" | "warning"> = {
     draft: "neutral",
@@ -353,11 +353,11 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   };
 
   const STATUS_STYLES: Record<string, string> = {
-    pending:   "bg-slate-100 text-slate-700",
+    pending:   "bg-brand-warm-100 text-brand-ink-700",
     partial:   "bg-brand-amber-100 text-brand-amber-700",
     paid:      "bg-brand-green-100 text-brand-green-700",
     overdue:   "bg-brand-red-100 text-brand-red-700",
-    cancelled: "bg-slate-50 text-slate-400 line-through",
+    cancelled: "bg-brand-warm-50 text-brand-ink-400 line-through",
   };
 
   const ROW_BG: Record<string, string> = {
@@ -385,7 +385,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
         <LeaseMetric label={locale === "zh" ? "逾期金额" : "Retard"} value={formatXof(dashboardStats.overdue)} tone="rose" />
       </div>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-natural sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-2xl border border-brand-warm-200 bg-white p-3 shadow-natural sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           {["all", "draft", "active", "terminated", "expired"].map((s) => (
             <button
@@ -401,7 +401,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
               {s === "all" ? (locale === "fr" ? "Tous" : "全部") : t.contractStatus[s as keyof typeof t.contractStatus]}
             </button>
           ))}
-          <span className="pl-1 text-xs font-semibold text-slate-400">
+          <span className="pl-1 text-xs font-semibold text-brand-ink-400">
             {filtered.length} / {contracts.length} {locale === "fr" ? "contrats" : "份合同"}
           </span>
         </div>
@@ -415,19 +415,19 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       </div>
 
       {groupedContracts.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white py-16 shadow-natural">
-          <p className="text-sm text-slate-400">{t.empty}</p>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-brand-warm-200 bg-white py-16 shadow-natural">
+          <p className="text-sm text-brand-ink-400">{t.empty}</p>
         </div>
       ) : (
         <div className="space-y-5">
           {groupedContracts.map(([floor, floorContracts]) => (
-            <section key={floor} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-natural">
+            <section key={floor} className="rounded-2xl border border-brand-warm-200 bg-white p-4 shadow-natural">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full bg-brand-orange-500" />
-                  <h3 className="text-sm font-black text-slate-950">{floor}</h3>
+                  <h3 className="text-sm font-black text-brand-ink-900">{floor}</h3>
                 </div>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">
+                <span className="rounded-full bg-brand-warm-100 px-2.5 py-1 text-xs font-bold text-brand-ink-500">
                   {floorContracts.length} {locale === "fr" ? "contrats" : "份合同"}
                 </span>
               </div>
@@ -451,9 +451,9 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-mono text-base font-black leading-none text-slate-950">{unit?.unit_no ?? "-"}</p>
-                          <p className="mt-2 truncate text-xs font-black text-slate-700">{customer?.name ?? "-"}</p>
-                          <p className="mt-1 truncate text-[10px] font-semibold text-slate-400">{contract.contract_no}</p>
+                          <p className="font-mono text-base font-black leading-none text-brand-ink-900">{unit?.unit_no ?? "-"}</p>
+                          <p className="mt-2 truncate text-xs font-black text-brand-ink-700">{customer?.name ?? "-"}</p>
+                          <p className="mt-1 truncate text-[10px] font-semibold text-brand-ink-400">{contract.contract_no}</p>
                         </div>
                         <Badge variant={statusVariant[contract.status]}>
                           {t.contractStatus[contract.status as keyof typeof t.contractStatus]}
@@ -473,9 +473,9 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                       </div>
 
                       <div className="mt-auto pt-2">
-                        <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400">
+                        <div className="flex items-center justify-between text-[10px] font-semibold text-brand-ink-400">
                           <span>{locale === "zh" ? "下一应收" : "Prochaine"}</span>
-                          <span className="text-slate-600">{summary.nextDue ?? "-"}</span>
+                          <span className="text-brand-ink-600">{summary.nextDue ?? "-"}</span>
                         </div>
                       </div>
                     </button>
@@ -492,10 +492,10 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       {panel === "new" && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setPanel(null)} />
-          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-slate-200 bg-white shadow-panel">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
-              <h3 className="text-base font-black text-slate-950">{t.form.newContract}</h3>
-              <button onClick={() => setPanel(null)} className="rounded p-1 text-slate-400 hover:bg-slate-50/80"><X className="h-5 w-5" /></button>
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-brand-warm-200 bg-white shadow-panel">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-200 bg-white px-5 py-4">
+              <h3 className="text-base font-black text-brand-ink-900">{t.form.newContract}</h3>
+              <button onClick={() => setPanel(null)} className="rounded p-1 text-brand-ink-400 hover:bg-brand-warm-50/80"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4 px-5 py-5">
               <div><label className={labelClass}>{t.form.contractNo} *</label><input type="text" value={fContractNo} onChange={(e) => setFContractNo(e.target.value)} className={inputClass} /></div>
@@ -532,7 +532,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 <div><label className={labelClass}>{t.form.rentFreeDays}</label><input type="number" value={fFreeDays} onChange={(e) => setFFreeDays(Number(e.target.value))} className={inputClass} /></div>
               </div>
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={fDepositReceived} onChange={(e) => setFDepositReceived(e.target.checked)} className="h-4 w-4 rounded border-slate-200" />
+                <input type="checkbox" checked={fDepositReceived} onChange={(e) => setFDepositReceived(e.target.checked)} className="h-4 w-4 rounded border-brand-warm-200" />
                 {t.form.depositReceived}
               </label>
               <div><label className={labelClass}>{t.form.signerName}</label><input type="text" value={fSigner} onChange={(e) => setFSigner(e.target.value)} className={inputClass} /></div>
@@ -544,7 +544,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 </select>
               </div>
               {error && <p className="text-sm text-brand-red-600">{error}</p>}
-              <button onClick={handleCreate} disabled={saving} className="w-full rounded-lg bg-slate-950 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">{saving ? "..." : t.form.newContract}</button>
+              <button onClick={handleCreate} disabled={saving} className="w-full rounded-lg bg-brand-orange-500 py-2.5 text-sm font-semibold text-white hover:bg-brand-orange-600 disabled:opacity-50">{saving ? "..." : t.form.newContract}</button>
             </div>
           </div>
         </>
@@ -554,36 +554,36 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       {panel === "detail" && selected && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setPanel(null)} />
-          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-slate-200 bg-white shadow-panel">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-brand-warm-200 bg-white shadow-panel">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-200 bg-white px-5 py-4">
               <div>
-                <h3 className="text-base font-black text-slate-950">{selected.contract_no}</h3>
+                <h3 className="text-base font-black text-brand-ink-900">{selected.contract_no}</h3>
                 <Badge variant={statusVariant[selected.status]}>{t.contractStatus[selected.status as keyof typeof t.contractStatus]}</Badge>
               </div>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => printLeaseContract({ contract: selected, unit: selectedUnit ?? null, customer: selectedCustomer ?? null }, locale)}
-                  className="rounded p-1 text-slate-400 hover:bg-slate-50/80 hover:text-brand-orange-600"
+                  className="rounded p-1 text-brand-ink-400 hover:bg-brand-warm-50/80 hover:text-brand-orange-600"
                   title={dictionaries[locale].settings.print.print}
                 >
                   <Printer className="h-4 w-4" />
                 </button>
-                <button onClick={() => setPanel(null)} className="rounded p-1 text-slate-400 hover:bg-slate-50/80"><X className="h-5 w-5" /></button>
+                <button onClick={() => setPanel(null)} className="rounded p-1 text-brand-ink-400 hover:bg-brand-warm-50/80"><X className="h-5 w-5" /></button>
               </div>
             </div>
             <div className="space-y-4 px-5 py-5">
               {/* Contract info */}
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <div><dt className="text-xs text-slate-400">{t.form.unit}</dt><dd className="font-medium">{selectedUnit?.unit_no ?? "-"} ({selectedUnit?.floor_label ?? ""})</dd></div>
-                <div><dt className="text-xs text-slate-400">{t.form.customer}</dt><dd className="font-medium">{selectedCustomer?.name ?? "-"}</dd></div>
-                <div><dt className="text-xs text-slate-400">{t.form.startDate}</dt><dd>{selected.start_date}</dd></div>
-                <div><dt className="text-xs text-slate-400">{t.form.expectedEndDate}</dt><dd>{selected.expected_end_date}</dd></div>
-                {selected.actual_end_date && <div><dt className="text-xs text-slate-400">{t.form.actualEndDate}</dt><dd>{selected.actual_end_date}</dd></div>}
-                <div><dt className="text-xs text-slate-400">{t.form.paymentCycle}</dt><dd>{t.paymentCycle[selected.payment_cycle as keyof typeof t.paymentCycle]} / {selected.payment_day}号</dd></div>
-                <div><dt className="text-xs text-slate-400">{t.form.monthlyRent}</dt><dd className="font-semibold">{formatXof(Number(selected.monthly_rent_xof))}</dd></div>
-                <div><dt className="text-xs text-slate-400">{t.form.deposit}</dt><dd>{formatXof(Number(selected.deposit_amount_xof))} {selected.deposit_received ? t.form.depositPaid : t.form.depositUnpaid}</dd></div>
-                {selected.rent_free_days > 0 && <div><dt className="text-xs text-slate-400">{t.form.rentFreeDays}</dt><dd>{selected.rent_free_days}天</dd></div>}
-                {selected.signer_name && <div><dt className="text-xs text-slate-400">{t.form.signerName}</dt><dd>{selected.signer_name}</dd></div>}
+                <div><dt className="text-xs text-brand-ink-400">{t.form.unit}</dt><dd className="font-medium">{selectedUnit?.unit_no ?? "-"} ({selectedUnit?.floor_label ?? ""})</dd></div>
+                <div><dt className="text-xs text-brand-ink-400">{t.form.customer}</dt><dd className="font-medium">{selectedCustomer?.name ?? "-"}</dd></div>
+                <div><dt className="text-xs text-brand-ink-400">{t.form.startDate}</dt><dd>{selected.start_date}</dd></div>
+                <div><dt className="text-xs text-brand-ink-400">{t.form.expectedEndDate}</dt><dd>{selected.expected_end_date}</dd></div>
+                {selected.actual_end_date && <div><dt className="text-xs text-brand-ink-400">{t.form.actualEndDate}</dt><dd>{selected.actual_end_date}</dd></div>}
+                <div><dt className="text-xs text-brand-ink-400">{t.form.paymentCycle}</dt><dd>{t.paymentCycle[selected.payment_cycle as keyof typeof t.paymentCycle]} / {selected.payment_day}号</dd></div>
+                <div><dt className="text-xs text-brand-ink-400">{t.form.monthlyRent}</dt><dd className="font-semibold">{formatXof(Number(selected.monthly_rent_xof))}</dd></div>
+                <div><dt className="text-xs text-brand-ink-400">{t.form.deposit}</dt><dd>{formatXof(Number(selected.deposit_amount_xof))} {selected.deposit_received ? t.form.depositPaid : t.form.depositUnpaid}</dd></div>
+                {selected.rent_free_days > 0 && <div><dt className="text-xs text-brand-ink-400">{t.form.rentFreeDays}</dt><dd>{selected.rent_free_days}天</dd></div>}
+                {selected.signer_name && <div><dt className="text-xs text-brand-ink-400">{t.form.signerName}</dt><dd>{selected.signer_name}</dd></div>}
               </dl>
 
               {/* Actions */}
@@ -599,28 +599,28 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
               {/* Risk indicators */}
               {selected.status === "active" && (
-                <div className="border-t border-slate-200 pt-4">
-                  <h4 className="text-sm font-bold text-slate-950 flex items-center gap-1.5">
+                <div className="border-t border-brand-warm-200 pt-4">
+                  <h4 className="text-sm font-bold text-brand-ink-900 flex items-center gap-1.5">
                     <AlertTriangle className="h-3.5 w-3.5 text-brand-orange" />
                     {locale === "zh" ? "风险概览" : "Apercu des risques"}
                   </h4>
                   <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                     <div className={cn("rounded border px-3 py-2", receivableStats.outstanding > 0 ? "border-brand-orange-200 bg-brand-orange-50" : "border-brand-green-200 bg-brand-green-50")}>
-                      <p className="text-slate-500">{t.risk.outstandingTotal}</p>
+                      <p className="text-brand-ink-500">{t.risk.outstandingTotal}</p>
                       <p className={cn("font-bold tabular-nums", receivableStats.outstanding > 0 ? "text-brand-orange-700" : "text-brand-green-700")}>{formatXof(receivableStats.outstanding)}</p>
                     </div>
                     <div className={cn("rounded border px-3 py-2", receivableStats.overdue > 0 ? "border-brand-red-200 bg-brand-red-50" : "border-brand-green-200 bg-brand-green-50")}>
-                      <p className="text-slate-500">{t.risk.overdueTotal}</p>
+                      <p className="text-brand-ink-500">{t.risk.overdueTotal}</p>
                       <p className={cn("font-bold tabular-nums", receivableStats.overdue > 0 ? "text-brand-red-700" : "text-brand-green-700")}>{formatXof(receivableStats.overdue)}</p>
                     </div>
                     <div className={cn("rounded border px-3 py-2", !selected.deposit_received ? "border-brand-red-200 bg-brand-red-50" : "border-brand-green-200 bg-brand-green-50")}>
-                      <p className="text-slate-500">{t.risk.depositStatus}</p>
+                      <p className="text-brand-ink-500">{t.risk.depositStatus}</p>
                       <p className={cn("text-xs font-semibold", selected.deposit_received ? "text-brand-green-700" : "text-brand-red-600")}>
                         {selected.deposit_received ? t.form.depositPaid : t.form.depositUnpaid}
                       </p>
                     </div>
                     <div className={cn("rounded border px-3 py-2", contractRisk.expiringSoon ? "border-brand-amber-200 bg-brand-amber-50" : "border-brand-green-200 bg-brand-green-50")}>
-                      <p className="text-slate-500">{t.risk.expiringSoon}</p>
+                      <p className="text-brand-ink-500">{t.risk.expiringSoon}</p>
                       <p className={cn("text-xs font-semibold", contractRisk.expiringSoon ? "text-brand-amber-700" : "text-brand-green-700")}>
                         {contractRisk.expiringSoon ? `${contractRisk.daysLeft} ${locale === "zh" ? "天后到期" : "j restants"}` : (locale === "zh" ? "否" : "Non")}
                       </p>
@@ -630,14 +630,14 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
               )}
 
               {/* Receivable list for this contract */}
-              <div className="border-t border-slate-200 pt-4">
+              <div className="border-t border-brand-warm-200 pt-4">
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-sm font-bold text-slate-950">{t.receivable.title}</h4>
+                  <h4 className="text-sm font-bold text-brand-ink-900">{t.receivable.title}</h4>
                   {selected.status === "active" && (
                     <button
                       onClick={() => handleGenerateReceivables(selected.id)}
                       disabled={saving}
-                      className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50/80 disabled:opacity-40"
+                      className="inline-flex items-center gap-1 rounded-xl border border-brand-warm-200 px-2 py-1 text-[10px] font-semibold text-brand-ink-600 hover:bg-brand-warm-50/80 disabled:opacity-40"
                     >
                       <RefreshCw className="h-3 w-3" />{t.receivable.generate}
                     </button>
@@ -645,11 +645,11 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 </div>
 
                 {contractReceivables.length === 0 ? (
-                  <p className="text-xs text-slate-400">{t.receivable.none}</p>
+                  <p className="text-xs text-brand-ink-400">{t.receivable.none}</p>
                 ) : (
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-natural text-xs">
+                  <div className="overflow-x-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural text-xs">
                     <table className="data-table">
-                      <thead className="bg-slate-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+                      <thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500">
                         <tr>
                           <th className="px-2 py-1.5 text-left">{t.receivable.dueDate}</th>
                           <th className="px-2 py-1.5 text-right">{t.receivable.amount}</th>
@@ -659,14 +659,14 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                           <th className="px-2 py-1.5"></th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-brand-warm-100">
                         {contractReceivables.map(r => {
                           const os = Number(r.amount_xof) - Number(r.paid_amount_xof);
                           const od = overdueDays(r);
                           const isPaying = payReceivableId === r.id;
                           return (
                             <tr key={r.id} className={cn("transition-colors", ROW_BG[r.status])}>
-                              <td className="px-2 py-1.5 text-slate-700 whitespace-nowrap">
+                              <td className="px-2 py-1.5 text-brand-ink-700 whitespace-nowrap">
                                 {r.due_date}
                                 {od !== null && od > 0 && <span className="ml-1 text-[10px] text-brand-red-500">+{od}</span>}
                               </td>
@@ -679,7 +679,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                               <td className="px-2 py-1.5">
                                 {os > 0 && selected.status === "active" && (
                                   isPaying ? (
-                                    <span className="text-[10px] text-slate-400">{locale === "zh" ? "收款中..." : "En cours..."}</span>
+                                    <span className="text-[10px] text-brand-ink-400">{locale === "zh" ? "收款中..." : "En cours..."}</span>
                                   ) : (
                                     <button
                                       onClick={() => {
@@ -688,7 +688,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                                         setPayReceiptNo("");
                                         setError("");
                                       }}
-                                      className="rounded-lg bg-slate-950 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-slate-800"
+                                      className="rounded-lg bg-brand-orange-500 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-brand-orange-600"
                                     >
                                       <DollarSign className="mr-0.5 inline h-3 w-3" />{t.receivable.collect}
                                     </button>
@@ -714,12 +714,12 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                       {t.receivable.fullPaymentNote}: <span className="text-brand-orange-700">{formatXof(outstanding)}</span>
                     </p>
                     <div className="grid grid-cols-2 gap-2">
-                      <div><label className="text-[10px] text-slate-500">{t.payment.paymentDate}</label><input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className={cn(inputClass, "text-xs py-1.5")} /></div>
-                      <div><label className="text-[10px] text-slate-500">{t.payment.receiptNo}</label><input type="text" value={payReceiptNo} onChange={(e) => setPayReceiptNo(e.target.value)} className={cn(inputClass, "text-xs py-1.5")} /></div>
+                      <div><label className="text-[10px] text-brand-ink-500">{t.payment.paymentDate}</label><input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className={cn(inputClass, "text-xs py-1.5")} /></div>
+                      <div><label className="text-[10px] text-brand-ink-500">{t.payment.receiptNo}</label><input type="text" value={payReceiptNo} onChange={(e) => setPayReceiptNo(e.target.value)} className={cn(inputClass, "text-xs py-1.5")} /></div>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => setPayReceivableId(null)} className="flex-1 rounded-xl border border-slate-200 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50/80">{locale === "zh" ? "取消" : "Annuler"}</button>
-                      <button onClick={handleCollectReceivable} disabled={saving} className="flex-1 rounded-lg bg-slate-950 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50">{saving ? "..." : t.payment.record}</button>
+                      <button onClick={() => setPayReceivableId(null)} className="flex-1 rounded-xl border border-brand-warm-200 py-1.5 text-xs font-semibold text-brand-ink-600 hover:bg-brand-warm-50/80">{locale === "zh" ? "取消" : "Annuler"}</button>
+                      <button onClick={handleCollectReceivable} disabled={saving} className="flex-1 rounded-lg bg-brand-orange-500 py-1.5 text-xs font-semibold text-white hover:bg-brand-orange-600 disabled:opacity-50">{saving ? "..." : t.payment.record}</button>
                     </div>
                   </div>
                 );
@@ -727,16 +727,16 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
               {/* Payment history */}
               {contractPayments.length > 0 && (
-                <div className="border-t border-slate-200 pt-4">
-                  <h4 className="text-sm font-bold text-slate-950">{t.payment.title}</h4>
+                <div className="border-t border-brand-warm-200 pt-4">
+                  <h4 className="text-sm font-bold text-brand-ink-900">{t.payment.title}</h4>
                   <ul className="mt-2 space-y-1.5 text-xs">
                     {contractPayments.map((p) => (
-                      <li key={p.id} className="flex justify-between text-slate-600">
+                      <li key={p.id} className="flex justify-between text-brand-ink-600">
                         <span>{p.payment_date}{p.receipt_no ? ` (${p.receipt_no})` : ""}</span>
                         <span className="font-semibold">{formatXof(Number(p.amount))}</span>
                       </li>
                     ))}
-                    <li className="flex justify-between border-t border-slate-200 pt-1 text-sm font-bold">
+                    <li className="flex justify-between border-t border-brand-warm-200 pt-1 text-sm font-bold">
                       <span>{t.payment.totalPaid}</span>
                       <span>{formatXof(totalPaid)}</span>
                     </li>
@@ -754,25 +754,25 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       {panel === "moveout" && selected && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/20" onClick={() => setPanel(null)} />
-          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-slate-200 bg-white shadow-panel">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
-              <h3 className="text-base font-black text-slate-950">{t.settlement.title}</h3>
-              <button onClick={() => setPanel(null)} className="rounded p-1 text-slate-400 hover:bg-slate-50/80"><X className="h-5 w-5" /></button>
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l border-brand-warm-200 bg-white shadow-panel">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-200 bg-white px-5 py-4">
+              <h3 className="text-base font-black text-brand-ink-900">{t.settlement.title}</h3>
+              <button onClick={() => setPanel(null)} className="rounded p-1 text-brand-ink-400 hover:bg-brand-warm-50/80"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4 px-5 py-5">
-              <p className="text-sm text-slate-600">{selected.contract_no} — {selectedCustomer?.name}</p>
+              <p className="text-sm text-brand-ink-600">{selected.contract_no} — {selectedCustomer?.name}</p>
 
               <div><label className={labelClass}>{t.form.actualEndDate}</label><input type="date" value={moEndDate} onChange={(e) => setMoEndDate(e.target.value)} className={inputClass} /></div>
               <div><label className={labelClass}>{t.settlement.unpaidRent}</label><input type="number" value={moUnpaid} onChange={(e) => setMoUnpaid(Number(e.target.value))} className={inputClass} /></div>
-              <p className="text-[10px] -mt-2 text-slate-400">{locale === "zh" ? "已自动填入当前未结清应收总额，可手动调整" : "Pre-rempli avec les impayes, ajustable"}</p>
+              <p className="text-[10px] -mt-2 text-brand-ink-400">{locale === "zh" ? "已自动填入当前未结清应收总额，可手动调整" : "Pre-rempli avec les impayes, ajustable"}</p>
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={moUtility} onChange={(e) => setMoUtility(e.target.checked)} className="h-4 w-4 rounded border-slate-200" />
+                <input type="checkbox" checked={moUtility} onChange={(e) => setMoUtility(e.target.checked)} className="h-4 w-4 rounded border-brand-warm-200" />
                 {t.settlement.utilityCleared}
               </label>
               <div><label className={labelClass}>{t.settlement.depositDeduction}</label><input type="number" value={moDeduction} onChange={(e) => setMoDeduction(Number(e.target.value))} className={inputClass} /></div>
 
               {/* Calculated refund */}
-              <div className="rounded bg-slate-50 p-3">
+              <div className="rounded bg-brand-warm-50 p-3">
                 <div className="flex justify-between text-sm">
                   <span>{t.settlement.depositRefund}</span>
                   <span className="font-semibold">
@@ -786,7 +786,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                   </div>
                 )}
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-brand-ink-400">
                 {locale === "zh" ? "退租后房间恢复为空闲，未来未收应收自动取消" : "Le lot redevient disponible, les echeances futures annulees"}
               </p>
               {error && <p className="text-sm text-brand-red-600">{error}</p>}
@@ -820,7 +820,7 @@ function LeaseCardField({
 
   return (
     <div className={cn("rounded-lg px-2 py-1.5", toneClass)}>
-      <p className="text-[9px] font-bold text-slate-400">{label}</p>
+      <p className="text-[9px] font-bold text-brand-ink-400">{label}</p>
       <p className="mt-0.5 text-[10px] font-black tabular-nums leading-tight break-all">{value}</p>
     </div>
   );
@@ -849,7 +849,7 @@ function LeaseMetric({ label, value, tone }: { label: string; value: string; ton
 
   return (
     <div className={cn("rounded-2xl border p-4 shadow-natural", toneClass)}>
-      <p className="text-xs font-bold text-slate-500">{label}</p>
+      <p className="text-xs font-bold text-brand-ink-500">{label}</p>
       <p className="mt-2 truncate text-xl font-black tabular-nums">{value}</p>
     </div>
   );

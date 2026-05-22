@@ -23,7 +23,7 @@ interface Props {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  pending:   "bg-slate-100 text-brand-ink-700",
+  pending:   "bg-brand-warm-100 text-brand-ink-700",
   partial:   "bg-brand-amber-100 text-brand-amber-700",
   paid:      "bg-brand-green-100 text-brand-green-700",
   overdue:   "bg-brand-red-100 text-brand-red-700",
@@ -154,12 +154,12 @@ export function FinanceDetailPanel({
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-200 bg-white/95 px-5 py-4 backdrop-blur">
           <div>
-            <h3 className="text-sm font-black text-slate-950">{labels.title}</h3>
+            <h3 className="text-sm font-black text-brand-ink-900">{labels.title}</h3>
             <p className="text-xs text-brand-ink-500">{labels.desc}</p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-1.5 text-brand-ink-400 hover:bg-slate-100 hover:text-brand-ink-600"
+            className="rounded-full p-1.5 text-brand-ink-400 hover:bg-brand-warm-100 hover:text-brand-ink-600"
             aria-label={locale === "zh" ? "关闭" : "Fermer"}
           >
             <X className="h-5 w-5" />
@@ -172,11 +172,11 @@ export function FinanceDetailPanel({
             <div className="flex flex-wrap gap-4 rounded-xl bg-brand-warm-50 px-4 py-3 text-sm">
               <div>
                 <span className="text-brand-ink-500">{locale === "zh" ? "笔数" : "Nb"}: </span>
-                <span className="font-black text-slate-950">{receivableData.length}</span>
+                <span className="font-black text-brand-ink-900">{receivableData.length}</span>
               </div>
               <div>
                 <span className="text-brand-ink-500">{locale === "zh" ? "应收合计" : "Total du"}: </span>
-                <span className="font-black text-slate-950">{formatXof(totalReceivable)}</span>
+                <span className="font-black text-brand-ink-900">{formatXof(totalReceivable)}</span>
               </div>
               <div>
                 <span className="text-brand-ink-500">{locale === "zh" ? "已收合计" : "Total encaisse"}: </span>
@@ -184,7 +184,7 @@ export function FinanceDetailPanel({
               </div>
               <div>
                 <span className="text-brand-ink-500">{locale === "zh" ? "未收合计" : "Restant"}: </span>
-                <span className={cn("font-black", totalReceivable - totalPaid > 0 ? "text-brand-red-700" : "text-slate-950")}>
+                <span className={cn("font-black", totalReceivable - totalPaid > 0 ? "text-brand-red-700" : "text-brand-ink-900")}>
                   {formatXof(totalReceivable - totalPaid)}
                 </span>
               </div>
@@ -195,7 +195,7 @@ export function FinanceDetailPanel({
             <div className="flex flex-wrap gap-4 rounded-xl bg-brand-warm-50 px-4 py-3 text-sm">
               <div>
                 <span className="text-brand-ink-500">{locale === "zh" ? "笔数" : "Nb"}: </span>
-                <span className="font-black text-slate-950">{paymentData.length}</span>
+                <span className="font-black text-brand-ink-900">{paymentData.length}</span>
               </div>
               <div>
                 <span className="text-brand-ink-500">{locale === "zh" ? "收款合计" : "Total encaisse"}: </span>
@@ -263,7 +263,7 @@ export function FinanceDetailPanel({
                               {formatXof(outstanding)}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap">
-                              <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold", STATUS_STYLES[r.status] ?? "bg-slate-100 text-brand-ink-700")}>
+                              <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold", STATUS_STYLES[r.status] ?? "bg-brand-warm-100 text-brand-ink-700")}>
                                 {r.status}
                               </span>
                             </td>

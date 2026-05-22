@@ -245,9 +245,9 @@ export function getBookingColorClass(booking: DailyBookingRow): string {
     return "bg-brand-sky-500 text-white";
   }
   if (booking.status === "checked_out") {
-    return "bg-slate-100 text-slate-500";
+    return "bg-brand-warm-100 text-brand-ink-500";
   }
-  return "bg-slate-50 text-slate-400";
+  return "bg-brand-warm-50 text-brand-ink-400";
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────

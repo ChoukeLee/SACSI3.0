@@ -113,8 +113,8 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
     URL.revokeObjectURL(url);
   };
 
-  const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15";
-  const labelClass = "block mb-1 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500";
+  const inputClass = "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm text-brand-ink-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15";
+  const labelClass = "block mb-1 text-[11px] font-black uppercase tracking-[0.14em] text-brand-ink-500";
 
   const dirColor: Record<string, string> = {
     income: "text-brand-green-700", expense: "text-brand-red-700",
@@ -131,20 +131,20 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
       </div>
 
       {/* Toolbar */}
-      <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-natural">
+      <div className="mb-4 rounded-2xl border border-brand-warm-200 bg-white p-3 shadow-natural">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15" />
-            <span className="text-xs font-semibold text-slate-400">-</span>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15" />
-            <select value={dirFilter} onChange={(e) => setDirFilter(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15">
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15" />
+            <span className="text-xs font-semibold text-brand-ink-400">-</span>
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15" />
+            <select value={dirFilter} onChange={(e) => setDirFilter(e.target.value)} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15">
               <option value="all">{t.filters.direction}: {t.filters.all}</option>
               <option value="income">{t.directions.income}</option>
               <option value="expense">{t.directions.expense}</option>
               <option value="liability_in">{t.directions.liability_in}</option>
               <option value="liability_out">{t.directions.liability_out}</option>
             </select>
-            <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15">
+            <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15">
               <option value="all">{t.filters.category}: {t.filters.all}</option>
               {allCategories.map(c => <option key={c} value={c}>{t.categories[c as keyof typeof t.categories]}</option>)}
             </select>
@@ -153,14 +153,14 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={locale === "zh" ? "搜索描述/房号..." : "Rechercher description, chambre..."}
-              className="w-48 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition placeholder:text-slate-400 hover:border-slate-300 hover:bg-slate-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15"
+              className="w-48 rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition placeholder:text-brand-ink-400 hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15"
             />
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={handleExportCsv} disabled={filtered.length === 0} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-40">
+            <button onClick={handleExportCsv} disabled={filtered.length === 0} className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:bg-brand-warm-50 disabled:opacity-40">
               <Download className="h-3.5 w-3.5" />{t.export.csv}
             </button>
-            <button onClick={() => setShowNewEntry(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-slate-950 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.98]">
+            <button onClick={() => setShowNewEntry(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-brand-orange-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-orange-600 active:scale-[0.98]">
               <Plus className="h-3.5 w-3.5" />{t.entry.title}
             </button>
           </div>
@@ -169,11 +169,11 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white py-16 shadow-natural">
-          <p className="text-sm font-semibold text-slate-400">{t.empty}</p>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-brand-warm-200 bg-white py-16 shadow-natural">
+          <p className="text-sm font-semibold text-brand-ink-400">{t.empty}</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-natural">
+        <div className="overflow-hidden rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
           <div className="overflow-x-auto">
             <table className="data-table min-w-[800px] text-sm">
               <thead>
@@ -190,20 +190,20 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
                 {filtered.map((e) => {
                   const unit = e.unit_id ? units.find(u => u.id === e.unit_id) : null;
                   return (
-                    <tr key={e.id} className="transition hover:bg-slate-50/80">
-                      <td className="px-4 py-3 text-sm text-slate-500">{e.entry_date}</td>
+                    <tr key={e.id} className="transition hover:bg-brand-warm-50/80">
+                      <td className="px-4 py-3 text-sm text-brand-ink-500">{e.entry_date}</td>
                       <td className="px-4 py-3">
                         <span className={cn("text-sm font-semibold", dirColor[e.direction])}>{t.directions[e.direction as keyof typeof t.directions]}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-slate-700">
+                      <td className="px-4 py-3 text-sm text-brand-ink-700">
                         <span>{t.categories[e.category as keyof typeof t.categories] ?? e.category}</span>
-                        {unit && <span className="ml-1 text-slate-400">({unit.unit_no})</span>}
+                        {unit && <span className="ml-1 text-brand-ink-400">({unit.unit_no})</span>}
                       </td>
                       <td className={cn("px-4 py-3 text-right text-sm font-semibold tabular-nums", e.direction === "expense" || e.direction === "liability_out" ? "text-brand-red-700" : "text-brand-green-700")}>
                         {e.direction === "expense" || e.direction === "liability_out" ? "-" : ""}{formatXof(Number(e.amount_xof))}
                       </td>
-                      <td className="px-4 py-3 text-right text-sm text-slate-500 tabular-nums">{e.amount_cny != null ? Number(e.amount_cny).toLocaleString() : "-"}</td>
-                      <td className="max-w-[260px] truncate px-4 py-3 text-sm text-slate-500">{e.description ?? "-"}</td>
+                      <td className="px-4 py-3 text-right text-sm text-brand-ink-500 tabular-nums">{e.amount_cny != null ? Number(e.amount_cny).toLocaleString() : "-"}</td>
+                      <td className="max-w-[260px] truncate px-4 py-3 text-sm text-brand-ink-500">{e.description ?? "-"}</td>
                     </tr>
                   );
                 })}
@@ -213,16 +213,16 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
         </div>
       )}
 
-      <p className="mt-3 text-xs text-slate-400">{filtered.length} {locale === "fr" ? "ecritures" : "条记录"}</p>
+      <p className="mt-3 text-xs text-brand-ink-400">{filtered.length} {locale === "fr" ? "ecritures" : "条记录"}</p>
 
       {/* New entry panel */}
       {showNewEntry && (
         <>
           <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setShowNewEntry(false)} />
-          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-auto border-l border-slate-200 bg-white shadow-xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
-              <h3 className="text-base font-black text-slate-950">{t.entry.title}</h3>
-              <button onClick={() => setShowNewEntry(false)} className="rounded p-1 text-slate-400 hover:bg-slate-50/80"><X className="h-5 w-5" /></button>
+          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-auto border-l border-brand-warm-200 bg-white shadow-xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-200 bg-white px-5 py-4">
+              <h3 className="text-base font-black text-brand-ink-900">{t.entry.title}</h3>
+              <button onClick={() => setShowNewEntry(false)} className="rounded p-1 text-brand-ink-400 hover:bg-brand-warm-50/80"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4 px-5 py-5">
               <div><label className={labelClass}>{t.entry.date}</label><input type="date" value={eDate} onChange={(e) => setEDate(e.target.value)} className={inputClass} /></div>
@@ -246,7 +246,7 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
                 <div><label className={labelClass}>{t.entry.exchangeRate}</label><input type="number" value={eRate} onChange={(e) => setERate(Number(e.target.value))} className={inputClass} /></div>
                 <div><label className={labelClass}>{t.entry.amount}</label><input type="number" value={eAmount} onChange={(e) => setEAmount(Number(e.target.value))} className={inputClass} /></div>
               </div>
-              <div className="rounded bg-slate-50 p-2 text-center text-sm font-bold text-slate-950">
+              <div className="rounded bg-brand-warm-50 p-2 text-center text-sm font-bold text-brand-ink-900">
                 {t.entry.amountXof}: {formatXof(eCurrency === "XOF" ? eAmount : Math.round(eAmount * eRate))}
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -261,7 +261,7 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
               </div>
               <div><label className={labelClass}>{t.entry.description}</label><textarea value={eDesc} onChange={(e) => setEDesc(e.target.value)} rows={3} className={inputClass} /></div>
               {error && <p className="text-sm text-brand-red-600">{error}</p>}
-              <button onClick={handleSave} disabled={saving} className="w-full rounded-xl bg-slate-950 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.98] disabled:opacity-50">{saving ? "..." : t.entry.save}</button>
+              <button onClick={handleSave} disabled={saving} className="w-full rounded-xl bg-brand-orange-500 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-brand-orange-600 active:scale-[0.98] disabled:opacity-50">{saving ? "..." : t.entry.save}</button>
             </div>
           </div>
         </>

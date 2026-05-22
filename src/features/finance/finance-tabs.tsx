@@ -16,7 +16,7 @@ export function FinanceTabs({ ledger, receivables, locale }: Props) {
 
   return (
     <div>
-      <div className="mb-4 flex gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 w-fit">
+      <div className="mb-4 flex gap-1 rounded-xl border border-brand-warm-200 bg-brand-warm-100 p-1 w-fit">
         <TabBtn active={tab === "ledger"} onClick={() => setTab("ledger")} label={t.ledger} />
         <TabBtn active={tab === "receivables"} onClick={() => setTab("receivables")} label={t.receivables} />
       </div>
@@ -35,8 +35,8 @@ function TabBtn({ active, onClick, label }: { active: boolean; onClick: () => vo
       onClick={onClick}
       className={`rounded-md px-3 py-1.5 text-[13px] font-semibold transition-all duration-fast ${
         active
-          ? "bg-white text-slate-950 shadow-sm"
-          : "text-slate-500 hover:text-slate-900"
+          ? "bg-white text-brand-ink-900 shadow-sm"
+          : "text-brand-ink-500 hover:text-brand-ink-800"
       }`}
     >
       {label}

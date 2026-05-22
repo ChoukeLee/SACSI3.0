@@ -123,8 +123,8 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
     { key: "audit", label: `${L.audit} (${data.auditLogs.length})` },
   ];
 
-  const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm";
-  const labelClass = "text-[10px] text-slate-500";
+  const inputClass = "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm";
+  const labelClass = "text-[10px] text-brand-ink-500";
 
   const buildDocs = (): DocumentRecord[] => {
     const docs: DocumentRecord[] = [];
@@ -178,19 +178,19 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
   return (
     <div className="max-w-4xl mx-auto space-y-4">
       {/* Header */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-natural">
+      <div className="rounded-2xl border border-brand-warm-200 bg-white p-5 shadow-natural">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-xl font-black text-slate-950">{customer.name}</h1>
+              <h1 className="text-xl font-black text-brand-ink-900">{customer.name}</h1>
               <Badge variant={statusVariant[customerStatus]}>{statusLabel[customerStatus]}</Badge>
               {customer.is_blacklisted && <AlertTriangle className="h-4 w-4 text-brand-red-500" />}
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-brand-ink-600">
               {customer.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{customer.phone}</span>}
               {customer.document_type && <span>{locale === "zh" ? "证件" : "Piece"}: {customer.document_type}</span>}
               {customer.gender && <span>{locale === "zh" ? (customer.gender === "male" ? "男" : customer.gender === "female" ? "女" : "其他") : (customer.gender === "male" ? "H" : customer.gender === "female" ? "F" : "Autre")}</span>}
-              {customer.notes && <span className="text-slate-400">{customer.notes}</span>}
+              {customer.notes && <span className="text-brand-ink-400">{customer.notes}</span>}
             </div>
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -209,10 +209,10 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 overflow-x-auto">
+      <div className="flex gap-1 rounded-lg border border-brand-warm-200 bg-brand-warm-50 p-1 overflow-x-auto">
         {tabs.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={cn("shrink-0 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors", tab === t.key ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-700")}>
+            className={cn("shrink-0 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors", tab === t.key ? "bg-white text-brand-ink-900 shadow-sm" : "text-brand-ink-500 hover:text-brand-ink-700")}>
             {t.label}
           </button>
         ))}
@@ -228,16 +228,16 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
             <StatBox label={L.overdueAmt} value={formatXof(stats.totalOverdue)} accent={stats.totalOverdue > 0 ? "red" : "green"} />
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs">
-              <p className="text-slate-500">{L.lastPayment}</p>
+            <div className="rounded-lg border border-brand-warm-200 bg-white p-3 text-xs">
+              <p className="text-brand-ink-500">{L.lastPayment}</p>
               <p className="font-semibold">{stats.latestPayment ? `${stats.latestPayment.payment_date} · ${formatXof(Number(stats.latestPayment.amount))}` : L.noData}</p>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs">
-              <p className="text-slate-500">{L.lastBooking}</p>
+            <div className="rounded-lg border border-brand-warm-200 bg-white p-3 text-xs">
+              <p className="text-brand-ink-500">{L.lastBooking}</p>
               <p className="font-semibold">{stats.latestBooking ? `${stats.latestBooking.check_in} · ${dailyStatusLabels[stats.latestBooking.status]}` : L.noData}</p>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs">
-              <p className="text-slate-500">{locale === "zh" ? "当前业务" : "Actif"}</p>
+            <div className="rounded-lg border border-brand-warm-200 bg-white p-3 text-xs">
+              <p className="text-brand-ink-500">{locale === "zh" ? "当前业务" : "Actif"}</p>
               <p className="font-semibold">
                 {stats.activeDaily > 0 && <span>{L.daily}:{stats.activeDaily} </span>}
                 {stats.activeLease > 0 && <span>{L.lease}:{stats.activeLease} </span>}
@@ -248,11 +248,11 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
           </div>
           {/* Related units */}
           {data.units.length > 0 && (
-            <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <div className="rounded-lg border border-brand-warm-200 bg-white p-3">
               <p className="text-xs font-semibold text-slate-800 mb-2">{locale === "zh" ? "关联房源" : "Logements lies"}</p>
               <div className="flex flex-wrap gap-1.5">
                 {data.units.map(u => (
-                  <span key={u.id} className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-mono text-slate-700">{u.unit_no} ({u.kind})</span>
+                  <span key={u.id} className="rounded bg-brand-warm-100 px-2 py-0.5 text-[10px] font-mono text-brand-ink-700">{u.unit_no} ({u.kind})</span>
                 ))}
               </div>
             </div>
@@ -262,20 +262,20 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
 
       {/* ── Daily Tab ── */}
       {tab === "daily" && (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-natural">
+        <div className="overflow-x-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
           {data.dailyBookings.length === 0 ? (
-            <div className="py-10 text-center text-sm text-slate-400">{L.noData}</div>
+            <div className="py-10 text-center text-sm text-brand-ink-400">{L.noData}</div>
           ) : (
             <table className="data-table">
-              <thead className="bg-slate-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"><tr>
+              <thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
                 <th className="px-3 py-2">{L.room}</th><th className="px-3 py-2">{L.date}</th><th className="px-3 py-2">{L.status}</th><th className="px-3 py-2 text-right">{L.amount}</th><th className="px-3 py-2">{L.action}</th>
               </tr></thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-brand-warm-100">
                 {data.dailyBookings.map(b => {
                   const unit = data.units.find(u => u.id === b.unit_id);
-                  return (<tr key={b.id} className="hover:bg-slate-50/80">
+                  return (<tr key={b.id} className="hover:bg-brand-warm-50/80">
                     <td className="px-3 py-2 font-mono font-medium">{unit?.unit_no ?? "?"}</td>
-                    <td className="px-3 py-2 text-slate-600">{b.check_in} → {b.check_out ?? (locale === "zh" ? "未定" : "?")}</td>
+                    <td className="px-3 py-2 text-brand-ink-600">{b.check_in} → {b.check_out ?? (locale === "zh" ? "未定" : "?")}</td>
                     <td className="px-3 py-2"><Badge variant={dailyStatusVariant[b.status]}>{dailyStatusLabels[b.status]}</Badge></td>
                     <td className="px-3 py-2 text-right font-medium">{formatXof(Number(b.total_amount_xof))}</td>
                     <td className="px-3 py-2"><Link href={routeFor(locale, "/daily-rentals")} className="text-brand-orange text-[10px] font-semibold hover:underline">{L.view}</Link></td>
@@ -289,23 +289,23 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
 
       {/* ── Lease Tab ── */}
       {tab === "lease" && (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-natural">
+        <div className="overflow-x-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
           {data.leaseContracts.length === 0 ? (
-            <div className="py-10 text-center text-sm text-slate-400">{L.noData}</div>
+            <div className="py-10 text-center text-sm text-brand-ink-400">{L.noData}</div>
           ) : (
             <table className="data-table">
-              <thead className="bg-slate-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"><tr>
+              <thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
                 <th className="px-3 py-2">{L.room}</th><th className="px-3 py-2">{L.contractNo}</th><th className="px-3 py-2">{L.date}</th><th className="px-3 py-2 text-right">{L.amount}</th><th className="px-3 py-2">{L.status}</th><th className="px-3 py-2">{L.action}</th>
               </tr></thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-brand-warm-100">
                 {data.leaseContracts.map(lc => {
                   const unit = data.units.find(u => u.id === lc.unit_id);
                   const statusV: Record<string, "neutral" | "success" | "danger" | "warning"> = { active: "success", draft: "neutral", terminated: "danger", expired: "warning" };
                   const statusL: Record<string, string> = locale === "zh" ? { active: "生效", draft: "草稿", terminated: "终止", expired: "过期" } : { active: "Actif", draft: "Brouillon", terminated: "Resilie", expired: "Expire" };
-                  return (<tr key={lc.id} className="hover:bg-slate-50/80">
+                  return (<tr key={lc.id} className="hover:bg-brand-warm-50/80">
                     <td className="px-3 py-2 font-mono font-medium">{unit?.unit_no ?? "?"}</td>
                     <td className="px-3 py-2">{lc.contract_no}</td>
-                    <td className="px-3 py-2 text-slate-600">{lc.start_date} → {lc.expected_end_date}</td>
+                    <td className="px-3 py-2 text-brand-ink-600">{lc.start_date} → {lc.expected_end_date}</td>
                     <td className="px-3 py-2 text-right font-medium">{formatXof(Number(lc.monthly_rent_xof))}</td>
                     <td className="px-3 py-2"><Badge variant={statusV[lc.status]}>{statusL[lc.status]}</Badge></td>
                     <td className="px-3 py-2"><Link href={routeFor(locale, "/leases")} className="text-brand-orange text-[10px] font-semibold hover:underline">{L.view}</Link></td>
@@ -319,20 +319,20 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
 
       {/* ── Sale Tab ── */}
       {tab === "sale" && (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-natural">
+        <div className="overflow-x-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
           {data.saleContracts.length === 0 ? (
-            <div className="py-10 text-center text-sm text-slate-400">{L.noData}</div>
+            <div className="py-10 text-center text-sm text-brand-ink-400">{L.noData}</div>
           ) : (
             <table className="data-table">
-              <thead className="bg-slate-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"><tr>
+              <thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
                 <th className="px-3 py-2">{L.room}</th><th className="px-3 py-2">{L.contractNo}</th><th className="px-3 py-2 text-right">{L.amount}</th><th className="px-3 py-2">{L.status}</th><th className="px-3 py-2">{L.action}</th>
               </tr></thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-brand-warm-100">
                 {data.saleContracts.map(sc => {
                   const unit = data.units.find(u => u.id === sc.unit_id);
                   const statusV: Record<string, "neutral" | "success" | "danger" | "warning"> = { active: "success", draft: "neutral", terminated: "danger", expired: "warning" };
                   const statusL: Record<string, string> = locale === "zh" ? { active: "生效", draft: "草稿", terminated: "终止", expired: "过期" } : { active: "Actif", draft: "Brouillon", terminated: "Resilie", expired: "Expire" };
-                  return (<tr key={sc.id} className="hover:bg-slate-50/80">
+                  return (<tr key={sc.id} className="hover:bg-brand-warm-50/80">
                     <td className="px-3 py-2 font-mono font-medium">{unit?.unit_no ?? "?"}</td>
                     <td className="px-3 py-2">{sc.contract_no}</td>
                     <td className="px-3 py-2 text-right font-medium">{formatXof(Number(sc.total_amount_xof))}</td>
@@ -357,26 +357,26 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
               const paid = srcRecs.reduce((s, r) => s + Number(r.paid_amount_xof), 0);
               const srcLabels: Record<string, string> = locale === "zh" ? { daily_booking: L.daily, lease_contract: L.lease, sale_contract: L.sale } : { daily_booking: "Jour", lease_contract: "Location", sale_contract: "Vente" };
               return (
-                <div key={src} className="rounded-lg border border-slate-200 bg-white p-3 text-xs">
-                  <p className="text-slate-500">{srcLabels[src]}</p>
-                  <p className="font-semibold">{formatXof(paid)} <span className="text-slate-400 font-normal">/ {formatXof(total)}</span></p>
+                <div key={src} className="rounded-lg border border-brand-warm-200 bg-white p-3 text-xs">
+                  <p className="text-brand-ink-500">{srcLabels[src]}</p>
+                  <p className="font-semibold">{formatXof(paid)} <span className="text-brand-ink-400 font-normal">/ {formatXof(total)}</span></p>
                 </div>
               );
             })}
           </div>
           {/* Receivables */}
-          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-natural">
-            <p className="px-3 py-2 text-[11px] font-bold text-slate-800 bg-slate-50">{locale === "zh" ? "应收记录" : "Creances"} ({data.receivables.filter(r => r.status !== "cancelled").length})</p>
+          <div className="overflow-x-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
+            <p className="px-3 py-2 text-[11px] font-bold text-slate-800 bg-brand-warm-50">{locale === "zh" ? "应收记录" : "Creances"} ({data.receivables.filter(r => r.status !== "cancelled").length})</p>
             <table className="data-table">
-              <thead className="bg-slate-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"><tr>
+              <thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
                 <th className="px-3 py-1.5">{L.date}</th><th className="px-3 py-1.5">{L.source}</th><th className="px-3 py-1.5 text-right">{L.amount}</th><th className="px-3 py-1.5 text-right">{L.paid}</th><th className="px-3 py-1.5">{L.status}</th>
               </tr></thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-brand-warm-100">
                 {data.receivables.filter(r => r.status !== "cancelled").slice(0, 50).map(r => {
                   const os = Number(r.amount_xof) - Number(r.paid_amount_xof);
                   const srcLabels: Record<string, string> = locale === "zh" ? { daily_booking: "日租", lease_contract: "长租", sale_contract: "出售", manual: "手工" } : { daily_booking: "Jour", lease_contract: "LT", sale_contract: "Vente", manual: "Manuel" };
-                  return (<tr key={r.id} className={cn("hover:bg-slate-50/80", r.status === "overdue" && "bg-brand-red-50/30")}>
-                    <td className="px-3 py-1.5">{r.due_date}</td><td className="px-3 py-1.5 text-slate-600">{srcLabels[r.source_type] ?? r.source_type}</td>
+                  return (<tr key={r.id} className={cn("hover:bg-brand-warm-50/80", r.status === "overdue" && "bg-brand-red-50/30")}>
+                    <td className="px-3 py-1.5">{r.due_date}</td><td className="px-3 py-1.5 text-brand-ink-600">{srcLabels[r.source_type] ?? r.source_type}</td>
                     <td className="px-3 py-1.5 text-right font-medium">{formatXof(Number(r.amount_xof))}</td>
                     <td className="px-3 py-1.5 text-right text-brand-green-600">{formatXof(Number(r.paid_amount_xof))}</td>
                     <td className="px-3 py-1.5"><Badge variant={os > 0 ? (r.status === "overdue" ? "danger" : "warning") : "success"}>{os > 0 ? formatXof(os) : (locale === "zh" ? "已结清" : "Paye")}</Badge></td>
@@ -386,18 +386,18 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
             </table>
           </div>
           {/* Payments */}
-          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-natural">
-            <p className="px-3 py-2 text-[11px] font-bold text-slate-800 bg-slate-50">{locale === "zh" ? "收款记录" : "Paiements"} ({data.payments.length})</p>
+          <div className="overflow-x-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
+            <p className="px-3 py-2 text-[11px] font-bold text-slate-800 bg-brand-warm-50">{locale === "zh" ? "收款记录" : "Paiements"} ({data.payments.length})</p>
             <table className="data-table">
-              <thead className="bg-slate-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"><tr>
+              <thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
                 <th className="px-3 py-1.5">{L.date}</th><th className="px-3 py-1.5 text-right">{L.amount}</th><th className="px-3 py-1.5">{locale === "zh" ? "收据" : "Recu"}</th>
               </tr></thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-brand-warm-100">
                 {data.payments.slice(0, 50).map(p => (
-                  <tr key={p.id} className="hover:bg-slate-50/80">
+                  <tr key={p.id} className="hover:bg-brand-warm-50/80">
                     <td className="px-3 py-1.5">{p.payment_date}</td>
                     <td className="px-3 py-1.5 text-right font-medium text-brand-green-700">{formatXof(Number(p.amount))}</td>
-                    <td className="px-3 py-1.5 text-slate-500">{p.receipt_no ?? "—"}</td>
+                    <td className="px-3 py-1.5 text-brand-ink-500">{p.receipt_no ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -408,23 +408,23 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
 
       {/* ── Docs Tab ── */}
       {tab === "docs" && (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-natural">
+        <div className="overflow-x-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
           {customerDocs.length === 0 ? (
-            <div className="py-10 text-center text-sm text-slate-400">{L.noData}</div>
+            <div className="py-10 text-center text-sm text-brand-ink-400">{L.noData}</div>
           ) : (
             <table className="data-table">
-              <thead className="bg-slate-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"><tr>
+              <thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
                 <th className="px-3 py-2">{locale === "zh" ? "单据" : "Document"}</th><th className="px-3 py-2">{L.date}</th><th className="px-3 py-2">{L.room}</th><th className="px-3 py-2">{L.action}</th>
               </tr></thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-brand-warm-100">
                 {customerDocs.map(d => (
-                  <tr key={d.id} className="hover:bg-slate-50/80">
+                  <tr key={d.id} className="hover:bg-brand-warm-50/80">
                     <td className="px-3 py-2 font-medium">{d.title}</td>
-                    <td className="px-3 py-2 text-slate-600">{d.date}</td>
+                    <td className="px-3 py-2 text-brand-ink-600">{d.date}</td>
                     <td className="px-3 py-2">{d.unitNo}</td>
                     <td className="px-3 py-2">
                       <button onClick={() => printDocumentRecord(d, locale)}
-                        className="rounded-lg bg-slate-950 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-slate-800">
+                        className="rounded-lg bg-brand-orange-500 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-brand-orange-600">
                         <Printer className="inline h-3 w-3 mr-0.5" />{L.print}
                       </button>
                     </td>
@@ -438,23 +438,23 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
 
       {/* ── Audit Tab ── */}
       {tab === "audit" && (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-natural">
+        <div className="overflow-x-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
           {data.auditLogs.length === 0 ? (
-            <div className="py-10 text-center text-sm text-slate-400">{L.noData}</div>
+            <div className="py-10 text-center text-sm text-brand-ink-400">{L.noData}</div>
           ) : (
             <table className="data-table">
-              <thead className="bg-slate-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"><tr>
+              <thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
                 <th className="px-3 py-2">{locale === "zh" ? "时间" : "Date"}</th><th className="px-3 py-2">{L.action}</th><th className="px-3 py-2">{locale === "zh" ? "对象" : "Objet"}</th>
               </tr></thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-brand-warm-100">
                 {data.auditLogs.slice(0, 50).map(l => {
                   const actionLabels: Record<string, string> = locale === "zh"
                     ? { create: "新建", update: "修改", delete: "删除", activate: "激活", terminate: "终止", check_in: "入住", check_out: "退房", payment: "收款", move_out: "退租", cancel: "取消", blacklist_add: "拉黑", blacklist_remove: "解除拉黑" }
                     : { create: "Creer", update: "Modifier", delete: "Suppr", activate: "Activer", terminate: "Resilier", check_in: "Arrivee", check_out: "Depart", payment: "Paiement", move_out: "Sortie", cancel: "Annuler", blacklist_add: "Bloquer", blacklist_remove: "Debloquer" };
-                  return (<tr key={l.id} className="hover:bg-slate-50/80">
-                    <td className="px-3 py-2 text-[10px] text-slate-500">{new Date(l.created_at).toLocaleDateString(locale === "zh" ? "zh-CN" : "fr-FR")}</td>
+                  return (<tr key={l.id} className="hover:bg-brand-warm-50/80">
+                    <td className="px-3 py-2 text-[10px] text-brand-ink-500">{new Date(l.created_at).toLocaleDateString(locale === "zh" ? "zh-CN" : "fr-FR")}</td>
                     <td className="px-3 py-2">{actionLabels[l.action] ?? l.action}</td>
-                    <td className="px-3 py-2 text-slate-500">{l.entity_type} {l.entity_id?.slice(0, 8)}</td>
+                    <td className="px-3 py-2 text-brand-ink-500">{l.entity_type} {l.entity_id?.slice(0, 8)}</td>
                   </tr>);
                 })}
               </tbody>
@@ -464,7 +464,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
       )}
 
       {/* Quick links */}
-      <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+      <div className="flex flex-wrap gap-2 text-xs text-brand-ink-500">
         <Link href={routeFor(locale, "/finance")} className="hover:text-brand-orange flex items-center gap-1">{L.finance} <ArrowRight className="h-3 w-3" /></Link>
         <Link href={routeFor(locale, "/todos")} className="hover:text-brand-orange flex items-center gap-1">{locale === "zh" ? "待办" : "Taches"} <ArrowRight className="h-3 w-3" /></Link>
         <Link href={routeFor(locale, "/data-quality")} className="hover:text-brand-orange flex items-center gap-1">{locale === "zh" ? "数据质量" : "Qualite"} <ArrowRight className="h-3 w-3" /></Link>
@@ -476,6 +476,6 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
 function StatBox({ label, value, accent }: { label: string; value: string; accent: string }) {
   const c: Record<string, string> = { ink: "bg-slate-800", green: "bg-brand-green-500", red: "bg-brand-red-500", orange: "bg-brand-orange" };
   return (
-    <div className="rounded-lg border border-slate-200 bg-white shadow-natural overflow-hidden"><div className={cn("h-[3px]", c[accent] ?? "bg-slate-800")} /><div className="px-3 py-2.5"><p className="text-[10px] text-slate-400">{label}</p><p className="text-sm font-bold tabular-nums text-slate-950">{value}</p></div></div>
+    <div className="rounded-lg border border-brand-warm-200 bg-white shadow-natural overflow-hidden"><div className={cn("h-[3px]", c[accent] ?? "bg-slate-800")} /><div className="px-3 py-2.5"><p className="text-[10px] text-brand-ink-400">{label}</p><p className="text-sm font-bold tabular-nums text-brand-ink-900">{value}</p></div></div>
   );
 }
