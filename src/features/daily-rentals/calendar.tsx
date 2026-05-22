@@ -361,7 +361,7 @@ export function DailyCalendar({
 
   if (dailyUnits.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-[22px] border border-brand-warm-300 bg-white py-12 text-center shadow-sm">
+      <div className="flex flex-col items-center gap-3 rounded-2xl border border-brand-warm-300 bg-white py-12 text-center shadow-sm">
         <p className="text-sm text-brand-ink-500">{copy.noRooms}</p>
       </div>
     );
@@ -369,8 +369,8 @@ export function DailyCalendar({
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-natural">
-        <div className="flex flex-col gap-4 border-b border-neutral-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+      <section className="overflow-hidden rounded-3xl border border-brand-warm-200 bg-white shadow-natural">
+        <div className="flex flex-col gap-4 border-b border-brand-warm-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h3 className="text-base font-black leading-5 text-brand-neutral-950">{locale === "zh" ? "日租概览" : "Apercu journalier"}</h3>
             <p className="mt-1 text-sm font-semibold text-brand-neutral-700">
@@ -378,7 +378,7 @@ export function DailyCalendar({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-2xl border border-neutral-200 bg-brand-neutral-50 px-4 py-2 text-sm font-black text-brand-neutral-950">
+            <div className="rounded-2xl border border-brand-warm-200 bg-brand-neutral-50 px-4 py-2 text-sm font-black text-brand-neutral-950">
               {new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN")}
               <span className="ml-3 text-brand-neutral-500">
                 {new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long" })}
@@ -399,8 +399,8 @@ export function DailyCalendar({
             <ShareCard key={row.key} label={row.label} value={row.count} units={row.units} tone={row.tone} />
           ))}
         </div>
-        <div className="border-t border-neutral-200 bg-brand-neutral-50/70 px-5 py-4">
-          <p className="mb-2.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">{locale === "zh" ? "本月财务" : "Finances du mois"}</p>
+        <div className="border-t border-brand-warm-200 bg-brand-neutral-50/70 px-5 py-4">
+          <p className="mb-2.5 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-400">{locale === "zh" ? "本月财务" : "Finances du mois"}</p>
           <div className="grid gap-3 md:grid-cols-3">
             {financeCards.map((card) => (
               <FinanceCard key={card.key} label={card.label} value={card.value} tone={card.tone} onClick={() => setFinanceDetail(card.key as "collected" | "outstanding" | "settled")} />
@@ -409,7 +409,7 @@ export function DailyCalendar({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[24px] border border-brand-warm-300 bg-white shadow-[0_18px_56px_rgba(88,65,43,0.08)]">
+      <section className="overflow-hidden rounded-2xl border border-brand-warm-300 bg-white shadow-card">
         <div className="flex flex-col gap-3 border-b border-brand-warm-300 bg-brand-warm-50 px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-xl font-black tracking-tight text-brand-ink-900">{copy.timeline}</h2>
@@ -453,7 +453,7 @@ export function DailyCalendar({
             </button>
             <button
               onClick={goToToday}
-              className="h-8 rounded-xl bg-brand-orange-500 px-4 text-sm font-black text-white shadow-lg shadow-brand-orange-100 transition hover:bg-brand-orange-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500"
+              className="h-8 rounded-xl bg-brand-orange-500 px-4 text-sm font-black text-white shadow-lifted transition hover:bg-brand-orange-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500"
             >
               {copy.today}
             </button>
@@ -629,69 +629,69 @@ export function DailyCalendar({
       {financeDetail && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/30 backdrop-blur-sm" onClick={() => setFinanceDetail(null)} />
-          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-full overflow-auto border-l border-slate-200 bg-white shadow-panel lg:max-w-lg" role="dialog">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur">
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-full overflow-auto border-l border-brand-warm-200 bg-white shadow-panel lg:max-w-lg" role="dialog">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-200 bg-white/95 px-5 py-4 backdrop-blur">
               <div>
-                <h3 className="text-sm font-black text-slate-950">
+                <h3 className="text-sm font-black text-brand-ink-900">
                   {financeDetail === "collected" ? (locale === "zh" ? "本月已收明细" : "Paiements du mois") :
                    financeDetail === "outstanding" ? (locale === "zh" ? "当前欠款明细" : "Soldes impayes") :
                    (locale === "zh" ? "本月结算明细" : "Reglements du mois")}
                 </h3>
               </div>
-              <button onClick={() => setFinanceDetail(null)} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100">
+              <button onClick={() => setFinanceDetail(null)} className="rounded-full p-1.5 text-brand-ink-400 hover:bg-brand-warm-100">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="px-5 py-4 space-y-3">
               {/* Summary */}
-              <div className="flex flex-wrap gap-4 rounded-xl bg-slate-50 px-4 py-3 text-sm">
+              <div className="flex flex-wrap gap-4 rounded-xl bg-brand-warm-50 px-4 py-3 text-sm">
                 {financeDetail === "collected" && (
                   <>
-                    <div><span className="text-slate-500">{locale === "zh" ? "笔数" : "Nb"}: </span><span className="font-black">{financeStats.collectedPayments.length}</span></div>
-                    <div><span className="text-slate-500">{locale === "zh" ? "合计" : "Total"}: </span><span className="font-black text-brand-green-700">{formatXof(financeStats.monthCollected)}</span></div>
+                    <div><span className="text-brand-ink-500">{locale === "zh" ? "笔数" : "Nb"}: </span><span className="font-black">{financeStats.collectedPayments.length}</span></div>
+                    <div><span className="text-brand-ink-500">{locale === "zh" ? "合计" : "Total"}: </span><span className="font-black text-brand-green-700">{formatXof(financeStats.monthCollected)}</span></div>
                   </>
                 )}
                 {financeDetail === "outstanding" && (
                   <>
-                    <div><span className="text-slate-500">{locale === "zh" ? "欠款笔数" : "Nb"}: </span><span className="font-black">{financeStats.outstandingBookings.length}</span></div>
-                    <div><span className="text-slate-500">{locale === "zh" ? "欠款合计" : "Total"}: </span><span className="font-black text-brand-orange-700">{formatXof(financeStats.currentOutstanding)}</span></div>
+                    <div><span className="text-brand-ink-500">{locale === "zh" ? "欠款笔数" : "Nb"}: </span><span className="font-black">{financeStats.outstandingBookings.length}</span></div>
+                    <div><span className="text-brand-ink-500">{locale === "zh" ? "欠款合计" : "Total"}: </span><span className="font-black text-brand-orange-700">{formatXof(financeStats.currentOutstanding)}</span></div>
                   </>
                 )}
                 {financeDetail === "settled" && (
                   <>
-                    <div><span className="text-slate-500">{locale === "zh" ? "笔数" : "Nb"}: </span><span className="font-black">{financeStats.settledBookings.length}</span></div>
-                    <div><span className="text-slate-500">{locale === "zh" ? "合计" : "Total"}: </span><span className="font-black text-slate-900">{formatXof(financeStats.monthSettled)}</span></div>
+                    <div><span className="text-brand-ink-500">{locale === "zh" ? "笔数" : "Nb"}: </span><span className="font-black">{financeStats.settledBookings.length}</span></div>
+                    <div><span className="text-brand-ink-500">{locale === "zh" ? "合计" : "Total"}: </span><span className="font-black text-brand-ink-900">{formatXof(financeStats.monthSettled)}</span></div>
                   </>
                 )}
               </div>
 
               {/* Table */}
-              <div className="overflow-hidden rounded-xl border border-slate-200">
+              <div className="overflow-hidden rounded-xl border border-brand-warm-200">
                 <div className="max-h-[calc(100vh-260px)] overflow-auto">
                   {financeDetail === "collected" && (
                     <table className="w-full text-xs">
-                      <thead className="sticky top-0 z-10 bg-slate-50">
-                        <tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
+                      <thead className="sticky top-0 z-10 bg-brand-warm-50">
+                        <tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-brand-ink-500">
                           <th className="px-4 py-3">{locale === "zh" ? "日期" : "Date"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "房号" : "Chambre"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "客户" : "Client"}</th>
                           <th className="px-4 py-3 text-right">{locale === "zh" ? "金额" : "Montant"}</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-brand-warm-100">
                         {financeStats.collectedPayments.length === 0 ? (
-                          <tr><td colSpan={4} className="px-4 py-10 text-center text-slate-400">{locale === "zh" ? "本月暂无收款" : "Aucun paiement ce mois"}</td></tr>
+                          <tr><td colSpan={4} className="px-4 py-10 text-center text-brand-ink-400">{locale === "zh" ? "本月暂无收款" : "Aucun paiement ce mois"}</td></tr>
                         ) : (
                           [...financeStats.collectedPayments].sort((a, b) => b.payment_date.localeCompare(a.payment_date)).map(p => {
                             const b = bookings.find(bk => bk.id === p.source_id);
                             const u = dailyUnits.find(u => u.id === b?.unit_id);
                             const c = b ? customerMap.get(b.customer_id) : null;
                             return (
-                              <tr key={p.id} className="hover:bg-slate-50">
-                                <td className="px-4 py-2.5 font-medium text-slate-900">{p.payment_date}</td>
-                                <td className="px-4 py-2.5 text-slate-700">{u?.unit_no ?? "—"}</td>
-                                <td className="px-4 py-2.5 text-slate-700">{c?.name ?? "—"}</td>
-                                <td className="px-4 py-2.5 text-right font-semibold text-slate-900">{formatXof(Number(p.amount))}</td>
+                              <tr key={p.id} className="hover:bg-brand-warm-50">
+                                <td className="px-4 py-2.5 font-medium text-brand-ink-900">{p.payment_date}</td>
+                                <td className="px-4 py-2.5 text-brand-ink-700">{u?.unit_no ?? "—"}</td>
+                                <td className="px-4 py-2.5 text-brand-ink-700">{c?.name ?? "—"}</td>
+                                <td className="px-4 py-2.5 text-right font-semibold text-brand-ink-900">{formatXof(Number(p.amount))}</td>
                               </tr>
                             );
                           })
@@ -702,8 +702,8 @@ export function DailyCalendar({
 
                   {financeDetail === "outstanding" && (
                     <table className="w-full text-xs">
-                      <thead className="sticky top-0 z-10 bg-slate-50">
-                        <tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
+                      <thead className="sticky top-0 z-10 bg-brand-warm-50">
+                        <tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-brand-ink-500">
                           <th className="px-4 py-3">{locale === "zh" ? "房号" : "Chambre"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "客户" : "Client"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "入住" : "Arrivee"}</th>
@@ -712,9 +712,9 @@ export function DailyCalendar({
                           <th className="px-4 py-3 text-right">{locale === "zh" ? "欠款" : "Impaye"}</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-brand-warm-100">
                         {financeStats.outstandingBookings.length === 0 ? (
-                          <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">{locale === "zh" ? "无未收款项" : "Aucun impaye"}</td></tr>
+                          <tr><td colSpan={6} className="px-4 py-10 text-center text-brand-ink-400">{locale === "zh" ? "无未收款项" : "Aucun impaye"}</td></tr>
                         ) : (
                           [...financeStats.outstandingBookings].sort((a, b) => {
                             const aOut = Number(a.final_amount_xof ?? a.total_amount_xof) - Number(a.prepaid_amount_xof ?? 0);
@@ -726,11 +726,11 @@ export function DailyCalendar({
                             const final = Number(b.final_amount_xof ?? b.total_amount_xof);
                             const prepaid = Number(b.prepaid_amount_xof ?? 0);
                             return (
-                              <tr key={b.id} className="hover:bg-slate-50">
-                                <td className="px-4 py-2.5 font-medium text-slate-900">{u?.unit_no ?? "—"}</td>
-                                <td className="px-4 py-2.5 text-slate-700">{c?.name ?? "—"}</td>
-                                <td className="px-4 py-2.5 text-slate-600">{b.check_in}</td>
-                                <td className="px-4 py-2.5 text-right text-slate-900">{formatXof(final)}</td>
+                              <tr key={b.id} className="hover:bg-brand-warm-50">
+                                <td className="px-4 py-2.5 font-medium text-brand-ink-900">{u?.unit_no ?? "—"}</td>
+                                <td className="px-4 py-2.5 text-brand-ink-700">{c?.name ?? "—"}</td>
+                                <td className="px-4 py-2.5 text-brand-ink-600">{b.check_in}</td>
+                                <td className="px-4 py-2.5 text-right text-brand-ink-900">{formatXof(final)}</td>
                                 <td className="px-4 py-2.5 text-right text-brand-green-700">{formatXof(prepaid)}</td>
                                 <td className="px-4 py-2.5 text-right font-semibold text-brand-orange-700">{formatXof(final - prepaid)}</td>
                               </tr>
@@ -743,8 +743,8 @@ export function DailyCalendar({
 
                   {financeDetail === "settled" && (
                     <table className="w-full text-xs">
-                      <thead className="sticky top-0 z-10 bg-slate-50">
-                        <tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
+                      <thead className="sticky top-0 z-10 bg-brand-warm-50">
+                        <tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-brand-ink-500">
                           <th className="px-4 py-3">{locale === "zh" ? "房号" : "Chambre"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "客户" : "Client"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "入住" : "Arrivee"}</th>
@@ -753,9 +753,9 @@ export function DailyCalendar({
                           <th className="px-4 py-3">{locale === "zh" ? "状态" : "Statut"}</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-brand-warm-100">
                         {financeStats.settledBookings.length === 0 ? (
-                          <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">{locale === "zh" ? "本月暂无结算" : "Aucun reglement ce mois"}</td></tr>
+                          <tr><td colSpan={6} className="px-4 py-10 text-center text-brand-ink-400">{locale === "zh" ? "本月暂无结算" : "Aucun reglement ce mois"}</td></tr>
                         ) : (
                           [...financeStats.settledBookings].sort((a, b) => {
                             const aD = (a.checkout_mode === "open" ? a.actual_check_out : a.check_out) ?? "";
@@ -768,12 +768,12 @@ export function DailyCalendar({
                             const prepaid = Number(b.prepaid_amount_xof ?? 0);
                             const isPaid = prepaid >= final;
                             return (
-                              <tr key={b.id} className="hover:bg-slate-50">
-                                <td className="px-4 py-2.5 font-medium text-slate-900">{u?.unit_no ?? "—"}</td>
-                                <td className="px-4 py-2.5 text-slate-700">{c?.name ?? "—"}</td>
-                                <td className="px-4 py-2.5 text-slate-600">{b.check_in}</td>
-                                <td className="px-4 py-2.5 text-slate-600">{b.checkout_mode === "open" ? b.actual_check_out : b.check_out}</td>
-                                <td className="px-4 py-2.5 text-right font-semibold text-slate-900">{formatXof(final)}</td>
+                              <tr key={b.id} className="hover:bg-brand-warm-50">
+                                <td className="px-4 py-2.5 font-medium text-brand-ink-900">{u?.unit_no ?? "—"}</td>
+                                <td className="px-4 py-2.5 text-brand-ink-700">{c?.name ?? "—"}</td>
+                                <td className="px-4 py-2.5 text-brand-ink-600">{b.check_in}</td>
+                                <td className="px-4 py-2.5 text-brand-ink-600">{b.checkout_mode === "open" ? b.actual_check_out : b.check_out}</td>
+                                <td className="px-4 py-2.5 text-right font-semibold text-brand-ink-900">{formatXof(final)}</td>
                                 <td className="px-4 py-2.5">
                                   <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold", isPaid ? "bg-brand-green-100 text-brand-green-700" : "bg-brand-amber-100 text-brand-amber-700")}>
                                     {isPaid ? (locale === "zh" ? "已付清" : "Paye") : (locale === "zh" ? "未付清" : "Impaye")}
@@ -974,12 +974,12 @@ function ShareCard({ label, value, units, tone }: { label: string; value: number
 
 function FinanceCard({ label, value, tone, onClick }: { label: string; value: string; tone: "dark" | "orange" | "green"; onClick: () => void }) {
   const styles = {
-    dark: "border-slate-200 bg-white hover:border-slate-300 hover:shadow-md",
-    orange: "border-brand-amber-200 bg-brand-amber-50 hover:border-brand-amber-300 hover:shadow-md",
-    green: "border-brand-green-200 bg-brand-green-50 hover:border-brand-green-300 hover:shadow-md",
+    dark: "border-brand-warm-200 bg-white hover:border-brand-warm-300 hover:shadow-card",
+    orange: "border-brand-amber-200 bg-brand-amber-50 hover:border-brand-amber-300 hover:shadow-card",
+    green: "border-brand-green-200 bg-brand-green-50 hover:border-brand-green-300 hover:shadow-card",
   }[tone];
   const barColors = {
-    dark: "bg-slate-800",
+    dark: "bg-brand-ink-800",
     orange: "bg-brand-orange-500",
     green: "bg-brand-green-500",
   }[tone];
@@ -987,8 +987,8 @@ function FinanceCard({ label, value, tone, onClick }: { label: string; value: st
     <button type="button" onClick={onClick} className={cn("flex min-h-[64px] overflow-hidden rounded-2xl border text-left shadow-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500 hover:-translate-y-0.5", styles)}>
       <div className={cn("w-1.5 shrink-0", barColors)} />
       <div className="flex min-w-0 flex-1 flex-col justify-between px-4 py-3">
-        <p className="truncate text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">{label}</p>
-        <p className="truncate text-lg font-black tracking-tight tabular-nums text-slate-900">{value}</p>
+        <p className="truncate text-[11px] font-bold uppercase tracking-[0.08em] text-brand-ink-500">{label}</p>
+        <p className="truncate text-lg font-black tracking-tight tabular-nums text-brand-ink-900">{value}</p>
       </div>
     </button>
   );

@@ -143,11 +143,11 @@ const config: Config = {
         lifted: "0 18px 44px -34px rgba(244,90,42,0.45)",
       },
       borderRadius: {
-        sm: "8px",
-        md: "10px",
+        sm: "6px",
+        md: "8px",
         lg: "12px",
         xl: "16px",
-        "2xl": "22px",
+        "2xl": "20px",
       },
       zIndex: {
         base: "0",

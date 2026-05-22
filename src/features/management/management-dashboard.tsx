@@ -329,10 +329,10 @@ export function ManagementDashboard({
 
         {/* ── Section 1: Core KPI Summary ── */}
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.72fr)]">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-natural">
+          <div className="rounded-2xl border border-brand-warm-200 bg-white p-4 shadow-natural">
             <div className="mb-3 flex items-center justify-between gap-3">
               <SectionLabel compact>{t.sections.financeOverview}</SectionLabel>
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+              <span className="rounded-full bg-brand-warm-100 px-2.5 py-1 text-[11px] font-semibold text-brand-ink-500">
                 {monthPrefix}
               </span>
             </div>
@@ -371,13 +371,13 @@ export function ManagementDashboard({
                 return (
                   <>
                     {lease && (
-                      <button type="button" onClick={() => setFinanceDetail("receivable")} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-left transition-all hover:shadow-sm hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-brand-orange-500">
+                      <button type="button" onClick={() => setFinanceDetail("receivable")} className="rounded-xl border border-brand-warm-200 bg-white px-3.5 py-2.5 text-left transition-all hover:shadow-sm hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-brand-orange-500">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-[11px] font-black text-slate-700">{locale === "zh" ? "长租" : "Bail"}</span>
-                          <span className="text-[11px] font-bold text-slate-400">{locale === "zh" ? `${receivables.filter(r => r.source_type === "lease_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length}笔` : `${receivables.filter(r => r.source_type === "lease_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length} creances`}</span>
+                          <span className="text-[11px] font-black text-brand-ink-600">{locale === "zh" ? "长租" : "Bail"}</span>
+                          <span className="text-[11px] font-bold text-brand-ink-400">{locale === "zh" ? `${receivables.filter(r => r.source_type === "lease_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length}笔` : `${receivables.filter(r => r.source_type === "lease_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length} creances`}</span>
                         </div>
                         <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
-                          <span className="font-bold text-slate-900">{locale === "zh" ? "应收" : "Du"} {formatXof(lease.totalReceivable)}</span>
+                          <span className="font-bold text-brand-ink-800">{locale === "zh" ? "应收" : "Du"} {formatXof(lease.totalReceivable)}</span>
                           <span className="text-brand-green-700">{locale === "zh" ? "已收" : "Enc"} {formatXof(lease.totalPaid)}</span>
                           {lease.outstanding > 0 && <span className="text-brand-orange-700">{locale === "zh" ? "未收" : "Impaye"} {formatXof(lease.outstanding)}</span>}
                           {lease.overdue > 0 && <span className="text-brand-red-600">{locale === "zh" ? "逾期" : "Retard"} {formatXof(lease.overdue)}</span>}
@@ -385,13 +385,13 @@ export function ManagementDashboard({
                       </button>
                     )}
                     {sale && (
-                      <button type="button" onClick={() => setFinanceDetail("receivable")} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-left transition-all hover:shadow-sm hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-brand-orange-500">
+                      <button type="button" onClick={() => setFinanceDetail("receivable")} className="rounded-xl border border-brand-warm-200 bg-white px-3.5 py-2.5 text-left transition-all hover:shadow-sm hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-brand-orange-500">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-[11px] font-black text-slate-700">{locale === "zh" ? "售房" : "Vente"}</span>
-                          <span className="text-[11px] font-bold text-slate-400">{locale === "zh" ? `${receivables.filter(r => r.source_type === "sale_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length}笔` : `${receivables.filter(r => r.source_type === "sale_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length} creances`}</span>
+                          <span className="text-[11px] font-black text-brand-ink-600">{locale === "zh" ? "售房" : "Vente"}</span>
+                          <span className="text-[11px] font-bold text-brand-ink-400">{locale === "zh" ? `${receivables.filter(r => r.source_type === "sale_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length}笔` : `${receivables.filter(r => r.source_type === "sale_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length} creances`}</span>
                         </div>
                         <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
-                          <span className="font-bold text-slate-900">{locale === "zh" ? "应收" : "Du"} {formatXof(sale.totalReceivable)}</span>
+                          <span className="font-bold text-brand-ink-800">{locale === "zh" ? "应收" : "Du"} {formatXof(sale.totalReceivable)}</span>
                           <span className="text-brand-green-700">{locale === "zh" ? "已收" : "Enc"} {formatXof(sale.totalPaid)}</span>
                           {sale.outstanding > 0 && <span className="text-brand-orange-700">{locale === "zh" ? "未收" : "Impaye"} {formatXof(sale.outstanding)}</span>}
                           {sale.overdue > 0 && <span className="text-brand-red-600">{locale === "zh" ? "逾期" : "Retard"} {formatXof(sale.overdue)}</span>}
@@ -404,7 +404,7 @@ export function ManagementDashboard({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-natural">
+          <div className="rounded-2xl border border-brand-warm-200 bg-white p-4 shadow-natural">
             <SectionLabel compact>{t.sections.buildingStatus}</SectionLabel>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {(["sold", "leased", "dailyOccupied", "available", "cleaningPending", "maintenance"] as MgmtStatus[]).map(s => (
@@ -423,7 +423,7 @@ export function ManagementDashboard({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <SectionLabel compact>{t.sections.buildingStatus} - {buildingName}</SectionLabel>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-brand-ink-500">
               {locale === "zh" ? "按楼层查看房间状态，点击房间可打开对应档案。" : "Statut par etage, cliquez pour ouvrir le dossier."}
             </p>
           </div>
@@ -452,35 +452,35 @@ export function ManagementDashboard({
             for (const s of bStates) bCounts[s.status] = (bCounts[s.status] ?? 0) + 1;
 
             return (
-              <div key={building.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div key={building.id} className="overflow-hidden rounded-2xl border border-brand-warm-200 bg-white shadow-sm">
                 {/* Building header */}
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brand-warm-200 bg-white px-4 py-3">
                   <div className="flex items-center gap-2.5">
                     <span className="h-2.5 w-2.5 rounded-full bg-brand-orange" />
-                    <h4 className="text-sm font-black text-slate-950">{building.display_name}</h4>
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                    <h4 className="text-sm font-black text-brand-ink-900">{building.display_name}</h4>
+                    <span className="rounded-full border border-brand-warm-200 bg-brand-warm-50 px-2 py-0.5 text-[10px] font-semibold text-brand-ink-500">
                       {bStates.length} {locale === "zh" ? "间" : "unités"}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
                     {(Object.keys(t.statuses) as MgmtStatus[]).filter(s => (bCounts[s] ?? 0) > 0).map(s => (
-                      <span key={s} className="flex items-center gap-1.5 text-slate-500">
+                      <span key={s} className="flex items-center gap-1.5 text-brand-ink-500">
                         <span className={cn("h-2.5 w-2.5 rounded-full", STATUS_CELL[s].dot)} />
                         {t.statuses[s]}
-                        <span className="tabular-nums text-slate-400">{(bCounts[s] ?? 0)}</span>
+                        <span className="tabular-nums text-brand-ink-400">{(bCounts[s] ?? 0)}</span>
                       </span>
                     ))}
                   </div>
                 </div>
 
                 {/* Floor groups */}
-                <div className="bg-slate-50/60 px-4 py-4">
+                <div className="bg-brand-warm-50/60 px-4 py-4">
                   <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
                     {floorGroups.map(group => (
-                      <div key={group.key} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                      <div key={group.key} className="rounded-2xl border border-brand-warm-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                         <div className="mb-3 flex items-center justify-between">
-                          <p className="text-[11px] font-bold text-slate-500">{group.label}</p>
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                          <p className="text-[11px] font-bold text-brand-ink-500">{group.label}</p>
+                          <span className="rounded-full bg-brand-warm-100 px-2 py-0.5 text-[10px] font-bold text-brand-ink-500">
                             {group.states.length}
                           </span>
                         </div>
@@ -637,7 +637,7 @@ function StatusSummaryCard({ label, value, status }: { label: string; value: num
 function SectionLabel({ children, compact = false }: { children: React.ReactNode; compact?: boolean }) {
   return (
     <h2 className={cn(
-      "text-[11px] font-black uppercase tracking-[0.14em] text-slate-500",
+      "text-[11px] font-black uppercase tracking-[0.14em] text-brand-ink-500",
       compact ? "mb-0" : "mb-4",
     )}>
       {children}
@@ -708,20 +708,20 @@ function RiskAlert({ label, value, unit, active, compact = false }: {
       compact ? "px-3 py-2.5" : "px-4 py-3.5",
       active
         ? "border-brand-red-200 bg-brand-red-50"
-        : "border-slate-200 bg-white",
+        : "border-brand-warm-200 bg-white",
     )}>
       <div className="mb-1.5 flex items-center gap-2">
         {active && <AlertTriangle className="h-4 w-4 text-brand-red-500 shrink-0" />}
         <span className={cn(
           "text-[11px] font-medium uppercase tracking-[0.14em]",
-          active ? "text-brand-red-600" : "text-slate-400",
+          active ? "text-brand-red-600" : "text-brand-ink-400",
         )}>
           {label}
         </span>
       </div>
       <p className={cn(
         compact ? "text-lg font-black tabular-nums" : "text-xl font-black tabular-nums",
-        active ? "text-brand-red-700" : "text-slate-400",
+        active ? "text-brand-red-700" : "text-brand-ink-400",
       )}>
         {value} <span className="text-sm font-normal">{unit}</span>
       </p>

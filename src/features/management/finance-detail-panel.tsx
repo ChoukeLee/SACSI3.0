@@ -23,11 +23,11 @@ interface Props {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  pending:   "bg-slate-100 text-slate-700",
+  pending:   "bg-slate-100 text-brand-ink-700",
   partial:   "bg-brand-amber-100 text-brand-amber-700",
   paid:      "bg-brand-green-100 text-brand-green-700",
   overdue:   "bg-brand-red-100 text-brand-red-700",
-  cancelled: "bg-slate-50 text-slate-400 line-through",
+  cancelled: "bg-brand-warm-50 text-brand-ink-400 line-through",
 };
 
 const SOURCE_TYPE_LABELS: Record<string, { zh: string; fr: string }> = {
@@ -150,16 +150,16 @@ export function FinanceDetailPanel({
   return (
     <>
       <div className="fixed inset-0 z-overlay bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-panel w-full max-w-full overflow-auto border-l border-slate-200 bg-white shadow-panel lg:max-w-2xl" role="dialog" aria-label={labels.title}>
+      <div className="fixed inset-y-0 right-0 z-panel w-full max-w-full overflow-auto border-l border-brand-warm-200 bg-white shadow-panel lg:max-w-2xl" role="dialog" aria-label={labels.title}>
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-200 bg-white/95 px-5 py-4 backdrop-blur">
           <div>
             <h3 className="text-sm font-black text-slate-950">{labels.title}</h3>
-            <p className="text-xs text-slate-500">{labels.desc}</p>
+            <p className="text-xs text-brand-ink-500">{labels.desc}</p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-full p-1.5 text-brand-ink-400 hover:bg-slate-100 hover:text-brand-ink-600"
             aria-label={locale === "zh" ? "关闭" : "Fermer"}
           >
             <X className="h-5 w-5" />
@@ -169,21 +169,21 @@ export function FinanceDetailPanel({
         <div className="px-5 py-4 space-y-4">
           {/* Summary bar */}
           {open !== "collected" && (
-            <div className="flex flex-wrap gap-4 rounded-xl bg-slate-50 px-4 py-3 text-sm">
+            <div className="flex flex-wrap gap-4 rounded-xl bg-brand-warm-50 px-4 py-3 text-sm">
               <div>
-                <span className="text-slate-500">{locale === "zh" ? "笔数" : "Nb"}: </span>
+                <span className="text-brand-ink-500">{locale === "zh" ? "笔数" : "Nb"}: </span>
                 <span className="font-black text-slate-950">{receivableData.length}</span>
               </div>
               <div>
-                <span className="text-slate-500">{locale === "zh" ? "应收合计" : "Total du"}: </span>
+                <span className="text-brand-ink-500">{locale === "zh" ? "应收合计" : "Total du"}: </span>
                 <span className="font-black text-slate-950">{formatXof(totalReceivable)}</span>
               </div>
               <div>
-                <span className="text-slate-500">{locale === "zh" ? "已收合计" : "Total encaisse"}: </span>
+                <span className="text-brand-ink-500">{locale === "zh" ? "已收合计" : "Total encaisse"}: </span>
                 <span className="font-black text-brand-green-700">{formatXof(totalPaid)}</span>
               </div>
               <div>
-                <span className="text-slate-500">{locale === "zh" ? "未收合计" : "Restant"}: </span>
+                <span className="text-brand-ink-500">{locale === "zh" ? "未收合计" : "Restant"}: </span>
                 <span className={cn("font-black", totalReceivable - totalPaid > 0 ? "text-brand-red-700" : "text-slate-950")}>
                   {formatXof(totalReceivable - totalPaid)}
                 </span>
@@ -192,25 +192,25 @@ export function FinanceDetailPanel({
           )}
 
           {open === "collected" && (
-            <div className="flex flex-wrap gap-4 rounded-xl bg-slate-50 px-4 py-3 text-sm">
+            <div className="flex flex-wrap gap-4 rounded-xl bg-brand-warm-50 px-4 py-3 text-sm">
               <div>
-                <span className="text-slate-500">{locale === "zh" ? "笔数" : "Nb"}: </span>
+                <span className="text-brand-ink-500">{locale === "zh" ? "笔数" : "Nb"}: </span>
                 <span className="font-black text-slate-950">{paymentData.length}</span>
               </div>
               <div>
-                <span className="text-slate-500">{locale === "zh" ? "收款合计" : "Total encaisse"}: </span>
+                <span className="text-brand-ink-500">{locale === "zh" ? "收款合计" : "Total encaisse"}: </span>
                 <span className="font-black text-brand-green-700">{formatXof(totalPaymentAmount)}</span>
               </div>
             </div>
           )}
 
           {/* Table */}
-          <div className="overflow-hidden rounded-xl border border-slate-200">
+          <div className="overflow-hidden rounded-xl border border-brand-warm-200">
             <div className="max-h-[calc(100vh-260px)] overflow-auto">
               {open !== "collected" ? (
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 z-10 bg-slate-50">
-                    <tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
+                  <thead className="sticky top-0 z-10 bg-brand-warm-50">
+                    <tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-brand-ink-500">
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "到期日" : "Echeance"}</th>
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
@@ -221,10 +221,10 @@ export function FinanceDetailPanel({
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "状态" : "Statut"}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-brand-warm-100">
                     {receivableData.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-10 text-center text-slate-400">
+                        <td colSpan={8} className="px-4 py-10 text-center text-brand-ink-400">
                           {locale === "zh" ? "暂无数据" : "Aucune donnee"}
                         </td>
                       </tr>
@@ -234,36 +234,36 @@ export function FinanceDetailPanel({
                         const overdueDays = getOverdueDays(r.due_date);
                         return (
                           <tr key={r.id} className={cn(
-                            "hover:bg-slate-50 transition-colors",
+                            "hover:bg-brand-warm-50 transition-colors",
                             r.status === "overdue" && "bg-brand-red-50/30",
                             r.status === "partial" && "bg-brand-amber-50/30",
                           )}>
-                            <td className="px-4 py-2.5 whitespace-nowrap font-medium text-slate-900">
+                            <td className="px-4 py-2.5 whitespace-nowrap font-medium text-brand-ink-900">
                               {r.due_date}
                               {r.status === "overdue" && (
                                 <span className="ml-2 text-brand-red-500">+{overdueDays}j</span>
                               )}
                             </td>
-                            <td className="px-4 py-2.5 whitespace-nowrap text-slate-700">
+                            <td className="px-4 py-2.5 whitespace-nowrap text-brand-ink-700">
                               {getUnitInfo(r.unit_id)}
                             </td>
-                            <td className="px-4 py-2.5 whitespace-nowrap text-slate-700">
+                            <td className="px-4 py-2.5 whitespace-nowrap text-brand-ink-700">
                               {getCustomerName(r.customer_id)}
                             </td>
-                            <td className="px-4 py-2.5 whitespace-nowrap text-slate-600">
+                            <td className="px-4 py-2.5 whitespace-nowrap text-brand-ink-600">
                               {getSourceTypeLabel(r.source_type)}
                             </td>
-                            <td className="px-4 py-2.5 whitespace-nowrap text-right font-semibold text-slate-900">
+                            <td className="px-4 py-2.5 whitespace-nowrap text-right font-semibold text-brand-ink-900">
                               {formatXof(Number(r.amount_xof))}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap text-right text-brand-green-700">
                               {formatXof(Number(r.paid_amount_xof))}
                             </td>
-                            <td className={cn("px-4 py-2.5 whitespace-nowrap text-right font-semibold", outstanding > 0 ? "text-brand-red-600" : "text-slate-400")}>
+                            <td className={cn("px-4 py-2.5 whitespace-nowrap text-right font-semibold", outstanding > 0 ? "text-brand-red-600" : "text-brand-ink-400")}>
                               {formatXof(outstanding)}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap">
-                              <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold", STATUS_STYLES[r.status] ?? "bg-slate-100 text-slate-700")}>
+                              <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold", STATUS_STYLES[r.status] ?? "bg-slate-100 text-brand-ink-700")}>
                                 {r.status}
                               </span>
                             </td>
@@ -275,8 +275,8 @@ export function FinanceDetailPanel({
                 </table>
               ) : (
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 z-10 bg-slate-50">
-                    <tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
+                  <thead className="sticky top-0 z-10 bg-brand-warm-50">
+                    <tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-brand-ink-500">
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "收款日期" : "Date"}</th>
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
@@ -285,32 +285,32 @@ export function FinanceDetailPanel({
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "收据号" : "Recu"}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-brand-warm-100">
                     {paymentData.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
+                        <td colSpan={6} className="px-4 py-10 text-center text-brand-ink-400">
                           {locale === "zh" ? "暂无数据" : "Aucune donnee"}
                         </td>
                       </tr>
                     ) : (
                       paymentData.map(p => (
-                        <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-2.5 whitespace-nowrap font-medium text-slate-900">
+                        <tr key={p.id} className="hover:bg-brand-warm-50 transition-colors">
+                          <td className="px-4 py-2.5 whitespace-nowrap font-medium text-brand-ink-900">
                             {p.payment_date}
                           </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-slate-700">
+                          <td className="px-4 py-2.5 whitespace-nowrap text-brand-ink-700">
                             {getUnitInfo(p.unit_id)}
                           </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-slate-700">
+                          <td className="px-4 py-2.5 whitespace-nowrap text-brand-ink-700">
                             {getCustomerName(p.customer_id)}
                           </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-slate-600">
+                          <td className="px-4 py-2.5 whitespace-nowrap text-brand-ink-600">
                             {getSourceTypeLabel(p.source_type)}
                           </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-right font-semibold text-slate-900">
+                          <td className="px-4 py-2.5 whitespace-nowrap text-right font-semibold text-brand-ink-900">
                             {formatXof(Number(p.amount))}
                           </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-slate-500 font-mono text-[11px]">
+                          <td className="px-4 py-2.5 whitespace-nowrap text-brand-ink-500 font-mono text-[11px]">
                             {p.receipt_no ?? "—"}
                           </td>
                         </tr>

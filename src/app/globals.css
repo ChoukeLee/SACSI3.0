@@ -116,59 +116,54 @@ body {
     background-attachment: local, local, scroll;
   }
 
-  /* Shared data table style — used across all pages */
+  /* Shared data table — DESIGN.md compliant */
   .data-table {
-    @apply w-full text-left text-xs;
+    @apply w-full text-left;
   }
   .data-table thead {
-    @apply border-b border-neutral-200 bg-brand-neutral-50;
+    @apply border-b border-brand-warm-200 bg-brand-warm-50;
   }
   .data-table th {
-    @apply px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-brand-neutral-800;
+    @apply px-4 py-2.5 text-[11px] font-black uppercase tracking-[0.10em] text-brand-ink-600;
   }
   .data-table td {
-    @apply border-b border-neutral-200/70 px-3 py-2.5 text-[13px] text-slate-700;
+    @apply border-b border-brand-warm-100 px-4 py-2.5 text-[13px] text-brand-ink-900;
   }
   .data-table tbody tr {
     @apply transition-colors duration-fast;
   }
   .data-table tbody tr:hover {
-    @apply bg-brand-orange-50/40;
+    @apply bg-brand-warm-50;
   }
   .data-table .num {
     @apply tabular-nums text-right;
   }
 
-  /* Shared stat card — no side-stripe, uses top-border instead */
+  /* Shared stat card */
   .stat-card {
-    @apply rounded-2xl border border-neutral-200 bg-white px-5 py-4 shadow-natural;
+    @apply rounded-xl border border-brand-warm-200 bg-white p-5 shadow-card;
   }
   .stat-card .stat-label {
-    @apply text-[11px] font-bold uppercase tracking-[0.08em] text-brand-neutral-800;
+    @apply text-[11px] font-black uppercase tracking-[0.10em] text-brand-ink-600;
   }
   .stat-card .stat-value {
-    @apply mt-1.5 text-2xl font-bold tracking-tight text-slate-950 tabular-nums;
+    @apply mt-1.5 text-2xl font-black tracking-tight text-brand-ink-900 tabular-nums;
   }
   .stat-card .stat-caption {
-    @apply mt-1.5 text-[13px] text-slate-500;
+    @apply mt-1.5 text-[13px] text-brand-ink-500;
   }
 
   .surface-panel {
-    @apply rounded-2xl border border-neutral-200 bg-white shadow-natural;
+    @apply rounded-xl border border-brand-warm-200 bg-white shadow-card;
   }
 
   .filter-chip {
-    @apply rounded-xl border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-neutral-900 shadow-sm transition hover:border-brand-orange-200 hover:bg-brand-orange-50;
+    @apply rounded-lg border border-brand-warm-200 bg-white px-3 py-1.5 text-[11px] font-black text-brand-ink-700 shadow-sm transition hover:border-brand-orange-200 hover:bg-brand-orange-50;
   }
 
   .page-rule {
-    @apply border-b border-slate-200;
+    @apply border-b border-brand-warm-200;
   }
-
-  /* Page section spacing */
-  .page-section-sm { @apply mb-4; }
-  .page-section-md { @apply mb-6; }
-  .page-section-lg { @apply mb-8; }
 }
 
 @layer base {
@@ -176,11 +171,11 @@ body {
   input, select, textarea { font-size: 16px; }
   @media (min-width: 640px) { input, select, textarea { font-size: 14px; } }
   button, a, [role="button"] { cursor: pointer; }
-  h1 { @apply text-2xl font-bold tracking-tight text-slate-950; }
-  h2 { @apply text-sm font-bold text-slate-950 tracking-tight; }
-  h3 { @apply text-sm font-semibold text-slate-900; }
-  h4 { @apply text-[13px] font-semibold text-slate-800; }
-  p { @apply text-slate-600 leading-relaxed; }
+  h1 { @apply text-xl font-black tracking-tight text-brand-ink-900; }
+  h2 { @apply text-sm font-black text-brand-ink-900 tracking-tight; }
+  h3 { @apply text-sm font-black text-brand-ink-900; }
+  h4 { @apply text-[13px] font-black text-brand-ink-800; }
+  p { @apply text-brand-ink-600; }
   @media (pointer: coarse) {
     button:active, a:active, [role="button"]:active { opacity: 0.8; }
   }
