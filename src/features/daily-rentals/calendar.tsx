@@ -314,7 +314,10 @@ export function DailyCalendar({
 
   const setMode = useCallback((mode: ViewMode) => {
     setViewMode(mode);
-    setAnchorDate((prev) => mode === "month" ? new Date(prev.getFullYear(), prev.getMonth(), 1) : prev);
+    setAnchorDate((prev) => {
+      if (mode === "month") return new Date(prev.getFullYear(), prev.getMonth(), 1);
+      return new Date();
+    });
   }, []);
 
   if (dailyUnits.length === 0) {
