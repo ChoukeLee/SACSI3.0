@@ -336,7 +336,6 @@ export function ManagementDashboard({
                 {monthPrefix}
               </span>
             </div>
-            <p className="mb-3 text-[11px] text-slate-400">{locale === "zh" ? "统计范围：长租 + 售房（日租请前往日租页面查看）" : "Perimetre : bail + vente (journalier sur sa page)"}</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <KPICard
                 label={t.cockpit.receivableThisMonth}
