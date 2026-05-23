@@ -215,6 +215,11 @@ export const dictionaries = {
         outstanding: "待补缴"
       },
       monthlyDiscountHint: "已住满 {nights} 晚，可考虑长住优惠。原价 {gross}，可手动输入优惠金额。",
+      setFixedCheckout: "设定固定离店",
+      setFixedCheckoutDesc: "客人已确定离店日期，从开放式切换为固定离店模式。",
+      setFixedCheckoutLabel: "预计离店日期",
+      setFixedCheckoutButton: "确认切换",
+      setFixedCheckoutNights: "{nights} 晚 = {amount}",
       openEndedBadge: "开放式",
       fixedBadge: "固定离店",
       conflicts: {
@@ -1085,6 +1090,11 @@ export const dictionaries = {
         outstanding: "Solde du"
       },
       monthlyDiscountHint: "{nights} nuits passees. Remise long sejour possible. Brut {gross}, saisir remise manuelle.",
+      setFixedCheckout: "Fixer le depart",
+      setFixedCheckoutDesc: "Le client a confirme sa date de depart. Basculer du sejour ouvert au depart fixe.",
+      setFixedCheckoutLabel: "Date de depart prevue",
+      setFixedCheckoutButton: "Confirmer le changement",
+      setFixedCheckoutNights: "{nights} nuits = {amount}",
       openEndedBadge: "Ouvert",
       fixedBadge: "Depart fixe",
       conflicts: {

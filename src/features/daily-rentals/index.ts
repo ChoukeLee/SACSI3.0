@@ -8,7 +8,7 @@ export {
   createBooking, confirmBooking, checkIn, checkOut,
   completeCleaning, extendStay, cancelBooking,
   recordSupplementaryPayment, applyDiscount, deletePayment,
-  checkConflicts,
+  setFixedCheckout, checkConflicts,
 } from "./actions";
 export {
   getDailyRoomStateForDate,

@@ -452,6 +452,57 @@ export async function applyDiscount(input: {
   return { success: true };
 }
 
+// ── Set fixed checkout (convert open-ended → fixed) ──
+
+export async function setFixedCheckout(bookingId: string, newCheckOut: string): Promise<{ success: boolean; error?: string }> {
+  await guardWrite();
+  const supabase = await createClient();
+
+  const { data: booking } = await supabase.from("daily_bookings")
+    .select("*").eq("id", bookingId).eq("status", "checked_in").single();
+  if (!booking) return { success: false, error: "Booking not found or not checked in." };
+  if (booking.checkout_mode !== "open") return { success: false, error: "Only open-ended bookings can be converted." };
+
+  if (newCheckOut <= booking.check_in) {
+    return { success: false, error: "Check-out date must be after check-in date." };
+  }
+
+  const conflict = await checkConflicts(booking.unit_id, booking.check_in, newCheckOut, bookingId);
+  if (conflict.hasConflict) {
+    return { success: false, error: conflict.reason ?? "Date conflict detected." };
+  }
+
+  const nights = Math.max(1, Math.ceil(
+    (new Date(newCheckOut).getTime() - new Date(booking.check_in).getTime()) / (1000 * 60 * 60 * 24)
+  ));
+  const newTotal = Math.round(nights * Number(booking.nightly_price_xof));
+  const newBillingStatus = Number(booking.prepaid_amount_xof) >= newTotal ? "prepaid" : "need_top_up";
+
+  await supabase.from("daily_bookings").update({
+    checkout_mode: "fixed",
+    check_out: newCheckOut,
+    total_amount_xof: newTotal,
+    billing_status: newBillingStatus,
+  }).eq("id", bookingId);
+
+  await supabase.from("audit_logs").insert({
+    action: "set_fixed_checkout", entity_type: "daily_booking", entity_id: bookingId,
+    metadata: { previous_mode: "open", new_check_out: newCheckOut, new_total: newTotal },
+  });
+
+  const { data: receivables } = await supabase.from("receivables")
+    .select("id").eq("source_type", "daily_booking").eq("source_id", bookingId).limit(1);
+  if (receivables && receivables.length > 0) {
+    await updateReceivableAmount(receivables[0].id, newTotal);
+  }
+
+  revalidatePath("/"); revalidatePath("/fr");
+  revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
+  revalidatePath("/management"); revalidatePath("/fr/management");
+
+  return { success: true };
+}
+
 // ── Complete cleaning ──
 export async function completeCleaning(taskId: string): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();

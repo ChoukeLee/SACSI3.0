@@ -14,7 +14,7 @@ import { printDailyReceipt } from "@/features/print";
 import { calculateBilling } from "./billing";
 import {
   createBooking, confirmBooking, checkIn, checkOut, completeCleaning, extendStay, cancelBooking,
-  recordSupplementaryPayment, applyDiscount, deletePayment,
+  recordSupplementaryPayment, applyDiscount, deletePayment, setFixedCheckout,
 } from "./actions";
 import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
 
@@ -55,6 +55,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   const [discountAmount, setDiscountAmount] = useState("");
   const [discountReason, setDiscountReason] = useState("");
   const [extendDays, setExtendDays] = useState("1");
+  const [fixedCheckOutDate, setFixedCheckOutDate] = useState("");
   const [actionError, setActionError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; amount: number } | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -143,6 +144,18 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
     const extraAmount = Math.round(Number(booking!.nightly_price_xof) * days);
     setSaving(true);
     const result = await extendStay(booking!.id, booking!.check_out ?? "", days, extraAmount);
+    setSaving(false); if (!result.success) setActionError(result.error ?? "Failed"); else { refresh(); onClose(); }
+  };
+
+  const fixedCheckOutNights = useMemo(() => {
+    if (!booking || !fixedCheckOutDate) return 0;
+    return Math.max(0, Math.ceil((new Date(fixedCheckOutDate).getTime() - new Date(booking.check_in).getTime()) / (1000 * 60 * 60 * 24)));
+  }, [booking, fixedCheckOutDate]);
+
+  const handleSetFixedCheckout = async () => {
+    if (!fixedCheckOutDate) { setActionError(t.setFixedCheckoutLabel + " is required."); return; }
+    setSaving(true);
+    const result = await setFixedCheckout(booking!.id, fixedCheckOutDate);
     setSaving(false); if (!result.success) setActionError(result.error ?? "Failed"); else { refresh(); onClose(); }
   };
 
@@ -311,6 +324,21 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                         <span className="text-xs text-brand-ink-600">{t.booking.nights} +{formatXof(Number(booking.nightly_price_xof) * (parseInt(extendDays,10)||1))}</span>
                         <Button variant="secondary" size="sm" onClick={handleExtend} disabled={saving}>{t.booking.extendStay}</Button>
                       </div>
+                    </div>
+                  )}
+
+                  {booking.checkout_mode === "open" && (
+                    <div className="rounded-lg border border-brand-orange-200 bg-brand-orange-50 p-3">
+                      <p className="text-xs font-semibold text-brand-orange-700 mb-2">{t.setFixedCheckout}</p>
+                      <p className="text-xs text-brand-ink-500 mb-2">{t.setFixedCheckoutDesc}</p>
+                      <label className={labelClass}>{t.setFixedCheckoutLabel}</label>
+                      <div className="flex items-center gap-2">
+                        <input type="date" value={fixedCheckOutDate} onChange={e => setFixedCheckOutDate(e.target.value)} className={inputClass} min={booking.check_in} />
+                        <Button variant="primary" size="sm" onClick={handleSetFixedCheckout} disabled={saving || !fixedCheckOutDate} className="shrink-0">{t.setFixedCheckoutButton}</Button>
+                      </div>
+                      {fixedCheckOutDate && fixedCheckOutNights > 0 && (
+                        <p className="mt-1 text-xs text-brand-ink-600">{t.setFixedCheckoutNights.replace("{nights}", String(fixedCheckOutNights)).replace("{amount}", formatXof(fixedCheckOutNights * Number(booking.nightly_price_xof)))}</p>
+                      )}
                     </div>
                   )}
 
