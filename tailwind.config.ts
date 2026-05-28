@@ -6,48 +6,48 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        border: "hsl(30 8% 89%)",
-        input: "hsl(30 8% 89%)",
-        ring: "hsl(237 74% 63%)",
-        background: "hsl(30 10% 97%)",
-        foreground: "hsl(180 2% 10%)",
+        border: "hsl(220 13% 91%)",
+        input: "hsl(220 13% 91%)",
+        ring: "hsl(217 91% 60%)",
+        background: "hsl(30 5% 97%)",
+        foreground: "hsl(220 9% 12%)",
         primary: {
-          DEFAULT: "hsl(237 74% 63%)",
+          DEFAULT: "hsl(0 0% 7%)",
           foreground: "hsl(0 0% 100%)",
         },
         secondary: {
-          DEFAULT: "hsl(30 6% 95%)",
-          foreground: "hsl(180 2% 10%)",
+          DEFAULT: "hsl(210 20% 98%)",
+          foreground: "hsl(220 9% 12%)",
         },
         destructive: {
-          DEFAULT: "hsl(0 72% 51%)",
+          DEFAULT: "hsl(0 84% 60%)",
           foreground: "hsl(0 0% 100%)",
         },
         muted: {
-          DEFAULT: "hsl(30 6% 95%)",
-          foreground: "hsl(240 4% 37%)",
+          DEFAULT: "hsl(210 20% 98%)",
+          foreground: "hsl(220 9% 46%)",
         },
         accent: {
-          DEFAULT: "hsl(237 90% 96%)",
-          foreground: "hsl(237 60% 40%)",
+          DEFAULT: "hsl(217 91% 95%)",
+          foreground: "hsl(217 91% 40%)",
         },
         popover: {
           DEFAULT: "hsl(0 0% 100%)",
-          foreground: "hsl(180 2% 10%)",
+          foreground: "hsl(220 9% 12%)",
         },
         card: {
           DEFAULT: "hsl(0 0% 100%)",
-          foreground: "hsl(180 2% 10%)",
+          foreground: "hsl(220 9% 12%)",
         },
         sidebar: {
-          DEFAULT: "hsl(30 10% 97%)",
-          foreground: "hsl(180 2% 10%)",
-          primary: "hsl(237 74% 63%)",
+          DEFAULT: "hsl(30 5% 97%)",
+          foreground: "hsl(220 9% 12%)",
+          primary: "hsl(0 0% 7%)",
           "primary-foreground": "hsl(0 0% 100%)",
-          accent: "hsl(30 6% 95%)",
-          "accent-foreground": "hsl(180 2% 10%)",
-          border: "hsl(30 8% 89%)",
-          ring: "hsl(237 74% 63%)",
+          accent: "hsl(210 20% 98%)",
+          "accent-foreground": "hsl(220 9% 12%)",
+          border: "hsl(220 13% 91%)",
+          ring: "hsl(217 91% 60%)",
         },
         brand: {
           indigo: {

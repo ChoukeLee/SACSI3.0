@@ -1,132 +1,142 @@
-# SACIS Design System V2 — Soft Hotel Palette
+# SACIS Design System V2 — Cal.com + Airtable + Notion
 
-Property operations system. Soft, professional, hotel-backend aesthetic.
-Grounded in shadcn/ui dashboard blocks, getdesign.md product patterns, and SACIS real business data.
+Property operations system. Clean, neutral, hotel-backend aesthetic optimized for daily rental scheduling, structured data, and long-session comfort.
+
+## Design References
+
+| Reference | Role | What We Take |
+|-----------|------|-------------|
+| **Cal.com** | Primary | Scheduling-first product structure, black primary CTAs, soft-white canvas, 12px card corners, generous whitespace, product UI in cards |
+| **Airtable** | Data | Structured tables and filters, sober editorial typography, signature card colors for visual distinction, modest weights (never bold for its own sake) |
+| **Notion** | Surface | Warm minimalism, soft surface tones (`#f6f5f4`), pastel-tinted feature cards, comfortable long-session feel, deep rich ink |
+
+SAICS is not a copy of any brand. It is a property-operations product that schedules rooms like Cal.com, displays data like Airtable, and feels comfortable like Notion.
 
 ## Color System
 
-### Surface
-- `canvas`: `#F7F6F4` — page background, warm neutral white
-- `surface`: `#FFFFFF` — cards, tables, panels
-- `surface-muted`: `#F3F2F0` — filter bars, table headers, secondary sections
+### Surface — Cal.com white + Notion warm
 
-### Primary Accent — Soft Indigo
-- `primary`: `#4F5DE6` — primary CTA, active nav, focus ring
-- `primary-hover`: `#3D4BCF` — hover state
-- `primary-soft`: `#EDEFFD` — light indigo background for selected/hover states
-- `primary-foreground`: `#FFFFFF` — text on primary
+- `canvas`: `#f6f5f4` — page background, warm off-white (Notion)
+- `surface`: `#ffffff` — cards, tables, panels (Cal.com)
+- `surface-muted`: `#f8f9fa` — filter bars, table headers, secondary sections (Cal.com)
 
-### Text
-- `ink`: `#181919` — headings, body text
-- `ink-muted`: `#5C5D61` — secondary text, labels
-- `ink-subtle`: `#949599` — placeholder, disabled
+### Primary CTA — Cal.com black-ink approach
 
-### Border
-- `border`: `#E5E3E0` — default card/input borders
-- `border-strong`: `#D0CDC8` — focus rings, active borders
+- `primary`: `#111111` — primary buttons, active nav (Cal.com)
+- `primary-hover`: `#242424` — hover state (Cal.com)
+- `primary-foreground`: `#ffffff` — text on primary
+- `primary-soft`: `#f3f4f6` — light background for selected/hover states
 
-### Room Status Cards — "Girlfriend Palette"
+### Accent — Cal.com blue for links and focus
 
-Status expressed through solid background color. Legend outside the matrix.
+- `accent`: `#3b82f6` — focus ring, link emphasis, active indicator
 
-| Status | Background | Text | Description |
-|--------|-----------|------|-------------|
-| sold | `#505080` | white text on badge | deep indigo-gray, neutral permanent |
-| leased | `#7050A0` | white text on badge | purple, stable long-term |
-| daily_occupied | `#5090C0` | white text on badge | soft steel blue, active |
-| reserved | `#A0C0E0` | `#1F4564` text | light blue, pending arrival |
-| cleaning_pending | `#5AB5B8` | white text on badge | teal, service required |
-| maintenance | `#F0A080` | `#673522` text | warm peach, blocked |
-| available | `#F0E0D0` | `#4F4238` text | cream beige, ready |
+### Text — Airtable ink
 
-Note: Cards with dark backgrounds (sold, leased, daily, cleaning) use white text.
-Cards with light backgrounds (reserved, maintenance, available) use dark text.
+- `ink`: `#181d26` — headings, body text (Airtable)
+- `ink-muted`: `#374151` — secondary text, labels (Cal.com)
+- `ink-subtle`: `#6b7280` — placeholder, disabled (Cal.com)
 
-### Semantic Colors
-- `success`: `#16A34A` — paid, completed
-- `warning`: `#D97706` — partial, pending
-- `danger`: `#DC2626` — overdue, cancelled
+### Border — Cal.com hairline
+
+- `border`: `#e5e7eb` — default card/input borders (Cal.com)
+- `border-strong`: `#d1d5db` — focus rings, active borders
+
+### Semantic — Cal.com
+
+- `success`: `#10b981` — paid, completed
+- `warning`: `#f59e0b` — partial, pending
+- `error`: `#ef4444` — overdue, cancelled, maintenance
+
+### Room Status — User's Soft Hotel Palette
+
+Status expressed through solid background color. Never overridden by getdesign brand colors.
+
+| Status | Background | Usage |
+|--------|-----------|-------|
+| sold | `#505080` | deep indigo-gray, neutral permanent |
+| leased | `#7050A0` | purple, stable long-term |
+| daily_occupied | `#5090C0` | soft steel blue, active daily use |
+| reserved | `#A0C0E0` | light blue, pending arrival |
+| cleaning_pending | `#5AB5B8` | teal, service required |
+| maintenance | `#F0A080` | warm peach, blocked |
+| available | `#F0E0D0` | cream beige, ready |
 
 ## Typography
 
 Single font stack: `"MiSans", "Microsoft YaHei", "PingFang SC", "Segoe UI", system-ui, -apple-system, sans-serif`
 
-| Role | Size | Weight | Line | Use |
-|------|------|--------|------|-----|
-| page-title | 20px | 700 | 1.3 | Main heading |
-| section-title | 15px | 700 | 1.3 | Card/section headings |
-| body | 14px | 400 | 1.5 | Normal text |
-| body-sm | 13px | 400 | 1.5 | Secondary text |
-| label | 12px | 600 | 1.3 | Table headers, form labels |
-| caption | 12px | 500 | 1.3 | Badge text, meta |
-| mono | 13px | 500 | 1.5 | Room numbers, amounts, IDs |
+| Role | Size | Weight | Use |
+|------|------|--------|-----|
+| page-title | 20px | 700 | Main heading |
+| section-title | 15px | 600 | Card/section headings |
+| body | 14px | 400 | Normal text |
+| body-sm | 13px | 400 | Secondary text |
+| label | 12px | 600 | Table headers, form labels |
+| caption | 12px | 500 | Badge text, meta |
+| mono | 13px | 500 | Room numbers, amounts, IDs |
 
 Rules:
 - Minimum text size: 12px
 - Amount columns: right-aligned, tabular-nums, mono font
 - No text below 12px anywhere
+- Never bold for decoration — only for hierarchy
 
-## Border Radius
-- `sm`: 6px — inline tags
+## Border Radius — Cal.com
+
+- `sm`: 6px
 - `md`: 8px — buttons, inputs
 - `lg`: 12px — compact cards
-- `xl`: 16px — page cards, panels
+- `xl`: 16px — page cards
 
 ## Shadows
-- `sm`: `0 1px 2px rgba(28,25,23,0.04)`
-- `card`: `0 1px 2px rgba(28,25,23,0.04), 0 8px 24px -16px rgba(28,25,23,0.08)`
-- `panel`: `0 24px 60px -32px rgba(28,25,23,0.16), 0 0 0 1px rgba(28,25,23,0.04)`
+
+Subtle, never heavy. Cal.com style.
+
+- `sm`: `0 1px 2px rgba(0,0,0,0.04)`
+- `card`: `0 1px 2px rgba(0,0,0,0.04), 0 4px 12px -6px rgba(0,0,0,0.06)`
+- `panel`: `0 20px 48px -28px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)`
 
 ## Components
 
 ### Button
-- `default`: orange bg, white text, 8px radius, 36px height
-- `secondary`: white bg, hairline border, ink text
-- `ghost`: transparent, muted text
-- `destructive`: red bg, white text, for delete/cancel only
+Cal.com pattern: black primary fills, white secondary, ghost for minimal.
+
+- `default`: black `#111111` bg, white text, 8px radius, 40px height
+- `secondary`: white bg, hairline border `#e5e7eb`, ink text
+- `ghost`: transparent, ink-muted text, soft gray hover
+- `destructive`: red bg, white text
 
 ### Card
-- White surface, 16px radius, hairline border, card shadow
-- Padding: 20px default, 16px compact
+White surface, 12px radius, hairline border, subtle shadow. Notion soft feel.
 
 ### Badge
-- Pill shape, 12px bold text, light bg with matching text
-- Variants: default(orange), secondary(gray), success(green), warning(amber), destructive(red)
+Pill shape, 12px text. Pastel-tinted backgrounds (Notion tinted card approach).
 
 ### RoomCard
-- Status expressed through card background color — no redundant status text inside card
-- Fixed aspect: 144px wide × 96px tall
-- Maximum 6 cards per row in a floor group
-- Content: room number pill (top-left), customer name or "可安排入住" (center), up to 3 round icon buttons (bottom)
-- Hover: subtle shadow lift on the card, buttons highlight individually
-- External legend maps colors to statuses
+User's Soft Hotel Palette. 144×96px fixed size. Color-coded background. Room number pill, customer name, 3 round icon buttons. External legend.
 
 ### DataTable
-- White container, hairline border, 16px radius
-- Header: surface-muted bg, 12px 600 label
-- Row: 44px height, hairline bottom border, hover bg change
-- Amount columns: right-aligned, tabular-nums, mono font
+Clean white container, hairline border. Cal.com table density — enough space to breathe, tight enough for data. Airtable structured columns.
 
 ### KPI Card
-- White card, hairline border, card shadow
-- Top color strip (4px) for semantic coding
-- Label above, large number below, optional trend caption
+White card, top color strip (4px). Label above, large number below. From room-status palette or semantic colors.
 
-## Page Layout — /management
+## Layout
 
-1. KPI row: 4 cards (receivable, collected, outstanding, overdue)
-2. Room status matrix:
-   - One section per floor
-   - Floor label + room count
-   - 6 cards per row max
-   - Color legend outside the matrix (above or to the side)
-3. Risk alerts or recent activity (secondary)
+- Sidebar: Light (Notion warm white), collapsible. Active item: black pill badge.
+- Header: Clean white, hairline bottom border.
+- Content: Generous whitespace (Cal.com), not cramped.
+- Page width: 1360px max, content fills available width.
 
 ## Anti-patterns
-- No dark sidebar — use light warm canvas
-- No purple/indigo as primary — orange only
-- No status text repeated inside colored cards
-- No giant description cards at page top
-- No fake charts with hardcoded data
+
+- No orange as primary or accent
+- No dark sidebar
+- No purple/pink decorative elements
+- No giant description text at page top
+- No candy-colored status badges
+- No fake charts or mock data
 - No nested cards
 - No text below 12px
+- No bold text used decoratively — only for hierarchy

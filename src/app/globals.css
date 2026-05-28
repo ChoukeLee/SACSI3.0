@@ -27,38 +27,38 @@
 /* ── SACIS Design Tokens V2 — warm orange system ── */
 @layer base {
   :root {
-    --background: 30 6% 98%;           /* #FAF9F8 canvas */
-    --foreground: 24 8% 11%;           /* #1C1917 ink */
-    --card: 0 0% 100%;                 /* #FFFFFF surface */
-    --card-foreground: 180 2% 10%;
+    --background: 30 5% 97%;           /* #f6f5f4 Notion warm white */
+    --foreground: 220 9% 12%;          /* #181d26 Airtable ink */
+    --card: 0 0% 100%;                 /* #ffffff Cal.com white */
+    --card-foreground: 220 9% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 180 2% 10%;
-    --primary: 237 74% 63%;            /* #4F5DE6 indigo */
+    --popover-foreground: 220 9% 12%;
+    --primary: 0 0% 7%;                /* #111111 Cal.com black CTA */
     --primary-foreground: 0 0% 100%;
-    --secondary: 30 6% 95%;            /* #F3F2F0 surface-muted */
-    --secondary-foreground: 180 2% 10%;
-    --muted: 30 6% 95%;
-    --muted-foreground: 240 4% 37%;    /* #5C5D61 ink-muted */
-    --accent: 237 90% 96%;             /* #EDEFFD primary-soft */
-    --accent-foreground: 237 60% 40%;
-    --destructive: 0 72% 51%;          /* #DC2626 danger */
+    --secondary: 210 20% 98%;          /* #f8f9fa Cal.com soft */
+    --secondary-foreground: 220 9% 12%;
+    --muted: 210 20% 98%;
+    --muted-foreground: 220 9% 46%;    /* #6b7280 Cal.com muted */
+    --accent: 217 91% 95%;             /* #eff6ff blue-50 Cal.com accent */
+    --accent-foreground: 217 91% 40%;
+    --destructive: 0 84% 60%;          /* #ef4444 Cal.com error */
     --destructive-foreground: 0 0% 100%;
-    --border: 30 8% 89%;               /* #E5E3E0 hairline */
-    --input: 30 8% 89%;
-    --ring: 237 74% 63%;
+    --border: 220 13% 91%;             /* #e5e7eb Cal.com hairline */
+    --input: 220 13% 91%;
+    --ring: 217 91% 60%;               /* #3b82f6 Cal.com blue */
     --radius: 0.5rem;
 
-    /* Sidebar — warm light */
-    --sidebar-background: 30 10% 97%;
-    --sidebar-foreground: 180 2% 10%;
-    --sidebar-primary: 237 74% 63%;
+    /* Sidebar — Notion warm light */
+    --sidebar-background: 30 5% 97%;
+    --sidebar-foreground: 220 9% 12%;
+    --sidebar-primary: 0 0% 7%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 30 6% 95%;
-    --sidebar-accent-foreground: 180 2% 10%;
-    --sidebar-border: 30 8% 89%;
-    --sidebar-ring: 237 74% 63%;
+    --sidebar-accent: 210 20% 98%;
+    --sidebar-accent-foreground: 220 9% 12%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217 91% 60%;
 
-    /* Room status — girlfriend palette */
+    /* Room status — unchanged user palette */
     --status-sold: 252 12% 41%;        /* #505080 */
     --status-leased: 264 24% 47%;      /* #7050A0 */
     --status-occupied: 202 44% 53%;    /* #5090C0 */
