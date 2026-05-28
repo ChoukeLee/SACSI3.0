@@ -38,18 +38,14 @@ export default async function FrenchFrontDeskPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="px-3 py-3">
-        <FrontDeskWorkspace
-          dailyUnits={dailyUnits}
-          bookings={bookings}
-          customers={customers}
-          payments={payments}
-          cleaningTasks={cleaningTasks}
-          locale="fr"
-          buildingName={building?.display_name ?? "SASCI11"}
-        />
-      </div>
-    </div>
+    <FrontDeskWorkspace
+      dailyUnits={dailyUnits}
+      bookings={bookings}
+      customers={customers}
+      payments={payments}
+      cleaningTasks={cleaningTasks}
+      locale="fr"
+      buildingName={building?.display_name ?? "SASCI11"}
+    />
   );
 }

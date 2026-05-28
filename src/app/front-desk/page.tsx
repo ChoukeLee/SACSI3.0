@@ -38,9 +38,7 @@ export default async function FrontDeskPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="px-3 py-3">
-        <FrontDeskWorkspace
+    <FrontDeskWorkspace
           dailyUnits={dailyUnits}
           bookings={bookings}
           customers={customers}
@@ -49,7 +47,5 @@ export default async function FrontDeskPage() {
           locale="zh"
           buildingName={building?.display_name ?? "SASCI11"}
         />
-      </div>
-    </div>
   );
 }
