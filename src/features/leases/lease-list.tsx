@@ -424,7 +424,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                   return (
                     <RoomCard
                       key={contract.id}
-                      variant="detail"
+                      
                       roomNo={unit?.unit_no ?? "-"}
                       status="leased"
                       statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]}

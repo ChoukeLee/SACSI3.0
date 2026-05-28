@@ -355,7 +355,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                   return (
                     <RoomCard
                       key={contract.id}
-                      variant="detail"
+                      
                       roomNo={unit?.unit_no ?? "-"}
                       status="sold"
                       statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]}

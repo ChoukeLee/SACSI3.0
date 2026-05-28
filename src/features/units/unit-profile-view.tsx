@@ -595,7 +595,7 @@ function TextLink({ href, children }: { href: string; children: React.ReactNode 
 function dailyStatusTone(status: string): BadgeTone {
   const tones: Record<string, BadgeTone> = {
     pending_review: "warning",
-    confirmed: "accent",
+    confirmed: "default",
     checked_in: "success",
     checked_out: "secondary",
     cancelled: "destructive",

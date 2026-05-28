@@ -1,12 +1,12 @@
 import { Badge } from "@/components/ui/badge"
 import type { UnitStatus } from "@/types/domain"
 
-const variantMap: Record<UnitStatus, "default" | "secondary" | "destructive" | "outline" | "accent" | "success" | "warning"> = {
+const variantMap: Record<UnitStatus, "default" | "secondary" | "destructive" | "outline" | "success" | "warning"> = {
   available: "success",
   reserved: "warning",
   daily_occupied: "default",
-  cleaning_pending: "accent",
-  leased: "accent",
+  cleaning_pending: "outline",
+  leased: "secondary",
   sold: "secondary",
   maintenance: "destructive",
   locked: "outline",
@@ -20,5 +20,4 @@ const labels: Record<UnitStatus, string> = {
 export function StatusBadge({ status, label }: { status: UnitStatus; label?: string }) {
   return <Badge variant={variantMap[status]}>{label ?? labels[status]}</Badge>
 }
-
 export { variantMap as unitStatusVariant, labels as shortLabel }

@@ -1,61 +1,79 @@
-"use client";
+"use client"
 
-import Link from "next/link";
-import { cn } from "@/lib/utils";
-import type { RoomVisualStatus } from "@/lib/status-styles";
+import Link from "next/link"
+import { Info, ReceiptText, ArrowRight } from "lucide-react"
+import { cn } from "@/lib/utils"
 
-const COLORS: Record<RoomVisualStatus, { bg: string; badge: string; text: string }> = {
-  sold:           { bg: "bg-[#505080]", badge: "bg-white/90 text-[#303052]", text: "text-white" },
-  leased:         { bg: "bg-[#7050A0]", badge: "bg-white/90 text-[#51347A]", text: "text-white" },
-  dailyOccupied:  { bg: "bg-[#5090C0]", badge: "bg-white/90 text-[#2C628B]", text: "text-white" },
-  reserved:       { bg: "bg-[#A0C0E0]", badge: "bg-white/90 text-[#315E83]", text: "text-[#1F4564]" },
-  cleaningPending:{ bg: "bg-[#5AB5B8]", badge: "bg-white/90 text-[#32757A]", text: "text-white" },
-  maintenance:    { bg: "bg-[#F0A080]", badge: "bg-white/90 text-[#8A4A32]", text: "text-[#673522]" },
-  available:      { bg: "bg-[#F0E0D0]", badge: "bg-white/90 text-[#5D4B3F]", text: "text-[#4F4238]" },
-};
+export type RoomStatus = "sold" | "leased" | "daily_occupied" | "reserved" | "cleaning_pending" | "maintenance" | "available"
+
+const statusStyle: Record<RoomStatus, { bg: string; badge: string; text: string }> = {
+  sold:            { bg: "bg-[#EDE8E3]", badge: "bg-white/80 text-[#5C554F]", text: "text-[#5C554F]" },
+  leased:          { bg: "bg-[#FEF0E0]", badge: "bg-white/80 text-[#7D5E2E]", text: "text-[#7D5E2E]" },
+  daily_occupied:  { bg: "bg-[#FFF1EB]", badge: "bg-white/80 text-[#9B3D1C]", text: "text-[#9B3D1C]" },
+  reserved:        { bg: "bg-[#EEF4FA]", badge: "bg-white/80 text-[#3C6080]", text: "text-[#3C6080]" },
+  cleaning_pending:{ bg: "bg-[#EDF7F5]", badge: "bg-white/80 text-[#2D6B60]", text: "text-[#2D6B60]" },
+  maintenance:     { bg: "bg-[#FBEDED]", badge: "bg-white/80 text-[#8B3535]", text: "text-[#8B3535]" },
+  available:       { bg: "bg-[#EDF5ED]", badge: "bg-white/80 text-[#356B35]", text: "text-[#356B35]" },
+}
 
 interface Props {
-  variant: "matrix" | "detail";
-  roomNo: string;
-  status: RoomVisualStatus;
-  statusLabel: string;
-  href?: string;
-  onClick?: () => void;
-  className?: string;
-  children?: React.ReactNode;
-  customerName?: string;
-  dateText?: string;
+  roomNo: string
+  status: RoomStatus
+  statusLabel?: string
+  customerName?: string
+  dateText?: string
+  href?: string
+  onClick?: () => void
+  className?: string
+  children?: React.ReactNode
 }
 
-export function RoomCard({ variant, roomNo, status, statusLabel, href, onClick, className, children, customerName, dateText }: Props) {
-  const c = COLORS[status];
-  const base = cn("rounded-2xl border border-white/10 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md", c.bg, c.text);
-  const badge = cn("inline-flex rounded-full px-2.5 py-1 font-mono text-xs font-bold shadow-sm ring-1 ring-inset ring-white/20", c.badge);
-  const dot = cn("h-2 w-2 rounded-full", status === "available" || status === "reserved" ? "bg-white/70" : "bg-white/50");
+function ActionButton({ icon: Icon, label }: { icon: typeof Info; label: string }) {
+  return (
+    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/70 text-current shadow-sm ring-1 ring-inset ring-white/50 transition hover:scale-110" aria-label={label}>
+      <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+    </span>
+  )
+}
 
-  const inner = (
-    <>
-      <div className="flex items-start justify-between gap-2">
-        <span className={badge}>{roomNo}</span>
-        {variant === "matrix" && <span className={dot} />}
-        {dateText && <span className="text-xs opacity-70">{dateText}</span>}
+export function RoomCard({ roomNo, status, statusLabel, customerName, dateText, href, onClick, className, children }: Props) {
+  const s = statusStyle[status]
+
+  // detail variant: if children are passed, use a flexible layout for lease/sale cards
+  if (children) {
+    const inner = (
+      <div className={cn("flex flex-col gap-3 rounded-2xl border border-white/10 p-4 shadow-sm transition-shadow hover:shadow-md", s.bg, s.text, className)}>
+        <div className="flex items-center justify-between gap-2">
+          <span className={cn("inline-flex rounded-full px-2.5 py-1 font-mono text-xs font-bold shadow-sm ring-1 ring-inset ring-white/20", s.badge)}>{roomNo}</span>
+          <span className={cn("h-2 w-2 rounded-full", s.text, "opacity-50")} />
+        </div>
+        {statusLabel && <p className="text-xs font-bold">{statusLabel}</p>}
+        {children}
       </div>
-      {variant === "matrix" ? (
-        <div className="flex flex-col items-center justify-center flex-1 min-h-0">
-          <p className="text-sm font-bold">{customerName ?? statusLabel}</p>
-          <p className="text-xs opacity-70">{statusLabel}</p>
-        </div>
-      ) : (
-        <div className="mt-1">
-          <p className="text-xs font-bold">{statusLabel}</p>
-          {children}
-        </div>
-      )}
-    </>
-  );
+    )
+    if (href) return <Link href={href} className="block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">{inner}</Link>
+    if (onClick) return <button onClick={onClick} className="w-full text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">{inner}</button>
+    return inner
+  }
 
-  if (href) return <Link href={href} className={cn(base, "flex flex-col", variant === "matrix" ? "h-[96px] w-[150px] p-2.5" : "p-4")}>{inner}</Link>;
-  return <div className={cn(base, "flex flex-col cursor-pointer", variant === "matrix" ? "h-[96px] w-[150px] p-2.5" : "p-4")} onClick={onClick}>{inner}</div>;
+  // matrix variant: compact card for management dashboard
+  const inner = (
+    <div className={cn("relative flex h-[96px] w-[144px] flex-col rounded-[14px] p-2.5 shadow-sm transition-shadow hover:shadow-md", s.bg, className)}>
+      <div className="flex items-start justify-between gap-1">
+        <span className={cn("inline-flex rounded-full px-2 py-0.5 font-mono text-[12px] font-bold shadow-sm", s.badge)}>{roomNo}</span>
+        {dateText && <span className={cn("text-[10px] font-medium", s.text)}>{dateText}</span>}
+      </div>
+      <div className="flex flex-1 items-center justify-center">
+        <p className={cn("text-center text-[13px] font-bold leading-tight", s.text)}>{customerName || "可安排入住"}</p>
+      </div>
+      <div className="flex items-center justify-center gap-2">
+        <ActionButton icon={Info} label="详情" />
+        <ActionButton icon={ReceiptText} label="财务" />
+        <ActionButton icon={ArrowRight} label="进入" />
+      </div>
+    </div>
+  )
+  if (href) return <Link href={href} className="block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">{inner}</Link>
+  if (onClick) return <button onClick={onClick} className="w-full text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">{inner}</button>
+  return inner
 }
-
-export { type RoomVisualStatus };
