@@ -27,9 +27,9 @@ export function MobileStatsBar({
   const tabs = dictionaries[locale].mobile.tabs;
 
   const items: { key: RoomDisplayStatus; count: number; label: string; accentClass: string }[] = [
-    { key: "occupied", count: occupiedCount, label: tabs.occupied, accentClass: "text-brand-orange" },
+    { key: "occupied", count: occupiedCount, label: tabs.occupied, accentClass: "text-brand-indigo" },
     { key: "checking_out_today", count: checkingOutCount, label: tabs.checkingOut, accentClass: "text-brand-amber-600" },
-    { key: "cleaning", count: cleaningCount, label: tabs.cleaning, accentClass: "text-brand-sky-600" },
+    { key: "cleaning", count: cleaningCount, label: tabs.cleaning, accentClass: "text-brand-cyan-600" },
     { key: "available", count: availableCount, label: tabs.all, accentClass: "text-brand-green-600" },
   ];
 
@@ -58,7 +58,7 @@ export function MobileStatsBar({
               {item.count}
             </span>
             <span className={cn(
-              "text-[10px] font-semibold mt-0.5 leading-tight",
+              "text-xs font-semibold mt-0.5 leading-tight",
               isActive ? "text-brand-ink-700" : "text-brand-ink-500"
             )}>
               {item.label}

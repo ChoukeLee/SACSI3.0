@@ -49,7 +49,7 @@ export default async function DailyRentalsPage() {
         <MobileDailyCards dailyUnits={dailyUnits} bookings={bookings} customers={customers as unknown as CustomerRow[]} payments={payments as unknown as PaymentRow[]} cleaningTasks={cleaningTasks} locale="zh" />
       </div>
       <div className="hidden lg:block">
-        <section>
+        <section className="-mx-2 xl:-mx-4">
           <DailyCalendar dailyUnits={dailyUnits} bookings={bookings} customers={customers} cleaningTasks={cleaningTasks} payments={payments} locale="zh" />
         </section>
       </div>

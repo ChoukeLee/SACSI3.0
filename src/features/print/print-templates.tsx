@@ -21,8 +21,8 @@ const a4Styles = `
   @media print { body { padding: 15mm; } }
   h1 { font-size: 18px; margin-bottom: 4px; }
   h2 { font-size: 14px; margin-bottom: 12px; color: #64748b; }
-  .header { text-align: center; border-bottom: 2px solid #F77F00; padding-bottom: 12px; margin-bottom: 16px; }
-  .header .company { font-size: 20px; font-weight: 800; color: #F77F00; }
+  .header { text-align: center; border-bottom: 2px solid #4F5DE6; padding-bottom: 12px; margin-bottom: 16px; }
+  .header .company { font-size: 20px; font-weight: 800; color: #4F5DE6; }
   .header .meta { font-size: 10px; color: #94a3b8; margin-top: 2px; }
   table { width: 100%; border-collapse: collapse; margin: 12px 0; }
   th { background: #f8fafc; text-align: left; padding: 6px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; border-bottom: 1px solid #e2e8f0; }

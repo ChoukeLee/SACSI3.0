@@ -47,7 +47,7 @@ export function MobileBottomNav({ locale, userRole: _userRole }: { locale: Local
               href={resolveHref(item.href)}
               className={cn(
                 "relative flex flex-col items-center justify-center gap-0.5 min-h-[52px] min-w-[72px] px-1",
-                "text-[11px] font-semibold select-none rounded-lg",
+                "text-xs font-semibold select-none rounded-lg",
                 "transition-colors duration-fast",
                 "active:scale-95 active:bg-slate-100",
                 active
@@ -57,12 +57,12 @@ export function MobileBottomNav({ locale, userRole: _userRole }: { locale: Local
               aria-current={active ? "page" : undefined}
             >
               {active && (
-                <span className="absolute top-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-brand-orange" />
+                <span className="absolute top-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-brand-indigo" />
               )}
               <Icon
                 className={cn(
                   "h-[22px] w-[22px] transition-colors duration-[100ms]",
-                  active ? "text-brand-orange" : "text-slate-400"
+                  active ? "text-brand-indigo" : "text-slate-400"
                 )}
                 aria-hidden
                 strokeWidth={active ? 2.5 : 2}

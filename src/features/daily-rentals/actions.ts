@@ -5,6 +5,15 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuth, requireRole } from "@/lib/auth";
 import type { DailyBookingRow } from "@/types/database";
 import {
+  allowCancelBooking,
+  allowCheckIn,
+  allowCheckOut,
+  allowCompleteCleaning,
+  allowConfirmBooking,
+  allowCreateBooking,
+  resolveUnitStatusAfterDailyChange,
+} from "./daily-rental-policy";
+import {
   createReceivable, syncReceivablesForSource,
   updateReceivableAmount, cancelReceivablesForSource,
 } from "@/features/finance/receivables";
@@ -90,6 +99,13 @@ export async function createBooking(input: {
   await guardWrite();
   const supabase = await createClient();
 
+  const createPolicy = allowCreateBooking({
+    checkIn: input.checkIn,
+    checkOut: input.checkOut,
+    checkoutMode: input.checkoutMode,
+  });
+  if (!createPolicy.allowed) return { success: false, error: createPolicy.reason };
+
   const { data: customer } = await supabase
     .from("customers").select("is_blacklisted, blacklist_reason").eq("id", input.customerId).single();
   if (customer?.is_blacklisted) {
@@ -162,7 +178,13 @@ export async function createBooking(input: {
 
 // ── Confirm ──
 export async function confirmBooking(bookingId: string): Promise<{ success: boolean; error?: string }> {
+  await guardWrite();
   const supabase = await createClient();
+  const { data: booking } = await supabase.from("daily_bookings").select("*").eq("id", bookingId).single();
+  if (!booking) return { success: false, error: "Booking not found." };
+  const policy = allowConfirmBooking(booking);
+  if (!policy.allowed) return { success: false, error: policy.reason };
+
   const { error } = await supabase.from("daily_bookings").update({ status: "confirmed" }).eq("id", bookingId).eq("status", "pending_review");
   if (error) return { success: false, error: error.message };
   await supabase.from("audit_logs").insert({ action: "confirm", entity_type: "daily_booking", entity_id: bookingId, metadata: {} });
@@ -176,16 +198,15 @@ export async function confirmBooking(bookingId: string): Promise<{ success: bool
 
 // ── Check-in (open-ended bookings can check in without prepayment) ──
 export async function checkIn(bookingId: string, prepaidAmount: number): Promise<{ success: boolean; error?: string }> {
+  await guardWrite();
   const supabase = await createClient();
 
   const { data: booking } = await supabase.from("daily_bookings")
-    .select("*").eq("id", bookingId).eq("status", "confirmed").single();
-  if (!booking) return { success: false, error: "Booking not found or not confirmed." };
+    .select("*").eq("id", bookingId).single();
+  if (!booking) return { success: false, error: "Booking not found." };
 
-  // Open-ended bookings can check in without prepayment; fixed bookings require at least partial prepay
-  if (booking.checkout_mode !== "open" && prepaidAmount <= 0) {
-    return { success: false, error: "At least partial prepayment is required for fixed bookings." };
-  }
+  const policy = allowCheckIn(booking, prepaidAmount);
+  if (!policy.allowed) return { success: false, error: policy.reason };
 
   const billingStatus = prepaidAmount >= Number(booking.total_amount_xof) ? "prepaid" : "partially_paid";
 
@@ -196,12 +217,13 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
   await supabase.from("units").update({ status: "daily_occupied" }).eq("id", booking.unit_id);
 
   if (prepaidAmount > 0) {
+    const { data: unit } = await supabase.from("units").select("building_id").eq("id", booking.unit_id).single();
     const { data: payment } = await supabase.from("payments").insert({
-      customer_id: null, unit_id: booking.unit_id, source_type: "daily_booking", source_id: bookingId,
+      customer_id: booking.customer_id, unit_id: booking.unit_id, source_type: "daily_booking", source_id: bookingId,
       payment_date: new Date().toISOString().slice(0, 10), amount: prepaidAmount, currency: "XOF", exchange_rate_to_xof: 1,
     }).select("id").single();
     await supabase.from("ledger_entries").insert({
-      building_id: null, unit_id: booking.unit_id, payment_id: payment?.id,
+      building_id: unit?.building_id ?? null, unit_id: booking.unit_id, payment_id: payment?.id,
       entry_date: new Date().toISOString().slice(0, 10), direction: "income", category: "daily_rental",
       amount_xof: prepaidAmount, description: `日租预付 booking=${bookingId}`,
     });
@@ -230,6 +252,7 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
 export async function recordSupplementaryPayment(input: {
   bookingId: string; amount: number; paymentDate?: string; receiptNo?: string;
 }): Promise<{ success: boolean; error?: string }> {
+  await guardWrite();
   if (input.amount <= 0) return { success: false, error: "Amount must be positive." };
   const supabase = await createClient();
 
@@ -244,6 +267,7 @@ export async function recordSupplementaryPayment(input: {
     prepaid_amount_xof: newPrepaid, billing_status: billingStatus,
   }).eq("id", input.bookingId);
 
+  const { data: unit } = await supabase.from("units").select("building_id").eq("id", booking.unit_id).single();
   const { data: payment } = await supabase.from("payments").insert({
     customer_id: booking.customer_id, unit_id: booking.unit_id,
     source_type: "daily_booking", source_id: input.bookingId,
@@ -253,7 +277,7 @@ export async function recordSupplementaryPayment(input: {
   }).select("id").single();
 
   await supabase.from("ledger_entries").insert({
-    unit_id: booking.unit_id, payment_id: payment?.id,
+    building_id: unit?.building_id ?? null, unit_id: booking.unit_id, payment_id: payment?.id,
     entry_date: input.paymentDate ?? new Date().toISOString().slice(0, 10),
     direction: "income", category: "daily_rental",
     amount_xof: input.amount, description: `日租补缴 booking=${input.bookingId}`,
@@ -277,6 +301,7 @@ export async function recordSupplementaryPayment(input: {
 
 // ── Reverse a supplementary payment ──
 export async function deletePayment(paymentId: string): Promise<{ success: boolean; error?: string }> {
+  await guardWrite();
   const supabase = await createClient();
 
   const { data: payment } = await supabase.from("payments")
@@ -345,11 +370,14 @@ export async function checkOut(bookingId: string, input: {
   finalAmount?: number; actualCheckOut?: string;
   discountAmount?: number; discountReason?: string;
 }): Promise<{ success: boolean; error?: string }> {
+  await guardWrite();
   const supabase = await createClient();
 
   const { data: booking } = await supabase.from("daily_bookings")
-    .select("*").eq("id", bookingId).eq("status", "checked_in").single();
-  if (!booking) return { success: false, error: "Booking not found or not checked in." };
+    .select("*").eq("id", bookingId).single();
+  if (!booking) return { success: false, error: "Booking not found." };
+  const policy = allowCheckOut(booking);
+  if (!policy.allowed) return { success: false, error: policy.reason };
 
   const actualCheckOut = input.actualCheckOut ?? new Date().toISOString().slice(0, 10);
 
@@ -383,13 +411,14 @@ export async function checkOut(bookingId: string, input: {
   const currentPaid = Number(booking.prepaid_amount_xof);
   const remaining = finalAmount - currentPaid;
   if (remaining > 0) {
+    const { data: unit } = await supabase.from("units").select("building_id").eq("id", booking.unit_id).single();
     const { data: payment } = await supabase.from("payments").insert({
       customer_id: booking.customer_id, unit_id: booking.unit_id,
       source_type: "daily_booking", source_id: bookingId,
       payment_date: actualCheckOut, amount: remaining, currency: "XOF", exchange_rate_to_xof: 1,
     }).select("id").single();
     await supabase.from("ledger_entries").insert({
-      unit_id: booking.unit_id, payment_id: payment?.id,
+      building_id: unit?.building_id ?? null, unit_id: booking.unit_id, payment_id: payment?.id,
       entry_date: actualCheckOut, direction: "income", category: "daily_rental",
       amount_xof: remaining, description: `日租结算 booking=${bookingId}`,
     });
@@ -425,6 +454,7 @@ export async function checkOut(bookingId: string, input: {
 export async function applyDiscount(input: {
   bookingId: string; amount: number; reason: string;
 }): Promise<{ success: boolean; error?: string }> {
+  await guardWrite();
   const supabase = await createClient();
   const gross = input.amount > 0 ? input.amount : 0;
   const { data: booking } = await supabase.from("daily_bookings")
@@ -505,12 +535,15 @@ export async function setFixedCheckout(bookingId: string, newCheckOut: string): 
 
 // ── Complete cleaning ──
 export async function completeCleaning(taskId: string): Promise<{ success: boolean; error?: string }> {
+  await guardWrite();
   const supabase = await createClient();
   const { data: task } = await supabase.from("cleaning_tasks").select("id, unit_id, is_completed").eq("id", taskId).single();
-  if (!task) return { success: false, error: "Cleaning task not found." };
-  if (task.is_completed) return { success: false, error: "Task already completed." };
+  const policy = allowCompleteCleaning(task);
+  if (!policy.allowed) return { success: false, error: policy.reason };
+  if (!task) return { success: false, error: "cleaningTaskNotFound" };
   await supabase.from("cleaning_tasks").update({ is_completed: true, completed_at: new Date().toISOString() }).eq("id", taskId);
-  await supabase.from("units").update({ status: "available" }).eq("id", task.unit_id);
+  const nextStatus = await resolveUnitStatusAfterDailyChange(supabase, task.unit_id);
+  await supabase.from("units").update({ status: nextStatus }).eq("id", task.unit_id);
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
@@ -521,6 +554,7 @@ export async function completeCleaning(taskId: string): Promise<{ success: boole
 
 // ── Extend stay ──
 export async function extendStay(bookingId: string, newCheckOut: string, extraNights: number, extraAmount: number): Promise<{ success: boolean; error?: string }> {
+  await guardWrite();
   const supabase = await createClient();
   const { data: booking } = await supabase.from("daily_bookings")
     .select("*").eq("id", bookingId).eq("status", "checked_in").single();
@@ -560,10 +594,13 @@ export async function cancelBooking(bookingId: string): Promise<{ success: boole
   await guardCancel();
   const supabase = await createClient();
   const { data: booking } = await supabase.from("daily_bookings")
-    .select("id, unit_id, status").eq("id", bookingId).in("status", ["pending_review", "confirmed"]).single();
-  if (!booking) return { success: false, error: "Booking not found or cannot be cancelled." };
+    .select("id, unit_id, status").eq("id", bookingId).single();
+  if (!booking) return { success: false, error: "Booking not found." };
+  const policy = allowCancelBooking(booking);
+  if (!policy.allowed) return { success: false, error: policy.reason };
   await supabase.from("daily_bookings").update({ status: "cancelled" }).eq("id", bookingId);
-  await supabase.from("units").update({ status: "available" }).eq("id", booking.unit_id);
+  const nextStatus = await resolveUnitStatusAfterDailyChange(supabase, booking.unit_id, { excludeBookingId: bookingId });
+  await supabase.from("units").update({ status: nextStatus }).eq("id", booking.unit_id);
   await supabase.from("audit_logs").insert({ action: "cancel", entity_type: "daily_booking", entity_id: bookingId, metadata: {} });
   await cancelReceivablesForSource("daily_booking", bookingId);
   revalidatePath("/"); revalidatePath("/fr");

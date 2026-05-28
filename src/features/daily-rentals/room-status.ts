@@ -1,4 +1,5 @@
 import type { UnitRow, DailyBookingRow } from "@/types/database";
+import { bookingOccupiesDate } from "./daily-rental-policy";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -29,9 +30,9 @@ const ACTIVE_PRIORITY: Record<string, number> = {
 export const STATUS_COLORS: Record<DailyRoomDisplayStatus, string> = {
   maintenance:        "bg-brand-red-100 text-brand-red-700 border border-brand-red-200",
   locked:             "bg-brand-neutral-100 text-brand-neutral-600 border border-brand-neutral-300",
-  occupied:           "bg-brand-orange-100 text-brand-orange-800 border border-brand-orange-200",
+  occupied:           "bg-brand-indigo-100 text-brand-indigo-800 border border-brand-indigo-200",
   checking_out_today: "bg-brand-amber-100 text-brand-amber-700 border border-brand-amber-200",
-  reserved:           "bg-brand-sky-100 text-brand-sky-700 border border-brand-sky-200",
+  reserved:           "bg-brand-cyan-100 text-brand-cyan-700 border border-brand-cyan-200",
   cleaning:           "bg-brand-green-100 text-brand-green-800 border border-brand-green-200",
   available:          "",
 };
@@ -65,7 +66,7 @@ export function getDailyRoomStateForDate(params: {
   let bestPriority = -1;
 
   for (const b of unitBookings) {
-    if (!coversDate(b, dateStr)) continue;
+    if (!coversDisplayDate(b, dateStr)) continue;
     const p = ACTIVE_PRIORITY[b.status] ?? 0;
     if (p > bestPriority) { bestPriority = p; bestBooking = b; }
   }
@@ -239,10 +240,10 @@ function resolveCalendarCheckOut(
 export function getBookingColorClass(booking: DailyBookingRow): string {
   // Aligned with Natural Professional STATUS_CELL earth-tone palette
   if (booking.status === "checked_in") {
-    return "bg-brand-orange-500 text-white";
+    return "bg-brand-indigo-500 text-white";
   }
   if (booking.status === "confirmed" || booking.status === "pending_review") {
-    return "bg-brand-sky-500 text-white";
+    return "bg-brand-cyan-500 text-white";
   }
   if (booking.status === "checked_out") {
     return "bg-brand-warm-100 text-brand-ink-500";
@@ -252,19 +253,13 @@ export function getBookingColorClass(booking: DailyBookingRow): string {
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-/** Does this booking cover the given date? */
-function coversDate(b: DailyBookingRow, dateStr: string): boolean {
-  if (dateStr < b.check_in) return false;
+/** Does this booking need to appear on the room-state display for this date? */
+function coversDisplayDate(b: DailyBookingRow, dateStr: string): boolean {
+  if (bookingOccupiesDate(b, dateStr)) return true;
 
-  if (b.checkout_mode === "open") {
-    if (b.actual_check_out !== null && dateStr >= b.actual_check_out) return false;
-    return true;
-  }
-
-  // fixed: departure date is included (guest occupies until checkout time)
-  if (b.check_out === null) return dateStr === b.check_in;
-  if (dateStr > b.check_out) return false;
-  return true;
+  // Fixed checked-in bookings should still appear on checkout day so the
+  // front desk can see the "checking out today" state before cleaning.
+  return b.status === "checked_in" && b.checkout_mode === "fixed" && b.check_out === dateStr;
 }
 
 function toUtcDate(s: string): Date {

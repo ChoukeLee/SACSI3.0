@@ -18,7 +18,7 @@ export default async function LoginPage({
     <div className="flex min-h-[80vh] items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-orange shadow-sm">
+          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-indigo shadow-sm">
             <span className="text-sm font-bold text-white">S</span>
           </div>
           <h1 className="text-base font-black text-slate-950">SACIS 3.0</h1>
@@ -33,7 +33,7 @@ export default async function LoginPage({
               name="email"
               placeholder="admin@sacsi.com"
               required
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/30"
             />
           </div>
           <div>
@@ -42,7 +42,7 @@ export default async function LoginPage({
               type="password"
               name="password"
               required
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/30"
             />
           </div>
 
@@ -52,7 +52,7 @@ export default async function LoginPage({
 
           <button
             type="submit"
-            className="w-full rounded-lg bg-brand-orange px-4 py-2.5 text-sm font-semibold text-white transition-all duration-fast hover:bg-brand-orange-600 active:scale-[0.98]"
+            className="w-full rounded-lg bg-brand-indigo px-4 py-2.5 text-sm font-semibold text-white transition-all duration-fast hover:bg-brand-indigo-600 active:scale-[0.98]"
           >
             登录
           </button>

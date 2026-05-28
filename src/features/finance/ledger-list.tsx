@@ -113,12 +113,12 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
     URL.revokeObjectURL(url);
   };
 
-  const inputClass = "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm text-brand-ink-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15";
-  const labelClass = "block mb-1 text-[11px] font-black uppercase tracking-[0.14em] text-brand-ink-500";
+  const inputClass = "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm text-brand-ink-700 shadow-sm transition focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15";
+  const labelClass = "block mb-1 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500";
 
   const dirColor: Record<string, string> = {
     income: "text-brand-green-700", expense: "text-brand-red-700",
-    liability_in: "text-brand-sky-700", liability_out: "text-brand-amber-700",
+    liability_in: "text-brand-cyan-700", liability_out: "text-brand-amber-700",
   };
 
   return (
@@ -134,17 +134,17 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
       <div className="mb-4 rounded-2xl border border-brand-warm-200 bg-white p-3 shadow-natural">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15" />
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15" />
             <span className="text-xs font-semibold text-brand-ink-400">-</span>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15" />
-            <select value={dirFilter} onChange={(e) => setDirFilter(e.target.value)} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15">
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15" />
+            <select value={dirFilter} onChange={(e) => setDirFilter(e.target.value)} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15">
               <option value="all">{t.filters.direction}: {t.filters.all}</option>
               <option value="income">{t.directions.income}</option>
               <option value="expense">{t.directions.expense}</option>
               <option value="liability_in">{t.directions.liability_in}</option>
               <option value="liability_out">{t.directions.liability_out}</option>
             </select>
-            <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15">
+            <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15">
               <option value="all">{t.filters.category}: {t.filters.all}</option>
               {allCategories.map(c => <option key={c} value={c}>{t.categories[c as keyof typeof t.categories]}</option>)}
             </select>
@@ -153,14 +153,14 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={locale === "zh" ? "搜索描述/房号..." : "Rechercher description, chambre..."}
-              className="w-48 rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition placeholder:text-brand-ink-400 hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15"
+              className="w-48 rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition placeholder:text-brand-ink-400 hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15"
             />
           </div>
           <div className="flex items-center gap-2">
             <button onClick={handleExportCsv} disabled={filtered.length === 0} className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:bg-brand-warm-50 disabled:opacity-40">
               <Download className="h-3.5 w-3.5" />{t.export.csv}
             </button>
-            <button onClick={() => setShowNewEntry(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-brand-orange-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-orange-600 active:scale-[0.98]">
+            <button onClick={() => setShowNewEntry(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-brand-indigo-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-indigo-600 active:scale-[0.98]">
               <Plus className="h-3.5 w-3.5" />{t.entry.title}
             </button>
           </div>
@@ -261,7 +261,7 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
               </div>
               <div><label className={labelClass}>{t.entry.description}</label><textarea value={eDesc} onChange={(e) => setEDesc(e.target.value)} rows={3} className={inputClass} /></div>
               {error && <p className="text-sm text-brand-red-600">{error}</p>}
-              <button onClick={handleSave} disabled={saving} className="w-full rounded-xl bg-brand-orange-500 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-brand-orange-600 active:scale-[0.98] disabled:opacity-50">{saving ? "..." : t.entry.save}</button>
+              <button onClick={handleSave} disabled={saving} className="w-full rounded-xl bg-brand-indigo-500 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-brand-indigo-600 active:scale-[0.98] disabled:opacity-50">{saving ? "..." : t.entry.save}</button>
             </div>
           </div>
         </>
@@ -274,12 +274,12 @@ function FinanceMetric({ label, value, tone }: { label: string; value: string; t
   const styles = {
     green: "border-brand-green-200 bg-brand-green-50 text-brand-green-700",
     red: "border-brand-red-200 bg-brand-red-50 text-brand-red-700",
-    orange: "border-brand-orange-200 bg-brand-orange-50 text-brand-orange-700",
+    orange: "border-brand-indigo-200 bg-brand-indigo-50 text-brand-indigo-700",
   }[tone];
 
   return (
     <div className={cn("rounded-2xl border px-4 py-3 shadow-sm", styles)}>
-      <p className="text-[11px] font-bold text-current opacity-70">{label}</p>
+      <p className="text-xs font-bold text-current opacity-70">{label}</p>
       <p className="mt-1 text-2xl font-black tabular-nums">{value}</p>
     </div>
   );

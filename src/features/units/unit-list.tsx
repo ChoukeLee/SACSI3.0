@@ -135,7 +135,7 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
                       tabIndex={0}
                       role="button"
                       aria-label={`${unit.unit_no} - ${t.actions.viewDetail}`}
-                      className="cursor-pointer transition-colors duration-fast hover:bg-brand-orange-50/50 focus-visible:bg-brand-orange-50/70 focus-visible:outline-none"
+                      className="cursor-pointer transition-colors duration-fast hover:bg-brand-indigo-50/50 focus-visible:bg-brand-indigo-50/70 focus-visible:outline-none"
                       onClick={() => setDetailUnitId(unit.id)}
                       onKeyDown={(e) => { if (e.key === "Enter") setDetailUnitId(unit.id); }}
                     >
@@ -163,7 +163,7 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
                               e.stopPropagation();
                               setDetailUnitId(unit.id);
                             }}
-                            className="inline-flex items-center gap-1 rounded-lg bg-brand-orange-500 px-3 py-1.5 text-[10px] font-bold text-white shadow-sm transition hover:bg-brand-orange-600"
+                            className="inline-flex items-center gap-1 rounded-lg bg-brand-indigo-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-brand-indigo-600"
                           >
                             <Eye className="h-3 w-3" />
                             {locale === "zh" ? "查看房源" : "Voir"}
@@ -202,14 +202,14 @@ function AssetMetric({ label, value, tone }: { label: string; value: number; ton
   const styles = {
     total: "border-brand-warm-300 bg-white text-brand-ink-900",
     sold: "border-brand-warm-300 bg-brand-warm-100 text-brand-ink-800",
-    leased: "border-brand-blue-200 bg-brand-blue-50 text-brand-blue-900",
-    daily: "border-brand-orange-200 bg-brand-orange-50 text-brand-orange-900",
+    leased: "border-brand-cyan-200 bg-brand-cyan-50 text-brand-cyan-900",
+    daily: "border-brand-indigo-200 bg-brand-indigo-50 text-brand-indigo-900",
     available: "border-brand-green-200 bg-brand-green-50 text-brand-green-900",
     other: "border-brand-warm-300 bg-white text-brand-neutral-700",
   }[tone];
   return (
     <div className={cn("overflow-hidden rounded-2xl border px-4 py-3 shadow-sm", styles)}>
-      <p className="text-[11px] font-black text-current opacity-85">{label}</p>
+      <p className="text-xs font-black text-current opacity-85">{label}</p>
       <p className="mt-1 text-[26px] font-black leading-none text-current tabular-nums">{value}</p>
     </div>
   );
@@ -219,9 +219,9 @@ function UnitStatusPill({ status, locale }: { status: UnitStatus; locale: Locale
   const label = dictionaries[locale].statuses[status];
   const styles: Record<UnitStatus, string> = {
     sold: "bg-brand-warm-100 text-brand-ink-800 ring-brand-warm-300",
-    leased: "bg-brand-blue-50 text-brand-blue-800 ring-brand-blue-200",
-    daily_occupied: "bg-brand-orange-50 text-brand-orange-800 ring-brand-orange-200",
-    reserved: "bg-brand-orange-100 text-brand-orange-900 ring-brand-orange-300",
+    leased: "bg-brand-cyan-50 text-brand-cyan-800 ring-brand-cyan-200",
+    daily_occupied: "bg-brand-indigo-50 text-brand-indigo-800 ring-brand-indigo-200",
+    reserved: "bg-brand-indigo-100 text-brand-indigo-900 ring-brand-indigo-300",
     cleaning_pending: "bg-brand-green-100 text-brand-green-900 ring-brand-green-300",
     available: "bg-brand-green-50 text-brand-green-800 ring-brand-green-200",
     maintenance: "bg-brand-red-500 text-white ring-brand-red-600",
@@ -230,7 +230,7 @@ function UnitStatusPill({ status, locale }: { status: UnitStatus; locale: Locale
 
   return (
     <span
-      className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-black ring-1 ring-inset", styles[status])}
+      className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-black ring-1 ring-inset", styles[status])}
       role="status"
       aria-label={label}
     >

@@ -48,7 +48,7 @@ export default async function FrenchDailyRentalsPage() {
       <>
 
 <><PageHeader title={t.title} description={t.description} />
-      <section>
+      <section className="-mx-2 xl:-mx-4">
         <DailyCalendar
           dailyUnits={dailyUnits}
           bookings={bookings}

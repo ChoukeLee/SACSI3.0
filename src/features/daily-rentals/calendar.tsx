@@ -32,15 +32,15 @@ interface CalendarProps {
 type ViewMode = "day" | "week" | "month";
 type RoomFilter = "all" | "available" | "occupied" | "checkingOutToday" | "openEnded" | "reserved" | "cleaning" | "maintenance";
 
-const ROOM_COL_WIDTH = 136;
-const DAY_COL_MIN_WIDTH = 72;
-const DAY_COL_WIDTH = 78;
-const ROW_HEIGHT = 60;
-const FLOOR_ROW_HEIGHT = 20;
+const ROOM_COL_WIDTH = 128;
+const DAY_COL_MIN_WIDTH = 70;
+const DAY_COL_WIDTH = 74;
+const ROW_HEIGHT = 46;
+const FLOOR_ROW_HEIGHT = 18;
 const MAINTENANCE_STATUSES = new Set(["available", "reserved", "daily_occupied", "cleaning_pending", "leased", "sold"]);
 
 const NAV_BTN =
-  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-brand-warm-300 bg-white text-brand-ink-500 shadow-sm transition-all duration-fast hover:border-brand-orange-200 hover:bg-brand-orange-50 hover:text-brand-orange-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500";
+  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-brand-warm-300 bg-white text-brand-ink-500 shadow-sm transition-all duration-fast hover:border-brand-indigo-200 hover:bg-brand-indigo-50 hover:text-brand-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo-500";
 
 const COPY = {
   zh: {
@@ -369,8 +369,8 @@ export function DailyCalendar({
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-3xl border border-brand-warm-200 bg-white shadow-natural">
-        <div className="flex flex-col gap-4 border-b border-brand-warm-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+      <section className="overflow-hidden rounded-2xl border border-brand-warm-300 bg-white shadow-card">
+        <div className="flex flex-col gap-3 border-b border-brand-warm-200 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h3 className="text-base font-black leading-5 text-brand-neutral-950">{locale === "zh" ? "日租概览" : "Apercu journalier"}</h3>
             <p className="mt-1 text-sm font-semibold text-brand-neutral-700">
@@ -378,7 +378,7 @@ export function DailyCalendar({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-2xl border border-brand-warm-200 bg-brand-neutral-50 px-4 py-2 text-sm font-black text-brand-neutral-950">
+            <div className="rounded-xl border border-brand-warm-200 bg-brand-neutral-50 px-3 py-1.5 text-xs font-black text-brand-neutral-950">
               {new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN")}
               <span className="ml-3 text-brand-neutral-500">
                 {new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long" })}
@@ -394,14 +394,14 @@ export function DailyCalendar({
             </Button>
           </div>
         </div>
-        <div className="grid gap-3 bg-brand-neutral-50/70 px-5 py-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-2 bg-brand-neutral-50/70 px-4 py-3 md:grid-cols-2 xl:grid-cols-4">
           {shareRows.map((row) => (
             <ShareCard key={row.key} label={row.label} value={row.count} units={row.units} tone={row.tone} />
           ))}
         </div>
-        <div className="border-t border-brand-warm-200 bg-brand-neutral-50/70 px-5 py-4">
-          <p className="mb-2.5 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-400">{locale === "zh" ? "本月财务" : "Finances du mois"}</p>
-          <div className="grid gap-3 md:grid-cols-3">
+        <div className="border-t border-brand-warm-200 bg-brand-neutral-50/70 px-4 py-3">
+          <p className="mb-2.5 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-400">{locale === "zh" ? "本月财务" : "Finances du mois"}</p>
+          <div className="grid gap-2 md:grid-cols-3">
             {financeCards.map((card) => (
               <FinanceCard key={card.key} label={card.label} value={card.value} tone={card.tone} onClick={() => setFinanceDetail(card.key as "collected" | "outstanding" | "settled")} />
             ))}
@@ -410,10 +410,10 @@ export function DailyCalendar({
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-brand-warm-300 bg-white shadow-card">
-        <div className="flex flex-col gap-3 border-b border-brand-warm-300 bg-brand-warm-50 px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-col gap-3 border-b border-brand-warm-300 bg-white px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h2 className="text-xl font-black tracking-tight text-brand-ink-900">{copy.timeline}</h2>
-            <p className="mt-0.5 text-[13px] font-medium text-brand-ink-500">{copy.subtitle}</p>
+            <h2 className="text-lg font-black tracking-tight text-brand-ink-900">{copy.timeline}</h2>
+            <p className="mt-0.5 text-xs font-semibold text-brand-ink-500">{copy.subtitle}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -424,11 +424,11 @@ export function DailyCalendar({
               label={copy.allRooms}
               count={filterCounts.all}
             />
-            <FilterButton active={roomFilter === "occupied"} onClick={() => setRoomFilter("occupied")} color="bg-brand-orange-500" label={copy.occupied} count={filterCounts.occupied} />
-            <FilterButton active={roomFilter === "checkingOutToday"} onClick={() => setRoomFilter("checkingOutToday")} color="bg-brand-orange-300" label={locale === "zh" ? "今日离店" : "Depart"} count={filterCounts.checkingOutToday} />
-            <FilterButton active={roomFilter === "openEnded"} onClick={() => setRoomFilter("openEnded")} color="bg-brand-orange-400" label={locale === "zh" ? "未定离店" : "Ouvert"} count={filterCounts.openEnded} />
+            <FilterButton active={roomFilter === "occupied"} onClick={() => setRoomFilter("occupied")} color="bg-brand-indigo-500" label={copy.occupied} count={filterCounts.occupied} />
+            <FilterButton active={roomFilter === "checkingOutToday"} onClick={() => setRoomFilter("checkingOutToday")} color="bg-brand-indigo-300" label={locale === "zh" ? "今日离店" : "Depart"} count={filterCounts.checkingOutToday} />
+            <FilterButton active={roomFilter === "openEnded"} onClick={() => setRoomFilter("openEnded")} color="bg-brand-indigo-400" label={locale === "zh" ? "未定离店" : "Ouvert"} count={filterCounts.openEnded} />
             <FilterButton active={roomFilter === "reserved"} onClick={() => setRoomFilter("reserved")} color="bg-brand-amber-500" label={copy.reserved} count={filterCounts.reserved} />
-            <FilterButton active={roomFilter === "cleaning"} onClick={() => setRoomFilter("cleaning")} color="bg-brand-blue-500" label={copy.cleaning} count={filterCounts.cleaning} />
+            <FilterButton active={roomFilter === "cleaning"} onClick={() => setRoomFilter("cleaning")} color="bg-brand-green-500" label={copy.cleaning} count={filterCounts.cleaning} />
             <FilterButton active={roomFilter === "available"} onClick={() => setRoomFilter("available")} color="bg-brand-green-500" label={copy.available} count={filterCounts.available} />
             <FilterButton active={roomFilter === "maintenance"} onClick={() => setRoomFilter("maintenance")} color="bg-brand-red-500" label={copy.maintenance} count={filterCounts.maintenance} />
           </div>
@@ -453,23 +453,23 @@ export function DailyCalendar({
             </button>
             <button
               onClick={goToToday}
-              className="h-8 rounded-xl bg-brand-orange-500 px-4 text-sm font-black text-white shadow-lifted transition hover:bg-brand-orange-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500"
+              className="h-8 rounded-xl bg-brand-indigo-500 px-4 text-sm font-black text-white shadow-lifted transition hover:bg-brand-indigo-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo-500"
             >
               {copy.today}
             </button>
           </div>
         </div>
 
-        <div ref={scrollRef} className="scroll-hint-x overflow-auto bg-white" style={{ maxHeight: "calc(100vh - 178px)" }} data-scroll-x>
+        <div ref={scrollRef} className="scroll-hint-x overflow-auto bg-white" style={{ maxHeight: "calc(100vh - 220px)" }} data-scroll-x>
           <div
-            className="grid min-w-full"
-            style={{ gridTemplateColumns: `${ROOM_COL_WIDTH}px repeat(${visibleDays.length}, minmax(${DAY_COL_MIN_WIDTH}px, 1fr))` }}
+            className="grid w-full min-w-full"
+            style={{ gridTemplateColumns: `${ROOM_COL_WIDTH}px repeat(${visibleDays.length}, minmax(${DAY_COL_MIN_WIDTH}px, 1fr))`, minWidth: "100%" }}
             role="grid"
             aria-label={copy.timeline}
           >
             <div
-              className="sticky left-0 top-0 z-30 flex items-center border-b border-r border-brand-warm-300 bg-white px-3 text-[10px] font-black uppercase tracking-[0.12em] text-brand-ink-500"
-              style={{ height: 38 }}
+              className="sticky left-0 top-0 z-30 flex items-center border-b border-r border-brand-warm-300 bg-white px-3 text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500"
+              style={{ height: 40 }}
             >
               {copy.roomType}
             </div>
@@ -482,16 +482,16 @@ export function DailyCalendar({
                   key={dateStr}
                   className={cn(
                     "sticky top-0 z-20 flex flex-col items-center justify-center border-b border-r border-brand-warm-300 text-xs",
-                    isToday && "bg-brand-orange-50 text-brand-orange-700",
+                    isToday && "bg-brand-indigo-50 text-brand-indigo-700",
                     isWeekend && !isToday && "bg-brand-warm-50 text-brand-ink-400",
                     !isToday && !isWeekend && "bg-white text-brand-ink-500",
                   )}
-                  style={{ height: 38 }}
+                  style={{ height: 40 }}
                   role="columnheader"
                 >
-                  <span className="font-semibold">{date.toLocaleDateString(localeStr, { weekday: "short" })}</span>
-                  <span className="text-sm font-black text-brand-ink-900">{date.getDate()}</span>
-                  {isToday && <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-brand-orange-500" />}
+                  <span className="text-xs font-semibold leading-3">{date.toLocaleDateString(localeStr, { weekday: "short" })}</span>
+                  <span className="text-base font-black leading-5 text-brand-ink-900">{date.getDate()}</span>
+                  {isToday && <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-brand-indigo-500" />}
                 </div>
               );
             })}
@@ -525,10 +525,10 @@ export function DailyCalendar({
                       style={{ height: ROW_HEIGHT }}
                       role="rowheader"
                     >
-                      <span className={cn("mr-2 h-10 w-1.5 rounded-full", roomTone.strip)} />
+                      <span className={cn("mr-2 h-8 w-1.5 rounded-full", roomTone.strip)} />
                       <div className="min-w-0">
-                        <div className="truncate text-[11px] font-black leading-3 text-brand-ink-900">{copy.room} {unit.unit_no}</div>
-                        <div className="truncate text-[9px] font-semibold leading-3 text-brand-ink-500">
+                        <div className="truncate text-xs font-black leading-4 text-brand-ink-900">{copy.room} {unit.unit_no}</div>
+                        <div className="truncate text-xs font-semibold leading-3 text-brand-ink-500">
                           {statusLabel} · {copy.apartment}
                         </div>
                       </div>
@@ -654,7 +654,7 @@ export function DailyCalendar({
                 {financeDetail === "outstanding" && (
                   <>
                     <div><span className="text-brand-ink-500">{locale === "zh" ? "欠款笔数" : "Nb"}: </span><span className="font-black">{financeStats.outstandingBookings.length}</span></div>
-                    <div><span className="text-brand-ink-500">{locale === "zh" ? "欠款合计" : "Total"}: </span><span className="font-black text-brand-orange-700">{formatXof(financeStats.currentOutstanding)}</span></div>
+                    <div><span className="text-brand-ink-500">{locale === "zh" ? "欠款合计" : "Total"}: </span><span className="font-black text-brand-indigo-700">{formatXof(financeStats.currentOutstanding)}</span></div>
                   </>
                 )}
                 {financeDetail === "settled" && (
@@ -671,7 +671,7 @@ export function DailyCalendar({
                   {financeDetail === "collected" && (
                     <table className="w-full text-xs">
                       <thead className="sticky top-0 z-10 bg-brand-warm-50">
-                        <tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-brand-ink-500">
+                        <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500">
                           <th className="px-4 py-3">{locale === "zh" ? "日期" : "Date"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "房号" : "Chambre"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "客户" : "Client"}</th>
@@ -703,7 +703,7 @@ export function DailyCalendar({
                   {financeDetail === "outstanding" && (
                     <table className="w-full text-xs">
                       <thead className="sticky top-0 z-10 bg-brand-warm-50">
-                        <tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-brand-ink-500">
+                        <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500">
                           <th className="px-4 py-3">{locale === "zh" ? "房号" : "Chambre"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "客户" : "Client"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "入住" : "Arrivee"}</th>
@@ -732,7 +732,7 @@ export function DailyCalendar({
                                 <td className="px-4 py-2.5 text-brand-ink-600">{b.check_in}</td>
                                 <td className="px-4 py-2.5 text-right text-brand-ink-900">{formatXof(final)}</td>
                                 <td className="px-4 py-2.5 text-right text-brand-green-700">{formatXof(prepaid)}</td>
-                                <td className="px-4 py-2.5 text-right font-semibold text-brand-orange-700">{formatXof(final - prepaid)}</td>
+                                <td className="px-4 py-2.5 text-right font-semibold text-brand-indigo-700">{formatXof(final - prepaid)}</td>
                               </tr>
                             );
                           })
@@ -744,7 +744,7 @@ export function DailyCalendar({
                   {financeDetail === "settled" && (
                     <table className="w-full text-xs">
                       <thead className="sticky top-0 z-10 bg-brand-warm-50">
-                        <tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-brand-ink-500">
+                        <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500">
                           <th className="px-4 py-3">{locale === "zh" ? "房号" : "Chambre"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "客户" : "Client"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "入住" : "Arrivee"}</th>
@@ -775,7 +775,7 @@ export function DailyCalendar({
                                 <td className="px-4 py-2.5 text-brand-ink-600">{b.checkout_mode === "open" ? b.actual_check_out : b.check_out}</td>
                                 <td className="px-4 py-2.5 text-right font-semibold text-brand-ink-900">{formatXof(final)}</td>
                                 <td className="px-4 py-2.5">
-                                  <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold", isPaid ? "bg-brand-green-100 text-brand-green-700" : "bg-brand-amber-100 text-brand-amber-700")}>
+                                  <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-bold", isPaid ? "bg-brand-green-100 text-brand-green-700" : "bg-brand-amber-100 text-brand-amber-700")}>
                                     {isPaid ? (locale === "zh" ? "已付清" : "Paye") : (locale === "zh" ? "未付清" : "Impaye")}
                                   </span>
                                 </td>
@@ -829,13 +829,13 @@ function TimelineCell({
 }) {
   const baseCell = cn(
     "group relative border-b border-r border-brand-warm-100 transition-colors",
-    isToday ? "bg-brand-orange-50/45" : "bg-white",
+    isToday ? "bg-brand-indigo-50/45" : "bg-white",
   );
 
   if (isMaintenance) {
     return (
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
-        <div className="absolute inset-x-1.5 top-1/2 h-9 -translate-y-1/2 rounded-lg border border-brand-red-200 bg-brand-red-50" />
+        <div className="absolute inset-x-1.5 top-1/2 h-8 -translate-y-1/2 rounded-lg border border-brand-red-200 bg-brand-red-50" />
       </div>
     );
   }
@@ -851,10 +851,10 @@ function TimelineCell({
         <button
           type="button"
           className={cn(
-            "absolute top-1/2 flex h-10 -translate-y-1/2 items-center overflow-hidden px-2 text-left shadow-sm transition-all hover:-translate-y-[54%] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500",
+            "absolute top-1/2 flex h-8 -translate-y-1/2 items-center overflow-hidden px-2 text-left shadow-sm transition-all hover:-translate-y-[54%] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo-500",
             tone,
-            isStart ? "left-2 rounded-l-2xl" : "-left-px rounded-l-none",
-            isEnd ? "right-2 rounded-r-2xl" : "-right-px rounded-r-none",
+            isStart ? "left-1.5 rounded-l-xl" : "-left-px rounded-l-none",
+            isEnd ? "right-1.5 rounded-r-xl" : "-right-px rounded-r-none",
           )}
           title={`${name} · ${dateRange}`}
           onClick={() => onOpenBooking(booking.id)}
@@ -864,7 +864,7 @@ function TimelineCell({
         >
           {isStart && (
             <span className="min-w-0">
-              <span className="block truncate text-[10px] font-black leading-3">{name}</span>
+              <span className="block truncate text-xs font-black leading-3">{name}</span>
               <span className="block truncate text-[8px] font-semibold opacity-85">
                 {bookingLabels[booking.status] ?? booking.status}
               </span>
@@ -880,7 +880,7 @@ function TimelineCell({
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
         <button
           type="button"
-          className="absolute inset-x-1.5 top-1/2 h-9 -translate-y-1/2 rounded-lg bg-brand-warm-100 text-[9px] font-bold text-brand-ink-400"
+          className="absolute inset-x-1.5 top-1/2 h-8 -translate-y-1/2 rounded-lg bg-brand-warm-100 text-xs font-bold text-brand-ink-400"
           title={customer?.name ?? copy.occupied}
           onClick={() => onOpenBooking(booking.id)}
         >
@@ -895,7 +895,7 @@ function TimelineCell({
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
         <button
           type="button"
-          className="absolute inset-x-1.5 top-1/2 flex h-9 -translate-y-1/2 items-center justify-center rounded-lg border border-brand-blue-200 bg-brand-blue-50 text-[9px] font-black text-brand-blue-700 transition-all hover:bg-brand-blue-100 hover:border-brand-blue-300 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500"
+          className="absolute inset-x-1.5 top-1/2 flex h-8 -translate-y-1/2 items-center justify-center rounded-lg border border-brand-green-200 bg-brand-green-50 text-xs font-black text-brand-green-700 transition-all hover:border-brand-green-300 hover:bg-brand-green-100 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo-500"
           onClick={() => onCompleteCleaning?.()}
         >
           {copy.cleaning}
@@ -909,7 +909,7 @@ function TimelineCell({
       type="button"
       className={cn(
         baseCell,
-        "flex cursor-pointer items-center justify-center hover:bg-brand-orange-50 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-brand-orange-500",
+        "flex cursor-pointer items-center justify-center hover:bg-brand-indigo-50 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-brand-indigo-500",
       )}
       style={{ height: ROW_HEIGHT }}
       aria-label={`${unit.unit_no} ${dateStr}`}
@@ -918,7 +918,7 @@ function TimelineCell({
         if (event.key === "Enter") onNewBooking();
       }}
     >
-      <Plus className="hidden h-4 w-4 text-brand-orange-500 group-hover:block group-focus-visible:block" />
+      <Plus className="hidden h-4 w-4 text-brand-indigo-500 group-hover:block group-focus-visible:block" />
     </button>
   );
 }
@@ -937,13 +937,13 @@ function FloorRow({
   return (
     <>
       <div
-        className="sticky left-0 z-10 flex items-center border-b border-r border-brand-warm-200 bg-brand-warm-50 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-brand-ink-500"
+        className="sticky left-0 z-10 flex items-center border-b border-r border-brand-warm-200 bg-brand-warm-50 px-3 text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500"
         style={{ height: FLOOR_ROW_HEIGHT }}
       >
         {floor}
       </div>
       <div
-        className="flex items-center border-b border-brand-warm-200 bg-brand-warm-50 px-3 text-[10px] font-bold text-brand-ink-400"
+        className="flex items-center border-b border-brand-warm-200 bg-brand-warm-50 px-3 text-xs font-bold text-brand-ink-400"
         style={{ gridColumn: `span ${daysCount}`, height: FLOOR_ROW_HEIGHT }}
       >
         {copy.floor} · {count}
@@ -956,9 +956,9 @@ type ShareTone = "dark" | "orange" | "teal" | "green";
 
 function ShareCard({ label, value, units, tone }: { label: string; value: number; units: string[]; tone: ShareTone }) {
   const styles = {
-    dark: "border-brand-orange-200 bg-brand-orange-50 text-brand-orange-900",
+    dark: "border-brand-indigo-200 bg-brand-indigo-50 text-brand-indigo-900",
     orange: "border-brand-amber-200 bg-brand-amber-50 text-brand-amber-900",
-    teal: "border-brand-blue-200 bg-brand-blue-50 text-brand-blue-900",
+    teal: "border-brand-cyan-200 bg-brand-cyan-50 text-brand-cyan-900",
     green: "border-brand-green-200 bg-brand-green-50 text-brand-green-900",
   }[tone];
   return (
@@ -980,14 +980,14 @@ function FinanceCard({ label, value, tone, onClick }: { label: string; value: st
   }[tone];
   const barColors = {
     dark: "bg-brand-ink-800",
-    orange: "bg-brand-orange-500",
+    orange: "bg-brand-indigo-500",
     green: "bg-brand-green-500",
   }[tone];
   return (
-    <button type="button" onClick={onClick} className={cn("flex min-h-[64px] overflow-hidden rounded-2xl border text-left shadow-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500 hover:-translate-y-0.5", styles)}>
+    <button type="button" onClick={onClick} className={cn("flex min-h-[64px] overflow-hidden rounded-2xl border text-left shadow-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo-500 hover:-translate-y-0.5", styles)}>
       <div className={cn("w-1.5 shrink-0", barColors)} />
       <div className="flex min-w-0 flex-1 flex-col justify-between px-4 py-3">
-        <p className="truncate text-[11px] font-bold uppercase tracking-[0.08em] text-brand-ink-500">{label}</p>
+        <p className="truncate text-xs font-bold uppercase tracking-[0.08em] text-brand-ink-500">{label}</p>
         <p className="truncate text-lg font-black tracking-tight tabular-nums text-brand-ink-900">{value}</p>
       </div>
     </button>
@@ -1014,8 +1014,8 @@ function FilterButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-black shadow-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500",
-        active ? "border-brand-orange-500 bg-brand-orange-500 text-white" : "border-brand-warm-300 bg-white text-brand-ink-700 hover:border-brand-orange-200 hover:bg-brand-orange-50",
+        "inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-black shadow-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo-500",
+        active ? "border-brand-indigo-500 bg-brand-indigo-500 text-white" : "border-brand-warm-300 bg-white text-brand-ink-700 hover:border-brand-indigo-200 hover:bg-brand-indigo-50",
       )}
     >
       {icon ?? <span className={cn("h-2 w-2 rounded-full", color)} />}
@@ -1032,7 +1032,7 @@ function ViewButton({ active, onClick, children }: { active: boolean; onClick: (
       onClick={onClick}
       className={cn(
         "rounded-lg px-3 py-1.5 transition",
-        active ? "bg-white text-brand-orange-700 shadow-sm" : "text-brand-ink-500 hover:text-brand-ink-900",
+        active ? "bg-white text-brand-indigo-700 shadow-sm" : "text-brand-ink-500 hover:text-brand-ink-900",
       )}
     >
       {children}
@@ -1041,17 +1041,17 @@ function ViewButton({ active, onClick, children }: { active: boolean; onClick: (
 }
 
 function getBookingTone(status: string): string {
-  if (status === "checked_in") return "bg-brand-orange-500 text-white shadow-brand-orange-100";
-  if (status === "confirmed") return "bg-brand-amber-200 text-brand-amber-900 ring-1 ring-inset ring-brand-amber-300 shadow-brand-amber-100";
-  if (status === "pending_review") return "bg-brand-blue-500 text-white shadow-brand-blue-100";
+  if (status === "checked_in") return "bg-brand-indigo-500 text-white shadow-brand-indigo-100";
+  if (status === "confirmed") return "bg-brand-amber-100 text-brand-amber-900 ring-1 ring-inset ring-brand-amber-300 shadow-brand-amber-100";
+  if (status === "pending_review") return "bg-brand-amber-500 text-white shadow-brand-amber-100";
   return "bg-brand-warm-100 text-brand-ink-500 shadow-brand-warm-200";
 }
 
 function getRoomTone(unit: UnitRow, hasCleaning: boolean, isMaintenance: boolean) {
   if (isMaintenance) return { strip: "bg-brand-red-500" };
-  if (hasCleaning || unit.status === "cleaning_pending") return { strip: "bg-brand-blue-500" };
+  if (hasCleaning || unit.status === "cleaning_pending") return { strip: "bg-brand-green-500" };
   if (unit.status === "reserved") return { strip: "bg-brand-amber-500" };
-  if (unit.status === "daily_occupied") return { strip: "bg-brand-orange-500" };
+  if (unit.status === "daily_occupied") return { strip: "bg-brand-indigo-500" };
   return { strip: "bg-brand-green-500" };
 }
 
@@ -1095,7 +1095,7 @@ function resolveRangeEnd(anchorDate: Date, viewMode: ViewMode): Date {
   const start = resolveRangeStart(anchorDate, viewMode);
   if (viewMode === "month") return new Date(start.getFullYear(), start.getMonth() + 1, 1);
   if (viewMode === "week") return addDays(start, 7);
-  return addDays(start, 10);
+  return addDays(start, 8);
 }
 
 function formatRangeLabel(days: Date[], localeStr: string, viewMode: ViewMode): string {

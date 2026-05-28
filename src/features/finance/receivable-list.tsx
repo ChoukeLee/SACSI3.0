@@ -132,7 +132,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
     URL.revokeObjectURL(url);
   };
 
-  const filterBtn = "rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition-all duration-fast hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15";
+  const filterBtn = "rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition-all duration-fast hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15";
 
   const resolveBuildingName = (r: ReceivableRow) => {
     const bid = r.building_id ?? unitBuildingMap.get(r.unit_id ?? "") ?? null;
@@ -239,7 +239,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
                       <td className="px-4 py-3 text-right text-sm tabular-nums text-brand-green-600">{formatXof(Number(r.paid_amount_xof))}</td>
                       <td className={cn("px-4 py-3 text-right text-sm tabular-nums font-semibold", os > 0 ? "text-brand-red-600" : "text-brand-green-600")}>{formatXof(os)}</td>
                       <td className="px-4 py-3">
-                        <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", STATUS_STYLES[r.status])}>
+                        <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", STATUS_STYLES[r.status])}>
                           {t.statuses[r.status as keyof typeof t.statuses] ?? r.status}
                         </span>
                       </td>
@@ -270,12 +270,12 @@ function MiniCard({ label, value, accent }: { label: string; value: string; acce
     : accent === "green"
       ? "border-brand-green-200 bg-brand-green-50 text-brand-green-700"
       : accent === "orange"
-        ? "border-brand-orange-200 bg-brand-orange-50 text-brand-orange-700"
+        ? "border-brand-indigo-200 bg-brand-indigo-50 text-brand-indigo-700"
         : "border-brand-red-200 bg-brand-red-50 text-brand-red-700";
 
   return (
     <div className={cn("rounded-2xl border px-4 py-3 shadow-sm", styles)}>
-      <p className="text-[11px] font-bold text-current opacity-70">{label}</p>
+      <p className="text-xs font-bold text-current opacity-70">{label}</p>
       <p className="mt-1 text-2xl font-black tabular-nums">{value}</p>
     </div>
   );

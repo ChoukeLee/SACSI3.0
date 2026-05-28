@@ -21,7 +21,7 @@ const SEVERITY_STYLES: Record<QualitySeverity, string> = {
 const SEVERITY_DOT: Record<QualitySeverity, string> = {
   high: "bg-brand-red-500",
   medium: "bg-brand-amber-500",
-  low: "bg-brand-sky-400",
+  low: "bg-brand-cyan-400",
 };
 
 const CATEGORY_LABELS: Record<Locale, Record<QualityCategory, string>> = {
@@ -55,12 +55,12 @@ export function QualityCenter({ issues, locale }: Props) {
   const financeIssues = issues.filter(i => i.category === "finance").length;
   const unitIssues = issues.filter(i => i.category === "unit").length;
 
-  const filterBtn = "rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50";
+  const filterBtn = "rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50";
 
   const sevBadge = (s: QualitySeverity) => {
-    const st: Record<QualitySeverity, string> = { high: "bg-brand-red-100 text-brand-red-700", medium: "bg-brand-amber-100 text-brand-amber-700", low: "bg-brand-sky-100 text-brand-sky-700" };
+    const st: Record<QualitySeverity, string> = { high: "bg-brand-red-100 text-brand-red-700", medium: "bg-brand-amber-100 text-brand-amber-700", low: "bg-brand-cyan-100 text-brand-cyan-700" };
     const l: Record<Locale, Record<QualitySeverity, string>> = { zh: { high: "高危", medium: "中危", low: "低危" }, fr: { high: "Eleve", medium: "Moyen", low: "Faible" } };
-    return <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", st[s])}>{l[locale][s]}</span>;
+    return <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", st[s])}>{l[locale][s]}</span>;
   };
 
   return (
@@ -91,7 +91,7 @@ export function QualityCenter({ issues, locale }: Props) {
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-brand-ink-400" />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder={locale === "zh" ? "搜索异常..." : "Rechercher..."}
-            className="w-full rounded-xl border border-brand-warm-200 bg-white py-1.5 pl-8 pr-3 text-xs text-brand-ink-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15" />
+            className="w-full rounded-xl border border-brand-warm-200 bg-white py-1.5 pl-8 pr-3 text-xs text-brand-ink-700 shadow-sm transition focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15" />
         </div>
         <span className="text-xs font-semibold text-brand-ink-400 ml-auto">{filtered.length} {locale === "zh" ? "条" : "lignes"}</span>
       </div>
@@ -119,10 +119,10 @@ export function QualityCenter({ issues, locale }: Props) {
                   className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-brand-warm-50/80"
                   onClick={() => setExpandedId(expanded ? null : i.id)}
                 >
-                  <AlertTriangle className={cn("h-5 w-5 shrink-0", i.severity === "high" ? "text-brand-red-500" : i.severity === "medium" ? "text-brand-amber-500" : "text-brand-sky-400")} />
+                  <AlertTriangle className={cn("h-5 w-5 shrink-0", i.severity === "high" ? "text-brand-red-500" : i.severity === "medium" ? "text-brand-amber-500" : "text-brand-cyan-400")} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-[10px] rounded-full bg-brand-warm-100 px-2 py-0.5 text-brand-ink-600 ring-1 ring-inset ring-slate-200">{catLabels[i.category]}</span>
+                      <span className="text-xs rounded-full bg-brand-warm-100 px-2 py-0.5 text-brand-ink-600 ring-1 ring-inset ring-slate-200">{catLabels[i.category]}</span>
                       {sevBadge(i.severity)}
                     </div>
                     <p className="text-sm font-bold text-brand-ink-900 truncate">{i.title}</p>
@@ -134,7 +134,7 @@ export function QualityCenter({ issues, locale }: Props) {
                   <div className="shrink-0 flex items-center gap-2">
                     {i.href && (
                       <Link href={routeFor(locale, i.href)} onClick={e => e.stopPropagation()}
-                        className="rounded-xl bg-brand-orange-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm transition hover:bg-brand-orange-600">
+                        className="rounded-xl bg-brand-indigo-500 px-2.5 py-1 text-xs font-bold text-white shadow-sm transition hover:bg-brand-indigo-600">
                         {locale === "zh" ? "查看" : "Voir"} <ArrowRight className="inline h-3 w-3 ml-0.5" />
                       </Link>
                     )}
@@ -149,7 +149,7 @@ export function QualityCenter({ issues, locale }: Props) {
                     </div>
                     <div>
                       <span className="font-semibold text-slate-800">{locale === "zh" ? "建议" : "Action"}: </span>
-                      <span className="text-brand-orange-700">{i.suggestedAction}</span>
+                      <span className="text-brand-indigo-700">{i.suggestedAction}</span>
                     </div>
                     {i.relatedEntities.length > 0 && (
                       <div>
@@ -172,12 +172,12 @@ function Pill({ label, value, accent }: { label: string; value: number; accent: 
   const colors: Record<string, string> = {
     ink: "bg-slate-800",
     red: "bg-brand-red-500",
-    orange: "bg-brand-orange",
-    sky: "bg-brand-sky-500",
+    orange: "bg-brand-indigo",
+    sky: "bg-brand-cyan-500",
   };
   return (
     <div className="overflow-hidden rounded-2xl border border-brand-warm-200 bg-white shadow-natural"><div className={cn("h-[3px]", colors[accent] ?? "bg-slate-800")} /><div className="px-3 py-2">
-      <p className="text-[10px] font-semibold text-brand-ink-400">{label}</p>
+      <p className="text-xs font-semibold text-brand-ink-400">{label}</p>
       <p className="text-lg font-black tabular-nums">{value}</p>
     </div></div>
   );

@@ -1,11 +1,11 @@
 {
-  "name": "SACIS 3.0 — 科建地产房屋管理系统",
+  "name": "SACIS 3.0 - 科建地产房屋管理系统",
   "short_name": "SACIS 3.0",
   "description": "Kejian Real Estate Management System",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f7f8f5",
-  "theme_color": "#F77F00",
+  "background_color": "#F7F6F4",
+  "theme_color": "#1E1F2C",
   "orientation": "any",
   "icons": [
     {

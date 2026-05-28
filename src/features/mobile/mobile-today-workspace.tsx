@@ -143,7 +143,7 @@ export function MobileTodayWorkspace({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-base font-black text-brand-ink-900">{t.today}</h1>
-          <p className="text-[11px] text-brand-ink-500">
+          <p className="text-xs text-brand-ink-500">
             {buildingName}{locale === "zh" ? "公寓" : ""} · {todayFormatted}
           </p>
         </div>

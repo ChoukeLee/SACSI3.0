@@ -82,7 +82,7 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
   };
 
   const btn = "rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50";
-  const primaryBtn = "rounded-xl bg-brand-orange-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-orange-600 active:scale-[0.98] disabled:opacity-50";
+  const primaryBtn = "rounded-xl bg-brand-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-indigo-600 active:scale-[0.98] disabled:opacity-50";
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
@@ -100,7 +100,7 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
       {tab === "export" && (
         <div className="rounded-2xl border border-brand-warm-200 bg-white p-5 shadow-natural space-y-4">
           <div>
-            <label className="block text-[11px] font-bold text-brand-ink-500 mb-1.5">{locale === "zh" ? "数据类型" : "Type"}</label>
+            <label className="block text-xs font-bold text-brand-ink-500 mb-1.5">{locale === "zh" ? "数据类型" : "Type"}</label>
             <select value={expType} onChange={e => setExpType(e.target.value as ExportDataType)} className={cn(btn, "w-full sm:w-64")}>
               {exportTypes.map(t => <option key={t} value={t}>{exportLabels[t]}</option>)}
             </select>
@@ -118,24 +118,24 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
         <div className="rounded-2xl border border-brand-warm-200 bg-white p-5 shadow-natural space-y-4">
           <div className="flex flex-wrap items-end gap-3">
             <div>
-              <label className="block text-[11px] font-bold text-brand-ink-500 mb-1.5">{locale === "zh" ? "数据类型" : "Type"}</label>
+              <label className="block text-xs font-bold text-brand-ink-500 mb-1.5">{locale === "zh" ? "数据类型" : "Type"}</label>
               <select value={impType} onChange={e => { setImpType(e.target.value as ImportDataType); setImpResult(null); setImpSubmitResult(null); }} className={cn(btn, "w-full sm:w-48")}>
                 {importTypes.map(t => <option key={t} value={t}>{importLabels[t]}</option>)}
               </select>
             </div>
-            <button onClick={handleDownloadTemplate} className={cn(btn, "inline-flex items-center gap-1.5 text-brand-orange-600 border-brand-orange-200 hover:bg-brand-orange-50")}>
+            <button onClick={handleDownloadTemplate} className={cn(btn, "inline-flex items-center gap-1.5 text-brand-indigo-600 border-brand-indigo-200 hover:bg-brand-indigo-50")}>
               <Download className="h-3.5 w-3.5" />{locale === "zh" ? "下载模板" : "Modele"}
             </button>
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-brand-ink-500 mb-1.5">{locale === "zh" ? "粘贴 CSV 内容" : "Coller CSV"}</label>
+            <label className="block text-xs font-bold text-brand-ink-500 mb-1.5">{locale === "zh" ? "粘贴 CSV 内容" : "Coller CSV"}</label>
             <textarea
               value={impText}
               onChange={e => { setImpText(e.target.value); setImpResult(null); setImpSubmitResult(null); }}
               rows={8}
               placeholder={locale === "zh" ? "将 CSV 内容粘贴到此处..." : "Collez le contenu CSV ici..."}
-              className="w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-mono text-brand-ink-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15"
+              className="w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-mono text-brand-ink-700 shadow-sm transition focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15"
             />
           </div>
 
@@ -166,7 +166,7 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
 
               <div className="overflow-auto max-h-[300px] rounded-xl border border-brand-warm-200 text-xs">
                 <table className="data-table">
-                  <thead className="sticky top-0 bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
+                  <thead className="sticky top-0 bg-brand-warm-50/90 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
                     <th className="px-2 py-1.5 text-left">{locale === "zh" ? "行" : "#"}</th>
                     <th className="px-2 py-1.5 text-left">{locale === "zh" ? "数据" : "Donnees"}</th>
                     <th className="px-2 py-1.5 text-left">{locale === "zh" ? "结果" : "Resultat"}</th>

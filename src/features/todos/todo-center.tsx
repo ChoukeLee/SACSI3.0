@@ -16,7 +16,7 @@ interface Props {
 const PRIORITY_DOT: Record<TodoPriority, string> = {
   high: "bg-brand-red-500",
   medium: "bg-brand-amber-500",
-  low: "bg-brand-sky-400",
+  low: "bg-brand-cyan-400",
 };
 
 const SOURCE_LABELS: Record<Locale, Record<TodoSource, string>> = {
@@ -51,19 +51,19 @@ export function TodoCenter({ todos, locale }: Props) {
     return todos.filter(todo => todo.dueDate < t && todo.status === "open");
   }, [todos]);
 
-  const filterBtn = "rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50";
+  const filterBtn = "rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50";
 
   const priorityBadge = (p: TodoPriority) => {
     const s: Record<TodoPriority, string> = {
       high: "bg-brand-red-100 text-brand-red-700",
       medium: "bg-brand-amber-100 text-amber-700",
-      low: "bg-brand-sky-100 text-brand-sky-700",
+      low: "bg-brand-cyan-100 text-brand-cyan-700",
     };
     const l: Record<Locale, Record<TodoPriority, string>> = {
       zh: { high: "紧急", medium: "一般", low: "低" },
       fr: { high: "Urgent", medium: "Moyen", low: "Bas" },
     };
-    return <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", s[p])}>{l[locale][p]}</span>;
+    return <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", s[p])}>{l[locale][p]}</span>;
   };
 
   return (
@@ -95,7 +95,7 @@ export function TodoCenter({ todos, locale }: Props) {
           <input type="text" value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={locale === "zh" ? "搜索房号/客户..." : "Rechercher..."}
-            className="w-full rounded-xl border border-brand-warm-200 bg-white py-1.5 pl-8 pr-3 text-xs text-brand-ink-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15" />
+            className="w-full rounded-xl border border-brand-warm-200 bg-white py-1.5 pl-8 pr-3 text-xs text-brand-ink-700 shadow-sm transition focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15" />
         </div>
         <span className="text-xs font-semibold text-brand-ink-400 ml-auto">{filtered.length} {locale === "zh" ? "条" : "lignes"}</span>
       </div>
@@ -119,7 +119,7 @@ export function TodoCenter({ todos, locale }: Props) {
                 {todo.priority === "high" ? (
                   <AlertTriangle className="h-5 w-5 text-brand-red-500" />
                 ) : todo.dueDate === new Date().toISOString().slice(0, 10) ? (
-                  <Clock className="h-5 w-5 text-brand-orange" />
+                  <Clock className="h-5 w-5 text-brand-indigo" />
                 ) : (
                   <Calendar className="h-5 w-5 text-brand-ink-400" />
                 )}
@@ -154,13 +154,13 @@ function StatPill({ label, value, accent }: { label: string; value: number; acce
   const colors: Record<string, string> = {
     ink: "bg-slate-800",
     red: "bg-brand-red-500",
-    orange: "bg-brand-orange",
+    orange: "bg-brand-indigo",
   };
   return (
     <div className="overflow-hidden rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
       <div className={cn("h-[3px]", colors[accent] ?? "bg-slate-800")} />
       <div className="px-3 py-2">
-        <p className="text-[10px] font-semibold text-brand-ink-400">{label}</p>
+        <p className="text-xs font-semibold text-brand-ink-400">{label}</p>
         <p className="text-lg font-black tabular-nums text-brand-ink-900">{value}</p>
       </div>
     </div>

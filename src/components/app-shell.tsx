@@ -47,14 +47,14 @@ export function AppShell({
             <div className="flex items-center gap-2 sm:gap-3">
               <NotificationBell notifications={notifications} t={notifT} locale={locale} />
               <Link
-                className="rounded-xl border border-brand-warm-300 bg-white px-3 py-1.5 text-[11px] font-bold text-brand-ink-900 shadow-sm transition-colors duration-fast hover:border-brand-orange-200 hover:bg-brand-orange-50 active:scale-95"
+                className="rounded-xl border border-brand-warm-300 bg-white px-3 py-1.5 text-xs font-bold text-brand-ink-900 shadow-sm transition-colors duration-fast hover:border-brand-indigo-200 hover:bg-brand-indigo-50 active:scale-95"
                 href={routeFor(otherLocale, pathname)}
                 aria-label={locale === "zh" ? "Switch to French" : "切换到中文"}
               >
                 {otherLocale.toUpperCase()}
               </Link>
               {roleLabel && (
-                <span className="hidden rounded-full bg-brand-orange-50 px-3 py-1 text-[11px] font-bold text-brand-orange-800 ring-1 ring-inset ring-brand-orange-200 sm:inline-flex">
+                <span className="hidden rounded-full bg-brand-indigo-50 px-3 py-1 text-xs font-bold text-brand-indigo-800 ring-1 ring-inset ring-brand-indigo-200 sm:inline-flex">
                   {userDisplayName || roleLabel}
                 </span>
               )}

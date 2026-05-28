@@ -210,7 +210,7 @@ export function FinanceDetailPanel({
               {open !== "collected" ? (
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 z-10 bg-brand-warm-50">
-                    <tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-brand-ink-500">
+                    <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500">
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "到期日" : "Echeance"}</th>
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
@@ -263,7 +263,7 @@ export function FinanceDetailPanel({
                               {formatXof(outstanding)}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap">
-                              <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold", STATUS_STYLES[r.status] ?? "bg-brand-warm-100 text-brand-ink-700")}>
+                              <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-bold", STATUS_STYLES[r.status] ?? "bg-brand-warm-100 text-brand-ink-700")}>
                                 {r.status}
                               </span>
                             </td>
@@ -276,7 +276,7 @@ export function FinanceDetailPanel({
               ) : (
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 z-10 bg-brand-warm-50">
-                    <tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-brand-ink-500">
+                    <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500">
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "收款日期" : "Date"}</th>
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
@@ -310,7 +310,7 @@ export function FinanceDetailPanel({
                           <td className="px-4 py-2.5 whitespace-nowrap text-right font-semibold text-brand-ink-900">
                             {formatXof(Number(p.amount))}
                           </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-brand-ink-500 font-mono text-[11px]">
+                          <td className="px-4 py-2.5 whitespace-nowrap text-brand-ink-500 font-mono text-xs">
                             {p.receipt_no ?? "—"}
                           </td>
                         </tr>

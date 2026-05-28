@@ -37,7 +37,7 @@ export function TodoDashboardWidget({ todos, locale, maxItems = 6 }: Props) {
     <div className="overflow-hidden rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
       <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-brand-warm-50/80">
         <h3 className="text-sm font-black text-brand-ink-900 flex items-center gap-2">
-          <Bell className="h-4 w-4 text-brand-orange" />
+          <Bell className="h-4 w-4 text-brand-indigo" />
           {locale === "zh" ? "今日待办" : "Aujourd'hui"}
         </h3>
         <span className="text-xs text-brand-ink-500">
@@ -57,13 +57,13 @@ export function TodoDashboardWidget({ todos, locale, maxItems = 6 }: Props) {
             {todo.priority === "high" ? (
               <AlertTriangle className="h-4 w-4 shrink-0 text-brand-red-500" />
             ) : todo.dueDate === new Date().toISOString().slice(0, 10) ? (
-              <Clock className="h-4 w-4 shrink-0 text-brand-orange" />
+              <Clock className="h-4 w-4 shrink-0 text-brand-indigo" />
             ) : (
               <Calendar className="h-4 w-4 shrink-0 text-brand-ink-400" />
             )}
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-brand-ink-800 truncate">{todo.title}</p>
-              <p className="text-[10px] text-brand-ink-500 truncate">
+              <p className="text-xs text-brand-ink-500 truncate">
                 {todo.unitLabel && <span>{todo.unitLabel} · </span>}
                 {todo.customerName}
                 {todo.amount > 0 && <span> · {formatXof(todo.amount)}</span>}
@@ -77,7 +77,7 @@ export function TodoDashboardWidget({ todos, locale, maxItems = 6 }: Props) {
         <div className="px-5 py-2 border-t border-slate-100 bg-brand-warm-50/70">
           <Link
             href={routeFor(locale, "/todos")}
-            className="text-xs font-semibold text-brand-orange hover:underline flex items-center gap-1"
+            className="text-xs font-semibold text-brand-indigo hover:underline flex items-center gap-1"
           >
             {locale === "zh" ? "查看全部" : "Voir tout"} ({todos.length})
             <ArrowRight className="h-3 w-3" />

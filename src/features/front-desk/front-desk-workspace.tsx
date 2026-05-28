@@ -107,9 +107,9 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
   // ── Room color ──
   const roomColor = (rs: RoomState) => {
     switch (rs.displayStatus) {
-      case "occupied": return "bg-brand-orange-100 text-brand-orange-700 border-brand-orange-300";
+      case "occupied": return "bg-brand-indigo-100 text-brand-indigo-700 border-brand-indigo-300";
       case "checking_out_today": return "bg-brand-amber-100 text-brand-amber-700 border-brand-amber-200";
-      case "reserved": return "bg-brand-sky-100 text-brand-sky-700 border-brand-sky-200";
+      case "reserved": return "bg-brand-cyan-100 text-brand-cyan-700 border-brand-cyan-200";
       case "cleaning": return "bg-brand-green-100 text-brand-green-700 border-brand-green-200";
       case "available": return "bg-brand-green-50 text-brand-green-700 border-brand-green-200";
       default: return "bg-brand-neutral-100 text-brand-neutral-600 border-brand-neutral-300";
@@ -174,12 +174,12 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
       <div className="flex items-center justify-between mb-3">
         <div>
           <p className="text-[13px] font-bold text-brand-ink-900">{buildingName}</p>
-          <p className="text-[10px] text-brand-ink-500">
+          <p className="text-xs text-brand-ink-500">
             {new Date().toLocaleDateString(locale === "zh" ? "zh-CN" : "fr-FR", { weekday: "short", month: "short", day: "numeric" })}
           </p>
         </div>
         <button onClick={handleCopyShare}
-          className={cn("flex items-center gap-1 rounded-lg px-3 py-1.5 text-[11px] font-medium transition-colors", copied ? "bg-brand-green-100 text-brand-green-700" : "bg-brand-warm-100 text-brand-ink-600")}>
+          className={cn("flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors", copied ? "bg-brand-green-100 text-brand-green-700" : "bg-brand-warm-100 text-brand-ink-600")}>
           {copied ? <ClipboardCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
           {copied ? t.copied : t.copyShare}
         </button>
@@ -187,16 +187,16 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
 
       {/* Quick action buttons */}
       <div className="grid grid-cols-3 gap-2 mb-4">
-        <button onClick={() => router.push("/daily-rentals")} className={cn(btnClass, "bg-brand-orange-500 text-white")}>
+        <button onClick={() => router.push("/daily-rentals")} className={cn(btnClass, "bg-brand-indigo-500 text-white")}>
           <Plus className="h-4 w-4" />{t.newBooking}
         </button>
-        <button onClick={() => setMainTab("checkins")} className={cn(btnClass, "bg-brand-sky-50 text-brand-sky-700 border border-brand-sky-200")}>
+        <button onClick={() => setMainTab("checkins")} className={cn(btnClass, "bg-brand-cyan-50 text-brand-cyan-700 border border-brand-cyan-200")}>
           <LogIn className="h-4 w-4" />{t.checkins} ({todayCheckins.length})
         </button>
         <button onClick={() => setMainTab("checkouts")} className={cn(btnClass, "bg-brand-amber-50 text-brand-amber-700 border border-brand-amber-200")}>
           <LogOut className="h-4 w-4" />{t.checkouts} ({todayCheckouts.length})
         </button>
-        <button onClick={() => setMainTab("occupied")} className={cn(btnClass, "bg-brand-orange-50 text-brand-orange-700 border border-brand-orange-200")}>
+        <button onClick={() => setMainTab("occupied")} className={cn(btnClass, "bg-brand-indigo-50 text-brand-indigo-700 border border-brand-indigo-200")}>
           <BedDouble className="h-4 w-4" />{t.occupied} ({occupied.length})
         </button>
         <button onClick={() => setMainTab("pending")} className={cn(btnClass, "bg-brand-warm-100 text-brand-ink-600 border border-brand-warm-200")}>
@@ -209,14 +209,14 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
 
       {/* Room matrix — apartments only, compact */}
       <div className="mb-4 rounded-xl border border-brand-warm-200 bg-white p-3">
-        <h3 className="text-[11px] font-bold text-brand-ink-600 mb-2">{t.roomStatus} ({roomStates.length})</h3>
+        <h3 className="text-xs font-bold text-brand-ink-600 mb-2">{t.roomStatus} ({roomStates.length})</h3>
         <div className="flex flex-wrap gap-1.5">
           {roomStates.map(rs => (
             <button
               key={rs.unit.id}
               onClick={() => setSelectedRoom(rs)}
               className={cn(
-                "flex h-8 w-8 items-center justify-center rounded text-[9px] font-semibold border transition-all active:scale-90",
+                "flex h-8 w-8 items-center justify-center rounded text-xs font-semibold border transition-all active:scale-90",
                 roomColor(rs),
               )}
               title={`${rs.unit.unit_no} — ${rs.customer?.name ?? ""}`}
@@ -225,21 +225,21 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
             </button>
           ))}
         </div>
-        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-brand-ink-500">
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-brand-ink-500">
           <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-brand-green-500" />{t.available} ({available.length})</span>
           <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-brand-red-500" />{t.occupied} ({occupied.length})</span>
           <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-brand-amber-500" />{t.checkouts} ({todayCheckouts.length})</span>
-          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-brand-sky-400" />{t.reserved} ({reserved.length})</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded bg-brand-cyan-400" />{t.reserved} ({reserved.length})</span>
         </div>
       </div>
 
       {/* Tab lists */}
       <div className="rounded-xl border border-brand-warm-200 bg-white overflow-hidden">
-        <div className="flex border-b border-brand-neutral-200 text-[11px] font-medium">
+        <div className="flex border-b border-brand-neutral-200 text-xs font-medium">
           {(["checkins", "occupied", "checkouts", "pending"] as MainTab[]).map(tab => (
             <button key={tab}
               onClick={() => setMainTab(tab)}
-              className={cn("flex-1 py-2.5 text-center transition-colors", mainTab === tab ? "bg-brand-orange-50 text-brand-orange-700 border-b-2 border-brand-orange" : "text-brand-ink-500")}>
+              className={cn("flex-1 py-2.5 text-center transition-colors", mainTab === tab ? "bg-brand-indigo-50 text-brand-indigo-700 border-b-2 border-brand-indigo" : "text-brand-ink-500")}>
               {t[tab]} ({tab === "checkins" ? todayCheckins.length : tab === "occupied" ? occupied.length : tab === "checkouts" ? todayCheckouts.length : pendingBookings.length})
             </button>
           ))}
@@ -259,14 +259,14 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
                 <span className="font-mono font-bold text-slate-800 min-w-[32px]">{unit?.unit_no ?? "?"}</span>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-brand-ink-800 truncate">{cust?.name ?? "?"}</p>
-                  <p className="text-[10px] text-brand-ink-500 truncate">
+                  <p className="text-xs text-brand-ink-500 truncate">
                     {b.check_in} · {nights}{locale === "zh" ? "晚" : "n"} · {formatXof(Number(b.total_amount_xof))}
                     {cust?.phone && <span className="ml-1">· {cust.phone}</span>}
                   </p>
                 </div>
-                <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold",
+                <span className={cn("rounded-full px-1.5 py-0.5 text-xs font-semibold",
                   b.status === "checked_in" ? "bg-brand-red-100 text-brand-red-700" :
-                  b.status === "confirmed" ? "bg-brand-sky-100 text-brand-sky-700" :
+                  b.status === "confirmed" ? "bg-brand-cyan-100 text-brand-cyan-700" :
                   b.status === "pending_review" ? "bg-brand-amber-100 text-brand-amber-700" :
                   "bg-brand-warm-100 text-brand-ink-500"
                 )}>
@@ -277,15 +277,15 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
                 <div className="flex gap-1">
                   {b.status === "pending_review" && (
                     <button onClick={() => openRoomAction(rs!, "confirm")}
-                      className="rounded bg-brand-sky-500 px-2 py-1 text-[9px] font-semibold text-white">{t.confirm}</button>
+                      className="rounded bg-brand-cyan-500 px-2 py-1 text-xs font-semibold text-white">{t.confirm}</button>
                   )}
                   {b.status === "confirmed" && b.check_in === todayStr && (
                     <button onClick={() => openRoomAction(rs!, "checkin")}
-                      className="rounded bg-brand-green-500 px-2 py-1 text-[9px] font-semibold text-white">{t.checkin}</button>
+                      className="rounded bg-brand-green-500 px-2 py-1 text-xs font-semibold text-white">{t.checkin}</button>
                   )}
                   {b.status === "checked_in" && (
                     <button onClick={() => openRoomAction(rs!, "checkout")}
-                      className="rounded bg-brand-amber-500 px-2 py-1 text-[9px] font-semibold text-white">{t.checkout}</button>
+                      className="rounded bg-brand-amber-500 px-2 py-1 text-xs font-semibold text-white">{t.checkout}</button>
                   )}
                 </div>
               </div>
@@ -328,7 +328,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
             )}
             <div className="grid grid-cols-2 gap-2">
               {(!selectedRoom.booking || selectedRoom.booking.status === "pending_review") && (
-                <button onClick={() => openRoomAction(selectedRoom, "confirm")} className={cn(btnClass, "bg-brand-sky-50 text-brand-sky-700")}>{t.confirm}</button>
+                <button onClick={() => openRoomAction(selectedRoom, "confirm")} className={cn(btnClass, "bg-brand-cyan-50 text-brand-cyan-700")}>{t.confirm}</button>
               )}
               {(!selectedRoom.booking || selectedRoom.booking.status === "confirmed") && selectedRoom.booking?.check_in === todayStr && (
                 <button onClick={() => openRoomAction(selectedRoom, "checkin")} className={cn(btnClass, "bg-brand-green-500 text-white")}>{t.checkin}</button>
@@ -336,7 +336,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
               {selectedRoom.booking?.status === "checked_in" && (
                 <>
                   <button onClick={() => openRoomAction(selectedRoom, "checkout")} className={cn(btnClass, "bg-brand-amber-500 text-white")}>{t.checkout}</button>
-                  <button onClick={() => openRoomAction(selectedRoom, "payment")} className={cn(btnClass, "bg-brand-orange-50 text-brand-orange-700")}>{t.payment}</button>
+                  <button onClick={() => openRoomAction(selectedRoom, "payment")} className={cn(btnClass, "bg-brand-indigo-50 text-brand-indigo-700")}>{t.payment}</button>
                 </>
               )}
               {selectedRoom.booking?.status && ["pending_review", "confirmed"].includes(selectedRoom.booking.status) && (
@@ -361,17 +361,17 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
 
             {popupAction === "checkin" && (
               <div className="space-y-2 mb-3">
-                <label className="text-[10px] text-brand-ink-500">{t.prepaid}</label>
+                <label className="text-xs text-brand-ink-500">{t.prepaid}</label>
                 <input type="number" value={popupAmount} onChange={e => setPopupAmount(Number(e.target.value))}
                   className="w-full rounded-lg border border-brand-warm-200 px-3 py-2 text-sm" />
               </div>
             )}
             {popupAction === "payment" && (
               <div className="space-y-2 mb-3">
-                <label className="text-[10px] text-brand-ink-500">{t.amount}</label>
+                <label className="text-xs text-brand-ink-500">{t.amount}</label>
                 <input type="number" value={popupAmount} onChange={e => setPopupAmount(Number(e.target.value))}
                   className="w-full rounded-lg border border-brand-warm-200 px-3 py-2 text-sm" />
-                <label className="text-[10px] text-brand-ink-500">{t.receiptNo}</label>
+                <label className="text-xs text-brand-ink-500">{t.receiptNo}</label>
                 <input type="text" value={popupReceiptNo} onChange={e => setPopupReceiptNo(e.target.value)}
                   className="w-full rounded-lg border border-brand-warm-200 px-3 py-2 text-sm" />
               </div>
@@ -383,7 +383,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
               <button onClick={() => { setPopupAction(null); setSelectedRoom(null); }}
                 className="flex-1 rounded-lg border border-brand-warm-200 py-2.5 text-sm font-semibold text-brand-ink-600">{t.closeModal}</button>
               <button onClick={doAction} disabled={loading}
-                className="flex-1 rounded-lg bg-brand-orange-500 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+                className="flex-1 rounded-lg bg-brand-indigo-500 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
                 {loading ? t.loading : popupAction === "checkin" ? t.checkin : popupAction === "checkout" ? t.checkout : popupAction === "payment" ? t.save : popupAction === "cancel" ? t.cancel : t.confirm}
               </button>
             </div>
@@ -393,7 +393,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
 
       {/* Toast for copy */}
       {copied && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-brand-orange-500 text-white rounded-full px-5 py-2 text-xs font-semibold shadow-lg animate-pulse">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-brand-indigo-500 text-white rounded-full px-5 py-2 text-xs font-semibold shadow-lg animate-pulse">
           <ClipboardCheck className="inline h-3.5 w-3.5 mr-1" />{t.copied}
         </div>
       )}

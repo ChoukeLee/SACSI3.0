@@ -50,9 +50,9 @@ export function SecurityCenter({ locale }: Props) {
     <div className="max-w-3xl space-y-4">
       {/* Security checks */}
       <div className="rounded-2xl border border-brand-warm-200 bg-white p-5 shadow-natural space-y-3">
-        <div className="flex items-center gap-2"><Shield className="h-5 w-5 text-brand-orange-600" /><h3 className="text-sm font-black text-brand-ink-900">{L.title}</h3></div>
+        <div className="flex items-center gap-2"><Shield className="h-5 w-5 text-brand-indigo-600" /><h3 className="text-sm font-black text-brand-ink-900">{L.title}</h3></div>
         <button onClick={handleCheck} disabled={loading}
-          className="rounded-xl bg-brand-orange-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-orange-600 active:scale-[0.98] disabled:opacity-50 inline-flex items-center gap-2">
+          className="rounded-xl bg-brand-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-indigo-600 active:scale-[0.98] disabled:opacity-50 inline-flex items-center gap-2">
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Shield className="h-3.5 w-3.5" />}{L.runCheck}
         </button>
         {checks.length > 0 && (
@@ -72,10 +72,10 @@ export function SecurityCenter({ locale }: Props) {
 
       {/* Backup */}
       <div className="rounded-2xl border border-brand-warm-200 bg-white p-5 shadow-natural space-y-3">
-        <div className="flex items-center gap-2"><Download className="h-5 w-5 text-brand-orange-600" /><h3 className="text-sm font-black text-brand-ink-900">{locale === "zh" ? "数据备份" : "Sauvegarde"}</h3></div>
+        <div className="flex items-center gap-2"><Download className="h-5 w-5 text-brand-indigo-600" /><h3 className="text-sm font-black text-brand-ink-900">{locale === "zh" ? "数据备份" : "Sauvegarde"}</h3></div>
         <p className="text-xs text-brand-ink-500">{L.backupDesc}</p>
         <button onClick={handleBackup} disabled={backupLoading}
-          className="rounded-xl bg-brand-orange-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-orange-600 active:scale-[0.98] disabled:opacity-50 inline-flex items-center gap-2">
+          className="rounded-xl bg-brand-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-indigo-600 active:scale-[0.98] disabled:opacity-50 inline-flex items-center gap-2">
           {backupLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}{L.backup}
         </button>
         {backupMsg && <p className="text-xs text-brand-green-600">{backupMsg}</p>}

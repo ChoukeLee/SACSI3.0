@@ -57,7 +57,7 @@ export function MobileRoomCard({
           : isReserved
             ? "border-brand-amber-200 bg-brand-amber-50/30"
             : isCleaning
-              ? "border-brand-sky-200 bg-brand-sky-50/40"
+              ? "border-brand-cyan-200 bg-brand-cyan-50/40"
               : hasOutstanding
                 ? "border-brand-red-200 bg-brand-red-50/30"
                 : "border-brand-warm-200"
@@ -84,7 +84,7 @@ export function MobileRoomCard({
               </p>
             )}
             {room.booking && (
-              <p className="text-[11px] text-brand-ink-500 mt-0.5">
+              <p className="text-xs text-brand-ink-500 mt-0.5">
                 {room.booking.check_in}
                 {room.booking.checkout_mode === "open"
                   ? ` · ${t.drawer.openEnded}`
@@ -114,15 +114,15 @@ export function MobileRoomCard({
 
       {/* Cleaning pending note */}
       {isCleaning && (
-        <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-brand-ink-500">
-          <span className="h-1.5 w-1.5 rounded-full bg-brand-sky-400" />
+        <div className="mt-2.5 flex items-center gap-1.5 text-xs text-brand-ink-500">
+          <span className="h-1.5 w-1.5 rounded-full bg-brand-cyan-400" />
           {locale === "zh" ? "退房后等待保洁" : "En attente de menage"}
         </div>
       )}
 
       {/* Reserved pending note */}
       {isReserved && room.booking && (
-        <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-brand-amber-700">
+        <div className="mt-2.5 flex items-center gap-1.5 text-xs text-brand-amber-700">
           <span className="h-1.5 w-1.5 rounded-full bg-brand-amber-500" />
           {locale === "zh" ? "预计入住 " : "Arrivee prevue "}{room.booking.check_in}
           {room.booking.check_out && (

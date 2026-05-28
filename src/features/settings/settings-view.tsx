@@ -25,8 +25,8 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
   const [bFloors, setBFloors] = useState(6);
   const [bElevators, setBElevators] = useState(0);
 
-  const inputClass = "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm text-brand-ink-700 shadow-sm transition focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15";
-  const labelClass = "block mb-1 text-[11px] font-black uppercase tracking-[0.14em] text-brand-ink-500";
+  const inputClass = "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm text-brand-ink-700 shadow-sm transition focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15";
+  const labelClass = "block mb-1 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500";
 
   const handleAddBuilding = async () => {
     if (!bCode.trim()) { setError(t.buildings.codeRequired); return; }
@@ -51,10 +51,10 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
       <section className="rounded-2xl border border-brand-warm-200 bg-white p-5 shadow-natural">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-brand-orange-600" />
+            <Building2 className="h-5 w-5 text-brand-indigo-600" />
             <h3 className="text-sm font-black text-brand-ink-900">{t.buildings.title}</h3>
           </div>
-          <button onClick={() => setShowNewBuilding(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-brand-orange-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-orange-600 active:scale-[0.98]">
+          <button onClick={() => setShowNewBuilding(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-brand-indigo-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-indigo-600 active:scale-[0.98]">
             <Plus className="h-3.5 w-3.5" />{t.buildings.add}
           </button>
         </div>
@@ -64,7 +64,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
         ) : (
           <div className="overflow-hidden rounded-xl border border-brand-warm-200">
             <table className="data-table">
-              <thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500">
+              <thead className="bg-brand-warm-50/90 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500">
                 <tr>
                   <th className="px-4 py-3">{t.buildings.code}</th>
                   <th className="px-4 py-3">{t.buildings.displayName}</th>
@@ -84,7 +84,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
                     <td className="px-4 py-3">
                       <button
                         onClick={() => handleToggleActive(b.id, b.is_active)}
-                        className={cn("rounded-full px-2.5 py-0.5 text-[10px] font-bold ring-1 ring-inset", b.is_active ? "bg-brand-green-100 text-brand-green-700" : "bg-brand-warm-100 text-brand-ink-400")}
+                        className={cn("rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset", b.is_active ? "bg-brand-green-100 text-brand-green-700" : "bg-brand-warm-100 text-brand-ink-400")}
                       >
                         {b.is_active ? "✓" : "✗"}
                       </button>
@@ -92,7 +92,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
                     <td className="px-4 py-3">
                       <button
                         onClick={() => handleTogglePaused(b.id, b.business_paused)}
-                        className={cn("rounded-full px-2.5 py-0.5 text-[10px] font-bold ring-1 ring-inset", b.business_paused ? "bg-brand-red-100 text-brand-red-700" : "bg-brand-warm-100 text-brand-ink-400")}
+                        className={cn("rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset", b.business_paused ? "bg-brand-red-100 text-brand-red-700" : "bg-brand-warm-100 text-brand-ink-400")}
                       >
                         {b.business_paused ? "暂停" : "正常"}
                       </button>
@@ -115,7 +115,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
             </div>
             {error && <p className="mt-2 text-sm text-brand-red-600">{error}</p>}
             <div className="mt-3 flex items-center gap-2">
-              <button onClick={handleAddBuilding} disabled={saving} className="rounded-xl bg-brand-orange-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-orange-600 active:scale-[0.98] disabled:opacity-50">{saving ? "..." : t.buildings.confirmAdd}</button>
+              <button onClick={handleAddBuilding} disabled={saving} className="rounded-xl bg-brand-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-indigo-600 active:scale-[0.98] disabled:opacity-50">{saving ? "..." : t.buildings.confirmAdd}</button>
               <button onClick={() => setShowNewBuilding(false)} className="rounded-xl px-4 py-1.5 text-xs font-semibold text-brand-ink-600 transition hover:bg-brand-warm-100">取消</button>
             </div>
           </div>
@@ -125,7 +125,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
       {/* 2. Pricing */}
       <section className="rounded-2xl border border-brand-warm-200 bg-white p-5 shadow-natural">
         <div className="flex items-center gap-2 mb-4">
-          <Tag className="h-5 w-5 text-brand-orange-600" />
+          <Tag className="h-5 w-5 text-brand-indigo-600" />
           <h3 className="text-sm font-black text-brand-ink-900">{t.pricing.title}</h3>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
@@ -152,7 +152,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
       {/* 3. Company Info */}
       <section className="rounded-2xl border border-brand-warm-200 bg-white p-5 shadow-natural">
         <div className="flex items-center gap-2 mb-4">
-          <Building className="h-5 w-5 text-brand-orange-600" />
+          <Building className="h-5 w-5 text-brand-indigo-600" />
           <h3 className="text-sm font-black text-brand-ink-900">{t.company.title}</h3>
         </div>
         <p className="text-xs font-semibold text-brand-ink-400 mb-3">{t.company.desc}</p>
@@ -167,12 +167,12 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
       {/* 4. Language */}
       <section className="rounded-2xl border border-brand-warm-200 bg-white p-5 shadow-natural">
         <div className="flex items-center gap-2 mb-4">
-          <Languages className="h-5 w-5 text-brand-orange-600" />
+          <Languages className="h-5 w-5 text-brand-indigo-600" />
           <h3 className="text-sm font-black text-brand-ink-900">{t.language.title}</h3>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-brand-ink-600">{t.language.current}: <strong>{locale === "zh" ? t.language.zh : t.language.fr}</strong></span>
-          <Link href={routeFor(locale === "zh" ? "fr" : "zh", "/settings")} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-orange-600 hover:bg-brand-orange-50">
+          <Link href={routeFor(locale === "zh" ? "fr" : "zh", "/settings")} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-indigo-600 hover:bg-brand-indigo-50">
             {locale === "zh" ? t.language.fr : t.language.zh}
           </Link>
         </div>
@@ -181,7 +181,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
       {/* 5. Dark Mode */}
       <section className="rounded-2xl border border-brand-warm-200 bg-white p-5 shadow-natural">
         <div className="flex items-center gap-2 mb-4">
-          <Moon className="h-5 w-5 text-brand-orange-600" />
+          <Moon className="h-5 w-5 text-brand-indigo-600" />
           <h3 className="text-sm font-black text-brand-ink-900">{t.darkMode.title}</h3>
         </div>
         <button disabled className="rounded-xl border border-brand-warm-200 bg-white px-4 py-1.5 text-xs font-semibold text-brand-ink-400 shadow-sm">
@@ -192,7 +192,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
       {/* 6. Audit Logs */}
       <section className="rounded-2xl border border-brand-warm-200 bg-white p-5 shadow-natural">
         <div className="flex items-center gap-2 mb-4">
-          <ShieldCheck className="h-5 w-5 text-brand-orange-600" />
+          <ShieldCheck className="h-5 w-5 text-brand-indigo-600" />
           <h3 className="text-sm font-black text-brand-ink-900">
             {locale === "zh" ? "审计日志" : "Journal d'audit"}
           </h3>
@@ -205,7 +205,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
         </p>
         <Link
           href={routeFor(locale, "/settings/audit-logs")}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-brand-orange-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-orange-600 active:scale-[0.98] transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-brand-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-indigo-600 active:scale-[0.98] transition-colors"
         >
           <ShieldCheck className="h-3.5 w-3.5" />
           {locale === "zh" ? "查看审计日志" : "Voir le journal"}

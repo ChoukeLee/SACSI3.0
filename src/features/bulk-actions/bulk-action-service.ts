@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { sortUnits } from "@/lib/utils";
 import { writeAuditLog } from "@/lib/audit";
 import { createReceivable, cancelReceivablesForSource } from "@/features/finance/receivables";
+import { resolveUnitStatusAfterDailyChange } from "@/features/daily-rentals/daily-rental-policy";
 import type { BulkActionType, BulkPreview, PreviewRow, BulkResult } from "./bulk-action-types";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -12,27 +13,6 @@ const monthPrefix = `${new Date().getFullYear()}-${String(new Date().getMonth() 
 
 function csvLine(fields: (string | number | null | undefined)[]): string {
   return fields.map(f => { const s = String(f ?? ""); return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s; }).join(",");
-}
-
-async function statusAfterCancellingDailyBooking(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  unitId: string,
-  cancelledBookingId: string,
-  currentStatus: string,
-): Promise<string> {
-  const [{ data: activeSale }, { data: activeLease }, { data: checkedIn }, { data: reserved }] = await Promise.all([
-    supabase.from("sale_contracts").select("id").eq("unit_id", unitId).eq("status", "active").limit(1),
-    supabase.from("lease_contracts").select("id").eq("unit_id", unitId).eq("status", "active").limit(1),
-    supabase.from("daily_bookings").select("id").eq("unit_id", unitId).eq("status", "checked_in").neq("id", cancelledBookingId).limit(1),
-    supabase.from("daily_bookings").select("id").eq("unit_id", unitId).in("status", ["pending_review", "confirmed"]).neq("id", cancelledBookingId).limit(1),
-  ]);
-
-  if ((activeSale?.length ?? 0) > 0) return "sold";
-  if ((activeLease?.length ?? 0) > 0) return "leased";
-  if ((checkedIn?.length ?? 0) > 0) return "daily_occupied";
-  if ((reserved?.length ?? 0) > 0) return "reserved";
-  if (currentStatus === "maintenance" || currentStatus === "locked" || currentStatus === "cleaning_pending") return currentStatus;
-  return "available";
 }
 
 export async function buildPreview(action: BulkActionType, ids: string[], extra?: Record<string, string>): Promise<BulkPreview> {
@@ -199,10 +179,9 @@ export async function executeBulk(action: BulkActionType, ids: string[], extra?:
           try {
             const { error } = await supabase.from("daily_bookings").update({ status: "cancelled" }).eq("id", id).eq("status", "pending_review");
             if (error) { failed++; errors.push(`${id}: ${error.message}`); } else {
-              const { data: b } = await supabase.from("daily_bookings").select("unit_id, units(status)").eq("id", id).single();
+              const { data: b } = await supabase.from("daily_bookings").select("unit_id").eq("id", id).single();
               if (b) {
-                const unit = (b as unknown as { units: { status: string } | null }).units;
-                const nextStatus = await statusAfterCancellingDailyBooking(supabase, b.unit_id, id, unit?.status ?? "available");
+                const nextStatus = await resolveUnitStatusAfterDailyChange(supabase, b.unit_id, { excludeBookingId: id });
                 await supabase.from("units").update({ status: nextStatus }).eq("id", b.unit_id);
               }
               await cancelReceivablesForSource("daily_booking", id);

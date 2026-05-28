@@ -201,7 +201,7 @@ export function UnitProfileView({ data, locale, userRole }: Props) {
             className={cn(
               "shrink-0 rounded-xl px-4 py-2 text-sm font-black transition",
               tab === item.key
-                ? "bg-brand-orange-500 text-white shadow-sm"
+                ? "bg-brand-indigo-500 text-white shadow-sm"
                 : "text-brand-neutral-800 hover:bg-brand-neutral-50"
             )}
           >
@@ -246,7 +246,7 @@ export function UnitProfileView({ data, locale, userRole }: Props) {
             <DataHead columns={[L.customer, L.date, L.status, L.amount, L.view]} />
             <tbody className="divide-y divide-neutral-100">
               {data.dailyBookings.map((b) => (
-                <tr key={b.id} className="hover:bg-brand-orange-50/40">
+                <tr key={b.id} className="hover:bg-brand-indigo-50/40">
                   <Cell strong>{custName(b.customer_id)}</Cell>
                   <Cell>{b.check_in} → {b.check_out ?? L.openEnded}</Cell>
                   <Cell><Badge variant={dailyStatusTone(b.status)}>{L.dailyStatusLabels[b.status] ?? b.status}</Badge></Cell>
@@ -265,7 +265,7 @@ export function UnitProfileView({ data, locale, userRole }: Props) {
             <DataHead columns={[L.customer, L.contractNo, L.date, L.amount, L.status, L.view]} />
             <tbody className="divide-y divide-neutral-100">
               {data.leaseContracts.map((lc) => (
-                <tr key={lc.id} className="hover:bg-brand-orange-50/40">
+                <tr key={lc.id} className="hover:bg-brand-indigo-50/40">
                   <Cell strong>{custName(lc.customer_id)}</Cell>
                   <Cell>{lc.contract_no}</Cell>
                   <Cell>{lc.start_date} → {lc.expected_end_date}</Cell>
@@ -285,7 +285,7 @@ export function UnitProfileView({ data, locale, userRole }: Props) {
             <DataHead columns={[L.buyer, L.contractNo, L.amount, L.status, L.view]} />
             <tbody className="divide-y divide-neutral-100">
               {data.saleContracts.map((sc) => (
-                <tr key={sc.id} className="hover:bg-brand-orange-50/40">
+                <tr key={sc.id} className="hover:bg-brand-indigo-50/40">
                   <Cell strong>{custName(sc.customer_id)}</Cell>
                   <Cell>{sc.contract_no}</Cell>
                   <Cell align="right" strong>{formatXof(Number(sc.total_amount_xof))}</Cell>
@@ -316,7 +316,7 @@ export function UnitProfileView({ data, locale, userRole }: Props) {
                 {data.receivables.filter((r) => r.status !== "cancelled").slice(0, 50).map((r) => {
                   const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
                   return (
-                    <tr key={r.id} className={cn("hover:bg-brand-orange-50/40", r.status === "overdue" && "bg-brand-red-50/40")}>
+                    <tr key={r.id} className={cn("hover:bg-brand-indigo-50/40", r.status === "overdue" && "bg-brand-red-50/40")}>
                       <Cell>{r.due_date}</Cell>
                       <Cell>{L.sourceLabels[r.source_type] ?? r.source_type}</Cell>
                       <Cell align="right" strong>{formatXof(Number(r.amount_xof))}</Cell>
@@ -334,7 +334,7 @@ export function UnitProfileView({ data, locale, userRole }: Props) {
               <DataHead columns={[L.date, L.amount, L.receipt]} />
               <tbody className="divide-y divide-neutral-100">
                 {data.payments.slice(0, 50).map((p) => (
-                  <tr key={p.id} className="hover:bg-brand-orange-50/40">
+                  <tr key={p.id} className="hover:bg-brand-indigo-50/40">
                     <Cell>{p.payment_date}</Cell>
                     <Cell align="right" className="font-black text-brand-green-700">{formatXof(Number(p.amount))}</Cell>
                     <Cell>{p.receipt_no ?? "-"}</Cell>
@@ -352,14 +352,14 @@ export function UnitProfileView({ data, locale, userRole }: Props) {
             <DataHead columns={[L.docs, L.date, L.action]} />
             <tbody className="divide-y divide-neutral-100">
               {documents.map((doc) => (
-                <tr key={doc.id} className="hover:bg-brand-orange-50/40">
+                <tr key={doc.id} className="hover:bg-brand-indigo-50/40">
                   <Cell strong>{doc.title}</Cell>
                   <Cell>{doc.date}</Cell>
                   <Cell>
                     <button
                       type="button"
                       onClick={() => printDocumentRecord(doc, locale)}
-                      className="inline-flex items-center gap-1 rounded-lg bg-brand-orange-500 px-3 py-1.5 text-xs font-black text-white transition hover:bg-brand-orange-600"
+                      className="inline-flex items-center gap-1 rounded-lg bg-brand-indigo-500 px-3 py-1.5 text-xs font-black text-white transition hover:bg-brand-indigo-600"
                     >
                       <Printer className="h-3.5 w-3.5" />
                       {L.print}
@@ -378,7 +378,7 @@ export function UnitProfileView({ data, locale, userRole }: Props) {
             <DataHead columns={[L.date, L.action, L.entity]} />
             <tbody className="divide-y divide-neutral-100">
               {data.auditLogs.slice(0, 50).map((log) => (
-                <tr key={log.id} className="hover:bg-brand-orange-50/40">
+                <tr key={log.id} className="hover:bg-brand-indigo-50/40">
                   <Cell>{new Date(log.created_at).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN")}</Cell>
                   <Cell strong>{L.auditActions[log.action] ?? log.action}</Cell>
                   <Cell>{log.entity_type} {log.entity_id?.slice(0, 8)}</Cell>
@@ -509,9 +509,9 @@ function labels(locale: Locale) {
 function UnitStatusPill({ status, label }: { status: UnitStatus; label: string }) {
   const styles: Record<UnitStatus, string> = {
     sold: "bg-brand-warm-100 text-brand-ink-800 ring-brand-warm-300",
-    leased: "bg-brand-blue-50 text-brand-blue-800 ring-brand-blue-200",
-    daily_occupied: "bg-brand-orange-50 text-brand-orange-800 ring-brand-orange-200",
-    reserved: "bg-brand-orange-100 text-brand-orange-900 ring-brand-orange-300",
+    leased: "bg-brand-cyan-50 text-brand-cyan-800 ring-brand-cyan-200",
+    daily_occupied: "bg-brand-indigo-50 text-brand-indigo-800 ring-brand-indigo-200",
+    reserved: "bg-brand-indigo-100 text-brand-indigo-900 ring-brand-indigo-300",
     cleaning_pending: "bg-brand-green-100 text-brand-green-900 ring-brand-green-300",
     available: "bg-brand-green-50 text-brand-green-800 ring-brand-green-200",
     maintenance: "bg-brand-red-500 text-white ring-brand-red-600",
@@ -522,9 +522,9 @@ function UnitStatusPill({ status, label }: { status: UnitStatus; label: string }
 
 function ActionLink({ href, tone, icon, children }: { href: string; tone: "dark" | "green" | "orange"; icon: React.ReactNode; children: React.ReactNode }) {
   const styles = {
-    dark: "bg-brand-orange-500 text-white hover:bg-brand-orange-600",
+    dark: "bg-brand-indigo-500 text-white hover:bg-brand-indigo-600",
     green: "bg-brand-green-50 text-brand-green-800 ring-brand-green-200 hover:bg-brand-green-100",
-    orange: "bg-brand-orange-50 text-brand-orange-800 ring-brand-orange-200 hover:bg-brand-orange-100",
+    orange: "bg-brand-indigo-50 text-brand-indigo-800 ring-brand-indigo-200 hover:bg-brand-indigo-100",
   }[tone];
   return (
     <Link href={href} className={cn("inline-flex h-10 items-center gap-2 rounded-xl px-3 text-xs font-black shadow-sm ring-1 ring-inset transition", styles)}>
@@ -537,7 +537,7 @@ function ActionLink({ href, tone, icon, children }: { href: string; tone: "dark"
 function HeaderInfo({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="rounded-2xl bg-brand-neutral-50 px-4 py-3">
-      <p className="text-[11px] font-black text-brand-neutral-500">{label}</p>
+      <p className="text-xs font-black text-brand-neutral-500">{label}</p>
       <p className={cn("mt-1 text-sm font-black text-brand-neutral-950", mono && "font-mono")}>{value}</p>
     </div>
   );
@@ -547,7 +547,7 @@ function StatBox({ label, value, tone }: { label: string; value: string; tone: "
   const styles = {
     dark: "border-brand-warm-300 bg-white text-brand-ink-900",
     green: "border-brand-green-200 bg-brand-green-50 text-brand-green-900",
-    orange: "border-brand-orange-200 bg-brand-orange-50 text-brand-orange-900",
+    orange: "border-brand-indigo-200 bg-brand-indigo-50 text-brand-indigo-900",
     red: "border-brand-red-600 bg-brand-red-500 text-white",
   }[tone];
   return (
@@ -578,7 +578,7 @@ function DataSection({ title, empty, emptyText, children }: { title?: string; em
 
 function DataHead({ columns }: { columns: string[] }) {
   return (
-    <thead className="bg-brand-neutral-50 text-[10px] font-black uppercase tracking-[0.14em] text-brand-neutral-700">
+    <thead className="bg-brand-neutral-50 text-xs font-black uppercase tracking-[0.14em] text-brand-neutral-700">
       <tr>{columns.map((column) => <th key={column} className="px-4 py-3 text-left">{column}</th>)}</tr>
     </thead>
   );
@@ -589,7 +589,7 @@ function Cell({ children, align, strong, className }: { children: React.ReactNod
 }
 
 function TextLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return <Link href={href} className="text-xs font-black text-brand-orange-700 hover:text-brand-orange-800 hover:underline">{children}</Link>;
+  return <Link href={href} className="text-xs font-black text-brand-indigo-700 hover:text-brand-indigo-800 hover:underline">{children}</Link>;
 }
 
 function dailyStatusTone(status: string): BadgeTone {

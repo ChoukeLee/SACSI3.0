@@ -2,7 +2,7 @@ import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
 const baseInputClass =
-  "w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm text-brand-neutral-950 shadow-sm transition placeholder:text-brand-neutral-700 hover:border-brand-orange-200 hover:bg-brand-orange-50/40 focus:border-brand-orange-300 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15";
+  "w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm text-brand-neutral-950 shadow-sm transition placeholder:text-brand-neutral-700 hover:border-brand-indigo-200 hover:bg-brand-indigo-50/40 focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15";
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
 

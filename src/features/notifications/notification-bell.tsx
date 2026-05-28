@@ -54,7 +54,7 @@ export function NotificationBell({ notifications, t, locale }: NotificationBellP
       >
         <Bell className="h-5 w-5" />
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red-500 px-1 text-[10px] font-bold text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red-500 px-1 text-xs font-bold text-white">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -99,7 +99,7 @@ export function NotificationBell({ notifications, t, locale }: NotificationBellP
                       key={n.id}
                       className={cn(
                         "px-4 py-3 transition cursor-pointer hover:bg-brand-warm-50",
-                        !n.read_at && "bg-brand-orange-50/50"
+                        !n.read_at && "bg-brand-indigo-50/50"
                       )}
                       onClick={() => markRead(n.id)}
                     >
@@ -108,11 +108,11 @@ export function NotificationBell({ notifications, t, locale }: NotificationBellP
                           {n.title}
                         </p>
                         {!n.read_at && (
-                          <span className="h-2 w-2 shrink-0 rounded-full bg-brand-orange mt-1.5" />
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-brand-indigo mt-1.5" />
                         )}
                       </div>
                       <p className="mt-0.5 text-xs text-brand-ink-500">{n.body}</p>
-                      <p className="mt-1 text-[10px] text-brand-ink-400">
+                      <p className="mt-1 text-xs text-brand-ink-400">
                         {new Date(n.created_at).toLocaleDateString(
                           locale === "fr" ? "fr-FR" : "zh-CN",
                           { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }

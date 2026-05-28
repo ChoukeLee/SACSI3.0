@@ -34,7 +34,7 @@ export function ConfirmDialog({
 
   return (
     <div className="fixed inset-0 z-overlay flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-brand-orange-500/30" onClick={onClose} />
+      <div className="absolute inset-0 bg-brand-indigo-500/30" onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-t-2xl sm:rounded-2xl bg-white p-5 shadow-panel animate-in slide-in-from-bottom-4 duration-fast">
         <button
           onClick={onClose}

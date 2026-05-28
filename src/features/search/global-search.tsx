@@ -87,7 +87,7 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
       >
         <Search className="h-3.5 w-3.5" />
         <span className="hidden lg:inline">{locale === "zh" ? "搜索..." : "Rechercher..."}</span>
-        <kbd className="hidden lg:inline rounded-xl border border-brand-warm-200 bg-white px-1.5 py-0 text-[10px] font-mono text-brand-ink-400">Ctrl+K</kbd>
+        <kbd className="hidden lg:inline rounded-xl border border-brand-warm-200 bg-white px-1.5 py-0 text-xs font-mono text-brand-ink-400">Ctrl+K</kbd>
       </button>
       {/* Mobile search icon */}
       <button
@@ -146,7 +146,7 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
           ) : (
             [...grouped.entries()].map(([type, items]) => (
               <div key={type}>
-                <div className="px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-400 bg-brand-warm-50">
+                <div className="px-4 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-400 bg-brand-warm-50">
                   {TYPE_LABELS[type as SearchResultType]?.[locale] ?? type}
                 </div>
                 {items.map((r, i) => {
@@ -158,7 +158,7 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
                       onClick={() => handleSelect(r)}
                       className={cn(
                         "w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors",
-                        globalIdx === selectedIdx ? "bg-brand-orange-50" : "hover:bg-brand-warm-50",
+                        globalIdx === selectedIdx ? "bg-brand-indigo-50" : "hover:bg-brand-warm-50",
                       )}
                     >
                       <Icon className="h-4 w-4 shrink-0 text-brand-ink-500" />
@@ -171,7 +171,7 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
                         </p>
                       </div>
                       {r.status && (
-                        <span className={cn("shrink-0 rounded-full px-1.5 py-0 text-[9px] font-semibold",
+                        <span className={cn("shrink-0 rounded-full px-1.5 py-0 text-xs font-semibold",
                           r.status === "active" || r.status === "paid" || r.status === "checked_in" ? "bg-brand-green-100 text-brand-green-700" :
                           r.status === "overdue" || r.status === "cancelled" ? "bg-brand-red-100 text-brand-red-700" :
                           "bg-brand-warm-100 text-brand-ink-600"
@@ -186,7 +186,7 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center gap-3 px-4 py-2 border-t border-brand-neutral-200 text-[10px] text-brand-ink-400">
+        <div className="flex items-center gap-3 px-4 py-2 border-t border-brand-neutral-200 text-xs text-brand-ink-400">
           <span>↑↓ {locale === "zh" ? "导航" : "Nav"}</span>
           <span>↵ {locale === "zh" ? "选择" : "Sel"}</span>
           <span>Esc {locale === "zh" ? "关闭" : "Fermer"}</span>

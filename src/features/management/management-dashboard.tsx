@@ -8,6 +8,7 @@ import {
 import {
   calculateReceivableSummary,
 } from "@/features/finance/receivable-summary";
+import { getDailyRoomStateForDate } from "@/features/daily-rentals/room-status";
 import { FinanceDetailPanel } from "./finance-detail-panel";
 import { QualityDashboardWidget } from "@/features/data-quality";
 import type { QualityIssue } from "@/features/data-quality/quality-types";
@@ -83,25 +84,25 @@ const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string; r
     stripe: "bg-slate-700",
   },
   leased: {
-    bg:   "bg-brand-sky-50 text-brand-sky-800 border-brand-sky-200 shadow-brand-sky-100",
-    dot:  "bg-brand-sky-600",
-    pill: "bg-brand-sky-50 text-brand-sky-700 border-brand-sky-200",
+    bg:   "bg-brand-cyan-50 text-brand-cyan-800 border-brand-cyan-200 shadow-brand-cyan-100",
+    dot:  "bg-brand-cyan-600",
+    pill: "bg-brand-cyan-50 text-brand-cyan-700 border-brand-cyan-200",
     ring: "",
-    stripe: "bg-brand-sky-700",
+    stripe: "bg-brand-cyan-700",
   },
   dailyOccupied: {
-    bg:   "bg-brand-orange-50 text-brand-orange-800 border-brand-orange-200 shadow-brand-orange-100",
-    dot:  "bg-brand-orange-500",
-    pill: "bg-brand-orange-50 text-brand-orange-700 border-brand-orange-200",
-    ring: "ring-1 ring-inset ring-brand-orange-300/50",
-    stripe: "bg-brand-orange-700",
+    bg:   "bg-brand-indigo-50 text-brand-indigo-800 border-brand-indigo-200 shadow-brand-indigo-100",
+    dot:  "bg-brand-indigo-500",
+    pill: "bg-brand-indigo-50 text-brand-indigo-700 border-brand-indigo-200",
+    ring: "ring-1 ring-inset ring-brand-indigo-300/50",
+    stripe: "bg-brand-indigo-700",
   },
   reserved: {
-    bg:   "bg-brand-orange-100 text-brand-orange-800 border-brand-orange-200 shadow-brand-orange-100",
-    dot:  "bg-brand-orange-400",
-    pill: "bg-brand-orange-50 text-brand-orange-700 border-brand-orange-200",
+    bg:   "bg-brand-indigo-100 text-brand-indigo-800 border-brand-indigo-200 shadow-brand-indigo-100",
+    dot:  "bg-brand-indigo-400",
+    pill: "bg-brand-indigo-50 text-brand-indigo-700 border-brand-indigo-200",
     ring: "",
-    stripe: "bg-brand-sky-700",
+    stripe: "bg-brand-cyan-700",
   },
   cleaningPending: {
     bg:   "bg-brand-green-50 text-brand-green-800 border-brand-green-200 shadow-brand-green-100",
@@ -173,6 +174,7 @@ function computeUnitState(
   leaseContracts: LeaseContractRow[],
   saleContracts: SaleContractRow[],
   cleaningTasks: { unit_id: string; is_completed: boolean }[],
+  dateStr: string,
 ): UnitState {
   const hasActiveSale = saleContracts.some(s => s.unit_id === unit.id && s.status === "active");
   if (unit.status === "sold" || hasActiveSale) return { unit, status: "sold" };
@@ -180,16 +182,11 @@ function computeUnitState(
   const hasActiveLease = leaseContracts.some(l => l.unit_id === unit.id && l.status === "active");
   if (unit.status === "leased" || hasActiveLease) return { unit, status: "leased" };
 
-  const hasCheckedIn = dailyBookings.some(b => b.unit_id === unit.id && b.status === "checked_in");
-  if (unit.status === "daily_occupied" || hasCheckedIn) return { unit, status: "dailyOccupied" };
-
-  const hasReservedBooking = dailyBookings.some(b => b.unit_id === unit.id && (b.status === "pending_review" || b.status === "confirmed"));
-  if (unit.status === "reserved" || hasReservedBooking) return { unit, status: "reserved" };
-
-  const hasPendingCleaning = cleaningTasks.some(t => t.unit_id === unit.id && !t.is_completed);
-  if (unit.status === "cleaning_pending" || hasPendingCleaning) return { unit, status: "cleaningPending" };
-
-  if (unit.status === "maintenance" || unit.status === "locked") return { unit, status: "maintenance" };
+  const dailyState = getDailyRoomStateForDate({ unit, dateStr, bookings: dailyBookings, cleaningTasks });
+  if (dailyState.status === "occupied" || dailyState.status === "checking_out_today") return { unit, status: "dailyOccupied" };
+  if (dailyState.status === "reserved") return { unit, status: "reserved" };
+  if (dailyState.status === "cleaning") return { unit, status: "cleaningPending" };
+  if (dailyState.status === "maintenance" || dailyState.status === "locked") return { unit, status: "maintenance" };
 
   return { unit, status: "available" };
 }
@@ -226,9 +223,11 @@ export function ManagementDashboard({
   }, [activeBuildings, residentialUnits]);
 
   // Unit states & counts
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   const unitStates = useMemo(
-    () => filteredUnits.map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks)),
-    [filteredUnits, dailyBookings, leaseContracts, saleContracts, cleaningTasks],
+    () => filteredUnits.map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks, todayStr)),
+    [filteredUnits, dailyBookings, leaseContracts, saleContracts, cleaningTasks, todayStr],
   );
 
   const counts = useMemo(() => {
@@ -332,7 +331,7 @@ export function ManagementDashboard({
           <div className="rounded-2xl border border-brand-warm-200 bg-white p-4 shadow-natural">
             <div className="mb-3 flex items-center justify-between gap-3">
               <SectionLabel compact>{t.sections.financeOverview}</SectionLabel>
-              <span className="rounded-full bg-brand-warm-100 px-2.5 py-1 text-[11px] font-semibold text-brand-ink-500">
+              <span className="rounded-full bg-brand-warm-100 px-2.5 py-1 text-xs font-semibold text-brand-ink-500">
                 {monthPrefix}
               </span>
             </div>
@@ -371,29 +370,29 @@ export function ManagementDashboard({
                 return (
                   <>
                     {lease && (
-                      <button type="button" onClick={() => setFinanceDetail("receivable")} className="rounded-xl border border-brand-warm-200 bg-white px-3.5 py-2.5 text-left transition-all hover:shadow-sm hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-brand-orange-500">
+                      <button type="button" onClick={() => setFinanceDetail("receivable")} className="rounded-xl border border-brand-warm-200 bg-white px-3.5 py-2.5 text-left transition-all hover:shadow-sm hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-brand-indigo-500">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-[11px] font-black text-brand-ink-600">{locale === "zh" ? "长租" : "Bail"}</span>
-                          <span className="text-[11px] font-bold text-brand-ink-400">{locale === "zh" ? `${receivables.filter(r => r.source_type === "lease_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length}笔` : `${receivables.filter(r => r.source_type === "lease_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length} creances`}</span>
+                          <span className="text-xs font-black text-brand-ink-600">{locale === "zh" ? "长租" : "Bail"}</span>
+                          <span className="text-xs font-bold text-brand-ink-400">{locale === "zh" ? `${receivables.filter(r => r.source_type === "lease_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length}笔` : `${receivables.filter(r => r.source_type === "lease_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length} creances`}</span>
                         </div>
                         <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
                           <span className="font-bold text-brand-ink-800">{locale === "zh" ? "应收" : "Du"} {formatXof(lease.totalReceivable)}</span>
                           <span className="text-brand-green-700">{locale === "zh" ? "已收" : "Enc"} {formatXof(lease.totalPaid)}</span>
-                          {lease.outstanding > 0 && <span className="text-brand-orange-700">{locale === "zh" ? "未收" : "Impaye"} {formatXof(lease.outstanding)}</span>}
+                          {lease.outstanding > 0 && <span className="text-brand-indigo-700">{locale === "zh" ? "未收" : "Impaye"} {formatXof(lease.outstanding)}</span>}
                           {lease.overdue > 0 && <span className="text-brand-red-600">{locale === "zh" ? "逾期" : "Retard"} {formatXof(lease.overdue)}</span>}
                         </div>
                       </button>
                     )}
                     {sale && (
-                      <button type="button" onClick={() => setFinanceDetail("receivable")} className="rounded-xl border border-brand-warm-200 bg-white px-3.5 py-2.5 text-left transition-all hover:shadow-sm hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-brand-orange-500">
+                      <button type="button" onClick={() => setFinanceDetail("receivable")} className="rounded-xl border border-brand-warm-200 bg-white px-3.5 py-2.5 text-left transition-all hover:shadow-sm hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-brand-indigo-500">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-[11px] font-black text-brand-ink-600">{locale === "zh" ? "售房" : "Vente"}</span>
-                          <span className="text-[11px] font-bold text-brand-ink-400">{locale === "zh" ? `${receivables.filter(r => r.source_type === "sale_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length}笔` : `${receivables.filter(r => r.source_type === "sale_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length} creances`}</span>
+                          <span className="text-xs font-black text-brand-ink-600">{locale === "zh" ? "售房" : "Vente"}</span>
+                          <span className="text-xs font-bold text-brand-ink-400">{locale === "zh" ? `${receivables.filter(r => r.source_type === "sale_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length}笔` : `${receivables.filter(r => r.source_type === "sale_contract" && r.status !== "cancelled" && r.due_date.startsWith(monthPrefix)).length} creances`}</span>
                         </div>
                         <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
                           <span className="font-bold text-brand-ink-800">{locale === "zh" ? "应收" : "Du"} {formatXof(sale.totalReceivable)}</span>
                           <span className="text-brand-green-700">{locale === "zh" ? "已收" : "Enc"} {formatXof(sale.totalPaid)}</span>
-                          {sale.outstanding > 0 && <span className="text-brand-orange-700">{locale === "zh" ? "未收" : "Impaye"} {formatXof(sale.outstanding)}</span>}
+                          {sale.outstanding > 0 && <span className="text-brand-indigo-700">{locale === "zh" ? "未收" : "Impaye"} {formatXof(sale.outstanding)}</span>}
                           {sale.overdue > 0 && <span className="text-brand-red-600">{locale === "zh" ? "逾期" : "Retard"} {formatXof(sale.overdue)}</span>}
                         </div>
                       </button>
@@ -445,7 +444,7 @@ export function ManagementDashboard({
         <div className="space-y-5">
           {(selectedBuildingId === "__all__" ? activeBuildings : activeBuildings.filter(b => b.id === selectedBuildingId)).map(building => {
             const bUnits = buildingUnits.get(building.id) ?? [];
-            const bStates = sortUnits(bUnits).map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks));
+            const bStates = sortUnits(bUnits).map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks, todayStr));
             const floorGroups = groupStatesByFloor(bStates, locale);
 
             const bCounts: Record<string, number> = {};
@@ -456,13 +455,13 @@ export function ManagementDashboard({
                 {/* Building header */}
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brand-warm-200 bg-white px-4 py-3">
                   <div className="flex items-center gap-2.5">
-                    <span className="h-2.5 w-2.5 rounded-full bg-brand-orange" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-brand-indigo" />
                     <h4 className="text-sm font-black text-brand-ink-900">{building.display_name}</h4>
-                    <span className="rounded-full border border-brand-warm-200 bg-brand-warm-50 px-2 py-0.5 text-[10px] font-semibold text-brand-ink-500">
+                    <span className="rounded-full border border-brand-warm-200 bg-brand-warm-50 px-2 py-0.5 text-xs font-semibold text-brand-ink-500">
                       {bStates.length} {locale === "zh" ? "间" : "unités"}
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
                     {(Object.keys(t.statuses) as MgmtStatus[]).filter(s => (bCounts[s] ?? 0) > 0).map(s => (
                       <span key={s} className="flex items-center gap-1.5 text-brand-ink-500">
                         <span className={cn("h-2.5 w-2.5 rounded-full", STATUS_CELL[s].dot)} />
@@ -479,8 +478,8 @@ export function ManagementDashboard({
                     {floorGroups.map(group => (
                       <div key={group.key} className="rounded-2xl border border-brand-warm-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                         <div className="mb-3 flex items-center justify-between">
-                          <p className="text-[11px] font-bold text-brand-ink-500">{group.label}</p>
-                          <span className="rounded-full bg-brand-warm-100 px-2 py-0.5 text-[10px] font-bold text-brand-ink-500">
+                          <p className="text-xs font-bold text-brand-ink-500">{group.label}</p>
+                          <span className="rounded-full bg-brand-warm-100 px-2 py-0.5 text-xs font-bold text-brand-ink-500">
                             {group.states.length}
                           </span>
                         </div>
@@ -539,18 +538,18 @@ const ROOM_CARD: Record<MgmtStatus, { card: string; badge: string; dot: string; 
     summary: "border-brand-warm-300 bg-white text-brand-ink-900",
   },
   leased: {
-    card: "border-brand-blue-200 bg-brand-blue-50 text-brand-blue-900",
-    badge: "bg-white text-brand-blue-900 ring-1 ring-inset ring-brand-blue-200",
-    dot: "bg-brand-blue-500",
-    action: "bg-white text-brand-blue-800 ring-brand-blue-200",
-    summary: "border-brand-blue-200 bg-brand-blue-50 text-brand-blue-900",
+    card: "border-brand-cyan-200 bg-brand-cyan-50 text-brand-cyan-900",
+    badge: "bg-white text-brand-cyan-900 ring-1 ring-inset ring-brand-cyan-200",
+    dot: "bg-brand-cyan-500",
+    action: "bg-white text-brand-cyan-800 ring-brand-cyan-200",
+    summary: "border-brand-cyan-200 bg-brand-cyan-50 text-brand-cyan-900",
   },
   dailyOccupied: {
-    card: "border-brand-orange-200 bg-brand-orange-50 text-brand-orange-900",
-    badge: "bg-white text-brand-orange-900 ring-1 ring-inset ring-brand-orange-200",
-    dot: "bg-brand-orange-500",
-    action: "bg-white text-brand-orange-800 ring-brand-orange-200",
-    summary: "border-brand-orange-200 bg-brand-orange-50 text-brand-orange-900",
+    card: "border-brand-indigo-200 bg-brand-indigo-50 text-brand-indigo-900",
+    badge: "bg-white text-brand-indigo-900 ring-1 ring-inset ring-brand-indigo-200",
+    dot: "bg-brand-indigo-500",
+    action: "bg-white text-brand-indigo-800 ring-brand-indigo-200",
+    summary: "border-brand-indigo-200 bg-brand-indigo-50 text-brand-indigo-900",
   },
   reserved: {
     card: "border-brand-amber-200 bg-brand-amber-50 text-brand-amber-900",
@@ -601,7 +600,7 @@ function RoomStatusCard({
       className={cn(
         "group relative flex min-h-[92px] flex-col justify-between overflow-hidden rounded-2xl border p-3 shadow-sm",
         "transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lifted active:scale-[0.98]",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo",
         styles.card,
       )}
     >
@@ -612,8 +611,8 @@ function RoomStatusCard({
         <span className={cn("mt-1 h-2.5 w-2.5 rounded-full ring-2 ring-white/25", styles.dot)} />
       </div>
       <div className="relative z-10">
-        <p className="truncate text-[11px] font-black text-current">{statusLabel}</p>
-        <p className={cn("mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset backdrop-blur", styles.action)}>
+        <p className="truncate text-xs font-black text-current">{statusLabel}</p>
+        <p className={cn("mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-bold ring-1 ring-inset backdrop-blur", styles.action)}>
           {roomText}
         </p>
       </div>
@@ -626,7 +625,7 @@ function StatusSummaryCard({ label, value, status }: { label: string; value: num
   return (
     <div className={cn("min-h-[94px] rounded-2xl border px-3.5 py-3.5", styles.summary)}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-black opacity-90">{label}</span>
+        <span className="text-xs font-black opacity-90">{label}</span>
         <span className={cn("h-2.5 w-2.5 rounded-full ring-2 ring-white/25", styles.dot)} />
       </div>
       <p className="mt-2 text-[28px] font-black leading-none text-current tabular-nums">{value}</p>
@@ -637,7 +636,7 @@ function StatusSummaryCard({ label, value, status }: { label: string; value: num
 function SectionLabel({ children, compact = false }: { children: React.ReactNode; compact?: boolean }) {
   return (
     <h2 className={cn(
-      "text-[11px] font-black uppercase tracking-[0.14em] text-brand-ink-500",
+      "text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500",
       compact ? "mb-0" : "mb-4",
     )}>
       {children}
@@ -652,8 +651,8 @@ function SegmentedTab({ active, onClick, label }: { active: boolean; onClick: ()
       className={cn(
         "rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-fast",
         active
-          ? "bg-brand-orange-500 text-white shadow-sm"
-          : "text-brand-neutral-600 hover:bg-brand-orange-50 hover:text-brand-orange-800",
+          ? "bg-brand-indigo-500 text-white shadow-sm"
+          : "text-brand-neutral-600 hover:bg-brand-indigo-50 hover:text-brand-indigo-800",
       )}
     >
       {label}
@@ -669,7 +668,7 @@ function KPICard({ label, value, variant, onClick }: {
   const styles: Record<string, { bg: string; text: string; dot: string; bar: string }> = {
     neutral:  { bg: "bg-white border-brand-neutral-600/40", text: "text-brand-neutral-950", dot: "bg-brand-neutral-700", bar: "bg-brand-neutral-950" },
     positive: { bg: "bg-white border-brand-green-500/40", text: "text-brand-green-700", dot: "bg-brand-green-500", bar: "bg-brand-green-500" },
-    warning:  { bg: "bg-white border-brand-orange-500/40", text: "text-brand-orange-700", dot: "bg-brand-orange-500", bar: "bg-brand-orange-500" },
+    warning:  { bg: "bg-white border-brand-indigo-500/40", text: "text-brand-indigo-700", dot: "bg-brand-indigo-500", bar: "bg-brand-indigo-500" },
     danger:   { bg: "bg-white border-brand-red-500/40", text: "text-brand-red-700", dot: "bg-brand-red-500", bar: "bg-brand-red-500" },
   };
   const s = styles[variant];
@@ -682,14 +681,14 @@ function KPICard({ label, value, variant, onClick }: {
       className={cn(
         "appearance-none flex min-h-[94px] overflow-hidden rounded-2xl border bg-white text-left transition-all duration-fast shadow-sm",
         s.bg,
-        isClickable && "cursor-pointer hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange-500",
+        isClickable && "cursor-pointer hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo-500",
       )}
     >
       <div className={cn("w-1.5 shrink-0", s.bar)} />
       <div className="flex min-w-0 flex-1 flex-col justify-between px-4 py-3">
         <div className="flex items-center gap-2 mb-1.5">
           <span className={cn("h-1.5 w-1.5 rounded-full", s.dot)} />
-          <p className="truncate text-[11px] font-bold uppercase tracking-[0.08em] text-brand-neutral-800">{label}</p>
+          <p className="truncate text-xs font-bold uppercase tracking-[0.08em] text-brand-neutral-800">{label}</p>
         </div>
         <p className={cn("truncate text-[24px] font-black tracking-tight tabular-nums", s.text)}>
           {value}
@@ -713,7 +712,7 @@ function RiskAlert({ label, value, unit, active, compact = false }: {
       <div className="mb-1.5 flex items-center gap-2">
         {active && <AlertTriangle className="h-4 w-4 text-brand-red-500 shrink-0" />}
         <span className={cn(
-          "text-[11px] font-medium uppercase tracking-[0.14em]",
+          "text-xs font-medium uppercase tracking-[0.14em]",
           active ? "text-brand-red-600" : "text-brand-ink-400",
         )}>
           {label}

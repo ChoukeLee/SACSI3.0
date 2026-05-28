@@ -142,7 +142,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
     <>
       {/* Overlay */}
       <div className="fixed inset-0 z-overlay" onClick={handleClose}>
-        <div className="absolute inset-0 bg-brand-orange-500/30" />
+        <div className="absolute inset-0 bg-brand-indigo-500/30" />
         {/* Bottom sheet */}
         <div
           className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-white shadow-panel animate-in slide-in-from-bottom-4 duration-normal"
@@ -175,7 +175,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
             {room.customer && (
               <div className="rounded-xl border border-brand-warm-200 bg-brand-warm-50 p-3.5 space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-ink-400">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-ink-400">
                     {t.drawer.guest}
                   </p>
                 </div>
@@ -183,7 +183,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                 {room.customer.phone && (
                   <button
                     onClick={handleCopyPhone}
-                    className="flex items-center gap-2 text-sm text-brand-orange active:opacity-70 min-h-[36px]"
+                    className="flex items-center gap-2 text-sm text-brand-indigo active:opacity-70 min-h-[36px]"
                   >
                     <Phone className="h-3.5 w-3.5" />
                     {room.customer.phone}
@@ -245,7 +245,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
 
             {/* Notes */}
             <div className="rounded-xl border border-brand-warm-200 bg-white p-3.5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-ink-400 mb-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-ink-400 mb-1">
                 {t.drawer.notes}
               </p>
               <p className="text-xs text-brand-ink-700">
@@ -255,7 +255,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
 
             {/* Payment input (when payment action active) */}
             {action?.type === "payment" && (
-              <div className="rounded-xl border border-brand-orange-200 bg-brand-orange-50 p-3.5">
+              <div className="rounded-xl border border-brand-indigo-200 bg-brand-indigo-50 p-3.5">
                 <p className="text-xs font-semibold text-slate-800 mb-2">
                   {actionLabels.recordPaymentTitle}
                 </p>
@@ -266,7 +266,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value)}
                     placeholder={actionLabels.recordPaymentPlaceholder}
-                    className="flex-1 rounded-lg border border-brand-warm-200 px-3 py-2 text-sm bg-white text-brand-ink-900 placeholder:text-brand-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-orange/30"
+                    className="flex-1 rounded-lg border border-brand-warm-200 px-3 py-2 text-sm bg-white text-brand-ink-900 placeholder:text-brand-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-indigo/30"
                     autoFocus
                   />
                   <Button
@@ -283,13 +283,13 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
 
             {/* Extend stay input (when extend action active) */}
             {action?.type === "extendStay" && room.booking && (
-              <div className="rounded-xl border border-brand-sky-200 bg-brand-sky-50 p-3.5">
+              <div className="rounded-xl border border-brand-cyan-200 bg-brand-cyan-50 p-3.5">
                 <p className="text-xs font-semibold text-slate-800 mb-2">
                   {actionLabels.extendStayDesc}
                 </p>
                 <div className="flex gap-2 items-end">
                   <div className="flex-1">
-                    <label className="text-[10px] text-brand-ink-500 block mb-1">
+                    <label className="text-xs text-brand-ink-500 block mb-1">
                       {locale === "zh" ? "新离店日期" : "Nouvelle date départ"}
                     </label>
                     <input
@@ -297,7 +297,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                       value={extendDate}
                       onChange={(e) => setExtendDate(e.target.value)}
                       min={room.booking.check_out ?? new Date().toISOString().slice(0, 10)}
-                      className="w-full rounded-lg border border-brand-warm-200 px-3 py-2 text-sm bg-white text-brand-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-orange/30"
+                      className="w-full rounded-lg border border-brand-warm-200 px-3 py-2 text-sm bg-white text-brand-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-indigo/30"
                       autoFocus
                     />
                   </div>
@@ -322,7 +322,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                     className="flex w-full items-center justify-between rounded-xl border border-brand-warm-200 bg-white px-4 py-3 text-sm font-semibold text-brand-ink-900 active:bg-brand-warm-50 min-h-[44px]"
                   >
                     <span className="flex items-center gap-2">
-                      <DoorOpen className="h-4 w-4 text-brand-orange" />
+                      <DoorOpen className="h-4 w-4 text-brand-indigo" />
                       {actionLabels.checkOut}
                     </span>
                     <ChevronRight className="h-4 w-4 text-brand-ink-400" />
@@ -369,7 +369,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                       className="flex w-full items-center justify-between rounded-xl border border-brand-warm-200 bg-white px-4 py-3 text-sm font-semibold text-brand-ink-900 active:bg-brand-warm-50 min-h-[44px]"
                     >
                       <span className="flex items-center gap-2">
-                        <CalendarPlus className="h-4 w-4 text-brand-sky-600" />
+                        <CalendarPlus className="h-4 w-4 text-brand-cyan-600" />
                         {actionLabels.extendStay}
                       </span>
                       <ChevronRight className="h-4 w-4 text-brand-ink-400" />

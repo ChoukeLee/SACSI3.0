@@ -124,7 +124,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
   ];
 
   const inputClass = "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm";
-  const labelClass = "text-[10px] text-brand-ink-500";
+  const labelClass = "text-xs text-brand-ink-500";
 
   const buildDocs = (): DocumentRecord[] => {
     const docs: DocumentRecord[] = [];
@@ -194,9 +194,9 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
             </div>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            <Link href={routeFor(locale, "/daily-rentals")} className="rounded bg-brand-sky-50 px-2.5 py-1.5 text-[10px] font-semibold text-sky-700 hover:bg-sky-100"><BedDouble className="inline h-3 w-3 mr-0.5" />{L.newBooking}</Link>
-            <Link href={routeFor(locale, "/leases")} className="rounded bg-brand-green-50 px-2.5 py-1.5 text-[10px] font-semibold text-green-700 hover:bg-green-100"><Home className="inline h-3 w-3 mr-0.5" />{L.newLease}</Link>
-            <Link href={routeFor(locale, "/sales")} className="rounded bg-brand-orange-50 px-2.5 py-1.5 text-[10px] font-semibold text-brand-orange-700 hover:bg-brand-orange-100"><CreditCard className="inline h-3 w-3 mr-0.5" />{L.newSale}</Link>
+            <Link href={routeFor(locale, "/daily-rentals")} className="rounded bg-brand-cyan-50 px-2.5 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"><BedDouble className="inline h-3 w-3 mr-0.5" />{L.newBooking}</Link>
+            <Link href={routeFor(locale, "/leases")} className="rounded bg-brand-green-50 px-2.5 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100"><Home className="inline h-3 w-3 mr-0.5" />{L.newLease}</Link>
+            <Link href={routeFor(locale, "/sales")} className="rounded bg-brand-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-brand-indigo-700 hover:bg-brand-indigo-100"><CreditCard className="inline h-3 w-3 mr-0.5" />{L.newSale}</Link>
           </div>
         </div>
         {/* Blacklist info */}
@@ -252,7 +252,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
               <p className="text-xs font-semibold text-slate-800 mb-2">{locale === "zh" ? "关联房源" : "Logements lies"}</p>
               <div className="flex flex-wrap gap-1.5">
                 {data.units.map(u => (
-                  <span key={u.id} className="rounded bg-brand-warm-100 px-2 py-0.5 text-[10px] font-mono text-brand-ink-700">{u.unit_no} ({u.kind})</span>
+                  <span key={u.id} className="rounded bg-brand-warm-100 px-2 py-0.5 text-xs font-mono text-brand-ink-700">{u.unit_no} ({u.kind})</span>
                 ))}
               </div>
             </div>
@@ -267,7 +267,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
             <div className="py-10 text-center text-sm text-brand-ink-400">{L.noData}</div>
           ) : (
             <table className="data-table">
-              <thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
+              <thead className="bg-brand-warm-50/90 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
                 <th className="px-3 py-2">{L.room}</th><th className="px-3 py-2">{L.date}</th><th className="px-3 py-2">{L.status}</th><th className="px-3 py-2 text-right">{L.amount}</th><th className="px-3 py-2">{L.action}</th>
               </tr></thead>
               <tbody className="divide-y divide-brand-warm-100">
@@ -278,7 +278,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
                     <td className="px-3 py-2 text-brand-ink-600">{b.check_in} → {b.check_out ?? (locale === "zh" ? "未定" : "?")}</td>
                     <td className="px-3 py-2"><Badge variant={dailyStatusVariant[b.status]}>{dailyStatusLabels[b.status]}</Badge></td>
                     <td className="px-3 py-2 text-right font-medium">{formatXof(Number(b.total_amount_xof))}</td>
-                    <td className="px-3 py-2"><Link href={routeFor(locale, "/daily-rentals")} className="text-brand-orange text-[10px] font-semibold hover:underline">{L.view}</Link></td>
+                    <td className="px-3 py-2"><Link href={routeFor(locale, "/daily-rentals")} className="text-brand-indigo text-xs font-semibold hover:underline">{L.view}</Link></td>
                   </tr>);
                 })}
               </tbody>
@@ -294,7 +294,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
             <div className="py-10 text-center text-sm text-brand-ink-400">{L.noData}</div>
           ) : (
             <table className="data-table">
-              <thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
+              <thead className="bg-brand-warm-50/90 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
                 <th className="px-3 py-2">{L.room}</th><th className="px-3 py-2">{L.contractNo}</th><th className="px-3 py-2">{L.date}</th><th className="px-3 py-2 text-right">{L.amount}</th><th className="px-3 py-2">{L.status}</th><th className="px-3 py-2">{L.action}</th>
               </tr></thead>
               <tbody className="divide-y divide-brand-warm-100">
@@ -308,7 +308,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
                     <td className="px-3 py-2 text-brand-ink-600">{lc.start_date} → {lc.expected_end_date}</td>
                     <td className="px-3 py-2 text-right font-medium">{formatXof(Number(lc.monthly_rent_xof))}</td>
                     <td className="px-3 py-2"><Badge variant={statusV[lc.status]}>{statusL[lc.status]}</Badge></td>
-                    <td className="px-3 py-2"><Link href={routeFor(locale, "/leases")} className="text-brand-orange text-[10px] font-semibold hover:underline">{L.view}</Link></td>
+                    <td className="px-3 py-2"><Link href={routeFor(locale, "/leases")} className="text-brand-indigo text-xs font-semibold hover:underline">{L.view}</Link></td>
                   </tr>);
                 })}
               </tbody>
@@ -324,7 +324,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
             <div className="py-10 text-center text-sm text-brand-ink-400">{L.noData}</div>
           ) : (
             <table className="data-table">
-              <thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
+              <thead className="bg-brand-warm-50/90 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
                 <th className="px-3 py-2">{L.room}</th><th className="px-3 py-2">{L.contractNo}</th><th className="px-3 py-2 text-right">{L.amount}</th><th className="px-3 py-2">{L.status}</th><th className="px-3 py-2">{L.action}</th>
               </tr></thead>
               <tbody className="divide-y divide-brand-warm-100">
@@ -337,7 +337,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
                     <td className="px-3 py-2">{sc.contract_no}</td>
                     <td className="px-3 py-2 text-right font-medium">{formatXof(Number(sc.total_amount_xof))}</td>
                     <td className="px-3 py-2"><Badge variant={statusV[sc.status]}>{statusL[sc.status]}</Badge></td>
-                    <td className="px-3 py-2"><Link href={routeFor(locale, "/sales")} className="text-brand-orange text-[10px] font-semibold hover:underline">{L.view}</Link></td>
+                    <td className="px-3 py-2"><Link href={routeFor(locale, "/sales")} className="text-brand-indigo text-xs font-semibold hover:underline">{L.view}</Link></td>
                   </tr>);
                 })}
               </tbody>
@@ -366,9 +366,9 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
           </div>
           {/* Receivables */}
           <div className="overflow-x-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
-            <p className="px-3 py-2 text-[11px] font-bold text-slate-800 bg-brand-warm-50">{locale === "zh" ? "应收记录" : "Creances"} ({data.receivables.filter(r => r.status !== "cancelled").length})</p>
+            <p className="px-3 py-2 text-xs font-bold text-slate-800 bg-brand-warm-50">{locale === "zh" ? "应收记录" : "Creances"} ({data.receivables.filter(r => r.status !== "cancelled").length})</p>
             <table className="data-table">
-              <thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
+              <thead className="bg-brand-warm-50/90 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
                 <th className="px-3 py-1.5">{L.date}</th><th className="px-3 py-1.5">{L.source}</th><th className="px-3 py-1.5 text-right">{L.amount}</th><th className="px-3 py-1.5 text-right">{L.paid}</th><th className="px-3 py-1.5">{L.status}</th>
               </tr></thead>
               <tbody className="divide-y divide-brand-warm-100">
@@ -387,9 +387,9 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
           </div>
           {/* Payments */}
           <div className="overflow-x-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
-            <p className="px-3 py-2 text-[11px] font-bold text-slate-800 bg-brand-warm-50">{locale === "zh" ? "收款记录" : "Paiements"} ({data.payments.length})</p>
+            <p className="px-3 py-2 text-xs font-bold text-slate-800 bg-brand-warm-50">{locale === "zh" ? "收款记录" : "Paiements"} ({data.payments.length})</p>
             <table className="data-table">
-              <thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
+              <thead className="bg-brand-warm-50/90 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
                 <th className="px-3 py-1.5">{L.date}</th><th className="px-3 py-1.5 text-right">{L.amount}</th><th className="px-3 py-1.5">{locale === "zh" ? "收据" : "Recu"}</th>
               </tr></thead>
               <tbody className="divide-y divide-brand-warm-100">
@@ -413,7 +413,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
             <div className="py-10 text-center text-sm text-brand-ink-400">{L.noData}</div>
           ) : (
             <table className="data-table">
-              <thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
+              <thead className="bg-brand-warm-50/90 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
                 <th className="px-3 py-2">{locale === "zh" ? "单据" : "Document"}</th><th className="px-3 py-2">{L.date}</th><th className="px-3 py-2">{L.room}</th><th className="px-3 py-2">{L.action}</th>
               </tr></thead>
               <tbody className="divide-y divide-brand-warm-100">
@@ -424,7 +424,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
                     <td className="px-3 py-2">{d.unitNo}</td>
                     <td className="px-3 py-2">
                       <button onClick={() => printDocumentRecord(d, locale)}
-                        className="rounded-lg bg-brand-orange-500 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-brand-orange-600">
+                        className="rounded-lg bg-brand-indigo-500 px-2 py-0.5 text-xs font-semibold text-white hover:bg-brand-indigo-600">
                         <Printer className="inline h-3 w-3 mr-0.5" />{L.print}
                       </button>
                     </td>
@@ -443,7 +443,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
             <div className="py-10 text-center text-sm text-brand-ink-400">{L.noData}</div>
           ) : (
             <table className="data-table">
-              <thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
+              <thead className="bg-brand-warm-50/90 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr>
                 <th className="px-3 py-2">{locale === "zh" ? "时间" : "Date"}</th><th className="px-3 py-2">{L.action}</th><th className="px-3 py-2">{locale === "zh" ? "对象" : "Objet"}</th>
               </tr></thead>
               <tbody className="divide-y divide-brand-warm-100">
@@ -452,7 +452,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
                     ? { create: "新建", update: "修改", delete: "删除", activate: "激活", terminate: "终止", check_in: "入住", check_out: "退房", payment: "收款", move_out: "退租", cancel: "取消", blacklist_add: "拉黑", blacklist_remove: "解除拉黑" }
                     : { create: "Creer", update: "Modifier", delete: "Suppr", activate: "Activer", terminate: "Resilier", check_in: "Arrivee", check_out: "Depart", payment: "Paiement", move_out: "Sortie", cancel: "Annuler", blacklist_add: "Bloquer", blacklist_remove: "Debloquer" };
                   return (<tr key={l.id} className="hover:bg-brand-warm-50/80">
-                    <td className="px-3 py-2 text-[10px] text-brand-ink-500">{new Date(l.created_at).toLocaleDateString(locale === "zh" ? "zh-CN" : "fr-FR")}</td>
+                    <td className="px-3 py-2 text-xs text-brand-ink-500">{new Date(l.created_at).toLocaleDateString(locale === "zh" ? "zh-CN" : "fr-FR")}</td>
                     <td className="px-3 py-2">{actionLabels[l.action] ?? l.action}</td>
                     <td className="px-3 py-2 text-brand-ink-500">{l.entity_type} {l.entity_id?.slice(0, 8)}</td>
                   </tr>);
@@ -465,17 +465,17 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
 
       {/* Quick links */}
       <div className="flex flex-wrap gap-2 text-xs text-brand-ink-500">
-        <Link href={routeFor(locale, "/finance")} className="hover:text-brand-orange flex items-center gap-1">{L.finance} <ArrowRight className="h-3 w-3" /></Link>
-        <Link href={routeFor(locale, "/todos")} className="hover:text-brand-orange flex items-center gap-1">{locale === "zh" ? "待办" : "Taches"} <ArrowRight className="h-3 w-3" /></Link>
-        <Link href={routeFor(locale, "/data-quality")} className="hover:text-brand-orange flex items-center gap-1">{locale === "zh" ? "数据质量" : "Qualite"} <ArrowRight className="h-3 w-3" /></Link>
+        <Link href={routeFor(locale, "/finance")} className="hover:text-brand-indigo flex items-center gap-1">{L.finance} <ArrowRight className="h-3 w-3" /></Link>
+        <Link href={routeFor(locale, "/todos")} className="hover:text-brand-indigo flex items-center gap-1">{locale === "zh" ? "待办" : "Taches"} <ArrowRight className="h-3 w-3" /></Link>
+        <Link href={routeFor(locale, "/data-quality")} className="hover:text-brand-indigo flex items-center gap-1">{locale === "zh" ? "数据质量" : "Qualite"} <ArrowRight className="h-3 w-3" /></Link>
       </div>
     </div>
   );
 }
 
 function StatBox({ label, value, accent }: { label: string; value: string; accent: string }) {
-  const c: Record<string, string> = { ink: "bg-slate-800", green: "bg-brand-green-500", red: "bg-brand-red-500", orange: "bg-brand-orange" };
+  const c: Record<string, string> = { ink: "bg-slate-800", green: "bg-brand-green-500", red: "bg-brand-red-500", orange: "bg-brand-indigo" };
   return (
-    <div className="rounded-lg border border-brand-warm-200 bg-white shadow-natural overflow-hidden"><div className={cn("h-[3px]", c[accent] ?? "bg-slate-800")} /><div className="px-3 py-2.5"><p className="text-[10px] text-brand-ink-400">{label}</p><p className="text-sm font-bold tabular-nums text-brand-ink-900">{value}</p></div></div>
+    <div className="rounded-lg border border-brand-warm-200 bg-white shadow-natural overflow-hidden"><div className={cn("h-[3px]", c[accent] ?? "bg-slate-800")} /><div className="px-3 py-2.5"><p className="text-xs text-brand-ink-400">{label}</p><p className="text-sm font-bold tabular-nums text-brand-ink-900">{value}</p></div></div>
   );
 }

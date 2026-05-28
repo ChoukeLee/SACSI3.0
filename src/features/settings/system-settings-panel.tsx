@@ -33,14 +33,14 @@ export function SystemSettingsPanel({ settings, isAdmin, locale }: Props) {
   return (
     <section className="rounded-2xl border border-brand-warm-200 bg-white p-5 shadow-natural">
       <div className="flex items-center gap-2 mb-4">
-        <Settings2 className="h-5 w-5 text-brand-orange-600" />
+        <Settings2 className="h-5 w-5 text-brand-indigo-600" />
         <h3 className="text-sm font-black text-brand-ink-900">{locale === "zh" ? "系统配置" : "Configuration"}</h3>
       </div>
       {msg && <p className="text-xs text-brand-green-600 mb-2">{msg}</p>}
       <div className="space-y-4">
         {Object.entries(CATEGORIES).map(([cat, catDef]) => (
           <div key={cat}>
-            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-brand-ink-500 mb-2">{locale === "zh" ? catDef.labelZh : catDef.labelFr}</p>
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500 mb-2">{locale === "zh" ? catDef.labelZh : catDef.labelFr}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {catDef.keys.map(key => (
                 <div key={key} className="flex items-center justify-between rounded-xl border border-brand-warm-200 bg-brand-warm-50 px-3 py-2">
@@ -50,13 +50,13 @@ export function SystemSettingsPanel({ settings, isAdmin, locale }: Props) {
                       <input value={editValue} onChange={e => setEditValue(e.target.value)}
                         className="w-24 sm:w-32 rounded-xl border border-brand-warm-200 bg-white px-2 py-0.5 text-xs" />
                       <button onClick={() => handleSave(key)} disabled={saving}
-                        className="rounded-xl bg-brand-orange-500 p-1.5 text-white shadow-sm hover:bg-brand-orange-600"><Save className="h-3 w-3" /></button>
+                        className="rounded-xl bg-brand-indigo-500 p-1.5 text-white shadow-sm hover:bg-brand-indigo-600"><Save className="h-3 w-3" /></button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold text-brand-ink-800">{values[key] ?? "—"}</span>
                       {isAdmin && <button onClick={() => { setEditing(key); setEditValue(values[key] ?? ""); }}
-                        className="text-[10px] text-brand-orange-600 hover:underline">{locale === "zh" ? "编辑" : "Edit"}</button>}
+                        className="text-xs text-brand-indigo-600 hover:underline">{locale === "zh" ? "编辑" : "Edit"}</button>}
                     </div>
                   )}
                 </div>

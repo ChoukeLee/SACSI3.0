@@ -1,4 +1,4 @@
-/* ===== MiSans @font-face — 5 weights ===== */
+/* ===== MiSans @font-face — 4 weights (removed Heavy 900) ===== */
 @font-face {
   font-family: "MiSans";
   src: url("/fonts/MiSans-Regular.woff2") format("woff2");
@@ -27,13 +27,6 @@
   font-style: normal;
   font-display: swap;
 }
-@font-face {
-  font-family: "MiSans";
-  src: url("/fonts/MiSans-Heavy.woff2") format("woff2");
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-}
 
 @tailwind base;
 @tailwind components;
@@ -44,28 +37,30 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
 
-  /* Design tokens — mirrors tailwind.config.ts Ivory Coast palette */
-  --color-bg: #F8F5F1;
+  /* Design tokens — SACIS 2.0 indigo-blue system */
+  --color-bg: #F7F6F4;
   --color-surface: #FFFFFF;
-  --color-border: #ECE6DE;
-  --color-border-light: #F3EEE8;
-  --color-text: #24211F;
-  --color-text-secondary: #5F5A55;
-  --color-text-muted: #8E8378;
-  --color-accent: #F45A2A;
-  --color-accent-light: #FFF4EE;
-  --color-success: #0E8F7E;
-  --color-danger: #C74646;
-  --color-warning: #F5A623;
-  --color-info: #58728A;
+  --color-surface-soft: #F3F2F0;
+  --color-border: #E5E3E0;
+  --color-border-strong: #D0CDC8;
+  --color-text: #181919;
+  --color-text-secondary: #5C5D61;
+  --color-text-muted: #949599;
+  --color-accent: #4F5DE6;
+  --color-accent-hover: #3D4BCF;
+  --color-accent-soft: #EDEFFD;
+  --color-success: #16A34A;
+  --color-danger: #DC2626;
+  --color-warning: #D97706;
+  --color-info: #0891B2;
+  --color-sidebar: #1E1F2C;
 
-  /* Typography scale — tuned for MiSans CJK readability */
-  --text-xs: 0.75rem;      /* 12px — minimum label size */
-  --text-sm: 0.8125rem;    /* 13px — body small / caption */
-  --text-base: 0.875rem;   /* 14px — body */
-  --text-lg: 1.125rem;     /* 18px — section heading */
-  --text-xl: 1.25rem;      /* 20px — page title */
-  --text-2xl: 1.5rem;      /* 24px — KPI value */
+  /* Typography scale */
+  --text-caption: 0.75rem;    /* 12px — minimum */
+  --text-body-sm: 0.8125rem;  /* 13px */
+  --text-body: 0.875rem;      /* 14px */
+  --text-section: 1rem;        /* 16px — section title */
+  --text-page: 1.375rem;       /* 22px — page title */
 
   /* Spacing scale */
   --space-section-sm: 1rem;
@@ -77,12 +72,12 @@ body {
   min-height: 100dvh;
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: "MiSans", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  font-family: "MiSans", "Microsoft YaHei", "PingFang SC", "Segoe UI", system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: 0;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 ::selection {
@@ -90,7 +85,7 @@ body {
   color: var(--color-surface);
 }
 
-/* Focus ring: subtle warm, hidden on touch */
+/* Focus ring */
 *:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
@@ -102,8 +97,8 @@ body {
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #D2D0D0; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #A99E9E; }
+::-webkit-scrollbar-thumb { background: #D0CDC8; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #B5B1AA; }
 
 @layer components {
   .scroll-hint-x {
@@ -116,7 +111,7 @@ body {
     background-attachment: local, local, scroll;
   }
 
-  /* Shared data table — DESIGN.md compliant */
+  /* Shared data table */
   .data-table {
     @apply w-full text-left;
   }
@@ -124,33 +119,33 @@ body {
     @apply border-b border-brand-warm-200 bg-brand-warm-50;
   }
   .data-table th {
-    @apply px-4 py-2.5 text-[11px] font-black uppercase tracking-[0.10em] text-brand-ink-600;
+    @apply px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.04em] text-brand-ink-500;
   }
   .data-table td {
-    @apply border-b border-brand-warm-100 px-4 py-2.5 text-[13px] text-brand-ink-900;
+    @apply border-b border-brand-warm-200 px-4 py-2.5 text-[13px] font-medium text-brand-ink-800;
   }
   .data-table tbody tr {
     @apply transition-colors duration-fast;
   }
   .data-table tbody tr:hover {
-    @apply bg-brand-warm-50;
+    @apply bg-brand-warm-100;
   }
   .data-table .num {
-    @apply tabular-nums text-right;
+    @apply tabular-nums text-right font-mono;
   }
 
-  /* Shared stat card */
+  /* Shared stat card / KPI card */
   .stat-card {
     @apply rounded-xl border border-brand-warm-200 bg-white p-5 shadow-card;
   }
   .stat-card .stat-label {
-    @apply text-[11px] font-black uppercase tracking-[0.10em] text-brand-ink-600;
+    @apply text-xs font-semibold uppercase tracking-[0.04em] text-brand-ink-500;
   }
   .stat-card .stat-value {
-    @apply mt-1.5 text-2xl font-black tracking-tight text-brand-ink-900 tabular-nums;
+    @apply mt-1.5 text-[22px] font-bold tracking-tight text-brand-ink-800 tabular-nums;
   }
   .stat-card .stat-caption {
-    @apply mt-1.5 text-[13px] text-brand-ink-500;
+    @apply mt-1.5 text-[13px] text-brand-ink-400;
   }
 
   .surface-panel {
@@ -158,7 +153,7 @@ body {
   }
 
   .filter-chip {
-    @apply rounded-lg border border-brand-warm-200 bg-white px-3 py-1.5 text-[11px] font-black text-brand-ink-700 shadow-sm transition hover:border-brand-orange-200 hover:bg-brand-orange-50;
+    @apply rounded-lg border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-500 shadow-sm transition hover:border-brand-indigo-300 hover:bg-brand-indigo-50;
   }
 
   .page-rule {
@@ -171,11 +166,11 @@ body {
   input, select, textarea { font-size: 16px; }
   @media (min-width: 640px) { input, select, textarea { font-size: 14px; } }
   button, a, [role="button"] { cursor: pointer; }
-  h1 { @apply text-xl font-black tracking-tight text-brand-ink-900; }
-  h2 { @apply text-sm font-black text-brand-ink-900 tracking-tight; }
-  h3 { @apply text-sm font-black text-brand-ink-900; }
-  h4 { @apply text-[13px] font-black text-brand-ink-800; }
-  p { @apply text-brand-ink-600; }
+  h1 { @apply text-[22px] font-bold tracking-tight text-brand-ink-800; }
+  h2 { @apply text-base font-bold text-brand-ink-800 tracking-tight; }
+  h3 { @apply text-sm font-semibold text-brand-ink-800; }
+  h4 { @apply text-[13px] font-semibold text-brand-ink-700; }
+  p { @apply text-brand-ink-500; }
   @media (pointer: coarse) {
     button:active, a:active, [role="button"]:active { opacity: 0.8; }
   }

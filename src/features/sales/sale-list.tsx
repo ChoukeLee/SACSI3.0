@@ -268,8 +268,8 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
     else setError(result.error ?? "Failed");
   };
 
-  const inputClass = "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm text-brand-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
-  const labelClass = "block text-[11px] font-black uppercase tracking-[0.14em] text-brand-ink-500 mb-1";
+  const inputClass = "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm text-brand-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/30";
+  const labelClass = "block text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500 mb-1";
 
   const statusVariant: Record<string, "neutral" | "success" | "danger" | "warning"> = {
     draft: "neutral", active: "success", terminated: "danger", expired: "warning",
@@ -305,8 +305,8 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
               className={cn(
                 "rounded-xl px-3 py-1.5 text-xs font-bold transition-colors duration-[100ms]",
                 statusFilter === s
-                  ? "bg-brand-orange-500 text-white"
-                  : "border border-brand-warm-300 bg-white text-brand-neutral-600 hover:bg-brand-orange-50"
+                  ? "bg-brand-indigo-500 text-white"
+                  : "border border-brand-warm-300 bg-white text-brand-neutral-600 hover:bg-brand-indigo-50"
               )}
             >
               {s === "all" ? (locale === "fr" ? "Tous" : "全部") : t.contractStatus[s as keyof typeof t.contractStatus]}
@@ -318,7 +318,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
         </div>
         <button
           onClick={() => { resetNewForm(); setPanel("new"); }}
-          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-orange-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors duration-[100ms] hover:bg-brand-orange-600 active:scale-[0.98]"
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors duration-[100ms] hover:bg-brand-indigo-600 active:scale-[0.98]"
         >
           <Plus className="h-3.5 w-3.5" />{t.form.newContract}
         </button>
@@ -334,7 +334,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
             <section key={floor} className="rounded-2xl border border-brand-warm-200 bg-white p-4 shadow-natural">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-brand-orange-500" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-brand-indigo-500" />
                   <h3 className="text-sm font-black text-brand-ink-900">{floor}</h3>
                 </div>
                 <span className="rounded-full bg-brand-warm-100 px-2.5 py-1 text-xs font-bold text-brand-ink-500">
@@ -360,25 +360,25 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                       onClick={() => { setSelectedId(contract.id); setPanel("detail"); setError(""); }}
                       className={cn(
                         "group flex min-h-[214px] flex-col rounded-2xl border bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-panel",
-                        isRisk ? "border-brand-amber-200 bg-brand-amber-50/40 ring-1 ring-brand-amber-100" : "border-brand-warm-300 hover:border-brand-orange-200",
+                        isRisk ? "border-brand-amber-200 bg-brand-amber-50/40 ring-1 ring-brand-amber-100" : "border-brand-warm-300 hover:border-brand-indigo-200",
                       )}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="font-mono text-base font-black leading-none text-brand-ink-900">{unit?.unit_no ?? "-"}</p>
                           <p className="mt-2 truncate text-xs font-black text-brand-ink-700">{customer?.name ?? "-"}</p>
-                          <p className="mt-1 truncate text-[10px] font-semibold text-brand-ink-400">{contract.contract_no}</p>
+                          <p className="mt-1 truncate text-xs font-semibold text-brand-ink-400">{contract.contract_no}</p>
                         </div>
                         <Badge variant={statusVariant[contract.status]}>{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
                       </div>
 
                       <div className="mt-3">
-                        <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-brand-ink-400">
+                        <div className="mb-1 flex items-center justify-between text-xs font-bold text-brand-ink-400">
                           <span>{locale === "zh" ? "回款进度" : "Paiement"}</span>
                           <span className="text-brand-ink-700">{rate}%</span>
                         </div>
                         <div className="h-2 overflow-hidden rounded-full bg-brand-warm-100">
-                          <div className={cn("h-full rounded-full", rate >= 100 ? "bg-brand-green-500" : overdue > 0 ? "bg-brand-red-500" : "bg-brand-orange-500")} style={{ width: String(rate) + "%" }} />
+                          <div className={cn("h-full rounded-full", rate >= 100 ? "bg-brand-green-500" : overdue > 0 ? "bg-brand-red-500" : "bg-brand-indigo-500")} style={{ width: String(rate) + "%" }} />
                         </div>
                       </div>
 
@@ -390,7 +390,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                       </div>
 
                       <div className="mt-auto pt-2">
-                        <div className="flex items-center justify-between gap-2 text-[10px] font-semibold text-brand-ink-400">
+                        <div className="flex items-center justify-between gap-2 text-xs font-semibold text-brand-ink-400">
                           <span>{locale === "zh" ? "过户" : "Transfert"}</span>
                           <span className="truncate text-brand-ink-600">{t.transferStatus[contract.transfer_status as keyof typeof t.transferStatus]}</span>
                         </div>
@@ -442,7 +442,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                 <label className="flex items-center gap-2 text-sm pt-5"><input type="checkbox" checked={fCommissionPaid} onChange={(e) => setFCommissionPaid(e.target.checked)} className="h-4 w-4 rounded border-brand-warm-200" />{t.form.agencyCommissionPaid}</label>
               </div>
               {error && <p className="text-sm text-brand-red-600">{error}</p>}
-              <button onClick={handleCreate} disabled={saving} className="w-full rounded-lg bg-brand-orange-500 py-2.5 text-sm font-semibold text-white hover:bg-brand-orange-600 disabled:opacity-50">{saving ? "..." : t.form.newContract}</button>
+              <button onClick={handleCreate} disabled={saving} className="w-full rounded-lg bg-brand-indigo-500 py-2.5 text-sm font-semibold text-white hover:bg-brand-indigo-600 disabled:opacity-50">{saving ? "..." : t.form.newContract}</button>
             </div>
           </div>
         </>
@@ -477,7 +477,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
               {/* Payment overview */}
               <div className="border-t border-brand-warm-200 pt-4">
                 <h4 className="text-sm font-bold text-brand-ink-900 flex items-center gap-1.5">
-                  <TrendingUp className="h-3.5 w-3.5 text-brand-orange" />{t.overview.title}
+                  <TrendingUp className="h-3.5 w-3.5 text-brand-indigo" />{t.overview.title}
                 </h4>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2">
@@ -488,9 +488,9 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                     <p className="text-brand-ink-500">{t.overview.paidAmount}</p>
                     <p className="font-bold tabular-nums text-brand-green-700">{formatXof(totalPaidRec || totalPaidPayments)}</p>
                   </div>
-                  <div className={cn("rounded border px-3 py-2", (totalReceivableRec - totalPaidRec) > 0 ? "border-brand-orange-200 bg-brand-orange-50" : "border-brand-green-200 bg-brand-green-50")}>
+                  <div className={cn("rounded border px-3 py-2", (totalReceivableRec - totalPaidRec) > 0 ? "border-brand-indigo-200 bg-brand-indigo-50" : "border-brand-green-200 bg-brand-green-50")}>
                     <p className="text-brand-ink-500">{t.overview.unpaidAmount}</p>
-                    <p className={cn("font-bold tabular-nums", (totalReceivableRec - totalPaidRec) > 0 ? "text-brand-orange-700" : "text-brand-green-700")}>
+                    <p className={cn("font-bold tabular-nums", (totalReceivableRec - totalPaidRec) > 0 ? "text-brand-indigo-700" : "text-brand-green-700")}>
                       {formatXof(Math.max(0, totalReceivableRec - totalPaidRec))}
                     </p>
                   </div>
@@ -503,7 +503,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                 </div>
                 {/* Progress bar */}
                 <div className="mt-2">
-                  <div className="flex justify-between text-[10px] text-brand-ink-500 mb-1">
+                  <div className="flex justify-between text-xs text-brand-ink-500 mb-1">
                     <span>{t.overview.collectionRate}</span>
                     <span className="tabular-nums font-medium">
                       {totalReceivableRec > 0 ? Math.round((totalPaidRec / totalReceivableRec) * 100) : 0}%
@@ -511,7 +511,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-brand-neutral-200">
                     <div
-                      className={cn("h-full rounded-full transition-all", totalPaidRec >= totalReceivableRec ? "bg-brand-green-500" : "bg-brand-orange")}
+                      className={cn("h-full rounded-full transition-all", totalPaidRec >= totalReceivableRec ? "bg-brand-green-500" : "bg-brand-indigo")}
                       style={{ width: `${totalReceivableRec > 0 ? Math.min(100, Math.round((totalPaidRec / totalReceivableRec) * 100)) : 0}%` }}
                     />
                   </div>
@@ -546,7 +546,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                           <span className="font-medium text-brand-ink-700 min-w-[24px]">#{s.installment_no}</span>
                           <span className={cn("text-brand-ink-500 min-w-[72px]", isOverdue && "text-brand-red-600")}>
                             {s.due_date}
-                            {od !== null && od > 0 && <span className="ml-1 text-[9px] text-brand-red-500">+{od}</span>}
+                            {od !== null && od > 0 && <span className="ml-1 text-xs text-brand-red-500">+{od}</span>}
                           </span>
                           <span className="font-semibold tabular-nums min-w-[80px] text-right">{formatXof(Number(s.amount_xof))}</span>
                           {matchingRec && (
@@ -614,7 +614,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                           <div><label className="text-xs text-brand-ink-500">{t.payment.paymentDate}</label><input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className={inputClass} /></div>
                           <div><label className="text-xs text-brand-ink-500">{t.payment.receiptNo}</label><input type="text" value={payReceiptNo} onChange={(e) => setPayReceiptNo(e.target.value)} className={inputClass} /></div>
                         </div>
-                        <button onClick={handleRecordPayment} disabled={saving} className="w-full rounded-lg bg-brand-orange-500 py-1.5 text-xs font-semibold text-white hover:bg-brand-orange-600 disabled:opacity-50"><DollarSign className="mr-1 inline h-3 w-3" />{t.payment.record}</button>
+                        <button onClick={handleRecordPayment} disabled={saving} className="w-full rounded-lg bg-brand-indigo-500 py-1.5 text-xs font-semibold text-white hover:bg-brand-indigo-600 disabled:opacity-50"><DollarSign className="mr-1 inline h-3 w-3" />{t.payment.record}</button>
                       </>
                     )}
                   </div>
@@ -701,14 +701,14 @@ function SaleCardField({
     slate: "bg-brand-warm-100 text-brand-ink-900",
     green: "bg-brand-green-50 text-brand-green-800",
     amber: "bg-brand-amber-50 text-brand-amber-800",
-    sky: "bg-brand-blue-50 text-brand-blue-800",
+    sky: "bg-brand-cyan-50 text-brand-cyan-800",
     rose: "bg-brand-red-50 text-brand-red-800",
   }[tone];
 
   return (
     <div className={cn("rounded-lg px-2 py-1.5", toneClass)}>
-      <p className="text-[9px] font-bold text-brand-ink-400">{label}</p>
-      <p className="mt-0.5 break-all text-[10px] font-black leading-tight tabular-nums">{value}</p>
+      <p className="text-xs font-bold text-brand-ink-400">{label}</p>
+      <p className="mt-0.5 break-all text-xs font-black leading-tight tabular-nums">{value}</p>
     </div>
   );
 }
@@ -730,7 +730,7 @@ function SaleMetric({ label, value, tone }: { label: string; value: string; tone
     slate: "border-brand-warm-300 bg-white text-brand-ink-900",
     green: "border-brand-green-200 bg-brand-green-50 text-brand-green-900",
     amber: "border-brand-amber-200 bg-brand-amber-50 text-brand-amber-900",
-    sky: "border-brand-blue-200 bg-brand-blue-50 text-brand-blue-900",
+    sky: "border-brand-cyan-200 bg-brand-cyan-50 text-brand-cyan-900",
     rose: "border-brand-red-200 bg-brand-red-50 text-brand-red-900",
   }[tone];
 

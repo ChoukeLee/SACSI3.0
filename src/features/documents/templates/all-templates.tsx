@@ -16,8 +16,8 @@ const PRINT_STYLES = `
   @media print {
     body { padding: 14mm 18mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
-  .header { text-align: center; border-bottom: 2px solid #F77F00; padding-bottom: 10px; margin-bottom: 14px; }
-  .header .company { font-size: 22px; font-weight: 800; color: #F77F00; letter-spacing: 0.04em; }
+  .header { text-align: center; border-bottom: 2px solid #4F5DE6; padding-bottom: 10px; margin-bottom: 14px; }
+  .header .company { font-size: 22px; font-weight: 800; color: #4F5DE6; letter-spacing: 0.04em; }
   .header .sub { font-size: 10px; color: #94a3b8; margin-top: 2px; }
   .header .doc-type { font-size: 14px; font-weight: 700; color: #1e293b; margin-top: 6px; }
   h1 { font-size: 15px; margin-bottom: 10px; }
@@ -30,7 +30,7 @@ const PRINT_STYLES = `
   table.data td { padding: 5px 8px; border-bottom: 1px solid #f1f5f9; font-size: 11px; }
   .total-row { border-top: 2px solid #1e293b; padding-top: 6px; margin-top: 8px; }
   .total-row .lbl { font-size: 13px; font-weight: 700; }
-  .total-row .val { font-size: 14px; font-weight: 700; color: #F77F00; }
+  .total-row .val { font-size: 14px; font-weight: 700; color: #4F5DE6; }
   .status-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; }
   .st-paid { background: #dcfce7; color: #16a34a; }
   .st-pending { background: #fef3c7; color: #d97706; }

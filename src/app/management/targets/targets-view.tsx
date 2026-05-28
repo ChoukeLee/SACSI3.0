@@ -93,22 +93,22 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
           const displayVal = def.key.endsWith("_max") ? current : current;
           return (
             <div key={def.key} className="rounded-lg border border-slate-200 bg-white p-3">
-              <p className="text-[10px] text-slate-500">{locale === "zh" ? def.labelZh : def.labelFr}</p>
+              <p className="text-xs text-slate-500">{locale === "zh" ? def.labelZh : def.labelFr}</p>
               <p className="text-lg font-black tabular-nums text-slate-950">
                 {def.isPercentage ? `${displayVal}%` : formatXof(displayVal)}
               </p>
               {target ? (
                 <div className="mt-1">
                   <div className="h-1.5 rounded-full bg-brand-neutral-200">
-                    <div className={cn("h-full rounded-full", (rate ?? 0) >= 100 ? "bg-brand-green-500" : (rate ?? 0) >= 70 ? "bg-brand-orange" : "bg-brand-red-400")} style={{ width: `${Math.min(100, rate ?? 0)}%` }} />
+                    <div className={cn("h-full rounded-full", (rate ?? 0) >= 100 ? "bg-brand-green-500" : (rate ?? 0) >= 70 ? "bg-brand-indigo" : "bg-brand-red-400")} style={{ width: `${Math.min(100, rate ?? 0)}%` }} />
                   </div>
-                  <p className="text-[9px] text-slate-400 mt-0.5">
+                  <p className="text-xs text-slate-400 mt-0.5">
                     {locale === "zh" ? "目标" : "Cible"}: {def.isPercentage ? `${target.target_value}%` : formatXof(Number(target.target_value))}
                     {" · "}{rate}%
                   </p>
                 </div>
               ) : (
-                <p className="text-[9px] text-slate-400 mt-1">{locale === "zh" ? "未设置目标" : "Pas d'objectif"}</p>
+                <p className="text-xs text-slate-400 mt-1">{locale === "zh" ? "未设置目标" : "Pas d'objectif"}</p>
               )}
             </div>
           );
@@ -124,7 +124,7 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
           </div>
 
           {showForm && (
-            <div className="mb-3 rounded border border-brand-orange-200 bg-brand-orange-50 p-3 space-y-2">
+            <div className="mb-3 rounded border border-brand-indigo-200 bg-brand-indigo-50 p-3 space-y-2">
               <select value={formPeriod} onChange={e => setFormPeriod(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-sm">
                 <option value="monthly">{locale === "zh" ? "月度" : "Mensuel"}</option>
                 <option value="quarterly">{locale === "zh" ? "季度" : "Trimestre"}</option>
@@ -142,7 +142,7 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
           {targets.length === 0 ? (
             <p className="text-xs text-slate-400">{locale === "zh" ? "暂无目标" : "Aucun"}</p>
           ) : (
-            <table className="w-full text-xs"><thead className="text-[10px] uppercase text-slate-500"><tr><th className="px-2 py-1">{locale === "zh" ? "指标" : "KPI"}</th><th className="px-2 py-1">{locale === "zh" ? "期间" : "Periode"}</th><th className="px-2 py-1 text-right">{locale === "zh" ? "目标值" : "Cible"}</th><th className="px-2 py-1"></th></tr></thead>
+            <table className="w-full text-xs"><thead className="text-xs uppercase text-slate-500"><tr><th className="px-2 py-1">{locale === "zh" ? "指标" : "KPI"}</th><th className="px-2 py-1">{locale === "zh" ? "期间" : "Periode"}</th><th className="px-2 py-1 text-right">{locale === "zh" ? "目标值" : "Cible"}</th><th className="px-2 py-1"></th></tr></thead>
             <tbody className="divide-y divide-brand-neutral-200">
               {targets.map(t => {
                 const def = KPI_DEFINITIONS.find(d => d.key === t.metric_key);

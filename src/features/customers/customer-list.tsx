@@ -177,8 +177,8 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
   };
 
   const inputClass =
-    "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm text-brand-ink-900 placeholder:text-brand-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/30";
-  const labelClass = "block text-[11px] font-black uppercase tracking-[0.14em] text-brand-ink-500 mb-1";
+    "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm text-brand-ink-900 placeholder:text-brand-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/30";
+  const labelClass = "block text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500 mb-1";
 
   const isFormOpen = formMode !== null;
   const isBlacklistOpen = blacklistPanelId !== null;
@@ -207,7 +207,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
               className={cn(
                 "rounded-xl px-3 py-2 text-xs font-bold transition",
                 segment === key
-                  ? "bg-brand-orange-500 text-white shadow-sm"
+                  ? "bg-brand-indigo-500 text-white shadow-sm"
                   : "border border-brand-warm-200 bg-brand-warm-50 text-brand-ink-600 hover:bg-white",
               )}
             >
@@ -221,7 +221,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
               placeholder={t.searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-9 w-64 rounded-xl border border-brand-warm-200 bg-white py-1.5 pl-8 pr-3 text-sm text-brand-ink-700 placeholder:text-brand-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-orange-500/15"
+              className="h-9 w-64 rounded-xl border border-brand-warm-200 bg-white py-1.5 pl-8 pr-3 text-sm text-brand-ink-700 placeholder:text-brand-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15"
             />
           </div>
         </div>
@@ -261,7 +261,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
           <p className="text-sm text-brand-ink-400">{t.empty}</p>
           <button
             onClick={openAdd}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-orange-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-[100ms] hover:bg-brand-orange-600 active:scale-[0.98]"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-indigo-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-[100ms] hover:bg-brand-indigo-600 active:scale-[0.98]"
           >
             <Plus className="h-3.5 w-3.5" />
             {t.actions.add}
@@ -270,7 +270,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
           <table className="data-table min-w-[640px]">
-            <thead className="border-b border-brand-warm-200 bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500">
+            <thead className="border-b border-brand-warm-200 bg-brand-warm-50/90 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500">
               <tr>
                 <th className="px-4 py-3">{t.fields.name}</th>
                 <th className="px-4 py-3">{t.fields.phone}</th>
@@ -288,7 +288,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                     c.is_blacklisted
                       ? "bg-brand-red-50/50 hover:bg-brand-red-50"
                       : "hover:bg-brand-warm-50/80",
-                    selectedId === c.id && "ring-1 ring-inset ring-brand-orange-500"
+                    selectedId === c.id && "ring-1 ring-inset ring-brand-indigo-500"
                   )}
                   onClick={() => {
                     setSelectedId(selectedId === c.id ? null : c.id);
@@ -326,7 +326,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                         e.stopPropagation();
                         openEdit(c);
                       }}
-                      className="text-xs font-semibold text-brand-orange-600 transition hover:underline"
+                      className="text-xs font-semibold text-brand-indigo-600 transition hover:underline"
                     >
                       {t.actions.edit}
                     </button>
@@ -448,7 +448,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-orange-600 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand-indigo-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-indigo-600 disabled:opacity-50"
                 >
                   {saving ? "..." : t.actions.save}
                 </button>
@@ -515,7 +515,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
             <div className="flex items-center gap-2">
               <Link
                 href={routeFor(locale, `/customers/${selected.id}`)}
-                className="inline-flex items-center gap-1 rounded-lg bg-brand-orange-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-orange-600"
+                className="inline-flex items-center gap-1 rounded-lg bg-brand-indigo-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-indigo-600"
               >
                 <Eye className="h-3.5 w-3.5" />
                 {locale === "zh" ? "查看档案" : "Profil"}
@@ -584,7 +584,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
                   type="checkbox"
                   checked={blPermanent}
                   onChange={(e) => setBlPermanent(e.target.checked)}
-                  className="h-4 w-4 rounded border-brand-warm-200 text-brand-orange-600 focus:ring-brand-orange-500"
+                  className="h-4 w-4 rounded border-brand-warm-200 text-brand-indigo-600 focus:ring-brand-indigo-500"
                 />
                 {t.blacklist.permanent}
               </label>
@@ -616,7 +616,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
 function CustomerStat({ label, value, tone }: { label: string; value: number; tone: "slate" | "sky" | "rose" | "emerald" }) {
   const toneClass = {
     slate: "border-brand-warm-200 bg-white text-brand-ink-900",
-    sky: "border-brand-sky-200 bg-brand-sky-50 text-brand-sky-900",
+    sky: "border-brand-cyan-200 bg-brand-cyan-50 text-brand-cyan-900",
     rose: "border-rose-200 bg-rose-50 text-rose-900",
     emerald: "border-brand-green-200 bg-brand-green-50 text-brand-green-900",
   }[tone];

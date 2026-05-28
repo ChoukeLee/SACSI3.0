@@ -75,7 +75,7 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
           <div className="flex items-center gap-2">
             <Link
               href={routeFor(locale, `/units/${unit.id}`)}
-              className="inline-flex h-9 items-center rounded-xl bg-brand-orange-500 px-3 text-xs font-bold text-white shadow-sm transition hover:bg-brand-orange-600"
+              className="inline-flex h-9 items-center rounded-xl bg-brand-indigo-500 px-3 text-xs font-bold text-white shadow-sm transition hover:bg-brand-indigo-600"
             >
               {locale === "zh" ? "完整档案" : "Dossier"}
             </Link>
@@ -100,7 +100,7 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
                 : []),
             ].map(([label, value]) => (
               <div key={label as string}>
-                <dt className="text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-400">{label}</dt>
+                <dt className="text-xs font-black uppercase tracking-[0.14em] text-brand-ink-400">{label}</dt>
                 <dd className="mt-1 font-medium text-brand-ink-900">
                   {label === t.detail.status ? <StatusBadge status={unit.status} labels={dictionaries[locale].statuses} /> : (value ?? t.detail.notSet)}
                 </dd>
@@ -109,11 +109,11 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
           </dl>
 
           <div>
-            <h4 className="text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-400">{t.detail.supportedBusiness}</h4>
+            <h4 className="text-xs font-black uppercase tracking-[0.14em] text-brand-ink-400">{t.detail.supportedBusiness}</h4>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {enabledBusinesses.length > 0 ? (
                 enabledBusinesses.map((f) => (
-                  <span key={f.business_type} className="inline-flex rounded-full bg-brand-orange-50 px-2.5 py-0.5 text-xs font-semibold text-brand-orange-600">
+                  <span key={f.business_type} className="inline-flex rounded-full bg-brand-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-brand-indigo-600">
                     {t.businessTypes[f.business_type]}
                   </span>
                 ))
@@ -124,7 +124,7 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
           </div>
 
           <div>
-            <h4 className="text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-400">{t.detail.photos}</h4>
+            <h4 className="text-xs font-black uppercase tracking-[0.14em] text-brand-ink-400">{t.detail.photos}</h4>
             <div className="mt-2 flex gap-3">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-brand-warm-200 bg-brand-warm-50 text-brand-ink-300">
@@ -135,12 +135,12 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
           </div>
 
           <div>
-            <h4 className="text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-400">{t.detail.notes}</h4>
+            <h4 className="text-xs font-black uppercase tracking-[0.14em] text-brand-ink-400">{t.detail.notes}</h4>
             <p className="mt-1.5 text-sm leading-relaxed text-brand-ink-600">{unit.notes ?? t.detail.noNotes}</p>
           </div>
 
           <div className="relative">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-400">{t.actions.changeStatus}</h4>
+            <h4 className="text-xs font-black uppercase tracking-[0.14em] text-brand-ink-400">{t.actions.changeStatus}</h4>
             <div className="mt-2">
               <button
                 onClick={() => setStatusOpen(!statusOpen)}
@@ -157,7 +157,7 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
                       key={s}
                       onClick={() => handleStatusChange(s)}
                       disabled={unit.status === s || changing}
-                      className="block w-full px-3 py-2 text-left text-sm text-slate-800 transition-colors duration-fast hover:bg-brand-orange-50 disabled:opacity-40"
+                      className="block w-full px-3 py-2 text-left text-sm text-slate-800 transition-colors duration-fast hover:bg-brand-indigo-50 disabled:opacity-40"
                     >
                       {statusLabels[s]}
                     </button>
@@ -169,7 +169,7 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
           </div>
 
           <div>
-            <h4 className="text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-400">{t.detail.statusHistory}</h4>
+            <h4 className="text-xs font-black uppercase tracking-[0.14em] text-brand-ink-400">{t.detail.statusHistory}</h4>
             {auditLogs.length === 0 ? (
               <p className="mt-1.5 text-xs text-brand-ink-400">{t.detail.noStatusHistory}</p>
             ) : (

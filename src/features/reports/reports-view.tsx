@@ -139,8 +139,8 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
   ];
 
   const statBox = (l: string, v: string, a: string, key?: string) => {
-    const c: Record<string,string>={green:"bg-brand-green-500",red:"bg-brand-red-500",ink:"bg-slate-800",orange:"bg-brand-orange"};
-    return <div key={key ?? l} className="overflow-hidden rounded-2xl border border-brand-warm-200 bg-white shadow-natural"><div className={cn("h-[3px]",c[a]??"bg-slate-800")} /><div className="px-3 py-2.5"><p className="text-[10px] font-semibold text-brand-ink-400">{l}</p><p className="text-sm font-bold tabular-nums text-brand-ink-900">{v}</p></div></div>;
+    const c: Record<string,string>={green:"bg-brand-green-500",red:"bg-brand-red-500",ink:"bg-slate-800",orange:"bg-brand-indigo"};
+    return <div key={key ?? l} className="overflow-hidden rounded-2xl border border-brand-warm-200 bg-white shadow-natural"><div className={cn("h-[3px]",c[a]??"bg-slate-800")} /><div className="px-3 py-2.5"><p className="text-xs font-semibold text-brand-ink-400">{l}</p><p className="text-sm font-bold tabular-nums text-brand-ink-900">{v}</p></div></div>;
   };
 
   return (
@@ -185,7 +185,7 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
             {statBox(locale==="zh"?"收缴率":"Taux", `${incomeData.rate}%`, incomeData.rate>=80?"green":"orange")}
           </div>
           <div className="overflow-x-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
-            <table className="data-table"><thead className="bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr><th className="px-3 py-2">{locale==="zh"?"业务类型":"Source"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"应收":"Du"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"实收":"Paye"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"收缴率":"Taux"}</th></tr></thead>
+            <table className="data-table"><thead className="bg-brand-warm-50/90 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr><th className="px-3 py-2">{locale==="zh"?"业务类型":"Source"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"应收":"Du"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"实收":"Paye"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"收缴率":"Taux"}</th></tr></thead>
             <tbody className="divide-y divide-brand-warm-100">
               {Object.entries(incomeData.bySource).map(([k,v]) => {
                 const labels: Record<string,string> = locale==="zh"?{daily_booking:"日租",lease_contract:"长租",sale_contract:"出售",manual:"手工"}:{daily_booking:"Jour",lease_contract:"LT",sale_contract:"Vente",manual:"Manuel"};
@@ -204,7 +204,7 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
           <div className="flex gap-2 text-xs text-brand-ink-500">{locale==="zh"?"共":"Total"}: {overdueData.length} {locale==="zh"?"条":"lignes"} · {locale==="zh"?"欠费合计":"Impaye"}: {formatXof(overdueData.reduce((s,r)=>s+r.unpaid,0))}</div>
           {overdueData.length===0 ? <p className="text-sm font-semibold text-brand-ink-400 py-8 text-center">{L.noData}</p> : (
             <div className="overflow-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural max-h-[500px]">
-              <table className="data-table"><thead className="sticky top-0 bg-brand-warm-50/90 text-[10px] font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr><th className="px-3 py-2">{locale==="zh"?"房号":"Ch"}</th><th className="px-3 py-2">{locale==="zh"?"客户":"Client"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"欠费":"Impaye"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"逾期天数":"Jours"}</th><th className="px-3 py-2">{locale==="zh"?"到期":"Echeance"}</th></tr></thead>
+              <table className="data-table"><thead className="sticky top-0 bg-brand-warm-50/90 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr><th className="px-3 py-2">{locale==="zh"?"房号":"Ch"}</th><th className="px-3 py-2">{locale==="zh"?"客户":"Client"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"欠费":"Impaye"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"逾期天数":"Jours"}</th><th className="px-3 py-2">{locale==="zh"?"到期":"Echeance"}</th></tr></thead>
               <tbody className="divide-y divide-brand-warm-100">{overdueData.map(r => <tr key={r.id} className="bg-brand-red-50/20"><td className="px-3 py-2 font-mono">{r.unitNo}</td><td className="px-3 py-2">{r.cust}</td><td className="px-3 py-2 text-right font-semibold text-brand-red-600">{formatXof(r.unpaid)}</td><td className="px-3 py-2 text-right text-brand-red-500">+{r.overdueDays}</td><td className="px-3 py-2">{r.due_date}</td></tr>)}</tbody></table>
             </div>
           )}
@@ -291,7 +291,7 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
             lines.push(`SACIS3.0 ${locale==="zh"?"日结":"Cloture"} — ${today}`);
             lines.push(`${locale==="zh"?"新预订":"Res"}: ${dailyCloseData.newBookings.length} | ${locale==="zh"?"入住":"Arr"}: ${dailyCloseData.checkins.length} | ${locale==="zh"?"退房":"Dep"}: ${dailyCloseData.checkouts.length} | ${locale==="zh"?"在住":"Occ"}: ${dailyCloseData.inHouse.length} | ${locale==="zh"?"收款":"P"}: ${formatXof(dailyCloseData.todayTotal)}`);
             navigator.clipboard.writeText(lines.join("\n"));
-          }} className="rounded-xl bg-brand-orange-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-orange-600 active:scale-[0.98] inline-flex items-center gap-1.5">
+          }} className="rounded-xl bg-brand-indigo-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-indigo-600 active:scale-[0.98] inline-flex items-center gap-1.5">
             {locale==="zh"?"复制日结":"Copier"}
           </button>
           <button onClick={() => downloadCsv("指标,数值",[["新预订",dailyCloseData.newBookings.length],["入住",dailyCloseData.checkins.length],["退房",dailyCloseData.checkouts.length],["在住",dailyCloseData.inHouse.length],["收款",dailyCloseData.todayTotal]].map(r=>csvLine(r)),"daily_close")}
