@@ -4,7 +4,8 @@ import { useState, useMemo } from "react";
 import { Plus, X, DollarSign, FileText, CalendarPlus, TrendingUp, AlertTriangle } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
-import { formatXof, cn } from "@/lib/utils";
+import { formatXof, cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
+import { contractStatusVariant as statusVariant } from "@/lib/status-styles";
 import { Badge } from "@/components/ui/badge";
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import {
@@ -270,10 +271,6 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
 
   const inputClass = "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm text-brand-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/30";
   const labelClass = "block text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500 mb-1";
-
-  const statusVariant: Record<string, "neutral" | "success" | "danger" | "warning"> = {
-    draft: "neutral", active: "success", terminated: "danger", expired: "warning",
-  };
 
   const schedStatusVariant: Record<string, "neutral" | "success" | "danger" | "default"> = {
     pending: "neutral", paid: "success", overdue: "danger", cancelled: "default",
@@ -711,18 +708,6 @@ function SaleCardField({
       <p className="mt-0.5 break-all text-xs font-black leading-tight tabular-nums">{value}</p>
     </div>
   );
-}
-
-function normalizeFloorLabel(floorLabel: string | null, unitNo: string): string {
-  if (floorLabel && floorLabel.trim()) return floorLabel.trim().replace("楼", "F");
-  const numeric = Number.parseInt(unitNo, 10);
-  if (Number.isFinite(numeric)) return `${Math.floor(numeric / 100)}F`;
-  return "F";
-}
-
-function floorSortValue(label: string): number {
-  const match = label.match(/\d+/);
-  return match ? Number.parseInt(match[0], 10) : 999;
 }
 
 function SaleMetric({ label, value, tone }: { label: string; value: string; tone: "slate" | "green" | "amber" | "sky" | "rose" }) {

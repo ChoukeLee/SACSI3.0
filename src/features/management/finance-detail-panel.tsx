@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
+import { receivableStatusStyles as STATUS_STYLES } from "@/lib/status-styles";
 import type {
   BuildingRow, UnitRow, ReceivableRow, PaymentRow, CustomerRow,
 } from "@/types/database";
@@ -21,14 +22,6 @@ interface Props {
   customers: CustomerRow[];
   locale: Locale;
 }
-
-const STATUS_STYLES: Record<string, string> = {
-  pending:   "bg-brand-warm-100 text-brand-ink-700",
-  partial:   "bg-brand-amber-100 text-brand-amber-700",
-  paid:      "bg-brand-green-100 text-brand-green-700",
-  overdue:   "bg-brand-red-100 text-brand-red-700",
-  cancelled: "bg-brand-warm-50 text-brand-ink-400 line-through",
-};
 
 const SOURCE_TYPE_LABELS: Record<string, { zh: string; fr: string }> = {
   daily_booking: { zh: "日租", fr: "Journalier" },

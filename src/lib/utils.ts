@@ -44,3 +44,15 @@ export function compareUnits<T extends { unit_no: string | null; floor_label?: s
 export function sortUnits<T extends { unit_no: string | null; floor_label?: string | null }>(units: T[]): T[] {
   return [...units].sort(compareUnits);
 }
+
+export function normalizeFloorLabel(floorLabel: string | null, unitNo: string): string {
+  if (floorLabel && floorLabel.trim()) return floorLabel.trim().replace("楼", "F");
+  const numeric = Number.parseInt(unitNo, 10);
+  if (Number.isFinite(numeric)) return `${Math.floor(numeric / 100)}F`;
+  return "F";
+}
+
+export function floorSortValue(label: string): number {
+  const match = label.match(/\d+/);
+  return match ? Number.parseInt(match[0], 10) : 999;
+}

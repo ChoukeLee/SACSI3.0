@@ -5,6 +5,7 @@ import { Download } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
+import { receivableStatusStyles as STATUS_STYLES, receivableRowBg as ROW_BG } from "@/lib/status-styles";
 import {
   calculateReceivableSummary,
   buildReceivableCsv,
@@ -26,22 +27,6 @@ interface Props {
   buildings: BuildingRow[];
   locale: Locale;
 }
-
-const STATUS_STYLES: Record<string, string> = {
-  pending:   "bg-brand-warm-100 text-brand-ink-700",
-  partial:   "bg-brand-amber-100 text-brand-amber-700",
-  paid:      "bg-brand-green-100 text-brand-green-700",
-  overdue:   "bg-brand-red-100 text-brand-red-700",
-  cancelled: "bg-brand-warm-50 text-brand-ink-400 line-through",
-};
-
-const ROW_BG: Record<string, string> = {
-  overdue:   "bg-brand-red-50/30",
-  partial:   "bg-brand-amber-50/30",
-  paid:      "",
-  pending:   "",
-  cancelled: "opacity-60",
-};
 
 export function ReceivableList({ receivables, units, customers, buildings, locale }: Props) {
   const t = dictionaries[locale].receivables;

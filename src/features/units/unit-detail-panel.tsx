@@ -102,7 +102,7 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
               <div key={label as string}>
                 <dt className="text-xs font-black uppercase tracking-[0.14em] text-brand-ink-400">{label}</dt>
                 <dd className="mt-1 font-medium text-brand-ink-900">
-                  {label === t.detail.status ? <StatusBadge status={unit.status} labels={dictionaries[locale].statuses} /> : (value ?? t.detail.notSet)}
+                  {label === t.detail.status ? <StatusBadge status={unit.status} label={dictionaries[locale].statuses[unit.status]} /> : (value ?? t.detail.notSet)}
                 </dd>
               </div>
             ))}

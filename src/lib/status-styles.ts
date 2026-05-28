@@ -118,3 +118,26 @@ export const financeToneStyles = {
   danger: "border-brand-red-200 bg-brand-red-50 text-brand-red-900",
   accent: "border-brand-indigo-200 bg-brand-indigo-50 text-brand-indigo-900",
 } as const;
+
+export const receivableStatusStyles: Record<string, string> = {
+  pending:   "bg-brand-warm-100 text-brand-ink-700",
+  partial:   "bg-brand-amber-100 text-brand-amber-700",
+  paid:      "bg-brand-green-100 text-brand-green-700",
+  overdue:   "bg-brand-red-100 text-brand-red-700",
+  cancelled: "bg-brand-warm-100 text-brand-ink-500 line-through",
+};
+
+export const receivableRowBg: Record<string, string> = {
+  pending:   "",
+  partial:   "bg-brand-amber-50/30",
+  paid:      "",
+  overdue:   "bg-brand-red-50/30",
+  cancelled: "opacity-60",
+};
+
+export const contractStatusVariant: Record<string, "neutral" | "success" | "danger" | "warning"> = {
+  draft: "neutral",
+  active: "success",
+  terminated: "danger",
+  expired: "warning",
+};

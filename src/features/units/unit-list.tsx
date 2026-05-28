@@ -219,13 +219,13 @@ function UnitStatusPill({ status, locale }: { status: UnitStatus; locale: Locale
   const label = dictionaries[locale].statuses[status];
   const styles: Record<UnitStatus, string> = {
     sold: "bg-brand-warm-100 text-brand-ink-800 ring-brand-warm-300",
-    leased: "bg-brand-cyan-50 text-brand-cyan-800 ring-brand-cyan-200",
+    leased: "bg-brand-purple-50 text-brand-purple-700 ring-brand-purple-200",
     daily_occupied: "bg-brand-indigo-50 text-brand-indigo-800 ring-brand-indigo-200",
-    reserved: "bg-brand-indigo-100 text-brand-indigo-900 ring-brand-indigo-300",
-    cleaning_pending: "bg-brand-green-100 text-brand-green-900 ring-brand-green-300",
+    reserved: "bg-brand-amber-50 text-brand-amber-700 ring-brand-amber-200",
+    cleaning_pending: "bg-brand-cyan-50 text-brand-cyan-700 ring-brand-cyan-200",
     available: "bg-brand-green-50 text-brand-green-800 ring-brand-green-200",
-    maintenance: "bg-brand-red-500 text-white ring-brand-red-600",
-    locked: "bg-white text-brand-neutral-950 ring-brand-neutral-600",
+    maintenance: "bg-brand-red-50 text-brand-red-700 ring-brand-red-200",
+    locked: "bg-white text-brand-ink-700 ring-brand-warm-300",
   };
 
   return (

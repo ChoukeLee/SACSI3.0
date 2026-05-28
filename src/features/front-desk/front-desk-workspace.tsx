@@ -109,8 +109,8 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
     switch (rs.displayStatus) {
       case "occupied": return "bg-brand-indigo-100 text-brand-indigo-700 border-brand-indigo-300";
       case "checking_out_today": return "bg-brand-amber-100 text-brand-amber-700 border-brand-amber-200";
-      case "reserved": return "bg-brand-cyan-100 text-brand-cyan-700 border-brand-cyan-200";
-      case "cleaning": return "bg-brand-green-100 text-brand-green-700 border-brand-green-200";
+      case "reserved": return "bg-brand-amber-100 text-brand-amber-700 border-brand-amber-200";
+      case "cleaning": return "bg-brand-cyan-100 text-brand-cyan-700 border-brand-cyan-200";
       case "available": return "bg-brand-green-50 text-brand-green-700 border-brand-green-200";
       default: return "bg-brand-neutral-100 text-brand-neutral-600 border-brand-neutral-300";
     }

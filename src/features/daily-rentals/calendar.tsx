@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Copy, Plus, Printer, SlidersHorizontal, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
-import { cn, formatXof } from "@/lib/utils";
+import { cn, formatXof, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
@@ -1121,17 +1121,6 @@ function startOfWeek(date: Date): Date {
   return addDays(start, offset);
 }
 
-function normalizeFloorLabel(floorLabel: string | null, unitNo: string): string {
-  if (floorLabel && floorLabel.trim()) return floorLabel.trim().replace("楼", "F");
-  const numeric = Number.parseInt(unitNo, 10);
-  if (Number.isFinite(numeric)) return `${Math.floor(numeric / 100)}F`;
-  return "F";
-}
-
-function floorSortValue(label: string): number {
-  const match = label.match(/\d+/);
-  return match ? Number.parseInt(match[0], 10) : 999;
-}
 
 function addDays(date: Date, days: number): Date {
   const next = new Date(date);

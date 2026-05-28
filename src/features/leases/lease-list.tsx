@@ -4,10 +4,11 @@ import { useState, useMemo } from "react";
 import { Plus, X, AlertTriangle, FileText, DollarSign, LogOut, Printer, RefreshCw } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
-import { formatXof, cn } from "@/lib/utils";
+import { formatXof, cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
+import { contractStatusVariant as statusVariant, receivableStatusStyles as STATUS_STYLES, receivableRowBg as ROW_BG } from "@/lib/status-styles";
 import { printLeaseContract } from "@/features/print";
 import {
   createLeaseContract,
@@ -345,28 +346,6 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm text-brand-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/30";
   const labelClass = "block text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500 mb-1";
 
-  const statusVariant: Record<string, "neutral" | "success" | "danger" | "warning"> = {
-    draft: "neutral",
-    active: "success",
-    terminated: "danger",
-    expired: "warning",
-  };
-
-  const STATUS_STYLES: Record<string, string> = {
-    pending:   "bg-brand-warm-100 text-brand-ink-700",
-    partial:   "bg-brand-amber-100 text-brand-amber-700",
-    paid:      "bg-brand-green-100 text-brand-green-700",
-    overdue:   "bg-brand-red-100 text-brand-red-700",
-    cancelled: "bg-brand-warm-50 text-brand-ink-400 line-through",
-  };
-
-  const ROW_BG: Record<string, string> = {
-    overdue:   "bg-brand-red-50/30",
-    partial:   "bg-brand-amber-50/30",
-    paid:      "",
-    pending:   "",
-    cancelled: "opacity-60",
-  };
 
   const statusLabel = (status: string) => {
     const labels: Record<string, string> = locale === "zh"
@@ -824,18 +803,6 @@ function LeaseCardField({
       <p className="mt-0.5 text-xs font-black tabular-nums leading-tight break-all">{value}</p>
     </div>
   );
-}
-
-function normalizeFloorLabel(floorLabel: string | null, unitNo: string): string {
-  if (floorLabel && floorLabel.trim()) return floorLabel.trim().replace("楼", "F");
-  const numeric = Number.parseInt(unitNo, 10);
-  if (Number.isFinite(numeric)) return `${Math.floor(numeric / 100)}F`;
-  return "F";
-}
-
-function floorSortValue(label: string): number {
-  const match = label.match(/\d+/);
-  return match ? Number.parseInt(match[0], 10) : 999;
 }
 
 function LeaseMetric({ label, value, tone }: { label: string; value: string; tone: "slate" | "green" | "amber" | "sky" | "rose" }) {
