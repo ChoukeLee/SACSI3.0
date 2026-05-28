@@ -61,7 +61,7 @@ export function ConfirmDialog({
             {cancelLabel ?? t.cancel}
           </Button>
           <Button
-            variant="primary"
+            variant="default"
             size="sm"
             onClick={onConfirm}
             disabled={loading}

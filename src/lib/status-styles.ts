@@ -135,9 +135,9 @@ export const receivableRowBg: Record<string, string> = {
   cancelled: "opacity-60",
 };
 
-export const contractStatusVariant: Record<string, "neutral" | "success" | "danger" | "warning"> = {
-  draft: "neutral",
+export const contractStatusVariant: Record<string, "secondary" | "success" | "destructive" | "warning"> = {
+  draft: "secondary",
   active: "success",
-  terminated: "danger",
+  terminated: "destructive",
   expired: "warning",
 };

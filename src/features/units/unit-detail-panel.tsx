@@ -79,7 +79,7 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
             >
               {locale === "zh" ? "完整档案" : "Dossier"}
             </Link>
-            <Button variant="icon" size="icon" onClick={onClose} aria-label={locale === "zh" ? "关闭" : "Fermer"}>
+            <Button size="icon" variant="ghost" onClick={onClose} aria-label={locale === "zh" ? "关闭" : "Fermer"}>
               <X className="h-5 w-5" />
             </Button>
           </div>

@@ -353,7 +353,7 @@ export function ManagementDashboard({
                 label={t.cockpit.receivableThisMonth}
                 value={formatXof(receivableMonthStats.totalReceivable)}
                 variant="neutral"
-                onClick={() => setFinanceDetail("receivable")}
+  onClick={() => setFinanceDetail("receivable")}
               />
               <KPICard
                 label={t.cockpit.paidThisMonth}
@@ -371,7 +371,7 @@ export function ManagementDashboard({
                 label={t.cockpit.overdueThisMonth}
                 value={formatXof(receivableMonthStats.overdue)}
                 variant="danger"
-                onClick={() => setFinanceDetail("overdue")}
+  onClick={() => setFinanceDetail("overdue")}
               />
             </div>
 

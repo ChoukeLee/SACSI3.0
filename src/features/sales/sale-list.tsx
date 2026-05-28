@@ -273,8 +273,8 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const inputClass = "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm text-brand-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/30";
   const labelClass = "block text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500 mb-1";
 
-  const schedStatusVariant: Record<string, "neutral" | "success" | "danger" | "default"> = {
-    pending: "neutral", paid: "success", overdue: "danger", cancelled: "default",
+  const schedStatusVariant: Record<string,  "secondary" | "success" |  "destructive" | "default"> = {
+    pending: "secondary", paid: "success", overdue: "destructive", cancelled: "default",
   };
 
   const schedStatusLabel = (s: string) => {
@@ -555,7 +555,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                               </span>
                             </>
                           )}
-                          <Badge variant={schedStatusVariant[s.status]} size="sm">
+                          <Badge variant={schedStatusVariant[s.status]}>
                             {schedStatusLabel(s.status)}
                           </Badge>
                         </div>

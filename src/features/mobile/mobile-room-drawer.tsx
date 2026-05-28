@@ -270,7 +270,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                     autoFocus
                   />
                   <Button
-                    variant="primary"
+                    variant="default"
                     size="sm"
                     onClick={executeAction}
                     disabled={loading || !paymentAmount || Number(paymentAmount) <= 0}
@@ -302,7 +302,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                     />
                   </div>
                   <Button
-                    variant="primary"
+                    variant="default"
                     size="sm"
                     onClick={executeAction}
                     disabled={loading || !extendDate}

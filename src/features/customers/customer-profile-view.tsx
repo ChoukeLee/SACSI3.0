@@ -97,8 +97,8 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
     contractNo: locale === "zh" ? "合同号" : "N°",
   };
 
-  const statusVariant: Record<string, "neutral" | "success" | "danger" | "warning"> = {
-    active: "success", inactive: "neutral", overdue: "danger", blacklisted: "danger",
+  const statusVariant: Record<string, "secondary" | "success" | "destructive" | "warning"> = {
+    active: "success", inactive: "secondary", overdue: "destructive", blacklisted: "destructive",
   };
 
   const statusLabel = locale === "zh"
@@ -109,8 +109,8 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
     ? { pending_review: "待审核", confirmed: "已确认", checked_in: "已入住", checked_out: "已退房", cancelled: "已取消" }
     : { pending_review: "A valider", confirmed: "Confirme", checked_in: "Arrive", checked_out: "Parti", cancelled: "Annule" };
 
-  const dailyStatusVariant: Record<string, "neutral" | "success" | "danger" | "warning"> = {
-    pending_review: "warning", confirmed: "neutral", checked_in: "success", checked_out: "neutral", cancelled: "danger",
+  const dailyStatusVariant: Record<string, "secondary" | "success" | "destructive" | "warning"> = {
+    pending_review: "warning", confirmed: "secondary", checked_in: "success", checked_out: "secondary", cancelled: "destructive",
   };
 
   const tabs: { key: Tab; label: string }[] = [
@@ -300,7 +300,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
               <tbody className="divide-y divide-brand-warm-100">
                 {data.leaseContracts.map(lc => {
                   const unit = data.units.find(u => u.id === lc.unit_id);
-                  const statusV: Record<string, "neutral" | "success" | "danger" | "warning"> = { active: "success", draft: "neutral", terminated: "danger", expired: "warning" };
+                  const statusV: Record<string, "secondary" | "success" | "destructive" | "warning"> = { active: "success", draft: "secondary", terminated: "destructive", expired: "warning" };
                   const statusL: Record<string, string> = locale === "zh" ? { active: "生效", draft: "草稿", terminated: "终止", expired: "过期" } : { active: "Actif", draft: "Brouillon", terminated: "Resilie", expired: "Expire" };
                   return (<tr key={lc.id} className="hover:bg-brand-warm-50/80">
                     <td className="px-3 py-2 font-mono font-medium">{unit?.unit_no ?? "?"}</td>
@@ -330,7 +330,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
               <tbody className="divide-y divide-brand-warm-100">
                 {data.saleContracts.map(sc => {
                   const unit = data.units.find(u => u.id === sc.unit_id);
-                  const statusV: Record<string, "neutral" | "success" | "danger" | "warning"> = { active: "success", draft: "neutral", terminated: "danger", expired: "warning" };
+                  const statusV: Record<string, "secondary" | "success" | "destructive" | "warning"> = { active: "success", draft: "secondary", terminated: "destructive", expired: "warning" };
                   const statusL: Record<string, string> = locale === "zh" ? { active: "生效", draft: "草稿", terminated: "终止", expired: "过期" } : { active: "Actif", draft: "Brouillon", terminated: "Resilie", expired: "Expire" };
                   return (<tr key={sc.id} className="hover:bg-brand-warm-50/80">
                     <td className="px-3 py-2 font-mono font-medium">{unit?.unit_no ?? "?"}</td>
@@ -379,7 +379,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
                     <td className="px-3 py-1.5">{r.due_date}</td><td className="px-3 py-1.5 text-brand-ink-600">{srcLabels[r.source_type] ?? r.source_type}</td>
                     <td className="px-3 py-1.5 text-right font-medium">{formatXof(Number(r.amount_xof))}</td>
                     <td className="px-3 py-1.5 text-right text-brand-green-600">{formatXof(Number(r.paid_amount_xof))}</td>
-                    <td className="px-3 py-1.5"><Badge variant={os > 0 ? (r.status === "overdue" ? "danger" : "warning") : "success"}>{os > 0 ? formatXof(os) : (locale === "zh" ? "已结清" : "Paye")}</Badge></td>
+                    <td className="px-3 py-1.5"><Badge variant={os > 0 ? (r.status === "overdue" ? "destructive" : "warning") : "success"}>{os > 0 ? formatXof(os) : (locale === "zh" ? "已结清" : "Paye")}</Badge></td>
                   </tr>);
                 })}
               </tbody>

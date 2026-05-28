@@ -384,7 +384,7 @@ export function DailyCalendar({
                 {new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long" })}
               </span>
             </div>
-            <Button variant="primary" size="sm" onClick={handleCopy}>
+            <Button variant="default" size="sm" onClick={handleCopy}>
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               {copied ? (locale === "zh" ? "已复制" : "Copie") : (locale === "zh" ? "复制群消息" : "Copier")}
             </Button>

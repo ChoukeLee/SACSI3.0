@@ -1,35 +1,29 @@
-import { cn } from "@/lib/utils";
+import * as React from "react"
+import { cva, type VariantProps } from "class-variance-authority"
+import { cn } from "@/lib/utils"
 
-export const badgeVariants = {
-  default: "bg-white text-brand-ink-800 ring-brand-warm-300",
-  accent: "bg-brand-indigo-50 text-brand-indigo-700 ring-brand-indigo-200",
-  success: "bg-brand-green-50 text-brand-green-700 ring-brand-green-200",
-  warning: "bg-brand-amber-50 text-brand-amber-700 ring-brand-amber-200",
-  danger: "bg-brand-red-50 text-brand-red-700 ring-brand-red-200",
-  info: "bg-brand-cyan-50 text-brand-cyan-700 ring-brand-cyan-200",
-  neutral: "bg-brand-warm-100 text-brand-ink-600 ring-brand-warm-300",
-  purple: "bg-brand-purple-50 text-brand-purple-700 ring-brand-purple-200",
-  outline: "bg-white text-brand-ink-700 ring-brand-warm-300",
-} as const;
+const badgeVariants = cva(
+  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  {
+    variants: {
+      variant: {
+        default: "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
+        secondary: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        destructive: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
+        outline: "text-foreground",
+        accent: "border-transparent bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]",
+        success: "border-transparent bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]",
+        warning: "border-transparent bg-[hsl(var(--warning))] text-[hsl(var(--warning-foreground))]",
+      },
+    },
+    defaultVariants: { variant: "default" },
+  }
+)
 
-export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: keyof typeof badgeVariants;
-  size?: "sm" | "md";
+export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {}
+
+function Badge({ className, variant, ...props }: BadgeProps) {
+  return <div className={cn(badgeVariants({ variant }), className)} {...props} />
 }
 
-export function Badge({ className, variant = "default", size = "sm", children, ...props }: BadgeProps) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full font-bold ring-1 ring-inset",
-        size === "sm" && "px-2.5 py-0.5 text-xs",
-        size === "md" && "px-3 py-1 text-xs",
-        badgeVariants[variant],
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </span>
-  );
-}
+export { Badge, badgeVariants }

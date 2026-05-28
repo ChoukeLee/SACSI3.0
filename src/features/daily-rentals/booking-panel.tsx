@@ -168,7 +168,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
             <h3 className="text-sm font-black text-brand-ink-900">{isNew ? t.booking.newBooking : t.booking.title}</h3>
             {selectedUnit && <p className="text-sm text-brand-ink-600">{selectedUnit.unit_no} ({selectedUnit.floor_label})</p>}
           </div>
-          <Button variant="icon" size="icon" onClick={onClose} aria-label={locale === "zh" ? "关闭" : "Fermer"}>
+          <Button size="icon" variant="ghost" onClick={onClose} aria-label={locale === "zh" ? "关闭" : "Fermer"}>
             <X className="h-5 w-5" />
           </Button>
         </div>
@@ -200,7 +200,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
             </div>
             <div><label className={labelClass}>{t.booking.notes}</label><textarea value={newNotes} onChange={e => setNewNotes(e.target.value)} rows={2} className={inputClass} /></div>
             {error && <p className="text-sm text-brand-red-600" role="alert">{error}</p>}
-            <Button onClick={handleCreate} disabled={saving} className="w-full" variant="primary">
+            <Button onClick={handleCreate} disabled={saving} className="w-full" variant="default">
               {saving ? "..." : t.booking.newBooking}
             </Button>
           </>)}
@@ -212,7 +212,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                 <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 bg-brand-amber-50 text-brand-amber-700 ring-brand-amber-200">{t.bookingStatus[booking.status as keyof typeof t.bookingStatus] ?? booking.status}</span>
                 <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", booking.checkout_mode === "open" ? "bg-brand-amber-100 text-brand-amber-700" : "bg-brand-warm-100 text-brand-ink-600")}>{booking.checkout_mode === "open" ? t.openEndedBadge : t.fixedBadge}</span>
               </div>
-              <Button variant="icon" size="icon" onClick={() => printDailyReceipt({ booking, unit: selectedUnit ?? null, customer: null }, locale)} aria-label={dictionaries[locale].settings.print.print}>
+              <Button size="icon" variant="ghost" onClick={() => printDailyReceipt({ booking, unit: selectedUnit ?? null, customer: null }, locale)} aria-label={dictionaries[locale].settings.print.print}>
                 <Printer className="h-4 w-4" />
               </Button>
             </div>
@@ -253,7 +253,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-brand-cyan-700">{t.cleaning.title}: {relatedCleaningTask.is_completed ? t.cleaning.completed : t.cleaning.pending}</span>
                   {!relatedCleaningTask.is_completed && (
-                    <Button variant="primary" size="sm" onClick={() => { setSaving(true); completeCleaning(relatedCleaningTask.id).then(() => { setSaving(false); refresh(); onClose(); }); }} disabled={saving}>
+                    <Button variant="default" size="sm" onClick={() => { setSaving(true); completeCleaning(relatedCleaningTask.id).then(() => { setSaving(false); refresh(); onClose(); }); }} disabled={saving}>
                       <Check className="h-3 w-3" />{t.cleaning.markComplete}
                     </Button>
                   )}
@@ -265,8 +265,8 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
             <div className="space-y-2">
               {booking.status === "pending_review" && (
                 <div className="flex gap-2">
-                  <Button variant="primary" onClick={() => { setSaving(true); confirmBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className="flex-1">{t.booking.confirmBooking}</Button>
-                  <Button variant="danger-secondary" onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className="flex-1"><UserX className="h-4 w-4" />{t.booking.cancelBooking}</Button>
+                  <Button variant="default" onClick={() => { setSaving(true); confirmBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className="flex-1">{t.booking.confirmBooking}</Button>
+                  <Button variant="outline" onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className="flex-1"><UserX className="h-4 w-4" />{t.booking.cancelBooking}</Button>
                 </div>
               )}
 
@@ -274,8 +274,8 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                 <div className="space-y-2">
                   <div><label className={labelClass}>{t.booking.prepaidAmount} *</label><input type="number" value={prepaidAmount} onChange={e => setPrepaidAmount(e.target.value)} className={inputClass} /><p className="mt-0.5 text-xs text-brand-ink-400">{t.booking.prepaidWarning}</p></div>
                   <div className="flex gap-2">
-                    <Button variant="primary" onClick={handleCheckIn} disabled={saving} className="flex-1">{t.booking.checkIn}</Button>
-                    <Button variant="danger-secondary" onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className="flex-1">{t.booking.cancelBooking}</Button>
+                    <Button variant="default" onClick={handleCheckIn} disabled={saving} className="flex-1">{t.booking.checkIn}</Button>
+                    <Button variant="outline" onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className="flex-1">{t.booking.cancelBooking}</Button>
                   </div>
                 </div>
               )}
@@ -286,7 +286,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                     <label className={labelClass}>{t.supplementaryPayment}</label>
                     <div className="flex items-center gap-2">
                       <input type="number" value={suppAmount} onChange={e => setSuppAmount(e.target.value)} className={inputClass} placeholder={t.booking.totalAmount} />
-                      <Button variant="primary" size="sm" onClick={handleSuppPayment} disabled={saving || (parseInt(suppAmount,10)||0) <= 0} className="shrink-0"><DollarSign className="h-3 w-3" />{locale === "zh" ? "收款" : "Payer"}</Button>
+                      <Button variant="default" size="sm" onClick={handleSuppPayment} disabled={saving || (parseInt(suppAmount,10)||0) <= 0} className="shrink-0"><DollarSign className="h-3 w-3" />{locale === "zh" ? "收款" : "Payer"}</Button>
                     </div>
                     {bookingPayments.length > 0 && (
                       <ul className="mt-2 space-y-0.5 text-xs text-brand-ink-600">
@@ -334,7 +334,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                       <label className={labelClass}>{t.setFixedCheckoutLabel}</label>
                       <div className="flex items-center gap-2">
                         <input type="date" value={fixedCheckOutDate} onChange={e => setFixedCheckOutDate(e.target.value)} className={inputClass} min={booking.check_in} />
-                        <Button variant="primary" size="sm" onClick={handleSetFixedCheckout} disabled={saving || !fixedCheckOutDate} className="shrink-0">{t.setFixedCheckoutButton}</Button>
+                        <Button variant="default" size="sm" onClick={handleSetFixedCheckout} disabled={saving || !fixedCheckOutDate} className="shrink-0">{t.setFixedCheckoutButton}</Button>
                       </div>
                       {fixedCheckOutDate && fixedCheckOutNights > 0 && (
                         <p className="mt-1 text-xs text-brand-ink-600">{t.setFixedCheckoutNights.replace("{nights}", String(fixedCheckOutNights)).replace("{amount}", formatXof(fixedCheckOutNights * Number(booking.nightly_price_xof)))}</p>
@@ -352,7 +352,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                     <label className={labelClass}>{t.booking.calculatedTotal}</label>
                     <input type="number" value={finalAmount} onChange={e => setFinalAmount(e.target.value)} className={inputClass} />
                   </div>
-                  <Button variant="primary" onClick={handleCheckOut} disabled={saving} className="w-full"><Check className="h-4 w-4" />{t.booking.confirmCheckOut} — {formatXof(parseInt(finalAmount,10)||0)}</Button>
+                  <Button variant="default" onClick={handleCheckOut} disabled={saving} className="w-full"><Check className="h-4 w-4" />{t.booking.confirmCheckOut} — {formatXof(parseInt(finalAmount,10)||0)}</Button>
                 </div>
               )}
 

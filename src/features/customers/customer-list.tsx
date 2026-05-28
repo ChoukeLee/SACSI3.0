@@ -234,7 +234,7 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
           </Button>
           <Button
             onClick={openAdd}
-            variant="primary"
+            variant="default"
             size="sm"
           >
             <Plus className="h-3.5 w-3.5" />

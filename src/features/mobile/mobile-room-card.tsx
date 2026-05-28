@@ -136,7 +136,7 @@ export function MobileRoomCard({
         <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
           {isOccupied && onCheckOut && (
             <Button
-              variant="primary"
+              variant="default"
               size="sm"
               onClick={() => onCheckOut(room)}
               className="flex-1 justify-center min-h-[38px]"
@@ -146,7 +146,7 @@ export function MobileRoomCard({
           )}
           {isCleaning && onCompleteCleaning && room.cleaningTask && (
             <Button
-              variant="accent"
+              variant="outline"
               size="sm"
               onClick={() => onCompleteCleaning(room)}
               className="flex-1 justify-center min-h-[38px]"

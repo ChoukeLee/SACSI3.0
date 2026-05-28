@@ -321,7 +321,7 @@ export function UnitProfileView({ data, locale, userRole }: Props) {
                       <Cell>{L.sourceLabels[r.source_type] ?? r.source_type}</Cell>
                       <Cell align="right" strong>{formatXof(Number(r.amount_xof))}</Cell>
                       <Cell align="right" className="font-black text-brand-green-700">{formatXof(Number(r.paid_amount_xof))}</Cell>
-                      <Cell><Badge variant={outstanding > 0 ? (r.status === "overdue" ? "danger" : "warning") : "success"}>{outstanding > 0 ? formatXof(outstanding) : L.settled}</Badge></Cell>
+                      <Cell><Badge variant={outstanding > 0 ? (r.status === "overdue" ? "destructive" : "warning") : "success"}>{outstanding > 0 ? formatXof(outstanding) : L.settled}</Badge></Cell>
                     </tr>
                   );
                 })}
@@ -597,20 +597,20 @@ function dailyStatusTone(status: string): BadgeTone {
     pending_review: "warning",
     confirmed: "accent",
     checked_in: "success",
-    checked_out: "neutral",
-    cancelled: "danger",
+    checked_out: "secondary",
+    cancelled: "destructive",
   };
-  return tones[status] ?? "neutral";
+  return tones[status] ?? "secondary";
 }
 
 function contractTone(status: ContractStatus): BadgeTone {
   const tones: Record<ContractStatus, BadgeTone> = {
     active: "success",
-    draft: "neutral",
-    terminated: "danger",
+    draft: "secondary",
+    terminated: "destructive",
     expired: "warning",
   };
-  return tones[status] ?? "neutral";
+  return tones[status] ?? "secondary";
 }
 
 function occupationText(stats: {
