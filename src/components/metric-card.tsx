@@ -6,6 +6,10 @@ const tones: Record<string, string> = {
   amber: "bg-brand-amber-500",
   red: "bg-brand-red-500",
   neutral: "bg-stone-500",
+  sold: "bg-[#505080]",
+  leased: "bg-[#7050A0]",
+  available: "bg-[#F0E0D0]",
+  maintenance: "bg-[#F0A080]",
 }
 
 export function MetricCard({ title, value, caption, tone = "indigo", onClick, className }: {

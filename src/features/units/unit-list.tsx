@@ -87,11 +87,11 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
       {/* ── Stat cards ── */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         <MetricCard title={locale === "zh" ? "住宿房源" : "Appartements"} value={String(summary.apartments)} tone="neutral" />
-        <MetricCard title={statusLabels.sold} value={String(summary.sold)} tone="neutral" />
-        <MetricCard title={statusLabels.leased} value={String(summary.leased)} tone="neutral" />
-        <MetricCard title={locale === "zh" ? "日租/预订" : "Jour"} value={String(summary.daily)} tone="neutral" />
-        <MetricCard title={statusLabels.available} value={String(summary.available)} tone="neutral" />
-        <MetricCard title={locale === "zh" ? "维护中" : "Maintenance"} value={String(summary.maintenance)} tone="neutral" />
+        <MetricCard title={statusLabels.sold} value={String(summary.sold)} tone="sold" />
+        <MetricCard title={statusLabels.leased} value={String(summary.leased)} tone="leased" />
+        <MetricCard title={locale === "zh" ? "日租/预订" : "Jour"} value={String(summary.daily)} tone="indigo" />
+        <MetricCard title={statusLabels.available} value={String(summary.available)} tone="available" />
+        <MetricCard title={locale === "zh" ? "维护中" : "Maintenance"} value={String(summary.maintenance)} tone="maintenance" />
         <MetricCard title={locale === "zh" ? "非住宿" : "Autres"} value={String(summary.nonApartment)} tone="neutral" />
       </div>
 
@@ -107,6 +107,15 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
         <EmptyState icon={<Building2 className="h-10 w-10" />} title={t.empty} description={locale === "zh" ? "请先在设置中导入楼栋和房间" : "Importez d'abord l'immeuble dans Parametres"} />
       ) : (
         <>
+          {/* ── Status legend ── */}
+          <div className="flex flex-wrap items-center gap-2">
+            {(["sold","leased","daily_occupied","reserved","cleaning_pending","maintenance","available"] as UnitStatus[]).map(s => (
+              <span key={s} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <StatusDot status={s} />{statusLabels[s]}
+              </span>
+            ))}
+          </div>
+
           {/* ── Apartment matrix — floor groups, 6 per row ── */}
           {floorGroups.length > 0 && (
             <div className="space-y-4">
