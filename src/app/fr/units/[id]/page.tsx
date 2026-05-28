@@ -15,8 +15,6 @@ export default async function FrenchUnitProfilePage({ params }: { params: Promis
   if (!profile) notFound();
 
   return (
-    <div className="min-h-screen bg-slate-50 py-6 px-4">
-      <UnitProfileView data={profile} locale="fr" userRole={user.role} />
-    </div>
+    <UnitProfileView data={profile} locale="fr" userRole={user.role} />
   );
 }

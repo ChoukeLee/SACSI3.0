@@ -64,13 +64,15 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
   const detailUnit = detailUnitId ? units.find((u) => u.id === detailUnitId) : null;
   const apartments = useMemo(() => units.filter(u => u.kind === "apartment"), [units]);
   const nonApartments = useMemo(() => units.filter(u => u.kind !== "apartment"), [units]);
+  const filteredApartments = useMemo(() => filtered.filter(u => u.kind === "apartment"), [filtered]);
+  const filteredNonApartments = useMemo(() => filtered.filter(u => u.kind !== "apartment"), [filtered]);
 
   // Group apartments by floor for matrix view
   const floorGroups = useMemo(() => {
     const g = new Map<string, UnitRow[]>();
-    for (const u of apartments) { const f = u.floor_label ?? "?"; if (!g.has(f)) g.set(f, []); g.get(f)!.push(u); }
+    for (const u of filteredApartments) { const f = u.floor_label ?? "?"; if (!g.has(f)) g.set(f, []); g.get(f)!.push(u); }
     return Array.from(g.entries()).sort((a,b) => { const an=parseInt(a[0],10),bn=parseInt(b[0],10); if(!isNaN(an)&&!isNaN(bn)) return an-bn; return a[0].localeCompare(b[0]); });
-  }, [apartments]);
+  }, [filteredApartments]);
 
   const summary = useMemo(() => ({
     apartments: apartments.length,
@@ -138,12 +140,12 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
           )}
 
           {/* ── Non-apartment assets ── */}
-          {nonApartments.length > 0 && (
+          {filteredNonApartments.length > 0 && (
             <Card>
               <CardContent className="py-3">
                 <p className="mb-2 text-xs font-semibold text-muted-foreground">{locale === "zh" ? "非住宿资产" : "Autres actifs"}</p>
                 <div className="flex flex-wrap gap-2">
-                  {nonApartments.map(u => (
+                  {sortUnits(filteredNonApartments).map(u => (
                     <Link key={u.id} href={routeFor(locale, `/units/${u.id}`)} className="inline-flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors">
                       <span className="font-mono font-bold">{u.unit_no}</span>
                       <span className="text-muted-foreground">{t.kinds[u.kind]}</span>
@@ -232,7 +234,7 @@ function StatusDot({ status }: { status: UnitStatus }) {
 function StatusPill({ status, locale }: { status: UnitStatus; locale: Locale }) {
   const label = dictionaries[locale].statuses[status];
   const styles: Record<string, string> = {
-    sold: "bg-warm-100 text-ink-700 ring-warm-300", leased: "bg-[#7050A0]/10 text-[#5C4388] ring-[#7050A0]/20",
+    sold: "bg-[#505080]/10 text-[#505080] ring-[#505080]/20", leased: "bg-[#7050A0]/10 text-[#5C4388] ring-[#7050A0]/20",
     daily_occupied: "bg-[#5090C0]/10 text-[#376F99] ring-[#5090C0]/20", reserved: "bg-[#A0C0E0]/20 text-[#315E83] ring-[#A0C0E0]/30",
     cleaning_pending: "bg-[#5AB5B8]/10 text-[#32757A] ring-[#5AB5B8]/20", available: "bg-[#F0E0D0]/30 text-[#5D4B3F] ring-[#F0E0D0]",
     maintenance: "bg-red-50 text-red-700 ring-red-200", locked: "bg-muted text-muted-foreground ring-border",
