@@ -1,14 +1,14 @@
 import { cn } from "@/lib/utils"
 
 const tones: Record<string, string> = {
-  orange: "bg-primary",
-  green: "bg-emerald-600",
-  amber: "bg-amber-600",
-  red: "bg-destructive",
+  indigo: "bg-brand-indigo-500",
+  green: "bg-brand-green-500",
+  amber: "bg-brand-amber-500",
+  red: "bg-brand-red-500",
   neutral: "bg-stone-500",
 }
 
-export function MetricCard({ title, value, caption, tone = "orange", onClick, className }: {
+export function MetricCard({ title, value, caption, tone = "indigo", onClick, className }: {
   title: string; value: string; caption?: string; tone?: keyof typeof tones; onClick?: () => void; className?: string
 }) {
   const Wrapper = onClick ? "button" : "div"

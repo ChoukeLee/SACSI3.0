@@ -4,16 +4,27 @@ import Link from "next/link"
 import { Info, ReceiptText, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export type RoomStatus = "sold" | "leased" | "daily_occupied" | "reserved" | "cleaning_pending" | "maintenance" | "available"
+export type RoomStatus =
+  | "sold"
+  | "leased"
+  | "daily_occupied"
+  | "dailyOccupied"
+  | "reserved"
+  | "cleaning_pending"
+  | "cleaningPending"
+  | "maintenance"
+  | "available"
 
 const statusStyle: Record<RoomStatus, { bg: string; badge: string; text: string }> = {
-  sold:            { bg: "bg-[#EDE8E3]", badge: "bg-white/80 text-[#5C554F]", text: "text-[#5C554F]" },
-  leased:          { bg: "bg-[#FEF0E0]", badge: "bg-white/80 text-[#7D5E2E]", text: "text-[#7D5E2E]" },
-  daily_occupied:  { bg: "bg-[#FFF1EB]", badge: "bg-white/80 text-[#9B3D1C]", text: "text-[#9B3D1C]" },
-  reserved:        { bg: "bg-[#EEF4FA]", badge: "bg-white/80 text-[#3C6080]", text: "text-[#3C6080]" },
-  cleaning_pending:{ bg: "bg-[#EDF7F5]", badge: "bg-white/80 text-[#2D6B60]", text: "text-[#2D6B60]" },
-  maintenance:     { bg: "bg-[#FBEDED]", badge: "bg-white/80 text-[#8B3535]", text: "text-[#8B3535]" },
-  available:       { bg: "bg-[#EDF5ED]", badge: "bg-white/80 text-[#356B35]", text: "text-[#356B35]" },
+  sold:            { bg: "bg-[#505080]", badge: "bg-white/90 text-[#303052]", text: "text-white" },
+  leased:          { bg: "bg-[#7050A0]", badge: "bg-white/90 text-[#51347A]", text: "text-white" },
+  daily_occupied:  { bg: "bg-[#5090C0]", badge: "bg-white/90 text-[#2C628B]", text: "text-white" },
+  dailyOccupied:   { bg: "bg-[#5090C0]", badge: "bg-white/90 text-[#2C628B]", text: "text-white" },
+  reserved:        { bg: "bg-[#A0C0E0]", badge: "bg-white/90 text-[#315E83]", text: "text-[#1F4564]" },
+  cleaning_pending:{ bg: "bg-[#5AB5B8]", badge: "bg-white/90 text-[#32757A]", text: "text-white" },
+  cleaningPending: { bg: "bg-[#5AB5B8]", badge: "bg-white/90 text-[#32757A]", text: "text-white" },
+  maintenance:     { bg: "bg-[#F0A080]", badge: "bg-white/90 text-[#8A4A32]", text: "text-[#673522]" },
+  available:       { bg: "bg-[#F0E0D0]", badge: "bg-white/90 text-[#5D4B3F]", text: "text-[#4F4238]" },
 }
 
 interface Props {
@@ -37,7 +48,7 @@ function ActionButton({ icon: Icon, label }: { icon: typeof Info; label: string 
 }
 
 export function RoomCard({ roomNo, status, statusLabel, customerName, dateText, href, onClick, className, children }: Props) {
-  const s = statusStyle[status]
+  const s = statusStyle[status] ?? statusStyle.available
 
   // detail variant: if children are passed, use a flexible layout for lease/sale cards
   if (children) {

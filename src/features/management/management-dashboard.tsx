@@ -14,7 +14,6 @@ import {
 import { getDailyRoomStateForDate } from "@/features/daily-rentals/room-status";
 import { roomStatusStyles } from "@/lib/status-styles";
 import { RoomCard } from "@/components/room-card";
-import type { RoomStatus } from "@/components/room-card";
 import { MetricCard } from "@/components/metric-card";
 import { FinanceDetailPanel } from "./finance-detail-panel";
 import { QualityDashboardWidget } from "@/features/data-quality";
@@ -333,7 +332,7 @@ export function ManagementDashboard({
 
       {/* ── KPI Row ── */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title={t.cockpit.receivableThisMonth} value={formatXof(receivableMonthStats.totalReceivable)} tone="orange" onClick={() => setFinanceDetail("receivable")} />
+        <MetricCard title={t.cockpit.receivableThisMonth} value={formatXof(receivableMonthStats.totalReceivable)} tone="indigo" onClick={() => setFinanceDetail("receivable")} />
         <MetricCard title={t.cockpit.paidThisMonth} value={formatXof(receivableMonthStats.totalPaid)} tone="green" onClick={() => setFinanceDetail("collected")} />
         <MetricCard title={t.cockpit.outstandingThisMonth} value={formatXof(receivableMonthStats.outstanding)} tone="amber" onClick={() => setFinanceDetail("outstanding")} />
         <MetricCard title={t.cockpit.overdueThisMonth} value={formatXof(receivableMonthStats.overdue)} tone="red" onClick={() => setFinanceDetail("overdue")} />
@@ -376,7 +375,7 @@ export function ManagementDashboard({
                     </div>
                     <div className="flex flex-wrap gap-2.5">
                       {group.states.map(s => (
-                        <RoomCard key={s.unit.id} roomNo={s.unit.unit_no ?? "?"} status={s.status as unknown as RoomStatus} customerName={getStateCustomerName(s, customerNameById, locale)} dateText={getStateDateText(s, locale)} href={routeFor(locale, `/units/${s.unit.id}`)} />
+                        <RoomCard key={s.unit.id} roomNo={s.unit.unit_no ?? "?"} status={s.status} customerName={getStateCustomerName(s, customerNameById, locale)} dateText={getStateDateText(s, locale)} href={routeFor(locale, `/units/${s.unit.id}`)} />
                       ))}
                     </div>
                   </div>
@@ -394,7 +393,7 @@ export function ManagementDashboard({
 }
 
 function legendDotColor(s: MgmtStatus): string {
-  return { sold: "#EDE8E3", leased: "#FEF0E0", dailyOccupied: "#FFF1EB", reserved: "#EEF4FA", cleaningPending: "#EDF7F5", maintenance: "#FBEDED", available: "#EDF5ED" }[s] ?? "#E8E4E0";
+  return { sold: "#505080", leased: "#7050A0", dailyOccupied: "#5090C0", reserved: "#A0C0E0", cleaningPending: "#5AB5B8", maintenance: "#F0A080", available: "#F0E0D0" }[s] ?? "#E5E3E0";
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────

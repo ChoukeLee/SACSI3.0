@@ -1,48 +1,51 @@
-# SACIS Design System V2
+# SACIS Design System V2 — Soft Hotel Palette
 
-Property operations system for managers, finance, and front desk. Warm, bright, data-dense, professional.
-Grounded in shadcn/ui dashboard blocks, getdesign.md warm/product patterns, and SACIS real business data.
+Property operations system. Soft, professional, hotel-backend aesthetic.
+Grounded in shadcn/ui dashboard blocks, getdesign.md product patterns, and SACIS real business data.
 
 ## Color System
 
 ### Surface
-- `canvas`: `#FAF9F8` — page background, warm off-white
+- `canvas`: `#F7F6F4` — page background, warm neutral white
 - `surface`: `#FFFFFF` — cards, tables, panels
-- `surface-muted`: `#F5F4F2` — filter bars, table headers, secondary sections
+- `surface-muted`: `#F3F2F0` — filter bars, table headers, secondary sections
 
-### Primary Accent — Warm Orange
-- `primary`: `#F45A2A` — primary CTA, active nav, focus ring
-- `primary-hover`: `#E04A1C` — hover state
-- `primary-soft`: `#FFF3EE` — light orange background for selected/hover states
+### Primary Accent — Soft Indigo
+- `primary`: `#4F5DE6` — primary CTA, active nav, focus ring
+- `primary-hover`: `#3D4BCF` — hover state
+- `primary-soft`: `#EDEFFD` — light indigo background for selected/hover states
 - `primary-foreground`: `#FFFFFF` — text on primary
 
 ### Text
-- `ink`: `#1C1917` — headings, body text
-- `ink-muted`: `#6B6560` — secondary text, labels
-- `ink-subtle`: `#9B9590` — placeholder, disabled
+- `ink`: `#181919` — headings, body text
+- `ink-muted`: `#5C5D61` — secondary text, labels
+- `ink-subtle`: `#949599` — placeholder, disabled
 
 ### Border
-- `border`: `#E8E4E0` — default card/input borders
-- `border-strong`: `#D4CFC9` — focus rings, active borders
+- `border`: `#E5E3E0` — default card/input borders
+- `border-strong`: `#D0CDC8` — focus rings, active borders
 
-### Room Status Cards
+### Room Status Cards — "Girlfriend Palette"
 
-Each status has a distinct, warm, muted background. Cards use solid fill — status is read from the background color alone. A legend outside the matrix explains the mapping.
+Status expressed through solid background color. Legend outside the matrix.
 
 | Status | Background | Text | Description |
 |--------|-----------|------|-------------|
-| sold | `#EDE8E3` | `#5C554F` | sold = warm gray, neutral permanent |
-| leased | `#FEF0E0` | `#7D5E2E` | leased = warm amber, stable long-term |
-| daily_occupied | `#FFF1EB` | `#9B3D1C` | daily = warm orange-pink, active |
-| reserved | `#EEF4FA` | `#3C6080` | reserved = soft blue, pending arrival |
-| cleaning_pending | `#EDF7F5` | `#2D6B60` | cleaning = soft teal, service |
-| maintenance | `#FBEDED` | `#8B3535` | maintenance = soft rose, blocked |
-| available | `#EDF5ED` | `#356B35` | available = soft green, ready |
+| sold | `#505080` | white text on badge | deep indigo-gray, neutral permanent |
+| leased | `#7050A0` | white text on badge | purple, stable long-term |
+| daily_occupied | `#5090C0` | white text on badge | soft steel blue, active |
+| reserved | `#A0C0E0` | `#1F4564` text | light blue, pending arrival |
+| cleaning_pending | `#5AB5B8` | white text on badge | teal, service required |
+| maintenance | `#F0A080` | `#673522` text | warm peach, blocked |
+| available | `#F0E0D0` | `#4F4238` text | cream beige, ready |
+
+Note: Cards with dark backgrounds (sold, leased, daily, cleaning) use white text.
+Cards with light backgrounds (reserved, maintenance, available) use dark text.
 
 ### Semantic Colors
-- `success`: `#0E8F7E` — paid, completed
+- `success`: `#16A34A` — paid, completed
 - `warning`: `#D97706` — partial, pending
-- `danger`: `#C74646` — overdue, cancelled
+- `danger`: `#DC2626` — overdue, cancelled
 
 ## Typography
 

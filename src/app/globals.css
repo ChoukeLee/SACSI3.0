@@ -30,42 +30,42 @@
     --background: 30 6% 98%;           /* #FAF9F8 canvas */
     --foreground: 24 8% 11%;           /* #1C1917 ink */
     --card: 0 0% 100%;                 /* #FFFFFF surface */
-    --card-foreground: 24 8% 11%;
+    --card-foreground: 180 2% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 24 8% 11%;
-    --primary: 14 86% 55%;             /* #F45A2A orange */
+    --popover-foreground: 180 2% 10%;
+    --primary: 237 74% 63%;            /* #4F5DE6 indigo */
     --primary-foreground: 0 0% 100%;
-    --secondary: 34 8% 96%;            /* #F5F4F2 surface-muted */
-    --secondary-foreground: 24 8% 11%;
-    --muted: 34 8% 96%;
-    --muted-foreground: 24 4% 42%;     /* #6B6560 ink-muted */
-    --accent: 14 86% 96%;              /* #FFF3EE primary-soft */
-    --accent-foreground: 14 70% 35%;
-    --destructive: 0 52% 52%;          /* #C74646 danger */
+    --secondary: 30 6% 95%;            /* #F3F2F0 surface-muted */
+    --secondary-foreground: 180 2% 10%;
+    --muted: 30 6% 95%;
+    --muted-foreground: 240 4% 37%;    /* #5C5D61 ink-muted */
+    --accent: 237 90% 96%;             /* #EDEFFD primary-soft */
+    --accent-foreground: 237 60% 40%;
+    --destructive: 0 72% 51%;          /* #DC2626 danger */
     --destructive-foreground: 0 0% 100%;
-    --border: 30 12% 90%;              /* #E8E4E0 hairline */
-    --input: 30 12% 90%;
-    --ring: 14 86% 55%;
+    --border: 30 8% 89%;               /* #E5E3E0 hairline */
+    --input: 30 8% 89%;
+    --ring: 237 74% 63%;
     --radius: 0.5rem;
 
     /* Sidebar — warm light */
-    --sidebar-background: 30 6% 98%;
-    --sidebar-foreground: 24 8% 11%;
-    --sidebar-primary: 14 86% 55%;
+    --sidebar-background: 30 10% 97%;
+    --sidebar-foreground: 180 2% 10%;
+    --sidebar-primary: 237 74% 63%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 34 8% 96%;
-    --sidebar-accent-foreground: 24 8% 11%;
-    --sidebar-border: 30 12% 90%;
-    --sidebar-ring: 14 86% 55%;
+    --sidebar-accent: 30 6% 95%;
+    --sidebar-accent-foreground: 180 2% 10%;
+    --sidebar-border: 30 8% 89%;
+    --sidebar-ring: 237 74% 63%;
 
-    /* Room status — warm tinted backgrounds */
-    --status-sold: 30 12% 90%;
-    --status-leased: 35 60% 93%;
-    --status-occupied: 20 75% 94%;
-    --status-reserved: 210 30% 94%;
-    --status-cleaning: 170 20% 93%;
-    --status-maintenance: 0 50% 94%;
-    --status-available: 130 20% 93%;
+    /* Room status — girlfriend palette */
+    --status-sold: 252 12% 41%;        /* #505080 */
+    --status-leased: 264 24% 47%;      /* #7050A0 */
+    --status-occupied: 202 44% 53%;    /* #5090C0 */
+    --status-reserved: 210 40% 75%;    /* #A0C0E0 */
+    --status-cleaning: 182 32% 54%;    /* #5AB5B8 */
+    --status-maintenance: 18 57% 72%;  /* #F0A080 */
+    --status-available: 32 38% 85%;    /* #F0E0D0 */
   }
 }
 
