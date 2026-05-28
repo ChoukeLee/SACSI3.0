@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Search, Plus, AlertTriangle, UserX, UserCheck, GitMerge, X, ChevronDown, Eye } from "lucide-react";
+import { Plus, AlertTriangle, UserX, UserCheck, GitMerge, X, ChevronDown, Eye } from "lucide-react";
+import { SearchInput } from "@/components/ui/search-input";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -214,16 +215,12 @@ export function CustomerList({ customers, customerSegments, locale }: CustomerLi
               {label} <span className="ml-1 tabular-nums opacity-70">{count}</span>
             </button>
           ))}
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-brand-ink-400" />
-            <input
-              type="text"
-              placeholder={t.searchPlaceholder}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-9 w-64 rounded-xl border border-brand-warm-200 bg-white py-1.5 pl-8 pr-3 text-sm text-brand-ink-700 placeholder:text-brand-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15"
-            />
-          </div>
+          <SearchInput
+            placeholder={t.searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-64"
+          />
         </div>
         <div className="flex items-center gap-2">
           <Button

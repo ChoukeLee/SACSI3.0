@@ -669,7 +669,7 @@ export function DailyCalendar({
               <div className="overflow-hidden rounded-xl border border-brand-warm-200">
                 <div className="max-h-[calc(100vh-260px)] overflow-auto">
                   {financeDetail === "collected" && (
-                    <table className="w-full text-xs">
+                    <table className="data-table">
                       <thead className="sticky top-0 z-10 bg-brand-warm-50">
                         <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500">
                           <th className="px-4 py-3">{locale === "zh" ? "日期" : "Date"}</th>
@@ -701,7 +701,7 @@ export function DailyCalendar({
                   )}
 
                   {financeDetail === "outstanding" && (
-                    <table className="w-full text-xs">
+                    <table className="data-table">
                       <thead className="sticky top-0 z-10 bg-brand-warm-50">
                         <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500">
                           <th className="px-4 py-3">{locale === "zh" ? "房号" : "Chambre"}</th>
@@ -742,7 +742,7 @@ export function DailyCalendar({
                   )}
 
                   {financeDetail === "settled" && (
-                    <table className="w-full text-xs">
+                    <table className="data-table">
                       <thead className="sticky top-0 z-10 bg-brand-warm-50">
                         <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500">
                           <th className="px-4 py-3">{locale === "zh" ? "房号" : "Chambre"}</th>

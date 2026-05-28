@@ -142,7 +142,7 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
           {targets.length === 0 ? (
             <p className="text-xs text-slate-400">{locale === "zh" ? "暂无目标" : "Aucun"}</p>
           ) : (
-            <table className="w-full text-xs"><thead className="text-xs uppercase text-slate-500"><tr><th className="px-2 py-1">{locale === "zh" ? "指标" : "KPI"}</th><th className="px-2 py-1">{locale === "zh" ? "期间" : "Periode"}</th><th className="px-2 py-1 text-right">{locale === "zh" ? "目标值" : "Cible"}</th><th className="px-2 py-1"></th></tr></thead>
+            <table className="data-table"><thead className="text-xs uppercase text-slate-500"><tr><th className="px-2 py-1">{locale === "zh" ? "指标" : "KPI"}</th><th className="px-2 py-1">{locale === "zh" ? "期间" : "Periode"}</th><th className="px-2 py-1 text-right">{locale === "zh" ? "目标值" : "Cible"}</th><th className="px-2 py-1"></th></tr></thead>
             <tbody className="divide-y divide-brand-neutral-200">
               {targets.map(t => {
                 const def = KPI_DEFINITIONS.find(d => d.key === t.metric_key);
