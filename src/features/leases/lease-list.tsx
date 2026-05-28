@@ -6,6 +6,8 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { RoomCard } from "@/components/room-card";
+import type { RoomVisualStatus } from "@/lib/status-styles";
 import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
 import { contractStatusVariant as statusVariant, receivableStatusStyles as STATUS_STYLES, receivableRowBg as ROW_BG } from "@/lib/status-styles";
@@ -420,19 +422,19 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                   const isRisk = summary.overdue > 0 || (contract.status === "active" && daysLeft >= 0 && daysLeft <= 30);
 
                   return (
-                    <button
+                    <RoomCard
                       key={contract.id}
+                      variant="detail"
+                      roomNo={unit?.unit_no ?? "-"}
+                      status="leased"
+                      statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]}
                       onClick={() => openDetail(contract.id)}
-                      className={cn(
-                        "group flex min-h-[198px] flex-col rounded-2xl border bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-panel",
-                        isRisk ? "border-brand-amber-200 bg-brand-amber-50/40 ring-1 ring-brand-amber-100" : "border-brand-warm-300 hover:border-brand-indigo-200",
-                      )}
+                      className={isRisk ? "border-brand-amber-200 bg-brand-amber-50/40 ring-1 ring-brand-amber-100" : ""}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-mono text-base font-black leading-none text-brand-ink-900">{unit?.unit_no ?? "-"}</p>
-                          <p className="mt-2 truncate text-xs font-black text-brand-ink-700">{customer?.name ?? "-"}</p>
-                          <p className="mt-1 truncate text-xs font-semibold text-brand-ink-400">{contract.contract_no}</p>
+                          <p className="truncate text-xs font-bold text-brand-ink-700">{customer?.name ?? "-"}</p>
+                          <p className="mt-0.5 truncate text-xs text-brand-ink-400">{contract.contract_no}</p>
                         </div>
                         <Badge variant={statusVariant[contract.status]}>
                           {t.contractStatus[contract.status as keyof typeof t.contractStatus]}
@@ -457,7 +459,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                           <span className="text-brand-ink-600">{summary.nextDue ?? "-"}</span>
                         </div>
                       </div>
-                    </button>
+                    </RoomCard>
                   );
                 })}
               </div>

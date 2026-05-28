@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   AlertTriangle,
 } from "lucide-react";
+import { RoomCard } from "@/components/room-card";
 import {
   calculateReceivableSummary,
 } from "@/features/finance/receivable-summary";
@@ -486,13 +487,18 @@ export function ManagementDashboard({
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                           {group.states.map(s => {
                             return (
-                              <RoomStatusCard
+                              <RoomCard
                                 key={s.unit.id}
-                                state={s}
+                                variant="matrix"
+                                roomNo={s.unit.unit_no ?? "?"}
+                                status={s.status}
                                 statusLabel={t.statuses[s.status]}
                                 href={routeFor(locale, `/units/${s.unit.id}`)}
-                                locale={locale}
-                              />
+                              >
+                                <p className={cn("mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-bold ring-1 ring-inset backdrop-blur", ROOM_CARD[s.status].action)}>
+                                  {locale === "zh" ? "房间档案" : "Dossier"}
+                                </p>
+                              </RoomCard>
                             );
                           })}
                         </div>
@@ -580,45 +586,6 @@ const ROOM_CARD: Record<MgmtStatus, { card: string; badge: string; dot: string; 
     summary: "border-brand-green-200 bg-brand-green-50 text-brand-green-900",
   },
 };
-
-function RoomStatusCard({
-  state, statusLabel, href, locale,
-}: {
-  state: UnitState;
-  statusLabel: string;
-  href: string;
-  locale: Locale;
-}) {
-  const styles = ROOM_CARD[state.status];
-  const roomText = locale === "zh" ? "房间档案" : "Dossier";
-
-  return (
-    <Link
-      href={href}
-      title={`${state.unit.unit_no} - ${statusLabel}`}
-      aria-label={`${state.unit.unit_no} - ${statusLabel}`}
-      className={cn(
-        "group relative flex min-h-[92px] flex-col justify-between overflow-hidden rounded-2xl border p-3 shadow-sm",
-        "transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lifted active:scale-[0.98]",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo",
-        styles.card,
-      )}
-    >
-      <div className="relative z-10 flex items-start justify-between gap-2">
-        <span className={cn("rounded-full px-2.5 py-1 font-mono text-xs font-black shadow-sm", styles.badge)}>
-          {state.unit.unit_no}
-        </span>
-        <span className={cn("mt-1 h-2.5 w-2.5 rounded-full ring-2 ring-white/25", styles.dot)} />
-      </div>
-      <div className="relative z-10">
-        <p className="truncate text-xs font-black text-current">{statusLabel}</p>
-        <p className={cn("mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-bold ring-1 ring-inset backdrop-blur", styles.action)}>
-          {roomText}
-        </p>
-      </div>
-    </Link>
-  );
-}
 
 function StatusSummaryCard({ label, value, status }: { label: string; value: number; status: MgmtStatus }) {
   const styles = ROOM_CARD[status];

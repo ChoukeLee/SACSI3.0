@@ -7,6 +7,7 @@ import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
 import { contractStatusVariant as statusVariant } from "@/lib/status-styles";
 import { Badge } from "@/components/ui/badge";
+import { RoomCard } from "@/components/room-card";
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import {
   createSaleContract,
@@ -352,19 +353,19 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                   const isRisk = overdue > 0 || (contract.status === "active" && contract.transfer_status !== "completed");
 
                   return (
-                    <button
+                    <RoomCard
                       key={contract.id}
+                      variant="detail"
+                      roomNo={unit?.unit_no ?? "-"}
+                      status="sold"
+                      statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]}
                       onClick={() => { setSelectedId(contract.id); setPanel("detail"); setError(""); }}
-                      className={cn(
-                        "group flex min-h-[214px] flex-col rounded-2xl border bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-panel",
-                        isRisk ? "border-brand-amber-200 bg-brand-amber-50/40 ring-1 ring-brand-amber-100" : "border-brand-warm-300 hover:border-brand-indigo-200",
-                      )}
+                      className={isRisk ? "border-brand-amber-200 bg-brand-amber-50/40 ring-1 ring-brand-amber-100" : ""}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-mono text-base font-black leading-none text-brand-ink-900">{unit?.unit_no ?? "-"}</p>
-                          <p className="mt-2 truncate text-xs font-black text-brand-ink-700">{customer?.name ?? "-"}</p>
-                          <p className="mt-1 truncate text-xs font-semibold text-brand-ink-400">{contract.contract_no}</p>
+                          <p className="truncate text-xs font-bold text-brand-ink-700">{customer?.name ?? "-"}</p>
+                          <p className="mt-0.5 truncate text-xs text-brand-ink-400">{contract.contract_no}</p>
                         </div>
                         <Badge variant={statusVariant[contract.status]}>{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
                       </div>
@@ -392,7 +393,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
                           <span className="truncate text-brand-ink-600">{t.transferStatus[contract.transfer_status as keyof typeof t.transferStatus]}</span>
                         </div>
                       </div>
-                    </button>
+                    </RoomCard>
                   );
                 })}
               </div>
