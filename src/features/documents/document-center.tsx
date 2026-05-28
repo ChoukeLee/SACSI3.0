@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Printer, X, FileText, Eye } from "lucide-react";
+import { Printer, X, FileText, Eye } from "lucide-react";
 import { cn, formatXof } from "@/lib/utils";
+import { EmptyState } from "@/components/empty-state";
+import { SearchInput } from "@/components/ui/search-input";
 import { printDocumentRecord } from "./templates/all-templates";
 import type { DocumentRecord, DocumentType, DocumentSource, Locale } from "./types";
 import {
@@ -93,16 +95,13 @@ export function DocumentCenter({ documents, locale }: Props) {
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={cn(filterBtn, "w-[130px]")} />
         <span className="text-xs font-semibold text-brand-ink-400">—</span>
         <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={cn(filterBtn, "w-[130px]")} />
-        <div className="relative flex-1 min-w-[180px] max-w-[320px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-brand-ink-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder={locale === "zh" ? "搜索客户/房号/合同号..." : "Rechercher client/chambre/contrat..."}
-            className="w-full rounded-xl border border-brand-warm-200 bg-white py-1.5 pl-8 pr-3 text-xs text-brand-ink-700 shadow-sm transition focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15"
-          />
-        </div>
+        <SearchInput
+          inputSize="sm"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder={locale === "zh" ? "搜索客户/房号/合同号..." : "Rechercher client/chambre/contrat..."}
+          className="flex-1 min-w-[180px] max-w-[320px]"
+        />
         <span className="text-xs font-semibold text-brand-ink-400 ml-auto">
           {filtered.length} {locale === "zh" ? "条单据" : "documents"}
         </span>
@@ -112,9 +111,7 @@ export function DocumentCenter({ documents, locale }: Props) {
         {/* Document list */}
         <div className={cn("flex-1 min-w-0", previewed && "hidden lg:block")}>
           {filtered.length === 0 ? (
-            <div className="rounded-2xl border border-brand-warm-200 bg-white py-16 text-center text-sm font-semibold text-brand-ink-400 shadow-natural">
-              {locale === "zh" ? "暂无符合条件的单据" : "Aucun document"}
-            </div>
+            <EmptyState title={locale === "zh" ? "暂无符合条件的单据" : "Aucun document"} />
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
               <table className="data-table min-w-[700px]">

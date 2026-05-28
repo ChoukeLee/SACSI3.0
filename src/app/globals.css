@@ -174,6 +174,38 @@ body {
   @media (pointer: coarse) {
     button:active, a:active, [role="button"]:active { opacity: 0.8; }
   }
+  :root {
+    /* Sidebar — SACIS dark sidebar mapped to shadcn sidebar tokens */
+    --sidebar-background: 230 16% 12%;       /* #1E1F2C */
+    --sidebar-foreground: 240 5% 93%;         /* #EDEDF0 */
+    --sidebar-primary: 237 74% 63%;            /* #4F5DE6 indigo */
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 230 10% 18%;
+    --sidebar-accent-foreground: 240 5% 88%;
+    --sidebar-border: 230 8% 16%;
+    --sidebar-ring: 237 74% 63%;
+    /* shadcn base tokens — mapped to getdesign system */
+    --background: 30 10% 97%;                  /* #F7F6F4 canvas */
+    --foreground: 180 2% 10%;                   /* #181919 ink */
+    --card: 0 0% 100%;                          /* #FFFFFF surface */
+    --card-foreground: 180 2% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 180 2% 10%;
+    --primary: 237 74% 63%;                     /* #4F5DE6 indigo */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 6% 95%;                     /* #F3F2F0 surface-soft */
+    --secondary-foreground: 180 2% 10%;
+    --muted: 30 6% 95%;
+    --muted-foreground: 240 4% 36%;             /* #5C5D61 ink-muted */
+    --accent: 237 90% 96%;                      /* #EDEFFD primary-soft */
+    --accent-foreground: 237 60% 40%;
+    --destructive: 0 72% 51%;                   /* #DC2626 red */
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 8% 89%;                        /* #E5E3E0 hairline */
+    --input: 30 8% 89%;
+    --ring: 237 74% 63%;
+    --radius: 0.5rem;
+  }
 }
 
 [data-scroll-x] {

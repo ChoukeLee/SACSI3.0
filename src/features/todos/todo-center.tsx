@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowRight, Bell, Calendar, Clock, Filter, Search } from
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { cn, formatXof } from "@/lib/utils";
+import { EmptyState } from "@/components/empty-state";
 import type { TodoItem, TodoSource, TodoPriority, TodoType } from "./todo-types";
 
 interface Props {
@@ -102,10 +103,7 @@ export function TodoCenter({ todos, locale }: Props) {
 
       {/* Todo list */}
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-brand-warm-200 bg-white py-16 text-center text-sm font-semibold text-brand-ink-400 shadow-natural">
-          <Bell className="mx-auto h-8 w-8 mb-3 text-brand-ink-300" />
-          {locale === "zh" ? "暂无待办事项" : "Aucune tache"}
-        </div>
+        <EmptyState icon={<Bell className="h-10 w-10" />} title={locale === "zh" ? "暂无待办事项" : "Aucune tache"} />
       ) : (
         <div className="space-y-2">
           {filtered.map(todo => (

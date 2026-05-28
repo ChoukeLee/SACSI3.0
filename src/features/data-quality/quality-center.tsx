@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowRight, Search, ShieldAlert, ChevronDown, ChevronUp 
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/empty-state";
 import type { QualityIssue, QualityCategory, QualitySeverity } from "./quality-types";
 
 interface Props {
@@ -98,11 +99,11 @@ export function QualityCenter({ issues, locale }: Props) {
 
       {/* Issues */}
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-brand-warm-200 bg-white py-16 text-center text-sm shadow-natural">
-          <ShieldAlert className="mx-auto h-8 w-8 mb-3 text-brand-green-400" />
-          <p className="text-brand-green-600 font-medium">{locale === "zh" ? "数据质量良好，未发现异常" : "Donnees saines, aucune anomalie"}</p>
-          <p className="text-brand-ink-400 text-xs mt-1">{locale === "zh" ? `共扫描 ${issues.length} 条规则` : `${issues.length} regles verifiees`}</p>
-        </div>
+        <EmptyState
+          icon={<ShieldAlert className="h-10 w-10" />}
+          title={locale === "zh" ? "数据质量良好，未发现异常" : "Donnees saines, aucune anomalie"}
+          description={locale === "zh" ? `共扫描 ${issues.length} 条规则` : `${issues.length} regles verifiees`}
+        />
       ) : (
         <div className="space-y-2">
           {filtered.map(i => {

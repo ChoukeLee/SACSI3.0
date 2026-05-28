@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/empty-state";
 import {
   BULK_ACTIONS, ROLE_ACTIONS,
   type BulkActionType, type BulkActionStatus, type BulkPreview, type BulkResult,
@@ -224,9 +225,7 @@ export function BulkActionCenter({ locale, userRole }: Props) {
 
       {/* Empty */}
       {status === "idle" && !preview && (
-        <div className="rounded-2xl border border-brand-warm-200 bg-white py-16 text-center text-sm font-semibold text-brand-ink-400 shadow-natural">
-          {L.noResults}
-        </div>
+        <EmptyState title={L.noResults} />
       )}
     </div>
   );
