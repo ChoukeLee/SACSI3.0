@@ -162,11 +162,11 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   return (
     <>
       <div className="fixed inset-0 z-overlay bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-panel w-full max-w-full overflow-auto border-l border-brand-warm-200 bg-white shadow-panel lg:max-w-md" role="dialog" aria-label={isNew ? t.booking.newBooking : t.booking.title}>
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-200 bg-white/95 px-5 py-4 backdrop-blur">
+      <div className="fixed inset-y-0 right-0 z-panel w-full max-w-full overflow-auto border-l bg-card shadow-lg lg:max-w-md" role="dialog" aria-label={isNew ? t.booking.newBooking : t.booking.title}>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-card/95 px-5 py-4 backdrop-blur">
           <div>
-            <h3 className="text-sm font-black text-brand-ink-900">{isNew ? t.booking.newBooking : t.booking.title}</h3>
-            {selectedUnit && <p className="text-sm text-brand-ink-600">{selectedUnit.unit_no} ({selectedUnit.floor_label})</p>}
+            <h3 className="text-sm font-bold">{isNew ? t.booking.newBooking : t.booking.title}</h3>
+            {selectedUnit && <p className="text-sm text-muted-foreground">{selectedUnit.unit_no} ({selectedUnit.floor_label})</p>}
           </div>
           <Button size="icon" variant="ghost" onClick={onClose} aria-label={locale === "zh" ? "关闭" : "Fermer"}>
             <X className="h-5 w-5" />
@@ -186,8 +186,8 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
             <div>
               <label className={labelClass}>{t.checkoutModeLabel}</label>
               <div className="flex gap-2">
-                <button onClick={() => setNewCheckoutMode("fixed")} className={cn("flex-1 rounded-lg border px-3 py-2.5 text-xs font-semibold transition-all duration-fast", newCheckoutMode === "fixed" ? "border-brand-indigo bg-brand-indigo-50 text-brand-indigo-700" : "border-brand-warm-200 bg-white text-brand-ink-600 hover:bg-brand-warm-50")}>{t.fixedCheckout}</button>
-                <button onClick={() => setNewCheckoutMode("open")} className={cn("flex-1 rounded-lg border px-3 py-2.5 text-xs font-semibold transition-all duration-fast", newCheckoutMode === "open" ? "border-brand-indigo bg-brand-indigo-50 text-brand-indigo-700" : "border-brand-warm-200 bg-white text-brand-ink-600 hover:bg-brand-warm-50")}>{t.openCheckout}</button>
+                <button onClick={() => setNewCheckoutMode("fixed")} className={cn("flex-1 rounded-md border px-3 py-2.5 text-xs font-semibold transition-all", newCheckoutMode === "fixed" ? "border-primary/30 bg-accent text-accent-foreground" : "border bg-card text-muted-foreground hover:bg-accent")}>{t.fixedCheckout}</button>
+                <button onClick={() => setNewCheckoutMode("open")} className={cn("flex-1 rounded-md border px-3 py-2.5 text-xs font-semibold transition-all", newCheckoutMode === "open" ? "border-primary/30 bg-accent text-accent-foreground" : "border bg-card text-muted-foreground hover:bg-accent")}>{t.openCheckout}</button>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -219,7 +219,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
 
             <div className="text-right text-sm"><p className="font-semibold text-brand-ink-900">{bookingCustomer?.name ?? booking.customer_id.slice(0, 8)}</p>{bookingCustomer?.phone && <p className="text-xs text-brand-ink-400">{bookingCustomer.phone}</p>}</div>
 
-            <div className="grid grid-cols-2 gap-3 rounded-lg bg-brand-warm-50 p-3 text-sm">
+            <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted p-3 text-sm">
               <div><p className="text-xs text-brand-ink-400">{t.booking.checkInDate}</p><p className="font-semibold text-brand-ink-900">{booking.check_in}</p></div>
               <div><p className="text-xs text-brand-ink-400">{booking.checkout_mode === "open" ? t.actualCheckOutDate : t.booking.checkOutDate}</p><p className="font-semibold text-brand-ink-900">{booking.checkout_mode === "open" ? (booking.actual_check_out ?? "—") : booking.check_out}</p></div>
             </div>

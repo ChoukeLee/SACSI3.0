@@ -32,15 +32,15 @@ interface CalendarProps {
 type ViewMode = "day" | "week" | "month";
 type RoomFilter = "all" | "available" | "occupied" | "checkingOutToday" | "openEnded" | "reserved" | "cleaning" | "maintenance";
 
-const ROOM_COL_WIDTH = 128;
-const DAY_COL_MIN_WIDTH = 70;
-const DAY_COL_WIDTH = 74;
-const ROW_HEIGHT = 46;
+const ROOM_COL_WIDTH = 120;
+const DAY_COL_MIN_WIDTH = 66;
+const DAY_COL_WIDTH = 70;
+const ROW_HEIGHT = 42;
 const FLOOR_ROW_HEIGHT = 18;
 const MAINTENANCE_STATUSES = new Set(["available", "reserved", "daily_occupied", "cleaning_pending", "leased", "sold"]);
 
 const NAV_BTN =
-  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-brand-warm-300 bg-white text-brand-ink-500 shadow-sm transition-all duration-fast hover:border-brand-indigo-200 hover:bg-brand-indigo-50 hover:text-brand-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo-500";
+  "inline-flex h-8 w-8 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-sm transition-all hover:border-primary/30 hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 const COPY = {
   zh: {
@@ -369,13 +369,10 @@ export function DailyCalendar({
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-2xl border border-brand-warm-300 bg-white shadow-card">
-        <div className="flex flex-col gap-3 border-b border-brand-warm-200 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+      <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="text-base font-black leading-5 text-brand-neutral-950">{locale === "zh" ? "日租概览" : "Apercu journalier"}</h3>
-            <p className="mt-1 text-sm font-semibold text-brand-neutral-700">
-              {locale === "zh" ? "房态与财务摘要，点击财务卡片查看明细。" : "Statut et finances, cliquez pour les details."}
-            </p>
+            <h3 className="text-[15px] font-bold">{locale === "zh" ? "日租概览" : "Apercu journalier"}</h3>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="rounded-xl border border-brand-warm-200 bg-brand-neutral-50 px-3 py-1.5 text-xs font-black text-brand-neutral-950">
@@ -412,8 +409,7 @@ export function DailyCalendar({
       <section className="overflow-hidden rounded-2xl border border-brand-warm-300 bg-white shadow-card">
         <div className="flex flex-col gap-3 border-b border-brand-warm-300 bg-white px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h2 className="text-lg font-black tracking-tight text-brand-ink-900">{copy.timeline}</h2>
-            <p className="mt-0.5 text-xs font-semibold text-brand-ink-500">{copy.subtitle}</p>
+            <h2 className="text-[15px] font-bold">{copy.timeline}</h2>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -451,12 +447,7 @@ export function DailyCalendar({
             <button onClick={() => moveRange(1)} className={NAV_BTN} aria-label="next range">
               <ChevronRight className="h-4 w-4" />
             </button>
-            <button
-              onClick={goToToday}
-              className="h-8 rounded-xl bg-brand-indigo-500 px-4 text-sm font-black text-white shadow-lifted transition hover:bg-brand-indigo-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo-500"
-            >
-              {copy.today}
-            </button>
+            <Button onClick={goToToday} size="sm">{copy.today}</Button>
           </div>
         </div>
 
@@ -482,7 +473,7 @@ export function DailyCalendar({
                   key={dateStr}
                   className={cn(
                     "sticky top-0 z-20 flex flex-col items-center justify-center border-b border-r border-brand-warm-300 text-xs",
-                    isToday && "bg-brand-indigo-50 text-brand-indigo-700",
+                    isToday && "bg-accent text-accent-foreground",
                     isWeekend && !isToday && "bg-brand-warm-50 text-brand-ink-400",
                     !isToday && !isWeekend && "bg-white text-brand-ink-500",
                   )}
@@ -491,7 +482,7 @@ export function DailyCalendar({
                 >
                   <span className="text-xs font-semibold leading-3">{date.toLocaleDateString(localeStr, { weekday: "short" })}</span>
                   <span className="text-base font-black leading-5 text-brand-ink-900">{date.getDate()}</span>
-                  {isToday && <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-brand-indigo-500" />}
+                  {isToday && <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary" />}
                 </div>
               );
             })}
@@ -829,13 +820,13 @@ function TimelineCell({
 }) {
   const baseCell = cn(
     "group relative border-b border-r border-brand-warm-100 transition-colors",
-    isToday ? "bg-brand-indigo-50/45" : "bg-white",
+    isToday ? "bg-accent/50" : "bg-card",
   );
 
   if (isMaintenance) {
     return (
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
-        <div className="absolute inset-x-1.5 top-1/2 h-8 -translate-y-1/2 rounded-lg border border-brand-red-200 bg-brand-red-50" />
+        <div className="absolute inset-x-1 top-1/2 h-7 -translate-y-1/2 rounded-lg bg-[#F0A080]/30 border border-[#F0A080]/40" />
       </div>
     );
   }
@@ -895,7 +886,7 @@ function TimelineCell({
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
         <button
           type="button"
-          className="absolute inset-x-1.5 top-1/2 flex h-8 -translate-y-1/2 items-center justify-center rounded-lg border border-brand-green-200 bg-brand-green-50 text-xs font-black text-brand-green-700 transition-all hover:border-brand-green-300 hover:bg-brand-green-100 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo-500"
+          className="absolute inset-x-1 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center rounded-lg bg-[#5AB5B8]/20 border border-[#5AB5B8]/30 text-xs font-bold text-[#32757A] transition-all hover:bg-[#5AB5B8]/30 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo-500"
           onClick={() => onCompleteCleaning?.()}
         >
           {copy.cleaning}
@@ -1041,18 +1032,20 @@ function ViewButton({ active, onClick, children }: { active: boolean; onClick: (
 }
 
 function getBookingTone(status: string): string {
-  if (status === "checked_in") return "bg-brand-indigo-500 text-white shadow-brand-indigo-100";
-  if (status === "confirmed") return "bg-brand-amber-100 text-brand-amber-900 ring-1 ring-inset ring-brand-amber-300 shadow-brand-amber-100";
-  if (status === "pending_review") return "bg-brand-amber-500 text-white shadow-brand-amber-100";
-  return "bg-brand-warm-100 text-brand-ink-500 shadow-brand-warm-200";
+  if (status === "checked_in") return "bg-[#5090C0] text-white shadow-sm";
+  if (status === "confirmed") return "bg-amber-100 text-amber-800 ring-1 ring-inset ring-amber-300";
+  if (status === "pending_review") return "bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-200";
+  return "bg-muted text-muted-foreground";
 }
 
 function getRoomTone(unit: UnitRow, hasCleaning: boolean, isMaintenance: boolean) {
-  if (isMaintenance) return { strip: "bg-brand-red-500" };
-  if (hasCleaning || unit.status === "cleaning_pending") return { strip: "bg-brand-green-500" };
-  if (unit.status === "reserved") return { strip: "bg-brand-amber-500" };
-  if (unit.status === "daily_occupied") return { strip: "bg-brand-indigo-500" };
-  return { strip: "bg-brand-green-500" };
+  if (isMaintenance) return { strip: "bg-[#F0A080]" };
+  if (hasCleaning || unit.status === "cleaning_pending") return { strip: "bg-[#5AB5B8]" };
+  if (unit.status === "reserved") return { strip: "bg-[#A0C0E0]" };
+  if (unit.status === "daily_occupied") return { strip: "bg-[#5090C0]" };
+  if (unit.status === "leased") return { strip: "bg-[#7050A0]" };
+  if (unit.status === "sold") return { strip: "bg-[#505080]" };
+  return { strip: "bg-[#F0E0D0]" };
 }
 
 function getUnitTimelineStatus(
