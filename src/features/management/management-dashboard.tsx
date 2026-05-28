@@ -318,8 +318,7 @@ export function ManagementDashboard({
     : activeBuildings.find(b => b.id === selectedBuildingId)?.display_name ?? "";
 
   return (
-    <div className="-my-6 bg-brand-warm-100">
-      <div className="mx-auto flex max-w-[1360px] flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
+    <div className="flex flex-col gap-6">
 
         {/* ── Building selector — segmented control ── */}
         <div>
@@ -530,7 +529,6 @@ export function ManagementDashboard({
           locale={locale}
         />
 
-      </div>
     </div>
   );
 }
