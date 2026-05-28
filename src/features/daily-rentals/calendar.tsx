@@ -35,8 +35,8 @@ type RoomFilter = "all" | "available" | "occupied" | "checkingOutToday" | "openE
 const ROOM_COL_WIDTH = 120;
 const DAY_COL_MIN_WIDTH = 66;
 const DAY_COL_WIDTH = 70;
-const ROW_HEIGHT = 42;
-const FLOOR_ROW_HEIGHT = 18;
+const ROW_HEIGHT = 38;
+const FLOOR_ROW_HEIGHT = 16;
 const MAINTENANCE_STATUSES = new Set(["available", "reserved", "daily_occupied", "cleaning_pending", "leased", "sold"]);
 
 const NAV_BTN =
@@ -361,8 +361,8 @@ export function DailyCalendar({
 
   if (dailyUnits.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-2xl border border-brand-warm-300 bg-white py-12 text-center shadow-sm">
-        <p className="text-sm text-brand-ink-500">{copy.noRooms}</p>
+      <div className="flex flex-col items-center gap-3 rounded-xl border bg-card py-12 text-center shadow-sm">
+        <p className="text-sm text-muted-foreground">{copy.noRooms}</p>
       </div>
     );
   }
@@ -375,11 +375,9 @@ export function DailyCalendar({
             <h3 className="text-[15px] font-bold">{locale === "zh" ? "日租概览" : "Apercu journalier"}</h3>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-xl border border-brand-warm-200 bg-brand-neutral-50 px-3 py-1.5 text-xs font-black text-brand-neutral-950">
+            <div className="rounded-md border bg-muted px-3 py-1.5 text-xs font-semibold">
               {new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN")}
-              <span className="ml-3 text-brand-neutral-500">
-                {new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long" })}
-              </span>
+              <span className="ml-3 text-muted-foreground">{new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long" })}</span>
             </div>
             <Button variant="default" size="sm" onClick={handleCopy}>
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -391,13 +389,13 @@ export function DailyCalendar({
             </Button>
           </div>
         </div>
-        <div className="grid gap-2 bg-brand-neutral-50/70 px-4 py-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-2 bg-muted/50 px-4 py-3 md:grid-cols-2 xl:grid-cols-4">
           {shareRows.map((row) => (
             <ShareCard key={row.key} label={row.label} value={row.count} units={row.units} tone={row.tone} />
           ))}
         </div>
-        <div className="border-t border-brand-warm-200 bg-brand-neutral-50/70 px-4 py-3">
-          <p className="mb-2.5 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-400">{locale === "zh" ? "本月财务" : "Finances du mois"}</p>
+        <div className="border-t bg-muted/50 px-4 py-3">
+          <p className="mb-2.5 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">{locale === "zh" ? "本月财务" : "Finances du mois"}</p>
           <div className="grid gap-2 md:grid-cols-3">
             {financeCards.map((card) => (
               <FinanceCard key={card.key} label={card.label} value={card.value} tone={card.tone} onClick={() => setFinanceDetail(card.key as "collected" | "outstanding" | "settled")} />
@@ -406,8 +404,8 @@ export function DailyCalendar({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-brand-warm-300 bg-white shadow-card">
-        <div className="flex flex-col gap-3 border-b border-brand-warm-300 bg-white px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
+      <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="flex flex-col gap-3 border-b px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-[15px] font-bold">{copy.timeline}</h2>
           </div>
@@ -430,8 +428,8 @@ export function DailyCalendar({
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 border-b border-brand-warm-300 bg-white px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="inline-flex w-fit rounded-xl border border-brand-warm-300 bg-brand-warm-100 p-1 text-xs font-bold text-brand-ink-500">
+        <div className="flex flex-col gap-3 border-b px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="inline-flex w-fit rounded-md border bg-muted p-1 text-xs font-medium text-muted-foreground">
             <ViewButton active={viewMode === "day"} onClick={() => setMode("day")}>{copy.day}</ViewButton>
             <ViewButton active={viewMode === "week"} onClick={() => setMode("week")}>{copy.week}</ViewButton>
             <ViewButton active={viewMode === "month"} onClick={() => setMode("month")}>{copy.month}</ViewButton>
@@ -451,7 +449,7 @@ export function DailyCalendar({
           </div>
         </div>
 
-        <div ref={scrollRef} className="scroll-hint-x overflow-auto bg-white" style={{ maxHeight: "calc(100vh - 220px)" }} data-scroll-x>
+        <div ref={scrollRef} className="scroll-hint-x overflow-auto" style={{ maxHeight: "calc(100vh - 200px)" }} data-scroll-x>
           <div
             className="grid w-full min-w-full"
             style={{ gridTemplateColumns: `${ROOM_COL_WIDTH}px repeat(${visibleDays.length}, minmax(${DAY_COL_MIN_WIDTH}px, 1fr))`, minWidth: "100%" }}
@@ -459,7 +457,7 @@ export function DailyCalendar({
             aria-label={copy.timeline}
           >
             <div
-              className="sticky left-0 top-0 z-30 flex items-center border-b border-r border-brand-warm-300 bg-white px-3 text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500"
+              className="sticky left-0 top-0 z-30 flex items-center border-b border-r bg-card px-3 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"
               style={{ height: 40 }}
             >
               {copy.roomType}
@@ -474,8 +472,8 @@ export function DailyCalendar({
                   className={cn(
                     "sticky top-0 z-20 flex flex-col items-center justify-center border-b border-r border-brand-warm-300 text-xs",
                     isToday && "bg-accent text-accent-foreground",
-                    isWeekend && !isToday && "bg-brand-warm-50 text-brand-ink-400",
-                    !isToday && !isWeekend && "bg-white text-brand-ink-500",
+                    isWeekend && !isToday && "bg-muted/30 text-muted-foreground",
+                    !isToday && !isWeekend && "bg-card text-muted-foreground",
                   )}
                   style={{ height: 40 }}
                   role="columnheader"
@@ -489,7 +487,7 @@ export function DailyCalendar({
 
             {unitsByFloor.length === 0 ? (
               <div
-                className="flex h-24 items-center justify-center text-sm font-semibold text-brand-ink-400"
+                className="flex h-24 items-center justify-center text-sm font-medium text-muted-foreground"
                 style={{ gridColumn: `span ${visibleDays.length + 1}` }}
               >
                 {copy.emptyFilter}
@@ -512,7 +510,7 @@ export function DailyCalendar({
                   return [
                     <div
                       key={`${unit.id}-room`}
-                      className="sticky left-0 z-10 flex items-center border-b border-r border-brand-warm-200 bg-white px-3"
+                      className="sticky left-0 z-10 flex items-center border-b border-r bg-card px-3"
                       style={{ height: ROW_HEIGHT }}
                       role="rowheader"
                     >
@@ -819,7 +817,7 @@ function TimelineCell({
   onCompleteCleaning?: () => void;
 }) {
   const baseCell = cn(
-    "group relative border-b border-r border-brand-warm-100 transition-colors",
+    "group relative border-b border-r transition-colors",
     isToday ? "bg-accent/50" : "bg-card",
   );
 
@@ -871,7 +869,7 @@ function TimelineCell({
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
         <button
           type="button"
-          className="absolute inset-x-1.5 top-1/2 h-8 -translate-y-1/2 rounded-lg bg-brand-warm-100 text-xs font-bold text-brand-ink-400"
+          className="absolute inset-x-1 top-1/2 h-7 -translate-y-1/2 rounded-md bg-muted text-xs font-medium text-muted-foreground"
           title={customer?.name ?? copy.occupied}
           onClick={() => onOpenBooking(booking.id)}
         >
@@ -928,13 +926,13 @@ function FloorRow({
   return (
     <>
       <div
-        className="sticky left-0 z-10 flex items-center border-b border-r border-brand-warm-200 bg-brand-warm-50 px-3 text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500"
+        className="sticky left-0 z-10 flex items-center border-b border-r bg-muted px-3 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"
         style={{ height: FLOOR_ROW_HEIGHT }}
       >
         {floor}
       </div>
       <div
-        className="flex items-center border-b border-brand-warm-200 bg-brand-warm-50 px-3 text-xs font-bold text-brand-ink-400"
+        className="flex items-center border-b bg-muted px-3 text-xs font-medium text-muted-foreground"
         style={{ gridColumn: `span ${daysCount}`, height: FLOOR_ROW_HEIGHT }}
       >
         {copy.floor} · {count}
@@ -947,39 +945,35 @@ type ShareTone = "dark" | "orange" | "teal" | "green";
 
 function ShareCard({ label, value, units, tone }: { label: string; value: number; units: string[]; tone: ShareTone }) {
   const styles = {
-    dark: "border-brand-indigo-200 bg-brand-indigo-50 text-brand-indigo-900",
-    orange: "border-brand-amber-200 bg-brand-amber-50 text-brand-amber-900",
-    teal: "border-brand-cyan-200 bg-brand-cyan-50 text-brand-cyan-900",
-    green: "border-brand-green-200 bg-brand-green-50 text-brand-green-900",
+    dark: "bg-accent text-accent-foreground border-accent",
+    orange: "bg-amber-50 text-amber-800 border-amber-200",
+    teal: "bg-[#5AB5B8]/10 text-[#32757A] border-[#5AB5B8]/20",
+    green: "bg-emerald-50 text-emerald-800 border-emerald-200",
   }[tone];
   return (
-    <div className={cn("rounded-2xl border px-4 py-3 shadow-sm", styles)}>
+    <div className={cn("rounded-xl border px-4 py-3 shadow-sm", styles)}>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-black opacity-85">{label}</p>
-        <p className="text-2xl font-black tabular-nums leading-none">{value}</p>
+        <p className="text-xs font-semibold opacity-85">{label}</p>
+        <p className="text-xl font-bold tabular-nums leading-none">{value}</p>
       </div>
-      <p className="mt-3 min-h-6 text-sm font-black leading-6">{units.join(", ")}</p>
+      <p className="mt-2 min-h-5 text-xs font-medium leading-5">{units.join(", ")}</p>
     </div>
   );
 }
 
 function FinanceCard({ label, value, tone, onClick }: { label: string; value: string; tone: "dark" | "orange" | "green"; onClick: () => void }) {
   const styles = {
-    dark: "border-brand-warm-200 bg-white hover:border-brand-warm-300 hover:shadow-card",
-    orange: "border-brand-amber-200 bg-brand-amber-50 hover:border-brand-amber-300 hover:shadow-card",
-    green: "border-brand-green-200 bg-brand-green-50 hover:border-brand-green-300 hover:shadow-card",
+    dark: "border bg-card hover:border-border hover:shadow-sm",
+    orange: "border-amber-200 bg-amber-50 hover:border-amber-300 hover:shadow-sm",
+    green: "border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:shadow-sm",
   }[tone];
-  const barColors = {
-    dark: "bg-brand-ink-800",
-    orange: "bg-brand-indigo-500",
-    green: "bg-brand-green-500",
-  }[tone];
+  const barColors = { dark: "bg-foreground", orange: "bg-amber-500", green: "bg-emerald-500" }[tone];
   return (
-    <button type="button" onClick={onClick} className={cn("flex min-h-[64px] overflow-hidden rounded-2xl border text-left shadow-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo-500 hover:-translate-y-0.5", styles)}>
+    <button type="button" onClick={onClick} className={cn("flex min-h-[64px] overflow-hidden rounded-xl border text-left shadow-sm transition-all hover:-translate-y-0.5", styles)}>
       <div className={cn("w-1.5 shrink-0", barColors)} />
       <div className="flex min-w-0 flex-1 flex-col justify-between px-4 py-3">
-        <p className="truncate text-xs font-bold uppercase tracking-[0.08em] text-brand-ink-500">{label}</p>
-        <p className="truncate text-lg font-black tracking-tight tabular-nums text-brand-ink-900">{value}</p>
+        <p className="truncate text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">{label}</p>
+        <p className="truncate text-lg font-bold tracking-tight tabular-nums">{value}</p>
       </div>
     </button>
   );
