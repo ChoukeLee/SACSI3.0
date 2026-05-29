@@ -55,7 +55,7 @@ export default async function DataQualityPage() {
     <>
       <div className="lg:hidden"><DesktopOnly locale="zh" /></div>
       <div className="hidden lg:block">
-        <PageHeader title="数据质量与异常检测" description="自动扫描房源、客户、合同、日租、出售、财务数据，发现不一致、缺失、冲突等问题" />
+        <PageHeader title="数据质量与异常检测" />
         <section className="mt-8"><QualityCenter issues={issues} locale="zh" /></section>
       </div>
     </>

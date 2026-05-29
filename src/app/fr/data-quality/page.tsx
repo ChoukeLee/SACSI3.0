@@ -50,7 +50,7 @@ export default async function FrenchDataQualityPage() {
     <>
       <div className="lg:hidden"><DesktopOnly locale="fr" /></div>
       <div className="hidden lg:block">
-        <PageHeader title="Qualite des donnees" description="Analyse automatique des anomalies : logements, clients, contrats, finances" />
+        <PageHeader title="Qualité des données" />
         <section className="mt-8"><QualityCenter issues={issues} locale="fr" /></section>
       </div>
     </>

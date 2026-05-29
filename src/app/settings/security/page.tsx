@@ -11,7 +11,7 @@ export default async function SecurityPage() {
 
   return (
     <>
-      <PageHeader title="安全中心" description="安全检查、数据备份、敏感操作保护" />
+      <PageHeader title="安全中心" />
       <section className="mt-8"><SecurityCenter locale="zh" /></section>
     </>
   );

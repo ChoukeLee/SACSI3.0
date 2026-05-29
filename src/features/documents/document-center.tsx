@@ -3,8 +3,8 @@
 import { useState, useMemo } from "react";
 import { Printer, X, FileText, Eye } from "lucide-react";
 import { cn, formatXof } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
-import { SearchInput } from "@/components/ui/search-input";
 import { printDocumentRecord } from "./templates/all-templates";
 import type { DocumentRecord, DocumentType, DocumentSource, Locale } from "./types";
 import {
@@ -16,9 +16,32 @@ interface Props {
   locale: Locale;
 }
 
+const statusLabels: Record<string, Record<string, string>> = {
+  zh: {
+    active: "生效中", draft: "草稿", terminated: "已终止", expired: "已过期",
+    paid: "已收", pending: "待收", partial: "部分", overdue: "逾期",
+    pending_review: "待审核", confirmed: "已确认", checked_in: "已入住", checked_out: "已退房",
+    cancelled: "已取消", not_started: "未过户", in_progress: "过户中", completed: "已完成",
+  },
+  fr: {
+    active: "Actif", draft: "Brouillon", terminated: "Résilié", expired: "Expiré",
+    paid: "Payé", pending: "Attente", partial: "Partiel", overdue: "Retard",
+    pending_review: "À valider", confirmed: "Confirmé", checked_in: "Arrivé", checked_out: "Parti",
+    cancelled: "Annulé", not_started: "Non commencé", in_progress: "En cours", completed: "Terminé",
+  },
+};
+
+const statusTone: Record<string, "success" | "destructive" | "warning" | "secondary" | "default"> = {
+  active: "success", checked_in: "success", completed: "success", paid: "success",
+  overdue: "destructive", cancelled: "destructive",
+  pending: "warning", pending_review: "warning", partial: "warning",
+  draft: "secondary", expired: "secondary", terminated: "secondary", checked_out: "secondary",
+};
+
 export function DocumentCenter({ documents, locale }: Props) {
   const typeLabels = DOC_TYPE_LABELS[locale];
   const sourceLabels = SOURCE_LABELS[locale];
+  const stLabels = statusLabels[locale];
 
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
@@ -46,64 +69,45 @@ export function DocumentCenter({ documents, locale }: Props) {
   }, [documents, typeFilter, sourceFilter, dateFrom, dateTo, search]);
 
   const previewed = previewId ? documents.find(d => d.id === previewId) : null;
-
-  const statusBadge = (status: string) => {
-    const cls = status === "paid" || status === "checked_out" || status === "completed" ? "bg-brand-green-100 text-brand-green-700"
-      : status === "overdue" ? "bg-brand-red-100 text-brand-red-700"
-      : status === "pending" || status === "pending_review" ? "bg-brand-amber-100 text-amber-700"
-      : status === "active" || status === "checked_in" ? "bg-brand-cyan-100 text-brand-cyan-700"
-      : "bg-brand-warm-100 text-brand-ink-600";
-    const labels: Record<string, string> = locale === "zh" ? {
-      active: "生效中", draft: "草稿", terminated: "已终止", expired: "已过期",
-      paid: "已收", pending: "待收", partial: "部分", overdue: "逾期",
-      pending_review: "待审核", confirmed: "已确认", checked_in: "已入住", checked_out: "已退房",
-      cancelled: "已取消", not_started: "未过户", in_progress: "过户中", completed: "已完成",
-    } : {
-      active: "Actif", draft: "Brouillon", terminated: "Resilie", expired: "Expire",
-      paid: "Paye", pending: "Attente", partial: "Partiel", overdue: "Retard",
-      pending_review: "A valider", confirmed: "Confirme", checked_in: "Arrive", checked_out: "Parti",
-      cancelled: "Annule", not_started: "Non commence", in_progress: "En cours", completed: "Termine",
-    };
-    return <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", cls)}>{labels[status] ?? status}</span>;
-  };
+  const zh = locale === "zh";
 
   const handlePrint = (d: DocumentRecord) => {
     printDocumentRecord(d, locale);
   };
 
-  const filterBtn = "rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50";
-  const filterBtnActive = "border-brand-indigo bg-brand-indigo-50 text-brand-indigo-700";
-
-  const inputClass = "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm text-brand-ink-700 shadow-sm transition focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15";
+  const filterBtn = "h-9 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
 
   return (
-    <div>
+    <div className="space-y-5">
       {/* Filters */}
-      <div className="mb-4 flex flex-wrap gap-2 items-center">
+      <div className="flex flex-wrap gap-2 items-center">
         <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className={filterBtn}>
-          <option value="all">{locale === "zh" ? "单据类型" : "Type"}: {locale === "zh" ? "全部" : "Tout"}</option>
+          <option value="all">{zh ? "单据类型" : "Type"}: {zh ? "全部" : "Tout"}</option>
           {(Object.entries(typeLabels) as [DocumentType, string][]).map(([k, v]) => (
             <option key={k} value={k}>{v}</option>
           ))}
         </select>
         <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} className={filterBtn}>
-          <option value="all">{locale === "zh" ? "业务来源" : "Source"}: {locale === "zh" ? "全部" : "Tout"}</option>
+          <option value="all">{zh ? "业务来源" : "Source"}: {zh ? "全部" : "Tout"}</option>
           {(Object.entries(sourceLabels) as [DocumentSource, string][]).map(([k, v]) => (
             <option key={k} value={k}>{v}</option>
           ))}
         </select>
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={cn(filterBtn, "w-[130px]")} />
-        <span className="text-xs font-semibold text-brand-ink-400">—</span>
-        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={cn(filterBtn, "w-[130px]")} />
-        <SearchInput
-          inputSize="sm"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder={locale === "zh" ? "搜索客户/房号/合同号..." : "Rechercher client/chambre/contrat..."}
-          className="flex-1 min-w-[180px] max-w-[320px]"
-        />
-        <span className="text-xs font-semibold text-brand-ink-400 ml-auto">
-          {filtered.length} {locale === "zh" ? "条单据" : "documents"}
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={cn(filterBtn, "w-[140px]")} />
+        <span className="text-sm font-semibold text-muted-foreground">—</span>
+        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={cn(filterBtn, "w-[140px]")} />
+        <div className="relative flex-1 min-w-[180px] max-w-[320px]">
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={zh ? "搜索客户/房号/合同号..." : "Rechercher client/chambre/contrat..."}
+            className="h-9 w-full rounded-md border bg-card pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20"
+          />
+        </div>
+        <span className="text-sm text-muted-foreground ml-auto">
+          {filtered.length} {zh ? "条单据" : "documents"}
         </span>
       </div>
 
@@ -111,123 +115,130 @@ export function DocumentCenter({ documents, locale }: Props) {
         {/* Document list */}
         <div className={cn("flex-1 min-w-0", previewed && "hidden lg:block")}>
           {filtered.length === 0 ? (
-            <EmptyState title={locale === "zh" ? "暂无符合条件的单据" : "Aucun document"} />
+            <EmptyState title={zh ? "暂无符合条件的单据" : "Aucun document"} />
           ) : (
-            <div className="overflow-x-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
-              <table className="data-table min-w-[700px]">
-                <thead className="border-b border-brand-warm-200 bg-brand-warm-50/90 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500">
-                  <tr>
-                    <th className="px-3 py-2.5">{locale === "zh" ? "单据类型" : "Type"}</th>
-                    <th className="px-3 py-2.5">{locale === "zh" ? "标题" : "Libelle"}</th>
-                    <th className="px-3 py-2.5">{locale === "zh" ? "日期" : "Date"}</th>
-                    <th className="px-3 py-2.5">{locale === "zh" ? "房号" : "Chambre"}</th>
-                    <th className="px-3 py-2.5">{locale === "zh" ? "客户" : "Client"}</th>
-                    <th className="px-3 py-2.5 text-right">{locale === "zh" ? "金额" : "Montant"}</th>
-                    <th className="px-3 py-2.5">{locale === "zh" ? "状态" : "Statut"}</th>
-                    <th className="px-3 py-2.5"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-brand-warm-100">
-                  {filtered.map(d => (
-                    <tr
-                      key={d.id}
-                      className={cn(
-                        "transition-colors cursor-pointer hover:bg-brand-warm-50/80",
-                        previewId === d.id && "bg-brand-indigo-50/50",
-                      )}
-                      onClick={() => setPreviewId(d.id)}
-                    >
-                      <td className="px-3 py-2">
-                        <span className="rounded-full bg-brand-warm-100 px-2 py-0.5 text-xs font-bold text-brand-ink-600 ring-1 ring-inset ring-slate-200">
-                          {typeLabels[d.docType]}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-slate-800 max-w-[160px] truncate">{d.title}</td>
-                      <td className="px-3 py-2 text-brand-ink-500 whitespace-nowrap">{d.date}</td>
-                      <td className="px-3 py-2 font-mono text-brand-ink-700">{d.unitNo || "—"}</td>
-                      <td className="px-3 py-2 text-brand-ink-700 max-w-[80px] truncate">{d.customerName || "—"}</td>
-                      <td className="px-3 py-2 text-right tabular-nums font-medium text-slate-800">{formatXof(d.amountXof)}</td>
-                      <td className="px-3 py-2">{statusBadge(d.status)}</td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={e => { e.stopPropagation(); setPreviewId(d.id); }}
-                            className="rounded p-1 text-brand-ink-400 hover:text-brand-indigo hover:bg-brand-warm-50/80"
-                            title={locale === "zh" ? "预览" : "Apercu"}
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={e => { e.stopPropagation(); handlePrint(d); }}
-                            className="rounded p-1 text-brand-ink-400 hover:text-brand-indigo hover:bg-brand-warm-50/80"
-                            title={locale === "zh" ? "打印" : "Imprimer"}
-                          >
-                            <Printer className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </td>
+            <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-[13px] min-w-[700px]">
+                  <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-2.5">{zh ? "单据类型" : "Type"}</th>
+                      <th className="px-4 py-2.5">{zh ? "标题" : "Libellé"}</th>
+                      <th className="px-4 py-2.5">{zh ? "日期" : "Date"}</th>
+                      <th className="px-4 py-2.5">{zh ? "房号" : "Chambre"}</th>
+                      <th className="px-4 py-2.5">{zh ? "客户" : "Client"}</th>
+                      <th className="px-4 py-2.5 text-right">{zh ? "金额" : "Montant"}</th>
+                      <th className="px-4 py-2.5">{zh ? "状态" : "Statut"}</th>
+                      <th className="px-4 py-2.5" />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y">
+                    {filtered.map(d => (
+                      <tr
+                        key={d.id}
+                        className={cn(
+                          "transition-colors cursor-pointer hover:bg-accent/50",
+                          previewId === d.id && "bg-accent/50",
+                        )}
+                        onClick={() => setPreviewId(d.id)}
+                      >
+                        <td className="px-4 py-2.5">
+                          <Badge variant="secondary" className="text-xs">{typeLabels[d.docType]}</Badge>
+                        </td>
+                        <td className="px-4 py-2.5 max-w-[160px] truncate">{d.title}</td>
+                        <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{d.date}</td>
+                        <td className="px-4 py-2.5 font-mono">{d.unitNo || "—"}</td>
+                        <td className="px-4 py-2.5 max-w-[80px] truncate">{d.customerName || "—"}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatXof(d.amountXof)}</td>
+                        <td className="px-4 py-2.5">
+                          <Badge variant={statusTone[d.status] ?? "secondary"} className="text-xs">{stLabels[d.status] ?? d.status}</Badge>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={e => { e.stopPropagation(); setPreviewId(d.id); }}
+                              className="rounded p-1 text-muted-foreground hover:text-foreground transition-colors"
+                              title={zh ? "预览" : "Aperçu"}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={e => { e.stopPropagation(); handlePrint(d); }}
+                              className="rounded p-1 text-muted-foreground hover:text-foreground transition-colors"
+                              title={zh ? "打印" : "Imprimer"}
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
 
         {/* Preview panel */}
         {previewed && (
-          <div className="w-[380px] shrink-0 rounded-xl border border-brand-warm-200 bg-white shadow-natural flex flex-col">
-            <div className="flex items-center justify-between border-b border-brand-warm-200 px-4 py-3">
-              <h3 className="text-sm font-black text-brand-ink-900 flex items-center gap-1.5">
-                <FileText className="h-4 w-4 text-brand-indigo" />
-                {locale === "zh" ? "单据预览" : "Apercu"}
+          <div className="w-[380px] shrink-0 rounded-xl border bg-card shadow-sm flex flex-col">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h3 className="text-sm font-bold flex items-center gap-1.5">
+                <FileText className="h-4 w-4 text-primary" />
+                {zh ? "单据预览" : "Aperçu"}
               </h3>
-              <button onClick={() => setPreviewId(null)} className="rounded p-1 text-brand-ink-400 hover:bg-brand-warm-50/80">
+              <button onClick={() => setPreviewId(null)} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>
             <div className="flex-1 overflow-auto p-4 space-y-3">
-              <div className="text-center border-b border-brand-warm-200 pb-3">
-                <p className="text-xs uppercase tracking-[0.14em] text-brand-indigo font-semibold">SACIS 3.0 · {locale === "zh" ? "科建地产" : "Kejian Immobilier"}</p>
-                <p className="text-sm font-black text-brand-ink-900 mt-1">{typeLabels[previewed.docType]}</p>
+              <div className="text-center border-b pb-3">
+                <p className="text-xs uppercase tracking-[0.04em] text-primary font-semibold">SACIS 3.0 · {zh ? "科建地产" : "Kejian Immobilier"}</p>
+                <p className="text-sm font-bold mt-1">{typeLabels[previewed.docType]}</p>
               </div>
-              <dl className="space-y-2 text-xs">
-                <div className="flex justify-between"><dt className="text-brand-ink-500">{locale === "zh" ? "标题" : "Libelle"}</dt><dd className="font-medium text-slate-800">{previewed.title}</dd></div>
-                <div className="flex justify-between"><dt className="text-brand-ink-500">{locale === "zh" ? "日期" : "Date"}</dt><dd className="text-brand-ink-700">{previewed.date}</dd></div>
-                <div className="flex justify-between"><dt className="text-brand-ink-500">{locale === "zh" ? "房号" : "Chambre"}</dt><dd className="font-mono text-slate-800">{previewed.unitNo || "—"}</dd></div>
-                <div className="flex justify-between"><dt className="text-brand-ink-500">{locale === "zh" ? "客户" : "Client"}</dt><dd className="text-slate-800">{previewed.customerName || "—"}</dd></div>
-                {previewed.customerPhone && <div className="flex justify-between"><dt className="text-brand-ink-500">{locale === "zh" ? "电话" : "Tel"}</dt><dd className="text-brand-ink-700">{previewed.customerPhone}</dd></div>}
-                {previewed.contractNo && <div className="flex justify-between"><dt className="text-brand-ink-500">{locale === "zh" ? "合同号" : "N° contrat"}</dt><dd className="font-mono text-brand-ink-700">{previewed.contractNo}</dd></div>}
-                <div className="flex justify-between border-t border-brand-warm-200 pt-2"><dt className="text-brand-ink-500">{locale === "zh" ? "金额" : "Montant"}</dt><dd className="font-semibold text-brand-ink-900">{formatXof(previewed.amountXof)}</dd></div>
+              <dl className="space-y-2 text-sm">
+                <div className="flex justify-between"><dt className="text-muted-foreground">{zh ? "标题" : "Libellé"}</dt><dd className="font-medium">{previewed.title}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted-foreground">{zh ? "日期" : "Date"}</dt><dd>{previewed.date}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted-foreground">{zh ? "房号" : "Chambre"}</dt><dd className="font-mono">{previewed.unitNo || "—"}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted-foreground">{zh ? "客户" : "Client"}</dt><dd>{previewed.customerName || "—"}</dd></div>
+                {previewed.customerPhone && <div className="flex justify-between"><dt className="text-muted-foreground">{zh ? "电话" : "Tél"}</dt><dd>{previewed.customerPhone}</dd></div>}
+                {previewed.contractNo && <div className="flex justify-between"><dt className="text-muted-foreground">{zh ? "合同号" : "N° contrat"}</dt><dd className="font-mono">{previewed.contractNo}</dd></div>}
+                <div className="flex justify-between border-t pt-2"><dt className="text-muted-foreground">{zh ? "金额" : "Montant"}</dt><dd className="font-semibold">{formatXof(previewed.amountXof)}</dd></div>
                 {previewed.amountXof > 0 && (
                   <div className="flex justify-between">
-                    <dt className="text-brand-ink-500">{locale === "zh" ? "已收" : "Paye"}</dt>
-                    <dd className={cn("font-semibold", previewed.paidAmountXof > 0 ? "text-brand-green-700" : "text-brand-ink-400")}>{formatXof(previewed.paidAmountXof)}</dd>
+                    <dt className="text-muted-foreground">{zh ? "已收" : "Payé"}</dt>
+                    <dd className={cn("font-semibold", previewed.paidAmountXof > 0 ? "text-emerald-600" : "text-muted-foreground")}>{formatXof(previewed.paidAmountXof)}</dd>
                   </div>
                 )}
                 {previewed.amountXof - previewed.paidAmountXof > 0 && (
                   <div className="flex justify-between">
-                    <dt className="text-brand-red-500">{locale === "zh" ? "未收" : "Du"}</dt>
-                    <dd className="font-semibold text-brand-red-600">{formatXof(previewed.amountXof - previewed.paidAmountXof)}</dd>
+                    <dt className="text-rose-600">{zh ? "未收" : "Dû"}</dt>
+                    <dd className="font-semibold text-rose-600">{formatXof(previewed.amountXof - previewed.paidAmountXof)}</dd>
                   </div>
                 )}
-                <div className="flex justify-between"><dt className="text-brand-ink-500">{locale === "zh" ? "状态" : "Statut"}</dt><dd>{statusBadge(previewed.status)}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted-foreground">{zh ? "状态" : "Statut"}</dt><dd><Badge variant={statusTone[previewed.status] ?? "secondary"} className="text-xs">{stLabels[previewed.status] ?? previewed.status}</Badge></dd></div>
               </dl>
-              <div className="border-t border-brand-warm-200 pt-3">
+              <div className="border-t pt-3">
                 <button
                   onClick={() => handlePrint(previewed)}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-brand-indigo-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-brand-indigo-600 active:scale-[0.98]"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 active:scale-[0.98]"
                 >
-                  <Printer className="h-4 w-4" />{locale === "zh" ? "打印单据" : "Imprimer"}
+                  <Printer className="h-4 w-4" />{zh ? "打印单据" : "Imprimer"}
                 </button>
-                <p className="mt-1.5 text-xs font-semibold text-brand-ink-400 text-center">
-                  {locale === "zh" ? "打印时自动隐藏侧栏，仅保留单据正文" : "L'impression masque la navigation"}
-                </p>
               </div>
             </div>
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+function SearchIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+    </svg>
   );
 }

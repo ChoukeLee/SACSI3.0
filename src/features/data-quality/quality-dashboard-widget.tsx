@@ -22,7 +22,7 @@ export function QualityDashboardWidget({ issues, locale, variant = "dashboard" }
     if (issues.length === 0) return null;
     const top = issues.slice(0, 5);
     return (
-      <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-natural">
+      <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-neutral-200 bg-brand-neutral-50 px-5 py-3">
           <h3 className="flex items-center gap-2 text-sm font-black text-brand-neutral-950">
             <ShieldAlert className="h-4 w-4 text-brand-indigo" />
@@ -54,7 +54,7 @@ export function QualityDashboardWidget({ issues, locale, variant = "dashboard" }
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-natural">
+    <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 bg-white px-5 py-4">
         <div className="flex items-center gap-2.5">
           <span className={cn(

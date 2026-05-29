@@ -52,7 +52,7 @@ export default async function FrenchTodosPage() {
         <DesktopOnly locale="fr" />
       </div>
       <div className="hidden lg:block">
-        <PageHeader title="Centre de notifications" description="Taches calculees depuis les donnees metier : arrivees, departs, impayes, echeances, anomalies" />
+        <PageHeader title="Centre de notifications" />
         <section className="mt-8">
           <TodoCenter todos={todos} locale="fr" />
         </section>

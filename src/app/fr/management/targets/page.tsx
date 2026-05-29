@@ -30,7 +30,7 @@ export default async function FrenchTargetsPage() {
 
   return (
     <>
-      <PageHeader title="Objectifs" description="Gerer les objectifs KPI mensuels, trimestriels et annuels" />
+      <PageHeader title="Objectifs" />
       <TargetsView targets={(targets ?? []) as any[]} receivables={receivables ?? []} units={units ?? []}
         bookings={bookings ?? []} leases={leases ?? []} sales={sales ?? []}
         locale="fr" userRole={user.role} />

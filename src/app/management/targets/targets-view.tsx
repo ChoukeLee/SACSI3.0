@@ -2,8 +2,11 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Save, TrendingUp, TrendingDown } from "lucide-react";
+import { Plus, Trash2, Save } from "lucide-react";
 import { cn, formatXof } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MetricCard } from "@/components/metric-card";
 import { computeKpiData, KPI_DEFINITIONS } from "@/features/management/kpi-service";
 import type { ReceivableRow, UnitRow, DailyBookingRow, LeaseContractRow, SaleContractRow } from "@/types/database";
 
@@ -21,8 +24,11 @@ interface Props {
   locale: "zh" | "fr"; userRole: string;
 }
 
+const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+
 export function TargetsView({ targets, receivables, units, bookings, leases, sales, locale, userRole }: Props) {
   const router = useRouter();
+  const zh = locale === "zh";
   const [showForm, setShowForm] = useState(false);
   const [formMetric, setFormMetric] = useState("monthly_receivable");
   const [formValue, setFormValue] = useState("");
@@ -51,7 +57,7 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
   }, [targets]);
 
   const handleSave = async () => {
-    if (!formValue || isNaN(Number(formValue))) { setFormMsg("请输入有效数值"); return; }
+    if (!formValue || isNaN(Number(formValue))) { setFormMsg(zh ? "请输入有效数值" : "Valeur invalide"); return; }
     setSaving(true);
     const now = new Date();
     const start = formPeriod === "monthly"
@@ -71,8 +77,8 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
         body: JSON.stringify({ period_type: formPeriod, period_start: start, period_end: end, metric_key: formMetric, target_value: Number(formValue), unit: KPI_DEFINITIONS.find(d => d.key === formMetric)?.unit ?? "%", scope_type: "global" }),
       });
       if (resp.ok) { setShowForm(false); setFormMsg(""); setFormValue(""); router.refresh(); }
-      else setFormMsg("保存失败");
-    } catch { setFormMsg("网络错误"); }
+      else setFormMsg(zh ? "保存失败" : "Échec");
+    } catch { setFormMsg(zh ? "网络错误" : "Erreur réseau"); }
     setSaving(false);
   };
 
@@ -83,74 +89,85 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {KPI_DEFINITIONS.map(def => {
           const current = kpiMap[def.key] ?? 0;
           const target = currentTargets.find(t => t.metric_key === def.key);
-          const rate = target ? (def.isPercentage ? Math.min(100, Math.round((current / Number(target.target_value)) * 100)) : Math.min(100, Math.round((current / Number(target.target_value)) * 100))) : null;
-          const displayVal = def.key.endsWith("_max") ? current : current;
+          const rate = target ? Math.min(100, Math.round((current / Number(target.target_value)) * 100)) : null;
+          const tone = target ? ((rate ?? 0) >= 100 ? "green" : (rate ?? 0) >= 70 ? "amber" : "red") : "neutral";
           return (
-            <div key={def.key} className="rounded-lg border border-slate-200 bg-white p-3">
-              <p className="text-xs text-slate-500">{locale === "zh" ? def.labelZh : def.labelFr}</p>
-              <p className="text-lg font-black tabular-nums text-slate-950">
-                {def.isPercentage ? `${displayVal}%` : formatXof(displayVal)}
-              </p>
-              {target ? (
-                <div className="mt-1">
-                  <div className="h-1.5 rounded-full bg-brand-neutral-200">
-                    <div className={cn("h-full rounded-full", (rate ?? 0) >= 100 ? "bg-brand-green-500" : (rate ?? 0) >= 70 ? "bg-brand-indigo" : "bg-brand-red-400")} style={{ width: `${Math.min(100, rate ?? 0)}%` }} />
-                  </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {locale === "zh" ? "目标" : "Cible"}: {def.isPercentage ? `${target.target_value}%` : formatXof(Number(target.target_value))}
-                    {" · "}{rate}%
-                  </p>
-                </div>
-              ) : (
-                <p className="text-xs text-slate-400 mt-1">{locale === "zh" ? "未设置目标" : "Pas d'objectif"}</p>
-              )}
-            </div>
+            <MetricCard
+              key={def.key}
+              title={zh ? def.labelZh : def.labelFr}
+              value={def.isPercentage ? `${current}%` : formatXof(current)}
+              caption={target ? `${zh ? "目标" : "Cible"}: ${def.isPercentage ? `${target.target_value}%` : formatXof(Number(target.target_value))} · ${rate}%` : (zh ? "未设置目标" : "Pas d'objectif")}
+              tone={tone}
+            />
           );
         })}
       </div>
 
-      {/* Targets list */}
+      {/* Targets management */}
       {canEdit && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-slate-950">{locale === "zh" ? "目标管理" : "Objectifs"}</h3>
-            <button onClick={() => setShowForm(!showForm)} className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white"><Plus className="inline h-3 w-3 mr-1" />{locale === "zh" ? "新增" : "Ajouter"}</button>
-          </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base">{zh ? "目标管理" : "Objectifs"}</CardTitle>
+            <Button size="sm" onClick={() => setShowForm(!showForm)}>
+              <Plus className="h-4 w-4" />{zh ? "新增" : "Ajouter"}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {showForm && (
+              <div className="mb-3 rounded-md border bg-muted/30 p-3 space-y-2">
+                <select value={formPeriod} onChange={e => setFormPeriod(e.target.value)} className={inputClass}>
+                  <option value="monthly">{zh ? "月度" : "Mensuel"}</option>
+                  <option value="quarterly">{zh ? "季度" : "Trimestre"}</option>
+                  <option value="yearly">{zh ? "年度" : "Annuel"}</option>
+                </select>
+                <select value={formMetric} onChange={e => setFormMetric(e.target.value)} className={inputClass}>
+                  {KPI_DEFINITIONS.map(d => <option key={d.key} value={d.key}>{zh ? d.labelZh : d.labelFr}</option>)}
+                </select>
+                <input type="number" value={formValue} onChange={e => setFormValue(e.target.value)} placeholder={zh ? "目标值" : "Valeur"} className={inputClass} />
+                {formMsg && <p className="text-sm text-destructive">{formMsg}</p>}
+                <Button size="sm" onClick={handleSave} disabled={saving}><Save className="h-4 w-4" />{zh ? "保存" : "OK"}</Button>
+              </div>
+            )}
 
-          {showForm && (
-            <div className="mb-3 rounded border border-brand-indigo-200 bg-brand-indigo-50 p-3 space-y-2">
-              <select value={formPeriod} onChange={e => setFormPeriod(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-sm">
-                <option value="monthly">{locale === "zh" ? "月度" : "Mensuel"}</option>
-                <option value="quarterly">{locale === "zh" ? "季度" : "Trimestre"}</option>
-                <option value="yearly">{locale === "zh" ? "年度" : "Annuel"}</option>
-              </select>
-              <select value={formMetric} onChange={e => setFormMetric(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-sm">
-                {KPI_DEFINITIONS.map(d => <option key={d.key} value={d.key}>{locale === "zh" ? d.labelZh : d.labelFr}</option>)}
-              </select>
-              <input type="number" value={formValue} onChange={e => setFormValue(e.target.value)} placeholder={locale === "zh" ? "目标值" : "Valeur"} className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-sm" />
-              {formMsg && <p className="text-xs text-brand-red-600">{formMsg}</p>}
-              <button onClick={handleSave} disabled={saving} className="rounded-lg bg-slate-950 px-4 py-1.5 text-xs font-semibold text-white"><Save className="inline h-3 w-3 mr-1" />{locale === "zh" ? "保存" : "OK"}</button>
-            </div>
-          )}
-
-          {targets.length === 0 ? (
-            <p className="text-xs text-slate-400">{locale === "zh" ? "暂无目标" : "Aucun"}</p>
-          ) : (
-            <table className="data-table"><thead className="text-xs uppercase text-slate-500"><tr><th className="px-2 py-1">{locale === "zh" ? "指标" : "KPI"}</th><th className="px-2 py-1">{locale === "zh" ? "期间" : "Periode"}</th><th className="px-2 py-1 text-right">{locale === "zh" ? "目标值" : "Cible"}</th><th className="px-2 py-1"></th></tr></thead>
-            <tbody className="divide-y divide-brand-neutral-200">
-              {targets.map(t => {
-                const def = KPI_DEFINITIONS.find(d => d.key === t.metric_key);
-                return <tr key={t.id}><td className="px-2 py-1">{def ? (locale === "zh" ? def.labelZh : def.labelFr) : t.metric_key}</td><td className="px-2 py-1">{t.period_start} ~ {t.period_end}</td><td className="px-2 py-1 text-right font-medium">{def?.isPercentage ? `${t.target_value}%` : formatXof(Number(t.target_value))}</td><td className="px-2 py-1"><button onClick={() => handleDelete(t.id)} className="text-brand-red-500 hover:text-brand-red-700"><Trash2 className="h-3 w-3" /></button></td></tr>;
-              })}
-            </tbody></table>
-          )}
-        </div>
+            {targets.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{zh ? "暂无目标" : "Aucun"}</p>
+            ) : (
+              <div className="overflow-hidden rounded-md border">
+                <table className="w-full text-left text-[13px]">
+                  <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-2.5">{zh ? "指标" : "KPI"}</th>
+                      <th className="px-4 py-2.5">{zh ? "期间" : "Période"}</th>
+                      <th className="px-4 py-2.5 text-right">{zh ? "目标值" : "Cible"}</th>
+                      <th className="px-4 py-2.5 w-10" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {targets.map(t => {
+                      const def = KPI_DEFINITIONS.find(d => d.key === t.metric_key);
+                      return (
+                        <tr key={t.id} className="transition-colors hover:bg-accent/50">
+                          <td className="px-4 py-2.5">{def ? (zh ? def.labelZh : def.labelFr) : t.metric_key}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground">{t.period_start} ~ {t.period_end}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums font-medium">{def?.isPercentage ? `${t.target_value}%` : formatXof(Number(t.target_value))}</td>
+                          <td className="px-4 py-2.5">
+                            <button onClick={() => handleDelete(t.id)} className="text-rose-500 hover:text-rose-700 p-1 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   );

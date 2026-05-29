@@ -2,20 +2,23 @@
 
 import { useState } from "react";
 import { Save, Settings2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { updateSystemSetting } from "./settings-server";
 
 interface Props { settings: Record<string, string>; isAdmin: boolean; locale: "zh" | "fr"; }
 
 const CATEGORIES: Record<string, { labelZh: string; labelFr: string; keys: string[] }> = {
-  general: { labelZh: "基础信息", labelFr: "General", keys: ["company_name", "project_name", "default_currency"] },
-  daily_rules: { labelZh: "日租规则", labelFr: "Regles jour", keys: ["default_daily_price", "open_checkout_alert_days"] },
+  general: { labelZh: "基础信息", labelFr: "Général", keys: ["company_name", "project_name", "default_currency"] },
+  daily_rules: { labelZh: "日租规则", labelFr: "Règles jour", keys: ["default_daily_price", "open_checkout_alert_days"] },
   unit_rules: { labelZh: "房源类型", labelFr: "Types lots", keys: ["accommodation_unit_types"] },
-  finance_rules: { labelZh: "财务规则", labelFr: "Regles finance", keys: ["overdue_grace_days"] },
+  finance_rules: { labelZh: "财务规则", labelFr: "Règles finance", keys: ["overdue_grace_days"] },
   reminder_rules: { labelZh: "提醒规则", labelFr: "Rappels", keys: ["lease_expiry_warning_days", "receivable_overdue_warning_days"] },
   print_rules: { labelZh: "单据/打印", labelFr: "Impression", keys: ["receipt_number_prefix", "contract_prefix", "print_company_name", "print_footer_text"] },
 };
 
 export function SystemSettingsPanel({ settings, isAdmin, locale }: Props) {
+  const zh = locale === "zh";
   const [values, setValues] = useState<Record<string, string>>(settings);
   const [editing, setEditing] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -31,40 +34,43 @@ export function SystemSettingsPanel({ settings, isAdmin, locale }: Props) {
   };
 
   return (
-    <section className="rounded-2xl border border-brand-warm-200 bg-white p-5 shadow-natural">
-      <div className="flex items-center gap-2 mb-4">
-        <Settings2 className="h-5 w-5 text-brand-indigo-600" />
-        <h3 className="text-sm font-black text-brand-ink-900">{locale === "zh" ? "系统配置" : "Configuration"}</h3>
-      </div>
-      {msg && <p className="text-xs text-brand-green-600 mb-2">{msg}</p>}
-      <div className="space-y-4">
-        {Object.entries(CATEGORIES).map(([cat, catDef]) => (
-          <div key={cat}>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500 mb-2">{locale === "zh" ? catDef.labelZh : catDef.labelFr}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {catDef.keys.map(key => (
-                <div key={key} className="flex items-center justify-between rounded-xl border border-brand-warm-200 bg-brand-warm-50 px-3 py-2">
-                  <span className="text-xs text-brand-ink-700 truncate mr-2">{key}</span>
-                  {editing === key ? (
-                    <div className="flex items-center gap-1">
-                      <input value={editValue} onChange={e => setEditValue(e.target.value)}
-                        className="w-24 sm:w-32 rounded-xl border border-brand-warm-200 bg-white px-2 py-0.5 text-xs" />
-                      <button onClick={() => handleSave(key)} disabled={saving}
-                        className="rounded-xl bg-brand-indigo-500 p-1.5 text-white shadow-sm hover:bg-brand-indigo-600"><Save className="h-3 w-3" /></button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-brand-ink-800">{values[key] ?? "—"}</span>
-                      {isAdmin && <button onClick={() => { setEditing(key); setEditValue(values[key] ?? ""); }}
-                        className="text-xs text-brand-indigo-600 hover:underline">{locale === "zh" ? "编辑" : "Edit"}</button>}
-                    </div>
-                  )}
-                </div>
-              ))}
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Settings2 className="h-5 w-5 text-primary" />
+          {zh ? "系统配置" : "Configuration"}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {msg && <p className="text-sm text-emerald-600 mb-3">{msg}</p>}
+        <div className="space-y-4">
+          {Object.entries(CATEGORIES).map(([cat, catDef]) => (
+            <div key={cat}>
+              <p className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2">{zh ? catDef.labelZh : catDef.labelFr}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {catDef.keys.map(key => (
+                  <div key={key} className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2">
+                    <span className="text-sm text-muted-foreground truncate mr-2">{key}</span>
+                    {editing === key ? (
+                      <div className="flex items-center gap-1">
+                        <input value={editValue} onChange={e => setEditValue(e.target.value)}
+                          className="w-24 sm:w-32 rounded-md border bg-card px-2 py-1 text-sm" />
+                        <Button size="icon" variant="ghost" onClick={() => handleSave(key)} disabled={saving} className="h-7 w-7"><Save className="h-3 w-3" /></Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold">{values[key] ?? "—"}</span>
+                        {isAdmin && <button onClick={() => { setEditing(key); setEditValue(values[key] ?? ""); }}
+                          className="text-sm text-primary hover:underline">{zh ? "编辑" : "Éditer"}</button>}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-    </section>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

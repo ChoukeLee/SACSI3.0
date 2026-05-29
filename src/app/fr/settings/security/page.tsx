@@ -11,7 +11,7 @@ export default async function FrenchSecurityPage() {
 
   return (
     <>
-      <PageHeader title="Securite" description="Verification securite, sauvegarde, protection operations" />
+      <PageHeader title="Sécurité" />
       <section className="mt-8"><SecurityCenter locale="fr" /></section>
     </>
   );

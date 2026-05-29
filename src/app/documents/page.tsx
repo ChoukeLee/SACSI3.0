@@ -267,7 +267,6 @@ export default async function DocumentsPage() {
       <div className="hidden lg:block">
         <PageHeader
           title="单据中心"
-          description="从现有业务数据生成可打印的业务凭证：合同摘要、收据、催款通知、退房结算单"
         />
         <section className="mt-8">
           <DocumentCenter documents={docs} locale="zh" />

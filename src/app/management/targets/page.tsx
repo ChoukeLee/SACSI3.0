@@ -30,7 +30,7 @@ export default async function TargetsPage() {
 
   return (
     <>
-      <PageHeader title="经营目标" description="设置和管理月度/季度/年度 KPI 目标" />
+      <PageHeader title="经营目标" />
       <TargetsView
         targets={(targets ?? []) as any[]}
         receivables={receivables ?? []} units={units ?? []}

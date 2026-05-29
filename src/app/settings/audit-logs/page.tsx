@@ -53,10 +53,7 @@ export default async function AuditLogsPage() {
         <DesktopOnly locale="zh" />
       </div>
       <div className="hidden lg:block">
-        <PageHeader
-          title="审计日志"
-          description="记录系统关键操作的变更历史：谁在什么时候创建、修改、删除了什么"
-        />
+        <PageHeader title="审计日志" />
         <section className="mt-8">
           <AuditLogViewer logs={logs} locale="zh" />
         </section>

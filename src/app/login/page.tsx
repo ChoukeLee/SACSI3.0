@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { login } from "./actions";
 
 function loginErrorMessage(error: string | undefined) {
@@ -50,12 +51,9 @@ export default async function LoginPage({
             <p className="rounded-lg bg-brand-red-50 px-3 py-2 text-sm text-brand-red-600">{error}</p>
           )}
 
-          <button
-            type="submit"
-            className="w-full rounded-lg bg-brand-indigo px-4 py-2.5 text-sm font-semibold text-white transition-all duration-fast hover:bg-brand-indigo-600 active:scale-[0.98]"
-          >
+          <Button type="submit" className="w-full">
             登录
-          </button>
+          </Button>
         </form>
       </div>
     </div>

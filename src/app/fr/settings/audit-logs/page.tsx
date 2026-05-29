@@ -51,10 +51,7 @@ export default async function FrenchAuditLogsPage() {
         <DesktopOnly locale="fr" />
       </div>
       <div className="hidden lg:block">
-        <PageHeader
-          title="Journal d'audit"
-          description="Historique des operations cles : qui a fait quoi, quand et sur quel objet"
-        />
+        <PageHeader title="Journal d'audit" />
         <section className="mt-8">
           <AuditLogViewer logs={logs} locale="fr" />
         </section>

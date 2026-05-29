@@ -39,7 +39,7 @@ const groups: NavGroup[] = [
     { key: "dataExchange", href: "/data-exchange", icon: ArrowUpDown },
     { key: "bulkActions", href: "/bulk-actions", icon: Layers },
     { key: "targets", href: "/management/targets", icon: Target, activeMatch: "/management/targets" },
-    { key: "settings", href: "/settings", icon: Settings, activeMatch: "/settings" },
+    { key: "settings", href: "/settings", icon: Settings },
     { key: "security", href: "/settings/security", icon: Shield, activeMatch: "/settings/security" },
   ]},
 ];

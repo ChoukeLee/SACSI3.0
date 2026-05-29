@@ -5,7 +5,8 @@ import { Download } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
-import { receivableStatusStyles as STATUS_STYLES, receivableRowBg as ROW_BG } from "@/lib/status-styles";
+import { Badge } from "@/components/ui/badge";
+import { MetricCard } from "@/components/metric-card";
 import {
   calculateReceivableSummary,
   buildReceivableCsv,
@@ -27,6 +28,20 @@ interface Props {
   buildings: BuildingRow[];
   locale: Locale;
 }
+
+const statusTone: Record<string, "default" | "secondary" | "destructive" | "outline" | "warning" | "success"> = {
+  pending: "secondary",
+  partial: "warning",
+  paid: "success",
+  overdue: "destructive",
+  cancelled: "outline",
+};
+
+const rowBg: Record<string, string> = {
+  partial: "bg-amber-50/30",
+  overdue: "bg-red-50/30",
+  cancelled: "opacity-60",
+};
 
 export function ReceivableList({ receivables, units, customers, buildings, locale }: Props) {
   const t = dictionaries[locale].receivables;
@@ -117,31 +132,34 @@ export function ReceivableList({ receivables, units, customers, buildings, local
     URL.revokeObjectURL(url);
   };
 
-  const filterBtn = "rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition-all duration-fast hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15";
-
   const resolveBuildingName = (r: ReceivableRow) => {
     const bid = r.building_id ?? unitBuildingMap.get(r.unit_id ?? "") ?? null;
     if (!bid) return "—";
     return buildingMap.get(bid) ?? "—";
   };
 
+  const filterBtn = "h-9 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+  const filterDate = cn(filterBtn, "w-[150px]");
+
+  const collectionTone = summary.collectionRate >= 0.8 ? "green" : summary.collectionRate >= 0.5 ? "amber" : "red";
+
   return (
-    <div>
+    <div className="space-y-5">
       {/* Summary cards */}
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <MiniCard label={t.summary.totalReceivable} value={formatXof(summary.totalReceivable)} accent="ink" />
-        <MiniCard label={t.summary.totalPaid} value={formatXof(summary.totalPaid)} accent="green" />
-        <MiniCard label={t.summary.totalOutstanding} value={formatXof(summary.outstanding)} accent="orange" />
-        <MiniCard label={t.summary.totalOverdue} value={formatXof(summary.overdue)} accent="red" />
-        <MiniCard
-          label={t.summary.collectionRate}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <MetricCard title={t.summary.totalReceivable} value={formatXof(summary.totalReceivable)} tone="indigo" />
+        <MetricCard title={t.summary.totalPaid} value={formatXof(summary.totalPaid)} tone="green" />
+        <MetricCard title={t.summary.totalOutstanding} value={formatXof(summary.outstanding)} tone="amber" />
+        <MetricCard title={t.summary.totalOverdue} value={formatXof(summary.overdue)} tone="red" />
+        <MetricCard
+          title={t.summary.collectionRate}
           value={`${(summary.collectionRate * 100).toFixed(1)}%`}
-          accent={summary.collectionRate >= 0.8 ? "green" : summary.collectionRate >= 0.5 ? "orange" : "red"}
+          tone={collectionTone}
         />
       </div>
 
       {/* Filters */}
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-brand-warm-200 bg-white p-3 shadow-natural">
+      <div className="flex flex-wrap items-center gap-2">
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={filterBtn}>
           <option value="all">{t.filters.status}: {t.filters.all}</option>
           {Object.entries(t.statuses).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -153,88 +171,88 @@ export function ReceivableList({ receivables, units, customers, buildings, local
         <select value={buildingFilter} onChange={e => setBuildingFilter(e.target.value)} className={filterBtn}>
           <option value="all">{t.filters.building}: {t.filters.all}</option>
           {buildings.map(b => <option key={b.id} value={b.id}>{b.display_name || b.code}</option>)}
-          <option value="__unassigned__">{locale === "zh" ? "未归属" : "Non attribue"}</option>
+          <option value="__unassigned__">{locale === "zh" ? "未归属" : "Non attribué"}</option>
         </select>
         <input
           type="date" value={dateFrom}
           onChange={e => setDateFrom(e.target.value)}
-          className={cn(filterBtn, "w-[150px]")}
-          title={locale === "zh" ? "起始日期" : "Date debut"}
+          className={filterDate}
+          title={locale === "zh" ? "起始日期" : "Date début"}
         />
-        <span className="text-xs font-semibold text-brand-ink-400">-</span>
+        <span className="text-xs font-semibold text-muted-foreground">-</span>
         <input
           type="date" value={dateTo}
           onChange={e => setDateTo(e.target.value)}
-          className={cn(filterBtn, "w-[150px]")}
+          className={filterDate}
           title={locale === "zh" ? "结束日期" : "Date fin"}
         />
-        <button
-          onClick={handleExportCsv}
-          disabled={filtered.length === 0}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:bg-brand-warm-50 disabled:opacity-40"
-        >
-          <Download className="h-3.5 w-3.5" />{t.export.csv}
-        </button>
-        <span className="text-xs font-semibold text-brand-ink-400">
-          {filtered.length} {locale === "zh" ? "条" : "lignes"}
-        </span>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={handleExportCsv}
+            disabled={filtered.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-accent disabled:opacity-40"
+          >
+            <Download className="h-4 w-4" />{t.export.csv}
+          </button>
+          <span className="text-xs font-semibold text-muted-foreground">
+            {filtered.length} {locale === "zh" ? "条" : "lignes"}
+          </span>
+        </div>
       </div>
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-brand-warm-200 bg-white py-16 shadow-natural">
-          <p className="text-sm font-semibold text-brand-ink-400">{t.empty}</p>
+        <div className="flex flex-col items-center gap-3 rounded-xl border bg-card py-16 shadow-sm">
+          <p className="text-sm font-semibold text-muted-foreground">{t.empty}</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
+        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
           <div className="overflow-x-auto">
-            <table className="data-table min-w-[980px] text-sm">
-              <thead>
+            <table className="w-full text-left text-[13px] min-w-[980px]">
+              <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3">{t.columns.dueDate}</th>
-                  <th className="px-4 py-3">{t.columns.building}</th>
-                  <th className="px-4 py-3">{t.columns.unit}</th>
-                  <th className="px-4 py-3">{t.columns.customer}</th>
-                  <th className="px-4 py-3">{t.columns.sourceType}</th>
-                  <th className="px-4 py-3">{t.columns.title}</th>
-                  <th className="px-4 py-3 text-right">{t.columns.amount}</th>
-                  <th className="px-4 py-3 text-right">{t.columns.paid}</th>
-                  <th className="px-4 py-3 text-right">{t.columns.outstanding}</th>
-                  <th className="px-4 py-3">{t.columns.status}</th>
-                  <th className="px-4 py-3 text-right">{t.columns.overdueDays}</th>
+                  <th className="px-4 py-2.5">{t.columns.dueDate}</th>
+                  <th className="px-4 py-2.5">{t.columns.building}</th>
+                  <th className="px-4 py-2.5">{t.columns.unit}</th>
+                  <th className="px-4 py-2.5">{t.columns.customer}</th>
+                  <th className="px-4 py-2.5">{t.columns.sourceType}</th>
+                  <th className="px-4 py-2.5">{t.columns.title}</th>
+                  <th className="px-4 py-2.5 text-right">{t.columns.amount}</th>
+                  <th className="px-4 py-2.5 text-right">{t.columns.paid}</th>
+                  <th className="px-4 py-2.5 text-right">{t.columns.outstanding}</th>
+                  <th className="px-4 py-2.5">{t.columns.status}</th>
+                  <th className="px-4 py-2.5 text-right">{t.columns.overdueDays}</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y">
                 {filtered.map(r => {
                   const os = Number(r.amount_xof) - Number(r.paid_amount_xof);
                   const od = overdueDays(r);
                   return (
-                    <tr key={r.id} className={cn("transition-colors duration-fast hover:bg-brand-warm-50/80", ROW_BG[r.status])}>
-                      <td className="px-4 py-3 text-sm text-brand-ink-500 whitespace-nowrap">{r.due_date}</td>
-                      <td className="px-4 py-3 text-sm text-brand-ink-500 whitespace-nowrap">{resolveBuildingName(r)}</td>
-                      <td className="px-4 py-3 font-mono text-sm font-bold text-brand-ink-900">{unitMap.get(r.unit_id ?? "") ?? "-"}</td>
-                      <td className="max-w-[120px] truncate px-4 py-3 text-sm text-brand-ink-700">{customerMap.get(r.customer_id ?? "") ?? "-"}</td>
-                      <td className="px-4 py-3">
-                        <span className="rounded bg-brand-warm-100 px-1.5 py-0.5 text-xs text-brand-ink-600">
+                    <tr key={r.id} className={cn("transition-colors hover:bg-accent/50", rowBg[r.status] ?? "")}>
+                      <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{r.due_date}</td>
+                      <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{resolveBuildingName(r)}</td>
+                      <td className="px-4 py-2.5 font-mono text-sm font-bold">{unitMap.get(r.unit_id ?? "") ?? "-"}</td>
+                      <td className="max-w-[120px] truncate px-4 py-2.5">{customerMap.get(r.customer_id ?? "") ?? "-"}</td>
+                      <td className="px-4 py-2.5">
+                        <Badge variant="secondary" className="text-xs">
                           {t.sourceTypes[r.source_type as keyof typeof t.sourceTypes] ?? r.source_type}
-                        </span>
+                        </Badge>
                       </td>
-                      <td className="max-w-[180px] truncate px-4 py-3 text-sm text-brand-ink-700">{r.title}</td>
-                      <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-800">{formatXof(Number(r.amount_xof))}</td>
-                      <td className="px-4 py-3 text-right text-sm tabular-nums text-brand-green-600">{formatXof(Number(r.paid_amount_xof))}</td>
-                      <td className={cn("px-4 py-3 text-right text-sm tabular-nums font-semibold", os > 0 ? "text-brand-red-600" : "text-brand-green-600")}>{formatXof(os)}</td>
-                      <td className="px-4 py-3">
-                        <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", STATUS_STYLES[r.status])}>
-                          {t.statuses[r.status as keyof typeof t.statuses] ?? r.status}
-                        </span>
+                      <td className="max-w-[180px] truncate px-4 py-2.5">{r.title}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums font-semibold">{formatXof(Number(r.amount_xof))}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">{formatXof(Number(r.paid_amount_xof))}</td>
+                      <td className={cn("px-4 py-2.5 text-right tabular-nums font-semibold", os > 0 ? "text-rose-600" : "text-emerald-600")}>{formatXof(os)}</td>
+                      <td className="px-4 py-2.5">
+                        <Badge variant={statusTone[r.status] ?? "secondary"}>{t.statuses[r.status as keyof typeof t.statuses] ?? r.status}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
+                      <td className="px-4 py-2.5 text-right tabular-nums">
                         {od !== null && od > 0 ? (
-                          <span className="text-brand-red-600 font-medium">+{od}</span>
+                          <span className="text-rose-600 font-semibold">+{od}</span>
                         ) : od !== null && od === 0 ? (
-                          <span className="text-brand-ink-400">0</span>
+                          <span className="text-muted-foreground">0</span>
                         ) : (
-                          <span className="text-brand-ink-300">-</span>
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </td>
                     </tr>
@@ -245,23 +263,6 @@ export function ReceivableList({ receivables, units, customers, buildings, local
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function MiniCard({ label, value, accent }: { label: string; value: string; accent: string }) {
-  const styles = accent === "ink"
-    ? "border-brand-warm-200 bg-white text-brand-ink-900"
-    : accent === "green"
-      ? "border-brand-green-200 bg-brand-green-50 text-brand-green-700"
-      : accent === "orange"
-        ? "border-brand-indigo-200 bg-brand-indigo-50 text-brand-indigo-700"
-        : "border-brand-red-200 bg-brand-red-50 text-brand-red-700";
-
-  return (
-    <div className={cn("rounded-2xl border px-4 py-3 shadow-sm", styles)}>
-      <p className="text-xs font-bold text-current opacity-70">{label}</p>
-      <p className="mt-1 text-2xl font-black tabular-nums">{value}</p>
     </div>
   );
 }

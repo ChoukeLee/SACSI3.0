@@ -536,6 +536,7 @@ export function DailyCalendar({
                           key={`${unit.id}-${dateStr}`}
                           unit={unit}
                           dateStr={dateStr}
+                          todayStr={todayStr}
                           booking={booking}
                           customer={booking ? customerMap.get(booking.customer_id) ?? null : null}
                           hasCleaning={hasCleaning}
@@ -658,7 +659,7 @@ export function DailyCalendar({
               <div className="overflow-hidden rounded-xl border border-brand-warm-200">
                 <div className="max-h-[calc(100vh-260px)] overflow-auto">
                   {financeDetail === "collected" && (
-                    <table className="data-table">
+                    <table className="w-full text-left text-[13px]">
                       <thead className="sticky top-0 z-10 bg-brand-warm-50">
                         <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500">
                           <th className="px-4 py-3">{locale === "zh" ? "日期" : "Date"}</th>
@@ -680,7 +681,7 @@ export function DailyCalendar({
                                 <td className="px-4 py-2.5 font-medium text-brand-ink-900">{p.payment_date}</td>
                                 <td className="px-4 py-2.5 text-brand-ink-700">{u?.unit_no ?? "—"}</td>
                                 <td className="px-4 py-2.5 text-brand-ink-700">{c?.name ?? "—"}</td>
-                                <td className="px-4 py-2.5 text-right font-semibold text-brand-ink-900">{formatXof(Number(p.amount))}</td>
+                                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-brand-ink-900">{formatXof(Number(p.amount))}</td>
                               </tr>
                             );
                           })
@@ -690,7 +691,7 @@ export function DailyCalendar({
                   )}
 
                   {financeDetail === "outstanding" && (
-                    <table className="data-table">
+                    <table className="w-full text-left text-[13px]">
                       <thead className="sticky top-0 z-10 bg-brand-warm-50">
                         <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500">
                           <th className="px-4 py-3">{locale === "zh" ? "房号" : "Chambre"}</th>
@@ -719,9 +720,9 @@ export function DailyCalendar({
                                 <td className="px-4 py-2.5 font-medium text-brand-ink-900">{u?.unit_no ?? "—"}</td>
                                 <td className="px-4 py-2.5 text-brand-ink-700">{c?.name ?? "—"}</td>
                                 <td className="px-4 py-2.5 text-brand-ink-600">{b.check_in}</td>
-                                <td className="px-4 py-2.5 text-right text-brand-ink-900">{formatXof(final)}</td>
-                                <td className="px-4 py-2.5 text-right text-brand-green-700">{formatXof(prepaid)}</td>
-                                <td className="px-4 py-2.5 text-right font-semibold text-brand-indigo-700">{formatXof(final - prepaid)}</td>
+                                <td className="px-4 py-2.5 text-right tabular-nums text-brand-ink-900">{formatXof(final)}</td>
+                                <td className="px-4 py-2.5 text-right tabular-nums text-brand-green-700">{formatXof(prepaid)}</td>
+                                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-brand-indigo-700">{formatXof(final - prepaid)}</td>
                               </tr>
                             );
                           })
@@ -731,7 +732,7 @@ export function DailyCalendar({
                   )}
 
                   {financeDetail === "settled" && (
-                    <table className="data-table">
+                    <table className="w-full text-left text-[13px]">
                       <thead className="sticky top-0 z-10 bg-brand-warm-50">
                         <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500">
                           <th className="px-4 py-3">{locale === "zh" ? "房号" : "Chambre"}</th>
@@ -762,7 +763,7 @@ export function DailyCalendar({
                                 <td className="px-4 py-2.5 text-brand-ink-700">{c?.name ?? "—"}</td>
                                 <td className="px-4 py-2.5 text-brand-ink-600">{b.check_in}</td>
                                 <td className="px-4 py-2.5 text-brand-ink-600">{b.checkout_mode === "open" ? b.actual_check_out : b.check_out}</td>
-                                <td className="px-4 py-2.5 text-right font-semibold text-brand-ink-900">{formatXof(final)}</td>
+                                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-brand-ink-900">{formatXof(final)}</td>
                                 <td className="px-4 py-2.5">
                                   <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-bold", isPaid ? "bg-brand-green-100 text-brand-green-700" : "bg-brand-amber-100 text-brand-amber-700")}>
                                     {isPaid ? (locale === "zh" ? "已付清" : "Paye") : (locale === "zh" ? "未付清" : "Impaye")}
@@ -788,6 +789,7 @@ export function DailyCalendar({
 function TimelineCell({
   unit,
   dateStr,
+  todayStr,
   booking,
   customer,
   hasCleaning,
@@ -803,6 +805,7 @@ function TimelineCell({
 }: {
   unit: UnitRow;
   dateStr: string;
+  todayStr: string;
   booking: DailyBookingRow | null;
   customer: CustomerSummary | null;
   hasCleaning: boolean;
@@ -891,6 +894,11 @@ function TimelineCell({
         </button>
       </div>
     );
+  }
+
+  const isPast = dateStr < todayStr;
+  if (isPast) {
+    return <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell" />;
   }
 
   return (

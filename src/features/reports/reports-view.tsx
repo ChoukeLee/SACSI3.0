@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Download, Mail, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
+import { Download } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
+import { MetricCard } from "@/components/metric-card";
 import type {
   LedgerEntryRow, DailyBookingRow, UnitRow, LeaseContractRow,
   SaleContractRow, SalePaymentScheduleRow, ReceivableRow, PaymentRow, CustomerRow,
@@ -36,31 +37,90 @@ function downloadCsv(header: string, rows: string[], filename: string) {
   a.download = `${filename}_${new Date().toISOString().slice(0,10)}.csv`; a.click();
 }
 
-export function ReportsView({ entries, bookings, units, leaseContracts, saleContracts, saleSchedules, receivables, payments, customers, locale, userRole }: Props) {
+export function ReportsView({ entries: _entries, bookings, units, leaseContracts, saleContracts, saleSchedules: _saleSchedules, receivables, payments, customers, locale, userRole }: Props) {
   const permitted = (Object.entries(TAB_PERMISSIONS) as [ReportTab, string[]][]).filter(([, roles]) => roles.includes(userRole)).map(([t]) => t);
   const [tab, setTab] = useState<ReportTab>(permitted[0] ?? "room_status");
   const today = new Date().toISOString().slice(0, 10);
   const monthPrefix = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}`;
+  const zh = locale === "zh";
 
   const custMap = useMemo(() => { const m = new Map<string, CustomerRow>(); for (const c of customers) m.set(c.id, c); return m; }, [customers]);
   const custName = (id?: string|null) => id ? custMap.get(id)?.name ?? id.slice(0,6) : "—";
 
-  const L = {
-    roomStatus: locale==="zh"?"房态报表":"Logements", income: locale==="zh"?"收入报表":"Revenus",
-    overdue: locale==="zh"?"欠费报表":"Impayes", daily: locale==="zh"?"日租报表":"Journalier",
-    lease: locale==="zh"?"长租报表":"Baux", sale: locale==="zh"?"出售回款":"Ventes",
-    dailyClose: locale==="zh"?"前台日结":"Cloture jour",
-    total: locale==="zh"?"总计":"Total", exportCsv: locale==="zh"?"导出CSV":"Export CSV",
-    noData: locale==="zh"?"暂无数据":"Aucune", unit: locale==="zh"?"万XOF":"10k XOF",
-  };
+  // ── Labels ──
+  const L = useMemo(() => ({
+    roomStatus: zh?"房态报表":"Logements",
+    income: zh?"收入报表":"Revenus",
+    overdue: zh?"欠费报表":"Impayés",
+    daily: zh?"日租报表":"Journalier",
+    lease: zh?"长租报表":"Baux",
+    sale: zh?"出售回款":"Ventes",
+    dailyClose: zh?"前台日结":"Clôture jour",
+    total: zh?"总计":"Total",
+    exportCsv: zh?"导出CSV":"Export CSV",
+    unit: zh?"万XOF":"10k XOF",
+    noData: zh?"暂无数据":"Aucune donnée",
+    amountXof: zh?"应收":"Dû",
+    paid: zh?"实收":"Payé",
+    unpaid: zh?"欠费":"Impayé",
+    overdueLabel: zh?"逾期":"Retard",
+    rate: zh?"收缴率":"Taux",
+    roomNo: zh?"房号":"Ch",
+    customer: zh?"客户":"Client",
+    overdueDays: zh?"逾期天数":"Jours",
+    dueDate: zh?"到期":"Échéance",
+    source: zh?"业务类型":"Source",
+    copyClose: zh?"复制日结":"Copier",
+    totalUnits: zh?"总房源":"Total",
+    residential: zh?"住宿房":"Appart.",
+    parking: zh?"车位":"Parking",
+    storefront: zh?"门面":"Commerce",
+    statusLabels: {
+      available: zh?"空闲":"Dispo",
+      reserved: zh?"预订":"Réservé",
+      daily_occupied: zh?"日租中":"Occupé",
+      cleaning_pending: zh?"待保洁":"Ménage",
+      leased: zh?"长租中":"Loué",
+      sold: zh?"已售":"Vendu",
+      maintenance: zh?"维修":"Maint.",
+      locked: zh?"锁定":"Bloqué",
+    } as Record<string, string>,
+    sourceLabels: {
+      daily_booking: zh?"日租":"Jour",
+      lease_contract: zh?"长租":"Location",
+      sale_contract: zh?"出售":"Vente",
+      manual: zh?"手工":"Manuel",
+    } as Record<string, string>,
+    todayCheckins: zh?"今日入住":"Arrivées",
+    todayCheckouts: zh?"今日退房":"Départs",
+    inHouse: zh?"当前在住":"Occupés",
+    occupancyRate: zh?"入住率":"Taux occ.",
+    pendingReview: zh?"待确认":"À conf.",
+    confirmed: zh?"已确认":"Confirmé",
+    monthlyIncome: zh?"月日租收入":"Revenu mois",
+    openLong: zh?"开放>3天":">3j ouvert",
+    activeContracts: zh?"有效合同":"Actifs",
+    monthlyDue: zh?"应收":"Dû",
+    monthlyPaid: zh?"实收":"Payé",
+    expire30d: zh?"30天内到期":"Exp. 30j",
+    expired: zh?"已到期未退":"Expiré",
+    overdueContracts: zh?"欠费合同":"Impayés",
+    terminated: zh?"已退租":"Résilié",
+    totalAmount: zh?"合同总额":"Total",
+    notDelivered: zh?"已结清未交付":"Non livré",
+    overdueInstallments: zh?"逾期分期":"Retard",
+    todayNewBookings: zh?"今日新预订":"Nouv. rés.",
+    todayPayments: zh?"今日收款":"Paiements",
+    paymentCount: zh?"收款笔数":"Nb paiements",
+  }), [zh]);
 
   const residential = useMemo(() => units.filter(u => u.kind === "apartment"), [units]);
 
   // ── Room Status Report ──
   const roomStatusData = useMemo(() => {
-    const kinds = { apartment: 0, parking: 0, storefront: 0, office: 0 };
+    const kinds: Record<string, number> = { apartment: 0, parking: 0, storefront: 0, office: 0 };
     const statuses: Record<string, number> = {};
-    for (const u of units) { kinds[u.kind as keyof typeof kinds] = (kinds[u.kind as keyof typeof kinds]??0)+1; statuses[u.status] = (statuses[u.status]??0)+1; }
+    for (const u of units) { kinds[u.kind] = (kinds[u.kind]??0)+1; statuses[u.status] = (statuses[u.status]??0)+1; }
     return { kinds, statuses, total: units.length, residential: residential.length };
   }, [units, residential]);
 
@@ -70,7 +130,7 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
     const bySource: Record<string, { rec: number; paid: number }> = {};
     for (const r of receivables) { if (r.status==="cancelled") continue; const a=Number(r.amount_xof); const p=Number(r.paid_amount_xof); rec+=a; paid+=p; if(r.status==="overdue"||(r.due_date<today&&p<a)) overdue+=a-p; const s=r.source_type; bySource[s]=bySource[s]??{rec:0,paid:0}; bySource[s].rec+=a; bySource[s].paid+=p; }
     return { rec, paid, overdue, unpaid: rec-paid, rate: rec>0?Math.round(paid/rec*100):0, bySource };
-  }, [receivables]);
+  }, [receivables, today]);
 
   // ── Overdue Report ──
   const overdueData = useMemo(() => {
@@ -78,9 +138,9 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
       const os = Number(r.amount_xof)-Number(r.paid_amount_xof);
       const od = Math.floor((Date.now()-new Date(r.due_date).getTime())/86400000);
       const unit = units.find(u=>u.id===r.unit_id);
-      return { ...r, unpaid: os, overdueDays: od, unitNo: unit?.unit_no??"", cust: custName(r.customer_id) };
+      return { id: r.id, unpaid: os, overdueDays: od, unitNo: unit?.unit_no??"", cust: custName(r.customer_id), dueDate: r.due_date };
     }).sort((a,b) => b.unpaid-a.unpaid);
-  }, [receivables, units, custName]);
+  }, [receivables, units, custName, today]);
 
   // ── Daily Report ──
   const dailyData = useMemo(() => {
@@ -89,11 +149,10 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
     const inHouse = bookings.filter(b => b.status==="checked_in");
     const confirmed = bookings.filter(b => b.status==="confirmed");
     const pending = bookings.filter(b => b.status==="pending_review");
-    const cancelled = bookings.filter(b => b.status==="cancelled");
     const openLong = inHouse.filter(b => b.checkout_mode==="open" && (Date.now()-new Date(b.check_in).getTime())/(86400000)>3);
     const dailyIncome = payments.filter(p => p.payment_date.startsWith(monthPrefix) && p.source_type==="daily_booking").reduce((s,p)=>s+Number(p.amount),0);
-    return { todayCheckins, todayCheckouts, inHouse, confirmed, pending, cancelled, openLong, dailyIncome, occupancyRate: residential.length>0?Math.round(inHouse.length/residential.length*100):0 };
-  }, [bookings, payments, residential]);
+    return { todayCheckins, todayCheckouts, inHouse, confirmed, pending, openLong, dailyIncome, occupancyRate: residential.length>0?Math.round(inHouse.length/residential.length*100):0 };
+  }, [bookings, payments, residential, today, monthPrefix]);
 
   // ── Lease Report ──
   const leaseData = useMemo(() => {
@@ -106,7 +165,7 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
     const leasePaid = leaseRecs.reduce((s,r)=>s+Number(r.paid_amount_xof),0);
     const leaseOverdue = leaseRecs.filter(r => { const os=Number(r.amount_xof)-Number(r.paid_amount_xof); return os>0&&(r.status==="overdue"||r.due_date<today); });
     return { active, expiring30d, expired, terminated, leaseRec, leasePaid, leaseOverdue, rate: leaseRec>0?Math.round(leasePaid/leaseRec*100):0 };
-  }, [leaseContracts, receivables]);
+  }, [leaseContracts, receivables, today]);
 
   // ── Sale Report ──
   const saleData = useMemo(() => {
@@ -129,173 +188,235 @@ export function ReportsView({ entries, bookings, units, leaseContracts, saleCont
     const inHouse = bookings.filter(b => b.status==="checked_in");
     const todayTotal = todayPayments.reduce((s,p)=>s+Number(p.amount),0);
     return { newBookings, checkins, checkouts, todayPayments, inHouse, todayTotal };
-  }, [bookings, payments]);
+  }, [bookings, payments, today]);
 
   const tabs: { key: ReportTab; label: string; count?: number }[] = [
-    { key: "room_status", label: L.roomStatus }, { key: "income", label: L.income },
+    { key: "room_status", label: L.roomStatus },
+    { key: "income", label: L.income },
     { key: "overdue", label: L.overdue, count: overdueData.length },
-    { key: "daily", label: L.daily }, { key: "lease", label: L.lease },
-    { key: "sale", label: L.sale }, { key: "daily_close", label: L.dailyClose },
+    { key: "daily", label: L.daily },
+    { key: "lease", label: L.lease },
+    { key: "sale", label: L.sale },
+    { key: "daily_close", label: L.dailyClose },
   ];
 
-  const statBox = (l: string, v: string, a: string, key?: string) => {
-    const c: Record<string,string>={green:"bg-brand-green-500",red:"bg-brand-red-500",ink:"bg-slate-800",orange:"bg-brand-indigo"};
-    return <div key={key ?? l} className="overflow-hidden rounded-2xl border border-brand-warm-200 bg-white shadow-natural"><div className={cn("h-[3px]",c[a]??"bg-slate-800")} /><div className="px-3 py-2.5"><p className="text-xs font-semibold text-brand-ink-400">{l}</p><p className="text-sm font-bold tabular-nums text-brand-ink-900">{v}</p></div></div>;
-  };
+  const btnExport = "inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-semibold shadow-sm transition-colors hover:bg-accent";
 
   return (
-    <div className="space-y-4">
-      {/* Tabs */}
-      <div className="flex gap-1 rounded-xl border border-brand-warm-200 bg-brand-warm-100 p-1 overflow-x-auto">
+    <div className="space-y-5">
+      {/* ── Tabs ── */}
+      <nav className="flex gap-1 overflow-x-auto rounded-xl border bg-card p-1.5 shadow-sm">
         {tabs.filter(t => permitted.includes(t.key)).map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} className={cn("shrink-0 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors", tab===t.key?"bg-white text-brand-ink-900 shadow-sm":"text-brand-ink-500")}>
-            {t.label}{t.count !== undefined ? ` (${t.count})` : ""}
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className={cn(
+              "shrink-0 rounded-md px-4 py-2 text-sm font-semibold transition",
+              tab === t.key
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+            )}
+          >
+            {t.label}{t.count !== undefined && <span className="ml-1 opacity-75">({t.count})</span>}
           </button>
         ))}
-      </div>
+      </nav>
 
       {/* ── Room Status ── */}
       {tab === "room_status" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {statBox(locale==="zh"?"总房源":"Total", String(roomStatusData.total), "ink")}
-            {statBox(locale==="zh"?"住宿房":"Appart.", String(roomStatusData.residential), "green")}
-            {statBox(locale==="zh"?"车位":"Parking", String(roomStatusData.kinds.parking), "ink")}
-            {statBox(locale==="zh"?"门面":"Commerce", String(roomStatusData.kinds.storefront), "ink")}
+        <div className="space-y-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <MetricCard title={L.totalUnits} value={String(roomStatusData.total)} tone="indigo" />
+            <MetricCard title={L.residential} value={String(roomStatusData.residential)} tone="green" />
+            <MetricCard title={L.parking} value={String(roomStatusData.kinds.parking)} tone="neutral" />
+            <MetricCard title={L.storefront} value={String(roomStatusData.kinds.storefront)} tone="neutral" />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {Object.entries(roomStatusData.statuses).map(([k,v]) => {
-              const labels: Record<string,string> = locale==="zh"?{available:"空闲",reserved:"预订",daily_occupied:"日租中",cleaning_pending:"待保洁",leased:"长租中",sold:"已售",maintenance:"维修",locked:"锁定"}:{available:"Dispo",reserved:"Reserve",daily_occupied:"Occupe",cleaning_pending:"Menage",leased:"Loue",sold:"Vendu",maintenance:"Maint",locked:"Bloque"};
-              return statBox(labels[k]??k, String(v), k==="available"?"green":k==="daily_occupied"?"red":"ink", k);
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {Object.entries(roomStatusData.statuses).map(([k, v]) => {
+              const tone = k === "available" ? "green" : k === "daily_occupied" ? "indigo" : k === "leased" ? "leased" : k === "sold" ? "sold" : k === "maintenance" || k === "locked" ? "maintenance" : k === "cleaning_pending" ? "amber" : "neutral";
+              return <MetricCard key={k} title={L.statusLabels[k] ?? k} value={String(v)} tone={tone} />;
             })}
           </div>
-          <button onClick={() => downloadCsv("类型,状态,数量",Object.entries(roomStatusData.statuses).map(([k,v])=>csvLine([k,(locale==="zh"?{available:"空闲",daily_occupied:"日租中",leased:"长租中",sold:"已售"}:{available:"Dispo",daily_occupied:"Occupe",leased:"Loue",sold:"Vendu"})[k]??k,v])),"room_status")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
+          <button onClick={() => downloadCsv("类型,状态,数量", Object.entries(roomStatusData.statuses).map(([k, v]) => csvLine([k, L.statusLabels[k] ?? k, v])), "room_status")}
+            className={btnExport}><Download className="h-4 w-4" />{L.exportCsv}</button>
         </div>
       )}
 
       {/* ── Income ── */}
       {tab === "income" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            {statBox(locale==="zh"?"应收":"Du", formatXof(incomeData.rec), "ink")}
-            {statBox(locale==="zh"?"实收":"Paye", formatXof(incomeData.paid), "green")}
-            {statBox(locale==="zh"?"欠费":"Impaye", formatXof(incomeData.unpaid), "red")}
-            {statBox(locale==="zh"?"逾期":"Retard", formatXof(incomeData.overdue), "red")}
-            {statBox(locale==="zh"?"收缴率":"Taux", `${incomeData.rate}%`, incomeData.rate>=80?"green":"orange")}
+        <div className="space-y-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <MetricCard title={L.amountXof} value={formatXof(incomeData.rec)} tone="indigo" />
+            <MetricCard title={L.paid} value={formatXof(incomeData.paid)} tone="green" />
+            <MetricCard title={L.unpaid} value={formatXof(incomeData.unpaid)} tone="amber" />
+            <MetricCard title={L.overdueLabel} value={formatXof(incomeData.overdue)} tone="red" />
+            <MetricCard title={L.rate} value={`${incomeData.rate}%`} tone={incomeData.rate >= 80 ? "green" : "amber"} />
           </div>
-          <div className="overflow-x-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
-            <table className="data-table"><thead className="bg-brand-warm-50/90 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr><th className="px-3 py-2">{locale==="zh"?"业务类型":"Source"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"应收":"Du"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"实收":"Paye"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"收缴率":"Taux"}</th></tr></thead>
-            <tbody className="divide-y divide-brand-warm-100">
-              {Object.entries(incomeData.bySource).map(([k,v]) => {
-                const labels: Record<string,string> = locale==="zh"?{daily_booking:"日租",lease_contract:"长租",sale_contract:"出售",manual:"手工"}:{daily_booking:"Jour",lease_contract:"LT",sale_contract:"Vente",manual:"Manuel"};
-                return <tr key={k}><td className="px-3 py-2 font-medium">{labels[k]??k}</td><td className="px-3 py-2 text-right">{formatXof(v.rec)}</td><td className="px-3 py-2 text-right text-brand-green-600">{formatXof(v.paid)}</td><td className="px-3 py-2 text-right">{v.rec>0?Math.round(v.paid/v.rec*100):0}%</td></tr>;
-              })}
-            </tbody></table>
+          <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[13px]">
+                <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2.5">{L.source}</th>
+                    <th className="px-4 py-2.5 text-right">{L.amountXof}</th>
+                    <th className="px-4 py-2.5 text-right">{L.paid}</th>
+                    <th className="px-4 py-2.5 text-right">{L.rate}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {Object.entries(incomeData.bySource).map(([k, v]) => (
+                    <tr key={k} className="transition-colors hover:bg-accent/50">
+                      <td className="px-4 py-2.5 font-medium">{L.sourceLabels[k] ?? k}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{formatXof(v.rec)}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">{formatXof(v.paid)}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{v.rec > 0 ? Math.round(v.paid / v.rec * 100) : 0}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <button onClick={() => downloadCsv("业务类型,应收,实收,收缴率",Object.entries(incomeData.bySource).map(([k,v])=>csvLine([k,v.rec,v.paid,`${v.rec>0?Math.round(v.paid/v.rec*100):0}%`])),"income")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
+          <button onClick={() => downloadCsv("业务类型,应收,实收,收缴率", Object.entries(incomeData.bySource).map(([k, v]) => csvLine([k, v.rec, v.paid, `${v.rec > 0 ? Math.round(v.paid / v.rec * 100) : 0}%`])), "income")}
+            className={btnExport}><Download className="h-4 w-4" />{L.exportCsv}</button>
         </div>
       )}
 
       {/* ── Overdue ── */}
       {tab === "overdue" && (
-        <div className="space-y-2">
-          <div className="flex gap-2 text-xs text-brand-ink-500">{locale==="zh"?"共":"Total"}: {overdueData.length} {locale==="zh"?"条":"lignes"} · {locale==="zh"?"欠费合计":"Impaye"}: {formatXof(overdueData.reduce((s,r)=>s+r.unpaid,0))}</div>
-          {overdueData.length===0 ? <p className="text-sm font-semibold text-brand-ink-400 py-8 text-center">{L.noData}</p> : (
-            <div className="overflow-auto rounded-2xl border border-brand-warm-200 bg-white shadow-natural max-h-[500px]">
-              <table className="data-table"><thead className="sticky top-0 bg-brand-warm-50/90 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500"><tr><th className="px-3 py-2">{locale==="zh"?"房号":"Ch"}</th><th className="px-3 py-2">{locale==="zh"?"客户":"Client"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"欠费":"Impaye"}</th><th className="px-3 py-2 text-right">{locale==="zh"?"逾期天数":"Jours"}</th><th className="px-3 py-2">{locale==="zh"?"到期":"Echeance"}</th></tr></thead>
-              <tbody className="divide-y divide-brand-warm-100">{overdueData.map(r => <tr key={r.id} className="bg-brand-red-50/20"><td className="px-3 py-2 font-mono">{r.unitNo}</td><td className="px-3 py-2">{r.cust}</td><td className="px-3 py-2 text-right font-semibold text-brand-red-600">{formatXof(r.unpaid)}</td><td className="px-3 py-2 text-right text-brand-red-500">+{r.overdueDays}</td><td className="px-3 py-2">{r.due_date}</td></tr>)}</tbody></table>
+        <div className="space-y-5">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>{zh ? "共" : "Total"}: {overdueData.length} {zh ? "条" : "lignes"}</span>
+            <span>·</span>
+            <span>{L.unpaid}: <strong className="tabular-nums text-rose-600">{formatXof(overdueData.reduce((s, r) => s + r.unpaid, 0))}</strong></span>
+          </div>
+          {overdueData.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 rounded-xl border bg-card py-16 shadow-sm">
+              <p className="text-sm font-semibold text-muted-foreground">{L.noData}</p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border bg-card shadow-sm max-h-[500px] overflow-y-auto">
+              <table className="w-full text-left text-[13px]">
+                <thead className="sticky top-0 bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2.5">{L.roomNo}</th>
+                    <th className="px-4 py-2.5">{L.customer}</th>
+                    <th className="px-4 py-2.5 text-right">{L.unpaid}</th>
+                    <th className="px-4 py-2.5 text-right">{L.overdueDays}</th>
+                    <th className="px-4 py-2.5">{L.dueDate}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {overdueData.map(r => (
+                    <tr key={r.id} className="bg-red-50/30 transition-colors hover:bg-accent/50">
+                      <td className="px-4 py-2.5 font-mono">{r.unitNo}</td>
+                      <td className="px-4 py-2.5">{r.cust}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-rose-600">{formatXof(r.unpaid)}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-rose-600 font-semibold">+{r.overdueDays}</td>
+                      <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{r.dueDate}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-          <button onClick={() => downloadCsv("房号,客户,欠费,逾期天数,到期日",overdueData.map(r=>csvLine([r.unitNo,r.cust,r.unpaid,r.overdueDays,r.due_date])),"overdue")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
+          <button onClick={() => downloadCsv("房号,客户,欠费,逾期天数,到期日", overdueData.map(r => csvLine([r.unitNo, r.cust, r.unpaid, r.overdueDays, r.dueDate])), "overdue")}
+            className={btnExport}><Download className="h-4 w-4" />{L.exportCsv}</button>
         </div>
       )}
 
       {/* ── Daily ── */}
       {tab === "daily" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {statBox(locale==="zh"?"今日入住":"Arrivees", String(dailyData.todayCheckins.length), "green")}
-            {statBox(locale==="zh"?"今日退房":"Departs", String(dailyData.todayCheckouts.length), "orange")}
-            {statBox(locale==="zh"?"当前在住":"Occupees", String(dailyData.inHouse.length), "ink")}
-            {statBox(locale==="zh"?"入住率":"Taux", `${dailyData.occupancyRate}%`, "green")}
+        <div className="space-y-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <MetricCard title={L.todayCheckins} value={String(dailyData.todayCheckins.length)} tone="green" />
+            <MetricCard title={L.todayCheckouts} value={String(dailyData.todayCheckouts.length)} tone="amber" />
+            <MetricCard title={L.inHouse} value={String(dailyData.inHouse.length)} tone="indigo" />
+            <MetricCard title={L.occupancyRate} value={`${dailyData.occupancyRate}%`} tone="green" />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {statBox(locale==="zh"?"待确认":"A conf.", String(dailyData.pending.length), "orange")}
-            {statBox(locale==="zh"?"已确认":"Conf.", String(dailyData.confirmed.length), "ink")}
-            {statBox(locale==="zh"?"月日租收入":"Revenu mois", formatXof(dailyData.dailyIncome), "green")}
-            {statBox(locale==="zh"?"开放>3天":"Open>3j", String(dailyData.openLong.length), "red")}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <MetricCard title={L.pendingReview} value={String(dailyData.pending.length)} tone="amber" />
+            <MetricCard title={L.confirmed} value={String(dailyData.confirmed.length)} tone="indigo" />
+            <MetricCard title={L.monthlyIncome} value={formatXof(dailyData.dailyIncome)} tone="green" />
+            <MetricCard title={L.openLong} value={String(dailyData.openLong.length)} tone="red" />
           </div>
-          <button onClick={() => downloadCsv("房号,客户,入住日期,状态",dailyData.todayCheckins.map(b=>{const u=units.find(x=>x.id===b.unit_id);return csvLine([u?.unit_no??"",custName(b.customer_id),b.check_in,b.status]);}),"daily_checkins")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
+          <button onClick={() => downloadCsv("房号,客户,入住日期,状态", dailyData.todayCheckins.map(b => { const u = units.find(x => x.id === b.unit_id); return csvLine([u?.unit_no ?? "", custName(b.customer_id), b.check_in, b.status]); }), "daily_checkins")}
+            className={btnExport}><Download className="h-4 w-4" />{L.exportCsv}</button>
         </div>
       )}
 
       {/* ── Lease ── */}
       {tab === "lease" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {statBox(locale==="zh"?"有效合同":"Actifs", String(leaseData.active.length), "green")}
-            {statBox(locale==="zh"?"本月应收":"Du", formatXof(leaseData.leaseRec), "ink")}
-            {statBox(locale==="zh"?"本月实收":"Paye", formatXof(leaseData.leasePaid), "green")}
-            {statBox(locale==="zh"?"收缴率":"Taux", `${leaseData.rate}%`, leaseData.rate>=80?"green":"orange")}
+        <div className="space-y-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <MetricCard title={L.activeContracts} value={String(leaseData.active.length)} tone="green" />
+            <MetricCard title={L.monthlyDue} value={formatXof(leaseData.leaseRec)} tone="indigo" />
+            <MetricCard title={L.monthlyPaid} value={formatXof(leaseData.leasePaid)} tone="green" />
+            <MetricCard title={L.rate} value={`${leaseData.rate}%`} tone={leaseData.rate >= 80 ? "green" : "amber"} />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {statBox(locale==="zh"?"30天到期":"Expire 30j", String(leaseData.expiring30d.length), "orange")}
-            {statBox(locale==="zh"?"已到期未退":"Expire", String(leaseData.expired.length), "red")}
-            {statBox(locale==="zh"?"欠费合同":"Impayes", String(leaseData.leaseOverdue.length), "red")}
-            {statBox(locale==="zh"?"已退租":"Term.", String(leaseData.terminated.length), "ink")}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <MetricCard title={L.expire30d} value={String(leaseData.expiring30d.length)} tone="amber" />
+            <MetricCard title={L.expired} value={String(leaseData.expired.length)} tone="red" />
+            <MetricCard title={L.overdueContracts} value={String(leaseData.leaseOverdue.length)} tone="red" />
+            <MetricCard title={L.terminated} value={String(leaseData.terminated.length)} tone="neutral" />
           </div>
-          {leaseData.expiring30d.length>0 && <div className="text-xs"><p className="font-semibold text-slate-800 mb-1">{locale==="zh"?"30天内到期合同":"Expirent sous 30j"}:</p>{leaseData.expiring30d.map(l => <p key={l.id} className="text-brand-ink-600">{l.contract_no} — {l.expected_end_date}</p>)}</div>}
-          <button onClick={() => downloadCsv("合同号,开始,到期,月租,状态",leaseData.active.map(l=>csvLine([l.contract_no,l.start_date,l.expected_end_date,l.monthly_rent_xof,l.status])),"leases")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
+          {leaseData.expiring30d.length > 0 && (
+            <div className="rounded-xl border bg-card p-4 shadow-sm">
+              <p className="mb-2 text-sm font-semibold">{zh ? "30天内到期合同" : "Contrats expirant sous 30 jours"}:</p>
+              {leaseData.expiring30d.map(l => (
+                <p key={l.id} className="text-sm text-muted-foreground">{l.contract_no} — {l.expected_end_date}</p>
+              ))}
+            </div>
+          )}
+          <button onClick={() => downloadCsv("合同号,开始,到期,月租,状态", leaseData.active.map(l => csvLine([l.contract_no, l.start_date, l.expected_end_date, l.monthly_rent_xof, l.status])), "leases")}
+            className={btnExport}><Download className="h-4 w-4" />{L.exportCsv}</button>
         </div>
       )}
 
       {/* ── Sale ── */}
       {tab === "sale" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {statBox(locale==="zh"?"有效合同":"Actifs", String(saleData.active.length), "green")}
-            {statBox(locale==="zh"?"合同总额":"Total", formatXof(saleData.totalAmount), "ink")}
-            {statBox(locale==="zh"?"已收":"Paye", formatXof(saleData.paid), "green")}
-            {statBox(locale==="zh"?"回款率":"Taux", `${saleData.rate}%`, saleData.rate>=80?"green":"orange")}
+        <div className="space-y-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <MetricCard title={L.activeContracts} value={String(saleData.active.length)} tone="green" />
+            <MetricCard title={L.totalAmount} value={formatXof(saleData.totalAmount)} tone="indigo" />
+            <MetricCard title={L.paid} value={formatXof(saleData.paid)} tone="green" />
+            <MetricCard title={L.rate} value={`${saleData.rate}%`} tone={saleData.rate >= 80 ? "green" : "amber"} />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {statBox(locale==="zh"?"未收":"Impaye", formatXof(saleData.unpaid), "red")}
-            {statBox(locale==="zh"?"逾期分期":"Retard", String(saleData.overdueRecs.length), "red")}
-            {statBox(locale==="zh"?"已结清未交付":"Non livre", String(saleData.notDelivered.length), "orange")}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <MetricCard title={L.unpaid} value={formatXof(saleData.unpaid)} tone="red" />
+            <MetricCard title={L.overdueInstallments} value={String(saleData.overdueRecs.length)} tone="red" />
+            <MetricCard title={L.notDelivered} value={String(saleData.notDelivered.length)} tone="amber" />
           </div>
-          <button onClick={() => downloadCsv("合同号,总价,已收,未收,状态",saleData.active.map(s=>{const p=saleData.active.find(x=>x.id===s.id);const rec=receivables.filter(r=>r.source_id===s.id&&r.status!=="cancelled");const paid=rec.reduce((sum,r)=>sum+Number(r.paid_amount_xof),0);return csvLine([s.contract_no,s.total_amount_xof,paid,Number(s.total_amount_xof)-paid,s.status]);}),"sales")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
+          <button onClick={() => downloadCsv("合同号,总价,已收,未收,状态", saleData.active.map(s => { const rec = receivables.filter(r => r.source_id === s.id && r.status !== "cancelled"); const paid = rec.reduce((sum, r) => sum + Number(r.paid_amount_xof), 0); return csvLine([s.contract_no, s.total_amount_xof, paid, Number(s.total_amount_xof) - paid, s.status]); }), "sales")}
+            className={btnExport}><Download className="h-4 w-4" />{L.exportCsv}</button>
         </div>
       )}
 
       {/* ── Daily Close ── */}
       {tab === "daily_close" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {statBox(locale==="zh"?"今日新预订":"Nouv. res.", String(dailyCloseData.newBookings.length), "ink")}
-            {statBox(locale==="zh"?"今日入住":"Arrivees", String(dailyCloseData.checkins.length), "green")}
-            {statBox(locale==="zh"?"今日退房":"Departs", String(dailyCloseData.checkouts.length), "orange")}
-            {statBox(locale==="zh"?"今日收款":"Paimts", formatXof(dailyCloseData.todayTotal), "green")}
+        <div className="space-y-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <MetricCard title={L.todayNewBookings} value={String(dailyCloseData.newBookings.length)} tone="indigo" />
+            <MetricCard title={L.todayCheckins} value={String(dailyCloseData.checkins.length)} tone="green" />
+            <MetricCard title={L.todayCheckouts} value={String(dailyCloseData.checkouts.length)} tone="amber" />
+            <MetricCard title={L.todayPayments} value={formatXof(dailyCloseData.todayTotal)} tone="green" />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {statBox(locale==="zh"?"当前在住":"Occupees", String(dailyCloseData.inHouse.length), "ink")}
-            {statBox(locale==="zh"?"收款笔数":"Nb paimts", String(dailyCloseData.todayPayments.length), "ink")}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2">
+            <MetricCard title={L.inHouse} value={String(dailyCloseData.inHouse.length)} tone="indigo" />
+            <MetricCard title={L.paymentCount} value={String(dailyCloseData.todayPayments.length)} tone="neutral" />
           </div>
-          <button onClick={() => {
-            const lines: string[] = [];
-            lines.push(`SACIS3.0 ${locale==="zh"?"日结":"Cloture"} — ${today}`);
-            lines.push(`${locale==="zh"?"新预订":"Res"}: ${dailyCloseData.newBookings.length} | ${locale==="zh"?"入住":"Arr"}: ${dailyCloseData.checkins.length} | ${locale==="zh"?"退房":"Dep"}: ${dailyCloseData.checkouts.length} | ${locale==="zh"?"在住":"Occ"}: ${dailyCloseData.inHouse.length} | ${locale==="zh"?"收款":"P"}: ${formatXof(dailyCloseData.todayTotal)}`);
-            navigator.clipboard.writeText(lines.join("\n"));
-          }} className="rounded-xl bg-brand-indigo-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-indigo-600 active:scale-[0.98] inline-flex items-center gap-1.5">
-            {locale==="zh"?"复制日结":"Copier"}
-          </button>
-          <button onClick={() => downloadCsv("指标,数值",[["新预订",dailyCloseData.newBookings.length],["入住",dailyCloseData.checkins.length],["退房",dailyCloseData.checkouts.length],["在住",dailyCloseData.inHouse.length],["收款",dailyCloseData.todayTotal]].map(r=>csvLine(r)),"daily_close")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink-600 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 ml-2"><Download className="h-3.5 w-3.5"/>{L.exportCsv}</button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => {
+              const lines: string[] = [];
+              lines.push(`SACIS3.0 ${zh ? "日结" : "Clôture"} — ${today}`);
+              lines.push(`${zh ? "新预订" : "Rés"}: ${dailyCloseData.newBookings.length} | ${zh ? "入住" : "Arr"}: ${dailyCloseData.checkins.length} | ${zh ? "退房" : "Dép"}: ${dailyCloseData.checkouts.length} | ${zh ? "在住" : "Occ"}: ${dailyCloseData.inHouse.length} | ${zh ? "收款" : "P"}: ${formatXof(dailyCloseData.todayTotal)}`);
+              navigator.clipboard.writeText(lines.join("\n"));
+            }} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 active:scale-[0.98]">
+              {L.copyClose}
+            </button>
+            <button onClick={() => downloadCsv("指标,数值", [["新预订", dailyCloseData.newBookings.length], ["入住", dailyCloseData.checkins.length], ["退房", dailyCloseData.checkouts.length], ["在住", dailyCloseData.inHouse.length], ["收款", dailyCloseData.todayTotal]].map(r => csvLine(r)), "daily_close")}
+              className={btnExport}><Download className="h-4 w-4" />{L.exportCsv}</button>
+          </div>
         </div>
       )}
     </div>

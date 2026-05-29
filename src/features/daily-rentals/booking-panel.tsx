@@ -191,7 +191,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelClass}>{t.booking.checkInDate}</label><input type="date" value={newCheckIn} onChange={e => setNewCheckIn(e.target.value)} className={inputClass} /></div>
+              <div><label className={labelClass}>{t.booking.checkInDate}</label><input type="date" value={newCheckIn} onChange={e => setNewCheckIn(e.target.value)} className={inputClass} min={new Date().toISOString().slice(0, 10)} /></div>
               {newCheckoutMode === "fixed" && <div><label className={labelClass}>{t.booking.checkOutDate}</label><input type="date" value={newCheckOut} onChange={e => setNewCheckOut(e.target.value)} className={inputClass} /></div>}
             </div>
             <div className="grid grid-cols-2 gap-3">

@@ -52,7 +52,7 @@ export default async function TodosPage() {
         <DesktopOnly locale="zh" />
       </div>
       <div className="hidden lg:block">
-        <PageHeader title="通知与待办中心" description="根据当前业务数据实时计算：待入住、待退房、欠费、到期、异常等需要处理的事项" />
+        <PageHeader title="通知与待办中心" />
         <section className="mt-8">
           <TodoCenter todos={todos} locale="zh" />
         </section>

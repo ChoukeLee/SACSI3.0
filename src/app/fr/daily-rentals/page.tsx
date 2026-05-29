@@ -6,7 +6,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
 import { DailyCalendar } from "@/features/daily-rentals";
-import type { UnitRow, DailyBookingRow } from "@/types/database";
+import { MobileDailyCards } from "@/features/mobile";
+import type { UnitRow, DailyBookingRow, CustomerRow, PaymentRow } from "@/types/database";
 import type { CustomerSummary } from "@/features/daily-rentals/calendar";
 
 export const dynamic = "force-dynamic";
@@ -45,20 +46,15 @@ export default async function FrenchDailyRentalsPage() {
   }
 
   return (
-      <>
-
-<><PageHeader title={t.title} description={t.description} />
-      <section className="-mx-2 xl:-mx-4">
-        <DailyCalendar
-          dailyUnits={dailyUnits}
-          bookings={bookings}
-          customers={customers}
-          cleaningTasks={cleaningTasks}
-          payments={payments}
-          locale="fr"
-        />
-      </section>
-
-      </>
-</>);
+    <>
+      <div className="lg:hidden">
+        <MobileDailyCards dailyUnits={dailyUnits} bookings={bookings} customers={customers as unknown as CustomerRow[]} payments={payments as unknown as PaymentRow[]} cleaningTasks={cleaningTasks} locale="fr" />
+      </div>
+      <div className="hidden lg:block">
+        <section className="-mx-2 xl:-mx-4">
+          <DailyCalendar dailyUnits={dailyUnits} bookings={bookings} customers={customers} cleaningTasks={cleaningTasks} payments={payments} locale="fr" />
+        </section>
+      </div>
+    </>
+  );
 }

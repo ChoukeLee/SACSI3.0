@@ -7,6 +7,7 @@ import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import type { LedgerEntryRow } from "@/types/database";
 import type { CurrencyCode } from "@/types/domain";
+import { MetricCard } from "@/components/metric-card";
 import { addLedgerEntry } from "./actions";
 
 function buildLedgerCsv(entries: LedgerEntryRow[]): string {
@@ -31,6 +32,9 @@ const allCategories = [
   "maintenance", "cleaning_wages", "garbage", "utilities", "property_management",
   "tax", "agency_commission", "other_expense",
 ];
+
+const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+const labelClass = "block mb-1 text-xs font-semibold text-muted-foreground";
 
 export function LedgerList({ entries, units, buildingId, locale }: LedgerListProps) {
   const t = dictionaries[locale].finance;
@@ -113,97 +117,95 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
     URL.revokeObjectURL(url);
   };
 
-  const inputClass = "w-full rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-sm text-brand-ink-700 shadow-sm transition focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15";
-  const labelClass = "block mb-1 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500";
-
   const dirColor: Record<string, string> = {
-    income: "text-brand-green-700", expense: "text-brand-red-700",
-    liability_in: "text-brand-cyan-700", liability_out: "text-brand-amber-700",
+    income: "text-emerald-600", expense: "text-rose-600",
+    liability_in: "text-cyan-600", liability_out: "text-amber-600",
   };
 
+  const filterSelect = "h-9 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+  const filterDate = "h-9 w-[150px] rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+
   return (
-    <div>
+    <div className="space-y-5">
       {/* Summary cards */}
-      <div className="mb-5 grid gap-3 sm:grid-cols-3">
-        <FinanceMetric label={t.summary.totalIncome} value={formatXof(summary.income)} tone="green" />
-        <FinanceMetric label={t.summary.totalExpense} value={formatXof(summary.expense)} tone="red" />
-        <FinanceMetric label={t.summary.netBalance} value={formatXof(summary.net)} tone={summary.net >= 0 ? "green" : "orange"} />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <MetricCard title={t.summary.totalIncome} value={formatXof(summary.income)} tone="green" />
+        <MetricCard title={t.summary.totalExpense} value={formatXof(summary.expense)} tone="red" />
+        <MetricCard title={t.summary.netBalance} value={formatXof(summary.net)} tone={summary.net >= 0 ? "indigo" : "amber"} />
       </div>
 
       {/* Toolbar */}
-      <div className="mb-4 rounded-2xl border border-brand-warm-200 bg-white p-3 shadow-natural">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15" />
-            <span className="text-xs font-semibold text-brand-ink-400">-</span>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15" />
-            <select value={dirFilter} onChange={(e) => setDirFilter(e.target.value)} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15">
-              <option value="all">{t.filters.direction}: {t.filters.all}</option>
-              <option value="income">{t.directions.income}</option>
-              <option value="expense">{t.directions.expense}</option>
-              <option value="liability_in">{t.directions.liability_in}</option>
-              <option value="liability_out">{t.directions.liability_out}</option>
-            </select>
-            <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15">
-              <option value="all">{t.filters.category}: {t.filters.all}</option>
-              {allCategories.map(c => <option key={c} value={c}>{t.categories[c as keyof typeof t.categories]}</option>)}
-            </select>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={locale === "zh" ? "搜索描述/房号..." : "Rechercher description, chambre..."}
-              className="w-48 rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition placeholder:text-brand-ink-400 hover:border-brand-warm-300 hover:bg-brand-warm-50 focus:border-brand-indigo-300 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/15"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={handleExportCsv} disabled={filtered.length === 0} className="inline-flex items-center gap-1.5 rounded-xl border border-brand-warm-200 bg-white px-3 py-2 text-xs font-bold text-brand-ink-700 shadow-sm transition hover:bg-brand-warm-50 disabled:opacity-40">
-              <Download className="h-3.5 w-3.5" />{t.export.csv}
-            </button>
-            <button onClick={() => setShowNewEntry(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-brand-indigo-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-indigo-600 active:scale-[0.98]">
-              <Plus className="h-3.5 w-3.5" />{t.entry.title}
-            </button>
-          </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={filterDate} />
+          <span className="text-xs font-semibold text-muted-foreground">-</span>
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={filterDate} />
+          <select value={dirFilter} onChange={(e) => setDirFilter(e.target.value)} className={filterSelect}>
+            <option value="all">{t.filters.direction}: {t.filters.all}</option>
+            <option value="income">{t.directions.income}</option>
+            <option value="expense">{t.directions.expense}</option>
+            <option value="liability_in">{t.directions.liability_in}</option>
+            <option value="liability_out">{t.directions.liability_out}</option>
+          </select>
+          <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className={filterSelect}>
+            <option value="all">{t.filters.category}: {t.filters.all}</option>
+            {allCategories.map(c => <option key={c} value={c}>{t.categories[c as keyof typeof t.categories]}</option>)}
+          </select>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={locale === "zh" ? "搜索描述/房号..." : "Rechercher description, chambre..."}
+            className="h-9 w-48 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={handleExportCsv} disabled={filtered.length === 0} className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-accent disabled:opacity-40">
+            <Download className="h-4 w-4" />{t.export.csv}
+          </button>
+          <button onClick={() => setShowNewEntry(true)} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 active:scale-[0.98]">
+            <Plus className="h-4 w-4" />{t.entry.title}
+          </button>
         </div>
       </div>
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-brand-warm-200 bg-white py-16 shadow-natural">
-          <p className="text-sm font-semibold text-brand-ink-400">{t.empty}</p>
+        <div className="flex flex-col items-center gap-3 rounded-xl border bg-card py-16 shadow-sm">
+          <p className="text-sm font-semibold text-muted-foreground">{t.empty}</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-brand-warm-200 bg-white shadow-natural">
+        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
           <div className="overflow-x-auto">
-            <table className="data-table min-w-[800px] text-sm">
-              <thead>
+            <table className="w-full text-left text-[13px] min-w-[800px]">
+              <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3">{t.filters.dateRange}</th>
-                  <th className="px-4 py-3">{t.filters.direction}</th>
-                  <th className="px-4 py-3">{t.filters.category}</th>
-                  <th className="px-4 py-3 text-right">XOF</th>
-                  <th className="px-4 py-3 text-right">CNY</th>
-                  <th className="px-4 py-3">{t.entry.description}</th>
+                  <th className="px-4 py-2.5">{t.filters.dateRange}</th>
+                  <th className="px-4 py-2.5">{t.filters.direction}</th>
+                  <th className="px-4 py-2.5">{t.filters.category}</th>
+                  <th className="px-4 py-2.5 text-right">XOF</th>
+                  <th className="px-4 py-2.5 text-right">CNY</th>
+                  <th className="px-4 py-2.5">{t.entry.description}</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y">
                 {filtered.map((e) => {
                   const unit = e.unit_id ? units.find(u => u.id === e.unit_id) : null;
                   return (
-                    <tr key={e.id} className="transition hover:bg-brand-warm-50/80">
-                      <td className="px-4 py-3 text-sm text-brand-ink-500">{e.entry_date}</td>
-                      <td className="px-4 py-3">
+                    <tr key={e.id} className="transition-colors hover:bg-accent/50">
+                      <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{e.entry_date}</td>
+                      <td className="px-4 py-2.5 whitespace-nowrap">
                         <span className={cn("text-sm font-semibold", dirColor[e.direction])}>{t.directions[e.direction as keyof typeof t.directions]}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-brand-ink-700">
+                      <td className="px-4 py-2.5">
                         <span>{t.categories[e.category as keyof typeof t.categories] ?? e.category}</span>
-                        {unit && <span className="ml-1 text-brand-ink-400">({unit.unit_no})</span>}
+                        {unit && <span className="ml-1 text-muted-foreground">({unit.unit_no})</span>}
                       </td>
-                      <td className={cn("px-4 py-3 text-right text-sm font-semibold tabular-nums", e.direction === "expense" || e.direction === "liability_out" ? "text-brand-red-700" : "text-brand-green-700")}>
+                      <td className={cn("px-4 py-2.5 text-right tabular-nums font-semibold", e.direction === "expense" || e.direction === "liability_out" ? "text-rose-600" : "text-emerald-600")}>
                         {e.direction === "expense" || e.direction === "liability_out" ? "-" : ""}{formatXof(Number(e.amount_xof))}
                       </td>
-                      <td className="px-4 py-3 text-right text-sm text-brand-ink-500 tabular-nums">{e.amount_cny != null ? Number(e.amount_cny).toLocaleString() : "-"}</td>
-                      <td className="max-w-[260px] truncate px-4 py-3 text-sm text-brand-ink-500">{e.description ?? "-"}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{e.amount_cny != null ? Number(e.amount_cny).toLocaleString() : "-"}</td>
+                      <td className="max-w-[260px] truncate px-4 py-2.5 text-muted-foreground">{e.description ?? "-"}</td>
                     </tr>
                   );
                 })}
@@ -213,16 +215,16 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
         </div>
       )}
 
-      <p className="mt-3 text-xs text-brand-ink-400">{filtered.length} {locale === "fr" ? "ecritures" : "条记录"}</p>
+      <p className="text-xs text-muted-foreground">{filtered.length} {locale === "fr" ? "écritures" : "条记录"}</p>
 
-      {/* New entry panel */}
+      {/* New entry side panel */}
       {showNewEntry && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setShowNewEntry(false)} />
-          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-auto border-l border-brand-warm-200 bg-white shadow-xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-200 bg-white px-5 py-4">
-              <h3 className="text-base font-black text-brand-ink-900">{t.entry.title}</h3>
-              <button onClick={() => setShowNewEntry(false)} className="rounded p-1 text-brand-ink-400 hover:bg-brand-warm-50/80"><X className="h-5 w-5" /></button>
+          <div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setShowNewEntry(false)} />
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l bg-card shadow-lg">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-card/95 px-5 py-4 backdrop-blur">
+              <h3 className="text-sm font-bold">{t.entry.title}</h3>
+              <button onClick={() => setShowNewEntry(false)} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"><X className="h-4 w-4" /></button>
             </div>
             <div className="space-y-4 px-5 py-5">
               <div><label className={labelClass}>{t.entry.date}</label><input type="date" value={eDate} onChange={(e) => setEDate(e.target.value)} className={inputClass} /></div>
@@ -246,7 +248,7 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
                 <div><label className={labelClass}>{t.entry.exchangeRate}</label><input type="number" value={eRate} onChange={(e) => setERate(Number(e.target.value))} className={inputClass} /></div>
                 <div><label className={labelClass}>{t.entry.amount}</label><input type="number" value={eAmount} onChange={(e) => setEAmount(Number(e.target.value))} className={inputClass} /></div>
               </div>
-              <div className="rounded bg-brand-warm-50 p-2 text-center text-sm font-bold text-brand-ink-900">
+              <div className="rounded-md bg-muted p-2 text-center text-sm font-bold">
                 {t.entry.amountXof}: {formatXof(eCurrency === "XOF" ? eAmount : Math.round(eAmount * eRate))}
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -260,27 +262,12 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
                 </div>
               </div>
               <div><label className={labelClass}>{t.entry.description}</label><textarea value={eDesc} onChange={(e) => setEDesc(e.target.value)} rows={3} className={inputClass} /></div>
-              {error && <p className="text-sm text-brand-red-600">{error}</p>}
-              <button onClick={handleSave} disabled={saving} className="w-full rounded-xl bg-brand-indigo-500 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-brand-indigo-600 active:scale-[0.98] disabled:opacity-50">{saving ? "..." : t.entry.save}</button>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <button onClick={handleSave} disabled={saving} className="w-full rounded-md bg-primary py-2.5 text-sm font-bold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50">{saving ? "..." : t.entry.save}</button>
             </div>
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-function FinanceMetric({ label, value, tone }: { label: string; value: string; tone: "green" | "red" | "orange" }) {
-  const styles = {
-    green: "border-brand-green-200 bg-brand-green-50 text-brand-green-700",
-    red: "border-brand-red-200 bg-brand-red-50 text-brand-red-700",
-    orange: "border-brand-indigo-200 bg-brand-indigo-50 text-brand-indigo-700",
-  }[tone];
-
-  return (
-    <div className={cn("rounded-2xl border px-4 py-3 shadow-sm", styles)}>
-      <p className="text-xs font-bold text-current opacity-70">{label}</p>
-      <p className="mt-1 text-2xl font-black tabular-nums">{value}</p>
     </div>
   );
 }

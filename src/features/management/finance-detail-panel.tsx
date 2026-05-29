@@ -201,7 +201,7 @@ export function FinanceDetailPanel({
           <div className="overflow-hidden rounded-xl border border-brand-warm-200">
             <div className="max-h-[calc(100vh-260px)] overflow-auto">
               {open !== "collected" ? (
-                <table className="data-table">
+                <table className="w-full text-left text-[13px]">
                   <thead className="sticky top-0 z-10 bg-brand-warm-50">
                     <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500">
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "到期日" : "Echeance"}</th>
@@ -246,13 +246,13 @@ export function FinanceDetailPanel({
                             <td className="px-4 py-2.5 whitespace-nowrap text-brand-ink-600">
                               {getSourceTypeLabel(r.source_type)}
                             </td>
-                            <td className="px-4 py-2.5 whitespace-nowrap text-right font-semibold text-brand-ink-900">
+                            <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold text-brand-ink-900">
                               {formatXof(Number(r.amount_xof))}
                             </td>
-                            <td className="px-4 py-2.5 whitespace-nowrap text-right text-brand-green-700">
+                            <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums text-brand-green-700">
                               {formatXof(Number(r.paid_amount_xof))}
                             </td>
-                            <td className={cn("px-4 py-2.5 whitespace-nowrap text-right font-semibold", outstanding > 0 ? "text-brand-red-600" : "text-brand-ink-400")}>
+                            <td className={cn("px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold", outstanding > 0 ? "text-brand-red-600" : "text-brand-ink-400")}>
                               {formatXof(outstanding)}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap">
@@ -267,7 +267,7 @@ export function FinanceDetailPanel({
                   </tbody>
                 </table>
               ) : (
-                <table className="data-table">
+                <table className="w-full text-left text-[13px]">
                   <thead className="sticky top-0 z-10 bg-brand-warm-50">
                     <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500">
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "收款日期" : "Date"}</th>
@@ -300,7 +300,7 @@ export function FinanceDetailPanel({
                           <td className="px-4 py-2.5 whitespace-nowrap text-brand-ink-600">
                             {getSourceTypeLabel(p.source_type)}
                           </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-right font-semibold text-brand-ink-900">
+                          <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold text-brand-ink-900">
                             {formatXof(Number(p.amount))}
                           </td>
                           <td className="px-4 py-2.5 whitespace-nowrap text-brand-ink-500 font-mono text-xs">

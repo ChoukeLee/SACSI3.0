@@ -34,7 +34,7 @@ export default async function SettingsPage() {
     <>
       <div className="lg:hidden"><DesktopOnly locale="zh" /></div>
       <div className="hidden lg:block">
-        <PageHeader title={t.title} description={t.description} />
+        <PageHeader title={t.title} />
         <div className="space-y-8">
           <SettingsView buildings={(buildings as BuildingRow[]) ?? []} locale="zh" />
           <SystemSettingsPanel settings={settingsMap} isAdmin={user.role === "admin"} locale="zh" />

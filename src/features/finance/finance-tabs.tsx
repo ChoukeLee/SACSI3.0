@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 interface Props {
   ledger: React.ReactNode;
@@ -14,32 +15,31 @@ export function FinanceTabs({ ledger, receivables, locale }: Props) {
   const t = dictionaries[locale].receivables.tabs;
   const [tab, setTab] = useState<"ledger" | "receivables">("ledger");
 
-  return (
-    <div>
-      <div className="mb-4 flex gap-1 rounded-xl border border-brand-warm-200 bg-brand-warm-100 p-1 w-fit">
-        <TabBtn active={tab === "ledger"} onClick={() => setTab("ledger")} label={t.ledger} />
-        <TabBtn active={tab === "receivables"} onClick={() => setTab("receivables")} label={t.receivables} />
-      </div>
-      {tab === "ledger" ? (
-        <div key="finance-ledger-panel">{ledger}</div>
-      ) : (
-        <div key="finance-receivables-panel">{receivables}</div>
-      )}
-    </div>
-  );
-}
+  const tabs = [
+    { key: "ledger" as const, label: t.ledger },
+    { key: "receivables" as const, label: t.receivables },
+  ];
 
-function TabBtn({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return (
-    <button
-      onClick={onClick}
-      className={`rounded-md px-3 py-1.5 text-[13px] font-semibold transition-all duration-fast ${
-        active
-          ? "bg-white text-brand-ink-900 shadow-sm"
-          : "text-brand-ink-500 hover:text-brand-ink-800"
-      }`}
-    >
-      {label}
-    </button>
+    <div className="space-y-5">
+      <nav className="flex gap-1 overflow-x-auto rounded-xl border bg-card p-1.5 shadow-sm w-fit" aria-label="Finance tabs">
+        {tabs.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => setTab(item.key)}
+            className={cn(
+              "shrink-0 rounded-md px-4 py-2 text-sm font-semibold transition",
+              tab === item.key
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+            )}
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
+      {tab === "ledger" ? ledger : receivables}
+    </div>
   );
 }

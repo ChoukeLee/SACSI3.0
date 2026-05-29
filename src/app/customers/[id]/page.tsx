@@ -15,8 +15,6 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
   if (!profile) notFound();
 
   return (
-    <div className="min-h-screen bg-slate-50 py-6 px-4">
-      <CustomerProfileView data={profile} locale="zh" userRole={user.role} />
-    </div>
+    <CustomerProfileView data={profile} locale="zh" userRole={user.role} />
   );
 }

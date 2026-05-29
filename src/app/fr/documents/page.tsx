@@ -211,7 +211,6 @@ export default async function FrenchDocumentsPage() {
       <div className="hidden lg:block">
         <PageHeader
           title="Centre de documents"
-          description="Documents imprimables generes depuis les donnees metier : contrats, recus, rappels, decomptes"
         />
         <section className="mt-8">
           <DocumentCenter documents={docs} locale="fr" />
