@@ -46,7 +46,11 @@ export function sortUnits<T extends { unit_no: string | null; floor_label?: stri
 }
 
 export function normalizeFloorLabel(floorLabel: string | null, unitNo: string): string {
-  if (floorLabel && floorLabel.trim()) return floorLabel.trim().replace("楼", "F");
+  if (floorLabel && floorLabel.trim()) {
+    const normalized = floorLabel.trim().replace("楼", "F");
+    // If the result has no digit (e.g. "楼" → "F"), fall back to unit_no
+    if (/\d/.test(normalized)) return normalized;
+  }
   const numeric = Number.parseInt(unitNo, 10);
   if (Number.isFinite(numeric)) return `${Math.floor(numeric / 100)}F`;
   return "F";
