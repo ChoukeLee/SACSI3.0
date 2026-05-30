@@ -34,15 +34,15 @@ export default async function FrenchManagementPage() {
   ] = await Promise.all([
     supabase.from("buildings").select("*").eq("is_active", true).order("code"),
     supabase.from("units").select("*").order("unit_no"),
-    supabase.from("daily_bookings").select("*").in("status", ["pending_review", "confirmed", "checked_in"]).order("check_in", { ascending: false }).limit(500),
-    supabase.from("lease_contracts").select("*").in("status", ["active", "draft"]).order("start_date", { ascending: false }).limit(500),
-    supabase.from("sale_contracts").select("*").in("status", ["active", "draft"]).order("signed_date", { ascending: false }).limit(500),
-    supabase.from("sale_payment_schedule").select("*").order("due_date", { ascending: false }).limit(1000),
-    supabase.from("ledger_entries").select("*").order("entry_date", { ascending: false }).limit(2000),
+    supabase.from("daily_bookings").select("*").in("status", ["pending_review", "confirmed", "checked_in"]).order("check_in", { ascending: false }).limit(200),
+    supabase.from("lease_contracts").select("*").in("status", ["active", "draft"]).order("start_date", { ascending: false }).limit(200),
+    supabase.from("sale_contracts").select("*").in("status", ["active", "draft"]).order("signed_date", { ascending: false }).limit(200),
+    supabase.from("sale_payment_schedule").select("*").order("due_date", { ascending: false }).limit(500),
+    supabase.from("ledger_entries").select("*").order("entry_date", { ascending: false }).limit(500),
     supabase.from("cleaning_tasks").select("id, unit_id, is_completed"),
-    supabase.from("receivables").select("*").order("due_date", { ascending: false }).limit(1000),
-    supabase.from("payments").select("*").order("payment_date", { ascending: false }).limit(1000),
-    supabase.from("customers").select("*").order("name").limit(500),
+    supabase.from("receivables").select("*").order("due_date", { ascending: false }).limit(300),
+    supabase.from("payments").select("*").order("payment_date", { ascending: false }).limit(300),
+    supabase.from("customers").select("*").order("name").limit(300),
   ]);
   const qualityIssues = runQualityChecks({
     units: (units ?? []) as UnitRow[],

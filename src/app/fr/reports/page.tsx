@@ -28,15 +28,15 @@ export default async function FrenchReportsPage() {
 
   if (buildingId) {
     const r = await Promise.all([
-      supabase.from("ledger_entries").select("*").order("entry_date",{ascending:false}).limit(2000),
-      supabase.from("daily_bookings").select("*").neq("status","cancelled").order("check_in").limit(1000),
+      supabase.from("ledger_entries").select("*").order("entry_date",{ascending:false}).limit(500),
+      supabase.from("daily_bookings").select("*").neq("status","cancelled").order("check_in").limit(300),
       supabase.from("units").select("*").eq("building_id",buildingId).order("unit_no"),
       supabase.from("lease_contracts").select("*").order("start_date",{ascending:false}).limit(200),
       supabase.from("sale_contracts").select("*").order("signed_date",{ascending:false}).limit(200),
       supabase.from("sale_payment_schedule").select("*").order("installment_no").limit(500),
-      supabase.from("receivables").select("*").order("due_date",{ascending:false}).limit(2000),
-      supabase.from("payments").select("*").order("payment_date",{ascending:false}).limit(2000),
-      supabase.from("customers").select("*").order("name").limit(500),
+      supabase.from("receivables").select("*").order("due_date",{ascending:false}).limit(500),
+      supabase.from("payments").select("*").order("payment_date",{ascending:false}).limit(500),
+      supabase.from("customers").select("*").order("name").limit(300),
     ]);
     if(!r[0].error) entries=r[0].data; if(!r[1].error) bookings=r[1].data;
     if(!r[2].error) units=sortUnits(r[2].data); if(!r[3].error) leaseContracts=r[3].data;

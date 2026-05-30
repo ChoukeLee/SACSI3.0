@@ -29,8 +29,8 @@ export default async function FrenchDailyRentalsPage() {
     supabase.from("buildings").select("id").eq("code", "SASCI11").single(),
     supabase.from("customers").select("id, name, phone, is_blacklisted").order("name"),
     supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed"),
-    supabase.from("payments").select("id, source_id, amount, payment_date").eq("source_type", "daily_booking").order("payment_date", { ascending: false }).limit(500),
-    supabase.from("daily_bookings").select("*").in("status", ["pending_review", "confirmed", "checked_in", "checked_out"]).order("check_in", { ascending: false }).limit(500),
+    supabase.from("payments").select("id, source_id, amount, payment_date").eq("source_type", "daily_booking").order("payment_date", { ascending: false }).limit(200),
+    supabase.from("daily_bookings").select("*").in("status", ["pending_review", "confirmed", "checked_in", "checked_out"]).order("check_in", { ascending: false }).limit(300),
   ]);
 
   if (!customersRes.error) customers = customersRes.data ?? [];

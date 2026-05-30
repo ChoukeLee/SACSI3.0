@@ -29,8 +29,8 @@ export default async function FrenchLeasesPage() {
       supabase.from("lease_contracts").select("*").order("start_date", { ascending: false }).limit(200),
       supabase.from("units").select("*").eq("building_id", buildingId).order("unit_no"),
       supabase.from("customers").select("*").order("name"),
-      supabase.from("payments").select("*").in("source_type", ["lease_rent", "lease_deposit"]).order("payment_date", { ascending: false }).limit(500),
-      supabase.from("receivables").select("*").in("source_type", ["lease_contract"]).order("due_date", { ascending: false }).limit(1000),
+      supabase.from("payments").select("*").in("source_type", ["lease_rent", "lease_deposit"]).order("payment_date", { ascending: false }).limit(200),
+      supabase.from("receivables").select("*").in("source_type", ["lease_contract"]).order("due_date", { ascending: false }).limit(300),
     ]);
     if (!contractsRes.error) contracts = contractsRes.data;
     if (!unitsRes.error) units = sortUnits(unitsRes.data);

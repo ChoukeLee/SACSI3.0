@@ -30,11 +30,11 @@ export default async function SalesPage() {
   if (buildingId) {
     const [contractsRes, schedulesRes, unitsRes, customersRes, paymentsRes, receivablesRes] = await Promise.all([
       supabase.from("sale_contracts").select("*").order("signed_date", { ascending: false }).limit(200),
-      supabase.from("sale_payment_schedule").select("*").order("installment_no").limit(500),
+      supabase.from("sale_payment_schedule").select("*").order("installment_no").limit(300),
       supabase.from("units").select("*").eq("building_id", buildingId).order("unit_no"),
       supabase.from("customers").select("*").order("name"),
-      supabase.from("payments").select("*").eq("source_type", "sale").order("payment_date", { ascending: false }).limit(500),
-      supabase.from("receivables").select("*").eq("source_type", "sale_contract").order("due_date").limit(1000),
+      supabase.from("payments").select("*").eq("source_type", "sale").order("payment_date", { ascending: false }).limit(200),
+      supabase.from("receivables").select("*").eq("source_type", "sale_contract").order("due_date").limit(300),
     ]);
     if (!contractsRes.error) contracts = contractsRes.data;
     if (!schedulesRes.error) schedules = schedulesRes.data;

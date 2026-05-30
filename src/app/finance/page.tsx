@@ -29,9 +29,9 @@ export default async function FinancePage() {
 
   if (buildingId) {
     const [entriesRes, unitsRes, receivablesRes, customersRes, buildingsRes] = await Promise.all([
-      supabase.from("ledger_entries").select("*").order("entry_date", { ascending: false }).limit(500),
+      supabase.from("ledger_entries").select("*").order("entry_date", { ascending: false }).limit(300),
       supabase.from("units").select("id, unit_no, building_id").order("unit_no"),
-      supabase.from("receivables").select("*").order("due_date", { ascending: false }).limit(500),
+      supabase.from("receivables").select("*").order("due_date", { ascending: false }).limit(300),
       supabase.from("customers").select("id, name").order("name"),
       supabase.from("buildings").select("*").eq("is_active", true).order("code"),
     ]);
