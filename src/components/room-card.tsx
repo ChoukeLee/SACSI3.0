@@ -1,6 +1,8 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import type { LucideIcon } from "lucide-react"
 import { Info, ReceiptText, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -15,13 +17,22 @@ export type RoomStatus =
   | "maintenance"
   | "available"
 
+export interface RoomCardAction {
+  key: string
+  label: string
+  icon: LucideIcon
+  href?: string
+  onClick?: (e: React.MouseEvent) => void
+  disabled?: boolean
+}
+
 /* ── Status → color mapping ── */
 type CardColors = { bg: string; badge: string; nameColor: string; metaColor: string; btnBg: string };
 const statusStyle: Record<RoomStatus, CardColors> = {
-  sold:            { bg: "bg-[#075A9A]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.94)]", metaColor: "text-[rgba(255,255,255,0.78)]", btnBg: "bg-white/[0.82]" },
+  sold:            { bg: "bg-[#075A9A]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.95)]", metaColor: "text-[rgba(255,255,255,0.72)]", btnBg: "bg-white/[0.82]" },
   leased:          { bg: "bg-[#E8E2FF]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
-  daily_occupied:  { bg: "bg-[#62B6F5]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.94)]", metaColor: "text-[rgba(255,255,255,0.78)]", btnBg: "bg-white/[0.82]" },
-  dailyOccupied:   { bg: "bg-[#62B6F5]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.94)]", metaColor: "text-[rgba(255,255,255,0.78)]", btnBg: "bg-white/[0.82]" },
+  daily_occupied:  { bg: "bg-[#62B6F5]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.95)]", metaColor: "text-[rgba(255,255,255,0.72)]", btnBg: "bg-white/[0.82]" },
+  dailyOccupied:   { bg: "bg-[#62B6F5]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.95)]", metaColor: "text-[rgba(255,255,255,0.72)]", btnBg: "bg-white/[0.82]" },
   reserved:        { bg: "bg-[#FFF6D8]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
   cleaning_pending:{ bg: "bg-[#D9F7F0]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
   cleaningPending: { bg: "bg-[#D9F7F0]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
@@ -39,26 +50,47 @@ interface Props {
   onClick?: () => void
   className?: string
   children?: React.ReactNode
+  actions?: RoomCardAction[]
 }
 
-/* ── Light circular button, 25×25, subtle ── */
-function ActionBtn({ icon: Icon, label, btnBg }: { icon: typeof Info; label: string; btnBg: string }) {
-  return (
+const DEFAULT_ACTIONS: RoomCardAction[] = [
+  { key: "detail", label: "详情", icon: Info },
+  { key: "finance", label: "财务", icon: ReceiptText },
+  { key: "enter", label: "进入", icon: ArrowRight },
+]
+
+/* ── 30×30 action button ── */
+function ActionBtn({ action, btnBg }: { action: RoomCardAction; btnBg: string }) {
+  const router = useRouter()
+  const inner = (
     <span
       className={cn(
-        "inline-flex h-[25px] w-[25px] items-center justify-center rounded-full border border-[rgba(23,50,77,0.08)] transition-all",
+        "inline-flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[rgba(23,50,77,0.08)] shadow-[0_1px_2px_rgba(25,58,92,0.05)] transition-all",
         btnBg,
-        "hover:bg-white/95 hover:-translate-y-px hover:shadow-[0_2px_4px_rgba(25,58,92,0.08)]",
+        action.disabled
+          ? "opacity-40 cursor-not-allowed"
+          : "hover:bg-white/[0.96] hover:-translate-y-px hover:shadow-[0_2px_4px_rgba(25,58,92,0.08)] cursor-pointer",
       )}
-      aria-label={label}
+      aria-label={action.label}
+      title={action.label}
     >
-      <Icon className="h-3.5 w-3.5 text-[rgba(23,50,77,0.78)]" strokeWidth={1.5} />
+      <action.icon className="h-[15px] w-[15px] text-[rgba(23,50,77,0.76)]" strokeWidth={1.5} />
     </span>
   )
+
+  if (action.disabled) return inner
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    if (action.onClick) { action.onClick(e) }
+    else if (action.href) { router.push(action.href) }
+  }
+  return <button type="button" onClick={handleClick} className="contents">{inner}</button>
 }
 
-export function RoomCard({ roomNo, status, statusLabel, customerName, dateText, href, onClick, className, children }: Props) {
+export function RoomCard({ roomNo, status, statusLabel, customerName, dateText, href, onClick, className, children, actions }: Props) {
   const s = statusStyle[status] ?? statusStyle.available
+  const btns = (actions ?? DEFAULT_ACTIONS).slice(0, 3)
 
   /* ── Detail variant (leases / sales) ── */
   if (children) {
@@ -83,34 +115,33 @@ export function RoomCard({ roomNo, status, statusLabel, customerName, dateText, 
   /* ── Matrix variant — hotel PMS card ── */
   const inner = (
     <div className={cn(
-      "relative h-[94px] w-[150px] rounded-lg border border-[rgba(23,50,77,0.08)] shadow-[0_8px_18px_rgba(25,58,92,0.08)]",
+      "relative h-[106px] w-full rounded-[10px] border border-[rgba(23,50,77,0.08)] shadow-[0_8px_18px_rgba(25,58,92,0.08)]",
       "font-[\"Segoe_UI\",\"PingFang_SC\",\"Microsoft_YaHei\",system-ui,sans-serif]",
       s.bg, className,
     )}>
-      {/* Room number capsule — shorter, rounder: h:22, min-w:38, px:8 */}
       <span className={cn(
-        "absolute top-[10px] left-3 inline-flex h-[22px] min-w-[38px] items-center justify-center rounded-full px-2 text-center text-[12px] font-bold leading-[22px]",
+        "absolute top-[11px] left-3 inline-flex h-[24px] min-w-[42px] items-center justify-center rounded-full px-[9px] text-center text-[13px] font-bold leading-[24px]",
         "shadow-[0_1px_2px_rgba(25,58,92,0.06)]",
         s.badge,
       )}>
         {roomNo}
       </span>
 
-      {/* Right info group — date + name, right-aligned */}
-      <div className="absolute top-[12px] right-3 left-[60px] overflow-hidden text-right">
-        <p className={cn("text-[11px] font-medium leading-[1.1] tracking-[0] truncate", s.metaColor)}>
-          {dateText || ""}
+      {/* Right info group — primary on top, meta below */}
+      <div className="absolute top-[16px] right-[14px] left-[68px] overflow-hidden text-right">
+        <p className={cn("text-[14px] font-medium leading-[1.15] tracking-[0] truncate", s.nameColor)}>
+          {customerName || "—"}
         </p>
-        <p className={cn("mt-[8px] text-[13px] font-medium leading-[1.15] tracking-[0] truncate", s.nameColor)}>
-          {customerName || "可安排入住"}
-        </p>
+        {dateText && (
+          <p className={cn("mt-[5px] text-[12px] font-medium leading-[1.1] tracking-[0] truncate opacity-[0.78]", s.metaColor)}>
+            {dateText}
+          </p>
+        )}
       </div>
 
-      {/* Action buttons — centered bottom, gap 10px */}
-      <div className="absolute inset-x-0 bottom-[10px] flex items-center justify-center gap-[10px]">
-        <ActionBtn icon={Info} label="详情" btnBg={s.btnBg} />
-        <ActionBtn icon={ReceiptText} label="财务" btnBg={s.btnBg} />
-        <ActionBtn icon={ArrowRight} label="进入" btnBg={s.btnBg} />
+      {/* Action buttons — 30×30, gap 16px */}
+      <div className="absolute inset-x-0 bottom-[14px] flex items-center justify-center gap-4">
+        {btns.map(a => <ActionBtn key={a.key} action={a} btnBg={s.btnBg} />)}
       </div>
     </div>
   )

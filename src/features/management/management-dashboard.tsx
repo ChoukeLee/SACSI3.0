@@ -14,6 +14,9 @@ import {
 } from "@/features/finance/receivable-summary";
 import { getDailyRoomStateForDate } from "@/features/daily-rentals/room-status";
 import { RoomCard } from "@/components/room-card";
+import { RoomBoard } from "@/components/room-board";
+import { RoomLegend } from "@/components/room-legend";
+import { getRoomCardActions } from "@/lib/room-card-actions";
 import { FinanceDetailPanel } from "./finance-detail-panel";
 import { QualityDashboardWidget } from "@/features/data-quality";
 import type { QualityIssue } from "@/features/data-quality/quality-types";
@@ -95,12 +98,10 @@ function shortDate(d: string | null | undefined): string {
 function stateCustomerName(s: UnitState, cmap: Map<string, string>, locale: Locale): string {
   const cid = s.booking?.customer_id ?? s.lease?.customer_id ?? s.sale?.customer_id ?? null;
   if (cid && cmap.has(cid)) return cmap.get(cid)!;
-  if (s.status === "available") return locale === "zh" ? "可安排入住" : "Disponible";
-  if (s.status === "cleaningPending") return locale === "zh" ? "等待保洁" : "Menage";
-  if (s.status === "maintenance") return locale === "zh" ? "暂停使用" : "Bloque";
-  if (s.status === "sold") return locale === "zh" ? "已售房源" : "Vendu";
-  if (s.status === "leased") return locale === "zh" ? "长租客户" : "Locataire";
-  return locale === "zh" ? "日租客户" : "Client";
+  if (s.status === "available") return locale === "zh" ? "空闲" : "Libre";
+  if (s.status === "cleaningPending") return locale === "zh" ? "待洁" : "Ménage";
+  if (s.status === "maintenance") return locale === "zh" ? "维修" : "Bloqué";
+  return "";
 }
 function stateDateText(s: UnitState, locale: Locale): string {
   if (s.booking) {
@@ -111,10 +112,6 @@ function stateDateText(s: UnitState, locale: Locale): string {
     return `${st} - ${end}`;
   }
   if (s.lease) return `${locale === "zh" ? "至" : "to"} ${shortDate(s.lease.expected_end_date)}`;
-  if (s.sale) return locale === "zh" ? "已完成出售" : "Sold";
-  if (s.status === "available") return locale === "zh" ? "公寓" : "Appartement";
-  if (s.status === "cleaningPending") return locale === "zh" ? "清洁后可用" : "Disponible apres menage";
-  if (s.status === "maintenance") return locale === "zh" ? "需处理" : "Action requise";
   return "";
 }
 
@@ -282,53 +279,61 @@ export function ManagementDashboard({
         </div>
       )}
 
-      {/* ── Room matrix ── */}
-      <div className="space-y-5">
-        {(selectedBuildingId === "__all__" ? activeBuildings : activeBuildings.filter(b => b.id === selectedBuildingId)).map(building => {
-          const bUnits = buildingUnits.get(building.id) ?? [];
-          const bStates = sortUnits(bUnits).map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks, todayStr));
-          const floorGroups = groupStatesByFloor(bStates, locale);
-          const bOccupied = bStates.filter(s => s.status === "dailyOccupied" || s.status === "leased" || s.status === "sold").length;
-          const bTotal = bStates.length;
+      {/* ── Room board — white panel container ── */}
+      {(selectedBuildingId === "__all__" ? activeBuildings : activeBuildings.filter(b => b.id === selectedBuildingId)).map(building => {
+        const bUnits = buildingUnits.get(building.id) ?? [];
+        const bStates = sortUnits(bUnits).map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks, todayStr));
+        const floorGroups = groupStatesByFloor(bStates, locale);
+        const bOccupied = bStates.filter(s => s.status === "dailyOccupied" || s.status === "leased" || s.status === "sold").length;
+        const bTotal = bStates.length;
 
-          return (
-            <section key={building.id}>
-              <div className="mb-3 flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-primary" />
-                  <h3 className="text-sm font-semibold">{building.display_name}</h3>
-                </div>
-                <span className="text-[11px] text-muted-foreground tabular-nums">
+        return (
+          <RoomBoard
+            key={building.id}
+            header={<>
+              <div className="flex items-center gap-3">
+                <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+                <h3 className="text-sm font-semibold">{building.display_name}</h3>
+                <span className="text-[12px] font-medium text-[#5D7186] tabular-nums">
                   {bOccupied}/{bTotal} {locale === "zh" ? "间已占用" : "occupés"}
                 </span>
-                <div className="ml-auto h-1 flex-1 max-w-[120px] rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full bg-accentBlue-500 transition-all" style={{ width: `${bTotal > 0 ? Math.round(bOccupied / bTotal * 100) : 0}%` }} />
-                </div>
               </div>
-              {floorGroups.map(group => (
-                <div key={group.key} className="mb-4">
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="text-[11px] font-semibold text-muted-foreground">{group.label}</span>
-                    <span className="text-[10px] text-muted-foreground/60">{group.states.length}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {group.states.map(s => (
+              <RoomLegend items={(["dailyOccupied","reserved","leased","sold","cleaningPending","maintenance","available"] as MgmtStatus[]).map(s => ({ key: s, label: t.statuses[s], color: STATUS_DOT[s] }))} />
+            </>}
+          >
+
+            {/* Floor groups + room grid */}
+            {floorGroups.map(group => (
+              <div key={group.key} className={group.key !== floorGroups[0]?.key ? "mt-[18px]" : ""}>
+                <p className="mb-2 text-[12px] font-semibold text-[#5D7186]">{group.label} <span className="font-normal text-[#5D7186]/60">{group.states.length}</span></p>
+                <div className="grid grid-cols-6 gap-3.5">
+                  {group.states.map(s => {
+                    const detailHref = routeFor(locale, `/units/${s.unit.id}`)
+                    const actions = getRoomCardActions(s.status, {
+                      locale, unitId: s.unit.id, unitNo: s.unit.unit_no ?? undefined,
+                      detailHref,
+                      dailyHref: routeFor(locale, "/daily-rentals"),
+                      leaseHref: routeFor(locale, "/leases"),
+                      saleHref: routeFor(locale, "/sales"),
+                    })
+                    return (
                       <RoomCard
                         key={s.unit.id}
                         roomNo={s.unit.unit_no ?? "?"}
                         status={s.status}
                         customerName={stateCustomerName(s, customerNameById, locale)}
                         dateText={stateDateText(s, locale)}
-                        href={routeFor(locale, `/units/${s.unit.id}`)}
+                        href={detailHref}
+                        actions={actions}
                       />
-                    ))}
-                  </div>
+                    )
+                  })}
                 </div>
-              ))}
-            </section>
-          );
-        })}
-      </div>
+              </div>
+            ))}
+          </RoomBoard>
+        );
+      })}
 
       {qualityIssues && <QualityDashboardWidget issues={qualityIssues} locale={locale} variant="management" />}
       <FinanceDetailPanel open={financeDetail} onClose={() => setFinanceDetail(null)} receivables={receivables} payments={payments} units={units} buildings={buildings} customers={customers} locale={locale} />

@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RoomCard } from "@/components/room-card";
+import { RoomBoard } from "@/components/room-board";
+import { RoomLegend } from "@/components/room-legend";
 import { EmptyState } from "@/components/empty-state";
 import type { RoomVisualStatus } from "@/lib/status-styles";
 import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
@@ -145,58 +147,58 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
         <Button size="sm" onClick={openNew}><Plus className="h-4 w-4"/>{t.form.newContract}</Button>
       </div>
 
-      {/* ── Contract matrix ── */}
+      {/* ── Contract matrix (BusinessRoomCard) ── */}
       {groupedContracts.length === 0 ? (
         <EmptyState title={t.empty} />
       ) : (
-        <div className="space-y-5">
-          {groupedContracts.map(([floor, floorContracts]) => (
-            <section key={floor}>
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-primary"/>
-                  <h3 className="text-sm font-bold">{floor}</h3>
-                </div>
-                <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-bold text-muted-foreground">{floorContracts.length} {locale==="fr"?"contrats":"份合同"}</span>
+        groupedContracts.map(([floor, floorContracts]) => (
+          <RoomBoard
+            key={floor}
+            header={<>
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+                <h3 className="text-sm font-semibold">{floor}</h3>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-                {floorContracts.map((contract) => {
-                  const unit = unitMap.get(contract.unit_id);
-                  const customer = customerMap.get(contract.customer_id);
-                  const summary = getContractReceivableSummary(contract.id);
-                  const daysLeft = Math.floor((new Date(contract.expected_end_date).getTime() - Date.now()) / 86400000);
-                  const isRisk = summary.overdue > 0 || (contract.status === "active" && daysLeft >= 0 && daysLeft <= 30);
-                  return (
-                    <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status="leased"
-                      statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]}
-                      onClick={() => openDetail(contract.id)}
-                      className={isRisk ? "ring-2 ring-amber-300" : ""}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-bold">{customer?.name ?? "-"}</p>
-                          <p className="mt-0.5 truncate text-xs text-muted-foreground">{contract.contract_no}</p>
-                        </div>
-                        <Badge variant={statusVariant[contract.status]}>{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
+              <span className="text-[12px] font-medium text-[#5D7186]">{floorContracts.length} {locale==="fr"?"contrats":"份合同"}</span>
+            </>}
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+              {floorContracts.map((contract) => {
+                const unit = unitMap.get(contract.unit_id);
+                const customer = customerMap.get(contract.customer_id);
+                const summary = getContractReceivableSummary(contract.id);
+                const daysLeft = Math.floor((new Date(contract.expected_end_date).getTime() - Date.now()) / 86400000);
+                const isRisk = summary.overdue > 0 || (contract.status === "active" && daysLeft >= 0 && daysLeft <= 30);
+                return (
+                  <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status="leased"
+                    statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]}
+                    onClick={() => openDetail(contract.id)}
+                    className={isRisk ? "ring-2 ring-amber-300" : ""}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-bold">{customer?.name ?? "-"}</p>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">{contract.contract_no}</p>
                       </div>
-                      <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">
-                        <span><span className="text-muted-foreground">{locale==="zh"?"月租":"Loyer"} </span><span className="font-medium">{formatXof(Number(contract.monthly_rent_xof))}</span></span>
-                        <span><span className="text-muted-foreground">{locale==="zh"?"到期":"Fin"} </span><span className={cn(daysLeft>=0&&daysLeft<=30?"text-amber-600":"")}>{contract.expected_end_date}</span></span>
-                        <span><span className="text-muted-foreground">{locale==="zh"?"待收":"Solde"} </span><span className={cn("font-medium",summary.outstanding>0?"text-amber-600":"text-emerald-600")}>{formatXof(summary.outstanding)}</span></span>
-                        <span><span className="text-muted-foreground">{locale==="zh"?"逾期":"Retard"} </span><span className={cn("font-medium",summary.overdue>0?"text-red-600":"text-emerald-600")}>{formatXof(summary.overdue)}</span></span>
+                      <Badge variant={statusVariant[contract.status]}>{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">
+                      <span><span className="text-muted-foreground">{locale==="zh"?"月租":"Loyer"} </span><span className="font-medium">{formatXof(Number(contract.monthly_rent_xof))}</span></span>
+                      <span><span className="text-muted-foreground">{locale==="zh"?"到期":"Fin"} </span><span className={cn(daysLeft>=0&&daysLeft<=30?"text-amber-600":"")}>{contract.expected_end_date}</span></span>
+                      <span><span className="text-muted-foreground">{locale==="zh"?"待收":"Solde"} </span><span className={cn("font-medium",summary.outstanding>0?"text-amber-600":"text-emerald-600")}>{formatXof(summary.outstanding)}</span></span>
+                      <span><span className="text-muted-foreground">{locale==="zh"?"逾期":"Retard"} </span><span className={cn("font-medium",summary.overdue>0?"text-red-600":"text-emerald-600")}>{formatXof(summary.overdue)}</span></span>
+                    </div>
+                    <div className="mt-auto pt-2">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{locale==="zh"?"下一应收":"Prochaine"}</span>
+                        <span>{summary.nextDue ?? "-"}</span>
                       </div>
-                      <div className="mt-auto pt-2">
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>{locale==="zh"?"下一应收":"Prochaine"}</span>
-                          <span>{summary.nextDue ?? "-"}</span>
-                        </div>
-                      </div>
-                    </RoomCard>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
+                    </div>
+                  </RoomCard>
+                );
+              })}
+            </div>
+          </RoomBoard>
+        ))
       )}
 
       {/* ── New Contract Panel ── */}

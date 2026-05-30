@@ -24,13 +24,10 @@ const unitToRoomStatus = (s: UnitStatus): RoomStatus => {
 };
 
 const statusCustomerName = (status: UnitStatus, locale: Locale): string => {
-  if (status === "available") return locale === "zh" ? "可安排入住" : "Disponible";
-  if (status === "cleaning_pending") return locale === "zh" ? "待保洁" : "Menage";
-  if (status === "maintenance" || status === "locked") return locale === "zh" ? "暂停使用" : "Bloque";
-  if (status === "sold") return locale === "zh" ? "已售房源" : "Vendu";
-  if (status === "leased") return locale === "zh" ? "长租客户" : "Locataire";
-  if (status === "reserved") return locale === "zh" ? "已预订" : "Reserve";
-  return locale === "zh" ? "日租客户" : "Client";
+  if (status === "available") return locale === "zh" ? "空闲" : "Libre";
+  if (status === "cleaning_pending") return locale === "zh" ? "待洁" : "Ménage";
+  if (status === "maintenance" || status === "locked") return locale === "zh" ? "维修" : "Bloqué";
+  return "";
 };
 
 const STATUS_DOT: Record<string, string> = {

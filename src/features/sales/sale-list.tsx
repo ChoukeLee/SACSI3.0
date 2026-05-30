@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { RoomCard } from "@/components/room-card";
+import { RoomBoard } from "@/components/room-board";
 import { EmptyState } from "@/components/empty-state";
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import { createSaleContract, recordSalePayment, addFlexibleInstallment, updateTransferStatus, terminateSaleContract } from "./actions";
@@ -130,10 +131,26 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
         <Button size="sm" onClick={openNew}><Plus className="h-4 w-4"/>{t.form.newContract}</Button>
       </div>
 
-      {/* ── Contract matrix ── */}
-      {groupedContracts.length===0?(<EmptyState title={t.empty}/>):(<div className="space-y-5">{groupedContracts.map(([floor,fc])=>(<section key={floor}><div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-primary"/><h3 className="text-sm font-bold">{floor}</h3></div><span className="rounded-full bg-muted px-2.5 py-1 text-xs font-bold text-muted-foreground">{fc.length} {locale==="fr"?"contrats":"份合同"}</span></div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">{fc.map(contract=>{const unit=unitMap.get(contract.unit_id);const customer=customerMap.get(contract.customer_id);const s=getContractSummary(contract.id);const isRisk=s.overdue>0||(contract.status==="active"&&contract.transfer_status!=="completed");return(<RoomCard key={contract.id} roomNo={unit?.unit_no??"-"} status="sold" statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]} onClick={()=>openDetail(contract.id)} className={isRisk?"ring-2 ring-amber-300":""}><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-bold">{customer?.name??"-"}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{contract.contract_no}</p></div><Badge variant={statusVariant[contract.status]}>{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge></div>
-        <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs"><span><span className="text-muted-foreground">{locale==="zh"?"总额":"Total"} </span><span className="font-medium">{formatXof(Number(contract.total_amount_xof))}</span></span><span><span className="text-muted-foreground">{locale==="zh"?"待收":"Solde"} </span><span className={cn("font-medium",s.outstanding>0?"text-amber-600":"text-emerald-600")}>{formatXof(s.outstanding)}</span></span><span><span className="text-muted-foreground">{locale==="zh"?"逾期":"Retard"} </span><span className={cn("font-medium",s.overdue>0?"text-red-600":"text-emerald-600")}>{formatXof(s.overdue)}</span></span><span><span className="text-muted-foreground">{locale==="zh"?"过户":"Transfert"} </span><span className={cn(contract.transfer_status==="completed"?"text-emerald-600":"text-muted-foreground")}>{transText(contract.transfer_status)}</span></span></div></RoomCard>);})}</div></section>))}</div>)}
+      {/* ── Contract matrix (BusinessRoomCard) ── */}
+      {groupedContracts.length===0?(<EmptyState title={t.empty}/>):(
+        groupedContracts.map(([floor,fc])=>(
+          <RoomBoard
+            key={floor}
+            header={<>
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+                <h3 className="text-sm font-semibold">{floor}</h3>
+              </div>
+              <span className="text-[12px] font-medium text-[#5D7186]">{fc.length} {locale==="fr"?"contrats":"份合同"}</span>
+            </>}
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+              {fc.map(contract=>{const unit=unitMap.get(contract.unit_id);const customer=customerMap.get(contract.customer_id);const s=getContractSummary(contract.id);const isRisk=s.overdue>0||(contract.status==="active"&&contract.transfer_status!=="completed");return(<RoomCard key={contract.id} roomNo={unit?.unit_no??"-"} status="sold" statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]} onClick={()=>openDetail(contract.id)} className={isRisk?"ring-2 ring-amber-300":""}><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-bold">{customer?.name??"-"}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{contract.contract_no}</p></div><Badge variant={statusVariant[contract.status]}>{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge></div>
+              <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs"><span><span className="text-muted-foreground">{locale==="zh"?"总额":"Total"} </span><span className="font-medium">{formatXof(Number(contract.total_amount_xof))}</span></span><span><span className="text-muted-foreground">{locale==="zh"?"待收":"Solde"} </span><span className={cn("font-medium",s.outstanding>0?"text-amber-600":"text-emerald-600")}>{formatXof(s.outstanding)}</span></span><span><span className="text-muted-foreground">{locale==="zh"?"逾期":"Retard"} </span><span className={cn("font-medium",s.overdue>0?"text-red-600":"text-emerald-600")}>{formatXof(s.overdue)}</span></span><span><span className="text-muted-foreground">{locale==="zh"?"过户":"Transfert"} </span><span className={cn(contract.transfer_status==="completed"?"text-emerald-600":"text-muted-foreground")}>{transText(contract.transfer_status)}</span></span></div></RoomCard>);})}
+            </div>
+          </RoomBoard>
+        ))
+      )}
 
       {/* ── New Contract Panel ── */}
       {panel==="new"&&(<><div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" onClick={()=>setPanel(null)}/><div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l bg-card shadow-lg"><div className="sticky top-0 z-10 flex items-center justify-between border-b bg-card/95 px-5 py-4 backdrop-blur"><h3 className="text-sm font-bold">{t.form.newContract}</h3><button onClick={()=>setPanel(null)} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent"><X className="h-4 w-4"/></button></div>
