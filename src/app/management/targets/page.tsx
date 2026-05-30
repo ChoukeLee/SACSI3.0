@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/page-header";
 import { TargetsView } from "./targets-view";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +29,7 @@ export default async function TargetsPage() {
 
   return (
     <>
-      <PageHeader title="经营目标" />
+      <h1 className="mb-6 text-2xl font-bold tracking-tight">经营目标</h1>
       <TargetsView
         targets={(targets ?? []) as any[]}
         receivables={receivables ?? []} units={units ?? []}

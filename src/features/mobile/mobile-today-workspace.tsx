@@ -142,8 +142,8 @@ export function MobileTodayWorkspace({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-base font-black text-brand-ink-900">{t.today}</h1>
-          <p className="text-xs text-brand-ink-500">
+          <h1 className="text-base font-black text-foreground">{t.today}</h1>
+          <p className="text-xs text-muted-foreground">
             {buildingName}{locale === "zh" ? "公寓" : ""} · {todayFormatted}
           </p>
         </div>
@@ -230,8 +230,8 @@ function EmptyState({
 
   return (
     <div className="py-14 text-center">
-      <BedDouble className="mx-auto h-8 w-8 text-brand-ink-300 mb-3" />
-      <p className="text-sm text-brand-ink-500">{message[activeTab] || empty.noRooms}</p>
+      <BedDouble className="mx-auto h-8 w-8 text-muted-foreground/40 mb-3" />
+      <p className="text-sm text-muted-foreground">{message[activeTab] || empty.noRooms}</p>
     </div>
   );
 }

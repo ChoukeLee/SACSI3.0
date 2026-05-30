@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/page-header";
 import { TargetsView } from "@/app/management/targets/targets-view";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +29,7 @@ export default async function FrenchTargetsPage() {
 
   return (
     <>
-      <PageHeader title="Objectifs" />
+      <h1 className="mb-6 text-2xl font-bold tracking-tight">Objectifs</h1>
       <TargetsView targets={(targets ?? []) as any[]} receivables={receivables ?? []} units={units ?? []}
         bookings={bookings ?? []} leases={leases ?? []} sales={sales ?? []}
         locale="fr" userRole={user.role} />

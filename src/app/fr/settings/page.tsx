@@ -1,4 +1,3 @@
-import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
@@ -34,7 +33,7 @@ export default async function FrenchSettingsPage() {
     <>
       <div className="lg:hidden"><DesktopOnly locale="fr" /></div>
       <div className="hidden lg:block">
-        <PageHeader title={t.title} />
+        <h1 className="mb-6 text-2xl font-bold tracking-tight">{t.title}</h1>
         <div className="space-y-8">
           <SettingsView buildings={(buildings as BuildingRow[]) ?? []} locale="fr" />
           <SystemSettingsPanel settings={settingsMap} isAdmin={user.role === "admin"} locale="fr" />

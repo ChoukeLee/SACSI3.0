@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
 import { ReportsView } from "@/features/reports";
@@ -50,7 +49,6 @@ export default async function ReportsPage() {
     <>
       <div className="lg:hidden"><DesktopOnly locale="zh" /></div>
       <div className="hidden lg:block">
-        <PageHeader title="报表中心" description="房态、收入、欠费、日租、长租、出售回款、前台日结" />
         <ReportsView entries={entries} bookings={bookings} units={units}
           leaseContracts={leaseContracts} saleContracts={saleContracts}
           saleSchedules={saleSchedules} receivables={receivables}

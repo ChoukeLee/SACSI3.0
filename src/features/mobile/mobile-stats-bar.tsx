@@ -27,10 +27,10 @@ export function MobileStatsBar({
   const tabs = dictionaries[locale].mobile.tabs;
 
   const items: { key: RoomDisplayStatus; count: number; label: string; accentClass: string }[] = [
-    { key: "occupied", count: occupiedCount, label: tabs.occupied, accentClass: "text-brand-indigo" },
-    { key: "checking_out_today", count: checkingOutCount, label: tabs.checkingOut, accentClass: "text-brand-amber-600" },
-    { key: "cleaning", count: cleaningCount, label: tabs.cleaning, accentClass: "text-brand-cyan-600" },
-    { key: "available", count: availableCount, label: tabs.all, accentClass: "text-brand-green-600" },
+    { key: "occupied", count: occupiedCount, label: tabs.occupied, accentClass: "text-accentBlue-600" },
+    { key: "checking_out_today", count: checkingOutCount, label: tabs.checkingOut, accentClass: "text-accentAmber-600" },
+    { key: "cleaning", count: cleaningCount, label: tabs.cleaning, accentClass: "text-cyan-600" },
+    { key: "available", count: availableCount, label: tabs.all, accentClass: "text-accentGreen-600" },
   ];
 
   return (
@@ -47,19 +47,19 @@ export function MobileStatsBar({
               "transition-colors duration-[100ms]",
               "active:scale-95",
               isActive
-                ? "bg-white border border-brand-warm-200 shadow-sm"
-                : "border border-transparent active:bg-brand-warm-100"
+                ? "bg-white border border-border shadow-sm"
+                : "border border-transparent active:bg-muted"
             )}
           >
             <span className={cn(
               "text-lg font-black leading-none tabular-nums",
-              isActive ? item.accentClass : "text-brand-ink-700"
+              isActive ? item.accentClass : "text-foreground/70"
             )}>
               {item.count}
             </span>
             <span className={cn(
               "text-xs font-semibold mt-0.5 leading-tight",
-              isActive ? "text-brand-ink-700" : "text-brand-ink-500"
+              isActive ? "text-foreground/70" : "text-muted-foreground"
             )}>
               {item.label}
             </span>

@@ -1,20 +1,19 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
 import {
   AlertTriangle,
-  ArrowRight,
-  Info,
-  ReceiptText,
+  Banknote,
+  CalendarCheck,
+  Clock,
+  TrendingDown,
+  TrendingUp,
 } from "lucide-react";
 import {
   calculateReceivableSummary,
 } from "@/features/finance/receivable-summary";
 import { getDailyRoomStateForDate } from "@/features/daily-rentals/room-status";
-import { roomStatusStyles } from "@/lib/status-styles";
 import { RoomCard } from "@/components/room-card";
-import { MetricCard } from "@/components/metric-card";
 import { FinanceDetailPanel } from "./finance-detail-panel";
 import { QualityDashboardWidget } from "@/features/data-quality";
 import type { QualityIssue } from "@/features/data-quality/quality-types";
@@ -27,180 +26,99 @@ import type {
   PaymentRow, CustomerRow,
 } from "@/types/database";
 
-// ── Types ──────────────────────────────────────────────────────────────
-
 export type MgmtStatus =
-  | "sold"
-  | "leased"
-  | "dailyOccupied"
-  | "reserved"
-  | "cleaningPending"
-  | "maintenance"
-  | "available";
+  | "sold" | "leased" | "dailyOccupied" | "reserved"
+  | "cleaningPending" | "maintenance" | "available";
 
 interface UnitState {
-  unit: UnitRow;
-  status: MgmtStatus;
-  booking?: DailyBookingRow | null;
-  lease?: LeaseContractRow | null;
-  sale?: SaleContractRow | null;
+  unit: UnitRow; status: MgmtStatus;
+  booking?: DailyBookingRow | null; lease?: LeaseContractRow | null; sale?: SaleContractRow | null;
 }
-
-interface FloorGroup {
-  key: string;
-  label: string;
-  sortValue: number;
-  states: UnitState[];
-}
+interface FloorGroup { key: string; label: string; sortValue: number; states: UnitState[] }
 
 interface Props {
-  buildings: BuildingRow[];
-  units: UnitRow[];
-  dailyBookings: DailyBookingRow[];
-  leaseContracts: LeaseContractRow[];
-  saleContracts: SaleContractRow[];
-  saleSchedules: SalePaymentScheduleRow[];
-  cleaningTasks: { unit_id: string; is_completed: boolean }[];
-  ledgerEntries: LedgerEntryRow[];
-  receivables: ReceivableRow[];
-  payments: PaymentRow[];
-  customers: CustomerRow[];
-  qualityIssues?: QualityIssue[];
-  t: ManagementDict;
-  locale: Locale;
+  buildings: BuildingRow[]; units: UnitRow[]; dailyBookings: DailyBookingRow[];
+  leaseContracts: LeaseContractRow[]; saleContracts: SaleContractRow[];
+  saleSchedules: SalePaymentScheduleRow[]; cleaningTasks: { unit_id: string; is_completed: boolean }[];
+  ledgerEntries: LedgerEntryRow[]; receivables: ReceivableRow[];
+  payments: PaymentRow[]; customers: CustomerRow[];
+  qualityIssues?: QualityIssue[]; t: ManagementDict; locale: Locale;
 }
 
-// ── Status colour system — operational state identifiers ──────────────
-// Each status has a distinct, scannable background colour.
-// Cells must be distinguishable at a glance from across the room.
-// Uses Tailwind native palette for stronger colour differentiation:
-//   sold    → slate   (neutral, permanent, no action)
-//   leased  → amber   (occupied long-term, warm)
-//   daily   → orange  (active use, energetic)
-//   reserve → blue    (pending arrival, calm)
-//   clean   → cyan    (service required, distinct from blue)
-//   maint   → red     (blocked, attention)
-//   avail   → emerald (ready, positive)
-//
-// bg: room cell  dot: legend  pill: summary badge  ring: depth
-
-const STATUS_CELL: Record<MgmtStatus, { bg: string; dot: string; pill: string; ring: string; stripe: string }> = {
-  sold: {
-    bg:   "bg-[#505080] text-white border-[#505080]/25",
-    dot:  "bg-[#505080]",
-    pill: "bg-[#505080]/10 text-[#505080] border-[#505080]/20",
-    ring: "",
-    stripe: "bg-[#505080]",
-  },
-  leased: {
-    bg:   "bg-[#7050A0] text-white border-[#7050A0]/20",
-    dot:  "bg-[#7050A0]",
-    pill: "bg-[#7050A0]/10 text-[#5C4388] border-[#7050A0]/20",
-    ring: "",
-    stripe: "bg-[#7050A0]",
-  },
-  dailyOccupied: {
-    bg:   "bg-[#5090C0] text-white border-[#5090C0]/20",
-    dot:  "bg-[#5090C0]",
-    pill: "bg-[#5090C0]/10 text-[#376F99] border-[#5090C0]/20",
-    ring: "ring-1 ring-inset ring-[#5090C0]/30",
-    stripe: "bg-[#5090C0]",
-  },
-  reserved: {
-    bg:   "bg-[#A0C0E0] text-[#1F4564] border-[#A0C0E0]/30",
-    dot:  "bg-[#A0C0E0]",
-    pill: "bg-[#A0C0E0]/25 text-[#315E83] border-[#A0C0E0]/30",
-    ring: "",
-    stripe: "bg-[#A0C0E0]",
-  },
-  cleaningPending: {
-    bg:   "bg-[#5AB5B8] text-white border-[#5AB5B8]/25",
-    dot:  "bg-[#5AB5B8]",
-    pill: "bg-[#5AB5B8]/10 text-[#32757A] border-[#5AB5B8]/25",
-    ring: "",
-    stripe: "bg-[#5AB5B8]",
-  },
-  maintenance: {
-    bg:   "bg-[#F0A080] text-[#673522] border-[#F0A080]/35",
-    dot:  "bg-[#F0A080]",
-    pill: "bg-[#F0A080]/20 text-[#8A4A32] border-[#F0A080]/35",
-    ring: "",
-    stripe: "bg-[#F0A080]",
-  },
-  available: {
-    bg:   "bg-[#F0E0D0] text-[#4F4238] border-[#F0E0D0]/70",
-    dot:  "bg-[#F0E0D0]",
-    pill: "bg-[#F0E0D0]/55 text-[#5D4B3F] border-[#F0E0D0]",
-    ring: "",
-    stripe: "bg-[#F0E0D0]",
-  },
+// ── Status colours (operational, not brand) ──
+const STATUS_DOT: Record<MgmtStatus, string> = {
+  sold: "#075A9A", leased: "#A898E8", dailyOccupied: "#62B6F5",
+  reserved: "#E8C840", cleaningPending: "#5CC4B8", maintenance: "#F08090",
+  available: "#A0D0E8",
 };
 
-// ── Helpers ────────────────────────────────────────────────────────────
-
-function firstNumber(value: string | null | undefined): number | null {
-  const match = String(value ?? "").match(/\d+/);
-  return match ? Number(match[0]) : null;
+// ── Helpers ──
+function firstNumber(v: string | null | undefined): number | null {
+  const m = String(v ?? "").match(/\d+/); return m ? Number(m[0]) : null;
 }
-
-function getUnitFloorValue(unit: UnitRow): number | null {
-  const floorFromLabel = firstNumber(unit.floor_label);
-  if (floorFromLabel !== null) return floorFromLabel;
-  const unitNo = firstNumber(unit.unit_no);
-  if (unitNo === null) return null;
-  if (unitNo >= 100) return Math.floor(unitNo / 100);
-  return unitNo;
+function getUnitFloorValue(u: UnitRow): number | null {
+  const f = firstNumber(u.floor_label); if (f !== null) return f;
+  const n = firstNumber(u.unit_no); if (n === null) return null;
+  return n >= 100 ? Math.floor(n / 100) : n;
 }
-
 function groupStatesByFloor(states: UnitState[], locale: Locale): FloorGroup[] {
   const groups = new Map<string, FloorGroup>();
-  for (const state of states) {
-    const floor = getUnitFloorValue(state.unit);
+  for (const s of states) {
+    const floor = getUnitFloorValue(s.unit);
     const key = floor === null ? "__unknown__" : String(floor);
     const label = floor === null
       ? (locale === "zh" ? "未分层" : "Sans étage")
       : (locale === "zh" ? `${floor}层` : `Étage ${floor}`);
-    if (!groups.has(key)) {
-      groups.set(key, { key, label, sortValue: floor ?? Number.MAX_SAFE_INTEGER, states: [] });
-    }
-    groups.get(key)!.states.push(state);
+    if (!groups.has(key)) groups.set(key, { key, label, sortValue: floor ?? Number.MAX_SAFE_INTEGER, states: [] });
+    groups.get(key)!.states.push(s);
   }
   return [...groups.values()]
-    .map(group => ({
-      ...group,
-      states: sortUnits(group.states.map(s => s.unit))
-        .map(unit => group.states.find(s => s.unit.id === unit.id)!)
-        .filter(Boolean),
-    }))
+    .map(g => ({ ...g, states: sortUnits(g.states.map(s => s.unit)).map(u => g.states.find(s => s.unit.id === u.id)!).filter(Boolean) }))
     .sort((a, b) => a.sortValue - b.sortValue);
 }
-
-// ── Compute unit snapshot status ───────────────────────────────────────
-
-function computeUnitState(
-  unit: UnitRow,
-  dailyBookings: DailyBookingRow[],
-  leaseContracts: LeaseContractRow[],
-  saleContracts: SaleContractRow[],
-  cleaningTasks: { unit_id: string; is_completed: boolean }[],
-  dateStr: string,
-): UnitState {
-  const activeSale = saleContracts.find(s => s.unit_id === unit.id && s.status === "active") ?? null;
-  if (unit.status === "sold" || activeSale) return { unit, status: "sold", sale: activeSale };
-
-  const activeLease = leaseContracts.find(l => l.unit_id === unit.id && l.status === "active") ?? null;
-  if (unit.status === "leased" || activeLease) return { unit, status: "leased", lease: activeLease };
-
-  const dailyState = getDailyRoomStateForDate({ unit, dateStr, bookings: dailyBookings, cleaningTasks });
-  if (dailyState.status === "occupied" || dailyState.status === "checking_out_today") return { unit, status: "dailyOccupied", booking: dailyState.booking };
-  if (dailyState.status === "reserved") return { unit, status: "reserved", booking: dailyState.booking };
-  if (dailyState.status === "cleaning") return { unit, status: "cleaningPending" };
-  if (dailyState.status === "maintenance" || dailyState.status === "locked") return { unit, status: "maintenance" };
-
-  return { unit, status: "available" };
+function computeUnitState(u: UnitRow, dailyBookings: DailyBookingRow[], leaseContracts: LeaseContractRow[], saleContracts: SaleContractRow[], cleaningTasks: { unit_id: string; is_completed: boolean }[], dateStr: string): UnitState {
+  const activeSale = saleContracts.find(s => s.unit_id === u.id && s.status === "active") ?? null;
+  if (u.status === "sold" || activeSale) return { unit: u, status: "sold", sale: activeSale };
+  const activeLease = leaseContracts.find(l => l.unit_id === u.id && l.status === "active") ?? null;
+  if (u.status === "leased" || activeLease) return { unit: u, status: "leased", lease: activeLease };
+  const ds = getDailyRoomStateForDate({ unit: u, dateStr, bookings: dailyBookings, cleaningTasks });
+  if (ds.status === "occupied" || ds.status === "checking_out_today") return { unit: u, status: "dailyOccupied", booking: ds.booking };
+  if (ds.status === "reserved") return { unit: u, status: "reserved", booking: ds.booking };
+  if (ds.status === "cleaning") return { unit: u, status: "cleaningPending" };
+  if (ds.status === "maintenance" || ds.status === "locked") return { unit: u, status: "maintenance" };
+  return { unit: u, status: "available" };
+}
+function shortDate(d: string | null | undefined): string {
+  if (!d) return "--"; const [, m, day] = d.split("-"); return m && day ? `${m}/${day}` : d;
 }
 
-// ── Component ──────────────────────────────────────────────────────────
+function stateCustomerName(s: UnitState, cmap: Map<string, string>, locale: Locale): string {
+  const cid = s.booking?.customer_id ?? s.lease?.customer_id ?? s.sale?.customer_id ?? null;
+  if (cid && cmap.has(cid)) return cmap.get(cid)!;
+  if (s.status === "available") return locale === "zh" ? "可安排入住" : "Disponible";
+  if (s.status === "cleaningPending") return locale === "zh" ? "等待保洁" : "Menage";
+  if (s.status === "maintenance") return locale === "zh" ? "暂停使用" : "Bloque";
+  if (s.status === "sold") return locale === "zh" ? "已售房源" : "Vendu";
+  if (s.status === "leased") return locale === "zh" ? "长租客户" : "Locataire";
+  return locale === "zh" ? "日租客户" : "Client";
+}
+function stateDateText(s: UnitState, locale: Locale): string {
+  if (s.booking) {
+    const st = shortDate(s.booking.check_in);
+    const end = s.booking.checkout_mode === "open"
+      ? (s.booking.actual_check_out ? shortDate(s.booking.actual_check_out) : (locale === "zh" ? "未定" : "Open"))
+      : (s.booking.check_out ? shortDate(s.booking.check_out) : st);
+    return `${st} - ${end}`;
+  }
+  if (s.lease) return `${locale === "zh" ? "至" : "to"} ${shortDate(s.lease.expected_end_date)}`;
+  if (s.sale) return locale === "zh" ? "已完成出售" : "Sold";
+  if (s.status === "available") return locale === "zh" ? "公寓" : "Appartement";
+  if (s.status === "cleaningPending") return locale === "zh" ? "清洁后可用" : "Disponible apres menage";
+  if (s.status === "maintenance") return locale === "zh" ? "需处理" : "Action requise";
+  return "";
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 
 export function ManagementDashboard({
   buildings, units, dailyBookings, leaseContracts, saleContracts,
@@ -210,390 +128,210 @@ export function ManagementDashboard({
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("__all__");
   const [financeDetail, setFinanceDetail] = useState<"receivable" | "collected" | "outstanding" | "overdue" | null>(null);
 
-  const residentialUnits = useMemo(
-    () => units.filter(u => u.kind === "apartment"),
-    [units],
-  );
-
-  const activeBuildings = useMemo(
-    () => buildings.filter(b => b.is_active),
-    [buildings],
-  );
-
+  const residentialUnits = useMemo(() => units.filter(u => u.kind === "apartment"), [units]);
+  const activeBuildings = useMemo(() => buildings.filter(b => b.is_active), [buildings]);
   const filteredUnits = useMemo(() => {
     if (selectedBuildingId === "__all__") return residentialUnits;
     return residentialUnits.filter(u => u.building_id === selectedBuildingId);
   }, [residentialUnits, selectedBuildingId]);
-
   const buildingUnits = useMemo(() => {
-    const map = new Map<string, UnitRow[]>();
-    for (const b of activeBuildings) map.set(b.id, residentialUnits.filter(u => u.building_id === b.id));
-    return map;
+    const m = new Map<string, UnitRow[]>();
+    for (const b of activeBuildings) m.set(b.id, residentialUnits.filter(u => u.building_id === b.id));
+    return m;
   }, [activeBuildings, residentialUnits]);
 
-  // Unit states & counts
   const todayStr = new Date().toISOString().slice(0, 10);
-
   const unitStates = useMemo(
     () => filteredUnits.map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks, todayStr)),
     [filteredUnits, dailyBookings, leaseContracts, saleContracts, cleaningTasks, todayStr],
   );
-
   const counts = useMemo(() => {
-    const c: Record<MgmtStatus, number> = {
-      sold: 0, leased: 0, dailyOccupied: 0, reserved: 0,
-      cleaningPending: 0, maintenance: 0, available: 0,
-    };
-    for (const s of unitStates) c[s.status]++;
-    return c;
+    const c: Record<MgmtStatus, number> = { sold: 0, leased: 0, dailyOccupied: 0, reserved: 0, cleaningPending: 0, maintenance: 0, available: 0 };
+    for (const s of unitStates) c[s.status]++; return c;
   }, [unitStates]);
 
-  // Finance — current month (exclude daily rental, which has its own page)
-  const now = new Date();
-  const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-
-  const nonDailyReceivables = useMemo(
-    () => receivables.filter(r => r.source_type !== "daily_booking"),
-    [receivables],
-  );
-
+  // Finance
+  const now = new Date(); const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const nonDailyReceivables = useMemo(() => receivables.filter(r => r.source_type !== "daily_booking"), [receivables]);
   const receivableMonthStats = useMemo(() => calculateReceivableSummary(nonDailyReceivables, { currentMonth: true }), [nonDailyReceivables]);
 
-  const businessStats = useMemo(() => {
-    const map = new Map<string, { totalReceivable: number; totalPaid: number; outstanding: number; overdue: number }>();
-    const filtered = nonDailyReceivables.filter(r => r.status !== "cancelled" && r.due_date.startsWith(monthPrefix));
-    for (const r of filtered) {
-      const key = r.source_type === "lease_contract" ? "lease" : r.source_type === "sale_contract" ? "sale" : "other";
-      let g = map.get(key);
-      if (!g) { g = { totalReceivable: 0, totalPaid: 0, outstanding: 0, overdue: 0 }; map.set(key, g); }
-      g.totalReceivable += Number(r.amount_xof);
-      g.totalPaid += Number(r.paid_amount_xof);
-      const unpaid = Number(r.amount_xof) - Number(r.paid_amount_xof);
-      if (unpaid > 0 && r.due_date < new Date().toISOString().slice(0, 10)) g.overdue += unpaid;
-    }
-    for (const g of map.values()) g.outstanding = g.totalReceivable - g.totalPaid;
-    return map;
-  }, [nonDailyReceivables, monthPrefix]);
-
   // Lookups
-  const unitMap = useMemo(() => {
-    const m = new Map<string, UnitRow>();
-    for (const u of units) m.set(u.id, u);
-    return m;
-  }, [units]);
-
-  const buildingNameById = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const b of buildings) m.set(b.id, b.display_name || b.code);
-    return m;
-  }, [buildings]);
-
-  const customerNameById = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const c of customers) m.set(c.id, c.name);
-    return m;
-  }, [customers]);
+  const customerNameById = useMemo(() => { const m = new Map<string, string>(); for (const c of customers) m.set(c.id, c.name); return m; }, [customers]);
 
   // Risks
   const risks = useMemo(() => {
     const cleaning = unitStates.filter(s => s.status === "cleaningPending").length;
     const maintenance = unitStates.filter(s => s.status === "maintenance").length;
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() + 30);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const leaseExpiring = leaseContracts.filter(
-      l => l.status === "active" && l.expected_end_date >= todayStr && l.expected_end_date <= cutoffStr,
-    );
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() + 30); const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const todayStr2 = new Date().toISOString().slice(0, 10);
+    const leaseExpiring = leaseContracts.filter(l => l.status === "active" && l.expected_end_date >= todayStr2 && l.expected_end_date <= cutoffStr);
     const activeSales = saleContracts.filter(s => s.status === "active");
-    const saleWithPending = activeSales.filter(s =>
-      saleSchedules.some(sch => sch.sale_contract_id === s.id && sch.status !== "paid"),
-    );
+    const saleWithPending = activeSales.filter(s => saleSchedules.some(sch => sch.sale_contract_id === s.id && sch.status !== "paid"));
     return { cleaning, maintenance, leaseExpiring, saleWithPending };
   }, [unitStates, leaseContracts, saleContracts, saleSchedules]);
 
-  const hasAnyRisk = risks.cleaning > 0 || risks.maintenance > 0 || risks.leaseExpiring.length > 0 || risks.saleWithPending.length > 0;
+  const totalRooms = filteredUnits.length;
+  const occupiedPct = totalRooms > 0 ? Math.round((counts.dailyOccupied + counts.leased + counts.sold) / totalRooms * 100) : 0;
 
-  const buildingName = selectedBuildingId === "__all__"
-    ? t.allBuildings
-    : activeBuildings.find(b => b.id === selectedBuildingId)?.display_name ?? "";
+  const financeBlocks = [
+    { key: "receivable" as const, label: t.cockpit.receivableThisMonth, value: formatXof(receivableMonthStats.totalReceivable), icon: CalendarCheck, color: "accentBlue" },
+    { key: "collected" as const, label: t.cockpit.paidThisMonth, value: formatXof(receivableMonthStats.totalPaid), icon: TrendingUp, color: "accentGreen" },
+    { key: "outstanding" as const, label: t.cockpit.outstandingThisMonth, value: formatXof(receivableMonthStats.outstanding), icon: Clock, color: "accentAmber" },
+    { key: "overdue" as const, label: t.cockpit.overdueThisMonth, value: formatXof(receivableMonthStats.overdue), icon: TrendingDown, color: "accentRed" },
+  ];
+
+  // ════════════════════════════════════════════════════════════════════════
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* ── Building selector ── */}
-      <div className="inline-flex flex-wrap gap-0.5 rounded-xl border bg-card p-1 shadow-sm">
-        {[{ id: "__all__", display_name: t.allBuildings }, ...activeBuildings].map(b => (
-          <button key={b.id} onClick={() => setSelectedBuildingId(b.id)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${selectedBuildingId === b.id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
-            {b.display_name}
-          </button>
-        ))}
+    <div className="flex flex-col gap-6">
+      {/* ── Page chrome: title row + building selector ── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+            {locale === "zh" ? "经营驾驶舱" : "Tableau de bord"}
+          </p>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight">
+            {selectedBuildingId === "__all__" ? t.allBuildings : activeBuildings.find(b => b.id === selectedBuildingId)?.display_name ?? ""}
+          </h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long", month: "short", day: "numeric" })}
+          </span>
+          <div className="inline-flex gap-0.5 rounded-lg border border-border/60 bg-muted/50 p-1">
+            {[{ id: "__all__", display_name: t.allBuildings }, ...activeBuildings].map(b => (
+              <button key={b.id} onClick={() => setSelectedBuildingId(b.id)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-xs font-medium transition",
+                  selectedBuildingId === b.id
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}>
+                {b.display_name}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* ── KPI Row ── */}
+      {/* ── Finance strip ── */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title={t.cockpit.receivableThisMonth} value={formatXof(receivableMonthStats.totalReceivable)} tone="indigo" onClick={() => setFinanceDetail("receivable")} />
-        <MetricCard title={t.cockpit.paidThisMonth} value={formatXof(receivableMonthStats.totalPaid)} tone="green" onClick={() => setFinanceDetail("collected")} />
-        <MetricCard title={t.cockpit.outstandingThisMonth} value={formatXof(receivableMonthStats.outstanding)} tone="amber" onClick={() => setFinanceDetail("outstanding")} />
-        <MetricCard title={t.cockpit.overdueThisMonth} value={formatXof(receivableMonthStats.overdue)} tone="red" onClick={() => setFinanceDetail("overdue")} />
+        {financeBlocks.map(block => {
+          const Icon = block.icon;
+          const colorMap: Record<string, string> = {
+            accentBlue: "before:bg-accentBlue-500",
+            accentGreen: "before:bg-accentGreen-500",
+            accentAmber: "before:bg-accentAmber-500",
+            accentRed: "before:bg-accentRed-500",
+          };
+          return (
+            <button
+              key={block.key}
+              onClick={() => setFinanceDetail(block.key)}
+              className={cn(
+                "group relative flex items-center gap-3 overflow-hidden rounded-xl border border-border/60 bg-card px-4 py-4 text-left shadow-sm transition-all",
+                "hover:-translate-y-0.5 hover:shadow-md hover:border-border",
+                "before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:rounded-full",
+                colorMap[block.color],
+              )}
+            >
+              <div className={cn(
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                block.color === "accentBlue" ? "bg-accentBlue-50 text-accentBlue-600" :
+                block.color === "accentGreen" ? "bg-accentGreen-50 text-accentGreen-600" :
+                block.color === "accentAmber" ? "bg-accentAmber-50 text-accentAmber-600" :
+                "bg-accentRed-50 text-accentRed-600",
+              )}>
+                <Icon className="h-4 w-4" strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-muted-foreground">{block.label}</p>
+                <p className="text-lg font-bold tracking-tight tabular-nums">{block.value}</p>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
-      {/* ── Room status legend ── */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold text-muted-foreground">{t.sections.buildingStatus}:</span>
-        {(["sold","leased","dailyOccupied","reserved","cleaningPending","maintenance","available"] as MgmtStatus[]).map(s => (
-          <div key={s} className="flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs font-semibold shadow-sm">
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: legendDotColor(s) }} />
-            <span className="tabular-nums">{counts[s] ?? 0}</span>
+      {/* ── Status overview bar ── */}
+      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border/60 bg-card px-4 py-3">
+        <span className="mr-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+          {t.sections.buildingStatus}
+        </span>
+        {(["dailyOccupied","reserved","leased","sold","cleaningPending","maintenance","available"] as MgmtStatus[]).map(s => (
+          <div key={s} className="flex items-center gap-1.5 rounded-full border border-border/60 px-2.5 py-1 text-xs font-medium">
+            <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT[s] }} />
+            <span className="tabular-nums font-semibold">{counts[s]}</span>
             <span className="text-muted-foreground">{t.statuses[s]}</span>
           </div>
         ))}
+        <span className="ml-auto text-xs text-muted-foreground">
+          {locale === "zh" ? "入住率" : "Taux occ."} <span className="font-semibold text-foreground tabular-nums">{occupiedPct}%</span>
+        </span>
       </div>
 
-      {/* ── Room status matrix ── */}
-      <div className="space-y-4">
+      {/* ── Risk alerts (compact) ── */}
+      {(risks.cleaning > 0 || risks.maintenance > 0 || risks.leaseExpiring.length > 0 || risks.saleWithPending.length > 0) && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-accentRed-100 bg-accentRed-50/60 px-4 py-2.5 text-sm">
+          <AlertTriangle className="h-4 w-4 text-accentRed-500 shrink-0" />
+          <span className="text-xs font-semibold text-accentRed-700">{locale === "zh" ? "待处理" : "Attention"}:</span>
+          {risks.cleaning > 0 && <span className="text-xs text-accentRed-600">{risks.cleaning} {locale === "zh" ? "间待保洁" : "ménages"}</span>}
+          {risks.maintenance > 0 && <span className="text-xs text-accentRed-600">{risks.maintenance} {locale === "zh" ? "间维修" : "maintenance"}</span>}
+          {risks.leaseExpiring.length > 0 && <span className="text-xs text-accentRed-600">{risks.leaseExpiring.length} {locale === "zh" ? "份合同将到期" : "baux expirant"}</span>}
+          {risks.saleWithPending.length > 0 && <span className="text-xs text-accentRed-600">{risks.saleWithPending.length} {locale === "zh" ? "笔出售待回款" : "ventes en attente"}</span>}
+        </div>
+      )}
+
+      {/* ── Room matrix ── */}
+      <div className="space-y-5">
         {(selectedBuildingId === "__all__" ? activeBuildings : activeBuildings.filter(b => b.id === selectedBuildingId)).map(building => {
           const bUnits = buildingUnits.get(building.id) ?? [];
           const bStates = sortUnits(bUnits).map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks, todayStr));
           const floorGroups = groupStatesByFloor(bStates, locale);
+          const bOccupied = bStates.filter(s => s.status === "dailyOccupied" || s.status === "leased" || s.status === "sold").length;
+          const bTotal = bStates.length;
 
           return (
-            <div key={building.id} className="overflow-hidden rounded-xl border bg-card shadow-sm">
-              <div className="flex items-center justify-between border-b px-4 py-2.5">
+            <section key={building.id}>
+              <div className="mb-3 flex items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-                  <h3 className="text-sm font-bold">{building.display_name}</h3>
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">{bStates.length} {locale === "zh" ? "间" : "unités"}</span>
+                  <span className="h-2 w-2 rounded-full bg-primary" />
+                  <h3 className="text-sm font-semibold">{building.display_name}</h3>
+                </div>
+                <span className="text-[11px] text-muted-foreground tabular-nums">
+                  {bOccupied}/{bTotal} {locale === "zh" ? "间已占用" : "occupés"}
+                </span>
+                <div className="ml-auto h-1 flex-1 max-w-[120px] rounded-full bg-muted overflow-hidden">
+                  <div className="h-full rounded-full bg-accentBlue-500 transition-all" style={{ width: `${bTotal > 0 ? Math.round(bOccupied / bTotal * 100) : 0}%` }} />
                 </div>
               </div>
-              <div className="px-4 py-4 space-y-4">
-                {floorGroups.map(group => (
-                  <div key={group.key}>
-                    <div className="mb-2 flex items-center justify-between">
-                      <p className="text-xs font-semibold text-muted-foreground">{group.label}</p>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">{group.states.length}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2.5">
-                      {group.states.map(s => (
-                        <RoomCard key={s.unit.id} roomNo={s.unit.unit_no ?? "?"} status={s.status} customerName={getStateCustomerName(s, customerNameById, locale)} dateText={getStateDateText(s, locale)} href={routeFor(locale, `/units/${s.unit.id}`)} />
-                      ))}
-                    </div>
+              {floorGroups.map(group => (
+                <div key={group.key} className="mb-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-muted-foreground">{group.label}</span>
+                    <span className="text-[10px] text-muted-foreground/60">{group.states.length}</span>
                   </div>
-                ))}
-              </div>
-            </div>
+                  <div className="flex flex-wrap gap-2">
+                    {group.states.map(s => (
+                      <RoomCard
+                        key={s.unit.id}
+                        roomNo={s.unit.unit_no ?? "?"}
+                        status={s.status}
+                        customerName={stateCustomerName(s, customerNameById, locale)}
+                        dateText={stateDateText(s, locale)}
+                        href={routeFor(locale, `/units/${s.unit.id}`)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </section>
           );
         })}
       </div>
 
       {qualityIssues && <QualityDashboardWidget issues={qualityIssues} locale={locale} variant="management" />}
       <FinanceDetailPanel open={financeDetail} onClose={() => setFinanceDetail(null)} receivables={receivables} payments={payments} units={units} buildings={buildings} customers={customers} locale={locale} />
-    </div>
-  );
-}
-
-function legendDotColor(s: MgmtStatus): string {
-  return { sold: "#505080", leased: "#7050A0", dailyOccupied: "#5090C0", reserved: "#A0C0E0", cleaningPending: "#5AB5B8", maintenance: "#F0A080", available: "#F0E0D0" }[s] ?? "#E5E3E0";
-}
-
-// ── Sub-components ─────────────────────────────────────────────────────
-
-function getStateCustomerName(state: UnitState, customerNameById: Map<string, string>, locale: Locale): string {
-  const customerId = state.booking?.customer_id ?? state.lease?.customer_id ?? state.sale?.customer_id ?? null;
-  if (customerId && customerNameById.has(customerId)) return customerNameById.get(customerId)!;
-
-  if (state.status === "available") return locale === "zh" ? "可安排入住" : "Disponible";
-  if (state.status === "cleaningPending") return locale === "zh" ? "等待保洁" : "Menage";
-  if (state.status === "maintenance") return locale === "zh" ? "暂停使用" : "Bloque";
-  if (state.status === "sold") return locale === "zh" ? "已售房源" : "Vendu";
-  if (state.status === "leased") return locale === "zh" ? "长租客户" : "Locataire";
-  return locale === "zh" ? "日租客户" : "Client";
-}
-
-function getStateDateText(state: UnitState, locale: Locale): string {
-  if (state.booking) {
-    const start = shortDate(state.booking.check_in);
-    const end = state.booking.checkout_mode === "open"
-      ? (state.booking.actual_check_out ? shortDate(state.booking.actual_check_out) : (locale === "zh" ? "未定" : "Open"))
-      : (state.booking.check_out ? shortDate(state.booking.check_out) : start);
-    return `${start} - ${end}`;
-  }
-  if (state.lease) return `${locale === "zh" ? "至" : "to"} ${shortDate(state.lease.expected_end_date)}`;
-  if (state.sale) return locale === "zh" ? "已完成出售" : "Sold";
-  if (state.status === "available") return locale === "zh" ? "公寓" : "Appartement";
-  if (state.status === "cleaningPending") return locale === "zh" ? "清洁后可用" : "Disponible apres menage";
-  if (state.status === "maintenance") return locale === "zh" ? "需处理" : "Action requise";
-  return "";
-}
-
-function shortDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return "--";
-  const [, month, day] = dateStr.split("-");
-  return month && day ? `${month}/${day}` : dateStr;
-}
-
-function RoomMixRadar({
-  counts,
-  labels,
-}: {
-  counts: Record<MgmtStatus, number>;
-  labels: Record<MgmtStatus, string>;
-}) {
-  const statuses: MgmtStatus[] = ["sold", "leased", "dailyOccupied", "reserved", "cleaningPending", "available"];
-  const fills: Record<MgmtStatus, string> = {
-    sold: "#505080",
-    leased: "#7050A0",
-    dailyOccupied: "#5090C0",
-    reserved: "#A0C0E0",
-    cleaningPending: "#5AB5B8",
-    maintenance: "#F0A080",
-    available: "#F0E0D0",
-  };
-  const max = Math.max(...statuses.map(s => counts[s]), 1);
-  const center = 72;
-  const radius = 54;
-  const points = statuses.map((status, index) => {
-    const angle = -Math.PI / 2 + (index * Math.PI * 2) / statuses.length;
-    const ratio = Math.max(0.18, counts[status] / max);
-    return [
-      center + Math.cos(angle) * radius * ratio,
-      center + Math.sin(angle) * radius * ratio,
-    ];
-  }).map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-
-  return (
-    <div className="rounded-2xl border border-[#A0C0E0]/25 bg-[#F8FBFD] p-3">
-      <div className="mb-1 flex items-center justify-between">
-        <p className="text-xs font-black text-brand-ink-700">Room mix</p>
-        <span className="text-xs font-bold tabular-nums text-brand-ink-400">
-          {statuses.reduce((sum, status) => sum + counts[status], 0)}
-        </span>
-      </div>
-      <svg viewBox="0 0 144 144" className="mx-auto h-32 w-32" aria-hidden="true">
-        {[0.33, 0.66, 1].map(scale => (
-          <polygon
-            key={scale}
-            points={statuses.map((_, index) => {
-              const angle = -Math.PI / 2 + (index * Math.PI * 2) / statuses.length;
-              return `${(center + Math.cos(angle) * radius * scale).toFixed(1)},${(center + Math.sin(angle) * radius * scale).toFixed(1)}`;
-            }).join(" ")}
-            fill="none"
-            stroke="#D7E3EE"
-            strokeWidth="1"
-          />
-        ))}
-        <polygon points={points} fill="#A0C0E0" fillOpacity="0.42" stroke="#5090C0" strokeWidth="2" />
-        {statuses.map((status, index) => {
-          const angle = -Math.PI / 2 + (index * Math.PI * 2) / statuses.length;
-          const x = center + Math.cos(angle) * (radius + 10);
-          const y = center + Math.sin(angle) * (radius + 10);
-          return (
-            <circle key={status} cx={x} cy={y} r="3" fill={fills[status]} />
-          );
-        })}
-      </svg>
-      <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] font-semibold text-brand-ink-500">
-        {statuses.slice(0, 4).map(status => (
-          <span key={status} className="truncate">
-            {labels[status]} <span className="tabular-nums text-brand-ink-400">{counts[status]}</span>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SectionLabel({ children, compact = false }: { children: React.ReactNode; compact?: boolean }) {
-  return (
-    <h2 className={cn(
-      "text-xs font-black uppercase tracking-[0.14em] text-brand-ink-500",
-      compact ? "mb-0" : "mb-4",
-    )}>
-      {children}
-    </h2>
-  );
-}
-
-function SegmentedTab({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-fast",
-        active
-          ? "bg-brand-indigo-500 text-white shadow-sm"
-          : "text-brand-neutral-600 hover:bg-brand-indigo-50 hover:text-brand-indigo-800",
-      )}
-    >
-      {label}
-    </button>
-  );
-}
-
-function KPICard({ label, value, variant, onClick }: {
-  label: string; value: string;
-  variant: "neutral" | "positive" | "warning" | "danger";
-  onClick?: () => void;
-}) {
-  const styles: Record<string, { bg: string; text: string; dot: string; bar: string }> = {
-    neutral:  { bg: "bg-white border-[#A0C0E0]/35", text: "text-[#303052]", dot: "bg-[#A0C0E0]", bar: "bg-[#A0C0E0]" },
-    positive: { bg: "bg-white border-[#5AB5B8]/30", text: "text-[#32757A]", dot: "bg-[#5AB5B8]", bar: "bg-[#5AB5B8]" },
-    warning:  { bg: "bg-white border-[#7050A0]/25", text: "text-[#5C4388]", dot: "bg-[#7050A0]", bar: "bg-[#7050A0]" },
-    danger:   { bg: "bg-white border-[#F0A080]/35", text: "text-[#8A4A32]", dot: "bg-[#F0A080]", bar: "bg-[#F0A080]" },
-  };
-  const s = styles[variant];
-  const isClickable = !!onClick;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!isClickable}
-      className={cn(
-        "appearance-none flex min-h-[94px] overflow-hidden rounded-2xl border bg-white text-left transition-all duration-fast shadow-sm",
-        s.bg,
-        isClickable && "cursor-pointer hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo-500",
-      )}
-    >
-      <div className={cn("w-1.5 shrink-0", s.bar)} />
-      <div className="flex min-w-0 flex-1 flex-col justify-between px-4 py-3">
-        <div className="flex items-center gap-2 mb-1.5">
-          <span className={cn("h-1.5 w-1.5 rounded-full", s.dot)} />
-          <p className="truncate text-xs font-bold uppercase tracking-[0.08em] text-brand-neutral-800">{label}</p>
-        </div>
-        <p className={cn("truncate text-[24px] font-black tracking-tight tabular-nums", s.text)}>
-          {value}
-        </p>
-      </div>
-    </button>
-  );
-}
-
-function RiskAlert({ label, value, unit, active, compact = false }: {
-  label: string; value: number; unit: string; active: boolean; compact?: boolean;
-}) {
-  return (
-    <div className={cn(
-      "rounded-xl border transition-colors",
-      compact ? "px-3 py-2.5" : "px-4 py-3.5",
-      active
-        ? "border-brand-red-200 bg-brand-red-50"
-        : "border-brand-warm-200 bg-white",
-    )}>
-      <div className="mb-1.5 flex items-center gap-2">
-        {active && <AlertTriangle className="h-4 w-4 text-brand-red-500 shrink-0" />}
-        <span className={cn(
-          "text-xs font-medium uppercase tracking-[0.14em]",
-          active ? "text-brand-red-600" : "text-brand-ink-400",
-        )}>
-          {label}
-        </span>
-      </div>
-      <p className={cn(
-        compact ? "text-lg font-black tabular-nums" : "text-xl font-black tabular-nums",
-        active ? "text-brand-red-700" : "text-brand-ink-400",
-      )}>
-        {value} <span className="text-sm font-normal">{unit}</span>
-      </p>
     </div>
   );
 }

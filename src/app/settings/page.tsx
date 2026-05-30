@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { SettingsView } from "@/features/settings";
@@ -34,7 +33,7 @@ export default async function SettingsPage() {
     <>
       <div className="lg:hidden"><DesktopOnly locale="zh" /></div>
       <div className="hidden lg:block">
-        <PageHeader title={t.title} />
+        <h1 className="mb-6 text-2xl font-bold tracking-tight">{t.title}</h1>
         <div className="space-y-8">
           <SettingsView buildings={(buildings as BuildingRow[]) ?? []} locale="zh" />
           <SystemSettingsPanel settings={settingsMap} isAdmin={user.role === "admin"} locale="zh" />

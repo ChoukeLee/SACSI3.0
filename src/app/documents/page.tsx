@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/page-header";
 import { DesktopOnly } from "@/features/mobile";
 import { DocumentCenter } from "@/features/documents";
 import type { DocumentRecord } from "@/features/documents/types";
@@ -265,12 +264,7 @@ export default async function DocumentsPage() {
         <DesktopOnly locale="zh" />
       </div>
       <div className="hidden lg:block">
-        <PageHeader
-          title="单据中心"
-        />
-        <section className="mt-8">
-          <DocumentCenter documents={docs} locale="zh" />
-        </section>
+        <DocumentCenter documents={docs} locale="zh" />
       </div>
     </>
   );

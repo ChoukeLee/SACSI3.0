@@ -6,7 +6,6 @@ import { Plus, Trash2, Save } from "lucide-react";
 import { cn, formatXof } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MetricCard } from "@/components/metric-card";
 import { computeKpiData, KPI_DEFINITIONS } from "@/features/management/kpi-service";
 import type { ReceivableRow, UnitRow, DailyBookingRow, LeaseContractRow, SaleContractRow } from "@/types/database";
 
@@ -96,14 +95,16 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
           const current = kpiMap[def.key] ?? 0;
           const target = currentTargets.find(t => t.metric_key === def.key);
           const rate = target ? Math.min(100, Math.round((current / Number(target.target_value)) * 100)) : null;
-          const tone = target ? ((rate ?? 0) >= 100 ? "green" : (rate ?? 0) >= 70 ? "amber" : "red") : "neutral";
+          const dot = target
+            ? ((rate ?? 0) >= 100 ? "bg-accentGreen-500" : (rate ?? 0) >= 70 ? "bg-accentAmber-500" : "bg-accentRed-500")
+            : "bg-muted-foreground/40";
           return (
-            <MetricCard
+            <StatTile
               key={def.key}
-              title={zh ? def.labelZh : def.labelFr}
+              label={zh ? def.labelZh : def.labelFr}
               value={def.isPercentage ? `${current}%` : formatXof(current)}
-              caption={target ? `${zh ? "目标" : "Cible"}: ${def.isPercentage ? `${target.target_value}%` : formatXof(Number(target.target_value))} · ${rate}%` : (zh ? "未设置目标" : "Pas d'objectif")}
-              tone={tone}
+              caption={target ? `${zh ? "目标" : "Cible"}: ${def.isPercentage ? `${target.target_value}%` : formatXof(Number(target.target_value))} - ${rate}%` : (zh ? "未设置目标" : "Pas d'objectif")}
+              dot={dot}
             />
           );
         })}
@@ -169,6 +170,19 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+function StatTile({ label, value, caption, dot }: { label: string; value: string; caption?: string; dot: string }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+      <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", dot)} />
+      <div className="min-w-0">
+        <p className="text-xl font-bold leading-none tracking-tight tabular-nums">{value}</p>
+        <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">{label}</p>
+        {caption && <p className="mt-1 truncate text-[11px] text-muted-foreground/80">{caption}</p>}
+      </div>
     </div>
   );
 }

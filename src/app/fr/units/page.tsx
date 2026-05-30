@@ -1,6 +1,4 @@
 
-import { PageHeader } from "@/components/page-header";
-import { dictionaries } from "@/lib/i18n";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -15,7 +13,6 @@ export default async function FrenchUnitsPage() {
   if (!user) redirect("/login");
   if (!["admin","front_desk","finance","boss"].includes(user.role)) redirect("/");
 
-  const t = dictionaries.fr.units;
   const supabase = await createClient();
 
   let units: UnitRow[] = [];
@@ -40,7 +37,6 @@ export default async function FrenchUnitsPage() {
     businessFlagsMap[flag.unit_id].push(flag);
   }
 
-  // Pre-fetch audit logs
   const auditLogsMap: Record<string, { id: string; action: string; metadata: Record<string, unknown>; created_at: string }[]> = {};
   if (buildingId && units.length > 0) {
     const unitIds = units.map((u) => u.id);
@@ -67,17 +63,5 @@ export default async function FrenchUnitsPage() {
     }
   }
 
-  return (
-      <>
-
-<><PageHeader title={t.title} description={t.description} />
-      <UnitList
-        units={units}
-        businessFlagsMap={businessFlagsMap}
-        auditLogsMap={auditLogsMap}
-        locale="fr"
-      />
-
-      </>
-</>);
+  return <UnitList units={units} businessFlagsMap={businessFlagsMap} auditLogsMap={auditLogsMap} locale="fr" />;
 }

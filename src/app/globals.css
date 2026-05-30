@@ -24,48 +24,47 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── SACIS Design Tokens V2 — warm orange system ── */
+/* ── SACIS Design Tokens V3 — warm bright SaaS ── */
 @layer base {
   :root {
-    --background: 30 5% 97%;           /* #f6f5f4 Notion warm white */
-    --foreground: 220 9% 12%;          /* #181d26 Airtable ink */
-    --card: 0 0% 100%;                 /* #ffffff Cal.com white */
-    --card-foreground: 220 9% 12%;
+    --background: 40 12% 96%;
+    --foreground: 30 8% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 30 8% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 9% 12%;
-    --primary: 0 0% 7%;                /* #111111 Cal.com black CTA */
+    --popover-foreground: 30 8% 10%;
+    --primary: 30 6% 12%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 20% 98%;          /* #f8f9fa Cal.com soft */
-    --secondary-foreground: 220 9% 12%;
-    --muted: 210 20% 98%;
-    --muted-foreground: 220 9% 46%;    /* #6b7280 Cal.com muted */
-    --accent: 217 91% 95%;             /* #eff6ff blue-50 Cal.com accent */
-    --accent-foreground: 217 91% 40%;
-    --destructive: 0 84% 60%;          /* #ef4444 Cal.com error */
+    --secondary: 38 12% 94%;
+    --secondary-foreground: 30 8% 16%;
+    --muted: 38 12% 94%;
+    --muted-foreground: 30 5% 44%;
+    --accent: 200 80% 94%;
+    --accent-foreground: 200 72% 36%;
+    --destructive: 0 72% 52%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 91%;             /* #e5e7eb Cal.com hairline */
-    --input: 220 13% 91%;
-    --ring: 217 91% 60%;               /* #3b82f6 Cal.com blue */
-    --radius: 0.5rem;
+    --border: 36 8% 88%;
+    --input: 36 8% 88%;
+    --ring: 200 72% 48%;
+    --radius: 0.625rem;
 
-    /* Sidebar — Notion warm light */
-    --sidebar-background: 30 5% 97%;
-    --sidebar-foreground: 220 9% 12%;
-    --sidebar-primary: 0 0% 7%;
+    --sidebar-background: 38 10% 94%;
+    --sidebar-foreground: 30 8% 12%;
+    --sidebar-primary: 30 6% 12%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 20% 98%;
-    --sidebar-accent-foreground: 220 9% 12%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-accent: 38 12% 90%;
+    --sidebar-accent-foreground: 30 8% 12%;
+    --sidebar-border: 36 8% 86%;
+    --sidebar-ring: 200 72% 48%;
 
-    /* Room status — unchanged user palette */
-    --status-sold: 252 12% 41%;        /* #505080 */
-    --status-leased: 264 24% 47%;      /* #7050A0 */
-    --status-occupied: 202 44% 53%;    /* #5090C0 */
-    --status-reserved: 210 40% 75%;    /* #A0C0E0 */
-    --status-cleaning: 182 32% 54%;    /* #5AB5B8 */
-    --status-maintenance: 18 57% 72%;  /* #F0A080 */
-    --status-available: 32 38% 85%;    /* #F0E0D0 */
+    /* Room status colours */
+    --status-sold: 252 12% 41%;
+    --status-leased: 264 24% 47%;
+    --status-occupied: 202 44% 53%;
+    --status-reserved: 210 40% 75%;
+    --status-cleaning: 182 32% 54%;
+    --status-maintenance: 18 57% 72%;
+    --status-available: 32 38% 85%;
   }
 }
 
@@ -76,12 +75,47 @@
     min-height: 100dvh;
     font-family: "MiSans", "Microsoft YaHei", "PingFang SC", "Segoe UI", system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   h1 { @apply text-xl font-bold tracking-tight; }
   h2 { @apply text-[15px] font-bold tracking-tight; }
   ::selection { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
   *:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
   @media (pointer: coarse) { *:focus-visible { outline: none; } }
+}
+
+/* ── Shared table system ── */
+@layer components {
+  .table-shell {
+    @apply w-full overflow-hidden rounded-xl border border-border bg-card;
+  }
+  .table-shell > table {
+    @apply w-full;
+  }
+  .table-shell thead {
+    @apply border-b border-border bg-muted/50;
+  }
+  .table-shell thead th {
+    @apply px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground tracking-wide;
+  }
+  .table-shell tbody tr {
+    @apply border-b border-border/60 transition-colors;
+  }
+  .table-shell tbody tr:last-child {
+    @apply border-b-0;
+  }
+  .table-shell tbody tr:hover {
+    @apply bg-accent/30;
+  }
+  .table-shell tbody td {
+    @apply px-4 py-2.5 text-sm;
+  }
+  .table-cell-amount {
+    @apply text-right tabular-nums font-medium;
+  }
+  .table-cell-action {
+    @apply text-center;
+  }
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }

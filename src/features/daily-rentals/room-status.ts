@@ -28,12 +28,12 @@ const ACTIVE_PRIORITY: Record<string, number> = {
 };
 
 export const STATUS_COLORS: Record<DailyRoomDisplayStatus, string> = {
-  maintenance:        "bg-brand-red-100 text-brand-red-700 border border-brand-red-200",
-  locked:             "bg-brand-neutral-100 text-brand-neutral-600 border border-brand-neutral-300",
-  occupied:           "bg-brand-indigo-100 text-brand-indigo-800 border border-brand-indigo-200",
-  checking_out_today: "bg-brand-amber-100 text-brand-amber-700 border border-brand-amber-200",
-  reserved:           "bg-brand-cyan-100 text-brand-cyan-700 border border-brand-cyan-200",
-  cleaning:           "bg-brand-green-100 text-brand-green-800 border border-brand-green-200",
+  maintenance:        "bg-[#FFE2EA] text-[#17324D] border border-[#F5C0CC]",
+  locked:             "bg-muted text-muted-foreground border border-border",
+  occupied:           "bg-[#62B6F5]/10 text-[#1A6090] border border-[#62B6F5]/20",
+  checking_out_today: "bg-amber-50 text-amber-700 border border-amber-200",
+  reserved:           "bg-[#FFF6D8] text-[#17324D] border border-[#E8D5A0]/60",
+  cleaning:           "bg-[#D9F7F0] text-[#17324D] border border-[#A8E8DB]",
   available:          "",
 };
 
@@ -240,15 +240,15 @@ function resolveCalendarCheckOut(
 export function getBookingColorClass(booking: DailyBookingRow): string {
   // Aligned with Natural Professional STATUS_CELL earth-tone palette
   if (booking.status === "checked_in") {
-    return "bg-brand-indigo-500 text-white";
+    return "bg-[#62B6F5] text-white";
   }
   if (booking.status === "confirmed" || booking.status === "pending_review") {
-    return "bg-brand-cyan-500 text-white";
+    return "bg-[#5CC4B8] text-white";
   }
   if (booking.status === "checked_out") {
-    return "bg-brand-warm-100 text-brand-ink-500";
+    return "bg-muted text-muted-foreground";
   }
-  return "bg-brand-warm-50 text-brand-ink-400";
+  return "bg-muted/50 text-muted-foreground/70";
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────

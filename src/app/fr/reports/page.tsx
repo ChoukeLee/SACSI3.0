@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
 import { ReportsView } from "@/features/reports";
@@ -50,7 +49,6 @@ export default async function FrenchReportsPage() {
     <>
       <div className="lg:hidden"><DesktopOnly locale="fr" /></div>
       <div className="hidden lg:block">
-        <PageHeader title="Rapports" description="Logements, revenus, impayes, journalier, baux, ventes, cloture jour" />
         <ReportsView entries={entries} bookings={bookings} units={units}
           leaseContracts={leaseContracts} saleContracts={saleContracts}
           saleSchedules={saleSchedules} receivables={receivables}

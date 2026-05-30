@@ -4,7 +4,6 @@ import { useState, useMemo } from "react";
 import { Download } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
-import { MetricCard } from "@/components/metric-card";
 import type {
   LedgerEntryRow, DailyBookingRow, UnitRow, LeaseContractRow,
   SaleContractRow, SalePaymentScheduleRow, ReceivableRow, PaymentRow, CustomerRow,
@@ -35,6 +34,18 @@ function downloadCsv(header: string, rows: string[], filename: string) {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
   a.download = `${filename}_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+}
+
+function StatBlock({ label, value, dot }: { label: string; value: string; dot: string }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+      <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", dot)} />
+      <div className="min-w-0">
+        <p className="text-xl font-bold tracking-tight tabular-nums leading-none">{value}</p>
+        <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{label}</p>
+      </div>
+    </div>
+  );
 }
 
 export function ReportsView({ entries: _entries, bookings, units, leaseContracts, saleContracts, saleSchedules: _saleSchedules, receivables, payments, customers, locale, userRole }: Props) {
@@ -226,16 +237,16 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
       {/* ── Room Status ── */}
       {tab === "room_status" && (
         <div className="space-y-5">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <MetricCard title={L.totalUnits} value={String(roomStatusData.total)} tone="indigo" />
-            <MetricCard title={L.residential} value={String(roomStatusData.residential)} tone="green" />
-            <MetricCard title={L.parking} value={String(roomStatusData.kinds.parking)} tone="neutral" />
-            <MetricCard title={L.storefront} value={String(roomStatusData.kinds.storefront)} tone="neutral" />
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <StatBlock label={L.totalUnits} value={String(roomStatusData.total)} dot="bg-accentBlue-500" />
+            <StatBlock label={L.residential} value={String(roomStatusData.residential)} dot="bg-accentGreen-500" />
+            <StatBlock label={L.parking} value={String(roomStatusData.kinds.parking)} dot="bg-muted-foreground/40" />
+            <StatBlock label={L.storefront} value={String(roomStatusData.kinds.storefront)} dot="bg-muted-foreground/40" />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {Object.entries(roomStatusData.statuses).map(([k, v]) => {
-              const tone = k === "available" ? "green" : k === "daily_occupied" ? "indigo" : k === "leased" ? "leased" : k === "sold" ? "sold" : k === "maintenance" || k === "locked" ? "maintenance" : k === "cleaning_pending" ? "amber" : "neutral";
-              return <MetricCard key={k} title={L.statusLabels[k] ?? k} value={String(v)} tone={tone} />;
+              const dot = k === "available" ? "bg-accentGreen-500" : k === "daily_occupied" ? "bg-accentBlue-500" : k === "leased" ? "bg-[#7050A0]" : k === "sold" ? "bg-[#505080]" : k === "maintenance" || k === "locked" ? "bg-[#F0A080]" : k === "cleaning_pending" ? "bg-accentAmber-500" : "bg-muted-foreground/40";
+              return <StatBlock key={k} label={L.statusLabels[k] ?? k} value={String(v)} dot={dot} />;
             })}
           </div>
           <button onClick={() => downloadCsv("类型,状态,数量", Object.entries(roomStatusData.statuses).map(([k, v]) => csvLine([k, L.statusLabels[k] ?? k, v])), "room_status")}
@@ -247,11 +258,11 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
       {tab === "income" && (
         <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <MetricCard title={L.amountXof} value={formatXof(incomeData.rec)} tone="indigo" />
-            <MetricCard title={L.paid} value={formatXof(incomeData.paid)} tone="green" />
-            <MetricCard title={L.unpaid} value={formatXof(incomeData.unpaid)} tone="amber" />
-            <MetricCard title={L.overdueLabel} value={formatXof(incomeData.overdue)} tone="red" />
-            <MetricCard title={L.rate} value={`${incomeData.rate}%`} tone={incomeData.rate >= 80 ? "green" : "amber"} />
+            <StatBlock label={L.amountXof} value={formatXof(incomeData.rec)} dot="bg-accentBlue-500" />
+            <StatBlock label={L.paid} value={formatXof(incomeData.paid)} dot="bg-accentGreen-500" />
+            <StatBlock label={L.unpaid} value={formatXof(incomeData.unpaid)} dot="bg-accentAmber-500" />
+            <StatBlock label={L.overdueLabel} value={formatXof(incomeData.overdue)} dot="bg-accentRed-500" />
+            <StatBlock label={L.rate} value={`${incomeData.rate}%`} dot={incomeData.rate >= 80 ? "bg-accentGreen-500" : "bg-accentAmber-500"} />
           </div>
           <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
             <div className="overflow-x-auto">
@@ -329,16 +340,16 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
       {tab === "daily" && (
         <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <MetricCard title={L.todayCheckins} value={String(dailyData.todayCheckins.length)} tone="green" />
-            <MetricCard title={L.todayCheckouts} value={String(dailyData.todayCheckouts.length)} tone="amber" />
-            <MetricCard title={L.inHouse} value={String(dailyData.inHouse.length)} tone="indigo" />
-            <MetricCard title={L.occupancyRate} value={`${dailyData.occupancyRate}%`} tone="green" />
+            <StatBlock label={L.todayCheckins} value={String(dailyData.todayCheckins.length)} dot="bg-accentGreen-500" />
+            <StatBlock label={L.todayCheckouts} value={String(dailyData.todayCheckouts.length)} dot="bg-accentAmber-500" />
+            <StatBlock label={L.inHouse} value={String(dailyData.inHouse.length)} dot="bg-accentBlue-500" />
+            <StatBlock label={L.occupancyRate} value={`${dailyData.occupancyRate}%`} dot="bg-accentGreen-500" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <MetricCard title={L.pendingReview} value={String(dailyData.pending.length)} tone="amber" />
-            <MetricCard title={L.confirmed} value={String(dailyData.confirmed.length)} tone="indigo" />
-            <MetricCard title={L.monthlyIncome} value={formatXof(dailyData.dailyIncome)} tone="green" />
-            <MetricCard title={L.openLong} value={String(dailyData.openLong.length)} tone="red" />
+            <StatBlock label={L.pendingReview} value={String(dailyData.pending.length)} dot="bg-accentAmber-500" />
+            <StatBlock label={L.confirmed} value={String(dailyData.confirmed.length)} dot="bg-accentBlue-500" />
+            <StatBlock label={L.monthlyIncome} value={formatXof(dailyData.dailyIncome)} dot="bg-accentGreen-500" />
+            <StatBlock label={L.openLong} value={String(dailyData.openLong.length)} dot="bg-accentRed-500" />
           </div>
           <button onClick={() => downloadCsv("房号,客户,入住日期,状态", dailyData.todayCheckins.map(b => { const u = units.find(x => x.id === b.unit_id); return csvLine([u?.unit_no ?? "", custName(b.customer_id), b.check_in, b.status]); }), "daily_checkins")}
             className={btnExport}><Download className="h-4 w-4" />{L.exportCsv}</button>
@@ -349,16 +360,16 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
       {tab === "lease" && (
         <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <MetricCard title={L.activeContracts} value={String(leaseData.active.length)} tone="green" />
-            <MetricCard title={L.monthlyDue} value={formatXof(leaseData.leaseRec)} tone="indigo" />
-            <MetricCard title={L.monthlyPaid} value={formatXof(leaseData.leasePaid)} tone="green" />
-            <MetricCard title={L.rate} value={`${leaseData.rate}%`} tone={leaseData.rate >= 80 ? "green" : "amber"} />
+            <StatBlock label={L.activeContracts} value={String(leaseData.active.length)} dot="bg-accentGreen-500" />
+            <StatBlock label={L.monthlyDue} value={formatXof(leaseData.leaseRec)} dot="bg-accentBlue-500" />
+            <StatBlock label={L.monthlyPaid} value={formatXof(leaseData.leasePaid)} dot="bg-accentGreen-500" />
+            <StatBlock label={L.rate} value={`${leaseData.rate}%`} dot={leaseData.rate >= 80 ? "bg-accentGreen-500" : "bg-accentAmber-500"} />
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <MetricCard title={L.expire30d} value={String(leaseData.expiring30d.length)} tone="amber" />
-            <MetricCard title={L.expired} value={String(leaseData.expired.length)} tone="red" />
-            <MetricCard title={L.overdueContracts} value={String(leaseData.leaseOverdue.length)} tone="red" />
-            <MetricCard title={L.terminated} value={String(leaseData.terminated.length)} tone="neutral" />
+            <StatBlock label={L.expire30d} value={String(leaseData.expiring30d.length)} dot="bg-accentAmber-500" />
+            <StatBlock label={L.expired} value={String(leaseData.expired.length)} dot="bg-accentRed-500" />
+            <StatBlock label={L.overdueContracts} value={String(leaseData.leaseOverdue.length)} dot="bg-accentRed-500" />
+            <StatBlock label={L.terminated} value={String(leaseData.terminated.length)} dot="bg-muted-foreground/40" />
           </div>
           {leaseData.expiring30d.length > 0 && (
             <div className="rounded-xl border bg-card p-4 shadow-sm">
@@ -377,15 +388,15 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
       {tab === "sale" && (
         <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <MetricCard title={L.activeContracts} value={String(saleData.active.length)} tone="green" />
-            <MetricCard title={L.totalAmount} value={formatXof(saleData.totalAmount)} tone="indigo" />
-            <MetricCard title={L.paid} value={formatXof(saleData.paid)} tone="green" />
-            <MetricCard title={L.rate} value={`${saleData.rate}%`} tone={saleData.rate >= 80 ? "green" : "amber"} />
+            <StatBlock label={L.activeContracts} value={String(saleData.active.length)} dot="bg-accentGreen-500" />
+            <StatBlock label={L.totalAmount} value={formatXof(saleData.totalAmount)} dot="bg-accentBlue-500" />
+            <StatBlock label={L.paid} value={formatXof(saleData.paid)} dot="bg-accentGreen-500" />
+            <StatBlock label={L.rate} value={`${saleData.rate}%`} dot={saleData.rate >= 80 ? "bg-accentGreen-500" : "bg-accentAmber-500"} />
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <MetricCard title={L.unpaid} value={formatXof(saleData.unpaid)} tone="red" />
-            <MetricCard title={L.overdueInstallments} value={String(saleData.overdueRecs.length)} tone="red" />
-            <MetricCard title={L.notDelivered} value={String(saleData.notDelivered.length)} tone="amber" />
+            <StatBlock label={L.unpaid} value={formatXof(saleData.unpaid)} dot="bg-accentRed-500" />
+            <StatBlock label={L.overdueInstallments} value={String(saleData.overdueRecs.length)} dot="bg-accentRed-500" />
+            <StatBlock label={L.notDelivered} value={String(saleData.notDelivered.length)} dot="bg-accentAmber-500" />
           </div>
           <button onClick={() => downloadCsv("合同号,总价,已收,未收,状态", saleData.active.map(s => { const rec = receivables.filter(r => r.source_id === s.id && r.status !== "cancelled"); const paid = rec.reduce((sum, r) => sum + Number(r.paid_amount_xof), 0); return csvLine([s.contract_no, s.total_amount_xof, paid, Number(s.total_amount_xof) - paid, s.status]); }), "sales")}
             className={btnExport}><Download className="h-4 w-4" />{L.exportCsv}</button>
@@ -396,14 +407,14 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
       {tab === "daily_close" && (
         <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <MetricCard title={L.todayNewBookings} value={String(dailyCloseData.newBookings.length)} tone="indigo" />
-            <MetricCard title={L.todayCheckins} value={String(dailyCloseData.checkins.length)} tone="green" />
-            <MetricCard title={L.todayCheckouts} value={String(dailyCloseData.checkouts.length)} tone="amber" />
-            <MetricCard title={L.todayPayments} value={formatXof(dailyCloseData.todayTotal)} tone="green" />
+            <StatBlock label={L.todayNewBookings} value={String(dailyCloseData.newBookings.length)} dot="bg-accentBlue-500" />
+            <StatBlock label={L.todayCheckins} value={String(dailyCloseData.checkins.length)} dot="bg-accentGreen-500" />
+            <StatBlock label={L.todayCheckouts} value={String(dailyCloseData.checkouts.length)} dot="bg-accentAmber-500" />
+            <StatBlock label={L.todayPayments} value={formatXof(dailyCloseData.todayTotal)} dot="bg-accentGreen-500" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2">
-            <MetricCard title={L.inHouse} value={String(dailyCloseData.inHouse.length)} tone="indigo" />
-            <MetricCard title={L.paymentCount} value={String(dailyCloseData.todayPayments.length)} tone="neutral" />
+            <StatBlock label={L.inHouse} value={String(dailyCloseData.inHouse.length)} dot="bg-accentBlue-500" />
+            <StatBlock label={L.paymentCount} value={String(dailyCloseData.todayPayments.length)} dot="bg-muted-foreground/40" />
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => {

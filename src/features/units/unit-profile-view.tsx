@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
-import { MetricCard } from "@/components/metric-card";
 import { printDocumentRecord } from "@/features/documents/templates/all-templates";
 import type { DocumentRecord } from "@/features/documents/types";
 import type { ContractStatus, UnitKind, UnitStatus } from "@/types/domain";
@@ -126,10 +125,10 @@ function OverviewTab({ stats, currentCustomer, unit, buildingName, L }: { stats:
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title={L.totalRec} value={formatXof(stats.totalRec)} tone="indigo" />
-        <MetricCard title={L.totalPaid} value={formatXof(stats.totalPaid)} tone="green" />
-        <MetricCard title={L.unpaid} value={formatXof(stats.unpaid)} tone={stats.unpaid > 0 ? "amber" : "green"} />
-        <MetricCard title={L.overdueAmt} value={formatXof(stats.totalOverdue)} tone={stats.totalOverdue > 0 ? "red" : "green"} />
+        <StatTile label={L.totalRec} value={formatXof(stats.totalRec)} dot="bg-accentBlue-500" />
+        <StatTile label={L.totalPaid} value={formatXof(stats.totalPaid)} dot="bg-accentGreen-500" />
+        <StatTile label={L.unpaid} value={formatXof(stats.unpaid)} dot={stats.unpaid > 0 ? "bg-accentAmber-500" : "bg-accentGreen-500"} />
+        <StatTile label={L.overdueAmt} value={formatXof(stats.totalOverdue)} dot={stats.totalOverdue > 0 ? "bg-accentRed-500" : "bg-accentGreen-500"} />
       </div>
 
       <div className="grid gap-3 lg:grid-cols-3">
@@ -149,6 +148,18 @@ function OverviewTab({ stats, currentCustomer, unit, buildingName, L }: { stats:
           {unit.notes && <span className="sm:col-span-2"><span className="text-muted-foreground">{L.notes}:</span> {unit.notes}</span>}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function StatTile({ label, value, dot }: { label: string; value: string; dot: string }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+      <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", dot)} />
+      <div className="min-w-0">
+        <p className="text-xl font-bold leading-none tracking-tight tabular-nums">{value}</p>
+        <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">{label}</p>
+      </div>
     </div>
   );
 }

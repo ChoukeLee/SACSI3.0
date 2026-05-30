@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
-import { PageHeader } from "@/components/page-header";
 import { DesktopOnly } from "@/features/mobile";
 import { QualityCenter, runQualityChecks } from "@/features/data-quality";
 import type { TodoRole } from "@/features/data-quality/quality-types";
@@ -50,8 +49,7 @@ export default async function FrenchDataQualityPage() {
     <>
       <div className="lg:hidden"><DesktopOnly locale="fr" /></div>
       <div className="hidden lg:block">
-        <PageHeader title="Qualité des données" />
-        <section className="mt-8"><QualityCenter issues={issues} locale="fr" /></section>
+        <QualityCenter issues={issues} locale="fr" />
       </div>
     </>
   );

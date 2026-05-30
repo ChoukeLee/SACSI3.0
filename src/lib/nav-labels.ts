@@ -6,6 +6,7 @@ export interface DesktopNavLabels {
   groups: Record<string, string>;
   nav: Record<string, string>;
   roles: Record<string, string>;
+  shell: { logout: string; langLabel: string };
 }
 
 export interface MobileNavLabels {
@@ -20,6 +21,7 @@ const desktop: Record<Locale, DesktopNavLabels> = {
     brand: "科建地产",
     building: "SASCI11 · 11#",
     roles: { admin: "管理员", boss: "老板", finance: "财务", front_desk: "前台" },
+    shell: { logout: "登出", langLabel: "FR" },
     groups: {
       home: "首页",
       business: "租售业务",
@@ -52,6 +54,7 @@ const desktop: Record<Locale, DesktopNavLabels> = {
     brand: "Kejian Immobilier",
     building: "SASCI11 · Phase 1",
     roles: { admin: "Administrateur", boss: "Proprietaire", finance: "Comptable", front_desk: "Reception" },
+    shell: { logout: "Déconnexion", langLabel: "ZH" },
     groups: {
       home: "Accueil",
       business: "Activites",

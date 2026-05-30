@@ -7,7 +7,6 @@ import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { cn, formatXof } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { MetricCard } from "@/components/metric-card";
 import { EmptyState } from "@/components/empty-state";
 import type { TodoItem, TodoSource, TodoPriority } from "./todo-types";
 
@@ -65,11 +64,17 @@ export function TodoCenter({ todos, locale }: Props) {
   return (
     <div className="space-y-5">
       {/* Summary stats */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title={zh ? "全部待办" : "Total"} value={String(todos.length)} tone="indigo" />
-        <MetricCard title={zh ? "紧急" : "Urgent"} value={String(highTodos.length)} tone="red" />
-        <MetricCard title={zh ? "今日" : "Aujourd'hui"} value={String(todayTodos.length)} tone="amber" />
-        <MetricCard title={zh ? "逾期" : "Retard"} value={String(overdueTodos.length)} tone="red" />
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {[{ key:"total", label:zh?"全部待办":"Total", value:String(todos.length), dot:"bg-accentBlue-500" },
+          { key:"high", label:zh?"紧急":"Urgent", value:String(highTodos.length), dot:"bg-accentRed-500" },
+          { key:"today", label:zh?"今日":"Aujourd'hui", value:String(todayTodos.length), dot:"bg-accentAmber-500" },
+          { key:"overdue", label:zh?"逾期":"Retard", value:String(overdueTodos.length), dot:"bg-accentRed-500" },
+        ].map(b => (
+          <div key={b.key} className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+            <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", b.dot)} />
+            <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{b.value}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{b.label}</p></div>
+          </div>
+        ))}
       </div>
 
       {/* Filters */}

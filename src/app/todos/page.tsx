@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/page-header";
 import { DesktopOnly } from "@/features/mobile";
 import { TodoCenter, computeTodos } from "@/features/todos";
 import type { TodoRole } from "@/features/todos/todo-types";
@@ -52,10 +51,7 @@ export default async function TodosPage() {
         <DesktopOnly locale="zh" />
       </div>
       <div className="hidden lg:block">
-        <PageHeader title="通知与待办中心" />
-        <section className="mt-8">
-          <TodoCenter todos={todos} locale="zh" />
-        </section>
+        <TodoCenter todos={todos} locale="zh" />
       </div>
     </>
   );

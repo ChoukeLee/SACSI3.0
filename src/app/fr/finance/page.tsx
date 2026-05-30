@@ -1,5 +1,3 @@
-import { PageHeader } from "@/components/page-header";
-import { dictionaries } from "@/lib/i18n";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -16,7 +14,6 @@ export default async function FrenchFinancePage() {
   if (!user) redirect("/login");
   if (!["admin","boss","finance"].includes(user.role)) redirect("/");
 
-  const t = dictionaries.fr.finance;
   const supabase = await createClient();
 
   const { data: building } = await supabase.from("buildings").select("id").eq("code", "SASCI11").single();
@@ -44,15 +41,10 @@ export default async function FrenchFinancePage() {
   }
 
   return (
-    <>
-      <PageHeader title={t.title} description={t.description} />
-      <section>
-        <FinanceTabs
-          ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale="fr" />}
-          receivables={<ReceivableList receivables={receivables} units={units} customers={customers} buildings={buildings} locale="fr" />}
-          locale="fr"
-        />
-      </section>
-    </>
+    <FinanceTabs
+      ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale="fr" />}
+      receivables={<ReceivableList receivables={receivables} units={units} customers={customers} buildings={buildings} locale="fr" />}
+      locale="fr"
+    />
   );
 }

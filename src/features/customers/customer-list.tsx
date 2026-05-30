@@ -8,8 +8,6 @@ import { routeFor } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { MetricCard } from "@/components/metric-card";
 import { EmptyState } from "@/components/empty-state";
 import type { CustomerRow } from "@/types/database";
 import {
@@ -219,61 +217,86 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
     stableFirst: locale === "zh" ? "稳定客户优先" : "Stables en premier",
   };
 
+  const statBlocks = [
+    { key: "lease", label: t.leaseClients, value: String(stats.lease), dot: "bg-[#7050A0]" },
+    { key: "sale", label: t.saleClients, value: String(stats.sale), dot: "bg-[#505080]" },
+    { key: "daily", label: t.dailyOnly, value: String(stats.dailyOnly), dot: "bg-sky-500" },
+    { key: "blacklisted", label: t.blacklisted, value: String(stats.blacklisted), dot: stats.blacklisted > 0 ? "bg-accentRed-500" : "bg-muted-foreground/40" },
+    { key: "total", label: t.total, value: String(stats.all), dot: "bg-accentAmber-500" },
+  ];
+
   return (
-    <div className="flex flex-col gap-5">
-      {/* ── Summary cards ── */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <MetricCard title={t.leaseClients} value={String(stats.lease)} tone="indigo" />
-        <MetricCard title={t.saleClients} value={String(stats.sale)} tone="purple" />
-        <MetricCard title={t.dailyOnly} value={String(stats.dailyOnly)} tone="green" />
-        <MetricCard title={t.blacklisted} value={String(stats.blacklisted)} tone={stats.blacklisted > 0 ? "red" : "neutral"} />
-        <MetricCard title={t.total} value={String(stats.all)} tone="amber" />
+    <div className="flex flex-col gap-6">
+      {/* ── Page chrome ── */}
+      <div className="flex flex-col gap-1">
+        <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          {locale === "zh" ? "客户档案" : "Clients"}
+        </p>
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-xl font-semibold tracking-tight">
+            {locale === "zh" ? "客户管理" : "Gestion des clients"}
+          </h1>
+          <span className="text-sm text-muted-foreground tabular-nums">
+            {stats.all} {locale === "zh" ? "位客户" : "clients"}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Summary stats ── */}
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        {statBlocks.map(b => (
+          <div key={b.key} className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+            <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", b.dot)} />
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight tabular-nums leading-none">{b.value}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{b.label}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* ── Segment tabs + search ── */}
-      <Card>
-        <CardContent className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            {([
-              ["all", t.allTab, stats.all],
-              ["lease", t.leaseTab, stats.lease],
-              ["sale", t.saleTab, stats.sale],
-              ["daily", t.dailyTab, stats.dailyOnly],
-              ["blacklisted", t.blacklistTab, stats.blacklisted],
-            ] as const).map(([key, label, count]) => (
-              <button
-                key={key}
-                onClick={() => setSegment(key)}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-xs font-semibold transition",
-                  segment === key
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "border bg-card text-muted-foreground hover:bg-accent",
-                )}
-              >
-                {label} <span className="ml-1 tabular-nums opacity-70">{count}</span>
-              </button>
-            ))}
-            <span className="pl-1 text-xs text-muted-foreground">
-              {t.filtered(filtered.length, customers.length)}
-              <span className="ml-2 text-[10px] opacity-60">{t.stableFirst}</span>
-            </span>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-card px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          {([
+            ["all", t.allTab, stats.all],
+            ["lease", t.leaseTab, stats.lease],
+            ["sale", t.saleTab, stats.sale],
+            ["daily", t.dailyTab, stats.dailyOnly],
+            ["blacklisted", t.blacklistTab, stats.blacklisted],
+          ] as const).map(([key, label, count]) => (
+            <button
+              key={key}
+              onClick={() => setSegment(key)}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-xs font-semibold transition",
+                segment === key
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "border bg-card text-muted-foreground hover:bg-accent",
+              )}
+            >
+              {label} <span className="ml-1 tabular-nums opacity-70">{count}</span>
+            </button>
+          ))}
+          <span className="pl-1 text-xs text-muted-foreground">
+            {t.filtered(filtered.length, customers.length)}
+            <span className="ml-2 text-[10px] opacity-60">{t.stableFirst}</span>
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t.search}
+              className="h-9 w-64 rounded-md border bg-card pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20"
+            />
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t.search}
-                className="h-9 w-64 rounded-md border bg-card pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20"
-              />
-            </div>
-            <Button size="sm" onClick={openAdd}><Plus className="h-4 w-4" />{t.add}</Button>
-          </div>
-        </CardContent>
-      </Card>
+          <Button size="sm" onClick={openAdd}><Plus className="h-4 w-4" />{t.add}</Button>
+        </div>
+      </div>
 
       {/* ── Blacklist warning banner ── */}
       {selected?.is_blacklisted && (

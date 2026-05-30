@@ -34,24 +34,24 @@ export function ConfirmDialog({
 
   return (
     <div className="fixed inset-0 z-overlay flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-brand-indigo-500/30" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/20" onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-t-2xl sm:rounded-2xl bg-white p-5 shadow-panel animate-in slide-in-from-bottom-4 duration-fast">
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-full p-1 text-brand-ink-400 hover:bg-brand-warm-100"
+          className="absolute right-4 top-4 rounded-full p-1 text-muted-foreground/60 hover:bg-muted"
           aria-label={t.cancel}
         >
           <X className="h-4 w-4" />
         </button>
 
         <div className="flex items-start gap-3 mb-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-red-50">
-            <AlertTriangle className="h-5 w-5 text-brand-red-600" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accentRed-50">
+            <AlertTriangle className="h-5 w-5 text-accentRed-600" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-brand-ink-900">{title}</h3>
+            <h3 className="text-sm font-bold text-foreground">{title}</h3>
             {description && (
-              <p className="mt-1 text-xs text-brand-ink-600">{description}</p>
+              <p className="mt-1 text-xs text-foreground/60">{description}</p>
             )}
           </div>
         </div>

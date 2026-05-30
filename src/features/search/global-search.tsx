@@ -83,16 +83,16 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
       {/* Desktop search button */}
       <button
         onClick={() => setOpen(true)}
-        className="hidden sm:flex items-center gap-2 rounded-lg border border-brand-warm-200 bg-brand-warm-50 px-3 py-1.5 text-xs text-brand-ink-500 hover:bg-brand-warm-100 hover:text-brand-ink-700 transition-colors"
+        className="hidden sm:flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground/70 transition-colors"
       >
         <Search className="h-3.5 w-3.5" />
         <span className="hidden lg:inline">{locale === "zh" ? "搜索..." : "Rechercher..."}</span>
-        <kbd className="hidden lg:inline rounded-xl border border-brand-warm-200 bg-white px-1.5 py-0 text-xs font-mono text-brand-ink-400">Ctrl+K</kbd>
+        <kbd className="hidden lg:inline rounded-xl border border-border bg-white px-1.5 py-0 text-xs font-mono text-muted-foreground/60">Ctrl+K</kbd>
       </button>
       {/* Mobile search icon */}
       <button
         onClick={() => setOpen(true)}
-        className="flex sm:hidden items-center justify-center rounded-lg border border-brand-warm-200 bg-brand-warm-50 p-1.5 text-brand-ink-500 hover:bg-brand-warm-100"
+        className="flex sm:hidden items-center justify-center rounded-lg border border-border bg-muted/50 p-1.5 text-muted-foreground hover:bg-muted"
       >
         <Search className="h-4 w-4" />
       </button>
@@ -110,12 +110,12 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" onClick={() => setOpen(false)}>
       <div className="absolute inset-0 bg-black/30" />
       <div
-        className="relative w-full max-w-lg rounded-2xl border border-brand-warm-200 bg-white shadow-2xl overflow-hidden mx-4"
+        className="relative w-full max-w-lg rounded-2xl border border-border bg-white shadow-2xl overflow-hidden mx-4"
         onClick={e => e.stopPropagation()}
       >
         {/* Input */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-brand-neutral-200">
-          <Search className="h-5 w-5 shrink-0 text-brand-ink-400" />
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border/60">
+          <Search className="h-5 w-5 shrink-0 text-muted-foreground/60" />
           <input
             ref={inputRef}
             type="text"
@@ -123,30 +123,30 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
             onChange={e => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={locale === "zh" ? "搜索客户、房源、合同、应收..." : "Rechercher client, chambre, contrat..."}
-            className="flex-1 text-sm text-brand-ink-900 placeholder:text-brand-ink-400 bg-transparent outline-none"
+            className="flex-1 text-sm text-foreground placeholder:text-muted-foreground/60 bg-transparent outline-none"
           />
-          {loading && <Loader2 className="h-4 w-4 animate-spin text-brand-ink-400" />}
-          <button onClick={() => setOpen(false)} className="p-1 rounded hover:bg-brand-warm-100">
-            <X className="h-4 w-4 text-brand-ink-500" />
+          {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground/60" />}
+          <button onClick={() => setOpen(false)} className="p-1 rounded hover:bg-muted">
+            <X className="h-4 w-4 text-muted-foreground" />
           </button>
         </div>
 
         {/* Results */}
         <div className="max-h-[360px] overflow-auto">
           {query.length < 2 ? (
-            <div className="py-12 text-center text-sm text-brand-ink-400">
+            <div className="py-12 text-center text-sm text-muted-foreground/60">
               {locale === "zh" ? "输入至少 2 个字符开始搜索" : "Tapez au moins 2 caracteres"}
             </div>
           ) : loading ? (
-            <div className="py-8 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-brand-ink-400" /></div>
+            <div className="py-8 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground/60" /></div>
           ) : results.length === 0 ? (
-            <div className="py-12 text-center text-sm text-brand-ink-400">
+            <div className="py-12 text-center text-sm text-muted-foreground/60">
               {locale === "zh" ? "无搜索结果" : "Aucun resultat"}
             </div>
           ) : (
             [...grouped.entries()].map(([type, items]) => (
               <div key={type}>
-                <div className="px-4 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-brand-ink-400 bg-brand-warm-50">
+                <div className="px-4 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-muted-foreground/60 bg-muted/50">
                   {TYPE_LABELS[type as SearchResultType]?.[locale] ?? type}
                 </div>
                 {items.map((r, i) => {
@@ -158,13 +158,13 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
                       onClick={() => handleSelect(r)}
                       className={cn(
                         "w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors",
-                        globalIdx === selectedIdx ? "bg-brand-indigo-50" : "hover:bg-brand-warm-50",
+                        globalIdx === selectedIdx ? "bg-accent" : "hover:bg-muted/50",
                       )}
                     >
-                      <Icon className="h-4 w-4 shrink-0 text-brand-ink-500" />
+                      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-brand-ink-800 truncate">{r.title}</p>
-                        <p className="text-xs text-brand-ink-500 truncate">
+                        <p className="text-sm font-semibold text-foreground/80 truncate">{r.title}</p>
+                        <p className="text-xs text-muted-foreground truncate">
                           {r.subtitle && <span>{r.subtitle} · </span>}
                           {r.description}
                           {r.amount > 0 && <span className="ml-1">· {formatXof(r.amount)}</span>}
@@ -172,9 +172,9 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
                       </div>
                       {r.status && (
                         <span className={cn("shrink-0 rounded-full px-1.5 py-0 text-xs font-semibold",
-                          r.status === "active" || r.status === "paid" || r.status === "checked_in" ? "bg-brand-green-100 text-brand-green-700" :
-                          r.status === "overdue" || r.status === "cancelled" ? "bg-brand-red-100 text-brand-red-700" :
-                          "bg-brand-warm-100 text-brand-ink-600"
+                          r.status === "active" || r.status === "paid" || r.status === "checked_in" ? "bg-emerald-100 text-emerald-700" :
+                          r.status === "overdue" || r.status === "cancelled" ? "bg-red-100 text-red-700" :
+                          "bg-muted text-foreground/60"
                         )}>{r.status}</span>
                       )}
                     </button>
@@ -186,7 +186,7 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center gap-3 px-4 py-2 border-t border-brand-neutral-200 text-xs text-brand-ink-400">
+        <div className="flex items-center gap-3 px-4 py-2 border-t border-border/60 text-xs text-muted-foreground/60">
           <span>↑↓ {locale === "zh" ? "导航" : "Nav"}</span>
           <span>↵ {locale === "zh" ? "选择" : "Sel"}</span>
           <span>Esc {locale === "zh" ? "关闭" : "Fermer"}</span>

@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/page-header";
 import { DesktopOnly } from "@/features/mobile";
 import { AuditLogViewer } from "@/features/settings";
 
@@ -53,7 +52,7 @@ export default async function AuditLogsPage() {
         <DesktopOnly locale="zh" />
       </div>
       <div className="hidden lg:block">
-        <PageHeader title="审计日志" />
+        <h1 className="mb-6 text-2xl font-bold tracking-tight">审计日志</h1>
         <section className="mt-8">
           <AuditLogViewer logs={logs} locale="zh" />
         </section>

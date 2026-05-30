@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, X, AlertTriangle, FileText, DollarSign, LogOut, Printer, RefreshCw } from "lucide-react";
+import { Plus, X, AlertTriangle, FileText, DollarSign, LogOut, Printer, RefreshCw, FileSignature } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MetricCard } from "@/components/metric-card";
 import { RoomCard } from "@/components/room-card";
 import { EmptyState } from "@/components/empty-state";
 import type { RoomVisualStatus } from "@/lib/status-styles";
@@ -95,31 +94,56 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
   const statusLabel = (status: string) => { const labels: Record<string,string> = locale==="zh" ? {pending:"待收",partial:"部分",paid:"已收",overdue:"逾期",cancelled:"已取消"} : {pending:"Attente",partial:"Partiel",paid:"Paye",overdue:"Retard",cancelled:"Annule"}; return labels[status]??status; };
 
+  const statBlocks = [
+    { key: "active", label: locale==="zh"?"生效合同":"Actifs", value: String(dashboardStats.active), dot: "bg-accentGreen-500" },
+    { key: "rent", label: locale==="zh"?"月租规模":"Loyer/mois", value: formatXof(dashboardStats.rent), dot: "bg-accentBlue-500" },
+    { key: "expiring", label: locale==="zh"?"30天到期":"30 jours", value: String(dashboardStats.expiring), dot: dashboardStats.expiring > 0 ? "bg-accentAmber-500" : "bg-muted-foreground/40" },
+    { key: "due", label: locale==="zh"?"待收账款":"A recevoir", value: formatXof(dashboardStats.due), dot: "bg-accentPurple-500" },
+    { key: "overdue", label: locale==="zh"?"逾期金额":"Retard", value: formatXof(dashboardStats.overdue), dot: dashboardStats.overdue > 0 ? "bg-accentRed-500" : "bg-muted-foreground/40" },
+  ];
+
   return (
-    <div className="flex flex-col gap-5">
-      {/* ── Summary cards ── */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <MetricCard title={locale==="zh"?"生效合同":"Actifs"} value={String(dashboardStats.active)} tone="indigo" />
-        <MetricCard title={locale==="zh"?"月租规模":"Loyer/mois"} value={formatXof(dashboardStats.rent)} tone="green" />
-        <MetricCard title={locale==="zh"?"30天到期":"30 jours"} value={String(dashboardStats.expiring)} tone="amber" />
-        <MetricCard title={locale==="zh"?"待收账款":"A recevoir"} value={formatXof(dashboardStats.due)} tone="indigo" />
-        <MetricCard title={locale==="zh"?"逾期金额":"Retard"} value={formatXof(dashboardStats.overdue)} tone="red" />
+    <div className="flex flex-col gap-6">
+      {/* ── Page chrome ── */}
+      <div className="flex flex-col gap-1">
+        <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          {locale === "zh" ? "长租业务" : "Baux"}
+        </p>
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-xl font-semibold tracking-tight">
+            {locale === "zh" ? "长租合同" : "Contrats de location"}
+          </h1>
+          <span className="text-sm text-muted-foreground tabular-nums">
+            {contracts.length} {locale==="fr"?"contrats":"份合同"}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Summary stats ── */}
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        {statBlocks.map(b => (
+          <div key={b.key} className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+            <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", b.dot)} />
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight tabular-nums leading-none">{b.value}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{b.label}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* ── Filter bar + new contract ── */}
-      <Card>
-        <CardContent className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            {["all","draft","active","terminated","expired"].map((s) => (
-              <button key={s} onClick={()=>setStatusFilter(s)} className={cn("rounded-md px-3 py-1.5 text-xs font-semibold transition", statusFilter===s ? "bg-primary text-primary-foreground shadow-sm" : "border bg-card text-muted-foreground hover:bg-accent")}>
-                {s==="all"?(locale==="fr"?"Tous":"全部"):t.contractStatus[s as keyof typeof t.contractStatus]}
-              </button>
-            ))}
-            <span className="pl-1 text-xs text-muted-foreground">{filtered.length}/{contracts.length} {locale==="fr"?"contrats":"份合同"}</span>
-          </div>
-          <Button size="sm" onClick={openNew}><Plus className="h-4 w-4"/>{t.form.newContract}</Button>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-card px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          {["all","draft","active","terminated","expired"].map((s) => (
+            <button key={s} onClick={()=>setStatusFilter(s)} className={cn("rounded-md px-3 py-1.5 text-xs font-semibold transition", statusFilter===s ? "bg-primary text-primary-foreground shadow-sm" : "border bg-card text-muted-foreground hover:bg-accent")}>
+              {s==="all"?(locale==="fr"?"Tous":"全部"):t.contractStatus[s as keyof typeof t.contractStatus]}
+            </button>
+          ))}
+          <span className="pl-1 text-xs text-muted-foreground">{filtered.length}/{contracts.length} {locale==="fr"?"contrats":"份合同"}</span>
+        </div>
+        <Button size="sm" onClick={openNew}><Plus className="h-4 w-4"/>{t.form.newContract}</Button>
+      </div>
 
       {/* ── Contract matrix ── */}
       {groupedContracts.length === 0 ? (

@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { PageHeader } from "@/components/page-header";
 import { SecurityCenter } from "@/features/security";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +10,7 @@ export default async function FrenchSecurityPage() {
 
   return (
     <>
-      <PageHeader title="Sécurité" />
+      <h1 className="mb-6 text-2xl font-bold tracking-tight">Sécurité</h1>
       <section className="mt-8"><SecurityCenter locale="fr" /></section>
     </>
   );

@@ -1,5 +1,3 @@
-import { PageHeader } from "@/components/page-header";
-import { dictionaries } from "@/lib/i18n";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -15,7 +13,6 @@ export default async function FrenchLeasesPage() {
   if (!user) redirect("/login");
   if (!["admin","front_desk","finance","boss"].includes(user.role)) redirect("/");
 
-  const t = dictionaries.fr.leases;
   const supabase = await createClient();
 
   const { data: building } = await supabase.from("buildings").select("id").eq("code", "SASCI11").single();
@@ -44,14 +41,9 @@ export default async function FrenchLeasesPage() {
 
   return (
     <>
-      <div className="lg:hidden">
-        <DesktopOnly locale="fr" />
-      </div>
+      <div className="lg:hidden"><DesktopOnly locale="fr" /></div>
       <div className="hidden lg:block">
-        <PageHeader title={t.title} description={t.description} />
-        <section>
-          <LeaseList contracts={contracts} units={units} customers={customers} payments={payments} receivables={receivables} locale="fr" />
-        </section>
+        <LeaseList contracts={contracts} units={units} customers={customers} payments={payments} receivables={receivables} locale="fr" />
       </div>
     </>
   );

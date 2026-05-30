@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
@@ -44,15 +43,10 @@ export default async function FinancePage() {
   }
 
   return (
-    <>
-      <PageHeader title={t.title} description={t.description} />
-      <section>
-        <FinanceTabs
-          ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale="zh" />}
-          receivables={<ReceivableList receivables={receivables} units={units} customers={customers} buildings={buildings} locale="zh" />}
-          locale="zh"
-        />
-      </section>
-    </>
+    <FinanceTabs
+      ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale="zh" />}
+      receivables={<ReceivableList receivables={receivables} units={units} customers={customers} buildings={buildings} locale="zh" />}
+      locale="zh"
+    />
   );
 }

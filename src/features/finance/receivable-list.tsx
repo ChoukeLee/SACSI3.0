@@ -6,7 +6,6 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { MetricCard } from "@/components/metric-card";
 import {
   calculateReceivableSummary,
   buildReceivableCsv,
@@ -145,17 +144,28 @@ export function ReceivableList({ receivables, units, customers, buildings, local
 
   return (
     <div className="space-y-5">
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <MetricCard title={t.summary.totalReceivable} value={formatXof(summary.totalReceivable)} tone="indigo" />
-        <MetricCard title={t.summary.totalPaid} value={formatXof(summary.totalPaid)} tone="green" />
-        <MetricCard title={t.summary.totalOutstanding} value={formatXof(summary.outstanding)} tone="amber" />
-        <MetricCard title={t.summary.totalOverdue} value={formatXof(summary.overdue)} tone="red" />
-        <MetricCard
-          title={t.summary.collectionRate}
-          value={`${(summary.collectionRate * 100).toFixed(1)}%`}
-          tone={collectionTone}
-        />
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+        <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+          <span className="h-2.5 w-2.5 rounded-full bg-accentBlue-500 shrink-0" />
+          <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{formatXof(summary.totalReceivable)}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t.summary.totalReceivable}</p></div>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+          <span className="h-2.5 w-2.5 rounded-full bg-accentGreen-500 shrink-0" />
+          <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{formatXof(summary.totalPaid)}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t.summary.totalPaid}</p></div>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+          <span className="h-2.5 w-2.5 rounded-full bg-accentAmber-500 shrink-0" />
+          <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{formatXof(summary.outstanding)}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t.summary.totalOutstanding}</p></div>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+          <span className="h-2.5 w-2.5 rounded-full bg-accentRed-500 shrink-0" />
+          <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{formatXof(summary.overdue)}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t.summary.totalOverdue}</p></div>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+          <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", collectionTone === "green" ? "bg-accentGreen-500" : collectionTone === "amber" ? "bg-accentAmber-500" : "bg-accentRed-500")} />
+          <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{(summary.collectionRate * 100).toFixed(1)}%</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t.summary.collectionRate}</p></div>
+        </div>
       </div>
 
       {/* Filters */}

@@ -418,13 +418,13 @@ export function DailyCalendar({
               label={copy.allRooms}
               count={filterCounts.all}
             />
-            <FilterButton active={roomFilter === "occupied"} onClick={() => setRoomFilter("occupied")} color="bg-brand-indigo-500" label={copy.occupied} count={filterCounts.occupied} />
-            <FilterButton active={roomFilter === "checkingOutToday"} onClick={() => setRoomFilter("checkingOutToday")} color="bg-brand-indigo-300" label={locale === "zh" ? "今日离店" : "Depart"} count={filterCounts.checkingOutToday} />
-            <FilterButton active={roomFilter === "openEnded"} onClick={() => setRoomFilter("openEnded")} color="bg-brand-indigo-400" label={locale === "zh" ? "未定离店" : "Ouvert"} count={filterCounts.openEnded} />
-            <FilterButton active={roomFilter === "reserved"} onClick={() => setRoomFilter("reserved")} color="bg-brand-amber-500" label={copy.reserved} count={filterCounts.reserved} />
-            <FilterButton active={roomFilter === "cleaning"} onClick={() => setRoomFilter("cleaning")} color="bg-brand-green-500" label={copy.cleaning} count={filterCounts.cleaning} />
-            <FilterButton active={roomFilter === "available"} onClick={() => setRoomFilter("available")} color="bg-brand-green-500" label={copy.available} count={filterCounts.available} />
-            <FilterButton active={roomFilter === "maintenance"} onClick={() => setRoomFilter("maintenance")} color="bg-brand-red-500" label={copy.maintenance} count={filterCounts.maintenance} />
+            <FilterButton active={roomFilter === "occupied"} onClick={() => setRoomFilter("occupied")} color="bg-[#62B6F5]" label={copy.occupied} count={filterCounts.occupied} />
+            <FilterButton active={roomFilter === "checkingOutToday"} onClick={() => setRoomFilter("checkingOutToday")} color="bg-[#E8C840]" label={locale === "zh" ? "今日离店" : "Depart"} count={filterCounts.checkingOutToday} />
+            <FilterButton active={roomFilter === "openEnded"} onClick={() => setRoomFilter("openEnded")} color="bg-[#62B6F5]/80" label={locale === "zh" ? "未定离店" : "Ouvert"} count={filterCounts.openEnded} />
+            <FilterButton active={roomFilter === "reserved"} onClick={() => setRoomFilter("reserved")} color="bg-amber-400" label={copy.reserved} count={filterCounts.reserved} />
+            <FilterButton active={roomFilter === "cleaning"} onClick={() => setRoomFilter("cleaning")} color="bg-emerald-400" label={copy.cleaning} count={filterCounts.cleaning} />
+            <FilterButton active={roomFilter === "available"} onClick={() => setRoomFilter("available")} color="bg-emerald-400" label={copy.available} count={filterCounts.available} />
+            <FilterButton active={roomFilter === "maintenance"} onClick={() => setRoomFilter("maintenance")} color="bg-red-400" label={copy.maintenance} count={filterCounts.maintenance} />
           </div>
         </div>
 
@@ -439,7 +439,7 @@ export function DailyCalendar({
             <button onClick={() => moveRange(-1)} className={NAV_BTN} aria-label="previous range">
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <div className="min-w-[190px] rounded-xl bg-brand-warm-100 px-4 py-1.5 text-center text-sm font-black text-brand-ink-900">
+            <div className="min-w-[190px] rounded-xl bg-muted px-4 py-1.5 text-center text-sm font-black text-foreground">
               {rangeLabel}
             </div>
             <button onClick={() => moveRange(1)} className={NAV_BTN} aria-label="next range">
@@ -470,7 +470,7 @@ export function DailyCalendar({
                 <div
                   key={dateStr}
                   className={cn(
-                    "sticky top-0 z-20 flex flex-col items-center justify-center border-b border-r border-brand-warm-300 text-xs",
+                    "sticky top-0 z-20 flex flex-col items-center justify-center border-b border-r border-border text-xs",
                     isToday && "bg-accent text-accent-foreground",
                     isWeekend && !isToday && "bg-muted/30 text-muted-foreground",
                     !isToday && !isWeekend && "bg-card text-muted-foreground",
@@ -479,7 +479,7 @@ export function DailyCalendar({
                   role="columnheader"
                 >
                   <span className="text-xs font-semibold leading-3">{date.toLocaleDateString(localeStr, { weekday: "short" })}</span>
-                  <span className="text-base font-black leading-5 text-brand-ink-900">{date.getDate()}</span>
+                  <span className="text-base font-black leading-5 text-foreground">{date.getDate()}</span>
                   {isToday && <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary" />}
                 </div>
               );
@@ -516,8 +516,8 @@ export function DailyCalendar({
                     >
                       <span className={cn("mr-2 h-8 w-1.5 rounded-full", roomTone.strip)} />
                       <div className="min-w-0">
-                        <div className="truncate text-xs font-black leading-4 text-brand-ink-900">{copy.room} {unit.unit_no}</div>
-                        <div className="truncate text-xs font-semibold leading-3 text-brand-ink-500">
+                        <div className="truncate text-xs font-black leading-4 text-foreground">{copy.room} {unit.unit_no}</div>
+                        <div className="truncate text-xs font-semibold leading-3 text-muted-foreground">
                           {statusLabel} · {copy.apartment}
                         </div>
                       </div>
@@ -619,69 +619,69 @@ export function DailyCalendar({
       {financeDetail && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/30 backdrop-blur-sm" onClick={() => setFinanceDetail(null)} />
-          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-full overflow-auto border-l border-brand-warm-200 bg-white shadow-panel lg:max-w-lg" role="dialog">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-brand-warm-200 bg-white/95 px-5 py-4 backdrop-blur">
+          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-full overflow-auto border-l border-border bg-white shadow-panel lg:max-w-lg" role="dialog">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white/95 px-5 py-4 backdrop-blur">
               <div>
-                <h3 className="text-sm font-black text-brand-ink-900">
+                <h3 className="text-sm font-black text-foreground">
                   {financeDetail === "collected" ? (locale === "zh" ? "本月已收明细" : "Paiements du mois") :
                    financeDetail === "outstanding" ? (locale === "zh" ? "当前欠款明细" : "Soldes impayes") :
                    (locale === "zh" ? "本月结算明细" : "Reglements du mois")}
                 </h3>
               </div>
-              <button onClick={() => setFinanceDetail(null)} className="rounded-full p-1.5 text-brand-ink-400 hover:bg-brand-warm-100">
+              <button onClick={() => setFinanceDetail(null)} className="rounded-full p-1.5 text-muted-foreground/70 hover:bg-muted">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="px-5 py-4 space-y-3">
               {/* Summary */}
-              <div className="flex flex-wrap gap-4 rounded-xl bg-brand-warm-50 px-4 py-3 text-sm">
+              <div className="flex flex-wrap gap-4 rounded-xl bg-muted/50 px-4 py-3 text-sm">
                 {financeDetail === "collected" && (
                   <>
-                    <div><span className="text-brand-ink-500">{locale === "zh" ? "笔数" : "Nb"}: </span><span className="font-black">{financeStats.collectedPayments.length}</span></div>
-                    <div><span className="text-brand-ink-500">{locale === "zh" ? "合计" : "Total"}: </span><span className="font-black text-brand-green-700">{formatXof(financeStats.monthCollected)}</span></div>
+                    <div><span className="text-muted-foreground">{locale === "zh" ? "笔数" : "Nb"}: </span><span className="font-black">{financeStats.collectedPayments.length}</span></div>
+                    <div><span className="text-muted-foreground">{locale === "zh" ? "合计" : "Total"}: </span><span className="font-black text-accentGreen-700">{formatXof(financeStats.monthCollected)}</span></div>
                   </>
                 )}
                 {financeDetail === "outstanding" && (
                   <>
-                    <div><span className="text-brand-ink-500">{locale === "zh" ? "欠款笔数" : "Nb"}: </span><span className="font-black">{financeStats.outstandingBookings.length}</span></div>
-                    <div><span className="text-brand-ink-500">{locale === "zh" ? "欠款合计" : "Total"}: </span><span className="font-black text-brand-indigo-700">{formatXof(financeStats.currentOutstanding)}</span></div>
+                    <div><span className="text-muted-foreground">{locale === "zh" ? "欠款笔数" : "Nb"}: </span><span className="font-black">{financeStats.outstandingBookings.length}</span></div>
+                    <div><span className="text-muted-foreground">{locale === "zh" ? "欠款合计" : "Total"}: </span><span className="font-black text-accentBlue-700">{formatXof(financeStats.currentOutstanding)}</span></div>
                   </>
                 )}
                 {financeDetail === "settled" && (
                   <>
-                    <div><span className="text-brand-ink-500">{locale === "zh" ? "笔数" : "Nb"}: </span><span className="font-black">{financeStats.settledBookings.length}</span></div>
-                    <div><span className="text-brand-ink-500">{locale === "zh" ? "合计" : "Total"}: </span><span className="font-black text-brand-ink-900">{formatXof(financeStats.monthSettled)}</span></div>
+                    <div><span className="text-muted-foreground">{locale === "zh" ? "笔数" : "Nb"}: </span><span className="font-black">{financeStats.settledBookings.length}</span></div>
+                    <div><span className="text-muted-foreground">{locale === "zh" ? "合计" : "Total"}: </span><span className="font-black text-foreground">{formatXof(financeStats.monthSettled)}</span></div>
                   </>
                 )}
               </div>
 
               {/* Table */}
-              <div className="overflow-hidden rounded-xl border border-brand-warm-200">
+              <div className="overflow-hidden rounded-xl border border-border">
                 <div className="max-h-[calc(100vh-260px)] overflow-auto">
                   {financeDetail === "collected" && (
                     <table className="w-full text-left text-[13px]">
-                      <thead className="sticky top-0 z-10 bg-brand-warm-50">
-                        <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500">
+                      <thead className="sticky top-0 z-10 bg-muted/50">
+                        <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
                           <th className="px-4 py-3">{locale === "zh" ? "日期" : "Date"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "房号" : "Chambre"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "客户" : "Client"}</th>
                           <th className="px-4 py-3 text-right">{locale === "zh" ? "金额" : "Montant"}</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-brand-warm-100">
+                      <tbody className="divide-y divide-border/50">
                         {financeStats.collectedPayments.length === 0 ? (
-                          <tr><td colSpan={4} className="px-4 py-10 text-center text-brand-ink-400">{locale === "zh" ? "本月暂无收款" : "Aucun paiement ce mois"}</td></tr>
+                          <tr><td colSpan={4} className="px-4 py-10 text-center text-muted-foreground/70">{locale === "zh" ? "本月暂无收款" : "Aucun paiement ce mois"}</td></tr>
                         ) : (
                           [...financeStats.collectedPayments].sort((a, b) => b.payment_date.localeCompare(a.payment_date)).map(p => {
                             const b = bookings.find(bk => bk.id === p.source_id);
                             const u = dailyUnits.find(u => u.id === b?.unit_id);
                             const c = b ? customerMap.get(b.customer_id) : null;
                             return (
-                              <tr key={p.id} className="hover:bg-brand-warm-50">
-                                <td className="px-4 py-2.5 font-medium text-brand-ink-900">{p.payment_date}</td>
-                                <td className="px-4 py-2.5 text-brand-ink-700">{u?.unit_no ?? "—"}</td>
-                                <td className="px-4 py-2.5 text-brand-ink-700">{c?.name ?? "—"}</td>
-                                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-brand-ink-900">{formatXof(Number(p.amount))}</td>
+                              <tr key={p.id} className="hover:bg-muted/50">
+                                <td className="px-4 py-2.5 font-medium text-foreground">{p.payment_date}</td>
+                                <td className="px-4 py-2.5 text-foreground/80">{u?.unit_no ?? "—"}</td>
+                                <td className="px-4 py-2.5 text-foreground/80">{c?.name ?? "—"}</td>
+                                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-foreground">{formatXof(Number(p.amount))}</td>
                               </tr>
                             );
                           })
@@ -692,8 +692,8 @@ export function DailyCalendar({
 
                   {financeDetail === "outstanding" && (
                     <table className="w-full text-left text-[13px]">
-                      <thead className="sticky top-0 z-10 bg-brand-warm-50">
-                        <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500">
+                      <thead className="sticky top-0 z-10 bg-muted/50">
+                        <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
                           <th className="px-4 py-3">{locale === "zh" ? "房号" : "Chambre"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "客户" : "Client"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "入住" : "Arrivee"}</th>
@@ -702,9 +702,9 @@ export function DailyCalendar({
                           <th className="px-4 py-3 text-right">{locale === "zh" ? "欠款" : "Impaye"}</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-brand-warm-100">
+                      <tbody className="divide-y divide-border/50">
                         {financeStats.outstandingBookings.length === 0 ? (
-                          <tr><td colSpan={6} className="px-4 py-10 text-center text-brand-ink-400">{locale === "zh" ? "无未收款项" : "Aucun impaye"}</td></tr>
+                          <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground/70">{locale === "zh" ? "无未收款项" : "Aucun impaye"}</td></tr>
                         ) : (
                           [...financeStats.outstandingBookings].sort((a, b) => {
                             const aOut = Number(a.final_amount_xof ?? a.total_amount_xof) - Number(a.prepaid_amount_xof ?? 0);
@@ -716,13 +716,13 @@ export function DailyCalendar({
                             const final = Number(b.final_amount_xof ?? b.total_amount_xof);
                             const prepaid = Number(b.prepaid_amount_xof ?? 0);
                             return (
-                              <tr key={b.id} className="hover:bg-brand-warm-50">
-                                <td className="px-4 py-2.5 font-medium text-brand-ink-900">{u?.unit_no ?? "—"}</td>
-                                <td className="px-4 py-2.5 text-brand-ink-700">{c?.name ?? "—"}</td>
-                                <td className="px-4 py-2.5 text-brand-ink-600">{b.check_in}</td>
-                                <td className="px-4 py-2.5 text-right tabular-nums text-brand-ink-900">{formatXof(final)}</td>
-                                <td className="px-4 py-2.5 text-right tabular-nums text-brand-green-700">{formatXof(prepaid)}</td>
-                                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-brand-indigo-700">{formatXof(final - prepaid)}</td>
+                              <tr key={b.id} className="hover:bg-muted/50">
+                                <td className="px-4 py-2.5 font-medium text-foreground">{u?.unit_no ?? "—"}</td>
+                                <td className="px-4 py-2.5 text-foreground/80">{c?.name ?? "—"}</td>
+                                <td className="px-4 py-2.5 text-foreground/70">{b.check_in}</td>
+                                <td className="px-4 py-2.5 text-right tabular-nums text-foreground">{formatXof(final)}</td>
+                                <td className="px-4 py-2.5 text-right tabular-nums text-accentGreen-700">{formatXof(prepaid)}</td>
+                                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-accentBlue-700">{formatXof(final - prepaid)}</td>
                               </tr>
                             );
                           })
@@ -733,8 +733,8 @@ export function DailyCalendar({
 
                   {financeDetail === "settled" && (
                     <table className="w-full text-left text-[13px]">
-                      <thead className="sticky top-0 z-10 bg-brand-warm-50">
-                        <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-brand-ink-500">
+                      <thead className="sticky top-0 z-10 bg-muted/50">
+                        <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
                           <th className="px-4 py-3">{locale === "zh" ? "房号" : "Chambre"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "客户" : "Client"}</th>
                           <th className="px-4 py-3">{locale === "zh" ? "入住" : "Arrivee"}</th>
@@ -743,9 +743,9 @@ export function DailyCalendar({
                           <th className="px-4 py-3">{locale === "zh" ? "状态" : "Statut"}</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-brand-warm-100">
+                      <tbody className="divide-y divide-border/50">
                         {financeStats.settledBookings.length === 0 ? (
-                          <tr><td colSpan={6} className="px-4 py-10 text-center text-brand-ink-400">{locale === "zh" ? "本月暂无结算" : "Aucun reglement ce mois"}</td></tr>
+                          <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground/70">{locale === "zh" ? "本月暂无结算" : "Aucun reglement ce mois"}</td></tr>
                         ) : (
                           [...financeStats.settledBookings].sort((a, b) => {
                             const aD = (a.checkout_mode === "open" ? a.actual_check_out : a.check_out) ?? "";
@@ -758,14 +758,14 @@ export function DailyCalendar({
                             const prepaid = Number(b.prepaid_amount_xof ?? 0);
                             const isPaid = prepaid >= final;
                             return (
-                              <tr key={b.id} className="hover:bg-brand-warm-50">
-                                <td className="px-4 py-2.5 font-medium text-brand-ink-900">{u?.unit_no ?? "—"}</td>
-                                <td className="px-4 py-2.5 text-brand-ink-700">{c?.name ?? "—"}</td>
-                                <td className="px-4 py-2.5 text-brand-ink-600">{b.check_in}</td>
-                                <td className="px-4 py-2.5 text-brand-ink-600">{b.checkout_mode === "open" ? b.actual_check_out : b.check_out}</td>
-                                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-brand-ink-900">{formatXof(final)}</td>
+                              <tr key={b.id} className="hover:bg-muted/50">
+                                <td className="px-4 py-2.5 font-medium text-foreground">{u?.unit_no ?? "—"}</td>
+                                <td className="px-4 py-2.5 text-foreground/80">{c?.name ?? "—"}</td>
+                                <td className="px-4 py-2.5 text-foreground/70">{b.check_in}</td>
+                                <td className="px-4 py-2.5 text-foreground/70">{b.checkout_mode === "open" ? b.actual_check_out : b.check_out}</td>
+                                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-foreground">{formatXof(final)}</td>
                                 <td className="px-4 py-2.5">
-                                  <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-bold", isPaid ? "bg-brand-green-100 text-brand-green-700" : "bg-brand-amber-100 text-brand-amber-700")}>
+                                  <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-bold", isPaid ? "bg-accentGreen-50 text-accentGreen-700" : "bg-accentAmber-50 text-accentAmber-700")}>
                                     {isPaid ? (locale === "zh" ? "已付清" : "Paye") : (locale === "zh" ? "未付清" : "Impaye")}
                                   </span>
                                 </td>
@@ -827,7 +827,7 @@ function TimelineCell({
   if (isMaintenance) {
     return (
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
-        <div className="absolute inset-x-1 top-1/2 h-7 -translate-y-1/2 rounded-lg bg-[#F0A080]/30 border border-[#F0A080]/40" />
+        <div className="absolute inset-x-1 top-1/2 h-7 -translate-y-1/2 rounded-lg bg-[#FFE2EA] border border-[#F5C0CC]" />
       </div>
     );
   }
@@ -843,7 +843,7 @@ function TimelineCell({
         <button
           type="button"
           className={cn(
-            "absolute top-1/2 flex h-8 -translate-y-1/2 items-center overflow-hidden px-2 text-left shadow-sm transition-all hover:-translate-y-[54%] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo-500",
+            "absolute top-1/2 flex h-8 -translate-y-1/2 items-center overflow-hidden px-2 text-left shadow-sm transition-all hover:-translate-y-[54%] hover:shadow-md focus-visible:ring-ring",
             tone,
             isStart ? "left-1.5 rounded-l-xl" : "-left-px rounded-l-none",
             isEnd ? "right-1.5 rounded-r-xl" : "-right-px rounded-r-none",
@@ -887,7 +887,7 @@ function TimelineCell({
       <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
         <button
           type="button"
-          className="absolute inset-x-1 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center rounded-lg bg-[#5AB5B8]/20 border border-[#5AB5B8]/30 text-xs font-bold text-[#32757A] transition-all hover:bg-[#5AB5B8]/30 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo-500"
+          className="absolute inset-x-1 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center rounded-lg bg-[#D9F7F0] border border-[#A8E8DB] text-xs font-bold text-[#17324D] transition-all hover:bg-[#C0EFE4] hover:shadow-sm focus-visible:ring-ring"
           onClick={() => onCompleteCleaning?.()}
         >
           {copy.cleaning}
@@ -906,7 +906,7 @@ function TimelineCell({
       type="button"
       className={cn(
         baseCell,
-        "flex cursor-pointer items-center justify-center hover:bg-brand-indigo-50 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-brand-indigo-500",
+        "flex cursor-pointer items-center justify-center hover:bg-accent focus-visible:outline-2 focus-visible:outline-inset focus-visible:ring-ring",
       )}
       style={{ height: ROW_HEIGHT }}
       aria-label={`${unit.unit_no} ${dateStr}`}
@@ -915,7 +915,7 @@ function TimelineCell({
         if (event.key === "Enter") onNewBooking();
       }}
     >
-      <Plus className="hidden h-4 w-4 text-brand-indigo-500 group-hover:block group-focus-visible:block" />
+      <Plus className="hidden h-4 w-4 text-primary/60 group-hover:block group-focus-visible:block" />
     </button>
   );
 }
@@ -955,7 +955,7 @@ function ShareCard({ label, value, units, tone }: { label: string; value: number
   const styles = {
     dark: "bg-accent text-accent-foreground border-accent",
     orange: "bg-amber-50 text-amber-800 border-amber-200",
-    teal: "bg-[#5AB5B8]/10 text-[#32757A] border-[#5AB5B8]/20",
+    teal: "bg-[#D9F7F0] text-[#17324D] border-[#A8E8DB]",
     green: "bg-emerald-50 text-emerald-800 border-emerald-200",
   }[tone];
   return (
@@ -1007,13 +1007,13 @@ function FilterButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-black shadow-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-indigo-500",
-        active ? "border-brand-indigo-500 bg-brand-indigo-500 text-white" : "border-brand-warm-300 bg-white text-brand-ink-700 hover:border-brand-indigo-200 hover:bg-brand-indigo-50",
+        "inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-black shadow-sm transition-all focus-visible:ring-ring",
+        active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-white text-foreground/80 hover:border-accentBlue-200 hover:bg-accent",
       )}
     >
       {icon ?? <span className={cn("h-2 w-2 rounded-full", color)} />}
       <span>{label}</span>
-      <span className={cn("tabular-nums", active ? "text-white/85" : "text-brand-ink-400")}>{count}</span>
+      <span className={cn("tabular-nums", active ? "text-white/85" : "text-muted-foreground/70")}>{count}</span>
     </button>
   );
 }
@@ -1025,7 +1025,7 @@ function ViewButton({ active, onClick, children }: { active: boolean; onClick: (
       onClick={onClick}
       className={cn(
         "rounded-lg px-3 py-1.5 transition",
-        active ? "bg-white text-brand-indigo-700 shadow-sm" : "text-brand-ink-500 hover:text-brand-ink-900",
+        active ? "bg-white text-accentBlue-700 shadow-sm" : "text-muted-foreground hover:text-foreground",
       )}
     >
       {children}
@@ -1034,20 +1034,20 @@ function ViewButton({ active, onClick, children }: { active: boolean; onClick: (
 }
 
 function getBookingTone(status: string): string {
-  if (status === "checked_in") return "bg-[#5090C0] text-white shadow-sm";
+  if (status === "checked_in") return "bg-[#62B6F5] text-white shadow-sm";
   if (status === "confirmed") return "bg-amber-100 text-amber-800 ring-1 ring-inset ring-amber-300";
   if (status === "pending_review") return "bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-200";
   return "bg-muted text-muted-foreground";
 }
 
 function getRoomTone(unit: UnitRow, hasCleaning: boolean, isMaintenance: boolean) {
-  if (isMaintenance) return { strip: "bg-[#F0A080]" };
-  if (hasCleaning || unit.status === "cleaning_pending") return { strip: "bg-[#5AB5B8]" };
-  if (unit.status === "reserved") return { strip: "bg-[#A0C0E0]" };
-  if (unit.status === "daily_occupied") return { strip: "bg-[#5090C0]" };
-  if (unit.status === "leased") return { strip: "bg-[#7050A0]" };
-  if (unit.status === "sold") return { strip: "bg-[#505080]" };
-  return { strip: "bg-[#F0E0D0]" };
+  if (isMaintenance) return { strip: "bg-[#F08090]" };
+  if (hasCleaning || unit.status === "cleaning_pending") return { strip: "bg-[#5CC4B8]" };
+  if (unit.status === "reserved") return { strip: "bg-[#E8C840]" };
+  if (unit.status === "daily_occupied") return { strip: "bg-[#62B6F5]" };
+  if (unit.status === "leased") return { strip: "bg-[#A898E8]" };
+  if (unit.status === "sold") return { strip: "bg-[#075A9A]" };
+  return { strip: "bg-[#A0D0E8]" };
 }
 
 function getUnitTimelineStatus(

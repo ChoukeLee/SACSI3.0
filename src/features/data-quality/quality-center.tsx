@@ -7,7 +7,6 @@ import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { MetricCard } from "@/components/metric-card";
 import { EmptyState } from "@/components/empty-state";
 import type { QualityIssue, QualityCategory, QualitySeverity } from "./quality-types";
 
@@ -63,13 +62,19 @@ export function QualityCenter({ issues, locale }: Props) {
   return (
     <div className="space-y-5">
       {/* Summary */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-        <MetricCard title={zh ? "全部异常" : "Total"} value={String(issues.length)} tone="indigo" />
-        <MetricCard title={zh ? "高危" : "Élevé"} value={String(high)} tone="red" />
-        <MetricCard title={zh ? "中危" : "Moyen"} value={String(medium)} tone="amber" />
-        <MetricCard title={zh ? "低危" : "Faible"} value={String(low)} tone="indigo" />
-        <MetricCard title={zh ? "财务异常" : "Finance"} value={String(financeIssues)} tone="red" />
-        <MetricCard title={zh ? "房态异常" : "Logement"} value={String(unitIssues)} tone="amber" />
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+        {[{ key:"total", label:zh?"全部异常":"Total", value:String(issues.length), dot:"bg-accentBlue-500" },
+          { key:"high", label:zh?"高危":"Élevé", value:String(high), dot:"bg-accentRed-500" },
+          { key:"medium", label:zh?"中危":"Moyen", value:String(medium), dot:"bg-accentAmber-500" },
+          { key:"low", label:zh?"低危":"Faible", value:String(low), dot:"bg-accentBlue-500" },
+          { key:"finance", label:zh?"财务异常":"Finance", value:String(financeIssues), dot:"bg-accentRed-500" },
+          { key:"unit", label:zh?"房态异常":"Logement", value:String(unitIssues), dot:"bg-accentAmber-500" },
+        ].map(b => (
+          <div key={b.key} className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+            <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", b.dot)} />
+            <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{b.value}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{b.label}</p></div>
+          </div>
+        ))}
       </div>
 
       {/* Filters */}

@@ -13,7 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
-import { MetricCard } from "@/components/metric-card";
 import { printDocumentRecord } from "@/features/documents/templates/all-templates";
 import type { DocumentRecord } from "@/features/documents/types";
 import type { CustomerProfileData } from "./customer-profile-service";
@@ -158,14 +157,14 @@ function OverviewTab({ stats, customer, L, data }: { stats: { totalRec: number; 
   };
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title={L.totalRec} value={formatXof(stats.totalRec)} tone="indigo" />
-        <MetricCard title={L.totalPaid} value={formatXof(stats.totalPaid)} tone="green" />
-        <MetricCard title={L.unpaid} value={formatXof(stats.unpaid)} tone={stats.unpaid > 0 ? "amber" : "green"} />
-        <MetricCard title={L.overdueAmt} value={formatXof(stats.totalOverdue)} tone={stats.totalOverdue > 0 ? "red" : "green"} />
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <StatBlock label={L.totalRec} value={formatXof(stats.totalRec)} dot="bg-accentBlue-500" />
+        <StatBlock label={L.totalPaid} value={formatXof(stats.totalPaid)} dot="bg-accentGreen-500" />
+        <StatBlock label={L.unpaid} value={formatXof(stats.unpaid)} dot={stats.unpaid > 0 ? "bg-accentAmber-500" : "bg-accentGreen-500"} />
+        <StatBlock label={L.overdueAmt} value={formatXof(stats.totalOverdue)} dot={stats.totalOverdue > 0 ? "bg-accentRed-500" : "bg-accentGreen-500"} />
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-2 md:grid-cols-3">
         <InfoCard label={L.lastPayment} value={stats.latestPayment ? `${stats.latestPayment.payment_date} · ${formatXof(Number(stats.latestPayment.amount))}` : L.noData} />
         <InfoCard label={L.lastBooking} value={stats.latestBooking ? `${stats.latestBooking.check_in} · ${dailyStatusLabels[stats.latestBooking.status] ?? stats.latestBooking.status}` : L.noData} />
         <InfoCard label={L.currentBusiness} value={businessSummary(stats, L)} />
@@ -310,7 +309,19 @@ function TableSection({ title, empty, emptyText, children }: { title?: string; e
 }
 
 function InfoCard({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl border bg-card p-4 shadow-sm"><p className="text-xs font-semibold text-muted-foreground">{label}</p><p className="mt-1.5 text-sm font-bold">{value}</p></div>;
+  return <div className="rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm"><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold">{value}</p></div>;
+}
+
+function StatBlock({ label, value, dot }: { label: string; value: string; dot: string }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+      <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", dot)} />
+      <div className="min-w-0">
+        <p className="text-xl font-bold tracking-tight tabular-nums leading-none">{value}</p>
+        <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{label}</p>
+      </div>
+    </div>
+  );
 }
 
 function TextLink({ href, children }: { href: string; children: React.ReactNode }) {

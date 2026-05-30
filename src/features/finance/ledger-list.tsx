@@ -7,7 +7,6 @@ import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import type { LedgerEntryRow } from "@/types/database";
 import type { CurrencyCode } from "@/types/domain";
-import { MetricCard } from "@/components/metric-card";
 import { addLedgerEntry } from "./actions";
 
 function buildLedgerCsv(entries: LedgerEntryRow[]): string {
@@ -127,11 +126,20 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
 
   return (
     <div className="space-y-5">
-      {/* Summary cards */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <MetricCard title={t.summary.totalIncome} value={formatXof(summary.income)} tone="green" />
-        <MetricCard title={t.summary.totalExpense} value={formatXof(summary.expense)} tone="red" />
-        <MetricCard title={t.summary.netBalance} value={formatXof(summary.net)} tone={summary.net >= 0 ? "indigo" : "amber"} />
+      {/* Summary stats */}
+      <div className="grid gap-2 sm:grid-cols-3">
+        <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+          <span className="h-2.5 w-2.5 rounded-full bg-accentGreen-500 shrink-0" />
+          <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{formatXof(summary.income)}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t.summary.totalIncome}</p></div>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+          <span className="h-2.5 w-2.5 rounded-full bg-accentRed-500 shrink-0" />
+          <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{formatXof(summary.expense)}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t.summary.totalExpense}</p></div>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+          <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", summary.net >= 0 ? "bg-accentBlue-500" : "bg-accentAmber-500")} />
+          <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{formatXof(summary.net)}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t.summary.netBalance}</p></div>
+        </div>
       </div>
 
       {/* Toolbar */}

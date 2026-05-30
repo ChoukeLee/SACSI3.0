@@ -1,5 +1,4 @@
 
-import { PageHeader } from "@/components/page-header";
 import { dictionaries } from "@/lib/i18n";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";

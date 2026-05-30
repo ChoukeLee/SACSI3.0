@@ -142,7 +142,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
     <>
       {/* Overlay */}
       <div className="fixed inset-0 z-overlay" onClick={handleClose}>
-        <div className="absolute inset-0 bg-brand-indigo-500/30" />
+        <div className="absolute inset-0 bg-black/20" />
         {/* Bottom sheet */}
         <div
           className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-white shadow-panel animate-in slide-in-from-bottom-4 duration-normal"
@@ -150,20 +150,20 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
         >
           {/* Handle */}
           <div className="flex justify-center pt-3 pb-1">
-            <div className="h-1 w-10 rounded-full bg-brand-neutral-400" />
+            <div className="h-1 w-10 rounded-full bg-muted-foreground/40" />
           </div>
 
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-2">
             <div className="flex items-baseline gap-2.5">
-              <span className="font-mono text-2xl font-bold text-brand-ink-900">
+              <span className="font-mono text-2xl font-bold text-foreground">
                 {room.unit.unit_no}
               </span>
               <StatusBadge status={unitStatus} label={dictionaries[locale].statuses[unitStatus]} />
             </div>
             <button
               onClick={handleClose}
-              className="rounded-full p-1.5 text-brand-ink-400 hover:bg-brand-warm-100"
+              className="rounded-full p-1.5 text-muted-foreground/60 hover:bg-muted"
               aria-label={actionLabels.cancel}
             >
               <X className="h-5 w-5" />
@@ -173,22 +173,22 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
           <div className="px-5 pb-6 space-y-4">
             {/* Guest info */}
             {room.customer && (
-              <div className="rounded-xl border border-brand-warm-200 bg-brand-warm-50 p-3.5 space-y-2">
+              <div className="rounded-xl border border-border bg-muted/50 p-3.5 space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-ink-400">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
                     {t.drawer.guest}
                   </p>
                 </div>
-                <p className="text-sm font-semibold text-brand-ink-900">{room.customer.name}</p>
+                <p className="text-sm font-semibold text-foreground">{room.customer.name}</p>
                 {room.customer.phone && (
                   <button
                     onClick={handleCopyPhone}
-                    className="flex items-center gap-2 text-sm text-brand-indigo active:opacity-70 min-h-[36px]"
+                    className="flex items-center gap-2 text-sm text-accentBlue-600 active:opacity-70 min-h-[36px]"
                   >
                     <Phone className="h-3.5 w-3.5" />
                     {room.customer.phone}
                     {phoneCopied ? (
-                      <Check className="h-3.5 w-3.5 text-brand-green-600" />
+                      <Check className="h-3.5 w-3.5 text-accentGreen-600" />
                     ) : (
                       <Copy className="h-3.5 w-3.5" />
                     )}
@@ -199,14 +199,14 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
 
             {/* Stay info */}
             {room.booking && (
-              <div className="rounded-xl border border-brand-warm-200 bg-white p-3.5">
+              <div className="rounded-xl border border-border bg-white p-3.5">
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <p className="text-brand-ink-400">{t.drawer.checkIn}</p>
+                    <p className="text-muted-foreground/60">{t.drawer.checkIn}</p>
                     <p className="font-semibold text-slate-800">{room.booking.check_in}</p>
                   </div>
                   <div>
-                    <p className="text-brand-ink-400">{t.drawer.checkOut}</p>
+                    <p className="text-muted-foreground/60">{t.drawer.checkOut}</p>
                     <p className="font-semibold text-slate-800">
                       {room.booking.checkout_mode === "open"
                         ? t.drawer.openEnded
@@ -215,25 +215,25 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                   </div>
                 </div>
                 {room.billing && (
-                  <div className="mt-3 pt-3 border-t border-brand-neutral-200">
+                  <div className="mt-3 pt-3 border-t border-border/60">
                     <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className="text-brand-ink-400">{t.drawer.nights}</span>
+                      <span className="text-muted-foreground/60">{t.drawer.nights}</span>
                       <span className="font-semibold text-slate-800">{room.billing.nights}</span>
                     </div>
                     <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className="text-brand-ink-400">{t.drawer.paid}</span>
-                      <span className="font-semibold text-brand-green-600">{formatXof(room.totalPaid)}</span>
+                      <span className="text-muted-foreground/60">{t.drawer.paid}</span>
+                      <span className="font-semibold text-accentGreen-600">{formatXof(room.totalPaid)}</span>
                     </div>
                     <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className="text-brand-ink-400">{t.drawer.total}</span>
+                      <span className="text-muted-foreground/60">{t.drawer.total}</span>
                       <span className="font-semibold text-slate-800">
                         {formatXof(room.billing.finalAmount)}
                       </span>
                     </div>
                     {room.billing.outstanding > 0 && (
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-brand-ink-400">{t.drawer.outstanding}</span>
-                        <span className="font-bold text-brand-red-600">
+                        <span className="text-muted-foreground/60">{t.drawer.outstanding}</span>
+                        <span className="font-bold text-accentRed-600">
                           {formatXof(room.billing.outstanding)}
                         </span>
                       </div>
@@ -244,18 +244,18 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
             )}
 
             {/* Notes */}
-            <div className="rounded-xl border border-brand-warm-200 bg-white p-3.5">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-ink-400 mb-1">
+            <div className="rounded-xl border border-border bg-white p-3.5">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground/60 mb-1">
                 {t.drawer.notes}
               </p>
-              <p className="text-xs text-brand-ink-700">
+              <p className="text-xs text-foreground/70">
                 {room.unit.notes || room.booking?.notes || t.drawer.noNotes}
               </p>
             </div>
 
             {/* Payment input (when payment action active) */}
             {action?.type === "payment" && (
-              <div className="rounded-xl border border-brand-indigo-200 bg-brand-indigo-50 p-3.5">
+              <div className="rounded-xl border border-accentBlue-200 bg-accentBlue-50 p-3.5">
                 <p className="text-xs font-semibold text-slate-800 mb-2">
                   {actionLabels.recordPaymentTitle}
                 </p>
@@ -266,7 +266,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value)}
                     placeholder={actionLabels.recordPaymentPlaceholder}
-                    className="flex-1 rounded-lg border border-brand-warm-200 px-3 py-2 text-sm bg-white text-brand-ink-900 placeholder:text-brand-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-indigo/30"
+                    className="flex-1 rounded-lg border border-border px-3 py-2 text-sm bg-white text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring/30"
                     autoFocus
                   />
                   <Button
@@ -283,13 +283,13 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
 
             {/* Extend stay input (when extend action active) */}
             {action?.type === "extendStay" && room.booking && (
-              <div className="rounded-xl border border-brand-cyan-200 bg-brand-cyan-50 p-3.5">
+              <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-3.5">
                 <p className="text-xs font-semibold text-slate-800 mb-2">
                   {actionLabels.extendStayDesc}
                 </p>
                 <div className="flex gap-2 items-end">
                   <div className="flex-1">
-                    <label className="text-xs text-brand-ink-500 block mb-1">
+                    <label className="text-xs text-muted-foreground block mb-1">
                       {locale === "zh" ? "新离店日期" : "Nouvelle date départ"}
                     </label>
                     <input
@@ -297,7 +297,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                       value={extendDate}
                       onChange={(e) => setExtendDate(e.target.value)}
                       min={room.booking.check_out ?? new Date().toISOString().slice(0, 10)}
-                      className="w-full rounded-lg border border-brand-warm-200 px-3 py-2 text-sm bg-white text-brand-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-indigo/30"
+                      className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
                       autoFocus
                     />
                   </div>
@@ -319,23 +319,23 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                 <>
                   <button
                     onClick={() => setAction({ type: "checkout" })}
-                    className="flex w-full items-center justify-between rounded-xl border border-brand-warm-200 bg-white px-4 py-3 text-sm font-semibold text-brand-ink-900 active:bg-brand-warm-50 min-h-[44px]"
+                    className="flex w-full items-center justify-between rounded-xl border border-border bg-white px-4 py-3 text-sm font-semibold text-foreground active:bg-muted/50 min-h-[44px]"
                   >
                     <span className="flex items-center gap-2">
-                      <DoorOpen className="h-4 w-4 text-brand-indigo" />
+                      <DoorOpen className="h-4 w-4 text-accentBlue-600" />
                       {actionLabels.checkOut}
                     </span>
-                    <ChevronRight className="h-4 w-4 text-brand-ink-400" />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/60" />
                   </button>
                   <button
                     onClick={() => setAction({ type: "payment" })}
-                    className="flex w-full items-center justify-between rounded-xl border border-brand-warm-200 bg-white px-4 py-3 text-sm font-semibold text-brand-ink-900 active:bg-brand-warm-50 min-h-[44px]"
+                    className="flex w-full items-center justify-between rounded-xl border border-border bg-white px-4 py-3 text-sm font-semibold text-foreground active:bg-muted/50 min-h-[44px]"
                   >
                     <span className="flex items-center gap-2">
-                      <CreditCard className="h-4 w-4 text-brand-green-600" />
+                      <CreditCard className="h-4 w-4 text-accentGreen-600" />
                       {actionLabels.recordPayment}
                     </span>
-                    <ChevronRight className="h-4 w-4 text-brand-ink-400" />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/60" />
                   </button>
                 </>
               )}
@@ -343,13 +343,13 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
               {isCleaning && room.cleaningTask && (
                 <button
                   onClick={() => setAction({ type: "cleaning" })}
-                  className="flex w-full items-center justify-between rounded-xl border border-brand-warm-200 bg-white px-4 py-3 text-sm font-semibold text-brand-ink-900 active:bg-brand-warm-50 min-h-[44px]"
+                  className="flex w-full items-center justify-between rounded-xl border border-border bg-white px-4 py-3 text-sm font-semibold text-foreground active:bg-muted/50 min-h-[44px]"
                 >
                   <span className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-brand-green-600" />
+                    <Check className="h-4 w-4 text-accentGreen-600" />
                     {actionLabels.completeCleaning}
                   </span>
-                  <ChevronRight className="h-4 w-4 text-brand-ink-400" />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/60" />
                 </button>
               )}
 
@@ -357,7 +357,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
               {!showMore ? (
                 <button
                   onClick={() => setShowMore(true)}
-                  className="flex w-full items-center justify-center gap-1 rounded-xl px-4 py-2.5 text-xs font-semibold text-brand-ink-500 active:bg-brand-warm-50 min-h-[44px]"
+                  className="flex w-full items-center justify-center gap-1 rounded-xl px-4 py-2.5 text-xs font-semibold text-muted-foreground active:bg-muted/50 min-h-[44px]"
                 >
                   {t.roomCard.more}
                 </button>
@@ -366,49 +366,49 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                   {isOccupied && (
                     <button
                       onClick={() => setAction({ type: "extendStay" })}
-                      className="flex w-full items-center justify-between rounded-xl border border-brand-warm-200 bg-white px-4 py-3 text-sm font-semibold text-brand-ink-900 active:bg-brand-warm-50 min-h-[44px]"
+                      className="flex w-full items-center justify-between rounded-xl border border-border bg-white px-4 py-3 text-sm font-semibold text-foreground active:bg-muted/50 min-h-[44px]"
                     >
                       <span className="flex items-center gap-2">
                         <CalendarPlus className="h-4 w-4 text-brand-cyan-600" />
                         {actionLabels.extendStay}
                       </span>
-                      <ChevronRight className="h-4 w-4 text-brand-ink-400" />
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/60" />
                     </button>
                   )}
                   {(isOccupied || isAvailable) && (
                     <button
                       onClick={() => setAction({ type: "maintenance" })}
-                      className="flex w-full items-center justify-between rounded-xl border border-brand-warm-200 bg-white px-4 py-3 text-sm font-semibold text-brand-ink-900 active:bg-brand-warm-50 min-h-[44px]"
+                      className="flex w-full items-center justify-between rounded-xl border border-border bg-white px-4 py-3 text-sm font-semibold text-foreground active:bg-muted/50 min-h-[44px]"
                     >
                       <span className="flex items-center gap-2">
-                        <Wrench className="h-4 w-4 text-brand-red-600" />
+                        <Wrench className="h-4 w-4 text-accentRed-600" />
                         {actionLabels.maintenance}
                       </span>
-                      <ChevronRight className="h-4 w-4 text-brand-ink-400" />
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/60" />
                     </button>
                   )}
                   {(isOccupied || isAvailable) && (
                     <button
                       onClick={() => setAction({ type: "lock" })}
-                      className="flex w-full items-center justify-between rounded-xl border border-brand-warm-200 bg-white px-4 py-3 text-sm font-semibold text-brand-ink-900 active:bg-brand-warm-50 min-h-[44px]"
+                      className="flex w-full items-center justify-between rounded-xl border border-border bg-white px-4 py-3 text-sm font-semibold text-foreground active:bg-muted/50 min-h-[44px]"
                     >
                       <span className="flex items-center gap-2">
-                        <Lock className="h-4 w-4 text-brand-ink-600" />
+                        <Lock className="h-4 w-4 text-foreground/60" />
                         {actionLabels.lock}
                       </span>
-                      <ChevronRight className="h-4 w-4 text-brand-ink-400" />
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/60" />
                     </button>
                   )}
                   {room.unit.status === "maintenance" || room.unit.status === "locked" ? (
                     <button
                       onClick={() => setAction({ type: "markAvailable" })}
-                      className="flex w-full items-center justify-between rounded-xl border border-brand-warm-200 bg-white px-4 py-3 text-sm font-semibold text-brand-green-700 active:bg-brand-warm-50 min-h-[44px]"
+                      className="flex w-full items-center justify-between rounded-xl border border-border bg-white px-4 py-3 text-sm font-semibold text-brand-green-700 active:bg-muted/50 min-h-[44px]"
                     >
                       <span className="flex items-center gap-2">
-                        <Unlock className="h-4 w-4 text-brand-green-600" />
+                        <Unlock className="h-4 w-4 text-accentGreen-600" />
                         {actionLabels.markAvailable}
                       </span>
-                      <ChevronRight className="h-4 w-4 text-brand-ink-400" />
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/60" />
                     </button>
                   ) : null}
                 </div>

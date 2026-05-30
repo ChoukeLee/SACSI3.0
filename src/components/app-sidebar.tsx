@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowUpDown, Banknote, BarChart3, Bell, Building2, CalendarDays, FileSignature, FileText, Layers, LayoutDashboard, Settings, Shield, ShieldCheck, Target, Users } from "lucide-react";
-import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarSeparator } from "@/components/ui/sidebar";
+import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { getDesktopNavLabels } from "@/lib/nav-labels";
@@ -69,28 +69,34 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-border">
-      <SidebarHeader className="gap-3 px-4 py-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground shadow-sm group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">S</div>
-          <div className="group-data-[collapsible=icon]:hidden"><p className="text-xs font-medium text-muted-foreground">{labels.brand}</p></div>
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
+      <SidebarHeader className="gap-0 px-4 py-3.5">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-[11px] font-bold text-primary-foreground">
+            S
+          </div>
+          <div className="group-data-[collapsible=icon]:hidden">
+            <p className="text-sm font-semibold leading-none">{labels.brand}</p>
+            <p className="mt-1 text-[10px] text-muted-foreground">{labels.building}</p>
+          </div>
         </div>
-        <SidebarSeparator />
       </SidebarHeader>
       <SidebarContent>
-        {visible.map(group => (
-          <SidebarGroup key={group.key}>
-            <SidebarGroupLabel>{labels.groups[group.key]}</SidebarGroupLabel>
+        {visible.map((group, gi) => (
+          <SidebarGroup key={group.key} className={gi === 0 ? "" : ""}>
+            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+              {labels.groups[group.key]}
+            </SidebarGroupLabel>
             <SidebarMenu>
               {group.items.map(item => {
                 const Icon = item.icon;
                 const active = isActive(item);
                 return (
                   <SidebarMenuItem key={item.key}>
-                    <SidebarMenuButton asChild isActive={active} tooltip={labels.nav[item.key]}>
+                    <SidebarMenuButton asChild isActive={active} tooltip={labels.nav[item.key]} size="default">
                       <Link href={routeFor(locale, item.href)}>
-                        <Icon strokeWidth={active ? 2.5 : 2} />
-                        <span>{labels.nav[item.key]}</span>
+                        <Icon className="h-4 w-4" strokeWidth={active ? 2.5 : 1.75} />
+                        <span className="text-[13px]">{labels.nav[item.key]}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -100,8 +106,8 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <SidebarFooter>
-        <p className="px-2 text-xs text-muted-foreground">{labels.building}</p>
+      <SidebarFooter className="px-4 py-3">
+        <p className="text-[10px] text-muted-foreground/60">{labels.building}</p>
       </SidebarFooter>
     </Sidebar>
   );

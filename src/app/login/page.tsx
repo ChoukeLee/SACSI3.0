@@ -19,36 +19,36 @@ export default async function LoginPage({
     <div className="flex min-h-[80vh] items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-indigo shadow-sm">
-            <span className="text-sm font-bold text-white">S</span>
+          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-sm">
+            <span className="text-sm font-bold text-primary-foreground">S</span>
           </div>
-          <h1 className="text-base font-black text-slate-950">SACIS 3.0</h1>
-          <p className="mt-1 text-sm text-slate-500">科建地产房屋管理系统</p>
+          <h1 className="text-base font-bold text-foreground">SACIS 3.0</h1>
+          <p className="mt-1 text-sm text-muted-foreground">科建地产房屋管理系统</p>
         </div>
 
         <form action={login} className="space-y-4">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-600">邮箱</label>
+            <label className="mb-1 block text-xs font-semibold text-muted-foreground">邮箱</label>
             <input
               type="email"
               name="email"
               placeholder="admin@sacsi.com"
               required
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/30"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring/30"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-600">密码</label>
+            <label className="mb-1 block text-xs font-semibold text-muted-foreground">密码</label>
             <input
               type="password"
               name="password"
               required
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-brand-indigo-500/30"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
             />
           </div>
 
           {error && (
-            <p className="rounded-lg bg-brand-red-50 px-3 py-2 text-sm text-brand-red-600">{error}</p>
+            <p className="rounded-lg bg-accentRed-50 px-3 py-2 text-sm text-accentRed-600">{error}</p>
           )}
 
           <Button type="submit" className="w-full">
