@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, X, AlertTriangle, FileText, DollarSign, LogOut, Printer, RefreshCw, FileSignature } from "lucide-react";
+import { Plus, X, AlertTriangle, FileText, DollarSign, LogOut, Printer, RefreshCw, Eye } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
@@ -169,29 +169,33 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 const summary = getContractReceivableSummary(contract.id);
                 const daysLeft = Math.floor((new Date(contract.expected_end_date).getTime() - Date.now()) / 86400000);
                 const isRisk = summary.overdue > 0 || (contract.status === "active" && daysLeft >= 0 && daysLeft <= 30);
+                const isLongTerm = contract.expected_end_date >= "2099-01-01";
+                const rent = Number(contract.monthly_rent_xof);
                 return (
                   <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status="leased"
-                    statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]}
                     onClick={() => openDetail(contract.id)}
                     className={isRisk ? "ring-2 ring-amber-300" : ""}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-bold">{customer?.name ?? "-"}</p>
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">{contract.contract_no}</p>
-                      </div>
-                      <Badge variant={statusVariant[contract.status]}>{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
+                    {/* Name + status badge */}
+                    <div className="flex items-start justify-between gap-1.5">
+                      <p className="text-[13px] font-medium leading-tight truncate" title={customer?.name ?? (locale==="zh"?"无客户":"Sans client")}>{customer?.name ?? "—"}</p>
+                      <Badge variant={statusVariant[contract.status]} className="shrink-0 text-[10px]">{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">
-                      <span><span className="text-muted-foreground">{locale==="zh"?"月租":"Loyer"} </span><span className="font-medium">{formatXof(Number(contract.monthly_rent_xof))}</span></span>
-                      <span><span className="text-muted-foreground">{locale==="zh"?"到期":"Fin"} </span><span className={cn(daysLeft>=0&&daysLeft<=30?"text-amber-600":"")}>{contract.expected_end_date}</span></span>
-                      <span><span className="text-muted-foreground">{locale==="zh"?"待收":"Solde"} </span><span className={cn("font-medium",summary.outstanding>0?"text-amber-600":"text-emerald-600")}>{formatXof(summary.outstanding)}</span></span>
-                      <span><span className="text-muted-foreground">{locale==="zh"?"逾期":"Retard"} </span><span className={cn("font-medium",summary.overdue>0?"text-red-600":"text-emerald-600")}>{formatXof(summary.overdue)}</span></span>
-                    </div>
-                    <div className="mt-auto pt-2">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{locale==="zh"?"下一应收":"Prochaine"}</span>
-                        <span>{summary.nextDue ?? "-"}</span>
-                      </div>
+                    {/* Rent + expiry — compact */}
+                    <p className="mt-1 text-[11px] text-[#5D7186] leading-tight">
+                      {rent > 0 ? formatXof(rent) : (locale==="zh"?"租金未录入":"Loyer non saisi")}
+                      <span className="mx-1.5">·</span>
+                      {isLongTerm ? (locale==="zh"?"长期有效":"Long terme") : contract.expected_end_date}
+                      {!isLongTerm && daysLeft>=0&&daysLeft<=30 && <span className="ml-1 text-amber-600 font-medium">({daysLeft}j)</span>}
+                    </p>
+                    {/* Outstanding alert */}
+                    {summary.outstanding > 0 && (
+                      <p className="text-[11px] text-amber-600 font-medium leading-tight">{locale==="zh"?"待收":"Dû"}: {formatXof(summary.outstanding)}</p>
+                    )}
+                    {/* Action buttons */}
+                    <div className="mt-auto flex justify-end gap-1.5 pt-1">
+                      <ActionBtn icon={Eye} label={locale==="zh"?"查看":"Voir"} onClick={() => openDetail(contract.id)} />
+                      <ActionBtn icon={DollarSign} label={locale==="zh"?"收款":"Paiement"} onClick={() => { openDetail(contract.id); }} />
+                      <ActionBtn icon={FileText} label={locale==="zh"?"合同":"Contrat"} onClick={() => { openDetail(contract.id); }} />
                     </div>
                   </RoomCard>
                 );
@@ -261,6 +265,25 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       {panel==="moveout"&&selected&&(<PanelShell onClose={()=>setPanel(null)} title={t.settlement.moveOut}>{/* form kept identical to original */}{/*...*/}<div className="space-y-4"><div><label className={labelClass}>{t.form.actualEndDate}</label><input type="date" value={moEndDate} onChange={e=>setMoEndDate(e.target.value)} className={inputClass}/></div><div><label className={labelClass}>{locale==="zh"?"未付租金":"Loyer impaye"}</label><input type="number" value={moUnpaid} onChange={e=>setMoUnpaid(Number(e.target.value))} className={inputClass}/></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={moUtility} onChange={e=>setMoUtility(e.target.checked)}/>{locale==="zh"?"水电已结清":"Charges reglees"}</label><div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-muted-foreground">{locale==="zh"?"押金抵扣":"Retenue depot"}</label><input type="number" value={moDeduction} onChange={e=>setMoDeduction(Number(e.target.value))} className={inputClass}/></div><div><label className="text-xs text-muted-foreground">{locale==="zh"?"押金退还":"Remb. depot"}</label><input type="number" value={moRefund} onChange={e=>setMoRefund(Number(e.target.value))} className={inputClass}/></div></div>{error&&<p className="text-sm text-red-600">{error}</p>}<Button className="w-full" onClick={handleMoveOut} disabled={saving}>{saving?"...":locale==="zh"?"确认退租":"Confirmer"}</Button></div></PanelShell>)}
     </div>
   );
+}
+
+// ── Card helpers ──
+function Info({ label, value, dim, warn, danger }: { label: string; value: string; dim?: boolean; warn?: boolean; danger?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-1 text-[12px]">
+      <span className="text-[#5D7186] shrink-0">{label}</span>
+      <span className={cn("font-medium tabular-nums truncate text-right", danger ? "text-[#C0394A]" : warn ? "text-amber-600" : dim ? "text-amber-600" : "text-[#17324D]")}>{value}</span>
+    </div>
+  )
+}
+function ActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[rgba(23,50,77,0.10)] bg-white/80 text-[#27506F] shadow-[0_1px_2px_rgba(25,58,92,0.04)] transition-all hover:bg-white hover:-translate-y-px"
+      aria-label={label} title={label}>
+      <Icon className="h-[14px] w-[14px]" strokeWidth={1.5} />
+    </button>
+  )
 }
 
 // ── Shared panel shell ──

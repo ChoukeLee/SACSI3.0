@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, X, DollarSign, FileText, CalendarPlus, TrendingUp, AlertTriangle } from "lucide-react";
+import { Plus, X, DollarSign, FileText, CalendarPlus, TrendingUp, AlertTriangle, Eye } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
@@ -83,6 +83,25 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
 
   const sellableUnits = useMemo(()=>units.filter(u=>(u.kind==="apartment"||u.kind==="parking")&&(u.status==="available"||u.status==="sold")),[units]);
 
+// ── Card helpers ──
+function SaleInfo({ label, value, good, warn, danger }: { label: string; value: string; good?: boolean; warn?: boolean; danger?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-1 text-[12px]">
+      <span className="text-[#5D7186] shrink-0">{label}</span>
+      <span className={cn("font-medium tabular-nums truncate text-right", danger ? "text-[#C0394A]" : warn ? "text-amber-600" : good ? "text-emerald-600" : "text-[#17324D]")}>{value}</span>
+    </div>
+  )
+}
+function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[rgba(23,50,77,0.10)] bg-white/80 text-[#27506F] shadow-[0_1px_2px_rgba(25,58,92,0.04)] transition-all hover:bg-white hover:-translate-y-px"
+      aria-label={label} title={label}>
+      <Icon className="h-[14px] w-[14px]" strokeWidth={1.5} />
+    </button>
+  )
+}
+
   const statBlocks = [
     { key: "active", label: locale==="zh"?"生效出售":"Ventes actives", value: String(dashboardStats.active), dot: "bg-accentGreen-500" },
     { key: "total", label: locale==="zh"?"合同总额":"Total contrats", value: formatXof(dashboardStats.total), dot: "bg-accentBlue-500" },
@@ -145,8 +164,29 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
             </>}
           >
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-              {fc.map(contract=>{const unit=unitMap.get(contract.unit_id);const customer=customerMap.get(contract.customer_id);const s=getContractSummary(contract.id);const isRisk=s.overdue>0||(contract.status==="active"&&contract.transfer_status!=="completed");return(<RoomCard key={contract.id} roomNo={unit?.unit_no??"-"} status="sold" statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]} onClick={()=>openDetail(contract.id)} className={isRisk?"ring-2 ring-amber-300":""}><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-bold">{customer?.name??"-"}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{contract.contract_no}</p></div><Badge variant={statusVariant[contract.status]}>{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge></div>
-              <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs"><span><span className="text-muted-foreground">{locale==="zh"?"总额":"Total"} </span><span className="font-medium">{formatXof(Number(contract.total_amount_xof))}</span></span><span><span className="text-muted-foreground">{locale==="zh"?"待收":"Solde"} </span><span className={cn("font-medium",s.outstanding>0?"text-amber-600":"text-emerald-600")}>{formatXof(s.outstanding)}</span></span><span><span className="text-muted-foreground">{locale==="zh"?"逾期":"Retard"} </span><span className={cn("font-medium",s.overdue>0?"text-red-600":"text-emerald-600")}>{formatXof(s.overdue)}</span></span><span><span className="text-muted-foreground">{locale==="zh"?"过户":"Transfert"} </span><span className={cn(contract.transfer_status==="completed"?"text-emerald-600":"text-muted-foreground")}>{transText(contract.transfer_status)}</span></span></div></RoomCard>);})}
+              {fc.map(contract=>{const unit=unitMap.get(contract.unit_id);const customer=customerMap.get(contract.customer_id);const s=getContractSummary(contract.id);const isRisk=s.overdue>0||(contract.status==="active"&&contract.transfer_status!=="completed");return(<RoomCard key={contract.id} roomNo={unit?.unit_no??"-"} status="sold" statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]} onClick={()=>openDetail(contract.id)} className={isRisk?"ring-2 ring-amber-300":""}>
+                {/* Name + status badge */}
+                <div className="flex items-start justify-between gap-1.5">
+                  <p className="text-[13px] font-medium leading-tight truncate" title={customer?.name??""}>{customer?.name??"-"}</p>
+                  <Badge variant={statusVariant[contract.status]} className="shrink-0 text-[10px]">{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
+                </div>
+                {/* Compact info row */}
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#5D7186]">
+                  <span title={contract.contract_no} className="truncate max-w-[90px]">{contract.contract_no}</span>
+                  <span>·</span>
+                  <span className="tabular-nums">{formatXof(Number(contract.total_amount_xof))}</span>
+                  {s.outstanding>0 && <span className="text-amber-600 font-medium">{formatXof(s.outstanding)} {locale==="zh"?"待收":"dû"}</span>}
+                </div>
+                {/* Transfer status + action buttons */}
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <span className={cn("text-[11px]", contract.transfer_status==="completed"?"text-emerald-600":"text-[#5D7186]")}>{transText(contract.transfer_status)}</span>
+                  <div className="flex gap-1.5">
+                    <SaleActionBtn icon={Eye} label={locale==="zh"?"查看":"Voir"} onClick={() => openDetail(contract.id)} />
+                    <SaleActionBtn icon={DollarSign} label={locale==="zh"?"回款":"Pmt"} onClick={() => { openDetail(contract.id); }} />
+                    <SaleActionBtn icon={FileText} label={locale==="zh"?"单据":"Docs"} onClick={() => { openDetail(contract.id); }} />
+                  </div>
+                </div>
+              </RoomCard>);})}
             </div>
           </RoomBoard>
         ))
