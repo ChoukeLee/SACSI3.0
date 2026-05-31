@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowRight, Building2, ChevronDown, ChevronUp, Home, Key } from "lucide-react";
+import { AlertTriangle, ArrowRight, Building2, ChevronDown, ChevronUp, Home, Key } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
-import { dictionaries, routeFor } from "@/lib/i18n";
+import { dictionaries } from "@/lib/i18n";
 import { cn, sortUnits } from "@/lib/utils";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
@@ -55,7 +55,7 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
   const [showNonApartments, setShowNonApartments] = useState(false);
 
   const floors = useMemo(() => {
-    const set = new Set(units.map((u) => u.floor_label));
+    const set = new Set(units.map((unit) => unit.floor_label));
     return Array.from(set).sort((a, b) => {
       const an = parseInt(a, 10);
       const bn = parseInt(b, 10);
@@ -79,51 +79,81 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
 
   const apartments = useMemo(() => units.filter((unit) => unit.kind === "apartment"), [units]);
   const nonApartments = useMemo(() => units.filter((unit) => unit.kind !== "apartment"), [units]);
-  const apartmentCount = apartments.length;
-  const nonApartmentCount = nonApartments.length;
+
+  const summary = useMemo(() => ({
+    apartments: apartments.length,
+    available: apartments.filter((unit) => unit.status === "available").length,
+    daily: apartments.filter((unit) => unit.status === "daily_occupied" || unit.status === "reserved").length,
+    leased: apartments.filter((unit) => unit.status === "leased").length,
+    sold: apartments.filter((unit) => unit.status === "sold").length,
+    maintenance: apartments.filter((unit) => unit.status === "maintenance" || unit.status === "locked" || unit.status === "cleaning_pending").length,
+    nonApartment: nonApartments.length,
+  }), [apartments, nonApartments]);
 
   const detailUnit = detailUnitId ? units.find((unit) => unit.id === detailUnitId) : null;
 
+  const assetBlocks = [
+    { key: "apartments", label: locale === "zh" ? "住宿房源" : "Appartements", value: summary.apartments, dot: "bg-foreground", icon: Home },
+    { key: "available", label: statusLabels.available, value: summary.available, dot: "bg-[#A0D0E8]", icon: undefined },
+    { key: "daily", label: locale === "zh" ? "日租/预订" : "Jour", value: summary.daily, dot: "bg-[#5090C0]", icon: undefined },
+    { key: "leased", label: statusLabels.leased, value: summary.leased, dot: "bg-[#7050A0]", icon: undefined },
+    { key: "sold", label: statusLabels.sold, value: summary.sold, dot: "bg-[#505080]", icon: undefined },
+    { key: "maintenance", label: locale === "zh" ? "维护中" : "Maintenance", value: summary.maintenance, dot: "bg-[#F0A080]", icon: AlertTriangle },
+    { key: "nonApartment", label: locale === "zh" ? "非住宿" : "Autres", value: summary.nonApartment, dot: "bg-muted-foreground", icon: Key },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Page chrome + compact stat blocks */}
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
-            {locale === "zh" ? "房源总览" : "Vue d'ensemble"}
-          </p>
-          <div className="flex items-baseline gap-3">
-            <h1 className="text-xl font-semibold tracking-tight">
-              {locale === "zh" ? "住宿资产" : "Actifs résidentiels"}
-            </h1>
-            <span className="text-sm text-muted-foreground tabular-nums">
-              {apartmentCount} {locale === "zh" ? "套公寓" : "appartements"}
-            </span>
-          </div>
+      <div className="flex flex-col gap-1">
+        <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          {locale === "zh" ? "房源总览" : "Vue d'ensemble"}
+        </p>
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-xl font-semibold tracking-tight">
+            {locale === "zh" ? "住宿资产" : "Actifs résidentiels"}
+          </h1>
+          <span className="text-sm text-muted-foreground tabular-nums">
+            {summary.apartments} {locale === "zh" ? "套公寓" : "appartements"}
+          </span>
         </div>
-        {/* Compact stat blocks — apartments + non-apartment */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-2.5 shadow-sm">
-            <Home className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
-            <div className="min-w-0">
-              <p className="text-lg font-bold tracking-tight tabular-nums leading-none">{apartmentCount}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{locale === "zh" ? "住宿房源" : "Appartements"}</p>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-4 lg:grid-cols-7">
+        {assetBlocks.map((block) => {
+          const Icon = block.icon;
+          const content = (
+            <>
+              {Icon ? (
+                <Icon className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+              ) : (
+                <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", block.dot)} />
+              )}
+              <div className="min-w-0">
+                <p className="text-lg font-bold leading-none tracking-tight tabular-nums">{block.value}</p>
+                <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">{block.label}</p>
+              </div>
+            </>
+          );
+
+          if (block.key === "nonApartment") {
+            return (
+              <button
+                key={block.key}
+                type="button"
+                onClick={() => setShowNonApartments(true)}
+                className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 text-left shadow-sm transition-colors hover:bg-accent/50"
+              >
+                {content}
+              </button>
+            );
+          }
+
+          return (
+            <div key={block.key} className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+              {content}
             </div>
-          </div>
-          <button
-            onClick={() => setShowNonApartments(!showNonApartments)}
-            className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-2.5 shadow-sm hover:bg-accent/50 transition-colors text-left"
-          >
-            <Key className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
-            <div className="min-w-0">
-              <p className="text-lg font-bold tracking-tight tabular-nums leading-none">{nonApartmentCount}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight flex items-center gap-1">
-                {locale === "zh" ? "非住宿资产" : "Autres actifs"}
-                {showNonApartments ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              </p>
-            </div>
-          </button>
-        </div>
+          );
+        })}
       </div>
 
       <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
@@ -163,72 +193,63 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
                 </tr>
               </thead>
               <tbody>
-                {sortUnits(filtered).map((unit) => {
-                  const flags = businessFlagsMap[unit.id] ?? [];
-                  const enabledFlags = flags.filter((flag) => flag.is_enabled);
-                  const dailyFlag = flags.find((flag) => flag.business_type === "daily_rental" && flag.is_enabled);
-                  return (
-                    <tr key={unit.id} className="cursor-pointer" onClick={() => setDetailUnitId(unit.id)}>
-                      <td><span className="font-mono text-xs font-bold">{unit.unit_no}</span></td>
-                      <td className="text-sm">{unit.floor_label}</td>
-                      <td className="text-sm text-muted-foreground">{t.kinds[unit.kind]}</td>
-                      <td><StatusPill status={unit.status} locale={locale} /></td>
-                      <td className="text-sm text-muted-foreground">{enabledFlags.map((flag) => t.businessTypes[flag.business_type]).join(" / ") || "-"}</td>
-                      <td className="table-cell-amount">{dailyFlag?.default_price_xof != null ? Number(dailyFlag.default_price_xof).toLocaleString() : "-"}</td>
-                      <td className="table-cell-action">
-                        <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); setDetailUnitId(unit.id); }}>
-                          <ArrowRight className="h-3.5 w-3.5" />
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {sortUnits(filtered).map((unit) => (
+                  <UnitTableRow
+                    key={unit.id}
+                    unit={unit}
+                    locale={locale}
+                    flags={businessFlagsMap[unit.id] ?? []}
+                    onOpen={() => setDetailUnitId(unit.id)}
+                  />
+                ))}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* Non-apartment assets — collapsible */}
-      {nonApartments.length > 0 && showNonApartments && (
-        <div className="border-t border-border/40 pt-4">
-          <p className="mb-3 text-xs font-semibold text-muted-foreground">
-            {locale === "zh" ? "非住宿资产" : "Actifs non résidentiels"} · {nonApartmentCount}
-          </p>
-          <div className="table-shell">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr>
-                    <th>{locale === "zh" ? "编号" : "N°"}</th>
-                    <th>{locale === "zh" ? "类型" : "Type"}</th>
-                    <th>{locale === "zh" ? "房态" : "Statut"}</th>
-                    <th>{locale === "zh" ? "支持业务" : "Activité"}</th>
-                    <th className="w-10" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortUnits(nonApartments).map((unit) => {
-                    const flags = businessFlagsMap[unit.id] ?? [];
-                    const enabledFlags = flags.filter((flag) => flag.is_enabled);
-                    return (
-                      <tr key={unit.id} className="cursor-pointer" onClick={() => setDetailUnitId(unit.id)}>
-                        <td><span className="font-mono text-xs font-bold">{unit.unit_no}</span></td>
-                        <td className="text-sm text-muted-foreground">{t.kinds[unit.kind]}</td>
-                        <td><StatusPill status={unit.status} locale={locale} /></td>
-                        <td className="text-sm text-muted-foreground">{enabledFlags.map((flag) => t.businessTypes[flag.business_type]).join(" / ") || "-"}</td>
-                        <td className="table-cell-action">
-                          <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); setDetailUnitId(unit.id); }}>
-                            <ArrowRight className="h-3.5 w-3.5" />
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+      {nonApartments.length > 0 && (
+        <div className="rounded-xl border border-border/60 bg-card shadow-sm">
+          <button
+            type="button"
+            onClick={() => setShowNonApartments((value) => !value)}
+            className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-accent/40"
+          >
+            <span className="text-sm font-semibold">
+              {locale === "zh" ? "非住宿资产" : "Actifs non résidentiels"} · {summary.nonApartment}
+            </span>
+            {showNonApartments ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </button>
+          {showNonApartments && (
+            <div className="border-t border-border/60">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr>
+                      <th>{locale === "zh" ? "编号" : "N°"}</th>
+                      <th>{locale === "zh" ? "楼层" : "Étage"}</th>
+                      <th>{locale === "zh" ? "类型" : "Type"}</th>
+                      <th>{locale === "zh" ? "房态" : "Statut"}</th>
+                      <th>{locale === "zh" ? "支持业务" : "Activité"}</th>
+                      <th className="w-10" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortUnits(nonApartments).map((unit) => (
+                      <UnitTableRow
+                        key={unit.id}
+                        unit={unit}
+                        locale={locale}
+                        flags={businessFlagsMap[unit.id] ?? []}
+                        onOpen={() => setDetailUnitId(unit.id)}
+                        compact
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -244,6 +265,42 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
         />
       )}
     </div>
+  );
+}
+
+function UnitTableRow({
+  unit,
+  locale,
+  flags,
+  onOpen,
+  compact = false,
+}: {
+  unit: UnitRow;
+  locale: Locale;
+  flags: UnitBusinessFlag[];
+  onOpen: () => void;
+  compact?: boolean;
+}) {
+  const t = dictionaries[locale].units;
+  const enabledFlags = flags.filter((flag) => flag.is_enabled);
+  const dailyFlag = flags.find((flag) => flag.business_type === "daily_rental" && flag.is_enabled);
+
+  return (
+    <tr className="cursor-pointer" onClick={onOpen}>
+      <td><span className="font-mono text-xs font-bold">{unit.unit_no}</span></td>
+      <td className="text-sm">{unit.floor_label}</td>
+      <td className="text-sm text-muted-foreground">{t.kinds[unit.kind]}</td>
+      <td><StatusPill status={unit.status} locale={locale} /></td>
+      <td className="text-sm text-muted-foreground">{enabledFlags.map((flag) => t.businessTypes[flag.business_type]).join(" / ") || "-"}</td>
+      {!compact && (
+        <td className="table-cell-amount">{dailyFlag?.default_price_xof != null ? Number(dailyFlag.default_price_xof).toLocaleString() : "-"}</td>
+      )}
+      <td className="table-cell-action">
+        <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); onOpen(); }}>
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </td>
+    </tr>
   );
 }
 
