@@ -221,7 +221,7 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
             {showNonApartments ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
           </button>
           {showNonApartments && (
-            <div className="border-t border-border/60">
+            <div className="table-shell border-t-0 rounded-t-none">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
