@@ -3,8 +3,8 @@ import type { BillingResult } from "@/features/daily-rentals/billing";
 import { calculateBilling } from "@/features/daily-rentals/billing";
 import {
   getDailyRoomStateForDate,
-  type DailyRoomDisplayStatus,
 } from "@/features/daily-rentals/room-status";
+import type { DailyRoomDisplayStatus } from "@/features/daily-rentals/daily-rental-policy";
 
 export type RoomDisplayStatus = DailyRoomDisplayStatus;
 

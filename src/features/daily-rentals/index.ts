@@ -16,5 +16,7 @@ export {
   getBookingColorClass,
   buildBookingMap,
 } from "./room-status";
-export type { DailyRoomDisplayStatus, DailyRoomStateForDate } from "./room-status";
+export type { DailyRoomStateForDate } from "./room-status";
+export type { DailyRoomDisplayStatus, DailyBookingActionState, DailyBookingStatus } from "./daily-rental-policy";
+export { getDailyBookingActionState, DAILY_ROOM_STATUS_PRIORITY } from "./daily-rental-policy";
 export { STATUS_COLORS } from "./room-status";

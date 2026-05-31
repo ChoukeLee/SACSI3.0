@@ -1,16 +1,10 @@
 import type { UnitRow, DailyBookingRow } from "@/types/database";
-import { bookingOccupiesDate } from "./daily-rental-policy";
+import {
+  bookingOccupiesDate,
+  type DailyRoomDisplayStatus,
+} from "./daily-rental-policy";
 
 // ── Types ──────────────────────────────────────────────────────────────
-
-export type DailyRoomDisplayStatus =
-  | "maintenance"
-  | "locked"
-  | "occupied"
-  | "checking_out_today"
-  | "reserved"
-  | "cleaning"
-  | "available";
 
 export interface DailyRoomStateForDate {
   unit: UnitRow;

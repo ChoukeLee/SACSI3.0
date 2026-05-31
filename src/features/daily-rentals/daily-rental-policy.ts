@@ -9,7 +9,37 @@ export type DailyBookingStatus =
   | "checked_out"
   | "cancelled";
 
+export type DailyRoomDisplayStatus =
+  | "maintenance"
+  | "locked"
+  | "occupied"
+  | "checking_out_today"
+  | "reserved"
+  | "cleaning"
+  | "available";
+
+export const DAILY_ROOM_STATUS_PRIORITY: Record<DailyRoomDisplayStatus, number> = {
+  maintenance: 60,
+  locked: 60,
+  occupied: 50,
+  checking_out_today: 50,
+  reserved: 40,
+  cleaning: 30,
+  available: 10,
+};
+
 export type PolicyResult = { allowed: true } | { allowed: false; reason: string };
+
+export interface DailyBookingActionState {
+  canConfirm: boolean;
+  canCancel: boolean;
+  canCheckIn: boolean;
+  canTakePayment: boolean;
+  canCheckOut: boolean;
+  canUseAdvancedActions: boolean;
+  canCompleteCleaning: boolean;
+  isReadonly: boolean;
+}
 
 export interface CreateBookingPolicyInput {
   checkIn: string;
@@ -68,6 +98,31 @@ export function allowCompleteCleaning(task: { is_completed: boolean } | null): P
   if (!task) return { allowed: false, reason: "cleaningTaskNotFound" };
   if (task.is_completed) return { allowed: false, reason: "cleaningTaskAlreadyCompleted" };
   return { allowed: true };
+}
+
+export function getDailyBookingActionState(
+  booking: Pick<DailyBookingRow, "status">,
+  options: { hasOpenCleaningTask?: boolean } = {},
+): DailyBookingActionState {
+  const status = booking.status as DailyBookingStatus;
+  const canConfirm = status === "pending_review";
+  const canCancel = status === "pending_review" || status === "confirmed";
+  const canCheckIn = status === "confirmed";
+  const canTakePayment = status === "checked_in";
+  const canCheckOut = status === "checked_in";
+  const canUseAdvancedActions = status === "checked_in";
+  const canCompleteCleaning = status === "checked_out" && Boolean(options.hasOpenCleaningTask);
+
+  return {
+    canConfirm,
+    canCancel,
+    canCheckIn,
+    canTakePayment,
+    canCheckOut,
+    canUseAdvancedActions,
+    canCompleteCleaning,
+    isReadonly: !canConfirm && !canCancel && !canCheckIn && !canTakePayment && !canCheckOut && !canCompleteCleaning,
+  };
 }
 
 export function bookingOccupiesDate(booking: DailyBookingRow, dateStr: string): boolean {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { X, Check, UserX, Printer, DollarSign, Percent, Trash2 } from "lucide-react";
+import { X, Check, UserX, Printer, DollarSign, Percent, Trash2, MoreHorizontal } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { CustomerSummary } from "./calendar";
 import { printDailyReceipt } from "@/features/print";
 import { calculateBilling } from "./billing";
+import { getDailyBookingActionState } from "./daily-rental-policy";
 import {
   createBooking, confirmBooking, checkIn, checkOut, completeCleaning, extendStay, cancelBooking,
   recordSupplementaryPayment, applyDiscount, deletePayment, setFixedCheckout,
@@ -59,6 +60,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   const [actionError, setActionError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; amount: number } | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showAdvancedActions, setShowAdvancedActions] = useState(false);
 
   useEffect(() => {
     if (defaultDate) { setNewCheckIn(defaultDate); const nextDay = new Date(defaultDate); nextDay.setDate(nextDay.getDate() + 1); setNewCheckOut(nextDay.toISOString().slice(0, 10)); }
@@ -67,6 +69,11 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   useEffect(() => {
     if (booking) { setFinalAmount(String(booking.final_amount_xof ?? booking.total_amount_xof)); }
   }, [booking]);
+
+  useEffect(() => {
+    setShowAdvancedActions(false);
+    setActionError("");
+  }, [booking?.id]);
 
   const selectedUnit = unitId ? units.find((u) => u.id === unitId) : null;
   const bookingPayments = useMemo(() => payments.filter(p => p.source_id === booking?.id), [payments, booking]);
@@ -81,15 +88,19 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   const bookingCustomer = booking ? customers.find((c) => c.id === booking.customer_id) : null;
   const relatedCleaningTask = booking ? cleaningTasks.find((t) => t.daily_booking_id === booking.id) : null;
   const billing = booking ? calculateBilling(booking) : null;
+  const actionState = booking
+    ? getDailyBookingActionState(booking, { hasOpenCleaningTask: Boolean(relatedCleaningTask && !relatedCleaningTask.is_completed) })
+    : null;
 
   const toN = (s: string) => parseInt(s, 10) || 0;
 
   const inputClass = "w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-foreground transition-all duration-fast hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/30";
   const labelClass = "block text-xs font-black uppercase tracking-[0.14em] text-muted-foreground/70 mb-1";
+  const formatError = (message?: string | null) => formatDailyRentalError(message, locale);
 
   const handleCreate = async () => {
     if (!newCustomerId) { setError(t.booking.noCustomer); return; }
-    if (newCheckoutMode === "fixed" && newNights <= 0) { setError("Invalid date range."); return; }
+    if (newCheckoutMode === "fixed" && newNights <= 0) { setError(formatError("invalidDateRange")); return; }
     setSaving(true); setError("");
     const result = await createBooking({
       unitId: unitId!, customerId: newCustomerId, checkIn: newCheckIn,
@@ -102,14 +113,14 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
       if (result.data) onBookingCreated?.(result.data);
       refresh(); onClose();
     }
-    else setError(result.error ?? "Failed");
+    else setError(formatError(result.error));
   };
 
   const handleCheckIn = async () => {
     const prepay = toN(prepaidAmount);
     if (booking?.checkout_mode !== "open" && prepay <= 0) { setActionError(t.booking.prepaidWarning); return; }
     setSaving(true); const result = await checkIn(booking!.id, prepay);
-    setSaving(false); if (!result.success) setActionError(result.error ?? "Failed"); else { refresh(); onClose(); }
+    setSaving(false); if (!result.success) setActionError(formatError(result.error)); else { refresh(); onClose(); }
   };
 
   const handleCheckOut = async () => {
@@ -122,21 +133,21 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
       discountAmount: disc || undefined,
       discountReason: discountReason || undefined,
     });
-    setSaving(false); if (!result.success) setActionError(result.error ?? "Failed"); else { refresh(); onClose(); }
+    setSaving(false); if (!result.success) setActionError(formatError(result.error)); else { refresh(); onClose(); }
   };
 
   const handleSuppPayment = async () => {
     const amt = toN(suppAmount);
     if (amt <= 0) return;
     setSaving(true); const result = await recordSupplementaryPayment({ bookingId: booking!.id, amount: amt });
-    setSaving(false); if (result.success) { refresh(); setSuppAmount(""); } else setActionError(result.error ?? "Failed");
+    setSaving(false); if (result.success) { refresh(); setSuppAmount(""); } else setActionError(formatError(result.error));
   };
 
   const handleDiscount = async () => {
     const amt = toN(discountAmount);
     if (amt <= 0) return;
     setSaving(true); const result = await applyDiscount({ bookingId: booking!.id, amount: amt, reason: discountReason || "手动优惠" });
-    setSaving(false); if (result.success) { refresh(); setDiscountAmount(""); setDiscountReason(""); } else setActionError(result.error ?? "Failed");
+    setSaving(false); if (result.success) { refresh(); setDiscountAmount(""); setDiscountReason(""); } else setActionError(formatError(result.error));
   };
 
   const handleExtend = async () => {
@@ -144,7 +155,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
     const extraAmount = Math.round(Number(booking!.nightly_price_xof) * days);
     setSaving(true);
     const result = await extendStay(booking!.id, booking!.check_out ?? "", days, extraAmount);
-    setSaving(false); if (!result.success) setActionError(result.error ?? "Failed"); else { refresh(); onClose(); }
+    setSaving(false); if (!result.success) setActionError(formatError(result.error)); else { refresh(); onClose(); }
   };
 
   const fixedCheckOutNights = useMemo(() => {
@@ -153,10 +164,10 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   }, [booking, fixedCheckOutDate]);
 
   const handleSetFixedCheckout = async () => {
-    if (!fixedCheckOutDate) { setActionError(t.setFixedCheckoutLabel + " is required."); return; }
+    if (!fixedCheckOutDate) { setActionError(formatError("checkOutRequired")); return; }
     setSaving(true);
     const result = await setFixedCheckout(booking!.id, fixedCheckOutDate);
-    setSaving(false); if (!result.success) setActionError(result.error ?? "Failed"); else { refresh(); onClose(); }
+    setSaving(false); if (!result.success) setActionError(formatError(result.error)); else { refresh(); onClose(); }
   };
 
   return (
@@ -263,24 +274,24 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
 
             {/* Actions by status */}
             <div className="space-y-2">
-              {booking.status === "pending_review" && (
+              {actionState?.canConfirm && (
                 <div className="flex gap-2">
-                  <Button variant="default" onClick={() => { setSaving(true); confirmBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className="flex-1">{t.booking.confirmBooking}</Button>
-                  <Button variant="outline" onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className="flex-1"><UserX className="h-4 w-4" />{t.booking.cancelBooking}</Button>
+                  <Button variant="default" onClick={() => { setSaving(true); confirmBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(formatError(r.error)); }); }} disabled={saving} className="flex-1">{t.booking.confirmBooking}</Button>
+                  <Button variant="outline" onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(formatError(r.error)); }); }} disabled={saving} className="flex-1"><UserX className="h-4 w-4" />{t.booking.cancelBooking}</Button>
                 </div>
               )}
 
-              {booking.status === "confirmed" && (
+              {actionState?.canCheckIn && (
                 <div className="space-y-2">
                   <div><label className={labelClass}>{t.booking.prepaidAmount} *</label><input type="number" value={prepaidAmount} onChange={e => setPrepaidAmount(e.target.value)} className={inputClass} /><p className="mt-0.5 text-xs text-muted-foreground/70">{t.booking.prepaidWarning}</p></div>
                   <div className="flex gap-2">
                     <Button variant="default" onClick={handleCheckIn} disabled={saving} className="flex-1">{t.booking.checkIn}</Button>
-                    <Button variant="outline" onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(r.error ?? "Failed"); }); }} disabled={saving} className="flex-1">{t.booking.cancelBooking}</Button>
+                    <Button variant="outline" onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(formatError(r.error)); }); }} disabled={saving} className="flex-1">{t.booking.cancelBooking}</Button>
                   </div>
                 </div>
               )}
 
-              {booking.status === "checked_in" && (
+              {actionState?.canCheckOut && (
                 <div className="space-y-3">
                   <div className="rounded-lg border border-border bg-muted/50 p-3">
                     <label className={labelClass}>{t.supplementaryPayment}</label>
@@ -307,6 +318,21 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                     )}
                   </div>
 
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAdvancedActions((value) => !value)}
+                    className="w-full justify-center"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                    {showAdvancedActions
+                      ? (locale === "zh" ? "收起更多操作" : "Masquer les actions")
+                      : (locale === "zh" ? "更多操作" : "Plus d'actions")}
+                  </Button>
+
+                  {showAdvancedActions && (
+                    <div className="space-y-3">
                   <div className="rounded-lg border border-dashed border-muted-foreground/30 p-3">
                     <label className={labelClass}>{t.discount}</label>
                     <div className="grid grid-cols-2 gap-2">
@@ -342,7 +368,13 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                     </div>
                   )}
 
-                  <div>
+                    </div>
+                  )}
+
+                  <div className="rounded-lg border border-border bg-card p-3">
+                    <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-muted-foreground/70">
+                      {locale === "zh" ? "主操作" : "Action principale"}
+                    </p>
                     {booking.checkout_mode === "open" && (
                       <div className="mb-2">
                         <label className={labelClass}>{t.actualCheckOutDate}</label>
@@ -387,4 +419,85 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
       />
     </>
   );
+}
+
+function formatDailyRentalError(message: string | null | undefined, locale: Locale): string {
+  const fallback = locale === "zh" ? "操作失败，请稍后重试。" : "Operation impossible. Veuillez reessayer.";
+  if (!message) return fallback;
+
+  if (message.startsWith("doubleBooked:")) {
+    const detail = message.replace("doubleBooked:", "").trim();
+    return locale === "zh"
+      ? `该房间所选日期已被占用：${detail}`
+      : `Cette chambre est deja occupee sur cette periode : ${detail}`;
+  }
+
+  const errors: Record<string, Record<Locale, string>> = {
+    checkInRequired: {
+      zh: "请选择入住日期。",
+      fr: "Veuillez choisir une date d'arrivee.",
+    },
+    checkOutRequired: {
+      zh: "请选择离店日期。",
+      fr: "Veuillez choisir une date de depart.",
+    },
+    invalidDateRange: {
+      zh: "离店日期必须晚于入住日期。",
+      fr: "La date de depart doit etre apres la date d'arrivee.",
+    },
+    pastDateNotAllowed: {
+      zh: "不能创建过去日期的普通预订。如需补录历史订单，请使用历史补录流程。",
+      fr: "Impossible de creer une reservation normale dans le passe. Utilisez le mode de rattrapage historique.",
+    },
+    cleaningPending: {
+      zh: "该房间仍待保洁，完成保洁后才能安排入住。",
+      fr: "Cette chambre est encore en menage. Terminez le menage avant une nouvelle arrivee.",
+    },
+    unitMaintenance: {
+      zh: "该房间处于维修状态，暂不能预订。",
+      fr: "Cette chambre est en maintenance et ne peut pas etre reservee.",
+    },
+    unitLocked: {
+      zh: "该房间已锁定，暂不能预订。",
+      fr: "Cette chambre est verrouillee et ne peut pas etre reservee.",
+    },
+    longLeaseConflict: {
+      zh: "该房间已有生效长租合同，不能创建日租预订。",
+      fr: "Cette chambre a deja un bail long actif.",
+    },
+    prepaymentRequired: {
+      zh: "固定离店订单办理入住前必须至少收取一笔预付款。",
+      fr: "Une avance est requise avant l'arrivee pour un depart fixe.",
+    },
+    bookingNotPendingReview: {
+      zh: "只有待确认预订可以执行确认操作。",
+      fr: "Seules les reservations a valider peuvent etre confirmees.",
+    },
+    bookingNotConfirmed: {
+      zh: "只有已确认预订可以办理入住。",
+      fr: "Seules les reservations confirmees peuvent etre enregistrees en arrivee.",
+    },
+    bookingNotCheckedIn: {
+      zh: "只有入住中的订单可以办理退房。",
+      fr: "Seuls les sejours en cours peuvent etre clotures.",
+    },
+    bookingCannotBeCancelled: {
+      zh: "该订单当前状态不能取消。",
+      fr: "Cette reservation ne peut pas etre annulee dans son etat actuel.",
+    },
+    cleaningTaskNotFound: {
+      zh: "未找到待保洁任务。",
+      fr: "Tache de menage introuvable.",
+    },
+    cleaningTaskAlreadyCompleted: {
+      zh: "该保洁任务已完成。",
+      fr: "Cette tache de menage est deja terminee.",
+    },
+    actualCheckOutBeforeCheckIn: {
+      zh: "实际退房日期不能早于入住日期。",
+      fr: "La date de depart reelle ne peut pas etre avant l'arrivee.",
+    },
+  };
+
+  return errors[message]?.[locale] ?? message;
 }

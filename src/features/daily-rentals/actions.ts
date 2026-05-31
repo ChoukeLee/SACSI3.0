@@ -12,6 +12,7 @@ import {
   allowConfirmBooking,
   allowCreateBooking,
   resolveUnitStatusAfterDailyChange,
+  todayIso,
 } from "./daily-rental-policy";
 import {
   createReceivable, syncReceivablesForSource,
@@ -30,6 +31,27 @@ async function syncBookingPrepaid(supabase: SupabaseClient, bookingId: string) {
     .neq("status", "cancelled");
   const canonicalPaid = (recs ?? []).reduce((s, r) => s + Number(r.paid_amount_xof), 0);
   await supabase.from("daily_bookings").update({ prepaid_amount_xof: canonicalPaid }).eq("id", bookingId);
+}
+
+async function sumBookingPayments(supabase: SupabaseClient, bookingId: string) {
+  const { data: payments } = await supabase
+    .from("payments")
+    .select("amount")
+    .eq("source_type", "daily_booking")
+    .eq("source_id", bookingId);
+
+  return (payments ?? []).reduce((sum, payment) => sum + Number(payment.amount), 0);
+}
+
+function resolveBillingStatus(
+  paidAmount: number,
+  finalAmount: number,
+  bookingStatus?: string,
+): "prepaid" | "partially_paid" | "need_top_up" | "settled" {
+  if (paidAmount >= finalAmount) {
+    return bookingStatus === "checked_out" ? "settled" : "prepaid";
+  }
+  return paidAmount > 0 ? "partially_paid" : "need_top_up";
 }
 
 // ── Permission guards ──
@@ -53,6 +75,19 @@ export async function checkConflicts(
   if (!unit) return { hasConflict: true, reason: "Unit not found." };
   if (unit.status === "maintenance") return { hasConflict: true, reason: "unitMaintenance" };
   if (unit.status === "locked") return { hasConflict: true, reason: "unitLocked" };
+
+  if (checkIn <= todayIso()) {
+    const { data: pendingCleaning } = await supabase
+      .from("cleaning_tasks")
+      .select("id")
+      .eq("unit_id", unitId)
+      .eq("is_completed", false)
+      .limit(1);
+
+    if ((pendingCleaning?.length ?? 0) > 0 || unit.status === "cleaning_pending") {
+      return { hasConflict: true, reason: "cleaningPending" };
+    }
+  }
 
   // For open-ended bookings, effective checkOut is far future
   const effectiveCheckOut = checkOut ?? "9999-12-31";
@@ -208,7 +243,7 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
   const policy = allowCheckIn(booking, prepaidAmount);
   if (!policy.allowed) return { success: false, error: policy.reason };
 
-  const billingStatus = prepaidAmount >= Number(booking.total_amount_xof) ? "prepaid" : "partially_paid";
+  const billingStatus = resolveBillingStatus(prepaidAmount, Number(booking.total_amount_xof), "checked_in");
 
   await supabase.from("daily_bookings").update({
     status: "checked_in", prepaid_amount_xof: prepaidAmount, billing_status: billingStatus,
@@ -261,7 +296,7 @@ export async function recordSupplementaryPayment(input: {
   if (!booking) return { success: false, error: "Booking not found or not checked in." };
 
   const newPrepaid = Number(booking.prepaid_amount_xof) + input.amount;
-  const billingStatus = newPrepaid >= Number(booking.final_amount_xof ?? booking.total_amount_xof) ? "prepaid" : "partially_paid";
+  const billingStatus = resolveBillingStatus(newPrepaid, Number(booking.final_amount_xof ?? booking.total_amount_xof), booking.status);
 
   await supabase.from("daily_bookings").update({
     prepaid_amount_xof: newPrepaid, billing_status: billingStatus,
@@ -354,7 +389,7 @@ export async function deletePayment(paymentId: string): Promise<{ success: boole
   if (bookingAfter) {
     const final = Number(bookingAfter.final_amount_xof ?? bookingAfter.total_amount_xof);
     const prepaid = Number(bookingAfter.prepaid_amount_xof);
-    const billingStatus = bookingAfter.status === "checked_out" || prepaid >= final ? bookingAfter.status === "checked_out" ? "settled" : "prepaid" : "partially_paid";
+    const billingStatus = resolveBillingStatus(prepaid, final, bookingAfter.status);
     await supabase.from("daily_bookings").update({ billing_status: billingStatus }).eq("id", payment.source_id);
   }
 
@@ -380,6 +415,9 @@ export async function checkOut(bookingId: string, input: {
   if (!policy.allowed) return { success: false, error: policy.reason };
 
   const actualCheckOut = input.actualCheckOut ?? new Date().toISOString().slice(0, 10);
+  if (actualCheckOut < booking.check_in) {
+    return { success: false, error: "actualCheckOutBeforeCheckIn" };
+  }
 
   // Calculate final amount if not provided
   let finalAmount = input.finalAmount;
@@ -391,9 +429,13 @@ export async function checkOut(bookingId: string, input: {
     finalAmount = gross - (input.discountAmount ?? 0);
   }
 
+  const currentPaid = await sumBookingPayments(supabase, bookingId);
   const update: Record<string, unknown> = {
-    status: "checked_out", total_amount_xof: finalAmount,
-    final_amount_xof: finalAmount, billing_status: "settled",
+    status: "checked_out",
+    total_amount_xof: finalAmount,
+    final_amount_xof: finalAmount,
+    prepaid_amount_xof: currentPaid,
+    billing_status: resolveBillingStatus(currentPaid, finalAmount, "checked_out"),
   };
   if (booking.checkout_mode === "open") {
     update.actual_check_out = actualCheckOut;
@@ -407,22 +449,8 @@ export async function checkOut(bookingId: string, input: {
 
   await supabase.from("units").update({ status: "cleaning_pending" }).eq("id", booking.unit_id);
 
-  // Remaining payment if needed
-  const currentPaid = Number(booking.prepaid_amount_xof);
-  const remaining = finalAmount - currentPaid;
-  if (remaining > 0) {
-    const { data: unit } = await supabase.from("units").select("building_id").eq("id", booking.unit_id).single();
-    const { data: payment } = await supabase.from("payments").insert({
-      customer_id: booking.customer_id, unit_id: booking.unit_id,
-      source_type: "daily_booking", source_id: bookingId,
-      payment_date: actualCheckOut, amount: remaining, currency: "XOF", exchange_rate_to_xof: 1,
-    }).select("id").single();
-    await supabase.from("ledger_entries").insert({
-      building_id: unit?.building_id ?? null, unit_id: booking.unit_id, payment_id: payment?.id,
-      entry_date: actualCheckOut, direction: "income", category: "daily_rental",
-      amount_xof: remaining, description: `日租结算 booking=${bookingId}`,
-    });
-  }
+  // Any unpaid balance remains as a receivable. Do not create a payment or
+  // ledger income here unless money was actually collected.
 
   await supabase.from("cleaning_tasks").insert({
     unit_id: booking.unit_id, daily_booking_id: bookingId, is_completed: false,
@@ -466,7 +494,7 @@ export async function applyDiscount(input: {
     manual_discount_amount_xof: gross,
     manual_discount_reason: input.reason,
     final_amount_xof: newFinal,
-    billing_status: Number(booking.prepaid_amount_xof) >= newFinal ? "prepaid" : "need_top_up",
+    billing_status: resolveBillingStatus(Number(booking.prepaid_amount_xof), newFinal, "checked_in"),
   }).eq("id", input.bookingId);
 
   await supabase.from("audit_logs").insert({
@@ -506,7 +534,7 @@ export async function setFixedCheckout(bookingId: string, newCheckOut: string): 
     (new Date(newCheckOut).getTime() - new Date(booking.check_in).getTime()) / (1000 * 60 * 60 * 24)
   ));
   const newTotal = Math.round(nights * Number(booking.nightly_price_xof));
-  const newBillingStatus = Number(booking.prepaid_amount_xof) >= newTotal ? "prepaid" : "need_top_up";
+  const newBillingStatus = resolveBillingStatus(Number(booking.prepaid_amount_xof), newTotal, booking.status);
 
   await supabase.from("daily_bookings").update({
     checkout_mode: "fixed",
