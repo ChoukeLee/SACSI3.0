@@ -2,38 +2,46 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Building2, ChevronDown, ChevronUp, Home, Key, AlertTriangle } from "lucide-react";
+import { AlertTriangle, ArrowRight, Building2, ChevronDown, ChevronUp, Home, Key } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
 import { cn, sortUnits } from "@/lib/utils";
-import { UnitFilters } from "./unit-filters";
-import { UnitDetailPanel } from "./unit-detail-panel";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import { UnitDetailPanel } from "./unit-detail-panel";
+import { UnitFilters } from "./unit-filters";
 import type { UnitRow } from "@/types/database";
 import type { BusinessType, UnitStatus } from "@/types/domain";
-import type { RoomStatus } from "@/components/room-card";
 
-interface UnitBusinessFlag { business_type: BusinessType; is_enabled: boolean; default_price_xof: number | null }
-interface AuditLogEntry { id: string; action: string; metadata: Record<string, unknown>; created_at: string }
-interface UnitListProps { units: UnitRow[]; businessFlagsMap: Record<string, UnitBusinessFlag[]>; auditLogsMap: Record<string, AuditLogEntry[]>; locale: Locale }
+interface UnitBusinessFlag {
+  business_type: BusinessType;
+  is_enabled: boolean;
+  default_price_xof: number | null;
+}
 
-const unitToRoomStatus = (s: UnitStatus): RoomStatus => {
-  const m: Record<string, RoomStatus> = { sold: "sold", leased: "leased", daily_occupied: "daily_occupied", reserved: "reserved", cleaning_pending: "cleaning_pending", maintenance: "maintenance", available: "available", locked: "maintenance" };
-  return m[s] ?? "available";
-};
+interface AuditLogEntry {
+  id: string;
+  action: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
 
-const statusCustomerName = (status: UnitStatus, locale: Locale): string => {
-  if (status === "available") return locale === "zh" ? "空闲" : "Libre";
-  if (status === "cleaning_pending") return locale === "zh" ? "待洁" : "Ménage";
-  if (status === "maintenance" || status === "locked") return locale === "zh" ? "维修" : "Bloqué";
-  return "";
-};
+interface UnitListProps {
+  units: UnitRow[];
+  businessFlagsMap: Record<string, UnitBusinessFlag[]>;
+  auditLogsMap: Record<string, AuditLogEntry[]>;
+  locale: Locale;
+}
 
 const STATUS_DOT: Record<string, string> = {
-  sold: "bg-[#075A9A]", leased: "bg-[#A898E8]", daily_occupied: "bg-[#62B6F5]",
-  reserved: "bg-[#E8C840]", cleaning_pending: "bg-[#5CC4B8]",
-  maintenance: "bg-[#F08090]", locked: "bg-gray-400", available: "bg-[#A0D0E8]",
+  sold: "bg-[#075A9A]",
+  leased: "bg-[#A898E8]",
+  daily_occupied: "bg-[#62B6F5]",
+  reserved: "bg-[#E8C840]",
+  cleaning_pending: "bg-[#5CC4B8]",
+  maintenance: "bg-[#F08090]",
+  locked: "bg-gray-400",
+  available: "bg-[#A0D0E8]",
 };
 
 export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: UnitListProps) {
@@ -45,47 +53,47 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
   const [selectedBusiness, setSelectedBusiness] = useState("all");
   const [detailUnitId, setDetailUnitId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [showTable, setShowTable] = useState(false);
+  const [showTable, setShowTable] = useState(true);
 
   const floors = useMemo(() => {
     const set = new Set(units.map((u) => u.floor_label));
-    return Array.from(set).sort((a, b) => { const an = parseInt(a,10), bn = parseInt(b,10); if (!isNaN(an)&&!isNaN(bn)) return an-bn; return a.localeCompare(b); });
+    return Array.from(set).sort((a, b) => {
+      const an = parseInt(a, 10);
+      const bn = parseInt(b, 10);
+      if (!Number.isNaN(an) && !Number.isNaN(bn)) return an - bn;
+      return a.localeCompare(b);
+    });
   }, [units]);
 
   const filtered = useMemo(() => {
-    return units.filter((u) => {
-      if (selectedFloor !== "all" && u.floor_label !== selectedFloor) return false;
-      if (selectedStatus !== "all" && u.status !== selectedStatus) return false;
-      if (selectedKind !== "all" && u.kind !== selectedKind) return false;
-      if (selectedBusiness !== "all") { const flags = businessFlagsMap[u.id] ?? []; return flags.some((f) => f.business_type === selectedBusiness && f.is_enabled); }
+    return units.filter((unit) => {
+      if (selectedFloor !== "all" && unit.floor_label !== selectedFloor) return false;
+      if (selectedStatus !== "all" && unit.status !== selectedStatus) return false;
+      if (selectedKind !== "all" && unit.kind !== selectedKind) return false;
+      if (selectedBusiness !== "all") {
+        const flags = businessFlagsMap[unit.id] ?? [];
+        return flags.some((flag) => flag.business_type === selectedBusiness && flag.is_enabled);
+      }
       return true;
     });
   }, [units, selectedFloor, selectedStatus, selectedKind, selectedBusiness, businessFlagsMap]);
 
-  const apartments = useMemo(() => units.filter(u => u.kind === "apartment"), [units]);
-  const nonApartments = useMemo(() => units.filter(u => u.kind !== "apartment"), [units]);
-  const filteredApartments = useMemo(() => filtered.filter(u => u.kind === "apartment"), [filtered]);
-  const filteredNonApartments = useMemo(() => filtered.filter(u => u.kind !== "apartment"), [filtered]);
-
-  const floorGroups = useMemo(() => {
-    const g = new Map<string, UnitRow[]>();
-    for (const u of filteredApartments) { const f = u.floor_label ?? "?"; if (!g.has(f)) g.set(f, []); g.get(f)!.push(u); }
-    return Array.from(g.entries()).sort((a,b) => { const an=parseInt(a[0],10),bn=parseInt(b[0],10); if(!isNaN(an)&&!isNaN(bn)) return an-bn; return a[0].localeCompare(b[0]); });
-  }, [filteredApartments]);
+  const apartments = useMemo(() => units.filter((unit) => unit.kind === "apartment"), [units]);
+  const nonApartments = useMemo(() => units.filter((unit) => unit.kind !== "apartment"), [units]);
+  const filteredNonApartments = useMemo(() => filtered.filter((unit) => unit.kind !== "apartment"), [filtered]);
 
   const summary = useMemo(() => ({
     apartments: apartments.length,
-    sold: apartments.filter(u => u.status === "sold").length,
-    leased: apartments.filter(u => u.status === "leased").length,
-    daily: apartments.filter(u => u.status === "daily_occupied" || u.status === "reserved").length,
-    available: apartments.filter(u => u.status === "available").length,
-    maintenance: apartments.filter(u => u.status === "maintenance" || u.status === "locked" || u.status === "cleaning_pending").length,
+    sold: apartments.filter((unit) => unit.status === "sold").length,
+    leased: apartments.filter((unit) => unit.status === "leased").length,
+    daily: apartments.filter((unit) => unit.status === "daily_occupied" || unit.status === "reserved").length,
+    available: apartments.filter((unit) => unit.status === "available").length,
+    maintenance: apartments.filter((unit) => unit.status === "maintenance" || unit.status === "locked" || unit.status === "cleaning_pending").length,
     nonApartment: nonApartments.length,
   }), [apartments, nonApartments]);
 
-  const detailUnit = detailUnitId ? units.find((u) => u.id === detailUnitId) : null;
+  const detailUnit = detailUnitId ? units.find((unit) => unit.id === detailUnitId) : null;
 
-  // Asset summary blocks
   const assetBlocks = [
     { key: "apartments", label: locale === "zh" ? "住宿房源" : "Appartements", value: summary.apartments, dot: "bg-foreground", icon: Home },
     { key: "daily", label: locale === "zh" ? "日租/预订" : "Jour", value: summary.daily, dot: "bg-[#5090C0]", icon: undefined },
@@ -98,7 +106,6 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
 
   return (
     <div className="flex flex-col gap-6">
-      {/* ── Page chrome ── */}
       <div className="flex flex-col gap-1">
         <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
           {locale === "zh" ? "房源总览" : "Vue d'ensemble"}
@@ -113,9 +120,8 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
         </div>
       </div>
 
-      {/* ── Asset summary strip ── */}
       <div className="grid gap-2 sm:grid-cols-4 lg:grid-cols-7">
-        {assetBlocks.map(block => {
+        {assetBlocks.map((block) => {
           const Icon = block.icon;
           return (
             <div
@@ -123,80 +129,61 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
               className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm"
             >
               {Icon ? (
-                <Icon className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
+                <Icon className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
               ) : (
-                <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", block.dot)} />
+                <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", block.dot)} />
               )}
               <div className="min-w-0">
-                <p className="text-xl font-bold tracking-tight tabular-nums leading-none">{block.value}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{block.label}</p>
+                <p className="text-xl font-bold leading-none tracking-tight tabular-nums">{block.value}</p>
+                <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">{block.label}</p>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* ── Filter toolbar ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-card px-4 py-3 shadow-sm">
+      <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <UnitFilters
           locale={locale}
-          selectedFloor={selectedFloor} selectedStatus={selectedStatus}
-          selectedKind={selectedKind} selectedBusiness={selectedBusiness}
+          selectedFloor={selectedFloor}
+          selectedStatus={selectedStatus}
+          selectedKind={selectedKind}
+          selectedBusiness={selectedBusiness}
           floors={floors}
-          onFloorChange={setSelectedFloor} onStatusChange={setSelectedStatus}
-          onKindChange={setSelectedKind} onBusinessChange={setSelectedBusiness}
+          onFloorChange={setSelectedFloor}
+          onStatusChange={setSelectedStatus}
+          onKindChange={setSelectedKind}
+          onBusinessChange={setSelectedBusiness}
         />
-        <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
           {filtered.length} / {units.length} {locale === "fr" ? "lots" : "套房源"}
         </span>
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState icon={<Building2 className="h-10 w-10" />} title={t.empty} description={locale === "zh" ? "请先在设置中导入楼栋和房间" : "Importez d'abord l'immeuble dans Parametres"} />
+        <EmptyState
+          icon={<Building2 className="h-10 w-10" />}
+          title={t.empty}
+          description={locale === "zh" ? "请先在设置中导入楼栋和房间" : "Importez d'abord l'immeuble dans Paramètres"}
+        />
       ) : (
         <>
-          {/* ── Status legend (compact inline) ── */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            {(["sold","leased","daily_occupied","reserved","cleaning_pending","maintenance","available"] as UnitStatus[]).map(s => (
-              <span key={s} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className={cn("h-2 w-2 rounded-full shrink-0", STATUS_DOT[s] ?? "bg-gray-300")} />
-                {statusLabels[s]}
-              </span>
-            ))}
-          </div>
-
-          {/* ── Apartment matrix ── */}
-          {floorGroups.length > 0 && (
-            <div className="space-y-5">
-              {floorGroups.map(([floor, floorUnits]) => (
-                <section key={floor}>
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="text-xs font-semibold text-muted-foreground">{locale === "zh" ? `${floor}层` : floor}</span>
-                    <span className="text-[10px] text-muted-foreground/50">{floorUnits.length}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2.5">
-                    {sortUnits(floorUnits).map(u => (
-                      <Link key={u.id} href={routeFor(locale, `/units/${u.id}`)} className="block">
-                        <RoomTile unit={u} locale={locale} />
-                      </Link>
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          )}
-
-          {/* ── Non-apartment assets ── */}
           {filteredNonApartments.length > 0 && (
             <div className="rounded-xl border border-border/60 bg-card px-4 py-3">
-              <p className="mb-2 text-xs font-semibold text-muted-foreground">{locale === "zh" ? "非住宿资产" : "Autres actifs"}</p>
+              <p className="mb-2 text-xs font-semibold text-muted-foreground">
+                {locale === "zh" ? "非住宿资产" : "Autres actifs"}
+              </p>
               <div className="flex flex-wrap gap-2">
-                {sortUnits(filteredNonApartments).map(u => (
-                  <Link key={u.id} href={routeFor(locale, `/units/${u.id}`)} className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors">
-                    <span className="font-mono font-bold">{u.unit_no}</span>
-                    <span className="text-muted-foreground">{t.kinds[u.kind]}</span>
-                    <span className={cn("h-2 w-2 rounded-full shrink-0", STATUS_DOT[u.status] ?? "bg-gray-300")} />
-                    <span className="text-muted-foreground">{statusLabels[u.status]}</span>
+                {sortUnits(filteredNonApartments).map((unit) => (
+                  <Link
+                    key={unit.id}
+                    href={routeFor(locale, `/units/${unit.id}`)}
+                    className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
+                  >
+                    <span className="font-mono font-bold">{unit.unit_no}</span>
+                    <span className="text-muted-foreground">{t.kinds[unit.kind]}</span>
+                    <span className={cn("h-2 w-2 shrink-0 rounded-full", STATUS_DOT[unit.status] ?? "bg-gray-300")} />
+                    <span className="text-muted-foreground">{statusLabels[unit.status]}</span>
                     <ArrowRight className="h-3 w-3 text-muted-foreground" />
                   </Link>
                 ))}
@@ -204,11 +191,10 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
             </div>
           )}
 
-          {/* ── Detail table (collapsible) ── */}
-          <div className="border-t border-border/40 pt-5">
+          <div>
             <button
               onClick={() => setShowTable(!showTable)}
-              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/50 transition-colors"
+              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50"
             >
               <span>{locale === "zh" ? "详细清单" : "Liste détaillée"} · {filtered.length} {locale === "zh" ? "条" : "lignes"}</span>
               {showTable ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -218,23 +204,30 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
                 <div className="overflow-x-auto">
                   <table>
                     <thead>
-                      <tr>{t.headers.map((h) => (<th key={h}>{h}</th>))}<th className="w-10" /></tr>
+                      <tr>
+                        {t.headers.map((header) => (
+                          <th key={header}>{header}</th>
+                        ))}
+                        <th className="w-10" />
+                      </tr>
                     </thead>
                     <tbody>
-                      {filtered.map((unit) => {
+                      {sortUnits(filtered).map((unit) => {
                         const flags = businessFlagsMap[unit.id] ?? [];
-                        const enabledFlags = flags.filter((f) => f.is_enabled);
-                        const dailyFlag = flags.find((f) => f.business_type === "daily_rental" && f.is_enabled);
+                        const enabledFlags = flags.filter((flag) => flag.is_enabled);
+                        const dailyFlag = flags.find((flag) => flag.business_type === "daily_rental" && flag.is_enabled);
                         return (
                           <tr key={unit.id} className="cursor-pointer" onClick={() => setDetailUnitId(unit.id)}>
                             <td><span className="font-mono text-xs font-bold">{unit.unit_no}</span></td>
                             <td className="text-sm">{unit.floor_label}</td>
                             <td className="text-sm text-muted-foreground">{t.kinds[unit.kind]}</td>
                             <td><StatusPill status={unit.status} locale={locale} /></td>
-                            <td className="text-sm text-muted-foreground">{enabledFlags.map((f) => t.businessTypes[f.business_type]).join(" / ") || "-"}</td>
+                            <td className="text-sm text-muted-foreground">{enabledFlags.map((flag) => t.businessTypes[flag.business_type]).join(" / ") || "-"}</td>
                             <td className="table-cell-amount">{dailyFlag?.default_price_xof != null ? Number(dailyFlag.default_price_xof).toLocaleString() : "-"}</td>
                             <td className="table-cell-action">
-                              <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setDetailUnitId(unit.id); }}><ArrowRight className="h-3.5 w-3.5" /></Button>
+                              <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); setDetailUnitId(unit.id); }}>
+                                <ArrowRight className="h-3.5 w-3.5" />
+                              </Button>
                             </td>
                           </tr>
                         );
@@ -256,35 +249,13 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
           auditLogs={auditLogsMap[detailUnit.id] ?? []}
           locale={locale}
           onClose={() => setDetailUnitId(null)}
-          onStatusChanged={() => setRefreshKey((k) => k + 1)}
+          onStatusChanged={() => setRefreshKey((key) => key + 1)}
         />
       )}
     </div>
   );
 }
 
-// ── RoomTile ──
-function RoomTile({ unit, locale }: { unit: UnitRow; locale: Locale }) {
-  const status = unitToRoomStatus(unit.status);
-  const bgMap: Record<string, string> = {
-    sold: "bg-[#075A9A]", leased: "bg-[#E8E2FF]", daily_occupied: "bg-[#62B6F5]", dailyOccupied: "bg-[#62B6F5]",
-    reserved: "bg-[#FFF6D8]", cleaning_pending: "bg-[#D9F7F0]", cleaningPending: "bg-[#D9F7F0]",
-    maintenance: "bg-[#FFE2EA]", available: "bg-[#EAF7FF]",
-  };
-  const textMap: Record<string, string> = {
-    sold: "text-white", leased: "text-[#17324D]", daily_occupied: "text-white", dailyOccupied: "text-white",
-    reserved: "text-[#17324D]", cleaning_pending: "text-[#17324D]", cleaningPending: "text-[#17324D]",
-    maintenance: "text-[#17324D]", available: "text-[#17324D]",
-  };
-  return (
-    <div className={cn("flex h-[72px] w-[120px] flex-col items-center justify-center gap-0.5 rounded-xl shadow-sm transition-shadow hover:shadow-md", bgMap[status], textMap[status])}>
-      <span className="font-mono text-xs font-bold">{unit.unit_no}</span>
-      <span className="text-[11px] font-medium">{statusCustomerName(unit.status, locale)}</span>
-    </div>
-  );
-}
-
-// ── StatusPill ──
 function StatusPill({ status, locale }: { status: UnitStatus; locale: Locale }) {
   const label = dictionaries[locale].statuses[status];
   const styles: Record<string, string> = {
@@ -297,7 +268,10 @@ function StatusPill({ status, locale }: { status: UnitStatus; locale: Locale }) 
     maintenance: "bg-[#FFE2EA] text-[#17324D] ring-[#F5C0CC]/60",
     locked: "bg-muted text-muted-foreground ring-border",
   };
+
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset", styles[status] ?? "")}>{label}</span>
+    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset", styles[status] ?? "")}>
+      {label}
+    </span>
   );
 }
