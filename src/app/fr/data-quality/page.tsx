@@ -10,7 +10,7 @@ import type {
   SaleContractRow, SalePaymentScheduleRow, ReceivableRow, PaymentRow,
 } from "@/types/database";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function FrenchDataQualityPage() {
   const user = await getCurrentUser();

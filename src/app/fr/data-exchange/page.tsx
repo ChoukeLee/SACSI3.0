@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { DataExchangeCenter } from "@/features/data-exchange";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function FrenchDataExchangePage() {
   const user = await getCurrentUser();

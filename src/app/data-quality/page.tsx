@@ -10,7 +10,7 @@ import type {
   SaleContractRow, SalePaymentScheduleRow, ReceivableRow, PaymentRow,
 } from "@/types/database";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function DataQualityPage() {
   const user = await getCurrentUser();

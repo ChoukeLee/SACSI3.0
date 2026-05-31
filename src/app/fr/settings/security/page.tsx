@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { SecurityCenter } from "@/features/security";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function FrenchSecurityPage() {
   const user = await getCurrentUser();

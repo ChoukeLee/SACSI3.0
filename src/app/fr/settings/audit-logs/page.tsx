@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { DesktopOnly } from "@/features/mobile";
 import { AuditLogViewer } from "@/features/settings";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 interface AuditLogRow {
   id: string;

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { BulkActionCenter } from "@/features/bulk-actions";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function BulkActionsPage() {
   const user = await getCurrentUser();

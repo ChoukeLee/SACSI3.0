@@ -7,7 +7,7 @@ import { SystemSettingsPanel } from "@/features/settings/system-settings-panel";
 import { DesktopOnly } from "@/features/mobile";
 import type { BuildingRow } from "@/types/database";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function SettingsPage() {
   const user = await getCurrentUser();
