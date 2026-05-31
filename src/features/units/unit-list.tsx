@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowRight, Building2 } from "lucide-react";
+import { ArrowRight, Building2, ChevronDown, ChevronUp, Home, Key } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
 import { cn, sortUnits } from "@/lib/utils";
@@ -52,6 +52,8 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
   const [selectedBusiness, setSelectedBusiness] = useState("all");
   const [detailUnitId, setDetailUnitId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showNonApartments, setShowNonApartments] = useState(false);
+
   const floors = useMemo(() => {
     const set = new Set(units.map((u) => u.floor_label));
     return Array.from(set).sort((a, b) => {
@@ -75,23 +77,52 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
     });
   }, [units, selectedFloor, selectedStatus, selectedKind, selectedBusiness, businessFlagsMap]);
 
-  const apartmentCount = useMemo(() => units.filter((unit) => unit.kind === "apartment").length, [units]);
+  const apartments = useMemo(() => units.filter((unit) => unit.kind === "apartment"), [units]);
+  const nonApartments = useMemo(() => units.filter((unit) => unit.kind !== "apartment"), [units]);
+  const apartmentCount = apartments.length;
+  const nonApartmentCount = nonApartments.length;
 
   const detailUnit = detailUnitId ? units.find((unit) => unit.id === detailUnitId) : null;
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
-          {locale === "zh" ? "房源总览" : "Vue d'ensemble"}
-        </p>
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-xl font-semibold tracking-tight">
-            {locale === "zh" ? "住宿资产" : "Actifs résidentiels"}
-          </h1>
-          <span className="text-sm text-muted-foreground tabular-nums">
-            {apartmentCount} {locale === "zh" ? "套公寓" : "appartements"}
-          </span>
+      {/* Page chrome + compact stat blocks */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+            {locale === "zh" ? "房源总览" : "Vue d'ensemble"}
+          </p>
+          <div className="flex items-baseline gap-3">
+            <h1 className="text-xl font-semibold tracking-tight">
+              {locale === "zh" ? "住宿资产" : "Actifs résidentiels"}
+            </h1>
+            <span className="text-sm text-muted-foreground tabular-nums">
+              {apartmentCount} {locale === "zh" ? "套公寓" : "appartements"}
+            </span>
+          </div>
+        </div>
+        {/* Compact stat blocks — apartments + non-apartment */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-2.5 shadow-sm">
+            <Home className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
+            <div className="min-w-0">
+              <p className="text-lg font-bold tracking-tight tabular-nums leading-none">{apartmentCount}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{locale === "zh" ? "住宿房源" : "Appartements"}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowNonApartments(!showNonApartments)}
+            className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-2.5 shadow-sm hover:bg-accent/50 transition-colors text-left"
+          >
+            <Key className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
+            <div className="min-w-0">
+              <p className="text-lg font-bold tracking-tight tabular-nums leading-none">{nonApartmentCount}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight flex items-center gap-1">
+                {locale === "zh" ? "非住宿资产" : "Autres actifs"}
+                {showNonApartments ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </p>
+            </div>
+          </button>
         </div>
       </div>
 
@@ -154,6 +185,49 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Non-apartment assets — collapsible */}
+      {nonApartments.length > 0 && showNonApartments && (
+        <div className="border-t border-border/40 pt-4">
+          <p className="mb-3 text-xs font-semibold text-muted-foreground">
+            {locale === "zh" ? "非住宿资产" : "Actifs non résidentiels"} · {nonApartmentCount}
+          </p>
+          <div className="table-shell">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th>{locale === "zh" ? "编号" : "N°"}</th>
+                    <th>{locale === "zh" ? "类型" : "Type"}</th>
+                    <th>{locale === "zh" ? "房态" : "Statut"}</th>
+                    <th>{locale === "zh" ? "支持业务" : "Activité"}</th>
+                    <th className="w-10" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortUnits(nonApartments).map((unit) => {
+                    const flags = businessFlagsMap[unit.id] ?? [];
+                    const enabledFlags = flags.filter((flag) => flag.is_enabled);
+                    return (
+                      <tr key={unit.id} className="cursor-pointer" onClick={() => setDetailUnitId(unit.id)}>
+                        <td><span className="font-mono text-xs font-bold">{unit.unit_no}</span></td>
+                        <td className="text-sm text-muted-foreground">{t.kinds[unit.kind]}</td>
+                        <td><StatusPill status={unit.status} locale={locale} /></td>
+                        <td className="text-sm text-muted-foreground">{enabledFlags.map((flag) => t.businessTypes[flag.business_type]).join(" / ") || "-"}</td>
+                        <td className="table-cell-action">
+                          <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); setDetailUnitId(unit.id); }}>
+                            <ArrowRight className="h-3.5 w-3.5" />
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
