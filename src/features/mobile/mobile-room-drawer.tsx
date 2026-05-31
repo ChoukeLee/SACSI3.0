@@ -11,6 +11,7 @@ import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { ConfirmDialog } from "./confirm-dialog";
 import type { RoomState } from "./room-state";
 import type { UnitStatus } from "@/types/domain";
@@ -292,10 +293,9 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
                     <label className="text-xs text-muted-foreground block mb-1">
                       {locale === "zh" ? "新离店日期" : "Nouvelle date départ"}
                     </label>
-                    <input
-                      type="date"
+                    <DateInput
                       value={extendDate}
-                      onChange={(e) => setExtendDate(e.target.value)}
+                      onChangeValue={setExtendDate}
                       min={room.booking.check_out ?? new Date().toISOString().slice(0, 10)}
                       className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
                       autoFocus

@@ -8,6 +8,7 @@ import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { CustomerSummary } from "./calendar";
 import { printDailyReceipt } from "@/features/print";
@@ -202,8 +203,8 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelClass}>{t.booking.checkInDate}</label><input type="date" value={newCheckIn} onChange={e => setNewCheckIn(e.target.value)} className={inputClass} min={new Date().toISOString().slice(0, 10)} /></div>
-              {newCheckoutMode === "fixed" && <div><label className={labelClass}>{t.booking.checkOutDate}</label><input type="date" value={newCheckOut} onChange={e => setNewCheckOut(e.target.value)} className={inputClass} /></div>}
+              <div><label className={labelClass}>{t.booking.checkInDate}</label><DateInput value={newCheckIn} onChangeValue={setNewCheckIn} className={inputClass} min={new Date().toISOString().slice(0, 10)} /></div>
+              {newCheckoutMode === "fixed" && <div><label className={labelClass}>{t.booking.checkOutDate}</label><DateInput value={newCheckOut} onChangeValue={setNewCheckOut} className={inputClass} /></div>}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div><label className={labelClass}>{t.booking.nightlyPrice}</label><input type="number" value={newNightlyPrice} onChange={e => setNewNightlyPrice(e.target.value)} className={inputClass} /></div>
@@ -359,7 +360,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                       <p className="text-xs text-muted-foreground mb-2">{t.setFixedCheckoutDesc}</p>
                       <label className={labelClass}>{t.setFixedCheckoutLabel}</label>
                       <div className="flex items-center gap-2">
-                        <input type="date" value={fixedCheckOutDate} onChange={e => setFixedCheckOutDate(e.target.value)} className={inputClass} min={booking.check_in} />
+                        <DateInput value={fixedCheckOutDate} onChangeValue={setFixedCheckOutDate} className={inputClass} min={booking.check_in} />
                         <Button variant="default" size="sm" onClick={handleSetFixedCheckout} disabled={saving || !fixedCheckOutDate} className="shrink-0">{t.setFixedCheckoutButton}</Button>
                       </div>
                       {fixedCheckOutDate && fixedCheckOutNights > 0 && (
@@ -378,7 +379,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                     {booking.checkout_mode === "open" && (
                       <div className="mb-2">
                         <label className={labelClass}>{t.actualCheckOutDate}</label>
-                        <input type="date" value={actualCheckOut} onChange={e => setActualCheckOut(e.target.value)} className={inputClass} />
+                        <DateInput value={actualCheckOut} onChangeValue={setActualCheckOut} className={inputClass} />
                       </div>
                     )}
                     <label className={labelClass}>{t.booking.calculatedTotal}</label>

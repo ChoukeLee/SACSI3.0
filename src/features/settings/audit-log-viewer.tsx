@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Search, ChevronDown, ChevronUp, Clock, User, Tag, FileText, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { DateInput } from "@/components/ui/date-input";
 import type { Locale } from "@/lib/i18n";
 
 interface AuditLogRow {
@@ -144,9 +145,9 @@ export function AuditLogViewer({ logs, locale }: Props) {
     <div className="space-y-5">
       {/* Filters */}
       <div className="flex flex-wrap gap-2 items-center">
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={filterDate} />
+        <DateInput value={dateFrom} onChangeValue={setDateFrom} className={filterDate} />
         <span className="text-sm font-semibold text-muted-foreground">—</span>
-        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={filterDate} />
+        <DateInput value={dateTo} onChangeValue={setDateTo} className={filterDate} />
         <select value={actionFilter} onChange={e => setActionFilter(e.target.value)} className={filterSelect}>
           <option value="all">{zh ? "操作" : "Action"}: {zh ? "全部" : "Tous"}</option>
           {uniqueActions.map(a => <option key={a} value={a}>{actionLabels[a] ?? a}</option>)}

@@ -6,6 +6,7 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { DateInput } from "@/components/ui/date-input";
 import {
   calculateReceivableSummary,
   buildReceivableCsv,
@@ -183,16 +184,16 @@ export function ReceivableList({ receivables, units, customers, buildings, local
           {buildings.map(b => <option key={b.id} value={b.id}>{b.display_name || b.code}</option>)}
           <option value="__unassigned__">{locale === "zh" ? "未归属" : "Non attribué"}</option>
         </select>
-        <input
-          type="date" value={dateFrom}
-          onChange={e => setDateFrom(e.target.value)}
+        <DateInput
+          value={dateFrom}
+          onChangeValue={setDateFrom}
           className={filterDate}
           title={locale === "zh" ? "起始日期" : "Date début"}
         />
         <span className="text-xs font-semibold text-muted-foreground">-</span>
-        <input
-          type="date" value={dateTo}
-          onChange={e => setDateTo(e.target.value)}
+        <DateInput
+          value={dateTo}
+          onChangeValue={setDateTo}
           className={filterDate}
           title={locale === "zh" ? "结束日期" : "Date fin"}
         />

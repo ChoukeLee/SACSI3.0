@@ -5,6 +5,7 @@ import { Plus, X, Download } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
+import { DateInput } from "@/components/ui/date-input";
 import type { LedgerEntryRow } from "@/types/database";
 import type { CurrencyCode } from "@/types/domain";
 import { addLedgerEntry } from "./actions";
@@ -145,9 +146,9 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
       {/* Toolbar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={filterDate} />
+          <DateInput value={startDate} onChangeValue={setStartDate} className={filterDate} />
           <span className="text-xs font-semibold text-muted-foreground">-</span>
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={filterDate} />
+          <DateInput value={endDate} onChangeValue={setEndDate} className={filterDate} />
           <select value={dirFilter} onChange={(e) => setDirFilter(e.target.value)} className={filterSelect}>
             <option value="all">{t.filters.direction}: {t.filters.all}</option>
             <option value="income">{t.directions.income}</option>
@@ -235,7 +236,7 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
               <button onClick={() => setShowNewEntry(false)} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"><X className="h-4 w-4" /></button>
             </div>
             <div className="space-y-4 px-5 py-5">
-              <div><label className={labelClass}>{t.entry.date}</label><input type="date" value={eDate} onChange={(e) => setEDate(e.target.value)} className={inputClass} /></div>
+              <div><label className={labelClass}>{t.entry.date}</label><DateInput value={eDate} onChangeValue={setEDate} className={inputClass} /></div>
               <div>
                 <label className={labelClass}>{t.entry.direction}</label>
                 <select value={eDir} onChange={(e) => setEDir(e.target.value as typeof eDir)} className={inputClass}>

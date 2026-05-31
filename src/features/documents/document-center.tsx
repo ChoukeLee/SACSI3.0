@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Printer, X, FileText, Eye } from "lucide-react";
 import { cn, formatXof } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { DateInput } from "@/components/ui/date-input";
 import { EmptyState } from "@/components/empty-state";
 import { printDocumentRecord } from "./templates/all-templates";
 import type { DocumentRecord, DocumentType, DocumentSource, Locale } from "./types";
@@ -93,9 +94,9 @@ export function DocumentCenter({ documents, locale }: Props) {
             <option key={k} value={k}>{v}</option>
           ))}
         </select>
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={cn(filterBtn, "w-[140px]")} />
+        <DateInput value={dateFrom} onChangeValue={setDateFrom} className={cn(filterBtn, "w-[140px]")} />
         <span className="text-sm font-semibold text-muted-foreground">—</span>
-        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={cn(filterBtn, "w-[140px]")} />
+        <DateInput value={dateTo} onChangeValue={setDateTo} className={cn(filterBtn, "w-[140px]")} />
         <div className="relative flex-1 min-w-[180px] max-w-[320px]">
           <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
