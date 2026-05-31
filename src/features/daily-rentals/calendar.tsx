@@ -61,6 +61,7 @@ const COPY = {
     openEnded: "未定离店",
     room: "房间",
     floor: "楼",
+    unitCount: "间",
     apartment: "公寓",
     emptyFilter: "当前筛选下没有房间",
   },
@@ -82,6 +83,7 @@ const COPY = {
     openEnded: "Ouvert",
     room: "Chambre",
     floor: "Etage",
+    unitCount: "unités",
     apartment: "Appartement",
     emptyFilter: "Aucune chambre dans ce filtre",
   },
@@ -943,7 +945,7 @@ function FloorRow({
         className="flex items-center border-b bg-muted px-3 text-xs font-medium text-muted-foreground"
         style={{ gridColumn: `span ${daysCount}`, height: FLOOR_ROW_HEIGHT }}
       >
-        {copy.floor} · {count}
+        {count} {copy.unitCount}
       </div>
     </>
   );
