@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import { AppShellWrapper } from "@/components/app-shell-wrapper";
 import { getCurrentUser } from "@/lib/auth";
 import { dictionaries } from "@/lib/i18n";
+
+export const experimental = { staleTimes: { dynamic: 30, static: 180 } };
 import Loading from "./loading";
 import "./globals.css";
 
