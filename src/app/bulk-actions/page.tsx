@@ -7,7 +7,7 @@ export const revalidate = 60;
 export default async function BulkActionsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!["admin", "boss", "finance", "front_desk"].includes(user.role)) redirect("/");
+  if (user.role !== "admin") redirect("/");
 
   return <BulkActionCenter locale="zh" userRole={user.role} />;
 }

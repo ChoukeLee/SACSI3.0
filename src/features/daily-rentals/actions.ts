@@ -75,6 +75,8 @@ export async function checkConflicts(
   if (!unit) return { hasConflict: true, reason: "Unit not found." };
   if (unit.status === "maintenance") return { hasConflict: true, reason: "unitMaintenance" };
   if (unit.status === "locked") return { hasConflict: true, reason: "unitLocked" };
+  if (unit.status === "sold") return { hasConflict: true, reason: "saleConflict" };
+  if (unit.status === "leased") return { hasConflict: true, reason: "longLeaseConflict" };
 
   if (checkIn <= todayIso()) {
     const { data: pendingCleaning } = await supabase
@@ -119,6 +121,14 @@ export async function checkConflicts(
     .gt("expected_end_date", checkIn).limit(1);
   if (activeLease && activeLease.length > 0) {
     return { hasConflict: true, reason: "longLeaseConflict" };
+  }
+
+  const { data: activeSale } = await supabase
+    .from("sale_contracts")
+    .select("id").eq("unit_id", unitId).eq("status", "active")
+    .limit(1);
+  if (activeSale && activeSale.length > 0) {
+    return { hasConflict: true, reason: "saleConflict" };
   }
 
   return { hasConflict: false };
@@ -206,6 +216,8 @@ export async function createBooking(input: {
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
+  revalidatePath("/finance"); revalidatePath("/fr/finance");
+  revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
   return { success: true, data };
@@ -226,6 +238,8 @@ export async function confirmBooking(bookingId: string): Promise<{ success: bool
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
+  revalidatePath("/finance"); revalidatePath("/fr/finance");
+  revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
   return { success: true };
@@ -278,6 +292,8 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
+  revalidatePath("/finance"); revalidatePath("/fr/finance");
+  revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
   return { success: true };
@@ -329,6 +345,8 @@ export async function recordSupplementaryPayment(input: {
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
+  revalidatePath("/finance"); revalidatePath("/fr/finance");
+  revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
   return { success: true };
@@ -396,6 +414,8 @@ export async function deletePayment(paymentId: string): Promise<{ success: boole
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
+  revalidatePath("/finance"); revalidatePath("/fr/finance");
+  revalidatePath("/reports"); revalidatePath("/fr/reports");
 
   return { success: true };
 }
@@ -473,6 +493,8 @@ export async function checkOut(bookingId: string, input: {
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
+  revalidatePath("/finance"); revalidatePath("/fr/finance");
+  revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
   return { success: true };
@@ -497,6 +519,14 @@ export async function applyDiscount(input: {
     billing_status: resolveBillingStatus(Number(booking.prepaid_amount_xof), newFinal, "checked_in"),
   }).eq("id", input.bookingId);
 
+  const { data: receivables } = await supabase.from("receivables")
+    .select("id").eq("source_type", "daily_booking").eq("source_id", input.bookingId).limit(1);
+  if (receivables && receivables.length > 0) {
+    await updateReceivableAmount(receivables[0].id, newFinal);
+  }
+  await syncReceivablesForSource("daily_booking", input.bookingId);
+  await syncBookingPrepaid(supabase, input.bookingId);
+
   await supabase.from("audit_logs").insert({
     action: "apply_discount", entity_type: "daily_booking", entity_id: input.bookingId,
     metadata: { discount: gross, reason: input.reason },
@@ -505,6 +535,8 @@ export async function applyDiscount(input: {
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
+  revalidatePath("/finance"); revalidatePath("/fr/finance");
+  revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
   return { success: true };
@@ -534,12 +566,15 @@ export async function setFixedCheckout(bookingId: string, newCheckOut: string): 
     (new Date(newCheckOut).getTime() - new Date(booking.check_in).getTime()) / (1000 * 60 * 60 * 24)
   ));
   const newTotal = Math.round(nights * Number(booking.nightly_price_xof));
-  const newBillingStatus = resolveBillingStatus(Number(booking.prepaid_amount_xof), newTotal, booking.status);
+  const discount = Number(booking.manual_discount_amount_xof ?? 0);
+  const newFinal = Math.max(0, newTotal - discount);
+  const newBillingStatus = resolveBillingStatus(Number(booking.prepaid_amount_xof), newFinal, booking.status);
 
   await supabase.from("daily_bookings").update({
     checkout_mode: "fixed",
     check_out: newCheckOut,
     total_amount_xof: newTotal,
+    final_amount_xof: newFinal,
     billing_status: newBillingStatus,
   }).eq("id", bookingId);
 
@@ -551,12 +586,16 @@ export async function setFixedCheckout(bookingId: string, newCheckOut: string): 
   const { data: receivables } = await supabase.from("receivables")
     .select("id").eq("source_type", "daily_booking").eq("source_id", bookingId).limit(1);
   if (receivables && receivables.length > 0) {
-    await updateReceivableAmount(receivables[0].id, newTotal);
+    await updateReceivableAmount(receivables[0].id, newFinal);
   }
+  await syncReceivablesForSource("daily_booking", bookingId);
+  await syncBookingPrepaid(supabase, bookingId);
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
+  revalidatePath("/finance"); revalidatePath("/fr/finance");
+  revalidatePath("/reports"); revalidatePath("/fr/reports");
 
   return { success: true };
 }
@@ -575,6 +614,8 @@ export async function completeCleaning(taskId: string): Promise<{ success: boole
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
+  revalidatePath("/finance"); revalidatePath("/fr/finance");
+  revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
   return { success: true };
@@ -583,26 +624,49 @@ export async function completeCleaning(taskId: string): Promise<{ success: boole
 // ── Extend stay ──
 export async function extendStay(bookingId: string, newCheckOut: string, extraNights: number, extraAmount: number): Promise<{ success: boolean; error?: string }> {
   await guardWrite();
+  if (extraNights <= 0 || extraAmount < 0) {
+    return { success: false, error: "Invalid extension amount or nights." };
+  }
   const supabase = await createClient();
   const { data: booking } = await supabase.from("daily_bookings")
     .select("*").eq("id", bookingId).eq("status", "checked_in").single();
   if (!booking) return { success: false, error: "Booking not found or not checked in." };
 
+  const newTotal = Number(booking.total_amount_xof) + extraAmount;
+  const newFinal = Number(booking.final_amount_xof ?? booking.total_amount_xof) + extraAmount;
+
   if (booking.checkout_mode === "open") {
     // For open-ended, just update is fine since there's no fixed check_out
     await supabase.from("daily_bookings").update({
-      total_amount_xof: Number(booking.total_amount_xof) + extraAmount,
-      billing_status: "need_top_up",
+      total_amount_xof: newTotal,
+      final_amount_xof: newFinal,
+      billing_status: resolveBillingStatus(
+        Number(booking.prepaid_amount_xof),
+        newFinal,
+        booking.status,
+      ),
     }).eq("id", bookingId);
   } else {
+    if (!booking.check_out || newCheckOut <= booking.check_out) {
+      return { success: false, error: "New check-out date must be after current check-out date." };
+    }
     const conflict = await checkConflicts(booking.unit_id, booking.check_out!, newCheckOut, bookingId);
     if (conflict.hasConflict) return { success: false, error: conflict.reason ?? "Conflict on extended dates." };
     await supabase.from("daily_bookings").update({
       check_out: newCheckOut,
-      total_amount_xof: Number(booking.total_amount_xof) + extraAmount,
-      billing_status: "need_top_up",
+      total_amount_xof: newTotal,
+      final_amount_xof: newFinal,
+      billing_status: resolveBillingStatus(Number(booking.prepaid_amount_xof), newFinal, booking.status),
     }).eq("id", bookingId);
   }
+
+  const { data: receivables } = await supabase.from("receivables")
+    .select("id").eq("source_type", "daily_booking").eq("source_id", bookingId).limit(1);
+  if (receivables && receivables.length > 0) {
+    await updateReceivableAmount(receivables[0].id, newFinal);
+  }
+  await syncReceivablesForSource("daily_booking", bookingId);
+  await syncBookingPrepaid(supabase, bookingId);
 
   await supabase.from("audit_logs").insert({
     action: "extend_stay", entity_type: "daily_booking", entity_id: bookingId,
@@ -612,6 +676,8 @@ export async function extendStay(bookingId: string, newCheckOut: string, extraNi
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
+  revalidatePath("/finance"); revalidatePath("/fr/finance");
+  revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
   return { success: true };
@@ -634,6 +700,8 @@ export async function cancelBooking(bookingId: string): Promise<{ success: boole
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
+  revalidatePath("/finance"); revalidatePath("/fr/finance");
+  revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
   return { success: true };

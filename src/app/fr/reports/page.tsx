@@ -14,7 +14,7 @@ export const revalidate = 60;
 export default async function FrenchReportsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!["admin","boss","finance","front_desk"].includes(user.role)) redirect("/");
+  if (!["admin","boss","finance"].includes(user.role)) redirect("/");
 
   const supabase = await createClient();
   const { data: building } = await supabase.from("buildings").select("id").eq("code","SASCI11").single();

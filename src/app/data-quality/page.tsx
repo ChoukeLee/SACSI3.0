@@ -15,7 +15,7 @@ export const revalidate = 60;
 export default async function DataQualityPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!["admin", "boss", "finance", "front_desk"].includes(user.role)) redirect("/");
+  if (!["admin", "boss"].includes(user.role)) redirect("/");
 
   const supabase = await createClient();
 

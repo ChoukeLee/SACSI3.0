@@ -61,7 +61,7 @@ export function MobileBottomNav({ locale, userRole: _userRole }: { locale: Local
               )}
               <Icon
                 className={cn(
-                  "h-[22px] w-[22px] transition-colors duration-[100ms]",
+                  "h-[22px] w-[22px] transition-colors duration-100",
                   active ? "text-primary" : "text-muted-foreground"
                 )}
                 aria-hidden

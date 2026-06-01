@@ -39,8 +39,11 @@ export async function syncReceivablesForSource(sourceType: string, sourceId: str
 
   if (!receivables || receivables.length === 0) return;
 
-  if (receivables.length === 1) {
-    const r = receivables[0];
+  const activeReceivables = receivables.filter((r) => r.status !== "cancelled");
+  if (activeReceivables.length === 0) return;
+
+  if (activeReceivables.length === 1) {
+    const r = activeReceivables[0];
     if (r.status === "cancelled") return;
     await supabase.from("receivables").update({
       paid_amount_xof: totalPaid,
@@ -48,12 +51,20 @@ export async function syncReceivablesForSource(sourceType: string, sourceId: str
     }).eq("id", r.id);
   } else {
     // Proportional distribution across multiple receivables
-    const totalAmount = receivables.reduce((s, r) => s + Number(r.amount_xof), 0);
+    const totalAmount = activeReceivables.reduce((s, r) => s + Number(r.amount_xof), 0);
+    if (totalAmount <= 0) {
+      for (const r of activeReceivables) {
+        await supabase.from("receivables").update({
+          paid_amount_xof: 0,
+          status: computeStatus(Number(r.amount_xof), 0, r.due_date),
+        }).eq("id", r.id);
+      }
+      return;
+    }
     let remaining = totalPaid;
-    for (let i = 0; i < receivables.length; i++) {
-      const r = receivables[i];
-      if (r.status === "cancelled") continue;
-      const isLast = i === receivables.length - 1;
+    for (let i = 0; i < activeReceivables.length; i++) {
+      const r = activeReceivables[i];
+      const isLast = i === activeReceivables.length - 1;
       const share = isLast
         ? remaining
         : Math.min(Number(r.amount_xof), Math.round(totalPaid * Number(r.amount_xof) / totalAmount));

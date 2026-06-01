@@ -75,16 +75,25 @@ export function createReceivableRepo(client: SupabaseClient) {
       // Distribute paid amount across receivables (simple: first receivable gets all, or prorated)
       // For v1: if single receivable, update directly.
       // If multiple (e.g. sale installments), distribute proportionally.
-      if (receivables.length === 1) {
-        const r = receivables[0];
+      const activeReceivables = receivables.filter((r) => r.status !== "cancelled");
+      if (activeReceivables.length === 0) return;
+
+      if (activeReceivables.length === 1) {
+        const r = activeReceivables[0];
         await this.updatePaidAmount(r.id, totalPaid);
       } else {
         // Proportional distribution
-        const totalAmount = receivables.reduce((s, r) => s + Number(r.amount_xof), 0);
+        const totalAmount = activeReceivables.reduce((s, r) => s + Number(r.amount_xof), 0);
+        if (totalAmount <= 0) {
+          for (const r of activeReceivables) {
+            await this.updatePaidAmount(r.id, 0);
+          }
+          return;
+        }
         let remaining = totalPaid;
-        for (let i = 0; i < receivables.length; i++) {
-          const r = receivables[i];
-          const share = i === receivables.length - 1
+        for (let i = 0; i < activeReceivables.length; i++) {
+          const r = activeReceivables[i];
+          const share = i === activeReceivables.length - 1
             ? remaining // last one gets the remainder
             : Math.min(Number(r.amount_xof), Math.round(totalPaid * Number(r.amount_xof) / totalAmount));
           await this.updatePaidAmount(r.id, share);

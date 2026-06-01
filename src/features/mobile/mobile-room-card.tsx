@@ -51,7 +51,7 @@ export function MobileRoomCard({
       onClick={() => onPress(room)}
       className={cn(
         "w-full rounded-xl border bg-white p-3.5 shadow-sm text-left",
-        "transition-colors duration-[100ms] active:bg-muted/50",
+        "transition-colors duration-100 active:bg-muted/50",
         isCheckingOut
           ? "border-amber-200 bg-amber-50/40"
           : isReserved

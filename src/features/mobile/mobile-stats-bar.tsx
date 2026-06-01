@@ -44,7 +44,7 @@ export function MobileStatsBar({
             onClick={() => onTabChange(item.key)}
             className={cn(
               "flex flex-col items-center justify-center rounded-xl px-1.5 py-2.5 text-center select-none",
-              "transition-colors duration-[100ms]",
+              "transition-colors duration-100",
               "active:scale-95",
               isActive
                 ? "bg-white border border-border shadow-sm"

@@ -154,8 +154,9 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   const handleExtend = async () => {
     const days = toN(extendDays) || 1;
     const extraAmount = Math.round(Number(booking!.nightly_price_xof) * days);
+    const nextCheckOut = booking!.check_out ? addDays(booking!.check_out, days) : "";
     setSaving(true);
-    const result = await extendStay(booking!.id, booking!.check_out ?? "", days, extraAmount);
+    const result = await extendStay(booking!.id, nextCheckOut, days, extraAmount);
     setSaving(false); if (!result.success) setActionError(formatError(result.error)); else { refresh(); onClose(); }
   };
 
@@ -422,6 +423,12 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   );
 }
 
+function addDays(dateStr: string, days: number): string {
+  const date = new Date(`${dateStr}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 function formatDailyRentalError(message: string | null | undefined, locale: Locale): string {
   const fallback = locale === "zh" ? "操作失败，请稍后重试。" : "Operation impossible. Veuillez reessayer.";
   if (!message) return fallback;
@@ -465,6 +472,10 @@ function formatDailyRentalError(message: string | null | undefined, locale: Loca
     longLeaseConflict: {
       zh: "该房间已有生效长租合同，不能创建日租预订。",
       fr: "Cette chambre a deja un bail long actif.",
+    },
+    saleConflict: {
+      zh: "该房间已有生效出售合同，不能创建日租预订。",
+      fr: "Cette chambre a deja un contrat de vente actif.",
     },
     prepaymentRequired: {
       zh: "固定离店订单办理入住前必须至少收取一笔预付款。",
