@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Search, X, User, Building2, BedDouble, Home, CreditCard, Receipt, DollarSign, FileText, Loader2 } from "lucide-react";
 import { cn, formatXof } from "@/lib/utils";
@@ -106,8 +107,8 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
     grouped.get(key)!.push(r);
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" onClick={() => setOpen(false)}>
+  const dialog = (
+    <div className="fixed inset-0 z-[1000] flex items-start justify-center pt-[15vh]" onClick={() => setOpen(false)}>
       <div className="absolute inset-0 bg-black/30" />
       <div
         className="relative w-full max-w-lg rounded-2xl border border-border bg-white shadow-2xl overflow-hidden mx-4"
@@ -194,4 +195,6 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
       </div>
     </div>
   );
+
+  return createPortal(dialog, document.body);
 }
