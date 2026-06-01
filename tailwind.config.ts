@@ -143,8 +143,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['"MiSans"', '"Microsoft YaHei"', '"PingFang SC"', '"Segoe UI"', "system-ui", "-apple-system", "sans-serif"],
-        mono: ['"ui-monospace"', '"SFMono-Regular"', '"Menlo"', '"Monaco"', '"Consolas"', "monospace"],
+        sans: ['"Geist"', '"Inter"', '"Noto Sans SC"', '"Microsoft YaHei UI"', "system-ui", "-apple-system", "BlinkMacSystemFont", '"Segoe UI"', "sans-serif"],
+        mono: ['"Geist Mono"', '"SFMono-Regular"', '"Consolas"', '"Liberation Mono"', "monospace"],
       },
       borderRadius: {
         lg: "var(--radius)",
