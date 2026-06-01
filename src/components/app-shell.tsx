@@ -12,7 +12,20 @@ import { createClient } from "@/lib/supabase/client";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { NavigationTransitionProvider, useNavigationTransition } from "@/components/navigation-transition-provider";
+import { IdlePrefetch } from "@/components/navigation-prefetch";
 import { getDesktopNavLabels } from "@/lib/nav-labels";
+
+function NavigationLoadingBar() {
+  const { isNavigating } = useNavigationTransition();
+  return (
+    <div className="pointer-events-none absolute top-0 left-0 right-0 z-overlay h-0.5 overflow-hidden">
+      {isNavigating && (
+        <div className="h-full w-1/3 animate-loading-bar rounded-full bg-accentBlue" />
+      )}
+    </div>
+  );
+}
 
 export function AppShell({
   children, locale = "zh", userRole, userDisplayName, notifications = [], notifT,
@@ -21,7 +34,30 @@ export function AppShell({
   notifications?: { id: string; title: string; body: string; read_at: string | null; created_at: string; due_at: string | null }[];
   notifT: ShellDict["notifications"];
 }) {
+  return (
+    <NavigationTransitionProvider>
+      <AppShellInner
+        locale={locale}
+        userRole={userRole}
+        userDisplayName={userDisplayName}
+        notifications={notifications}
+        notifT={notifT}
+      >
+        {children}
+      </AppShellInner>
+    </NavigationTransitionProvider>
+  );
+}
+
+function AppShellInner({
+  children, locale, userRole, userDisplayName, notifications, notifT,
+}: {
+  children: React.ReactNode; locale: Locale; userRole?: UserRole; userDisplayName?: string;
+  notifications: { id: string; title: string; body: string; read_at: string | null; created_at: string; due_at: string | null }[];
+  notifT: ShellDict["notifications"];
+}) {
   const pathname = usePathname();
+  const { isNavigating } = useNavigationTransition();
   const otherLocale: Locale = locale === "zh" ? "fr" : "zh";
   const labels = getDesktopNavLabels(locale);
   const roleLabel = userRole ? labels.roles[userRole] : "";
@@ -34,8 +70,10 @@ export function AppShell({
 
   return (
     <SidebarProvider defaultOpen>
+      <IdlePrefetch locale={locale} />
       <AppSidebar locale={locale} userRole={userRole} />
       <SidebarInset>
+        <NavigationLoadingBar />
         <header className="flex h-13 shrink-0 items-center gap-2 border-b border-border/60 bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/70">
           <div className="flex w-full items-center justify-between px-4">
             <div className="flex items-center gap-3">
@@ -70,7 +108,14 @@ export function AppShell({
             </div>
           </div>
         </header>
-        <main className="flex-1 p-4 pb-20 sm:p-6 lg:p-8">{children}</main>
+        <main className="relative flex-1 p-4 pb-20 sm:p-6 lg:p-8">
+          {isNavigating && (
+            <div className="pointer-events-auto absolute inset-0 z-overlay bg-background/40" />
+          )}
+          <div className={isNavigating ? "pointer-events-none select-none" : ""}>
+            {children}
+          </div>
+        </main>
       </SidebarInset>
       <MobileBottomNav locale={locale} userRole={userRole} />
     </SidebarProvider>

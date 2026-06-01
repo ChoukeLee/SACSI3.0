@@ -11,7 +11,8 @@ import type { UnitStatus } from "@/types/domain";
 import { BookingPanel } from "./booking-panel";
 import { completeCleaning } from "./actions";
 import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
-import { buildBookingMap, buildDailyRoomStateMap } from "./room-status";
+import { buildBookingMap, buildDailyRoomStateMap, getDailyRoomStateForDate } from "./room-status";
+import { getPrimaryDailyAction } from "./daily-rental-policy";
 
 export interface CustomerSummary {
   id: string;
@@ -27,6 +28,7 @@ interface CalendarProps {
   cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[];
   payments: { id: string; source_id: string; amount: number; payment_date: string }[];
   locale: Locale;
+  userRole?: string;
 }
 
 type ViewMode = "day" | "week" | "month";
@@ -136,6 +138,7 @@ export function DailyCalendar({
   cleaningTasks,
   payments,
   locale,
+  userRole,
 }: CalendarProps) {
   const copy = COPY[locale];
   const statusLabels = UNIT_STATUS_LABELS[locale];
@@ -147,6 +150,7 @@ export function DailyCalendar({
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [newBookingUnitId, setNewBookingUnitId] = useState<string | null>(null);
   const [newBookingDate, setNewBookingDate] = useState<string | null>(null);
+  const [backfillOpen, setBackfillOpen] = useState(false);
   const [tick, setTick] = useState(0);
   const [optimisticBookings, setOptimisticBookings] = useState<DailyBookingRow[]>([]);
   const [cleaningTarget, setCleaningTarget] = useState<{ taskId: string; unitNo: string } | null>(null);
@@ -389,6 +393,11 @@ export function DailyCalendar({
               <Printer className="h-3.5 w-3.5" />
               {locale === "zh" ? "打印" : "Imprimer"}
             </Button>
+            {userRole === "admin" && (
+              <Button variant="outline" size="sm" onClick={() => { setBackfillOpen(true); setSelectedBookingId(null); setNewBookingUnitId(null); }} className="text-accentAmber-700 border-accentAmber-200 hover:bg-accentAmber-50">
+                {locale === "zh" ? "历史补录" : "Backfill"}
+              </Button>
+            )}
           </div>
         </div>
         <div className="grid gap-2 bg-muted/50 px-4 py-3 md:grid-cols-2 xl:grid-cols-4">
@@ -529,6 +538,12 @@ export function DailyCalendar({
                       const prevDateStr = toDateStr(addDays(date, -1));
                       const nextDateStr = toDateStr(addDays(date, 1));
                       const booking = unitBM?.get(dateStr) ?? null;
+                      const dateRoomState = getDailyRoomStateForDate({
+                        unit,
+                        dateStr,
+                        bookings,
+                        cleaningTasks,
+                      });
                       const prevSame = booking && unitBM?.get(prevDateStr)?.id === booking.id;
                       const nextSame = booking && unitBM?.get(nextDateStr)?.id === booking.id;
                       const isToday = dateStr === todayStr;
@@ -554,9 +569,17 @@ export function DailyCalendar({
                             setNewBookingDate(null);
                           }}
                           onNewBooking={() => {
-                            setNewBookingUnitId(unit.id);
-                            setNewBookingDate(dateStr);
-                            setSelectedBookingId(null);
+                            const action = getPrimaryDailyAction({
+                              roomDisplayStatus: dateRoomState.status,
+                              unitStatus: unit.status as UnitStatus,
+                              hasOpenCleaningTask: hasCleaning,
+                              isPastDate: dateStr < todayStr,
+                            });
+                            if (action.action === "create_booking" && action.allowed) {
+                              setNewBookingUnitId(unit.id);
+                              setNewBookingDate(dateStr);
+                              setSelectedBookingId(null);
+                            }
                           }}
                           onCompleteCleaning={() => {
                             if (cleaningTaskId) {
@@ -574,7 +597,7 @@ export function DailyCalendar({
         </div>
       </section>
 
-      {(panelBooking || newBookingUnitId) && (
+      {(panelBooking || newBookingUnitId || backfillOpen) && (
         <BookingPanel
           key={tick}
           booking={panelBooking}
@@ -585,10 +608,12 @@ export function DailyCalendar({
           cleaningTasks={cleaningTasks}
           payments={payments}
           locale={locale}
+          backfillMode={backfillOpen}
           onClose={() => {
             setSelectedBookingId(null);
             setNewBookingUnitId(null);
             setNewBookingDate(null);
+            setBackfillOpen(false);
             setOptimisticBookings([]);
           }}
           onChanged={() => { setTick((t) => t + 1); setOptimisticBookings([]); }}
@@ -834,6 +859,65 @@ function TimelineCell({
     );
   }
 
+  // Checked-in guest — always takes priority
+  if (booking && booking.status === "checked_in") {
+    const tone = getBookingTone(booking.status);
+    const name = customer?.name ?? "?";
+    const dateRange = booking.checkout_mode === "open"
+      ? `${booking.check_in} → ${copy.openEnded}`
+      : `${booking.check_in} → ${booking.check_out ?? copy.openEnded}`;
+    return (
+      <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
+        <button
+          type="button"
+          className={cn(
+            "absolute top-1/2 flex h-8 -translate-y-1/2 items-center overflow-hidden px-2 text-left shadow-sm transition-all hover:-translate-y-[54%] hover:shadow-md focus-visible:ring-ring",
+            tone,
+            isStart ? "left-1.5 rounded-l-xl" : "-left-px rounded-l-none",
+            isEnd ? "right-1.5 rounded-r-xl" : "-right-px rounded-r-none",
+          )}
+          title={`${name} · ${dateRange}`}
+          onClick={() => onOpenBooking(booking.id)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") onOpenBooking(booking.id);
+          }}
+        >
+          {isStart && (
+            <span className="min-w-0">
+              <span className="block truncate text-xs font-black leading-3">{name}</span>
+              <span className="block truncate text-[8px] font-semibold opacity-85">
+                {bookingLabels[booking.status] ?? booking.status}
+              </span>
+            </span>
+          )}
+        </button>
+      </div>
+    );
+  }
+
+  // Cleaning pending — takes priority over future bookings (confirmed/pending_review)
+  if (hasCleaning || unit.status === "cleaning_pending") {
+    // If a future booking exists, show its name as context alongside the cleaning status
+    const upcomingName = booking && (booking.status === "confirmed" || booking.status === "pending_review")
+      ? (customer?.name ?? "").slice(0, 4)
+      : "";
+    return (
+      <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
+        <button
+          type="button"
+          className="absolute inset-x-1 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center gap-1 rounded-lg bg-[#D9F7F0] border border-[#A8E8DB] text-xs font-bold text-[#17324D] transition-all hover:bg-[#C0EFE4] hover:shadow-sm focus-visible:ring-ring"
+          onClick={() => onCompleteCleaning?.()}
+        >
+          {copy.cleaning}
+          {upcomingName && (
+            <span className="font-normal text-[#17324D]/60">{upcomingName}</span>
+          )}
+        </button>
+      </div>
+    );
+  }
+
+  // Confirmed / pending_review — only shown when no cleaning is pending
   if (booking && booking.status !== "checked_out") {
     const tone = getBookingTone(booking.status);
     const name = customer?.name ?? "?";
@@ -879,20 +963,6 @@ function TimelineCell({
           onClick={() => onOpenBooking(booking.id)}
         >
           {isStart ? customer?.name?.slice(0, 4) ?? "" : ""}
-        </button>
-      </div>
-    );
-  }
-
-  if (hasCleaning || unit.status === "cleaning_pending") {
-    return (
-      <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
-        <button
-          type="button"
-          className="absolute inset-x-1 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center rounded-lg bg-[#D9F7F0] border border-[#A8E8DB] text-xs font-bold text-[#17324D] transition-all hover:bg-[#C0EFE4] hover:shadow-sm focus-visible:ring-ring"
-          onClick={() => onCompleteCleaning?.()}
-        >
-          {copy.cleaning}
         </button>
       </div>
     );

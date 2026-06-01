@@ -1,123 +1,185 @@
-# 日租业务规则 v1
+# SACIS 3.0 Daily Rental Business Rules v2
 
-本文档用于统一 `/daily-rentals`、`/daily-rentals/overview`、经营驾驶舱、移动前台和财务流水中的日租判断逻辑。后续改代码时，先按这里的规则改，不再每个页面各算一套房态。
+> **Status**: Implemented. Reflects the actual code in `src/features/daily-rentals/`.
+> **Last updated**: 2026-06-01
 
-## 1. 核心原则
+---
 
-- `daily_bookings` 是日租事实源。日历、占用页、前台工作台、经营驾驶舱都应从同一套日租状态计算函数得到结果。
-- `units.status` 只能作为当前状态缓存或人工锁定状态，不能单独决定一个日期是否可订。
-- 普通“新建预订”只能创建今天及未来日期。历史入住记录必须走“历史补录”入口，并写审计日志。
-- 同一房间同一晚只能有一个有效占用。但同一天“上午退房、保洁完成、下午入住”是允许的。
-- 财务记录必须挂到对应 `booking_id`、`customer_id`、`unit_id`、`building_id`，日租收入、补款、结算和冲销要能追溯。
+## 1. Booking Status Lifecycle
 
-## 2. 日租订单状态机
-
-```mermaid
-stateDiagram-v2
-  [*] --> pending_review: 新建预订
-  pending_review --> confirmed: 确认
-  pending_review --> cancelled: 取消
-  confirmed --> checked_in: 办理入住
-  confirmed --> cancelled: 取消
-  checked_in --> checked_out: 办理退房/结算
-  checked_out --> cleaning_pending: 生成保洁
-  cleaning_pending --> available: 保洁完成
-  cancelled --> [*]
-  available --> pending_review: 新建下一单
+```
+pending_review  →  confirmed  →  checked_in  →  checked_out
+     ↓                ↓
+  cancelled       cancelled
 ```
 
-## 3. 日期与冲突规则
+- `pending_review`: New booking, awaiting confirmation.
+- `confirmed`: Staff confirmed. Guest is expected.
+- `checked_in`: Guest arrived. Room is occupied.
+- `checked_out`: Guest departed. Room needs cleaning.
+- `cancelled`: Terminal. All payments reversed. Cannot be reactivated.
 
-### 3.1 普通新建预订
+Transition functions: `allowConfirmBooking`, `allowCheckIn`, `allowCheckOut`, `allowCancelBooking` in `daily-rental-policy.ts`.
 
-- `check_in < 今天`：禁止，返回 `pastDateNotAllowed`。
-- 固定离店必须满足 `check_out > check_in`。
-- 开放式未定离店允许没有 `check_out`。
-- 黑名单客户禁止新建。
-- 房间处于 `maintenance` 或 `locked` 时禁止新建。
+---
 
-### 3.2 历史补录
+## 2. Unit Status vs Booking Status
 
-历史补录不是普通新建预订。它应该单独做入口，并满足：
+- **`daily_bookings` is the source of truth** for room occupancy.
+- **`units.status` is a cache**, updated as a side effect by server actions:
+  - `createBooking` → `units.status = "reserved"`
+  - `checkIn` → `units.status = "daily_occupied"`
+  - `checkOut` → `units.status = "cleaning_pending"`
+  - `completeCleaning` → resolved by `resolveUnitStatusAfterDailyChange()`
+  - `cancelBooking` → resolved by same
+- If `units.status` diverges from booking reality, `daily-rental-audit.ts` flags it.
 
-- 仅管理员可用。
-- 表单上明确显示“历史补录，不改变当前房态”。
-- 可以选择过去日期。
-- 创建后的订单默认应是 `checked_out` 或完整历史状态，而不是 `pending_review`。
-- 必须写入 `audit_logs`，记录操作者、补录原因、补录日期范围。
-- 不应把 `units.status` 改成 `reserved` 或 `daily_occupied`。
+---
 
-### 3.3 同日退房再入住
+## 3. Creating New Bookings
 
-允许以下场景：
+### Allowed
+- Future dates (`check_in >= today`).
+- Fixed mode: `check_out > check_in`.
+- Open mode: no `check_out` required.
+- Unit not blocked (`maintenance`, `locked`, `sold`, `leased`).
 
-- A 单：`check_out = 2026-05-21`，早上退房。
-- 系统生成保洁任务。
-- 保洁完成后，B 单：`check_in = 2026-05-21`，下午入住。
+### Blocked
+- Past dates without backfill flag.
+- Open cleaning tasks on the unit (today/future, non-backfill).
+- Overlapping active bookings (`pending_review`, `confirmed`, `checked_in`).
+- Blacklisted customers.
 
-冲突判断应按“夜晚占用”处理：
+### Policy Function
+`allowCreateBooking(input)` in `daily-rental-policy.ts` checks: `unitStatus`, `checkIn` date, `isBackfill`, `checkOut` validity.
 
-- 固定单占用区间为 `[check_in, check_out)`。
-- 开放式在未实际退房前，占用区间为 `[check_in, +∞)`。
-- 新单 `check_in = 上一单 check_out` 不算夜晚冲突。
-- 但如果上一单当天还没退房，或退房后保洁未完成，新单只能创建为“待入住/等待保洁”，不能直接办理入住。
+---
 
-## 4. 页面显示规则
+## 4. Check-in Rules
 
-### 4.1 日租时间轴
+### Hard Checks (`allowCheckIn`)
+- Booking must be `confirmed`.
+- **No open cleaning tasks** on the unit (even cross-booking).
+- **No other checked_in booking** on the unit.
+- Unit not `maintenance`, `locked`, `sold`, `leased`.
+- Fixed checkout: `prepaidAmount > 0`.
 
-- 默认显示“今天附近日期”，不要从每月 1 号开始。
-- 每行房间高度要紧凑，确保 21 间日租房尽量一屏可读。
-- 日期列应铺满可用宽度，避免右侧大面积留白。
-- 空白格可点击新建预订；有条形订单的格子点击查看订单。
-- 条形颜色要使用全局状态颜色，不使用孤立紫色方案。
+### Server Action (`checkIn`)
+1. Fetches unit status, open cleaning tasks, other checked_in bookings.
+2. Calls `allowCheckIn` with all checks.
+3. Inserts payment + ledger entry if prepaid.
+4. Calls `syncBookingFinance` to align all financial records.
 
-建议状态色：
+---
 
-| 状态 | 视觉角色 |
-| --- | --- |
-| 可预订 | 绿色/青绿色，轻背景，清晰边框 |
-| 预订 | 琥珀/暖黄，表示未来或待确认 |
-| 入住/占用 | 橙色主色，最高可见度 |
-| 待保洁 | 青色，和可预订区分 |
-| 维修/锁定 | 红色 |
+## 5. Check-out Rules
 
-### 4.2 日租占用页
+1. Booking must be `checked_in`.
+2. Final amount calculated or provided.
+3. `unit.status = "cleaning_pending"`.
+4. `cleaning_task` inserted with `is_completed = false`.
+5. `syncBookingFinance` for financial alignment.
 
-- 今日群发内容优先显示，不再用可滚动小框截断。
-- 房态卡片按楼层分组显示，卡片中包含房号、客户、入住区间、应收/待收、状态。
-- 有详细卡片后，下方重复表格可以删除。
-- 日期如果只是查看当天群发内容，可以保留选择器；如果没有业务作用，应改成只读日期展示。
+---
 
-### 4.3 经营驾驶舱
+## 6. Same-Day Turnover
 
-- 老板优先看两类信息：财务状况、房间状态。
-- 风险、数据健康应作为辅助区域，不抢主视觉。
-- 房间状态、长租、出售、日租都必须使用同一套状态色逻辑。
+```
+08:00  Guest A checks out → cleaning_task created → unit.status = "cleaning_pending"
+10:00  Staff completes cleaning → cleaning_task.is_completed = true → unit.status resolved
+14:00  Guest B (confirmed booking) checks in → unit.status = "daily_occupied"
+```
 
-## 5. 操作按钮规则
+### Rules
+1. **New booking can be created for same day** even while cleaning is pending (date conflict check allows `check_out = next check_in`).
+2. **Check-in is blocked** until cleaning is completed.
+3. Calendar display priority: `checked_in > cleaning > confirmed/pending_review > checked_out > available`.
+4. `getPrimaryDailyAction` returns `complete_cleaning` (not `check_in`) for confirmed bookings with open cleaning.
 
-订单详情面板不要把所有按钮都堆出来。每个状态只给一个主操作：
+---
 
-| 当前状态 | 主操作 | 次操作 |
-| --- | --- | --- |
-| `pending_review` | 确认预订 | 取消 |
-| `confirmed` | 办理入住 | 取消、打印 |
-| `checked_in` | 办理退房 | 补款、优惠、打印 |
-| `checked_out` | 查看结算 | 打印 |
-| `cleaning_pending` | 完成保洁 | 查看退房单 |
+## 7. Historical Backfill (Admin Only)
 
-## 6. 当前已落地的防护
+### Rules
+- **Only admin**: `requireRole("admin")`.
+- **Past dates only**: `check_out < today`.
+- Booking status: `checked_out` (never `pending_review`).
+- **Does NOT modify `units.status`**.
+- **Does NOT create `cleaning_task`**.
+- Creates `receivable`, `payment`, `ledger_entry` if paid.
+- Writes `audit_logs` with `action = "daily_booking_backfill"`.
+- `notes` field prefixed with `[历史补录]` for traceability.
+- Server action: `createBackfillBooking` in `actions.ts`.
 
-- 普通 `createBooking` 已增加日期验证：过去日期返回 `pastDateNotAllowed`。
-- 固定离店订单已校验 `check_out > check_in`。
-- 历史补录尚未实现，应作为单独功能开发，不能复用普通新建预订。
+---
 
-## 7. 推荐实现顺序
+## 8. Financial Invariants
 
-1. 抽出统一的 `daily-rental-policy`：状态机、日期覆盖、冲突判断、可执行动作。
-2. 让 `createBooking`、`checkIn`、`checkOut`、`completeCleaning` 全部调用 policy。
-3. 让 `/daily-rentals`、`/daily-rentals/overview`、`/management`、移动前台使用同一个 `buildDailyRoomStateMap`。
-4. 新增“历史补录”入口，仅管理员可用。
-5. 重构 BookingPanel：按状态显示主操作，减少按钮堆叠。
-6. 最后做 UI：时间轴铺满页面、紧凑行高、统一状态色。
+### Data Flow
+```
+payments (source of truth for money received)
+    → receivables.paid_amount_xof (synced from payments)
+    → daily_bookings.prepaid_amount_xof (synced from receivables)
+    → daily_bookings.billing_status (computed from paid vs final)
+    → ledger_entries (every payment must have one)
+```
+
+### Rules
+1. `receivables.paid_amount_xof` = SUM(payments.amount) for same `source_id`.
+2. `daily_bookings.prepaid_amount_xof` = `receivables.paid_amount_xof`.
+3. `receivables.amount_xof` = `daily_bookings.final_amount_xof` (or `total_amount_xof`).
+4. `billing_status` derived: `prepaid` / `settled` / `partially_paid` / `need_top_up`.
+5. Every payment must have a `ledger_entry`.
+6. Deleting a payment must insert reversal ledger entries before delete.
+7. Cancelling a booking must reverse payments + cancel receivables.
+
+### Sync Function
+`syncBookingFinance(supabase, bookingId)` in `daily-rental-finance.ts`:
+1. `syncReceivablesForSource` — sync receivable from payments.
+2. `syncBookingPrepaidFromReceivables` — sync booking prepaid from receivable.
+3. `syncBillingStatus` — recompute and persist billing_status.
+
+---
+
+## 9. Data Quality Repair
+
+### Auto-fixable (admin only, single-issue)
+| Prefix | Action |
+|---|---|
+| `dr_ci_not_occupied_` | Set `unit.status = "daily_occupied"` |
+| `dr_clean_not_status_` | Set `unit.status = "cleaning_pending"` |
+| `dr_clean_status_no_task_` | Recalculate `unit.status` from active bookings: `daily_occupied`, `reserved`, or `available` |
+| `dr_fin_*` | Run `syncBookingFinance` |
+| `dr_bf_no_audit_` | Insert `daily_booking_backfill` audit log |
+| `dr_bf_unit_status_` | Recalculate `unit.status` from active bookings |
+
+### Manual-only (report, no auto-fix)
+| Prefix | Reason |
+|---|---|
+| `dr_overlap_` | Human must decide which booking to keep |
+| `dr_ci_multi_occupied_` | Human must decide which is valid |
+| `dr_occupied_no_ci_` | Human must confirm room is empty |
+| `dr_fin_no_ledger_` | Human must verify amount |
+| `dr_fin_orphan_ledger_` | Human must verify before reversal |
+| `dr_bf_future_` | Human must verify date |
+
+### Constraints
+- Single-issue repair only. No batch.
+- Every repair writes `audit_logs`.
+- `revalidatePath` for all affected pages after repair.
+- `requireRole("admin")` enforced in `repairDailyRentalIssue`.
+
+---
+
+## 10. Key Files Reference
+
+| File | Role |
+|---|---|
+| `daily-rental-policy.ts` | Status machine, action permissions, conflict checks |
+| `daily-rental-finance.ts` | Financial computation, sync, ledger helpers |
+| `daily-rental-audit.ts` | Issue scanning (pure function) |
+| `daily-rental-repair.ts` | Server action for single-issue repair |
+| `actions.ts` | All 10 server actions (create, confirm, checkIn, checkOut, etc.) |
+| `room-status.ts` | Display status computation for calendar |
+| `booking-panel.tsx` | UI panel driven by `getPrimaryDailyAction` |
+| `calendar.tsx` | Calendar grid with policy-checked cell click |

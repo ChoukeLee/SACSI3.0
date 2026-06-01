@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:daily-rental-rules": "node scripts/check-daily-rental-rules.mjs",
+    "validate": "npm run check:daily-rental-rules && npm run typecheck && npm run build"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

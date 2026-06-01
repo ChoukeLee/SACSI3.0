@@ -5,7 +5,7 @@ export { BookingPanel } from "./booking-panel";
 export { calculateBilling, billingModeLabel } from "./billing";
 export type { BillingResult } from "./billing";
 export {
-  createBooking, confirmBooking, checkIn, checkOut,
+  createBooking, createBackfillBooking, confirmBooking, checkIn, checkOut,
   completeCleaning, extendStay, cancelBooking,
   recordSupplementaryPayment, applyDiscount, deletePayment,
   setFixedCheckout, checkConflicts,

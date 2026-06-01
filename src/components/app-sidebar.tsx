@@ -7,6 +7,8 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { getDesktopNavLabels } from "@/lib/nav-labels";
+import { useNavigationTransition } from "@/components/navigation-transition-provider";
+import { usePrefetch } from "@/components/navigation-prefetch";
 import type { UserRole } from "@/lib/auth";
 
 type NavKey = "management" | "units" | "dailyRentals" | "leases" | "sales" | "customers" | "finance" | "reports" | "todos" | "documents" | "dataQuality" | "auditLogs" | "dataExchange" | "bulkActions" | "targets" | "settings" | "security";
@@ -60,12 +62,15 @@ function filter(role?: UserRole): NavGroup[] {
 
 export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: UserRole }) {
   const pathname = usePathname();
+  const { pendingHref, startNavigation } = useNavigationTransition();
+  const prefetch = usePrefetch();
   const labels = getDesktopNavLabels(locale);
   const visible = filter(userRole);
+  const activeHref = pendingHref ?? pathname;
 
   const isActive = (item: NavItem) => {
     const target = item.activeMatch ? routeFor(locale, item.activeMatch) : routeFor(locale, item.href);
-    return pathname === target || (item.activeMatch ? pathname.startsWith(target) : false);
+    return activeHref === target || (item.activeMatch ? activeHref.startsWith(target) : false);
   };
 
   return (
@@ -94,7 +99,15 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
                 return (
                   <SidebarMenuItem key={item.key}>
                     <SidebarMenuButton asChild isActive={active} tooltip={labels.nav[item.key]} size="default">
-                      <Link href={routeFor(locale, item.href)}>
+                      <Link
+                        href={routeFor(locale, item.href)}
+                        onClick={() => {
+                          const target = routeFor(locale, item.href);
+                          if (pathname !== target) startNavigation(target);
+                        }}
+                        onMouseEnter={() => prefetch(routeFor(locale, item.href))}
+                        onFocus={() => prefetch(routeFor(locale, item.href))}
+                      >
                         <Icon className="h-4 w-4" strokeWidth={active ? 2.5 : 1.75} />
                         <span className="text-[13px]">{labels.nav[item.key]}</span>
                       </Link>

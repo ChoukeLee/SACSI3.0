@@ -4,7 +4,7 @@ import {
   type DailyRoomDisplayStatus,
 } from "./daily-rental-policy";
 
-// ── Types ──────────────────────────────────────────────────────────────
+// Types.
 
 export interface DailyRoomStateForDate {
   unit: UnitRow;
@@ -13,7 +13,7 @@ export interface DailyRoomStateForDate {
   isCheckoutDay: boolean;
 }
 
-// ── Constants ──────────────────────────────────────────────────────────
+// Constants.
 
 const ACTIVE_PRIORITY: Record<string, number> = {
   checked_in: 3,
@@ -31,18 +31,18 @@ export const STATUS_COLORS: Record<DailyRoomDisplayStatus, string> = {
   available:          "",
 };
 
-// ── Core: single unit × single date ────────────────────────────────────
+// Core room-state calculation.
 
 /**
  * Compute display status for one room on one date.
  *
  * Priority:
- *   1. checked_in booking covering date → occupied / checking_out_today
- *   2. confirmed / pending_review booking covering date → reserved
- *   3. early check-in: unit is daily_occupied + checked_in exists → occupied
- *   4. unit.status = maintenance → maintenance
- *   5. unit.status = locked → locked
- *   6. cleaning pending → cleaning
+ *   1. checked_in booking covering date : occupied / checking_out_today
+ *   2. confirmed / pending_review booking covering date : reserved
+ *   3. early check-in: unit is daily_occupied + checked_in exists : occupied
+ *   4. unit.status = maintenance : maintenance
+ *   5. unit.status = locked : locked
+ *   6. cleaning pending : cleaning
  *   7. available
  */
 export function getDailyRoomStateForDate(params: {
@@ -55,7 +55,9 @@ export function getDailyRoomStateForDate(params: {
 
   const unitBookings = bookings.filter(b => b.unit_id === unit.id && b.status !== "cancelled");
 
-  // 1-2. Find best booking covering this date
+  // ── Priority: checked_in > cleaning > confirmed/pending_review > checked_out > available ──
+
+  // 1. Find best booking covering this date
   let bestBooking: DailyBookingRow | null = null;
   let bestPriority = -1;
 
@@ -65,18 +67,13 @@ export function getDailyRoomStateForDate(params: {
     if (p > bestPriority) { bestPriority = p; bestBooking = b; }
   }
 
-  if (bestBooking) {
-    if (bestBooking.status === "checked_in") {
-      const isCO = bestBooking.checkout_mode === "fixed" && bestBooking.check_out === dateStr;
-      return { unit, status: isCO ? "checking_out_today" : "occupied", booking: bestBooking, isCheckoutDay: isCO };
-    }
-    if (bestBooking.status === "confirmed" || bestBooking.status === "pending_review") {
-      return { unit, status: "reserved", booking: bestBooking, isCheckoutDay: false };
-    }
-    // checked_out: fall through to unit-level checks
+  // 1a. Active checked_in guest — highest priority
+  if (bestBooking && bestBooking.status === "checked_in") {
+    const isCO = bestBooking.checkout_mode === "fixed" && bestBooking.check_out === dateStr;
+    return { unit, status: isCO ? "checking_out_today" : "occupied", booking: bestBooking, isCheckoutDay: isCO };
   }
 
-  // 3. Early check-in: unit is daily_occupied with a checked_in booking (guest arrived before official check_in)
+  // 1b. Early check-in (unit status says occupied but booking may have earlier check_in)
   if (unit.status === "daily_occupied") {
     const checkedInB = unitBookings.find(b => b.status === "checked_in");
     if (checkedInB) {
@@ -84,7 +81,23 @@ export function getDailyRoomStateForDate(params: {
     }
   }
 
-  // 4-5. Unit-level blocks (only when no active booking)
+  // 2. Cleaning pending — takes priority over future bookings
+  const hasPendingCleaning = cleaningTasks.some(t => t.unit_id === unit.id && !t.is_completed);
+  const pendingCleaningTask = cleaningTasks.find(t => t.unit_id === unit.id && !t.is_completed);
+  if (hasPendingCleaning || unit.status === "cleaning_pending") {
+    // If a confirmed/pending_review booking exists for today, include it as context
+    // so the calendar can show the guest name alongside the cleaning status.
+    const upcomingBooking = bestBooking && (bestBooking.status === "confirmed" || bestBooking.status === "pending_review")
+      ? bestBooking : null;
+    return { unit, status: "cleaning", booking: upcomingBooking, isCheckoutDay: false };
+  }
+
+  // 3. Confirmed/pending_review — only shown when no cleaning is pending
+  if (bestBooking && (bestBooking.status === "confirmed" || bestBooking.status === "pending_review")) {
+    return { unit, status: "reserved", booking: bestBooking, isCheckoutDay: false };
+  }
+
+  // 4-5. Unit-level blocks
   if (unit.status === "maintenance") {
     return { unit, status: "maintenance", booking: null, isCheckoutDay: false };
   }
@@ -92,17 +105,11 @@ export function getDailyRoomStateForDate(params: {
     return { unit, status: "locked", booking: null, isCheckoutDay: false };
   }
 
-  // 6. Cleaning
-  const hasPendingCleaning = cleaningTasks.some(t => t.unit_id === unit.id && !t.is_completed);
-  if (hasPendingCleaning || unit.status === "cleaning_pending") {
-    return { unit, status: "cleaning", booking: null, isCheckoutDay: false };
-  }
-
-  // 7. Available
+  // 6. Available (includes checked_out historical bookings — no display impact)
   return { unit, status: "available", booking: null, isCheckoutDay: false };
 }
 
-// ── Batch: all units × single date ─────────────────────────────────────
+// Batch room-state calculation.
 
 /**
  * Compute display status for all daily-rental units on a single date.
@@ -122,7 +129,7 @@ export function buildDailyRoomStateMap(params: {
   return map;
 }
 
-// ── Booking map builder (calendar grid) ─────────────────────────────────
+// Booking map builder for the calendar grid.
 
 interface BuildBookingMapOptions {
   todayStr: string;
@@ -130,19 +137,19 @@ interface BuildBookingMapOptions {
 }
 
 /**
- * Build a booking lookup map: unitId → dateStr → booking.
+ * Build a booking lookup map: unitId : dateStr : booking.
  *
  * Calendar visual rules for OPEN bookings (no fixed check_out):
- *   - checked_in + no actual_check_out → from check_in to TODAY (not beyond)
- *   - pending_review / confirmed + open → just check_in day (one cell)
- *   - checked_out + open + actual_check_out → full recorded range
+ *   - checked_in + no actual_check_out : from check_in to TODAY (not beyond)
+ *   - pending_review / confirmed + open : just check_in day (one cell)
+ *   - checked_out + open + actual_check_out : full recorded range
  *
  * Active statuses (checked_in, confirmed, pending_review) are processed
  * LAST so they overwrite inactive ones (checked_out) on overlapping dates.
  * Cancelled bookings are excluded.
  *
  * NOTE: this only affects calendar rendering.
- * Business occupancy (coversDate) is NOT affected — open bookings still
+ * Business occupancy (coversDate) is NOT affected - open bookings still
  * count as occupying indefinitely for conflict detection and overview.
  */
 export function buildBookingMap(
@@ -181,12 +188,12 @@ export function buildBookingMap(
 /**
  * Compute the calendar display end date for a single booking.
  *
- * OPEN mode rules (calendar only — does NOT affect coversDate):
- *   - checked_in + actual_check_out set   → check_in … actual_check_out
- *   - checked_in + actual_check_out null  → check_in … today (inclusive)
- *   - pending_review / confirmed + open   → check_in only (one cell)
- *   - checked_out + open + actual_check_out → full recorded range
- *   - checked_out + open + no actual      → check_in only (fallback)
+ * OPEN mode rules (calendar only - does NOT affect coversDate):
+ *   - checked_in + actual_check_out set   : check_in  through  actual_check_out
+ *   - checked_in + actual_check_out null  : check_in  through  today (inclusive)
+ *   - pending_review / confirmed + open   : check_in only (one cell)
+ *   - checked_out + open + actual_check_out : full recorded range
+ *   - checked_out + open + no actual      : check_in only (fallback)
  */
 function resolveCalendarCheckOut(
   b: DailyBookingRow,
@@ -199,30 +206,30 @@ function resolveCalendarCheckOut(
     return b.check_out ?? b.check_in;
   }
 
-  // ── Open mode: visual-only rules ──
+  // Open mode: visual-only rules.
 
-  // checked_in with actual_check_out → show the recorded range
+  // checked_in with actual_check_out : show the recorded range
   if (b.status === "checked_in" && b.actual_check_out) {
     return b.actual_check_out;
   }
 
-  // checked_in without actual_check_out → from check_in to today (inclusive)
+  // checked_in without actual_check_out : from check_in to today (inclusive)
   if (b.status === "checked_in") {
     // "today" inclusive: we want to show today's cell, so end = tomorrow
     return b.check_in <= todayStr ? opts.tomorrowStr : addDays(b.check_in, 1);
   }
 
-  // pending_review / confirmed → just the check_in day (one cell)
+  // pending_review / confirmed : just the check_in day (one cell)
   if (b.status === "pending_review" || b.status === "confirmed") {
     return addDays(b.check_in, 1);
   }
 
-  // checked_out with actual_check_out → recorded range
+  // checked_out with actual_check_out : recorded range
   if (b.status === "checked_out" && b.actual_check_out) {
     return b.actual_check_out;
   }
 
-  // checked_out without actual → just check_in (one cell, as historical record)
+  // checked_out without actual : just check_in (one cell, as historical record)
   if (b.status === "checked_out") {
     return addDays(b.check_in, 1);
   }
@@ -245,7 +252,7 @@ export function getBookingColorClass(booking: DailyBookingRow): string {
   return "bg-muted/50 text-muted-foreground/70";
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────
+// Helpers.
 
 /** Does this booking need to appear on the room-state display for this date? */
 function coversDisplayDate(b: DailyBookingRow, dateStr: string): boolean {

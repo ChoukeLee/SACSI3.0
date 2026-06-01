@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth, requireRole } from "@/lib/auth";
 import type { DailyBookingRow } from "@/types/database";
+import type { UnitStatus } from "@/types/domain";
 import {
   allowCancelBooking,
   allowCheckIn,
@@ -15,44 +16,16 @@ import {
   todayIso,
 } from "./daily-rental-policy";
 import {
-  createReceivable, syncReceivablesForSource,
-  updateReceivableAmount, cancelReceivablesForSource,
+  createReceivable,
+  updateReceivableAmount,
+  cancelReceivablesForSource,
 } from "@/features/finance/receivables";
-import type { SupabaseClient } from "@supabase/supabase-js";
-
-// ── Helpers ──
-
-/** Keep daily_bookings.prepaid_amount_xof in sync with receivable.paid_amount_xof after payment changes. */
-async function syncBookingPrepaid(supabase: SupabaseClient, bookingId: string) {
-  const { data: recs } = await supabase.from("receivables")
-    .select("paid_amount_xof")
-    .eq("source_type", "daily_booking")
-    .eq("source_id", bookingId)
-    .neq("status", "cancelled");
-  const canonicalPaid = (recs ?? []).reduce((s, r) => s + Number(r.paid_amount_xof), 0);
-  await supabase.from("daily_bookings").update({ prepaid_amount_xof: canonicalPaid }).eq("id", bookingId);
-}
-
-async function sumBookingPayments(supabase: SupabaseClient, bookingId: string) {
-  const { data: payments } = await supabase
-    .from("payments")
-    .select("amount")
-    .eq("source_type", "daily_booking")
-    .eq("source_id", bookingId);
-
-  return (payments ?? []).reduce((sum, payment) => sum + Number(payment.amount), 0);
-}
-
-function resolveBillingStatus(
-  paidAmount: number,
-  finalAmount: number,
-  bookingStatus?: string,
-): "prepaid" | "partially_paid" | "need_top_up" | "settled" {
-  if (paidAmount >= finalAmount) {
-    return bookingStatus === "checked_out" ? "settled" : "prepaid";
-  }
-  return paidAmount > 0 ? "partially_paid" : "need_top_up";
-}
+import {
+  sumPayments,
+  syncBookingFinance,
+  insertLedgerEntry,
+  reverseLedgerEntriesForPayment,
+} from "./daily-rental-finance";
 
 // ── Permission guards ──
 async function guardWrite() {
@@ -77,19 +50,6 @@ export async function checkConflicts(
   if (unit.status === "locked") return { hasConflict: true, reason: "unitLocked" };
   if (unit.status === "sold") return { hasConflict: true, reason: "saleConflict" };
   if (unit.status === "leased") return { hasConflict: true, reason: "longLeaseConflict" };
-
-  if (checkIn <= todayIso()) {
-    const { data: pendingCleaning } = await supabase
-      .from("cleaning_tasks")
-      .select("id")
-      .eq("unit_id", unitId)
-      .eq("is_completed", false)
-      .limit(1);
-
-    if ((pendingCleaning?.length ?? 0) > 0 || unit.status === "cleaning_pending") {
-      return { hasConflict: true, reason: "cleaningPending" };
-    }
-  }
 
   // For open-ended bookings, effective checkOut is far future
   const effectiveCheckOut = checkOut ?? "9999-12-31";
@@ -144,10 +104,13 @@ export async function createBooking(input: {
   await guardWrite();
   const supabase = await createClient();
 
+  const { data: unitCheck } = await supabase.from("units").select("status").eq("id", input.unitId).single();
+
   const createPolicy = allowCreateBooking({
     checkIn: input.checkIn,
     checkOut: input.checkOut,
     checkoutMode: input.checkoutMode,
+    unitStatus: (unitCheck?.status ?? null) as UnitStatus | null,
   });
   if (!createPolicy.allowed) return { success: false, error: createPolicy.reason };
 
@@ -181,6 +144,7 @@ export async function createBooking(input: {
     checkout_mode: mode,
     nightly_price_xof: input.nightlyPriceXof,
     total_amount_xof: totalAmount,
+    final_amount_xof: totalAmount,
     prepaid_amount_xof: 0,
     billing_status: "need_top_up",
     status: "pending_review",
@@ -223,6 +187,115 @@ export async function createBooking(input: {
   return { success: true, data };
 }
 
+// ── Backfill (admin only) ──
+
+export async function createBackfillBooking(input: {
+  unitId: string; customerId: string; checkIn: string; checkOut: string;
+  nightlyPriceXof: number; prepaidAmountXof: number; reason: string;
+  notes?: string;
+}): Promise<{ success: boolean; data?: DailyBookingRow; error?: string }> {
+  await requireRole("admin");
+  const supabase = await createClient();
+
+  // Validate dates
+  if (!input.checkIn || !input.checkOut) return { success: false, error: "checkInRequired" };
+  if (input.checkOut <= input.checkIn) return { success: false, error: "invalidDateRange" };
+  if (input.checkIn >= todayIso()) return { success: false, error: "backfillMustBePastDate" };
+  if (input.checkOut > todayIso()) return { success: false, error: "backfillMustBeCompleted" };
+  if (input.nightlyPriceXof <= 0) return { success: false, error: "invalidPrice" };
+  if (input.prepaidAmountXof < 0) return { success: false, error: "invalidPrepaid" };
+
+  const { data: customer } = await supabase
+    .from("customers").select("is_blacklisted, blacklist_reason").eq("id", input.customerId).single();
+  if (customer?.is_blacklisted) {
+    return { success: false, error: `Customer is blacklisted: ${customer.blacklist_reason}` };
+  }
+
+  const nights = Math.max(1, Math.ceil(
+    (new Date(input.checkOut).getTime() - new Date(input.checkIn).getTime()) / (1000 * 60 * 60 * 24)
+  ));
+  const totalAmount = Math.round(input.nightlyPriceXof * nights);
+  const paidAmount = input.prepaidAmountXof;
+  const isSettled = paidAmount >= totalAmount;
+
+  // Insert as checked_out — no unit.status change, no cleaning task
+  const { data, error } = await supabase.from("daily_bookings").insert({
+    unit_id: input.unitId, customer_id: input.customerId,
+    check_in: input.checkIn,
+    check_out: input.checkOut,
+    checkout_mode: "fixed",
+    nightly_price_xof: input.nightlyPriceXof,
+    total_amount_xof: totalAmount,
+    final_amount_xof: totalAmount,
+    prepaid_amount_xof: paidAmount,
+    billing_status: isSettled ? "settled" : (paidAmount > 0 ? "partially_paid" : "need_top_up"),
+    status: "checked_out",
+    notes: `[历史补录] ${input.reason}${input.notes ? ` — ${input.notes}` : ""}`,
+  }).select("*").single();
+
+  if (error) return { success: false, error: error.message };
+
+  // Create receivable
+  const { data: unit } = await supabase.from("units").select("building_id").eq("id", input.unitId).single();
+  await createReceivable({
+    building_id: unit?.building_id ?? null,
+    unit_id: input.unitId,
+    customer_id: input.customerId,
+    source_type: "daily_booking",
+    source_id: data.id,
+    category: "daily_rental",
+    title: `日租(补录) ${data.check_in}–${input.checkOut}`,
+    due_date: input.checkIn,
+    amount_xof: totalAmount,
+    paid_amount_xof: paidAmount,
+    status: isSettled ? "paid" : (paidAmount > 0 ? "partial" : "pending"),
+    currency: "XOF",
+  });
+
+  // If money was received, record payment + ledger
+  if (paidAmount > 0) {
+    const { data: payment } = await supabase.from("payments").insert({
+      customer_id: input.customerId, unit_id: input.unitId,
+      source_type: "daily_booking", source_id: data.id,
+      payment_date: input.checkOut, amount: paidAmount, currency: "XOF", exchange_rate_to_xof: 1,
+    }).select("id").single();
+
+    if (payment) {
+      await insertLedgerEntry(supabase, {
+        bookingId: data.id, unitId: input.unitId, buildingId: unit?.building_id ?? null,
+        paymentId: payment.id, amount: paidAmount, direction: "income",
+        entryDate: input.checkOut,
+        description: `日租历史补录 booking=${data.id}`,
+      });
+    }
+  }
+
+  // Audit log
+  await supabase.from("audit_logs").insert({
+    action: "daily_booking_backfill",
+    entity_type: "daily_booking",
+    entity_id: data.id,
+    metadata: {
+      reason: input.reason,
+      check_in: input.checkIn,
+      check_out: input.checkOut,
+      amount: totalAmount,
+      paid_amount: paidAmount,
+      unit_id: input.unitId,
+      customer_id: input.customerId,
+    },
+  });
+
+  // Revalidate all financial pages
+  revalidatePath("/"); revalidatePath("/fr");
+  revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
+  revalidatePath("/management"); revalidatePath("/fr/management");
+  revalidatePath("/finance"); revalidatePath("/fr/finance");
+  revalidatePath("/reports"); revalidatePath("/fr/reports");
+
+  return { success: true, data };
+}
+
 // ── Confirm ──
 export async function confirmBooking(bookingId: string): Promise<{ success: boolean; error?: string }> {
   await guardWrite();
@@ -254,13 +327,24 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
     .select("*").eq("id", bookingId).single();
   if (!booking) return { success: false, error: "Booking not found." };
 
-  const policy = allowCheckIn(booking, prepaidAmount);
+  // Fetch unit status, open cleaning tasks, and other checked_in bookings
+  const [{ data: unit }, { data: openCleaning }, { data: otherCheckedIn }] = await Promise.all([
+    supabase.from("units").select("status").eq("id", booking.unit_id).single(),
+    supabase.from("cleaning_tasks").select("id").eq("unit_id", booking.unit_id).eq("is_completed", false).limit(1),
+    supabase.from("daily_bookings").select("id").eq("unit_id", booking.unit_id).eq("status", "checked_in").neq("id", bookingId).limit(1),
+  ]);
+
+  const policy = allowCheckIn({
+    booking,
+    prepaidAmount,
+    hasOpenCleaningTask: (openCleaning?.length ?? 0) > 0,
+    otherCheckedInCount: otherCheckedIn?.length ?? 0,
+    unitStatus: (unit?.status ?? null) as UnitStatus | null,
+  });
   if (!policy.allowed) return { success: false, error: policy.reason };
 
-  const billingStatus = resolveBillingStatus(prepaidAmount, Number(booking.total_amount_xof), "checked_in");
-
   await supabase.from("daily_bookings").update({
-    status: "checked_in", prepaid_amount_xof: prepaidAmount, billing_status: billingStatus,
+    status: "checked_in",
   }).eq("id", bookingId);
 
   await supabase.from("units").update({ status: "daily_occupied" }).eq("id", booking.unit_id);
@@ -271,11 +355,12 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
       customer_id: booking.customer_id, unit_id: booking.unit_id, source_type: "daily_booking", source_id: bookingId,
       payment_date: new Date().toISOString().slice(0, 10), amount: prepaidAmount, currency: "XOF", exchange_rate_to_xof: 1,
     }).select("id").single();
-    await supabase.from("ledger_entries").insert({
-      building_id: unit?.building_id ?? null, unit_id: booking.unit_id, payment_id: payment?.id,
-      entry_date: new Date().toISOString().slice(0, 10), direction: "income", category: "daily_rental",
-      amount_xof: prepaidAmount, description: `日租预付 booking=${bookingId}`,
-    });
+    if (payment) {
+      await insertLedgerEntry(supabase, {
+        bookingId, unitId: booking.unit_id, buildingId: unit?.building_id ?? null, paymentId: payment.id,
+        amount: prepaidAmount, direction: "income", description: `日租预付 booking=${bookingId}`,
+      });
+    }
   }
 
   await supabase.from("audit_logs").insert({
@@ -283,11 +368,10 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
     metadata: { prepaid_amount: prepaidAmount, checkout_mode: booking.checkout_mode },
   });
 
-  // Sync receivable
+  // Full financial sync: receivable → booking prepaid → billing status
   if (prepaidAmount > 0) {
-    await syncReceivablesForSource("daily_booking", bookingId);
+    await syncBookingFinance(supabase, bookingId);
   }
-  await syncBookingPrepaid(supabase, bookingId);
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
@@ -311,13 +395,6 @@ export async function recordSupplementaryPayment(input: {
     .select("*").eq("id", input.bookingId).eq("status", "checked_in").single();
   if (!booking) return { success: false, error: "Booking not found or not checked in." };
 
-  const newPrepaid = Number(booking.prepaid_amount_xof) + input.amount;
-  const billingStatus = resolveBillingStatus(newPrepaid, Number(booking.final_amount_xof ?? booking.total_amount_xof), booking.status);
-
-  await supabase.from("daily_bookings").update({
-    prepaid_amount_xof: newPrepaid, billing_status: billingStatus,
-  }).eq("id", input.bookingId);
-
   const { data: unit } = await supabase.from("units").select("building_id").eq("id", booking.unit_id).single();
   const { data: payment } = await supabase.from("payments").insert({
     customer_id: booking.customer_id, unit_id: booking.unit_id,
@@ -327,20 +404,21 @@ export async function recordSupplementaryPayment(input: {
     receipt_no: input.receiptNo ?? null,
   }).select("id").single();
 
-  await supabase.from("ledger_entries").insert({
-    building_id: unit?.building_id ?? null, unit_id: booking.unit_id, payment_id: payment?.id,
-    entry_date: input.paymentDate ?? new Date().toISOString().slice(0, 10),
-    direction: "income", category: "daily_rental",
-    amount_xof: input.amount, description: `日租补缴 booking=${input.bookingId}`,
-  });
+  if (payment) {
+    await insertLedgerEntry(supabase, {
+      bookingId: input.bookingId, unitId: booking.unit_id, buildingId: unit?.building_id ?? null,
+      paymentId: payment.id, amount: input.amount, direction: "income",
+      entryDate: input.paymentDate,
+      description: `日租补缴 booking=${input.bookingId}`,
+    });
+  }
 
   await supabase.from("audit_logs").insert({
     action: "supplementary_payment", entity_type: "daily_booking", entity_id: input.bookingId,
-    metadata: { amount: input.amount, total_prepaid: newPrepaid },
+    metadata: { amount: input.amount },
   });
 
-  await syncReceivablesForSource("daily_booking", input.bookingId);
-  await syncBookingPrepaid(supabase, input.bookingId);
+  await syncBookingFinance(supabase, input.bookingId);
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
@@ -370,25 +448,7 @@ export async function deletePayment(paymentId: string): Promise<{ success: boole
   if (!booking) return { success: false, error: "Booking not found." };
 
   // Soft-delete ledger: insert reversal entries instead of physical DELETE
-  const { data: entries } = await supabase.from("ledger_entries")
-    .select("*").eq("payment_id", paymentId);
-  if (entries && entries.length > 0) {
-    const today = new Date().toISOString().slice(0, 10);
-    const reversals = entries.map(e => {
-      const revDirection =
-        e.direction === "income" ? "expense" :
-        e.direction === "expense" ? "income" :
-        e.direction === "liability_in" ? "liability_out" :
-        e.direction === "liability_out" ? "liability_in" : e.direction;
-      return {
-        unit_id: e.unit_id, building_id: e.building_id,
-        entry_date: today, direction: revDirection, category: e.category,
-        amount_xof: e.amount_xof, amount_cny: e.amount_cny,
-        description: `冲销 payment=${paymentId.slice(0, 8)}`,
-      };
-    });
-    await supabase.from("ledger_entries").insert(reversals);
-  }
+  await reverseLedgerEntriesForPayment(supabase, paymentId);
 
   await supabase.from("payments").delete().eq("id", paymentId);
 
@@ -397,19 +457,7 @@ export async function deletePayment(paymentId: string): Promise<{ success: boole
     metadata: { amount: payment.amount, booking_id: payment.source_id, unit_id: payment.unit_id },
   });
 
-  await syncReceivablesForSource("daily_booking", payment.source_id);
-  await syncBookingPrepaid(supabase, payment.source_id);
-
-  // Recompute billing_status from canonical prepaid
-  const { data: bookingAfter } = await supabase.from("daily_bookings")
-    .select("prepaid_amount_xof, final_amount_xof, total_amount_xof, status")
-    .eq("id", payment.source_id).single();
-  if (bookingAfter) {
-    const final = Number(bookingAfter.final_amount_xof ?? bookingAfter.total_amount_xof);
-    const prepaid = Number(bookingAfter.prepaid_amount_xof);
-    const billingStatus = resolveBillingStatus(prepaid, final, bookingAfter.status);
-    await supabase.from("daily_bookings").update({ billing_status: billingStatus }).eq("id", payment.source_id);
-  }
+  await syncBookingFinance(supabase, payment.source_id);
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
@@ -439,29 +487,25 @@ export async function checkOut(bookingId: string, input: {
     return { success: false, error: "actualCheckOutBeforeCheckIn" };
   }
 
-  // Calculate final amount if not provided
-  let finalAmount = input.finalAmount;
-  if (finalAmount == null) {
-    const checkIn = new Date(booking.check_in);
-    const checkOutDate = new Date(actualCheckOut);
-    const nights = Math.max(1, Math.ceil((checkOutDate.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)));
-    const gross = Math.round(nights * Number(booking.nightly_price_xof));
-    finalAmount = gross - (input.discountAmount ?? 0);
-  }
+  const checkIn = new Date(booking.check_in);
+  const checkOutDate = new Date(actualCheckOut);
+  const nights = Math.max(1, Math.ceil((checkOutDate.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)));
+  const grossAmount = Math.round(nights * Number(booking.nightly_price_xof));
+  const discountAmount = Math.max(0, Number(input.discountAmount ?? 0));
+  const finalAmount = Math.max(0, input.finalAmount ?? (grossAmount - discountAmount));
 
-  const currentPaid = await sumBookingPayments(supabase, bookingId);
+  const currentPaid = await sumPayments(supabase, bookingId);
   const update: Record<string, unknown> = {
     status: "checked_out",
-    total_amount_xof: finalAmount,
+    total_amount_xof: grossAmount,
     final_amount_xof: finalAmount,
     prepaid_amount_xof: currentPaid,
-    billing_status: resolveBillingStatus(currentPaid, finalAmount, "checked_out"),
   };
   if (booking.checkout_mode === "open") {
     update.actual_check_out = actualCheckOut;
   }
-  if (input.discountAmount) {
-    update.manual_discount_amount_xof = input.discountAmount;
+  if (discountAmount > 0) {
+    update.manual_discount_amount_xof = discountAmount;
     update.manual_discount_reason = input.discountReason ?? null;
   }
 
@@ -478,17 +522,16 @@ export async function checkOut(bookingId: string, input: {
 
   await supabase.from("audit_logs").insert({
     action: "check_out", entity_type: "daily_booking", entity_id: bookingId,
-    metadata: { final_amount: finalAmount, actual_check_out: actualCheckOut, discount: input.discountAmount ?? 0 },
+    metadata: { final_amount: finalAmount, total_amount: grossAmount, nights, actual_check_out: actualCheckOut, discount: discountAmount },
   });
 
-  // Sync receivable: update amount for open bookings, then sync paid amount
+  // Sync receivable: update amount, then full financial sync
   const { data: receivables } = await supabase.from("receivables")
     .select("id").eq("source_type", "daily_booking").eq("source_id", bookingId).limit(1);
   if (receivables && receivables.length > 0) {
     await updateReceivableAmount(receivables[0].id, finalAmount);
   }
-  await syncReceivablesForSource("daily_booking", bookingId);
-  await syncBookingPrepaid(supabase, bookingId);
+  await syncBookingFinance(supabase, bookingId);
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
@@ -508,15 +551,15 @@ export async function applyDiscount(input: {
   const supabase = await createClient();
   const gross = input.amount > 0 ? input.amount : 0;
   const { data: booking } = await supabase.from("daily_bookings")
-    .select("total_amount_xof, prepaid_amount_xof, nightly_price_xof, checkout_mode").eq("id", input.bookingId).single();
+    .select("total_amount_xof, prepaid_amount_xof, status").eq("id", input.bookingId).single();
   if (!booking) return { success: false, error: "Booking not found." };
+  if (booking.status !== "checked_in") return { success: false, error: "Discount can only be applied to checked-in bookings." };
 
   const newFinal = Math.max(0, Number(booking.total_amount_xof) - gross);
   await supabase.from("daily_bookings").update({
     manual_discount_amount_xof: gross,
     manual_discount_reason: input.reason,
     final_amount_xof: newFinal,
-    billing_status: resolveBillingStatus(Number(booking.prepaid_amount_xof), newFinal, "checked_in"),
   }).eq("id", input.bookingId);
 
   const { data: receivables } = await supabase.from("receivables")
@@ -524,8 +567,7 @@ export async function applyDiscount(input: {
   if (receivables && receivables.length > 0) {
     await updateReceivableAmount(receivables[0].id, newFinal);
   }
-  await syncReceivablesForSource("daily_booking", input.bookingId);
-  await syncBookingPrepaid(supabase, input.bookingId);
+  await syncBookingFinance(supabase, input.bookingId);
 
   await supabase.from("audit_logs").insert({
     action: "apply_discount", entity_type: "daily_booking", entity_id: input.bookingId,
@@ -568,14 +610,12 @@ export async function setFixedCheckout(bookingId: string, newCheckOut: string): 
   const newTotal = Math.round(nights * Number(booking.nightly_price_xof));
   const discount = Number(booking.manual_discount_amount_xof ?? 0);
   const newFinal = Math.max(0, newTotal - discount);
-  const newBillingStatus = resolveBillingStatus(Number(booking.prepaid_amount_xof), newFinal, booking.status);
 
   await supabase.from("daily_bookings").update({
     checkout_mode: "fixed",
     check_out: newCheckOut,
     total_amount_xof: newTotal,
     final_amount_xof: newFinal,
-    billing_status: newBillingStatus,
   }).eq("id", bookingId);
 
   await supabase.from("audit_logs").insert({
@@ -588,8 +628,7 @@ export async function setFixedCheckout(bookingId: string, newCheckOut: string): 
   if (receivables && receivables.length > 0) {
     await updateReceivableAmount(receivables[0].id, newFinal);
   }
-  await syncReceivablesForSource("daily_booking", bookingId);
-  await syncBookingPrepaid(supabase, bookingId);
+  await syncBookingFinance(supabase, bookingId);
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
@@ -640,11 +679,6 @@ export async function extendStay(bookingId: string, newCheckOut: string, extraNi
     await supabase.from("daily_bookings").update({
       total_amount_xof: newTotal,
       final_amount_xof: newFinal,
-      billing_status: resolveBillingStatus(
-        Number(booking.prepaid_amount_xof),
-        newFinal,
-        booking.status,
-      ),
     }).eq("id", bookingId);
   } else {
     if (!booking.check_out || newCheckOut <= booking.check_out) {
@@ -656,7 +690,6 @@ export async function extendStay(bookingId: string, newCheckOut: string, extraNi
       check_out: newCheckOut,
       total_amount_xof: newTotal,
       final_amount_xof: newFinal,
-      billing_status: resolveBillingStatus(Number(booking.prepaid_amount_xof), newFinal, booking.status),
     }).eq("id", bookingId);
   }
 
@@ -665,8 +698,7 @@ export async function extendStay(bookingId: string, newCheckOut: string, extraNi
   if (receivables && receivables.length > 0) {
     await updateReceivableAmount(receivables[0].id, newFinal);
   }
-  await syncReceivablesForSource("daily_booking", bookingId);
-  await syncBookingPrepaid(supabase, bookingId);
+  await syncBookingFinance(supabase, bookingId);
 
   await supabase.from("audit_logs").insert({
     action: "extend_stay", entity_type: "daily_booking", entity_id: bookingId,
@@ -695,8 +727,27 @@ export async function cancelBooking(bookingId: string): Promise<{ success: boole
   await supabase.from("daily_bookings").update({ status: "cancelled" }).eq("id", bookingId);
   const nextStatus = await resolveUnitStatusAfterDailyChange(supabase, booking.unit_id, { excludeBookingId: bookingId });
   await supabase.from("units").update({ status: nextStatus }).eq("id", booking.unit_id);
-  await supabase.from("audit_logs").insert({ action: "cancel", entity_type: "daily_booking", entity_id: bookingId, metadata: {} });
+
+  // Reverse all payments + ledger entries for this booking
+  const { data: bookingPayments } = await supabase
+    .from("payments")
+    .select("id")
+    .eq("source_type", "daily_booking")
+    .eq("source_id", bookingId);
+
+  if (bookingPayments && bookingPayments.length > 0) {
+    for (const p of bookingPayments) {
+      await reverseLedgerEntriesForPayment(supabase, p.id);
+    }
+    await supabase.from("payments").delete().eq("source_type", "daily_booking").eq("source_id", bookingId);
+  }
+
+  await supabase.from("audit_logs").insert({
+    action: "cancel", entity_type: "daily_booking", entity_id: bookingId,
+    metadata: { payments_reversed: bookingPayments?.length ?? 0 },
+  });
   await cancelReceivablesForSource("daily_booking", bookingId);
+  await supabase.from("daily_bookings").update({ prepaid_amount_xof: 0 }).eq("id", bookingId);
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");

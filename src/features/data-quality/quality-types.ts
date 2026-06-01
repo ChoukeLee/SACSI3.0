@@ -16,6 +16,12 @@ export interface QualityIssue {
   suggestedAction: string;
   detectedAt: string;
   status: QualityStatus;
+  /** Whether this issue can be fixed automatically via repair action. */
+  fixable?: boolean;
+  /** The repair action identifier (matched in repairDailyRentalIssue). */
+  repairAction?: string;
+  /** The entity ID to pass to the repair function. */
+  repairEntityId?: string | null;
 }
 
 export type TodoRole = "admin" | "boss" | "finance" | "front_desk";

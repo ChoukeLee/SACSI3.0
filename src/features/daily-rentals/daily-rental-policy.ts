@@ -2,6 +2,94 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 
+// Unified action type: single source of truth for button logic.
+
+export type DailyPrimaryAction =
+  | "create_booking"
+  | "confirm"
+  | "check_in"
+  | "check_out"
+  | "complete_cleaning"
+  | "view_settlement"
+  | "readonly";
+
+export interface GetPrimaryActionInput {
+  bookingStatus?: DailyBookingStatus | null;
+  roomDisplayStatus?: DailyRoomDisplayStatus;
+  hasOpenCleaningTask?: boolean;
+  isPastDate?: boolean;
+  unitStatus?: UnitStatus | null;
+}
+
+export function getPrimaryDailyAction(input: GetPrimaryActionInput): {
+  action: DailyPrimaryAction; allowed: boolean; reason?: string;
+} {
+  const {
+    bookingStatus, roomDisplayStatus, hasOpenCleaningTask,
+    isPastDate, unitStatus,
+  } = input;
+
+  // Unit-level blocks: sold / leased / maintenance / locked.
+  if (unitStatus === "sold" || unitStatus === "maintenance" || unitStatus === "locked") {
+    return { action: "readonly", allowed: false, reason: `unit_${unitStatus}` };
+  }
+  if (unitStatus === "leased") {
+    return { action: "readonly", allowed: false, reason: "unit_leased" };
+  }
+
+  // No booking: create if the room display state allows it.
+  if (!bookingStatus || bookingStatus === "cancelled") {
+    if (roomDisplayStatus) {
+      if (roomDisplayStatus === "maintenance" || roomDisplayStatus === "locked") {
+        return { action: "readonly", allowed: false, reason: "room_blocked" };
+      }
+      if (roomDisplayStatus === "cleaning") {
+        return { action: "complete_cleaning", allowed: true };
+      }
+      if (roomDisplayStatus === "occupied" || roomDisplayStatus === "checking_out_today" || roomDisplayStatus === "reserved") {
+        return { action: "readonly", allowed: false, reason: "room_occupied_or_reserved" };
+      }
+    }
+    // Past date + no existing booking: normal bookings are not allowed.
+    if (isPastDate) {
+      return { action: "readonly", allowed: false, reason: "past_date_no_booking" };
+    }
+    // Cleaning pending on unit
+    if (hasOpenCleaningTask) {
+      return { action: "complete_cleaning", allowed: true };
+    }
+    return { action: "create_booking", allowed: true };
+  }
+
+  // Has a booking: map the primary action by status.
+  switch (bookingStatus) {
+    case "pending_review":
+      return { action: "confirm", allowed: true };
+
+    case "confirmed":
+      // Cannot check in while cleaning is pending on the unit
+      if (hasOpenCleaningTask) {
+        return { action: "complete_cleaning", allowed: true };
+      }
+      return { action: "check_in", allowed: true };
+
+    case "checked_in":
+      return { action: "check_out", allowed: true };
+
+    case "checked_out":
+      if (hasOpenCleaningTask) {
+        return { action: "complete_cleaning", allowed: true };
+      }
+      return { action: "view_settlement", allowed: true };
+
+    default:
+      // Cancelled or any other unhandled status: readonly.
+      return { action: "readonly", allowed: false, reason: bookingStatus === "cancelled" ? "booking_cancelled" : "unknown_status" };
+  }
+}
+
+// Original types, extended below.
+
 export type DailyBookingStatus =
   | "pending_review"
   | "confirmed"
@@ -47,6 +135,7 @@ export interface CreateBookingPolicyInput {
   checkoutMode?: "fixed" | "open";
   todayStr?: string;
   isBackfill?: boolean;
+  unitStatus?: UnitStatus | null;
 }
 
 export function todayIso() {
@@ -59,6 +148,16 @@ export function allowCreateBooking(input: CreateBookingPolicyInput): PolicyResul
   const today = input.todayStr ?? todayIso();
 
   if (!checkIn) return { allowed: false, reason: "checkInRequired" };
+
+  // Unit-level blocks.
+  if (input.unitStatus) {
+    if (input.unitStatus === "maintenance") return { allowed: false, reason: "unitMaintenance" };
+    if (input.unitStatus === "locked") return { allowed: false, reason: "unitLocked" };
+    if (input.unitStatus === "sold") return { allowed: false, reason: "saleConflict" };
+    if (input.unitStatus === "leased") return { allowed: false, reason: "longLeaseConflict" };
+  }
+
+  // Date checks.
   if (!input.isBackfill && checkIn < today) return { allowed: false, reason: "pastDateNotAllowed" };
 
   if (mode === "fixed") {
@@ -74,8 +173,35 @@ export function allowConfirmBooking(booking: Pick<DailyBookingRow, "status">): P
   return { allowed: true };
 }
 
-export function allowCheckIn(booking: Pick<DailyBookingRow, "status" | "checkout_mode">, prepaidAmount: number): PolicyResult {
+export interface CheckInPolicyInput {
+  booking: Pick<DailyBookingRow, "status" | "checkout_mode">;
+  prepaidAmount: number;
+  hasOpenCleaningTask?: boolean;
+  otherCheckedInCount?: number;
+  unitStatus?: UnitStatus | null;
+}
+
+export function allowCheckIn(input: CheckInPolicyInput): PolicyResult {
+  const { booking, prepaidAmount, hasOpenCleaningTask, otherCheckedInCount, unitStatus } = input;
+
   if (booking.status !== "confirmed") return { allowed: false, reason: "bookingNotConfirmed" };
+
+  // Unit-level blocks
+  if (unitStatus) {
+    if (unitStatus === "maintenance") return { allowed: false, reason: "unitMaintenance" };
+    if (unitStatus === "locked") return { allowed: false, reason: "unitLocked" };
+    if (unitStatus === "sold") return { allowed: false, reason: "saleConflict" };
+    if (unitStatus === "leased") return { allowed: false, reason: "longLeaseConflict" };
+  }
+
+  // Cleaning must be completed before check-in
+  if (hasOpenCleaningTask) return { allowed: false, reason: "cleaningPending" };
+
+  // Cannot check in if another guest is already checked in
+  if (otherCheckedInCount && otherCheckedInCount > 0) {
+    return { allowed: false, reason: "unitAlreadyOccupied" };
+  }
+
   if (booking.checkout_mode !== "open" && prepaidAmount <= 0) {
     return { allowed: false, reason: "prepaymentRequired" };
   }

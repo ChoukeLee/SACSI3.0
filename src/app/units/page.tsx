@@ -22,7 +22,7 @@ export default async function UnitsPage() {
 
   const [buildingRes, flagsRes] = await Promise.all([
     supabase.from("buildings").select("id").eq("code", "SASCI11").single(),
-    supabase.from("unit_business_flags").select("*"),
+    supabase.from("unit_business_flags").select("unit_id, business_type, is_enabled, default_price_xof"),
   ]);
 
   if (flagsRes.error) console.error("Failed to fetch business flags:", flagsRes.error);
@@ -30,9 +30,9 @@ export default async function UnitsPage() {
 
   const buildingId = buildingRes.data?.id;
   if (buildingId) {
-    const { data: unitsData, error: unitsErr } = await supabase.from("units").select("*").eq("building_id", buildingId).order("unit_no");
+    const { data: unitsData, error: unitsErr } = await supabase.from("units").select("id, building_id, code, unit_no, floor_label, kind, status, area_sqm, layout, furnishing, notes").eq("building_id", buildingId).order("unit_no");
     if (unitsErr) console.error("Failed to fetch units:", unitsErr);
-    else units = sortUnits(unitsData);
+    else units = sortUnits(unitsData as unknown as UnitRow[]);
   }
 
   // Build business flags map

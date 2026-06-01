@@ -1,18 +1,22 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Search, ShieldAlert, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertTriangle, ArrowRight, Search, ShieldAlert, ChevronDown, ChevronUp, Wrench } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
+import { repairDailyRentalIssue } from "@/features/daily-rentals/daily-rental-repair";
 import type { QualityIssue, QualityCategory, QualitySeverity } from "./quality-types";
 
 interface Props {
   issues: QualityIssue[];
   locale: Locale;
+  userRole?: string;
 }
 
 const CATEGORY_LABELS: Record<Locale, Record<QualityCategory, string>> = {
@@ -29,13 +33,44 @@ const sevLabels: Record<Locale, Record<QualitySeverity, string>> = {
   fr: { high: "Élevé", medium: "Moyen", low: "Faible" },
 };
 
-export function QualityCenter({ issues, locale }: Props) {
+export function QualityCenter({ issues, locale, userRole }: Props) {
+  const router = useRouter();
   const catLabels = CATEGORY_LABELS[locale];
 
   const [severityFilter, setSeverityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [repairingId, setRepairingId] = useState<string | null>(null);
+  const [repairErrorById, setRepairErrorById] = useState<Record<string, string>>({});
+
+  const isAdmin = userRole === "admin";
+
+  const handleRepair = async (issue: QualityIssue, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!issue.repairEntityId) return;
+    setRepairingId(issue.id);
+    setRepairErrorById((prev) => {
+      const next = { ...prev };
+      delete next[issue.id];
+      return next;
+    });
+    try {
+      const result = await repairDailyRentalIssue(issue.id, issue.repairEntityId);
+      if (result.success) {
+        router.refresh();
+      } else {
+        setRepairErrorById((prev) => ({ ...prev, [issue.id]: result.message }));
+      }
+    } catch (err: unknown) {
+      setRepairErrorById((prev) => ({
+        ...prev,
+        [issue.id]: err instanceof Error ? err.message : "Repair failed",
+      }));
+    } finally {
+      setRepairingId(null);
+    }
+  };
 
   const filtered = useMemo(() => {
     return issues.filter(i => {
@@ -157,6 +192,31 @@ export function QualityCenter({ issues, locale }: Props) {
                         <span className="font-semibold">{zh ? "关联实体" : "Liés"}: </span>
                         <span className="text-muted-foreground font-mono text-xs">{i.relatedEntities.map(e => e.slice(0, 8)).join(", ")}</span>
                       </div>
+                    )}
+                    {isAdmin && i.fixable && i.repairEntityId && (
+                      <div className="pt-1">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          disabled={repairingId === i.id}
+                          onClick={(e) => handleRepair(i, e)}
+                        >
+                          {repairingId === i.id ? (
+                            <span className="inline-flex items-center gap-1">...</span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1">
+                              <Wrench className="h-3.5 w-3.5" />
+                              {zh ? "修复此项" : "Réparer"}
+                            </span>
+                          )}
+                        </Button>
+                        {repairErrorById[i.id] && (
+                          <p className="mt-1 text-xs text-accentRed-600">{repairErrorById[i.id]}</p>
+                        )}
+                      </div>
+                    )}
+                    {!isAdmin && i.fixable && (
+                      <p className="text-xs text-muted-foreground">{zh ? "仅管理员可修复" : "Admin requis pour réparer"}</p>
                     )}
                   </div>
                 )}

@@ -6,6 +6,8 @@ import { Building2, CalendarDays, Home, Users } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { getMobileNavLabels } from "@/lib/nav-labels";
+import { useNavigationTransition } from "@/components/navigation-transition-provider";
+import { usePrefetch } from "@/components/navigation-prefetch";
 import { cn } from "@/lib/utils";
 
 const mobileTabs = [
@@ -17,12 +19,15 @@ const mobileTabs = [
 
 export function MobileBottomNav({ locale, userRole: _userRole }: { locale: Locale; userRole?: string }) {
   const pathname = usePathname();
+  const { pendingHref, startNavigation } = useNavigationTransition();
+  const prefetch = usePrefetch();
   const labels = getMobileNavLabels(locale);
+  const activeHref = pendingHref ?? pathname;
 
   const isActive = (href: string) => {
     const localized = routeFor(locale, href);
-    if (href === "/") return pathname === "/" || pathname === "/fr" || pathname === "/front-desk" || pathname === "/fr/front-desk";
-    return pathname === localized || pathname.startsWith(localized);
+    if (href === "/") return activeHref === "/" || activeHref === "/fr" || activeHref === "/front-desk" || activeHref === "/fr/front-desk";
+    return activeHref === localized || activeHref.startsWith(localized);
   };
 
   const resolveHref = (href: string) => {
@@ -45,6 +50,12 @@ export function MobileBottomNav({ locale, userRole: _userRole }: { locale: Local
             <Link
               key={item.key}
               href={resolveHref(item.href)}
+              onClick={() => {
+                const target = resolveHref(item.href);
+                if (pathname !== target) startNavigation(target);
+              }}
+              onMouseEnter={() => prefetch(resolveHref(item.href))}
+              onFocus={() => prefetch(resolveHref(item.href))}
               className={cn(
                 "relative flex flex-col items-center justify-center gap-0.5 min-h-[52px] min-w-[72px] px-1",
                 "text-xs font-semibold select-none rounded-lg",

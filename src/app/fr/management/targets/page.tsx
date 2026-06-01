@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { TargetsView } from "@/app/management/targets/targets-view";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function FrenchTargetsPage() {
   const user = await getCurrentUser();
