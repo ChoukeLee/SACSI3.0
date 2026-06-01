@@ -311,5 +311,9 @@ export function computeTodos(input: DataInput): TodoItem[] {
 }
 
 function formatXofRaw(amount: number): string {
-  return new Intl.NumberFormat("fr-CI", { style: "currency", currency: "XOF", maximumFractionDigits: 0 }).format(amount);
+  const safeValue = Number.isFinite(amount) ? amount : 0;
+  return `${new Intl.NumberFormat("zh-CN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(safeValue / 10000)}万 FCFA`;
 }

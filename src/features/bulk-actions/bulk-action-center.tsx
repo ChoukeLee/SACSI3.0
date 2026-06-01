@@ -5,7 +5,7 @@ import {
   AlertTriangle, Check, X, Loader2, Play, Eye, Download,
   ChevronDown, ChevronUp,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatXof } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
@@ -131,7 +131,7 @@ export function BulkActionCenter({ locale, userRole }: Props) {
             <div className="flex gap-3 text-sm">
               <span className="text-emerald-600">{zh ? "将修改" : "Modif."}: {preview.changeCount}</span>
               <span className="text-amber-600">{zh ? "跳过" : "Sautés"}: {preview.skipCount}</span>
-              {preview.totalAmount > 0 && <span className="text-muted-foreground">{zh ? "涉及金额" : "Montant"}: {preview.totalAmount.toLocaleString()} XOF</span>}
+              {preview.totalAmount > 0 && <span className="text-muted-foreground">{zh ? "涉及金额" : "Montant"}: {formatXof(preview.totalAmount)}</span>}
             </div>
           </CardHeader>
           <CardContent className="space-y-3">

@@ -5,12 +5,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatXof(amount: number) {
-  return new Intl.NumberFormat("fr-CI", {
-    style: "currency",
-    currency: "XOF",
-    maximumFractionDigits: 0
-  }).format(amount);
+export function formatXof(amount: number | string | null | undefined) {
+  const value = Number(amount ?? 0);
+  const safeValue = Number.isFinite(value) ? value : 0;
+  const valueInTenThousands = safeValue / 10000;
+
+  return `${new Intl.NumberFormat("zh-CN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(valueInTenThousands)}万 FCFA`;
 }
 
 function firstNumber(value: string | null | undefined): number | null {

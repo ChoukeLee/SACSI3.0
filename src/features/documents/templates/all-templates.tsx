@@ -179,7 +179,7 @@ export function printLeaseReceiptDoc(data: DocumentRecord, locale: Locale) {
       <tr><td class="lbl">${L.paid}</td><td class="val" style="color:#16a34a">${formatXof(data.paidAmountXof)}</td></tr>
       ${unpaid > 0 ? `<tr><td class="lbl" style="color:#dc2626">${L.outstanding}</td><td class="val" style="color:#dc2626;font-weight:700">${formatXof(unpaid)}</td></tr>` : ""}
     </table>
-    <div class="total-row"><span class="lbl">${L.amount}</span><span class="val">${formatXof(data.amountXof)} XOF</span></div>
+    <div class="total-row"><span class="lbl">${L.amount}</span><span class="val">${formatXof(data.amountXof)}</span></div>
     <p style="font-size:10px;color:#64748b;margin-top:8px">${statusBadge(data.status, L.statusLabels)}</p>
     ${sigBlock(L.signTenant, L.signStaff)}
     <div class="footer">${L.company} · ${L.building} · ${new Date().toLocaleDateString()}</div>`;

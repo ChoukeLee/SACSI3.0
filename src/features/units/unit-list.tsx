@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, Building2, ChevronDown, ChevronUp, Home, Key } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
-import { cn, sortUnits } from "@/lib/utils";
+import { cn, formatXof, sortUnits } from "@/lib/utils";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { UnitDetailPanel } from "./unit-detail-panel";
@@ -293,7 +293,7 @@ function UnitTableRow({
       <td><StatusPill status={unit.status} locale={locale} /></td>
       <td className="text-sm text-muted-foreground">{enabledFlags.map((flag) => t.businessTypes[flag.business_type]).join(" / ") || "-"}</td>
       {!compact && (
-        <td className="table-cell-amount">{dailyFlag?.default_price_xof != null ? Number(dailyFlag.default_price_xof).toLocaleString() : "-"}</td>
+        <td className="table-cell-amount">{dailyFlag?.default_price_xof != null ? formatXof(dailyFlag.default_price_xof) : "-"}</td>
       )}
       <td className="table-cell-action">
         <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); onOpen(); }}>
