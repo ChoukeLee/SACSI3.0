@@ -460,10 +460,10 @@ export function DailyCalendar({
           </div>
         </div>
 
-        <div ref={scrollRef} className="scroll-hint-x overflow-x-auto" data-scroll-x>
+        <div ref={scrollRef} className="overflow-hidden">
           <div
-            className="grid w-full min-w-full"
-            style={{ gridTemplateColumns: `${ROOM_COL_WIDTH}px repeat(${visibleDays.length}, minmax(${DAY_COL_MIN_WIDTH}px, 1fr))`, minWidth: "100%" }}
+            className="grid w-full"
+            style={{ gridTemplateColumns: `${ROOM_COL_WIDTH}px repeat(${visibleDays.length}, minmax(0, 1fr))` }}
             role="grid"
             aria-label={copy.timeline}
           >
