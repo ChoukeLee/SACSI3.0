@@ -113,6 +113,13 @@
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 999px; }
 
+[data-daily-calendar-grid] > *,
+[role="grid"][data-daily-calendar-grid] > *,
+main [role="grid"] > * {
+  position: relative !important;
+  left: auto !important;
+}
+
 @media print {
   body { background: white !important; color: black !important; }
   .no-print, nav, aside, header { display: none !important; }

@@ -455,12 +455,13 @@ export function DailyCalendar({
           <div
             className="grid w-full"
             style={{ gridTemplateColumns: `${ROOM_COL_WIDTH}px repeat(${visibleDays.length}, minmax(0, 1fr))` }}
+            data-daily-calendar-grid
             role="grid"
             aria-label={copy.timeline}
           >
             <div
               className="z-30 flex items-center border-b border-r bg-card px-3 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"
-              style={{ height: 40 }}
+              style={{ height: 40, left: "auto", position: "relative" }}
             >
               {copy.roomType}
             </div>
@@ -513,7 +514,7 @@ export function DailyCalendar({
                     <div
                       key={`${unit.id}-room`}
                       className="z-10 flex items-center border-b border-r bg-card px-3"
-                      style={{ height: ROW_HEIGHT }}
+                      style={{ height: ROW_HEIGHT, left: "auto", position: "relative" }}
                       role="rowheader"
                       title={`${copy.room} ${unit.unit_no} - ${statusLabel} - ${copy.apartment}`}
                     >
@@ -1001,7 +1002,7 @@ function FloorRow({
     <>
       <div
         className="z-10 flex items-center border-b border-r bg-muted px-3 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"
-        style={{ height: FLOOR_ROW_HEIGHT }}
+        style={{ height: FLOOR_ROW_HEIGHT, left: "auto", position: "relative" }}
       >
         {floor}
       </div>
