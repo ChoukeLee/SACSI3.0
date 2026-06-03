@@ -35,6 +35,18 @@ const ACTION_LABELS: Record<string, Record<string, string>> = {
     move_out: "退租结算", status_change: "修改状态",
     role_change: "修改角色", generate: "生成",
     confirm: "确认", settle: "结算",
+    daily_booking_backfill: "历史补录",
+    supplementary_payment: "补缴房费",
+    payment_reversed: "撤销收款",
+    payment_deleted: "删除收款",
+    set_fixed_checkout: "设定退房日",
+    apply_discount: "优惠折扣",
+    extend_stay: "续住",
+    generate_receivables: "生成应收",
+    complete_cleaning: "完成保洁",
+    backup: "数据备份",
+    update_setting: "修改设置",
+    bulk_action: "批量操作",
   },
   fr: {
     create: "Créer", update: "Modifier", delete: "Supprimer",
@@ -43,6 +55,18 @@ const ACTION_LABELS: Record<string, Record<string, string>> = {
     move_out: "Sortie", status_change: "Changer statut",
     role_change: "Changer rôle", generate: "Générer",
     confirm: "Confirmer", settle: "Régler",
+    daily_booking_backfill: "Saisie historique",
+    supplementary_payment: "Paiement complementaire",
+    payment_reversed: "Paiement annule",
+    payment_deleted: "Paiement supprime",
+    set_fixed_checkout: "Fixer le depart",
+    apply_discount: "Remise",
+    extend_stay: "Prolonger",
+    generate_receivables: "Generer creances",
+    complete_cleaning: "Menage termine",
+    backup: "Sauvegarde",
+    update_setting: "Modifier parametre",
+    bulk_action: "Action groupee",
   },
 };
 
@@ -53,6 +77,9 @@ const ENTITY_LABELS: Record<string, Record<string, string>> = {
     payment: "收款", receivable: "应收账款", ledger_entry: "财务流水",
     user: "用户", building: "楼栋", lease_settlement: "退租结算",
     user_profile: "用户档案",
+    cleaning_task: "保洁任务",
+    system_setting: "系统设置",
+    system: "系统",
   },
   fr: {
     daily_booking: "Réservation", lease_contract: "Contrat location",
@@ -60,6 +87,9 @@ const ENTITY_LABELS: Record<string, Record<string, string>> = {
     payment: "Paiement", receivable: "Créance", ledger_entry: "Écriture",
     user: "Utilisateur", building: "Immeuble", lease_settlement: "Sortie",
     user_profile: "Profil",
+    cleaning_task: "Tache menage",
+    system_setting: "Parametre",
+    system: "Systeme",
   },
 };
 
@@ -99,8 +129,8 @@ export function AuditLogViewer({ logs, locale }: Props) {
         const q = search.toLowerCase();
         const haystack = [
           l.entity_label ?? "", l.entity_id ?? "", l.actor_email ?? "",
-          actionLabels[l.action] ?? l.action,
-          entityLabels[l.entity_type] ?? l.entity_type,
+          labelOrHumanize(actionLabels, l.action),
+          labelOrHumanize(entityLabels, l.entity_type),
         ].join(" ").toLowerCase();
         if (!haystack.includes(q)) return false;
       }
@@ -117,6 +147,10 @@ export function AuditLogViewer({ logs, locale }: Props) {
     const d = new Date(iso);
     return `${d.toLocaleDateString(locale === "zh" ? "zh-CN" : "fr-FR")} ${d.toLocaleTimeString(locale === "zh" ? "zh-CN" : "fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
   };
+
+  function labelOrHumanize(labels: Record<string, string>, key: string) {
+    return labels[key] ?? key.replace(/_/g, " ");
+  }
 
   const renderDiff = (before: Record<string, unknown> | null, after: Record<string, unknown> | null) => {
     if (!before && !after) return <p className="text-sm text-muted-foreground">{zh ? "无变更数据" : "Aucune donnée"}</p>;
@@ -150,11 +184,11 @@ export function AuditLogViewer({ logs, locale }: Props) {
         <DateInput value={dateTo} onChangeValue={setDateTo} className={filterDate} />
         <select value={actionFilter} onChange={e => setActionFilter(e.target.value)} className={filterSelect}>
           <option value="all">{zh ? "操作" : "Action"}: {zh ? "全部" : "Tous"}</option>
-          {uniqueActions.map(a => <option key={a} value={a}>{actionLabels[a] ?? a}</option>)}
+          {uniqueActions.map(a => <option key={a} value={a}>{labelOrHumanize(actionLabels, a)}</option>)}
         </select>
         <select value={entityFilter} onChange={e => setEntityFilter(e.target.value)} className={filterSelect}>
           <option value="all">{zh ? "模块" : "Module"}: {zh ? "全部" : "Tous"}</option>
-          {uniqueEntities.map(e => <option key={e} value={e}>{entityLabels[e] ?? e}</option>)}
+          {uniqueEntities.map(e => <option key={e} value={e}>{labelOrHumanize(entityLabels, e)}</option>)}
         </select>
         <div className="relative flex-1 min-w-[160px] max-w-[280px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -226,12 +260,12 @@ export function AuditLogViewer({ logs, locale }: Props) {
                       </td>
                       <td className="px-4 py-2.5" onClick={() => setExpandedId(expanded ? null : l.id)}>
                         <Badge variant="secondary" className="text-xs">
-                          {actionLabels[l.action] ?? l.action}
+                          {labelOrHumanize(actionLabels, l.action)}
                         </Badge>
                       </td>
                       <td className="px-4 py-2.5" onClick={() => setExpandedId(expanded ? null : l.id)}>
                         <span className="text-muted-foreground">
-                          {entityLabels[l.entity_type] ?? l.entity_type}
+                          {labelOrHumanize(entityLabels, l.entity_type)}
                           {l.entity_label && <span className="ml-1">· {l.entity_label}</span>}
                         </span>
                       </td>

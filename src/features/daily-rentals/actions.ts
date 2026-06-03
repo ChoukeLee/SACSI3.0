@@ -26,6 +26,7 @@ import {
   insertLedgerEntry,
   reverseLedgerEntriesForPayment,
 } from "./daily-rental-finance";
+import { writeAuditLog } from "@/lib/audit";
 
 // ── Permission guards ──
 async function guardWrite() {
@@ -155,8 +156,8 @@ export async function createBooking(input: {
   if (error) return { success: false, error: error.message };
 
   await supabase.from("units").update({ status: "reserved" }).eq("id", input.unitId);
-  await supabase.from("audit_logs").insert({
-    action: "create", entity_type: "daily_booking", entity_id: data.id,
+  await writeAuditLog({
+    action: "create", entityType: "daily_booking", entityId: data.id,
     metadata: { unit_id: input.unitId, customer_id: input.customerId, check_in: input.checkIn, checkout_mode: mode },
   });
 
@@ -271,10 +272,10 @@ export async function createBackfillBooking(input: {
   }
 
   // Audit log
-  await supabase.from("audit_logs").insert({
+  await writeAuditLog({
     action: "daily_booking_backfill",
-    entity_type: "daily_booking",
-    entity_id: data.id,
+    entityType: "daily_booking",
+    entityId: data.id,
     metadata: {
       reason: input.reason,
       check_in: input.checkIn,
@@ -307,7 +308,7 @@ export async function confirmBooking(bookingId: string): Promise<{ success: bool
 
   const { error } = await supabase.from("daily_bookings").update({ status: "confirmed" }).eq("id", bookingId).eq("status", "pending_review");
   if (error) return { success: false, error: error.message };
-  await supabase.from("audit_logs").insert({ action: "confirm", entity_type: "daily_booking", entity_id: bookingId, metadata: {} });
+  await writeAuditLog({ action: "confirm", entityType: "daily_booking", entityId: bookingId, metadata: {} });
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
@@ -363,8 +364,8 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
     }
   }
 
-  await supabase.from("audit_logs").insert({
-    action: "check_in", entity_type: "daily_booking", entity_id: bookingId,
+  await writeAuditLog({
+    action: "check_in", entityType: "daily_booking", entityId: bookingId,
     metadata: { prepaid_amount: prepaidAmount, checkout_mode: booking.checkout_mode },
   });
 
@@ -413,8 +414,8 @@ export async function recordSupplementaryPayment(input: {
     });
   }
 
-  await supabase.from("audit_logs").insert({
-    action: "supplementary_payment", entity_type: "daily_booking", entity_id: input.bookingId,
+  await writeAuditLog({
+    action: "supplementary_payment", entityType: "daily_booking", entityId: input.bookingId,
     metadata: { amount: input.amount },
   });
 
@@ -452,8 +453,8 @@ export async function deletePayment(paymentId: string): Promise<{ success: boole
 
   await supabase.from("payments").delete().eq("id", paymentId);
 
-  await supabase.from("audit_logs").insert({
-    action: "payment_reversed", entity_type: "payment", entity_id: paymentId,
+  await writeAuditLog({
+    action: "payment_reversed", entityType: "payment", entityId: paymentId,
     metadata: { amount: payment.amount, booking_id: payment.source_id, unit_id: payment.unit_id },
   });
 
@@ -520,8 +521,8 @@ export async function checkOut(bookingId: string, input: {
     unit_id: booking.unit_id, daily_booking_id: bookingId, is_completed: false,
   });
 
-  await supabase.from("audit_logs").insert({
-    action: "check_out", entity_type: "daily_booking", entity_id: bookingId,
+  await writeAuditLog({
+    action: "check_out", entityType: "daily_booking", entityId: bookingId,
     metadata: { final_amount: finalAmount, total_amount: grossAmount, nights, actual_check_out: actualCheckOut, discount: discountAmount },
   });
 
@@ -569,8 +570,8 @@ export async function applyDiscount(input: {
   }
   await syncBookingFinance(supabase, input.bookingId);
 
-  await supabase.from("audit_logs").insert({
-    action: "apply_discount", entity_type: "daily_booking", entity_id: input.bookingId,
+  await writeAuditLog({
+    action: "apply_discount", entityType: "daily_booking", entityId: input.bookingId,
     metadata: { discount: gross, reason: input.reason },
   });
 
@@ -618,8 +619,8 @@ export async function setFixedCheckout(bookingId: string, newCheckOut: string): 
     final_amount_xof: newFinal,
   }).eq("id", bookingId);
 
-  await supabase.from("audit_logs").insert({
-    action: "set_fixed_checkout", entity_type: "daily_booking", entity_id: bookingId,
+  await writeAuditLog({
+    action: "set_fixed_checkout", entityType: "daily_booking", entityId: bookingId,
     metadata: { previous_mode: "open", new_check_out: newCheckOut, new_total: newTotal },
   });
 
@@ -643,18 +644,32 @@ export async function setFixedCheckout(bookingId: string, newCheckOut: string): 
 export async function completeCleaning(taskId: string): Promise<{ success: boolean; error?: string }> {
   await guardWrite();
   const supabase = await createClient();
-  const { data: task } = await supabase.from("cleaning_tasks").select("id, unit_id, is_completed").eq("id", taskId).single();
+  const { data: task } = await supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed").eq("id", taskId).single();
   const policy = allowCompleteCleaning(task);
   if (!policy.allowed) return { success: false, error: policy.reason };
   if (!task) return { success: false, error: "cleaningTaskNotFound" };
   await supabase.from("cleaning_tasks").update({ is_completed: true, completed_at: new Date().toISOString() }).eq("id", taskId);
   const nextStatus = await resolveUnitStatusAfterDailyChange(supabase, task.unit_id);
   await supabase.from("units").update({ status: nextStatus }).eq("id", task.unit_id);
+  const { data: unit } = await supabase.from("units").select("unit_no").eq("id", task.unit_id).single();
+  await writeAuditLog({
+    action: "complete_cleaning",
+    entityType: "cleaning_task",
+    entityId: task.id,
+    entityLabel: unit?.unit_no ? `房间 ${unit.unit_no}` : null,
+    metadata: {
+      unit_id: task.unit_id,
+      unit_no: unit?.unit_no ?? null,
+      daily_booking_id: task.daily_booking_id,
+      next_status: nextStatus,
+    },
+  });
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
   revalidatePath("/finance"); revalidatePath("/fr/finance");
   revalidatePath("/reports"); revalidatePath("/fr/reports");
+  revalidatePath("/settings/audit-logs"); revalidatePath("/fr/settings/audit-logs");
   
 
   return { success: true };
@@ -700,8 +715,8 @@ export async function extendStay(bookingId: string, newCheckOut: string, extraNi
   }
   await syncBookingFinance(supabase, bookingId);
 
-  await supabase.from("audit_logs").insert({
-    action: "extend_stay", entity_type: "daily_booking", entity_id: bookingId,
+  await writeAuditLog({
+    action: "extend_stay", entityType: "daily_booking", entityId: bookingId,
     metadata: { extra_nights: extraNights, extra_amount: extraAmount },
   });
 
@@ -742,8 +757,8 @@ export async function cancelBooking(bookingId: string): Promise<{ success: boole
     await supabase.from("payments").delete().eq("source_type", "daily_booking").eq("source_id", bookingId);
   }
 
-  await supabase.from("audit_logs").insert({
-    action: "cancel", entity_type: "daily_booking", entity_id: bookingId,
+  await writeAuditLog({
+    action: "cancel", entityType: "daily_booking", entityId: bookingId,
     metadata: { payments_reversed: bookingPayments?.length ?? 0 },
   });
   await cancelReceivablesForSource("daily_booking", bookingId);
