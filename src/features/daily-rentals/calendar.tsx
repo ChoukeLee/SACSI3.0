@@ -468,7 +468,7 @@ export function DailyCalendar({
             aria-label={copy.timeline}
           >
             <div
-              className="sticky left-0 z-30 flex items-center border-b border-r bg-card px-3 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"
+              className="z-30 flex items-center border-b border-r bg-card px-3 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"
               style={{ height: 40 }}
             >
               {copy.roomType}
@@ -521,7 +521,7 @@ export function DailyCalendar({
                   return [
                     <div
                       key={`${unit.id}-room`}
-                      className="sticky left-0 z-10 flex items-center border-b border-r bg-card px-3"
+                      className="z-10 flex items-center border-b border-r bg-card px-3"
                       style={{ height: ROW_HEIGHT }}
                       role="rowheader"
                       title={`${copy.room} ${unit.unit_no} - ${statusLabel} - ${copy.apartment}`}
@@ -1009,7 +1009,7 @@ function FloorRow({
   return (
     <>
       <div
-        className="sticky left-0 z-10 flex items-center border-b border-r bg-muted px-3 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"
+        className="z-10 flex items-center border-b border-r bg-muted px-3 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"
         style={{ height: FLOOR_ROW_HEIGHT }}
       >
         {floor}
