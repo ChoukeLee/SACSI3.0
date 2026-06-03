@@ -14,7 +14,7 @@ const seedAccountProfiles: Record<string, { role: UserRole; displayName: string 
   "admin@sacsi.com": { role: "admin", displayName: "管理员" },
   "boss@sacsi.com": { role: "boss", displayName: "王老板" },
   "finance@sacsi.com": { role: "finance", displayName: "李财务" },
-  "front@sacsi.com": { role: "front_desk", displayName: "小张前台" },
+  "front@sacsi.com": { role: "front_desk", displayName: "Niamké" },
 };
 
 export function getSeedAccountProfile(email: string | undefined) {
