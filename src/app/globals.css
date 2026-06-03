@@ -49,12 +49,20 @@
 @layer base {
   * { @apply border-border; }
   html {
+    width: 100%;
+    max-width: 100vw;
     overflow-x: hidden;
+    overflow-x: clip;
+    overscroll-behavior-x: none;
   }
   body {
     @apply bg-background text-foreground;
+    width: 100%;
+    max-width: 100vw;
     min-height: 100dvh;
     overflow-x: hidden;
+    overflow-x: clip;
+    overscroll-behavior-x: none;
     font-family: "Geist", "Inter", "Noto Sans SC", "Microsoft YaHei UI", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

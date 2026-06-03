@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { LogOut } from "lucide-react";
 import type { Locale, ShellDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -62,6 +63,31 @@ function AppShellInner({
   const otherLocale: Locale = locale === "zh" ? "fr" : "zh";
   const labels = getDesktopNavLabels(locale);
   const roleLabel = userRole ? labels.roles[userRole] : "";
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+
+    const resetHorizontalScroll = () => {
+      const y = window.scrollY;
+      if (window.scrollX !== 0) window.scrollTo(0, y);
+      document.documentElement.scrollLeft = 0;
+      document.body.scrollLeft = 0;
+    };
+
+    resetHorizontalScroll();
+    const frame = window.requestAnimationFrame(resetHorizontalScroll);
+    window.addEventListener("scroll", resetHorizontalScroll, { passive: true });
+    window.addEventListener("resize", resetHorizontalScroll);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", resetHorizontalScroll);
+      window.removeEventListener("resize", resetHorizontalScroll);
+    };
+  }, [pathname]);
 
   const handleLogout = async () => {
     const supabase = createClient();
