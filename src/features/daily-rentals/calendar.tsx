@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo, useCallback } from "react";
 import type { ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Copy, Plus, Printer, SlidersHorizontal, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
@@ -35,8 +35,6 @@ type ViewMode = "day" | "week" | "month";
 type RoomFilter = "all" | "available" | "occupied" | "checkingOutToday" | "openEnded" | "reserved" | "cleaning" | "maintenance";
 
 const ROOM_COL_WIDTH = 120;
-const DAY_COL_MIN_WIDTH = 66;
-const DAY_COL_WIDTH = 70;
 const ROW_HEIGHT = 38;
 const FLOOR_ROW_HEIGHT = 16;
 const MAINTENANCE_STATUSES = new Set(["available", "reserved", "daily_occupied", "cleaning_pending", "leased", "sold"]);
@@ -143,7 +141,6 @@ export function DailyCalendar({
   const copy = COPY[locale];
   const statusLabels = UNIT_STATUS_LABELS[locale];
   const bookingLabels = BOOKING_STATUS_LABELS[locale];
-  const scrollRef = useRef<HTMLDivElement | null>(null);
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [roomFilter, setRoomFilter] = useState<RoomFilter>("all");
@@ -340,12 +337,6 @@ export function DailyCalendar({
 
   const panelBooking = selectedBookingId ? bookings.find((booking) => booking.id === selectedBookingId) ?? null : null;
 
-  useEffect(() => {
-    const todayIndex = visibleDays.findIndex((date) => toDateStr(date) === todayStr);
-    if (todayIndex < 0 || !scrollRef.current) return;
-    scrollRef.current.scrollLeft = Math.max(0, (todayIndex - 1) * DAY_COL_WIDTH);
-  }, [todayStr, visibleDays, viewMode]);
-
   const moveRange = useCallback((direction: -1 | 1) => {
     setAnchorDate((prev) => {
       if (viewMode === "month") return new Date(prev.getFullYear(), prev.getMonth() + direction, 1);
@@ -460,7 +451,7 @@ export function DailyCalendar({
           </div>
         </div>
 
-        <div ref={scrollRef} className="overflow-hidden">
+        <div className="overflow-hidden">
           <div
             className="grid w-full"
             style={{ gridTemplateColumns: `${ROOM_COL_WIDTH}px repeat(${visibleDays.length}, minmax(0, 1fr))` }}
