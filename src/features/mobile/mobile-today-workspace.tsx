@@ -2,9 +2,10 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { BedDouble } from "lucide-react";
+import { BedDouble, Building2, CalendarDays, RefreshCw } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import type { DailyBookingRow, UnitRow, CustomerRow, PaymentRow } from "@/types/database";
 import { MobileStatsBar } from "./mobile-stats-bar";
 import { MobileRoomCard } from "./mobile-room-card";
@@ -138,16 +139,37 @@ export function MobileTodayWorkspace({
   );
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-base font-black text-foreground">{t.today}</h1>
-          <p className="text-xs text-muted-foreground">
-            {buildingName}{locale === "zh" ? "公寓" : ""} · {todayFormatted}
-          </p>
+    <div className="space-y-4 pb-2">
+      <section className="overflow-hidden rounded-xl border border-border/70 bg-white shadow-sm">
+        <div className="flex items-start justify-between gap-3 px-4 py-4">
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-2 text-xs font-bold text-muted-foreground">
+              <Building2 className="h-3.5 w-3.5" />
+              <span className="truncate">{buildingName}{locale === "zh" ? "公寓" : ""}</span>
+            </div>
+            <h1 className="text-xl font-black leading-tight text-foreground">{t.today}</h1>
+            <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+              <CalendarDays className="h-3.5 w-3.5" />
+              <span>{todayFormatted}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.refresh()}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-sm active:bg-muted"
+            aria-label={locale === "zh" ? "刷新" : "Actualiser"}
+          >
+            <RefreshCw className="h-4 w-4" />
+          </button>
         </div>
-      </div>
+
+        <div className="grid grid-cols-4 border-t border-border/70 bg-muted/35">
+          <SummaryCell label={t.stats.checkingOut} value={checkingOutCount} tone="amber" />
+          <SummaryCell label={t.stats.cleaning} value={cleaningCount} tone="teal" />
+          <SummaryCell label={t.stats.occupied} value={occupiedCount} tone="blue" />
+          <SummaryCell label={t.stats.available} value={availableCount} tone="green" />
+        </div>
+      </section>
 
       {/* Stats bar (also serves as tab switcher) */}
       <MobileStatsBar
@@ -206,6 +228,29 @@ export function MobileTodayWorkspace({
         locale={locale}
         loading={actionLoading}
       />
+    </div>
+  );
+}
+
+function SummaryCell({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "amber" | "teal" | "blue" | "green";
+}) {
+  const color = {
+    amber: "text-accentAmber-700",
+    teal: "text-emerald-700",
+    blue: "text-accentBlue-700",
+    green: "text-accentGreen-700",
+  }[tone];
+  return (
+    <div className="min-w-0 border-r border-border/60 px-3 py-3 last:border-r-0">
+      <p className={cn("text-lg font-black leading-none tabular-nums", color)}>{value}</p>
+      <p className="mt-1 truncate text-[11px] font-semibold text-muted-foreground">{label}</p>
     </div>
   );
 }

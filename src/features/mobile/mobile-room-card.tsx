@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, CreditCard, Check } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, CreditCard, UserRound } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
@@ -34,7 +34,11 @@ function displayStatusToUnitStatus(status: RoomState["displayStatus"]): UnitStat
 }
 
 export function MobileRoomCard({
-  room, locale, onPress, onCheckOut, onCompleteCleaning,
+  room,
+  locale,
+  onPress,
+  onCheckOut,
+  onCompleteCleaning,
 }: MobileRoomCardProps) {
   const t = dictionaries[locale].mobile;
   const unitStatus = displayStatusToUnitStatus(room.displayStatus);
@@ -43,120 +47,149 @@ export function MobileRoomCard({
   const isOccupied = room.displayStatus === "occupied" || isCheckingOut;
   const isReserved = room.displayStatus === "reserved";
   const isCleaning = room.displayStatus === "cleaning";
-  const hasOutstanding = room.billing && room.billing.outstanding > 0;
+  const hasOutstanding = Boolean(room.billing && room.billing.outstanding > 0);
+
+  const tone = isCheckingOut
+    ? {
+        border: "border-accentAmber-200",
+        bar: "bg-accentAmber-500",
+        soft: "bg-accentAmber-50 text-accentAmber-800",
+      }
+    : isReserved
+      ? {
+          border: "border-accentAmber-200",
+          bar: "bg-accentAmber-400",
+          soft: "bg-accentAmber-50 text-accentAmber-800",
+        }
+      : isCleaning
+        ? {
+            border: "border-emerald-200",
+            bar: "bg-emerald-500",
+            soft: "bg-emerald-50 text-emerald-800",
+          }
+        : hasOutstanding
+          ? {
+              border: "border-accentRed-200",
+              bar: "bg-accentRed-500",
+              soft: "bg-accentRed-50 text-accentRed-700",
+            }
+          : {
+              border: "border-border/80",
+              bar: "bg-accentBlue-400",
+              soft: "bg-accentBlue-50 text-accentBlue-700",
+            };
+
+  const stayText = room.booking
+    ? [
+        room.booking.check_in,
+        room.booking.checkout_mode === "open"
+          ? t.drawer.openEnded
+          : room.booking.check_out || null,
+      ]
+        .filter(Boolean)
+        .join(" -> ")
+    : null;
 
   return (
     <button
       type="button"
       onClick={() => onPress(room)}
       className={cn(
-        "w-full rounded-xl border bg-white p-3.5 shadow-sm text-left",
-        "transition-colors duration-100 active:bg-muted/50",
-        isCheckingOut
-          ? "border-amber-200 bg-amber-50/40"
-          : isReserved
-            ? "border-amber-200 bg-amber-50/30"
-            : isCleaning
-              ? "border-cyan-200 bg-cyan-50/40"
-              : hasOutstanding
-                ? "border-red-200 bg-red-50/30"
-                : "border-border"
+        "flex w-full overflow-hidden rounded-xl border bg-white text-left shadow-sm",
+        "transition active:scale-[0.99] active:bg-muted/40",
+        tone.border,
       )}
     >
-      {/* Top row: room number + status + chevron */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="font-mono text-xl font-black leading-none text-foreground tabular-nums">
-            {room.unit.unit_no}
-          </span>
-          <StatusBadge status={unitStatus} label={dictionaries[locale].statuses[unitStatus]} />
-        </div>
-        <ArrowRight className="h-4 w-4 text-muted-foreground/60 shrink-0 mt-0.5" />
-      </div>
+      <span className={cn("w-1.5 shrink-0", tone.bar)} aria-hidden="true" />
 
-      {/* Guest & stay info */}
-      {(room.customer || room.booking) && (
-        <div className="mt-2.5 flex items-center justify-between gap-2">
-          <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 p-3.5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="font-mono text-xl font-black leading-none text-foreground tabular-nums">
+                {room.unit.unit_no}
+              </span>
+              <StatusBadge status={unitStatus} label={dictionaries[locale].statuses[unitStatus]} />
+            </div>
+          </div>
+          <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/60" />
+        </div>
+
+        {(room.customer || room.booking) && (
+          <div className="mt-3 space-y-1.5">
             {room.customer && (
-              <p className="text-[13px] font-semibold text-foreground/80 truncate">
-                {room.customer.name}
-              </p>
+              <div className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-foreground/85">
+                <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate">{room.customer.name}</span>
+              </div>
             )}
-            {room.booking && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {room.booking.check_in}
-                {room.booking.checkout_mode === "open"
-                  ? ` · ${t.drawer.openEnded}`
-                  : room.booking.check_out
-                    ? ` → ${room.booking.check_out}`
-                    : ""}
-                {room.billing && (
-                  <span className="ml-1.5">
-                    · {room.billing.nights}{t.roomCard.nights}
-                  </span>
-                )}
-              </p>
+            {stayText && (
+              <div className="flex min-w-0 items-center gap-2 text-xs font-medium text-muted-foreground">
+                <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  {stayText}
+                  {room.billing && (
+                    <span className="ml-1.5">
+                      · {room.billing.nights}
+                      {t.roomCard.nights}
+                    </span>
+                  )}
+                </span>
+              </div>
             )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Outstanding balance alert */}
-      {hasOutstanding && (
-        <div className="mt-2.5 flex items-center gap-1.5 rounded-md bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-accentRed-600">
-          <CreditCard className="h-3.5 w-3.5 shrink-0" />
-          <span>
-            {locale === "zh" ? "欠费 " : "Dû "}{formatXof(room.billing!.outstanding)}
-          </span>
-        </div>
-      )}
+        {hasOutstanding && (
+          <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-accentRed-50 px-2.5 py-1.5 text-xs font-bold text-accentRed-700">
+            <CreditCard className="h-3.5 w-3.5 shrink-0" />
+            <span>
+              {locale === "zh" ? "欠费 " : "Du "}
+              {formatXof(room.billing!.outstanding)}
+            </span>
+          </div>
+        )}
 
-      {/* Cleaning pending note */}
-      {isCleaning && (
-        <div className="mt-2.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span className="h-1.5 w-1.5 rounded-full bg-brand-cyan-400" />
-          {locale === "zh" ? "退房后等待保洁" : "En attente de menage"}
-        </div>
-      )}
+        {isCleaning && (
+          <div className={cn("mt-3 inline-flex rounded-lg px-2.5 py-1.5 text-xs font-bold", tone.soft)}>
+            {locale === "zh" ? "等待保洁完成" : "En attente de menage"}
+          </div>
+        )}
 
-      {/* Reserved pending note */}
-      {isReserved && room.booking && (
-        <div className="mt-2.5 flex items-center gap-1.5 text-xs text-brand-amber-700">
-          <span className="h-1.5 w-1.5 rounded-full bg-brand-amber-500" />
-          {locale === "zh" ? "预计入住 " : "Arrivee prevue "}{room.booking.check_in}
-          {room.booking.check_out && (
-            <span> → {room.booking.check_out}</span>
-          )}
-        </div>
-      )}
+        {isReserved && room.booking && (
+          <div className={cn("mt-3 inline-flex rounded-lg px-2.5 py-1.5 text-xs font-bold", tone.soft)}>
+            {locale === "zh" ? "预计入住 " : "Arrivee prevue "}
+            {room.booking.check_in}
+            {room.booking.check_out ? ` -> ${room.booking.check_out}` : ""}
+          </div>
+        )}
 
-      {/* Quick action buttons */}
-      {(isOccupied || isCleaning) && (
-        <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
-          {isOccupied && onCheckOut && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => onCheckOut(room)}
-              className="flex-1 justify-center min-h-[38px]"
-            >
-              {t.roomCard.checkOut}
-            </Button>
-          )}
-          {isCleaning && onCompleteCleaning && room.cleaningTask && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onCompleteCleaning(room)}
-              className="flex-1 justify-center min-h-[38px]"
-            >
-              <Check className="h-3.5 w-3.5" />
-              {t.roomCard.cleaningDone}
-            </Button>
-          )}
-        </div>
-      )}
+        {(isOccupied || isCleaning) && (
+          <div className="mt-3 flex gap-2" onClick={(event) => event.stopPropagation()}>
+            {isOccupied && onCheckOut && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => onCheckOut(room)}
+                className="min-h-[38px] flex-1 justify-center rounded-lg"
+              >
+                {t.roomCard.checkOut}
+              </Button>
+            )}
+            {isCleaning && onCompleteCleaning && room.cleaningTask && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onCompleteCleaning(room)}
+                className="min-h-[38px] flex-1 justify-center rounded-lg"
+              >
+                <Check className="h-3.5 w-3.5" />
+                {t.roomCard.cleaningDone}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
     </button>
   );
 }
