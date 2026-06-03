@@ -15,6 +15,7 @@ import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { NavigationTransitionProvider, useNavigationTransition } from "@/components/navigation-transition-provider";
 import { IdlePrefetch } from "@/components/navigation-prefetch";
 import { getDesktopNavLabels } from "@/lib/nav-labels";
+import { cn } from "@/lib/utils";
 
 function NavigationLoadingBar() {
   const { isNavigating } = useNavigationTransition();
@@ -108,11 +109,11 @@ function AppShellInner({
             </div>
           </div>
         </header>
-        <main className="relative flex-1 p-4 pb-20 sm:p-6 lg:p-8">
+        <main className="relative min-w-0 flex-1 overflow-x-hidden p-4 pb-20 sm:p-6 lg:p-8">
           {isNavigating && (
             <div className="pointer-events-auto absolute inset-0 z-overlay bg-background/40" />
           )}
-          <div className={isNavigating ? "pointer-events-none select-none" : ""}>
+          <div className={cn("min-w-0", isNavigating ? "pointer-events-none select-none" : "")}>
             {children}
           </div>
         </main>
