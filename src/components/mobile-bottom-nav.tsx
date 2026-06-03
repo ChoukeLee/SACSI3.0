@@ -31,7 +31,7 @@ export function MobileBottomNav({ locale, userRole: _userRole }: { locale: Local
   };
 
   const resolveHref = (href: string) => {
-    if (href === "/" && _userRole === "front_desk") return routeFor(locale, "/front-desk");
+    if (href === "/" && _userRole === "front_desk") return routeFor(locale, "/daily-rentals");
     return routeFor(locale, href);
   };
 

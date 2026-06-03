@@ -71,7 +71,7 @@ const COPY = {
     noRooms: "Aucune chambre journaliere",
     timeline: "Planning des reservations",
     subtitle: "Affiche les dates autour d'aujourd'hui. Cliquez une case vide pour creer.",
-    roomType: "Chambre / statut",
+    roomType: "Ch. / statut",
     allRooms: "Toutes",
     day: "Jour",
     week: "Semaine",
@@ -79,11 +79,11 @@ const COPY = {
     today: "Aujourd'hui",
     occupied: "Occupe",
     maintenance: "Maintenance",
-    available: "Disponible",
+    available: "Dispo",
     reserved: "Reserve",
     cleaning: "Menage",
     openEnded: "Ouvert",
-    room: "Chambre",
+    room: "Ch.",
     floor: "Etage",
     unitCount: "unités",
     apartment: "Appartement",
@@ -460,7 +460,7 @@ export function DailyCalendar({
           </div>
         </div>
 
-        <div ref={scrollRef} className="scroll-hint-x overflow-auto" style={{ maxHeight: "calc(100vh - 200px)" }} data-scroll-x>
+        <div ref={scrollRef} className="scroll-hint-x overflow-x-auto" data-scroll-x>
           <div
             className="grid w-full min-w-full"
             style={{ gridTemplateColumns: `${ROOM_COL_WIDTH}px repeat(${visibleDays.length}, minmax(${DAY_COL_MIN_WIDTH}px, 1fr))`, minWidth: "100%" }}
@@ -468,7 +468,7 @@ export function DailyCalendar({
             aria-label={copy.timeline}
           >
             <div
-              className="sticky left-0 top-0 z-30 flex items-center border-b border-r bg-card px-3 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"
+              className="sticky left-0 z-30 flex items-center border-b border-r bg-card px-3 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"
               style={{ height: 40 }}
             >
               {copy.roomType}
@@ -481,7 +481,7 @@ export function DailyCalendar({
                 <div
                   key={dateStr}
                   className={cn(
-                    "sticky top-0 z-20 flex flex-col items-center justify-center border-b border-r border-border text-xs",
+                    "flex flex-col items-center justify-center border-b border-r border-border text-xs",
                     isToday && "bg-accent text-accent-foreground",
                     isWeekend && !isToday && "bg-muted/30 text-muted-foreground",
                     !isToday && !isWeekend && "bg-card text-muted-foreground",
@@ -524,12 +524,15 @@ export function DailyCalendar({
                       className="sticky left-0 z-10 flex items-center border-b border-r bg-card px-3"
                       style={{ height: ROW_HEIGHT }}
                       role="rowheader"
+                      title={`${copy.room} ${unit.unit_no} - ${statusLabel} - ${copy.apartment}`}
                     >
                       <span className={cn("mr-2 h-8 w-1.5 rounded-full", roomTone.strip)} />
                       <div className="min-w-0">
-                        <div className="truncate text-xs font-black leading-4 text-foreground">{copy.room} {unit.unit_no}</div>
+                        <div className="truncate text-xs font-black leading-4 text-foreground">
+                          {locale === "fr" ? unit.unit_no : `${copy.room} ${unit.unit_no}`}
+                        </div>
                         <div className="truncate text-xs font-semibold leading-3 text-muted-foreground">
-                          {statusLabel} · {copy.apartment}
+                          {locale === "fr" ? statusLabel : `${statusLabel} · ${copy.apartment}`}
                         </div>
                       </div>
                     </div>,
