@@ -76,16 +76,33 @@ function AppShellInner({
       document.documentElement.scrollLeft = 0;
       document.body.scrollLeft = 0;
     };
+    const resetDailyCalendarStickyCells = () => {
+      if (!window.location.pathname.includes("daily-rentals")) return;
+      document
+        .querySelectorAll<HTMLElement>('[role="rowheader"], [data-daily-calendar-grid] > *, main [role="grid"] > *')
+        .forEach((element) => {
+          element.style.setProperty("position", "relative", "important");
+          element.style.setProperty("left", "auto", "important");
+          element.style.setProperty("right", "auto", "important");
+          element.style.setProperty("transform", "none", "important");
+        });
+    };
+    const resetLayout = () => {
+      resetHorizontalScroll();
+      resetDailyCalendarStickyCells();
+    };
 
-    resetHorizontalScroll();
-    const frame = window.requestAnimationFrame(resetHorizontalScroll);
-    window.addEventListener("scroll", resetHorizontalScroll, { passive: true });
-    window.addEventListener("resize", resetHorizontalScroll);
+    resetLayout();
+    const frame = window.requestAnimationFrame(resetLayout);
+    const delayedFrames = [250, 1000, 2500].map((delay) => window.setTimeout(resetLayout, delay));
+    window.addEventListener("scroll", resetLayout, { passive: true });
+    window.addEventListener("resize", resetLayout);
 
     return () => {
       window.cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", resetHorizontalScroll);
-      window.removeEventListener("resize", resetHorizontalScroll);
+      delayedFrames.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      window.removeEventListener("scroll", resetLayout);
+      window.removeEventListener("resize", resetLayout);
     };
   }, [pathname]);
 
