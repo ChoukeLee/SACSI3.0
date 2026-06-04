@@ -11,7 +11,7 @@ export interface CurrentUser {
 }
 
 const seedAccountProfiles: Record<string, { role: UserRole; displayName: string }> = {
-  "admin@sacsi.com": { role: "admin", displayName: "管理员" },
+  "admin@sacsi.com": { role: "admin", displayName: "Chouke" },
   "boss@sacsi.com": { role: "boss", displayName: "王老板" },
   "finance@sacsi.com": { role: "finance", displayName: "李财务" },
   "front@sacsi.com": { role: "front_desk", displayName: "Niamké" },
