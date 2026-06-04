@@ -163,8 +163,8 @@ export function AuditLogViewer({ logs, locale }: Props) {
 
   function actorText(log: AuditLogRow) {
     return (
-      log.actor_email ||
       metadataText(log, "actor_display_name") ||
+      log.actor_email ||
       metadataText(log, "actor_email") ||
       log.actor_id?.slice(0, 8) ||
       "—"
