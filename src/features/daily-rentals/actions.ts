@@ -644,38 +644,49 @@ export async function setFixedCheckout(bookingId: string, newCheckOut: string): 
 export async function completeCleaning(taskId: string): Promise<{ success: boolean; error?: string }> {
   await guardWrite();
   const supabase = await createClient();
-  const { data: task } = await supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed").eq("id", taskId).single();
+  const { data: task, error: taskError } = await supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed").eq("id", taskId).single();
+  if (taskError || !task) return { success: false, error: "cleaningTaskNotFound" };
   const policy = allowCompleteCleaning(task);
   if (!policy.allowed) return { success: false, error: policy.reason };
-  if (!task) return { success: false, error: "cleaningTaskNotFound" };
-  await supabase.from("cleaning_tasks").update({ is_completed: true, completed_at: new Date().toISOString() }).eq("id", taskId);
+
+  const completedAt = new Date().toISOString();
+  const { error: taskUpdateError } = await supabase.from("cleaning_tasks").update({ is_completed: true, completed_at: completedAt }).eq("id", taskId);
+  if (taskUpdateError) return { success: false, error: taskUpdateError.message };
+
   const nextStatus = await resolveUnitStatusAfterDailyChange(supabase, task.unit_id);
-  await supabase.from("units").update({ status: nextStatus }).eq("id", task.unit_id);
+  const { error: unitUpdateError } = await supabase.from("units").update({ status: nextStatus }).eq("id", task.unit_id);
+  if (unitUpdateError) return { success: false, error: unitUpdateError.message };
+
   const { data: unit } = await supabase.from("units").select("unit_no").eq("id", task.unit_id).single();
-  await writeAuditLog({
-    action: "complete_cleaning",
-    entityType: "cleaning_task",
-    entityId: task.id,
-    entityLabel: unit?.unit_no ? `房间 ${unit.unit_no}` : null,
-    metadata: {
-      unit_id: task.unit_id,
-      unit_no: unit?.unit_no ?? null,
-      daily_booking_id: task.daily_booking_id,
-      next_status: nextStatus,
-    },
-  });
+  try {
+    await writeAuditLog({
+      action: "complete_cleaning",
+      entityType: "cleaning_task",
+      entityId: task.id,
+      entityLabel: unit?.unit_no ? `Room ${unit.unit_no}` : null,
+      beforeData: { is_completed: task.is_completed },
+      afterData: { is_completed: true, completed_at: completedAt },
+      metadata: {
+        unit_id: task.unit_id,
+        unit_no: unit?.unit_no ?? null,
+        daily_booking_id: task.daily_booking_id,
+        next_status: nextStatus,
+      },
+    });
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "auditLogWriteFailed" };
+  }
+
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
   revalidatePath("/finance"); revalidatePath("/fr/finance");
   revalidatePath("/reports"); revalidatePath("/fr/reports");
   revalidatePath("/settings/audit-logs"); revalidatePath("/fr/settings/audit-logs");
-  
 
   return { success: true };
 }
 
-// ── Extend stay ──
 export async function extendStay(bookingId: string, newCheckOut: string, extraNights: number, extraAmount: number): Promise<{ success: boolean; error?: string }> {
   await guardWrite();
   if (extraNights <= 0 || extraAmount < 0) {

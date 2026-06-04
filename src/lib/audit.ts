@@ -12,15 +12,29 @@ export interface AuditInput {
 }
 
 /**
- * Write an audit log entry. Does NOT throw — logs errors to console.
- * Auto-fills actor info from the current session.
+ * Write an audit log entry and attach the current actor when available.
+ *
+ * The deployed database may still use the original audit_logs schema, which
+ * only has actor_id/action/entity_type/entity_id/metadata/created_at. When the
+ * enhanced columns are missing, keep actor and label details inside metadata so
+ * operational logs are still recorded and searchable.
  */
 export async function writeAuditLog(input: AuditInput): Promise<void> {
   try {
     const supabase = await createClient();
     const user = await getCurrentUser();
 
-    const { error } = await supabase.from("audit_logs").insert({
+    const metadata = {
+      ...(input.metadata ?? {}),
+      actor_email: user?.email ?? null,
+      actor_role: user?.role ?? null,
+      actor_display_name: user?.displayName ?? null,
+      entity_label: input.entityLabel ?? null,
+      before_data: input.beforeData ?? null,
+      after_data: input.afterData ?? null,
+    };
+
+    const enhancedPayload = {
       actor_id: user?.id ?? null,
       actor_email: user?.email ?? null,
       actor_role: user?.role ?? null,
@@ -30,21 +44,41 @@ export async function writeAuditLog(input: AuditInput): Promise<void> {
       entity_label: input.entityLabel ?? null,
       before_data: input.beforeData ?? null,
       after_data: input.afterData ?? null,
-      metadata: input.metadata ?? {},
+      metadata,
+    };
+
+    const { error } = await supabase.from("audit_logs").insert(enhancedPayload);
+    if (!error) return;
+
+    const isLegacySchema =
+      error.code === "42703" ||
+      error.message.includes("actor_email") ||
+      error.message.includes("actor_role") ||
+      error.message.includes("entity_label") ||
+      error.message.includes("before_data") ||
+      error.message.includes("after_data");
+
+    if (!isLegacySchema) {
+      throw error;
+    }
+
+    const { error: fallbackError } = await supabase.from("audit_logs").insert({
+      actor_id: user?.id ?? null,
+      action: input.action,
+      entity_type: input.entityType,
+      entity_id: input.entityId ?? null,
+      metadata,
     });
 
-    if (error) {
-      console.error("Audit log write failed:", error.message);
+    if (fallbackError) {
+      throw fallbackError;
     }
   } catch (err) {
     console.error("Audit log write error:", err);
+    throw err;
   }
 }
 
-/**
- * Compute a simple diff summary string from before/after objects.
- * Returns null if no changes, or a summary string like "status: available → leased".
- */
 export function diffSummary(
   before: Record<string, unknown> | null | undefined,
   after: Record<string, unknown> | null | undefined,
@@ -56,13 +90,12 @@ export function diffSummary(
     const b = before[k];
     const a = after[k];
     if (JSON.stringify(b) !== JSON.stringify(a)) {
-      changes.push(`${k}: ${String(b ?? "—")} → ${String(a ?? "—")}`);
+      changes.push(`${k}: ${String(b ?? "-")} -> ${String(a ?? "-")}`);
     }
   }
   return changes.length > 0 ? changes.join("; ") : null;
 }
 
-// ── Entity type constants ──
 export const EntityType = {
   DAILY_BOOKING: "daily_booking",
   LEASE_CONTRACT: "lease_contract",
@@ -77,7 +110,6 @@ export const EntityType = {
   SETTLEMENT: "lease_settlement",
 } as const;
 
-// ── Action constants ──
 export const AuditAction = {
   CREATE: "create",
   UPDATE: "update",

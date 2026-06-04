@@ -129,6 +129,10 @@ export function AuditLogViewer({ logs, locale }: Props) {
         const q = search.toLowerCase();
         const haystack = [
           l.entity_label ?? "", l.entity_id ?? "", l.actor_email ?? "",
+          metadataText(l, "entity_label"),
+          metadataText(l, "unit_no"),
+          metadataText(l, "actor_email"),
+          metadataText(l, "actor_display_name"),
           labelOrHumanize(actionLabels, l.action),
           labelOrHumanize(entityLabels, l.entity_type),
         ].join(" ").toLowerCase();
@@ -150,6 +154,44 @@ export function AuditLogViewer({ logs, locale }: Props) {
 
   function labelOrHumanize(labels: Record<string, string>, key: string) {
     return labels[key] ?? key.replace(/_/g, " ");
+  }
+
+  function metadataText(log: AuditLogRow, key: string) {
+    const value = log.metadata?.[key];
+    return value == null ? "" : String(value);
+  }
+
+  function actorText(log: AuditLogRow) {
+    return (
+      log.actor_email ||
+      metadataText(log, "actor_display_name") ||
+      metadataText(log, "actor_email") ||
+      log.actor_id?.slice(0, 8) ||
+      "—"
+    );
+  }
+
+  function actorRole(log: AuditLogRow) {
+    return log.actor_role || metadataText(log, "actor_role");
+  }
+
+  function entityLabel(log: AuditLogRow) {
+    const metaLabel = metadataText(log, "entity_label");
+    const unitNo = metadataText(log, "unit_no");
+    if (log.entity_label) return log.entity_label;
+    if (metaLabel) return metaLabel;
+    if (unitNo) return `房间 ${unitNo}`;
+    return "";
+  }
+
+  function summaryText(log: AuditLogRow) {
+    const unitNo = metadataText(log, "unit_no");
+    if (log.action === "complete_cleaning" && unitNo) {
+      return `房间 ${unitNo}`;
+    }
+    const label = entityLabel(log);
+    if (label) return label;
+    return log.entity_id ? `${log.entity_id.slice(0, 8)}...` : "—";
   }
 
   const renderDiff = (before: Record<string, unknown> | null, after: Record<string, unknown> | null) => {
@@ -249,11 +291,11 @@ export function AuditLogViewer({ logs, locale }: Props) {
                       <td className="px-4 py-2.5" onClick={() => setExpandedId(expanded ? null : l.id)}>
                         <div className="flex items-center gap-1.5">
                           <span className="font-medium">
-                            {l.actor_email ?? l.actor_id?.slice(0, 8) ?? "—"}
+                            {actorText(l)}
                           </span>
-                          {l.actor_role && (
+                          {actorRole(l) && (
                             <Badge variant="secondary" className="text-[10px]">
-                              {roleLabels[l.actor_role] ?? l.actor_role}
+                              {roleLabels[actorRole(l)] ?? actorRole(l)}
                             </Badge>
                           )}
                         </div>
@@ -266,11 +308,11 @@ export function AuditLogViewer({ logs, locale }: Props) {
                       <td className="px-4 py-2.5" onClick={() => setExpandedId(expanded ? null : l.id)}>
                         <span className="text-muted-foreground">
                           {labelOrHumanize(entityLabels, l.entity_type)}
-                          {l.entity_label && <span className="ml-1">· {l.entity_label}</span>}
+                          {entityLabel(l) && <span className="ml-1">· {entityLabel(l)}</span>}
                         </span>
                       </td>
                       <td className="px-4 py-2.5 max-w-[200px] truncate text-muted-foreground" onClick={() => setExpandedId(expanded ? null : l.id)}>
-                        {l.entity_id ? `${l.entity_id.slice(0, 8)}...` : "—"}
+                        {summaryText(l)}
                       </td>
                       <td className="px-4 py-2.5">
                         <button
