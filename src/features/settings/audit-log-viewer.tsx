@@ -178,17 +178,15 @@ export function AuditLogViewer({ logs, locale }: Props) {
   function entityLabel(log: AuditLogRow) {
     const metaLabel = metadataText(log, "entity_label");
     const unitNo = metadataText(log, "unit_no");
+    if (unitNo) return locale === "zh" ? `房间 ${unitNo}` : `Chambre ${unitNo}`;
     if (log.entity_label) return log.entity_label;
     if (metaLabel) return metaLabel;
-    if (unitNo) return `房间 ${unitNo}`;
     return "";
   }
 
   function summaryText(log: AuditLogRow) {
     const unitNo = metadataText(log, "unit_no");
-    if (log.action === "complete_cleaning" && unitNo) {
-      return `房间 ${unitNo}`;
-    }
+    if (unitNo) return locale === "zh" ? `房间 ${unitNo}` : `Chambre ${unitNo}`;
     const label = entityLabel(log);
     if (label) return label;
     return log.entity_id ? `${log.entity_id.slice(0, 8)}...` : "—";

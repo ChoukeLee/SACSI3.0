@@ -45,7 +45,7 @@ export default async function AuditLogsPage() {
   // Admin/boss: get all (RLS also enforces this server-side)
 
   const { data } = await query;
-  const logs = (data ?? []) as unknown as AuditLogRow[];
+  const logs = await enrichAuditLogsWithUnitNumbers(supabase, (data ?? []) as unknown as AuditLogRow[]);
 
   return (
     <>
@@ -60,4 +60,67 @@ export default async function AuditLogsPage() {
       </div>
     </>
   );
+}
+
+async function enrichAuditLogsWithUnitNumbers(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  logs: AuditLogRow[],
+) {
+  const bookingIds = Array.from(new Set(logs
+    .filter((log) => log.entity_type === "daily_booking" && log.entity_id)
+    .map((log) => log.entity_id as string)));
+
+  const bookingToUnitId = new Map<string, string>();
+  if (bookingIds.length > 0) {
+    const { data: bookings } = await supabase
+      .from("daily_bookings")
+      .select("id, unit_id")
+      .in("id", bookingIds);
+
+    for (const booking of bookings ?? []) {
+      if (booking.id && booking.unit_id) {
+        bookingToUnitId.set(booking.id, booking.unit_id);
+      }
+    }
+  }
+
+  const unitIds = new Set<string>();
+  for (const log of logs) {
+    const metadataUnitId = typeof log.metadata?.unit_id === "string" ? log.metadata.unit_id : null;
+    if (metadataUnitId) unitIds.add(metadataUnitId);
+    const bookingUnitId = log.entity_id ? bookingToUnitId.get(log.entity_id) : null;
+    if (bookingUnitId) unitIds.add(bookingUnitId);
+  }
+
+  const unitIdToNo = new Map<string, string>();
+  if (unitIds.size > 0) {
+    const { data: units } = await supabase
+      .from("units")
+      .select("id, unit_no")
+      .in("id", Array.from(unitIds));
+
+    for (const unit of units ?? []) {
+      if (unit.id && unit.unit_no) {
+        unitIdToNo.set(unit.id, unit.unit_no);
+      }
+    }
+  }
+
+  return logs.map((log) => {
+    const metadataUnitNo = typeof log.metadata?.unit_no === "string" ? log.metadata.unit_no : null;
+    if (metadataUnitNo) return log;
+
+    const metadataUnitId = typeof log.metadata?.unit_id === "string" ? log.metadata.unit_id : null;
+    const bookingUnitId = log.entity_id ? bookingToUnitId.get(log.entity_id) : null;
+    const unitNo = unitIdToNo.get(metadataUnitId ?? "") ?? unitIdToNo.get(bookingUnitId ?? "");
+    if (!unitNo) return log;
+
+    return {
+      ...log,
+      metadata: {
+        ...(log.metadata ?? {}),
+        unit_no: unitNo,
+      },
+    };
+  });
 }
