@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
+import { Analytics } from "@vercel/analytics/next";
 import { AppShellWrapper } from "@/components/app-shell-wrapper";
 import { getCurrentUser } from "@/lib/auth";
 import { dictionaries } from "@/lib/i18n";
@@ -61,6 +62,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             }).catch(function(){});
           })();
         `}} />
+        <Analytics />
       </body>
     </html>
   );
