@@ -177,8 +177,6 @@ export function AuditLogViewer({ logs, locale }: Props) {
 
   function entityLabel(log: AuditLogRow) {
     const metaLabel = metadataText(log, "entity_label");
-    const unitNo = metadataText(log, "unit_no");
-    if (unitNo) return locale === "zh" ? `房间 ${unitNo}` : `Chambre ${unitNo}`;
     if (log.entity_label) return log.entity_label;
     if (metaLabel) return metaLabel;
     return "";
