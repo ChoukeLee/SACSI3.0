@@ -39,7 +39,7 @@ export default async function DailyRentalsPage() {
 
   const buildingId = buildingRes.data?.id;
   if (buildingId) {
-    const { data: unitsData, error: unitsErr } = await supabase.from("units").select("id, unit_no, floor_label, status, notes, unit_business_flags!inner(business_type, is_enabled)").eq("building_id", buildingId).eq("unit_business_flags.business_type", "daily_rental").eq("unit_business_flags.is_enabled", true).order("unit_no");
+    const { data: unitsData, error: unitsErr } = await supabase.from("units").select("id, unit_no, floor_label, status, notes, unit_business_flags!inner(business_type, is_enabled)").eq("building_id", buildingId).eq("unit_business_flags.business_type", "daily_rental").eq("unit_business_flags.is_enabled", true).in("status", ["available", "reserved", "daily_occupied", "cleaning_pending", "maintenance"]).order("unit_no");
     if (!unitsErr) dailyUnits = sortUnits(((unitsData as unknown as UnitRow[]) ?? []));
   }
 
