@@ -191,21 +191,24 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                   <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status={isManaged ? "managed" : "leased"}
                     onClick={() => openDetail(contract.id)}
                     className={isRisk ? "border-amber-200 shadow-[0_10px_24px_rgba(180,120,24,0.14)]" : ""}>
-                    {/* Name + status badge */}
-                    <div className="flex items-start justify-between gap-1.5">
-                      <p className="text-[13px] font-medium leading-tight truncate" title={customer?.name ?? (locale==="zh"?"无客户":"Sans client")}>{customer?.name ?? "—"}</p>
-                      <div className="flex shrink-0 flex-col items-end gap-1">
-                        {isManaged && <Badge variant="outline" className="text-[10px]">{locale === "zh" ? "代管" : "Gestion"}</Badge>}
-                        <Badge variant={statusVariant[contract.status]} className="text-[10px]">{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
+                    {/* Customer and tags */}
+                    <div className="flex min-h-[58px] flex-col justify-start gap-2">
+                      <p className="text-[13px] font-semibold leading-snug line-clamp-2 break-words" title={customer?.name ?? (locale==="zh"?"无客户":"Sans client")}>
+                        {customer?.name ?? "—"}
+                      </p>
+                      <div className="flex h-5 items-center gap-1.5">
+                        {isManaged && <Badge variant="outline" className="h-5 px-2 text-[10px]">{locale === "zh" ? "代管" : "Gestion"}</Badge>}
+                        <Badge variant={statusVariant[contract.status]} className="h-5 px-2 text-[10px]">{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
                       </div>
                     </div>
-                    {/* Rent + expiry — compact */}
-                    <p className="mt-1 text-[11px] text-[#5D7186] leading-tight">
-                      {rent > 0 ? formatXof(rent) : (locale==="zh"?"租金未录入":"Loyer non saisi")}
-                      <span className="mx-1.5">·</span>
-                      {isLongTerm ? (locale==="zh"?"长期有效":"Long terme") : contract.expected_end_date}
-                      {!isLongTerm && daysLeft>=0&&daysLeft<=30 && <span className="ml-1 text-amber-600 font-medium">({daysLeft}j)</span>}
-                    </p>
+                    {/* Rent + expiry */}
+                    <div className="min-h-[34px] text-[11px] leading-relaxed text-[#5D7186]">
+                      <p className="tabular-nums">{rent > 0 ? formatXof(rent) : (locale==="zh"?"租金未录入":"Loyer non saisi")}</p>
+                      <p>
+                        {isLongTerm ? (locale==="zh"?"长期有效":"Long terme") : contract.expected_end_date}
+                        {!isLongTerm && daysLeft>=0&&daysLeft<=30 && <span className="ml-1 text-amber-600 font-medium">({daysLeft}j)</span>}
+                      </p>
+                    </div>
                     {/* Outstanding alert */}
                     {summary.outstanding > 0 && (
                       <p className="text-[11px] text-amber-600 font-medium leading-tight">{locale==="zh"?"待收":"Dû"}: {formatXof(summary.outstanding)}</p>
