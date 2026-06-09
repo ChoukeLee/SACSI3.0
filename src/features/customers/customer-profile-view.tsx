@@ -138,7 +138,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
       {tab === "daily" && <DailyTab data={data} L={L} locale={locale} />}
       {tab === "lease" && <LeaseTab data={data} L={L} locale={locale} />}
       {tab === "sale" && <SaleTab data={data} L={L} locale={locale} />}
-      {tab === "finance" && <FinanceTab data={data} L={L} />}
+      {tab === "finance" && <FinanceTab data={data} L={L} locale={locale} />}
       {tab === "docs" && <TableTab columns={[L.docs, L.date, L.role, L.action]} rows={documents.map(doc => ({ cells: [doc.title, doc.date, doc.unitNo, <Button key="p" size="sm" variant="ghost" onClick={() => printDocumentRecord(doc, locale)}><Printer className="h-3.5 w-3.5" />{L.print}</Button>] }))} empty={documents.length === 0} emptyText={L.noData} />}
       {tab === "audit" && <TableTab columns={[L.date, L.action, L.entity]} rows={data.auditLogs.slice(0, 50).map(log => ({ cells: [new Date(log.created_at).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN"), L.auditActions[log.action] ?? log.action, `${log.entity_type} ${log.entity_id?.slice(0, 8)}`] }))} empty={data.auditLogs.length === 0} emptyText={L.noData} />}
 
@@ -147,15 +147,6 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
         <Link href={routeFor(locale, "/finance")} className="hover:text-primary flex items-center gap-1">{L.finance} <ArrowRight className="h-3 w-3" /></Link>
         <Link href={routeFor(locale, "/customers")} className="hover:text-primary flex items-center gap-1">{L.backToList} <ArrowRight className="h-3 w-3" /></Link>
       </div>
-      {data.attachments && data.attachments.length > 0 && (
-        <TableSection title={L.attachments + " (" + data.attachments.length + ")"} empty={false} emptyText="">
-          <div>
-            {data.attachments.map((att) => (
-              <div key={att.id}><ReceiptThumb attachment={att} locale={"zh"} /></div>
-            ))}
-          </div>
-        </TableSection>
-      )}
     </div>
   );
 }
@@ -207,7 +198,7 @@ function OverviewTab({ stats, customer, L, data }: { stats: { totalRec: number; 
 }
 
 // ── Finance Tab ──
-function FinanceTab({ data, L }: { data: CustomerProfileData; L: ReturnType<typeof labels> }) {
+function FinanceTab({ data, L, locale }: { data: CustomerProfileData; L: ReturnType<typeof labels>; locale: Locale }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-3">
@@ -247,6 +238,15 @@ function FinanceTab({ data, L }: { data: CustomerProfileData; L: ReturnType<type
           </tbody>
         </table>
       </TableSection>
+      {data.attachments && data.attachments.length > 0 && (
+        <TableSection title={L.attachments + " (" + data.attachments.length + ")"} empty={false} emptyText="">
+          <div>
+            {data.attachments.map((att) => (
+              <div key={att.id}><ReceiptThumb attachment={att} locale={locale} /></div>
+            ))}
+          </div>
+        </TableSection>
+      )}
     </div>
   );
 }

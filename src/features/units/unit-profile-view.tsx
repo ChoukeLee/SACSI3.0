@@ -114,7 +114,7 @@ export function UnitProfileView({ data, locale, userRole }: Props) {
       {tab === "lease" && <LeaseTab data={data} L={L} locale={locale} custName={custName} />}
       {tab === "sale" && <SaleTab data={data} L={L} locale={locale} custName={custName} />}
 
-      {tab === "finance" && <FinanceTab data={data} L={L} />}
+      {tab === "finance" && <FinanceTab data={data} L={L} locale={locale} />}
       {tab === "docs" && <TableTab columns={[L.docs, L.date, L.action]} rows={documents.map(doc => ({ cells: [doc.title, doc.date, <Button key="p" size="sm" variant="ghost" onClick={() => printDocumentRecord(doc, locale)}><Printer className="h-3.5 w-3.5" />{L.print}</Button>] }))} empty={documents.length === 0} emptyText={L.noData} />}
       {tab === "audit" && <TableTab columns={[L.date, L.action, L.entity]} rows={data.auditLogs.slice(0, 50).map(log => ({ cells: [new Date(log.created_at).toLocaleDateString(locale==="fr"?"fr-FR":"zh-CN"), L.auditActions[log.action]??log.action, `${log.entity_type} ${log.entity_id?.slice(0,8)}`] }))} empty={data.auditLogs.length === 0} emptyText={L.noData} />}
     </div>
@@ -166,7 +166,7 @@ function StatTile({ label, value, dot }: { label: string; value: string; dot: st
 }
 
 // ── Finance Tab ──
-function FinanceTab({ data, L }: { data: UnitProfileData; L: ReturnType<typeof labels> }) {
+function FinanceTab({ data, L, locale }: { data: UnitProfileData; L: ReturnType<typeof labels>; locale: Locale }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-3">
@@ -209,7 +209,7 @@ function FinanceTab({ data, L }: { data: UnitProfileData; L: ReturnType<typeof l
         <TableSection title={L.receipt + " (" + data.attachments.length + ")"} empty={false} emptyText="">
           <div>
             {data.attachments.map((att) => (
-              <div key={att.id}><ReceiptThumb attachment={att} locale={"zh"} /></div>
+              <div key={att.id}><ReceiptThumb attachment={att} locale={locale} /></div>
             ))}
           </div>
         </TableSection>
