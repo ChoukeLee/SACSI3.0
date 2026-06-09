@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, Sparkles, X } from "lucide-react";
+import { ImageUp, Loader2, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ReceiptUpload } from "@/features/finance/receipt-upload";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -35,6 +36,7 @@ const EXAMPLES_FR = [
 
 export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
   const [open, setOpen] = useState(false);
+  const [receiptMode, setReceiptMode] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -129,19 +131,35 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
         {/* ── Header ── */}
         <div className="flex shrink-0 items-center gap-2.5 border-b border-border/60 px-4 py-3">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
-            <Sparkles className="h-4 w-4 text-primary" />
+            {receiptMode ? <ImageUp className="h-4 w-4 text-primary" /> : <Sparkles className="h-4 w-4 text-primary" />}
           </div>
           <div className="flex-1">
-            <p className="text-[13px] font-semibold">{zh ? "SACIS 助理" : "Assistant SACIS"}</p>
-            <p className="text-[10px] text-muted-foreground">{zh ? "后台业务助手 · 生成草稿需确认后执行" : "Brouillons à confirmer avant exécution"}</p>
+            <p className="text-[13px] font-semibold">{receiptMode ? (zh ? "收据扫描入账" : "Scan de reçu") : (zh ? "SACIS 助理" : "Assistant SACIS")}</p>
+            <p className="text-[10px] text-muted-foreground">
+              {receiptMode ? (zh ? "上传收据 → AI 识别 → 确认入账" : "Télécharger → Analyser → Confirmer") : (zh ? "后台业务助手 · 生成草稿需确认后执行" : "Brouillons à confirmer avant exécution")}
+            </p>
           </div>
+          <button
+            onClick={() => { setReceiptMode(!receiptMode); setMessages([]); setInput(""); }}
+            className="rounded-lg px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted transition-colors"
+            title={receiptMode ? (zh ? "切换到 AI 对话" : "Passer au chat") : (zh ? "扫描收据" : "Scanner un reçu")}
+          >
+            {receiptMode ? <Sparkles className="h-4 w-4" /> : <ImageUp className="h-4 w-4" />}
+          </button>
           <button onClick={handleClose} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
 
+        {/* ── Receipt scan mode ── */}
+        {receiptMode && (
+          <div className="flex-1 overflow-auto px-4 py-4">
+            <ReceiptUpload locale={locale} onClose={() => setReceiptMode(false)} />
+          </div>
+        )}
+
         {/* ── Messages / Empty state ── */}
-        <div ref={listRef} className="flex-1 overflow-auto px-4 py-4 space-y-4">
+        {!receiptMode && <div ref={listRef} className="flex-1 overflow-auto px-4 py-4 space-y-4">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
@@ -178,10 +196,10 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
               {zh ? "正在思考……" : "Réflexion en cours…"}
             </div>
           )}
-        </div>
+        </div>}
 
-        {/* ── Input ── */}
-        <div className="shrink-0 border-t border-border/60 p-3">
+        {/* ── Input (hidden in receipt mode) ── */}
+        {!receiptMode && <div className="shrink-0 border-t border-border/60 p-3">
           <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
             <input
               ref={inputRef}
@@ -202,7 +220,7 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
               <Sparkles className="h-4 w-4" />
             </button>
           </div>
-        </div>
+        </div>}
       </div>
     </div>,
     document.body,
