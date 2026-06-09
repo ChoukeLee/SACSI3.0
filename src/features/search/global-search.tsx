@@ -95,7 +95,7 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
     } finally {
       setLoading(false);
     }
-  }, [input, loading, locale, zh]);
+  }, [input, loading, locale, zh, messages]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape") { setOpen(false); return; }

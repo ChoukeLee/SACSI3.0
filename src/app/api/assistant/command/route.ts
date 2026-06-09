@@ -163,7 +163,7 @@ function fallbackChat(message: string, ctx: AssistantContext, locale: string): A
       if (room.cleaning) lines.push(zh ? "⚠ 待保洁" : "⚠ Ménage en attente");
       if (room.payments && (room.payments as unknown[]).length > 0) {
         const pms = room.payments as Record<string, unknown>[];
-        const total = pms.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+        const total = pms.reduce((s, p) => s + Number(p.amount || 0) * (Number(p.exchange_rate_to_xof) || 1), 0);
         lines.push(zh ? `收款 ${pms.length} 笔，共 ${total.toLocaleString()} XOF` : `Paiements: ${pms.length}, ${total.toLocaleString()} XOF`);
       }
       results.push(lines.join("\n"));
