@@ -130,13 +130,13 @@ export function ReceiptUpload({ locale, onClose }: Props) {
       });
       const data = (await res.json()) as ConfirmResult;
 
-      if (data.requiresOverride) {
+      if (!data.success && data.requiresOverride) {
         setError(data.duplicateWarning ?? "检测到重复收据");
         setOverrideDuplicate(true);
         return;
       }
 
-      if (!res.ok) { setError(data.error ?? "Confirmation failed"); return; }
+      if (!data.success || !res.ok) { setError(data.error ?? data.message ?? (zh ? "入账失败" : "Échec")); return; }
 
       setConfirmed(true);
       setConfirmResult(data);

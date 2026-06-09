@@ -49,6 +49,11 @@ export async function POST(req: NextRequest) {
 
     const data = result as Record<string, unknown>;
 
+    // Business failure that isn't duplicate override → return 400
+    if (data.success === false && data.requiresOverride !== true) {
+      return NextResponse.json(data, { status: 400 });
+    }
+
     revalidatePath("/"); revalidatePath("/fr");
     revalidatePath("/finance"); revalidatePath("/fr/finance");
     revalidatePath("/management"); revalidatePath("/fr/management");

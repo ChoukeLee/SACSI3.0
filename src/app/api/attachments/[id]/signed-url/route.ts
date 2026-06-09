@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 /** Generate a signed URL for a receipt image stored in the private receipts bucket. */
@@ -10,6 +10,9 @@ export async function GET(
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    if (!hasPermission(user, "finance:read") && !hasPermission(user, "daily_rentals:read") && user.role !== "admin" && user.role !== "boss") {
+      return NextResponse.json({ error: "Finance access required" }, { status: 403 });
+    }
 
     const { id } = await params;
     const supabase = await createClient();
