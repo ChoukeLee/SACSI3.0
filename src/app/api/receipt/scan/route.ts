@@ -21,29 +21,88 @@ interface ReceiptDraft {
 const today = () => new Date().toISOString().slice(0, 10);
 
 // ═══════════════════════════════════════════════════
-// Draft parser — runs OCR text through DeepSeek or fallback
+// Normalize draft — fix Chinese amounts, validate fields
 // ═══════════════════════════════════════════════════
 
-async function parseReceiptDraft(ocrText: string, locale: string): Promise<ReceiptDraft> {
+function normalizeReceiptDraft(draft: ReceiptDraft, ocrText: string): ReceiptDraft {
+  const warnings = [...draft.warnings];
+  let amount = draft.amount_xof;
+  const amountText = draft.notes ?? ocrText;
+
+  // Fix Chinese 万 amounts: if OCR text says "195万" but amount is 195000, correct to 1,950,000
+  const wanMatch = amountText.match(/(\d+)\s*万/);
+  if (wanMatch) {
+    const expectedWan = parseInt(wanMatch[1], 10) * 10000;
+    if (amount && amount < 1000000 && amount < expectedWan * 0.1) {
+      warnings.push(`金额疑似错误：原文"${wanMatch[0]}"应为${expectedWan.toLocaleString()}，但识别为${amount.toLocaleString()}，已自动修正。`);
+      amount = expectedWan;
+    }
+    // If no amount was extracted but 万 is present, use the wan value
+    if (!amount) {
+      amount = expectedWan;
+      warnings.push(`从原文"${wanMatch[0]}"推导金额=${expectedWan.toLocaleString()}。`);
+    }
+  }
+
+  // receipt_date must not be copied to period_start
+  if (draft.period_start === draft.receipt_date && ocrText.includes("周期") || ocrText.includes("租期") || ocrText.includes("期间")) {
+    warnings.push("period_start与receipt_date相同，请确认原文中是否有独立租期。");
+  }
+
+  // period start > end
+  if (draft.period_start && draft.period_end && draft.period_start > draft.period_end) {
+    warnings.push(`周期开始(${draft.period_start})晚于结束(${draft.period_end})。`);
+  }
+
+  // Low amount for lease
+  if (draft.business_type === "lease_rent" && amount && amount < 300000 && /万/.test(amountText)) {
+    warnings.push(`长租金额${amount?.toLocaleString()}偏低，原文含"万"，请确认。`);
+  }
+
+  let confidence: "high" | "medium" | "low" = "high";
+  if (!draft.room_no) { confidence = "low"; warnings.push("未识别到房号。"); }
+  if (!amount || amount <= 0) { confidence = "low"; warnings.push("未识别到金额或金额无效。"); }
+  else if (!draft.receipt_date) { confidence = "medium"; warnings.push("未识别到日期。"); }
+  else if (!draft.receipt_no) { confidence = "medium"; warnings.push("未识别到收据号。"); }
+
+  return { ...draft, amount_xof: amount, confidence, warnings };
+}
+
+// ═══════════════════════════════════════════════════
+// Draft parser
+// ═══════════════════════════════════════════════════
+
+async function parseReceiptDraft(ocrText: string, locale: string, structured?: import("@/lib/receipt-ocr").OcrStructured | null): Promise<ReceiptDraft> {
+  // If Qwen/OpenAI vision returned structured JSON, use it directly
+  if (structured && (structured.amount_xof || structured.room_no || structured.receipt_date)) {
+    const draft: ReceiptDraft = {
+      room_no: structured.room_no ?? null,
+      receipt_no: structured.receipt_no ?? null,
+      receipt_date: structured.receipt_date ?? null,
+      amount_xof: structured.amount_xof ?? null,
+      currency: structured.currency ?? "XOF",
+      period_start: structured.period_start ?? null,
+      period_end: structured.period_end ?? null,
+      business_type: structured.business_type ?? null,
+      payer_name: structured.payer_name ?? null,
+      notes: null,
+      confidence: "high",
+      warnings: structured.warnings ?? [],
+    };
+    return normalizeReceiptDraft(draft, ocrText);
+  }
+
   const warnings: string[] = [];
   const apiKey = process.env.DEEPSEEK_API_KEY;
 
   if (apiKey) {
     try {
       const draft = await parseWithDeepSeek(ocrText, locale);
-      // Assess confidence
-      let confidence: "high" | "medium" | "low" = "high";
-      if (!draft.room_no) { confidence = "low"; warnings.push("未识别到房号。"); }
-      if (!draft.amount_xof || draft.amount_xof <= 0) { confidence = "low"; warnings.push("未识别到金额或金额无效。"); }
-      if (!draft.receipt_date) { confidence = "medium"; warnings.push("未识别到日期。"); }
-      if (!draft.receipt_no) { confidence = "medium"; warnings.push("未识别到收据号。"); }
-      return { ...draft, confidence, warnings };
-    } catch {
-      // Fall through to fallback
-    }
+      return normalizeReceiptDraft({ ...draft, warnings: [...draft.warnings, ...warnings] }, ocrText);
+    } catch { /* fall through */ }
   }
 
-  return fallbackParseDraft(ocrText);
+  return normalizeReceiptDraft(fallbackParseDraft(ocrText), ocrText);
 }
 
 async function parseWithDeepSeek(ocrText: string, locale: string): Promise<ReceiptDraft> {
@@ -171,8 +230,8 @@ export async function POST(req: NextRequest) {
       provider = ocrResult.provider;
       ocrError = ocrResult.error ?? null;
 
-      // Parse draft
-      const draft = await parseReceiptDraft(ocrText, locale);
+      // Parse draft (use structured OCR JSON when available)
+      const draft = await parseReceiptDraft(ocrText, locale, ocrResult.structured);
 
       return NextResponse.json({
         success: true,
