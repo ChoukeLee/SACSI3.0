@@ -188,9 +188,9 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 const rent = Number(contract.monthly_rent_xof);
                 const isManaged = unit ? isManagedLeaseUnit(unit) : false;
                 return (
-                  <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status={isManaged ? "sold" : "leased"}
+                  <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status={isManaged ? "managed" : "leased"}
                     onClick={() => openDetail(contract.id)}
-                    className={isRisk ? "ring-2 ring-amber-300" : ""}>
+                    className={isRisk ? "border-amber-200 shadow-[0_10px_24px_rgba(180,120,24,0.14)]" : ""}>
                     {/* Name + status badge */}
                     <div className="flex items-start justify-between gap-1.5">
                       <p className="text-[13px] font-medium leading-tight truncate" title={customer?.name ?? (locale==="zh"?"无客户":"Sans client")}>{customer?.name ?? "—"}</p>

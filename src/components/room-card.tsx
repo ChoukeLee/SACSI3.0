@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 
 export type RoomStatus =
   | "sold"
+  | "managed"
   | "leased"
   | "daily_occupied"
   | "dailyOccupied"
@@ -29,8 +30,9 @@ export interface RoomCardAction {
 /* ── Status → color mapping ── */
 type CardColors = { bg: string; badge: string; nameColor: string; metaColor: string; btnBg: string };
 const statusStyle: Record<RoomStatus, CardColors> = {
-  sold:            { bg: "bg-[#075A9A]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.95)]", metaColor: "text-[rgba(255,255,255,0.72)]", btnBg: "bg-white/[0.82]" },
-  leased:          { bg: "bg-[#E8E2FF]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
+  sold:            { bg: "bg-[#F7F1E6]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
+  managed:         { bg: "bg-[#D9F7F0]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
+  leased:          { bg: "bg-[#EAF3FA]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
   daily_occupied:  { bg: "bg-[#62B6F5]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.95)]", metaColor: "text-[rgba(255,255,255,0.72)]", btnBg: "bg-white/[0.82]" },
   dailyOccupied:   { bg: "bg-[#62B6F5]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.95)]", metaColor: "text-[rgba(255,255,255,0.72)]", btnBg: "bg-white/[0.82]" },
   reserved:        { bg: "bg-[#FFF6D8]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
