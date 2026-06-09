@@ -13,6 +13,7 @@ export interface UnitProfileData {
   payments: PaymentRow[];
   customers: CustomerRow[];
   auditLogs: { id: string; created_at: string; action: string; entity_type: string; entity_id: string | null; metadata: Record<string, unknown> | null }[];
+  attachments: { id: string; storage_path: string; file_type: string; ocr_text: string | null; metadata: Record<string, unknown> | null; paper_archive_status: string; uploaded_at: string }[];
   buildingName: string;
 }
 
@@ -32,6 +33,7 @@ export async function fetchUnitProfile(unitId: string): Promise<UnitProfileData 
     { data: payments },
     { data: auditLogs },
     { data: customers },
+    { data: attachments },
   ] = await Promise.all([
     supabase.from("daily_bookings").select("*").eq("unit_id", unitId).order("check_in", { ascending: false }).limit(100),
     supabase.from("lease_contracts").select("*").eq("unit_id", unitId).order("start_date", { ascending: false }).limit(50),
@@ -40,6 +42,7 @@ export async function fetchUnitProfile(unitId: string): Promise<UnitProfileData 
     supabase.from("payments").select("*").eq("unit_id", unitId).order("payment_date", { ascending: false }).limit(200),
     supabase.from("audit_logs").select("id, created_at, action, entity_type, entity_id, metadata").eq("entity_id", unitId).order("created_at", { ascending: false }).limit(100),
     supabase.from("customers").select("*").order("name").limit(500),
+    supabase.from("attachments").select("id, storage_path, file_type, ocr_text, metadata, paper_archive_status, uploaded_at").eq("unit_id", unitId).order("uploaded_at", { ascending: false }).limit(20),
   ]);
 
   // Collect customer IDs from bookings/contracts
@@ -58,6 +61,7 @@ export async function fetchUnitProfile(unitId: string): Promise<UnitProfileData 
     payments: (payments ?? []) as PaymentRow[],
     customers: relevantCustomers as CustomerRow[],
     auditLogs: (auditLogs ?? []) as { id: string; created_at: string; action: string; entity_type: string; entity_id: string | null; metadata: Record<string, unknown> | null }[],
+    attachments: (attachments ?? []) as { id: string; storage_path: string; file_type: string; ocr_text: string | null; metadata: Record<string, unknown> | null; paper_archive_status: string; uploaded_at: string }[],
     buildingName: building?.display_name ?? building?.code ?? "",
   };
 }

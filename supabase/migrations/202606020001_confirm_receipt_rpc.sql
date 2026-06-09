@@ -39,7 +39,11 @@ declare
   v_payment_source_id uuid;
   v_payment_customer_id uuid;
 
-  v_rec record;
+  v_matched_source_type text;
+  v_matched_source_id uuid;
+  v_matched_customer_id uuid;
+  v_matched_amount_xof integer;
+  v_matched_paid_xof integer;
   v_existing record;
   v_building_unit_ids uuid[];
   r record;
@@ -83,13 +87,13 @@ begin
     end if;
   end if;
 
-  -- D. Match receivable
-  v_rec := null; -- prevent stale record state from leaking
+  -- D. Match receivable (explicit scalars — no record-field access)
+  v_matched_receivable_id := null;
   if v_source_type != 'manual' then
     -- Period match first
     if v_period_start is not null and v_period_end is not null then
       select id, source_id, source_type, customer_id, amount_xof, paid_amount_xof
-      into v_rec
+      into v_matched_receivable_id, v_matched_source_id, v_matched_source_type, v_matched_customer_id, v_matched_amount_xof, v_matched_paid_xof
       from receivables
       where unit_id = v_unit_id
         and source_type = v_source_type
@@ -99,10 +103,10 @@ begin
       limit 1;
     end if;
 
-    -- Amount match fallback (use explicit null check, not dependent on FOUND state)
-    if v_rec.id is null then
+    -- Amount match fallback
+    if v_matched_receivable_id is null then
       select id, source_id, source_type, customer_id, amount_xof, paid_amount_xof
-      into v_rec
+      into v_matched_receivable_id, v_matched_source_id, v_matched_source_type, v_matched_customer_id, v_matched_amount_xof, v_matched_paid_xof
       from receivables
       where unit_id = v_unit_id
         and source_type = v_source_type
@@ -110,20 +114,18 @@ begin
       order by abs((amount_xof - paid_amount_xof) - v_amount_xof)
       limit 1;
 
-      if v_rec.id is not null then
-        if abs((v_rec.amount_xof - v_rec.paid_amount_xof) - v_amount_xof) > v_amount_xof * 0.5 then
-          v_rec := null;
+      if v_matched_receivable_id is not null then
+        if abs((v_matched_amount_xof - v_matched_paid_xof) - v_amount_xof) > v_amount_xof * 0.5 then
+          v_matched_receivable_id := null;
         end if;
       end if;
     end if;
 
-    if v_rec.id is not null then
-      v_matched_receivable_id := v_rec.id;
-      v_payment_source_type := v_rec.source_type;
-      v_payment_source_id := v_rec.source_id;
-      v_payment_customer_id := v_rec.customer_id;
+    if v_matched_receivable_id is not null then
+      v_payment_source_type := v_matched_source_type;
+      v_payment_source_id := v_matched_source_id;
+      v_payment_customer_id := v_matched_customer_id;
 
-      -- Update receivable
       update receivables
       set paid_amount_xof = paid_amount_xof + v_amount_xof,
           status = case

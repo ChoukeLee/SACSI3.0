@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { BedDouble, Building2, Calendar, CreditCard, Home, Printer, User } from "lucide-react";
+import { ReceiptThumb } from "@/components/attachments/receipt-thumb";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { cn, formatXof } from "@/lib/utils";
@@ -204,6 +205,15 @@ function FinanceTab({ data, L }: { data: UnitProfileData; L: ReturnType<typeof l
           </tbody>
         </table>
       </TableSection>
+      {data.attachments && data.attachments.length > 0 && (
+        <TableSection title={L.receipt + " (" + data.attachments.length + ")"} empty={false} emptyText="">
+          <div>
+            {data.attachments.map((att) => (
+              <div key={att.id}><ReceiptThumb attachment={att} locale={"zh"} /></div>
+            ))}
+          </div>
+        </TableSection>
+      )}
     </div>
   );
 }
