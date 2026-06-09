@@ -210,7 +210,7 @@ function canExecuteDraft(
     case "record_payment": return hasPermission(u, "finance:write");
     case "complete_cleaning": return hasPermission(u, "daily_rentals:write");
     case "check_in": case "check_out": return hasPermission(u, "daily_rentals:write");
-    default: return hasPermission(u, "daily_rentals:write") || hasPermission(u, "finance:write");
+    default: return false; // P2: unknown actions must be explicitly whitelisted
   }
 }
 
@@ -229,8 +229,8 @@ export async function POST(req: NextRequest) {
     const history = (body.history ?? []) as HistoryEntry[];
     if (!message) return NextResponse.json({ error: "message required" }, { status: 400 });
 
-    // Load business context
-    const ctx = await buildAssistantContext(message, user, locale);
+    // Load business context (with history for follow-up tracking)
+    const ctx = await buildAssistantContext(message, user, locale, history);
 
     const apiKey = process.env.DEEPSEEK_API_KEY;
     let result: AssistantResult;

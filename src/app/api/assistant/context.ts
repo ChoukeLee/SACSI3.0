@@ -10,6 +10,11 @@ export interface AssistantUser {
   email?: string;
 }
 
+export interface HistoryEntry {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface DailySummary {
   checkedInCount: number;
   cleaningPendingCount: number;
@@ -51,18 +56,56 @@ export interface AssistantContext {
 const t = () => new Date().toISOString().slice(0, 10);
 const monthPrefix = () => t().slice(0, 7);
 
-function detectPatterns(message: string) {
+interface Patterns {
+  wantsDailyOverview: boolean;
+  wantsRoomInfo: boolean;
+  roomNumbers: string[];
+  wantsCustomerInfo: boolean;
+  wantsFinanceInfo: boolean;
+  wantsAuditInfo: boolean;
+  wantsDraft: boolean;
+  wantsHelp: boolean;
+  /** Room numbers extracted from history (follow-up context) */
+  historyRoomNumbers: string[];
+  /** Customer names extracted from history */
+  historyCustomerNames: string[];
+}
+
+function detectPatterns(message: string, history?: HistoryEntry[]): Patterns {
   const m = message.toLowerCase();
   const roomNumbers = [...message.matchAll(/\b(\d{3,4})\b/g)].map(r => r[1]);
+
+  // Extract room numbers and customer mentions from recent history
+  const historyRoomNumbers: string[] = [];
+  const historyCustomerNames: string[] = [];
+  if (history) {
+    for (const h of history.slice(-10)) {
+      if (h.role !== "user") continue;
+      // Extract room numbers from recent user messages
+      const hRooms = [...h.content.matchAll(/\b(\d{3,4})\b/g)].map(r => r[1]);
+      for (const r of hRooms) {
+        if (!historyRoomNumbers.includes(r)) historyRoomNumbers.push(r);
+      }
+      // Extract customer name references
+      const nameMatch = h.content.match(/客户[：:]\s*(\S+)|(\S{2,4})\s*(的|租客|客户|租约|房间|付款|状态)/);
+      if (nameMatch) {
+        const name = nameMatch[1] ?? nameMatch[2];
+        if (name && !historyCustomerNames.includes(name)) historyCustomerNames.push(name);
+      }
+    }
+  }
+
   return {
     wantsDailyOverview: /今天|今日|概览|情况|重点|关注|日租|退房|清洁|入住|aujourd|today|résumé|aperçu|overview|quoi de neuf|que faire/i.test(m),
-    wantsRoomInfo: roomNumbers.length > 0,
-    roomNumbers,
+    wantsRoomInfo: roomNumbers.length > 0 || historyRoomNumbers.length > 0,
+    roomNumbers: [...new Set([...roomNumbers, ...historyRoomNumbers])],
     wantsCustomerInfo: /客户|租给谁|谁租|谁在|住客|client|locataire|occupant|qui (est|loue|occupe)/i.test(m),
-    wantsFinanceInfo: /财务|收款|欠款|应收|已收|金额|余额|收入|支出|finance|paiement|revenu|dette|balance|encaissé|chiffres/i.test(m),
-    wantsAuditInfo: /审计|操作|谁.*做|谁.*改|最近.*操作|前台.*做|清洁.*完成|historique|audit|qui a|quand|dernière/i.test(m),
+    wantsFinanceInfo: /财务|收款|欠款|应收|已收|金额|余额|收入|支出|付款|paiement|payment|revenu|dette|balance|encaissé|chiffres/i.test(m),
+    wantsAuditInfo: /审计|操作|谁.*做|谁.*改|最近.*操作|前台.*做|清洁.*谁|historique|audit|qui a|quand|dernière/i.test(m),
     wantsDraft: /完成|收到|入住|退房|清洁|保洁|记录.*收款|长租|出售|execute|do|fait|marque|termine/i.test(m),
     wantsHelp: /你能做|帮.*做|怎么用|解释|介绍|功能|aide|help|que faire|comment|explique/i.test(m),
+    historyRoomNumbers,
+    historyCustomerNames,
   };
 }
 
@@ -87,12 +130,14 @@ async function loadDailySummary(): Promise<DailySummary> {
     supabase.from("daily_bookings").select("*", { count: "exact", head: true }).eq("status", "checked_in"),
     supabase.from("cleaning_tasks").select("*", { count: "exact", head: true }).eq("is_completed", false),
     supabase.from("cleaning_tasks").select("id, unit_id").gte("completed_at", date).eq("is_completed", true),
-    // Checkouts today: bookings where check_out = today, any status (checked_in, checked_out)
     supabase.from("daily_bookings").select("id, unit_id, check_out, status").eq("check_out", date).in("status", ["checked_in", "checked_out"]),
     supabase.from("daily_bookings").select("id, unit_id, check_in, status").eq("check_in", date).in("status", ["pending_review", "confirmed"]),
-    supabase.from("payments").select("amount").gte("payment_date", date).lte("payment_date", date),
-    supabase.from("payments").select("amount").gte("payment_date", `${month}-01`).lte("payment_date", date),
+    supabase.from("payments").select("amount, currency, exchange_rate_to_xof").gte("payment_date", date).lte("payment_date", date),
+    supabase.from("payments").select("amount, currency, exchange_rate_to_xof").gte("payment_date", `${month}-01`).lte("payment_date", date),
   ]);
+
+  const sumXOF = (rows: { amount: unknown; currency?: unknown; exchange_rate_to_xof?: unknown }[]) =>
+    rows.reduce((s, p) => s + Number(p.amount) * (Number(p.exchange_rate_to_xof) || 1), 0);
 
   return {
     checkedInCount: checkedIn ?? 0,
@@ -100,14 +145,8 @@ async function loadDailySummary(): Promise<DailySummary> {
     cleaningDoneToday: cleaningDone?.length ?? 0,
     checkoutsToday: checkoutsToday?.length ?? 0,
     newBookingsToday: newBookings?.length ?? 0,
-    todayPayments: {
-      count: todayPayments?.length ?? 0,
-      total: todayPayments?.reduce((s, p) => s + Number(p.amount), 0) ?? 0,
-    },
-    monthPayments: {
-      count: monthPayments?.length ?? 0,
-      total: monthPayments?.reduce((s, p) => s + Number(p.amount), 0) ?? 0,
-    },
+    todayPayments: { count: todayPayments?.length ?? 0, total: sumXOF(todayPayments ?? []) },
+    monthPayments: { count: monthPayments?.length ?? 0, total: sumXOF(monthPayments ?? []) },
   };
 }
 
@@ -123,8 +162,9 @@ async function loadRoomContext(roomNo: string): Promise<RoomFullContext | null> 
     supabase.from("cleaning_tasks").select("*").eq("unit_id", unit.id).eq("is_completed", false).limit(1).maybeSingle(),
     // Financial: query by unit_id only — cover daily, lease, sale, managed lease
     supabase.from("receivables").select("*").eq("unit_id", unit.id).neq("status", "cancelled").order("due_date", { ascending: false }).limit(10),
-    supabase.from("payments").select("*").eq("unit_id", unit.id).order("payment_date", { ascending: false }).limit(15),
-    supabase.from("audit_logs").select("id, action, entity_type, entity_id, created_at, metadata").or(`entity_id.eq.${unit.id},entity_id.ilike.%${roomNo}%`).order("created_at", { ascending: false }).limit(5),
+    supabase.from("payments").select("*, currency, exchange_rate_to_xof").eq("unit_id", unit.id).order("payment_date", { ascending: false }).limit(15),
+    // P1 fix: entity_id is uuid — use eq only. Also select actor fields.
+    supabase.from("audit_logs").select("id, action, entity_type, entity_id, entity_label, actor_email, actor_role, created_at, metadata").eq("entity_id", unit.id).order("created_at", { ascending: false }).limit(5),
   ]);
 
   const customerId = (lease?.data as Record<string, unknown> | null)?.customer_id ??
@@ -158,7 +198,7 @@ async function loadGlobalAuditLogs(): Promise<Record<string, unknown>[]> {
   const date = t();
   const { data } = await supabase
     .from("audit_logs")
-    .select("id, action, entity_type, entity_id, created_at, metadata")
+    .select("id, action, entity_type, entity_id, entity_label, actor_email, actor_role, created_at, metadata")
     .gte("created_at", date)
     .order("created_at", { ascending: false })
     .limit(20);
@@ -173,8 +213,9 @@ export async function buildAssistantContext(
   message: string,
   user: AssistantUser,
   _locale: string,
+  history?: HistoryEntry[],
 ): Promise<AssistantContext> {
-  const patterns = detectPatterns(message);
+  const patterns = detectPatterns(message, history);
   const date = t();
 
   const ctx: AssistantContext = {
@@ -188,6 +229,7 @@ export async function buildAssistantContext(
     ctx.dailySummary = await loadDailySummary();
   }
 
+  // P1 fix: load room context for follow-up questions even without room in current message
   if (patterns.wantsRoomInfo && patterns.roomNumbers.length > 0) {
     ctx.rooms = {};
     for (const roomNo of [...new Set(patterns.roomNumbers)]) {
@@ -201,13 +243,16 @@ export async function buildAssistantContext(
     const customerName = nameMatch?.[1] ?? nameMatch?.[2];
     if (customerName) {
       ctx.customers = await loadCustomerContext(customerName);
+    } else if (patterns.historyCustomerNames.length > 0) {
+      // P1 fix: use customer name from history for follow-up
+      ctx.customers = await loadCustomerContext(patterns.historyCustomerNames[0]);
     }
   }
 
   if (patterns.wantsFinanceInfo) {
     ctx.financeSnapshot = {
       dailySummary: await loadDailySummary(),
-      note: "monthPayments is the sum of all payments this month",
+      note: "monthPayments is the sum of all payments this month (XOF, with currency conversion)",
     };
   }
 
@@ -233,11 +278,17 @@ export async function buildAssistantContext(
 function auditLogSummary(log: Record<string, unknown>): string {
   const action = log.action ?? "?";
   const created = (log.created_at as string ?? "").slice(0, 19).replace("T", " ");
+  const actor = log.actor_email ?? log.actor ?? "";
+  const actorRole = log.actor_role ?? "";
+  const entityLabel = log.entity_label ?? "";
   const meta = log.metadata as Record<string, unknown> | undefined;
   const parts = [String(action), created];
+  // P2 fix: prefer schema actor fields over metadata
+  if (actor) parts.push(`by=${actor}${actorRole ? `(${actorRole})` : ""}`);
+  if (entityLabel) parts.push(`entity=${entityLabel}`);
   if (meta) {
     if (meta.unit_no) parts.push(`room=${meta.unit_no}`);
-    if (meta.operator_name || meta.operator) parts.push(`by=${meta.operator_name ?? meta.operator}`);
+    if (meta.operator_name || meta.operator) parts.push(`operator=${meta.operator_name ?? meta.operator}`);
     if (meta.customer_name) parts.push(`customer=${meta.customer_name}`);
     if (meta.amount) parts.push(`amount=${meta.amount}`);
     if (meta.prepaid_amount) parts.push(`prepaid=${meta.prepaid_amount}`);
@@ -285,7 +336,13 @@ export function buildContextPrompt(ctx: AssistantContext, locale: string): strin
       if (room.payments && (room.payments as unknown[]).length > 0) {
         const pms = room.payments as Record<string, unknown>[];
         lines.push(`  PAYMENTS (${pms.length}):`);
-        for (const p of pms) lines.push(`    ${p.source_type}: ${p.amount} XAF on ${p.payment_date}`);
+        for (const p of pms) {
+          const amt = Number(p.amount) || 0;
+          const rate = Number(p.exchange_rate_to_xof) || 1;
+          const xof = amt * rate;
+          const cur = (p.currency as string) ?? "XOF";
+          lines.push(`    ${p.source_type}: ${amt} ${cur}${cur !== "XOF" ? ` (${xof} XOF)` : ""} on ${p.payment_date}`);
+        }
       }
       if (room.receivables && (room.receivables as unknown[]).length > 0) {
         const recs = room.receivables as Record<string, unknown>[];
