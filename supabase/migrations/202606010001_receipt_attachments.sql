@@ -1,7 +1,8 @@
 -- Receipt Attachments & Storage Bucket
 -- Links uploaded receipt images to payments, receivables, and units.
--- Does NOT create database uniqueness constraints on receipt_no.
--- Duplicate detection is handled at the application layer.
+-- Duplicate detection is handled at the application layer (not DB constraints).
+
+-- ── Attachments table ──────────────────────────────────────────
 
 create table if not exists attachments (
   id uuid primary key default gen_random_uuid(),
@@ -26,9 +27,43 @@ create table if not exists attachments (
 
 comment on table attachments is 'Links uploaded images to business entities (payments, receivables, etc.)';
 
--- Create the receipts storage bucket if not exists (Supabase migration cannot create
--- buckets directly — run this in the Supabase dashboard SQL editor or via CLI):
---
---   INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
---   VALUES ('receipts', 'receipts', false, 10485760, '{image/jpeg,image/png,image/webp,application/pdf}')
---   ON CONFLICT (id) DO NOTHING;
+-- ── RLS ────────────────────────────────────────────────────────
+
+alter table attachments enable row level security;
+
+-- Authenticated users can read all attachments
+create policy "Authenticated users can read attachments"
+  on attachments for select
+  to authenticated
+  using (true);
+
+-- Authenticated users can insert attachments
+create policy "Authenticated users can insert attachments"
+  on attachments for insert
+  to authenticated
+  with check (true);
+
+-- Only the uploading user or admin can delete
+create policy "Uploader or admin can delete attachments"
+  on attachments for delete
+  to authenticated
+  using (uploaded_by = auth.uid());
+
+-- ── Storage bucket ─────────────────────────────────────────────
+
+-- Create the receipts bucket (private, for receipt images and PDFs).
+-- This INSERT runs directly in the migration context (no manual step needed).
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('receipts', 'receipts', false, 10485760, '{image/jpeg,image/png,image/webp,application/pdf}')
+on conflict (id) do nothing;
+
+-- Storage RLS: authenticated users can read and write to receipts bucket
+create policy "Authenticated users can read receipts"
+  on storage.objects for select
+  to authenticated
+  using (bucket_id = 'receipts');
+
+create policy "Authenticated users can upload receipts"
+  on storage.objects for insert
+  to authenticated
+  with check (bucket_id = 'receipts');

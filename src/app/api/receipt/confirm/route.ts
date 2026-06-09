@@ -29,6 +29,7 @@ const sourceTypeMap: Record<string, string> = {
 };
 
 export async function POST(req: NextRequest) {
+  const warnings: string[] = [];
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
@@ -39,7 +40,6 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as ConfirmDraftInput;
     const supabase = await createClient();
 
-    // Validate
     if (!body.room_no) return NextResponse.json({ error: "Room number is required" }, { status: 400 });
     if (!body.receipt_date) return NextResponse.json({ error: "Receipt date is required" }, { status: 400 });
     if (!body.amount_xof || body.amount_xof <= 0) return NextResponse.json({ error: "Valid amount is required" }, { status: 400 });
@@ -47,27 +47,28 @@ export async function POST(req: NextRequest) {
     const { data: unit } = await supabase.from("units").select("id, building_id").eq("unit_no", body.room_no).maybeSingle();
     if (!unit) return NextResponse.json({ error: `Room ${body.room_no} not found` }, { status: 400 });
 
-    // ═══════════════════════════════════════════════════════
-    // 1. Duplicate check — BLOCK unless override
-    // ═══════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════
+    // 1. Duplicate check — receipt_no + year + building_id
+    // ═══════════════════════════════════════════════
     let duplicateWarning: string | null = null;
     if (body.receipt_no) {
       const receiptYear = body.receipt_date.slice(0, 4);
+      // Get all unit IDs in the same building
+      const { data: buildingUnits } = await supabase.from("units")
+        .select("id").eq("building_id", unit.building_id);
+      const buildingUnitIds = (buildingUnits ?? []).map(u => u.id);
+
       const { data: existing } = await supabase.from("payments")
-        .select("id, receipt_no, payment_date, amount")
+        .select("id, receipt_no, payment_date, amount, unit_id")
         .eq("receipt_no", body.receipt_no)
         .gte("payment_date", `${receiptYear}-01-01`)
         .lte("payment_date", `${receiptYear}-12-31`)
+        .in("unit_id", buildingUnitIds)
         .limit(1);
       if (existing && existing.length > 0) {
         duplicateWarning = `收据号 ${body.receipt_no} 在 ${receiptYear} 年已存在（金额 ${existing[0].amount} XOF，日期 ${existing[0].payment_date}）。`;
         if (!body.overrideDuplicate) {
-          return NextResponse.json({
-            success: false,
-            duplicateWarning,
-            requiresOverride: true,
-            message: "检测到重复收据号，需要手动确认后才能入账。",
-          });
+          return NextResponse.json({ success: false, duplicateWarning, requiresOverride: true, message: "检测到重复收据号，需要手动确认后才能入账。" });
         }
       }
     }
@@ -75,23 +76,24 @@ export async function POST(req: NextRequest) {
     const currency = body.currency ?? "XOF";
     const sourceType = sourceTypeMap[body.business_type ?? ""] ?? "manual";
 
-    // ═══════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════
     // 2. Match receivable
-    // ═══════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════
     let matchedReceivableId: string | null = null;
     let unmatchedReceivable = false;
 
     if (body.business_type && sourceType !== "manual") {
-      let receivableQuery = supabase.from("receivables")
-        .select("id, source_id, source_type, unit_id, customer_id, amount_xof, paid_amount_xof, status")
-        .eq("unit_id", unit.id)
-        .eq("source_type", sourceType)
-        .neq("status", "paid")
-        .neq("status", "cancelled");
+      // P1+P2 fix: always include amount_xof in select, filter by source_type in all queries
+      const baseSelect = "id, source_id, source_type, unit_id, customer_id, amount_xof, paid_amount_xof, status";
 
-      // Try period match first
+      // Try period match first (same source_type)
       if (body.period_start && body.period_end) {
-        const { data: periodMatch } = await receivableQuery
+        const { data: periodMatch } = await supabase.from("receivables")
+          .select(baseSelect)
+          .eq("unit_id", unit.id)
+          .eq("source_type", sourceType)
+          .neq("status", "paid")
+          .neq("status", "cancelled")
           .gte("due_date", body.period_start)
           .lte("due_date", body.period_end)
           .limit(1);
@@ -100,18 +102,18 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Try amount match
+      // P2 fix: amount match also filters by source_type
       if (!matchedReceivableId) {
         const { data: amountMatch } = await supabase.from("receivables")
-          .select("id, source_id, source_type, unit_id, customer_id, amount_xof, paid_amount_xof, status")
+          .select(baseSelect)
           .eq("unit_id", unit.id)
+          .eq("source_type", sourceType)
           .neq("status", "paid")
           .neq("status", "cancelled")
           .order("due_date", { ascending: false })
           .limit(5);
         if (amountMatch && amountMatch.length > 0) {
-          // Find the closest by amount
-          let best: typeof amountMatch[0] | null = null;
+          let best: (typeof amountMatch)[0] | null = null;
           let bestDiff = Infinity;
           for (const r of amountMatch) {
             const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
@@ -124,14 +126,12 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      if (!matchedReceivableId) {
-        unmatchedReceivable = true;
-      }
+      if (!matchedReceivableId) unmatchedReceivable = true;
     }
 
-    // ═══════════════════════════════════════════════════════
-    // 3. Insert payment
-    // ═══════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════
+    // 3. Insert payment (the critical write)
+    // ═══════════════════════════════════════════════
     let paymentSourceType = sourceType;
     let paymentSourceId: string | null = null;
     let paymentCustomerId: string | null = null;
@@ -158,27 +158,37 @@ export async function POST(req: NextRequest) {
       notes: body.notes ?? null,
     }).select("id").single();
 
-    if (paymentErr) return NextResponse.json({ error: `Failed to insert payment: ${paymentErr.message}` }, { status: 500 });
+    if (paymentErr || !payment) {
+      return NextResponse.json({ error: `Failed to insert payment: ${paymentErr?.message ?? "unknown"}` }, { status: 500 });
+    }
 
-    // Update receivable
+    // ═══════════════════════════════════════════════
+    // 4. Update receivable (P1 fix: amount_xof now correctly selected)
+    // ═══════════════════════════════════════════════
     if (matchedReceivableId) {
-      const { data: recBefore } = await supabase.from("receivables").select("paid_amount_xof, status").eq("id", matchedReceivableId).single();
-      if (recBefore) {
+      const { data: recBefore, error: recErr } = await supabase.from("receivables")
+        .select("paid_amount_xof, status, amount_xof")
+        .eq("id", matchedReceivableId).single();
+      if (!recErr && recBefore) {
         const newPaid = Number(recBefore.paid_amount_xof) + body.amount_xof;
+        const receivableTotal = Number(recBefore.amount_xof);
         let newStatus = recBefore.status;
-        if (newPaid >= Number((recBefore as Record<string, unknown>).amount_xof ?? 0)) {
+        if (newPaid >= receivableTotal) {
           newStatus = "paid";
         } else if (newPaid > 0) {
           newStatus = "partial";
         }
-        await supabase.from("receivables").update({ paid_amount_xof: newPaid, status: newStatus }).eq("id", matchedReceivableId);
+        const { error: updErr } = await supabase.from("receivables")
+          .update({ paid_amount_xof: newPaid, status: newStatus })
+          .eq("id", matchedReceivableId);
+        if (updErr) warnings.push(`应收款更新失败: ${updErr.message}`);
       }
     }
 
-    // ═══════════════════════════════════════════════════════
-    // 4. Ledger entry
-    // ═══════════════════════════════════════════════════════
-    await supabase.from("ledger_entries").insert({
+    // ═══════════════════════════════════════════════
+    // 5. Ledger entry (non-critical — warn on failure)
+    // ═══════════════════════════════════════════════
+    const { error: ledgerErr } = await supabase.from("ledger_entries").insert({
       building_id: unit.building_id,
       unit_id: unit.id,
       payment_id: payment.id,
@@ -188,13 +198,14 @@ export async function POST(req: NextRequest) {
       amount_xof: body.amount_xof,
       description: `Receipt scan: ${body.receipt_no ?? "no receipt no"} | ${body.payer_name ?? ""} ${body.period_start ? `| ${body.period_start}→${body.period_end ?? "?"}` : ""}`.trim(),
     });
+    if (ledgerErr) warnings.push(`流水写入失败: ${ledgerErr.message}`);
 
-    // ═══════════════════════════════════════════════════════
-    // 5. Attachment
-    // ═══════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════
+    // 6. Attachment (non-critical — warn on failure)
+    // ═══════════════════════════════════════════════
     let attachmentId: string | null = null;
     if (body.image_path) {
-      const { data: att } = await supabase.from("attachments").insert({
+      const { data: att, error: attErr } = await supabase.from("attachments").insert({
         storage_path: body.image_path,
         bucket: "receipts",
         file_type: "receipt_image",
@@ -212,36 +223,34 @@ export async function POST(req: NextRequest) {
           business_type: body.business_type,
         },
       }).select("id").single();
-      if (att) attachmentId = att.id;
+      if (attErr) warnings.push(`附件保存失败: ${attErr.message}`);
+      else attachmentId = att?.id ?? null;
     }
 
-    // ═══════════════════════════════════════════════════════
-    // 6. Audit log (unified)
-    // ═══════════════════════════════════════════════════════
-    await writeAuditLog({
-      action: "receipt_scan_confirm",
-      entityType: "payment",
-      entityId: payment.id,
-      entityLabel: `Room ${body.room_no} receipt ${body.receipt_no ?? ""}`.trim(),
-      metadata: {
-        room_no: body.room_no,
-        unit_id: unit.id,
-        amount_xof: body.amount_xof,
-        receipt_no: body.receipt_no,
-        receipt_date: body.receipt_date,
-        currency,
-        business_type: body.business_type,
-        payer_name: body.payer_name,
-        period_start: body.period_start,
-        period_end: body.period_end,
-        image_path: body.image_path,
-        attachment_id: attachmentId,
-        ocr_provider: body.ocr_provider ?? "manual",
-        duplicate_override: body.overrideDuplicate ?? false,
-        matched_receivable_id: matchedReceivableId,
-        unmatched_receivable: unmatchedReceivable,
-      },
-    });
+    // ═══════════════════════════════════════════════
+    // 7. Audit log (non-critical — warn on failure)
+    // ═══════════════════════════════════════════════
+    try {
+      await writeAuditLog({
+        action: "receipt_scan_confirm",
+        entityType: "payment",
+        entityId: payment.id,
+        entityLabel: `Room ${body.room_no} receipt ${body.receipt_no ?? ""}`.trim(),
+        metadata: {
+          room_no: body.room_no, unit_id: unit.id, amount_xof: body.amount_xof,
+          receipt_no: body.receipt_no, receipt_date: body.receipt_date, currency,
+          business_type: body.business_type, payer_name: body.payer_name,
+          period_start: body.period_start, period_end: body.period_end,
+          image_path: body.image_path, attachment_id: attachmentId,
+          ocr_provider: body.ocr_provider ?? "manual",
+          duplicate_override: body.overrideDuplicate ?? false,
+          matched_receivable_id: matchedReceivableId,
+          unmatched_receivable: unmatchedReceivable,
+        },
+      });
+    } catch (auditErr) {
+      warnings.push(`审计日志写入失败: ${auditErr instanceof Error ? auditErr.message : "unknown"}`);
+    }
 
     revalidatePath("/"); revalidatePath("/fr");
     revalidatePath("/finance"); revalidatePath("/fr/finance");
@@ -256,6 +265,7 @@ export async function POST(req: NextRequest) {
       duplicateOverridden: body.overrideDuplicate ?? false,
       matchedReceivableId,
       unmatchedReceivable,
+      warnings: warnings.length > 0 ? warnings : undefined,
       message: unmatchedReceivable
         ? "收款已入账，但未匹配到应收款，请人工核对。"
         : "收款已确认入账。",
