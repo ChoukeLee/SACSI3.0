@@ -14,6 +14,7 @@ export interface CustomerProfileData {
   receivables: ReceivableRow[];
   payments: PaymentRow[];
   auditLogs: { id: string; created_at: string; action: string; entity_type: string; entity_id: string | null; metadata: Record<string, unknown> | null }[];
+  attachments: { id: string; storage_path: string; file_type: string; ocr_text: string | null; metadata: Record<string, unknown> | null; paper_archive_status: string; uploaded_at: string }[];
 }
 
 export async function fetchCustomerProfile(customerId: string): Promise<CustomerProfileData | null> {
@@ -30,6 +31,7 @@ export async function fetchCustomerProfile(customerId: string): Promise<Customer
     { data: payments },
     { data: auditLogs },
     { data: units },
+    { data: attachments },
   ] = await Promise.all([
     supabase.from("daily_bookings").select("*").eq("customer_id", customerId).order("check_in", { ascending: false }).limit(100),
     supabase.from("lease_contracts").select("*").eq("customer_id", customerId).order("start_date", { ascending: false }).limit(50),
@@ -38,6 +40,7 @@ export async function fetchCustomerProfile(customerId: string): Promise<Customer
     supabase.from("payments").select("*").eq("customer_id", customerId).order("payment_date", { ascending: false }).limit(200),
     supabase.from("audit_logs").select("id, created_at, action, entity_type, entity_id, metadata").eq("entity_id", customerId).order("created_at", { ascending: false }).limit(100),
     supabase.from("units").select("*").order("unit_no"),
+    supabase.from("attachments").select("id, storage_path, file_type, ocr_text, metadata, paper_archive_status, uploaded_at").eq("customer_id", customerId).order("uploaded_at", { ascending: false }).limit(20),
   ]);
 
   // Get all units that appear in this customer's bookings/contracts
@@ -56,5 +59,6 @@ export async function fetchCustomerProfile(customerId: string): Promise<Customer
     receivables: (receivables ?? []) as ReceivableRow[],
     payments: (payments ?? []) as PaymentRow[],
     auditLogs: (auditLogs ?? []) as { id: string; created_at: string; action: string; entity_type: string; entity_id: string | null; metadata: Record<string, unknown> | null }[],
+    attachments: (attachments ?? []) as { id: string; storage_path: string; file_type: string; ocr_text: string | null; metadata: Record<string, unknown> | null; paper_archive_status: string; uploaded_at: string }[],
   };
 }

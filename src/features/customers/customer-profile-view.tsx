@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { printDocumentRecord } from "@/features/documents/templates/all-templates";
+import { ReceiptThumb } from "@/components/attachments/receipt-thumb";
 import type { DocumentRecord } from "@/features/documents/types";
 import type { CustomerProfileData } from "./customer-profile-service";
 
@@ -146,6 +147,15 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
         <Link href={routeFor(locale, "/finance")} className="hover:text-primary flex items-center gap-1">{L.finance} <ArrowRight className="h-3 w-3" /></Link>
         <Link href={routeFor(locale, "/customers")} className="hover:text-primary flex items-center gap-1">{L.backToList} <ArrowRight className="h-3 w-3" /></Link>
       </div>
+      {data.attachments && data.attachments.length > 0 && (
+        <TableSection title={L.attachments + " (" + data.attachments.length + ")"} empty={false} emptyText="">
+          <div>
+            {data.attachments.map((att) => (
+              <div key={att.id}><ReceiptThumb attachment={att} locale={"zh"} /></div>
+            ))}
+          </div>
+        </TableSection>
+      )}
     </div>
   );
 }
@@ -360,7 +370,7 @@ function contractTone(status: string): BadgeTone {
 function labels(locale: Locale) {
   if (locale === "fr") {
     return {
-      overview: "Aperçu", daily: "Jour", lease: "Location", sale: "Vente", finance: "Finance", docs: "Docs", audit: "Audit",
+      overview: "Aperçu", daily: "Jour", lease: "Location", sale: "Vente", finance: "Finance", docs: "Docs", audit: "Audit", attachments: "Reçus",
       tabs: "Onglets", name: "Nom", gender: "Genre", phone: "Tél", docType: "Pièce", notes: "Notes",
       newBooking: "Réserver", newLease: "Nouveau bail", newSale: "Nouvelle vente",
       totalRec: "Total dû", totalPaid: "Total payé", unpaid: "Impayé", overdueAmt: "Retard",
@@ -384,7 +394,7 @@ function labels(locale: Locale) {
     };
   }
   return {
-    overview: "\u603b\u89c8", daily: "\u65e5\u79df", lease: "\u957f\u79df", sale: "\u51fa\u552e", finance: "\u8d22\u52a1", docs: "\u5355\u636e", audit: "\u5ba1\u8ba1",
+    overview: "\u603b\u89c8", daily: "\u65e5\u79df", lease: "\u957f\u79df", sale: "\u51fa\u552e", finance: "\u8d22\u52a1", docs: "\u5355\u636e", audit: "\u5ba1\u8ba1", attachments: "\u51ed\u8bc1",
     tabs: "\u5ba2\u6237\u6863\u6848\u6807\u7b7e", name: "\u59d3\u540d", gender: "\u6027\u522b", phone: "\u7535\u8bdd", docType: "\u8bc1\u4ef6", notes: "\u5907\u6ce8",
     newBooking: "\u65b0\u5efa\u65e5\u79df", newLease: "\u65b0\u589e\u957f\u79df", newSale: "\u65b0\u589e\u51fa\u552e",
     totalRec: "\u7d2f\u8ba1\u5e94\u6536", totalPaid: "\u7d2f\u8ba1\u5b9e\u6536", unpaid: "\u5f53\u524d\u6b20\u8d39", overdueAmt: "\u903e\u671f\u91d1\u989d",
