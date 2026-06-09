@@ -78,6 +78,29 @@ function buildSystemPrompt(locale: string, contextPrompt: string): string {
     "- When the context has DAILY SUMMARY, use those numbers to answer \"how is today\" questions.",
     "- Room numbers are 3-4 digits like 602, 1106.",
     "- Amounts are in XOF (West African CFA franc).",
+    "",
+    "SYSTEM CAPABILITIES (what you CAN do):",
+    "- Query room status (business_query)",
+    "- Generate drafts for: check-in, check-out, record payment, complete cleaning (business_draft)",
+    "- Show today's occupancy, cleaning, payments summary (analytics)",
+    "- Answer business questions using provided context data",
+    "",
+    "SYSTEM LIMITATIONS (what you CANNOT do):",
+    "- The system has NO timed/scheduled check-in. All check-ins are full-day, date-level only.",
+    "- There is NO reservation system for specific hours (e.g., 'check in at 11 PM').",
+    "- You cannot create, modify, or cancel bookings — only generate draft suggestions.",
+    "- You cannot manually change unit status or clean status.",
+    "- You cannot process refunds or complex multi-step financial operations.",
+    "",
+    "IMPORTANT — Scenario vs Command:",
+    "- If the user DESCRIBES a situation (e.g., 'a guest wants to check in at 11 PM', 'someone asked if they can arrive late'),",
+    "  this is general_chat or business_query, NOT business_draft.",
+    "- If the user mentions specific times ('几点', '几点入住', '晚上', '下午', '早上'),",
+    "  this is a question about system capabilities, not a check-in command.",
+    "- Only generate a draft when the user CLEARLY commands an action, e.g.:",
+    "  '602办理入住', '1106完成清洁', '103收到租金195万'.",
+    "- Ambiguous messages like '1202有客人要入住' should be business_query — first check the room status, then ask if the user wants a draft.",
+    "- Messages containing both a room number AND question words ('为什么', '能不能', '可以吗', '怎么', '几点') are questions, NOT commands.",
   ].join("\n");
 }
 
@@ -146,18 +169,30 @@ function fallbackChat(message: string, ctx: AssistantContext, locale: string): A
     return { intent: "business_query", reply: results.join("\n\n"), requiresConfirmation: false, usedContext: ["room"] };
   }
 
-  // ── Draft commands ──
-  if (/清洁|保洁|ménage|menage|cleaning/i.test(message) && /完成|done|termine|terminé|fait/i.test(lowered) && roomNums.length > 0) {
+  // ── Draft commands (only when user CLEARLY issues a command, not describing a scenario) ──
+  const isScenarioOrQuestion = /预定|预约|几点|什么时候|今晚|明天|可以.*吗|能不能|怎么.*做|怎样.*做|为什么|réservation|réserver|quelle heure|quand|peut.*on|pourquoi/i.test(message);
+  if (/清洁|保洁|ménage|menage|cleaning/i.test(message) && /完成|done|termine|terminé|fait/i.test(lowered) && roomNums.length > 0 && !isScenarioOrQuestion) {
     return { intent: "business_draft", reply: `准备标记房间 ${roomNums[0]} 保洁已完成。`, draft: { action: "complete_cleaning", room: roomNums[0], date: today() }, requiresConfirmation: true };
   }
-  if (/收|租金|押金|付款|payment|paiement|loyer/i.test(message) && amount && roomNums.length > 0) {
+  if (/收|租金|押金|付款|payment|paiement|loyer/i.test(message) && amount && roomNums.length > 0 && !isScenarioOrQuestion) {
     return { intent: "business_draft", reply: `准备为房间 ${roomNums[0]} 记录收款 ${amount.toLocaleString()} XOF。`, draft: { action: "record_payment", room: roomNums[0], amount_xof: amount, date: today() }, requiresConfirmation: true };
   }
-  if (/入住|check.?in|arriv/i.test(lowered) && roomNums.length > 0) {
+  if (/入住|check.?in|arriv/i.test(lowered) && roomNums.length > 0 && !isScenarioOrQuestion) {
     return { intent: "business_draft", reply: `准备为房间 ${roomNums[0]} 办理入住。`, draft: { action: "check_in", room: roomNums[0], date: today() }, requiresConfirmation: true };
   }
-  if (/退房|check.?out|départ|depart/i.test(lowered) && roomNums.length > 0) {
+  if (/退房|check.?out|départ|depart/i.test(lowered) && roomNums.length > 0 && !isScenarioOrQuestion) {
     return { intent: "business_draft", reply: `准备为房间 ${roomNums[0]} 办理退房。`, draft: { action: "check_out", room: roomNums[0], date: today() }, requiresConfirmation: true };
+  }
+
+  // Scenario description with room number → business_query, not draft
+  if (roomNums.length > 0 && isScenarioOrQuestion && /入住|check.?in|arriv|退房|check.?out|清洁|保洁|支付|付|收租/i.test(message)) {
+    return {
+      intent: "business_query",
+      reply: zh
+        ? `我听出来你在描述一个场景，不是直接命令。\n\n关于房间 ${roomNums.join("、")}：系统目前只支持全天级别的入住/退房操作，不支持按小时预约（如"今晚十一点入住"）。如果需要办理入住，请直接说"${roomNums[0]}办理入住"，我会生成草稿。\n\n需要我帮你查一下 ${roomNums.join("、")} 的当前状态吗？`
+        : `Je comprends que vous décrivez un scénario, pas une commande.\n\nConcernant la chambre ${roomNums.join(", ")} : le système ne gère que les check-ins par date, pas par horaire spécifique. Pour un check-in, dites "${roomNums[0]}办理入住".\n\nVoulez-vous que je vérifie le statut de ${roomNums.join(", ")} ?`,
+      requiresConfirmation: false,
+    };
   }
 
   return { intent: "unknown", reply: zh ? "我没有完全理解你的意思。可以换个说法试试？" : "Je n'ai pas bien compris. Pouvez-vous reformuler ?", requiresConfirmation: false };
