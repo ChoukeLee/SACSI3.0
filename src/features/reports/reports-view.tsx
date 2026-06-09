@@ -245,7 +245,7 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {Object.entries(roomStatusData.statuses).map(([k, v]) => {
-              const dot = k === "available" ? "bg-accentGreen-500" : k === "daily_occupied" ? "bg-accentBlue-500" : k === "leased" ? "bg-[#7050A0]" : k === "sold" ? "bg-[#505080]" : k === "maintenance" || k === "locked" ? "bg-[#F0A080]" : k === "cleaning_pending" ? "bg-accentAmber-500" : "bg-muted-foreground/40";
+              const dot = k === "available" ? "bg-accentGreen-500" : k === "daily_occupied" ? "bg-accentBlue-500" : k === "leased" ? "bg-[#5E9BC5]" : k === "sold" ? "bg-[#B88A48]" : k === "maintenance" || k === "locked" ? "bg-[#F0A080]" : k === "cleaning_pending" ? "bg-accentAmber-500" : "bg-muted-foreground/40";
               return <StatBlock key={k} label={L.statusLabels[k] ?? k} value={String(v)} dot={dot} />;
             })}
           </div>

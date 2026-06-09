@@ -29,7 +29,7 @@ interface UnitState {
 interface FloorGroup { key: string; label: string; sortValue: number; states: UnitState[] }
 
 export const STATUS_DOT: Record<MgmtStatus, string> = {
-  sold: "#075A9A", leased: "#A898E8", dailyOccupied: "#62B6F5",
+  sold: "#B88A48", leased: "#5E9BC5", dailyOccupied: "#62B6F5",
   reserved: "#E8C840", cleaningPending: "#5CC4B8", maintenance: "#F08090",
   available: "#A0D0E8",
 };

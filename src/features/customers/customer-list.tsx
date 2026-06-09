@@ -218,8 +218,8 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
   };
 
   const statBlocks = [
-    { key: "lease", label: t.leaseClients, value: String(stats.lease), dot: "bg-[#7050A0]" },
-    { key: "sale", label: t.saleClients, value: String(stats.sale), dot: "bg-[#505080]" },
+    { key: "lease", label: t.leaseClients, value: String(stats.lease), dot: "bg-[#5E9BC5]" },
+    { key: "sale", label: t.saleClients, value: String(stats.sale), dot: "bg-[#B88A48]" },
     { key: "daily", label: t.dailyOnly, value: String(stats.dailyOnly), dot: "bg-sky-500" },
     { key: "blacklisted", label: t.blacklisted, value: String(stats.blacklisted), dot: stats.blacklisted > 0 ? "bg-accentRed-500" : "bg-muted-foreground/40" },
     { key: "total", label: t.total, value: String(stats.all), dot: "bg-accentAmber-500" },
@@ -359,8 +359,8 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-1">
-                  {hasLease && <span className="rounded bg-[#7050A0]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#7050A0]"><Home className="mr-0.5 inline h-3 w-3" />{t.leaseTag}</span>}
-                  {hasSale && <span className="rounded bg-[#505080]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#505080]"><CreditCard className="mr-0.5 inline h-3 w-3" />{t.saleTag}</span>}
+                  {hasLease && <span className="rounded bg-[#DDECF7] px-1.5 py-0.5 text-[10px] font-medium text-[#2E6F9A]"><Home className="mr-0.5 inline h-3 w-3" />{t.leaseTag}</span>}
+                  {hasSale && <span className="rounded bg-[#EFE1CA] px-1.5 py-0.5 text-[10px] font-medium text-[#7B5A2B]"><CreditCard className="mr-0.5 inline h-3 w-3" />{t.saleTag}</span>}
                   {hasDaily && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700"><BedDouble className="mr-0.5 inline h-3 w-3" />{t.dailyTag}</span>}
                   {c.is_blacklisted && <AlertTriangle className="h-3 w-3 text-red-500" />}
                 </div>

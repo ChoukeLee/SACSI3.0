@@ -30,9 +30,9 @@ export interface RoomCardAction {
 /* ── Status → color mapping ── */
 type CardColors = { bg: string; badge: string; nameColor: string; metaColor: string; btnBg: string };
 const statusStyle: Record<RoomStatus, CardColors> = {
-  sold:            { bg: "bg-[#F7F1E6]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
-  managed:         { bg: "bg-[#D9F7F0]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
-  leased:          { bg: "bg-[#EAF3FA]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
+  sold:            { bg: "bg-[#EFE1CA]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
+  managed:         { bg: "bg-[#C6F0E7]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
+  leased:          { bg: "bg-[#DDECF7]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
   daily_occupied:  { bg: "bg-[#62B6F5]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.95)]", metaColor: "text-[rgba(255,255,255,0.72)]", btnBg: "bg-white/[0.82]" },
   dailyOccupied:   { bg: "bg-[#62B6F5]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.95)]", metaColor: "text-[rgba(255,255,255,0.72)]", btnBg: "bg-white/[0.82]" },
   reserved:        { bg: "bg-[#FFF6D8]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
@@ -98,7 +98,7 @@ export function RoomCard({ roomNo, status, statusLabel, customerName, dateText, 
   if (children) {
     const inner = (
       <div className={cn(
-        "flex flex-col gap-3 rounded-lg border border-[rgba(23,50,77,0.08)] p-4 shadow-[0_8px_18px_rgba(25,58,92,0.08)]",
+        "flex min-h-[132px] flex-col gap-3 rounded-lg border border-[rgba(23,50,77,0.08)] p-4 shadow-[0_8px_18px_rgba(25,58,92,0.08)]",
         s.bg, s.nameColor, className,
       )}>
         <div className="flex items-center justify-between gap-2">

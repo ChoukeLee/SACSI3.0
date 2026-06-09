@@ -1112,8 +1112,8 @@ function getRoomTone(unit: UnitRow, hasCleaning: boolean, isMaintenance: boolean
   if (hasCleaning || unit.status === "cleaning_pending") return { strip: "bg-[#5CC4B8]" };
   if (unit.status === "reserved") return { strip: "bg-[#E8C840]" };
   if (unit.status === "daily_occupied") return { strip: "bg-[#62B6F5]" };
-  if (unit.status === "leased") return { strip: "bg-[#A898E8]" };
-  if (unit.status === "sold") return { strip: "bg-[#075A9A]" };
+  if (unit.status === "leased") return { strip: "bg-[#5E9BC5]" };
+  if (unit.status === "sold") return { strip: "bg-[#B88A48]" };
   return { strip: "bg-[#A0D0E8]" };
 }
 

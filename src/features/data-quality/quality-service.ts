@@ -73,9 +73,9 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
       const activeDaily = data.dailyBookings.find(b => b.unit_id === unit.id && b.status === "checked_in");
       if (activeDaily) issues.push(issue(
         `unit_sold_daily_${unit.id}`, "high", "unit",
-        `?????????? ${unit.unit_no}`,
-        `${unit.unit_no} ??? sold???? checked_in ?? ${activeDaily.check_in}`,
-        "?????????????????????????????",
+        `已售房源存在日租入住 ${unit.unit_no}`,
+        `${unit.unit_no} 房态为 sold，但存在 checked_in 日租 ${activeDaily.check_in}`,
+        "检查日租记录；已售房源不应存在日租入住",
         "unit", unit.id, label, [activeDaily.id], "/daily-rentals",
       ));
     }

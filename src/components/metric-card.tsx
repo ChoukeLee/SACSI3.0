@@ -9,8 +9,8 @@ const tones: Record<string, { bg: string; icon: string; dot: string }> = {
   red:      { bg: "bg-accentRed-50/70",    icon: "text-accentRed-600",    dot: "bg-accentRed-500" },
   purple:   { bg: "bg-accentPurple-50/70", icon: "text-accentPurple-600", dot: "bg-accentPurple-500" },
   neutral:  { bg: "bg-muted/60",           icon: "text-foreground",        dot: "bg-foreground/60" },
-  sold:     { bg: "bg-muted/60",           icon: "text-foreground",        dot: "bg-[#505080]" },
-  leased:   { bg: "bg-accentPurple-50/70", icon: "text-accentPurple-600", dot: "bg-[#7050A0]" },
+  sold:     { bg: "bg-[#EFE1CA]/70",       icon: "text-[#7B5A2B]",         dot: "bg-[#B88A48]" },
+  leased:   { bg: "bg-[#DDECF7]/70",       icon: "text-[#2E6F9A]",         dot: "bg-[#5E9BC5]" },
   available:{ bg: "bg-accentAmber-50/30",  icon: "text-accentAmber-600",  dot: "bg-[#F0E0D0]" },
   maintenance:{ bg: "bg-accentRed-50/50",  icon: "text-accentRed-600",    dot: "bg-[#F0A080]" },
 }
