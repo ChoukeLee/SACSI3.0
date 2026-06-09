@@ -197,15 +197,15 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                         {customer?.name ?? "—"}
                       </p>
                       <div className="flex h-5 items-center gap-1.5">
-                        {isManaged && <Badge variant="outline" className="h-5 px-2 text-[10px]">{locale === "zh" ? "代管" : "Gestion"}</Badge>}
+                        {isManaged && <Badge variant="success" className="h-5 bg-white/70 px-2 text-[10px] text-[#217365]">{locale === "zh" ? "代管" : "Gestion"}</Badge>}
                         <Badge variant={statusVariant[contract.status]} className="h-5 px-2 text-[10px]">{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
                       </div>
                     </div>
                     {/* Rent + expiry */}
                     <div className="min-h-[34px] text-[11px] leading-relaxed text-[#5D7186]">
                       <p className="tabular-nums">{rent > 0 ? formatXof(rent) : (locale==="zh"?"租金未录入":"Loyer non saisi")}</p>
-                      <p>
-                        {isLongTerm ? (locale==="zh"?"长期有效":"Long terme") : contract.expected_end_date}
+                      <p className="tabular-nums">
+                        {contract.start_date} → {isLongTerm ? (locale==="zh"?"长期有效":"Long terme") : contract.expected_end_date}
                         {!isLongTerm && daysLeft>=0&&daysLeft<=30 && <span className="ml-1 text-amber-600 font-medium">({daysLeft}j)</span>}
                       </p>
                     </div>
