@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ImageUp, Loader2, Pencil, Sparkles, X } from "lucide-react";
+import { AlertTriangle, Check, ImageUp, Loader2, Pencil, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -36,7 +36,12 @@ interface ScanResult {
 interface ConfirmResult {
   success: boolean;
   paymentId?: string;
+  attachmentId?: string | null;
   duplicateWarning?: string | null;
+  duplicateOverridden?: boolean;
+  requiresOverride?: boolean;
+  matchedReceivableId?: string | null;
+  unmatchedReceivable?: boolean;
   message?: string;
   error?: string;
 }
@@ -58,8 +63,8 @@ export function ReceiptUpload({ locale, onClose }: Props) {
   const [result, setResult] = useState<ScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
-  const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
-  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+  const [confirmResult, setConfirmResult] = useState<ConfirmResult | null>(null);
+  const [overrideDuplicate, setOverrideDuplicate] = useState(false);
 
   // Editable draft fields
   const [editRoom, setEditRoom] = useState("");
@@ -77,30 +82,21 @@ export function ReceiptUpload({ locale, onClose }: Props) {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] ?? null;
     setFile(f);
-    if (f) {
-      setPreviewUrl(URL.createObjectURL(f));
-      setResult(null);
-      setError(null);
-      setConfirmed(false);
-    }
+    if (f) { setPreviewUrl(URL.createObjectURL(f)); setResult(null); setError(null); setConfirmed(false); }
   };
 
   const handleScan = async () => {
     if (!file && !manualText) { setError(zh ? "请选择收据图片或粘贴文字" : "Choisissez une image ou collez le texte"); return; }
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
       const formData = new FormData();
       if (file) formData.append("file", file);
       if (manualText) formData.append("manual_text", manualText);
       formData.append("locale", locale);
-
       const res = await fetch("/api/receipt/scan", { method: "POST", body: formData });
       const data = (await res.json()) as ScanResult;
       if (!res.ok) { setError(data.error ?? "Scan failed"); return; }
-
       setResult(data);
-      // Populate editable fields
       setEditRoom(data.draft.room_no ?? "");
       setEditAmount(data.draft.amount_xof?.toString() ?? "");
       setEditDate(data.draft.receipt_date ?? "");
@@ -110,51 +106,43 @@ export function ReceiptUpload({ locale, onClose }: Props) {
       setEditBusinessType(data.draft.business_type ?? "");
       setEditPayer(data.draft.payer_name ?? "");
       setEditNotes(data.draft.notes ?? "");
-    } catch {
-      setError(zh ? "扫描失败，请重试" : "Échec du scan");
-    } finally {
-      setLoading(false);
-    }
+      setOverrideDuplicate(false);
+    } catch { setError(zh ? "扫描失败，请重试" : "Échec du scan"); }
+    finally { setLoading(false); }
   };
 
-  const handleConfirm = async () => {
-    if (!editRoom || !editDate || !editAmount) {
-      setError(zh ? "房号、金额、日期为必填" : "Chambre, montant, date obligatoires");
-      return;
-    }
-    setConfirming(true);
-    setError(null);
+  const handleConfirm = async (forceOverride = false) => {
+    if (!editRoom || !editDate || !editAmount) { setError(zh ? "房号、金额、日期为必填" : "Chambre, montant, date obligatoires"); return; }
+    setConfirming(true); setError(null);
     try {
       const res = await fetch("/api/receipt/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          room_no: editRoom,
-          receipt_no: editReceiptNo || null,
-          receipt_date: editDate,
-          amount_xof: parseInt(editAmount, 10) || 0,
-          currency: "XOF",
-          period_start: editPeriodStart || null,
-          period_end: editPeriodEnd || null,
-          business_type: editBusinessType || null,
-          payer_name: editPayer || null,
-          notes: editNotes || null,
-          image_path: result?.imagePath ?? null,
-          ocr_text: result?.ocrText ?? null,
+          room_no: editRoom, receipt_no: editReceiptNo || null, receipt_date: editDate,
+          amount_xof: parseInt(editAmount, 10) || 0, currency: "XOF",
+          period_start: editPeriodStart || null, period_end: editPeriodEnd || null,
+          business_type: editBusinessType || null, payer_name: editPayer || null,
+          notes: editNotes || null, image_path: result?.imagePath ?? null,
+          ocr_text: result?.ocrText ?? null, ocr_provider: result?.ocrProvider ?? "manual",
+          overrideDuplicate: forceOverride,
         }),
       });
       const data = (await res.json()) as ConfirmResult;
+
+      if (data.requiresOverride) {
+        setError(data.duplicateWarning ?? "检测到重复收据");
+        setOverrideDuplicate(true);
+        return;
+      }
+
       if (!res.ok) { setError(data.error ?? "Confirmation failed"); return; }
 
       setConfirmed(true);
-      setConfirmMessage(data.message ?? null);
-      setDuplicateWarning(data.duplicateWarning ?? null);
+      setConfirmResult(data);
       router.refresh();
-    } catch {
-      setError(zh ? "确认失败" : "Échec de la confirmation");
-    } finally {
-      setConfirming(false);
-    }
+    } catch { setError(zh ? "确认失败" : "Échec de la confirmation"); }
+    finally { setConfirming(false); }
   };
 
   const labelClass = "text-[11px] font-semibold uppercase tracking-wider text-muted-foreground";
@@ -164,18 +152,9 @@ export function ReceiptUpload({ locale, onClose }: Props) {
     <div className="space-y-4">
       {!confirmed && (
         <>
-          {/* Upload area */}
           <input ref={fileRef} type="file" accept="image/*,.pdf" onChange={handleFileSelect} className="hidden" />
-          <div
-            onClick={() => fileRef.current?.click()}
-            className={cn(
-              "cursor-pointer rounded-xl border-2 border-dashed p-6 text-center transition-colors",
-              file ? "border-primary/30 bg-accent/30" : "border-border hover:border-primary/20 hover:bg-muted/30",
-            )}
-          >
-            {previewUrl ? (
-              <img src={previewUrl} alt="receipt preview" className="mx-auto max-h-48 rounded-lg object-contain" />
-            ) : (
+          <div onClick={() => fileRef.current?.click()} className={cn("cursor-pointer rounded-xl border-2 border-dashed p-6 text-center transition-colors", file ? "border-primary/30 bg-accent/30" : "border-border hover:border-primary/20 hover:bg-muted/30")}>
+            {previewUrl ? <img src={previewUrl} alt="receipt" className="mx-auto max-h-48 rounded-lg object-contain" /> : (
               <div className="space-y-2">
                 <ImageUp className="mx-auto h-8 w-8 text-muted-foreground/60" />
                 <p className="text-[13px] text-muted-foreground">{zh ? "点击上传收据图片" : "Cliquez pour télécharger"}</p>
@@ -184,25 +163,10 @@ export function ReceiptUpload({ locale, onClose }: Props) {
             )}
           </div>
 
-          {/* Manual text toggle */}
-          <button
-            type="button"
-            onClick={() => setShowManualInput(!showManualInput)}
-            className="text-[11px] text-muted-foreground underline"
-          >
-            {showManualInput
-              ? (zh ? "收起" : "Masquer")
-              : (zh ? "或手动粘贴收据文字" : "Ou collez le texte du reçu")}
+          <button type="button" onClick={() => setShowManualInput(!showManualInput)} className="text-[11px] text-muted-foreground underline">
+            {showManualInput ? (zh ? "收起" : "Masquer") : (zh ? "或手动粘贴收据文字" : "Ou collez le texte du reçu")}
           </button>
-          {showManualInput && (
-            <textarea
-              value={manualText}
-              onChange={(e) => setManualText(e.target.value)}
-              placeholder={zh ? "粘贴收据上的文字……" : "Collez le texte du reçu…"}
-              rows={4}
-              className={inputClass}
-            />
-          )}
+          {showManualInput && <textarea value={manualText} onChange={(e) => setManualText(e.target.value)} placeholder={zh ? "粘贴收据上的文字……" : "Collez le texte du reçu…"} rows={4} className={inputClass} />}
 
           {!result && (
             <Button onClick={handleScan} disabled={loading} variant="default" className="w-full">
@@ -211,60 +175,50 @@ export function ReceiptUpload({ locale, onClose }: Props) {
             </Button>
           )}
 
-          {error && <p className="text-[13px] text-red-600">{error}</p>}
+          {error && !overrideDuplicate && <p className="text-[13px] text-red-600">{error}</p>}
         </>
       )}
 
-      {/* Result: draft review */}
-      {result && !confirmed && (
+      {/* Duplicate override prompt */}
+      {overrideDuplicate && !confirmed && (
+        <div className="space-y-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-4 text-center">
+          <AlertTriangle className="mx-auto h-8 w-8 text-amber-600" />
+          <p className="text-sm font-semibold text-amber-800">{zh ? "检测到重复收据" : "Reçu en double détecté"}</p>
+          <p className="text-xs text-amber-700">{error}</p>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => { setOverrideDuplicate(false); setError(null); }}>
+              {zh ? "取消" : "Annuler"}
+            </Button>
+            <Button variant="default" size="sm" className="flex-1" onClick={() => handleConfirm(true)} disabled={confirming}>
+              {confirming ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+              {zh ? "仍然确认入账" : "Confirmer quand même"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Draft review */}
+      {result && !confirmed && !overrideDuplicate && (
         <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-4">
-          <p className="text-xs font-semibold text-muted-foreground">
-            {zh ? "OCR 识别结果" : "Résultat OCR"} ({result.ocrProvider})
-          </p>
+          <p className="text-xs font-semibold text-muted-foreground">{zh ? "OCR 识别结果" : "Résultat OCR"} ({result.ocrProvider})</p>
           {result.ocrError && <p className="text-xs text-red-600">{result.ocrError}</p>}
-          <pre className="max-h-24 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-white p-2 text-[11px] text-muted-foreground">
-            {result.ocrText}
-          </pre>
+          <pre className="max-h-24 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-white p-2 text-[11px] text-muted-foreground">{result.ocrText}</pre>
 
           <div className="space-y-3">
             <p className="text-xs font-semibold">
-              {zh ? "AI 解析草稿" : "Brouillon"} —
-              <span className={cn(
-                "ml-1",
-                result.draft.confidence === "high" ? "text-green-600" : result.draft.confidence === "medium" ? "text-amber-600" : "text-red-600",
-              )}>
-                {zh ? `置信度 ${result.draft.confidence === "high" ? "高" : result.draft.confidence === "medium" ? "中" : "低"}` : `Confiance ${result.draft.confidence}`}
+              {zh ? "AI 解析草稿" : "Brouillon"} — <span className={cn("ml-1", result.draft.confidence === "high" ? "text-green-600" : result.draft.confidence === "medium" ? "text-amber-600" : "text-red-600")}>
+                {result.draft.confidence === "high" ? "✓" : result.draft.confidence === "medium" ? "⚠" : "✗"}
               </span>
             </p>
-            {result.draft.warnings.map((w, i) => (
-              <p key={i} className="text-[11px] text-amber-600">⚠ {w}</p>
-            ))}
+            {result.draft.warnings.map((w, i) => <p key={i} className="text-[11px] text-amber-600">⚠ {w}</p>)}
 
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelClass}>{zh ? "房号 *" : "Chambre *"}</label>
-                <Input value={editRoom} onChange={(e) => setEditRoom(e.target.value)} className={cn(inputClass, !result.draft.room_no && "border-amber-400 bg-amber-50")} />
-              </div>
-              <div>
-                <label className={labelClass}>{zh ? "金额 (XOF) *" : "Montant *"}</label>
-                <Input type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className={cn(inputClass, !result.draft.amount_xof && "border-amber-400 bg-amber-50")} />
-              </div>
-              <div>
-                <label className={labelClass}>{zh ? "收据日期 *" : "Date *"}</label>
-                <Input value={editDate} onChange={(e) => setEditDate(e.target.value)} className={cn(inputClass, !result.draft.receipt_date && "border-amber-400 bg-amber-50")} />
-              </div>
-              <div>
-                <label className={labelClass}>{zh ? "收据号" : "No reçu"}</label>
-                <Input value={editReceiptNo} onChange={(e) => setEditReceiptNo(e.target.value)} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>{zh ? "周期开始" : "Début période"}</label>
-                <Input value={editPeriodStart} onChange={(e) => setEditPeriodStart(e.target.value)} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>{zh ? "周期结束" : "Fin période"}</label>
-                <Input value={editPeriodEnd} onChange={(e) => setEditPeriodEnd(e.target.value)} className={inputClass} />
-              </div>
+              <div><label className={labelClass}>{zh ? "房号 *" : "Chambre *"}</label><Input value={editRoom} onChange={(e) => setEditRoom(e.target.value)} className={cn(inputClass, !result.draft.room_no && "border-amber-400 bg-amber-50")} /></div>
+              <div><label className={labelClass}>{zh ? "金额 (XOF) *" : "Montant *"}</label><Input type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className={cn(inputClass, !result.draft.amount_xof && "border-amber-400 bg-amber-50")} /></div>
+              <div><label className={labelClass}>{zh ? "收据日期 *" : "Date *"}</label><Input value={editDate} onChange={(e) => setEditDate(e.target.value)} className={cn(inputClass, !result.draft.receipt_date && "border-amber-400 bg-amber-50")} /></div>
+              <div><label className={labelClass}>{zh ? "收据号" : "No reçu"}</label><Input value={editReceiptNo} onChange={(e) => setEditReceiptNo(e.target.value)} className={inputClass} /></div>
+              <div><label className={labelClass}>{zh ? "周期开始" : "Début période"}</label><Input value={editPeriodStart} onChange={(e) => setEditPeriodStart(e.target.value)} className={inputClass} /></div>
+              <div><label className={labelClass}>{zh ? "周期结束" : "Fin période"}</label><Input value={editPeriodEnd} onChange={(e) => setEditPeriodEnd(e.target.value)} className={inputClass} /></div>
               <div>
                 <label className={labelClass}>{zh ? "业务类型" : "Type"}</label>
                 <select value={editBusinessType} onChange={(e) => setEditBusinessType(e.target.value)} className={inputClass}>
@@ -276,18 +230,12 @@ export function ReceiptUpload({ locale, onClose }: Props) {
                   <option value="other">{zh ? "其他" : "Autre"}</option>
                 </select>
               </div>
-              <div>
-                <label className={labelClass}>{zh ? "付款人" : "Payeur"}</label>
-                <Input value={editPayer} onChange={(e) => setEditPayer(e.target.value)} className={inputClass} />
-              </div>
+              <div><label className={labelClass}>{zh ? "付款人" : "Payeur"}</label><Input value={editPayer} onChange={(e) => setEditPayer(e.target.value)} className={inputClass} /></div>
             </div>
-            <div>
-              <label className={labelClass}>{zh ? "备注" : "Notes"}</label>
-              <Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className={inputClass} />
-            </div>
+            <div><label className={labelClass}>{zh ? "备注" : "Notes"}</label><Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className={inputClass} /></div>
           </div>
 
-          <Button onClick={handleConfirm} disabled={confirming} variant="default" className="w-full">
+          <Button onClick={() => handleConfirm(false)} disabled={confirming} variant="default" className="w-full">
             {confirming ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
             {confirming ? "……" : (zh ? "确认入账" : "Confirmer l'écriture")}
           </Button>
@@ -296,13 +244,14 @@ export function ReceiptUpload({ locale, onClose }: Props) {
 
       {/* Confirmed */}
       {confirmed && (
-        <div className="space-y-3 rounded-xl border border-green-200 bg-green-50 p-4 text-center">
-          <Check className="mx-auto h-8 w-8 text-green-600" />
-          <p className="text-sm font-semibold text-green-800">
-            {zh ? "收款已确认入账" : "Paiement enregistré"}
+        <div className={cn("space-y-3 rounded-xl border p-4 text-center", confirmResult?.unmatchedReceivable ? "border-amber-200 bg-amber-50" : "border-green-200 bg-green-50")}>
+          <Check className={cn("mx-auto h-8 w-8", confirmResult?.unmatchedReceivable ? "text-amber-600" : "text-green-600")} />
+          <p className={cn("text-sm font-semibold", confirmResult?.unmatchedReceivable ? "text-amber-800" : "text-green-800")}>
+            {confirmResult?.unmatchedReceivable ? (zh ? "收款已入账（未匹配应收款）" : "Paiement enregistré (créance non trouvée)") : (zh ? "收款已确认入账" : "Paiement enregistré")}
           </p>
-          {confirmMessage && <p className="text-xs text-green-700">{confirmMessage}</p>}
-          {duplicateWarning && <p className="text-xs text-amber-700">⚠ {duplicateWarning}</p>}
+          {confirmResult?.message && <p className="text-xs text-muted-foreground">{confirmResult.message}</p>}
+          {confirmResult?.duplicateWarning && <p className="text-xs text-amber-700">⚠ {confirmResult.duplicateWarning}</p>}
+          {confirmResult?.attachmentId && <p className="text-xs text-muted-foreground">{zh ? "附件已保存" : "Pièce jointe sauvegardée"}</p>}
           <Button variant="outline" size="sm" onClick={onClose}>{zh ? "关闭" : "Fermer"}</Button>
         </div>
       )}
