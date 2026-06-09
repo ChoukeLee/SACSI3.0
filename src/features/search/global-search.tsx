@@ -75,10 +75,12 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
     setLoading(true);
 
     try {
+      // Build history from recent messages (last 10, excluding current user msg)
+      const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
       const res = await fetch("/api/assistant/command", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, locale }),
+        body: JSON.stringify({ message: text, locale, history }),
       });
       const data = (await res.json()) as AssistantResponse;
       const assistantMsg: ChatMessage = {
