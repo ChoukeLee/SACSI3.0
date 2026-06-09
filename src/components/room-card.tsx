@@ -98,7 +98,7 @@ export function RoomCard({ roomNo, status, statusLabel, customerName, dateText, 
   if (children) {
     const inner = (
       <div className={cn(
-        "flex min-h-[132px] flex-col gap-3 rounded-lg border border-[rgba(23,50,77,0.08)] p-4 shadow-[0_8px_18px_rgba(25,58,92,0.08)]",
+        "flex h-[170px] flex-col gap-3 rounded-lg border border-[rgba(23,50,77,0.08)] p-4 shadow-[0_8px_18px_rgba(25,58,92,0.08)]",
         s.bg, s.nameColor, className,
       )}>
         <div className="flex items-center justify-between gap-2">
