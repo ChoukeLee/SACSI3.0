@@ -84,6 +84,7 @@ begin
   end if;
 
   -- D. Match receivable
+  v_rec := null; -- prevent stale record state from leaking
   if v_source_type != 'manual' then
     -- Period match first
     if v_period_start is not null and v_period_end is not null then
