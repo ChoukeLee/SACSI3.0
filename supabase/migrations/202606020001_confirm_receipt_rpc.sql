@@ -98,8 +98,8 @@ begin
       limit 1;
     end if;
 
-    -- Amount match fallback
-    if not found then
+    -- Amount match fallback (use explicit null check, not dependent on FOUND state)
+    if v_rec.id is null then
       select id, source_id, source_type, customer_id, amount_xof, paid_amount_xof
       into v_rec
       from receivables
@@ -109,7 +109,7 @@ begin
       order by abs((amount_xof - paid_amount_xof) - v_amount_xof)
       limit 1;
 
-      if found then
+      if v_rec.id is not null then
         if abs((v_rec.amount_xof - v_rec.paid_amount_xof) - v_amount_xof) > v_amount_xof * 0.5 then
           v_rec := null;
         end if;
@@ -207,8 +207,5 @@ begin
       else 'Receipt confirmed.'
     end
   );
-
-exception when others then
-  return jsonb_build_object('success', false, 'error', SQLERRM);
 end;
 $$;

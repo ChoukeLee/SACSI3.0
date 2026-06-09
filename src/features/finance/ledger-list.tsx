@@ -9,6 +9,7 @@ import { DateInput } from "@/components/ui/date-input";
 import type { LedgerEntryRow } from "@/types/database";
 import type { CurrencyCode } from "@/types/domain";
 import { addLedgerEntry } from "./actions";
+import { ReceiptThumb } from "@/components/attachments/receipt-thumb";
 
 function buildLedgerCsv(entries: LedgerEntryRow[]): string {
   const header = "Date,Direction,Category,Amount_XOF,Amount_CNY,Description";
@@ -20,11 +21,14 @@ function buildLedgerCsv(entries: LedgerEntryRow[]): string {
 
 interface UnitSummary { id: string; unit_no: string }
 
+interface AttachmentRow { id: string; storage_path: string; linked_id: string; file_type: string; ocr_text: string | null; ocr_provider: string | null; metadata: Record<string, unknown> | null; paper_archive_status: string; paper_archive_location: string | null; uploaded_at: string; }
+
 interface LedgerListProps {
   entries: LedgerEntryRow[];
   units: UnitSummary[];
   buildingId: string | null;
   locale: Locale;
+  attachments?: AttachmentRow[];
 }
 
 const allCategories = [
@@ -36,12 +40,18 @@ const allCategories = [
 const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
 const labelClass = "block mb-1 text-xs font-semibold text-muted-foreground";
 
-export function LedgerList({ entries, units, buildingId, locale }: LedgerListProps) {
+export function LedgerList({ entries, units, buildingId, locale, attachments }: LedgerListProps) {
   const t = dictionaries[locale].finance;
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [dirFilter, setDirFilter] = useState("all");
   const [catFilter, setCatFilter] = useState("all");
+
+  const attachmentByPayment = useMemo(() => {
+    const map = new Map<string, AttachmentRow>();
+    for (const a of (attachments ?? [])) map.set(a.linked_id, a);
+    return map;
+  }, [attachments]);
   const [search, setSearch] = useState("");
   const [showNewEntry, setShowNewEntry] = useState(false);
   const [error, setError] = useState("");
@@ -195,6 +205,7 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
                   <th className="px-4 py-2.5 text-right">XOF</th>
                   <th className="px-4 py-2.5 text-right">CNY</th>
                   <th className="px-4 py-2.5">{t.entry.description}</th>
+                  {attachments && attachments.length > 0 && <th className="px-4 py-2.5 w-10"></th>}
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -215,6 +226,13 @@ export function LedgerList({ entries, units, buildingId, locale }: LedgerListPro
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{e.amount_cny != null ? Number(e.amount_cny).toLocaleString() : "-"}</td>
                       <td className="max-w-[260px] truncate px-4 py-2.5 text-muted-foreground">{e.description ?? "-"}</td>
+                      {attachments && attachments.length > 0 && (
+                        <td className="px-2 py-2.5">
+                          {e.payment_id && attachmentByPayment.has(e.payment_id) && (
+                            <ReceiptThumb attachment={attachmentByPayment.get(e.payment_id)!} locale={locale as "zh" | "fr"} />
+                          )}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
