@@ -85,10 +85,11 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
     available: apartments.filter((unit) => unit.status === "available").length,
     daily: apartments.filter((unit) => unit.status === "daily_occupied" || unit.status === "reserved").length,
     leased: apartments.filter((unit) => unit.status === "leased").length,
+    managed: apartments.filter((unit) => unit.status === "sold" && (businessFlagsMap[unit.id] ?? []).some((flag) => flag.business_type === "long_lease" && flag.is_enabled)).length,
     sold: apartments.filter((unit) => unit.status === "sold").length,
     maintenance: apartments.filter((unit) => unit.status === "maintenance" || unit.status === "locked" || unit.status === "cleaning_pending").length,
     nonApartment: nonApartments.length,
-  }), [apartments, nonApartments]);
+  }), [apartments, nonApartments, businessFlagsMap]);
 
   const detailUnit = detailUnitId ? units.find((unit) => unit.id === detailUnitId) : null;
 
@@ -97,6 +98,7 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
     { key: "available", label: statusLabels.available, value: summary.available, dot: "bg-[#A0D0E8]", icon: undefined },
     { key: "daily", label: locale === "zh" ? "日租/预订" : "Jour", value: summary.daily, dot: "bg-[#5090C0]", icon: undefined },
     { key: "leased", label: statusLabels.leased, value: summary.leased, dot: "bg-[#7050A0]", icon: undefined },
+    { key: "managed", label: locale === "zh" ? "????" : "Gestion locative", value: summary.managed, dot: "bg-[#075A9A]", icon: undefined },
     { key: "sold", label: statusLabels.sold, value: summary.sold, dot: "bg-[#505080]", icon: undefined },
     { key: "maintenance", label: locale === "zh" ? "维护中" : "Maintenance", value: summary.maintenance, dot: "bg-[#F0A080]", icon: AlertTriangle },
     { key: "nonApartment", label: locale === "zh" ? "非住宿" : "Autres", value: summary.nonApartment, dot: "bg-muted-foreground", icon: Key },
@@ -290,7 +292,7 @@ function UnitTableRow({
       <td><span className="font-mono text-xs font-bold">{unit.unit_no}</span></td>
       <td className="text-sm">{unit.floor_label}</td>
       <td className="text-sm text-muted-foreground">{t.kinds[unit.kind]}</td>
-      <td><StatusPill status={unit.status} locale={locale} /></td>
+      <td><StatusPill status={unit.status} locale={locale} managedLease={unit.status === "sold" && enabledFlags.some((flag) => flag.business_type === "long_lease")} /></td>
       <td className="text-sm text-muted-foreground">{enabledFlags.map((flag) => t.businessTypes[flag.business_type]).join(" / ") || "-"}</td>
       {!compact && (
         <td className="table-cell-amount">{dailyFlag?.default_price_xof != null ? formatXof(dailyFlag.default_price_xof) : "-"}</td>
@@ -304,8 +306,8 @@ function UnitTableRow({
   );
 }
 
-function StatusPill({ status, locale }: { status: UnitStatus; locale: Locale }) {
-  const label = dictionaries[locale].statuses[status];
+function StatusPill({ status, locale, managedLease = false }: { status: UnitStatus; locale: Locale; managedLease?: boolean }) {
+  const label = managedLease ? (locale === "zh" ? "????" : "Vendu gere") : dictionaries[locale].statuses[status];
   const styles: Record<string, string> = {
     sold: "bg-[#075A9A]/10 text-[#075A9A] ring-[#075A9A]/20",
     leased: "bg-[#E8E2FF] text-[#17324D] ring-[#C8BEF0]/60",

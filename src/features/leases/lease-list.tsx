@@ -20,9 +20,23 @@ import { contractStatusVariant as statusVariant, receivableStatusStyles as STATU
 import { printLeaseContract } from "@/features/print";
 import { createLeaseContract, activateContract, terminateContract, recordReceivablePayment, generateLeaseReceivables, processMoveOut } from "./actions";
 
-interface LeaseListProps { contracts: LeaseContractRow[]; units: UnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; locale: Locale }
+interface UnitBusinessFlag {
+  business_type: "daily_rental" | "long_lease" | "sale";
+  is_enabled: boolean;
+  default_price_xof: number | null;
+}
+
+type LeaseUnitRow = UnitRow & {
+  unit_business_flags?: UnitBusinessFlag[];
+};
+
+interface LeaseListProps { contracts: LeaseContractRow[]; units: LeaseUnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; locale: Locale }
 type PanelType = "new" | "detail" | "moveout" | null;
 const paymentCycles = ["monthly", "quarterly", "semiannual", "annual"];
+
+function isManagedLeaseUnit(unit: LeaseUnitRow) {
+  return unit.status === "sold" && unit.unit_business_flags?.some((flag) => flag.business_type === "long_lease" && flag.is_enabled);
+}
 
 export function LeaseList({ contracts, units, customers, payments, receivables, locale }: LeaseListProps) {
   const t = dictionaries[locale].leases;
@@ -74,7 +88,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const totalPaid = contractPayments.reduce((s, p) => s + Number(p.amount), 0);
   const receivableStats = useMemo(() => { let totalRec=0,totalPd=0,overdue=0; const today=new Date().toISOString().slice(0,10); for(const r of contractReceivables){totalRec+=Number(r.amount_xof);totalPd+=Number(r.paid_amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))overdue+=os;} return {totalReceivable:totalRec,totalPaid:totalPd,outstanding:totalRec-totalPd,overdue}; }, [contractReceivables]);
   const contractRisk = useMemo(() => { if(!selected||selected.status!=="active")return {expiringSoon:false,daysLeft:0}; const today=new Date(); const diff=Math.floor((new Date(selected.expected_end_date).getTime()-today.getTime())/86400000); return {expiringSoon:diff<=30&&diff>=0,daysLeft:Math.max(0,diff)}; }, [selected]);
-  const availableUnits = useMemo(() => units.filter((u) => u.kind === "apartment" && u.status === "available"), [units]);
+  const availableUnits = useMemo(() => units.filter((u) => u.kind === "apartment" && (u.status === "available" || isManagedLeaseUnit(u))), [units]);
 
   const resetNewForm = () => { setFContractNo(""); setFUnitId(""); setFCustomerId(""); setFStartDate(""); setFEndDate(""); setFCycle("monthly"); setFPayDay(5); setFRent(0); setFDeposit(0); setFDepositReceived(false); setFFreeDays(0); setFSigner(""); setFStatus("draft"); setError(""); };
   const openNew = () => { resetNewForm(); setPanel("new"); setSelectedId(null); };
@@ -172,14 +186,18 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 const isRisk = summary.overdue > 0 || (contract.status === "active" && daysLeft >= 0 && daysLeft <= 30);
                 const isLongTerm = contract.expected_end_date >= "2099-01-01";
                 const rent = Number(contract.monthly_rent_xof);
+                const isManaged = unit ? isManagedLeaseUnit(unit) : false;
                 return (
-                  <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status="leased"
+                  <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status={isManaged ? "sold" : "leased"}
                     onClick={() => openDetail(contract.id)}
                     className={isRisk ? "ring-2 ring-amber-300" : ""}>
                     {/* Name + status badge */}
                     <div className="flex items-start justify-between gap-1.5">
                       <p className="text-[13px] font-medium leading-tight truncate" title={customer?.name ?? (locale==="zh"?"无客户":"Sans client")}>{customer?.name ?? "—"}</p>
-                      <Badge variant={statusVariant[contract.status]} className="shrink-0 text-[10px]">{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        {isManaged && <Badge variant="outline" className="text-[10px]">{locale === "zh" ? "代管" : "Gestion"}</Badge>}
+                        <Badge variant={statusVariant[contract.status]} className="text-[10px]">{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
+                      </div>
                     </div>
                     {/* Rent + expiry — compact */}
                     <p className="mt-1 text-[11px] text-[#5D7186] leading-tight">
@@ -210,7 +228,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       {panel === "new" && (<PanelShell onClose={()=>setPanel(null)} title={t.form.newContract}>{/* form fields same as before, using shadcn tokens */}{/* kept compact */}
         <div className="space-y-4">
           <div><label className={labelClass}>{t.form.contractNo} *</label><input type="text" value={fContractNo} onChange={e=>setFContractNo(e.target.value)} className={inputClass}/></div>
-          <div><label className={labelClass}>{t.form.unit} *</label><select value={fUnitId} onChange={e=>setFUnitId(e.target.value)} className={inputClass}><option value="">{t.form.noUnit}</option>{availableUnits.map(u=><option key={u.id} value={u.id}>{u.unit_no} ({u.floor_label})</option>)}</select></div>
+          <div><label className={labelClass}>{t.form.unit} *</label><select value={fUnitId} onChange={e=>setFUnitId(e.target.value)} className={inputClass}><option value="">{t.form.noUnit}</option>{availableUnits.map(u=><option key={u.id} value={u.id}>{u.unit_no} ({u.floor_label}){isManagedLeaseUnit(u) ? (locale === "zh" ? " · 已售代管" : " · Gestion") : ""}</option>)}</select></div>
           <div><label className={labelClass}>{t.form.customer} *</label><select value={fCustomerId} onChange={e=>setFCustomerId(e.target.value)} className={inputClass}><option value="">{t.form.noCustomer}</option>{customers.filter(cc=>!cc.is_blacklisted).map(cc=><option key={cc.id} value={cc.id}>{cc.name} {cc.phone?`(${cc.phone})`:""}</option>)}</select></div>
           <div className="grid grid-cols-2 gap-3"><div><label className={labelClass}>{t.form.startDate}</label><DateInput value={fStartDate} onChangeValue={setFStartDate} className={inputClass}/></div><div><label className={labelClass}>{t.form.expectedEndDate}</label><DateInput value={fEndDate} onChangeValue={setFEndDate} className={inputClass}/></div></div>
           <div className="grid grid-cols-3 gap-3"><div><label className={labelClass}>{t.form.paymentCycle}</label><select value={fCycle} onChange={e=>setFCycle(e.target.value)} className={inputClass}>{paymentCycles.map(pc=><option key={pc} value={pc}>{t.paymentCycle[pc as keyof typeof t.paymentCycle]}</option>)}</select></div><div><label className={labelClass}>{t.form.paymentDay}</label><input type="number" min={1} max={31} value={fPayDay} onChange={e=>setFPayDay(Number(e.target.value))} className={inputClass}/></div><div><label className={labelClass}>{t.form.monthlyRent}</label><input type="number" value={fRent} onChange={e=>setFRent(Number(e.target.value))} className={inputClass}/></div></div>

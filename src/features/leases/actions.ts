@@ -222,7 +222,10 @@ export async function createLeaseContract(input: {
 
   // If active, update unit status and generate receivables
   if (targetStatus === "active") {
-    await supabase.from("units").update({ status: "leased" }).eq("id", input.unitId);
+    const { data: unit } = await supabase.from("units").select("status").eq("id", input.unitId).single();
+    if (unit?.status !== "sold") {
+      await supabase.from("units").update({ status: "leased" }).eq("id", input.unitId);
+    }
     // Generate rent receivables (don't block on failure)
     await generateLeaseReceivables(data.id);
   }
@@ -313,7 +316,10 @@ export async function activateContract(
   }
 
   await supabase.from("lease_contracts").update({ status: "active" }).eq("id", contractId);
-  await supabase.from("units").update({ status: "leased" }).eq("id", contract.unit_id);
+  const { data: unit } = await supabase.from("units").select("status").eq("id", contract.unit_id).single();
+  if (unit?.status !== "sold") {
+    await supabase.from("units").update({ status: "leased" }).eq("id", contract.unit_id);
+  }
 
   await supabase.from("audit_logs").insert({
     action: "activate",

@@ -27,7 +27,7 @@ export default async function FrenchLeasesPage() {
   if (buildingId) {
     const [contractsRes, unitsRes, customersRes, paymentsRes, receivablesRes] = await Promise.all([
       supabase.from("lease_contracts").select("*").order("start_date", { ascending: false }).limit(200),
-      supabase.from("units").select("*").eq("building_id", buildingId).order("unit_no"),
+      supabase.from("units").select("*, unit_business_flags(business_type, is_enabled, default_price_xof)").eq("building_id", buildingId).order("unit_no"),
       supabase.from("customers").select("*").order("name"),
       supabase.from("payments").select("*").in("source_type", ["lease_rent", "lease_deposit"]).order("payment_date", { ascending: false }).limit(200),
       supabase.from("receivables").select("*").in("source_type", ["lease_contract"]).order("due_date", { ascending: false }).limit(300),

@@ -68,15 +68,15 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
       ));
     }
 
-    // Unit shows "sold" but has active lease/daily
+    // Unit shows "sold" but has active daily. Active lease is allowed for managed leasing.
     if (unit.status === "sold") {
-      const activeLease = data.leaseContracts.find(l => l.unit_id === unit.id && l.status === "active");
-      if (activeLease) issues.push(issue(
-        `unit_sold_leased_${unit.id}`, "high", "unit",
-        `已售房源存在长租 ${unit.unit_no}`,
-        `${unit.unit_no} 房态为 sold，但存在生效长租合同 ${activeLease.contract_no}`,
-        "确认出售/长租冲突，修正一方状态",
-        "unit", unit.id, label, [activeLease.id], "/leases",
+      const activeDaily = data.dailyBookings.find(b => b.unit_id === unit.id && b.status === "checked_in");
+      if (activeDaily) issues.push(issue(
+        `unit_sold_daily_${unit.id}`, "high", "unit",
+        `?????????? ${unit.unit_no}`,
+        `${unit.unit_no} ??? sold???? checked_in ?? ${activeDaily.check_in}`,
+        "?????????????????????????????",
+        "unit", unit.id, label, [activeDaily.id], "/daily-rentals",
       ));
     }
 
@@ -271,7 +271,7 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
     ));
 
     // Active lease but unit is available or other non-leased status
-    if (lc.status === "active" && unit && unit.status !== "leased") {
+    if (lc.status === "active" && unit && unit.status !== "leased" && unit.status !== "sold") {
       issues.push(issue(
         `lease_unit_status_${lc.id}`, "high", "lease",
         `长租房态不匹配 ${lc.contract_no}`,
