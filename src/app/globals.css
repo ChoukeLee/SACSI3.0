@@ -102,10 +102,21 @@
     @apply px-4 py-2.5 text-sm;
   }
   .table-cell-amount {
-    @apply text-right tabular-nums font-medium;
+    @apply text-left tabular-nums font-medium;
   }
   .table-cell-action {
     @apply text-center;
+  }
+}
+
+/* Keep tabular data visually consistent across modules. */
+@layer utilities {
+  table th,
+  table td,
+  table th.text-right,
+  table td.text-right,
+  table .table-cell-amount {
+    text-align: left !important;
   }
 }
 
