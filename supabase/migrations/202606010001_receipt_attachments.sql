@@ -32,18 +32,21 @@ comment on table attachments is 'Links uploaded images to business entities (pay
 alter table attachments enable row level security;
 
 -- Authenticated users can read all attachments
+drop policy if exists "Authenticated users can read attachments" on attachments;
 create policy "Authenticated users can read attachments"
   on attachments for select
   to authenticated
   using (true);
 
 -- Authenticated users can insert attachments
+drop policy if exists "Authenticated users can insert attachments" on attachments;
 create policy "Authenticated users can insert attachments"
   on attachments for insert
   to authenticated
   with check (true);
 
 -- Only the uploading user or admin can delete
+drop policy if exists "Uploader or admin can delete attachments" on attachments;
 create policy "Uploader or admin can delete attachments"
   on attachments for delete
   to authenticated
@@ -58,11 +61,13 @@ values ('receipts', 'receipts', false, 10485760, '{image/jpeg,image/png,image/we
 on conflict (id) do nothing;
 
 -- Storage RLS: authenticated users can read and write to receipts bucket
+drop policy if exists "Authenticated users can read receipts" on storage.objects;
 create policy "Authenticated users can read receipts"
   on storage.objects for select
   to authenticated
   using (bucket_id = 'receipts');
 
+drop policy if exists "Authenticated users can upload receipts" on storage.objects;
 create policy "Authenticated users can upload receipts"
   on storage.objects for insert
   to authenticated

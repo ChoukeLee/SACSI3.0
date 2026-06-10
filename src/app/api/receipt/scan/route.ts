@@ -29,18 +29,18 @@ function normalizeReceiptDraft(draft: ReceiptDraft, ocrText: string): ReceiptDra
   let amount = draft.amount_xof;
   const amountText = draft.notes ?? ocrText;
 
-  // Fix Chinese 万 amounts: if OCR text says "195万" but amount is 195000, correct to 1,950,000
+  // Fix Chinese 万 amounts: if OCR text says "195万" but amount is 195000 or 195, correct to 1,950,000
   const wanMatch = amountText.match(/(\d+)\s*万/);
   if (wanMatch) {
-    const expectedWan = parseInt(wanMatch[1], 10) * 10000;
-    if (amount && amount < 1000000 && amount < expectedWan * 0.1) {
-      warnings.push(`金额疑似错误：原文"${wanMatch[0]}"应为${expectedWan.toLocaleString()}，但识别为${amount.toLocaleString()}，已自动修正。`);
+    const wanDigits = parseInt(wanMatch[1], 10);
+    const expectedWan = wanDigits * 10000;
+    // Fix: amount is null, or suspiciously small relative to expected value
+    const needsFix = !amount
+      || (amount < 1000000 && amount <= expectedWan * 0.1)
+      || (amount >= 100 && amount < 10000 && amount === wanDigits); // e.g. 195 when OCR says 195万
+    if (needsFix) {
+      warnings.push(`金额修正：原文"${wanMatch[0]}"，原识别${amount?.toLocaleString() ?? "无"}→${expectedWan.toLocaleString()}。`);
       amount = expectedWan;
-    }
-    // If no amount was extracted but 万 is present, use the wan value
-    if (!amount) {
-      amount = expectedWan;
-      warnings.push(`从原文"${wanMatch[0]}"推导金额=${expectedWan.toLocaleString()}。`);
     }
   }
 

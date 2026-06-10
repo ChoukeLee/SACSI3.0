@@ -107,7 +107,9 @@ function buildSystemPrompt(locale: string, contextPrompt: string): string {
 function fallbackChat(message: string, ctx: AssistantContext, locale: string): AssistantResult {
   const zh = locale === "zh";
   const lowered = message.toLowerCase();
-  const roomNums = [...message.matchAll(/\b(\d{3,4})\b/g)].map(r => r[1]);
+  const explicitRoomNums = [...message.matchAll(/\b(\d{3,4})\b/g)].map(r => r[1]);
+  const contextRoomNums = ctx.rooms ? Object.keys(ctx.rooms) : [];
+  const roomNums = explicitRoomNums.length > 0 ? explicitRoomNums : contextRoomNums;
   const amountMatch = message.match(/(\d+(?:\.\d+)?)\s*(万|w|W)?/);
   const amount = amountMatch ? Number(amountMatch[1]) * (amountMatch[2] ? 10000 : 1) : undefined;
   const isScenarioOrQuestion = /预定|预约|几点|什么时候|今晚|明天|可以.*吗|能不能|怎么.*做|怎样.*做|为什么|réservation|réserver|quelle heure|quand|peut.*on|pourquoi/i.test(message);

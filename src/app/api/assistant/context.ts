@@ -75,17 +75,24 @@ function detectPatterns(message: string, history?: HistoryEntry[]): Patterns {
   const m = message.toLowerCase();
   const roomNumbers = [...message.matchAll(/\b(\d{3,4})\b/g)].map(r => r[1]);
 
-  // Extract room numbers and customer mentions from recent history
+  // Follow-up questions should inherit only the most recent explicit room,
+  // not every room mentioned in the whole chat history.
   const historyRoomNumbers: string[] = [];
   const historyCustomerNames: string[] = [];
   if (history) {
-    for (const h of history.slice(-10)) {
-      if (h.role !== "user") continue;
-      // Extract room numbers from recent user messages
-      const hRooms = [...h.content.matchAll(/\b(\d{3,4})\b/g)].map(r => r[1]);
-      for (const r of hRooms) {
-        if (!historyRoomNumbers.includes(r)) historyRoomNumbers.push(r);
+    const recentUserMessages = history.slice(-10).filter(h => h.role === "user").reverse();
+    if (roomNumbers.length === 0) {
+      for (const h of recentUserMessages) {
+        const hRooms = [...h.content.matchAll(/\b(\d{3,4})\b/g)].map(r => r[1]);
+        if (hRooms.length > 0) {
+          historyRoomNumbers.push(...new Set(hRooms));
+          break;
+        }
       }
+    }
+
+    for (const h of recentUserMessages) {
+      if (h.role !== "user") continue;
       // Extract customer name references
       const nameMatch = h.content.match(/客户[：:]\s*(\S+)|(\S{2,4})\s*(的|租客|客户|租约|房间|付款|状态)/);
       if (nameMatch) {
@@ -155,17 +162,40 @@ async function loadRoomContext(roomNo: string): Promise<RoomFullContext | null> 
   const { data: unit } = await supabase.from("units").select("*").eq("unit_no", roomNo).maybeSingle();
   if (!unit) return null;
 
-  const [lease, sale, daily, cleaning, receivables, payments, recentAuditLogs] = await Promise.all([
+  const auditSelect = "id, action, entity_type, entity_id, entity_label, actor_email, actor_role, created_at, metadata";
+  const [lease, sale, daily, cleaning, cleaningTasks, receivables, payments, unitAuditLogs, roomMetaAuditLogs] = await Promise.all([
     supabase.from("lease_contracts").select("*").eq("unit_id", unit.id).eq("status", "active").maybeSingle(),
     supabase.from("sale_contracts").select("*").eq("unit_id", unit.id).eq("status", "active").maybeSingle(),
     supabase.from("daily_bookings").select("*").eq("unit_id", unit.id).in("status", ["checked_in", "confirmed", "pending_review"]).order("check_in", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("cleaning_tasks").select("*").eq("unit_id", unit.id).eq("is_completed", false).limit(1).maybeSingle(),
+    supabase.from("cleaning_tasks").select("id").eq("unit_id", unit.id).order("created_at", { ascending: false }).limit(30),
     // Financial: query by unit_id only — cover daily, lease, sale, managed lease
     supabase.from("receivables").select("*").eq("unit_id", unit.id).neq("status", "cancelled").order("due_date", { ascending: false }).limit(10),
     supabase.from("payments").select("*, currency, exchange_rate_to_xof").eq("unit_id", unit.id).order("payment_date", { ascending: false }).limit(15),
     // P1 fix: entity_id is uuid — use eq only. Also select actor fields.
-    supabase.from("audit_logs").select("id, action, entity_type, entity_id, entity_label, actor_email, actor_role, created_at, metadata").eq("entity_id", unit.id).order("created_at", { ascending: false }).limit(5),
+    supabase.from("audit_logs").select(auditSelect).eq("entity_id", unit.id).order("created_at", { ascending: false }).limit(10),
+    supabase.from("audit_logs").select(auditSelect).contains("metadata", { unit_no: roomNo }).order("created_at", { ascending: false }).limit(10),
   ]);
+
+  const cleaningTaskIds = ((cleaningTasks?.data ?? []) as { id: string }[]).map(task => task.id);
+  const { data: cleaningAuditLogs } = cleaningTaskIds.length > 0
+    ? await supabase
+      .from("audit_logs")
+      .select(auditSelect)
+      .eq("entity_type", "cleaning_task")
+      .in("entity_id", cleaningTaskIds)
+      .order("created_at", { ascending: false })
+      .limit(10)
+    : { data: [] };
+
+  const recentAuditLogs = [
+    ...((unitAuditLogs?.data ?? []) as Record<string, unknown>[]),
+    ...((roomMetaAuditLogs?.data ?? []) as Record<string, unknown>[]),
+    ...((cleaningAuditLogs ?? []) as Record<string, unknown>[]),
+  ]
+    .filter((log, index, all) => all.findIndex(item => item.id === log.id) === index)
+    .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")))
+    .slice(0, 10);
 
   const customerId = (lease?.data as Record<string, unknown> | null)?.customer_id ??
     (sale?.data as Record<string, unknown> | null)?.customer_id ??
@@ -183,7 +213,7 @@ async function loadRoomContext(roomNo: string): Promise<RoomFullContext | null> 
     customer: customer as unknown as Record<string, unknown> | null,
     receivables: (receivables?.data ?? []) as Record<string, unknown>[],
     payments: (payments?.data ?? []) as Record<string, unknown>[],
-    recentAuditLogs: (recentAuditLogs?.data ?? []) as Record<string, unknown>[],
+    recentAuditLogs,
   };
 }
 
