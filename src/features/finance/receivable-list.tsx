@@ -276,9 +276,9 @@ export function ReceivableList({ receivables, units, customers, buildings, local
                         </Badge>
                       </td>
                       <td className="max-w-[180px] truncate px-4 py-2.5">{r.title}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums font-semibold">{formatXof(Number(r.amount_xof))}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">{formatXof(Number(r.paid_amount_xof))}</td>
-                      <td className={cn("px-4 py-2.5 text-right tabular-nums font-semibold", os > 0 ? "text-rose-600" : "text-emerald-600")}>{formatXof(os)}</td>
+                      <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold">{formatXof(Number(r.amount_xof))}</td>
+                      <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums text-emerald-600">{formatXof(Number(r.paid_amount_xof))}</td>
+                      <td className={cn("px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold", os > 0 ? "text-rose-600" : "text-emerald-600")}>{formatXof(os)}</td>
                       <td className="px-4 py-2.5">
                         <Badge variant={statusTone[r.status] ?? "secondary"}>{t.statuses[r.status as keyof typeof t.statuses] ?? r.status}</Badge>
                       </td>

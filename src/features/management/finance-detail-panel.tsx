@@ -143,7 +143,7 @@ export function FinanceDetailPanel({
   return (
     <>
       <div className="fixed inset-0 z-overlay bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-panel w-full max-w-full overflow-auto border-l border-border bg-white shadow-panel lg:max-w-2xl" role="dialog" aria-label={labels.title}>
+      <div className="fixed inset-y-0 right-0 z-panel w-full max-w-full overflow-auto border-l border-border bg-white shadow-panel lg:max-w-5xl" role="dialog" aria-label={labels.title}>
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white/95 px-5 py-4 backdrop-blur">
           <div>
@@ -201,7 +201,7 @@ export function FinanceDetailPanel({
           <div className="overflow-hidden rounded-xl border border-border">
             <div className="max-h-[calc(100vh-260px)] overflow-auto">
               {open !== "collected" ? (
-                <table className="w-full text-left text-[13px]">
+                <table className="w-full min-w-[980px] text-left text-[13px]">
                   <thead className="sticky top-0 z-10 bg-muted/50">
                     <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "到期日" : "Echeance"}</th>
@@ -267,7 +267,7 @@ export function FinanceDetailPanel({
                   </tbody>
                 </table>
               ) : (
-                <table className="w-full text-left text-[13px]">
+                <table className="w-full min-w-[820px] text-left text-[13px]">
                   <thead className="sticky top-0 z-10 bg-muted/50">
                     <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "收款日期" : "Date"}</th>
