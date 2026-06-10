@@ -7,9 +7,12 @@ import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { DateInput } from "@/components/ui/date-input";
 import type { LedgerEntryRow } from "@/types/database";
-import type { CurrencyCode } from "@/types/domain";
 import { addLedgerEntry } from "./actions";
 import { ReceiptThumb } from "@/components/attachments/receipt-thumb";
+
+function normalizeDepositPeriod(value: string): string {
+  return value.trim().replace(/^(\d+)\s*months?$/i, "$1个月");
+}
 
 function formatLedgerDescription(description: string | null | undefined): string {
   const raw = description?.trim();
@@ -17,11 +20,11 @@ function formatLedgerDescription(description: string | null | undefined): string
   const managedRent = raw.match(/^Room\s+(\S+)\s+managed lease rent received,\s*([\d-]+)\s+to\s+([\d-]+)$/i);
   if (managedRent) return `${managedRent[1]}房 代管长租租金 ${managedRent[2]} 至 ${managedRent[3]}`;
   const managedDeposit = raw.match(/^Room\s+(\S+)\s+managed lease deposit received\s+\(([^)]+)\)$/i);
-  if (managedDeposit) return `${managedDeposit[1]}房 代管长租押金 ${managedDeposit[2]}`;
+  if (managedDeposit) return `${managedDeposit[1]}房 代管长租押金 ${normalizeDepositPeriod(managedDeposit[2])}`;
   const leaseRent = raw.match(/^Room\s+(\S+)\s+lease rent received for\s*([\d-]+)\s+to\s+([\d-]+)$/i);
   if (leaseRent) return `${leaseRent[1]}房 长租租金 ${leaseRent[2]} 至 ${leaseRent[3]}`;
   const leaseDeposit = raw.match(/^Room\s+(\S+)\s+lease deposit received\s+\(([^)]+)\)$/i);
-  if (leaseDeposit) return `${leaseDeposit[1]}房 长租押金 ${leaseDeposit[2]}`;
+  if (leaseDeposit) return `${leaseDeposit[1]}房 长租押金 ${normalizeDepositPeriod(leaseDeposit[2])}`;
   return raw
     .replace(/\s+(booking|lease|receivable|sale|payment)=[0-9a-f-]{8,}/gi, "")
     .replace(/\s+installment=(\d+)/gi, " 第$1期")
@@ -30,9 +33,9 @@ function formatLedgerDescription(description: string | null | undefined): string
 }
 
 function buildLedgerCsv(entries: LedgerEntryRow[]): string {
-  const header = "Date,Direction,Category,Amount_XOF,Amount_CNY,Description";
+  const header = "Date,Direction,Category,Amount_XOF,Description";
   const rows = entries.map((e) =>
-    [e.entry_date, e.direction, e.category, e.amount_xof, e.amount_cny ?? "", `"${formatLedgerDescription(e.description).replace(/"/g, '""')}"`].join(",")
+    [e.entry_date, e.direction, e.category, e.amount_xof, `"${formatLedgerDescription(e.description).replace(/"/g, '""')}"`].join(",")
   );
   return [header, ...rows].join("\n");
 }
@@ -80,8 +83,6 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
   const [eDir, setEDir] = useState<"income" | "expense" | "liability_in" | "liability_out">("income");
   const [eCat, setECat] = useState("other_income");
   const [eAmount, setEAmount] = useState(0);
-  const [eCurrency, setECurrency] = useState<CurrencyCode>("XOF");
-  const [eRate, setERate] = useState(1);
   const [eDesc, setEDesc] = useState("");
   const [eReceiptNo, setEReceiptNo] = useState("");
   const [eUnitId, setEUnitId] = useState("");
@@ -122,7 +123,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
       buildingId: buildingId ?? undefined,
       unitId: eUnitId || undefined,
       entryDate: eDate, direction: eDir, category: eCat,
-      amount: eAmount, currency: eCurrency, exchangeRateToXof: eRate,
+      amount: eAmount, currency: "XOF", exchangeRateToXof: 1,
       description: eDesc || undefined, receiptNo: eReceiptNo || undefined,
     });
     setSaving(false);
@@ -220,7 +221,6 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
                 <col className="w-[110px]" />
                 <col className="w-[210px]" />
                 <col className="w-[150px]" />
-                <col className="w-[90px]" />
                 <col />
                 {attachments && attachments.length > 0 && <col className="w-14" />}
               </colgroup>
@@ -230,7 +230,6 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
                   <th className="px-4 py-2.5">{t.filters.direction}</th>
                   <th className="px-4 py-2.5">{t.filters.category}</th>
                   <th className="px-4 py-2.5">XOF</th>
-                  <th className="px-4 py-2.5">CNY</th>
                   <th className="px-4 py-2.5">{t.entry.description}</th>
                   {attachments && attachments.length > 0 && <th className="px-4 py-2.5"></th>}
                 </tr>
@@ -253,7 +252,6 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
                       <td className={cn("px-4 py-2.5 tabular-nums font-semibold", e.direction === "expense" || e.direction === "liability_out" ? "text-rose-600" : "text-emerald-600")}>
                         {e.direction === "expense" || e.direction === "liability_out" ? "-" : ""}{formatXof(Number(e.amount_xof))}
                       </td>
-                      <td className="px-4 py-2.5 tabular-nums text-muted-foreground">{e.amount_cny != null ? Number(e.amount_cny).toLocaleString() : "-"}</td>
                       <td className="truncate px-4 py-2.5 text-muted-foreground">{formatLedgerDescription(e.description)}</td>
                       {attachments && attachments.length > 0 && (
                         <td className="px-2 py-2.5">
@@ -299,13 +297,12 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
                   {allCategories.map(c => <option key={c} value={c}>{t.categories[c as keyof typeof t.categories]}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div><label className={labelClass}>{t.entry.currency}</label><select value={eCurrency} onChange={(e) => setECurrency(e.target.value as CurrencyCode)} className={inputClass}><option value="XOF">XOF</option><option value="CNY">CNY</option></select></div>
-                <div><label className={labelClass}>{t.entry.exchangeRate}</label><input type="number" value={eRate} onChange={(e) => setERate(Number(e.target.value))} className={inputClass} /></div>
-                <div><label className={labelClass}>{t.entry.amount}</label><input type="number" value={eAmount} onChange={(e) => setEAmount(Number(e.target.value))} className={inputClass} /></div>
+              <div>
+                <label className={labelClass}>{t.entry.amount} (XOF)</label>
+                <input type="number" value={eAmount} onChange={(e) => setEAmount(Number(e.target.value))} className={inputClass} />
               </div>
               <div className="rounded-md bg-muted p-2 text-center text-sm font-bold">
-                {t.entry.amountXof}: {formatXof(eCurrency === "XOF" ? eAmount : Math.round(eAmount * eRate))}
+                {t.entry.amountXof}: {formatXof(eAmount)}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div><label className={labelClass}>{t.entry.receiptNo}</label><input type="text" value={eReceiptNo} onChange={(e) => setEReceiptNo(e.target.value)} className={inputClass} /></div>
