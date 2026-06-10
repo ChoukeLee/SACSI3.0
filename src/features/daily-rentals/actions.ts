@@ -237,7 +237,7 @@ export async function createBackfillBooking(input: {
   if (error) return { success: false, error: error.message };
 
   // Create receivable
-  const { data: unit } = await supabase.from("units").select("building_id").eq("id", input.unitId).single();
+  const { data: unit } = await supabase.from("units").select("building_id, unit_no").eq("id", input.unitId).single();
   await createReceivable({
     building_id: unit?.building_id ?? null,
     unit_id: input.unitId,
@@ -266,7 +266,7 @@ export async function createBackfillBooking(input: {
         bookingId: data.id, unitId: input.unitId, buildingId: unit?.building_id ?? null,
         paymentId: payment.id, amount: paidAmount, direction: "income",
         entryDate: input.checkOut,
-        description: `日租历史补录 booking=${data.id}`,
+        description: `日租历史补录 房间${unit?.unit_no ?? "?"}`,
       });
     }
   }
@@ -351,7 +351,7 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
   await supabase.from("units").update({ status: "daily_occupied" }).eq("id", booking.unit_id);
 
   if (prepaidAmount > 0) {
-    const { data: unit } = await supabase.from("units").select("building_id").eq("id", booking.unit_id).single();
+    const { data: unit } = await supabase.from("units").select("building_id, unit_no").eq("id", booking.unit_id).single();
     const { data: payment } = await supabase.from("payments").insert({
       customer_id: booking.customer_id, unit_id: booking.unit_id, source_type: "daily_booking", source_id: bookingId,
       payment_date: new Date().toISOString().slice(0, 10), amount: prepaidAmount, currency: "XOF", exchange_rate_to_xof: 1,
@@ -359,7 +359,7 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
     if (payment) {
       await insertLedgerEntry(supabase, {
         bookingId, unitId: booking.unit_id, buildingId: unit?.building_id ?? null, paymentId: payment.id,
-        amount: prepaidAmount, direction: "income", description: `日租预付 booking=${bookingId}`,
+        amount: prepaidAmount, direction: "income", description: `日租预付 房间${unit?.unit_no ?? booking.unit_id}`,
       });
     }
   }
@@ -396,7 +396,7 @@ export async function recordSupplementaryPayment(input: {
     .select("*").eq("id", input.bookingId).eq("status", "checked_in").single();
   if (!booking) return { success: false, error: "Booking not found or not checked in." };
 
-  const { data: unit } = await supabase.from("units").select("building_id").eq("id", booking.unit_id).single();
+  const { data: unit } = await supabase.from("units").select("building_id, unit_no").eq("id", booking.unit_id).single();
   const { data: payment } = await supabase.from("payments").insert({
     customer_id: booking.customer_id, unit_id: booking.unit_id,
     source_type: "daily_booking", source_id: input.bookingId,
@@ -410,7 +410,7 @@ export async function recordSupplementaryPayment(input: {
       bookingId: input.bookingId, unitId: booking.unit_id, buildingId: unit?.building_id ?? null,
       paymentId: payment.id, amount: input.amount, direction: "income",
       entryDate: input.paymentDate,
-      description: `日租补缴 booking=${input.bookingId}`,
+      description: `日租补缴 房间${unit?.unit_no ?? booking.unit_id}`,
     });
   }
 

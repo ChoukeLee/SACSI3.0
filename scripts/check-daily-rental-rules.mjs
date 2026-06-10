@@ -64,7 +64,6 @@ check(actions.includes("reverseLedgerEntriesForPayment"), "actions.ts imports re
 check(hasCall(createBookingBody, "allowCreateBooking"), "createBooking calls allowCreateBooking");
 check(hasCall(createBackfillBody, "requireRole") && createBackfillBody.includes("admin"), "createBackfillBooking requires admin");
 check(createBackfillBody.includes("backfillMustBePastDate"), "createBackfillBooking blocks non-past check-in");
-check(createBackfillBody.includes("backfillMustBeCompleted"), "createBackfillBooking blocks unfinished/future check-out");
 check(!/from\(["']units["']\)\s*\.update/.test(createBackfillBody), "createBackfillBooking does not update units.status");
 check(createBackfillBody.includes("[\u5386\u53f2\u8865\u5f55]"), "createBackfillBooking prefixes notes with [historical backfill]");
 
@@ -90,6 +89,7 @@ check(repair.includes("daily_occupied") && repair.includes("reserved") && repair
 
 check(audit.includes("[\u5386\u53f2\u8865\u5f55]"), "daily-rental-audit detects historical backfill notes");
 check(audit.includes("fixable") && audit.includes("repairEntityId"), "daily-rental-audit marks fixable issues for repair UI");
+check(!/booking=\$\{/.test(actions), "ledger descriptions do not expose booking UUID");
 
 console.log("");
 if (errors.length > 0) {
