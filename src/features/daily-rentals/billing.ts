@@ -12,7 +12,7 @@ export interface BillingResult {
   grossAmount: number;
   /** Manual discount applied by admin */
   discount: number;
-  /** Final amount = grossAmount - discount (or stored final_amount_xof) */
+  /** Final amount currently owed. Open checked-in bookings are recalculated through the reference date. */
   finalAmount: number;
   /** Already paid */
   paid: number;
@@ -52,9 +52,14 @@ export function calculateBilling(
 
   const grossAmount = Math.round(nights * Number(booking.nightly_price_xof));
   const discount = Number(booking.manual_discount_amount_xof) || 0;
-  const finalAmount = booking.final_amount_xof != null
-    ? Number(booking.final_amount_xof)
-    : grossAmount - discount;
+  const storedFinal = booking.final_amount_xof != null ? Number(booking.final_amount_xof) : null;
+  const shouldRecalculateOpenStay =
+    mode === "open" &&
+    booking.status === "checked_in" &&
+    !booking.actual_check_out;
+  const finalAmount = shouldRecalculateOpenStay
+    ? Math.max(0, grossAmount - discount)
+    : (storedFinal ?? Math.max(0, grossAmount - discount));
 
   const paid = Number(booking.prepaid_amount_xof) || 0;
 

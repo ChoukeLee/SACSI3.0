@@ -13,6 +13,7 @@ import { completeCleaning } from "./actions";
 import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
 import { buildBookingMap, buildDailyRoomStateMap, getDailyRoomStateForDate } from "./room-status";
 import { getPrimaryDailyAction } from "./daily-rental-policy";
+import { calculateBilling } from "./billing";
 
 export interface CustomerSummary {
   id: string;
@@ -262,9 +263,9 @@ export function DailyCalendar({
 
     for (const b of bookings) {
       if (b.status === "cancelled") continue;
-      const final = Number(b.final_amount_xof ?? b.total_amount_xof);
-      const prepaid = Number(b.prepaid_amount_xof ?? 0);
-      const outstanding = final - prepaid;
+      const billing = calculateBilling(b, todayStr);
+      const final = billing.finalAmount;
+      const outstanding = billing.outstanding;
 
       if (outstanding > 0 && (b.status === "checked_in" || b.status === "checked_out")) {
         currentOutstanding += outstanding;
@@ -282,7 +283,7 @@ export function DailyCalendar({
       monthCollected, currentOutstanding, monthSettled,
       collectedPayments, outstandingBookings, settledBookings,
     };
-  }, [bookings, payments]);
+  }, [bookings, payments, todayStr]);
 
   const financeCards = useMemo(() => [
     { key: "collected", label: locale === "zh" ? "本月已收" : "Encaisse", value: formatXof(financeStats.monthCollected), tone: "green" as const },
@@ -729,22 +730,21 @@ export function DailyCalendar({
                           <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground/70">{locale === "zh" ? "无未收款项" : "Aucun impaye"}</td></tr>
                         ) : (
                           [...financeStats.outstandingBookings].sort((a, b) => {
-                            const aOut = Number(a.final_amount_xof ?? a.total_amount_xof) - Number(a.prepaid_amount_xof ?? 0);
-                            const bOut = Number(b.final_amount_xof ?? b.total_amount_xof) - Number(b.prepaid_amount_xof ?? 0);
+                            const aOut = calculateBilling(a, todayStr).outstanding;
+                            const bOut = calculateBilling(b, todayStr).outstanding;
                             return bOut - aOut;
                           }).map(b => {
                             const u = dailyUnits.find(u => u.id === b.unit_id);
                             const c = customerMap.get(b.customer_id);
-                            const final = Number(b.final_amount_xof ?? b.total_amount_xof);
-                            const prepaid = Number(b.prepaid_amount_xof ?? 0);
+                            const billing = calculateBilling(b, todayStr);
                             return (
                               <tr key={b.id} className="hover:bg-muted/50">
                                 <td className="px-4 py-2.5 font-medium text-foreground">{u?.unit_no ?? "—"}</td>
                                 <td className="px-4 py-2.5 text-foreground/80">{c?.name ?? "—"}</td>
                                 <td className="px-4 py-2.5 text-foreground/70">{b.check_in}</td>
-                                <td className="px-4 py-2.5 text-right tabular-nums text-foreground">{formatXof(final)}</td>
-                                <td className="px-4 py-2.5 text-right tabular-nums text-accentGreen-700">{formatXof(prepaid)}</td>
-                                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-accentBlue-700">{formatXof(final - prepaid)}</td>
+                                <td className="px-4 py-2.5 text-right tabular-nums text-foreground">{formatXof(billing.finalAmount)}</td>
+                                <td className="px-4 py-2.5 text-right tabular-nums text-accentGreen-700">{formatXof(billing.paid)}</td>
+                                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-accentBlue-700">{formatXof(billing.outstanding)}</td>
                               </tr>
                             );
                           })
@@ -776,16 +776,15 @@ export function DailyCalendar({
                           }).map(b => {
                             const u = dailyUnits.find(u => u.id === b.unit_id);
                             const c = customerMap.get(b.customer_id);
-                            const final = Number(b.final_amount_xof ?? b.total_amount_xof);
-                            const prepaid = Number(b.prepaid_amount_xof ?? 0);
-                            const isPaid = prepaid >= final;
+                            const billing = calculateBilling(b, todayStr);
+                            const isPaid = billing.outstanding <= 0;
                             return (
                               <tr key={b.id} className="hover:bg-muted/50">
                                 <td className="px-4 py-2.5 font-medium text-foreground">{u?.unit_no ?? "—"}</td>
                                 <td className="px-4 py-2.5 text-foreground/80">{c?.name ?? "—"}</td>
                                 <td className="px-4 py-2.5 text-foreground/70">{b.check_in}</td>
                                 <td className="px-4 py-2.5 text-foreground/70">{b.checkout_mode === "open" ? b.actual_check_out : b.check_out}</td>
-                                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-foreground">{formatXof(final)}</td>
+                                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-foreground">{formatXof(billing.finalAmount)}</td>
                                 <td className="px-4 py-2.5">
                                   <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-bold", isPaid ? "bg-accentGreen-50 text-accentGreen-700" : "bg-accentAmber-50 text-accentAmber-700")}>
                                     {isPaid ? (locale === "zh" ? "已付清" : "Paye") : (locale === "zh" ? "未付清" : "Impaye")}
