@@ -43,6 +43,10 @@ export async function extractReceiptTextFromImage(
       const result = await extractWithQwenVision(fileBuffer, fileName);
       return { ...result, provider, processedAt };
     }
+    if (provider === "glm-4v") {
+      const result = await extractWithGlmVision(fileBuffer, fileName);
+      return { ...result, provider, processedAt };
+    }
     return {
       rawText: ["=== RECEIPT (MOCK)", `File: ${fileName}`, `Size: ${fileBuffer.length} bytes`, "", "Set OCR_PROVIDER=qwen-vl-plus and QWEN_API_KEY to enable real OCR."].join("\n"),
       provider, processedAt, error: null,
@@ -95,6 +99,37 @@ async function extractWithQwenVision(
   });
 
   if (!res.ok) { const errText = await res.text(); return { rawText: `Qwen error: ${res.status} — ${errText.slice(0, 200)}` }; }
+
+  const data = await res.json();
+  const rawText = data?.choices?.[0]?.message?.content ?? "";
+  const structured = parseStructuredJson(rawText);
+  return { rawText, structured };
+}
+
+// ── GLM-4V (智谱 ChatGLM Vision) ───────────────────────────
+
+async function extractWithGlmVision(
+  fileBuffer: Buffer,
+  fileName: string,
+): Promise<{ rawText: string; structured?: OcrStructured | null }> {
+  const apiKey = process.env.GLM_API_KEY;
+  if (!apiKey) return { rawText: "GLM_API_KEY not set." };
+
+  const baseUrl = (process.env.GLM_BASE_URL ?? "https://open.bigmodel.cn/api/paas/v4").replace(/\/$/, "");
+  const model = process.env.GLM_VISION_MODEL ?? "glm-4v";
+  const mime = detectMime(fileName);
+  const dataUrl = `data:${mime};base64,${fileBuffer.toString("base64")}`;
+
+  const res = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model, temperature: 0,
+      messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: dataUrl } }, { type: "text", text: QWEN_VISION_PROMPT }] }],
+    }),
+  });
+
+  if (!res.ok) { const errText = await res.text(); return { rawText: `GLM error: ${res.status} — ${errText.slice(0, 200)}` }; }
 
   const data = await res.json();
   const rawText = data?.choices?.[0]?.message?.content ?? "";
