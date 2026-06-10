@@ -58,6 +58,9 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
 
   const enabledBusinesses = businessFlags.filter((f) => f.is_enabled);
   const dailyFlag = enabledBusinesses.find((f) => f.business_type === "daily_rental");
+  const meaningfulAuditLogs = auditLogs.filter(
+    (log) => log.metadata.previous_status !== log.metadata.new_status
+  );
 
   return (
     <>
@@ -154,11 +157,11 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
 
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">{t.detail.statusHistory}</h4>
-            {auditLogs.length === 0 ? (
+            {meaningfulAuditLogs.length === 0 ? (
               <p className="mt-1.5 text-xs text-muted-foreground">{t.detail.noStatusHistory}</p>
             ) : (
               <ul className="mt-2 space-y-1.5">
-                {auditLogs.map((log) => (
+                {meaningfulAuditLogs.map((log) => (
                   <li key={log.id} className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-xs">
                     <span>
                       {statusLabels[log.metadata.previous_status as UnitStatus] ?? "-"}
