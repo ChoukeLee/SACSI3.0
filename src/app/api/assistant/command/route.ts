@@ -88,10 +88,150 @@ function buildSystemPrompt(locale: Locale, contextPrompt: string): string {
   ].join("\n");
 }
 
-const money = (value: unknown) => `${Number(value || 0).toLocaleString()} XOF`;
+const money = (value: unknown, locale: Locale = "zh") => {
+  const amount = Number(value || 0);
+  return `${amount.toLocaleString(locale === "fr" ? "fr-FR" : "zh-CN")} FCFA`;
+};
 
 function formatActor(log: Record<string, unknown>) {
   return log.actor_display_name || log.actor_email || log.actor_role || "未知操作人";
+}
+
+function joinRooms(items: unknown[], locale: Locale) {
+  return items.map((item) => String(item || "?")).join(locale === "fr" ? ", " : "、");
+}
+
+function dailyStatusLabel(status: unknown, locale: Locale) {
+  const zh: Record<string, string> = {
+    pending_review: "待确认",
+    confirmed: "已确认",
+    checked_in: "在住",
+    checked_out: "已退房",
+    cancelled: "已取消",
+  };
+  const fr: Record<string, string> = {
+    pending_review: "à confirmer",
+    confirmed: "confirmée",
+    checked_in: "occupée",
+    checked_out: "départ terminé",
+    cancelled: "annulée",
+  };
+  const key = String(status || "");
+  return (locale === "fr" ? fr[key] : zh[key]) ?? (status ? String(status) : "-");
+}
+
+function checkoutStatePhrase(status: unknown, locale: Locale) {
+  const key = String(status || "");
+  if (locale === "fr") {
+    if (key === "checked_in") return "elle est encore marquée comme occupée dans le système";
+    if (key === "checked_out") return "le départ est déjà terminé dans le système";
+    if (key === "confirmed") return "la réservation est confirmée et le départ est prévu aujourd'hui";
+    if (key === "pending_review") return "la réservation attend confirmation, avec départ prévu aujourd'hui";
+    return `statut : ${dailyStatusLabel(status, locale)}`;
+  }
+  if (key === "checked_in") return "系统里仍显示在住，说明退房还没有正式完成";
+  if (key === "checked_out") return "系统里已经完成退房";
+  if (key === "confirmed") return "预订已确认，今天是预计退房日";
+  if (key === "pending_review") return "预订还在待确认，但退房日期是今天";
+  return `状态是${dailyStatusLabel(status, locale)}`;
+}
+
+function checkinStatePhrase(status: unknown, locale: Locale) {
+  const key = String(status || "");
+  if (locale === "fr") {
+    if (key === "checked_in") return "elle est déjà enregistrée comme arrivée";
+    if (key === "confirmed") return "l'arrivée est confirmée pour aujourd'hui";
+    if (key === "pending_review") return "l'arrivée attend encore confirmation";
+    return `statut : ${dailyStatusLabel(status, locale)}`;
+  }
+  if (key === "checked_in") return "已经办理入住";
+  if (key === "confirmed") return "今天预计入住，预订已确认";
+  if (key === "pending_review") return "今天预计入住，但预订还在待确认";
+  return `状态是${dailyStatusLabel(status, locale)}`;
+}
+
+function cleaningText(status: unknown, locale: Locale) {
+  const key = String(status || "none");
+  if (locale === "fr") {
+    if (key === "completed") return "ménage terminé";
+    if (key === "pending") return "ménage à faire";
+    return "aucune tâche de ménage ouverte";
+  }
+  if (key === "completed") return "清洁已完成";
+  if (key === "pending") return "待清洁";
+  return "没有未完成的清洁任务";
+}
+
+function remainingText(value: unknown, locale: Locale) {
+  const amount = Number(value || 0);
+  if (amount <= 0) return locale === "fr" ? "solde réglé" : "尾款已结清";
+  return locale === "fr" ? `solde restant ${money(amount, locale)}` : `还需收尾款 ${money(amount, locale)}`;
+}
+
+function unitStatusLabel(status: unknown, locale: Locale) {
+  const zh: Record<string, string> = {
+    available: "空闲",
+    daily_occupied: "日租中",
+    reserved: "已预订",
+    cleaning: "待清洁",
+    cleaning_pending: "待清洁",
+    maintenance: "维修中",
+    locked: "锁定",
+    leased: "长租中",
+    sold: "已出售",
+  };
+  const fr: Record<string, string> = {
+    available: "disponible",
+    daily_occupied: "location journalière en cours",
+    reserved: "réservée",
+    cleaning: "ménage à faire",
+    cleaning_pending: "ménage à faire",
+    maintenance: "maintenance",
+    locked: "bloquée",
+    leased: "louée en longue durée",
+    sold: "vendue",
+  };
+  const key = String(status || "");
+  return (locale === "fr" ? fr[key] : zh[key]) ?? (status ? String(status) : "-");
+}
+
+function actionLabel(action: unknown, locale: Locale) {
+  const zh: Record<string, string> = {
+    check_in: "办理入住",
+    check_out: "办理退房",
+    complete_cleaning: "完成清洁",
+    record_payment: "登记收款",
+    supplementary_payment: "补缴房费",
+    extend_stay: "续住",
+    generate_receivables: "生成应收",
+    payment_deleted: "删除收款",
+    payment_reversed: "撤销收款",
+    set_fixed_checkout: "设置退房日期",
+    status_change: "修改状态",
+    update: "修改",
+    create: "新建",
+    confirm: "确认",
+    cancel: "取消",
+  };
+  const fr: Record<string, string> = {
+    check_in: "arrivée",
+    check_out: "départ",
+    complete_cleaning: "ménage terminé",
+    record_payment: "paiement enregistré",
+    supplementary_payment: "paiement complémentaire",
+    extend_stay: "prolongation",
+    generate_receivables: "créances générées",
+    payment_deleted: "paiement supprimé",
+    payment_reversed: "paiement annulé",
+    set_fixed_checkout: "date de départ fixée",
+    status_change: "statut modifié",
+    update: "modification",
+    create: "création",
+    confirm: "confirmation",
+    cancel: "annulation",
+  };
+  const key = String(action || "");
+  return (locale === "fr" ? fr[key] : zh[key]) ?? (action ? String(action) : "-");
 }
 
 function fallbackReply(ctx: AssistantContext, locale: Locale): AssistantResult {
@@ -118,22 +258,40 @@ function fallbackReply(ctx: AssistantContext, locale: Locale): AssistantResult {
   }
 
   if (ctx.intent === "daily_today_overview") {
-    const checkouts = (data.checkouts ?? []) as Record<string, unknown>[];
-    const checkins = (data.checkins ?? []) as Record<string, unknown>[];
-    const cleaningTasks = (data.cleaningTasks ?? []) as Record<string, unknown>[];
-    const availableRooms = (data.availableRooms ?? []) as Record<string, unknown>[];
-    const pendingCleaning = cleaningTasks.filter((task) => task.is_completed === false);
-    const lines = [
-      zh ? `今天日租运营：退房 ${checkouts.length} 间，入住 ${checkins.length} 间，待清洁 ${pendingCleaning.length} 间，可入住 ${availableRooms.length} 间。`
-        : `Aujourd'hui : ${checkouts.length} départ(s), ${checkins.length} arrivée(s), ${pendingCleaning.length} ménage(s), ${availableRooms.length} disponible(s).`,
+    const overviewCheckouts = (data.checkouts ?? []) as Record<string, unknown>[];
+    const overviewCheckins = (data.checkins ?? []) as Record<string, unknown>[];
+    const overviewCleaningTasks = (data.cleaningTasks ?? []) as Record<string, unknown>[];
+    const overviewAvailableRooms = (data.availableRooms ?? []) as Record<string, unknown>[];
+    const overviewPendingCleaning = overviewCleaningTasks.filter((task) => task.is_completed === false);
+    const overviewLines = [
+      zh
+        ? `今天日租业务概况：预计退房 ${overviewCheckouts.length} 间，预计入住 ${overviewCheckins.length} 间，待清洁 ${overviewPendingCleaning.length} 间，可安排入住 ${overviewAvailableRooms.length} 间。`
+        : `Aujourd'hui : ${overviewCheckouts.length} départ(s), ${overviewCheckins.length} arrivée(s), ${overviewPendingCleaning.length} ménage(s), ${overviewAvailableRooms.length} disponible(s).`,
     ];
-    if (checkouts.length > 0) lines.push(zh ? `退房：${checkouts.map((item) => item.room_no ?? "?").join("、")}` : `Départs : ${checkouts.map((item) => item.room_no ?? "?").join(", ")}`);
-    if (checkins.length > 0) lines.push(zh ? `入住：${checkins.map((item) => item.room_no ?? "?").join("、")}` : `Arrivées : ${checkins.map((item) => item.room_no ?? "?").join(", ")}`);
-    if (pendingCleaning.length > 0) lines.push(zh ? `待清洁：${pendingCleaning.map((item) => item.room_no ?? "?").join("、")}` : `Ménage : ${pendingCleaning.map((item) => item.room_no ?? "?").join(", ")}`);
-    return { intent: ctx.intent, reply: withWarnings(lines.join("\n")), usedContext: ["getDailyTodayOverview"] };
+    if (overviewCheckouts.length > 0) overviewLines.push(zh ? `预计退房：${joinRooms(overviewCheckouts.map((item) => item.room_no), locale)}` : `Départs prévus : ${joinRooms(overviewCheckouts.map((item) => item.room_no), locale)}`);
+    if (overviewCheckins.length > 0) overviewLines.push(zh ? `预计入住：${joinRooms(overviewCheckins.map((item) => item.room_no), locale)}` : `Arrivées prévues : ${joinRooms(overviewCheckins.map((item) => item.room_no), locale)}`);
+    if (overviewPendingCleaning.length > 0) overviewLines.push(zh ? `待清洁：${joinRooms(overviewPendingCleaning.map((item) => item.room_no), locale)}` : `Ménage à faire : ${joinRooms(overviewPendingCleaning.map((item) => item.room_no), locale)}`);
+    return { intent: ctx.intent, reply: withWarnings(overviewLines.join("\n")), usedContext: ["getDailyTodayOverview"] };
   }
 
   if (ctx.intent === "daily_today_checkouts") {
+    const directCheckouts = (data.checkouts ?? []) as Record<string, unknown>[];
+    if (directCheckouts.length === 0) {
+      return { intent: ctx.intent, reply: withWarnings(zh ? "今天没有日租退房。" : "Aucun départ journalier aujourd'hui."), usedContext: ["getTodayDailyCheckouts"] };
+    }
+    const directLines = [
+      zh
+        ? `今天有 ${directCheckouts.length} 间日租房预计退房：${joinRooms(directCheckouts.map((item) => item.room_no), locale)}。`
+        : `Aujourd'hui, ${directCheckouts.length} chambre(s) en location journalière ont un départ prévu : ${joinRooms(directCheckouts.map((item) => item.room_no), locale)}.`,
+    ];
+    for (const item of directCheckouts) {
+      const room = item.room_no ?? (zh ? "未知房号" : "?");
+      const customer = item.customer_name ?? (zh ? "未登记客户" : "client non renseigné");
+      directLines.push(zh
+        ? `${room}：客户 ${customer}，${checkoutStatePhrase(item.status, locale)}，${remainingText(item.remaining_amount_xof, locale)}，${cleaningText(item.cleaning_status, locale)}。`
+        : `${room} : ${customer}, ${checkoutStatePhrase(item.status, locale)}, ${remainingText(item.remaining_amount_xof, locale)}, ${cleaningText(item.cleaning_status, locale)}.`);
+    }
+    return { intent: ctx.intent, reply: withWarnings(directLines.join("\n")), usedContext: ["getTodayDailyCheckouts"] };
     const checkouts = (data.checkouts ?? []) as Record<string, unknown>[];
     if (checkouts.length === 0) {
       return { intent: ctx.intent, reply: withWarnings(zh ? "今天没有日租退房。" : "Aucun départ journalier aujourd'hui."), usedContext: ["getTodayDailyCheckouts"] };
@@ -150,6 +308,21 @@ function fallbackReply(ctx: AssistantContext, locale: Locale): AssistantResult {
   }
 
   if (ctx.intent === "daily_today_checkins") {
+    const directCheckins = (data.checkins ?? []) as Record<string, unknown>[];
+    if (directCheckins.length === 0) return { intent: ctx.intent, reply: withWarnings(zh ? "今天没有日租入住。" : "Aucune arrivée journalière aujourd'hui."), usedContext: ["getTodayDailyCheckins"] };
+    const directLines = [
+      zh
+        ? `今天有 ${directCheckins.length} 间日租房预计入住：${joinRooms(directCheckins.map((item) => item.room_no), locale)}。`
+        : `Aujourd'hui, ${directCheckins.length} chambre(s) ont une arrivée prévue : ${joinRooms(directCheckins.map((item) => item.room_no), locale)}.`,
+    ];
+    for (const item of directCheckins) {
+      const room = item.room_no ?? (zh ? "未知房号" : "?");
+      const customer = item.customer_name ?? (zh ? "未登记客户" : "client non renseigné");
+      directLines.push(zh
+        ? `${room}：客户 ${customer}，${checkinStatePhrase(item.status, locale)}，已收 ${money(item.paid_amount_xof, locale)}，${remainingText(item.remaining_amount_xof, locale)}。`
+        : `${room} : ${customer}, ${checkinStatePhrase(item.status, locale)}, payé ${money(item.paid_amount_xof, locale)}, ${remainingText(item.remaining_amount_xof, locale)}.`);
+    }
+    return { intent: ctx.intent, reply: withWarnings(directLines.join("\n")), usedContext: ["getTodayDailyCheckins"] };
     const checkins = (data.checkins ?? []) as Record<string, unknown>[];
     if (checkins.length === 0) return { intent: ctx.intent, reply: withWarnings(zh ? "今天没有日租入住。" : "Aucune arrivée journalière aujourd'hui."), usedContext: ["getTodayDailyCheckins"] };
     const lines = [zh ? `今天日租入住 ${checkins.length} 间：` : `${checkins.length} arrivée(s) journalière(s) aujourd'hui :`];
@@ -162,6 +335,22 @@ function fallbackReply(ctx: AssistantContext, locale: Locale): AssistantResult {
   }
 
   if (ctx.intent === "daily_cleaning_tasks") {
+    const directTasks = (data.tasks ?? []) as Record<string, unknown>[];
+    if (directTasks.length === 0) return { intent: ctx.intent, reply: withWarnings(zh ? "当前没有查到清洁任务。" : "Aucune tâche de ménage trouvée."), usedContext: ["getCleaningTasks"] };
+    const directPending = directTasks.filter((task) => task.is_completed === false);
+    const directDone = directTasks.filter((task) => task.is_completed === true);
+    const directLines = [
+      zh
+        ? `当前清洁任务：待完成 ${directPending.length} 个，已完成 ${directDone.length} 个。`
+        : `Ménage : ${directPending.length} en attente, ${directDone.length} terminé(s).`,
+    ];
+    for (const task of directTasks.slice(0, 15)) {
+      const time = String((task.completed_at ?? task.created_at) || "").slice(0, 16).replace("T", " ");
+      directLines.push(zh
+        ? `${task.room_no ?? "未知房号"}：${task.is_completed ? "清洁已完成" : "待清洁"}${time ? `，时间 ${time}` : ""}。`
+        : `${task.room_no ?? "?"} : ${task.is_completed ? "ménage terminé" : "ménage à faire"}${time ? `, ${time}` : ""}.`);
+    }
+    return { intent: ctx.intent, reply: withWarnings(directLines.join("\n")), usedContext: ["getCleaningTasks"] };
     const tasks = (data.tasks ?? []) as Record<string, unknown>[];
     if (tasks.length === 0) return { intent: ctx.intent, reply: withWarnings(zh ? "当前没有查到清洁任务。" : "Aucune tâche de ménage trouvée."), usedContext: ["getCleaningTasks"] };
     const pending = tasks.filter((task) => task.is_completed === false);
@@ -176,6 +365,13 @@ function fallbackReply(ctx: AssistantContext, locale: Locale): AssistantResult {
   }
 
   if (ctx.intent === "daily_available_rooms") {
+    const directRooms = (data.rooms ?? []) as Record<string, unknown>[];
+    if (directRooms.length === 0) return { intent: ctx.intent, reply: withWarnings(zh ? "当前没有可安排日租入住的空房。" : "Aucune chambre journalière disponible."), usedContext: ["getAvailableDailyRooms"] };
+    return {
+      intent: ctx.intent,
+      reply: withWarnings(zh ? `当前可安排日租入住 ${directRooms.length} 间：${joinRooms(directRooms.map((r) => r.room_no), locale)}。` : `${directRooms.length} chambre(s) disponible(s) : ${joinRooms(directRooms.map((r) => r.room_no), locale)}.`),
+      usedContext: ["getAvailableDailyRooms"],
+    };
     const rooms = (data.rooms ?? []) as Record<string, unknown>[];
     if (rooms.length === 0) return { intent: ctx.intent, reply: withWarnings(zh ? "当前没有可安排日租入住的空房。" : "Aucune chambre journalière disponible."), usedContext: ["getAvailableDailyRooms"] };
     return {
@@ -186,6 +382,17 @@ function fallbackReply(ctx: AssistantContext, locale: Locale): AssistantResult {
   }
 
   if (ctx.intent === "audit_activity") {
+    const directLogs = (data.logs ?? []) as Record<string, unknown>[];
+    if (directLogs.length === 0) return { intent: ctx.intent, reply: withWarnings(zh ? "今天没有查到相关操作记录。" : "Aucun journal d'audit trouvé aujourd'hui."), usedContext: ["getAuditActivity"] };
+    const directLines = [zh ? `查到 ${directLogs.length} 条相关操作记录：` : `${directLogs.length} opération(s) trouvée(s) :`];
+    for (const log of directLogs.slice(0, 12)) {
+      const time = String(log.created_at ?? "").slice(11, 16);
+      const room = log.room_no ?? log.entity_label ?? "-";
+      directLines.push(zh
+        ? `${time}，${formatActor(log)}，${actionLabel(log.action, locale)}，房间 ${room}。`
+        : `${time}, ${formatActor(log)}, ${actionLabel(log.action, locale)}, chambre ${room}.`);
+    }
+    return { intent: ctx.intent, reply: withWarnings(directLines.join("\n")), usedContext: ["getAuditActivity"] };
     const logs = (data.logs ?? []) as Record<string, unknown>[];
     if (logs.length === 0) return { intent: ctx.intent, reply: withWarnings(zh ? "今天没有查到相关审计日志。" : "Aucun journal d'audit trouvé aujourd'hui."), usedContext: ["getAuditActivity"] };
     const lines = [zh ? `查到 ${logs.length} 条相关操作：` : `${logs.length} opération(s) trouvée(s) :`];
@@ -198,6 +405,16 @@ function fallbackReply(ctx: AssistantContext, locale: Locale): AssistantResult {
   }
 
   if (ctx.intent === "finance_receivables") {
+    const directReceivables = (data.receivables ?? []) as Record<string, unknown>[];
+    if (directReceivables.length === 0) return { intent: ctx.intent, reply: withWarnings(zh ? "当前没有查到未结清应收。" : "Aucune créance ouverte trouvée."), usedContext: ["getFinanceReceivables"] };
+    const directTotal = directReceivables.reduce((sum, item) => sum + Number(item.outstanding_xof || 0), 0);
+    const directLines = [zh ? `当前未结清应收 ${directReceivables.length} 条，合计 ${money(directTotal, locale)}：` : `${directReceivables.length} créance(s), total ${money(directTotal, locale)} :`];
+    for (const item of directReceivables.slice(0, 15)) {
+      directLines.push(zh
+        ? `${item.room_no ?? "-"}：${item.customer_name ?? "未登记客户"}，${item.title ?? item.category ?? "应收款"}，未收 ${money(item.outstanding_xof, locale)}，到期日 ${item.due_date ?? "未定"}。`
+        : `${item.room_no ?? "-"} : ${item.customer_name ?? "client non renseigné"}, ${item.title ?? item.category ?? "créance"}, solde ${money(item.outstanding_xof, locale)}, échéance ${item.due_date ?? "non fixée"}.`);
+    }
+    return { intent: ctx.intent, reply: withWarnings(directLines.join("\n")), usedContext: ["getFinanceReceivables"] };
     const receivables = (data.receivables ?? []) as Record<string, unknown>[];
     if (receivables.length === 0) return { intent: ctx.intent, reply: withWarnings(zh ? "当前没有查到未结清应收。" : "Aucune créance ouverte trouvée."), usedContext: ["getFinanceReceivables"] };
     const total = receivables.reduce((sum, item) => sum + Number(item.outstanding_xof || 0), 0);
@@ -211,6 +428,29 @@ function fallbackReply(ctx: AssistantContext, locale: Locale): AssistantResult {
   }
 
   if (ctx.intent === "room_profile") {
+    const directProfiles = (data.profiles ?? {}) as Record<string, Record<string, unknown> | null>;
+    const directLines: string[] = [];
+    for (const [roomNo, profile] of Object.entries(directProfiles)) {
+      if (!profile) {
+        directLines.push(zh ? `${roomNo}：没有查到这个房间。` : `${roomNo}: chambre introuvable.`);
+        continue;
+      }
+      const safeProfile = profile as Record<string, unknown>;
+      const unit = safeProfile.unit as Record<string, unknown>;
+      const daily = (safeProfile.daily as Record<string, unknown>[] | undefined) ?? [];
+      const lease = (safeProfile.lease as Record<string, unknown>[] | undefined) ?? [];
+      const sale = (safeProfile.sale as Record<string, unknown>[] | undefined) ?? [];
+      const receivables = (safeProfile.receivables as Record<string, unknown>[] | undefined) ?? [];
+      const payments = (safeProfile.payments as Record<string, unknown>[] | undefined) ?? [];
+      const outstanding = receivables.reduce((sum, item) => sum + Math.max(0, Number(item.amount_xof || 0) - Number(item.paid_amount_xof || 0)), 0);
+
+      directLines.push(zh ? `${roomNo} 当前状态：${unitStatusLabel(unit.status, locale)}。` : `${roomNo}: ${unitStatusLabel(unit.status, locale)}.`);
+      if (daily[0]) directLines.push(zh ? `日租记录：${daily[0].check_in} 到 ${daily[0].check_out ?? "未定"}，${dailyStatusLabel(daily[0].status, locale)}。` : `Journalier : ${daily[0].check_in} au ${daily[0].check_out ?? "non fixé"}, ${dailyStatusLabel(daily[0].status, locale)}.`);
+      if (lease[0]) directLines.push(zh ? `长租记录：${lease[0].start_date} 到 ${lease[0].expected_end_date ?? "未定"}，月租 ${money(lease[0].monthly_rent_xof, locale)}。` : `Longue durée : ${lease[0].start_date} au ${lease[0].expected_end_date ?? "non fixé"}, ${money(lease[0].monthly_rent_xof, locale)}/mois.`);
+      if (sale[0]) directLines.push(zh ? `出售记录：合同 ${sale[0].contract_no ?? "未登记"}，总价 ${money(sale[0].total_amount_xof, locale)}。` : `Vente : contrat ${sale[0].contract_no ?? "non renseigné"}, total ${money(sale[0].total_amount_xof, locale)}.`);
+      directLines.push(zh ? `收款记录 ${payments.length} 条，未结清应收 ${money(outstanding, locale)}。` : `${payments.length} paiement(s), créances ouvertes ${money(outstanding, locale)}.`);
+    }
+    return { intent: ctx.intent, reply: withWarnings(directLines.join("\n")), usedContext: ["getRoomFullProfile"] };
     const profiles = (data.profiles ?? {}) as Record<string, Record<string, unknown> | null>;
     const lines: string[] = [];
     for (const [roomNo, profile] of Object.entries(profiles)) {
@@ -218,12 +458,13 @@ function fallbackReply(ctx: AssistantContext, locale: Locale): AssistantResult {
         lines.push(zh ? `${roomNo}：没有查到这个房间。` : `${roomNo}: chambre introuvable.`);
         continue;
       }
-      const unit = profile.unit as Record<string, unknown>;
-      const daily = (profile.daily as Record<string, unknown>[] | undefined) ?? [];
-      const lease = (profile.lease as Record<string, unknown>[] | undefined) ?? [];
-      const sale = (profile.sale as Record<string, unknown>[] | undefined) ?? [];
-      const receivables = (profile.receivables as Record<string, unknown>[] | undefined) ?? [];
-      const payments = (profile.payments as Record<string, unknown>[] | undefined) ?? [];
+      const safeProfile = profile as Record<string, unknown>;
+      const unit = safeProfile.unit as Record<string, unknown>;
+      const daily = (safeProfile.daily as Record<string, unknown>[] | undefined) ?? [];
+      const lease = (safeProfile.lease as Record<string, unknown>[] | undefined) ?? [];
+      const sale = (safeProfile.sale as Record<string, unknown>[] | undefined) ?? [];
+      const receivables = (safeProfile.receivables as Record<string, unknown>[] | undefined) ?? [];
+      const payments = (safeProfile.payments as Record<string, unknown>[] | undefined) ?? [];
       const outstanding = receivables.reduce((sum, item) => sum + Math.max(0, Number(item.amount_xof || 0) - Number(item.paid_amount_xof || 0)), 0);
       lines.push(zh ? `${roomNo} 当前状态：${unit.status ?? "-"}` : `${roomNo}: statut ${unit.status ?? "-"}`);
       if (daily[0]) lines.push(zh ? `日租：${daily[0].check_in} → ${daily[0].check_out ?? "未定"}，${daily[0].status}` : `Jour: ${daily[0].check_in} → ${daily[0].check_out ?? "ouvert"}, ${daily[0].status}`);
