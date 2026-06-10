@@ -261,10 +261,12 @@ export async function recordSalePayment(input: {
 
   const { data: contract } = await supabase
     .from("sale_contracts")
-    .select("id, unit_id, customer_id, payment_plan_type, contract_no")
+    .select("id, unit_id, customer_id, payment_plan_type, contract_no, unit:units(unit_no)")
     .eq("id", input.contractId)
     .single();
   if (!contract) return { success: false, error: "Contract not found." };
+  const saleUnit = (contract as typeof contract & { unit?: { unit_no?: string } | null }).unit;
+  const unitNo = saleUnit?.unit_no ?? "未设置";
 
   // Find matching receivable
   const category = contract.payment_plan_type === "lump_sum" ? "sale_lump_sum" : "sale_installment";
@@ -309,7 +311,7 @@ export async function recordSalePayment(input: {
     direction: "income",
     category: "sale",
     amount_xof: input.amount,
-    description: `出售收款 sale=${input.contractId} installment=${schedule.installment_no}`,
+    description: `出售收款 房间${unitNo} 第${schedule.installment_no}期`,
   });
 
   // Update individual receivable directly (instead of bulk sync)

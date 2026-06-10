@@ -248,6 +248,7 @@ export async function createLeaseContract(input: {
       .select("id")
       .single();
 
+    const { data: depositUnit } = await supabase.from("units").select("unit_no").eq("id", input.unitId).single();
     await supabase.from("ledger_entries").insert({
       unit_id: input.unitId,
       payment_id: payment?.id,
@@ -255,7 +256,7 @@ export async function createLeaseContract(input: {
       direction: "liability_in",
       category: "lease_deposit",
       amount_xof: input.depositAmountXof,
-      description: `押金 lease=${data.id}`,
+      description: `长租押金 房间${depositUnit?.unit_no ?? "未设置"}`,
     });
 
     const { data: unit } = await supabase.from("units").select("building_id").eq("id", input.unitId).single();
@@ -420,6 +421,11 @@ export async function recordReceivablePayment(input: {
     .select("id")
     .single();
 
+  const { data: unit } = receivable.unit_id
+    ? await supabase.from("units").select("unit_no").eq("id", receivable.unit_id).single()
+    : { data: null };
+  const roomText = unit?.unit_no ? `房间${unit.unit_no}` : "未关联房间";
+
   // Ledger entry
   await supabase.from("ledger_entries").insert({
     building_id: receivable.building_id,
@@ -429,7 +435,7 @@ export async function recordReceivablePayment(input: {
     direction: "income",
     category: receivable.category,
     amount_xof: amount,
-    description: `收款 receivable=${receivable.id} ${receivable.title}`,
+    description: `${receivable.title} ${roomText}`,
   });
 
   // Update receivable
@@ -470,7 +476,7 @@ export async function processMoveOut(input: {
 
   const { data: contract } = await supabase
     .from("lease_contracts")
-    .select("id, unit_id, customer_id, deposit_amount_xof, deposit_received")
+    .select("id, unit_id, customer_id, deposit_amount_xof, deposit_received, unit:units(unit_no, building_id)")
     .eq("id", input.contractId)
     .in("status", ["active", "expired"])
     .single();
@@ -481,6 +487,8 @@ export async function processMoveOut(input: {
   const refund = Math.max(0, depositAmount - deduction);
   const totalDue = input.unpaidRentXof;
   const totalRefund = refund;
+  const contractUnit = (contract as typeof contract & { unit?: { unit_no?: string; building_id?: string | null } | null }).unit;
+  const unitNo = contractUnit?.unit_no ?? "未设置";
 
   // Collect unpaid rent if any
   if (input.unpaidRentXof > 0) {
@@ -506,12 +514,11 @@ export async function processMoveOut(input: {
       direction: "income",
       category: "lease_rent",
       amount_xof: input.unpaidRentXof,
-      description: `退租结算未付租金 lease=${input.contractId}`,
+      description: `退租结算未付租金 房间${unitNo}`,
     });
 
-    const { data: unit } = await supabase.from("units").select("building_id").eq("id", contract.unit_id).single();
     await createReceivable({
-      building_id: unit?.building_id ?? null,
+      building_id: contractUnit?.building_id ?? null,
       unit_id: contract.unit_id,
       customer_id: contract.customer_id,
       source_type: "lease_contract",
@@ -534,7 +541,7 @@ export async function processMoveOut(input: {
       direction: "liability_out",
       category: "lease_deposit",
       amount_xof: input.depositRefundXof,
-      description: `退还押金 lease=${input.contractId}${deduction > 0 ? ` (扣除 ${deduction})` : ""}`,
+      description: `退还押金 房间${unitNo}${deduction > 0 ? ` 扣除${deduction}` : ""}`,
     });
   }
 
@@ -546,7 +553,7 @@ export async function processMoveOut(input: {
       direction: "income",
       category: "other_income",
       amount_xof: deduction,
-      description: `押金扣除 lease=${input.contractId}`,
+      description: `押金扣除 房间${unitNo}`,
     });
   }
 

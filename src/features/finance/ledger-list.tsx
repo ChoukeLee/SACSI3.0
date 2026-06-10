@@ -11,10 +11,28 @@ import type { CurrencyCode } from "@/types/domain";
 import { addLedgerEntry } from "./actions";
 import { ReceiptThumb } from "@/components/attachments/receipt-thumb";
 
+function formatLedgerDescription(description: string | null | undefined): string {
+  const raw = description?.trim();
+  if (!raw) return "-";
+  const managedRent = raw.match(/^Room\s+(\S+)\s+managed lease rent received,\s*([\d-]+)\s+to\s+([\d-]+)$/i);
+  if (managedRent) return `${managedRent[1]}房 代管长租租金 ${managedRent[2]} 至 ${managedRent[3]}`;
+  const managedDeposit = raw.match(/^Room\s+(\S+)\s+managed lease deposit received\s+\(([^)]+)\)$/i);
+  if (managedDeposit) return `${managedDeposit[1]}房 代管长租押金 ${managedDeposit[2]}`;
+  const leaseRent = raw.match(/^Room\s+(\S+)\s+lease rent received for\s*([\d-]+)\s+to\s+([\d-]+)$/i);
+  if (leaseRent) return `${leaseRent[1]}房 长租租金 ${leaseRent[2]} 至 ${leaseRent[3]}`;
+  const leaseDeposit = raw.match(/^Room\s+(\S+)\s+lease deposit received\s+\(([^)]+)\)$/i);
+  if (leaseDeposit) return `${leaseDeposit[1]}房 长租押金 ${leaseDeposit[2]}`;
+  return raw
+    .replace(/\s+(booking|lease|receivable|sale|payment)=[0-9a-f-]{8,}/gi, "")
+    .replace(/\s+installment=(\d+)/gi, " 第$1期")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 function buildLedgerCsv(entries: LedgerEntryRow[]): string {
   const header = "Date,Direction,Category,Amount_XOF,Amount_CNY,Description";
   const rows = entries.map((e) =>
-    [e.entry_date, e.direction, e.category, e.amount_xof, e.amount_cny ?? "", `"${(e.description ?? "").replace(/"/g, '""')}"`].join(",")
+    [e.entry_date, e.direction, e.category, e.amount_xof, e.amount_cny ?? "", `"${formatLedgerDescription(e.description).replace(/"/g, '""')}"`].join(",")
   );
   return [header, ...rows].join("\n");
 }
@@ -236,7 +254,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
                         {e.direction === "expense" || e.direction === "liability_out" ? "-" : ""}{formatXof(Number(e.amount_xof))}
                       </td>
                       <td className="px-4 py-2.5 tabular-nums text-muted-foreground">{e.amount_cny != null ? Number(e.amount_cny).toLocaleString() : "-"}</td>
-                      <td className="truncate px-4 py-2.5 text-muted-foreground">{e.description ?? "-"}</td>
+                      <td className="truncate px-4 py-2.5 text-muted-foreground">{formatLedgerDescription(e.description)}</td>
                       {attachments && attachments.length > 0 && (
                         <td className="px-2 py-2.5">
                           {e.payment_id && attachmentByPayment.has(e.payment_id) && (

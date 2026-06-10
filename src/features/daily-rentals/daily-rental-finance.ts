@@ -213,7 +213,7 @@ export async function reverseLedgerEntriesForPayment(
       category: e.category,
       amount_xof: e.amount_xof,
       amount_cny: e.amount_cny,
-      description: `冲销 payment=${paymentId.slice(0, 8)}`,
+      description: `冲销 ${e.description ?? "收款记录"}`,
     };
   });
   await supabase.from("ledger_entries").insert(reversals);
