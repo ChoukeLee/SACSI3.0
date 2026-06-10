@@ -196,16 +196,16 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
       ) : (
         <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px] min-w-[800px]">
+            <table className="w-full min-w-[960px] table-fixed text-left text-[13px]">
               <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-2.5">{t.filters.dateRange}</th>
-                  <th className="px-4 py-2.5">{t.filters.direction}</th>
-                  <th className="px-4 py-2.5">{t.filters.category}</th>
-                  <th className="px-4 py-2.5 text-right">XOF</th>
-                  <th className="px-4 py-2.5 text-right">CNY</th>
+                  <th className="w-[130px] px-4 py-2.5">{t.filters.dateRange}</th>
+                  <th className="w-[110px] px-4 py-2.5">{t.filters.direction}</th>
+                  <th className="w-[210px] px-4 py-2.5">{t.filters.category}</th>
+                  <th className="w-[150px] px-4 py-2.5 text-right">XOF</th>
+                  <th className="w-[90px] px-4 py-2.5 text-right">CNY</th>
                   <th className="px-4 py-2.5">{t.entry.description}</th>
-                  {attachments && attachments.length > 0 && <th className="px-4 py-2.5 w-10"></th>}
+                  {attachments && attachments.length > 0 && <th className="w-14 px-4 py-2.5"></th>}
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -218,14 +218,16 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
                         <span className={cn("text-sm font-semibold", dirColor[e.direction])}>{t.directions[e.direction as keyof typeof t.directions]}</span>
                       </td>
                       <td className="px-4 py-2.5">
-                        <span>{t.categories[e.category as keyof typeof t.categories] ?? e.category}</span>
-                        {unit && <span className="ml-1 text-muted-foreground">({unit.unit_no})</span>}
+                        <div className="truncate">
+                          <span>{t.categories[e.category as keyof typeof t.categories] ?? e.category}</span>
+                          {unit && <span className="ml-1 text-muted-foreground">({unit.unit_no})</span>}
+                        </div>
                       </td>
                       <td className={cn("px-4 py-2.5 text-right tabular-nums font-semibold", e.direction === "expense" || e.direction === "liability_out" ? "text-rose-600" : "text-emerald-600")}>
                         {e.direction === "expense" || e.direction === "liability_out" ? "-" : ""}{formatXof(Number(e.amount_xof))}
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{e.amount_cny != null ? Number(e.amount_cny).toLocaleString() : "-"}</td>
-                      <td className="max-w-[260px] truncate px-4 py-2.5 text-muted-foreground">{e.description ?? "-"}</td>
+                      <td className="truncate px-4 py-2.5 text-muted-foreground">{e.description ?? "-"}</td>
                       {attachments && attachments.length > 0 && (
                         <td className="px-2 py-2.5">
                           {e.payment_id && attachmentByPayment.has(e.payment_id) && (
