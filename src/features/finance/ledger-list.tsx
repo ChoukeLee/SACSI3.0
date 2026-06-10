@@ -226,15 +226,15 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
           <p className="text-sm font-semibold text-muted-foreground">{t.empty}</p>
         </div>
       ) : (
-        <div className="max-w-[1180px] overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] table-fixed text-left text-[13px]">
+            <table className="w-full min-w-[960px] table-fixed text-left text-[13px]">
               <colgroup>
-                <col className="w-[130px]" />
-                <col className="w-[100px]" />
-                <col className="w-[210px]" />
-                <col className="w-[150px]" />
-                <col />
+                <col className="w-[16%]" />
+                <col className="w-[12%]" />
+                <col className="w-[18%]" />
+                <col className="w-[16%]" />
+                <col className="w-[38%]" />
                 {attachments && attachments.length > 0 && <col className="w-14" />}
               </colgroup>
               <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
