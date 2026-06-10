@@ -28,6 +28,7 @@ interface AuditLogEntry {
 interface UnitListProps {
   units: UnitRow[];
   businessFlagsMap: Record<string, UnitBusinessFlag[]>;
+  managedLeaseUnitIds?: string[];
   auditLogsMap: Record<string, AuditLogEntry[]>;
   locale: Locale;
 }
@@ -43,7 +44,7 @@ const STATUS_DOT: Record<string, string> = {
   available: "bg-[#A0D0E8]",
 };
 
-export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: UnitListProps) {
+export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], auditLogsMap, locale }: UnitListProps) {
   const t = dictionaries[locale].units;
   const statusLabels = dictionaries[locale].statuses;
   const [selectedFloor, setSelectedFloor] = useState("all");
@@ -79,17 +80,18 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
 
   const apartments = useMemo(() => units.filter((unit) => unit.kind === "apartment"), [units]);
   const nonApartments = useMemo(() => units.filter((unit) => unit.kind !== "apartment"), [units]);
+  const managedLeaseUnitSet = useMemo(() => new Set(managedLeaseUnitIds), [managedLeaseUnitIds]);
 
   const summary = useMemo(() => ({
     apartments: apartments.length,
     available: apartments.filter((unit) => unit.status === "available").length,
     daily: apartments.filter((unit) => unit.status === "daily_occupied" || unit.status === "reserved").length,
     leased: apartments.filter((unit) => unit.status === "leased").length,
-    managed: apartments.filter((unit) => unit.status === "sold" && (businessFlagsMap[unit.id] ?? []).some((flag) => flag.business_type === "long_lease" && flag.is_enabled)).length,
+    managed: apartments.filter((unit) => unit.status === "sold" && managedLeaseUnitSet.has(unit.id)).length,
     sold: apartments.filter((unit) => unit.status === "sold").length,
     maintenance: apartments.filter((unit) => unit.status === "maintenance" || unit.status === "locked" || unit.status === "cleaning_pending").length,
     nonApartment: nonApartments.length,
-  }), [apartments, nonApartments, businessFlagsMap]);
+  }), [apartments, nonApartments, managedLeaseUnitSet]);
 
   const detailUnit = detailUnitId ? units.find((unit) => unit.id === detailUnitId) : null;
 
@@ -201,6 +203,7 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
                     unit={unit}
                     locale={locale}
                     flags={businessFlagsMap[unit.id] ?? []}
+                    managedLease={managedLeaseUnitSet.has(unit.id)}
                     onOpen={() => setDetailUnitId(unit.id)}
                   />
                 ))}
@@ -243,6 +246,7 @@ export function UnitList({ units, businessFlagsMap, auditLogsMap, locale }: Unit
                         unit={unit}
                         locale={locale}
                         flags={businessFlagsMap[unit.id] ?? []}
+                        managedLease={managedLeaseUnitSet.has(unit.id)}
                         onOpen={() => setDetailUnitId(unit.id)}
                         compact
                       />
@@ -274,12 +278,14 @@ function UnitTableRow({
   unit,
   locale,
   flags,
+  managedLease,
   onOpen,
   compact = false,
 }: {
   unit: UnitRow;
   locale: Locale;
   flags: UnitBusinessFlag[];
+  managedLease: boolean;
   onOpen: () => void;
   compact?: boolean;
 }) {
@@ -292,7 +298,7 @@ function UnitTableRow({
       <td><span className="font-mono text-xs font-bold">{unit.unit_no}</span></td>
       <td className="text-sm">{unit.floor_label}</td>
       <td className="text-sm text-muted-foreground">{t.kinds[unit.kind]}</td>
-      <td><StatusPill status={unit.status} locale={locale} managedLease={unit.status === "sold" && enabledFlags.some((flag) => flag.business_type === "long_lease")} /></td>
+      <td><StatusPill status={unit.status} locale={locale} managedLease={unit.status === "sold" && managedLease} /></td>
       <td className="text-sm text-muted-foreground">{enabledFlags.map((flag) => t.businessTypes[flag.business_type]).join(" / ") || "-"}</td>
       {!compact && (
         <td className="table-cell-amount">{dailyFlag?.default_price_xof != null ? formatXof(dailyFlag.default_price_xof) : "-"}</td>

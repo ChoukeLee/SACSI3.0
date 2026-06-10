@@ -19,6 +19,7 @@ export default async function UnitsPage() {
 
   let units: UnitRow[] = [];
   let flags: UnitBusinessFlagRow[] = [];
+  let managedLeaseUnitIds: string[] = [];
 
   const [buildingRes, flagsRes] = await Promise.all([
     supabase.from("buildings").select("id").eq("code", "SASCI11").single(),
@@ -33,6 +34,17 @@ export default async function UnitsPage() {
     const { data: unitsData, error: unitsErr } = await supabase.from("units").select("id, building_id, code, unit_no, floor_label, kind, status, area_sqm, layout, furnishing, notes").eq("building_id", buildingId).order("unit_no");
     if (unitsErr) console.error("Failed to fetch units:", unitsErr);
     else units = sortUnits(unitsData as unknown as UnitRow[]);
+  }
+
+  if (buildingId && units.length > 0) {
+    const unitIds = units.map((unit) => unit.id);
+    const { data: activeLeases, error: activeLeasesErr } = await supabase
+      .from("lease_contracts")
+      .select("unit_id")
+      .eq("status", "active")
+      .in("unit_id", unitIds);
+    if (activeLeasesErr) console.error("Failed to fetch active lease units:", activeLeasesErr);
+    else managedLeaseUnitIds = Array.from(new Set((activeLeases ?? []).map((lease) => lease.unit_id)));
   }
 
   // Build business flags map
@@ -77,6 +89,7 @@ export default async function UnitsPage() {
       <UnitList
         units={units}
         businessFlagsMap={businessFlagsMap}
+        managedLeaseUnitIds={managedLeaseUnitIds}
         auditLogsMap={auditLogsMap}
         locale="zh"
       />
