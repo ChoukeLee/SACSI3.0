@@ -98,10 +98,36 @@ const ROLE_LABELS: Record<string, Record<string, string>> = {
   fr: { admin: "Admin", boss: "Propriétaire", finance: "Comptable", front_desk: "Réception" },
 };
 
+const EXTRA_ACTION_LABELS: Record<string, Record<string, string>> = {
+  zh: {
+    reconcile_daily_debt_payment: "日租欠款补缴",
+    reconcile_daily_rental_batch: "日租统一交付",
+    repair_finance: "修复财务",
+    repair_unit_status: "修正房态",
+    unit_change_status: "修改房态",
+    record_payment: "登记收款",
+    reverse_payment: "撤销收款",
+    upload_receipt: "上传收据",
+    confirm_receipt: "确认收据",
+  },
+  fr: {
+    reconcile_daily_debt_payment: "Regulariser dette jour",
+    reconcile_daily_rental_batch: "Paiement groupe jour",
+    repair_finance: "Reparer finance",
+    repair_unit_status: "Corriger statut",
+    unit_change_status: "Changer statut",
+    record_payment: "Enregistrer paiement",
+    reverse_payment: "Annuler paiement",
+    upload_receipt: "Televerser recu",
+    confirm_receipt: "Confirmer recu",
+  },
+};
+
 export function AuditLogViewer({ logs, locale }: Props) {
   const actionLabels = ACTION_LABELS[locale];
   const entityLabels = ENTITY_LABELS[locale];
   const roleLabels = ROLE_LABELS[locale];
+  const extraActionLabels = EXTRA_ACTION_LABELS[locale];
 
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -133,14 +159,14 @@ export function AuditLogViewer({ logs, locale }: Props) {
           metadataText(l, "unit_no"),
           metadataText(l, "actor_email"),
           metadataText(l, "actor_display_name"),
-          labelOrHumanize(actionLabels, l.action),
+          actionLabel(l.action),
           labelOrHumanize(entityLabels, l.entity_type),
         ].join(" ").toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
     });
-  }, [logs, dateFrom, dateTo, actionFilter, entityFilter, search, actionLabels, entityLabels]);
+  }, [logs, dateFrom, dateTo, actionFilter, entityFilter, search, actionLabels, entityLabels, extraActionLabels]);
 
   const zh = locale === "zh";
 
@@ -152,8 +178,18 @@ export function AuditLogViewer({ logs, locale }: Props) {
     return `${d.toLocaleDateString(locale === "zh" ? "zh-CN" : "fr-FR")} ${d.toLocaleTimeString(locale === "zh" ? "zh-CN" : "fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
   };
 
+  function normalizedKey(key: string) {
+    return key.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  }
+
   function labelOrHumanize(labels: Record<string, string>, key: string) {
-    return labels[key] ?? key.replace(/_/g, " ");
+    const normalized = normalizedKey(key);
+    return labels[key] ?? labels[normalized] ?? normalized.replace(/_/g, " ");
+  }
+
+  function actionLabel(key: string) {
+    const normalized = normalizedKey(key);
+    return actionLabels[key] ?? actionLabels[normalized] ?? extraActionLabels[key] ?? extraActionLabels[normalized] ?? labelOrHumanize({}, key);
   }
 
   function metadataText(log: AuditLogRow, key: string) {
@@ -182,10 +218,41 @@ export function AuditLogViewer({ logs, locale }: Props) {
     return "";
   }
 
+  function extractRoomNo(value: string) {
+    const match = value.match(/(?:room|chambre|房间|房)\s*#?\s*(\d{3,4})/i) ?? value.match(/\b(\d{3,4})\b/);
+    return match?.[1] ?? "";
+  }
+
+  function roomText(roomNo: string) {
+    return locale === "zh" ? `房间 ${roomNo}` : `Chambre ${roomNo}`;
+  }
+
+  function cleanLabel(value: string) {
+    return value
+      .replace(/\s+(booking|lease|receivable|sale|payment|task)=[0-9a-f-]{8,}/gi, "")
+      .replace(/^Room\s+#?\s*(\d{3,4})$/i, (_, roomNo: string) => roomText(roomNo))
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
+
+  function unitNoFromLog(log: AuditLogRow) {
+    const direct = metadataText(log, "unit_no") || metadataText(log, "room_no");
+    if (direct) return direct;
+    return extractRoomNo(entityLabel(log));
+  }
+
+  function entityText(log: AuditLogRow) {
+    const base = labelOrHumanize(entityLabels, log.entity_type);
+    const unitNo = unitNoFromLog(log);
+    if (unitNo) return `${base} · ${roomText(unitNo)}`;
+    const label = cleanLabel(entityLabel(log));
+    return label ? `${base} · ${label}` : base;
+  }
+
   function summaryText(log: AuditLogRow) {
-    const unitNo = metadataText(log, "unit_no");
-    if (unitNo) return locale === "zh" ? `房间 ${unitNo}` : `Chambre ${unitNo}`;
-    const label = entityLabel(log);
+    const unitNo = unitNoFromLog(log);
+    if (unitNo) return roomText(unitNo);
+    const label = cleanLabel(entityLabel(log));
     if (label) return label;
     return log.entity_id ? `${log.entity_id.slice(0, 8)}...` : "—";
   }
@@ -222,7 +289,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
         <DateInput value={dateTo} onChangeValue={setDateTo} className={filterDate} />
         <select value={actionFilter} onChange={e => setActionFilter(e.target.value)} className={filterSelect}>
           <option value="all">{zh ? "操作" : "Action"}: {zh ? "全部" : "Tous"}</option>
-          {uniqueActions.map(a => <option key={a} value={a}>{labelOrHumanize(actionLabels, a)}</option>)}
+          {uniqueActions.map(a => <option key={a} value={a}>{actionLabel(a)}</option>)}
         </select>
         <select value={entityFilter} onChange={e => setEntityFilter(e.target.value)} className={filterSelect}>
           <option value="all">{zh ? "模块" : "Module"}: {zh ? "全部" : "Tous"}</option>
@@ -298,13 +365,12 @@ export function AuditLogViewer({ logs, locale }: Props) {
                       </td>
                       <td className="px-4 py-2.5" onClick={() => setExpandedId(expanded ? null : l.id)}>
                         <Badge variant="secondary" className="text-xs">
-                          {labelOrHumanize(actionLabels, l.action)}
+                          {actionLabel(l.action)}
                         </Badge>
                       </td>
                       <td className="px-4 py-2.5" onClick={() => setExpandedId(expanded ? null : l.id)}>
                         <span className="text-muted-foreground">
-                          {labelOrHumanize(entityLabels, l.entity_type)}
-                          {entityLabel(l) && <span className="ml-1">· {entityLabel(l)}</span>}
+                          {entityText(l)}
                         </span>
                       </td>
                       <td className="px-4 py-2.5 max-w-[200px] truncate text-muted-foreground" onClick={() => setExpandedId(expanded ? null : l.id)}>
