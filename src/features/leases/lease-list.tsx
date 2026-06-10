@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, X, AlertTriangle, FileText, DollarSign, LogOut, Printer, RefreshCw, Eye } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
@@ -39,6 +40,7 @@ function isManagedLeaseUnit(unit: LeaseUnitRow) {
 }
 
 export function LeaseList({ contracts, units, customers, payments, receivables, locale }: LeaseListProps) {
+  const router = useRouter();
   const t = dictionaries[locale].leases;
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [panel, setPanel] = useState<PanelType>(null);
@@ -102,7 +104,23 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   };
   const handleActivate = async (id: string) => { setSaving(true); const result = await activateContract(id); setSaving(false); if(!result.success) setError(result.error??"Failed"); else setGenMsg(locale==="zh"?"合同已激活，应收已自动生成":"Contrat active, echeances generees"); };
   const handleTerminate = async (id: string) => { setSaving(true); const result = await terminateContract(id); setSaving(false); if(!result.success) setError(result.error??"Failed"); };
-  const handleGenerateReceivables = async (id: string) => { setSaving(true); setGenMsg(""); const result = await generateLeaseReceivables(id); setSaving(false); if(result.success) setGenMsg(t.receivable.generated.replace("{count}",String(result.count))); else setError(result.error??"Failed"); };
+  const handleGenerateReceivables = async (id: string) => {
+    setSaving(true);
+    setGenMsg("");
+    setError("");
+    const result = await generateLeaseReceivables(id);
+    setSaving(false);
+    if (result.success) {
+      router.refresh();
+      if (result.count > 0) {
+        setGenMsg(t.receivable.generated.replace("{count}", String(result.count)));
+      } else if ((result.existingCount ?? 0) > 0) {
+        setGenMsg(locale === "zh" ? `应收已存在 ${result.existingCount} 条，已刷新列表` : `${result.existingCount} créance(s) déjà existante(s), liste actualisée`);
+      } else {
+        setGenMsg(locale === "zh" ? "未生成新的应收，请检查合同日期和支付周期" : "Aucune nouvelle créance générée, vérifiez les dates et le cycle");
+      }
+    } else setError(result.error ?? "Failed");
+  };
   const handleCollectReceivable = async () => { if(!payReceivableId)return; setSaving(true);setError("");const result=await recordReceivablePayment({receivableId:payReceivableId,paymentDate:payDate,receiptNo:payReceiptNo||undefined});setSaving(false);if(result.success){setPayReceivableId(null);setPayReceiptNo("");}else setError(result.error??"Failed");};
   const handleMoveOut = async () => { if(!selectedId)return;setSaving(true);setError("");const result=await processMoveOut({contractId:selectedId,actualEndDate:moEndDate,unpaidRentXof:moUnpaid,utilityCleared:moUtility,depositDeductionXof:moDeduction,depositRefundXof:moRefund});setSaving(false);if(result.success)setPanel(null);else setError(result.error??"Failed");};
 

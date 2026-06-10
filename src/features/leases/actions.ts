@@ -29,7 +29,7 @@ const CYCLE_MULTIPLIER: Record<string, number> = {
 
 export async function generateLeaseReceivables(
   contractId: string,
-): Promise<{ success: boolean; count: number; error?: string }> {
+): Promise<{ success: boolean; count: number; existingCount?: number; error?: string }> {
   await guardLeaseWrite();
   const supabase = await createClient();
 
@@ -59,6 +59,7 @@ export async function generateLeaseReceivables(
     .eq("category", "lease_rent")
     .neq("status", "cancelled");
   const existingDueDates = new Set((existing ?? []).map(r => r.due_date));
+  const existingCount = existing?.length ?? 0;
 
   const unit = (contract as any).unit as { id: string; unit_no: string; building_id: string } | null;
   const unitNo = unit?.unit_no ?? "";
@@ -117,7 +118,7 @@ export async function generateLeaseReceivables(
 
   revalidatePath("/leases");
   revalidatePath("/fr/leases");
-  return { success: true, count };
+  return { success: true, count, existingCount };
 }
 
 /** Sync all receivable statuses for a contract based on current date. */
