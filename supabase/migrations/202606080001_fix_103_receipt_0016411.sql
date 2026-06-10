@@ -76,23 +76,41 @@ begin
     raise notice 'Attachment % metadata fixed.', r.id;
   end loop;
 
-  -- Fix receivable: match by unit_id + source_type + period range first
+  -- Fix receivable: match by unit_id + source_type + period range first.
+  -- Only auto-fix if exactly ONE receivable matches — never guess among multiple.
   v_amount_diff := v_correct_amount - v_old_amount;
   if v_amount_diff != 0 then
     -- Primary match: unit 103 + lease_contract + period 2026-05-07 to 2026-08-06
-    select id, paid_amount_xof
-    into v_rec_id, v_rec_paid_before
-    from receivables
-    where unit_id = v_unit_id
-      and source_type = 'lease_contract'
-      and status not in ('paid', 'cancelled')
-      and due_date >= v_period_start
-      and due_date <= v_period_end
-    order by due_date
-    limit 1;
+    -- Check count first: if >1, skip with manual review notice
+    if (select count(*) from receivables
+        where unit_id = v_unit_id
+          and source_type = 'lease_contract'
+          and status not in ('paid', 'cancelled')
+          and due_date >= v_period_start
+          and due_date <= v_period_end) = 1 then
 
-    -- Fallback: match by unit + type, closest amount (if no period match)
-    if v_rec_id is null then
+      select id, paid_amount_xof
+      into v_rec_id, v_rec_paid_before
+      from receivables
+      where unit_id = v_unit_id
+        and source_type = 'lease_contract'
+        and status not in ('paid', 'cancelled')
+        and due_date >= v_period_start
+        and due_date <= v_period_end;
+
+    elsif (select count(*) from receivables
+           where unit_id = v_unit_id
+             and source_type = 'lease_contract'
+             and status not in ('paid', 'cancelled')
+             and due_date >= v_period_start
+             and due_date <= v_period_end) > 1 then
+
+      raise notice 'Multiple receivables match the period — manual review needed. Skipping receivable auto-fix.';
+      v_rec_id := null;
+    end if;
+
+    -- Fallback: match by unit + type, closest amount (if no period match and still null)
+    if v_rec_id is null and v_amount_diff != 0 then
       select id, paid_amount_xof
       into v_rec_id, v_rec_paid_before
       from receivables
@@ -112,7 +130,7 @@ begin
       where id = v_rec_id;
       raise notice 'Receivable % paid adjusted by % (was %)', v_rec_id, v_amount_diff, v_rec_paid_before;
     else
-      raise notice 'No matching receivable found for amount correction — manual review needed.';
+      raise notice 'No unique matching receivable found for amount correction — manual review needed.';
     end if;
   end if;
 
