@@ -43,6 +43,31 @@ const rowBg: Record<string, string> = {
   cancelled: "opacity-60",
 };
 
+function receivableBusinessLabel(r: ReceivableRow, locale: Locale) {
+  const zh: Record<string, string> = {
+    daily_booking: "日租房费",
+    lease_rent: "长租租金",
+    lease_deposit: "长租押金",
+    sale_installment: "出售分期",
+    sale_lump_sum: "出售全款",
+    sale_contract: "出售",
+    manual: "手工应收",
+    other: "其他应收",
+  };
+  const fr: Record<string, string> = {
+    daily_booking: "Location jour",
+    lease_rent: "Loyer longue durée",
+    lease_deposit: "Dépôt longue durée",
+    sale_installment: "Vente échelonnée",
+    sale_lump_sum: "Vente comptant",
+    sale_contract: "Vente",
+    manual: "Créance manuelle",
+    other: "Autre créance",
+  };
+  const labels = locale === "fr" ? fr : zh;
+  return labels[r.category || ""] ?? labels[r.source_type] ?? r.source_type;
+}
+
 export function ReceivableList({ receivables, units, customers, buildings, locale }: Props) {
   const t = dictionaries[locale].receivables;
   const [statusFilter, setStatusFilter] = useState("all");
@@ -247,7 +272,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
                       <td className="max-w-[120px] truncate px-4 py-2.5">{customerMap.get(r.customer_id ?? "") ?? "-"}</td>
                       <td className="px-4 py-2.5">
                         <Badge variant="secondary" className="text-xs">
-                          {t.sourceTypes[r.source_type as keyof typeof t.sourceTypes] ?? r.source_type}
+                          {receivableBusinessLabel(r, locale)}
                         </Badge>
                       </td>
                       <td className="max-w-[180px] truncate px-4 py-2.5">{r.title}</td>

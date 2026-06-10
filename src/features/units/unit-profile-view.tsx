@@ -23,6 +23,52 @@ type BadgeTone = React.ComponentProps<typeof Badge>["variant"];
 
 interface Props { data: UnitProfileData; locale: Locale; userRole: string }
 
+function receivableBusinessLabel(sourceType: string, category: string | null | undefined, locale: Locale) {
+  const zh: Record<string, string> = {
+    daily_booking: "日租房费",
+    lease_rent: "长租租金",
+    lease_deposit: "长租押金",
+    sale_installment: "出售分期",
+    sale_lump_sum: "出售全款",
+    sale_contract: "出售",
+    manual: "手工应收",
+    other: "其他应收",
+  };
+  const fr: Record<string, string> = {
+    daily_booking: "Location jour",
+    lease_rent: "Loyer longue durée",
+    lease_deposit: "Dépôt longue durée",
+    sale_installment: "Vente échelonnée",
+    sale_lump_sum: "Vente comptant",
+    sale_contract: "Vente",
+    manual: "Créance manuelle",
+    other: "Autre créance",
+  };
+  const labels = locale === "fr" ? fr : zh;
+  return labels[category || ""] ?? labels[sourceType] ?? sourceType;
+}
+
+function paymentBusinessLabel(sourceType: string | null | undefined, locale: Locale) {
+  const zh: Record<string, string> = {
+    daily_booking: "日租收款",
+    lease_rent: "长租租金",
+    lease_deposit: "长租押金",
+    sale: "出售收款",
+    sale_contract: "出售收款",
+    manual: "手工收款",
+  };
+  const fr: Record<string, string> = {
+    daily_booking: "Paiement jour",
+    lease_rent: "Loyer longue durée",
+    lease_deposit: "Dépôt longue durée",
+    sale: "Paiement vente",
+    sale_contract: "Paiement vente",
+    manual: "Paiement manuel",
+  };
+  const key = sourceType ?? "";
+  return (locale === "fr" ? fr[key] : zh[key]) ?? key;
+}
+
 export function UnitProfileView({ data, locale, userRole }: Props) {
   void userRole;
   const { unit, buildingName } = data;
@@ -186,7 +232,7 @@ function FinanceTab({ data, L, locale }: { data: UnitProfileData; L: ReturnType<
             {data.receivables.filter(r=>r.status!=="cancelled").slice(0,50).map(r=>{
               const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
               return <tr key={r.id} className={cn("transition-colors hover:bg-accent/50", r.status==="overdue" && "bg-red-50/30")}>
-                <td className="px-4 py-2.5">{r.due_date}</td><td className="px-4 py-2.5 text-muted-foreground">{L.sourceLabels[r.source_type]??r.source_type}</td>
+                <td className="px-4 py-2.5">{r.due_date}</td><td className="px-4 py-2.5 text-muted-foreground">{receivableBusinessLabel(r.source_type, r.category, locale)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatXof(Number(r.amount_xof))}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600 font-medium">{formatXof(Number(r.paid_amount_xof))}</td>
                 <td className="px-4 py-2.5"><Badge variant={outstanding>0?(r.status==="overdue"?"destructive":"warning"):"success"}>{outstanding>0?formatXof(outstanding):L.settled}</Badge></td>
@@ -198,10 +244,10 @@ function FinanceTab({ data, L, locale }: { data: UnitProfileData; L: ReturnType<
       <TableSection title={`${L.payments} (${data.payments.length})`} empty={data.payments.length===0} emptyText={L.noData}>
         <table className="w-full text-left text-[13px]">
           <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
-            <tr>{[L.date,L.amount,L.receipt].map(h=><th key={h} className="px-4 py-2.5">{h}</th>)}</tr>
+            <tr>{[L.date,L.source,L.amount,L.receipt].map(h=><th key={h} className="px-4 py-2.5">{h}</th>)}</tr>
           </thead>
           <tbody className="divide-y">
-            {data.payments.slice(0,50).map(p=><tr key={p.id} className="transition-colors hover:bg-accent/50"><td className="px-4 py-2.5">{p.payment_date}</td><td className="px-4 py-2.5 text-right tabular-nums text-emerald-600 font-medium">{formatXof(Number(p.amount))}</td><td className="px-4 py-2.5 text-muted-foreground">{p.receipt_no??"-"}</td></tr>)}
+            {data.payments.slice(0,50).map(p=><tr key={p.id} className="transition-colors hover:bg-accent/50"><td className="px-4 py-2.5">{p.payment_date}</td><td className="px-4 py-2.5 text-muted-foreground">{paymentBusinessLabel(p.source_type, locale)}</td><td className="px-4 py-2.5 text-right tabular-nums text-emerald-600 font-medium">{formatXof(Number(p.amount))}</td><td className="px-4 py-2.5 text-muted-foreground">{p.receipt_no??"-"}</td></tr>)}
           </tbody>
         </table>
       </TableSection>
