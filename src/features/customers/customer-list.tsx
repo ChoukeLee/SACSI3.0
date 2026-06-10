@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Plus, AlertTriangle, UserX, UserCheck, X, Eye, Search, Phone, Home, CreditCard, BedDouble, Star } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn, compareUnitNo } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
@@ -31,6 +31,7 @@ interface CustomerListProps {
 
 type FormMode = { type: "add" } | { type: "edit"; customer: CustomerRow } | null;
 type CustomerSegment = "all" | "lease" | "sale" | "daily" | "blacklisted";
+type CustomerGroup = "lease" | "sale" | "daily" | "uncategorized" | "blacklisted";
 
 export function CustomerList({ customers, customerSegments, customerRooms, customerLastActivity, locale }: CustomerListProps) {
   const [search, setSearch] = useState("");
@@ -68,14 +69,38 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
     all: customers.length,
   }), [customers, segmentSets]);
 
-  // Stable-first, then by recent activity
+  const customerGroup = (c: CustomerRow): CustomerGroup => {
+    if (c.is_blacklisted) return "blacklisted";
+    if (segmentSets.lease.has(c.id)) return "lease";
+    if (segmentSets.sale.has(c.id)) return "sale";
+    if (segmentSets.daily.has(c.id)) return "daily";
+    return "uncategorized";
+  };
+
+  const primaryRoom = (customerId: string) => {
+    const rooms = [...((customerRooms ?? {})[customerId] ?? [])].sort(compareUnitNo);
+    return rooms[0] ?? "";
+  };
+
+  // Group-first, then by room number, recent activity and name.
   const sorted = useMemo(() => {
-    const rooms = customerRooms ?? {};
     const activity = customerLastActivity ?? {};
+    const groupRank: Record<CustomerGroup, number> = {
+      lease: 0,
+      sale: 1,
+      daily: 2,
+      uncategorized: 3,
+      blacklisted: 4,
+    };
     return [...customers].sort((a, b) => {
-      const aStable = segmentSets.lease.has(a.id) || segmentSets.sale.has(a.id);
-      const bStable = segmentSets.lease.has(b.id) || segmentSets.sale.has(b.id);
-      if (aStable !== bStable) return aStable ? -1 : 1;
+      const groupOrder = groupRank[customerGroup(a)] - groupRank[customerGroup(b)];
+      if (groupOrder !== 0) return groupOrder;
+      const aRoom = primaryRoom(a.id);
+      const bRoom = primaryRoom(b.id);
+      if (aRoom || bRoom) {
+        const roomOrder = compareUnitNo(aRoom || null, bRoom || null);
+        if (roomOrder !== 0) return roomOrder;
+      }
       const aAct = activity[a.id] ?? "";
       const bAct = activity[b.id] ?? "";
       if (aAct !== bAct) return bAct.localeCompare(aAct);
@@ -87,10 +112,11 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
     const s = search.toLowerCase().trim();
     const rooms = customerRooms ?? {};
     return sorted.filter((c) => {
-      if (segment === "lease" && !segmentSets.lease.has(c.id)) return false;
-      if (segment === "sale" && !segmentSets.sale.has(c.id)) return false;
-      if (segment === "daily" && !segmentSets.daily.has(c.id)) return false;
-      if (segment === "blacklisted" && !c.is_blacklisted) return false;
+      const group = customerGroup(c);
+      if (segment === "lease" && group !== "lease") return false;
+      if (segment === "sale" && group !== "sale") return false;
+      if (segment === "daily" && group !== "daily") return false;
+      if (segment === "blacklisted" && group !== "blacklisted") return false;
       if (s) {
         const nameMatch = c.name.toLowerCase().includes(s);
         const phoneMatch = c.phone?.includes(s) ?? false;
@@ -103,6 +129,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
   }, [sorted, search, segment, segmentSets, customerRooms]);
 
   const selected = selectedId ? customers.find((c) => c.id === selectedId) : null;
+  const selectedRooms = selected ? [...((customerRooms ?? {})[selected.id] ?? [])].sort(compareUnitNo) : [];
 
   const customerTypeLabel = (c: CustomerRow) => {
     if (c.is_blacklisted) return locale === "zh" ? "黑名单" : "Liste noire";
@@ -225,6 +252,87 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
     { key: "total", label: t.total, value: String(stats.all), dot: "bg-accentAmber-500" },
   ];
 
+  const groupDefinitions: { key: CustomerGroup; label: string; dot: string }[] = [
+    { key: "lease", label: t.leaseClients, dot: "bg-[#5E9BC5]" },
+    { key: "sale", label: t.saleClients, dot: "bg-[#B88A48]" },
+    { key: "daily", label: t.dailyOnly, dot: "bg-sky-500" },
+    { key: "uncategorized", label: locale === "zh" ? "未分类客户" : "Non classés", dot: "bg-muted-foreground/40" },
+    { key: "blacklisted", label: t.blacklisted, dot: "bg-accentRed-500" },
+  ];
+
+  const visibleGroups = groupDefinitions
+    .filter((group) => segment === "all" || group.key === segment)
+    .map((group) => ({
+      ...group,
+      customers: filtered.filter((customer) => customerGroup(customer) === group.key),
+    }))
+    .filter((group) => group.customers.length > 0);
+
+  const renderCustomerCard = (c: CustomerRow) => {
+    const isSelected = selectedId === c.id;
+    const hasLease = segmentSets.lease.has(c.id);
+    const hasSale = segmentSets.sale.has(c.id);
+    const hasDaily = segmentSets.daily.has(c.id);
+    const isStable = hasLease || hasSale;
+    const rooms = [...((customerRooms ?? {})[c.id] ?? [])].sort(compareUnitNo);
+
+    return (
+      <button
+        key={c.id}
+        onClick={() => {
+          setSelectedId(isSelected ? null : c.id);
+          setFormMode(null);
+          setBlacklistPanelId(null);
+        }}
+        className={cn(
+          "flex flex-col gap-1.5 rounded-xl border bg-card p-3.5 text-left shadow-sm transition-all hover:shadow-md",
+          c.is_blacklisted && "border-l-[3px] border-l-red-400 bg-red-50/40",
+          isSelected && "ring-2 ring-ring",
+        )}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="flex items-center gap-1 truncate text-sm font-bold">
+              {isStable && <Star className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
+              {c.name}
+            </p>
+            {c.gender && (
+              <span className="text-[11px] text-muted-foreground">
+                {c.gender === "male" ? t.male : c.gender === "female" ? t.female : t.other}
+              </span>
+            )}
+          </div>
+          {c.is_blacklisted ? (
+            <Badge variant="destructive" className="shrink-0 text-[10px]">{t.blacklisted}</Badge>
+          ) : (
+            <Badge variant={customerTypeTone(c)} className="shrink-0 text-[10px]">{customerTypeLabel(c)}</Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {c.phone ? (
+            <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{c.phone}</span>
+          ) : (
+            <span>-</span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-1">
+          {hasLease && <span className="rounded bg-[#DDECF7] px-1.5 py-0.5 text-[10px] font-medium text-[#2E6F9A]"><Home className="mr-0.5 inline h-3 w-3" />{t.leaseTag}</span>}
+          {hasSale && <span className="rounded bg-[#EFE1CA] px-1.5 py-0.5 text-[10px] font-medium text-[#7B5A2B]"><CreditCard className="mr-0.5 inline h-3 w-3" />{t.saleTag}</span>}
+          {hasDaily && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700"><BedDouble className="mr-0.5 inline h-3 w-3" />{t.dailyTag}</span>}
+          {c.is_blacklisted && <AlertTriangle className="h-3 w-3 text-red-500" />}
+        </div>
+        {rooms.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 pt-0.5">
+            {rooms.slice(0, 3).map((r) => (
+              <span key={r} className="rounded bg-muted px-1 py-0 text-[10px] text-muted-foreground font-mono">{r}</span>
+            ))}
+            {rooms.length > 3 && <span className="text-[10px] text-muted-foreground">+{rooms.length - 3}</span>}
+          </div>
+        )}
+      </button>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-6">
       {/* ── Page chrome ── */}
@@ -311,70 +419,26 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       {filtered.length === 0 ? (
         <EmptyState title={t.empty} action={<Button size="sm" onClick={openAdd}><Plus className="h-4 w-4" />{t.add}</Button>} />
       ) : (
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((c) => {
-            const isSelected = selectedId === c.id;
-            const hasLease = segmentSets.lease.has(c.id);
-            const hasSale = segmentSets.sale.has(c.id);
-            const hasDaily = segmentSets.daily.has(c.id);
-            const isStable = hasLease || hasSale;
-            const rooms = (customerRooms ?? {})[c.id] ?? [];
-            return (
-              <button
-                key={c.id}
-                onClick={() => {
-                  setSelectedId(isSelected ? null : c.id);
-                  setFormMode(null);
-                  setBlacklistPanelId(null);
-                }}
-                className={cn(
-                  "flex flex-col gap-1.5 rounded-xl border bg-card p-3.5 text-left shadow-sm transition-all hover:shadow-md",
-                  c.is_blacklisted && "border-l-[3px] border-l-red-400 bg-red-50/40",
-                  isSelected && "ring-2 ring-ring",
-                )}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="flex items-center gap-1 truncate text-sm font-bold">
-                      {isStable && <Star className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
-                      {c.name}
-                    </p>
-                    {c.gender && (
-                      <span className="text-[11px] text-muted-foreground">
-                        {c.gender === "male" ? t.male : c.gender === "female" ? t.female : t.other}
-                      </span>
-                    )}
-                  </div>
-                  {c.is_blacklisted ? (
-                    <Badge variant="destructive" className="shrink-0 text-[10px]">{t.blacklisted}</Badge>
-                  ) : (
-                    <Badge variant={customerTypeTone(c)} className="shrink-0 text-[10px]">{customerTypeLabel(c)}</Badge>
-                  )}
+        <div className="space-y-5">
+          {visibleGroups.map((group) => (
+            <section key={group.key} className="space-y-2">
+              <div className="flex items-center justify-between border-b border-border/70 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className={cn("h-2.5 w-2.5 rounded-full", group.dot)} />
+                  <h2 className="text-sm font-bold">{group.label}</h2>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
+                    {group.customers.length}
+                  </span>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  {c.phone ? (
-                    <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{c.phone}</span>
-                  ) : (
-                    <span>-</span>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center gap-1">
-                  {hasLease && <span className="rounded bg-[#DDECF7] px-1.5 py-0.5 text-[10px] font-medium text-[#2E6F9A]"><Home className="mr-0.5 inline h-3 w-3" />{t.leaseTag}</span>}
-                  {hasSale && <span className="rounded bg-[#EFE1CA] px-1.5 py-0.5 text-[10px] font-medium text-[#7B5A2B]"><CreditCard className="mr-0.5 inline h-3 w-3" />{t.saleTag}</span>}
-                  {hasDaily && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700"><BedDouble className="mr-0.5 inline h-3 w-3" />{t.dailyTag}</span>}
-                  {c.is_blacklisted && <AlertTriangle className="h-3 w-3 text-red-500" />}
-                </div>
-                {rooms.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1 pt-0.5">
-                    {rooms.slice(0, 3).map((r) => (
-                      <span key={r} className="rounded bg-muted px-1 py-0 text-[10px] text-muted-foreground font-mono">{r}</span>
-                    ))}
-                    {rooms.length > 3 && <span className="text-[10px] text-muted-foreground">+{rooms.length - 3}</span>}
-                  </div>
-                )}
-              </button>
-            );
-          })}
+                <span className="text-[11px] text-muted-foreground">
+                  {locale === "zh" ? "按房号、最近业务、姓名排序" : "Tri par chambre, activité, nom"}
+                </span>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {group.customers.map(renderCustomerCard)}
+              </div>
+            </section>
+          ))}
         </div>
       )}
 
@@ -388,8 +452,8 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
               {selected.gender && <p className="text-muted-foreground">{t.gender}: {selected.gender === "male" ? t.male : selected.gender === "female" ? t.female : t.other}</p>}
               {selected.document_type && <p className="text-muted-foreground">{t.docType}: {selected.document_type === "id_card" ? t.idCard : selected.document_type === "passport" ? t.passport : selected.document_type === "drivers_license" ? t.driversLicense : selected.document_type}</p>}
               {selected.notes && <p className="text-xs text-muted-foreground">{selected.notes}</p>}
-              {((customerRooms ?? {})[selected.id] ?? []).length > 0 && (
-                <p className="text-xs text-muted-foreground">{t.rooms}: {((customerRooms ?? {})[selected.id] ?? []).join(", ")}</p>
+              {selectedRooms.length > 0 && (
+                <p className="text-xs text-muted-foreground">{t.rooms}: {selectedRooms.join(", ")}</p>
               )}
               {selected.is_blacklisted && (
                 <div className="mt-2 rounded border border-red-200 bg-red-50 p-2.5 text-xs">
