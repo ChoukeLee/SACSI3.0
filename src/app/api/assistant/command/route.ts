@@ -1,25 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
-import { buildAssistantContext, buildContextPrompt, type AssistantContext } from "../context";
-
-type AssistantIntent = "general_chat" | "business_query" | "business_draft" | "analytics" | "unknown";
-
-interface HistoryEntry { role: "user" | "assistant"; content: string; }
+import {
+  buildAssistantContext,
+  buildContextPrompt,
+  type AssistantContext,
+  type AssistantDraft,
+  type AssistantIntent,
+  type HistoryEntry,
+} from "../context";
 
 interface AssistantResult {
   reply: string;
   intent: AssistantIntent;
-  draft?: Record<string, unknown> | null;
+  draft?: AssistantDraft | null;
   requiresConfirmation?: boolean;
   usedContext?: string[];
   error?: string;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
-
-// ═══════════════════════════════════════════════
-// DeepSeek
-// ═══════════════════════════════════════════════
+type Locale = "zh" | "fr";
+const DETERMINISTIC_INTENTS = new Set<AssistantIntent>([
+  "daily_today_overview",
+  "daily_today_checkouts",
+  "daily_today_checkins",
+  "daily_cleaning_tasks",
+  "daily_available_rooms",
+  "room_profile",
+  "finance_receivables",
+  "audit_activity",
+  "business_draft",
+]);
 
 async function chatWithDeepSeek(messages: { role: string; content: string }[]): Promise<string | null> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -32,7 +42,7 @@ async function chatWithDeepSeek(messages: { role: string; content: string }[]): 
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model,
-      temperature: 0.3,
+      temperature: 0.25,
       messages,
       response_format: { type: "json_object" },
     }),
@@ -43,182 +53,216 @@ async function chatWithDeepSeek(messages: { role: string; content: string }[]): 
 }
 
 function extractJson(text: string): Record<string, unknown> {
-  // Try fenced code block first
   const fenced = text.match(/```json\s*([\s\S]*?)```/i);
   if (fenced) {
-    try { return JSON.parse(fenced[1]) as Record<string, unknown>; } catch { /* fall through */ }
+    try { return JSON.parse(fenced[1]) as Record<string, unknown>; } catch {}
   }
-  // Try raw JSON object
   const raw = text.match(/\{[\s\S]*\}/);
   if (raw) {
-    try { return JSON.parse(raw[0]) as Record<string, unknown>; } catch { /* fall through */ }
+    try { return JSON.parse(raw[0]) as Record<string, unknown>; } catch {}
   }
-  // Fallback: return the raw text as reply — don't show broken JSON
-  return { intent: "unknown", reply: text.slice(0, 500), draft: null };
+  return { reply: text.slice(0, 1000) };
 }
 
-// ═══════════════════════════════════════════════
-// System prompt
-// ═══════════════════════════════════════════════
-
-function buildSystemPrompt(locale: string, contextPrompt: string): string {
+function buildSystemPrompt(locale: Locale, contextPrompt: string): string {
+  const language = locale === "fr" ? "French" : "Chinese";
   return [
-    "You are SACIS Assistant, a back-office operations AI for a property management system in Abidjan, Côte d'Ivoire.",
-    "You help staff manage daily rentals, leases, sales, finance, cleaning, and customers.",
+    "You are SACIS Assistant, a conversational back-office operations assistant for a property management system in Abidjan.",
+    "You should feel like a capable colleague: understand the user's real intent, answer naturally, and avoid rigid report-template language unless the user asks for a report.",
+    "",
+    "Your job is not to invent business facts. The application has already selected business tools and placed their results in TOOL_CONTEXT.",
+    "Room numbers, customer names, dates, amounts, statuses, receipt numbers, audit actors, and task IDs must come only from TOOL_CONTEXT.",
+    "If TOOL_CONTEXT does not contain a fact, say that it is not available from current data.",
+    "For write-like requests, return a draft only. Never say that an operation has been executed.",
     "",
     contextPrompt,
     "",
-    "--- YOUR TASK ---",
-    "Classify the user message into: general_chat, business_query, business_draft, analytics, unknown.",
-    "",
-    "Reply in strict JSON format (no markdown, no code fences — pure JSON):",
+    "Return strict JSON only:",
     "{",
-    "  \"intent\": \"<intent>\",",
-    "  \"reply\": \"<natural-language reply in " + (locale === "fr" ? "French" : "Chinese") + ">\",",
-    "  \"draft\": null or { \"action\": \"...\", \"room\": \"...\", \"amount_xof\": number, ... },",
-    "  \"requiresConfirmation\": true or false,",
-    "  \"usedContext\": [\"daily_summary\", \"room\", \"finance\", \"audit\"]",
+    '  "reply": "natural answer in ' + language + '",',
+    '  "intent": "same intent as TOOL_CONTEXT.intent",',
+    '  "draft": null or the draft object from TOOL_CONTEXT,',
+    '  "requiresConfirmation": true or false,',
+    '  "usedContext": ["tool name or data area"]',
     "}",
-    "",
-    "CRITICAL RULES:",
-    "- ONLY use data from the BUSINESS CONTEXT. Do NOT invent data.",
-    "- If data is insufficient, say so clearly.",
-    "- business_draft: draft with action/room/amount, requiresConfirmation=true, NEVER claim you executed it.",
-    "- Reference RECENT AUDIT LOGS when the user asks about recent operations.",
-    "- Reference PAYMENTS details (source_type, amount, payment_date) in your answers.",
-    "",
-    "SYSTEM LIMITATIONS:",
-    "- NO timed/scheduled check-in. Check-ins are always full-day.",
-    "- NO reservation system. Cannot reserve specific hours.",
-    "- CANNOT modify bookings — only generate draft suggestions.",
-    "- CANNOT process refunds.",
-    "",
-    "SCENARIO vs COMMAND:",
-    "- \"a guest wants to check in at 11 PM\" → general_chat (scenario, not command)",
-    "- Messages with time references (几点, 几点入住, 晚上, 下午, 早上) are QUESTIONS, not commands.",
-    "- Messages with question words (为什么, 能不能, 可以吗, 怎么) are QUESTIONS.",
   ].join("\n");
 }
 
-// ═══════════════════════════════════════════════
-// Fallback
-// ═══════════════════════════════════════════════
+const money = (value: unknown) => `${Number(value || 0).toLocaleString()} XOF`;
 
-function fallbackChat(message: string, ctx: AssistantContext, locale: string): AssistantResult {
-  const zh = locale === "zh";
-  const lowered = message.toLowerCase();
-  const explicitRoomNums = [...message.matchAll(/\b(\d{3,4})\b/g)].map(r => r[1]);
-  const contextRoomNums = ctx.rooms ? Object.keys(ctx.rooms) : [];
-  const roomNums = explicitRoomNums.length > 0 ? explicitRoomNums : contextRoomNums;
-  const amountMatch = message.match(/(\d+(?:\.\d+)?)\s*(万|w|W)?/);
-  const amount = amountMatch ? Number(amountMatch[1]) * (amountMatch[2] ? 10000 : 1) : undefined;
-  const isScenarioOrQuestion = /预定|预约|几点|什么时候|今晚|明天|可以.*吗|能不能|怎么.*做|怎样.*做|为什么|réservation|réserver|quelle heure|quand|peut.*on|pourquoi/i.test(message);
-
-  if (/你能做|帮.*做|怎么用|解释|介绍|功能|aide|help|que faire|comment|explique/i.test(message)) {
-    return { intent: "general_chat", reply: zh ? `我是 SACIS 后台助理 (${ctx.project})。\n\n你可以问我：\n• "今天情况怎么样？"\n• "602现在什么状态？"\n• "1106完成清洁"\n• "103收到租金195万"\n• "今天谁操作了系统？"\n\n我先生成操作草稿，你确认后才会写入数据库。` : `Je suis l'assistant SACIS (${ctx.project}).\n\nDemandez-moi un aperçu du jour, le statut d'une chambre, ou générez des brouillons d'opération.`, requiresConfirmation: false };
-  }
-
-  // Daily overview
-  if (/今天|今日|概览|情况|重点|关注|退房|清洁|日租|aujourd|today|résumé|aperçu|overview/i.test(message) && ctx.dailySummary) {
-    const ds = ctx.dailySummary;
-    return { intent: "analytics", reply: [
-      zh ? `**今日概览 (${ctx.date})**` : `**Aperçu (${ctx.date})**`,
-      zh ? `当前入住：${ds.checkedInCount} 间` : `Occupés: ${ds.checkedInCount}`,
-      zh ? `待清洁：${ds.cleaningPendingCount} 间` : `Ménage: ${ds.cleaningPendingCount}`,
-      zh ? `今日已完成清洁：${ds.cleaningDoneToday} 间` : `Ménage terminé: ${ds.cleaningDoneToday}`,
-      zh ? `今日退房：${ds.checkoutsToday} 单` : `Départs: ${ds.checkoutsToday}`,
-      zh ? `今日新预订：${ds.newBookingsToday} 单` : `Nouvelles réservations: ${ds.newBookingsToday}`,
-      zh ? `今日收款：${ds.todayPayments.count} 笔，共 ${ds.todayPayments.total.toLocaleString()} XOF` : `Paiements: ${ds.todayPayments.count}, ${ds.todayPayments.total.toLocaleString()} XOF`,
-      zh ? `本月收款：${ds.monthPayments.count} 笔，共 ${ds.monthPayments.total.toLocaleString()} XOF` : `Mois: ${ds.monthPayments.count}, ${ds.monthPayments.total.toLocaleString()} XOF`,
-    ].join("\n"), requiresConfirmation: false, usedContext: ["daily_summary"] };
-  }
-
-  // Audit log query
-  if (/审计|操作|谁.*做|谁.*改|最近.*操作|前台.*做|清洁.*谁|historique|audit|qui a/i.test(message) && ctx.globalAuditLogs) {
-    const logs = ctx.globalAuditLogs;
-    if (logs.length === 0) return { intent: "business_query", reply: zh ? "今天还没有操作记录。" : "Aucune opération aujourd'hui.", requiresConfirmation: false };
-    const lines = [zh ? `**今日操作记录 (${logs.length} 条)**` : `**Opérations du jour (${logs.length})**`];
-    for (const l of logs) {
-      const meta = l.metadata as Record<string, unknown> | undefined;
-      const action = l.action ?? "?";
-      const when = ((l.created_at as string) ?? "").slice(11, 19);
-      const room = meta?.unit_no || meta?.room || "";
-      const by = meta?.operator_name || meta?.operator || "";
-      const extras = meta?.amount ? ` ${Number(meta.amount).toLocaleString()}XAF` : "";
-      lines.push(`${when} ${action} ${room ? `房间${room}` : ""}${by ? ` ${by}` : ""}${extras}`);
-    }
-    return { intent: "business_query", reply: lines.join("\n"), requiresConfirmation: false, usedContext: ["audit"] };
-  }
-
-  // Room query
-  if (roomNums.length > 0 && ctx.rooms) {
-    const results: string[] = [];
-    for (const roomNo of roomNums) {
-      const room = ctx.rooms[roomNo];
-      if (!room?.unit) { results.push(zh ? `**${roomNo}**：未找到` : `**${roomNo}**: introuvable`); continue; }
-      const u = room.unit as Record<string, unknown>;
-      const lines = [zh ? `**${u.unit_no}** ｜ ${u.status} ｜ ${u.floor_label}` : `**${u.unit_no}** | ${u.status} | ${u.floor_label}`];
-      if (room.customer) { const c = room.customer as Record<string, unknown>; lines.push(zh ? `客户：${c.name}${c.phone ? ` (${c.phone})` : ""}` : `Client: ${c.name}${c.phone ? ` (${c.phone})` : ""}`); }
-      if (room.lease) { const l = room.lease as Record<string, unknown>; lines.push(zh ? `长租：${l.contract_no}，${l.start_date}→${l.expected_end_date}，${Number(l.monthly_rent_xof).toLocaleString()} XOF/月` : `Bail: ${l.contract_no}, ${l.start_date}→${l.expected_end_date}`); }
-      if (room.sale) { const s = room.sale as Record<string, unknown>; lines.push(zh ? `出售：${s.contract_no}，${Number(s.total_amount_xof).toLocaleString()} XOF` : `Vente: ${s.contract_no}`); }
-      if (room.daily) { const d = room.daily as Record<string, unknown>; lines.push(zh ? `日租：${d.check_in}→${d.check_out ?? "未定"}，${d.status}` : `Journalier: ${d.check_in}→${d.check_out ?? "ouvert"}, ${d.status}`); }
-      if (room.cleaning) lines.push(zh ? "⚠ 待保洁" : "⚠ Ménage en attente");
-      if (room.payments && (room.payments as unknown[]).length > 0) {
-        const pms = room.payments as Record<string, unknown>[];
-        const total = pms.reduce((s, p) => s + Number(p.amount || 0) * (Number(p.exchange_rate_to_xof) || 1), 0);
-        lines.push(zh ? `收款 ${pms.length} 笔，共 ${total.toLocaleString()} XOF` : `Paiements: ${pms.length}, ${total.toLocaleString()} XOF`);
-      }
-      results.push(lines.join("\n"));
-    }
-    return { intent: "business_query", reply: results.join("\n\n"), requiresConfirmation: false, usedContext: ["room"] };
-  }
-
-  // Draft commands (only when NOT a scenario/question)
-  if (!isScenarioOrQuestion) {
-    if (/清洁|保洁|ménage|menage|cleaning/i.test(message) && /完成|done|termine|terminé|fait/i.test(lowered) && roomNums.length > 0) {
-      return { intent: "business_draft", reply: `准备标记房间 ${roomNums[0]} 保洁已完成。`, draft: { action: "complete_cleaning", room: roomNums[0], date: today() }, requiresConfirmation: true };
-    }
-    if (/收|租金|押金|付款|payment|paiement|loyer/i.test(message) && amount && roomNums.length > 0) {
-      return { intent: "business_draft", reply: `准备为房间 ${roomNums[0]} 记录收款 ${amount.toLocaleString()} XOF。`, draft: { action: "record_payment", room: roomNums[0], amount_xof: amount, date: today() }, requiresConfirmation: true };
-    }
-    if (/入住|check.?in|arriv/i.test(lowered) && roomNums.length > 0) {
-      return { intent: "business_draft", reply: `准备为房间 ${roomNums[0]} 办理入住。`, draft: { action: "check_in", room: roomNums[0], date: today() }, requiresConfirmation: true };
-    }
-    if (/退房|check.?out|départ|depart/i.test(lowered) && roomNums.length > 0) {
-      return { intent: "business_draft", reply: `准备为房间 ${roomNums[0]} 办理退房。`, draft: { action: "check_out", room: roomNums[0], date: today() }, requiresConfirmation: true };
-    }
-  }
-
-  // Scenario → explain limitation
-  if (roomNums.length > 0 && isScenarioOrQuestion) {
-    return { intent: "business_query", reply: zh ? `我听出来你在描述一个场景。\n\n关于房间 ${roomNums.join("、")}：系统只支持全天级别的入住/退房，不支持按小时预约。如果需要办理入住，请直接说"${roomNums[0]}办理入住"。\n\n需要我查一下 ${roomNums.join("、")} 的当前状态吗？` : `Je comprends que vous décrivez un scénario.\n\nLe système ne gère que les check-ins par date. Dites "${roomNums[0]}办理入住" pour un check-in.\n\nVoulez-vous que je vérifie le statut ?`, requiresConfirmation: false };
-  }
-
-  return { intent: "unknown", reply: zh ? "我没有完全理解。可以换个说法试试？" : "Je n'ai pas bien compris. Reformulez ?", requiresConfirmation: false };
+function formatActor(log: Record<string, unknown>) {
+  return log.actor_display_name || log.actor_email || log.actor_role || "未知操作人";
 }
 
-// ═══════════════════════════════════════════════
-// Permission per draft action
-// ═══════════════════════════════════════════════
+function fallbackReply(ctx: AssistantContext, locale: Locale): AssistantResult {
+  const zh = locale === "zh";
+  const tool = ctx.toolContext as Record<string, unknown>;
+  const data = (tool.data ?? tool) as Record<string, unknown>;
+  const toolWarnings = [
+    ...((tool.warnings ?? []) as string[]),
+    ...(((tool.missingFields as string[] | undefined)?.length ?? 0) > 0
+      ? [zh ? `工具结果缺少字段：${((tool.missingFields ?? []) as string[]).join("、")}` : `Champs manquants : ${((tool.missingFields ?? []) as string[]).join(", ")}`]
+      : []),
+  ];
+  const withWarnings = (reply: string) => toolWarnings.length > 0 ? `${reply}\n${zh ? "注意：" : "Attention :"}${toolWarnings.join("；")}` : reply;
 
-function canExecuteDraft(
+  if (ctx.intent === "general_chat") {
+    return {
+      intent: ctx.intent,
+      reply: withWarnings(zh
+        ? "我可以像后台业务助理一样帮你查日租退房、入住、清洁、房间档案、收款和审计日志。涉及修改时，我会先生成草稿，等你确认后才应该写入数据库。"
+        : "Je peux vérifier les départs, arrivées, ménages, chambres, paiements et journaux d'audit. Pour les modifications, je prépare d'abord un brouillon à confirmer."),
+      requiresConfirmation: false,
+      usedContext: ["none"],
+    };
+  }
+
+  if (ctx.intent === "daily_today_overview") {
+    const checkouts = (data.checkouts ?? []) as Record<string, unknown>[];
+    const checkins = (data.checkins ?? []) as Record<string, unknown>[];
+    const cleaningTasks = (data.cleaningTasks ?? []) as Record<string, unknown>[];
+    const availableRooms = (data.availableRooms ?? []) as Record<string, unknown>[];
+    const pendingCleaning = cleaningTasks.filter((task) => task.is_completed === false);
+    const lines = [
+      zh ? `今天日租运营：退房 ${checkouts.length} 间，入住 ${checkins.length} 间，待清洁 ${pendingCleaning.length} 间，可入住 ${availableRooms.length} 间。`
+        : `Aujourd'hui : ${checkouts.length} départ(s), ${checkins.length} arrivée(s), ${pendingCleaning.length} ménage(s), ${availableRooms.length} disponible(s).`,
+    ];
+    if (checkouts.length > 0) lines.push(zh ? `退房：${checkouts.map((item) => item.room_no ?? "?").join("、")}` : `Départs : ${checkouts.map((item) => item.room_no ?? "?").join(", ")}`);
+    if (checkins.length > 0) lines.push(zh ? `入住：${checkins.map((item) => item.room_no ?? "?").join("、")}` : `Arrivées : ${checkins.map((item) => item.room_no ?? "?").join(", ")}`);
+    if (pendingCleaning.length > 0) lines.push(zh ? `待清洁：${pendingCleaning.map((item) => item.room_no ?? "?").join("、")}` : `Ménage : ${pendingCleaning.map((item) => item.room_no ?? "?").join(", ")}`);
+    return { intent: ctx.intent, reply: withWarnings(lines.join("\n")), usedContext: ["getDailyTodayOverview"] };
+  }
+
+  if (ctx.intent === "daily_today_checkouts") {
+    const checkouts = (data.checkouts ?? []) as Record<string, unknown>[];
+    if (checkouts.length === 0) {
+      return { intent: ctx.intent, reply: withWarnings(zh ? "今天没有日租退房。" : "Aucun départ journalier aujourd'hui."), usedContext: ["getTodayDailyCheckouts"] };
+    }
+    const lines = [zh ? `今天日租退房 ${checkouts.length} 间：` : `${checkouts.length} départ(s) journalier(s) aujourd'hui :`];
+    for (const item of checkouts) {
+      lines.push(
+        zh
+          ? `${item.room_no ?? "未知房号"}｜客户：${item.customer_name ?? "未登记"}｜状态：${item.status ?? "-"}｜尾款：${money(item.remaining_amount_xof)}｜清洁：${item.cleaning_status ?? "none"}`
+          : `${item.room_no ?? "?"} | Client: ${item.customer_name ?? "non renseigné"} | Statut: ${item.status ?? "-"} | Solde: ${money(item.remaining_amount_xof)} | Ménage: ${item.cleaning_status ?? "none"}`,
+      );
+    }
+    return { intent: ctx.intent, reply: withWarnings(lines.join("\n")), usedContext: ["getTodayDailyCheckouts"] };
+  }
+
+  if (ctx.intent === "daily_today_checkins") {
+    const checkins = (data.checkins ?? []) as Record<string, unknown>[];
+    if (checkins.length === 0) return { intent: ctx.intent, reply: withWarnings(zh ? "今天没有日租入住。" : "Aucune arrivée journalière aujourd'hui."), usedContext: ["getTodayDailyCheckins"] };
+    const lines = [zh ? `今天日租入住 ${checkins.length} 间：` : `${checkins.length} arrivée(s) journalière(s) aujourd'hui :`];
+    for (const item of checkins) {
+      lines.push(zh
+        ? `${item.room_no ?? "未知房号"}｜客户：${item.customer_name ?? "未登记"}｜状态：${item.status ?? "-"}｜已收：${money(item.paid_amount_xof)}｜尾款：${money(item.remaining_amount_xof)}`
+        : `${item.room_no ?? "?"} | Client: ${item.customer_name ?? "non renseigné"} | Statut: ${item.status ?? "-"} | Payé: ${money(item.paid_amount_xof)} | Solde: ${money(item.remaining_amount_xof)}`);
+    }
+    return { intent: ctx.intent, reply: withWarnings(lines.join("\n")), usedContext: ["getTodayDailyCheckins"] };
+  }
+
+  if (ctx.intent === "daily_cleaning_tasks") {
+    const tasks = (data.tasks ?? []) as Record<string, unknown>[];
+    if (tasks.length === 0) return { intent: ctx.intent, reply: withWarnings(zh ? "当前没有查到清洁任务。" : "Aucune tâche de ménage trouvée."), usedContext: ["getCleaningTasks"] };
+    const pending = tasks.filter((task) => task.is_completed === false);
+    const done = tasks.filter((task) => task.is_completed === true);
+    const lines = [zh ? `清洁任务：待完成 ${pending.length} 个，今日/最近完成 ${done.length} 个。` : `Ménage : ${pending.length} en attente, ${done.length} terminé(s).`];
+    for (const task of tasks.slice(0, 15)) {
+      lines.push(zh
+        ? `${task.room_no ?? "未知房号"}｜${task.is_completed ? "已完成" : "待清洁"}｜${task.completed_at ? `完成时间：${String(task.completed_at).slice(0, 16).replace("T", " ")}` : `创建：${String(task.created_at ?? "").slice(0, 16).replace("T", " ")}`}`
+        : `${task.room_no ?? "?"} | ${task.is_completed ? "terminé" : "en attente"} | ${String((task.completed_at ?? task.created_at) || "").slice(0, 16).replace("T", " ")}`);
+    }
+    return { intent: ctx.intent, reply: withWarnings(lines.join("\n")), usedContext: ["getCleaningTasks"] };
+  }
+
+  if (ctx.intent === "daily_available_rooms") {
+    const rooms = (data.rooms ?? []) as Record<string, unknown>[];
+    if (rooms.length === 0) return { intent: ctx.intent, reply: withWarnings(zh ? "当前没有可安排日租入住的空房。" : "Aucune chambre journalière disponible."), usedContext: ["getAvailableDailyRooms"] };
+    return {
+      intent: ctx.intent,
+      reply: withWarnings(zh ? `当前可安排日租入住 ${rooms.length} 间：${rooms.map((r) => r.room_no).join("、")}` : `${rooms.length} chambre(s) disponible(s) : ${rooms.map((r) => r.room_no).join(", ")}`),
+      usedContext: ["getAvailableDailyRooms"],
+    };
+  }
+
+  if (ctx.intent === "audit_activity") {
+    const logs = (data.logs ?? []) as Record<string, unknown>[];
+    if (logs.length === 0) return { intent: ctx.intent, reply: withWarnings(zh ? "今天没有查到相关审计日志。" : "Aucun journal d'audit trouvé aujourd'hui."), usedContext: ["getAuditActivity"] };
+    const lines = [zh ? `查到 ${logs.length} 条相关操作：` : `${logs.length} opération(s) trouvée(s) :`];
+    for (const log of logs.slice(0, 12)) {
+      lines.push(zh
+        ? `${String(log.created_at ?? "").slice(11, 16)}｜${formatActor(log)}｜${log.action ?? "-"}｜房间 ${log.room_no ?? log.entity_label ?? "-"}`
+        : `${String(log.created_at ?? "").slice(11, 16)} | ${formatActor(log)} | ${log.action ?? "-"} | Chambre ${log.room_no ?? log.entity_label ?? "-"}`);
+    }
+    return { intent: ctx.intent, reply: withWarnings(lines.join("\n")), usedContext: ["getAuditActivity"] };
+  }
+
+  if (ctx.intent === "finance_receivables") {
+    const receivables = (data.receivables ?? []) as Record<string, unknown>[];
+    if (receivables.length === 0) return { intent: ctx.intent, reply: withWarnings(zh ? "当前没有查到未结清应收。" : "Aucune créance ouverte trouvée."), usedContext: ["getFinanceReceivables"] };
+    const total = receivables.reduce((sum, item) => sum + Number(item.outstanding_xof || 0), 0);
+    const lines = [zh ? `当前未结清应收 ${receivables.length} 条，合计 ${money(total)}：` : `${receivables.length} créance(s), total ${money(total)} :`];
+    for (const item of receivables.slice(0, 15)) {
+      lines.push(zh
+        ? `${item.room_no ?? "-"}｜${item.customer_name ?? "未登记"}｜${item.title ?? item.category}｜未收 ${money(item.outstanding_xof)}｜到期 ${item.due_date ?? "-"}`
+        : `${item.room_no ?? "-"} | ${item.customer_name ?? "non renseigné"} | ${item.title ?? item.category} | Solde ${money(item.outstanding_xof)} | Échéance ${item.due_date ?? "-"}`);
+    }
+    return { intent: ctx.intent, reply: withWarnings(lines.join("\n")), usedContext: ["getFinanceReceivables"] };
+  }
+
+  if (ctx.intent === "room_profile") {
+    const profiles = (data.profiles ?? {}) as Record<string, Record<string, unknown> | null>;
+    const lines: string[] = [];
+    for (const [roomNo, profile] of Object.entries(profiles)) {
+      if (!profile) {
+        lines.push(zh ? `${roomNo}：没有查到这个房间。` : `${roomNo}: chambre introuvable.`);
+        continue;
+      }
+      const unit = profile.unit as Record<string, unknown>;
+      const daily = (profile.daily as Record<string, unknown>[] | undefined) ?? [];
+      const lease = (profile.lease as Record<string, unknown>[] | undefined) ?? [];
+      const sale = (profile.sale as Record<string, unknown>[] | undefined) ?? [];
+      const receivables = (profile.receivables as Record<string, unknown>[] | undefined) ?? [];
+      const payments = (profile.payments as Record<string, unknown>[] | undefined) ?? [];
+      const outstanding = receivables.reduce((sum, item) => sum + Math.max(0, Number(item.amount_xof || 0) - Number(item.paid_amount_xof || 0)), 0);
+      lines.push(zh ? `${roomNo} 当前状态：${unit.status ?? "-"}` : `${roomNo}: statut ${unit.status ?? "-"}`);
+      if (daily[0]) lines.push(zh ? `日租：${daily[0].check_in} → ${daily[0].check_out ?? "未定"}，${daily[0].status}` : `Jour: ${daily[0].check_in} → ${daily[0].check_out ?? "ouvert"}, ${daily[0].status}`);
+      if (lease[0]) lines.push(zh ? `长租：${lease[0].start_date} → ${lease[0].expected_end_date}，月租 ${money(lease[0].monthly_rent_xof)}` : `Bail: ${lease[0].start_date} → ${lease[0].expected_end_date}, ${money(lease[0].monthly_rent_xof)}/mois`);
+      if (sale[0]) lines.push(zh ? `出售：${sale[0].contract_no ?? "-"}，总价 ${money(sale[0].total_amount_xof)}` : `Vente: ${sale[0].contract_no ?? "-"}, ${money(sale[0].total_amount_xof)}`);
+      lines.push(zh ? `收款记录 ${payments.length} 条，未结清应收 ${money(outstanding)}。` : `${payments.length} paiement(s), créances ouvertes ${money(outstanding)}.`);
+    }
+    return { intent: ctx.intent, reply: withWarnings(lines.join("\n")), usedContext: ["getRoomFullProfile"] };
+  }
+
+  if (ctx.intent === "business_draft") {
+    const draft = ctx.draft ?? null;
+    if (!draft) return { intent: ctx.intent, reply: zh ? "我没能生成操作草稿，因为缺少房号。" : "Je n'ai pas pu préparer le brouillon : chambre manquante.", requiresConfirmation: false };
+    const missing = draft.missing?.filter(Boolean) ?? [];
+    const text = zh
+      ? `我准备好了一个操作草稿：${draft.action}，房间 ${draft.room_no ?? draft.room ?? "-"}${draft.amount_xof ? `，金额 ${money(draft.amount_xof)}` : ""}。${missing.length ? `但还缺少：${missing.join("、")}，暂时不能直接确认。` : "这还没有写入数据库，需要确认后再执行。"}`
+      : `Brouillon préparé : ${draft.action}, chambre ${draft.room_no ?? draft.room ?? "-"}${draft.amount_xof ? `, montant ${money(draft.amount_xof)}` : ""}. ${missing.length ? `Champs manquants : ${missing.join(", ")}.` : "Rien n'a été écrit en base."}`;
+    return { intent: ctx.intent, reply: withWarnings(text), draft, requiresConfirmation: missing.length === 0, usedContext: ["buildDraft"] };
+  }
+
+  return { intent: ctx.intent, reply: zh ? "我还没有理解这个问题。你可以换一种更接近日常业务的说法。" : "Je n'ai pas encore compris. Reformulez avec le contexte métier.", requiresConfirmation: false };
+}
+
+function canConfirmDraft(
   user: { role?: string | null; id?: string; displayName?: string | null },
-  draft: Record<string, unknown>,
+  draft: AssistantDraft,
 ): boolean {
-  const action = draft.action as string ?? "";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const u = user as any;
-  switch (action) {
+  switch (draft.action) {
     case "record_payment": return hasPermission(u, "finance:write");
-    case "complete_cleaning": return hasPermission(u, "daily_rentals:write");
-    case "check_in": case "check_out": return hasPermission(u, "daily_rentals:write");
-    default: return false; // P2: unknown actions must be explicitly whitelisted
+    case "complete_cleaning":
+    case "check_in":
+    case "check_out":
+      return hasPermission(u, "daily_rentals:write");
+    default:
+      return false;
   }
 }
-
-// ═══════════════════════════════════════════════
-// POST
-// ═══════════════════════════════════════════════
 
 export async function POST(req: NextRequest) {
   try {
@@ -227,64 +271,58 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const message = String(body.message ?? "").trim();
-    const locale = String(body.locale ?? "zh");
+    const locale = (String(body.locale ?? "zh") === "fr" ? "fr" : "zh") as Locale;
     const history = (body.history ?? []) as HistoryEntry[];
     if (!message) return NextResponse.json({ error: "message required" }, { status: 400 });
 
-    // Load business context (with history for follow-up tracking)
     const ctx = await buildAssistantContext(message, user, locale, history);
+    let result: AssistantResult | null = null;
 
+    const contextPrompt = buildContextPrompt(ctx);
+    const systemMsg = buildSystemPrompt(locale, contextPrompt);
     const apiKey = process.env.DEEPSEEK_API_KEY;
-    let result: AssistantResult;
 
-    if (apiKey) {
-      const contextPrompt = buildContextPrompt(ctx, locale);
-      const systemMsg = buildSystemPrompt(locale, contextPrompt);
-
-      // Build messages array: system + trimmed history + current message
-      const messages: { role: string; content: string }[] = [
-        { role: "system", content: systemMsg },
-      ];
-      const recentHistory = history.slice(-10);
-      for (const h of recentHistory) {
-        if (h.role === "user") messages.push({ role: "user", content: h.content });
-        else if (h.role === "assistant") messages.push({ role: "assistant", content: h.content });
-      }
+    if (DETERMINISTIC_INTENTS.has(ctx.intent)) {
+      result = fallbackReply(ctx, locale);
+    } else if (apiKey) {
+      const messages: { role: string; content: string }[] = [{ role: "system", content: systemMsg }];
+      for (const h of history.slice(-10)) messages.push({ role: h.role, content: h.content });
       messages.push({ role: "user", content: message });
 
       const aiResponse = await chatWithDeepSeek(messages);
-
       if (aiResponse) {
         const parsed = extractJson(aiResponse);
-        const intent = (parsed.intent as AssistantIntent) ?? "unknown";
-        const reply = (parsed.reply as string) ?? aiResponse;
         result = {
-          reply: reply.length > 0 ? reply : aiResponse,
-          intent,
-          draft: (parsed.draft as Record<string, unknown> | null) ?? null,
+          reply: String(parsed.reply ?? "").trim(),
+          intent: (parsed.intent as AssistantIntent) || ctx.intent,
+          draft: (parsed.draft as AssistantDraft | null) ?? ctx.draft ?? null,
           requiresConfirmation: parsed.requiresConfirmation === true,
-          usedContext: (parsed.usedContext as string[]) ?? undefined,
+          usedContext: (parsed.usedContext as string[]) ?? [String((ctx.toolContext as Record<string, unknown>).tool ?? "tool")],
         };
-      } else {
-        result = fallbackChat(message, ctx, locale);
+        if (!result.reply) result = null;
       }
-    } else {
-      result = fallbackChat(message, ctx, locale);
     }
 
-    const isWrite = result.intent === "business_draft";
-    const canWrite = !isWrite || (result.draft ? canExecuteDraft(user, result.draft as Record<string, unknown>) : false);
+    if (!result) result = fallbackReply(ctx, locale);
+
+    if (ctx.draft && !result.draft) result.draft = ctx.draft;
+    const isDraft = result.intent === "business_draft" || !!result.draft;
+    const allowed = !isDraft || (result.draft ? canConfirmDraft(user, result.draft) : false);
+    const missing = result.draft?.missing?.filter(Boolean) ?? [];
 
     return NextResponse.json({
-      reply: canWrite ? result.reply : "你当前账号没有执行此类操作的权限。",
+      reply: allowed ? result.reply : (locale === "zh" ? "你当前账号没有执行此类操作的权限。" : "Votre compte n'a pas cette permission."),
       intent: result.intent,
       draft: result.draft ?? null,
-      requiresConfirmation: canWrite && (result.requiresConfirmation ?? false),
+      requiresConfirmation: allowed && isDraft && missing.length === 0 && (result.requiresConfirmation ?? true),
       executable: false,
       usedContext: result.usedContext ?? [],
     });
   } catch (error) {
     console.error("assistant error", error);
-    return NextResponse.json({ error: "Assistant failed", reply: "AI助手暂时不可用，请稍后重试。" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Assistant failed", reply: "AI助手暂时不可用，请稍后重试。" },
+      { status: 500 },
+    );
   }
 }

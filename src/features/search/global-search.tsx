@@ -275,9 +275,13 @@ function ChatBubble({ msg, locale }: { msg: ChatMessage; locale: string }) {
 function DraftCard({ draft, locale }: { draft: Record<string, unknown>; locale: string }) {
   const zh = locale === "zh";
   const action = draft.action as string ?? "";
-  const room = draft.room as string ?? "";
+  const room = (draft.room_no as string | undefined) ?? (draft.room as string | undefined) ?? "";
   const amount = draft.amount_xof as number | undefined;
   const date = draft.date as string | undefined;
+  const taskId = draft.cleaning_task_id as string | undefined;
+  const bookingId = draft.booking_id as string | undefined;
+  const note = draft.note as string | undefined;
+  const missing = Array.isArray(draft.missing) ? draft.missing.filter(Boolean).map(String) : [];
   const labels: Record<string, string> = {
     record_payment: zh ? "记录收款" : "Enregistrer paiement",
     complete_cleaning: zh ? "完成清洁" : "Ménage terminé",
@@ -309,6 +313,27 @@ function DraftCard({ draft, locale }: { draft: Record<string, unknown>; locale: 
           <span className="font-semibold text-foreground">{date}</span>
         </div>
       )}
+      {bookingId && (
+        <div className="flex gap-2">
+          <span className="text-muted-foreground">Booking:</span>
+          <span className="font-mono text-[11px] text-foreground">{bookingId.slice(0, 8)}...</span>
+        </div>
+      )}
+      {taskId && (
+        <div className="flex gap-2">
+          <span className="text-muted-foreground">{zh ? "任务" : "Tache"}:</span>
+          <span className="font-mono text-[11px] text-foreground">{taskId.slice(0, 8)}...</span>
+        </div>
+      )}
+      {missing.length > 0 && (
+        <div className="rounded-lg bg-white/60 px-2 py-1.5 text-[11px] text-amber-800">
+          {zh ? "缺少信息：" : "Infos manquantes : "}{missing.join(", ")}
+        </div>
+      )}
+      {note && <div className="text-[11px] leading-relaxed text-muted-foreground">{note}</div>}
+      <div className="text-[11px] font-medium text-amber-700">
+        {zh ? "尚未写入数据库。" : "Pas encore enregistre en base."}
+      </div>
     </div>
   );
 }
