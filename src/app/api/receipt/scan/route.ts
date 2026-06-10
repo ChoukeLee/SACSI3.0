@@ -45,7 +45,7 @@ function normalizeReceiptDraft(draft: ReceiptDraft, ocrText: string): ReceiptDra
   }
 
   // receipt_date must not be copied to period_start
-  if (draft.period_start === draft.receipt_date && ocrText.includes("周期") || ocrText.includes("租期") || ocrText.includes("期间")) {
+  if (draft.period_start === draft.receipt_date && (ocrText.includes("周期") || ocrText.includes("租期") || ocrText.includes("期间"))) {
     warnings.push("period_start与receipt_date相同，请确认原文中是否有独立租期。");
   }
 

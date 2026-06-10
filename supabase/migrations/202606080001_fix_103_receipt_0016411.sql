@@ -63,9 +63,9 @@ begin
     raise notice 'Ledger % fixed: amount %→%', r.id, r.amount_xof, v_correct_amount;
   end loop;
 
-  -- Fix attachments metadata
+  -- Fix attachments metadata (merge, don't replace)
   for r in select id from attachments where linked_type = 'payment' and linked_id = v_payment_id loop
-    update attachments set metadata = jsonb_build_object(
+    update attachments set metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object(
       'receipt_no', '0016411',
       'receipt_date', v_correct_date,
       'period_start', v_period_start,
@@ -76,18 +76,22 @@ begin
     raise notice 'Attachment % metadata fixed.', r.id;
   end loop;
 
-  -- Fix receivable: prefer the one linked via payment.source_id, else match by unit+type+amount
+  -- Fix receivable: match by unit_id + source_type + period range first
   v_amount_diff := v_correct_amount - v_old_amount;
   if v_amount_diff != 0 then
-    -- Try to find the receivable this payment was actually linked to
-    select r.id, r.paid_amount_xof
+    -- Primary match: unit 103 + lease_contract + period 2026-05-07 to 2026-08-06
+    select id, paid_amount_xof
     into v_rec_id, v_rec_paid_before
-    from receivables r
-    join payments p on p.source_id = r.source_id and p.source_type = r.source_type
-    where p.id = v_payment_id
+    from receivables
+    where unit_id = v_unit_id
+      and source_type = 'lease_contract'
+      and status not in ('paid', 'cancelled')
+      and due_date >= v_period_start
+      and due_date <= v_period_end
+    order by due_date
     limit 1;
 
-    -- Fallback: match by unit_id + source_type lease_contract, closest amount
+    -- Fallback: match by unit + type, closest amount (if no period match)
     if v_rec_id is null then
       select id, paid_amount_xof
       into v_rec_id, v_rec_paid_before
@@ -108,7 +112,7 @@ begin
       where id = v_rec_id;
       raise notice 'Receivable % paid adjusted by % (was %)', v_rec_id, v_amount_diff, v_rec_paid_before;
     else
-      raise notice 'No matching receivable found for amount correction.';
+      raise notice 'No matching receivable found for amount correction — manual review needed.';
     end if;
   end if;
 
