@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, X, Download } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
@@ -60,6 +60,7 @@ const allCategories = [
 
 const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
 const labelClass = "block mb-1 text-xs font-semibold text-muted-foreground";
+const pageSize = 20;
 
 export function LedgerList({ entries, units, buildingId, locale, attachments }: LedgerListProps) {
   const t = dictionaries[locale].finance;
@@ -67,6 +68,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
   const [endDate, setEndDate] = useState("");
   const [dirFilter, setDirFilter] = useState("all");
   const [catFilter, setCatFilter] = useState("all");
+  const [page, setPage] = useState(1);
 
   const attachmentByPayment = useMemo(() => {
     const map = new Map<string, AttachmentRow>();
@@ -103,6 +105,17 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
       return true;
     });
   }, [entries, startDate, endDate, dirFilter, catFilter, search, units]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [startDate, endDate, dirFilter, catFilter, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedEntries = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [currentPage, filtered]);
 
   const summary = useMemo(() => {
     let income = 0;
@@ -213,12 +226,12 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
           <p className="text-sm font-semibold text-muted-foreground">{t.empty}</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="max-w-[1180px] overflow-hidden rounded-xl border bg-card shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] table-fixed text-left text-[13px]">
+            <table className="w-full min-w-[820px] table-fixed text-left text-[13px]">
               <colgroup>
                 <col className="w-[130px]" />
-                <col className="w-[110px]" />
+                <col className="w-[100px]" />
                 <col className="w-[210px]" />
                 <col className="w-[150px]" />
                 <col />
@@ -235,7 +248,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filtered.map((e) => {
+                {pagedEntries.map((e) => {
                   const unit = e.unit_id ? units.find(u => u.id === e.unit_id) : null;
                   return (
                     <tr key={e.id} className="transition-colors hover:bg-accent/50">
@@ -266,6 +279,36 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
               </tbody>
             </table>
           </div>
+          {filtered.length > pageSize && (
+            <div className="flex flex-col gap-2 border-t bg-muted/30 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                {locale === "fr"
+                  ? `${filtered.length} écritures, ${pageSize} par page`
+                  : `共 ${filtered.length} 条，每页 ${pageSize} 条`}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((value) => Math.max(1, value - 1))}
+                  disabled={currentPage <= 1}
+                  className="rounded-md border bg-card px-3 py-1.5 font-semibold text-foreground shadow-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {locale === "fr" ? "Précédent" : "上一页"}
+                </button>
+                <span className="min-w-20 text-center font-semibold text-foreground">
+                  {currentPage} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                  disabled={currentPage >= totalPages}
+                  className="rounded-md border bg-card px-3 py-1.5 font-semibold text-foreground shadow-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {locale === "fr" ? "Suivant" : "下一页"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
