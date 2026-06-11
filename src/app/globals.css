@@ -124,11 +124,13 @@
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 999px; }
 
-[data-daily-calendar-grid] > *,
-[role="grid"][data-daily-calendar-grid] > *,
-main [role="grid"] > * {
-  position: relative !important;
-  left: auto !important;
+[data-daily-calendar-viewport] {
+  overscroll-behavior: contain;
+  contain: layout paint;
+}
+
+[data-daily-calendar-grid] {
+  isolation: isolate;
 }
 
 @media print {

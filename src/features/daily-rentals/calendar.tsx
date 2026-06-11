@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Copy, Plus, Printer, SlidersHorizontal, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
@@ -153,6 +153,7 @@ export function DailyCalendar({
   const [optimisticBookings, setOptimisticBookings] = useState<DailyBookingRow[]>([]);
   const [cleaningTarget, setCleaningTarget] = useState<{ taskId: string; unitNo: string } | null>(null);
   const [cleaningLoading, setCleaningLoading] = useState(false);
+  const calendarViewportRef = useRef<HTMLDivElement | null>(null);
 
   const bookings = useMemo(() => {
     const seen = new Set(optimisticBookings.map((booking) => booking.id));
@@ -338,6 +339,13 @@ export function DailyCalendar({
 
   const panelBooking = selectedBookingId ? bookings.find((booking) => booking.id === selectedBookingId) ?? null : null;
 
+  useEffect(() => {
+    const viewport = calendarViewportRef.current;
+    if (!viewport) return;
+    viewport.scrollTop = 0;
+    viewport.scrollLeft = 0;
+  }, [rangeLabel, roomFilter, viewMode]);
+
   const moveRange = useCallback((direction: -1 | 1) => {
     setAnchorDate((prev) => {
       if (viewMode === "month") return new Date(prev.getFullYear(), prev.getMonth() + direction, 1);
@@ -452,10 +460,14 @@ export function DailyCalendar({
           </div>
         </div>
 
-        <div className="overflow-hidden">
+        <div
+          ref={calendarViewportRef}
+          data-daily-calendar-viewport
+          className="max-h-[calc(100vh-280px)] min-h-[360px] overflow-auto overscroll-contain rounded-b-xl"
+        >
           <div
-            className="grid w-full"
-            style={{ gridTemplateColumns: `${ROOM_COL_WIDTH}px repeat(${visibleDays.length}, minmax(0, 1fr))` }}
+            className="relative grid min-w-[760px] w-full"
+            style={{ gridTemplateColumns: `${ROOM_COL_WIDTH}px repeat(${visibleDays.length}, minmax(132px, 1fr))` }}
             data-daily-calendar-grid
             role="grid"
             aria-label={copy.timeline}
@@ -463,6 +475,7 @@ export function DailyCalendar({
             <div
               className="z-30 flex items-center border-b border-r bg-card px-3 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"
               style={{ height: 40, left: "auto", position: "relative" }}
+              data-daily-calendar-room-label
             >
               {copy.roomType}
             </div>
@@ -517,6 +530,7 @@ export function DailyCalendar({
                       className="z-10 flex items-center border-b border-r bg-card px-3"
                       style={{ height: ROW_HEIGHT, left: "auto", position: "relative" }}
                       role="rowheader"
+                      data-daily-calendar-room-label
                       title={`${copy.room} ${unit.unit_no} - ${statusLabel} - ${copy.apartment}`}
                     >
                       <span className={cn("mr-2 h-8 w-1.5 rounded-full", roomTone.strip)} />
@@ -1002,6 +1016,7 @@ function FloorRow({
       <div
         className="z-10 flex items-center border-b border-r bg-muted px-3 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"
         style={{ height: FLOOR_ROW_HEIGHT, left: "auto", position: "relative" }}
+        data-daily-calendar-floor-label
       >
         {floor}
       </div>

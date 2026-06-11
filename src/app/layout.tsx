@@ -24,20 +24,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="zh-CN">
       <body>
-        <script dangerouslySetInnerHTML={{ __html: `
-          (function(){
-            if (!location.pathname.includes('/daily-rentals')) return;
-            try {
-              if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-              var reset = function(){ scrollTo(0, 0); document.documentElement.scrollTop = 0; document.body.scrollTop = 0; document.documentElement.scrollLeft = 0; document.body.scrollLeft = 0; };
-              reset();
-              addEventListener('pageshow', reset);
-              addEventListener('DOMContentLoaded', reset);
-              addEventListener('load', reset);
-              [50, 250, 750, 1500, 3000].forEach(function(ms){ setTimeout(reset, ms); });
-            } catch (_) {}
-          })();
-        `}} />
         <AppShellWrapper userRole={user?.role} userDisplayName={user?.displayName} notifT={dictionaries.zh.shell.notifications} notifTFr={dictionaries.fr.shell.notifications}>
           <Suspense fallback={<Loading />}>
             {children}

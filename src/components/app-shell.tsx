@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
 import { LogOut } from "lucide-react";
 import type { Locale, ShellDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -63,48 +62,6 @@ function AppShellInner({
   const otherLocale: Locale = locale === "zh" ? "fr" : "zh";
   const labels = getDesktopNavLabels(locale);
   const roleLabel = userRole ? labels.roles[userRole] : "";
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if ("scrollRestoration" in window.history) {
-      window.history.scrollRestoration = "manual";
-    }
-
-    const resetHorizontalScroll = () => {
-      const y = window.scrollY;
-      if (window.scrollX !== 0) window.scrollTo(0, y);
-      document.documentElement.scrollLeft = 0;
-      document.body.scrollLeft = 0;
-    };
-    const resetDailyCalendarStickyCells = () => {
-      if (!window.location.pathname.includes("daily-rentals")) return;
-      document
-        .querySelectorAll<HTMLElement>('[role="rowheader"], [data-daily-calendar-grid] > *, main [role="grid"] > *')
-        .forEach((element) => {
-          element.style.setProperty("position", "relative", "important");
-          element.style.setProperty("left", "auto", "important");
-          element.style.setProperty("right", "auto", "important");
-          element.style.setProperty("transform", "none", "important");
-        });
-    };
-    const resetLayout = () => {
-      resetHorizontalScroll();
-      resetDailyCalendarStickyCells();
-    };
-
-    resetLayout();
-    const frame = window.requestAnimationFrame(resetLayout);
-    const delayedFrames = [250, 1000, 2500].map((delay) => window.setTimeout(resetLayout, delay));
-    window.addEventListener("scroll", resetLayout, { passive: true });
-    window.addEventListener("resize", resetLayout);
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      delayedFrames.forEach((timeoutId) => window.clearTimeout(timeoutId));
-      window.removeEventListener("scroll", resetLayout);
-      window.removeEventListener("resize", resetLayout);
-    };
-  }, [pathname]);
 
   const handleLogout = async () => {
     const supabase = createClient();
