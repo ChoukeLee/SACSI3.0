@@ -286,6 +286,54 @@ export function DailyCalendar({
     };
   }, [bookings, payments, todayStr]);
 
+  const collectedPaymentGroups = useMemo(() => {
+    const groups = new Map<string, {
+      id: string;
+      paymentDates: string[];
+      amount: number;
+      count: number;
+      booking: DailyBookingRow | null;
+      unit: UnitRow | null;
+      customer: CustomerSummary | null;
+      stayRange: string;
+      sortDate: string;
+    }>();
+
+    for (const payment of financeStats.collectedPayments) {
+      const booking = bookings.find((item) => item.id === payment.source_id) ?? null;
+      const unit = dailyUnits.find((item) => item.id === booking?.unit_id) ?? null;
+      const customer = booking ? customerMap.get(booking.customer_id) ?? null : null;
+      const key = booking ? `booking:${booking.id}` : `payment:${payment.id}`;
+      const stayEnd = booking
+        ? ((booking.checkout_mode === "open" ? booking.actual_check_out : booking.check_out) ?? booking.check_out)
+        : null;
+      const stayRange = booking ? `${booking.check_in} → ${stayEnd ?? (locale === "zh" ? "未退房" : "En cours")}` : "—";
+      const existing = groups.get(key);
+
+      if (existing) {
+        existing.paymentDates.push(payment.payment_date);
+        existing.amount += Number(payment.amount);
+        existing.count += 1;
+        if (payment.payment_date > existing.sortDate) existing.sortDate = payment.payment_date;
+        continue;
+      }
+
+      groups.set(key, {
+        id: key,
+        paymentDates: [payment.payment_date],
+        amount: Number(payment.amount),
+        count: 1,
+        booking,
+        unit,
+        customer,
+        stayRange,
+        sortDate: payment.payment_date,
+      });
+    }
+
+    return Array.from(groups.values()).sort((a, b) => b.sortDate.localeCompare(a.sortDate));
+  }, [bookings, customerMap, dailyUnits, financeStats.collectedPayments, locale]);
+
   const financeCards = useMemo(() => [
     { key: "collected", label: locale === "zh" ? "本月已收" : "Encaisse", value: formatXof(financeStats.monthCollected), tone: "green" as const },
     { key: "outstanding", label: locale === "zh" ? "当前欠款" : "Impaye", value: formatXof(financeStats.currentOutstanding), tone: "orange" as const },
@@ -705,33 +753,32 @@ export function DailyCalendar({
               <div className="overflow-hidden rounded-xl border border-border">
                 <div className="max-h-[calc(100vh-260px)] overflow-auto">
                   {financeDetail === "collected" && (
-                    <table className="w-full min-w-[900px] text-left text-[13px]">
+                    <table className="w-full min-w-[980px] text-left text-[13px]">
                       <thead className="sticky top-0 z-10 bg-muted/50">
                         <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
-                          <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "日期" : "Date"}</th>
+                          <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "收款日期" : "Date"}</th>
                           <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "居住日期" : "Sejour"}</th>
                           <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
                           <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
-                          <th className="px-4 py-3 whitespace-nowrap text-right">{locale === "zh" ? "金额" : "Montant"}</th>
+                          <th className="px-4 py-3 whitespace-nowrap text-center">{locale === "zh" ? "笔数" : "Nb"}</th>
+                          <th className="px-4 py-3 whitespace-nowrap text-right">{locale === "zh" ? "已收合计" : "Total encaisse"}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/50">
-                        {financeStats.collectedPayments.length === 0 ? (
-                          <tr><td colSpan={5} className="px-4 py-10 text-center text-muted-foreground/70">{locale === "zh" ? "本月暂无收款" : "Aucun paiement ce mois"}</td></tr>
+                        {collectedPaymentGroups.length === 0 ? (
+                          <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground/70">{locale === "zh" ? "本月暂无收款" : "Aucun paiement ce mois"}</td></tr>
                         ) : (
-                          [...financeStats.collectedPayments].sort((a, b) => b.payment_date.localeCompare(a.payment_date)).map(p => {
-                            const b = bookings.find(bk => bk.id === p.source_id);
-                            const u = dailyUnits.find(u => u.id === b?.unit_id);
-                            const c = b ? customerMap.get(b.customer_id) : null;
-                            const stayEnd = b ? ((b.checkout_mode === "open" ? b.actual_check_out : b.check_out) ?? b.check_out) : null;
-                            const stayRange = b ? `${b.check_in} → ${stayEnd ?? (locale === "zh" ? "未退房" : "En cours")}` : "—";
+                          collectedPaymentGroups.map((group) => {
+                            const dates = Array.from(new Set(group.paymentDates)).sort();
+                            const paymentDateLabel = dates.length === 1 ? dates[0] : `${dates[0]} / ${dates[dates.length - 1]}`;
                             return (
-                              <tr key={p.id} className="hover:bg-muted/50">
-                                <td className="px-4 py-2.5 whitespace-nowrap font-medium text-foreground">{p.payment_date}</td>
-                                <td className="px-4 py-2.5 whitespace-nowrap text-foreground/80">{stayRange}</td>
-                                <td className="px-4 py-2.5 whitespace-nowrap text-foreground/80">{u?.unit_no ?? "—"}</td>
-                                <td className="px-4 py-2.5 whitespace-nowrap text-foreground/80">{c?.name ?? "—"}</td>
-                                <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold text-foreground">{formatXof(Number(p.amount))}</td>
+                              <tr key={group.id} className="hover:bg-muted/50">
+                                <td className="px-4 py-2.5 whitespace-nowrap font-medium text-foreground">{paymentDateLabel}</td>
+                                <td className="px-4 py-2.5 whitespace-nowrap text-foreground/80">{group.stayRange}</td>
+                                <td className="px-4 py-2.5 whitespace-nowrap text-foreground/80">{group.unit?.unit_no ?? "—"}</td>
+                                <td className="px-4 py-2.5 whitespace-nowrap text-foreground/80">{group.customer?.name ?? "—"}</td>
+                                <td className="px-4 py-2.5 whitespace-nowrap text-center tabular-nums text-foreground/70">{group.count}</td>
+                                <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold text-foreground">{formatXof(group.amount)}</td>
                               </tr>
                             );
                           })
