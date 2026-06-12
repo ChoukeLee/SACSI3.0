@@ -472,7 +472,7 @@ export function DailyCalendar({
         <div
           ref={calendarViewportRef}
           data-daily-calendar-viewport
-          className="max-h-[calc(100vh-280px)] min-h-[360px] overflow-auto overscroll-contain rounded-b-xl"
+          className="max-h-[calc(100vh-280px)] min-h-[360px] overflow-auto overscroll-contain rounded-b-xl md:max-h-none md:overflow-x-auto md:overflow-y-hidden md:overscroll-auto"
         >
           <div
             className="relative grid min-w-[760px] w-full"
@@ -705,10 +705,11 @@ export function DailyCalendar({
               <div className="overflow-hidden rounded-xl border border-border">
                 <div className="max-h-[calc(100vh-260px)] overflow-auto">
                   {financeDetail === "collected" && (
-                    <table className="w-full min-w-[720px] text-left text-[13px]">
+                    <table className="w-full min-w-[900px] text-left text-[13px]">
                       <thead className="sticky top-0 z-10 bg-muted/50">
                         <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
                           <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "日期" : "Date"}</th>
+                          <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "居住日期" : "Sejour"}</th>
                           <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
                           <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
                           <th className="px-4 py-3 whitespace-nowrap text-right">{locale === "zh" ? "金额" : "Montant"}</th>
@@ -716,15 +717,18 @@ export function DailyCalendar({
                       </thead>
                       <tbody className="divide-y divide-border/50">
                         {financeStats.collectedPayments.length === 0 ? (
-                          <tr><td colSpan={4} className="px-4 py-10 text-center text-muted-foreground/70">{locale === "zh" ? "本月暂无收款" : "Aucun paiement ce mois"}</td></tr>
+                          <tr><td colSpan={5} className="px-4 py-10 text-center text-muted-foreground/70">{locale === "zh" ? "本月暂无收款" : "Aucun paiement ce mois"}</td></tr>
                         ) : (
                           [...financeStats.collectedPayments].sort((a, b) => b.payment_date.localeCompare(a.payment_date)).map(p => {
                             const b = bookings.find(bk => bk.id === p.source_id);
                             const u = dailyUnits.find(u => u.id === b?.unit_id);
                             const c = b ? customerMap.get(b.customer_id) : null;
+                            const stayEnd = b ? ((b.checkout_mode === "open" ? b.actual_check_out : b.check_out) ?? b.check_out) : null;
+                            const stayRange = b ? `${b.check_in} → ${stayEnd ?? (locale === "zh" ? "未退房" : "En cours")}` : "—";
                             return (
                               <tr key={p.id} className="hover:bg-muted/50">
                                 <td className="px-4 py-2.5 whitespace-nowrap font-medium text-foreground">{p.payment_date}</td>
+                                <td className="px-4 py-2.5 whitespace-nowrap text-foreground/80">{stayRange}</td>
                                 <td className="px-4 py-2.5 whitespace-nowrap text-foreground/80">{u?.unit_no ?? "—"}</td>
                                 <td className="px-4 py-2.5 whitespace-nowrap text-foreground/80">{c?.name ?? "—"}</td>
                                 <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold text-foreground">{formatXof(Number(p.amount))}</td>
