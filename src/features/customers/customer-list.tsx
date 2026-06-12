@@ -442,10 +442,21 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
         </div>
       )}
 
-      {/* ── Selected detail bar ── */}
+      {/* ── Selected detail drawer ── */}
       {selected && !isFormOpen && !isBlacklistOpen && (
-        <div className="rounded-xl border bg-card p-4 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <>
+          <div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setSelectedId(null)} />
+          <div className="fixed inset-x-0 bottom-0 z-panel max-h-[88vh] overflow-auto rounded-t-2xl border bg-card p-4 shadow-2xl sm:inset-y-0 sm:left-auto sm:right-0 sm:w-full sm:max-w-lg sm:rounded-none sm:border-l">
+            <div className="mb-4 flex items-start justify-between gap-3 border-b pb-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-muted-foreground">{locale === "zh" ? "客户详情" : "Détail client"}</p>
+                <h3 className="truncate text-lg font-bold">{selected.name}</h3>
+              </div>
+              <button onClick={() => setSelectedId(null)} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1.5 text-sm">
               <p className="font-bold">{selected.name}</p>
               {selected.phone && <p className="text-muted-foreground"><Phone className="mr-1 inline h-3.5 w-3.5" />{selected.phone}</p>}
@@ -479,8 +490,9 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
                 </Button>
               )}
             </div>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* ── Add/Edit Form Panel ── */}
