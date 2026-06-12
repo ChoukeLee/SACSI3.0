@@ -39,6 +39,7 @@ interface MobileRoomDrawerProps {
   open: boolean;
   onClose: () => void;
   locale: Locale;
+  onCleaningCompleted?: (result: { taskId: string; unitId: string; unitStatus: UnitStatus }) => void;
 }
 
 type DrawerAction =
@@ -51,7 +52,7 @@ type DrawerAction =
   | { type: "extendStay" }
   | null;
 
-export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDrawerProps) {
+export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningCompleted }: MobileRoomDrawerProps) {
   const t = dictionaries[locale].mobile;
   const router = useRouter();
   const [action, setAction] = useState<DrawerAction>(null);
@@ -112,7 +113,10 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
         if (amt <= 0) return;
         await recordSupplementaryPayment({ bookingId: room.booking.id, amount: amt });
       } else if (action.type === "cleaning" && room.cleaningTask) {
-        await completeCleaning(room.cleaningTask.id);
+        const result = await completeCleaning(room.cleaningTask.id);
+        if (result.success && result.taskId && result.unitId && result.unitStatus) {
+          onCleaningCompleted?.({ taskId: result.taskId, unitId: result.unitId, unitStatus: result.unitStatus });
+        }
       } else if (action.type === "maintenance") {
         await updateUnitStatus(room.unit.id, "maintenance");
       } else if (action.type === "lock") {
@@ -128,7 +132,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale }: MobileRoomDraw
         await extendStay(room.booking.id, extendDate, extraNights, extraAmount);
       }
       resetState();
-      router.replace(window.location.pathname + window.location.search + (window.location.search ? '&' : '?') + '_t=' + Date.now());
+      router.refresh();
       onClose();
     } catch (e) {
       console.error("Action failed:", e);

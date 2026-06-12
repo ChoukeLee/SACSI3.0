@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { BedDouble, Building2, CalendarDays, RefreshCw } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { DailyBookingRow, UnitRow, CustomerRow, PaymentRow } from "@/types/database";
+import type { UnitStatus } from "@/types/domain";
 import { MobileStatsBar } from "./mobile-stats-bar";
 import { MobileRoomCard } from "./mobile-room-card";
 import { MobileRoomDrawer } from "./mobile-room-drawer";
@@ -46,10 +47,47 @@ export function MobileTodayWorkspace({
   const t = dictionaries[locale].mobile;
   const router = useRouter();
   const todayStr = new Date().toISOString().slice(0, 10);
+  const [optimisticCompletedCleaningIds, setOptimisticCompletedCleaningIds] = useState<Set<string>>(() => new Set());
+  const [optimisticUnitStatuses, setOptimisticUnitStatuses] = useState<Map<string, UnitStatus>>(() => new Map());
+
+  const visibleDailyUnits = useMemo(() => {
+    if (optimisticUnitStatuses.size === 0) return dailyUnits;
+    return dailyUnits.map((unit) => {
+      const status = optimisticUnitStatuses.get(unit.id);
+      return status ? { ...unit, status } : unit;
+    });
+  }, [dailyUnits, optimisticUnitStatuses]);
+
+  const visibleCleaningTasks = useMemo(() => {
+    if (optimisticCompletedCleaningIds.size === 0) return cleaningTasks;
+    return cleaningTasks.map((task) => (
+      optimisticCompletedCleaningIds.has(task.id) ? { ...task, is_completed: true } : task
+    ));
+  }, [cleaningTasks, optimisticCompletedCleaningIds]);
+
+  useEffect(() => {
+    setOptimisticCompletedCleaningIds((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set(prev);
+      for (const task of cleaningTasks) {
+        if (task.is_completed) next.delete(task.id);
+      }
+      return next.size === prev.size ? prev : next;
+    });
+    setOptimisticUnitStatuses((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Map(prev);
+      for (const unit of dailyUnits) {
+        const optimisticStatus = next.get(unit.id);
+        if (optimisticStatus && unit.status === optimisticStatus) next.delete(unit.id);
+      }
+      return next.size === prev.size ? prev : next;
+    });
+  }, [cleaningTasks, dailyUnits]);
 
   const roomStates = useMemo(
-    () => computeRoomStates(dailyUnits, bookings, customers, cleaningTasks, payments, todayStr),
-    [dailyUnits, bookings, customers, cleaningTasks, payments, todayStr],
+    () => computeRoomStates(visibleDailyUnits, bookings, customers, visibleCleaningTasks, payments, todayStr),
+    [visibleDailyUnits, bookings, customers, visibleCleaningTasks, payments, todayStr],
   );
 
   const occupied = useMemo(() => getOccupiedRooms(roomStates), [roomStates]);
@@ -92,6 +130,19 @@ export function MobileTodayWorkspace({
     setDrawerOpen(true);
   }, []);
 
+  const applyCompletedCleaning = useCallback((result: { taskId: string; unitId: string; unitStatus: UnitStatus }) => {
+    setOptimisticCompletedCleaningIds((prev) => {
+      const next = new Set(prev);
+      next.add(result.taskId);
+      return next;
+    });
+    setOptimisticUnitStatuses((prev) => {
+      const next = new Map(prev);
+      next.set(result.unitId, result.unitStatus);
+      return next;
+    });
+  }, []);
+
   const handleCloseDrawer = useCallback(() => {
     setDrawerOpen(false);
     setSelectedRoom(null);
@@ -123,15 +174,18 @@ export function MobileTodayWorkspace({
     if (!cleaningTarget?.cleaningTask) return;
     setActionLoading(true);
     try {
-      await completeCleaning(cleaningTarget.cleaningTask.id);
-      router.replace(window.location.pathname + window.location.search + (window.location.search ? '&' : '?') + '_t=' + Date.now());
+      const result = await completeCleaning(cleaningTarget.cleaningTask.id);
+      if (result.success && result.taskId && result.unitId && result.unitStatus) {
+        applyCompletedCleaning({ taskId: result.taskId, unitId: result.unitId, unitStatus: result.unitStatus });
+        router.refresh();
+      }
     } catch (e) {
       console.error("Cleaning completion failed:", e);
     } finally {
       setActionLoading(false);
       setCleaningTarget(null);
     }
-  }, [cleaningTarget, router]);
+  }, [applyCompletedCleaning, cleaningTarget, router]);
 
   const todayFormatted = new Date().toLocaleDateString(
     locale === "fr" ? "fr-FR" : "zh-CN",
@@ -206,6 +260,7 @@ export function MobileTodayWorkspace({
         open={drawerOpen}
         onClose={handleCloseDrawer}
         locale={locale}
+        onCleaningCompleted={applyCompletedCleaning}
       />
 
       {/* Checkout confirmation */}

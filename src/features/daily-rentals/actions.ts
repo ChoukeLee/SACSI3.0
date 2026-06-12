@@ -645,7 +645,7 @@ export async function setFixedCheckout(bookingId: string, newCheckOut: string): 
 }
 
 // ── Complete cleaning ──
-export async function completeCleaning(taskId: string): Promise<{ success: boolean; error?: string }> {
+export async function completeCleaning(taskId: string): Promise<{ success: boolean; error?: string; taskId?: string; unitId?: string; unitStatus?: UnitStatus }> {
   await guardWrite();
   const supabase = await createClient();
   const { data: task, error: taskError } = await supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed").eq("id", taskId).single();
@@ -683,12 +683,12 @@ export async function completeCleaning(taskId: string): Promise<{ success: boole
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
+  revalidatePath("/front-desk"); revalidatePath("/fr/front-desk");
   revalidatePath("/management"); revalidatePath("/fr/management");
-  revalidatePath("/finance"); revalidatePath("/fr/finance");
-  revalidatePath("/reports"); revalidatePath("/fr/reports");
+  revalidatePath("/data-quality"); revalidatePath("/fr/data-quality");
   revalidatePath("/settings/audit-logs"); revalidatePath("/fr/settings/audit-logs");
 
-  return { success: true };
+  return { success: true, taskId: task.id, unitId: task.unit_id, unitStatus: nextStatus };
 }
 
 export async function extendStay(bookingId: string, newCheckOut: string, extraNights: number, extraAmount: number): Promise<{ success: boolean; error?: string }> {

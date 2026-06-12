@@ -151,6 +151,8 @@ export function DailyCalendar({
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [tick, setTick] = useState(0);
   const [optimisticBookings, setOptimisticBookings] = useState<DailyBookingRow[]>([]);
+  const [optimisticCompletedCleaningIds, setOptimisticCompletedCleaningIds] = useState<Set<string>>(() => new Set());
+  const [optimisticUnitStatuses, setOptimisticUnitStatuses] = useState<Map<string, UnitStatus>>(() => new Map());
   const [cleaningTarget, setCleaningTarget] = useState<{ taskId: string; unitNo: string } | null>(null);
   const [cleaningLoading, setCleaningLoading] = useState(false);
   const calendarViewportRef = useRef<HTMLDivElement | null>(null);
@@ -159,6 +161,41 @@ export function DailyCalendar({
     const seen = new Set(optimisticBookings.map((booking) => booking.id));
     return [...optimisticBookings, ...serverBookings.filter((booking) => !seen.has(booking.id))];
   }, [serverBookings, optimisticBookings]);
+
+  const visibleDailyUnits = useMemo(() => {
+    if (optimisticUnitStatuses.size === 0) return dailyUnits;
+    return dailyUnits.map((unit) => {
+      const status = optimisticUnitStatuses.get(unit.id);
+      return status ? { ...unit, status } : unit;
+    });
+  }, [dailyUnits, optimisticUnitStatuses]);
+
+  const visibleCleaningTasks = useMemo(() => {
+    if (optimisticCompletedCleaningIds.size === 0) return cleaningTasks;
+    return cleaningTasks.map((task) => (
+      optimisticCompletedCleaningIds.has(task.id) ? { ...task, is_completed: true } : task
+    ));
+  }, [cleaningTasks, optimisticCompletedCleaningIds]);
+
+  useEffect(() => {
+    setOptimisticCompletedCleaningIds((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set(prev);
+      for (const task of cleaningTasks) {
+        if (task.is_completed) next.delete(task.id);
+      }
+      return next.size === prev.size ? prev : next;
+    });
+    setOptimisticUnitStatuses((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Map(prev);
+      for (const unit of dailyUnits) {
+        const optimisticStatus = next.get(unit.id);
+        if (optimisticStatus && unit.status === optimisticStatus) next.delete(unit.id);
+      }
+      return next.size === prev.size ? prev : next;
+    });
+  }, [cleaningTasks, dailyUnits]);
 
   const localeStr = locale === "fr" ? "fr-FR" : "zh-CN";
   const todayStr = toDateStr(new Date());
@@ -193,20 +230,20 @@ export function DailyCalendar({
 
   const unitCleaningMap = useMemo(() => {
     const map = new Map<string, string>();
-    for (const task of cleaningTasks) {
+    for (const task of visibleCleaningTasks) {
       if (!task.is_completed) map.set(task.unit_id, task.id);
     }
     return map;
-  }, [cleaningTasks]);
+  }, [visibleCleaningTasks]);
 
   const todayStateMap = useMemo(
-    () => buildDailyRoomStateMap({ dailyUnits, dateStr: todayStr, bookings, cleaningTasks }),
-    [dailyUnits, todayStr, bookings, cleaningTasks],
+    () => buildDailyRoomStateMap({ dailyUnits: visibleDailyUnits, dateStr: todayStr, bookings, cleaningTasks: visibleCleaningTasks }),
+    [visibleDailyUnits, todayStr, bookings, visibleCleaningTasks],
   );
 
   const filterCounts = useMemo(() => {
     const counts: Record<RoomFilter, number> = {
-      all: dailyUnits.length,
+      all: visibleDailyUnits.length,
       available: 0,
       occupied: 0,
       checkingOutToday: 0,
@@ -215,21 +252,21 @@ export function DailyCalendar({
       cleaning: 0,
       maintenance: 0,
     };
-    for (const unit of dailyUnits) {
+    for (const unit of visibleDailyUnits) {
       counts[getUnitTimelineStatus(unit, visibleDays, bookingMap, unitCleaningMap, todayStr)]++;
     }
     counts.occupied += counts.checkingOutToday + counts.openEnded;
     return counts;
-  }, [dailyUnits, visibleDays, bookingMap, unitCleaningMap, todayStr]);
+  }, [visibleDailyUnits, visibleDays, bookingMap, unitCleaningMap, todayStr]);
 
   const filteredUnits = useMemo(() => {
-    return dailyUnits.filter((unit) => {
+    return visibleDailyUnits.filter((unit) => {
       if (roomFilter === "all") return true;
       const status = getUnitTimelineStatus(unit, visibleDays, bookingMap, unitCleaningMap, todayStr);
       if (roomFilter === "occupied") return status === "occupied" || status === "checkingOutToday" || status === "openEnded";
       return status === roomFilter;
     });
-  }, [bookingMap, dailyUnits, roomFilter, unitCleaningMap, visibleDays, todayStr]);
+  }, [bookingMap, visibleDailyUnits, roomFilter, unitCleaningMap, visibleDays, todayStr]);
 
   const unitsByFloor = useMemo(() => {
     const grouped = new Map<string, UnitRow[]>();
@@ -301,7 +338,7 @@ export function DailyCalendar({
 
     for (const payment of financeStats.collectedPayments) {
       const booking = bookings.find((item) => item.id === payment.source_id) ?? null;
-      const unit = dailyUnits.find((item) => item.id === booking?.unit_id) ?? null;
+      const unit = visibleDailyUnits.find((item) => item.id === booking?.unit_id) ?? null;
       const customer = booking ? customerMap.get(booking.customer_id) ?? null : null;
       const key = booking ? `booking:${booking.id}` : `payment:${payment.id}`;
       const stayEnd = booking
@@ -332,7 +369,7 @@ export function DailyCalendar({
     }
 
     return Array.from(groups.values()).sort((a, b) => b.sortDate.localeCompare(a.sortDate));
-  }, [bookings, customerMap, dailyUnits, financeStats.collectedPayments, locale]);
+  }, [bookings, customerMap, visibleDailyUnits, financeStats.collectedPayments, locale]);
 
   const financeCards = useMemo(() => [
     { key: "collected", label: locale === "zh" ? "本月已收" : "Encaisse", value: formatXof(financeStats.monthCollected), tone: "green" as const },
@@ -341,19 +378,19 @@ export function DailyCalendar({
   ], [financeStats, locale]);
 
   const shareRows = useMemo(() => {
-    const occupied = dailyUnits.filter((u) => {
+    const occupied = visibleDailyUnits.filter((u) => {
       const s = todayStateMap.get(u.id);
       return s && (s.status === "occupied" || s.status === "checking_out_today" || s.status === "reserved");
     });
-    const checkingOut = dailyUnits.filter((u) => {
+    const checkingOut = visibleDailyUnits.filter((u) => {
       const s = todayStateMap.get(u.id);
       return s?.isCheckoutDay;
     });
-    const cleaning = dailyUnits.filter((u) => {
+    const cleaning = visibleDailyUnits.filter((u) => {
       const s = todayStateMap.get(u.id);
       return s?.status === "cleaning";
     });
-    const available = dailyUnits.filter((u) => {
+    const available = visibleDailyUnits.filter((u) => {
       const s = todayStateMap.get(u.id);
       return s?.status === "available";
     });
@@ -363,7 +400,7 @@ export function DailyCalendar({
       { key: "cleaning", label: locale === "zh" ? "待保洁" : "Menage", count: cleaning.length, units: cleaning.map((u) => u.unit_no), tone: "teal" as const },
       { key: "available", label: locale === "zh" ? "可安排入住" : "Disponible", count: available.length, units: available.map((u) => u.unit_no), tone: "green" as const },
     ];
-  }, [dailyUnits, todayStateMap, locale]);
+  }, [visibleDailyUnits, todayStateMap, locale]);
 
   const handleCopy = useCallback(async () => {
     let text = `11# ${locale === "zh" ? "日租房态" : "Occupation journaliere"}\n`;
@@ -422,7 +459,7 @@ export function DailyCalendar({
     });
   }, []);
 
-  if (dailyUnits.length === 0) {
+  if (visibleDailyUnits.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border bg-card py-12 text-center shadow-sm">
         <p className="text-sm text-muted-foreground">{copy.noRooms}</p>
@@ -609,7 +646,7 @@ export function DailyCalendar({
                         unit,
                         dateStr,
                         bookings,
-                        cleaningTasks,
+                        cleaningTasks: visibleCleaningTasks,
                       });
                       const prevSame = booking && unitBM?.get(prevDateStr)?.id === booking.id;
                       const nextSame = booking && unitBM?.get(nextDateStr)?.id === booking.id;
@@ -670,9 +707,9 @@ export function DailyCalendar({
           booking={panelBooking}
           unitId={newBookingUnitId ?? panelBooking?.unit_id ?? null}
           defaultDate={newBookingDate ?? undefined}
-          units={dailyUnits}
+          units={visibleDailyUnits}
           customers={customers}
-          cleaningTasks={cleaningTasks}
+          cleaningTasks={visibleCleaningTasks}
           payments={payments}
           locale={locale}
           backfillMode={backfillOpen}
@@ -694,10 +731,25 @@ export function DailyCalendar({
         onConfirm={() => {
           if (!cleaningTarget) return;
           setCleaningLoading(true);
-          completeCleaning(cleaningTarget.taskId).then(() => {
+          completeCleaning(cleaningTarget.taskId).then((result) => {
+            if (result.success && result.taskId && result.unitId && result.unitStatus) {
+              setOptimisticCompletedCleaningIds((prev) => {
+                const next = new Set(prev);
+                next.add(result.taskId!);
+                return next;
+              });
+              setOptimisticUnitStatuses((prev) => {
+                const next = new Map(prev);
+                next.set(result.unitId!, result.unitStatus!);
+                return next;
+              });
+            }
             setCleaningLoading(false);
             setCleaningTarget(null);
             setTick((t) => t + 1);
+          }).catch((error) => {
+            console.error("Cleaning completion failed:", error);
+            setCleaningLoading(false);
           });
         }}
         title={locale === "zh" ? "完成保洁" : "Menage termine"}
@@ -824,7 +876,7 @@ export function DailyCalendar({
                             const bOut = calculateBilling(b, todayStr).outstanding;
                             return bOut - aOut;
                           }).map(b => {
-                            const u = dailyUnits.find(u => u.id === b.unit_id);
+                            const u = visibleDailyUnits.find(u => u.id === b.unit_id);
                             const c = customerMap.get(b.customer_id);
                             const billing = calculateBilling(b, todayStr);
                             return (
@@ -872,7 +924,7 @@ export function DailyCalendar({
                             const bD = (b.checkout_mode === "open" ? b.actual_check_out : b.check_out) ?? "";
                             return bD.localeCompare(aD);
                           }).map(b => {
-                            const u = dailyUnits.find(u => u.id === b.unit_id);
+                            const u = visibleDailyUnits.find(u => u.id === b.unit_id);
                             const c = customerMap.get(b.customer_id);
                             const billing = calculateBilling(b, todayStr);
                             const isPaid = billing.outstanding <= 0;
