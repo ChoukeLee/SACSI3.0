@@ -27,6 +27,7 @@ import {
   reverseLedgerEntriesForPayment,
 } from "./daily-rental-finance";
 import { writeAuditLog } from "@/lib/audit";
+import { getSetting } from "@/lib/settings";
 
 // ── Permission guards ──
 async function guardWrite() {
@@ -512,18 +513,21 @@ export async function checkOut(bookingId: string, input: {
 
   await supabase.from("daily_bookings").update(update).eq("id", bookingId);
 
-  await supabase.from("units").update({ status: "cleaning_pending" }).eq("id", booking.unit_id);
+  const checkoutUnitStatus = await getSetting<UnitStatus>("checkout_default_unit_status", "cleaning_pending");
+  await supabase.from("units").update({ status: checkoutUnitStatus }).eq("id", booking.unit_id);
 
   // Any unpaid balance remains as a receivable. Do not create a payment or
   // ledger income here unless money was actually collected.
 
-  await supabase.from("cleaning_tasks").insert({
-    unit_id: booking.unit_id, daily_booking_id: bookingId, is_completed: false,
-  });
+  if (checkoutUnitStatus === "cleaning_pending") {
+    await supabase.from("cleaning_tasks").insert({
+      unit_id: booking.unit_id, daily_booking_id: bookingId, is_completed: false,
+    });
+  }
 
   await writeAuditLog({
     action: "check_out", entityType: "daily_booking", entityId: bookingId,
-    metadata: { final_amount: finalAmount, total_amount: grossAmount, nights, actual_check_out: actualCheckOut, discount: discountAmount },
+    metadata: { final_amount: finalAmount, total_amount: grossAmount, nights, actual_check_out: actualCheckOut, discount: discountAmount, unit_status: checkoutUnitStatus },
   });
 
   // Sync receivable: update amount, then full financial sync

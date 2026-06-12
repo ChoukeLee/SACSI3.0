@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
 import { DesktopOnly } from "@/features/mobile";
-import { QualityCenter, runQualityChecks } from "@/features/data-quality";
+import { BusinessRepairCenter, QualityCenter, runQualityChecks } from "@/features/data-quality";
 import { scanDailyRentalIssues } from "@/features/daily-rentals/daily-rental-audit";
 import type { TodoRole } from "@/features/data-quality/quality-types";
 import type {
@@ -65,7 +65,8 @@ export default async function FrenchDataQualityPage() {
   return (
     <>
       <div className="lg:hidden"><DesktopOnly locale="fr" /></div>
-      <div className="hidden lg:block">
+      <div className="hidden space-y-5 lg:block">
+        <BusinessRepairCenter locale="fr" userRole={user.role} />
         <QualityCenter issues={allIssues} locale="fr" userRole={user.role} />
       </div>
     </>
