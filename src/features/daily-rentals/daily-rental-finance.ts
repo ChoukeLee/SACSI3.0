@@ -33,6 +33,7 @@ export interface DailyBookingForFinance {
   check_in: string;
   check_out: string | null;
   checkout_mode: "fixed" | "open" | null;
+  actual_check_out: string | null;
   nightly_price_xof: number;
   total_amount_xof: number;
   prepaid_amount_xof: number;
@@ -42,6 +43,14 @@ export interface DailyBookingForFinance {
   status: string;
 }
 
+export interface DailyBookingAmountState {
+  nights: number;
+  grossAmount: number;
+  discount: number;
+  finalAmount: number;
+  effectiveCheckOut: string;
+}
+
 // ── Core financial computation ─────────────────────────────────────────────
 
 /** Compute the unified financial state for a booking + its payments. */
@@ -49,17 +58,42 @@ export function computeFinanceState(
   booking: DailyBookingForFinance,
   payments: { amount: number }[],
 ): DailyBookingFinanceState {
-  const grossAmount = Number(booking.total_amount_xof);
-  const discount = Number(booking.manual_discount_amount_xof ?? 0);
-  const finalAmount = booking.final_amount_xof != null
-    ? Number(booking.final_amount_xof)
-    : Math.max(0, grossAmount - discount);
+  const { grossAmount, discount, finalAmount } = computeBookingAmountState(booking);
   const paidAmount = payments.reduce((s, p) => s + Number(p.amount), 0);
   const balanceDue = Math.max(0, finalAmount - paidAmount);
 
   const billingStatus = resolveBillingStatus(paidAmount, finalAmount, booking.status);
 
   return { grossAmount, discount, finalAmount, paidAmount, balanceDue, billingStatus };
+}
+
+export function computeBookingAmountState(
+  booking: DailyBookingForFinance,
+  referenceDate = new Date().toISOString().slice(0, 10),
+): DailyBookingAmountState {
+  const effectiveCheckOut = resolveEffectiveCheckOut(booking, referenceDate);
+  const nights = Math.max(1, dateDiffDays(booking.check_in, effectiveCheckOut));
+  const grossAmount = Number(booking.total_amount_xof);
+  const discount = Number(booking.manual_discount_amount_xof ?? 0);
+  const finalAmount = Math.max(0, grossAmount - discount);
+
+  return { nights, grossAmount, discount, finalAmount, effectiveCheckOut };
+}
+
+function resolveEffectiveCheckOut(
+  booking: DailyBookingForFinance,
+  referenceDate: string,
+): string {
+  const mode = booking.checkout_mode ?? "fixed";
+  if (mode === "fixed" && booking.check_out) return booking.check_out;
+  if (mode === "open" && booking.actual_check_out) return booking.actual_check_out;
+  return referenceDate;
+}
+
+function dateDiffDays(start: string, end: string): number {
+  const startTime = new Date(start).getTime();
+  const endTime = new Date(end).getTime();
+  return Math.ceil((endTime - startTime) / (1000 * 60 * 60 * 24));
 }
 
 // ── Billing status resolver ────────────────────────────────────────────────
@@ -137,6 +171,44 @@ export async function syncBillingStatus(
     .eq("id", bookingId);
 }
 
+export async function syncBookingAmounts(
+  supabase: SupabaseClient,
+  bookingId: string,
+): Promise<DailyBookingAmountState | null> {
+  const { data: booking } = await supabase
+    .from("daily_bookings")
+    .select("id, unit_id, customer_id, check_in, check_out, checkout_mode, actual_check_out, nightly_price_xof, total_amount_xof, prepaid_amount_xof, manual_discount_amount_xof, final_amount_xof, billing_status, status")
+    .eq("id", bookingId)
+    .single();
+
+  if (!booking || booking.status === "cancelled") return null;
+
+  const amountState = computeBookingAmountState(booking as DailyBookingForFinance);
+
+  await supabase
+    .from("daily_bookings")
+    .update({
+      final_amount_xof: amountState.finalAmount,
+    })
+    .eq("id", bookingId);
+
+  const { data: receivables } = await supabase
+    .from("receivables")
+    .select("id, status")
+    .eq("source_type", "daily_booking")
+    .eq("source_id", bookingId);
+
+  const activeReceivables = (receivables ?? []).filter((r) => r.status !== "cancelled");
+  if (activeReceivables.length === 1) {
+    await supabase
+      .from("receivables")
+      .update({ amount_xof: amountState.finalAmount })
+      .eq("id", activeReceivables[0].id);
+  }
+
+  return amountState;
+}
+
 /**
  * Full financial sync after any money-affecting action:
  * 1. Sync receivable paid_amount_xof from payments.
@@ -149,6 +221,7 @@ export async function syncBookingFinance(
 ): Promise<void> {
   // Re-export to avoid circular dependency — called from actions.ts
   const { syncReceivablesForSource } = await import("@/features/finance/receivables");
+  await syncBookingAmounts(supabase, bookingId);
   await syncReceivablesForSource("daily_booking", bookingId);
   await syncBookingPrepaidFromReceivables(supabase, bookingId);
   await syncBillingStatus(supabase, bookingId);

@@ -15,7 +15,7 @@ export async function repairDailyRentalIssue(
   const supabase = await createClient();
 
   // ── Financial sync ──
-  if (issueId.startsWith("dr_fin_prepaid_") || issueId.startsWith("dr_fin_rec_amt_") || issueId.startsWith("dr_fin_rec_paid_") || issueId.startsWith("dr_fin_billing_")) {
+  if (issueId.startsWith("dr_fin_amount_") || issueId.startsWith("dr_fin_prepaid_") || issueId.startsWith("dr_fin_rec_amt_") || issueId.startsWith("dr_fin_rec_paid_") || issueId.startsWith("dr_fin_billing_")) {
     const bookingId = entityId;
     try {
       await syncBookingFinance(supabase, bookingId);
