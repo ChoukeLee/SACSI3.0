@@ -45,7 +45,7 @@ export default async function FrenchDailyRentalsPage() {
   }
 
   return (
-    <>
+    <div data-daily-rentals-page>
       <div className="lg:hidden">
         <MobileDailyCards dailyUnits={dailyUnits} bookings={bookings} customers={customers as unknown as CustomerRow[]} payments={payments as unknown as PaymentRow[]} cleaningTasks={cleaningTasks} locale="fr" />
       </div>
@@ -54,6 +54,6 @@ export default async function FrenchDailyRentalsPage() {
           <DailyCalendar dailyUnits={dailyUnits} bookings={bookings} customers={customers} cleaningTasks={cleaningTasks} payments={payments} locale="fr" userRole={user.role} />
         </section>
       </div>
-    </>
+    </div>
   );
 }
