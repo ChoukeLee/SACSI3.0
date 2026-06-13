@@ -23,6 +23,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="zh-CN">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            try {
+              if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+              if (location.pathname === '/daily-rentals' || location.pathname === '/fr/daily-rentals') {
+                window.scrollTo(0, 0);
+              }
+            } catch (_) {}
+          })();
+        `}} />
+      </head>
       <body>
         <AppShellWrapper userRole={user?.role} userDisplayName={user?.displayName} notifT={dictionaries.zh.shell.notifications} notifTFr={dictionaries.fr.shell.notifications}>
           <Suspense fallback={<Loading />}>

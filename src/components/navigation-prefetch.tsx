@@ -9,12 +9,17 @@ import { routeFor } from "@/lib/i18n";
 const COMMON_ROUTES = [
   "/management",
   "/units",
-  "/daily-rentals",
   "/leases",
   "/sales",
   "/customers",
   "/finance",
 ];
+
+const NO_PREFETCH_ROUTES = new Set(["/daily-rentals", "/fr/daily-rentals"]);
+
+function shouldPrefetch(href: string) {
+  return !NO_PREFETCH_ROUTES.has(href);
+}
 
 /** Deduplicated router.prefetch wrapper — swallows errors silently. */
 export function usePrefetch() {
@@ -23,6 +28,7 @@ export function usePrefetch() {
 
   const prefetch = useCallback(
     (href: string) => {
+      if (!shouldPrefetch(href)) return;
       if (seen.current.has(href)) return;
       seen.current.add(href);
       try {
