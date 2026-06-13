@@ -468,8 +468,8 @@ export function DailyCalendar({
   }
 
   return (
-    <div className="space-y-5">
-      <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
+    <div className="relative isolate space-y-5">
+      <section className="relative z-20 overflow-hidden rounded-xl border bg-card shadow-sm">
         <div className="flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h3 className="text-[15px] font-bold">{locale === "zh" ? "日租概览" : "Apercu journalier"}</h3>
@@ -509,7 +509,7 @@ export function DailyCalendar({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
+      <section className="relative z-10 overflow-hidden rounded-xl border bg-card shadow-sm">
         <div className="flex flex-col gap-3 border-b px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-[15px] font-bold">{copy.timeline}</h2>
@@ -557,7 +557,7 @@ export function DailyCalendar({
         <div
           ref={calendarViewportRef}
           data-daily-calendar-viewport
-          className="min-h-[360px] overflow-visible rounded-b-xl"
+          className="min-h-[360px] overflow-hidden rounded-b-xl [contain:paint]"
         >
           <div
             className="relative grid min-w-[760px] w-full"
