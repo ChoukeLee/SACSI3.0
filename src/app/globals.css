@@ -124,11 +124,6 @@
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 999px; }
 
-[data-daily-calendar-viewport] {
-  overscroll-behavior: contain;
-  contain: layout paint;
-}
-
 [data-daily-calendar-grid] {
   isolation: isolate;
 }

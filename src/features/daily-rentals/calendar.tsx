@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Copy, Plus, Printer, SlidersHorizontal, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
@@ -424,7 +424,7 @@ export function DailyCalendar({
 
   const panelBooking = selectedBookingId ? bookings.find((booking) => booking.id === selectedBookingId) ?? null : null;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if ("scrollRestoration" in window.history) {
       window.history.scrollRestoration = "manual";
     }
@@ -557,7 +557,7 @@ export function DailyCalendar({
         <div
           ref={calendarViewportRef}
           data-daily-calendar-viewport
-          className="max-h-[calc(100vh-280px)] min-h-[360px] overflow-auto overscroll-contain rounded-b-xl md:max-h-none md:overflow-x-auto md:overflow-y-hidden md:overscroll-auto"
+          className="min-h-[360px] overflow-visible rounded-b-xl"
         >
           <div
             className="relative grid min-w-[760px] w-full"
