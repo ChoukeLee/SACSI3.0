@@ -69,6 +69,24 @@ function AppShellInner({
     document.body.setAttribute("data-sacis-route", pathname);
     document.body.setAttribute("data-sacis-daily-route", isDailyRoute ? "true" : "false");
 
+    const reconcileRouteRoot = () => {
+      const main = document.querySelector<HTMLElement>("[data-app-main]");
+      if (!main) return;
+
+      const roots = Array.from(main.querySelectorAll<HTMLElement>(":scope > [data-route-root]"));
+      roots.forEach((root, index) => {
+        const isCurrentRoot = root.getAttribute("data-route-root") === pathname;
+        const isLastRoot = index === roots.length - 1;
+        if (!isCurrentRoot || !isLastRoot) root.remove();
+      });
+
+      Array.from(main.children).forEach((child) => {
+        const el = child as HTMLElement;
+        if (el.hasAttribute("data-route-root") || el.hasAttribute("data-navigation-overlay")) return;
+        el.remove();
+      });
+    };
+
     const reconcileDailyNodes = () => {
       const dailyPages = Array.from(document.querySelectorAll<HTMLElement>("[data-daily-rentals-page]"));
       const dailyCalendars = Array.from(document.querySelectorAll<HTMLElement>("[data-daily-calendar-root]"));
@@ -83,11 +101,16 @@ function AppShellInner({
       dailyCalendars.slice(1).forEach((node) => node.remove());
     };
 
+    reconcileRouteRoot();
     reconcileDailyNodes();
-    const frame = window.requestAnimationFrame(reconcileDailyNodes);
-    const timer = window.setTimeout(reconcileDailyNodes, 750);
-    const observer = new MutationObserver(reconcileDailyNodes);
-    observer.observe(document.body, { childList: true, subtree: true });
+    const reconcile = () => {
+      reconcileRouteRoot();
+      reconcileDailyNodes();
+    };
+    const frame = window.requestAnimationFrame(reconcile);
+    const timer = window.setTimeout(reconcile, 750);
+    const observer = new MutationObserver(reconcile);
+    observer.observe(document.querySelector("[data-app-main]") ?? document.body, { childList: true, subtree: true });
 
     return () => {
       window.cancelAnimationFrame(frame);
@@ -152,9 +175,9 @@ function AppShellInner({
             </div>
           </div>
         </header>
-        <main className="relative isolate min-w-0 flex-1 overflow-x-hidden bg-background p-4 pb-20 sm:p-6 lg:p-8">
+        <main data-app-main className="relative isolate min-w-0 flex-1 overflow-x-hidden bg-background p-4 pb-20 sm:p-6 lg:p-8">
           {isNavigating && (
-            <div className="pointer-events-auto absolute inset-0 z-overlay bg-background/40" />
+            <div data-navigation-overlay className="pointer-events-auto absolute inset-0 z-overlay bg-background/40" />
           )}
           <div
             key={pathname}

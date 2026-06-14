@@ -90,6 +90,11 @@
     isolation: isolate;
     background: hsl(var(--background));
   }
+
+  [data-app-main] > :not([data-route-root]):not([data-navigation-overlay]) {
+    display: none !important;
+    visibility: hidden !important;
+  }
 }
 
 /* ── Shared table system ── */
