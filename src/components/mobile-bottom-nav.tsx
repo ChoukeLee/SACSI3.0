@@ -50,7 +50,7 @@ export function MobileBottomNav({ locale, userRole: _userRole }: { locale: Local
             <Link
               key={item.key}
               href={resolveHref(item.href)}
-              prefetch={item.href === "/daily-rentals" ? false : undefined}
+              prefetch={false}
               onClick={() => {
                 const target = resolveHref(item.href);
                 if (pathname !== target) startNavigation(target);

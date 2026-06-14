@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { LogOut } from "lucide-react";
 import type { Locale, ShellDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -13,7 +14,6 @@ import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/s
 import { AppSidebar } from "@/components/app-sidebar";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { NavigationTransitionProvider, useNavigationTransition } from "@/components/navigation-transition-provider";
-import { IdlePrefetch } from "@/components/navigation-prefetch";
 import { getDesktopNavLabels } from "@/lib/nav-labels";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +63,16 @@ function AppShellInner({
   const labels = getDesktopNavLabels(locale);
   const roleLabel = userRole ? labels.roles[userRole] : "";
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [pathname]);
+
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -71,7 +81,6 @@ function AppShellInner({
 
   return (
     <SidebarProvider defaultOpen>
-      <IdlePrefetch locale={locale} />
       <AppSidebar locale={locale} userRole={userRole} />
       <SidebarInset>
         <NavigationLoadingBar />
@@ -90,6 +99,7 @@ function AppShellInner({
               <NotificationBell notifications={notifications} t={notifT} locale={locale} />
               <Link
                 href={routeFor(otherLocale, pathname)}
+                prefetch={false}
                 className="rounded-md border border-border/60 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
               >
                 {labels.shell.langLabel}
@@ -113,7 +123,11 @@ function AppShellInner({
           {isNavigating && (
             <div className="pointer-events-auto absolute inset-0 z-overlay bg-background/40" />
           )}
-          <div className={cn("min-w-0", isNavigating ? "pointer-events-none select-none" : "")}>
+          <div
+            key={pathname}
+            data-route-root={pathname}
+            className={cn("min-w-0", isNavigating ? "pointer-events-none select-none" : "")}
+          >
             {children}
           </div>
         </main>
