@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { LogOut } from "lucide-react";
 import type { Locale, ShellDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -62,6 +62,24 @@ function AppShellInner({
   const otherLocale: Locale = locale === "zh" ? "fr" : "zh";
   const labels = getDesktopNavLabels(locale);
   const roleLabel = userRole ? labels.roles[userRole] : "";
+  const isDailyRoute = pathname === "/daily-rentals" || pathname === "/fr/daily-rentals";
+
+  useLayoutEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.setAttribute("data-sacis-route", pathname);
+    document.body.setAttribute("data-sacis-daily-route", isDailyRoute ? "true" : "false");
+
+    if (isDailyRoute) return;
+    const removeStaleDailyNodes = () => {
+      document
+        .querySelectorAll("[data-daily-rentals-page], [data-daily-calendar-root]")
+        .forEach((node) => node.remove());
+    };
+
+    removeStaleDailyNodes();
+    const frame = window.requestAnimationFrame(removeStaleDailyNodes);
+    return () => window.cancelAnimationFrame(frame);
+  }, [pathname, isDailyRoute]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -119,7 +137,7 @@ function AppShellInner({
             </div>
           </div>
         </header>
-        <main className="relative min-w-0 flex-1 overflow-x-hidden p-4 pb-20 sm:p-6 lg:p-8">
+        <main className="relative isolate min-w-0 flex-1 overflow-x-hidden bg-background p-4 pb-20 sm:p-6 lg:p-8">
           {isNavigating && (
             <div className="pointer-events-auto absolute inset-0 z-overlay bg-background/40" />
           )}

@@ -461,14 +461,14 @@ export function DailyCalendar({
 
   if (visibleDailyUnits.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-xl border bg-card py-12 text-center shadow-sm">
+      <div data-daily-calendar-root className="flex flex-col items-center gap-3 rounded-xl border bg-card py-12 text-center shadow-sm">
         <p className="text-sm text-muted-foreground">{copy.noRooms}</p>
       </div>
     );
   }
 
   return (
-    <div className="relative isolate space-y-5">
+    <div data-daily-calendar-root className="relative isolate space-y-5">
       <section className="relative z-20 overflow-hidden rounded-xl border bg-card shadow-sm">
         <div className="flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
