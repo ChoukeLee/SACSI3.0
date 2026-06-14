@@ -80,6 +80,12 @@
     visibility: hidden !important;
   }
 
+  body[data-sacis-daily-route="true"] [data-route-root] > [data-daily-rentals-page] ~ [data-daily-rentals-page],
+  body[data-sacis-daily-route="true"] [data-daily-rentals-page] [data-daily-calendar-root] ~ [data-daily-calendar-root] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
   [data-route-root] {
     isolation: isolate;
     background: hsl(var(--background));

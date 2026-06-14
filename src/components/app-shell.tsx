@@ -69,16 +69,31 @@ function AppShellInner({
     document.body.setAttribute("data-sacis-route", pathname);
     document.body.setAttribute("data-sacis-daily-route", isDailyRoute ? "true" : "false");
 
-    if (isDailyRoute) return;
-    const removeStaleDailyNodes = () => {
-      document
-        .querySelectorAll("[data-daily-rentals-page], [data-daily-calendar-root]")
-        .forEach((node) => node.remove());
+    const reconcileDailyNodes = () => {
+      const dailyPages = Array.from(document.querySelectorAll<HTMLElement>("[data-daily-rentals-page]"));
+      const dailyCalendars = Array.from(document.querySelectorAll<HTMLElement>("[data-daily-calendar-root]"));
+
+      if (!isDailyRoute) {
+        dailyPages.forEach((node) => node.remove());
+        dailyCalendars.forEach((node) => node.remove());
+        return;
+      }
+
+      dailyPages.slice(1).forEach((node) => node.remove());
+      dailyCalendars.slice(1).forEach((node) => node.remove());
     };
 
-    removeStaleDailyNodes();
-    const frame = window.requestAnimationFrame(removeStaleDailyNodes);
-    return () => window.cancelAnimationFrame(frame);
+    reconcileDailyNodes();
+    const frame = window.requestAnimationFrame(reconcileDailyNodes);
+    const timer = window.setTimeout(reconcileDailyNodes, 750);
+    const observer = new MutationObserver(reconcileDailyNodes);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+      observer.disconnect();
+    };
   }, [pathname, isDailyRoute]);
 
   useEffect(() => {

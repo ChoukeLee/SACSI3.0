@@ -284,8 +284,12 @@ export function UnitDataClient({
       {/* Room board */}
       {(selectedBuildingId === "__all__" ? activeBuildings : activeBuildings.filter(b => b.id === selectedBuildingId)).map(building => {
         const bUnits = buildingUnits.get(building.id) ?? [];
+        if (bUnits.length === 0) return null;
+
         const bStates = sortUnits(bUnits).map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks, todayStr));
         const floorGroups = groupStatesByFloor(bStates, locale);
+        if (floorGroups.length === 0) return null;
+
         const bOccupied = bStates.filter(s => s.status === "dailyOccupied" || s.status === "leased" || s.status === "sold").length;
         const bTotal = bStates.length;
 
