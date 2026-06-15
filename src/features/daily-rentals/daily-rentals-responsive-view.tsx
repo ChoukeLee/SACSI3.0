@@ -1,0 +1,65 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import type { Locale } from "@/lib/i18n";
+import type { CustomerRow, DailyBookingRow, PaymentRow, UnitRow } from "@/types/database";
+import type { CustomerSummary } from "./calendar";
+import { DailyCalendar } from "./calendar";
+import { MobileDailyCards } from "@/features/mobile";
+
+interface DailyRentalsResponsiveViewProps {
+  dailyUnits: UnitRow[];
+  bookings: DailyBookingRow[];
+  customers: CustomerSummary[];
+  cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[];
+  payments: { id: string; source_id: string; amount: number; payment_date: string }[];
+  locale: Locale;
+  userRole?: string;
+}
+
+export function DailyRentalsResponsiveView({
+  dailyUnits,
+  bookings,
+  customers,
+  cleaningTasks,
+  payments,
+  locale,
+  userRole,
+}: DailyRentalsResponsiveViewProps) {
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px)");
+    const syncViewport = () => setIsDesktop(media.matches);
+    syncViewport();
+    media.addEventListener("change", syncViewport);
+    return () => media.removeEventListener("change", syncViewport);
+  }, []);
+
+  if (!isDesktop) {
+    return (
+      <MobileDailyCards
+        dailyUnits={dailyUnits}
+        bookings={bookings}
+        customers={customers as unknown as CustomerRow[]}
+        payments={payments as unknown as PaymentRow[]}
+        cleaningTasks={cleaningTasks}
+        locale={locale}
+      />
+    );
+  }
+
+  return (
+    <section className="-mx-2 xl:-mx-4">
+      <DailyCalendar
+        dailyUnits={dailyUnits}
+        bookings={bookings}
+        customers={customers}
+        cleaningTasks={cleaningTasks}
+        payments={payments}
+        locale={locale}
+        userRole={userRole}
+      />
+    </section>
+  );
+}

@@ -3,9 +3,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
-import { DailyCalendar } from "@/features/daily-rentals";
-import { MobileDailyCards } from "@/features/mobile";
-import type { UnitRow, DailyBookingRow, CustomerRow, PaymentRow } from "@/types/database";
+import { DailyRentalsResponsiveView } from "@/features/daily-rentals/daily-rentals-responsive-view";
+import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { CustomerSummary } from "@/features/daily-rentals/calendar";
 
 export const dynamic = "force-dynamic";
@@ -45,14 +44,7 @@ export default async function DailyRentalsPage() {
 
   return (
     <div data-daily-rentals-page>
-      <div className="lg:hidden">
-        <MobileDailyCards dailyUnits={dailyUnits} bookings={bookings} customers={customers as unknown as CustomerRow[]} payments={payments as unknown as PaymentRow[]} cleaningTasks={cleaningTasks} locale="zh" />
-      </div>
-      <div className="hidden lg:block">
-        <section className="-mx-2 xl:-mx-4">
-          <DailyCalendar dailyUnits={dailyUnits} bookings={bookings} customers={customers} cleaningTasks={cleaningTasks} payments={payments} locale="zh" userRole={user.role} />
-        </section>
-      </div>
+      <DailyRentalsResponsiveView dailyUnits={dailyUnits} bookings={bookings} customers={customers} payments={payments} cleaningTasks={cleaningTasks} locale="zh" userRole={user.role} />
     </div>
   );
 }
