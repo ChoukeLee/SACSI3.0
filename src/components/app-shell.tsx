@@ -77,7 +77,11 @@ function AppShellInner({
       roots.forEach((root, index) => {
         const isCurrentRoot = root.getAttribute("data-route-root") === pathname;
         const isLastRoot = index === roots.length - 1;
-        if (!isCurrentRoot || !isLastRoot) root.remove();
+        if (!isCurrentRoot || !isLastRoot) {
+          root.remove();
+          return;
+        }
+        root.setAttribute("data-current-route-root", "");
       });
 
       Array.from(main.children).forEach((child) => {
@@ -182,6 +186,7 @@ function AppShellInner({
           <div
             key={pathname}
             data-route-root={pathname}
+            data-current-route-root
             className={cn("min-w-0", isNavigating ? "pointer-events-none select-none" : "")}
           >
             {children}
