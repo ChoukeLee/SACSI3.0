@@ -74,6 +74,7 @@ function AppShellInner({
       if (!main) return;
 
       const roots = Array.from(main.querySelectorAll<HTMLElement>(":scope > [data-route-root]"));
+      roots.forEach((root) => root.removeAttribute("data-current-route-root"));
       roots.forEach((root, index) => {
         const isCurrentRoot = root.getAttribute("data-route-root") === pathname;
         const isLastRoot = index === roots.length - 1;

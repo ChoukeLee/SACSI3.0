@@ -96,6 +96,11 @@
     visibility: hidden !important;
   }
 
+  [data-app-main] > [data-route-root]:has(~ [data-route-root]) {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
   [data-app-main] > :not([data-route-root]):not([data-navigation-overlay]) {
     display: none !important;
     visibility: hidden !important;
