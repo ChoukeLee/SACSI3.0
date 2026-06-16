@@ -6,7 +6,7 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { DateInput } from "@/components/ui/date-input";
-import { BusinessTable, BusinessTbody, BusinessTd, BusinessTh, BusinessThead, BusinessRow, MoneyCell } from "@/components/ui/business-table";
+import { BusinessTable, BusinessTbody, BusinessTd, BusinessTh, BusinessThead, BusinessRow, MoneyCell, DEFAULT_BUSINESS_TABLE_PAGE_SIZE } from "@/components/ui/business-table";
 import type { LedgerEntryRow } from "@/types/database";
 import { addLedgerEntry } from "./actions";
 import { ReceiptThumb } from "@/components/attachments/receipt-thumb";
@@ -61,7 +61,7 @@ const allCategories = [
 
 const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
 const labelClass = "block mb-1 text-xs font-semibold text-muted-foreground";
-const pageSize = 20;
+const pageSize = DEFAULT_BUSINESS_TABLE_PAGE_SIZE;
 
 export function LedgerList({ entries, units, buildingId, locale, attachments }: LedgerListProps) {
   const t = dictionaries[locale].finance;

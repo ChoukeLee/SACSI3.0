@@ -11,6 +11,8 @@ const alignClass: Record<Align, string> = {
   right: "text-right",
 };
 
+export const DEFAULT_BUSINESS_TABLE_PAGE_SIZE = 20;
+
 export function BusinessTable({
   children,
   minWidth,

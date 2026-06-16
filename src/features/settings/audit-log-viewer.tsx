@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Search, ChevronDown, ChevronUp, Clock, User, Tag, FileText, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { DateInput } from "@/components/ui/date-input";
+import { DEFAULT_BUSINESS_TABLE_PAGE_SIZE } from "@/components/ui/business-table";
 import type { Locale } from "@/lib/i18n";
 
 interface AuditLogRow {
@@ -135,6 +136,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
   const [entityFilter, setEntityFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const uniqueActions = useMemo(() =>
     [...new Set(logs.map(l => l.action))].sort(),
@@ -167,6 +169,19 @@ export function AuditLogViewer({ logs, locale }: Props) {
       return true;
     }).sort((a, b) => b.created_at.localeCompare(a.created_at));
   }, [logs, dateFrom, dateTo, actionFilter, entityFilter, search, actionLabels, entityLabels, extraActionLabels]);
+
+  useEffect(() => {
+    setPage(1);
+    setExpandedId(null);
+  }, [dateFrom, dateTo, actionFilter, entityFilter, search]);
+
+  const pageSize = DEFAULT_BUSINESS_TABLE_PAGE_SIZE;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedLogs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [currentPage, filtered, pageSize]);
 
   const zh = locale === "zh";
 
@@ -337,7 +352,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filtered.map(l => {
+                {pagedLogs.map(l => {
                   const expanded = expandedId === l.id;
                   return (
                     <tr key={l.id} className={cn("group", expanded && "bg-accent/30")}>
@@ -390,7 +405,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
               </tbody>
             </table>
             {/* Expanded detail */}
-            {filtered.map(l => {
+            {pagedLogs.map(l => {
               if (expandedId !== l.id) return null;
               return (
                 <div key={`detail-${l.id}`} className="border-t bg-muted/30 px-6 py-3">
@@ -416,6 +431,31 @@ export function AuditLogViewer({ logs, locale }: Props) {
               );
             })}
           </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-3 border-t px-4 py-3 text-sm text-muted-foreground">
+              <span className="tabular-nums">
+                {zh ? "第" : "Page"} {currentPage} / {totalPages} {zh ? "页" : ""}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  className="rounded-md border bg-card px-3 py-1.5 font-medium text-foreground shadow-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {zh ? "上一页" : "Précédent"}
+                </button>
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  className="rounded-md border bg-card px-3 py-1.5 font-medium text-foreground shadow-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {zh ? "下一页" : "Suivant"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
