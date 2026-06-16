@@ -6,6 +6,7 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { DateInput } from "@/components/ui/date-input";
+import { BusinessTable, BusinessTbody, BusinessTd, BusinessTh, BusinessThead, BusinessRow, MoneyCell } from "@/components/ui/business-table";
 import type { LedgerEntryRow } from "@/types/database";
 import { addLedgerEntry } from "./actions";
 import { ReceiptThumb } from "@/components/attachments/receipt-thumb";
@@ -103,6 +104,14 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
         if (!desc.includes(s) && !unitNo.includes(s)) return false;
       }
       return true;
+    }).sort((a, b) => {
+      const dateCompare = b.entry_date.localeCompare(a.entry_date);
+      if (dateCompare !== 0) return dateCompare;
+      const unitA = units.find(u => u.id === a.unit_id)?.unit_no ?? "";
+      const unitB = units.find(u => u.id === b.unit_id)?.unit_no ?? "";
+      const roomCompare = unitA.localeCompare(unitB, undefined, { numeric: true });
+      if (roomCompare !== 0) return roomCompare;
+      return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
     });
   }, [entries, startDate, endDate, dirFilter, catFilter, search, units]);
 
@@ -226,9 +235,8 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
           <p className="text-sm font-semibold text-muted-foreground">{t.empty}</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] table-fixed text-left text-[13px]">
+        <>
+        <BusinessTable minWidth="min-w-[960px]">
               <colgroup>
                 <col className="w-[16%]" />
                 <col className="w-[12%]" />
@@ -237,50 +245,49 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
                 <col className="w-[38%]" />
                 {attachments && attachments.length > 0 && <col className="w-14" />}
               </colgroup>
-              <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+              <BusinessThead>
                 <tr>
-                  <th className="px-4 py-2.5">{t.filters.dateRange}</th>
-                  <th className="px-4 py-2.5">{t.filters.direction}</th>
-                  <th className="px-4 py-2.5">{t.filters.category}</th>
-                  <th className="px-4 py-2.5">XOF</th>
-                  <th className="px-4 py-2.5">{t.entry.description}</th>
-                  {attachments && attachments.length > 0 && <th className="px-4 py-2.5"></th>}
+                  <BusinessTh>{t.filters.dateRange}</BusinessTh>
+                  <BusinessTh align="center">{t.filters.direction}</BusinessTh>
+                  <BusinessTh>{t.filters.category}</BusinessTh>
+                  <BusinessTh align="right">XOF</BusinessTh>
+                  <BusinessTh>{t.entry.description}</BusinessTh>
+                  {attachments && attachments.length > 0 && <BusinessTh align="center"></BusinessTh>}
                 </tr>
-              </thead>
-              <tbody className="divide-y">
+              </BusinessThead>
+              <BusinessTbody>
                 {pagedEntries.map((e) => {
                   const unit = e.unit_id ? units.find(u => u.id === e.unit_id) : null;
                   return (
-                    <tr key={e.id} className="transition-colors hover:bg-accent/50">
-                      <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{e.entry_date}</td>
-                      <td className="px-4 py-2.5 whitespace-nowrap">
+                    <BusinessRow key={e.id}>
+                      <BusinessTd className="text-muted-foreground">{e.entry_date}</BusinessTd>
+                      <BusinessTd align="center">
                         <span className={cn("text-sm font-semibold", dirColor[e.direction])}>{t.directions[e.direction as keyof typeof t.directions]}</span>
-                      </td>
-                      <td className="px-4 py-2.5">
+                      </BusinessTd>
+                      <BusinessTd>
                         <div className="truncate">
                           <span>{t.categories[e.category as keyof typeof t.categories] ?? e.category}</span>
                           {unit && <span className="ml-1 text-muted-foreground">({unit.unit_no})</span>}
                         </div>
-                      </td>
-                      <td className={cn("px-4 py-2.5 tabular-nums font-semibold", e.direction === "expense" || e.direction === "liability_out" ? "text-rose-600" : "text-emerald-600")}>
+                      </BusinessTd>
+                      <MoneyCell tone={e.direction === "expense" || e.direction === "liability_out" ? "expense" : "income"}>
                         {e.direction === "expense" || e.direction === "liability_out" ? "-" : ""}{formatXof(Number(e.amount_xof))}
-                      </td>
-                      <td className="truncate px-4 py-2.5 text-muted-foreground">{formatLedgerDescription(e.description)}</td>
+                      </MoneyCell>
+                      <BusinessTd className="truncate text-muted-foreground">{formatLedgerDescription(e.description)}</BusinessTd>
                       {attachments && attachments.length > 0 && (
-                        <td className="px-2 py-2.5">
+                        <BusinessTd align="center" className="px-2">
                           {e.payment_id && attachmentByPayment.has(e.payment_id) && (
                             <ReceiptThumb attachment={attachmentByPayment.get(e.payment_id)!} locale={locale as "zh" | "fr"} />
                           )}
-                        </td>
+                        </BusinessTd>
                       )}
-                    </tr>
+                    </BusinessRow>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+              </BusinessTbody>
+        </BusinessTable>
           {filtered.length > pageSize && (
-            <div className="flex flex-col gap-2 border-t bg-muted/30 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-3 flex flex-col gap-2 rounded-xl border bg-muted/30 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
               <span>
                 {locale === "fr"
                   ? `${filtered.length} écritures, ${pageSize} par page`
@@ -309,7 +316,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
               </div>
             </div>
           )}
-        </div>
+        </>
       )}
 
       <p className="text-xs text-muted-foreground">{filtered.length} {locale === "fr" ? "écritures" : "条记录"}</p>

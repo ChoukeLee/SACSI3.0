@@ -7,6 +7,7 @@ import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { DateInput } from "@/components/ui/date-input";
+import { BusinessTable, BusinessTbody, BusinessTd, BusinessTh, BusinessThead, BusinessRow, MoneyCell } from "@/components/ui/business-table";
 import {
   calculateReceivableSummary,
   buildReceivableCsv,
@@ -101,6 +102,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
   }, [buildings]);
 
   const filtered = useMemo(() => {
+    const statusWeight: Record<string, number> = { overdue: 0, partial: 1, pending: 2, paid: 3, cancelled: 4 };
     return receivables.filter((r) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
       if (sourceFilter !== "all" && r.source_type !== sourceFilter) return false;
@@ -115,8 +117,16 @@ export function ReceivableList({ receivables, units, customers, buildings, local
       if (dateFrom && r.due_date < dateFrom) return false;
       if (dateTo && r.due_date > dateTo) return false;
       return true;
+    }).sort((a, b) => {
+      const statusCompare = (statusWeight[a.status] ?? 9) - (statusWeight[b.status] ?? 9);
+      if (statusCompare !== 0) return statusCompare;
+      const dueCompare = a.due_date.localeCompare(b.due_date);
+      if (dueCompare !== 0) return dueCompare;
+      const unitCompare = (unitMap.get(a.unit_id ?? "") ?? "").localeCompare(unitMap.get(b.unit_id ?? "") ?? "", undefined, { numeric: true });
+      if (unitCompare !== 0) return unitCompare;
+      return Number(b.amount_xof) - Number(a.amount_xof);
     });
-  }, [receivables, statusFilter, sourceFilter, buildingFilter, dateFrom, dateTo, unitBuildingMap]);
+  }, [receivables, statusFilter, sourceFilter, buildingFilter, dateFrom, dateTo, unitBuildingMap, unitMap]);
 
   const summary = useMemo(
     () => calculateReceivableSummary(filtered),
@@ -242,47 +252,45 @@ export function ReceivableList({ receivables, units, customers, buildings, local
           <p className="text-sm font-semibold text-muted-foreground">{t.empty}</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px] min-w-[980px]">
-              <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+        <BusinessTable minWidth="min-w-[980px]">
+              <BusinessThead>
                 <tr>
-                  <th className="px-4 py-2.5">{t.columns.dueDate}</th>
-                  <th className="px-4 py-2.5">{t.columns.building}</th>
-                  <th className="px-4 py-2.5">{t.columns.unit}</th>
-                  <th className="px-4 py-2.5">{t.columns.customer}</th>
-                  <th className="px-4 py-2.5">{t.columns.sourceType}</th>
-                  <th className="px-4 py-2.5">{t.columns.title}</th>
-                  <th className="px-4 py-2.5 text-right">{t.columns.amount}</th>
-                  <th className="px-4 py-2.5 text-right">{t.columns.paid}</th>
-                  <th className="px-4 py-2.5 text-right">{t.columns.outstanding}</th>
-                  <th className="px-4 py-2.5">{t.columns.status}</th>
-                  <th className="px-4 py-2.5 text-right">{t.columns.overdueDays}</th>
+                  <BusinessTh>{t.columns.dueDate}</BusinessTh>
+                  <BusinessTh>{t.columns.building}</BusinessTh>
+                  <BusinessTh>{t.columns.unit}</BusinessTh>
+                  <BusinessTh>{t.columns.customer}</BusinessTh>
+                  <BusinessTh align="center">{t.columns.sourceType}</BusinessTh>
+                  <BusinessTh>{t.columns.title}</BusinessTh>
+                  <BusinessTh align="right">{t.columns.amount}</BusinessTh>
+                  <BusinessTh align="right">{t.columns.paid}</BusinessTh>
+                  <BusinessTh align="right">{t.columns.outstanding}</BusinessTh>
+                  <BusinessTh align="center">{t.columns.status}</BusinessTh>
+                  <BusinessTh align="right">{t.columns.overdueDays}</BusinessTh>
                 </tr>
-              </thead>
-              <tbody className="divide-y">
+              </BusinessThead>
+              <BusinessTbody>
                 {filtered.map(r => {
                   const os = Number(r.amount_xof) - Number(r.paid_amount_xof);
                   const od = overdueDays(r);
                   return (
-                    <tr key={r.id} className={cn("transition-colors hover:bg-accent/50", rowBg[r.status] ?? "")}>
-                      <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{r.due_date}</td>
-                      <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{resolveBuildingName(r)}</td>
-                      <td className="px-4 py-2.5 font-mono text-sm font-bold">{unitMap.get(r.unit_id ?? "") ?? "-"}</td>
-                      <td className="max-w-[120px] truncate px-4 py-2.5">{customerMap.get(r.customer_id ?? "") ?? "-"}</td>
-                      <td className="px-4 py-2.5">
+                    <BusinessRow key={r.id} className={rowBg[r.status] ?? ""}>
+                      <BusinessTd className="text-muted-foreground">{r.due_date}</BusinessTd>
+                      <BusinessTd className="text-muted-foreground">{resolveBuildingName(r)}</BusinessTd>
+                      <BusinessTd className="font-mono text-sm font-bold">{unitMap.get(r.unit_id ?? "") ?? "-"}</BusinessTd>
+                      <BusinessTd className="max-w-[120px] truncate">{customerMap.get(r.customer_id ?? "") ?? "-"}</BusinessTd>
+                      <BusinessTd align="center">
                         <Badge variant="secondary" className="text-xs">
                           {receivableBusinessLabel(r, locale)}
                         </Badge>
-                      </td>
-                      <td className="max-w-[180px] truncate px-4 py-2.5">{r.title}</td>
-                      <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold">{formatXof(Number(r.amount_xof))}</td>
-                      <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums text-emerald-600">{formatXof(Number(r.paid_amount_xof))}</td>
-                      <td className={cn("px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold", os > 0 ? "text-rose-600" : "text-emerald-600")}>{formatXof(os)}</td>
-                      <td className="px-4 py-2.5">
+                      </BusinessTd>
+                      <BusinessTd className="max-w-[180px] truncate">{r.title}</BusinessTd>
+                      <MoneyCell>{formatXof(Number(r.amount_xof))}</MoneyCell>
+                      <MoneyCell tone="income">{formatXof(Number(r.paid_amount_xof))}</MoneyCell>
+                      <MoneyCell tone={os > 0 ? "expense" : "income"}>{formatXof(os)}</MoneyCell>
+                      <BusinessTd align="center">
                         <Badge variant={statusTone[r.status] ?? "secondary"}>{t.statuses[r.status as keyof typeof t.statuses] ?? r.status}</Badge>
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">
+                      </BusinessTd>
+                      <BusinessTd align="right" className="tabular-nums">
                         {od !== null && od > 0 ? (
                           <span className="text-rose-600 font-semibold">+{od}</span>
                         ) : od !== null && od === 0 ? (
@@ -290,14 +298,12 @@ export function ReceivableList({ receivables, units, customers, buildings, local
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
-                      </td>
-                    </tr>
+                      </BusinessTd>
+                    </BusinessRow>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              </BusinessTbody>
+        </BusinessTable>
       )}
     </div>
   );

@@ -874,7 +874,12 @@ export function DailyCalendar({
                           [...financeStats.outstandingBookings].sort((a, b) => {
                             const aOut = calculateBilling(a, todayStr).outstanding;
                             const bOut = calculateBilling(b, todayStr).outstanding;
-                            return bOut - aOut;
+                            if (bOut !== aOut) return bOut - aOut;
+                            const dateCompare = a.check_in.localeCompare(b.check_in);
+                            if (dateCompare !== 0) return dateCompare;
+                            const aUnit = visibleDailyUnits.find(u => u.id === a.unit_id)?.unit_no ?? "";
+                            const bUnit = visibleDailyUnits.find(u => u.id === b.unit_id)?.unit_no ?? "";
+                            return aUnit.localeCompare(bUnit, undefined, { numeric: true });
                           }).map(b => {
                             const u = visibleDailyUnits.find(u => u.id === b.unit_id);
                             const c = customerMap.get(b.customer_id);
@@ -922,7 +927,11 @@ export function DailyCalendar({
                           [...financeStats.settledBookings].sort((a, b) => {
                             const aD = (a.checkout_mode === "open" ? a.actual_check_out : a.check_out) ?? "";
                             const bD = (b.checkout_mode === "open" ? b.actual_check_out : b.check_out) ?? "";
-                            return bD.localeCompare(aD);
+                            const dateCompare = bD.localeCompare(aD);
+                            if (dateCompare !== 0) return dateCompare;
+                            const aUnit = visibleDailyUnits.find(u => u.id === a.unit_id)?.unit_no ?? "";
+                            const bUnit = visibleDailyUnits.find(u => u.id === b.unit_id)?.unit_no ?? "";
+                            return aUnit.localeCompare(bUnit, undefined, { numeric: true });
                           }).map(b => {
                             const u = visibleDailyUnits.find(u => u.id === b.unit_id);
                             const c = customerMap.get(b.customer_id);

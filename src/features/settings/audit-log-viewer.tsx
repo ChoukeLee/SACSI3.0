@@ -165,7 +165,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
         if (!haystack.includes(q)) return false;
       }
       return true;
-    });
+    }).sort((a, b) => b.created_at.localeCompare(a.created_at));
   }, [logs, dateFrom, dateTo, actionFilter, entityFilter, search, actionLabels, entityLabels, extraActionLabels]);
 
   const zh = locale === "zh";
@@ -317,19 +317,19 @@ export function AuditLogViewer({ logs, locale }: Props) {
       ) : (
         <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px] min-w-[800px]">
-              <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+            <table className="w-full min-w-[900px] table-fixed text-left text-[13px]">
+              <thead className="border-b bg-muted/70 text-xs font-semibold text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2.5 w-[150px]">
                     <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{zh ? "时间" : "Date"}</span>
                   </th>
-                  <th className="px-4 py-2.5">
+                  <th className="px-4 py-2.5 w-[210px]">
                     <span className="inline-flex items-center gap-1"><User className="h-3 w-3" />{zh ? "操作人" : "Acteur"}</span>
                   </th>
-                  <th className="px-4 py-2.5">
+                  <th className="px-4 py-2.5 w-[180px] text-center">
                     <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" />{zh ? "操作" : "Action"}</span>
                   </th>
-                  <th className="px-4 py-2.5">
+                  <th className="px-4 py-2.5 w-[240px]">
                     <span className="inline-flex items-center gap-1"><Tag className="h-3 w-3" />{zh ? "对象" : "Objet"}</span>
                   </th>
                   <th className="px-4 py-2.5">{zh ? "摘要" : "Résumé"}</th>
@@ -363,7 +363,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-2.5" onClick={() => setExpandedId(expanded ? null : l.id)}>
+                      <td className="px-4 py-2.5 text-center" onClick={() => setExpandedId(expanded ? null : l.id)}>
                         <Badge variant="secondary" className="text-xs">
                           {actionLabel(l.action)}
                         </Badge>
@@ -373,7 +373,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
                           {entityText(l)}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 max-w-[200px] truncate text-muted-foreground" onClick={() => setExpandedId(expanded ? null : l.id)}>
+                      <td className="px-4 py-2.5 max-w-[300px] truncate text-muted-foreground" onClick={() => setExpandedId(expanded ? null : l.id)}>
                         {summaryText(l)}
                       </td>
                       <td className="px-4 py-2.5">
