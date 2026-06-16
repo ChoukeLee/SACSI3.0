@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
+import { auditActionLabel } from "@/lib/audit-labels";
 import {
   buildAssistantContext,
   buildContextPrompt,
@@ -196,42 +197,7 @@ function unitStatusLabel(status: unknown, locale: Locale) {
 }
 
 function actionLabel(action: unknown, locale: Locale) {
-  const zh: Record<string, string> = {
-    check_in: "办理入住",
-    check_out: "办理退房",
-    complete_cleaning: "完成清洁",
-    record_payment: "登记收款",
-    supplementary_payment: "补缴房费",
-    extend_stay: "续住",
-    generate_receivables: "生成应收",
-    payment_deleted: "删除收款",
-    payment_reversed: "撤销收款",
-    set_fixed_checkout: "设置退房日期",
-    status_change: "修改状态",
-    update: "修改",
-    create: "新建",
-    confirm: "确认",
-    cancel: "取消",
-  };
-  const fr: Record<string, string> = {
-    check_in: "arrivée",
-    check_out: "départ",
-    complete_cleaning: "ménage terminé",
-    record_payment: "paiement enregistré",
-    supplementary_payment: "paiement complémentaire",
-    extend_stay: "prolongation",
-    generate_receivables: "créances générées",
-    payment_deleted: "paiement supprimé",
-    payment_reversed: "paiement annulé",
-    set_fixed_checkout: "date de départ fixée",
-    status_change: "statut modifié",
-    update: "modification",
-    create: "création",
-    confirm: "confirmation",
-    cancel: "annulation",
-  };
-  const key = String(action || "");
-  return (locale === "fr" ? fr[key] : zh[key]) ?? (action ? String(action) : "-");
+  return auditActionLabel(action, locale);
 }
 
 function fallbackReply(ctx: AssistantContext, locale: Locale): AssistantResult {
@@ -398,8 +364,8 @@ function fallbackReply(ctx: AssistantContext, locale: Locale): AssistantResult {
     const lines = [zh ? `查到 ${logs.length} 条相关操作：` : `${logs.length} opération(s) trouvée(s) :`];
     for (const log of logs.slice(0, 12)) {
       lines.push(zh
-        ? `${String(log.created_at ?? "").slice(11, 16)}｜${formatActor(log)}｜${log.action ?? "-"}｜房间 ${log.room_no ?? log.entity_label ?? "-"}`
-        : `${String(log.created_at ?? "").slice(11, 16)} | ${formatActor(log)} | ${log.action ?? "-"} | Chambre ${log.room_no ?? log.entity_label ?? "-"}`);
+        ? `${String(log.created_at ?? "").slice(11, 16)}｜${formatActor(log)}｜${actionLabel(log.action, locale)}｜房间 ${log.room_no ?? log.entity_label ?? "-"}`
+        : `${String(log.created_at ?? "").slice(11, 16)} | ${formatActor(log)} | ${actionLabel(log.action, locale)} | Chambre ${log.room_no ?? log.entity_label ?? "-"}`);
     }
     return { intent: ctx.intent, reply: withWarnings(lines.join("\n")), usedContext: ["getAuditActivity"] };
   }

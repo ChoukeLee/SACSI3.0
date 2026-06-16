@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { DateInput } from "@/components/ui/date-input";
 import { DEFAULT_BUSINESS_TABLE_PAGE_SIZE } from "@/components/ui/business-table";
 import type { Locale } from "@/lib/i18n";
+import { auditActionLabel, auditEntityLabel } from "@/lib/audit-labels";
 
 interface AuditLogRow {
   id: string;
@@ -162,7 +163,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
           metadataText(l, "actor_email"),
           metadataText(l, "actor_display_name"),
           actionLabel(l.action),
-          labelOrHumanize(entityLabels, l.entity_type),
+          auditEntityLabel(l.entity_type, locale),
         ].join(" ").toLowerCase();
         if (!haystack.includes(q)) return false;
       }
@@ -203,8 +204,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
   }
 
   function actionLabel(key: string) {
-    const normalized = normalizedKey(key);
-    return actionLabels[key] ?? actionLabels[normalized] ?? extraActionLabels[key] ?? extraActionLabels[normalized] ?? labelOrHumanize({}, key);
+    return auditActionLabel(key, locale);
   }
 
   function metadataText(log: AuditLogRow, key: string) {
@@ -257,7 +257,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
   }
 
   function entityText(log: AuditLogRow) {
-    const base = labelOrHumanize(entityLabels, log.entity_type);
+    const base = auditEntityLabel(log.entity_type, locale);
     const unitNo = unitNoFromLog(log);
     if (unitNo) return `${base} · ${roomText(unitNo)}`;
     const label = cleanLabel(entityLabel(log));
@@ -308,7 +308,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
         </select>
         <select value={entityFilter} onChange={e => setEntityFilter(e.target.value)} className={filterSelect}>
           <option value="all">{zh ? "模块" : "Module"}: {zh ? "全部" : "Tous"}</option>
-          {uniqueEntities.map(e => <option key={e} value={e}>{labelOrHumanize(entityLabels, e)}</option>)}
+          {uniqueEntities.map(e => <option key={e} value={e}>{auditEntityLabel(e, locale)}</option>)}
         </select>
         <div className="relative flex-1 min-w-[160px] max-w-[280px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

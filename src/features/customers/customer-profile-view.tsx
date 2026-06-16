@@ -9,6 +9,7 @@ import {
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
+import { auditActionLabel, auditEntityLabel } from "@/lib/audit-labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -140,7 +141,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
       {tab === "sale" && <SaleTab data={data} L={L} locale={locale} />}
       {tab === "finance" && <FinanceTab data={data} L={L} locale={locale} />}
       {tab === "docs" && <TableTab columns={[L.docs, L.date, L.role, L.action]} rows={documents.map(doc => ({ cells: [doc.title, doc.date, doc.unitNo, <Button key="p" size="sm" variant="ghost" onClick={() => printDocumentRecord(doc, locale)}><Printer className="h-3.5 w-3.5" />{L.print}</Button>] }))} empty={documents.length === 0} emptyText={L.noData} />}
-      {tab === "audit" && <TableTab columns={[L.date, L.action, L.entity]} rows={data.auditLogs.slice(0, 50).map(log => ({ cells: [new Date(log.created_at).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN"), L.auditActions[log.action] ?? log.action, `${log.entity_type} ${log.entity_id?.slice(0, 8)}`] }))} empty={data.auditLogs.length === 0} emptyText={L.noData} />}
+      {tab === "audit" && <TableTab columns={[L.date, L.action, L.entity]} rows={data.auditLogs.slice(0, 50).map(log => ({ cells: [new Date(log.created_at).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN"), auditActionLabel(log.action, locale), `${auditEntityLabel(log.entity_type, locale)} ${log.entity_id?.slice(0, 8)}`] }))} empty={data.auditLogs.length === 0} emptyText={L.noData} />}
 
       {/* Quick links */}
       <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
