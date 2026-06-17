@@ -124,6 +124,7 @@ export function ManagementDashboard({
 }: Props) {
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("__all__");
   const [financeDetail, setFinanceDetail] = useState<"receivable" | "collected" | "outstanding" | "overdue" | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<MgmtStatus | null>(null);
 
   const residentialUnits = useMemo(() => units.filter(u => u.kind === "apartment"), [units]);
   const activeBuildings = useMemo(() => buildings.filter(b => b.is_active), [buildings]);
@@ -256,12 +257,32 @@ export function ManagementDashboard({
           {t.sections.buildingStatus}
         </span>
         {(["dailyOccupied","reserved","leased","sold","cleaningPending","maintenance","available"] as MgmtStatus[]).map(s => (
-          <div key={s} className="flex items-center gap-1.5 rounded-full border border-border/60 px-2.5 py-1 text-xs font-medium">
+          <button
+            key={s}
+            type="button"
+            onClick={() => setSelectedStatus(current => current === s ? null : s)}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition",
+              selectedStatus === s
+                ? "border-foreground/20 bg-foreground text-background shadow-sm"
+                : "border-border/60 hover:bg-accent/50",
+            )}
+            aria-pressed={selectedStatus === s}
+          >
             <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT[s] }} />
             <span className="tabular-nums font-semibold">{counts[s]}</span>
-            <span className="text-muted-foreground">{t.statuses[s]}</span>
-          </div>
+            <span className={selectedStatus === s ? "text-background/80" : "text-muted-foreground"}>{t.statuses[s]}</span>
+          </button>
         ))}
+        {selectedStatus && (
+          <button
+            type="button"
+            onClick={() => setSelectedStatus(null)}
+            className="rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition hover:bg-accent/50 hover:text-foreground"
+          >
+            {locale === "zh" ? "显示全部" : "Tout afficher"}
+          </button>
+        )}
         <span className="ml-auto text-xs text-muted-foreground">
           {locale === "zh" ? "入住率" : "Taux occ."} <span className="font-semibold text-foreground tabular-nums">{occupiedPct}%</span>
         </span>
@@ -285,10 +306,12 @@ export function ManagementDashboard({
         if (bUnits.length === 0) return null;
 
         const bStates = sortUnits(bUnits).map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks, todayStr));
-        const floorGroups = groupStatesByFloor(bStates, locale);
+        const visibleBStates = selectedStatus ? bStates.filter(s => s.status === selectedStatus) : bStates;
+        if (visibleBStates.length === 0) return null;
+        const floorGroups = groupStatesByFloor(visibleBStates, locale);
         if (floorGroups.length === 0) return null;
-        const bOccupied = bStates.filter(s => s.status === "dailyOccupied" || s.status === "leased" || s.status === "sold").length;
-        const bTotal = bStates.length;
+        const bOccupied = visibleBStates.filter(s => s.status === "dailyOccupied" || s.status === "leased" || s.status === "sold").length;
+        const bTotal = visibleBStates.length;
 
         return (
           <RoomBoard
