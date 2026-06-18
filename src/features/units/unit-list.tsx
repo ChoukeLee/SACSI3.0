@@ -7,6 +7,8 @@ import { dictionaries } from "@/lib/i18n";
 import { cn, formatXof, sortUnits } from "@/lib/utils";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import { FilterBar } from "@/components/ui/operational";
+import { PageHeader } from "@/components/page-header";
 import { UnitDetailPanel } from "./unit-detail-panel";
 import { UnitFilters } from "./unit-filters";
 import type { UnitRow } from "@/types/database";
@@ -108,19 +110,10 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
-          {locale === "zh" ? "房源总览" : "Vue d'ensemble"}
-        </p>
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-xl font-semibold tracking-tight">
-            {locale === "zh" ? "住宿资产" : "Actifs résidentiels"}
-          </h1>
-          <span className="text-sm text-muted-foreground tabular-nums">
-            {summary.apartments} {locale === "zh" ? "套公寓" : "appartements"}
-          </span>
-        </div>
-      </div>
+      <PageHeader
+        title={locale === "zh" ? "住宿资产" : "Actifs residentiels"}
+        description={`${summary.apartments} ${locale === "zh" ? "套公寓" : "appartements"} · ${locale === "zh" ? "按楼层、状态和业务筛选房源" : "Filtrer par etage, statut et activite"}`}
+      />
 
       <div className="grid gap-2 sm:grid-cols-4 lg:grid-cols-7">
         {assetBlocks.map((block) => {
@@ -145,7 +138,7 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
                 key={block.key}
                 type="button"
                 onClick={() => setShowNonApartments(true)}
-                className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 text-left shadow-sm transition-colors hover:bg-accent/50"
+                className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left shadow-card transition-colors hover:bg-muted/50"
               >
                 {content}
               </button>
@@ -153,14 +146,16 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
           }
 
           return (
-            <div key={block.key} className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+            <div key={block.key} className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3 shadow-card">
               {content}
             </div>
           );
         })}
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <FilterBar
+        meta={`${filtered.length} / ${units.length} ${locale === "fr" ? "lots" : "套房源"}`}
+      >
         <UnitFilters
           locale={locale}
           selectedFloor={selectedFloor}
@@ -173,10 +168,7 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
           onKindChange={setSelectedKind}
           onBusinessChange={setSelectedBusiness}
         />
-        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-          {filtered.length} / {units.length} {locale === "fr" ? "lots" : "套房源"}
-        </span>
-      </div>
+      </FilterBar>
 
       {filtered.length === 0 ? (
         <EmptyState
@@ -214,7 +206,7 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
       )}
 
       {nonApartments.length > 0 && (
-        <div className="rounded-xl border border-border/60 bg-card shadow-sm">
+        <div className="rounded-xl border border-border bg-card shadow-card">
           <button
             type="button"
             onClick={() => setShowNonApartments((value) => !value)}

@@ -461,7 +461,7 @@ export function DailyCalendar({
 
   if (visibleDailyUnits.length === 0) {
     return (
-      <div data-daily-calendar-root className="flex flex-col items-center gap-3 rounded-xl border bg-card py-12 text-center shadow-sm">
+      <div data-daily-calendar-root className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card py-12 text-center shadow-card">
         <p className="text-sm text-muted-foreground">{copy.noRooms}</p>
       </div>
     );
@@ -469,13 +469,14 @@ export function DailyCalendar({
 
   return (
     <div data-daily-calendar-root className="relative isolate space-y-5">
-      <section className="relative z-20 overflow-hidden rounded-xl border bg-card shadow-sm">
-        <div className="flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+      <section className="relative z-20 overflow-hidden rounded-xl border border-border bg-card shadow-card">
+        <div className="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="text-[15px] font-bold">{locale === "zh" ? "日租概览" : "Apercu journalier"}</h3>
+            <h3 className="text-[15px] font-semibold tracking-tight">{locale === "zh" ? "日租概览" : "Apercu journalier"}</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">{locale === "zh" ? "今日房态、群消息和日租收款" : "Occupation, message et paiements du jour"}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-md border bg-muted px-3 py-1.5 text-xs font-semibold">
+            <div className="rounded-lg border border-border bg-muted px-3 py-1.5 text-xs font-semibold">
               {new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN")}
               <span className="ml-3 text-muted-foreground">{new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long" })}</span>
             </div>
@@ -494,12 +495,12 @@ export function DailyCalendar({
             )}
           </div>
         </div>
-        <div className="grid gap-2 bg-muted/50 px-4 py-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-2 bg-muted/40 px-4 py-3 md:grid-cols-2 xl:grid-cols-4">
           {shareRows.map((row) => (
             <ShareCard key={row.key} label={row.label} value={row.count} units={row.units} tone={row.tone} />
           ))}
         </div>
-        <div className="border-t bg-muted/50 px-4 py-3">
+        <div className="border-t border-border bg-card px-4 py-3">
           <p className="mb-2.5 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">{locale === "zh" ? "本月财务" : "Finances du mois"}</p>
           <div className="grid gap-2 md:grid-cols-3">
             {financeCards.map((card) => (
@@ -509,10 +510,11 @@ export function DailyCalendar({
         </div>
       </section>
 
-      <section className="relative z-10 overflow-hidden rounded-xl border bg-card shadow-sm">
-        <div className="flex flex-col gap-3 border-b px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
+      <section className="relative z-10 overflow-hidden rounded-xl border border-border bg-card shadow-card">
+        <div className="flex flex-col gap-3 border-b border-border px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h2 className="text-[15px] font-bold">{copy.timeline}</h2>
+            <h2 className="text-[15px] font-semibold tracking-tight">{copy.timeline}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{copy.subtitle}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -533,8 +535,8 @@ export function DailyCalendar({
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 border-b px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="inline-flex w-fit rounded-md border bg-muted p-1 text-xs font-medium text-muted-foreground">
+        <div className="flex flex-col gap-3 border-b border-border px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="inline-flex w-fit rounded-xl border border-border bg-muted p-1 text-xs font-semibold text-muted-foreground">
             <ViewButton active={viewMode === "day"} onClick={() => setMode("day")}>{copy.day}</ViewButton>
             <ViewButton active={viewMode === "week"} onClick={() => setMode("week")}>{copy.week}</ViewButton>
             <ViewButton active={viewMode === "month"} onClick={() => setMode("month")}>{copy.month}</ViewButton>
@@ -544,7 +546,7 @@ export function DailyCalendar({
             <button onClick={() => moveRange(-1)} className={NAV_BTN} aria-label="previous range">
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <div className="min-w-[190px] rounded-xl bg-muted px-4 py-1.5 text-center text-sm font-black text-foreground">
+            <div className="min-w-[190px] rounded-lg border border-border bg-card px-4 py-1.5 text-center text-sm font-semibold text-foreground shadow-xs">
               {rangeLabel}
             </div>
             <button onClick={() => moveRange(1)} className={NAV_BTN} aria-label="next range">
@@ -1179,16 +1181,16 @@ type ShareTone = "dark" | "orange" | "teal" | "green";
 
 function ShareCard({ label, value, units, tone }: { label: string; value: number; units: string[]; tone: ShareTone }) {
   const styles = {
-    dark: "bg-accent text-accent-foreground border-accent",
+    dark: "bg-card text-foreground border-border",
     orange: "bg-amber-50 text-amber-800 border-amber-200",
     teal: "bg-[#D9F7F0] text-[#17324D] border-[#A8E8DB]",
     green: "bg-emerald-50 text-emerald-800 border-emerald-200",
   }[tone];
   return (
-    <div className={cn("rounded-xl border px-4 py-3 shadow-sm", styles)}>
+    <div className={cn("rounded-lg border px-4 py-3 shadow-xs", styles)}>
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs font-semibold opacity-85">{label}</p>
-        <p className="text-xl font-bold tabular-nums leading-none">{value}</p>
+        <p className="text-xl font-semibold tabular-nums leading-none">{value}</p>
       </div>
       <p className="mt-2 min-h-5 text-xs font-medium leading-5">{units.join(", ")}</p>
     </div>
@@ -1197,17 +1199,17 @@ function ShareCard({ label, value, units, tone }: { label: string; value: number
 
 function FinanceCard({ label, value, tone, onClick }: { label: string; value: string; tone: "dark" | "orange" | "green"; onClick: () => void }) {
   const styles = {
-    dark: "border bg-card hover:border-border hover:shadow-sm",
+    dark: "border-border bg-card hover:bg-muted/40 hover:shadow-card",
     orange: "border-amber-200 bg-amber-50 hover:border-amber-300 hover:shadow-sm",
     green: "border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:shadow-sm",
   }[tone];
   const barColors = { dark: "bg-foreground", orange: "bg-amber-500", green: "bg-emerald-500" }[tone];
   return (
-    <button type="button" onClick={onClick} className={cn("flex min-h-[64px] overflow-hidden rounded-xl border text-left shadow-sm transition-all hover:-translate-y-0.5", styles)}>
+    <button type="button" onClick={onClick} className={cn("flex min-h-[64px] overflow-hidden rounded-lg border text-left shadow-xs transition-all hover:-translate-y-0.5", styles)}>
       <div className={cn("w-1.5 shrink-0", barColors)} />
       <div className="flex min-w-0 flex-1 flex-col justify-between px-4 py-3">
         <p className="truncate text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">{label}</p>
-        <p className="truncate text-lg font-bold tracking-tight tabular-nums">{value}</p>
+        <p className="truncate text-lg font-semibold tracking-tight tabular-nums">{value}</p>
       </div>
     </button>
   );
@@ -1233,8 +1235,8 @@ function FilterButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-black shadow-sm transition-all focus-visible:ring-ring",
-        active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-white text-foreground/80 hover:border-accentBlue-200 hover:bg-accent",
+        "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold shadow-xs transition-all focus-visible:ring-ring",
+        active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground/80 hover:bg-muted",
       )}
     >
       {icon ?? <span className={cn("h-2 w-2 rounded-full", color)} />}
@@ -1251,7 +1253,7 @@ function ViewButton({ active, onClick, children }: { active: boolean; onClick: (
       onClick={onClick}
       className={cn(
         "rounded-lg px-3 py-1.5 transition",
-        active ? "bg-white text-accentBlue-700 shadow-sm" : "text-muted-foreground hover:text-foreground",
+        active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
       )}
     >
       {children}

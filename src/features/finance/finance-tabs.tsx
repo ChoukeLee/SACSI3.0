@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { SegmentedControl } from "@/components/ui/operational";
 
 interface Props {
   ledger: React.ReactNode;
@@ -22,23 +22,7 @@ export function FinanceTabs({ ledger, receivables, locale }: Props) {
 
   return (
     <div className="space-y-5">
-      <nav className="flex gap-1 overflow-x-auto rounded-xl border bg-card p-1.5 shadow-sm w-fit" aria-label="Finance tabs">
-        {tabs.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            onClick={() => setTab(item.key)}
-            className={cn(
-              "shrink-0 rounded-md px-4 py-2 text-sm font-semibold transition",
-              tab === item.key
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-            )}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
+      <SegmentedControl value={tab} items={tabs.map((item) => ({ value: item.key, label: item.label }))} onChange={setTab} ariaLabel="Finance tabs" />
       {tab === "ledger" ? ledger : receivables}
     </div>
   );

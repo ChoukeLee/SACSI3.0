@@ -23,7 +23,7 @@ export function BusinessTable({
   className?: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
       <div className="overflow-x-auto">
         <table
           className={cn("w-full table-fixed text-left text-[13px]", minWidth, className)}
@@ -39,7 +39,7 @@ export function BusinessThead({ children, sticky = false }: { children: ReactNod
   return (
     <thead
       className={cn(
-        "border-b bg-muted/70 text-xs font-semibold text-muted-foreground",
+        "border-b border-border bg-muted/80 text-xs font-semibold text-muted-foreground",
         sticky && "sticky top-0 z-10",
       )}
     >
@@ -58,14 +58,14 @@ export function BusinessTh({
   className?: string;
 }) {
   return (
-    <th className={cn("h-11 whitespace-nowrap px-4 py-3 align-middle", alignClass[align], className)}>
+    <th className={cn("h-11 whitespace-nowrap px-4 py-3 align-middle uppercase tracking-[0.04em]", alignClass[align], className)}>
       {children}
     </th>
   );
 }
 
 export function BusinessTbody({ children }: { children: ReactNode }) {
-  return <tbody className="divide-y divide-border/60">{children}</tbody>;
+  return <tbody className="divide-y divide-border/60 bg-card">{children}</tbody>;
 }
 
 export function BusinessTd({
@@ -78,7 +78,7 @@ export function BusinessTd({
   className?: string;
 }) {
   return (
-    <td className={cn("h-12 whitespace-nowrap px-4 py-3 align-middle", alignClass[align], className)}>
+    <td className={cn("h-12 whitespace-nowrap px-4 py-3 align-middle text-[13px]", alignClass[align], className)}>
       {children}
     </td>
   );
@@ -91,7 +91,7 @@ export function BusinessRow({
   children: ReactNode;
   className?: string;
 }) {
-  return <tr className={cn("transition-colors hover:bg-accent/45", className)}>{children}</tr>;
+  return <tr className={cn("transition-colors hover:bg-muted/55", className)}>{children}</tr>;
 }
 
 export function MoneyCell({

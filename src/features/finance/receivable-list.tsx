@@ -6,8 +6,11 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
 import { BusinessTable, BusinessTbody, BusinessTd, BusinessTh, BusinessThead, BusinessRow, MoneyCell } from "@/components/ui/business-table";
+import { DataVizCard, DonutChart } from "@/components/ui/data-viz";
+import { FilterBar, StatTile, controlClass } from "@/components/ui/operational";
 import {
   calculateReceivableSummary,
   buildReceivableCsv,
@@ -173,39 +176,47 @@ export function ReceivableList({ receivables, units, customers, buildings, local
     return buildingMap.get(bid) ?? "—";
   };
 
-  const filterBtn = "h-9 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+  const filterBtn = controlClass;
   const filterDate = cn(filterBtn, "w-[150px]");
 
   const collectionTone = summary.collectionRate >= 0.8 ? "green" : summary.collectionRate >= 0.5 ? "amber" : "red";
 
   return (
     <div className="space-y-5">
-      {/* Summary stats */}
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
-        <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-          <span className="h-2.5 w-2.5 rounded-full bg-accentBlue-500 shrink-0" />
-          <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{formatXof(summary.totalReceivable)}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t.summary.totalReceivable}</p></div>
-        </div>
-        <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-          <span className="h-2.5 w-2.5 rounded-full bg-accentGreen-500 shrink-0" />
-          <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{formatXof(summary.totalPaid)}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t.summary.totalPaid}</p></div>
-        </div>
-        <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-          <span className="h-2.5 w-2.5 rounded-full bg-accentAmber-500 shrink-0" />
-          <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{formatXof(summary.outstanding)}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t.summary.totalOutstanding}</p></div>
-        </div>
-        <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-          <span className="h-2.5 w-2.5 rounded-full bg-accentRed-500 shrink-0" />
-          <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{formatXof(summary.overdue)}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t.summary.totalOverdue}</p></div>
-        </div>
-        <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-          <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", collectionTone === "green" ? "bg-accentGreen-500" : collectionTone === "amber" ? "bg-accentAmber-500" : "bg-accentRed-500")} />
-          <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{(summary.collectionRate * 100).toFixed(1)}%</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t.summary.collectionRate}</p></div>
-        </div>
+        <StatTile tone="blue" label={t.summary.totalReceivable} value={formatXof(summary.totalReceivable)} />
+        <StatTile tone="green" label={t.summary.totalPaid} value={formatXof(summary.totalPaid)} />
+        <StatTile tone="amber" label={t.summary.totalOutstanding} value={formatXof(summary.outstanding)} />
+        <StatTile tone="red" label={t.summary.totalOverdue} value={formatXof(summary.overdue)} />
+        <StatTile tone={collectionTone} label={t.summary.collectionRate} value={`${(summary.collectionRate * 100).toFixed(1)}%`} />
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
+      <DataVizCard
+        title={locale === "zh" ? "应收结构" : "Structure des créances"}
+        description={locale === "zh" ? "已收、未收与逾期的比例" : "Payé, restant et en retard"}
+        metric={`${(summary.collectionRate * 100).toFixed(1)}%`}
+      >
+        <DonutChart
+          centerValue={`${Math.round(summary.collectionRate * 100)}%`}
+          centerLabel={t.summary.collectionRate}
+          items={[
+            { label: t.summary.totalPaid, value: summary.totalPaid, tone: "green" },
+            { label: t.summary.totalOutstanding, value: Math.max(summary.outstanding - summary.overdue, 0), tone: "amber" },
+            { label: t.summary.totalOverdue, value: summary.overdue, tone: "red" },
+          ]}
+        />
+      </DataVizCard>
+
+      <FilterBar
+        meta={
+          <div className="flex items-center gap-2">
+            <Button onClick={handleExportCsv} disabled={filtered.length === 0} variant="outline" size="sm">
+              <Download className="h-4 w-4" />{t.export.csv}
+            </Button>
+            <span>{filtered.length} {locale === "zh" ? "条" : "lignes"}</span>
+          </div>
+        }
+      >
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={filterBtn}>
           <option value="all">{t.filters.status}: {t.filters.all}</option>
           {Object.entries(t.statuses).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -232,19 +243,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
           className={filterDate}
           title={locale === "zh" ? "结束日期" : "Date fin"}
         />
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={handleExportCsv}
-            disabled={filtered.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-accent disabled:opacity-40"
-          >
-            <Download className="h-4 w-4" />{t.export.csv}
-          </button>
-          <span className="text-xs font-semibold text-muted-foreground">
-            {filtered.length} {locale === "zh" ? "条" : "lignes"}
-          </span>
-        </div>
-      </div>
+      </FilterBar>
 
       {/* Table */}
       {filtered.length === 0 ? (

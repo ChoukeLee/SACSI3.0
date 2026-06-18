@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Banknote, Clock3, TrendingUp, WalletCards } from "lucide-react";
 import { getDailyRoomStateForDate } from "@/features/daily-rentals/room-status";
 import { calculateReceivableSummary } from "@/features/finance/receivable-summary";
 import { FinanceDetailPanel } from "@/features/management/finance-detail-panel";
 import { RoomCard } from "@/components/room-card";
 import { RoomBoard } from "@/components/room-board";
 import { RoomLegend } from "@/components/room-legend";
+import { DataVizCard, DonutChart, RadarChart } from "@/components/ui/data-viz";
+import { FilterBar, SegmentedControl, StatTile } from "@/components/ui/operational";
 import { getRoomCardActions } from "@/lib/room-card-actions";
 import type { Locale, ManagementDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -112,48 +114,54 @@ export function FinanceSectionClient({
   const nonDaily = useMemo(() => receivables.filter(r => r.source_type !== "daily_booking"), [receivables]);
   const stats = useMemo(() => calculateReceivableSummary(nonDaily, { currentMonth: true }), [nonDaily]);
 
-  const colorMap: Record<string, string> = {
-    accentBlue: "before:bg-accentBlue-500",
-    accentGreen: "before:bg-accentGreen-500",
-    accentAmber: "before:bg-accentAmber-500",
-    accentRed: "before:bg-accentRed-500",
-  };
-  const iconBg: Record<string, string> = {
-    accentBlue: "bg-accentBlue-50 text-accentBlue-600",
-    accentGreen: "bg-accentGreen-50 text-accentGreen-600",
-    accentAmber: "bg-accentAmber-50 text-accentAmber-600",
-    accentRed: "bg-accentRed-50 text-accentRed-600",
-  };
-
   const blocks = [
-    { key: "receivable", label: t.cockpit.receivableThisMonth, value: stats.totalReceivable, color: "accentBlue" as const },
-    { key: "collected", label: t.cockpit.paidThisMonth, value: stats.totalPaid, color: "accentGreen" as const },
-    { key: "outstanding", label: t.cockpit.outstandingThisMonth, value: stats.outstanding, color: "accentAmber" as const },
-    { key: "overdue", label: t.cockpit.overdueThisMonth, value: stats.overdue, color: "accentRed" as const },
+    { key: "receivable", label: t.cockpit.receivableThisMonth, value: stats.totalReceivable, color: "accentBlue" as const, icon: TrendingUp },
+    { key: "collected", label: t.cockpit.paidThisMonth, value: stats.totalPaid, color: "accentGreen" as const, icon: Banknote },
+    { key: "outstanding", label: t.cockpit.outstandingThisMonth, value: stats.outstanding, color: "accentAmber" as const, icon: WalletCards },
+    { key: "overdue", label: t.cockpit.overdueThisMonth, value: stats.overdue, color: "accentRed" as const, icon: Clock3 },
   ];
 
   return (
     <>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {blocks.map(block => {
-          const filled = block.key === detail;
-          return (
-            <button
-              key={block.key}
-              onClick={() => setDetail(filled ? null : block.key)}
-              className={`group relative flex items-center gap-3 overflow-hidden rounded-xl border border-border/60 bg-card px-4 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md hover:border-border before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:rounded-full ${colorMap[block.color]}`}
-            >
-              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${iconBg[block.color]}`}>
-                <span className="text-sm font-bold">{block.key[0].toUpperCase()}</span>
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-medium text-muted-foreground">{block.label}</p>
-                <p className="text-lg font-bold tracking-tight tabular-nums">{formatXof(block.value)}</p>
-              </div>
-            </button>
-          );
-        })}
+      <div className="rounded-xl border border-border bg-card p-3 shadow-card">
+        <div className="mb-3 flex items-center justify-between gap-3 px-1">
+          <div>
+            <h2 className="text-[15px] font-semibold tracking-tight">{locale === "zh" ? "财务概览" : "Vue financiere"}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{locale === "zh" ? "点击指标查看明细" : "Cliquez un indicateur pour le detail"}</p>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {blocks.map(block => {
+            const filled = block.key === detail;
+            return (
+              <StatTile
+                key={block.key}
+                onClick={() => setDetail(filled ? null : block.key)}
+                active={filled}
+                icon={block.icon}
+                tone={block.color === "accentGreen" ? "green" : block.color === "accentAmber" ? "amber" : block.color === "accentRed" ? "red" : "blue"}
+                label={block.label}
+                value={formatXof(block.value)}
+              />
+            );
+          })}
+        </div>
       </div>
+      <DataVizCard
+        title={locale === "zh" ? "本月回款结构" : "Structure mensuelle"}
+        description={locale === "zh" ? "已收、未收与逾期拆分" : "Payé, restant et en retard"}
+        metric={`${Math.round(stats.collectionRate * 100)}%`}
+      >
+        <DonutChart
+          centerValue={`${Math.round(stats.collectionRate * 100)}%`}
+          centerLabel={locale === "zh" ? "回款率" : "Taux"}
+          items={[
+            { label: t.cockpit.paidThisMonth, value: stats.totalPaid, tone: "green" },
+            { label: t.cockpit.outstandingThisMonth, value: Math.max(stats.outstanding - stats.overdue, 0), tone: "amber" },
+            { label: t.cockpit.overdueThisMonth, value: stats.overdue, tone: "red" },
+          ]}
+        />
+      </DataVizCard>
       {detail != null && (
         <FinanceDetailPanel
           open={detail as "receivable" | "collected" | "outstanding" | "overdue"}
@@ -227,72 +235,99 @@ export function UnitDataClient({
 
   const totalRooms = filteredUnits.length;
   const occupiedPct = totalRooms > 0 ? Math.round((counts.dailyOccupied + counts.leased + counts.sold) / totalRooms * 100) : 0;
+  const riskMax = Math.max(1, totalRooms, risks.leaseExpiring.length, risks.saleWithPending.length);
 
   return (
     <>
-      {/* Building selector */}
-      <div className="flex items-center gap-3">
-        <span className="text-xs font-medium text-muted-foreground">
+      <FilterBar
+        meta={
+          <span>
+            {locale === "zh" ? "入住率" : "Taux occ."} <span className="font-semibold text-foreground">{occupiedPct}%</span>
+          </span>
+        }
+      >
+        <span className="text-xs font-semibold text-muted-foreground">
           {locale === "zh" ? "楼栋" : "Bâtiment"}
         </span>
-        <div className="inline-flex gap-0.5 rounded-lg border border-border/60 bg-muted/50 p-1">
-          {[{ id: "__all__", display_name: t.allBuildings }, ...activeBuildings].map(b => (
+        <SegmentedControl
+          value={selectedBuildingId}
+          onChange={setSelectedBuildingId}
+          ariaLabel={locale === "zh" ? "楼栋筛选" : "Filtre bâtiment"}
+          items={[{ id: "__all__", display_name: t.allBuildings }, ...activeBuildings].map((b) => ({
+            value: b.id,
+            label: b.display_name,
+          }))}
+        />
+        <div className="basis-full pt-1">
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-3">
+          <span className="mr-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+            {t.sections.buildingStatus}
+          </span>
+          {(["dailyOccupied", "reserved", "leased", "sold", "cleaningPending", "maintenance", "available"] as MgmtStatus[]).map(s => (
             <button
-              key={b.id}
-              onClick={() => setSelectedBuildingId(b.id)}
+              key={s}
+              type="button"
+              onClick={() => setSelectedStatus(current => current === s ? null : s)}
               className={cn(
-                "rounded-md px-3 py-1.5 text-xs font-medium transition",
-                selectedBuildingId === b.id
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
+                "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition",
+                selectedStatus === s
+                  ? "border-foreground/20 bg-foreground text-background shadow-sm"
+                  : "border-border bg-muted/50 hover:bg-muted",
               )}
+              aria-pressed={selectedStatus === s}
             >
-              {b.display_name}
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: STATUS_DOT[s] }} />
+              <span className="tabular-nums font-semibold">{counts[s]}</span>
+              <span className={selectedStatus === s ? "text-background/80" : "text-muted-foreground"}>{t.statuses[s]}</span>
             </button>
           ))}
+          {selectedStatus && (
+            <button
+              type="button"
+              onClick={() => setSelectedStatus(null)}
+              className="rounded-full px-2 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              {locale === "zh" ? "显示全部" : "Tout afficher"}
+            </button>
+          )}
+          </div>
         </div>
-      </div>
+      </FilterBar>
 
-      {/* Status overview bar */}
-      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border/60 bg-card px-4 py-3">
-        <span className="mr-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-          {t.sections.buildingStatus}
-        </span>
-        {(["dailyOccupied", "reserved", "leased", "sold", "cleaningPending", "maintenance", "available"] as MgmtStatus[]).map(s => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setSelectedStatus(current => current === s ? null : s)}
-            className={cn(
-              "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition",
-              selectedStatus === s
-                ? "border-foreground/20 bg-foreground text-background shadow-sm"
-                : "border-border/60 hover:bg-accent/50",
-            )}
-            aria-pressed={selectedStatus === s}
-          >
-            <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT[s] }} />
-            <span className="tabular-nums font-semibold">{counts[s]}</span>
-            <span className={selectedStatus === s ? "text-background/80" : "text-muted-foreground"}>{t.statuses[s]}</span>
-          </button>
-        ))}
-        {selectedStatus && (
-          <button
-            type="button"
-            onClick={() => setSelectedStatus(null)}
-            className="rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition hover:bg-accent/50 hover:text-foreground"
-          >
-            {locale === "zh" ? "显示全部" : "Tout afficher"}
-          </button>
-        )}
-        <span className="ml-auto text-xs text-muted-foreground">
-          {locale === "zh" ? "入住率" : "Taux occ."} <span className="font-semibold text-foreground tabular-nums">{occupiedPct}%</span>
-        </span>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+        <DataVizCard
+          title={locale === "zh" ? "房态结构" : "Structure des chambres"}
+          description={locale === "zh" ? "保留现有房态颜色，只统一呈现方式" : "Couleurs métier conservées"}
+          metric={`${totalRooms} ${locale === "zh" ? "间" : "unités"}`}
+        >
+          <DonutChart
+            centerValue={`${occupiedPct}%`}
+            centerLabel={locale === "zh" ? "占用" : "Occupé"}
+            items={(["dailyOccupied", "reserved", "leased", "sold", "cleaningPending", "maintenance", "available"] as MgmtStatus[]).map((status) => ({
+              label: t.statuses[status],
+              value: counts[status],
+              color: STATUS_DOT[status],
+            }))}
+          />
+        </DataVizCard>
+        <DataVizCard
+          title={locale === "zh" ? "运营风险雷达" : "Radar opérationnel"}
+          description={locale === "zh" ? "保洁、维修、到期与回款压力" : "Ménage, maintenance, échéances, paiements"}
+        >
+          <RadarChart
+            axes={[
+              { label: locale === "zh" ? "待保洁" : "Ménage", value: risks.cleaning / riskMax, tone: "amber" },
+              { label: locale === "zh" ? "维修" : "Maintenance", value: risks.maintenance / riskMax, tone: "red" },
+              { label: locale === "zh" ? "合同到期" : "Baux", value: risks.leaseExpiring.length / riskMax, tone: "blue" },
+              { label: locale === "zh" ? "出售回款" : "Ventes", value: risks.saleWithPending.length / riskMax, tone: "green" },
+            ]}
+          />
+        </DataVizCard>
       </div>
 
       {/* Risk alerts */}
       {(risks.cleaning > 0 || risks.maintenance > 0 || risks.leaseExpiring.length > 0 || risks.saleWithPending.length > 0) && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-accentRed-100 bg-accentRed-50/60 px-4 py-2.5 text-sm">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-accentRed-100 bg-accentRed-50/70 px-4 py-2.5 text-sm shadow-xs">
           <AlertTriangle className="h-4 w-4 text-accentRed-500 shrink-0" />
           <span className="text-xs font-semibold text-accentRed-700">{locale === "zh" ? "待处理" : "Attention"}:</span>
           {risks.cleaning > 0 && <span className="text-xs text-accentRed-600">{risks.cleaning} {locale === "zh" ? "间待保洁" : "ménages"}</span>}

@@ -8,7 +8,9 @@ import { routeFor } from "@/lib/i18n";
 import { cn, compareUnitNo } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { FilterBar, SegmentedControl, StatTile, controlClass } from "@/components/ui/operational";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 import type { CustomerRow } from "@/types/database";
 import {
   createCustomer,
@@ -192,7 +194,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
   const isFormOpen = formMode !== null;
   const isBlacklistOpen = blacklistPanelId !== null;
 
-  const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+  const inputClass = cn("w-full", controlClass);
   const labelClass = "block text-xs font-semibold text-muted-foreground mb-1";
 
   const t = {
@@ -336,62 +338,20 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
   return (
     <div className="flex flex-col gap-6">
       {/* ── Page chrome ── */}
-      <div className="flex flex-col gap-1">
-        <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
-          {locale === "zh" ? "客户档案" : "Clients"}
-        </p>
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-xl font-semibold tracking-tight">
-            {locale === "zh" ? "客户管理" : "Gestion des clients"}
-          </h1>
-          <span className="text-sm text-muted-foreground tabular-nums">
-            {stats.all} {locale === "zh" ? "位客户" : "clients"}
-          </span>
-        </div>
-      </div>
+      <PageHeader
+        title={locale === "zh" ? "客户管理" : "Gestion des clients"}
+        description={`${stats.all} ${locale === "zh" ? "位客户" : "clients"} · ${locale === "zh" ? "按业务类型、房号和最近活动排序" : "Tries par activite, chambre et recence"}`}
+        action={<Button size="sm" onClick={openAdd}><Plus className="h-4 w-4" />{t.add}</Button>}
+      />
 
-      {/* ── Summary stats ── */}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         {statBlocks.map(b => (
-          <div key={b.key} className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-            <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", b.dot)} />
-            <div className="min-w-0">
-              <p className="text-xl font-bold tracking-tight tabular-nums leading-none">{b.value}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{b.label}</p>
-            </div>
-          </div>
+          <StatTile key={b.key} label={b.label} value={b.value} tone={b.key === "blacklisted" ? "red" : b.key === "lease" ? "leased" : b.key === "sale" ? "sold" : b.key === "daily" ? "blue" : "neutral"} />
         ))}
       </div>
 
-      {/* ── Segment tabs + search ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-card px-4 py-3 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          {([
-            ["all", t.allTab, stats.all],
-            ["lease", t.leaseTab, stats.lease],
-            ["sale", t.saleTab, stats.sale],
-            ["daily", t.dailyTab, stats.dailyOnly],
-            ["blacklisted", t.blacklistTab, stats.blacklisted],
-          ] as const).map(([key, label, count]) => (
-            <button
-              key={key}
-              onClick={() => setSegment(key)}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-xs font-semibold transition",
-                segment === key
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "border bg-card text-muted-foreground hover:bg-accent",
-              )}
-            >
-              {label} <span className="ml-1 tabular-nums opacity-70">{count}</span>
-            </button>
-          ))}
-          <span className="pl-1 text-xs text-muted-foreground">
-            {t.filtered(filtered.length, customers.length)}
-            <span className="ml-2 text-[10px] opacity-60">{t.stableFirst}</span>
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
+      <FilterBar
+        meta={
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -399,12 +359,28 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t.search}
-              className="h-9 w-64 rounded-md border bg-card pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20"
+              className={cn("w-64 pl-9 pr-3", controlClass)}
             />
           </div>
-          <Button size="sm" onClick={openAdd}><Plus className="h-4 w-4" />{t.add}</Button>
-        </div>
-      </div>
+        }
+      >
+          <SegmentedControl
+            value={segment}
+            onChange={setSegment}
+            ariaLabel={locale === "zh" ? "客户类型" : "Segments clients"}
+            items={[
+              { value: "all", label: t.allTab, count: stats.all },
+              { value: "lease", label: t.leaseTab, count: stats.lease },
+              { value: "sale", label: t.saleTab, count: stats.sale },
+              { value: "daily", label: t.dailyTab, count: stats.dailyOnly },
+              { value: "blacklisted", label: t.blacklistTab, count: stats.blacklisted },
+            ]}
+          />
+          <span className="pl-1 text-xs text-muted-foreground">
+            {t.filtered(filtered.length, customers.length)}
+            <span className="ml-2 text-[10px] opacity-60">{t.stableFirst}</span>
+          </span>
+      </FilterBar>
 
       {/* ── Blacklist warning banner ── */}
       {selected?.is_blacklisted && (

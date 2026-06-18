@@ -145,11 +145,13 @@ function AppShellInner({
       <AppSidebar locale={locale} userRole={userRole} />
       <SidebarInset>
         <NavigationLoadingBar />
-        <header className="flex h-13 shrink-0 items-center gap-2 border-b border-border/60 bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/70">
+        <header className="sticky top-0 z-sticky flex h-13 shrink-0 items-center gap-2 border-b border-border bg-card/95 shadow-xs backdrop-blur supports-[backdrop-filter]:bg-card/90">
           <div className="flex w-full items-center justify-between px-4">
             <div className="flex items-center gap-3">
               <SidebarTrigger className="hidden lg:flex" />
-              <span className="text-[11px] font-semibold text-muted-foreground tracking-wide">{labels.building}</span>
+              <span className="rounded-md border border-border bg-muted/60 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
+                {labels.building}
+              </span>
             </div>
             <div className="flex flex-1 justify-center px-4">
               <div className="w-full max-w-md">
@@ -161,7 +163,7 @@ function AppShellInner({
               <Link
                 href={routeFor(otherLocale, pathname)}
                 prefetch={false}
-                className="rounded-md border border-border/60 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                className="rounded-md border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 {labels.shell.langLabel}
               </Link>

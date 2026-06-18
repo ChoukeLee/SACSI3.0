@@ -6,6 +6,7 @@ import { sortUnits } from "@/lib/utils";
 import { LedgerList } from "@/features/finance";
 import { ReceivableList } from "@/features/finance/receivable-list";
 import { FinanceTabs } from "@/features/finance/finance-tabs";
+import { PageHeader } from "@/components/page-header";
 import type { LedgerEntryRow, ReceivableRow, BuildingRow } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -48,10 +49,16 @@ export default async function FinancePage() {
   }
 
   return (
-    <FinanceTabs
-      ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale="zh" attachments={attachments} />}
-      receivables={<ReceivableList receivables={receivables} units={units} customers={customers} buildings={buildings} locale="zh" />}
-      locale="zh"
-    />
+    <div className="space-y-5">
+      <PageHeader
+        title={t.title}
+        description="收款流水、应收账款与票据核对"
+      />
+      <FinanceTabs
+        ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale="zh" attachments={attachments} />}
+        receivables={<ReceivableList receivables={receivables} units={units} customers={customers} buildings={buildings} locale="zh" />}
+        locale="zh"
+      />
+    </div>
   );
 }

@@ -36,19 +36,19 @@ export function MetricCard({
     <Wrapper
       onClick={onClick}
       className={cn(
-        "group relative flex items-start gap-4 rounded-xl border border-border/70 bg-card p-5 text-left shadow-sm transition-all duration-fast",
+        "group relative flex items-start gap-4 rounded-xl border border-border bg-card p-5 text-left shadow-card transition-all duration-fast",
         onClick && "cursor-pointer hover:-translate-y-0.5 hover:shadow-lifted",
         className,
       )}
     >
       {Icon && (
-        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", a.bg)}>
+        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-black/5", a.bg)}>
           <Icon className={cn("h-5 w-5", a.icon)} strokeWidth={1.75} />
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-muted-foreground">{title}</p>
-        <p className="mt-1 text-xl font-bold tracking-tight tabular-nums">{value}</p>
+        <p className="text-xs font-semibold text-muted-foreground">{title}</p>
+        <p className="mt-1 text-xl font-semibold tracking-tight tabular-nums">{value}</p>
         {caption && <p className="mt-1 text-xs text-muted-foreground">{caption}</p>}
       </div>
       {onClick && (

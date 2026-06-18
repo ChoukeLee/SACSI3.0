@@ -1,585 +1,865 @@
 ---
-version: 2.0
+version: 4.0
 name: SACIS-design-system
-description: A calm, professional property-operations design system. Indigo-blue primary on a warm neutral canvas. Data-dense dashboards for managers, finance staff, and front desk operators. Built on structural lessons from Stripe (color discipline), Notion (component clarity), and Linear (surface hierarchy).
+description: Complete product design rules for SACIS 3.0. Built from getdesign.md-style design rules and 21st.dev component patterns, adapted for a Chinese/French property operations system in Abidjan.
 ---
 
-colors:
-  # ── Primary accent (indigo-blue) ──
-  primary: "#4F5DE6"
-  primary-hover: "#3D4BCF"
-  primary-press: "#2F3BA8"
-  primary-soft: "#EDEFFD"
-  primary-soft-hover: "#DEE3FC"
-  on-primary: "#FFFFFF"
+# SACIS 3.0 Design Rules
 
-  # ── Surface ladder ──
-  canvas: "#F7F6F4"
-  surface: "#FFFFFF"
-  surface-soft: "#F3F2F0"
-  surface-hover: "#EBEAE7"
-  surface-dark: "#1E1F2C"
+SACIS is a property operations system for management, finance, front desk, and administrative staff. It is used for long office sessions, daily rental operations, finance reconciliation, customer lookup, and asset monitoring.
 
-  # ── Borders ──
-  hairline: "#E5E3E0"
-  hairline-strong: "#D0CDC8"
-  hairline-input: "#C5C3C8"
+The product must feel like one coherent system: calm, bright, data-dense, operational, and trustworthy. It should not feel like a marketing site or a set of unrelated component snippets.
 
-  # ── Text ──
-  ink: "#181919"
-  ink-muted: "#5C5D61"
-  ink-subtle: "#949599"
-  ink-on-dark: "#EDEDF0"
+## Reference Sources
 
-  # ── Semantic: room status ──
-  status-available-bg: "#F0FDF4"
-  status-available-border: "#86EFAC"
-  status-available-text: "#166534"
-  status-occupied-bg: "#EDEFFD"
-  status-occupied-border: "#A5B0F6"
-  status-occupied-text: "#2F3BA8"
-  status-reserved-bg: "#FFF8EB"
-  status-reserved-border: "#FCD34D"
-  status-reserved-text: "#92400E"
-  status-cleaning-bg: "#ECFEFF"
-  status-cleaning-border: "#67E8F9"
-  status-cleaning-text: "#155E75"
-  status-maintenance-bg: "#FEF2F2"
-  status-maintenance-border: "#FECACA"
-  status-maintenance-text: "#991B1B"
-  status-sold-bg: "#F5F5F4"
-  status-sold-border: "#D6D3D1"
-  status-sold-text: "#44403C"
-  status-leased-bg: "#F5F3FF"
-  status-leased-border: "#C4B5FD"
-  status-leased-text: "#5B21B6"
+### getdesign.md References
 
-  # ── Semantic: finance & feedback ──
-  semantic-success: "#16A34A"
-  semantic-success-bg: "#F0FDF4"
-  semantic-warning: "#D97706"
-  semantic-warning-bg: "#FFFBEB"
-  semantic-danger: "#DC2626"
-  semantic-danger-bg: "#FEF2F2"
-  semantic-info: "#4F5DE6"
-  semantic-info-bg: "#EDEFFD"
+Use getdesign.md for foundational design rules: product tone, tokens, hierarchy, layout behavior, and anti-patterns.
 
-typography:
-  page-title:
-    fontSize: 22px
-    fontWeight: 700
-    lineHeight: 1.25
-    letterSpacing: -0.3px
-  section-title:
-    fontSize: 16px
-    fontWeight: 700
-    lineHeight: 1.3
-    letterSpacing: 0
-  card-label:
-    fontSize: 12px
-    fontWeight: 600
-    lineHeight: 1.3
-    letterSpacing: 0.04em
-    textTransform: uppercase
-  body:
-    fontSize: 14px
-    fontWeight: 400
-    lineHeight: 1.5
-    letterSpacing: 0
-  body-sm:
-    fontSize: 13px
-    fontWeight: 400
-    lineHeight: 1.5
-    letterSpacing: 0
-  table-text:
-    fontSize: 13px
-    fontWeight: 500
-    lineHeight: 1.4
-    letterSpacing: 0
-  caption:
-    fontSize: 12px
-    fontWeight: 500
-    lineHeight: 1.4
-    letterSpacing: 0
-  mono:
-    fontSize: 13px
-    fontWeight: 400
-    lineHeight: 1.5
-    letterSpacing: 0
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+- **Cal.com**: clean neutral UI, black primary actions, scheduling-oriented product structure.
+- **Airtable**: structured data UI, filters, tables, field-like records, friendly but organized information density.
+- **Notion**: warm minimal canvas, soft surfaces, comfortable long-session reading.
+- **Linear**: precision, restrained hierarchy, clean active states. Use only as a minor reference for sharpness, not for dark/purple branding.
+- **Stripe / Vercel**: component polish and product clarity. Use only for discipline, not for marketing-style hero composition.
 
-rounded:
-  xs: 4px
-  sm: 6px
-  md: 8px
-  lg: 12px
-  xl: 16px
-  full: 9999px
+### 21st.dev References
 
-spacing:
-  xs: 4px
-  sm: 8px
-  md: 12px
-  lg: 16px
-  xl: 20px
-  "2xl": 24px
-  "3xl": 32px
+Use 21st.dev for concrete component patterns and code inspiration:
 
-shadow:
-  none: "none"
-  sm: "0 1px 2px rgba(24,25,25,0.04)"
-  card: "0 1px 2px rgba(24,25,25,0.04), 0 4px 16px -8px rgba(24,25,25,0.08)"
-  lifted: "0 8px 24px -12px rgba(24,25,25,0.12)"
-  panel: "0 24px 60px -32px rgba(24,25,25,0.16), 0 0 0 1px rgba(24,25,25,0.04)"
+- Buttons
+- Cards
+- Tables
+- Tabs
+- Inputs
+- Selects
+- Forms
+- Calendars
+- Sidebars
+- Dialogs / Drawers
+- Alerts
+- Empty states
+- Pagination
+- AI chat / command surfaces
 
-components:
-  # ── Button ──
-  button-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-primary}"
-    typography: "{typography.card-label}"
-    rounded: "{rounded.md}"
-    padding: 8px 16px
-    height: 36px
-  button-primary-hover:
-    backgroundColor: "{colors.primary-hover}"
-  button-secondary:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.ink}"
-    typography: "{typography.card-label}"
-    rounded: "{rounded.md}"
-    padding: 8px 16px
-    height: 36px
-    border: 1px solid "{colors.hairline}"
-  button-secondary-hover:
-    backgroundColor: "{colors.surface-soft}"
-  button-ghost:
-    backgroundColor: transparent
-    textColor: "{colors.ink-muted}"
-    typography: "{typography.card-label}"
-    rounded: "{rounded.md}"
-    padding: 6px 12px
-    height: 36px
-  button-ghost-hover:
-    backgroundColor: "{colors.surface-soft}"
-    textColor: "{colors.ink}"
-  button-danger:
-    backgroundColor: "{colors.semantic-danger}"
-    textColor: "#FFFFFF"
-    typography: "{typography.card-label}"
-    rounded: "{rounded.md}"
-    padding: 8px 16px
-    height: 36px
-  button-danger-secondary:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.semantic-danger}"
-    border: 1px solid "{colors.hairline}"
-    rounded: "{rounded.md}"
-    padding: 8px 16px
-    height: 36px
+Do not copy a 21st.dev component verbatim if it conflicts with SACIS density, bilingual text, or business workflows. Adapt the pattern into SACIS primitives.
 
-  # ── Card ──
-  card-default:
-    backgroundColor: "{colors.surface}"
-    border: 1px solid "{colors.hairline}"
-    rounded: "{rounded.xl}"
-    shadow: "{shadow.card}"
-    padding: "{spacing.xl}"
-  card-subtle:
-    backgroundColor: "{colors.surface-soft}"
-    border: 1px solid "{colors.hairline}"
-    rounded: "{rounded.xl}"
-    padding: "{spacing.xl}"
+## What We Imitate
 
-  # ── Table ──
-  table-root:
-    backgroundColor: "{colors.surface}"
-    border: 1px solid "{colors.hairline}"
-    rounded: "{rounded.xl}"
-    typography: "{typography.table-text}"
-  table-head:
-    backgroundColor: "{colors.surface-soft}"
-    borderBottom: 1px solid "{colors.hairline}"
-  table-th:
-    padding: 10px 16px
-    typography: "{typography.card-label}"
-    textColor: "{colors.ink-muted}"
-  table-td:
-    padding: 10px 16px
-    textColor: "{colors.ink}"
-    borderBottom: 1px solid "{colors.hairline}"
-  table-row-hover:
-    backgroundColor: "{colors.surface-hover}"
+### Cal.com
 
-  # ── KPI Card ──
-  kpi-card:
-    backgroundColor: "{colors.surface}"
-    border: 1px solid "{colors.hairline}"
-    rounded: "{rounded.xl}"
-    shadow: "{shadow.card}"
-    padding: "{spacing.lg}"
-    minHeight: 96px
+Imitate:
 
-  # ── Input ──
-  input:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.ink}"
-    border: 1px solid "{colors.hairline-input}"
-    rounded: "{rounded.md}"
-    padding: 8px 12px
-    typography: "{typography.body}"
-  input-focus:
-    border: 1px solid "{colors.primary}"
-    ring: 2px solid rgba(79,93,230,0.20)
+- Black primary actions.
+- White cards on warm/neutral canvas.
+- Simple 8-12px radius controls.
+- Scheduling toolbar clarity.
+- Low-decoration product UI.
 
-  # ── Badge ──
-  badge:
-    rounded: "{rounded.full}"
-    padding: 2px 10px
-    typography: "{typography.caption}"
-    fontWeight: 600
+Do not imitate:
 
-  # ── Tab ──
-  tab-default:
-    backgroundColor: transparent
-    textColor: "{colors.ink-muted}"
-    rounded: "{rounded.md}"
-    padding: 6px 14px
-    typography: "{typography.card-label}"
-  tab-active:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.ink}"
-    shadow: "{shadow.sm}"
+- Excessive whitespace when SACIS needs dense data.
+- Pure scheduling-only assumptions.
 
-  # ── Empty State ──
-  empty-state:
-    backgroundColor: "{colors.surface}"
-    border: 1px solid "{colors.hairline}"
-    rounded: "{rounded.xl}"
-    shadow: "{shadow.card}"
-    padding: 64px 16px
-    textColor: "{colors.ink-subtle}"
-    typography: "{typography.body-sm}"
+### Airtable
 
-  # ── Panel ──
-  panel:
-    backgroundColor: "{colors.surface}"
-    borderLeft: 1px solid "{colors.hairline}"
-    shadow: "{shadow.panel}"
-    width: 440px
+Imitate:
 
----
+- Tables as primary business surfaces.
+- Filter bars above records.
+- Structured fields and status chips.
+- Dense but readable rows.
+- Friendly information organization.
 
-## Overview
+Do not imitate:
 
-SACIS 3.0 is a property operations system for managers, finance staff, and front desk operators. The interface should feel calm, professional, and data-dense — a polished operational tool, not a marketing site.
+- Too many playful colors.
+- Spreadsheet complexity when a chart or dashboard is clearer.
 
-The design system is built on three anchors:
-- **Stripe's color discipline** — single indigo-blue accent, navy depth, monochrome discipline everywhere else
-- **Notion's component clarity** — 8px rectangular buttons, 12px cards, sober editorial geometry
-- **Linear's surface hierarchy** — canvas → surface → surface-soft ladder, hairline depth, zero decoration
+### Notion
 
-**Key Characteristics:**
-- **Indigo-blue primary** (`{colors.primary}` #4F5DE6) — the single chromatic accent. Used on primary CTAs, focus rings, active indicators, and "daily occupied" room status.
-- **Warm neutral canvas** (`{colors.canvas}` #F7F6F4) — warmer than gray, cooler than cream. Provides temperature without competing with the blue primary.
-- **Three-step surface ladder** (canvas → surface-soft → surface) carries hierarchy. Cards lift via hairline border + subtle shadow, not color fills.
-- **Hairline borders** (`{colors.hairline}` #E5E3E0) — 1px warm-gray borders on all containers. No heavy outlines.
-- **System font stack** — Microsoft YaHei / PingFang SC for Chinese, Segoe UI / system-ui for Latin. Tabular numbers for all amounts and counts.
-- **Consistent 8px spacing unit** — all padding and gaps derive from the spacing scale.
+Imitate:
 
-## Product Tone
+- Warm canvas.
+- Calm reading experience.
+- Soft section boundaries.
+- Minimal decoration.
 
-- Calm and professional, not flashy or decorative.
-- Clean operational dashboard for daily work — managers must read finance and room status at a glance.
-- Data-dense enough for power users, clean enough for occasional users.
-- No fake controls. Every button, filter, tab, and chip must either work or be removed.
-- No giant description cards at the top of mature modules. Start with data and controls.
+Do not imitate:
 
-## Colors
+- Document-editor looseness.
+- Serif-forward typography.
+- Overly sparse content blocks.
 
-### Primary Accent
+### Linear
 
-- **Indigo-Blue** (`{colors.primary}` — #4F5DE6): The single brand accent. Primary CTA buttons, focus rings, link emphasis, active navigation indicator, "daily occupied" room status.
-- **Indigo Hover** (`{colors.primary-hover}` — #3D4BCF): Hover/pressed state for primary buttons.
-- **Indigo Soft** (`{colors.primary-soft}` — #EDEFFD): Light indigo background for selected rows, hovered nav items, "daily occupied" status backgrounds.
-- **Indigo Soft Hover** (`{colors.primary-soft-hover}` — #DEE3FC): Deeper soft indigo for hover-on-soft states.
+Imitate:
 
-### Surface
+- Precise active states.
+- Tight hierarchy.
+- Crisp borders and motion.
 
-- **Canvas** (`{colors.canvas}` — #F7F6F4): Page background. Warm neutral that sits between pure white and warm cream.
-- **Surface** (`{colors.surface}` — #FFFFFF): Cards, tables, panels, modals. Pure white.
-- **Surface Soft** (`{colors.surface-soft}` — #F3F2F0): Filter bars, table headers, inactive tabs, alternating row backgrounds.
-- **Surface Hover** (`{colors.surface-hover}` — #EBEAE7): Row hover, card hover lift.
-- **Surface Dark** (`{colors.surface-dark}` — #1E1F2C): Sidebar navigation background. Deep navy-indigo for the desktop sidebar only.
+Do not imitate:
 
-### Borders
+- Dark-first UI.
+- Purple product accent.
+- Engineering-tool tone.
 
-- **Hairline** (`{colors.hairline}` — #E5E3E0): Default card, input, and table borders.
-- **Hairline Strong** (`{colors.hairline-strong}` — #D0CDC8): Active controls, selected tabs, stronger dividers.
-- **Hairline Input** (`{colors.hairline-input}` — #C5C3C8): Slightly cooler border for form inputs (distinguishable from card borders).
+## Protected Existing Design
 
-### Text
+These areas are already approved and should not be restyled unless explicitly requested:
 
-- **Ink** (`{colors.ink}` — #181919): Headings, body text, important numbers. Near-black.
-- **Ink Muted** (`{colors.ink-muted}` — #5C5D61): Secondary text, labels, table headers.
-- **Ink Subtle** (`{colors.ink-subtle}` — #949599): Placeholder text, disabled states, captions.
-- **Ink On Dark** (`{colors.ink-on-dark}` — #EDEDF0): Text on the dark sidebar.
+- Management / market room-status card color language in `src/components/room-card.tsx`.
+- Daily rental calendar booking/status color language in `src/features/daily-rentals/calendar.tsx`.
 
-### Room Status Colors
+These can be improved around the edges:
 
-Every room tile, badge, and status indicator uses one consistent color mapping:
+- Toolbars.
+- Headers.
+- View switchers.
+- Filters.
+- Detail panels.
+- Data visualization around the existing calendar/cards.
 
-| Status | Background | Border | Text | Strip |
-|---|---|---|---|---|
-| Available | `#F0FDF4` | `#86EFAC` | `#166534` | `#22C55E` |
-| Daily Occupied | `#EDEFFD` | `#A5B0F6` | `#2F3BA8` | `#4F5DE6` |
-| Reserved | `#FFF8EB` | `#FCD34D` | `#92400E` | `#F59E0B` |
-| Cleaning | `#ECFEFF` | `#67E8F9` | `#155E75` | `#06B6D4` |
-| Maintenance/Locked | `#FEF2F2` | `#FECACA` | `#991B1B` | `#EF4444` |
-| Sold | `#F5F5F4` | `#D6D3D1` | `#44403C` | `#78716C` |
-| Leased | `#F5F3FF` | `#C4B5FD` | `#5B21B6` | `#8B5CF6` |
+## Foundation Tokens
 
-Always use background + border + text together. Never rely on background color alone to communicate status.
+### Color
 
-### Finance & Feedback Colors
+Core palette:
 
-- **Success** (`{colors.semantic-success}` — #16A34A): Paid, completed, on-track.
-- **Warning** (`{colors.semantic-warning}` — #D97706): Partial payment, pending, overdue-soon.
-- **Danger** (`{colors.semantic-danger}` — #DC2626): Overdue, cancelled, requires attention.
-- **Info** (`{colors.semantic-info}` — #4F5DE6): Neutral informational status. Same as primary.
+- `canvas`: `#f6f5f4` warm off-white page background.
+- `surface`: `#ffffff` cards, tables, panels, sheets.
+- `surface-muted`: `#f3f2f0` table headers, filter bars, inactive segmented containers.
+- `surface-hover`: `#ecebe8` hover background.
+- `ink`: `#181919` primary text and primary actions.
+- `ink-muted`: `#5c5d61` secondary text.
+- `ink-subtle`: `#8f8d89` placeholders and disabled copy.
+- `border`: `#e5e3e0` default hairline.
+- `border-strong`: `#d2cfca` active/selected border.
 
-## Typography
+Semantic colors:
 
-### Font Family
+- Success: green. Paid, completed, on track.
+- Warning: amber. Pending, partial, attention soon.
+- Danger: red. Overdue, blacklist, destructive.
+- Info/focus: blue. Links, focus rings, neutral information.
 
-System font stack for Chinese + Latin rendering:
+Rules:
 
-```
-"Microsoft YaHei", "PingFang SC", "Segoe UI", system-ui, -apple-system, sans-serif
+- Black/ink is the only default primary action color.
+- Blue is not the primary CTA color; it is focus/link/info.
+- Red is not decoration; it means danger.
+- Amber is not decoration; it means attention.
+- Green is not decoration; it means success or completion.
+- Purple is not part of the system palette unless a protected business status already uses it.
+- Room-status colors are separate from general semantic colors.
+
+### Typography
+
+Font stack:
+
+```css
+"MiSans", "Microsoft YaHei", "PingFang SC", "Segoe UI", system-ui, -apple-system, sans-serif
 ```
 
-Monospace for amounts, IDs, and receipt numbers:
-
-```
-ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace
-```
-
-### Hierarchy
+Type scale:
 
 | Token | Size | Weight | Line Height | Use |
-|---|---|---|---|---|
-| `page-title` | 22px | 700 | 1.25 | Main page heading |
-| `section-title` | 16px | 700 | 1.3 | Card and section headings |
-| `card-label` | 12px | 600 | 1.3 | Table headers, form labels, KPI labels, button labels |
-| `body` | 14px | 400 | 1.5 | Normal body text, descriptions |
-| `body-sm` | 13px | 400 | 1.5 | Supporting text, footnotes |
-| `table-text` | 13px | 500 | 1.4 | Dense data rows, table cells |
-| `caption` | 12px | 500 | 1.4 | Badge text, status labels, helper text |
-| `mono` | 13px | 400 | 1.5 | Receipt numbers, IDs, currency amounts |
+|---|---:|---:|---:|---|
+| `title.page` | 22-24px | 650-700 | 1.25 | Main page title |
+| `title.section` | 16px | 600-650 | 1.3 | Section/card title |
+| `title.subsection` | 14-15px | 600 | 1.35 | Small panel/table title |
+| `body.default` | 14px | 400-500 | 1.5 | Normal text |
+| `body.table` | 13px | 500 | 1.4 | Table cells |
+| `label` | 12px | 600 | 1.3 | Table headers, form labels, KPI labels |
+| `caption` | 12px | 400-500 | 1.4 | Helper text, dates, meta |
+| `button` | 13-14px | 600 | 1 | Buttons and segmented controls |
+| `numeric.sm` | 13px | 500-600 | 1.3 | Table amounts, counts |
+| `numeric.lg` | 18-24px | 600-700 | 1.1 | KPI values |
 
-### Rules
+Rules:
 
-- **No text below 12px.** Even in dense data tables, 12px is the floor.
-- **Tabular numbers for amounts.** Every currency value, room count, or numeric stat uses `font-feature-settings: "tnum"` via the mono token.
-- **Weight 700 for headings, 600 for labels, 400-500 for body.** Never use weight 800+.
-- **Single font stack globally.** No decorative fonts, no serif headings.
-- **Amount columns right-aligned** with mono font in all tables.
+- No meaningful text below 12px.
+- Avoid `font-black`.
+- Avoid negative letter spacing.
+- Use `tabular-nums` for money, counts, dates, room numbers, percentages.
+- Chinese labels should not use heavy uppercase/tracking habits copied from English UI.
+- Same hierarchy equals same visual treatment across pages.
+- Page title should not compete with KPI values.
 
-## Layout
+### Spacing
 
-### Spacing System
+Base unit: 4px.
 
-Base unit: 4px. Tokens: `xs` 4px · `sm` 8px · `md` 12px · `lg` 16px · `xl` 20px · `2xl` 24px · `3xl` 32px.
+Spacing tokens:
 
-- Card padding: `xl` 20px default, `lg` 16px compact.
-- Table cell padding: 10px 16px.
-- Section gap: `2xl` 24px between major sections.
-- Card grid gap: `md` 12px for dense grids, `lg` 16px for standard grids.
-- Page content max-width: 1360px.
+- `space.1`: 4px
+- `space.2`: 8px
+- `space.3`: 12px
+- `space.4`: 16px
+- `space.5`: 20px
+- `space.6`: 24px
+- `space.8`: 32px
 
-### Page Structure
+Rules:
 
-- Main content fills available width. No large empty right-side areas.
-- Consistent vertical rhythm: 24px between major sections, 16px within sections.
-- Mature modules start with controls or data, not descriptive hero cards.
-- Sidebar is the only dark surface on the page (`{colors.surface-dark}`).
+- Page major sections: 24px.
+- Related blocks inside a section: 12-16px.
+- Toolbar controls: 8px.
+- Card padding: 16px compact, 20px standard.
+- Table cell padding: 10-12px vertical, 12-16px horizontal.
+- Drawer content spacing: 16px groups, 12px fields.
+- Avoid arbitrary padding like `p-3.5` unless it is standardized into a component.
 
-### Cards
+### Radius
 
-- Radius: `xl` 16px for page cards, `lg` 12px for compact cards.
-- Border: 1px solid `{colors.hairline}`.
-- Shadow: `{shadow.card}` — subtle, never heavy.
-- Padding: `xl` 20px for normal cards, `lg` 16px for dense cards.
-- No nested cards unless each is a repeated item.
+Radius tokens:
 
-### Tables
+- `radius.control`: 8px for buttons, inputs, select.
+- `radius.card`: 12px for cards, tables, panels.
+- `radius.compact`: 8px for dense record cards.
+- `radius.sheet`: 12-16px for mobile bottom sheets only.
+- `radius.pill`: 999px for badges/chips.
 
-One shared table style across the entire system:
+Rules:
 
-- White surface container, warm hairline border, `xl` 16px radius.
-- Header background `{colors.surface-soft}`.
-- Row height 44–48px for standard tables, 40px for dense tables.
-- Amount columns: right-aligned, mono font, tabular numbers.
-- Action column: one primary action. Avoid two competing buttons.
-- Row hover: `{colors.surface-hover}` background.
+- A normal toolbar button and input should share radius.
+- Do not mix `rounded-md`, `rounded-lg`, `rounded-xl`, and `rounded-2xl` in one toolbar.
+- Large soft radius belongs to mobile sheets or specific repeated cards, not every control.
 
-## Elevation & Depth
+### Border
 
-| Level | Treatment | Use |
-|---|---|---|
-| 0 (flat) | No shadow | Page background, inline text |
-| 1 (card) | `{shadow.card}` | Standard cards, table containers |
-| 2 (lifted) | `{shadow.lifted}` | Hovered KPI cards, active panels |
-| 3 (panel) | `{shadow.panel}` | Slide-out panels, dropdowns, modals |
+Border tokens:
 
-No custom `shadow-[...]` values. No Tailwind defaults. Only the 4 defined tokens.
+- Default: 1px solid `border`.
+- Strong: 1px solid `border-strong`.
+- Active: 1px solid ink or component-specific active border.
+- Table dividers: 1px `border` at reduced visual emphasis.
+- Danger/warning/success borders use semantic tints.
 
-## Components
+Rules:
 
-### Button
+- Operational UI should rely more on border and layout than heavy shadows.
+- Inputs and cards should not have identical hover states if they behave differently.
+- Selected state must be visible through color, border, or filled surface.
 
-4 variants: primary, secondary, ghost, danger. All use `{rounded.md}` 8px, 36px height. Labels use `{typography.card-label}` (12px 600 uppercase).
+### Elevation
 
-- **Primary**: Indigo background, white text. The only filled blue button on screen.
-- **Secondary**: White background, 1px hairline border, ink text.
-- **Ghost**: Transparent, muted text, soft background on hover.
-- **Danger**: Red background, white text. Only for destructive actions.
-- **Icon buttons** must have tooltips or aria-labels.
+Elevation tokens:
 
-Never build raw `<button>` elements outside the shared Button component.
+- `flat`: no shadow.
+- `card`: subtle shadow for cards and table shells.
+- `raised`: hover/active card lift.
+- `dropdown`: menus, popovers.
+- `panel`: drawer and modal.
 
-### Card
+Rules:
 
-2 variants: default (white + hairline + card shadow), subtle (surface-soft background). Both `{rounded.xl}` 16px, `{spacing.xl}` 20px padding.
+- No `shadow-2xl` inside ordinary app content.
+- Drawer and dialog may use stronger panel shadow.
+- Hover lift should be subtle and consistent.
+- Avoid decorative glassmorphism. Backdrop blur is allowed for overlays only.
 
-### Table
+### Motion
 
-Use `.data-table` or the shared Table component. Never override styles inline. Header: surface-soft background, hairline bottom border. Cells: 10px 16px padding. Row hover: surface-hover background. Amount columns: right-aligned with mono font.
+Motion tokens:
 
-### KPI Card
+- Fast: 120ms.
+- Normal: 180-220ms.
+- Slow: 300ms for overlays only.
 
-96px min-height, `{rounded.xl}`, white surface, hairline border, card shadow. Label above in `{typography.card-label}`, large value below in `{typography.page-title}` with mono font for numbers. Optional 4px-left color strip for semantic coding.
+Rules:
 
-### Input
+- Buttons may use color and slight active scale.
+- Cards may use subtle hover lift if clickable.
+- Tables use row background hover only.
+- Drawers/sheets should animate consistently.
+- No decorative motion for dashboards.
 
-`{rounded.md}` 8px, hairline border, 8px 12px padding, `{typography.body}` 14px. Focus: 1px primary border + 2px primary ring at 20% opacity.
+### Iconography
 
-### Badge
+Use Lucide icons by default.
 
-Pill-shaped (`{rounded.full}`), 2px 10px padding, `{typography.caption}` 12px 600. Uses room-status or semantic color backgrounds at full opacity with matching text.
+Rules:
 
-### Empty State
+- Default icon size: 16px.
+- Small icon size: 14px.
+- KPI icon: 18-20px.
+- Stroke width: 1.75-2.
+- Icon + text gap: 8px.
+- Icon-only button must have `aria-label` or tooltip.
+- Do not use letters as icon substitutes when a clear icon exists.
 
-Centered content, `{rounded.xl}`, card shadow, 64px vertical padding, ink-subtle text.
+## Density System
 
-### Panel (Slide-out)
+SACIS needs three density modes:
 
-White surface, hairline left border, panel shadow, 440px width.
+### Comfortable
 
-## Module Rules
+Use for:
+
+- Forms.
+- Detail panels.
+- Customer profile.
+- Settings.
+
+Traits:
+
+- 14px body.
+- 40px controls.
+- 16-20px card padding.
+
+### Compact
+
+Use for:
+
+- Finance lists.
+- Unit lists.
+- Customer lists.
+- Business dashboards.
+
+Traits:
+
+- 13-14px text.
+- 36-40px controls.
+- 12-16px padding.
+
+### Dense
+
+Use for:
+
+- Daily rental calendar.
+- Room matrix.
+- Ledger tables.
+
+Traits:
+
+- 12-13px labels and table text.
+- Fixed row heights.
+- High information density.
+- Strong hover/focus affordance.
+
+Dense does not mean unreadable. It means disciplined.
+
+## Core Component Rules
+
+### Button System
+
+Variants:
+
+- `primary`: black/ink fill, white text. One main action per section.
+- `secondary`: white surface, border, ink text.
+- `ghost`: transparent, muted text, subtle hover.
+- `danger`: red fill or red outline for destructive actions.
+- `warning`: amber outline/fill only for attention workflows.
+- `icon`: square 36-40px icon button.
+- `toolbar`: compact button inside toolbars.
+- `segmented`: active/inactive group selection.
+
+Rules:
+
+- Same toolbar must not mix unrelated button heights/radius/shadows.
+- Primary button should not be used for navigation tabs.
+- Secondary and outline should not both exist if they look identical.
+- Destructive buttons require clear label and usually confirmation.
+
+### Input / Select / Textarea
+
+Rules:
+
+- 36-40px height.
+- 8px radius.
+- White surface.
+- Hairline border.
+- Clear focus ring.
+- Placeholder muted.
+- Search uses leading icon.
+- Select should look like input, not browser default.
+- Textarea follows same border/radius/focus.
+
+### Filter Bar
+
+Filter bars are a core SACIS component.
+
+Contains:
+
+- Search.
+- Date range.
+- Building selector.
+- Status chips.
+- Type selector.
+- Result count.
+- Reset action when filters are active.
+
+Rules:
+
+- Filters sit in a single white panel or muted segmented shell.
+- Counts use tabular numbers.
+- Active filters are visually obvious.
+- No fake or disabled filters shown as normal controls.
+
+### Card System
+
+Card types:
+
+- `KpiCard`: number, label, optional trend, optional mini chart.
+- `ChartCard`: title, metric, chart, small supporting caption.
+- `RiskCard`: attention item with severity and action.
+- `RecordCard`: customer/unit/contract summary.
+- `ActionCard`: clear action with icon and label.
+- `StatusCard`: protected room-status color cards.
+
+Rules:
+
+- Cards represent one unit of meaning.
+- Avoid nested cards.
+- Use repeated cards for repeated records.
+- Use charts when comparing ratios/trends; do not force everything into cards.
+
+### Table System
+
+Table types:
+
+- `BusinessTable`: default records.
+- `FinanceTable`: right-aligned amounts, stronger numeric hierarchy.
+- `SelectableTable`: checkbox column, batch toolbar.
+- `GroupedTable`: section headers for grouped records.
+- `CompactTable`: dense rows for panels.
+
+Rules:
+
+- Table shell has white surface, border, radius, optional shadow.
+- Header uses muted surface.
+- Header text: 12px, 600.
+- Body text: 13px.
+- Standard row height: 44-48px.
+- Dense row height: 36-40px.
+- Amounts right-aligned.
+- Action column uses icon button or single text action.
+- Rows should support hover.
+- Empty state belongs inside the table shell.
+
+### Tabs / Segmented Controls
+
+Rules:
+
+- Use segmented controls for switching views within the same page.
+- Active state: filled ink or white elevated pill, depending on background.
+- Tab height: 36-40px.
+- Label: 13px, 600.
+- Count badge optional.
+- Do not make tabs look like primary CTAs.
+
+### Badge / Status Pill
+
+Rules:
+
+- Badge text: 12px, 600.
+- Pill radius.
+- Semantic badges use matching bg/border/text.
+- Protected room-status badges follow existing room/status palette.
+- Badge should not be the only status signal when risk is high.
+
+### Drawer / Dialog / Sheet
+
+Rules:
+
+- Desktop detail/edit flows prefer right drawer.
+- Mobile detail/edit flows prefer bottom sheet.
+- Overlay scrim: black 20-30%.
+- Drawer width: 420-520px for forms, wider for finance details.
+- Header is sticky with title and close button.
+- Footer actions are sticky if the form is long.
+- Close button is icon-only with aria-label.
+
+### Calendar / Timeline
+
+Protected:
+
+- Existing daily rental booking/status colors.
+
+Rules:
+
+- Calendar toolbar uses same button system.
+- View switcher is segmented.
+- Date range navigation is compact and centered.
+- Empty cells must show click affordance.
+- Booking bars must remain readable at dense sizes.
+- Calendar should have status legend and active filter count.
+
+### Sidebar / Navigation
+
+Rules:
+
+- Light sidebar by default.
+- Active item uses black/ink filled pill.
+- Group labels are subtle but readable.
+- Icon size 16px.
+- Collapsed mode keeps active state clear.
+- Mobile uses bottom nav, but deep pages need a secondary access pattern.
+
+### Topbar
+
+Rules:
+
+- Topbar is utility chrome, not a marketing header.
+- Language, user, notification, logout should use same icon/utility button family.
+- Do not mix pill styles in the same topbar.
+
+## Data Visualization Rules
+
+SACIS currently overuses raw data display. Add visualization when it improves judgment.
+
+### Chart Types
+
+#### Donut / Ring
+
+Use for:
+
+- Occupancy rate.
+- Collection rate.
+- Room-status distribution.
+- Receivable paid vs unpaid.
+
+Rules:
+
+- 2-5 segments.
+- Center label must state the main number.
+- Legend uses labels and counts/percentages.
+
+#### Line Chart
+
+Use for:
+
+- Monthly revenue trend.
+- Daily rental occupancy trend.
+- Outstanding balance over time.
+- Collection rate over months.
+
+Rules:
+
+- Use for time series only.
+- Show current period and comparison period when useful.
+- Avoid too many lines.
+
+#### Bar Chart
+
+Use for:
+
+- Building comparison.
+- Business type revenue.
+- Monthly income/expense.
+- Customer segment counts.
+
+Rules:
+
+- Sort bars by business priority or value.
+- Label values directly when space allows.
+
+#### Radar Chart
+
+Use sparingly for:
+
+- Building health score.
+- Multi-factor operational comparison.
+
+Potential axes:
+
+- Occupancy.
+- Collection rate.
+- Low overdue rate.
+- Low maintenance rate.
+- Revenue progress.
+- Data quality.
+
+Rules:
+
+- Radar chart needs normalized 0-100 values.
+- Use no more than 5-6 axes.
+- Must have explanation tooltip or legend.
+
+#### Progress / Goal
+
+Use for:
+
+- Monthly revenue target.
+- Occupancy target.
+- Contract payment progress.
+
+Rules:
+
+- Always show actual and target.
+- Avoid fake progress without a target.
+
+#### Sparkline
+
+Use inside KPI cards for:
+
+- Revenue mini trend.
+- Occupancy mini trend.
+- Receivable mini trend.
+
+Rules:
+
+- Decorative only if the main number remains readable.
+- Use consistent time window.
+
+### Chart Card Structure
+
+Each chart card has:
+
+1. Title.
+2. Primary metric.
+3. Chart.
+4. Context line or trend badge.
+5. Optional drill-down action.
+
+Charts should not replace tables when exact reconciliation is needed. Use chart for overview, table for detail.
+
+## Page Rules
 
 ### Management Dashboard
 
-Primary audience: owner / management. Must prioritize:
-1. Current month receivable, received, unpaid, overdue.
-2. Building room matrix with clear status colors (7 states).
-3. Room cards grouped by floor — each card shows room number, status, customer name, date range, outstanding amount.
+Goal: owner/manager scans business health.
 
-Secondary: risk alerts, data quality, operational details. Cards already showing data should not be followed by duplicate tables.
+Structure:
 
-### Daily Rentals
+1. Executive summary: revenue, collection, occupancy, risk count.
+2. Visualization row: collection donut, revenue trend, room-status distribution.
+3. Risk strip: overdue, expiring contracts, maintenance, cleaning.
+4. Building selector/status filters.
+5. Protected room cards grouped by building/floor.
+6. Drill-down panels.
 
-The daily rental page is a timeline, not a spreadsheet.
-- Default to dates around today, not first of month.
-- Timeline fills available width, no large right-side gaps.
-- 21 rooms readable without excessive vertical scrolling.
-- Row height compact (46px) for one-screen overview.
-- Empty cells clickable for new bookings; booking bars clickable for detail.
-- All filter chips functional. Status colors match the global room status table.
-- Booking bar colors: checked_in = primary indigo, confirmed = amber, pending_review = amber-light, cancelled/checked_out = neutral.
+Do not:
 
-### Long Lease & Sale
-
-Use grouped cards by floor or status. Avoid opening with one giant flat table. Tables are secondary detail views. Status colors follow the global room status table.
-
-### Units
-
-Unit list shows apartment status prominently. Parking and storefront assets are secondary. Each unit card: room number, status badge, customer, date range, outstanding amount.
+- Start with raw tables.
+- Hide risks below room matrix.
+- Duplicate the same number in five places.
 
 ### Finance
 
-Finance pages match the management dashboard:
-- Same KPI card style and table style.
-- Clear amount alignment with tabular numbers.
-- One primary action for creating ledger entries or receivables.
-- Status colors for payment states: success (paid), warning (partial), danger (overdue).
+Goal: reconcile receivables and payments.
+
+Structure:
+
+1. KPI + trend row.
+2. Receivable donut/progress.
+3. Cashflow line/bar chart.
+4. Segmented tabs: ledger / receivables / receipts.
+5. Dense tables with search/filter/export.
+6. Receipt drawer and payment confirmation flow.
+
+Do not:
+
+- Show finance as only rows.
+- Use charts without drill-down table.
+
+### Units
+
+Goal: understand asset inventory and room status.
+
+Structure:
+
+1. Asset summary.
+2. Status distribution donut/bar.
+3. Filters: building/floor/status/business.
+4. Table or record grid.
+5. Unit detail drawer.
+
+Protected:
+
+- Existing room status colors.
 
 ### Customers
 
-Clean list with search and filter. Blacklist indicator in danger color. Customer profile shows full history across daily/lease/sale.
+Goal: find customers and understand business relationship.
 
-### Front Desk (Mobile)
+Structure:
 
-Mobile-optimized workspace:
-- Room cards grouped by floor.
-- Quick actions: checkout, record payment, complete cleaning, maintenance toggle.
-- Today's checkouts and cleaning tasks surfaced first.
-- Minimal chrome — the room cards are the interface.
+1. Segment summary.
+2. Customer distribution chart.
+3. Search/filter toolbar.
+4. Grouped customer records.
+5. Customer detail drawer/profile.
 
-## Do's and Don'ts
+Important:
 
-### Do
-- Use `{colors.canvas}` (#F7F6F4) as the page background everywhere.
-- Use `{colors.primary}` (#4F5DE6) ONLY for: primary CTA, focus ring, active nav, daily-occupied status.
-- Use the surface ladder (canvas → surface-soft → surface) for hierarchy.
-- Apply the shared room-status color table consistently across ALL modules.
-- Use `{typography.card-label}` (12px 600) for all table headers, form labels, and KPI labels.
-- Use `{typography.table-text}` (13px 500) for all table body cells.
-- Use mono font + right-alignment for all amount columns.
-- Card padding: 20px standard, 16px compact. Never mix arbitrary values.
-- Use `{shadow.card}` for container lift. Never use Tailwind defaults.
+- Blacklist must be visually strong and consistent.
+- Stable customers should be easy to identify.
 
-### Don't
-- Don't use orange, green, or any second chromatic accent for CTAs or active states.
-- Don't build raw `<button>` elements. Use the Button component.
-- Don't override table styles inline. Use the shared table classes.
-- Don't create nested cards unless each item is a repeated element.
-- Don't use text below 12px.
-- Don't use font weights above 700.
-- Don't mix multiple font stacks or introduce decorative typefaces.
-- Don't rely on background color alone for room status — always pair bg + border + text.
-- Don't make the sidebar light. The dark sidebar anchors the layout.
-- Don't add large explanatory hero sections to mature modules — start with data.
+### Daily Rentals
 
-## Responsive Behavior
+Goal: operate today's and upcoming stays.
 
-### Breakpoints
+Structure:
 
-| Name | Width | Key Changes |
-|---|---|---|
-| Mobile | < 768px | Bottom nav, single-column, cards full-width. Front desk workspace becomes primary view. |
-| Tablet | 768–1023px | Sidebar collapsed. Feature grids 2-up. |
-| Desktop | 1024px+ | Full sidebar, multi-column grids, full data tables. |
+1. Today summary.
+2. Share/print/backfill toolbar.
+3. Daily rental finance mini cards.
+4. Calendar timeline with protected colors.
+5. Booking panel.
+6. Optional occupancy trend or checkout/cleaning chart above calendar.
 
-### Touch Targets
-- All interactive elements ≥ 40×40px on touch screens.
-- Form inputs minimum 40px height on mobile.
-- Bottom nav items ≥ 44px tap target.
+Do not:
 
-### Font Scaling
-- Page title: 22px desktop → 18px mobile.
-- Table text: 13px desktop → 12px mobile (12px is the absolute floor).
-- Card labels: 12px, consistent across all breakpoints.
+- Change approved calendar status colors.
+- Let toolbar buttons use inconsistent styles.
 
-## Implementation Priority
+### Leases / Sales
 
-1. **Tokens & Foundation** — Update tailwind.config.ts, globals.css, and 4 UI primitives.
-2. **Status Colors** — Update status-styles.ts, room-status.ts to match the new 7-state table.
-3. **Shell** — Dark sidebar, updated nav, page header, metric card, empty state.
-4. **Management Dashboard** — Room matrix, finance overview, KPI cards.
-5. **Daily Rentals** — Timeline calendar, booking panel, room status display.
-6. **Long Lease & Sale** — Card grids, contract lists, detail panels.
-7. **Finance** — Ledger, receivables, reports.
-8. **Units & Customers** — Unit list, customer list, profile views.
-9. **Remaining Modules** — Front desk, todos, documents, settings, data exchange, bulk actions, security.
-10. **Page Files & Meta** — layout.tsx viewport color, loading.tsx, login page.
+Goal: manage contracts and payment progress.
+
+Structure:
+
+1. Contract status summary.
+2. Payment progress visualization.
+3. Filters/tabs.
+4. Contract list/table.
+5. Detail drawer with payment schedule.
+
+### Reports
+
+Goal: visualization-first business reporting.
+
+Structure:
+
+1. Date range and report type.
+2. Chart grid.
+3. Export actions.
+4. Supporting detail tables.
+
+### Settings / Data Quality / Bulk Actions
+
+Goal: safe administration.
+
+Rules:
+
+- Risky actions use warning/danger surfaces.
+- Batch actions require preview and confirmation.
+- Data quality uses severity, count, and fix actions.
+
+## State Rules
+
+### Empty State
+
+Must include:
+
+- Clear title.
+- Short reason or next step.
+- Optional action.
+
+Do not show only blank panels.
+
+### Loading State
+
+Use:
+
+- Skeleton for cards/tables.
+- Loading text only when skeleton is not appropriate.
+
+### Error State
+
+Must include:
+
+- What failed.
+- Whether retry is possible.
+- Support/debug hint if needed.
+
+### Disabled State
+
+Rules:
+
+- Disabled controls need a visible reason if not obvious.
+- Do not show future features as disabled primary UI.
+
+## Accessibility Rules
+
+- All icon buttons need accessible labels or tooltips.
+- Touch targets: 40px minimum on touch devices.
+- Meaningful text: 12px minimum.
+- Do not communicate status by color alone.
+- Focus states must be visible.
+- Dialogs/drawers need clear close behavior.
+- Tables need readable headers and row focus/hover.
+
+## Responsive Rules
+
+### Mobile
+
+- Bottom nav remains primary.
+- Tables convert to cards unless exact comparison is required.
+- Drawers become bottom sheets.
+- Toolbars wrap into two rows.
+- Calendar keeps dense operational mode but controls simplify.
+
+### Tablet
+
+- Sidebar may collapse.
+- Two-column card grids.
+- Tables can scroll horizontally.
+
+### Desktop
+
+- Sidebar expanded.
+- Dashboard grids.
+- Dense tables.
+- Right drawers for detail/edit.
+
+## Implementation Rules
+
+### No Raw UI Drift
+
+Avoid hand-written one-off styles for:
+
+- Buttons.
+- Inputs.
+- Selects.
+- Tables.
+- Tabs.
+- Cards.
+- Drawers.
+- Badges.
+
+If a page needs a variant, add it to the shared component family.
+
+### Migration Order
+
+1. Foundation tokens: color, type, spacing, radius, border, elevation.
+2. Typography utilities.
+3. Button system.
+4. Form controls.
+5. Filter/toolbar system.
+6. Card system.
+7. Table system.
+8. Drawer/dialog system.
+9. Chart components.
+10. Page refactors.
+
+### Review Checklist
+
+Before accepting a UI change:
+
+- Does it use the shared component family?
+- Does typography match the type scale?
+- Are button sizes/radius consistent in the same toolbar?
+- Are semantic colors used only for meaning?
+- Are protected room/calendar colors untouched?
+- Is data visualized when it helps judgment?
+- Does the page work in Chinese and French?
+- Does it avoid horizontal overflow?
+- Does build/typecheck pass?
+
+## Anti-Patterns
+
+- Eight buttons in one screen with eight visual languages.
+- Raw tables without filter/search/pagination where data can grow.
+- KPI-only dashboards with no trends or ratios.
+- Charts with no business question.
+- Decorative gradients or orbs.
+- Dark sidebar as default.
+- Purple/indigo primary brand system.
+- Text below 12px for meaningful information.
+- Unexplained disabled buttons.
+- Cards inside cards for page layout.
+- Marketing hero sections in the app.
+- Data dumped without visual hierarchy.

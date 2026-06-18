@@ -7,16 +7,17 @@ const config: Config = {
     extend: {
       colors: {
         border: "hsl(36 8% 88%)",
+        "border-strong": "hsl(36 8% 82%)",
         input: "hsl(36 8% 88%)",
         ring: "hsl(200 72% 48%)",
-        background: "hsl(40 12% 96%)",
+        background: "hsl(30 10% 96%)",
         foreground: "hsl(30 8% 10%)",
         primary: {
           DEFAULT: "hsl(30 6% 12%)",
           foreground: "hsl(0 0% 100%)",
         },
         secondary: {
-          DEFAULT: "hsl(38 12% 94%)",
+          DEFAULT: "hsl(30 9% 94%)",
           foreground: "hsl(30 8% 16%)",
         },
         destructive: {
@@ -24,12 +25,12 @@ const config: Config = {
           foreground: "hsl(0 0% 100%)",
         },
         muted: {
-          DEFAULT: "hsl(38 12% 94%)",
+          DEFAULT: "hsl(30 9% 94%)",
           foreground: "hsl(30 5% 44%)",
         },
         accent: {
-          DEFAULT: "hsl(200 80% 94%)",
-          foreground: "hsl(200 72% 36%)",
+          DEFAULT: "hsl(210 40% 96%)",
+          foreground: "hsl(215 35% 28%)",
         },
         popover: {
           DEFAULT: "hsl(0 0% 100%)",
@@ -40,11 +41,11 @@ const config: Config = {
           foreground: "hsl(30 8% 10%)",
         },
         sidebar: {
-          DEFAULT: "hsl(38 10% 94%)",
+          DEFAULT: "hsl(30 11% 96%)",
           foreground: "hsl(30 8% 12%)",
           primary: "hsl(30 6% 12%)",
           "primary-foreground": "hsl(0 0% 100%)",
-          accent: "hsl(38 12% 90%)",
+          accent: "hsl(30 9% 91%)",
           "accent-foreground": "hsl(30 8% 12%)",
           border: "hsl(36 8% 86%)",
           ring: "hsl(200 72% 48%)",
@@ -143,8 +144,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['"Geist"', '"Inter"', '"Noto Sans SC"', '"Microsoft YaHei UI"', "system-ui", "-apple-system", "BlinkMacSystemFont", '"Segoe UI"', "sans-serif"],
-        mono: ['"Geist Mono"', '"SFMono-Regular"', '"Consolas"', '"Liberation Mono"', "monospace"],
+        sans: ['"MiSans"', '"Microsoft YaHei"', '"PingFang SC"', '"Segoe UI"', "system-ui", "-apple-system", "sans-serif"],
+        mono: ['"SFMono-Regular"', '"Consolas"', '"Liberation Mono"', "monospace"],
       },
       borderRadius: {
         lg: "var(--radius)",

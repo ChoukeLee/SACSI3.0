@@ -6,7 +6,10 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { DateInput } from "@/components/ui/date-input";
+import { Button } from "@/components/ui/button";
 import { BusinessTable, BusinessTbody, BusinessTd, BusinessTh, BusinessThead, BusinessRow, MoneyCell, DEFAULT_BUSINESS_TABLE_PAGE_SIZE } from "@/components/ui/business-table";
+import { DataVizCard, MiniLineChart } from "@/components/ui/data-viz";
+import { FilterBar, StatTile, controlClass } from "@/components/ui/operational";
 import type { LedgerEntryRow } from "@/types/database";
 import { addLedgerEntry } from "./actions";
 import { ReceiptThumb } from "@/components/attachments/receipt-thumb";
@@ -59,7 +62,7 @@ const allCategories = [
   "tax", "agency_commission", "other_expense",
 ];
 
-const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+const inputClass = cn("w-full", controlClass);
 const labelClass = "block mb-1 text-xs font-semibold text-muted-foreground";
 const pageSize = DEFAULT_BUSINESS_TABLE_PAGE_SIZE;
 
@@ -139,6 +142,22 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
     return { income, expense, net: income - expense };
   }, [filtered]);
 
+  const monthlyTrend = useMemo(() => {
+    const buckets = new Map<string, number>();
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      buckets.set(d.toISOString().slice(0, 7), 0);
+    }
+    for (const e of filtered) {
+      const key = e.entry_date.slice(0, 7);
+      if (!buckets.has(key)) continue;
+      const amount = Number(e.amount_xof);
+      buckets.set(key, (buckets.get(key) ?? 0) + (e.direction === "expense" || e.direction === "liability_out" ? -amount : amount));
+    }
+    return [...buckets.entries()].map(([month, value]) => ({ month, value }));
+  }, [filtered]);
+
   const handleSave = async () => {
     setSaving(true); setError("");
     const result = await addLedgerEntry({
@@ -173,30 +192,41 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
     liability_in: "text-cyan-600", liability_out: "text-amber-600",
   };
 
-  const filterSelect = "h-9 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
-  const filterDate = "h-9 w-[150px] rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+  const filterSelect = controlClass;
+  const filterDate = cn("w-[150px]", controlClass);
 
   return (
     <div className="space-y-5">
-      {/* Summary stats */}
       <div className="grid gap-2 sm:grid-cols-3">
-        <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-          <span className="h-2.5 w-2.5 rounded-full bg-accentGreen-500 shrink-0" />
-          <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{formatXof(summary.income)}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t.summary.totalIncome}</p></div>
-        </div>
-        <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-          <span className="h-2.5 w-2.5 rounded-full bg-accentRed-500 shrink-0" />
-          <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{formatXof(summary.expense)}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t.summary.totalExpense}</p></div>
-        </div>
-        <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-          <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", summary.net >= 0 ? "bg-accentBlue-500" : "bg-accentAmber-500")} />
-          <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{formatXof(summary.net)}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t.summary.netBalance}</p></div>
-        </div>
+        <StatTile tone="green" label={t.summary.totalIncome} value={formatXof(summary.income)} />
+        <StatTile tone="red" label={t.summary.totalExpense} value={formatXof(summary.expense)} />
+        <StatTile tone={summary.net >= 0 ? "blue" : "amber"} label={t.summary.netBalance} value={formatXof(summary.net)} />
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
+      <DataVizCard
+        title={locale === "zh" ? "近 6 个月净现金流" : "Flux net sur 6 mois"}
+        description={locale === "zh" ? "按当前筛选条件聚合收入与支出" : "Agrégé selon les filtres actifs"}
+        metric={formatXof(summary.net)}
+      >
+        <MiniLineChart
+          tone={summary.net >= 0 ? "green" : "amber"}
+          values={monthlyTrend.map((item) => item.value)}
+          label={monthlyTrend.map((item) => `${item.month} ${formatXof(item.value)}`).join(" · ")}
+        />
+      </DataVizCard>
+
+      <FilterBar
+        meta={
+          <div className="flex items-center gap-2">
+            <Button onClick={handleExportCsv} disabled={filtered.length === 0} variant="outline" size="sm">
+              <Download className="h-4 w-4" />{t.export.csv}
+            </Button>
+            <Button onClick={() => setShowNewEntry(true)} size="sm">
+              <Plus className="h-4 w-4" />{t.entry.title}
+            </Button>
+          </div>
+        }
+      >
           <DateInput value={startDate} onChangeValue={setStartDate} className={filterDate} />
           <span className="text-xs font-semibold text-muted-foreground">-</span>
           <DateInput value={endDate} onChangeValue={setEndDate} className={filterDate} />
@@ -216,18 +246,9 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={locale === "zh" ? "搜索描述/房号..." : "Rechercher description, chambre..."}
-            className="h-9 w-48 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20"
+            className={cn("w-48", controlClass)}
           />
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={handleExportCsv} disabled={filtered.length === 0} className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-accent disabled:opacity-40">
-            <Download className="h-4 w-4" />{t.export.csv}
-          </button>
-          <button onClick={() => setShowNewEntry(true)} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 active:scale-[0.98]">
-            <Plus className="h-4 w-4" />{t.entry.title}
-          </button>
-        </div>
-      </div>
+      </FilterBar>
 
       {/* Table */}
       {filtered.length === 0 ? (
@@ -294,25 +315,27 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
                   : `共 ${filtered.length} 条，每页 ${pageSize} 条`}
               </span>
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   type="button"
                   onClick={() => setPage((value) => Math.max(1, value - 1))}
                   disabled={currentPage <= 1}
-                  className="rounded-md border bg-card px-3 py-1.5 font-semibold text-foreground shadow-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+                  variant="outline"
+                  size="sm"
                 >
                   {locale === "fr" ? "Précédent" : "上一页"}
-                </button>
+                </Button>
                 <span className="min-w-20 text-center font-semibold text-foreground">
                   {currentPage} / {totalPages}
                 </span>
-                <button
+                <Button
                   type="button"
                   onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
                   disabled={currentPage >= totalPages}
-                  className="rounded-md border bg-card px-3 py-1.5 font-semibold text-foreground shadow-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+                  variant="outline"
+                  size="sm"
                 >
                   {locale === "fr" ? "Suivant" : "下一页"}
-                </button>
+                </Button>
               </div>
             </div>
           )}
