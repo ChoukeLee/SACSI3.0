@@ -95,7 +95,7 @@ export function MobileRoomCard({
       type="button"
       onClick={() => onPress(room)}
       className={cn(
-        "flex w-full overflow-hidden rounded-xl border bg-white text-left shadow-sm",
+        "flex w-full overflow-hidden rounded-xl border bg-card text-left shadow-card",
         "transition active:scale-[0.99] active:bg-muted/40",
         tone.border,
       )}
@@ -106,7 +106,7 @@ export function MobileRoomCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="font-mono text-xl font-black leading-none text-foreground tabular-nums">
+              <span className="font-mono text-xl font-semibold leading-none text-foreground tabular-nums">
                 {room.unit.unit_no}
               </span>
               <StatusBadge status={unitStatus} label={dictionaries[locale].statuses[unitStatus]} />
@@ -118,7 +118,7 @@ export function MobileRoomCard({
         {(room.customer || room.booking) && (
           <div className="mt-3 space-y-1.5">
             {room.customer && (
-              <div className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-foreground/85">
+              <div className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-foreground/85">
                 <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <span className="truncate">{room.customer.name}</span>
               </div>

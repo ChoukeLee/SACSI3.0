@@ -84,7 +84,7 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
     URL.revokeObjectURL(url);
   };
 
-  const selectClass = "h-9 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+  const selectClass = "h-9 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
 
   const tabs = [
     { key: "export" as Tab, label: zh ? "导出" : "Export" },
@@ -152,7 +152,7 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
                 onChange={e => { setImpText(e.target.value); setImpResult(null); setImpSubmitResult(null); }}
                 rows={8}
                 placeholder={zh ? "将 CSV 内容粘贴到此处..." : "Collez le contenu CSV ici..."}
-                className="w-full rounded-md border bg-card px-3 py-2 text-sm font-mono shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20"
+                className="w-full rounded-md border bg-card px-3 py-2 text-sm font-mono shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60"
               />
             </div>
 
@@ -181,7 +181,7 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
 
                 <div className="overflow-auto max-h-[300px] rounded-md border text-sm">
                   <table className="w-full">
-                    <thead className="sticky top-0 bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"><tr>
+                    <thead className="sticky top-0 bg-muted text-xs font-medium text-muted-foreground"><tr>
                       <th className="px-3 py-2 text-left">{zh ? "行" : "#"}</th>
                       <th className="px-3 py-2 text-left">{zh ? "数据" : "Données"}</th>
                       <th className="px-3 py-2 text-left">{zh ? "结果" : "Résultat"}</th>

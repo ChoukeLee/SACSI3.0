@@ -275,7 +275,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
                     <BusinessRow key={r.id} className={rowBg[r.status] ?? ""}>
                       <BusinessTd className="text-muted-foreground">{r.due_date}</BusinessTd>
                       <BusinessTd className="text-muted-foreground">{resolveBuildingName(r)}</BusinessTd>
-                      <BusinessTd className="font-mono text-sm font-bold">{unitMap.get(r.unit_id ?? "") ?? "-"}</BusinessTd>
+                      <BusinessTd className="font-mono text-sm font-semibold">{unitMap.get(r.unit_id ?? "") ?? "-"}</BusinessTd>
                       <BusinessTd className="max-w-[120px] truncate">{customerMap.get(r.customer_id ?? "") ?? "-"}</BusinessTd>
                       <BusinessTd align="center">
                         <Badge variant="secondary" className="text-xs">

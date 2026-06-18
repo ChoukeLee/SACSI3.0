@@ -186,7 +186,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
 
   const zh = locale === "zh";
 
-  const filterSelect = "h-9 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+  const filterSelect = "h-9 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
   const filterDate = cn(filterSelect, "w-[140px]");
 
   const formatTime = (iso: string) => {
@@ -315,7 +315,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
           <input type="text" value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={zh ? "搜索房号/客户/合同..." : "Rechercher..."}
-            className="h-9 w-full rounded-md border bg-card pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20" />
+            className="h-9 w-full rounded-md border bg-card pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60" />
         </div>
         <span className="text-sm text-muted-foreground ml-auto tabular-nums">
           {filtered.length} / {logs.length} {zh ? "条" : "lignes"}
@@ -394,7 +394,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
                       <td className="px-4 py-2.5">
                         <button
                           onClick={() => setExpandedId(expanded ? null : l.id)}
-                          className="rounded p-1 text-muted-foreground hover:text-foreground transition-colors"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                           {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                         </button>

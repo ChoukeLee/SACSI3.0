@@ -76,7 +76,7 @@ export const getReceivables = cache(async () => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("receivables")
-    .select("id, unit_id, customer_id, building_id, amount_xof, paid_amount_xof, due_date, status, source_type")
+    .select("id, unit_id, customer_id, building_id, amount_xof, paid_amount_xof, due_date, status, source_type, category")
     .order("due_date", { ascending: false })
     .limit(300);
   return data ?? [];

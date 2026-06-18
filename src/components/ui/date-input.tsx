@@ -23,7 +23,7 @@ export function DateInput({ value, onChangeValue, className, onBlur, ...props }:
       value={displayValue}
       placeholder="YYYY/MM/DD"
       className={cn(
-        "flex h-9 w-full rounded-lg border border-border bg-card px-3 py-1.5 text-sm shadow-xs transition-all duration-fast placeholder:text-muted-foreground/60 hover:border-border/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:border-ring/40",
+        "flex h-9 w-full rounded-lg border border-border bg-card px-3 py-1.5 text-[13px] shadow-xs outline-offset-2 transition-colors duration-fast placeholder:text-muted-foreground/60 hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60",
         className,
       )}
       onChange={(event) => setDisplayValue(event.target.value)}

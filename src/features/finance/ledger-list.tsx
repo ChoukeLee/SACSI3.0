@@ -347,11 +347,11 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
       {/* New entry side panel */}
       {showNewEntry && (
         <>
-          <div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setShowNewEntry(false)} />
-          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l bg-card shadow-lg">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-card/95 px-5 py-4 backdrop-blur">
-              <h3 className="text-sm font-bold">{t.entry.title}</h3>
-              <button onClick={() => setShowNewEntry(false)} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"><X className="h-4 w-4" /></button>
+          <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setShowNewEntry(false)} />
+          <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]">
+            <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
+              <h3 className="text-[15px] font-semibold">{t.entry.title}</h3>
+              <button onClick={() => setShowNewEntry(false)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"><X className="h-4 w-4" /></button>
             </div>
             <div className="space-y-4 px-5 py-5">
               <div><label className={labelClass}>{t.entry.date}</label><DateInput value={eDate} onChangeValue={setEDate} className={inputClass} /></div>
@@ -374,7 +374,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
                 <label className={labelClass}>{t.entry.amount} (XOF)</label>
                 <input type="number" value={eAmount} onChange={(e) => setEAmount(Number(e.target.value))} className={inputClass} />
               </div>
-              <div className="rounded-md bg-muted p-2 text-center text-sm font-bold">
+              <div className="rounded-md bg-muted p-2 text-center text-sm font-semibold">
                 {t.entry.amountXof}: {formatXof(eAmount)}
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -389,7 +389,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
               </div>
               <div><label className={labelClass}>{t.entry.description}</label><textarea value={eDesc} onChange={(e) => setEDesc(e.target.value)} rows={3} className={inputClass} /></div>
               {error && <p className="text-sm text-destructive">{error}</p>}
-              <button onClick={handleSave} disabled={saving} className="w-full rounded-md bg-primary py-2.5 text-sm font-bold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50">{saving ? "..." : t.entry.save}</button>
+              <Button onClick={handleSave} disabled={saving} className="w-full">{saving ? "..." : t.entry.save}</Button>
             </div>
           </div>
         </>

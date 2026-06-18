@@ -75,13 +75,13 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar">
-      <SidebarHeader className="gap-0 border-b border-sidebar-border px-4 py-3.5">
+      <SidebarHeader className="gap-0 border-b border-sidebar-border px-4 py-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-[11px] font-bold text-primary-foreground shadow-sm ring-1 ring-black/5">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-[11px] font-semibold text-primary-foreground shadow-sm ring-1 ring-black/5">
             S
           </div>
           <div className="group-data-[collapsible=icon]:hidden">
-            <p className="text-sm font-semibold leading-none text-sidebar-foreground">{labels.brand}</p>
+            <p className="text-sm font-medium leading-none text-sidebar-foreground">{labels.brand}</p>
             <p className="mt-1 text-[11px] font-medium text-sidebar-foreground/55">{labels.building}</p>
           </div>
         </div>
@@ -89,7 +89,7 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
       <SidebarContent>
         {visible.map((group, gi) => (
           <SidebarGroup key={group.key} className={gi === 0 ? "" : ""}>
-            <SidebarGroupLabel className="h-7 text-[11px] font-semibold uppercase tracking-[0.08em] text-sidebar-foreground/50">
+            <SidebarGroupLabel className="h-7 text-xs font-medium text-sidebar-foreground/50">
               {labels.groups[group.key]}
             </SidebarGroupLabel>
             <SidebarMenu>
@@ -110,7 +110,7 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
                         onFocus={() => prefetch(routeFor(locale, item.href))}
                       >
                         <Icon className="h-4 w-4" strokeWidth={active ? 2.5 : 1.75} />
-                        <span className="text-[13px] font-semibold">{labels.nav[item.key]}</span>
+                        <span className="text-[13px] font-medium">{labels.nav[item.key]}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

@@ -17,7 +17,7 @@ interface SettingsViewProps {
   locale: Locale;
 }
 
-const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
 const labelClass = "block mb-1 text-xs font-semibold text-muted-foreground";
 
 export function SettingsView({ buildings, locale }: SettingsViewProps) {
@@ -63,7 +63,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
           ) : (
             <div className="overflow-hidden rounded-md border">
               <table className="w-full text-left text-[13px]">
-                <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                <thead className="border-b bg-muted text-xs font-medium text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2.5">{t.buildings.code}</th>
                     <th className="px-4 py-2.5">{t.buildings.displayName}</th>
@@ -124,7 +124,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-md border p-4">
-              <label className="text-sm font-bold">{t.pricing.dailyDefault}</label>
+              <label className="text-sm font-medium">{t.pricing.dailyDefault}</label>
               <p className="text-xs text-muted-foreground mt-0.5">{t.pricing.dailyDefaultDesc}</p>
               <div className="mt-2 flex items-center gap-2">
                 <input type="number" defaultValue={40000} className="w-32 rounded-md border bg-card px-3 py-2 text-sm" />
@@ -132,7 +132,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
               </div>
             </div>
             <div className="rounded-md border p-4">
-              <label className="text-sm font-bold">{t.pricing.lateRate}</label>
+              <label className="text-sm font-medium">{t.pricing.lateRate}</label>
               <p className="text-xs text-muted-foreground mt-0.5">{t.pricing.lateRateDesc}</p>
               <div className="mt-2 flex items-center gap-2">
                 <input type="number" defaultValue={5} className="w-24 rounded-md border bg-card px-3 py-2 text-sm" />

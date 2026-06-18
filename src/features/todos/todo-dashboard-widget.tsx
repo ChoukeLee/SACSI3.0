@@ -26,7 +26,7 @@ export function TodoDashboardWidget({ todos, locale, maxItems = 6 }: Props) {
 
   if (todos.length === 0) {
     return (
-      <div className="rounded-2xl border border-border/70 bg-white p-5 shadow-sm text-center">
+      <div className="rounded-xl border border-border bg-card p-5 text-center text-card-foreground shadow-card">
         <Bell className="mx-auto h-6 w-6 text-muted-foreground/40 mb-2" />
         <p className="text-sm font-semibold text-muted-foreground/60">{locale === "zh" ? "今日暂无待办" : "Aucune tache"}</p>
       </div>
@@ -34,9 +34,9 @@ export function TodoDashboardWidget({ todos, locale, maxItems = 6 }: Props) {
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border/70 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-card">
       <div className="flex items-center justify-between px-5 py-3 border-b border-border/60 bg-muted/80">
-        <h3 className="text-sm font-black text-foreground flex items-center gap-2">
+        <h3 className="text-sm font-medium tracking-tight text-foreground flex items-center gap-2">
           <Bell className="h-4 w-4 text-accentBlue-600" />
           {locale === "zh" ? "今日待办" : "Aujourd'hui"}
         </h3>

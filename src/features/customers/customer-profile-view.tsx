@@ -91,7 +91,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
         <CardContent className="flex flex-col gap-5 p-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-bold">{customer.name}</h1>
+              <h1 className="text-xl font-semibold">{customer.name}</h1>
               <CustomerStatusBadge status={customerStatus} labels={L} />
               {customer.is_blacklisted && <AlertTriangle className="h-5 w-5 text-red-500" />}
             </div>
@@ -212,7 +212,7 @@ function FinanceTab({ data, L, locale }: { data: CustomerProfileData; L: ReturnT
       </div>
       <TableSection title={`${L.receivables} (${data.receivables.filter(r => r.status !== "cancelled").length})`} empty={data.receivables.length === 0} emptyText={L.noData}>
         <table className="w-full text-left text-[13px]">
-          <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+          <thead className="border-b bg-muted text-xs font-semibold text-muted-foreground">
             <tr>{[L.date, L.source, L.amount, L.paid, L.status].map(h => <th key={h} className="px-4 py-2.5">{h}</th>)}</tr>
           </thead>
           <tbody className="divide-y">
@@ -231,7 +231,7 @@ function FinanceTab({ data, L, locale }: { data: CustomerProfileData; L: ReturnT
       </TableSection>
       <TableSection title={`${L.payments} (${data.payments.length})`} empty={data.payments.length === 0} emptyText={L.noData}>
         <table className="w-full text-left text-[13px]">
-          <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+          <thead className="border-b bg-muted text-xs font-semibold text-muted-foreground">
             <tr>{[L.date, L.amount, L.receipt].map(h => <th key={h} className="px-4 py-2.5">{h}</th>)}</tr>
           </thead>
           <tbody className="divide-y">
@@ -306,7 +306,7 @@ function TableTab({ columns, rows, empty, emptyText }: { columns: string[]; rows
   return (
     <Card><div className="overflow-x-auto">
       <table className="w-full text-left text-[13px]">
-        <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"><tr>{columns.map(h => <th key={h} className="px-4 py-2.5">{h}</th>)}</tr></thead>
+        <thead className="border-b bg-muted text-xs font-semibold text-muted-foreground"><tr>{columns.map(h => <th key={h} className="px-4 py-2.5">{h}</th>)}</tr></thead>
         <tbody className="divide-y">{rows.map((row, i) => <tr key={i} className="transition-colors hover:bg-accent/50">{row.cells.map((c, j) => <td key={j} className="px-4 py-2.5">{c}</td>)}</tr>)}</tbody>
       </table>
     </div></Card>
@@ -320,17 +320,17 @@ function TableSection({ title, empty, emptyText, children }: { title?: string; e
 }
 
 function InfoCard({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm"><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold">{value}</p></div>;
+  return <div className="min-h-[84px] rounded-xl border border-border bg-card p-3.5 text-card-foreground shadow-card transition-shadow duration-200"><p className="truncate text-sm font-medium leading-tight tracking-tight text-foreground">{label}</p><p className="mt-2 text-lg font-semibold leading-snug tabular-nums text-foreground">{value}</p></div>;
 }
 
 function StatBlock({ label, value, dot }: { label: string; value: string; dot: string }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-      <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", dot)} />
-      <div className="min-w-0">
-        <p className="text-xl font-bold tracking-tight tabular-nums leading-none">{value}</p>
-        <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{label}</p>
+    <div className="flex min-h-[84px] flex-col rounded-xl border border-border bg-card p-3.5 text-card-foreground shadow-card transition-shadow duration-200">
+      <div className="flex min-w-0 items-center justify-between gap-3 pb-2">
+        <p className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">{label}</p>
+        <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", dot)} />
       </div>
+      <p className="text-lg font-semibold leading-none tabular-nums text-foreground">{value}</p>
     </div>
   );
 }

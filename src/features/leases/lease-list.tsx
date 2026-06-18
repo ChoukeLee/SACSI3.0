@@ -14,6 +14,7 @@ import { RoomCard } from "@/components/room-card";
 import { RoomBoard } from "@/components/room-board";
 import { RoomLegend } from "@/components/room-legend";
 import { EmptyState } from "@/components/empty-state";
+import { controlClass } from "@/components/ui/operational";
 import type { RoomVisualStatus } from "@/lib/status-styles";
 import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
@@ -124,7 +125,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const handleCollectReceivable = async () => { if(!payReceivableId)return; setSaving(true);setError("");const result=await recordReceivablePayment({receivableId:payReceivableId,paymentDate:payDate,receiptNo:payReceiptNo||undefined});setSaving(false);if(result.success){setPayReceivableId(null);setPayReceiptNo("");}else setError(result.error??"Failed");};
   const handleMoveOut = async () => { if(!selectedId)return;setSaving(true);setError("");const result=await processMoveOut({contractId:selectedId,actualEndDate:moEndDate,unpaidRentXof:moUnpaid,utilityCleared:moUtility,depositDeductionXof:moDeduction,depositRefundXof:moRefund});setSaving(false);if(result.success)setPanel(null);else setError(result.error??"Failed");};
 
-  const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+  const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
   const labelClass = "block text-xs font-semibold text-muted-foreground mb-1";
 
   const statusLabel = (status: string) => { const labels: Record<string,string> = locale==="zh" ? {pending:"待收",partial:"部分",paid:"已收",overdue:"逾期",cancelled:"已取消"} : {pending:"Attente",partial:"Partiel",paid:"Paye",overdue:"Retard",cancelled:"Annule"}; return labels[status]??status; };
@@ -147,7 +148,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     <div className="flex flex-col gap-6">
       {/* ── Page chrome ── */}
       <div className="flex flex-col gap-1">
-        <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+        <p className="text-xs font-medium text-muted-foreground">
           {locale === "zh" ? "长租业务" : "Baux"}
         </p>
         <div className="flex items-baseline gap-3">
@@ -163,12 +164,12 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       {/* ── Summary stats ── */}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         {statBlocks.map(b => (
-          <div key={b.key} className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-            <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", b.dot)} />
-            <div className="min-w-0">
-              <p className="text-xl font-bold tracking-tight tabular-nums leading-none">{b.value}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{b.label}</p>
+          <div key={b.key} className="flex min-h-[76px] flex-col rounded-xl border border-border bg-card p-3 text-card-foreground shadow-card transition-shadow duration-200">
+            <div className="flex min-w-0 items-center justify-between gap-3 pb-2">
+              <p className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">{b.label}</p>
+              <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", b.dot)} />
             </div>
+            <p className="text-lg font-semibold leading-none tabular-nums text-foreground">{b.value}</p>
           </div>
         ))}
       </div>
@@ -177,7 +178,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-card px-4 py-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           {["all","draft","active","terminated","expired"].map((s) => (
-            <button key={s} onClick={()=>setStatusFilter(s)} className={cn("rounded-md px-3 py-1.5 text-xs font-semibold transition", statusFilter===s ? "bg-primary text-primary-foreground shadow-sm" : "border bg-card text-muted-foreground hover:bg-accent")}>
+            <button key={s} onClick={()=>setStatusFilter(s)} className={cn(controlClass, "text-xs font-medium", statusFilter===s ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-accent")}>
               {s==="all"?(locale==="fr"?"Tous":"全部"):t.contractStatus[s as keyof typeof t.contractStatus]}
             </button>
           ))}
@@ -289,10 +290,10 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
           {/* Risk indicators */}
           {selected.status==="active"&&<div className="border-t pt-4">
-            <h4 className="text-sm font-bold flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-amber-500"/>{locale==="zh"?"风险概览":"Apercu des risques"}</h4>
+            <h4 className="flex items-center gap-1.5 text-sm font-semibold"><AlertTriangle className="h-3.5 w-3.5 text-amber-500"/>{locale==="zh"?"风险概览":"Apercu des risques"}</h4>
             <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-              <div className={cn("rounded-md border px-3 py-2",receivableStats.outstanding>0?"border-amber-200 bg-amber-50":"border-emerald-200 bg-emerald-50")}><p className="text-muted-foreground">{t.risk.outstandingTotal}</p><p className={cn("font-bold tabular-nums",receivableStats.outstanding>0?"text-amber-700":"text-emerald-700")}>{formatXof(receivableStats.outstanding)}</p></div>
-              <div className={cn("rounded-md border px-3 py-2",receivableStats.overdue>0?"border-red-200 bg-red-50":"border-emerald-200 bg-emerald-50")}><p className="text-muted-foreground">{t.risk.overdueTotal}</p><p className={cn("font-bold tabular-nums",receivableStats.overdue>0?"text-red-700":"text-emerald-700")}>{formatXof(receivableStats.overdue)}</p></div>
+              <div className={cn("rounded-md border px-3 py-2",receivableStats.outstanding>0?"border-amber-200 bg-amber-50":"border-emerald-200 bg-emerald-50")}><p className="text-muted-foreground">{t.risk.outstandingTotal}</p><p className={cn("font-semibold tabular-nums",receivableStats.outstanding>0?"text-amber-700":"text-emerald-700")}>{formatXof(receivableStats.outstanding)}</p></div>
+              <div className={cn("rounded-md border px-3 py-2",receivableStats.overdue>0?"border-red-200 bg-red-50":"border-emerald-200 bg-emerald-50")}><p className="text-muted-foreground">{t.risk.overdueTotal}</p><p className={cn("font-semibold tabular-nums",receivableStats.overdue>0?"text-red-700":"text-emerald-700")}>{formatXof(receivableStats.overdue)}</p></div>
               <div className={cn("rounded-md border px-3 py-2",!selected.deposit_received?"border-red-200 bg-red-50":"border-emerald-200 bg-emerald-50")}><p className="text-muted-foreground">{t.risk.depositStatus}</p><p className={cn("text-xs font-semibold",selected.deposit_received?"text-emerald-700":"text-red-600")}>{selected.deposit_received?t.form.depositPaid:t.form.depositUnpaid}</p></div>
               <div className={cn("rounded-md border px-3 py-2",contractRisk.expiringSoon?"border-amber-200 bg-amber-50":"border-emerald-200 bg-emerald-50")}><p className="text-muted-foreground">{t.risk.expiringSoon}</p><p className={cn("text-xs font-semibold",contractRisk.expiringSoon?"text-amber-700":"text-emerald-700")}>{contractRisk.expiringSoon?`${contractRisk.daysLeft} ${locale==="zh"?"天后到期":"j restants"}`:(locale==="zh"?"否":"Non")}</p></div>
             </div>
@@ -300,7 +301,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
           {/* Receivable list */}
           <div className="border-t pt-4">
-            <div className="flex items-center justify-between mb-2"><h4 className="text-sm font-bold">{t.receivable.title}</h4>{selected.status==="active"&&<button onClick={()=>handleGenerateReceivables(selected.id)} disabled={saving} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-40"><RefreshCw className="h-3 w-3"/>{t.receivable.generate}</button>}</div>
+            <div className="flex items-center justify-between mb-2"><h4 className="text-sm font-semibold">{t.receivable.title}</h4>{selected.status==="active"&&<button onClick={()=>handleGenerateReceivables(selected.id)} disabled={saving} className={cn(controlClass, "text-xs font-medium disabled:opacity-40")}><RefreshCw className="h-3 w-3"/>{t.receivable.generate}</button>}</div>
             {contractReceivables.length===0?<p className="text-xs text-muted-foreground">{t.receivable.none}</p>:<div className="space-y-1.5">{contractReceivables.map(r=>{const amount=Number(r.amount_xof);const paid=Number(r.paid_amount_xof);const os=Math.max(0,amount-paid);const od=os>0&&new Date(r.due_date).getTime()<Date.now()?Math.floor((Date.now()-new Date(r.due_date).getTime())/86400000):null;return(<div key={r.id} className={cn("flex items-center gap-3 rounded-lg border px-3 py-2 text-[13px] transition-colors hover:bg-accent/40",ROW_BG[r.status])}><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="font-semibold">{receivableKindLabel(r.category)}</span><span className="text-xs text-muted-foreground tabular-nums">{r.due_date}</span>{od!==null&&od>0&&<span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-600">+{od}d</span>}</div><p className="mt-0.5 text-xs text-muted-foreground">{paid>0?(locale==="zh"?"已收 ":"Payé ")+formatXof(paid):(locale==="zh"?"未收款":"Non payé")}</p></div><div className="text-right"><p className="font-semibold tabular-nums">{formatXof(amount)}</p><span className={cn("inline-flex rounded-full px-1.5 py-0.5 text-[11px] font-semibold",STATUS_STYLES[r.status])}>{statusLabel(r.status)}</span></div>{os>0&&selected.status==="active"&&(payReceivableId===r.id?<span className="text-xs text-muted-foreground">{locale==="zh"?"收款中...":"En cours..."}</span>:<button onClick={()=>{setPayReceivableId(r.id);setPayDate(new Date().toISOString().slice(0,10));setPayReceiptNo("");setError("");}} className="rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground hover:opacity-90">{locale==="zh"?"收款":"Enc"}</button>)}</div>);})}</div>}
             {payReceivableId&&<div className="mt-3 space-y-2 rounded-md border bg-card p-3"><div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-muted-foreground">{locale==="zh"?"收款日期":"Date"}</label><DateInput value={payDate} onChangeValue={setPayDate} className={inputClass}/></div><div><label className="text-xs text-muted-foreground">{locale==="zh"?"收据号":"Recu"}</label><input type="text" value={payReceiptNo} onChange={e=>setPayReceiptNo(e.target.value)} className={inputClass}/></div></div>{error&&<p className="text-xs text-red-600">{error}</p>}<div className="flex gap-2"><Button size="sm" onClick={handleCollectReceivable} disabled={saving}>{saving?"...":locale==="zh"?"确认收款":"Encaisser"}</Button><Button size="sm" variant="ghost" onClick={()=>{setPayReceivableId(null);setError("");}}>{locale==="zh"?"取消":"Annuler"}</Button></div></div>}
           </div>
@@ -325,7 +326,7 @@ function Info({ label, value, dim, warn, danger }: { label: string; value: strin
 function ActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label: string; onClick: () => void }) {
   return (
     <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); }}
-      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[rgba(23,50,77,0.10)] bg-white/80 text-[#27506F] shadow-[0_1px_2px_rgba(25,58,92,0.04)] transition-all hover:bg-white hover:-translate-y-px"
+      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[rgba(23,50,77,0.10)] bg-white/80 text-[#27506F] shadow-[0_1px_2px_rgba(25,58,92,0.04)] transition-colors hover:bg-white"
       aria-label={label} title={label}>
       <Icon className="h-[14px] w-[14px]" strokeWidth={1.5} />
     </button>
@@ -335,11 +336,11 @@ function ActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label: st
 // ── Shared panel shell ──
 function PanelShell({ onClose, title, badge, actions, children }: { onClose:()=>void; title:string; badge?:React.ReactNode; actions?:React.ReactNode; children:React.ReactNode }) {
   return (<>
-    <div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" onClick={onClose}/>
-    <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l bg-card shadow-lg">
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-card/95 px-5 py-4 backdrop-blur">
-        <div className="flex items-center gap-2"><h3 className="text-sm font-bold">{title}</h3>{badge}</div>
-        <div className="flex items-center gap-1">{actions}<button onClick={onClose} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"><X className="h-4 w-4"/></button></div>
+    <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={onClose}/>
+    <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]">
+      <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
+        <div className="flex items-center gap-2"><h3 className="text-[15px] font-semibold">{title}</h3>{badge}</div>
+        <div className="flex items-center gap-1">{actions}<button onClick={onClose} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"><X className="h-4 w-4"/></button></div>
       </div>
       <div className="px-5 py-5">{children}</div>
     </div>

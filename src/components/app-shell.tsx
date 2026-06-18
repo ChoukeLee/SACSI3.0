@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect } from "react";
-import { LogOut } from "lucide-react";
+import { LogOut, UserRound } from "lucide-react";
 import type { Locale, ShellDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import type { UserRole } from "@/lib/auth";
@@ -145,36 +145,37 @@ function AppShellInner({
       <AppSidebar locale={locale} userRole={userRole} />
       <SidebarInset>
         <NavigationLoadingBar />
-        <header className="sticky top-0 z-sticky flex h-13 shrink-0 items-center gap-2 border-b border-border bg-card/95 shadow-xs backdrop-blur supports-[backdrop-filter]:bg-card/90">
-          <div className="flex w-full items-center justify-between px-4">
-            <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-sticky flex h-12 shrink-0 items-center border-b border-border bg-card/95 shadow-xs backdrop-blur supports-[backdrop-filter]:bg-card/90">
+          <div className="grid w-full grid-cols-[minmax(200px,320px)_minmax(180px,1fr)_minmax(200px,320px)] items-center gap-3 px-4">
+            <div className="flex min-w-0 items-center gap-2">
               <SidebarTrigger className="hidden lg:flex" />
-              <span className="rounded-md border border-border bg-muted/60 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
+              <span className="inline-flex h-8 max-w-[180px] items-center truncate rounded-lg border border-border bg-muted/55 px-3 text-xs font-medium text-muted-foreground shadow-xs">
                 {labels.building}
               </span>
             </div>
-            <div className="flex flex-1 justify-center px-4">
-              <div className="w-full max-w-md">
+            <div className="flex min-w-0 justify-center">
+              <div className="w-full max-w-[220px]">
                 <GlobalSearch locale={locale} />
               </div>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="ml-auto flex h-9 items-center gap-1 rounded-lg border border-border bg-muted/55 p-0.5 shadow-xs">
               <NotificationBell notifications={notifications} t={notifT} locale={locale} />
               <Link
                 href={routeFor(otherLocale, pathname)}
                 prefetch={false}
-                className="rounded-md border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="inline-flex h-8 items-center rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
               >
                 {labels.shell.langLabel}
               </Link>
               {roleLabel && (
-                <span className="hidden rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground sm:inline-flex">
+                <span className="hidden h-8 items-center gap-1.5 rounded-md bg-card px-2.5 text-xs font-medium text-foreground shadow-xs sm:inline-flex">
+                  <UserRound className="h-3.5 w-3.5 text-muted-foreground" />
                   {userDisplayName || roleLabel}
                 </span>
               )}
               <button
                 onClick={handleLogout}
-                className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                 aria-label={labels.shell.logout}
               >
                 <LogOut className="h-4 w-4" />
@@ -182,7 +183,7 @@ function AppShellInner({
             </div>
           </div>
         </header>
-        <main data-app-main className="relative isolate min-w-0 flex-1 overflow-x-hidden bg-background p-4 pb-20 sm:p-6 lg:p-8">
+        <main data-app-main className="relative isolate min-w-0 flex-1 overflow-x-hidden bg-background p-4 pb-20 sm:p-5 lg:p-6">
           {isNavigating && (
             <div data-navigation-overlay className="pointer-events-auto absolute inset-0 z-overlay bg-background/40" />
           )}

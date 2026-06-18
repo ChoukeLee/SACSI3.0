@@ -116,10 +116,10 @@
     @apply w-full;
   }
   .table-shell thead {
-    @apply border-b border-border bg-muted/50;
+    @apply border-b border-border bg-muted/60;
   }
   .table-shell thead th {
-    @apply h-11 px-4 py-3 text-left text-xs font-semibold text-muted-foreground;
+    @apply h-10 px-4 py-2.5 text-left text-xs font-medium text-muted-foreground;
   }
   .table-shell tbody tr {
     @apply border-b border-border/60 transition-colors;
@@ -128,7 +128,7 @@
     @apply border-b-0;
   }
   .table-shell tbody tr:hover {
-    @apply bg-accent/30;
+    @apply bg-muted/45;
   }
   .table-shell tbody td {
     @apply h-12 px-4 py-3 text-[13px];

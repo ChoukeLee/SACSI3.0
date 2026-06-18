@@ -9,6 +9,7 @@ import { formatXof, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
+import { controlClass } from "@/components/ui/operational";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { CustomerSummary } from "./calendar";
 import { printDailyReceipt } from "@/features/print";
@@ -119,8 +120,8 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
 
   const toN = (s: string) => parseInt(s, 10) || 0;
 
-  const inputClass = "w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-foreground transition-all duration-fast hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/30";
-  const labelClass = "block text-xs font-black uppercase tracking-[0.14em] text-muted-foreground/70 mb-1";
+  const inputClass = cn("w-full bg-card", controlClass);
+  const labelClass = "mb-1 block text-xs font-semibold text-muted-foreground";
   const formatError = (message?: string | null) => formatDailyRentalError(message, locale);
 
   const handleCreate = async () => {
@@ -227,15 +228,15 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
 
   return (
     <>
-      <div className="fixed inset-0 z-overlay bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-panel w-full max-w-full overflow-auto border-l bg-card shadow-lg lg:max-w-md" role="dialog" aria-label={isNew ? t.booking.newBooking : t.booking.title}>
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-card/95 px-5 py-4 backdrop-blur">
+      <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/25 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]" role="dialog" aria-label={isNew ? t.booking.newBooking : t.booking.title}>
+        <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
           <div>
-            <h3 className="text-sm font-bold">{isBackfill ? (locale === "zh" ? "历史补录" : "Backfill") : isNew ? t.booking.newBooking : t.booking.title}</h3>
-            {selectedUnit && <p className="text-sm text-muted-foreground">{selectedUnit.unit_no} ({selectedUnit.floor_label})</p>}
+            <h3 className="text-[15px] font-semibold">{isBackfill ? (locale === "zh" ? "历史补录" : "Backfill") : isNew ? t.booking.newBooking : t.booking.title}</h3>
+            {selectedUnit && <p className="mt-0.5 text-xs text-muted-foreground">{selectedUnit.unit_no} ({selectedUnit.floor_label})</p>}
           </div>
-          <Button size="icon" variant="ghost" onClick={onClose} aria-label={locale === "zh" ? "关闭" : "Fermer"}>
-            <X className="h-5 w-5" />
+          <Button size="icon" variant="ghost" onClick={onClose} aria-label={locale === "zh" ? "关闭" : "Fermer"} className="h-8 w-8">
+            <X className="h-4 w-4" />
           </Button>
         </div>
 
@@ -251,10 +252,29 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
             </div>
             <div>
               <label className={labelClass}>{t.checkoutModeLabel}</label>
-              <div className="flex gap-2">
-                <button onClick={() => setNewCheckoutMode("fixed")} className={cn("flex-1 rounded-md border px-3 py-2.5 text-xs font-semibold transition-all", newCheckoutMode === "fixed" ? "border-primary/30 bg-accent text-accent-foreground" : "border bg-card text-muted-foreground hover:bg-accent")}>{t.fixedCheckout}</button>
-                <button onClick={() => setNewCheckoutMode("open")} className={cn("flex-1 rounded-md border px-3 py-2.5 text-xs font-semibold transition-all", newCheckoutMode === "open" ? "border-primary/30 bg-accent text-accent-foreground" : "border bg-card text-muted-foreground hover:bg-accent")}>{t.openCheckout}</button>
+              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t.checkoutModeLabel}>
+                {([
+                  { value: "fixed" as const, label: t.fixedCheckout },
+                  { value: "open" as const, label: t.openCheckout },
+                ]).map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setNewCheckoutMode(item.value)}
+                    className={cn(
+                      "h-9 rounded-lg border px-3 text-sm font-medium shadow-xs transition-colors",
+                      newCheckoutMode === item.value
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card text-muted-foreground hover:bg-white hover:text-foreground",
+                    )}
+                    role="radio"
+                    aria-checked={newCheckoutMode === item.value}
+                  >
+                    {item.label}
+                  </button>
+                ))}
               </div>
+              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{t.checkoutModeHint}</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div><label className={labelClass}>{t.booking.checkInDate}</label><DateInput value={newCheckIn} onChangeValue={setNewCheckIn} className={inputClass} min={new Date().toISOString().slice(0, 10)} /></div>
@@ -262,7 +282,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div><label className={labelClass}>{t.booking.nightlyPrice}</label><input type="number" value={newNightlyPrice} onChange={e => setNewNightlyPrice(e.target.value)} className={inputClass} /></div>
-              <div><label className={labelClass}>{t.booking.totalAmount}</label><p className="mt-2 text-base font-black text-foreground">{newCheckoutMode === "fixed" ? `${newNights} ${t.booking.nights} = ${formatXof(newTotal)}` : `${t.booking.nights}×${newNightlyPrice.toLocaleString()} ${locale === "zh" ? "起" : "min"}`}</p></div>
+              <div><label className={labelClass}>{t.booking.totalAmount}</label><p className="mt-2 text-sm font-semibold text-foreground">{newCheckoutMode === "fixed" ? `${newNights} ${t.booking.nights} = ${formatXof(newTotal)}` : `${t.booking.nights}×${newNightlyPrice.toLocaleString()} ${locale === "zh" ? "起" : "min"}`}</p></div>
             </div>
             <div><label className={labelClass}>{t.booking.notes}</label><textarea value={newNotes} onChange={e => setNewNotes(e.target.value)} rows={2} className={inputClass} /></div>
             {error && <p className="text-sm text-accentRed-600" role="alert">{error}</p>}
@@ -486,7 +506,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                         <div>
                           <label className={labelClass}>{t.booking.extendStay}</label>
                           <div className="flex items-center gap-2">
-                            <input type="number" min={1} value={extendDays} onChange={e => setExtendDays(e.target.value)} className="w-16 rounded-lg border border-border px-2 py-2 text-sm transition-all duration-fast hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/30" />
+                            <input type="number" min={1} value={extendDays} onChange={e => setExtendDays(e.target.value)} className="h-9 w-16 rounded-lg border border-border px-2 text-sm shadow-sm transition-colors duration-fast hover:border-ring/30 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20" />
                             <span className="text-xs text-foreground/70">+{formatXof(Number(booking.nightly_price_xof) * (parseInt(extendDays,10)||1))}</span>
                             <Button variant="secondary" size="sm" onClick={handleExtend} disabled={saving}>{t.booking.extendStay}</Button>
                           </div>

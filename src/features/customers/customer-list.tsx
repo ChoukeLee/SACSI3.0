@@ -294,7 +294,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="flex items-center gap-1 truncate text-sm font-bold">
+            <p className="flex items-center gap-1 truncate text-sm font-medium">
               {isStable && <Star className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
               {c.name}
             </p>
@@ -401,7 +401,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
               <div className="flex items-center justify-between border-b border-border/70 pb-2">
                 <div className="flex items-center gap-2">
                   <span className={cn("h-2.5 w-2.5 rounded-full", group.dot)} />
-                  <h2 className="text-sm font-bold">{group.label}</h2>
+                  <h2 className="text-sm font-medium">{group.label}</h2>
                   <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
                     {group.customers.length}
                   </span>
@@ -422,19 +422,19 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       {selected && !isFormOpen && !isBlacklistOpen && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setSelectedId(null)} />
-          <div className="fixed inset-x-0 bottom-0 z-panel max-h-[88vh] overflow-auto rounded-t-2xl border bg-card p-4 shadow-2xl sm:inset-y-0 sm:left-auto sm:right-0 sm:w-full sm:max-w-lg sm:rounded-none sm:border-l">
+          <div className="fixed inset-x-0 bottom-0 z-panel max-h-[88vh] overflow-auto rounded-t-xl border bg-card p-4 shadow-panel sm:inset-y-0 sm:left-auto sm:right-0 sm:w-full sm:max-w-lg sm:rounded-none sm:border-l">
             <div className="mb-4 flex items-start justify-between gap-3 border-b pb-3">
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-muted-foreground">{locale === "zh" ? "客户详情" : "Détail client"}</p>
-                <h3 className="truncate text-lg font-bold">{selected.name}</h3>
+                <h3 className="truncate text-base font-semibold">{selected.name}</h3>
               </div>
-              <button onClick={() => setSelectedId(null)} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground">
+              <button onClick={() => setSelectedId(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1.5 text-sm">
-              <p className="font-bold">{selected.name}</p>
+              <p className="font-medium">{selected.name}</p>
               {selected.phone && <p className="text-muted-foreground"><Phone className="mr-1 inline h-3.5 w-3.5" />{selected.phone}</p>}
               {selected.gender && <p className="text-muted-foreground">{t.gender}: {selected.gender === "male" ? t.male : selected.gender === "female" ? t.female : t.other}</p>}
               {selected.document_type && <p className="text-muted-foreground">{t.docType}: {selected.document_type === "id_card" ? t.idCard : selected.document_type === "passport" ? t.passport : selected.document_type === "drivers_license" ? t.driversLicense : selected.document_type}</p>}
@@ -474,11 +474,11 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       {/* ── Add/Edit Form Panel ── */}
       {isFormOpen && (
         <>
-          <div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setFormMode(null)} />
-          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l bg-card shadow-lg">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-card/95 px-5 py-4 backdrop-blur">
-              <h3 className="text-sm font-bold">{formMode.type === "add" ? t.add : t.edit}</h3>
-              <button onClick={() => setFormMode(null)} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"><X className="h-4 w-4" /></button>
+          <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setFormMode(null)} />
+          <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]">
+            <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
+              <h3 className="text-[15px] font-semibold">{formMode.type === "add" ? t.add : t.edit}</h3>
+              <button onClick={() => setFormMode(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"><X className="h-4 w-4" /></button>
             </div>
             <div className="space-y-4 px-5 py-5">
               <div><label className={labelClass}>{t.name} *</label><input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} className={inputClass} placeholder={t.name} /></div>
@@ -511,11 +511,11 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       {/* ── Blacklist form panel ── */}
       {isBlacklistOpen && (
         <>
-          <div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setBlacklistPanelId(null)} />
-          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-sm overflow-auto border-l bg-card shadow-lg">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-card/95 px-5 py-4 backdrop-blur">
-              <h3 className="text-sm font-bold">{t.blacklistAdd}</h3>
-              <button onClick={() => setBlacklistPanelId(null)} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"><X className="h-4 w-4" /></button>
+          <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setBlacklistPanelId(null)} />
+          <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[420px]">
+            <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
+              <h3 className="text-[15px] font-semibold">{t.blacklistAdd}</h3>
+              <button onClick={() => setBlacklistPanelId(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"><X className="h-4 w-4" /></button>
             </div>
             <div className="space-y-4 px-5 py-5">
               <div><label className={labelClass}>{t.blacklistReason} *</label><textarea value={blReason} onChange={(e) => setBlReason(e.target.value)} rows={3} className={inputClass} placeholder={t.blacklistReason} /></div>

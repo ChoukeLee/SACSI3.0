@@ -67,7 +67,7 @@ export function BulkActionCenter({ locale, userRole }: Props) {
 
   const reset = () => { setStatus("idle"); setPreview(null); setResult(null); setCheckedIds(new Set()); };
 
-  const selectClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+  const selectClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
 
   return (
     <div className="max-w-4xl space-y-5">
@@ -150,7 +150,7 @@ export function BulkActionCenter({ locale, userRole }: Props) {
 
             <div className="max-h-[300px] overflow-auto rounded-md border text-sm">
               <table className="w-full">
-                <thead className="sticky top-0 bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"><tr>
+                <thead className="sticky top-0 bg-muted text-xs font-medium text-muted-foreground"><tr>
                   <th className="px-3 py-2 w-8" />
                   <th className="px-3 py-2 text-left">{zh ? "记录" : "Enr."}</th>
                   <th className="px-3 py-2 text-left">{zh ? "结果" : "Résultat"}</th>

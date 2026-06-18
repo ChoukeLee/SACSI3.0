@@ -42,7 +42,7 @@ export function RiskAlertsSkeleton() {
 
 export function RoomBoardSkeleton() {
   return (
-    <div className="rounded-[14px] border border-[rgba(23,50,77,0.06)] bg-white p-5">
+    <div className="rounded-xl border border-border bg-card p-5">
       <div className="flex justify-between border-b border-[rgba(23,50,77,0.04)] pb-3 mb-4">
         <div className="flex items-center gap-3">
           <div className="h-2.5 w-2.5 rounded-full bg-muted/50 animate-pulse" />

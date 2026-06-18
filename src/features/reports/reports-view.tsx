@@ -4,6 +4,8 @@ import { useState, useMemo } from "react";
 import { Download } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
+import { SegmentedControl, StatTile } from "@/components/ui/operational";
+import { BarListChart, DataVizCard } from "@/components/ui/data-viz";
 import type {
   LedgerEntryRow, DailyBookingRow, UnitRow, LeaseContractRow,
   SaleContractRow, SalePaymentScheduleRow, ReceivableRow, PaymentRow, CustomerRow,
@@ -37,15 +39,12 @@ function downloadCsv(header: string, rows: string[], filename: string) {
 }
 
 function StatBlock({ label, value, dot }: { label: string; value: string; dot: string }) {
-  return (
-    <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-      <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", dot)} />
-      <div className="min-w-0">
-        <p className="text-xl font-bold tracking-tight tabular-nums leading-none">{value}</p>
-        <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{label}</p>
-      </div>
-    </div>
-  );
+  const tone = dot.includes("Red") || dot.includes("rose") ? "red"
+    : dot.includes("Amber") ? "amber"
+      : dot.includes("Green") ? "green"
+        : dot.includes("muted") ? "neutral"
+          : "blue";
+  return <StatTile label={label} value={value} tone={tone as "red" | "amber" | "green" | "blue" | "neutral"} />;
 }
 
 export function ReportsView({ entries: _entries, bookings, units, leaseContracts, saleContracts, saleSchedules: _saleSchedules, receivables, payments, customers, locale, userRole }: Props) {
@@ -211,28 +210,20 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
     { key: "daily_close", label: L.dailyClose },
   ];
 
-  const btnExport = "inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-semibold shadow-sm transition-colors hover:bg-accent";
+  const btnExport = "inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs font-semibold shadow-xs transition-colors hover:bg-muted";
 
   return (
     <div className="space-y-5">
       {/* ── Tabs ── */}
-      <nav className="flex gap-1 overflow-x-auto rounded-xl border bg-card p-1.5 shadow-sm">
-        {tabs.filter(t => permitted.includes(t.key)).map(t => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={cn(
-              "shrink-0 rounded-md px-4 py-2 text-sm font-semibold transition",
-              tab === t.key
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-            )}
-          >
-            {t.label}{t.count !== undefined && <span className="ml-1 opacity-75">({t.count})</span>}
-          </button>
-        ))}
-      </nav>
+      <SegmentedControl
+        value={tab}
+        onChange={setTab}
+        ariaLabel={zh ? "报表类型" : "Type de rapport"}
+        items={tabs.filter(t => permitted.includes(t.key)).map((item) => ({
+          value: item.key,
+          label: item.count !== undefined ? `${item.label} (${item.count})` : item.label,
+        }))}
+      />
 
       {/* ── Room Status ── */}
       {tab === "room_status" && (
@@ -249,6 +240,20 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
               return <StatBlock key={k} label={L.statusLabels[k] ?? k} value={String(v)} dot={dot} />;
             })}
           </div>
+          <DataVizCard
+            title={zh ? "房态分布" : "Distribution des statuts"}
+            description={zh ? "按当前房源状态展示占比" : "Repartition par statut"}
+            metric={`${roomStatusData.total} ${zh ? "间" : "unités"}`}
+          >
+            <BarListChart
+              maxValue={roomStatusData.total}
+              items={Object.entries(roomStatusData.statuses).map(([k, v]) => ({
+                label: L.statusLabels[k] ?? k,
+                value: v,
+                color: k === "available" ? "#26a269" : k === "daily_occupied" ? "#62B6F5" : k === "leased" ? "#5E9BC5" : k === "sold" ? "#B88A48" : k === "maintenance" || k === "locked" ? "#F08090" : k === "cleaning_pending" ? "#d88406" : "#8f8d89",
+              }))}
+            />
+          </DataVizCard>
           <button onClick={() => downloadCsv("类型,状态,数量", Object.entries(roomStatusData.statuses).map(([k, v]) => csvLine([k, L.statusLabels[k] ?? k, v])), "room_status")}
             className={btnExport}><Download className="h-4 w-4" />{L.exportCsv}</button>
         </div>
@@ -264,10 +269,23 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
             <StatBlock label={L.overdueLabel} value={formatXof(incomeData.overdue)} dot="bg-accentRed-500" />
             <StatBlock label={L.rate} value={`${incomeData.rate}%`} dot={incomeData.rate >= 80 ? "bg-accentGreen-500" : "bg-accentAmber-500"} />
           </div>
+          <DataVizCard
+            title={zh ? "收入来源结构" : "Structure des revenus"}
+            description={zh ? "按业务类型展示应收规模，单位为万 XOF" : "Montants dus par source, en 10k XOF"}
+            metric={formatXof(incomeData.rec)}
+          >
+            <BarListChart
+              items={Object.entries(incomeData.bySource).map(([k, v]) => ({
+                label: L.sourceLabels[k] ?? k,
+                value: Math.round(v.rec / 10000),
+                tone: "blue",
+              }))}
+            />
+          </DataVizCard>
           <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-[13px]">
-                <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                <thead className="border-b bg-muted text-xs font-semibold text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2.5">{L.source}</th>
                     <th className="px-4 py-2.5 text-right">{L.amountXof}</th>
@@ -308,7 +326,7 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
           ) : (
             <div className="overflow-hidden rounded-xl border bg-card shadow-sm max-h-[500px] overflow-y-auto">
               <table className="w-full text-left text-[13px]">
-                <thead className="sticky top-0 bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                <thead className="sticky top-0 bg-muted text-xs font-semibold text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2.5">{L.roomNo}</th>
                     <th className="px-4 py-2.5">{L.customer}</th>
@@ -422,7 +440,7 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
               lines.push(`SACIS3.0 ${zh ? "日结" : "Clôture"} — ${today}`);
               lines.push(`${zh ? "新预订" : "Rés"}: ${dailyCloseData.newBookings.length} | ${zh ? "入住" : "Arr"}: ${dailyCloseData.checkins.length} | ${zh ? "退房" : "Dép"}: ${dailyCloseData.checkouts.length} | ${zh ? "在住" : "Occ"}: ${dailyCloseData.inHouse.length} | ${zh ? "收款" : "P"}: ${formatXof(dailyCloseData.todayTotal)}`);
               navigator.clipboard.writeText(lines.join("\n"));
-            }} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 active:scale-[0.98]">
+            }} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90">
               {L.copyClose}
             </button>
             <button onClick={() => downloadCsv("指标,数值", [["新预订", dailyCloseData.newBookings.length], ["入住", dailyCloseData.checkins.length], ["退房", dailyCloseData.checkouts.length], ["在住", dailyCloseData.inHouse.length], ["收款", dailyCloseData.todayTotal]].map(r => csvLine(r)), "daily_close")}

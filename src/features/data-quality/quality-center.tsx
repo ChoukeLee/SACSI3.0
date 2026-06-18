@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
+import { StatTile, controlClass } from "@/components/ui/operational";
 import { repairDailyRentalIssue } from "@/features/daily-rentals/daily-rental-repair";
 import type { QualityIssue, QualityCategory, QualitySeverity } from "./quality-types";
 
@@ -90,7 +91,7 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
   const financeIssues = issues.filter(i => i.category === "finance").length;
   const unitIssues = issues.filter(i => i.category === "unit").length;
 
-  const filterBtn = "h-9 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+  const filterBtn = controlClass;
 
   const zh = locale === "zh";
 
@@ -104,12 +105,10 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
           { key:"low", label:zh?"低危":"Faible", value:String(low), dot:"bg-accentBlue-500" },
           { key:"finance", label:zh?"财务异常":"Finance", value:String(financeIssues), dot:"bg-accentRed-500" },
           { key:"unit", label:zh?"房态异常":"Logement", value:String(unitIssues), dot:"bg-accentAmber-500" },
-        ].map(b => (
-          <div key={b.key} className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-            <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", b.dot)} />
-            <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{b.value}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{b.label}</p></div>
-          </div>
-        ))}
+        ].map(b => {
+          const tone = b.dot.includes("Red") ? "red" : b.dot.includes("Amber") ? "amber" : b.dot.includes("Green") ? "green" : "blue";
+          return <StatTile key={b.key} label={b.label} value={b.value} tone={tone as "red" | "amber" | "green" | "blue"} />;
+        })}
       </div>
 
       {/* Filters */}
@@ -128,7 +127,7 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder={zh ? "搜索异常..." : "Rechercher..."}
-            className="h-9 w-full rounded-md border bg-card pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20" />
+            className={cn("w-full pl-9", controlClass)} />
         </div>
         <span className="text-sm text-muted-foreground ml-auto tabular-nums">{filtered.length} {zh ? "条" : "lignes"}</span>
       </div>
@@ -161,7 +160,7 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
                       <Badge variant="secondary" className="text-[10px]">{catLabels[i.category]}</Badge>
                       <Badge variant={sevTone[i.severity] === "red" ? "destructive" : sevTone[i.severity] === "amber" ? "warning" : "default"} className="text-[10px]">{sevLabels[locale][i.severity]}</Badge>
                     </div>
-                    <p className="text-sm font-bold truncate">{i.title}</p>
+                    <p className="truncate text-sm font-semibold">{i.title}</p>
                     <p className="text-xs text-muted-foreground truncate">
                       {i.entityLabel}
                       <span className="ml-2 text-muted-foreground/70">{i.detectedAt}</span>

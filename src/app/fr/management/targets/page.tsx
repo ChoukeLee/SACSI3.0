@@ -29,7 +29,7 @@ export default async function FrenchTargetsPage() {
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-bold tracking-tight">Objectifs</h1>
+      <h1 className="mb-6 text-2xl font-semibold tracking-tight">Objectifs</h1>
       <TargetsView targets={(targets ?? []) as any[]} receivables={receivables ?? []} units={units ?? []}
         bookings={bookings ?? []} leases={leases ?? []} sales={sales ?? []}
         locale="fr" userRole={user.role} />

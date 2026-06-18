@@ -35,10 +35,10 @@ export function ConfirmDialog({
   return (
     <div className="fixed inset-0 z-overlay flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/20" onClick={onClose} />
-      <div className="relative w-full max-w-sm rounded-t-2xl sm:rounded-2xl bg-white p-5 shadow-panel animate-in slide-in-from-bottom-4 duration-fast">
+      <div className="relative w-full max-w-sm rounded-t-xl bg-card p-5 shadow-panel animate-in slide-in-from-bottom-4 duration-fast sm:rounded-xl">
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-full p-1 text-muted-foreground/60 hover:bg-muted"
+          className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted"
           aria-label={t.cancel}
         >
           <X className="h-4 w-4" />
@@ -49,7 +49,7 @@ export function ConfirmDialog({
             <AlertTriangle className="h-5 w-5 text-accentRed-600" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-foreground">{title}</h3>
+            <h3 className="text-sm font-medium text-foreground">{title}</h3>
             {description && (
               <p className="mt-1 text-xs text-foreground/60">{description}</p>
             )}

@@ -9,7 +9,7 @@ function StatSkeleton({ tone = "muted" }: { tone?: "muted" | "blue" | "green" | 
   };
 
   return (
-    <div className={`rounded-2xl border border-border/60 ${tones[tone]} p-4 shadow-sm`}>
+    <div className={`rounded-xl border border-border ${tones[tone]} p-4 shadow-card`}>
       <div className="mb-4 h-3 w-20 animate-pulse rounded-full bg-muted/60" />
       <div className="h-7 w-24 animate-pulse rounded-lg bg-muted/70" />
     </div>
@@ -18,7 +18,7 @@ function StatSkeleton({ tone = "muted" }: { tone?: "muted" | "blue" | "green" | 
 
 function RoomGridSkeleton() {
   return (
-    <div className="rounded-[18px] border border-border/60 bg-card p-5 shadow-sm">
+    <div className="rounded-xl border border-border bg-card p-5 shadow-card">
       <div className="mb-4 flex items-center justify-between border-b border-border/50 pb-3">
         <div className="flex items-center gap-2">
           <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-primary/70" />
@@ -48,7 +48,7 @@ function RoomGridSkeleton() {
 
 function TimelineSkeleton() {
   return (
-    <div className="overflow-hidden rounded-[22px] border border-border/60 bg-card shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
       <div className="flex items-center justify-between border-b border-border/60 p-5">
         <div>
           <div className="h-6 w-28 animate-pulse rounded-lg bg-muted/70" />
@@ -76,7 +76,7 @@ function TimelineSkeleton() {
 
 function TableSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
       <div className="grid grid-cols-6 border-b border-border/60 bg-muted/35 px-4 py-3">
         {Array.from({ length: 6 }).map((_, index) => (
           <div key={index} className="h-3 w-16 animate-pulse rounded-full bg-muted/70" />

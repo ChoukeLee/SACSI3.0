@@ -61,9 +61,9 @@ export function MobileStatsBar({
           >
             <div className="flex w-full items-center justify-between gap-1">
               <Icon className={cn("h-4 w-4", isActive ? "text-current" : "text-muted-foreground")} />
-              <span className={cn("text-lg font-black leading-none tabular-nums", isActive ? "text-current" : "text-foreground")}>{item.count}</span>
+              <span className={cn("text-lg font-semibold leading-none tabular-nums", isActive ? "text-current" : "text-foreground")}>{item.count}</span>
             </div>
-            <span className={cn("text-[11px] font-bold leading-tight", isActive ? "text-current" : "text-muted-foreground")}>{item.label}</span>
+            <span className={cn("text-xs font-medium leading-tight", isActive ? "text-current" : "text-muted-foreground")}>{item.label}</span>
           </button>
         );
       })}

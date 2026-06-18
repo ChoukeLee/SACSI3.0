@@ -2,10 +2,11 @@
 
 import { useState, useMemo, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, Copy, Plus, Printer, SlidersHorizontal, X } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, History, Plus, Printer, SlidersHorizontal, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { cn, formatXof, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { SegmentedControl, StatTile } from "@/components/ui/operational";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import { BookingPanel } from "./booking-panel";
@@ -41,7 +42,11 @@ const FLOOR_ROW_HEIGHT = 16;
 const MAINTENANCE_STATUSES = new Set(["available", "reserved", "daily_occupied", "cleaning_pending", "leased", "sold"]);
 
 const NAV_BTN =
-  "inline-flex h-8 w-8 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-sm transition-all hover:border-primary/30 hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+  "inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-xs transition-colors hover:bg-white hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+const TOOLBAR_SURFACE = "flex flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/45 p-1 shadow-xs";
+const TOOLBAR_ITEM =
+  "inline-flex h-8 items-center gap-2 rounded-md border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:bg-white hover:text-foreground";
+const TOOLBAR_META = cn(TOOLBAR_ITEM, "text-[13px] font-medium text-foreground tabular-nums hover:bg-card hover:text-foreground");
 
 const COPY = {
   zh: {
@@ -470,43 +475,51 @@ export function DailyCalendar({
   return (
     <div data-daily-calendar-root className="relative isolate space-y-5">
       <section className="relative z-20 overflow-hidden rounded-xl border border-border bg-card shadow-card">
-        <div className="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h3 className="text-[15px] font-semibold tracking-tight">{locale === "zh" ? "日租概览" : "Apercu journalier"}</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">{locale === "zh" ? "今日房态、群消息和日租收款" : "Occupation, message et paiements du jour"}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-lg border border-border bg-muted px-3 py-1.5 text-xs font-semibold">
-              {new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN")}
-              <span className="ml-3 text-muted-foreground">{new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long" })}</span>
+          <div className={TOOLBAR_SURFACE}>
+            <div className={TOOLBAR_META}>
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              <span>{new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN")}</span>
+              <span className="text-xs font-medium text-muted-foreground">{new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long" })}</span>
             </div>
-            <Button variant="default" size="sm" onClick={handleCopy}>
+            <Button
+              variant={copied ? "default" : "ghost"}
+              size="sm"
+              onClick={handleCopy}
+              className={cn(
+                TOOLBAR_ITEM,
+                copied && "border-primary bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+              )}
+              aria-live="polite"
+            >
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               {copied ? (locale === "zh" ? "已复制" : "Copie") : (locale === "zh" ? "复制群消息" : "Copier")}
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => window.print()} className="no-print">
+            <Button variant="ghost" size="sm" onClick={() => window.print()} className={cn(TOOLBAR_ITEM, "no-print")}>
               <Printer className="h-3.5 w-3.5" />
               {locale === "zh" ? "打印" : "Imprimer"}
             </Button>
             {userRole === "admin" && (
-              <Button variant="outline" size="sm" onClick={() => { setBackfillOpen(true); setSelectedBookingId(null); setNewBookingUnitId(null); }} className="text-accentAmber-700 border-accentAmber-200 hover:bg-accentAmber-50">
+              <Button variant="ghost" size="sm" onClick={() => { setBackfillOpen(true); setSelectedBookingId(null); setNewBookingUnitId(null); }} className={TOOLBAR_ITEM}>
+                <History className="h-3.5 w-3.5" />
                 {locale === "zh" ? "历史补录" : "Backfill"}
               </Button>
             )}
           </div>
         </div>
-        <div className="grid gap-2 bg-muted/40 px-4 py-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 bg-card px-4 py-3 md:grid-cols-2 xl:grid-cols-4">
           {shareRows.map((row) => (
             <ShareCard key={row.key} label={row.label} value={row.count} units={row.units} tone={row.tone} />
           ))}
         </div>
-        <div className="border-t border-border bg-card px-4 py-3">
-          <p className="mb-2.5 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">{locale === "zh" ? "本月财务" : "Finances du mois"}</p>
-          <div className="grid gap-2 md:grid-cols-3">
-            {financeCards.map((card) => (
-              <FinanceCard key={card.key} label={card.label} value={card.value} tone={card.tone} onClick={() => setFinanceDetail(card.key as "collected" | "outstanding" | "settled")} />
-            ))}
-          </div>
+        <div className="grid gap-3 border-t border-border bg-card px-4 py-3 md:grid-cols-3">
+          {financeCards.map((card) => (
+            <FinanceCard key={card.key} label={card.label} value={card.value} tone={card.tone} onClick={() => setFinanceDetail(card.key as "collected" | "outstanding" | "settled")} />
+          ))}
         </div>
       </section>
 
@@ -517,7 +530,7 @@ export function DailyCalendar({
             <p className="mt-0.5 text-xs text-muted-foreground">{copy.subtitle}</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className={TOOLBAR_SURFACE}>
             <FilterButton
               active={roomFilter === "all"}
               onClick={() => setRoomFilter("all")}
@@ -525,34 +538,40 @@ export function DailyCalendar({
               label={copy.allRooms}
               count={filterCounts.all}
             />
-            <FilterButton active={roomFilter === "occupied"} onClick={() => setRoomFilter("occupied")} color="bg-[#62B6F5]" label={copy.occupied} count={filterCounts.occupied} />
-            <FilterButton active={roomFilter === "checkingOutToday"} onClick={() => setRoomFilter("checkingOutToday")} color="bg-[#E8C840]" label={locale === "zh" ? "今日离店" : "Depart"} count={filterCounts.checkingOutToday} />
-            <FilterButton active={roomFilter === "openEnded"} onClick={() => setRoomFilter("openEnded")} color="bg-[#62B6F5]/80" label={locale === "zh" ? "未定离店" : "Ouvert"} count={filterCounts.openEnded} />
-            <FilterButton active={roomFilter === "reserved"} onClick={() => setRoomFilter("reserved")} color="bg-amber-400" label={copy.reserved} count={filterCounts.reserved} />
-            <FilterButton active={roomFilter === "cleaning"} onClick={() => setRoomFilter("cleaning")} color="bg-emerald-400" label={copy.cleaning} count={filterCounts.cleaning} />
-            <FilterButton active={roomFilter === "available"} onClick={() => setRoomFilter("available")} color="bg-emerald-400" label={copy.available} count={filterCounts.available} />
-            <FilterButton active={roomFilter === "maintenance"} onClick={() => setRoomFilter("maintenance")} color="bg-red-400" label={copy.maintenance} count={filterCounts.maintenance} />
+            <FilterButton active={roomFilter === "occupied"} onClick={() => setRoomFilter("occupied")} color="#62B6F5" label={copy.occupied} count={filterCounts.occupied} />
+            <FilterButton active={roomFilter === "checkingOutToday"} onClick={() => setRoomFilter("checkingOutToday")} color="#E8C840" label={locale === "zh" ? "今日离店" : "Depart"} count={filterCounts.checkingOutToday} />
+            <FilterButton active={roomFilter === "openEnded"} onClick={() => setRoomFilter("openEnded")} color="#62B6F5" label={locale === "zh" ? "未定离店" : "Ouvert"} count={filterCounts.openEnded} />
+            <FilterButton active={roomFilter === "reserved"} onClick={() => setRoomFilter("reserved")} color="#E8C840" label={copy.reserved} count={filterCounts.reserved} />
+            <FilterButton active={roomFilter === "cleaning"} onClick={() => setRoomFilter("cleaning")} color="#5CC4B8" label={copy.cleaning} count={filterCounts.cleaning} />
+            <FilterButton active={roomFilter === "available"} onClick={() => setRoomFilter("available")} color="#A0D0E8" label={copy.available} count={filterCounts.available} />
+            <FilterButton active={roomFilter === "maintenance"} onClick={() => setRoomFilter("maintenance")} color="#F08090" label={copy.maintenance} count={filterCounts.maintenance} />
           </div>
         </div>
 
         <div className="flex flex-col gap-3 border-b border-border px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="inline-flex w-fit rounded-xl border border-border bg-muted p-1 text-xs font-semibold text-muted-foreground">
-            <ViewButton active={viewMode === "day"} onClick={() => setMode("day")}>{copy.day}</ViewButton>
-            <ViewButton active={viewMode === "week"} onClick={() => setMode("week")}>{copy.week}</ViewButton>
-            <ViewButton active={viewMode === "month"} onClick={() => setMode("month")}>{copy.month}</ViewButton>
-          </div>
+          <SegmentedControl
+            value={viewMode}
+            onChange={setMode}
+            ariaLabel={locale === "zh" ? "日历视图" : "Vue calendrier"}
+            className="h-9 rounded-lg"
+            items={[
+              { value: "day", label: copy.day },
+              { value: "week", label: copy.week },
+              { value: "month", label: copy.month },
+            ]}
+          />
 
-          <div className="flex items-center gap-2">
+          <div className={TOOLBAR_SURFACE}>
             <button onClick={() => moveRange(-1)} className={NAV_BTN} aria-label="previous range">
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <div className="min-w-[190px] rounded-lg border border-border bg-card px-4 py-1.5 text-center text-sm font-semibold text-foreground shadow-xs">
+            <div className={cn(TOOLBAR_META, "min-w-[180px] justify-center px-3 text-center")}>
               {rangeLabel}
             </div>
             <button onClick={() => moveRange(1)} className={NAV_BTN} aria-label="next range">
               <ChevronRight className="h-4 w-4" />
             </button>
-            <Button onClick={goToToday} size="sm">{copy.today}</Button>
+            <Button onClick={goToToday} size="sm" variant="ghost" className={TOOLBAR_ITEM}>{copy.today}</Button>
           </div>
         </div>
 
@@ -569,7 +588,7 @@ export function DailyCalendar({
             aria-label={copy.timeline}
           >
             <div
-              className="z-30 flex items-center border-b border-r bg-card px-3 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"
+              className="z-30 flex items-center border-b border-r bg-card px-3 text-xs font-semibold text-muted-foreground"
               style={{ height: 40, left: "auto", position: "relative" }}
               data-daily-calendar-room-label
             >
@@ -591,8 +610,8 @@ export function DailyCalendar({
                   style={{ height: 40 }}
                   role="columnheader"
                 >
-                  <span className="text-xs font-semibold leading-3">{date.toLocaleDateString(localeStr, { weekday: "short" })}</span>
-                  <span className="text-base font-black leading-5 text-foreground">{date.getDate()}</span>
+                  <span className="text-xs font-medium leading-3">{date.toLocaleDateString(localeStr, { weekday: "short" })}</span>
+                  <span className="text-[15px] font-semibold leading-5 text-foreground">{date.getDate()}</span>
                   {isToday && <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary" />}
                 </div>
               );
@@ -631,10 +650,10 @@ export function DailyCalendar({
                     >
                       <span className={cn("mr-2 h-8 w-1.5 rounded-full", roomTone.strip)} />
                       <div className="min-w-0">
-                        <div className="truncate text-xs font-black leading-4 text-foreground">
+                        <div className="truncate text-[13px] font-semibold leading-4 text-foreground">
                           {locale === "fr" ? unit.unit_no : `${copy.room} ${unit.unit_no}`}
                         </div>
-                        <div className="truncate text-xs font-semibold leading-3 text-muted-foreground">
+                        <div className="truncate text-xs font-medium leading-3 text-muted-foreground">
                           {locale === "fr" ? statusLabel : `${statusLabel} · ${copy.apartment}`}
                         </div>
                       </div>
@@ -766,18 +785,18 @@ export function DailyCalendar({
       {/* Finance detail panel */}
       {financeDetail && (
         <>
-          <div className="fixed inset-0 z-overlay bg-black/30 backdrop-blur-sm" onClick={() => setFinanceDetail(null)} />
-          <div className="fixed inset-y-0 right-0 z-panel w-full max-w-full overflow-auto border-l border-border bg-white shadow-panel lg:max-w-4xl" role="dialog">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white/95 px-5 py-4 backdrop-blur">
+          <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/30 backdrop-blur-sm" onClick={() => setFinanceDetail(null)} />
+          <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-4xl" role="dialog">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
               <div>
-                <h3 className="text-sm font-black text-foreground">
+                <h3 className="text-sm font-medium tracking-tight text-foreground">
                   {financeDetail === "collected" ? (locale === "zh" ? "本月已收明细" : "Paiements du mois") :
                    financeDetail === "outstanding" ? (locale === "zh" ? "当前欠款明细" : "Soldes impayes") :
                    (locale === "zh" ? "本月结算明细" : "Reglements du mois")}
                 </h3>
               </div>
-              <button onClick={() => setFinanceDetail(null)} className="rounded-full p-1.5 text-muted-foreground/70 hover:bg-muted">
-                <X className="h-5 w-5" />
+              <button onClick={() => setFinanceDetail(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
+                <X className="h-4 w-4" />
               </button>
             </div>
             <div className="px-5 py-4 space-y-3">
@@ -785,20 +804,20 @@ export function DailyCalendar({
               <div className="flex flex-wrap gap-4 rounded-xl bg-muted/50 px-4 py-3 text-sm">
                 {financeDetail === "collected" && (
                   <>
-                    <div><span className="text-muted-foreground">{locale === "zh" ? "笔数" : "Nb"}: </span><span className="font-black">{financeStats.collectedPayments.length}</span></div>
-                    <div><span className="text-muted-foreground">{locale === "zh" ? "合计" : "Total"}: </span><span className="font-black text-accentGreen-700">{formatXof(financeStats.monthCollected)}</span></div>
+                    <div><span className="text-muted-foreground">{locale === "zh" ? "笔数" : "Nb"}: </span><span className="font-semibold">{financeStats.collectedPayments.length}</span></div>
+                    <div><span className="text-muted-foreground">{locale === "zh" ? "合计" : "Total"}: </span><span className="font-semibold text-accentGreen-700">{formatXof(financeStats.monthCollected)}</span></div>
                   </>
                 )}
                 {financeDetail === "outstanding" && (
                   <>
-                    <div><span className="text-muted-foreground">{locale === "zh" ? "欠款笔数" : "Nb"}: </span><span className="font-black">{financeStats.outstandingBookings.length}</span></div>
-                    <div><span className="text-muted-foreground">{locale === "zh" ? "欠款合计" : "Total"}: </span><span className="font-black text-accentBlue-700">{formatXof(financeStats.currentOutstanding)}</span></div>
+                    <div><span className="text-muted-foreground">{locale === "zh" ? "欠款笔数" : "Nb"}: </span><span className="font-semibold">{financeStats.outstandingBookings.length}</span></div>
+                    <div><span className="text-muted-foreground">{locale === "zh" ? "欠款合计" : "Total"}: </span><span className="font-semibold text-accentBlue-700">{formatXof(financeStats.currentOutstanding)}</span></div>
                   </>
                 )}
                 {financeDetail === "settled" && (
                   <>
-                    <div><span className="text-muted-foreground">{locale === "zh" ? "笔数" : "Nb"}: </span><span className="font-black">{financeStats.settledBookings.length}</span></div>
-                    <div><span className="text-muted-foreground">{locale === "zh" ? "合计" : "Total"}: </span><span className="font-black text-foreground">{formatXof(financeStats.monthSettled)}</span></div>
+                    <div><span className="text-muted-foreground">{locale === "zh" ? "笔数" : "Nb"}: </span><span className="font-semibold">{financeStats.settledBookings.length}</span></div>
+                    <div><span className="text-muted-foreground">{locale === "zh" ? "合计" : "Total"}: </span><span className="font-semibold text-foreground">{formatXof(financeStats.monthSettled)}</span></div>
                   </>
                 )}
               </div>
@@ -817,7 +836,7 @@ export function DailyCalendar({
                         <col className="w-[23%]" />
                       </colgroup>
                       <thead className="sticky top-0 z-10 bg-muted/50">
-                        <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                        <tr className="text-left text-xs font-semibold text-muted-foreground">
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "收款日期" : "Date"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "居住日期" : "Sejour"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
@@ -860,7 +879,7 @@ export function DailyCalendar({
                         <col className="w-[18%]" />
                       </colgroup>
                       <thead className="sticky top-0 z-10 bg-muted/50">
-                        <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                        <tr className="text-left text-xs font-semibold text-muted-foreground">
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "入住" : "Arrivee"}</th>
@@ -913,7 +932,7 @@ export function DailyCalendar({
                         <col className="w-[15%]" />
                       </colgroup>
                       <thead className="sticky top-0 z-10 bg-muted/50">
-                        <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                        <tr className="text-left text-xs font-semibold text-muted-foreground">
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "入住" : "Arrivee"}</th>
@@ -1039,7 +1058,7 @@ function TimelineCell({
         >
           {isStart && (
             <span className="min-w-0">
-              <span className="block truncate text-xs font-black leading-3">{name}</span>
+              <span className="block truncate text-xs font-semibold leading-3">{name}</span>
               <span className="block truncate text-[8px] font-semibold opacity-85">
                 {bookingLabels[booking.status] ?? booking.status}
               </span>
@@ -1097,7 +1116,7 @@ function TimelineCell({
         >
           {isStart && (
             <span className="min-w-0">
-              <span className="block truncate text-xs font-black leading-3">{name}</span>
+              <span className="block truncate text-xs font-semibold leading-3">{name}</span>
               <span className="block truncate text-[8px] font-semibold opacity-85">
                 {bookingLabels[booking.status] ?? booking.status}
               </span>
@@ -1161,7 +1180,7 @@ function FloorRow({
   return (
     <>
       <div
-        className="z-10 flex items-center border-b border-r bg-muted px-3 text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"
+        className="z-10 flex items-center border-b border-r bg-muted px-3 text-xs font-semibold text-muted-foreground"
         style={{ height: FLOOR_ROW_HEIGHT, left: "auto", position: "relative" }}
         data-daily-calendar-floor-label
       >
@@ -1180,38 +1199,49 @@ function FloorRow({
 type ShareTone = "dark" | "orange" | "teal" | "green";
 
 function ShareCard({ label, value, units, tone }: { label: string; value: number; units: string[]; tone: ShareTone }) {
-  const styles = {
-    dark: "bg-card text-foreground border-border",
-    orange: "bg-amber-50 text-amber-800 border-amber-200",
-    teal: "bg-[#D9F7F0] text-[#17324D] border-[#A8E8DB]",
-    green: "bg-emerald-50 text-emerald-800 border-emerald-200",
+  const tileTone = {
+    dark: "neutral",
+    orange: "amber",
+    teal: "teal",
+    green: "green",
+  }[tone] as "neutral" | "amber" | "teal" | "green";
+  const candyClass = {
+    dark: "border-border bg-[#F5F5F2]",
+    orange: "border-[#FFD99A] bg-[#FFF3DF]",
+    teal: "border-[#9BE8DC] bg-[#DDF8F2]",
+    green: "border-[#BCEFD9] bg-[#EAFBF3]",
   }[tone];
+
   return (
-    <div className={cn("rounded-lg border px-4 py-3 shadow-xs", styles)}>
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-semibold opacity-85">{label}</p>
-        <p className="text-xl font-semibold tabular-nums leading-none">{value}</p>
-      </div>
-      <p className="mt-2 min-h-5 text-xs font-medium leading-5">{units.join(", ")}</p>
-    </div>
+    <StatTile
+      label={label}
+      value={value}
+      caption={units.join(", ") || "-"}
+      tone={tileTone}
+      className={cn(
+        "min-h-[118px] shadow-xs",
+        candyClass,
+        "[&>span:last-child]:whitespace-normal [&>span:last-child]:break-words [&>span:last-child]:leading-4",
+      )}
+    />
   );
 }
 
 function FinanceCard({ label, value, tone, onClick }: { label: string; value: string; tone: "dark" | "orange" | "green"; onClick: () => void }) {
-  const styles = {
-    dark: "border-border bg-card hover:bg-muted/40 hover:shadow-card",
-    orange: "border-amber-200 bg-amber-50 hover:border-amber-300 hover:shadow-sm",
-    green: "border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:shadow-sm",
-  }[tone];
-  const barColors = { dark: "bg-foreground", orange: "bg-amber-500", green: "bg-emerald-500" }[tone];
+  const tileTone = {
+    dark: "neutral",
+    orange: "amber",
+    green: "green",
+  }[tone] as "neutral" | "amber" | "green";
+
   return (
-    <button type="button" onClick={onClick} className={cn("flex min-h-[64px] overflow-hidden rounded-lg border text-left shadow-xs transition-all hover:-translate-y-0.5", styles)}>
-      <div className={cn("w-1.5 shrink-0", barColors)} />
-      <div className="flex min-w-0 flex-1 flex-col justify-between px-4 py-3">
-        <p className="truncate text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">{label}</p>
-        <p className="truncate text-lg font-semibold tracking-tight tabular-nums">{value}</p>
-      </div>
-    </button>
+    <StatTile
+      label={label}
+      value={value}
+      tone={tileTone}
+      onClick={onClick}
+      className="min-h-[84px]"
+    />
   );
 }
 
@@ -1235,28 +1265,13 @@ function FilterButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold shadow-xs transition-all focus-visible:ring-ring",
+        "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium shadow-xs transition-all focus-visible:ring-ring",
         active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground/80 hover:bg-muted",
       )}
     >
-      {icon ?? <span className={cn("h-2 w-2 rounded-full", color)} />}
+      {icon ?? <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />}
       <span>{label}</span>
       <span className={cn("tabular-nums", active ? "text-white/85" : "text-muted-foreground/70")}>{count}</span>
-    </button>
-  );
-}
-
-function ViewButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-lg px-3 py-1.5 transition",
-        active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {children}
     </button>
   );
 }

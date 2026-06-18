@@ -27,13 +27,13 @@ export function DataVizCard({
   className?: string;
 }) {
   return (
-    <section className={cn("rounded-xl border border-border bg-card p-4 shadow-card", className)}>
-      <div className="mb-3 flex items-start justify-between gap-3">
+    <section className={cn("rounded-xl border border-border bg-card p-4 text-card-foreground shadow-card transition-shadow duration-200", className)}>
+      <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-[15px] font-semibold leading-tight">{title}</h2>
-          {description && <p className="mt-1 text-xs text-muted-foreground">{description}</p>}
+          <h2 className="text-sm font-medium leading-tight tracking-tight text-foreground">{title}</h2>
+          {description && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>}
         </div>
-        {metric && <div className="shrink-0 text-right text-sm font-semibold tabular-nums">{metric}</div>}
+        {metric && <div className="shrink-0 text-right text-xl font-semibold leading-none tabular-nums text-foreground">{metric}</div>}
       </div>
       {children}
     </section>
@@ -85,7 +85,7 @@ export function DonutChart({
           })}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          {centerValue && <span className="text-xl font-semibold leading-none tabular-nums">{centerValue}</span>}
+          {centerValue && <span className="text-lg font-semibold leading-none tabular-nums">{centerValue}</span>}
           {centerLabel && <span className="mt-1 text-[11px] font-medium text-muted-foreground">{centerLabel}</span>}
         </div>
       </div>
@@ -188,3 +188,37 @@ export function RadarChart({
   );
 }
 
+export function BarListChart({
+  items,
+  maxValue,
+}: {
+  items: { label: string; value: number; tone?: ChartTone; color?: string }[];
+  maxValue?: number;
+}) {
+  const max = Math.max(maxValue ?? 0, ...items.map((item) => item.value), 1);
+
+  return (
+    <div className="space-y-2.5">
+      {items.map((item) => {
+        const pct = Math.max(0, Math.min(100, (item.value / max) * 100));
+        return (
+          <div key={item.label} className="space-y-1">
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span className="min-w-0 truncate text-muted-foreground">{item.label}</span>
+              <span className="shrink-0 font-semibold tabular-nums text-foreground">{item.value}</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${pct}%`,
+                  backgroundColor: item.color ?? toneStroke[item.tone ?? "blue"],
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

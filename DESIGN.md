@@ -1,5 +1,5 @@
 ---
-version: 4.0
+version: 4.1
 name: SACIS-design-system
 description: Complete product design rules for SACIS 3.0. Built from getdesign.md-style design rules and 21st.dev component patterns, adapted for a Chinese/French property operations system in Abidjan.
 ---
@@ -288,6 +288,466 @@ Rules:
 - Icon + text gap: 8px.
 - Icon-only button must have `aria-label` or tooltip.
 - Do not use letters as icon substitutes when a clear icon exists.
+
+## Layout & Scale Rules
+
+This section defines the missing proportional system. It exists because visual unity is not only color, radius, and shadow. SACIS needs predictable scale, density, hierarchy, and page templates so every screen feels designed by the same team.
+
+Use these rules before choosing individual component styles.
+
+### Imitation Objects For Scale
+
+Use these references as proportional models:
+
+- **Cal.com** for scheduling toolbars, black primary commands, compact navigation controls, and clear date controls.
+- **Airtable** for dense data tables, filters above records, compact chips, and field-like information layout.
+- **Notion** for warm surface spacing, quiet containers, and long-session readability.
+- **Linear** for precise active states, controlled hierarchy, low-noise borders, and disciplined motion.
+- **21st.dev** for concrete component execution: button groups, command bars, cards, tables, sidebars, drawers, tabs, calendars, and empty states.
+
+Adapt these references to SACIS. Do not copy marketing scale, excessive whitespace, decorative gradients, or purely aesthetic component snippets.
+
+### Component Scale System
+
+Component size is a hierarchy tool. Controls in the same row should not all look equally important.
+
+Button and control scale:
+
+| Token | Height | Padding | Text | Icon | Use |
+|---|---:|---:|---|---:|---|
+| `command.primary` | 40px | 16-18px | 13-14px / 600 | 16px | Main business action |
+| `command.secondary` | 36px | 12-14px | 13px / 600 | 15-16px | Print, export, backfill, secondary action |
+| `command.tertiary` | 32px | 8-10px | 12-13px / 600 | 14-16px | Low emphasis command |
+| `control.icon.sm` | 32px square | 0 | none | 16px | Topbar/account icon |
+| `control.icon.md` | 36px square | 0 | none | 16px | Toolbar navigation icon |
+| `control.meta` | 36px | 12-14px | 13px / 600 | optional 16px | Date, range, current user, read-only meta |
+| `control.segmented` | 36px | 12-16px | 13px / 600 | optional 14px | View mode, tabs, filter modes |
+| `input.standard` | 40px | 12px | 14px / 400-500 | optional 16px | Forms |
+| `input.compact` | 36px | 12px | 13px | optional 16px | Filter bars and dense tables |
+
+Rules:
+
+- One toolbar should have one `command.primary` by default.
+- Secondary actions must not visually compete with the primary command.
+- Date/range/user controls are `control.meta`; they should read as stable information, not as primary commands.
+- Topbar controls use 32px height; page toolbars use 36-40px.
+- Avoid mixing 28px, 32px, 36px, and 40px controls in one group unless the scale token explains why.
+- Icon-only controls must use a fixed square size.
+- A toolbar group must share one outer surface, one radius rhythm, and one spacing rhythm.
+
+### Page Density System
+
+Density is chosen by workflow, not by taste.
+
+| Page Type | Density | Primary Goal | Rules |
+|---|---|---|---|
+| Dashboard / cockpit | Medium | Scan metrics and risks | More breathing room around chart/KPI groups |
+| Calendar operations | Dense | Fast room/date decisions | Compact controls, clear status blocks, sticky labels |
+| Finance / reconciliation | Dense | Compare rows and amounts | Tight tables, right-aligned numbers, compact filters |
+| Customer / record management | Medium-dense | Find and edit records | Search-first, card/list hybrid, details in drawer |
+| Sales / lease operations | Medium-dense | Track contracts and actions | Record cards plus structured payment tables |
+| Settings / tools | Dense | Repeated admin tasks | Low decoration, compact forms, clear danger zones |
+| Reports | Medium | Interpret trends | Larger charts, fewer controls, stronger narrative order |
+
+Rules:
+
+- Do not use dashboard-scale whitespace in finance tables.
+- Do not use table density inside form drawers.
+- Daily rental calendar can be dense, but its toolbar must remain readable.
+- Settings pages should feel utilitarian, not like marketing cards.
+
+### Information Hierarchy Ratios
+
+Hierarchy must be visible through size, weight, spacing, and placement.
+
+Ratios:
+
+- KPI value should be 1.5-2x the size of its label.
+- Page title should be larger than section title, but smaller than major KPI values.
+- Section title should be 14-16px, not hero-sized.
+- Table body should be 13px, table header 12px.
+- Captions and helper text are 12px minimum.
+- A card should not contain more than one visually dominant number unless it is a comparison card.
+
+Rules:
+
+- Same semantic level means same visual treatment across pages.
+- Page descriptions should clarify context, not repeat visible controls.
+- Avoid uppercase/tracking-heavy labels for Chinese UI.
+- Use `tabular-nums` for money, dates, room numbers, counts, percentages, and occupancy rates.
+- Long labels must wrap or truncate predictably; they must not stretch buttons.
+
+### Container Proportions
+
+Containers define the rhythm of the product.
+
+Global dimensions:
+
+- Desktop page padding: 24-32px.
+- Tablet page padding: 20-24px.
+- Mobile page padding: 16px.
+- Major section gap: 24px.
+- Related group gap: 12-16px.
+- Toolbar vertical padding: 8-12px.
+- Standard card padding: 16-20px.
+- Dense card padding: 12-16px.
+- Table row height: 44-52px.
+- Table header height: 40-44px.
+- Drawer header height: 56-64px.
+- Drawer footer action bar height: 64-72px.
+- Topbar height: 52-56px.
+- Sidebar item height: 36-40px.
+
+Rules:
+
+- A toolbar should be visually shorter than a KPI card.
+- A KPI row should not be taller than the chart cards below it unless it is the main dashboard.
+- Filter bars should not look like page headers.
+- Drawer content should be narrower and calmer than full-page content.
+- Calendar row height must prioritize scanning; do not let booking text increase row height.
+
+### Grid System
+
+Use predictable layout templates.
+
+Desktop grid:
+
+- KPI rows: 4 columns by default, 5 columns only for compact metrics.
+- Chart rows: 2 columns by default.
+- Main table: full width.
+- Detail + list layouts: list 55-65%, detail 35-45%.
+- Drawer width: 420px compact, 480px standard, 560px complex.
+- Wide analytical drawer: 720-960px only for tables or multi-section finance details.
+
+Responsive grid:
+
+- KPI cards collapse from 4 -> 2 -> 1 columns.
+- Chart cards collapse from 2 -> 1 columns.
+- Toolbars wrap by group, not by individual buttons whenever possible.
+- Tables can scroll horizontally; do not crush columns into unreadable widths.
+- Calendar desktop uses timeline/grid; mobile may use cards or simplified day list.
+
+Rules:
+
+- Do not invent new grid ratios per page.
+- Avoid nested cards inside cards.
+- A full-width table should not be placed inside a decorative card if the table shell already has a border.
+- Keep filter bars directly above the data they control.
+
+### Action Hierarchy
+
+Every region must define command priority.
+
+Priority levels:
+
+1. **Primary command**: the main thing the user is expected to do now.
+2. **Secondary command**: useful but not central.
+3. **Navigation control**: previous/next, today, view mode.
+4. **Meta control**: date, current range, user, count.
+5. **Danger command**: destructive or irreversible action.
+
+Rules:
+
+- One toolbar should normally have one primary command.
+- Danger commands must be visually separated from ordinary secondary commands.
+- Print, export, and copy are operational tools; only copy becomes primary when it is the main workflow output.
+- Date navigation is not a business command.
+- Batch actions should be grouped behind a bulk action surface when there are more than two.
+- Icon-only actions need tooltips or accessible labels.
+- Confirmation actions in dialogs should be right aligned; cancel should be lower emphasis.
+
+### Status Color Weight
+
+SACIS uses many business states. Color weight must be controlled.
+
+Color weight levels:
+
+| Weight | Form | Use |
+|---|---|---|
+| `status.block` | Large colored block | Room/calendar booking states only |
+| `status.badge` | Tinted pill | Contract, payment, customer, workflow states |
+| `status.dot` | Small dot | Filters, legends, compact summaries |
+| `status.text` | Colored text only | Money direction, minor risk hint |
+| `status.alert` | Tinted alert surface | Requires action soon |
+
+Rules:
+
+- Room-status colors are allowed as large blocks only in room cards and daily calendar cells.
+- Finance semantic colors should not be confused with room-status colors.
+- Red large surfaces are only for serious risk, blacklist, overdue, destructive confirmation, or blocking error.
+- A page should not show more than 4 high-saturation status colors in the same visual region.
+- Legends should use dots, not large chips.
+- If color communicates state, text or icon must also communicate the state.
+
+### Data Visualization Proportions
+
+Charts need their own scale rules.
+
+Chart dimensions:
+
+- Small donut: 112-132px.
+- Standard donut: 140-160px.
+- Dashboard donut: 180px max.
+- Sparkline: 56-72px high.
+- Standard line chart: 112-160px high.
+- Report line chart: 220-280px high.
+- Radar chart: 160-200px.
+- Bar chart row height: 28-36px.
+- Chart card minimum height: 180px compact, 240px standard.
+
+Rules:
+
+- A chart card must include title, optional description, primary metric, chart body, and legend.
+- Donut center values should be short: percent, count, or compact money.
+- Legends should be right side or below chart depending on available width.
+- A chart should answer one question, not decorate the page.
+- If the table is the source of truth, the chart summarizes before the table.
+- Do not use chart colors that conflict with protected room-status colors unless the chart is explicitly about rooms.
+
+### Table Visual System
+
+Tables are SACIS's core work surface.
+
+Dimensions:
+
+- Header height: 40-44px.
+- Row height: 44-52px.
+- Compact row height: 40-44px.
+- Cell horizontal padding: 12-16px.
+- Amount columns: right aligned.
+- Status columns: center or left depending on density.
+- Action column: fixed width 40-56px.
+- Empty table state: 160px minimum height.
+- Pagination height: 44-52px.
+
+Rules:
+
+- Use `BusinessTable` or a successor `DataTable`; avoid raw table styling in feature files.
+- Table headers should be readable Chinese/French labels, not uppercase English styling.
+- Money, dates, and counts use `tabular-nums`.
+- Row hover should be subtle and consistent.
+- Selected row should be visible through border/background, not color alone.
+- Risk rows can have a tinted background, but keep text readable.
+- Long text should truncate with a tooltip or open details in a drawer.
+
+### Drawer And Panel System
+
+Drawers are the standard place for details and forms.
+
+Drawer sizes:
+
+- `drawer.compact`: 420px. Simple edit form.
+- `drawer.standard`: 480px. Record detail plus actions.
+- `drawer.wide`: 560px. Multi-section form.
+- `drawer.table`: 720-960px. Finance details or large related table.
+- Mobile drawer: bottom sheet with 88-92vh max height.
+
+Rules:
+
+- Header is sticky and contains title, status, close.
+- Body uses 16px section gaps and 12px field gaps.
+- Footer is sticky for primary/cancel actions when the form is long.
+- Destructive actions are separated from save/confirm actions.
+- Close buttons are icon-only and 32px.
+- Drawer text should not use page-title scale.
+- Detail `dl` blocks should use consistent label/value rhythm.
+
+### Form System
+
+Forms must feel predictable across modules.
+
+Field dimensions:
+
+- Standard input: 40px high.
+- Compact filter input: 36px high.
+- Textarea: 80-120px depending on expected content.
+- Label: 12px / 600.
+- Helper/error text: 12px.
+- Field gap: 12px.
+- Form group gap: 16px.
+
+Rules:
+
+- Required fields use a subtle marker, not loud red labels.
+- Errors sit directly under the field they explain when possible.
+- Form-level errors sit above the action row.
+- Selects, date inputs, and text inputs share height and radius.
+- Checkbox rows use 16px checkbox size and 14px text.
+- Numeric fields should show units or formatted preview when money is involved.
+
+### Empty Loading Error Weight
+
+State screens must be consistent and low-noise.
+
+Rules:
+
+- Empty state icon: 32-40px.
+- Empty state title: 14-15px / 600.
+- Empty state description: 13px muted.
+- Empty state action: one primary or secondary button.
+- Loading skeleton should match the size of the real component.
+- Error state uses red sparingly; recoverable errors should not dominate the page.
+- Permission states should be calm and explicit.
+
+### Bilingual Text Rules
+
+Chinese and French must both fit.
+
+Rules:
+
+- Buttons must allow French labels to be 30-50% longer than Chinese labels.
+- Use `whitespace-nowrap` only when the label is known to fit.
+- Long labels in cards and tables should truncate with accessible title or detail drawer.
+- Avoid fixed tiny widths for controls containing French text.
+- Date formats should be locale-specific but layout-stable.
+- Currency should stay compact: XOF values may use short formatting in cards and full formatting in tables.
+
+### Responsive Behavior
+
+SACIS is desktop-first but mobile must remain usable.
+
+Rules:
+
+- Desktop is the primary operational surface.
+- Tablet should preserve most desktop controls but allow wrapping.
+- Mobile should reduce side-by-side complexity, not shrink everything.
+- Topbar search can collapse or hide on mobile.
+- Toolbars wrap in groups: meta group, primary command, secondary tools.
+- Tables scroll horizontally on mobile.
+- Calendar should use a simplified mobile view instead of forcing tiny timeline cells.
+- Drawers become bottom sheets on mobile.
+
+### Interaction Motion
+
+Motion should clarify, not entertain.
+
+Rules:
+
+- Button active scale may be `0.98`, but not every control needs it.
+- Hover lift is allowed for clickable cards, not for normal table rows.
+- Toolbars should use color/background changes instead of vertical movement.
+- Drawers/dialogs animate quickly: 160-220ms.
+- Tab/filter changes should feel immediate.
+- Loading bar is allowed for route transitions.
+- Avoid decorative or idle animation in operational pages.
+
+### Accessibility Proportions
+
+Usability rules are part of the design system.
+
+Rules:
+
+- Focus ring must be visible on keyboard navigation.
+- Icon-only buttons require `aria-label`.
+- Minimum click target: 32px topbar, 36px toolbar, 40px primary command.
+- Do not communicate status by color alone.
+- Dialogs/drawers must have a clear close control.
+- Tables with row click should also expose a visible action.
+- Text contrast must remain readable on tinted status backgrounds.
+
+### Page Templates
+
+Every major screen should map to one template.
+
+#### Dashboard Template
+
+Use for management cockpit and high-level summaries.
+
+Structure:
+
+1. Page header.
+2. KPI row.
+3. Chart/risk row.
+4. Operational sections.
+5. Detail drawers for drill-down.
+
+Imitate: Cal.com for header/toolbars, Linear for hierarchy, Airtable for data sections.
+
+#### Calendar Operations Template
+
+Use for daily rentals.
+
+Structure:
+
+1. Overview toolbar with date meta and primary action.
+2. Status summary cards.
+3. Finance summary or operational alerts.
+4. Calendar toolbar with filters, view mode, date navigation.
+5. Timeline grid.
+6. Booking drawer.
+
+Imitate: Cal.com scheduling controls, 21st.dev calendar/toolbars, Airtable filter chips.
+
+#### Data Table Template
+
+Use for finance, receivables, audit logs, imports, documents, and settings tables.
+
+Structure:
+
+1. Page header.
+2. KPI or summary row when useful.
+3. Optional chart summary.
+4. Filter bar.
+5. Data table.
+6. Pagination and detail drawer.
+
+Imitate: Airtable tables/filters, Linear precision, 21st.dev table patterns.
+
+#### Record Management Template
+
+Use for customers, units, leases, sales.
+
+Structure:
+
+1. Page header with primary create action.
+2. Segment/filter/search bar.
+3. KPI or segment summary.
+4. Card/list/table hybrid.
+5. Detail drawer with actions.
+
+Imitate: Airtable records, Notion calm surfaces, 21st.dev cards/drawers.
+
+#### Finance Reconciliation Template
+
+Use for finance and payments.
+
+Structure:
+
+1. Page header.
+2. Money KPI row.
+3. Trend/structure chart.
+4. Dense filter bar.
+5. Ledger/receivable table.
+6. Export/add actions grouped in toolbar.
+
+Imitate: Airtable density, Linear hierarchy, Cal.com primary command discipline.
+
+#### Settings Tool Template
+
+Use for settings, data quality, bulk actions, security, import/export.
+
+Structure:
+
+1. Compact page header.
+2. Task cards or utility sections.
+3. Dense forms/tables.
+4. Clear danger zones.
+
+Imitate: Linear settings precision, Airtable utility density, Notion calm surfaces.
+
+#### Report Analytics Template
+
+Use for reports.
+
+Structure:
+
+1. Page header.
+2. Time range and filter controls.
+3. 2-column chart grid.
+4. Supporting tables.
+5. Export/print tools as secondary commands.
+
+Imitate: Stripe/Vercel analytical clarity, Airtable data grounding, 21st.dev chart cards.
 
 ## Density System
 
@@ -806,6 +1266,8 @@ Rules:
 - Right drawers for detail/edit.
 
 ## Implementation Rules
+
+Before editing UI, use `docs/ui-execution-checklist.md` as the execution gate. `DESIGN.md` defines the product rules; the checklist defines whether a page or component actually passed those rules in code and screenshot review.
 
 ### No Raw UI Drift
 

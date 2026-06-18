@@ -39,7 +39,7 @@ export function BusinessThead({ children, sticky = false }: { children: ReactNod
   return (
     <thead
       className={cn(
-        "border-b border-border bg-muted/80 text-xs font-semibold text-muted-foreground",
+        "border-b border-border bg-muted/60 text-xs font-medium text-muted-foreground",
         sticky && "sticky top-0 z-10",
       )}
     >
@@ -58,7 +58,7 @@ export function BusinessTh({
   className?: string;
 }) {
   return (
-    <th className={cn("h-11 whitespace-nowrap px-4 py-3 align-middle uppercase tracking-[0.04em]", alignClass[align], className)}>
+    <th className={cn("h-10 whitespace-nowrap px-4 py-2.5 align-middle", alignClass[align], className)}>
       {children}
     </th>
   );
@@ -91,7 +91,7 @@ export function BusinessRow({
   children: ReactNode;
   className?: string;
 }) {
-  return <tr className={cn("transition-colors hover:bg-muted/55", className)}>{children}</tr>;
+  return <tr className={cn("transition-colors hover:bg-muted/45", className)}>{children}</tr>;
 }
 
 export function MoneyCell({

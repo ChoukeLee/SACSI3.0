@@ -2,17 +2,18 @@ import * as React from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Tone = "neutral" | "blue" | "green" | "amber" | "red" | "purple" | "sold" | "leased";
+type Tone = "neutral" | "blue" | "green" | "amber" | "red" | "purple" | "teal" | "sold" | "leased";
 
-const toneClass: Record<Tone, { dot: string; icon: string; bg: string; ring: string }> = {
-  neutral: { dot: "bg-foreground/70", icon: "text-foreground", bg: "bg-muted/60", ring: "ring-border" },
-  blue: { dot: "bg-accentBlue-500", icon: "text-accentBlue-600", bg: "bg-accentBlue-50", ring: "ring-accentBlue-100" },
-  green: { dot: "bg-accentGreen-500", icon: "text-accentGreen-600", bg: "bg-accentGreen-50", ring: "ring-accentGreen-100" },
-  amber: { dot: "bg-accentAmber-500", icon: "text-accentAmber-600", bg: "bg-accentAmber-50", ring: "ring-accentAmber-100" },
-  red: { dot: "bg-accentRed-500", icon: "text-accentRed-600", bg: "bg-accentRed-50", ring: "ring-accentRed-100" },
-  purple: { dot: "bg-accentPurple-500", icon: "text-accentPurple-600", bg: "bg-accentPurple-50", ring: "ring-accentPurple-100" },
-  sold: { dot: "bg-[#B88A48]", icon: "text-[#7B5A2B]", bg: "bg-[#EFE1CA]/70", ring: "ring-[#D8BF98]/70" },
-  leased: { dot: "bg-[#5E9BC5]", icon: "text-[#2E6F9A]", bg: "bg-[#DDECF7]/70", ring: "ring-[#AFCBE1]/70" },
+const toneClass: Record<Tone, { dot: string; icon: string }> = {
+  neutral: { dot: "bg-foreground/65", icon: "text-muted-foreground" },
+  blue: { dot: "bg-accentBlue-500", icon: "text-accentBlue-600" },
+  green: { dot: "bg-accentGreen-500", icon: "text-accentGreen-600" },
+  amber: { dot: "bg-accentAmber-500", icon: "text-accentAmber-600" },
+  red: { dot: "bg-accentRed-500", icon: "text-accentRed-600" },
+  purple: { dot: "bg-accentPurple-500", icon: "text-accentPurple-600" },
+  teal: { dot: "bg-[#5CC4B8]", icon: "text-[#217365]" },
+  sold: { dot: "bg-[#B88A48]", icon: "text-[#7B5A2B]" },
+  leased: { dot: "bg-[#5E9BC5]", icon: "text-[#2E6F9A]" },
 };
 
 export function StatTile({
@@ -42,24 +43,25 @@ export function StatTile({
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={cn(
-        "group flex min-h-[76px] items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-3 text-left shadow-card transition-all duration-fast",
-        onClick && "cursor-pointer hover:-translate-y-0.5 hover:border-border-strong hover:shadow-lifted",
-        active && "border-foreground/30 bg-muted/30 ring-2 ring-foreground/5",
+        "group flex flex-col rounded-xl border border-border bg-card p-3.5 text-left text-card-foreground shadow-card transition-shadow duration-200",
+        caption ? "min-h-[100px]" : "min-h-[84px]",
+        onClick && "cursor-pointer hover:shadow-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
+        active && "border-foreground/25 ring-2 ring-foreground/10",
         className,
       )}
     >
-      {Icon ? (
-        <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1", t.bg, t.ring)}>
-          <Icon className={cn("h-4 w-4", t.icon)} strokeWidth={1.8} />
+      <span className="flex min-w-0 items-center justify-between gap-3 pb-2">
+        <span className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">{label}</span>
+        <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+          {Icon ? (
+            <Icon className={cn("h-4 w-4", t.icon)} strokeWidth={1.8} />
+          ) : (
+            <span className={cn("h-2.5 w-2.5 rounded-full", t.dot)} />
+          )}
         </span>
-      ) : (
-        <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", t.dot)} />
-      )}
-      <span className="min-w-0">
-        <span className="block text-xl font-semibold leading-none tabular-nums text-foreground">{value}</span>
-        <span className="mt-1 block text-[11px] font-medium leading-tight text-muted-foreground">{label}</span>
-        {caption && <span className="mt-1 block text-[11px] leading-tight text-muted-foreground/80">{caption}</span>}
       </span>
+      <span className="block text-lg font-semibold leading-none tabular-nums text-foreground">{value}</span>
+      {caption && <span className="mt-2 block min-h-5 text-xs leading-relaxed text-muted-foreground">{caption}</span>}
     </Comp>
   );
 }
@@ -95,14 +97,14 @@ export function SegmentedControl<T extends string>({
   className?: string;
 }) {
   return (
-    <nav className={cn("inline-flex max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-muted p-1 shadow-xs", className)} aria-label={ariaLabel}>
+    <nav className={cn("inline-flex max-w-full gap-1 overflow-x-auto rounded-lg border border-border bg-muted/70 p-1 shadow-xs", className)} aria-label={ariaLabel}>
       {items.map((item) => (
         <button
           key={item.value}
           type="button"
           onClick={() => onChange(item.value)}
           className={cn(
-            "shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors sm:px-4 sm:py-2 sm:text-sm",
+            "shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
             value === item.value
               ? "bg-primary text-primary-foreground shadow-sm"
               : "text-muted-foreground hover:bg-card hover:text-foreground",
@@ -117,5 +119,4 @@ export function SegmentedControl<T extends string>({
 }
 
 export const controlClass =
-  "h-9 rounded-lg border border-input bg-card px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground hover:border-border-strong focus:outline-none focus:ring-2 focus:ring-ring/20";
-
+  "h-9 rounded-lg border border-input bg-card px-3 py-2 text-sm font-medium shadow-xs outline-offset-2 transition-colors placeholder:text-muted-foreground hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";

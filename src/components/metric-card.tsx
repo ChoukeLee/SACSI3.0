@@ -36,24 +36,20 @@ export function MetricCard({
     <Wrapper
       onClick={onClick}
       className={cn(
-        "group relative flex items-start gap-4 rounded-xl border border-border bg-card p-5 text-left shadow-card transition-all duration-fast",
-        onClick && "cursor-pointer hover:-translate-y-0.5 hover:shadow-lifted",
+        "group flex flex-col rounded-xl border border-border bg-card p-3.5 text-left text-card-foreground shadow-card transition-shadow duration-200",
+        caption ? "min-h-[100px]" : "min-h-[84px]",
+        onClick && "cursor-pointer hover:shadow-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
         className,
       )}
     >
-      {Icon && (
-        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-black/5", a.bg)}>
-          <Icon className={cn("h-5 w-5", a.icon)} strokeWidth={1.75} />
-        </div>
-      )}
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-semibold text-muted-foreground">{title}</p>
-        <p className="mt-1 text-xl font-semibold tracking-tight tabular-nums">{value}</p>
-        {caption && <p className="mt-1 text-xs text-muted-foreground">{caption}</p>}
+      <div className="flex min-w-0 items-center justify-between gap-3 pb-2">
+        <p className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">{title}</p>
+        <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+          {Icon ? <Icon className={cn("h-4 w-4", a.icon)} strokeWidth={1.75} /> : <span className={cn("h-2.5 w-2.5 rounded-full", a.dot)} />}
+        </span>
       </div>
-      {onClick && (
-        <div className={cn("mt-0.5 h-2 w-2 shrink-0 rounded-full opacity-0 transition-opacity group-hover:opacity-100", a.dot)} />
-      )}
+      <p className="text-lg font-semibold leading-none tabular-nums text-foreground">{value}</p>
+      {caption && <p className="mt-2 min-h-5 text-xs leading-relaxed text-muted-foreground">{caption}</p>}
     </Wrapper>
   )
 }

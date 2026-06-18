@@ -13,6 +13,7 @@ import { DateInput } from "@/components/ui/date-input";
 import { RoomCard } from "@/components/room-card";
 import { RoomBoard } from "@/components/room-board";
 import { EmptyState } from "@/components/empty-state";
+import { controlClass } from "@/components/ui/operational";
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import { createSaleContract, recordSalePayment, addFlexibleInstallment, updateTransferStatus, terminateSaleContract } from "./actions";
 
@@ -77,7 +78,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const handleTransfer = async () => {if(!trDate){setError(locale==="zh"?"请选择过户日期":"Champs obligatoires");return;}setSaving(true);setError("");const r=await updateTransferStatus(selectedId!,trStatus,trDate,trCertNo||undefined);setSaving(false);if(r.success)setPanel(null);else setError(r.error??"Failed");};
   const handleTerminateSale = async () => {setSaving(true);setError("");const r=await terminateSaleContract(selectedId!,termReason||(locale==="zh"?"手动终止":"Manuel"));setSaving(false);if(r.success)setPanel(null);else setError(r.error??"Failed");};
 
-  const inputClass="w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+  const inputClass="w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
   const labelClass="block text-xs font-semibold text-muted-foreground mb-1";
   const schedLabel = (s: string) => { const l: Record<string,string>=locale==="zh"?{pending:"待付",paid:"已付",overdue:"逾期",cancelled:"取消"}:{pending:"Attente",paid:"Paye",overdue:"Retard",cancelled:"Annule"}; return l[s]??s; };
   const transText = (s:string)=>locale==="zh"?{not_started:"未开始",in_progress:"办理中",completed:"已完成"}[s]??s:{not_started:"Non debute",in_progress:"En cours",completed:"Termine"}[s]??s;
@@ -96,7 +97,7 @@ function SaleInfo({ label, value, good, warn, danger }: { label: string; value: 
 function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label: string; onClick: () => void }) {
   return (
     <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); }}
-      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[rgba(23,50,77,0.10)] bg-white/80 text-[#27506F] shadow-[0_1px_2px_rgba(25,58,92,0.04)] transition-all hover:bg-white hover:-translate-y-px"
+      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground"
       aria-label={label} title={label}>
       <Icon className="h-[14px] w-[14px]" strokeWidth={1.5} />
     </button>
@@ -116,7 +117,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
     <div className="flex flex-col gap-6">
       {/* ── Page chrome ── */}
       <div className="flex flex-col gap-1">
-        <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+        <p className="text-xs font-medium text-muted-foreground">
           {locale === "zh" ? "出售业务" : "Ventes"}
         </p>
         <div className="flex items-baseline gap-3">
@@ -132,12 +133,12 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
       {/* ── Summary stats ── */}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
         {statBlocks.map(b => (
-          <div key={b.key} className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-            <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", b.dot)} />
-            <div className="min-w-0">
-              <p className="text-xl font-bold tracking-tight tabular-nums leading-none">{b.value}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{b.label}</p>
+          <div key={b.key} className="flex min-h-[76px] flex-col rounded-xl border border-border bg-card p-3 text-card-foreground shadow-card transition-shadow duration-200">
+            <div className="flex min-w-0 items-center justify-between gap-3 pb-2">
+              <p className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">{b.label}</p>
+              <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", b.dot)} />
             </div>
+            <p className="text-lg font-semibold leading-none tabular-nums text-foreground">{b.value}</p>
           </div>
         ))}
       </div>
@@ -145,7 +146,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
       {/* ── Filter bar ── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-card px-4 py-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
-          {["all","draft","active","terminated","expired"].map(s=>(<button key={s} onClick={()=>setStatusFilter(s)} className={cn("rounded-md px-3 py-1.5 text-xs font-semibold transition",statusFilter===s?"bg-primary text-primary-foreground shadow-sm":"border bg-card text-muted-foreground hover:bg-accent")}>{s==="all"?(locale==="fr"?"Tous":"全部"):t.contractStatus[s as keyof typeof t.contractStatus]}</button>))}
+          {["all","draft","active","terminated","expired"].map(s=>(<button key={s} onClick={()=>setStatusFilter(s)} className={cn(controlClass, "text-xs font-medium", statusFilter===s?"bg-primary text-primary-foreground shadow-sm":"text-muted-foreground hover:bg-accent")}>{s==="all"?(locale==="fr"?"Tous":"全部"):t.contractStatus[s as keyof typeof t.contractStatus]}</button>))}
           <span className="pl-1 text-xs text-muted-foreground">{filtered.length}/{contracts.length} {locale==="fr"?"contrats":"份合同"}</span>
         </div>
         <Button size="sm" onClick={openNew}><Plus className="h-4 w-4"/>{t.form.newContract}</Button>
@@ -194,7 +195,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
       )}
 
       {/* ── New Contract Panel ── */}
-      {panel==="new"&&(<><div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" onClick={()=>setPanel(null)}/><div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l bg-card shadow-lg"><div className="sticky top-0 z-10 flex items-center justify-between border-b bg-card/95 px-5 py-4 backdrop-blur"><h3 className="text-sm font-bold">{t.form.newContract}</h3><button onClick={()=>setPanel(null)} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent"><X className="h-4 w-4"/></button></div>
+      {panel==="new"&&(<><div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={()=>setPanel(null)}/><div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]"><div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur"><h3 className="text-[15px] font-semibold">{t.form.newContract}</h3><button onClick={()=>setPanel(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"><X className="h-4 w-4"/></button></div>
         <div className="space-y-4 px-5 py-5"><div><label className={labelClass}>{t.form.contractNo}</label><input type="text" value={fContractNo} onChange={e=>setFContractNo(e.target.value)} className={inputClass}/></div><div><label className={labelClass}>{t.form.unit} *</label><select value={fUnitId} onChange={e=>setFUnitId(e.target.value)} className={inputClass}><option value="">{t.form.noUnit}</option>{sellableUnits.map(u=><option key={u.id} value={u.id}>{u.unit_no} ({u.floor_label})</option>)}</select></div><div><label className={labelClass}>{t.form.customer} *</label><select value={fCustomerId} onChange={e=>setFCustomerId(e.target.value)} className={inputClass}><option value="">{t.form.noCustomer}</option>{customers.filter(cc=>!cc.is_blacklisted).map(cc=><option key={cc.id} value={cc.id}>{cc.name}</option>)}</select></div>
           <div className="grid grid-cols-2 gap-3"><div><label className={labelClass}>{t.form.signedDate}</label><DateInput value={fSignedDate} onChangeValue={setFSignedDate} className={inputClass}/></div><div><label className={labelClass}>{t.form.totalAmount} *</label><input type="number" value={fTotalAmount} onChange={e=>setFTotalAmount(Number(e.target.value))} className={inputClass}/></div></div>
           <div><label className={labelClass}>{locale==="zh"?"付款计划":"Plan"}</label><select value={fPlanType} onChange={e=>setFPlanType(e.target.value)} className={inputClass}><option value="lump_sum">{t.paymentPlan.lump_sum}</option><option value="fixed_installment">{t.paymentPlan.fixed_installment}</option><option value="flexible_installment">{t.paymentPlan.flexible_installment}</option></select></div>
@@ -204,14 +205,14 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
           {error&&<p className="text-sm text-red-600">{error}</p>}<Button className="w-full" onClick={handleCreate} disabled={saving}>{saving?"...":t.form.newContract}</Button></div></div></>)}
 
       {/* ── Detail Panel ── */}
-      {panel==="detail"&&selected&&(<><div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" onClick={()=>setPanel(null)}/><div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l bg-card shadow-lg"><div className="sticky top-0 z-10 flex items-center justify-between border-b bg-card/95 px-5 py-4 backdrop-blur"><div><h3 className="text-sm font-bold">{selected.contract_no}</h3><Badge variant={statusVariant[selected.status]}>{t.contractStatus[selected.status as keyof typeof t.contractStatus]}</Badge></div><button onClick={()=>setPanel(null)} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent"><X className="h-4 w-4"/></button></div>
+      {panel==="detail"&&selected&&(<><div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={()=>setPanel(null)}/><div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]"><div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur"><div><h3 className="text-[15px] font-semibold">{selected.contract_no}</h3><Badge variant={statusVariant[selected.status]}>{t.contractStatus[selected.status as keyof typeof t.contractStatus]}</Badge></div><button onClick={()=>setPanel(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"><X className="h-4 w-4"/></button></div>
         <div className="space-y-4 px-5 py-5">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm"><div><dt className="text-xs text-muted-foreground">{t.form.unit}</dt><dd className="font-medium">{selectedUnit?.unit_no??"-"} ({selectedUnit?.floor_label??""})</dd></div><div><dt className="text-xs text-muted-foreground">{t.form.customer}</dt><dd className="font-medium">{selectedCustomer?.name??"-"}</dd></div><div><dt className="text-xs text-muted-foreground">{t.form.signedDate}</dt><dd>{selected.signed_date}</dd></div><div><dt className="text-xs text-muted-foreground">{t.form.totalAmount}</dt><dd className="font-semibold">{formatXof(Number(selected.total_amount_xof))}</dd></div><div><dt className="text-xs text-muted-foreground">{locale==="zh"?"过户状态":"Transfert"}</dt><dd className={cn("font-medium",selected.transfer_status==="completed"?"text-emerald-600":"")}>{transText(selected.transfer_status)}</dd></div></dl>
           {selected.status==="active"&&<div className="grid grid-cols-2 gap-2"><Button size="sm" onClick={()=>{setPayScheduleId(contractSchedules.find(s=>s.status!=="paid")?.id??"");setPayAmount(0);}}><DollarSign className="h-4 w-4"/>{locale==="zh"?"收款":"Paiement"}</Button><Button size="sm" variant="outline" onClick={()=>{setShowFlexForm(true);setFlexDueDate("");setFlexAmount(0);setError("");}}><CalendarPlus className="h-4 w-4"/>{locale==="zh"?"新增分期":"+Echeance"}</Button><Button size="sm" variant="outline" onClick={()=>{setTrDate(new Date().toISOString().slice(0,10));setTrStatus(selected.transfer_status);}}><TrendingUp className="h-4 w-4"/>{locale==="zh"?"过户":"Transfert"}</Button><Button size="sm" variant="ghost" onClick={handleTerminateSale}><AlertTriangle className="h-4 w-4"/>{locale==="zh"?"终止":"Resilier"}</Button></div>}
 
           {/* Installment plan */}
-          <div className="border-t pt-4"><h4 className="text-sm font-bold mb-2">{locale==="zh"?"分期计划":"Plan de paiement"}</h4>
-            {contractSchedules.length===0?<p className="text-xs text-muted-foreground">{locale==="zh"?"暂无数据":"Aucun"}</p>:<table className="w-full text-left text-[13px]"><thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground"><tr><th className="px-2 py-1.5">#</th><th className="px-2 py-1.5">{locale==="zh"?"到期日":"Echeance"}</th><th className="px-2 py-1.5 text-right">{locale==="zh"?"金额":"Montant"}</th><th className="px-2 py-1.5 text-center">{locale==="zh"?"状态":"Statut"}</th><th className="px-2 py-1.5 text-right">{locale==="zh"?"已收":"Paye"}</th></tr></thead><tbody className="divide-y">{contractSchedules.map(s=>{const stat=getSchedStatus(s,contractReceivables);const recPaid=contractReceivables.find(r=>r.due_date===s.due_date&&Math.abs(Number(r.amount_xof)-Number(s.amount_xof))<1);return(<tr key={s.id} className={cn("transition-colors hover:bg-accent/50",stat==="overdue"&&"bg-red-50/30")}><td className="px-2 py-1.5 font-mono text-xs">{s.installment_no}</td><td className="px-2 py-1.5">{s.due_date}</td><td className="px-2 py-1.5 text-right tabular-nums font-medium">{formatXof(Number(s.amount_xof))}</td><td className="px-2 py-1.5 text-center"><Badge variant={stat==="paid"?"success":stat==="overdue"?"destructive":"warning"}>{schedLabel(stat)}</Badge></td><td className="px-2 py-1.5 text-right tabular-nums text-emerald-600">{recPaid?formatXof(Number(recPaid.paid_amount_xof)):"-"}</td></tr>);})}</tbody></table>}
+          <div className="border-t pt-4"><h4 className="mb-2 text-sm font-semibold">{locale==="zh"?"分期计划":"Plan de paiement"}</h4>
+            {contractSchedules.length===0?<p className="text-xs text-muted-foreground">{locale==="zh"?"暂无数据":"Aucun"}</p>:<table className="w-full text-left text-[13px]"><thead className="border-b bg-muted text-xs font-semibold text-muted-foreground"><tr><th className="px-2 py-1.5">#</th><th className="px-2 py-1.5">{locale==="zh"?"到期日":"Echeance"}</th><th className="px-2 py-1.5 text-right">{locale==="zh"?"金额":"Montant"}</th><th className="px-2 py-1.5 text-center">{locale==="zh"?"状态":"Statut"}</th><th className="px-2 py-1.5 text-right">{locale==="zh"?"已收":"Paye"}</th></tr></thead><tbody className="divide-y">{contractSchedules.map(s=>{const stat=getSchedStatus(s,contractReceivables);const recPaid=contractReceivables.find(r=>r.due_date===s.due_date&&Math.abs(Number(r.amount_xof)-Number(s.amount_xof))<1);return(<tr key={s.id} className={cn("transition-colors hover:bg-accent/50",stat==="overdue"&&"bg-red-50/30")}><td className="px-2 py-1.5 font-mono text-xs">{s.installment_no}</td><td className="px-2 py-1.5">{s.due_date}</td><td className="px-2 py-1.5 text-right tabular-nums font-medium">{formatXof(Number(s.amount_xof))}</td><td className="px-2 py-1.5 text-center"><Badge variant={stat==="paid"?"success":stat==="overdue"?"destructive":"warning"}>{schedLabel(stat)}</Badge></td><td className="px-2 py-1.5 text-right tabular-nums text-emerald-600">{recPaid?formatXof(Number(recPaid.paid_amount_xof)):"-"}</td></tr>);})}</tbody></table>}
           </div>
 
           {/* Pay form */}

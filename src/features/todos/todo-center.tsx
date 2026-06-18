@@ -59,7 +59,7 @@ export function TodoCenter({ todos, locale }: Props) {
 
   const zh = locale === "zh";
 
-  const filterBtn = "h-9 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+  const filterBtn = "h-9 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
 
   return (
     <div className="space-y-5">
@@ -70,9 +70,12 @@ export function TodoCenter({ todos, locale }: Props) {
           { key:"today", label:zh?"今日":"Aujourd'hui", value:String(todayTodos.length), dot:"bg-accentAmber-500" },
           { key:"overdue", label:zh?"逾期":"Retard", value:String(overdueTodos.length), dot:"bg-accentRed-500" },
         ].map(b => (
-          <div key={b.key} className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-            <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", b.dot)} />
-            <div className="min-w-0"><p className="text-xl font-bold tracking-tight tabular-nums leading-none">{b.value}</p><p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{b.label}</p></div>
+          <div key={b.key} className="flex min-h-[76px] flex-col rounded-xl border border-border bg-card p-3 text-card-foreground shadow-card transition-shadow duration-200">
+            <div className="flex min-w-0 items-center justify-between gap-3 pb-2">
+              <p className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">{b.label}</p>
+              <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", b.dot)} />
+            </div>
+            <p className="text-lg font-semibold leading-none tabular-nums text-foreground">{b.value}</p>
           </div>
         ))}
       </div>
@@ -96,7 +99,7 @@ export function TodoCenter({ todos, locale }: Props) {
           <input type="text" value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={zh ? "搜索房号/客户..." : "Rechercher..."}
-            className="h-9 w-full rounded-md border bg-card pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20" />
+            className="h-9 w-full rounded-md border bg-card pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60" />
         </div>
         <span className="text-sm text-muted-foreground ml-auto tabular-nums">{filtered.length} {zh ? "条" : "lignes"}</span>
       </div>
@@ -129,7 +132,7 @@ export function TodoCenter({ todos, locale }: Props) {
                   </Badge>
                   <Badge variant={priorityTone[todo.priority]} className="text-[10px]">{priLabels[todo.priority]}</Badge>
                 </div>
-                <p className="text-sm font-bold truncate">{todo.title}</p>
+                <p className="truncate text-sm font-medium">{todo.title}</p>
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">
                   {todo.unitLabel && <span className="font-mono mr-2">{todo.unitLabel}</span>}
                   {todo.customerName}

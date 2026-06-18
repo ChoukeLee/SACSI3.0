@@ -39,7 +39,7 @@ export default async function AuditLogsPage() {
         <DesktopOnly locale="zh" />
       </div>
       <div className="hidden lg:block">
-        <h1 className="mb-6 text-2xl font-bold tracking-tight">审计日志</h1>
+        <h1 className="mb-6 text-2xl font-semibold tracking-tight">审计日志</h1>
         <section className="mt-8">
           <AuditLogViewer logs={logs} locale="zh" />
         </section>

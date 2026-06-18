@@ -120,15 +120,15 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
           const Icon = block.icon;
           const content = (
             <>
-              {Icon ? (
-                <Icon className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-              ) : (
-                <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", block.dot)} />
-              )}
-              <div className="min-w-0">
-                <p className="text-lg font-bold leading-none tracking-tight tabular-nums">{block.value}</p>
-                <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">{block.label}</p>
+              <div className="flex min-w-0 items-center justify-between gap-3 pb-2">
+                <p className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">{block.label}</p>
+                {Icon ? (
+                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                ) : (
+                  <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", block.dot)} />
+                )}
               </div>
+              <p className="text-lg font-semibold leading-none tabular-nums text-foreground">{block.value}</p>
             </>
           );
 
@@ -138,7 +138,7 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
                 key={block.key}
                 type="button"
                 onClick={() => setShowNonApartments(true)}
-                className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left shadow-card transition-colors hover:bg-muted/50"
+                className="flex min-h-[76px] flex-col rounded-xl border border-border bg-card p-3 text-left text-card-foreground shadow-card transition-shadow duration-200 hover:shadow-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
               >
                 {content}
               </button>
@@ -146,7 +146,7 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
           }
 
           return (
-            <div key={block.key} className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3 shadow-card">
+            <div key={block.key} className="flex min-h-[76px] flex-col rounded-xl border border-border bg-card p-3 text-card-foreground shadow-card transition-shadow duration-200">
               {content}
             </div>
           );

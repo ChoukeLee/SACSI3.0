@@ -5,6 +5,7 @@ import { AlertTriangle, Banknote, Clock3, TrendingUp, WalletCards } from "lucide
 import { getDailyRoomStateForDate } from "@/features/daily-rentals/room-status";
 import { calculateReceivableSummary } from "@/features/finance/receivable-summary";
 import { FinanceDetailPanel } from "@/features/management/finance-detail-panel";
+import { getCurrentMonthNonDailyPayments, sumPayments } from "@/features/management/finance-utils";
 import { RoomCard } from "@/components/room-card";
 import { RoomBoard } from "@/components/room-board";
 import { RoomLegend } from "@/components/room-legend";
@@ -113,11 +114,18 @@ export function FinanceSectionClient({
 
   const nonDaily = useMemo(() => receivables.filter(r => r.source_type !== "daily_booking"), [receivables]);
   const stats = useMemo(() => calculateReceivableSummary(nonDaily, { currentMonth: true }), [nonDaily]);
+  const monthPrefix = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
+  const currentMonthPayments = useMemo(() => getCurrentMonthNonDailyPayments(payments, monthPrefix), [payments, monthPrefix]);
+  const currentMonthCollected = useMemo(() => sumPayments(currentMonthPayments), [currentMonthPayments]);
+  const currentMonthOutstanding = Math.max(stats.totalReceivable - currentMonthCollected, 0);
 
   const blocks = [
     { key: "receivable", label: t.cockpit.receivableThisMonth, value: stats.totalReceivable, color: "accentBlue" as const, icon: TrendingUp },
-    { key: "collected", label: t.cockpit.paidThisMonth, value: stats.totalPaid, color: "accentGreen" as const, icon: Banknote },
-    { key: "outstanding", label: t.cockpit.outstandingThisMonth, value: stats.outstanding, color: "accentAmber" as const, icon: WalletCards },
+    { key: "collected", label: t.cockpit.paidThisMonth, value: currentMonthCollected, color: "accentGreen" as const, icon: Banknote },
+    { key: "outstanding", label: t.cockpit.outstandingThisMonth, value: currentMonthOutstanding, color: "accentAmber" as const, icon: WalletCards },
     { key: "overdue", label: t.cockpit.overdueThisMonth, value: stats.overdue, color: "accentRed" as const, icon: Clock3 },
   ];
 
@@ -156,8 +164,8 @@ export function FinanceSectionClient({
           centerValue={`${Math.round(stats.collectionRate * 100)}%`}
           centerLabel={locale === "zh" ? "回款率" : "Taux"}
           items={[
-            { label: t.cockpit.paidThisMonth, value: stats.totalPaid, tone: "green" },
-            { label: t.cockpit.outstandingThisMonth, value: Math.max(stats.outstanding - stats.overdue, 0), tone: "amber" },
+            { label: t.cockpit.paidThisMonth, value: currentMonthCollected, tone: "green" },
+            { label: t.cockpit.outstandingThisMonth, value: Math.max(currentMonthOutstanding - stats.overdue, 0), tone: "amber" },
             { label: t.cockpit.overdueThisMonth, value: stats.overdue, tone: "red" },
           ]}
         />
@@ -260,9 +268,9 @@ export function UnitDataClient({
         />
         <div className="basis-full pt-1">
           <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-3">
-          <span className="mr-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-            {t.sections.buildingStatus}
-          </span>
+            <span className="mr-2 text-xs font-medium text-muted-foreground">
+              {t.sections.buildingStatus}
+            </span>
           {(["dailyOccupied", "reserved", "leased", "sold", "cleaningPending", "maintenance", "available"] as MgmtStatus[]).map(s => (
             <button
               key={s}

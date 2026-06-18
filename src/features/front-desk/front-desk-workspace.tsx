@@ -212,10 +212,10 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
       {selectedRoom && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/30" onClick={()=>{setSelectedRoom(null);setPopupAction(null);}} />
-          <div className="fixed inset-x-4 bottom-4 z-panel mx-auto max-w-lg rounded-2xl border bg-card p-5 shadow-lg">
+          <div className="fixed inset-x-4 bottom-4 z-panel mx-auto max-w-lg rounded-xl border bg-card p-5 shadow-panel">
             <div className="flex items-start justify-between mb-3">
               <div>
-                <p className="text-lg font-bold font-mono">{selectedRoom.unit.unit_no}</p>
+                <p className="font-mono text-base font-semibold">{selectedRoom.unit.unit_no}</p>
                 <p className="text-sm text-muted-foreground">{roomCustomer(selectedRoom)}</p>
                 {selectedRoom.booking && (
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -266,7 +266,7 @@ function SummaryCard({ icon, label, count }: { icon: React.ReactNode; label: str
   return (
     <div className="flex flex-col items-center gap-1 rounded-xl border bg-card p-3 shadow-sm">
       {icon}
-      <span className="text-lg font-bold tabular-nums">{count}</span>
+      <span className="text-base font-semibold tabular-nums">{count}</span>
       <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
     </div>
   );

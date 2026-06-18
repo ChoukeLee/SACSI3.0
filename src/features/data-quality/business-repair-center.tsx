@@ -82,14 +82,14 @@ export function BusinessRepairCenter({ locale, userRole }: Props) {
   };
 
   return (
-    <section className="rounded-2xl border bg-card shadow-sm">
+    <section className="rounded-xl border border-border bg-card text-card-foreground shadow-card">
       <div className="flex flex-col gap-3 border-b px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-start gap-3">
           <div className="rounded-xl bg-primary/10 p-2 text-primary">
             <Wrench className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-base font-bold">{zh ? "业务修正中心" : "Centre de correction"}</h2>
+            <h2 className="text-sm font-medium tracking-tight text-foreground">{zh ? "业务修正中心" : "Centre de correction"}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {zh ? "把高频运营纠错从代码和数据库操作中拿出来，所有动作都会写入审计日志。" : "Corriger les cas opérationnels fréquents avec audit."}
             </p>
@@ -109,7 +109,7 @@ export function BusinessRepairCenter({ locale, userRole }: Props) {
               value={unitNo}
               onChange={(e) => setUnitNo(e.target.value)}
               placeholder={zh ? "例如 1201" : "ex. 1201"}
-              className="h-10 w-full rounded-lg border bg-background px-3 text-sm shadow-sm outline-none transition focus:ring-2 focus:ring-ring/20"
+              className="h-10 w-full rounded-lg border bg-background px-3 text-sm shadow-sm outline-none transition focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
             />
           </label>
 
@@ -118,7 +118,7 @@ export function BusinessRepairCenter({ locale, userRole }: Props) {
             <select
               value={action}
               onChange={(e) => setAction(e.target.value as BusinessRepairAction)}
-              className="h-10 w-full rounded-lg border bg-background px-3 text-sm shadow-sm outline-none transition focus:ring-2 focus:ring-ring/20"
+              className="h-10 w-full rounded-lg border bg-background px-3 text-sm shadow-sm outline-none transition focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
             >
               {actions.map((item) => (
                 <option key={item.value} value={item.value}>{zh ? item.zh : item.fr}</option>
@@ -132,7 +132,7 @@ export function BusinessRepairCenter({ locale, userRole }: Props) {
               <select
                 value={targetStatus}
                 onChange={(e) => setTargetStatus(e.target.value as UnitStatus)}
-                className="h-10 w-full rounded-lg border bg-background px-3 text-sm shadow-sm outline-none transition focus:ring-2 focus:ring-ring/20"
+                className="h-10 w-full rounded-lg border bg-background px-3 text-sm shadow-sm outline-none transition focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
               >
                 {statuses.map((item) => (
                   <option key={item.value} value={item.value}>{zh ? item.zh : item.fr}</option>
@@ -146,7 +146,7 @@ export function BusinessRepairCenter({ locale, userRole }: Props) {
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder={zh ? "可选，说明为什么修正" : "Optionnel"}
-                className="h-10 w-full rounded-lg border bg-background px-3 text-sm shadow-sm outline-none transition focus:ring-2 focus:ring-ring/20"
+                className="h-10 w-full rounded-lg border bg-background px-3 text-sm shadow-sm outline-none transition focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
               />
             </label>
           )}
@@ -154,7 +154,7 @@ export function BusinessRepairCenter({ locale, userRole }: Props) {
 
         <div className="flex flex-col gap-3 rounded-xl bg-muted/40 p-4">
           <div>
-            <p className="text-sm font-bold">{zh ? selectedAction.zh : selectedAction.fr}</p>
+            <p className="text-sm font-medium">{zh ? selectedAction.zh : selectedAction.fr}</p>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
               {zh ? selectedAction.descriptionZh : selectedAction.descriptionFr}
             </p>

@@ -23,7 +23,7 @@ interface Props {
   locale: "zh" | "fr"; userRole: string;
 }
 
-const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-ring/30 focus:outline-none focus:ring-2 focus:ring-ring/20";
+const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
 
 export function TargetsView({ targets, receivables, units, bookings, leases, sales, locale, userRole }: Props) {
   const router = useRouter();
@@ -141,7 +141,7 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
             ) : (
               <div className="overflow-hidden rounded-md border">
                 <table className="w-full text-left text-[13px]">
-                  <thead className="border-b bg-muted text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                  <thead className="border-b bg-muted text-xs font-medium text-muted-foreground">
                     <tr>
                       <th className="px-4 py-2.5">{zh ? "指标" : "KPI"}</th>
                       <th className="px-4 py-2.5">{zh ? "期间" : "Période"}</th>
@@ -176,13 +176,13 @@ export function TargetsView({ targets, receivables, units, bookings, leases, sal
 
 function StatTile({ label, value, caption, dot }: { label: string; value: string; caption?: string; dot: string }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-      <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", dot)} />
-      <div className="min-w-0">
-        <p className="text-xl font-bold leading-none tracking-tight tabular-nums">{value}</p>
-        <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">{label}</p>
-        {caption && <p className="mt-1 truncate text-[11px] text-muted-foreground/80">{caption}</p>}
+    <div className="flex min-h-[76px] flex-col rounded-xl border border-border bg-card p-3 text-card-foreground shadow-card transition-shadow duration-200">
+      <div className="flex min-w-0 items-center justify-between gap-3 pb-2">
+        <p className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">{label}</p>
+        <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", dot)} />
       </div>
+      <p className="text-lg font-semibold leading-none tabular-nums text-foreground">{value}</p>
+      {caption && <p className="mt-2 min-h-5 truncate text-xs leading-relaxed text-muted-foreground">{caption}</p>}
     </div>
   );
 }

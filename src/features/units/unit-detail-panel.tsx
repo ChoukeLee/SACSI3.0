@@ -64,17 +64,17 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
 
   return (
     <>
-      <div className="fixed inset-0 z-overlay bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-panel w-full max-w-md overflow-auto border-l bg-card shadow-lg" role="dialog" aria-label={t.detail.title}>
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-card/95 px-5 py-4 backdrop-blur">
+      <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]" role="dialog" aria-label={t.detail.title}>
+        <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
           <div>
-            <h2 className="text-sm font-bold">{t.detail.title}</h2>
+            <h2 className="text-sm font-medium tracking-tight text-foreground">{t.detail.title}</h2>
             <p className="mt-0.5 font-mono text-xs text-muted-foreground">{unit.code}</p>
           </div>
           <div className="flex items-center gap-2">
             <Button asChild size="sm"><Link href={routeFor(locale, `/units/${unit.id}`)}>{locale === "zh" ? "完整档案" : "Dossier"}</Link></Button>
             <Button size="icon" variant="ghost" onClick={onClose} aria-label={locale === "zh" ? "关闭" : "Fermer"}>
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -94,7 +94,7 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
                 : []),
             ].map(([label, value]) => (
               <div key={label as string}>
-                <dt className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">{label}</dt>
+                <dt className="text-xs font-semibold text-muted-foreground">{label}</dt>
                 <dd className="mt-1 font-medium">
                   {label === t.detail.status ? <StatusBadge status={unit.status} label={dictionaries[locale].statuses[unit.status]} /> : (value ?? t.detail.notSet)}
                 </dd>
@@ -103,7 +103,7 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
           </dl>
 
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">{t.detail.supportedBusiness}</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground">{t.detail.supportedBusiness}</h4>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {enabledBusinesses.length > 0 ? (
                 enabledBusinesses.map((f) => (
@@ -116,7 +116,7 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
           </div>
 
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">{t.detail.photos}</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground">{t.detail.photos}</h4>
             <div className="mt-2 flex gap-3">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed bg-muted text-muted-foreground/40"><Camera className="h-6 w-6" /></div>
@@ -125,12 +125,12 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
           </div>
 
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">{t.detail.notes}</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground">{t.detail.notes}</h4>
             <p className="mt-1.5 text-sm leading-relaxed">{unit.notes ?? t.detail.noNotes}</p>
           </div>
 
           <div className="relative">
-            <h4 className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">{t.actions.changeStatus}</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground">{t.actions.changeStatus}</h4>
             <div className="mt-2">
               <button onClick={() => setStatusOpen(!statusOpen)} disabled={changing}
                 className="inline-flex h-9 items-center gap-1.5 rounded-md border bg-card px-3 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50">
@@ -156,7 +156,7 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
           </div>
 
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">{t.detail.statusHistory}</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground">{t.detail.statusHistory}</h4>
             {meaningfulAuditLogs.length === 0 ? (
               <p className="mt-1.5 text-xs text-muted-foreground">{t.detail.noStatusHistory}</p>
             ) : (

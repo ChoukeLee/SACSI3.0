@@ -51,12 +51,12 @@ export function ReceiptThumb({ attachment, locale }: Props) {
       {open && (
         <div className="fixed inset-0 z-[1001] flex items-center justify-center bg-black/40" onClick={() => setOpen(false)}>
           <div
-            className="relative mx-2 w-full max-w-lg max-h-[90vh] overflow-auto rounded-2xl border border-border bg-card shadow-2xl"
+            className="relative mx-2 max-h-[90vh] w-full max-w-lg overflow-auto rounded-xl border border-border bg-card shadow-panel"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-              <p className="text-[13px] font-semibold">{zh ? "收据凭证" : "Reçu"}</p>
-              <button onClick={() => setOpen(false)} className="rounded p-1 hover:bg-muted"><X className="h-4 w-4" /></button>
+              <p className="text-sm font-medium">{zh ? "收据凭证" : "Reçu"}</p>
+              <button onClick={() => setOpen(false)} className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"><X className="h-4 w-4" /></button>
             </div>
             <div className="p-4 space-y-3">
               {loading && <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />}

@@ -17,7 +17,7 @@ export function ManagementPageShell({
       <div className="relative overflow-hidden rounded-xl border border-border bg-card px-5 py-4 shadow-card sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <p className="text-xs font-medium text-muted-foreground">
             {locale === "zh" ? "经营驾驶舱" : "Tableau de bord"}
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">

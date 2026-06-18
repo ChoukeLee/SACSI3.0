@@ -6,6 +6,7 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { receivableStatusStyles as STATUS_STYLES } from "@/lib/status-styles";
+import { getCurrentMonthNonDailyPayments, sumPayments } from "./finance-utils";
 import type {
   BuildingRow, UnitRow, ReceivableRow, PaymentRow, CustomerRow,
 } from "@/types/database";
@@ -28,6 +29,13 @@ const SOURCE_TYPE_LABELS: Record<string, { zh: string; fr: string }> = {
   lease_contract: { zh: "长租", fr: "Bail" },
   sale_contract: { zh: "售房", fr: "Vente" },
   manual: { zh: "手动", fr: "Manuel" },
+  daily_rental: { zh: "日租房费", fr: "Sejour journalier" },
+  lease_rent: { zh: "长租租金", fr: "Loyer longue duree" },
+  lease_deposit: { zh: "长租押金", fr: "Depot location" },
+  sale_installment: { zh: "出售分期", fr: "Echeance vente" },
+  sale_lump_sum: { zh: "出售全款", fr: "Vente comptant" },
+  other_income: { zh: "其他收入", fr: "Autre revenu" },
+  other: { zh: "其他", fr: "Autre" },
 };
 
 const PANEL_LABELS: Record<DetailType, { zh: { title: string; desc: string }; fr: { title: string; desc: string } }> = {
@@ -100,9 +108,7 @@ export function FinanceDetailPanel({
   const paymentData = useMemo(() => {
     if (open !== "collected") return [];
 
-    return payments
-      .filter(p => p.payment_date.startsWith(currentMonthPrefix) && p.source_type !== "daily_booking")
-      .sort((a, b) => b.payment_date.localeCompare(a.payment_date));
+    return getCurrentMonthNonDailyPayments(payments, currentMonthPrefix);
   }, [open, payments]);
 
   if (!open) return null;
@@ -111,7 +117,7 @@ export function FinanceDetailPanel({
 
   const totalReceivable = receivableData.reduce((s, r) => s + Number(r.amount_xof), 0);
   const totalPaid = receivableData.reduce((s, r) => s + Number(r.paid_amount_xof), 0);
-  const totalPaymentAmount = paymentData.reduce((s, p) => s + Number(p.amount), 0);
+  const totalPaymentAmount = sumPayments(paymentData);
 
   const getUnitInfo = (unitId: string | null) => {
     if (!unitId) return "—";
@@ -131,8 +137,10 @@ export function FinanceDetailPanel({
     return c?.name ?? customerId.slice(0, 8);
   };
 
-  const getSourceTypeLabel = (sourceType: string) => {
-    return SOURCE_TYPE_LABELS[sourceType]?.[locale === "fr" ? "fr" : "zh"] ?? sourceType;
+  const getBusinessTypeLabel = (sourceType: string, category?: string | null) => {
+    const key = category || sourceType;
+    const lang = locale === "fr" ? "fr" : "zh";
+    return SOURCE_TYPE_LABELS[key]?.[lang] ?? SOURCE_TYPE_LABELS[sourceType]?.[lang] ?? key;
   };
 
   const getOverdueDays = (dueDate: string) => {
@@ -142,20 +150,20 @@ export function FinanceDetailPanel({
 
   return (
     <>
-      <div className="fixed inset-0 z-overlay bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-panel w-full max-w-full overflow-auto border-l border-border bg-white shadow-panel lg:max-w-5xl" role="dialog" aria-label={labels.title}>
+      <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-5xl" role="dialog" aria-label={labels.title}>
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white/95 px-5 py-4 backdrop-blur">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
           <div>
-            <h3 className="text-sm font-black text-foreground">{labels.title}</h3>
+            <h3 className="text-sm font-medium tracking-tight text-foreground">{labels.title}</h3>
             <p className="text-xs text-muted-foreground">{labels.desc}</p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-1.5 text-muted-foreground/60 hover:bg-muted hover:text-foreground/60"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label={locale === "zh" ? "关闭" : "Fermer"}
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
@@ -165,19 +173,19 @@ export function FinanceDetailPanel({
             <div className="flex flex-wrap gap-4 rounded-xl bg-muted/50 px-4 py-3 text-sm">
               <div>
                 <span className="text-muted-foreground">{locale === "zh" ? "笔数" : "Nb"}: </span>
-                <span className="font-black text-foreground">{receivableData.length}</span>
+                <span className="font-semibold text-foreground">{receivableData.length}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">{locale === "zh" ? "应收合计" : "Total du"}: </span>
-                <span className="font-black text-foreground">{formatXof(totalReceivable)}</span>
+                <span className="font-semibold text-foreground">{formatXof(totalReceivable)}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">{locale === "zh" ? "已收合计" : "Total encaisse"}: </span>
-                <span className="font-black text-accentGreen-700">{formatXof(totalPaid)}</span>
+                <span className="font-semibold text-accentGreen-700">{formatXof(totalPaid)}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">{locale === "zh" ? "未收合计" : "Restant"}: </span>
-                <span className={cn("font-black", totalReceivable - totalPaid > 0 ? "text-accentRed-700" : "text-foreground")}>
+                <span className={cn("font-semibold", totalReceivable - totalPaid > 0 ? "text-accentRed-700" : "text-foreground")}>
                   {formatXof(totalReceivable - totalPaid)}
                 </span>
               </div>
@@ -188,11 +196,11 @@ export function FinanceDetailPanel({
             <div className="flex flex-wrap gap-4 rounded-xl bg-muted/50 px-4 py-3 text-sm">
               <div>
                 <span className="text-muted-foreground">{locale === "zh" ? "笔数" : "Nb"}: </span>
-                <span className="font-black text-foreground">{paymentData.length}</span>
+                <span className="font-semibold text-foreground">{paymentData.length}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">{locale === "zh" ? "收款合计" : "Total encaisse"}: </span>
-                <span className="font-black text-accentGreen-700">{formatXof(totalPaymentAmount)}</span>
+                <span className="font-semibold text-accentGreen-700">{formatXof(totalPaymentAmount)}</span>
               </div>
             </div>
           )}
@@ -203,7 +211,7 @@ export function FinanceDetailPanel({
               {open !== "collected" ? (
                 <table className="w-full min-w-[980px] text-left text-[13px]">
                   <thead className="sticky top-0 z-10 bg-muted/50">
-                    <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                    <tr className="text-left text-xs font-semibold text-muted-foreground">
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "到期日" : "Echeance"}</th>
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
@@ -244,7 +252,7 @@ export function FinanceDetailPanel({
                               {getCustomerName(r.customer_id)}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap text-foreground/60">
-                              {getSourceTypeLabel(r.source_type)}
+                              {getBusinessTypeLabel(r.source_type, r.category)}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold text-foreground">
                               {formatXof(Number(r.amount_xof))}
@@ -256,7 +264,7 @@ export function FinanceDetailPanel({
                               {formatXof(outstanding)}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap">
-                              <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-bold", STATUS_STYLES[r.status] ?? "bg-muted text-foreground/70")}>
+                              <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-semibold", STATUS_STYLES[r.status] ?? "bg-muted text-foreground/70")}>
                                 {r.status}
                               </span>
                             </td>
@@ -269,7 +277,7 @@ export function FinanceDetailPanel({
               ) : (
                 <table className="w-full min-w-[820px] text-left text-[13px]">
                   <thead className="sticky top-0 z-10 bg-muted/50">
-                    <tr className="text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                    <tr className="text-left text-xs font-semibold text-muted-foreground">
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "收款日期" : "Date"}</th>
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
@@ -298,7 +306,7 @@ export function FinanceDetailPanel({
                             {getCustomerName(p.customer_id)}
                           </td>
                           <td className="px-4 py-2.5 whitespace-nowrap text-foreground/60">
-                            {getSourceTypeLabel(p.source_type)}
+                            {getBusinessTypeLabel(p.source_type)}
                           </td>
                           <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold text-foreground">
                             {formatXof(Number(p.amount))}

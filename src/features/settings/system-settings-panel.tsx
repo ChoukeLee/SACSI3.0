@@ -252,7 +252,7 @@ export function SystemSettingsPanel({ settings, isAdmin, locale }: Props) {
         {GROUPS.map((group) => (
           <section key={group.key} className="rounded-xl border bg-background/40">
             <div className="border-b px-4 py-3">
-              <h3 className="text-sm font-bold">{zh ? group.zh : group.fr}</h3>
+              <h3 className="text-sm font-medium">{zh ? group.zh : group.fr}</h3>
               <p className="mt-1 text-xs text-muted-foreground">{zh ? group.descriptionZh : group.descriptionFr}</p>
             </div>
             <div className="grid gap-3 p-4 lg:grid-cols-2">
@@ -260,7 +260,7 @@ export function SystemSettingsPanel({ settings, isAdmin, locale }: Props) {
                 <div key={field.key} className="rounded-lg border bg-card p-3 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-bold">{zh ? field.zh : field.fr}</p>
+                      <p className="text-sm font-medium">{zh ? field.zh : field.fr}</p>
                       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                         {zh ? field.descriptionZh : field.descriptionFr}
                       </p>
@@ -326,7 +326,7 @@ function SettingInput({
   locale: "zh" | "fr";
   onChange: (value: string) => void;
 }) {
-  const baseClass = "h-9 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm shadow-sm outline-none transition focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-60";
+  const baseClass = "h-9 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm shadow-sm outline-none transition focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-60";
 
   if (field.type === "select") {
     return (

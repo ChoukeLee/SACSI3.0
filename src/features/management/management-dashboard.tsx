@@ -12,6 +12,7 @@ import {
 import {
   calculateReceivableSummary,
 } from "@/features/finance/receivable-summary";
+import { getCurrentMonthNonDailyPayments, sumPayments } from "./finance-utils";
 import { getDailyRoomStateForDate } from "@/features/daily-rentals/room-status";
 import { RoomCard } from "@/components/room-card";
 import { RoomBoard } from "@/components/room-board";
@@ -19,6 +20,7 @@ import { RoomLegend } from "@/components/room-legend";
 import { getRoomCardActions } from "@/lib/room-card-actions";
 import { FinanceDetailPanel } from "./finance-detail-panel";
 import { QualityDashboardWidget } from "@/features/data-quality";
+import { StatTile } from "@/components/ui/operational";
 import type { QualityIssue } from "@/features/data-quality/quality-types";
 import type { Locale, ManagementDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -152,6 +154,8 @@ export function ManagementDashboard({
   const now = new Date(); const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const nonDailyReceivables = useMemo(() => receivables.filter(r => r.source_type !== "daily_booking"), [receivables]);
   const receivableMonthStats = useMemo(() => calculateReceivableSummary(nonDailyReceivables, { currentMonth: true }), [nonDailyReceivables]);
+  const currentMonthNonDailyPayments = useMemo(() => getCurrentMonthNonDailyPayments(payments, monthPrefix), [payments, monthPrefix]);
+  const currentMonthCollected = useMemo(() => sumPayments(currentMonthNonDailyPayments), [currentMonthNonDailyPayments]);
 
   // Lookups
   const customerNameById = useMemo(() => { const m = new Map<string, string>(); for (const c of customers) m.set(c.id, c.name); return m; }, [customers]);
@@ -173,7 +177,7 @@ export function ManagementDashboard({
 
   const financeBlocks = [
     { key: "receivable" as const, label: t.cockpit.receivableThisMonth, value: formatXof(receivableMonthStats.totalReceivable), icon: CalendarCheck, color: "accentBlue" },
-    { key: "collected" as const, label: t.cockpit.paidThisMonth, value: formatXof(receivableMonthStats.totalPaid), icon: TrendingUp, color: "accentGreen" },
+    { key: "collected" as const, label: t.cockpit.paidThisMonth, value: formatXof(currentMonthCollected), icon: TrendingUp, color: "accentGreen" },
     { key: "outstanding" as const, label: t.cockpit.outstandingThisMonth, value: formatXof(receivableMonthStats.outstanding), icon: Clock, color: "accentAmber" },
     { key: "overdue" as const, label: t.cockpit.overdueThisMonth, value: formatXof(receivableMonthStats.overdue), icon: TrendingDown, color: "accentRed" },
   ];
@@ -185,7 +189,7 @@ export function ManagementDashboard({
       {/* ── Page chrome: title row + building selector ── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          <p className="text-xs font-medium text-muted-foreground">
             {locale === "zh" ? "经营驾驶舱" : "Tableau de bord"}
           </p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight">
@@ -216,44 +220,26 @@ export function ManagementDashboard({
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {financeBlocks.map(block => {
           const Icon = block.icon;
-          const colorMap: Record<string, string> = {
-            accentBlue: "before:bg-accentBlue-500",
-            accentGreen: "before:bg-accentGreen-500",
-            accentAmber: "before:bg-accentAmber-500",
-            accentRed: "before:bg-accentRed-500",
-          };
+          const tone = block.color === "accentGreen" ? "green"
+            : block.color === "accentAmber" ? "amber"
+              : block.color === "accentRed" ? "red"
+                : "blue";
           return (
-            <button
+            <StatTile
               key={block.key}
               onClick={() => setFinanceDetail(block.key)}
-              className={cn(
-                "group relative flex items-center gap-3 overflow-hidden rounded-xl border border-border/60 bg-card px-4 py-4 text-left shadow-sm transition-all",
-                "hover:-translate-y-0.5 hover:shadow-md hover:border-border",
-                "before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:rounded-full",
-                colorMap[block.color],
-              )}
-            >
-              <div className={cn(
-                "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-                block.color === "accentBlue" ? "bg-accentBlue-50 text-accentBlue-600" :
-                block.color === "accentGreen" ? "bg-accentGreen-50 text-accentGreen-600" :
-                block.color === "accentAmber" ? "bg-accentAmber-50 text-accentAmber-600" :
-                "bg-accentRed-50 text-accentRed-600",
-              )}>
-                <Icon className="h-4 w-4" strokeWidth={1.75} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-medium text-muted-foreground">{block.label}</p>
-                <p className="text-lg font-bold tracking-tight tabular-nums">{block.value}</p>
-              </div>
-            </button>
+              icon={Icon}
+              tone={tone}
+              label={block.label}
+              value={block.value}
+            />
           );
         })}
       </div>
 
       {/* ── Status overview bar ── */}
       <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border/60 bg-card px-4 py-3">
-        <span className="mr-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+        <span className="mr-2 text-xs font-semibold text-muted-foreground">
           {t.sections.buildingStatus}
         </span>
         {(["dailyOccupied","reserved","leased","sold","cleaningPending","maintenance","available"] as MgmtStatus[]).map(s => (
@@ -262,7 +248,7 @@ export function ManagementDashboard({
             type="button"
             onClick={() => setSelectedStatus(current => current === s ? null : s)}
             className={cn(
-              "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition",
+              "flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors",
               selectedStatus === s
                 ? "border-foreground/20 bg-foreground text-background shadow-sm"
                 : "border-border/60 hover:bg-accent/50",

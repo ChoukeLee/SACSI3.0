@@ -199,8 +199,9 @@ export const dictionaries = {
         customerName: "客户姓名"
       },
       checkoutModeLabel: "入住模式",
-      fixedCheckout: "固定离店",
-      openCheckout: "开放式 — 未定离店",
+      fixedCheckout: "固定日期",
+      openCheckout: "未定离店",
+      checkoutModeHint: "固定日期会按入住/退房日计算；未定离店适合暂不确定退房日的入住。",
       actualCheckOutDate: "实际退房日期",
       supplementaryPayment: "补缴收款",
       discount: "手动优惠",
@@ -1074,8 +1075,9 @@ export const dictionaries = {
         customerName: "Nom du client"
       },
       checkoutModeLabel: "Mode d'entree",
-      fixedCheckout: "Depart fixe",
-      openCheckout: "Sejour ouvert",
+      fixedCheckout: "Dates fixes",
+      openCheckout: "Depart ouvert",
+      checkoutModeHint: "Dates fixes calcule avec l'arrivee et le depart ; depart ouvert convient quand la date de sortie n'est pas encore connue.",
       actualCheckOutDate: "Date de depart reelle",
       supplementaryPayment: "Paiement supplementaire",
       discount: "Remise manuelle",

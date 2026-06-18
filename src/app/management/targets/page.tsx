@@ -29,7 +29,7 @@ export default async function TargetsPage() {
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-bold tracking-tight">经营目标</h1>
+      <h1 className="mb-6 text-2xl font-semibold tracking-tight">经营目标</h1>
       <TargetsView
         targets={(targets ?? []) as any[]}
         receivables={receivables ?? []} units={units ?? []}

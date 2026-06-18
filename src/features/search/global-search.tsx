@@ -109,10 +109,10 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
   if (!open) {
     return (
       <>
-        <button onClick={() => setOpen(true)} className="hidden items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground/70 sm:flex">
+        <button onClick={() => setOpen(true)} className="hidden h-8 w-full items-center justify-center gap-2 rounded-lg border border-border bg-muted/55 px-2.5 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:bg-card hover:text-foreground sm:flex">
           <Sparkles className="h-3.5 w-3.5" />
-          <span className="hidden lg:inline">{zh ? "AI 助理…" : "Assistant IA…"}</span>
-          <kbd className="hidden rounded-md border border-border bg-white px-1.5 py-0 font-mono text-[10px] text-muted-foreground/60 lg:inline">Ctrl+K</kbd>
+          <span className="hidden truncate lg:inline">{zh ? "AI 助理…" : "Assistant IA…"}</span>
+          <kbd className="hidden rounded-md border border-border bg-white px-1.5 py-0 font-mono text-[10px] text-muted-foreground/60 xl:inline">Ctrl+K</kbd>
         </button>
         <button onClick={() => setOpen(true)} className="flex items-center justify-center rounded-lg border border-border bg-muted/50 p-1.5 text-muted-foreground hover:bg-muted sm:hidden">
           <Sparkles className="h-4 w-4" />
@@ -125,7 +125,7 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
     <div className="fixed inset-0 z-[1000] flex items-start justify-center pt-[8vh] sm:pt-[10vh]" onClick={handleClose}>
       <div className="absolute inset-0 bg-black/25 backdrop-blur-[1px]" />
       <div
-        className="relative mx-2 flex h-[85vh] max-h-[640px] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl sm:mx-4"
+        className="relative mx-2 flex h-[85vh] max-h-[640px] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-panel sm:mx-4"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ── */}
@@ -134,19 +134,19 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
             {receiptMode ? <ImageUp className="h-4 w-4 text-primary" /> : <Sparkles className="h-4 w-4 text-primary" />}
           </div>
           <div className="flex-1">
-            <p className="text-[13px] font-semibold">{receiptMode ? (zh ? "收据扫描入账" : "Scan de reçu") : (zh ? "SACIS 助理" : "Assistant SACIS")}</p>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-sm font-medium tracking-tight">{receiptMode ? (zh ? "收据扫描入账" : "Scan de reçu") : (zh ? "SACIS 助理" : "Assistant SACIS")}</p>
+            <p className="text-xs text-muted-foreground">
               {receiptMode ? (zh ? "上传收据 → AI 识别 → 确认入账" : "Télécharger → Analyser → Confirmer") : (zh ? "后台业务助手 · 生成草稿需确认后执行" : "Brouillons à confirmer avant exécution")}
             </p>
           </div>
           <button
             onClick={() => { setReceiptMode(!receiptMode); setMessages([]); setInput(""); }}
-            className="rounded-lg px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted transition-colors"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             title={receiptMode ? (zh ? "切换到 AI 对话" : "Passer au chat") : (zh ? "扫描收据" : "Scanner un reçu")}
           >
             {receiptMode ? <Sparkles className="h-4 w-4" /> : <ImageUp className="h-4 w-4" />}
           </button>
-          <button onClick={handleClose} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted transition-colors">
+          <button onClick={handleClose} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -162,11 +162,11 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
         {!receiptMode && <div ref={listRef} className="flex-1 overflow-auto px-4 py-4 space-y-4">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-                <Sparkles className="h-6 w-6 text-primary" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-muted text-primary">
+                <Sparkles className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-semibold">{zh ? "SACIS 后台助理" : "Assistant SACIS"}</p>
+                <p className="text-sm font-medium">{zh ? "SACIS 后台助理" : "Assistant SACIS"}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {zh ? "我是你的业务助手。可以查询房态、生成操作草稿、回答业务问题。" : "Je peux vous aider avec les chambres, les opérations et les questions métier."}
                 </p>
@@ -200,7 +200,7 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
 
         {/* ── Input (hidden in receipt mode) ── */}
         {!receiptMode && <div className="shrink-0 border-t border-border/60 p-3">
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 outline-offset-2 transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-ring/60">
             <input
               ref={inputRef}
               type="text"
@@ -247,7 +247,7 @@ function ChatBubble({ msg, locale }: { msg: ChatMessage; locale: string }) {
         isUser ? "items-end" : "items-start",
       )}>
         <div className={cn(
-          "rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed",
+          "rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed",
           isUser
             ? "bg-primary text-primary-foreground rounded-br-md"
             : "bg-muted/60 text-foreground rounded-bl-md",
@@ -256,7 +256,7 @@ function ChatBubble({ msg, locale }: { msg: ChatMessage; locale: string }) {
         </div>
         {msg.draft && !isUser && (
           <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 mb-1.5">
+            <p className="mb-1.5 text-xs font-medium text-amber-700">
               {zh ? "操作草稿" : "Brouillon"}
             </p>
             <DraftCard draft={msg.draft} locale={locale} />
