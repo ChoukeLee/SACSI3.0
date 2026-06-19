@@ -94,7 +94,7 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
   return (
     <div className="max-w-4xl space-y-5">
       {/* Tabs */}
-      <nav className="flex gap-1 rounded-xl border bg-card p-1.5 shadow-sm w-fit">
+      <nav className="flex w-fit gap-1 rounded-lg border bg-muted/60 p-1 shadow-xs">
         {tabs.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={cn("rounded-md px-4 py-2 text-sm font-semibold transition",

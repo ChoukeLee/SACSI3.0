@@ -282,10 +282,10 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
               }))}
             />
           </DataVizCard>
-          <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+          <div className="table-shell overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-[13px]">
-                <thead className="border-b bg-muted text-xs font-semibold text-muted-foreground">
+                <thead className="border-b bg-muted/60 text-xs font-medium text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2.5">{L.source}</th>
                     <th className="px-4 py-2.5 text-right">{L.amountXof}</th>
@@ -324,9 +324,9 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
               <p className="text-sm font-semibold text-muted-foreground">{L.noData}</p>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-xl border bg-card shadow-sm max-h-[500px] overflow-y-auto">
+            <div className="table-shell max-h-[500px] overflow-y-auto">
               <table className="w-full text-left text-[13px]">
-                <thead className="sticky top-0 bg-muted text-xs font-semibold text-muted-foreground">
+                <thead className="sticky top-0 bg-muted/60 text-xs font-medium text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2.5">{L.roomNo}</th>
                     <th className="px-4 py-2.5">{L.customer}</th>

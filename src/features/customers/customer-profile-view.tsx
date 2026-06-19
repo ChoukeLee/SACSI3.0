@@ -125,7 +125,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
       )}
 
       {/* ── Tabs ── */}
-      <nav className="flex gap-1 overflow-x-auto rounded-xl border bg-card p-1.5 shadow-sm" aria-label={L.tabs}>
+      <nav className="flex gap-1 overflow-x-auto rounded-lg border bg-muted/60 p-1 shadow-xs" aria-label={L.tabs}>
         {tabs.map((item) => (
           <button key={item.key} type="button" onClick={() => setTab(item.key)}
             className={cn("shrink-0 rounded-md px-4 py-2 text-sm font-semibold transition", tab === item.key ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")}>
@@ -212,7 +212,7 @@ function FinanceTab({ data, L, locale }: { data: CustomerProfileData; L: ReturnT
       </div>
       <TableSection title={`${L.receivables} (${data.receivables.filter(r => r.status !== "cancelled").length})`} empty={data.receivables.length === 0} emptyText={L.noData}>
         <table className="w-full text-left text-[13px]">
-          <thead className="border-b bg-muted text-xs font-semibold text-muted-foreground">
+          <thead className="border-b bg-muted/60 text-xs font-medium text-muted-foreground">
             <tr>{[L.date, L.source, L.amount, L.paid, L.status].map(h => <th key={h} className="px-4 py-2.5">{h}</th>)}</tr>
           </thead>
           <tbody className="divide-y">
@@ -231,7 +231,7 @@ function FinanceTab({ data, L, locale }: { data: CustomerProfileData; L: ReturnT
       </TableSection>
       <TableSection title={`${L.payments} (${data.payments.length})`} empty={data.payments.length === 0} emptyText={L.noData}>
         <table className="w-full text-left text-[13px]">
-          <thead className="border-b bg-muted text-xs font-semibold text-muted-foreground">
+          <thead className="border-b bg-muted/60 text-xs font-medium text-muted-foreground">
             <tr>{[L.date, L.amount, L.receipt].map(h => <th key={h} className="px-4 py-2.5">{h}</th>)}</tr>
           </thead>
           <tbody className="divide-y">
@@ -306,7 +306,7 @@ function TableTab({ columns, rows, empty, emptyText }: { columns: string[]; rows
   return (
     <Card><div className="overflow-x-auto">
       <table className="w-full text-left text-[13px]">
-        <thead className="border-b bg-muted text-xs font-semibold text-muted-foreground"><tr>{columns.map(h => <th key={h} className="px-4 py-2.5">{h}</th>)}</tr></thead>
+        <thead className="border-b bg-muted/60 text-xs font-medium text-muted-foreground"><tr>{columns.map(h => <th key={h} className="px-4 py-2.5">{h}</th>)}</tr></thead>
         <tbody className="divide-y">{rows.map((row, i) => <tr key={i} className="transition-colors hover:bg-accent/50">{row.cells.map((c, j) => <td key={j} className="px-4 py-2.5">{c}</td>)}</tr>)}</tbody>
       </table>
     </div></Card>
@@ -315,7 +315,7 @@ function TableTab({ columns, rows, empty, emptyText }: { columns: string[]; rows
 
 function TableSection({ title, empty, emptyText, children }: { title?: string; empty: boolean; emptyText: string; children: React.ReactNode }) {
   return (
-    <Card>{title && <div className="border-b bg-muted px-4 py-2.5 text-xs font-semibold text-muted-foreground">{title}</div>}{empty ? <div className="py-12 text-center text-sm text-muted-foreground">{emptyText}</div> : <div className="overflow-x-auto">{children}</div>}</Card>
+    <Card>{title && <div className="border-b bg-muted/60 px-4 py-2.5 text-xs font-medium text-muted-foreground">{title}</div>}{empty ? <div className="py-12 text-center text-sm text-muted-foreground">{emptyText}</div> : <div className="overflow-x-auto">{children}</div>}</Card>
   );
 }
 

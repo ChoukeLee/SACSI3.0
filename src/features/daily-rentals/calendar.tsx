@@ -37,7 +37,7 @@ type ViewMode = "day" | "week" | "month";
 type RoomFilter = "all" | "available" | "occupied" | "checkingOutToday" | "openEnded" | "reserved" | "cleaning" | "maintenance";
 
 const ROOM_COL_WIDTH = 120;
-const ROW_HEIGHT = 38;
+const ROW_HEIGHT = 36;
 const FLOOR_ROW_HEIGHT = 16;
 const MAINTENANCE_STATUSES = new Set(["available", "reserved", "daily_occupied", "cleaning_pending", "leased", "sold"]);
 
@@ -53,7 +53,6 @@ const COPY = {
     noRooms: "暂无日租房源",
     timeline: "预订时间轴",
     subtitle: "默认显示今天附近日期；点击空白格新建预订，点击色条查看订单。",
-    roomType: "房间 / 状态",
     allRooms: "全部房间",
     day: "天",
     week: "周",
@@ -75,7 +74,6 @@ const COPY = {
     noRooms: "Aucune chambre journaliere",
     timeline: "Planning des reservations",
     subtitle: "Affiche les dates autour d'aujourd'hui. Cliquez une case vide pour creer.",
-    roomType: "Ch. / statut",
     allRooms: "Toutes",
     day: "Jour",
     week: "Semaine",
@@ -145,7 +143,6 @@ export function DailyCalendar({
   userRole,
 }: CalendarProps) {
   const copy = COPY[locale];
-  const statusLabels = UNIT_STATUS_LABELS[locale];
   const bookingLabels = BOOKING_STATUS_LABELS[locale];
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("day");
@@ -592,7 +589,7 @@ export function DailyCalendar({
               style={{ height: 40, left: "auto", position: "relative" }}
               data-daily-calendar-room-label
             >
-              {copy.roomType}
+              {copy.room}
             </div>
             {visibleDays.map((date) => {
               const dateStr = toDateStr(date);
@@ -633,12 +630,6 @@ export function DailyCalendar({
                   const cleaningTaskId = unitCleaningMap.get(unit.id);
                   const isMaintenance = !MAINTENANCE_STATUSES.has(unit.status);
                   const roomTone = getRoomTone(unit, hasCleaning, isMaintenance);
-                  const statusLabel = isMaintenance
-                    ? statusLabels[unit.status as UnitStatus]
-                    : hasCleaning || unit.status === "cleaning_pending"
-                      ? copy.cleaning
-                      : statusLabels[unit.status as UnitStatus] ?? copy.available;
-
                   return [
                     <div
                       key={`${unit.id}-room`}
@@ -646,15 +637,12 @@ export function DailyCalendar({
                       style={{ height: ROW_HEIGHT, left: "auto", position: "relative" }}
                       role="rowheader"
                       data-daily-calendar-room-label
-                      title={`${copy.room} ${unit.unit_no} - ${statusLabel} - ${copy.apartment}`}
+                      title={`${copy.room} ${unit.unit_no}`}
                     >
-                      <span className={cn("mr-2 h-8 w-1.5 rounded-full", roomTone.strip)} />
+                      <span className={cn("mr-2 h-7 w-1.5 rounded-full", roomTone.strip)} />
                       <div className="min-w-0">
                         <div className="truncate text-[13px] font-semibold leading-4 text-foreground">
                           {locale === "fr" ? unit.unit_no : `${copy.room} ${unit.unit_no}`}
-                        </div>
-                        <div className="truncate text-xs font-medium leading-3 text-muted-foreground">
-                          {locale === "fr" ? statusLabel : `${statusLabel} · ${copy.apartment}`}
                         </div>
                       </div>
                     </div>,

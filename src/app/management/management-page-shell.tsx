@@ -14,7 +14,7 @@ export function ManagementPageShell({
   return (
     <div className="flex flex-col gap-6">
       {/* ── Chrome: title + date (renders immediately — buildings is lightweight) ── */}
-      <div className="relative overflow-hidden rounded-xl border border-border bg-card px-5 py-4 shadow-card sm:px-6">
+      <div className="border-b border-border pb-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-medium text-muted-foreground">
@@ -28,7 +28,7 @@ export function ManagementPageShell({
             <span className="rounded-lg border border-border bg-muted/70 px-3 py-1.5 text-xs font-medium text-muted-foreground tabular-nums">
               {new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long", month: "short", day: "numeric" })}
             </span>
-            <span className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm tabular-nums">
+            <span className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-xs tabular-nums">
               {buildingCount} {locale === "zh" ? "栋在管" : "actifs"}
             </span>
           </div>
