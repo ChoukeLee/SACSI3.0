@@ -637,12 +637,12 @@ export function DailyCalendar({
                       style={{ height: ROW_HEIGHT, left: "auto", position: "relative" }}
                       role="rowheader"
                       data-daily-calendar-room-label
-                      title={unit.unit_no}
+                      title={`11#${unit.unit_no}`}
                     >
                       <span className={cn("mr-2 h-7 w-1.5 rounded-full", roomTone.strip)} />
                       <div className="min-w-0">
                         <div className="truncate text-[13px] font-semibold leading-4 text-foreground">
-                          {unit.unit_no}
+                          11#{unit.unit_no}
                         </div>
                       </div>
                     </div>,
