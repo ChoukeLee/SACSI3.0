@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
@@ -12,7 +13,8 @@ type CookieOptions = {
   priority?: "low" | "medium" | "high";
 };
 
-export async function createClient() {
+/** PERF: cached via React.cache() — single client per render pass. */
+export const createClient = cache(async () => {
   const cookieStore = await cookies();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -34,7 +36,7 @@ export async function createClient() {
         } catch {
           // Server Components cannot set cookies; middleware/server actions will handle auth writes.
         }
-      }
-    }
+      },
+    },
   });
-}
+});

@@ -1,11 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import type { Locale } from "@/lib/i18n";
 import type { CustomerRow, DailyBookingRow, PaymentRow, UnitRow } from "@/types/database";
 import type { CustomerSummary } from "./calendar";
-import { DailyCalendar } from "./calendar";
 import { MobileDailyCards } from "@/features/mobile";
+import { CalendarSkeleton } from "./calendar-skeleton";
+
+/**
+ * Lazy-load the heavy calendar component.
+ * The 1287-line DailyCalendar is code-split and loaded only when needed,
+ * with a skeleton shown during download.
+ */
+const DailyCalendar = dynamic(() => import("./calendar").then((mod) => ({ default: mod.DailyCalendar })), {
+  loading: () => <CalendarSkeleton locale="zh" />,
+  ssr: false,
+});
 
 interface DailyRentalsResponsiveViewProps {
   dailyUnits: UnitRow[];
@@ -50,16 +61,14 @@ export function DailyRentalsResponsiveView({
   }
 
   return (
-    <section className="-mx-2 xl:-mx-4">
-      <DailyCalendar
-        dailyUnits={dailyUnits}
-        bookings={bookings}
-        customers={customers}
-        cleaningTasks={cleaningTasks}
-        payments={payments}
-        locale={locale}
-        userRole={userRole}
-      />
-    </section>
+    <DailyCalendar
+      dailyUnits={dailyUnits}
+      bookings={bookings}
+      customers={customers}
+      cleaningTasks={cleaningTasks}
+      payments={payments}
+      locale={locale}
+      userRole={userRole}
+    />
   );
 }

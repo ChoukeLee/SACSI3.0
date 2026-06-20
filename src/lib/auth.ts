@@ -78,6 +78,18 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 
   const user = session.user;
 
+  // PERF: seed accounts skip the user_profiles DB query — they're resolved in-memory
+  const seedProfile = getSeedAccountProfile(user.email);
+  if (seedProfile) {
+    return {
+      id: user.id,
+      email: user.email,
+      role: seedProfile.role,
+      displayName: seedProfile.displayName,
+    };
+  }
+
+  // Non-seed accounts: lookup role/display_name from user_profiles
   const { data: profile } = await supabase
     .from("user_profiles")
     .select("role, display_name")
@@ -87,8 +99,8 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   return {
     id: user.id,
     email: user.email,
-    role: (profile?.role as UserRole) ?? getSeedAccountProfile(user.email)?.role ?? "front_desk",
-    displayName: profile?.display_name ?? getSeedAccountProfile(user.email)?.displayName ?? user.email ?? "User",
+    role: (profile?.role as UserRole) ?? "front_desk",
+    displayName: profile?.display_name ?? user.email ?? "User",
   };
 });
 
