@@ -105,7 +105,7 @@ function AppShellInner({
           <div className="grid w-full grid-cols-[minmax(200px,320px)_minmax(180px,1fr)_minmax(200px,320px)] items-center gap-3 px-4">
             <div className="flex min-w-0 items-center gap-2">
               <SidebarTrigger className="hidden lg:flex" />
-              <Logo variant="full-horizontal" size={36} />
+              <Logo variant="icon" size={40} />
             </div>
             <div className="flex min-w-0 justify-center">
               <div className="w-full max-w-[220px]">
