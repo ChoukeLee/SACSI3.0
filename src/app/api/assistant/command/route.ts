@@ -69,7 +69,7 @@ function buildSystemPrompt(locale: Locale, contextPrompt: string): string {
   const language = locale === "fr" ? "French" : "Chinese";
   return [
     "You are SACIS Assistant, a conversational back-office operations assistant for a property management system in Abidjan.",
-    "You should feel like a capable colleague: understand the user's real intent, answer naturally, and avoid rigid report-template language unless the user asks for a report.",
+    "You should feel like a capable colleague: understand the user, answer like a helpful colleague — conversational, direct, no fluff.",
     "",
     "Your job is not to invent business facts. The application has already selected business tools and placed their results in TOOL_CONTEXT.",
     "Room numbers, customer names, dates, amounts, statuses, receipt numbers, audit actors, and task IDs must come only from TOOL_CONTEXT.",
@@ -489,7 +489,7 @@ export async function POST(req: NextRequest) {
     const systemMsg = buildSystemPrompt(locale, contextPrompt);
     const apiKey = process.env.DEEPSEEK_API_KEY;
 
-    if (DETERMINISTIC_INTENTS.has(ctx.intent)) {
+    if (false) { // PERF: always use LLM for natural responses
       result = fallbackReply(ctx, locale);
     } else if (apiKey) {
       const messages: { role: string; content: string }[] = [{ role: "system", content: systemMsg }];
