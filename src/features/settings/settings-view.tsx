@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import type { BuildingRow } from "@/types/database";
-import { useTheme } from "@/components/theme-provider"
+import { useTheme } from "@/components/theme-provider";
 import { addBuilding, toggleBuildingActive, toggleBuildingPaused, saveCompanyInfo } from "./actions";
 import type { CompanyInfo } from "./actions";
 
