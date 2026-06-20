@@ -3,6 +3,7 @@ import type { Locale } from "@/lib/i18n";
 export interface DesktopNavLabels {
   brand: string;
   building: string;
+  system: string;
   groups: Record<string, string>;
   nav: Record<string, string>;
   roles: Record<string, string>;
@@ -20,6 +21,7 @@ const desktop: Record<Locale, DesktopNavLabels> = {
   zh: {
     brand: "科建地产",
     building: "SASCI11 · 11#",
+    system: "SACSI",
     roles: { admin: "管理员", boss: "老板", finance: "财务", front_desk: "前台" },
     shell: { logout: "登出", langLabel: "FR" },
     groups: {
@@ -53,6 +55,7 @@ const desktop: Record<Locale, DesktopNavLabels> = {
   fr: {
     brand: "Kejian Immobilier",
     building: "SASCI11 · Phase 1",
+    system: "SACSI",
     roles: { admin: "Administrateur", boss: "Proprietaire", finance: "Comptable", front_desk: "Reception" },
     shell: { logout: "Déconnexion", langLabel: "ZH" },
     groups: {

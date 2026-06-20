@@ -77,8 +77,8 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar">
       <SidebarHeader className="gap-0 border-b border-sidebar-border px-4 py-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-[11px] font-semibold text-primary-foreground shadow-sm ring-1 ring-black/5">
-            S
+          <div className="flex h-7 min-w-[3.5rem] items-center justify-center rounded-lg bg-primary px-1.5 text-[10px] font-bold tracking-wider text-primary-foreground shadow-sm ring-1 ring-black/5">
+            SACSI
           </div>
           <div className="group-data-[collapsible=icon]:hidden">
             <p className="text-sm font-medium leading-none text-sidebar-foreground">{labels.brand}</p>
@@ -121,7 +121,7 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
         ))}
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border px-4 py-3">
-        <p className="text-[11px] font-medium text-sidebar-foreground/45">{labels.building}</p>
+        <p className="text-[11px] font-medium text-sidebar-foreground/45">{labels.system}</p>
       </SidebarFooter>
     </Sidebar>
   );
