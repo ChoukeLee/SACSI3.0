@@ -69,7 +69,7 @@
     },
     units: {
       title: "11#房源总览",
-      description: "房源表按多楼栋设计，首期筛选 building_code = SASCI11。后续新增楼栋只需要导入楼栋、房间和业务属性。",
+      description: "房源表按多楼栋设计，首期筛选 building_code = SACSI11。后续新增楼栋只需要导入楼栋、房间和业务属性。",
       headers: ["房号", "楼层", "类型", "房态", "支持业务", "日租价"],
       empty: "暂无房源数据，请先导入楼栋和房间。",
       filters: {
@@ -615,7 +615,7 @@
         confirmAdd: "确认新增",
         noBuildings: "暂无楼栋数据",
         codeRequired: "请输入楼栋编号",
-        codeFormat: "格式：SASCI3 ~ SASCI11"
+        codeFormat: "格式：SACSI3 ~ SACSI11"
       },
       pricing: {
         title: "价格配置",

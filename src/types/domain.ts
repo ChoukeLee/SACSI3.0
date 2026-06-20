@@ -1,10 +1,10 @@
 export type BuildingCode =
-  | "SASCI3"
-  | "SASCI4"
-  | "SASCI5"
-  | "SASCI6"
-  | "SASCI7"
-  | "SASCI11";
+  | "SACSI3"
+  | "SACSI4"
+  | "SACSI5"
+  | "SACSI6"
+  | "SACSI7"
+  | "SACSI11";
 
 export type BusinessType = "daily_rental" | "long_lease" | "sale";
 

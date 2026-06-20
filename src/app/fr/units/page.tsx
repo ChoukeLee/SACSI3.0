@@ -19,7 +19,7 @@ export default async function FrenchUnitsPage() {
   let managedLeaseUnitIds: string[] = [];
 
   const [buildingRes, flagsRes] = await Promise.all([
-    supabase.from("buildings").select("id").eq("code", "SASCI11").single(),
+    supabase.from("buildings").select("id").eq("code", "SACSI11").single(),
     supabase.from("unit_business_flags").select("unit_id, business_type, is_enabled, default_price_xof"),
   ]);
 

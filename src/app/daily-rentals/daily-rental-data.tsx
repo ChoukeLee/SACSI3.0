@@ -20,7 +20,7 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
 
   const [buildingRes, customersRes, cleaningRes, paymentsRes, bookingsRes] =
     await Promise.all([
-      supabase.from("buildings").select("id").eq("code", "SASCI11").single(),
+      supabase.from("buildings").select("id").eq("code", "SACSI11").single(),
       supabase.from("customers").select("id, name, phone, is_blacklisted").order("name"),
       supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed"),
       supabase

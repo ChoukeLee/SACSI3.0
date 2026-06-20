@@ -42,7 +42,7 @@ export function MobileTodayWorkspace({
   payments,
   cleaningTasks,
   locale,
-  buildingName = "SASCI11",
+  buildingName = "SACSI11",
 }: MobileTodayWorkspaceProps) {
   const t = dictionaries[locale].mobile;
   const router = useRouter();

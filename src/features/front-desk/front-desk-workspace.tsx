@@ -54,7 +54,7 @@ const T = (locale: Locale) => locale === "zh" ? {
   groupLabel: "Etage",
 };
 
-export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, cleaningTasks, locale, buildingName = "SASCI11" }: Props) {
+export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, cleaningTasks, locale, buildingName = "SACSI11" }: Props) {
   const router = useRouter();
   const t = T(locale);
 

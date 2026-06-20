@@ -169,10 +169,10 @@ export async function submitImport(type: ImportDataType, csvText: string): Promi
           break;
         }
         case "units": {
-          const { data: bldg } = await supabase.from("buildings").select("id").eq("code", "SASCI11").single();
+          const { data: bldg } = await supabase.from("buildings").select("id").eq("code", "SACSI11").single();
           if (!bldg?.id) {
             errors++;
-            messages.push(`行${i + 2}: 未找到楼栋 SASCI11，无法导入房源`);
+            messages.push(`行${i + 2}: 未找到楼栋 SACSI11，无法导入房源`);
             break;
           }
           const { error } = await supabase.from("units").insert({

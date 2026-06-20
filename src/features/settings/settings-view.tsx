@@ -98,7 +98,7 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
           {showNewBuilding && (
             <div className="mt-4 rounded-md border border-dashed p-4 bg-muted/30">
               <div className="grid grid-cols-4 gap-3">
-                <div><label className={labelClass}>{t.buildings.code}</label><input value={bCode} onChange={(e) => setBCode(e.target.value)} className={inputClass} placeholder="SASCI3" /></div>
+                <div><label className={labelClass}>{t.buildings.code}</label><input value={bCode} onChange={(e) => setBCode(e.target.value)} className={inputClass} placeholder="SACSI3" /></div>
                 <div><label className={labelClass}>{t.buildings.displayName}</label><input value={bName} onChange={(e) => setBName(e.target.value)} className={inputClass} placeholder="3#公寓" /></div>
                 <div><label className={labelClass}>{t.buildings.floors}</label><input type="number" value={bFloors} onChange={(e) => setBFloors(Number(e.target.value))} className={inputClass} /></div>
                 <div><label className={labelClass}>{t.buildings.elevators}</label><input type="number" value={bElevators} onChange={(e) => setBElevators(Number(e.target.value))} className={inputClass} /></div>

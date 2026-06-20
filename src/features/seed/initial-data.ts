@@ -2,7 +2,7 @@ import type { Building, ModuleCard, Unit } from "@/types/domain";
 
 export const activeBuilding: Building = {
   id: "sasci11",
-  code: "SASCI11",
+  code: "SACSI11",
   displayName: "11#公寓",
   active: true,
   floorsAboveGround: 12,
@@ -36,7 +36,7 @@ export const dailyRentalUnitNumbers = [
 export const sampleUnits: Unit[] = [
   {
     id: "sasci11-503",
-    buildingCode: "SASCI11",
+    buildingCode: "SACSI11",
     unitNo: "503",
     floorLabel: "5F",
     kind: "apartment",
@@ -48,7 +48,7 @@ export const sampleUnits: Unit[] = [
   },
   {
     id: "sasci11-901",
-    buildingCode: "SASCI11",
+    buildingCode: "SACSI11",
     unitNo: "901",
     floorLabel: "9F",
     kind: "apartment",
@@ -60,7 +60,7 @@ export const sampleUnits: Unit[] = [
   },
   {
     id: "sasci11-1105",
-    buildingCode: "SASCI11",
+    buildingCode: "SACSI11",
     unitNo: "1105",
     floorLabel: "11F",
     kind: "apartment",
@@ -72,7 +72,7 @@ export const sampleUnits: Unit[] = [
   },
   {
     id: "sasci11-206",
-    buildingCode: "SASCI11",
+    buildingCode: "SACSI11",
     unitNo: "206",
     floorLabel: "2F",
     kind: "apartment",
@@ -83,7 +83,7 @@ export const sampleUnits: Unit[] = [
   },
   {
     id: "sasci11-g-01",
-    buildingCode: "SASCI11",
+    buildingCode: "SACSI11",
     unitNo: "G-01",
     floorLabel: "G",
     kind: "parking",

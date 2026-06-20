@@ -18,7 +18,7 @@ export default async function FrenchFinancePage() {
 
   const supabase = await createClient();
 
-  const { data: building } = await supabase.from("buildings").select("id").eq("code", "SASCI11").single();
+  const { data: building } = await supabase.from("buildings").select("id").eq("code", "SACSI11").single();
   const buildingId = building?.id ?? null;
 
   let entries: LedgerEntryRow[] = [];

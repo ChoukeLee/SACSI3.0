@@ -69,7 +69,7 @@
     },
     units: {
       title: "Lots de l'immeuble 11",
-      description: "Les lots sont concus pour plusieurs immeubles. La phase pilote filtre building_code = SASCI11.",
+      description: "Les lots sont concus pour plusieurs immeubles. La phase pilote filtre building_code = SACSI11.",
       headers: ["Lot", "Etage", "Type", "Statut", "Activites", "Prix jour"],
       empty: "Aucun lot. Veuillez d'abord importer l'immeuble et les lots.",
       filters: {
@@ -615,7 +615,7 @@
         confirmAdd: "Confirmer ajout",
         noBuildings: "Aucun immeuble",
         codeRequired: "Le code est obligatoire",
-        codeFormat: "Format: SASCI3 ~ SASCI11"
+        codeFormat: "Format: SACSI3 ~ SACSI11"
       },
       pricing: {
         title: "Configuration des prix",

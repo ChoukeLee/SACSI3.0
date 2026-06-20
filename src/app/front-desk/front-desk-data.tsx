@@ -15,7 +15,7 @@ export async function FrontDeskData({ userRole, locale }: FrontDeskDataProps) {
   const { data: building } = await supabase
     .from("buildings")
     .select("id, display_name")
-    .eq("code", "SASCI11")
+    .eq("code", "SACSI11")
     .single();
 
   const buildingId = building?.id;

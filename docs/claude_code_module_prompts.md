@@ -7,7 +7,7 @@
 ```text
 请先阅读项目根目录的 spec_v4.md、11_apartment_flow_framework.md、README.md，以及 supabase/migrations 下的数据库迁移文件。
 
-项目是科建地产房屋管理系统 SACIS 3.0，技术栈为 Next.js App Router + TypeScript + Tailwind CSS + Supabase PostgreSQL。首期业务只启用 SASCI11 / 11#公寓，但所有代码和数据库必须保留多楼栋扩展能力，不能把 11#写死为唯一业务边界。
+项目是科建地产房屋管理系统 SACIS 3.0，技术栈为 Next.js App Router + TypeScript + Tailwind CSS + Supabase PostgreSQL。首期业务只启用 SACSI11 / 11#公寓，但所有代码和数据库必须保留多楼栋扩展能力，不能把 11#写死为唯一业务边界。
 
 开发要求：
 1. 遵循现有 src/app、src/components、src/features、src/lib、src/types 结构。
@@ -26,7 +26,7 @@
 目标：
 1. 基于现有 src/lib/supabase/client.ts 和 server.ts，创建统一的 repository/query 层。
 2. 添加楼栋、房源、客户、日租、长租、出售、收款、财务流水的基础查询函数。
-3. 查询函数默认支持 buildingId/buildingCode 参数，首期默认 SASCI11，但不能写死为唯一楼栋。
+3. 查询函数默认支持 buildingId/buildingCode 参数，首期默认 SACSI11，但不能写死为唯一楼栋。
 4. 添加数据库类型定义入口，可先手写基础类型，后续再由 Supabase CLI 生成替换。
 5. 页面先可以继续使用 mock 数据，但要预留切换到真实查询的位置。
 
@@ -206,7 +206,7 @@
 请实现系统设置和多楼栋扩展入口。
 
 目标：
-1. /settings 页面支持楼栋列表，当前启用 SASCI11，其他楼栋可后续创建/暂停业务。
+1. /settings 页面支持楼栋列表，当前启用 SACSI11，其他楼栋可后续创建/暂停业务。
 2. 支持新增楼栋、批量生成房间、导入房间清单的接口设计。
 3. 支持配置日租默认价、长租户型定价、出售区域/户型定价、滞纳金比例。
 4. 支持公司信息设置，用于后续打印模板。
