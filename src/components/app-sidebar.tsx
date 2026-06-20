@@ -79,7 +79,7 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
       <SidebarHeader className="gap-0 border-b border-sidebar-border px-4 h-12 relative">
         <div className="absolute -top-5 left-4 flex items-end gap-3">
           <Logo variant="icon" size={80} />
-          <span className="text-base font-semibold text-sidebar-foreground whitespace-nowrap pb-[5px]" style={{ fontFamily: "KaiTi, STKaiti, 'AR PL UKai CN', serif" }}>{labels.brand}</span>
+          <span className="text-base font-semibold text-sidebar-foreground whitespace-nowrap pb-[14px]" style={{ fontFamily: "KaiTi, STKaiti, 'AR PL UKai CN', serif" }}>{labels.brand}</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
