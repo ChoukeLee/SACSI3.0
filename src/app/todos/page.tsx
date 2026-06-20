@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { DesktopOnly } from "@/features/mobile";
@@ -9,7 +9,6 @@ import type {
   ReceivableRow, UnitRow, CustomerRow,
 } from "@/types/database";
 
-export const dynamic = "force-dynamic";
 
 export default async function TodosPage() {
   const user = await getCurrentUser();
@@ -56,3 +55,4 @@ export default async function TodosPage() {
     </>
   );
 }
+

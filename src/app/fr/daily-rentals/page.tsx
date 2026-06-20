@@ -1,4 +1,4 @@
-
+﻿
 import { dictionaries } from "@/lib/i18n";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
@@ -8,7 +8,6 @@ import { DailyRentalsResponsiveView } from "@/features/daily-rentals/daily-renta
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { CustomerSummary } from "@/features/daily-rentals/calendar";
 
-export const dynamic = "force-dynamic";
 
 export default async function FrenchDailyRentalsPage() {
   const user = await getCurrentUser();
@@ -49,3 +48,4 @@ export default async function FrenchDailyRentalsPage() {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-import { cache } from "react";
+﻿import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 
 export const getBuildings = cache(async () => {
@@ -52,7 +52,7 @@ export const getSaleSchedules = cache(async () => {
     .from("sale_payment_schedule")
     .select("id, sale_contract_id, status, due_date")
     .order("due_date", { ascending: false })
-    .limit(500);
+    .limit(200);
   return data ?? [];
 });
 
@@ -66,9 +66,9 @@ export const getLedgerEntries = cache(async () => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("ledger_entries")
-    .select("*")
+    .select("id, building_id, unit_id, entry_date, direction, category, amount_xof, description")
     .order("entry_date", { ascending: false })
-    .limit(500);
+    .limit(200);
   return data ?? [];
 });
 
@@ -78,7 +78,7 @@ export const getReceivables = cache(async () => {
     .from("receivables")
     .select("id, unit_id, customer_id, building_id, amount_xof, paid_amount_xof, due_date, status, source_type, category")
     .order("due_date", { ascending: false })
-    .limit(300);
+    .limit(200);
   return data ?? [];
 });
 
@@ -88,12 +88,13 @@ export const getPayments = cache(async () => {
     .from("payments")
     .select("id, source_id, source_type, amount, payment_date, customer_id, unit_id, receipt_no")
     .order("payment_date", { ascending: false })
-    .limit(300);
+    .limit(200);
   return data ?? [];
 });
 
 export const getCustomers = cache(async () => {
   const supabase = await createClient();
-  const { data } = await supabase.from("customers").select("id, name").order("name").limit(300);
+  const { data } = await supabase.from("customers").select("id, name").order("name").limit(200);
   return data ?? [];
 });
+

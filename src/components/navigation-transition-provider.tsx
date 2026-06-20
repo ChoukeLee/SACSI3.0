@@ -49,7 +49,7 @@ export function NavigationTransitionProvider({ children }: { children: React.Rea
 
   useEffect(() => {
     if (pendingHref == null) return;
-    const timeout = window.setTimeout(() => setPendingHref(null), 8000);
+    const timeout = window.setTimeout(() => setPendingHref(null), 3000);
     return () => window.clearTimeout(timeout);
   }, [pendingHref]);
 

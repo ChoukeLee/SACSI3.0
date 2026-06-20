@@ -1,4 +1,4 @@
-
+﻿
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -6,7 +6,6 @@ import { sortUnits } from "@/lib/utils";
 import { UnitList } from "@/features/units";
 import type { UnitRow, UnitBusinessFlagRow } from "@/types/database";
 
-export const dynamic = "force-dynamic";
 
 export default async function FrenchUnitsPage() {
   const user = await getCurrentUser();
@@ -76,3 +75,4 @@ export default async function FrenchUnitsPage() {
 
   return <UnitList units={units} businessFlagsMap={businessFlagsMap} managedLeaseUnitIds={managedLeaseUnitIds} auditLogsMap={auditLogsMap} locale="fr" />;
 }
+

@@ -1,15 +1,13 @@
-import type { Metadata, Viewport } from "next";
+﻿import type { Metadata, Viewport } from "next";
 import { AppShellWrapper } from "@/components/app-shell-wrapper";
 import { getCurrentUser } from "@/lib/auth";
-import { dictionaries } from "@/lib/i18n";
+import { notificationStrings } from "@/lib/dictionaries/notifications";
 
 import "./globals.css";
 
-export const dynamic = "force-dynamic";
-
 export const metadata: Metadata = {
-  title: "SACIS 3.0 | 科建地产房屋管理系统",
-  description: "11#公寓首期业务管理系统",
+  title: "SACIS 3.0 | ç§‘å»ºåœ°äº§æˆ¿å±‹ç®¡ç†ç³»ç»Ÿ",
+  description: "11#å…¬å¯“é¦–æœŸä¸šåŠ¡ç®¡ç†ç³»ç»Ÿ",
   manifest: "/manifest.json",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "SACIS 3.0" },
 };
@@ -34,28 +32,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         `}} />
       </head>
       <body>
-        <AppShellWrapper userRole={user?.role} userDisplayName={user?.displayName} notifT={dictionaries.zh.shell.notifications} notifTFr={dictionaries.fr.shell.notifications}>
+        <AppShellWrapper userRole={user?.role} userDisplayName={user?.displayName} notifT={notificationStrings.zh} notifTFr={notificationStrings.fr}>
           {children}
         </AppShellWrapper>
-        <script defer dangerouslySetInnerHTML={{ __html: `
-          (function(){
-            if (!('serviceWorker' in navigator)) return;
-            Promise.all([
-              navigator.serviceWorker.getRegistrations().then(function(regs){
-                return Promise.all(regs.map(function(reg){ return reg.unregister(); }));
-              }),
-              'caches' in window
-                ? caches.keys().then(function(keys){ return Promise.all(keys.map(function(key){ return caches.delete(key); })); })
-                : Promise.resolve()
-            ]).then(function(){
-              if (navigator.serviceWorker.controller && !sessionStorage.getItem('sacis-sw-cleaned')) {
-                sessionStorage.setItem('sacis-sw-cleaned', '1');
-                window.location.reload();
-              }
-            }).catch(function(){});
-          })();
-        `}} />
       </body>
     </html>
   );
 }
+
+
+

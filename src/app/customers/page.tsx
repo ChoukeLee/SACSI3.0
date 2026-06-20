@@ -1,11 +1,10 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { CustomerList } from "@/features/customers";
 import type { CustomerRow } from "@/types/database";
 
-export const dynamic = "force-dynamic";
 
 export default async function CustomersPage() {
   const user = await getCurrentUser();
@@ -34,7 +33,7 @@ export default async function CustomersPage() {
   const unitMap = new Map<string, string>();
   for (const u of (unitsRes.data ?? [])) unitMap.set(u.id, u.unit_no);
 
-  // Customer → room numbers
+  // Customer â†’ room numbers
   const customerRooms: Record<string, string[]> = {};
   const addRoom = (customerId: string, unitId: string) => {
     const unitNo = unitMap.get(unitId);
@@ -70,3 +69,4 @@ export default async function CustomersPage() {
     </>
   );
 }
+

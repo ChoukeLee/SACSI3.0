@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -9,7 +9,6 @@ import { FinanceTabs } from "@/features/finance/finance-tabs";
 import { PageHeader } from "@/components/page-header";
 import type { LedgerEntryRow, ReceivableRow, BuildingRow } from "@/types/database";
 
-export const dynamic = "force-dynamic";
 
 interface AttachmentRow { id: string; storage_path: string; linked_id: string; file_type: string; ocr_text: string | null; ocr_provider: string | null; metadata: Record<string, unknown> | null; paper_archive_status: string; paper_archive_location: string | null; uploaded_at: string; }
 
@@ -52,7 +51,7 @@ export default async function FinancePage() {
     <div className="space-y-5">
       <PageHeader
         title={t.title}
-        description="收款流水、应收账款与票据核对"
+        description="æ”¶æ¬¾æµæ°´ã€åº”æ”¶è´¦æ¬¾ä¸Žç¥¨æ®æ ¸å¯¹"
       />
       <FinanceTabs
         ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale="zh" attachments={attachments} />}
@@ -62,3 +61,4 @@ export default async function FinancePage() {
     </div>
   );
 }
+

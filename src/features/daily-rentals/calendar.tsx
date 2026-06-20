@@ -230,6 +230,18 @@ export function DailyCalendar({
     return map;
   }, [customers]);
 
+  const bookingById = useMemo(() => {
+    const map = new Map<string, DailyBookingRow>();
+    for (const booking of bookings) map.set(booking.id, booking);
+    return map;
+  }, [bookings]);
+
+  const unitById = useMemo(() => {
+    const map = new Map<string, UnitRow>();
+    for (const unit of visibleDailyUnits) map.set(unit.id, unit);
+    return map;
+  }, [visibleDailyUnits]);
+
   const unitCleaningMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const task of visibleCleaningTasks) {
@@ -339,8 +351,8 @@ export function DailyCalendar({
     }>();
 
     for (const payment of financeStats.collectedPayments) {
-      const booking = bookings.find((item) => item.id === payment.source_id) ?? null;
-      const unit = visibleDailyUnits.find((item) => item.id === booking?.unit_id) ?? null;
+      const booking = payment.source_id ? bookingById.get(payment.source_id) ?? null : null;
+      const unit = booking ? unitById.get(booking.unit_id) ?? null : null;
       const customer = booking ? customerMap.get(booking.customer_id) ?? null : null;
       const key = booking ? `booking:${booking.id}` : `payment:${payment.id}`;
       const stayEnd = booking
@@ -371,7 +383,7 @@ export function DailyCalendar({
     }
 
     return Array.from(groups.values()).sort((a, b) => b.sortDate.localeCompare(a.sortDate));
-  }, [bookings, customerMap, visibleDailyUnits, financeStats.collectedPayments, locale]);
+  }, [bookingById, customerMap, unitById, financeStats.collectedPayments, locale]);
 
   const financeCards = useMemo(() => [
     { key: "collected", label: locale === "zh" ? "本月已收" : "Encaisse", value: formatXof(financeStats.monthCollected), tone: "green" as const },
@@ -424,7 +436,7 @@ export function DailyCalendar({
     setTimeout(() => setCopied(false), 2000);
   }, [shareRows, locale]);
 
-  const panelBooking = selectedBookingId ? bookings.find((booking) => booking.id === selectedBookingId) ?? null : null;
+  const panelBooking = selectedBookingId ? bookingById.get(selectedBookingId) ?? null : null;
 
   useLayoutEffect(() => {
     if ("scrollRestoration" in window.history) {

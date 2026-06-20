@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect } from "react";
 import { LogOut, UserRound } from "lucide-react";
 import type { Locale, ShellDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -64,64 +64,19 @@ function AppShellInner({
   const roleLabel = userRole ? labels.roles[userRole] : "";
   const isDailyRoute = pathname === "/daily-rentals" || pathname === "/fr/daily-rentals";
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (typeof document === "undefined") return;
     document.body.setAttribute("data-sacis-route", pathname);
     document.body.setAttribute("data-sacis-daily-route", isDailyRoute ? "true" : "false");
 
-    const reconcileRouteRoot = () => {
-      const main = document.querySelector<HTMLElement>("[data-app-main]");
-      if (!main) return;
-
-      const roots = Array.from(main.querySelectorAll<HTMLElement>(":scope > [data-route-root]"));
-      roots.forEach((root) => root.removeAttribute("data-current-route-root"));
-      roots.forEach((root, index) => {
-        const isCurrentRoot = root.getAttribute("data-route-root") === pathname;
-        const isLastRoot = index === roots.length - 1;
-        if (!isCurrentRoot || !isLastRoot) {
-          root.remove();
-          return;
-        }
-        root.setAttribute("data-current-route-root", "");
-      });
-
-      Array.from(main.children).forEach((child) => {
-        const el = child as HTMLElement;
-        if (el.hasAttribute("data-route-root") || el.hasAttribute("data-navigation-overlay")) return;
-        el.remove();
-      });
-    };
-
-    const reconcileDailyNodes = () => {
-      const dailyPages = Array.from(document.querySelectorAll<HTMLElement>("[data-daily-rentals-page]"));
-      const dailyCalendars = Array.from(document.querySelectorAll<HTMLElement>("[data-daily-calendar-root]"));
-
+    const frame = window.requestAnimationFrame(() => {
       if (!isDailyRoute) {
-        dailyPages.forEach((node) => node.remove());
-        dailyCalendars.forEach((node) => node.remove());
-        return;
+        document.querySelectorAll("[data-daily-rentals-page], [data-daily-calendar-root]").forEach(function(n) { n.remove(); });
+      } else {
+        document.querySelectorAll("[data-daily-rentals-page]:nth-child(n+2), [data-daily-calendar-root]:nth-child(n+2)").forEach(function(n) { n.remove(); });
       }
-
-      dailyPages.slice(1).forEach((node) => node.remove());
-      dailyCalendars.slice(1).forEach((node) => node.remove());
-    };
-
-    reconcileRouteRoot();
-    reconcileDailyNodes();
-    const reconcile = () => {
-      reconcileRouteRoot();
-      reconcileDailyNodes();
-    };
-    const frame = window.requestAnimationFrame(reconcile);
-    const timer = window.setTimeout(reconcile, 750);
-    const observer = new MutationObserver(reconcile);
-    observer.observe(document.querySelector("[data-app-main]") ?? document.body, { childList: true, subtree: true });
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.clearTimeout(timer);
-      observer.disconnect();
-    };
+    });
+    return function() { window.cancelAnimationFrame(frame); };
   }, [pathname, isDailyRoute]);
 
   useEffect(() => {

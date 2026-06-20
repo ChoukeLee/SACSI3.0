@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -7,7 +7,6 @@ import { DailyRentalsResponsiveView } from "@/features/daily-rentals/daily-renta
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { CustomerSummary } from "@/features/daily-rentals/calendar";
 
-export const dynamic = "force-dynamic";
 
 export default async function DailyRentalsPage() {
   const user = await getCurrentUser();
@@ -48,3 +47,4 @@ export default async function DailyRentalsPage() {
     </div>
   );
 }
+

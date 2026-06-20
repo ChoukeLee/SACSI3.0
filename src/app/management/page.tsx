@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+﻿import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { dictionaries } from "@/lib/i18n";
@@ -11,19 +11,18 @@ import {
 } from "./management-skeletons";
 import type { BuildingRow } from "@/types/database";
 
-export const dynamic = "force-dynamic";
 
 export default async function ManagementPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  // Only fetch buildings — all heavy data loads inside Suspense boundaries
+  // Only fetch buildings â€” all heavy data loads inside Suspense boundaries
   const buildings = (await getBuildings()) as BuildingRow[];
   const t = dictionaries.zh.management;
 
   return (
     <ManagementPageShell buildings={buildings} locale="zh" t={t}>
-      {/* Finance strip — loads independently */}
+      {/* Finance strip â€” loads independently */}
       <Suspense fallback={<FinanceStripSkeleton />}>
         <FinanceSection locale="zh" t={t} buildings={buildings} />
       </Suspense>
@@ -40,10 +39,11 @@ export default async function ManagementPage() {
         <UnitDataSection buildings={buildings} locale="zh" t={t} />
       </Suspense>
 
-      {/* Quality widget — loads independently */}
+      {/* Quality widget â€” loads independently */}
       <Suspense fallback={<QualityWidgetSkeleton />}>
         <QualitySection locale="zh" userRole={user.role} />
       </Suspense>
     </ManagementPageShell>
   );
 }
+

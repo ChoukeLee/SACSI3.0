@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
@@ -8,7 +8,6 @@ import { FinanceTabs } from "@/features/finance/finance-tabs";
 import { PageHeader } from "@/components/page-header";
 import type { LedgerEntryRow, ReceivableRow, BuildingRow } from "@/types/database";
 
-export const dynamic = "force-dynamic";
 
 interface AttachmentRow { id: string; storage_path: string; linked_id: string; file_type: string; ocr_text: string | null; ocr_provider: string | null; metadata: Record<string, unknown> | null; paper_archive_status: string; paper_archive_location: string | null; uploaded_at: string; }
 
@@ -60,3 +59,4 @@ export default async function FrenchFinancePage() {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -7,7 +7,6 @@ import { LeaseList } from "@/features/leases";
 import { DesktopOnly } from "@/features/mobile";
 import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 
-export const dynamic = "force-dynamic";
 
 export default async function LeasesPage() {
   const user = await getCurrentUser();
@@ -54,3 +53,4 @@ export default async function LeasesPage() {
     </>
   );
 }
+

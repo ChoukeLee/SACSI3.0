@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -7,7 +7,6 @@ import { UnitList } from "@/features/units";
 import type { UnitRow, UnitBusinessFlagRow } from "@/types/database";
 import type { BusinessType } from "@/types/domain";
 
-export const dynamic = "force-dynamic";
 
 export default async function UnitsPage() {
   const user = await getCurrentUser();
@@ -54,7 +53,7 @@ export default async function UnitsPage() {
     businessFlagsMap[flag.unit_id].push(flag);
   }
 
-  // Audit logs map — populated on demand via client-side or pre-fetched for units with history.
+  // Audit logs map â€” populated on demand via client-side or pre-fetched for units with history.
   // For now we pass empty; the detail panel can refetch when opened.
   const auditLogsMap: Record<string, { id: string; action: string; metadata: Record<string, unknown>; created_at: string }[]> = {};
 
@@ -96,3 +95,4 @@ export default async function UnitsPage() {
     </>
   );
 }
+

@@ -1,11 +1,10 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
 import { FrontDeskWorkspace } from "@/features/front-desk";
 import type { UnitRow, DailyBookingRow, CustomerRow, PaymentRow } from "@/types/database";
 
-export const dynamic = "force-dynamic";
 
 export default async function FrontDeskPage() {
   const user = await getCurrentUser();
@@ -49,3 +48,4 @@ export default async function FrontDeskPage() {
         />
   );
 }
+

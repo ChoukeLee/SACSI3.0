@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -7,7 +7,6 @@ import { SaleList } from "@/features/sales";
 import { DesktopOnly } from "@/features/mobile";
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 
-export const dynamic = "force-dynamic";
 
 export default async function SalesPage() {
   const user = await getCurrentUser();
@@ -57,3 +56,4 @@ export default async function SalesPage() {
     </>
   );
 }
+
