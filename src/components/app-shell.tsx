@@ -105,7 +105,7 @@ function AppShellInner({
             <div className="flex min-w-0 items-center gap-2">
               <SidebarTrigger className="hidden lg:flex" />
               <span className="inline-flex h-8 max-w-[180px] items-center truncate rounded-lg border border-border bg-muted/55 px-3 text-xs font-medium text-muted-foreground shadow-xs">
-                {labels.building}
+                {labels.system}
               </span>
             </div>
             <div className="flex min-w-0 justify-center">
