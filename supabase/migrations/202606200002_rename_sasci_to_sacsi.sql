@@ -4,10 +4,10 @@
 -- 1. Update building code
 UPDATE buildings SET code = 'SACSI11' WHERE code = 'SASCI11';
 
--- 2. Update unit numbers (strip building prefix, re-attach with new prefix)
+-- 2. Update unit codes (the building prefix is stored in the 'code' field, not 'unit_no')
 UPDATE units
-SET unit_no = 'SACSI-' || substring(unit_no from position('-' in unit_no) + 1)
-WHERE unit_no LIKE 'SASCI11-%';
+SET code = 'SACSI-' || substring(code from position('-' in code) + 1)
+WHERE code LIKE 'SASCI11-%';
 
 -- 3. Update any hardcoded references in system_settings (if any)
 UPDATE system_settings
