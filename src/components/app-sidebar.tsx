@@ -76,7 +76,7 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar">
-      <SidebarHeader className="gap-0 border-b border-sidebar-border px-4 py-3">
+      <SidebarHeader className="gap-0 border-b border-sidebar-border px-4 py-1.5">
         <Logo variant="icon" size={60} />
       </SidebarHeader>
       <SidebarContent>
