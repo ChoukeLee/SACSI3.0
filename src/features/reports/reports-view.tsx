@@ -437,7 +437,7 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
           <div className="flex items-center gap-2">
             <button onClick={() => {
               const lines: string[] = [];
-              lines.push(`SACIS3.0 ${zh ? "日结" : "Clôture"} — ${today}`);
+              lines.push(`SACSI ${zh ? "日结" : "Clôture"} — ${today}`);
               lines.push(`${zh ? "新预订" : "Rés"}: ${dailyCloseData.newBookings.length} | ${zh ? "入住" : "Arr"}: ${dailyCloseData.checkins.length} | ${zh ? "退房" : "Dép"}: ${dailyCloseData.checkouts.length} | ${zh ? "在住" : "Occ"}: ${dailyCloseData.inHouse.length} | ${zh ? "收款" : "P"}: ${formatXof(dailyCloseData.todayTotal)}`);
               navigator.clipboard.writeText(lines.join("\n"));
             }} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90">

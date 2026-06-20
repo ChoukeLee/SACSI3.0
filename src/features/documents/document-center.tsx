@@ -195,7 +195,7 @@ export function DocumentCenter({ documents, locale }: Props) {
             </div>
             <div className="flex-1 overflow-auto p-4 space-y-3">
               <div className="text-center border-b pb-3">
-                <p className="text-xs font-medium text-primary">SACIS 3.0 · {zh ? "科建地产" : "Kejian Immobilier"}</p>
+                <p className="text-xs font-medium text-primary">SACSI · {zh ? "科建地产" : "Kejian Immobilier"}</p>
                 <p className="mt-1 text-sm font-medium">{typeLabels[previewed.docType]}</p>
               </div>
               <dl className="space-y-2 text-sm">

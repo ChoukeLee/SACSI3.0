@@ -134,7 +134,7 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
             {receiptMode ? <ImageUp className="h-4 w-4 text-primary" /> : <Sparkles className="h-4 w-4 text-primary" />}
           </div>
           <div className="flex-1">
-            <p className="text-sm font-medium tracking-tight">{receiptMode ? (zh ? "收据扫描入账" : "Scan de reçu") : (zh ? "SACIS 助理" : "Assistant SACIS")}</p>
+            <p className="text-sm font-medium tracking-tight">{receiptMode ? (zh ? "收据扫描入账" : "Scan de reçu") : (zh ? "SACSI 助理" : "Assistant SACSI")}</p>
             <p className="text-xs text-muted-foreground">
               {receiptMode ? (zh ? "上传收据 → AI 识别 → 确认入账" : "Télécharger → Analyser → Confirmer") : (zh ? "后台业务助手 · 生成草稿需确认后执行" : "Brouillons à confirmer avant exécution")}
             </p>
@@ -166,7 +166,7 @@ export function GlobalSearch({ locale }: { locale: "zh" | "fr" }) {
                 <Sparkles className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-medium">{zh ? "SACIS 后台助理" : "Assistant SACIS"}</p>
+                <p className="text-sm font-medium">{zh ? "SACSI 后台助理" : "Assistant SACSI"}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {zh ? "我是你的业务助手。可以查询房态、生成操作草稿、回答业务问题。" : "Je peux vous aider avec les chambres, les opérations et les questions métier."}
                 </p>

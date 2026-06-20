@@ -1,6 +1,6 @@
 {
-  "name": "SACIS 3.0 - 科建地产房屋管理系统",
-  "short_name": "SACIS 3.0",
+  "name": "SACSI - 科建地产房屋管理系统",
+  "short_name": "SACSI",
   "description": "Kejian Real Estate Management System",
   "start_url": "/",
   "display": "standalone",
@@ -9,12 +9,7 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/icon-512.png",
+      "src": "/logo.png",
       "sizes": "512x512",
       "type": "image/png"
     }

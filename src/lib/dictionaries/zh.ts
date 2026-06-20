@@ -1,6 +1,6 @@
 ﻿export const zhDict = {
     meta: {
-      title: "SACIS 3.0 | 科建地产房屋管理系统",
+      title: "SACSI | 科建地产房屋管理系统",
       description: "11#公寓首期业务管理系统"
     },
     shell: {

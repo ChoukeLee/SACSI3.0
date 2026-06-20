@@ -6,10 +6,11 @@ import { notificationStrings } from "@/lib/dictionaries/notifications";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SACIS 3.0 | 科建地产房屋管理系统",
+  title: "SACSI | 科建地产房屋管理系统",
   description: "11#公寓首期业务管理系统",
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "SACIS 3.0" },
+  icons: { icon: "/logo.png", apple: "/logo.png" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "SACSI" },
 };
 
 export const viewport: Viewport = { themeColor: "#f7f5f2" };

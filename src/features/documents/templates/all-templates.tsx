@@ -63,7 +63,7 @@ function headerHtml(company: string, docType: string, sub?: string) {
   return `
     <div class="header">
       <div class="company">${company}</div>
-      <div class="sub">SACIS 3.0${sub ? ` · ${sub}` : ""}</div>
+      <div class="sub">SACSI${sub ? ` · ${sub}` : ""}</div>
       <div class="doc-type">${docType}</div>
     </div>`;
 }

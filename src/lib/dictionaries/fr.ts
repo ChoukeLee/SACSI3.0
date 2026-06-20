@@ -1,6 +1,6 @@
 ﻿export const frDict = {
     meta: {
-      title: "SACIS 3.0 | Gestion immobiliere Kejian",
+      title: "SACSI | Gestion immobiliere Kejian",
       description: "Systeme pilote pour l'immeuble 11"
     },
     shell: {
