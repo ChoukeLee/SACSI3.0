@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: "SACSI | 科建地产房屋管理系统",
   description: "11#公寓首期业务管理系统",
   manifest: "/manifest.json",
-  icons: { icon: "/logo.png", apple: "/logo.png" },
+  icons: { icon: "/favicon.png", apple: "/icon-192.png" },
   appleWebApp: { capable: true, statusBarStyle: "default", title: "SACSI" },
 };
 
