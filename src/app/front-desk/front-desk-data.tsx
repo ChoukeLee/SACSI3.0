@@ -3,11 +3,14 @@ import { sortUnits } from "@/lib/utils";
 import { FrontDeskWorkspace } from "@/features/front-desk";
 import type { UnitRow, DailyBookingRow, CustomerRow, PaymentRow } from "@/types/database";
 
+import type { Locale } from "@/lib/i18n";
+
 interface FrontDeskDataProps {
   userRole: string;
+  locale: Locale;
 }
 
-export async function FrontDeskData({ userRole }: FrontDeskDataProps) {
+export async function FrontDeskData({ userRole, locale }: FrontDeskDataProps) {
   const supabase = await createClient();
   const { data: building } = await supabase
     .from("buildings")
@@ -63,8 +66,8 @@ export async function FrontDeskData({ userRole }: FrontDeskDataProps) {
       customers={customers}
       payments={payments}
       cleaningTasks={cleaningTasks}
-      locale="zh"
-      buildingName={building?.display_name ?? "11#"}
+      locale={locale}
+      buildingName={building?.display_name ?? (locale === "fr" ? "11#" : "11#")}
     />
   );
 }

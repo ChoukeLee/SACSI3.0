@@ -4,9 +4,11 @@ import { DailyRentalsResponsiveView } from "@/features/daily-rentals/daily-renta
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { CustomerSummary } from "@/features/daily-rentals/calendar";
 
+import type { Locale } from "@/lib/i18n";
+
 interface DailyRentalDataProps {
   userRole: string;
-  locale: "zh";
+  locale: Locale;
 }
 
 /**

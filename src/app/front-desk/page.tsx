@@ -16,7 +16,7 @@ export default async function FrontDeskPage() {
         </div>
       }
     >
-      <FrontDeskData userRole={user.role} />
+      <FrontDeskData userRole={user.role} locale="zh" />
     </Suspense>
   );
 }
