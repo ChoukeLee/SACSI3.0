@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 
 type Theme = "light" | "dark";
 
@@ -15,22 +15,21 @@ export function useTheme() {
   return useContext(ThemeContext);
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("light");
+function getInitialTheme(): Theme {
+  if (typeof window === "undefined") return "light";
+  return document.documentElement.classList.contains("dark") ? "dark" : "light";
+}
 
-  useEffect(() => {
-    const stored = localStorage.getItem("sacsi-theme") as Theme | null;
-    if (stored === "dark") {
-      setTheme("dark");
-      document.documentElement.classList.add("dark");
-    }
-  }, []);
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
 
   const toggle = () => {
     const next = theme === "light" ? "dark" : "light";
     setTheme(next);
-    localStorage.setItem("sacsi-theme", next);
-    document.documentElement.classList.toggle("dark", next === "dark");
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sacsi-theme", next);
+      document.documentElement.classList.toggle("dark", next === "dark");
+    }
   };
 
   return (
