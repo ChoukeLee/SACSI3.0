@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Building2, Tag, Building, Languages, Moon, ShieldCheck, Download } from "lucide-react";
+import { Plus, Building2, Tag, Building, Languages, Moon, ShieldCheck, Download, Sun } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import type { BuildingRow } from "@/types/database";
+import { useTheme } from "@/components/theme-provider"
 import { addBuilding, toggleBuildingActive, toggleBuildingPaused, saveCompanyInfo } from "./actions";
 import type { CompanyInfo } from "./actions";
 
@@ -38,6 +39,7 @@ export function SettingsView({ buildings, companyInfo, locale }: SettingsViewPro
   const [cPhone, setCPhone] = useState(companyInfo.phone);
   const [cAddress, setCAddress] = useState(companyInfo.address);
   const [cSaving, setCSaving] = useState(false);
+  const { theme, toggle: toggleTheme } = useTheme();
   const [cSaved, setCSaved] = useState(false);
 
   const handleAddBuilding = async () => {
@@ -210,7 +212,7 @@ export function SettingsView({ buildings, companyInfo, locale }: SettingsViewPro
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Button variant="outline" size="sm" disabled>{t.darkMode.placeholder}</Button>
+          <Button variant="outline" size="sm" onClick={toggleTheme}>{theme === "dark" ? (zh ? "浅色模式" : "Clair") : (zh ? "深色模式" : "Sombre")}</Button>
         </CardContent>
       </Card>
 

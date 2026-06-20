@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { dictionaries } from "@/lib/i18n";
 import { getBuildings } from "./management-data";
 import { FinanceSection, UnitDataSection, QualitySection } from "./management-sections";
+import { ManagementAlertSection } from "./management-alert-section";
 import { ManagementPageShell } from "./management-page-shell";
 import {
   FinanceStripSkeleton, StatusOverviewSkeleton,
@@ -16,13 +17,17 @@ export default async function ManagementPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  // Only fetch buildings â€” all heavy data loads inside Suspense boundaries
   const buildings = (await getBuildings()) as BuildingRow[];
   const t = dictionaries.zh.management;
 
   return (
     <ManagementPageShell buildings={buildings} locale="zh" t={t}>
-      {/* Finance strip â€” loads independently */}
+      {/* Alert strip — urgent items needing attention */}
+      <Suspense fallback={null}>
+        <ManagementAlertSection locale="zh" />
+      </Suspense>
+
+      {/* Finance strip */}
       <Suspense fallback={<FinanceStripSkeleton />}>
         <FinanceSection locale="zh" t={t} buildings={buildings} />
       </Suspense>
@@ -39,11 +44,10 @@ export default async function ManagementPage() {
         <UnitDataSection buildings={buildings} locale="zh" t={t} />
       </Suspense>
 
-      {/* Quality widget â€” loads independently */}
+      {/* Quality widget */}
       <Suspense fallback={<QualityWidgetSkeleton />}>
         <QualitySection locale="zh" userRole={user.role} />
       </Suspense>
     </ManagementPageShell>
   );
 }
-

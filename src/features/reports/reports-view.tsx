@@ -375,7 +375,7 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
                   </thead>
                   <tbody className="divide-y">
                     {overdueData.map(r => (
-                      <tr key={r.id} className="bg-red-50/30 transition-colors hover:bg-accent/50">
+                      <tr key={r.id} className="tr-overdue transition-colors hover:bg-accent/50">
                         <td className="px-4 py-2.5 font-mono">{r.unitNo}</td>
                         <td className="px-4 py-2.5">{r.cust}</td>
                         <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-rose-600">{formatXof(r.unpaid)}</td>

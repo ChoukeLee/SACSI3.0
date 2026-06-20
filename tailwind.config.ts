@@ -9,7 +9,7 @@ const config: Config = {
         border: "hsl(36 8% 88%)",
         "border-strong": "hsl(36 8% 82%)",
         input: "hsl(36 8% 88%)",
-        ring: "hsl(200 72% 48%)",
+        ring: "hsl(210 85% 48%)",
         background: "hsl(30 10% 96%)",
         foreground: "hsl(30 8% 10%)",
         primary: {
@@ -48,16 +48,18 @@ const config: Config = {
           accent: "hsl(30 9% 91%)",
           "accent-foreground": "hsl(30 8% 12%)",
           border: "hsl(36 8% 86%)",
-          ring: "hsl(200 72% 48%)",
+          ring: "hsl(210 85% 48%)",
         },
-        /* ── Semantic dashboard palette ── */
+        /* ── Semantic dashboard palette (SACSI brand) ── */
         accentBlue: {
-          DEFAULT: "hsl(200 72% 48%)",
-          50: "hsl(200 80% 96%)",
-          100: "hsl(200 80% 90%)",
-          500: "hsl(200 72% 48%)",
-          600: "hsl(200 72% 40%)",
-          700: "hsl(200 72% 32%)",
+          DEFAULT: "hsl(210 85% 48%)",
+          50: "hsl(210 85% 96%)",
+          100: "hsl(210 85% 90%)",
+          200: "hsl(210 85% 82%)",
+          400: "hsl(210 85% 58%)",
+          500: "hsl(210 85% 48%)",
+          600: "hsl(210 85% 40%)",
+          700: "hsl(210 85% 32%)",
         },
         accentGreen: {
           DEFAULT: "hsl(152 60% 40%)",

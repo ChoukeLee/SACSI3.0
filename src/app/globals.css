@@ -45,6 +45,35 @@
     --status-maintenance: 18 57% 72%;
     --status-available: 32 38% 85%;
   }
+
+  .dark {
+    --background: 30 6% 8%;
+    --foreground: 30 10% 92%;
+    --card: 30 6% 12%;
+    --card-foreground: 30 10% 92%;
+    --popover: 30 6% 12%;
+    --popover-foreground: 30 10% 92%;
+    --primary: 210 85% 48%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 6% 16%;
+    --secondary-foreground: 30 10% 88%;
+    --muted: 30 6% 16%;
+    --muted-foreground: 30 6% 56%;
+    --accent: 210 30% 20%;
+    --accent-foreground: 210 40% 85%;
+    --destructive: 0 68% 50%;
+    --border: 30 6% 18%;
+    --border-strong: 30 6% 24%;
+    --input: 30 6% 18%;
+    --ring: 210 85% 48%;
+    --sidebar-background: 30 6% 10%;
+    --sidebar-foreground: 30 10% 88%;
+    --sidebar-primary: 210 85% 48%;
+    --sidebar-accent: 30 6% 18%;
+    --sidebar-accent-foreground: 30 10% 88%;
+    --sidebar-border: 30 6% 18%;
+    --sidebar-ring: 210 85% 48%;
+  }
 }
 
 @layer base {
@@ -139,6 +168,12 @@
   .table-cell-action {
     @apply text-center;
   }
+
+  /* Row status indicators */
+  .tr-overdue  { @apply border-l-[3px] border-l-accentRed-500 bg-accentRed-50/40; }
+  .tr-warning  { @apply border-l-[3px] border-l-accentAmber-500 bg-accentAmber-50/40; }
+  .tr-success  { @apply border-l-[3px] border-l-accentGreen-500; }
+  .tr-expiring { @apply border-l-[3px] border-l-accentAmber-400 bg-accentAmber-50/30; }
 }
 
 /* Keep tabular data visually consistent across modules. */
