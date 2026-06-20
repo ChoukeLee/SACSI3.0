@@ -141,7 +141,7 @@ export function Logo({ variant = "full", size = 32, className, label }: LogoProp
         style={{ width: size * 0.65, height: size * 0.65 }}
       >
         <Image
-          src="/logo.png"
+          src="/favicon.png"
           alt="SACSI"
           width={size}
           height={size}
