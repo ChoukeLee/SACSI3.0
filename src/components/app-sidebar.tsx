@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowUpDown, Banknote, BarChart3, Bell, Building2, CalendarDays, FileSignature, FileText, Layers, LayoutDashboard, Settings, Shield, ShieldCheck, Target, Users } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { Logo } from "@/components/logo";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { getDesktopNavLabels } from "@/lib/nav-labels";
@@ -77,9 +78,7 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar">
       <SidebarHeader className="gap-0 border-b border-sidebar-border px-4 py-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 min-w-[3.5rem] items-center justify-center rounded-lg bg-primary px-1.5 text-[10px] font-bold tracking-wider text-primary-foreground shadow-sm ring-1 ring-black/5">
-            SACSI
-          </div>
+          <Logo variant="icon-mono" size={28} />
           <div className="group-data-[collapsible=icon]:hidden">
             <p className="text-sm font-medium leading-none text-sidebar-foreground">{labels.brand}</p>
             <p className="mt-1 text-[11px] font-medium text-sidebar-foreground/55">{labels.building}</p>

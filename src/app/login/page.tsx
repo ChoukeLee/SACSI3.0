@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/logo";
 import { login } from "./actions";
 
 function loginErrorMessage(error: string | undefined) {
@@ -19,8 +20,8 @@ export default async function LoginPage({
     <div className="flex min-h-[80vh] items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-10 min-w-[4rem] items-center justify-center rounded-xl bg-primary px-2 shadow-sm">
-            <span className="text-xs font-bold tracking-wider text-primary-foreground">SACSI</span>
+          <div className="mx-auto mb-4 flex justify-center">
+            <Logo variant="full" size={36} />
           </div>
           <h1 className="text-base font-semibold text-foreground">SACIS 3.0</h1>
           <p className="mt-1 text-sm text-muted-foreground">科建地产房屋管理系统</p>

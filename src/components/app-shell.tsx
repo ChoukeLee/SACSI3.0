@@ -8,6 +8,7 @@ import type { Locale, ShellDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import type { UserRole } from "@/lib/auth";
 import { NotificationBell } from "@/features/notifications";
+import { Logo } from "@/components/logo";
 import { GlobalSearch } from "@/features/search";
 import { createClient } from "@/lib/supabase/client";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
@@ -104,9 +105,8 @@ function AppShellInner({
           <div className="grid w-full grid-cols-[minmax(200px,320px)_minmax(180px,1fr)_minmax(200px,320px)] items-center gap-3 px-4">
             <div className="flex min-w-0 items-center gap-2">
               <SidebarTrigger className="hidden lg:flex" />
-              <span className="inline-flex h-8 max-w-[180px] items-center truncate rounded-lg border border-border bg-muted/55 px-3 text-xs font-medium text-muted-foreground shadow-xs">
-                {labels.system}
-              </span>
+              <Logo variant="icon" size={20} className="mr-1" />
+              <span className="text-[11px] font-medium text-muted-foreground">{labels.system}</span>
             </div>
             <div className="flex min-w-0 justify-center">
               <div className="w-full max-w-[220px]">
