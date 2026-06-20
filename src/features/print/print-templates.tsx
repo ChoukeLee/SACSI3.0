@@ -247,3 +247,82 @@ export function printCleaningTask(data: CleaningTaskPrintData[], locale: "zh" | 
   </body></html>`;
   openPrintWindow(html);
 }
+
+// ── Move-out Settlement ──
+
+export interface MoveOutSettlementData {
+  contract: LeaseContractRow;
+  unit: UnitRow | null;
+  customer: CustomerRow | null;
+  unpaidRent: number;
+  depositAmount: number;
+  damageDeduction: number;
+  refundAmount: number;
+  utilitiesCleared: boolean;
+  receivables: ReceivableRow[];
+}
+
+export function printMoveOutSettlement(data: MoveOutSettlementData, locale: "zh" | "fr") {
+  const zh2 = locale === "zh";
+  const labels = zh2
+    ? { title: "退租结算单", company: "科建地产", contractNo: "合同编号", unit: "房源", customer: "客户", startDate: "起租", actualEnd: "实际退租", utilities: "水电结清", yes: "是", no: "否", unpaidRent: "未付租金", deposit: "押金总额", damageDeduction: "损坏赔偿", refund: "退还押金", summary: "结算汇总", tenant: "承租方", landlord: "出租方" }
+    : { title: "Decompte de sortie", company: "Kejian Immobilier", contractNo: "No contrat", unit: "Logement", customer: "Client", startDate: "Debut", actualEnd: "Sortie", utilities: "Charges reglees", yes: "Oui", no: "Non", unpaidRent: "Loyer impaye", deposit: "Caution totale", damageDeduction: "Retenue degats", refund: "Caution remboursee", summary: "Recapitulatif", tenant: "Locataire", landlord: "Bailleur" };
+
+  const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + labels.title + '</title>' + a4Styles + '</head><body>' +
+    '<div class="header"><div class="company">' + labels.company + '</div><div class="meta">' + labels.title + '</div></div>' +
+    '<h1>' + labels.title + '</h1>' +
+    '<table>' +
+    '<tr><td class="label">' + labels.contractNo + '</td><td class="value">' + data.contract.contract_no + '</td></tr>' +
+    '<tr><td class="label">' + labels.unit + '</td><td class="value">' + (data.unit?.unit_no ?? "-") + ' (' + (data.unit?.floor_label ?? "") + ')</td></tr>' +
+    '<tr><td class="label">' + labels.customer + '</td><td class="value">' + (data.customer?.name ?? "-") + '</td></tr>' +
+    '<tr><td class="label">' + labels.startDate + '</td><td class="value">' + data.contract.start_date + '</td></tr>' +
+    '<tr><td class="label">' + labels.actualEnd + '</td><td class="value">' + (data.contract.actual_end_date ?? new Date().toISOString().slice(0,10)) + '</td></tr>' +
+    '<tr><td class="label">' + labels.utilities + '</td><td class="value">' + (data.utilitiesCleared ? labels.yes : labels.no) + '</td></tr>' +
+    '</table>' +
+    '<h2>' + labels.summary + '</h2>' +
+    '<div class="total-grid">' +
+    '<div class="total-box"><span class="label">' + labels.unpaidRent + '</span><span class="value" style="color:#dc2626">' + formatXof(data.unpaidRent) + '</span></div>' +
+    '<div class="total-box"><span class="label">' + labels.deposit + '</span><span class="value">' + formatXof(data.depositAmount) + '</span></div>' +
+    '<div class="total-box"><span class="label">' + labels.damageDeduction + '</span><span class="value" style="color:#dc2626">-' + formatXof(data.damageDeduction) + '</span></div>' +
+    '</div>' +
+    '<div class="row" style="font-size:14px;font-weight:700;margin-top:12px;padding:8px;background:#f0fdf4;border-radius:8px">' +
+    '<span>' + labels.refund + '</span><span style="color:#16a34a;font-size:16px">' + formatXof(data.refundAmount) + '</span></div>' +
+    '<div class="signature"><div class="sig-line">' + labels.tenant + ': ' + (data.customer?.name ?? "___________") + '</div><div class="sig-line">' + labels.landlord + ': ' + labels.company + '</div></div>' +
+    '<div class="footer">' + labels.company + ' - ' + new Date().toLocaleDateString() + '</div></body></html>';
+  openPrintWindow(html);
+}
+
+// ── Overdue Notice ──
+
+export interface OverdueNoticeData {
+  customer: CustomerRow | null;
+  unit: UnitRow | null;
+  overdueAmount: number;
+  overdueDays: number;
+  dueDate: string;
+  contractNo: string;
+  sourceType: "lease_contract" | "sale_contract" | "daily_booking";
+}
+
+export function printOverdueNotice(data: OverdueNoticeData, locale: "zh" | "fr") {
+  const zh2 = locale === "zh";
+  const labels = zh2
+    ? { title: "欠款催交通知单", company: "科建地产", dear: "尊敬的", notice: "您承租/购买的以下房源存在逾期未付款项，请于收到本通知后7日内结清。如有疑问请联系管理处。", unit: "房源", customer: "客户", contractNo: "合同编号", dueDate: "应付款日", overdueDays: "逾期天数", overdueAmount: "欠款金额", dayUnit: "天", contact: "联系电话", address: "地址" }
+    : { title: "Avis de retard de paiement", company: "Kejian Immobilier", dear: "Cher/Chere", notice: "Le paiement pour le logement suivant est en retard. Veuillez regler dans les 7 jours.", unit: "Logement", customer: "Client", contractNo: "No contrat", dueDate: "Date", overdueDays: "Jours de retard", overdueAmount: "Montant du", dayUnit: "j", contact: "Telephone", address: "Adresse" };
+
+  const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + labels.title + '</title>' + a4Styles + '</head><body>' +
+    '<div class="header"><div class="company">' + labels.company + '</div><div class="meta">' + labels.title + '</div></div>' +
+    '<h1>' + labels.title + '</h1>' +
+    '<p style="font-size:13px;margin-bottom:12px">' + labels.dear + ' ' + (data.customer?.name ?? "___________") + '</p>' +
+    '<p style="font-size:12px;color:#64748b;margin-bottom:16px">' + labels.notice + '</p>' +
+    '<table>' +
+    '<tr><td class="label">' + labels.unit + '</td><td class="value">' + (data.unit?.unit_no ?? "-") + '</td></tr>' +
+    '<tr><td class="label">' + labels.contractNo + '</td><td class="value">' + data.contractNo + '</td></tr>' +
+    '<tr><td class="label">' + labels.dueDate + '</td><td class="value">' + data.dueDate + '</td></tr>' +
+    '<tr><td class="label">' + labels.overdueDays + '</td><td class="value" style="color:#dc2626;font-weight:700">' + data.overdueDays + ' ' + labels.dayUnit + '</td></tr>' +
+    '<tr><td class="label">' + labels.overdueAmount + '</td><td class="value" style="color:#dc2626;font-size:16px;font-weight:800">' + formatXof(data.overdueAmount) + '</td></tr>' +
+    '</table>' +
+    '<div style="margin-top:24px"><p style="font-size:10px;color:#94a3b8">' + labels.contact + ': ___________  ' + labels.address + ': ___________</p></div>' +
+    '<div class="footer">' + labels.company + ' - ' + new Date().toLocaleDateString() + '</div></body></html>';
+  openPrintWindow(html);
+}

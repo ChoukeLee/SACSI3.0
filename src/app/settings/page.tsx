@@ -23,10 +23,14 @@ export default async function SettingsPage() {
   ]);
 
   const settingsMap: Record<string, string> = {};
+  const companyInfo = { name: "科建地产", phone: "", address: "" };
   for (const s of (sysSettings ?? [])) {
     const v = typeof s.value === "string" ? s.value : JSON.stringify(s.value);
     try { settingsMap[s.key] = JSON.parse(v); } catch { settingsMap[s.key] = v; }
     if (typeof settingsMap[s.key] === "object") settingsMap[s.key] = JSON.stringify(settingsMap[s.key]);
+    if (s.key === "company_name") companyInfo.name = String(settingsMap[s.key]);
+    if (s.key === "company_phone") companyInfo.phone = String(settingsMap[s.key]);
+    if (s.key === "company_address") companyInfo.address = String(settingsMap[s.key]);
   }
 
   return (
@@ -35,7 +39,11 @@ export default async function SettingsPage() {
       <div className="hidden lg:block">
         <h1 className="mb-6 text-2xl font-semibold tracking-tight">{t.title}</h1>
         <div className="space-y-8">
-          <SettingsView buildings={(buildings as BuildingRow[]) ?? []} locale="zh" />
+          <SettingsView
+            buildings={(buildings as BuildingRow[]) ?? []}
+            companyInfo={companyInfo}
+            locale="zh"
+          />
           <SystemSettingsPanel settings={settingsMap} isAdmin={user.role === "admin"} locale="zh" />
         </div>
       </div>

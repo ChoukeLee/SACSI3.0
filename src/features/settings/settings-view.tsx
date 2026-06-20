@@ -10,19 +10,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import type { BuildingRow } from "@/types/database";
-import { addBuilding, toggleBuildingActive, toggleBuildingPaused } from "./actions";
+import { addBuilding, toggleBuildingActive, toggleBuildingPaused, saveCompanyInfo } from "./actions";
+import type { CompanyInfo } from "./actions";
 
 interface SettingsViewProps {
   buildings: BuildingRow[];
+  companyInfo: CompanyInfo;
   locale: Locale;
 }
 
-const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
-const labelClass = "block mb-1 text-xs font-semibold text-muted-foreground";
-
-export function SettingsView({ buildings, locale }: SettingsViewProps) {
+export function SettingsView({ buildings, companyInfo, locale }: SettingsViewProps) {
   const t = dictionaries[locale].settings;
   const zh = locale === "zh";
+  const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
+  const labelClass = "block mb-1 text-xs font-semibold text-muted-foreground";
   const [showNewBuilding, setShowNewBuilding] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -31,6 +32,13 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
   const [bName, setBName] = useState("");
   const [bFloors, setBFloors] = useState(6);
   const [bElevators, setBElevators] = useState(0);
+
+  // Company info form state
+  const [cName, setCName] = useState(companyInfo.name);
+  const [cPhone, setCPhone] = useState(companyInfo.phone);
+  const [cAddress, setCAddress] = useState(companyInfo.address);
+  const [cSaving, setCSaving] = useState(false);
+  const [cSaved, setCSaved] = useState(false);
 
   const handleAddBuilding = async () => {
     if (!bCode.trim()) { setError(t.buildings.codeRequired); return; }
@@ -155,11 +163,23 @@ export function SettingsView({ buildings, locale }: SettingsViewProps) {
         <CardContent>
           <p className="text-xs text-muted-foreground mb-3">{t.company.desc}</p>
           <div className="grid gap-3 md:grid-cols-2">
-            <div><label className={labelClass}>{t.company.name}</label><input className={inputClass} placeholder="科建地产" /></div>
-            <div><label className={labelClass}>{t.company.phone}</label><input className={inputClass} placeholder="+225 XX XX XX XX" /></div>
+            <div><label className={labelClass}>{t.company.name}</label><input className={inputClass} value={cName} onChange={e => setCName(e.target.value)} placeholder="科建地产" /></div>
+            <div><label className={labelClass}>{t.company.phone}</label><input className={inputClass} value={cPhone} onChange={e => setCPhone(e.target.value)} placeholder="+225 XX XX XX XX" /></div>
           </div>
-          <div className="mt-3"><label className={labelClass}>{t.company.address}</label><input className={inputClass} placeholder="Abidjan, Côte d'Ivoire" /></div>
-          <Button variant="outline" size="sm" disabled className="mt-4">{t.company.save}</Button>
+          <div className="mt-3"><label className={labelClass}>{t.company.address}</label><input className={inputClass} value={cAddress} onChange={e => setCAddress(e.target.value)} placeholder="Abidjan, Côte d'Ivoire" /></div>
+          <Button
+            variant="outline" size="sm" className="mt-4"
+            disabled={cSaving}
+            onClick={async () => {
+              setCSaving(true);
+              const result = await saveCompanyInfo({ name: cName, phone: cPhone, address: cAddress });
+              setCSaving(false);
+              if (result.success) { setCSaved(true); setTimeout(() => setCSaved(false), 2000); }
+              else setError(result.error ?? "Save failed");
+            }}
+          >
+            {cSaving ? (zh ? "保存中..." : "En cours...") : cSaved ? (zh ? "已保存 ✓" : "Sauvegardé ✓") : t.company.save}
+          </Button>
         </CardContent>
       </Card>
 
