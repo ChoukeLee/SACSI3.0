@@ -51,7 +51,7 @@ export default async function FinancePage() {
     <div className="space-y-5">
       <PageHeader
         title={t.title}
-        description="æ”¶æ¬¾æµæ°´ã€åº”æ”¶è´¦æ¬¾ä¸Žç¥¨æ®æ ¸å¯¹"
+        description={t.description}
       />
       <FinanceTabs
         ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale="zh" attachments={attachments} />}
