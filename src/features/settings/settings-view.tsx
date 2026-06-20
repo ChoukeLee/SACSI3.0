@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Building2, Tag, Building, Languages, Moon, ShieldCheck } from "lucide-react";
+import { Plus, Building2, Tag, Building, Languages, Moon, ShieldCheck, Download } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -211,6 +211,25 @@ export function SettingsView({ buildings, companyInfo, locale }: SettingsViewPro
         </CardHeader>
         <CardContent>
           <Button variant="outline" size="sm" disabled>{t.darkMode.placeholder}</Button>
+        </CardContent>
+      </Card>
+
+      {/* Data Backup */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Download className="h-5 w-5 text-primary" />
+            {zh ? "数据备份" : "Sauvegarde"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-xs text-muted-foreground mb-3">
+            {zh ? "一键下载全量数据 JSON。包含楼栋、房源、客户、合同、财务流水、审计日志。" : "Telechargement complet des donnees au format JSON."}
+          </p>
+          <Button variant="outline" size="sm" onClick={() => window.open("/api/backup", "_blank")}>
+            <Download className="h-4 w-4" />
+            {zh ? "下载备份" : "Telecharger"}
+          </Button>
         </CardContent>
       </Card>
 
