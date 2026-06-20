@@ -88,7 +88,7 @@ function sigBlock(tenant: string, staff: string) {
 
 function zh() {
   return {
-    company: "科建地产", building: "SASCI11 · 11#",
+    company: "科建地产", building: "SACSI 11#",
     contractNo: "合同编号", unit: "房源", customer: "客户", phone: "电话",
     startDate: "起租日期", endDate: "预计退租", paymentCycle: "支付周期",
     monthlyRent: "月租金", deposit: "押金", totalPrice: "合同总价",
@@ -111,7 +111,7 @@ function zh() {
 
 function fr() {
   return {
-    company: "Kejian Immobilier", building: "SASCI11 · Phase 1",
+    company: "Kejian Immobilier", building: "SACSI · Phase 1",
     contractNo: "N° contrat", unit: "Logement", customer: "Client", phone: "Tel",
     startDate: "Date debut", endDate: "Fin prevue", paymentCycle: "Cycle",
     monthlyRent: "Loyer mensuel", deposit: "Caution", totalPrice: "Prix total",

@@ -20,7 +20,7 @@ export interface MobileNavLabels {
 const desktop: Record<Locale, DesktopNavLabels> = {
   zh: {
     brand: "科建地产",
-    building: "SASCI11 · 11#",
+    building: "SACSI 11#",
     system: "SACSI",
     roles: { admin: "管理员", boss: "老板", finance: "财务", front_desk: "前台" },
     shell: { logout: "登出", langLabel: "FR" },
@@ -54,7 +54,7 @@ const desktop: Record<Locale, DesktopNavLabels> = {
   },
   fr: {
     brand: "Kejian Immobilier",
-    building: "SASCI11 · Phase 1",
+    building: "SACSI · Phase 1",
     system: "SACSI",
     roles: { admin: "Administrateur", boss: "Proprietaire", finance: "Comptable", front_desk: "Reception" },
     shell: { logout: "Déconnexion", langLabel: "ZH" },
