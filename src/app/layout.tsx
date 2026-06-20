@@ -1,7 +1,5 @@
-﻿import { Suspense } from "react";
-import type { Metadata, Viewport } from "next";
+﻿import type { Metadata, Viewport } from "next";
 import { AppShellWrapper } from "@/components/app-shell-wrapper";
-import { StaticShell } from "@/components/static-shell";
 import { getCurrentUser } from "@/lib/auth";
 import { notificationStrings } from "@/lib/dictionaries/notifications";
 
@@ -16,7 +14,9 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: "#f7f5f2" };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const user = await getCurrentUser();
+
   return (
     <html lang="zh-CN">
       <head>
@@ -32,28 +32,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         `}} />
       </head>
       <body>
-        {/* PERF: StaticShell renders instantly (zero data fetching).
-             The real AppShell with auth streams in when getCurrentUser resolves. */}
-        <Suspense fallback={<StaticShell>{children}</StaticShell>}>
-          <AuthShell>{children}</AuthShell>
-        </Suspense>
+        <AppShellWrapper
+          userRole={user?.role}
+          userDisplayName={user?.displayName}
+          notifT={notificationStrings.zh}
+          notifTFr={notificationStrings.fr}
+        >
+          {children}
+        </AppShellWrapper>
       </body>
     </html>
-  );
-}
-
-/** Inner async component — awaits auth then renders the full AppShell. */
-async function AuthShell({ children }: { children: React.ReactNode }) {
-  const user = await getCurrentUser();
-
-  return (
-    <AppShellWrapper
-      userRole={user?.role}
-      userDisplayName={user?.displayName}
-      notifT={notificationStrings.zh}
-      notifTFr={notificationStrings.fr}
-    >
-      {children}
-    </AppShellWrapper>
   );
 }
