@@ -20,11 +20,10 @@ export default async function LoginPage({
     <div className="flex min-h-[80vh] items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex justify-center">
-            <Logo variant="full" size={48} />
+          <div className="mx-auto mb-4 flex justify-center -mr-9">
+            <Logo variant="icon" size={128} />
           </div>
-          <h1 className="text-base font-semibold text-foreground">SACSI</h1>
-          <p className="mt-1 text-sm text-muted-foreground">科建地产房屋管理系统</p>
+          <p className="text-sm text-muted-foreground">科建地产房屋管理系统</p>
         </div>
 
         <form action={login} className="space-y-4">

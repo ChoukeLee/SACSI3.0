@@ -77,9 +77,9 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar">
       <SidebarHeader className="gap-0 border-b border-sidebar-border px-4 h-12 relative">
-        <div className="absolute -top-5 left-4 flex items-end gap-3">
-          <Logo variant="icon" size={80} />
-          <span className="text-base font-semibold text-sidebar-foreground whitespace-nowrap pb-[2px]" style={{ fontFamily: "KaiTi, STKaiti, 'AR PL UKai CN', serif" }}>{labels.brand}</span>
+        <div className="absolute top-0 left-4 flex items-center gap-3 h-full">
+          <Logo variant="icon" size={72} />
+          <span className="text-xs font-semibold italic text-sidebar-foreground whitespace-nowrap -mt-[1px]">{labels.brand}</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -117,10 +117,7 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
         ))}
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Logo variant="icon" size={18} />
-          <p className="text-[11px] font-medium text-sidebar-foreground/45">{labels.system}</p>
-        </div>
+        <p className="text-[11px] font-medium text-sidebar-foreground/45">{labels.system}</p>
       </SidebarFooter>
     </Sidebar>
   );
