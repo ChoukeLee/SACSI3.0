@@ -20,7 +20,7 @@ export default async function LoginPage({
     <div className="flex min-h-[80vh] items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex justify-center -ml-9">
+          <div className="mx-auto mb-4 flex justify-center -ml-5">
             <Logo variant="icon" size={128} />
           </div>
           <p className="text-sm text-muted-foreground">科建地产房屋管理系统</p>
