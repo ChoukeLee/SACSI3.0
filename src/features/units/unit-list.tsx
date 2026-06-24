@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { AlertTriangle, ArrowRight, Building2, ChevronDown, ChevronUp, Home, Key } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
@@ -11,14 +11,8 @@ import { FilterBar } from "@/components/ui/operational";
 import { PageHeader } from "@/components/page-header";
 import { UnitDetailPanel } from "./unit-detail-panel";
 import { UnitFilters } from "./unit-filters";
-import type { UnitRow } from "@/types/database";
-import type { BusinessType, UnitStatus } from "@/types/domain";
-
-interface UnitBusinessFlag {
-  business_type: BusinessType;
-  is_enabled: boolean;
-  default_price_xof: number | null;
-}
+import type { UnitRow, UnitBusinessFlagRow } from "@/types/database";
+import type { BusinessType } from "@/types/domain";
 
 interface AuditLogEntry {
   id: string;
@@ -27,11 +21,18 @@ interface AuditLogEntry {
   created_at: string;
 }
 
+interface BuildingInfo {
+  id: string;
+  code: string;
+  display_name: string;
+}
+
 interface UnitListProps {
   units: UnitRow[];
-  businessFlagsMap: Record<string, UnitBusinessFlag[]>;
+  businessFlagsMap: Record<string, UnitBusinessFlagRow[]>;
   managedLeaseUnitIds?: string[];
   auditLogsMap: Record<string, AuditLogEntry[]>;
+  buildings: BuildingInfo[];
   locale: Locale;
 }
 
@@ -46,7 +47,9 @@ const STATUS_DOT: Record<string, string> = {
   available: "bg-[#A0D0E8]",
 };
 
-export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], auditLogsMap, locale }: UnitListProps) {
+const LS_KEY = "sacsi_active_building_id";
+
+export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], auditLogsMap, buildings, locale }: UnitListProps) {
   const t = dictionaries[locale].units;
   const statusLabels = dictionaries[locale].statuses;
   const [selectedFloor, setSelectedFloor] = useState("all");
@@ -57,18 +60,45 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
   const [refreshKey, setRefreshKey] = useState(0);
   const [showNonApartments, setShowNonApartments] = useState(false);
 
+  // Building switcher with localStorage persistence
+  const [activeBuildingId, setActiveBuildingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(LS_KEY);
+    if (saved && buildings.some((b) => b.id === saved)) {
+      setActiveBuildingId(saved);
+    } else if (buildings.length > 0) {
+      // Default to first building (SACSI7 if available)
+      const defaultBld = buildings.find((b) => b.code === "SACSI7") ?? buildings[0];
+      setActiveBuildingId(defaultBld.id);
+    }
+  }, [buildings]);
+
+  const handleBuildingChange = (id: string) => {
+    setActiveBuildingId(id);
+    localStorage.setItem(LS_KEY, id);
+  };
+
+  // Filter units by active building
+  const buildingUnits = useMemo(() => {
+    if (!activeBuildingId) return [];
+    return units.filter((u) => u.building_id === activeBuildingId);
+  }, [units, activeBuildingId]);
+
+  const activeBuilding = buildings.find((b) => b.id === activeBuildingId);
+
   const floors = useMemo(() => {
-    const set = new Set(units.map((unit) => unit.floor_label));
+    const set = new Set(buildingUnits.map((unit) => unit.floor_label));
     return Array.from(set).sort((a, b) => {
       const an = parseInt(a, 10);
       const bn = parseInt(b, 10);
       if (!Number.isNaN(an) && !Number.isNaN(bn)) return an - bn;
       return a.localeCompare(b);
     });
-  }, [units]);
+  }, [buildingUnits]);
 
   const filtered = useMemo(() => {
-    return units.filter((unit) => {
+    return buildingUnits.filter((unit) => {
       if (selectedFloor !== "all" && unit.floor_label !== selectedFloor) return false;
       if (selectedStatus !== "all" && unit.status !== selectedStatus) return false;
       if (selectedKind !== "all" && unit.kind !== selectedKind) return false;
@@ -78,10 +108,10 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
       }
       return true;
     });
-  }, [units, selectedFloor, selectedStatus, selectedKind, selectedBusiness, businessFlagsMap]);
+  }, [buildingUnits, selectedFloor, selectedStatus, selectedKind, selectedBusiness, businessFlagsMap]);
 
-  const apartments = useMemo(() => units.filter((unit) => unit.kind === "apartment"), [units]);
-  const nonApartments = useMemo(() => units.filter((unit) => unit.kind !== "apartment"), [units]);
+  const apartments = useMemo(() => buildingUnits.filter((unit) => unit.kind === "apartment"), [buildingUnits]);
+  const nonApartments = useMemo(() => buildingUnits.filter((unit) => unit.kind !== "apartment"), [buildingUnits]);
   const managedLeaseUnitSet = useMemo(() => new Set(managedLeaseUnitIds), [managedLeaseUnitIds]);
 
   const summary = useMemo(() => ({
@@ -95,7 +125,7 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
     nonApartment: nonApartments.length,
   }), [apartments, nonApartments, managedLeaseUnitSet]);
 
-  const detailUnit = detailUnitId ? units.find((unit) => unit.id === detailUnitId) : null;
+  const detailUnit = detailUnitId ? buildingUnits.find((unit) => unit.id === detailUnitId) : null;
 
   const assetBlocks = [
     { key: "apartments", label: locale === "zh" ? "住宿房源" : "Appartements", value: summary.apartments, dot: "bg-foreground", icon: Home },
@@ -110,8 +140,31 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Building Switcher */}
+      {buildings.length > 1 && (
+        <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-card">
+          {buildings.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => handleBuildingChange(b.id)}
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all",
+                activeBuildingId === b.id
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              <Building2 className="h-4 w-4" />
+              <span className="font-mono">{b.code}</span>
+              <span className="hidden sm:inline">{b.display_name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <PageHeader
-        title={locale === "zh" ? "住宿资产" : "Actifs residentiels"}
+        title={activeBuilding ? `${activeBuilding.code} ${activeBuilding.display_name}` : (locale === "zh" ? "住宿资产" : "Actifs residentiels")}
         description={`${summary.apartments} ${locale === "zh" ? "套公寓" : "appartements"} · ${locale === "zh" ? "按楼层、状态和业务筛选房源" : "Filtrer par etage, statut et activite"}`}
       />
 
@@ -154,7 +207,7 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
       </div>
 
       <FilterBar
-        meta={`${filtered.length} / ${units.length} ${locale === "fr" ? "lots" : "套房源"}`}
+        meta={`${filtered.length} / ${buildingUnits.length} ${locale === "fr" ? "lots" : "套房源"}`}
       >
         <UnitFilters
           locale={locale}
@@ -276,7 +329,7 @@ function UnitTableRow({
 }: {
   unit: UnitRow;
   locale: Locale;
-  flags: UnitBusinessFlag[];
+  flags: UnitBusinessFlagRow[];
   managedLease: boolean;
   onOpen: () => void;
   compact?: boolean;
@@ -304,8 +357,8 @@ function UnitTableRow({
   );
 }
 
-function StatusPill({ status, locale, managedLease = false }: { status: UnitStatus; locale: Locale; managedLease?: boolean }) {
-  const label = managedLease ? (locale === "zh" ? "已售代管" : "Vendu gere") : dictionaries[locale].statuses[status];
+function StatusPill({ status, locale, managedLease = false }: { status: string; locale: Locale; managedLease?: boolean }) {
+  const label = managedLease ? (locale === "zh" ? "已售代管" : "Vendu gere") : (dictionaries[locale].statuses as Record<string, string>)[status] ?? status;
   const styles: Record<string, string> = {
     sold: "bg-[#EFE1CA] text-[#17324D] ring-[#D8BF98]/70",
     leased: "bg-[#DDECF7] text-[#17324D] ring-[#AFCBE1]/70",

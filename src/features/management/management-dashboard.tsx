@@ -100,6 +100,10 @@ function shortDate(d: string | null | undefined): string {
 function stateCustomerName(s: UnitState, cmap: Map<string, string>, locale: Locale): string {
   const cid = s.booking?.customer_id ?? s.lease?.customer_id ?? s.sale?.customer_id ?? null;
   if (cid && cmap.has(cid)) return cmap.get(cid)!;
+  // Occupied units without a known customer → "待补充"
+  if (s.status === "leased" || s.status === "sold" || s.status === "dailyOccupied") {
+    return locale === "zh" ? "待补充" : "À compléter";
+  }
   if (s.status === "available") return locale === "zh" ? "空闲" : "Libre";
   if (s.status === "cleaningPending") return locale === "zh" ? "待洁" : "Ménage";
   if (s.status === "maintenance") return locale === "zh" ? "维修" : "Bloqué";

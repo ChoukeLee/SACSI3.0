@@ -14,31 +14,46 @@ export default async function FrenchUnitsPage() {
 
   const supabase = await createClient();
 
+  // Fetch all active buildings
+  const { data: allBuildings, error: bldErr } = await supabase
+    .from("buildings")
+    .select("id, code, display_name")
+    .eq("is_active", true)
+    .order("code");
+
+  if (bldErr) {
+    console.error("Failed to fetch buildings:", bldErr);
+    return <div>Failed to load buildings</div>;
+  }
+
+  const buildingIds = allBuildings?.map((b) => b.id) ?? [];
   let units: UnitRow[] = [];
   let flags: UnitBusinessFlagRow[] = [];
   let managedLeaseUnitIds: string[] = [];
 
-  const [buildingRes, flagsRes] = await Promise.all([
-    supabase.from("buildings").select("id").eq("code", "SACSI11").single(),
+  const [flagsRes] = await Promise.all([
     supabase.from("unit_business_flags").select("unit_id, business_type, is_enabled, default_price_xof"),
   ]);
 
   if (!flagsRes.error) flags = flagsRes.data;
 
-  const buildingId = buildingRes.data?.id;
-  if (buildingId) {
-    const { data: unitsData, error: unitsErr } = await supabase.from("units").select("id, building_id, code, unit_no, floor_label, kind, status, area_sqm, layout, furnishing, notes").eq("building_id", buildingId).order("unit_no");
+  if (buildingIds.length > 0) {
+    const { data: unitsData, error: unitsErr } = await supabase
+      .from("units")
+      .select("id, building_id, code, unit_no, floor_label, kind, status, area_sqm, layout, furnishing, notes")
+      .in("building_id", buildingIds)
+      .order("unit_no");
     if (!unitsErr) units = sortUnits(unitsData as unknown as UnitRow[]);
-  }
 
-  if (buildingId && units.length > 0) {
-    const unitIds = units.map((unit) => unit.id);
-    const { data: activeLeases } = await supabase
-      .from("lease_contracts")
-      .select("unit_id")
-      .eq("status", "active")
-      .in("unit_id", unitIds);
-    managedLeaseUnitIds = Array.from(new Set((activeLeases ?? []).map((lease) => lease.unit_id)));
+    if (units.length > 0) {
+      const unitIds = units.map((unit) => unit.id);
+      const { data: activeLeases } = await supabase
+        .from("lease_contracts")
+        .select("unit_id")
+        .eq("status", "active")
+        .in("unit_id", unitIds);
+      managedLeaseUnitIds = Array.from(new Set((activeLeases ?? []).map((lease) => lease.unit_id)));
+    }
   }
 
   const businessFlagsMap: Record<string, UnitBusinessFlagRow[]> = {};
@@ -48,7 +63,7 @@ export default async function FrenchUnitsPage() {
   }
 
   const auditLogsMap: Record<string, { id: string; action: string; metadata: Record<string, unknown>; created_at: string }[]> = {};
-  if (buildingId && units.length > 0) {
+  if (buildingIds.length > 0 && units.length > 0) {
     const unitIds = units.map((u) => u.id);
     const { data: logs } = await supabase
       .from("audit_logs")
@@ -73,6 +88,6 @@ export default async function FrenchUnitsPage() {
     }
   }
 
-  return <UnitList units={units} businessFlagsMap={businessFlagsMap} managedLeaseUnitIds={managedLeaseUnitIds} auditLogsMap={auditLogsMap} locale="fr" />;
+  return <UnitList units={units} businessFlagsMap={businessFlagsMap} managedLeaseUnitIds={managedLeaseUnitIds} auditLogsMap={auditLogsMap} buildings={allBuildings ?? []} locale="fr" />;
 }
 
