@@ -16,8 +16,19 @@ export default async function SalesPage() {
   const t = dictionaries.zh.sales;
   const supabase = await createClient();
 
-  const { data: building } = await supabase.from("buildings").select("id").eq("code", "SACSI11").single();
-  const buildingId = building?.id;
+  // Fetch all active buildings
+  const { data: allBuildings, error: bldErr } = await supabase
+    .from("buildings")
+    .select("id, code, display_name")
+    .eq("is_active", true)
+    .order("code");
+
+  if (bldErr) {
+    console.error("Failed to fetch buildings:", bldErr);
+    return <div>Failed to load buildings</div>;
+  }
+
+  const buildingIds = allBuildings?.map((b) => b.id) ?? [];
 
   let contracts: SaleContractRow[] = [];
   let schedules: SalePaymentScheduleRow[] = [];
@@ -26,11 +37,11 @@ export default async function SalesPage() {
   let payments: PaymentRow[] = [];
   let receivables: ReceivableRow[] = [];
 
-  if (buildingId) {
+  if (buildingIds.length > 0) {
     const [contractsRes, schedulesRes, unitsRes, customersRes, paymentsRes, receivablesRes] = await Promise.all([
       supabase.from("sale_contracts").select("*").order("signed_date", { ascending: false }).limit(200),
       supabase.from("sale_payment_schedule").select("*").order("installment_no").limit(300),
-      supabase.from("units").select("*").eq("building_id", buildingId).order("unit_no"),
+      supabase.from("units").select("*").in("building_id", buildingIds).order("unit_no"),
       supabase.from("customers").select("*").order("name"),
       supabase.from("payments").select("*").eq("source_type", "sale").order("payment_date", { ascending: false }).limit(200),
       supabase.from("receivables").select("*").eq("source_type", "sale_contract").order("due_date").limit(300),
@@ -50,7 +61,7 @@ export default async function SalesPage() {
       </div>
       <div className="hidden lg:block">
         <section>
-          <SaleList contracts={contracts} schedules={schedules} units={units} customers={customers} payments={payments} receivables={receivables} locale="zh" />
+          <SaleList contracts={contracts} schedules={schedules} units={units} customers={customers} payments={payments} receivables={receivables} buildings={allBuildings ?? []} locale="zh" />
         </section>
       </div>
     </>

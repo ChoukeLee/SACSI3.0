@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, X, DollarSign, FileText, CalendarPlus, TrendingUp, AlertTriangle, Eye } from "lucide-react";
+import { Plus, X, DollarSign, FileText, CalendarPlus, TrendingUp, AlertTriangle, Eye, Building2 } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
@@ -17,10 +17,10 @@ import { controlClass } from "@/components/ui/operational";
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import { createSaleContract, recordSalePayment, addFlexibleInstallment, updateTransferStatus, terminateSaleContract } from "./actions";
 
-interface SaleListProps { contracts: SaleContractRow[]; schedules: SalePaymentScheduleRow[]; units: UnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; locale: Locale }
+interface SaleListProps { contracts: SaleContractRow[]; schedules: SalePaymentScheduleRow[]; units: UnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale }
 type PanelType = "new" | "detail" | null;
 
-export function SaleList({ contracts, schedules, units, customers, payments, receivables, locale }: SaleListProps) {
+export function SaleList({ contracts, schedules, units, customers, payments, receivables, buildings, locale }: SaleListProps) {
   const t = dictionaries[locale].sales;
   const [statusFilter, setStatusFilter] = useState("all");
   const [panel, setPanel] = useState<PanelType>(null);
@@ -37,7 +37,21 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const [termReason, setTermReason] = useState("");
   const [showFlexForm, setShowFlexForm] = useState(false);
 
-  const filtered = useMemo(() => statusFilter==="all"?contracts:contracts.filter(c=>c.status===statusFilter), [contracts,statusFilter]);
+  // Building switcher
+  const [activeBuildingId, setActiveBuildingId] = useState<string>("__all__");
+
+  const unitBuildingMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const u of units) m.set(u.id, u.building_id);
+    return m;
+  }, [units]);
+
+  const filteredByBuilding = useMemo(() => {
+    if (activeBuildingId === "__all__") return contracts;
+    return contracts.filter((c) => unitBuildingMap.get(c.unit_id) === activeBuildingId);
+  }, [contracts, activeBuildingId, unitBuildingMap]);
+
+  const filtered = useMemo(() => statusFilter==="all"?filteredByBuilding:filteredByBuilding.filter(c=>c.status===statusFilter), [filteredByBuilding,statusFilter]);
   const unitMap = useMemo(()=>new Map(units.map(u=>[u.id,u])), [units]);
   const customerMap = useMemo(()=>new Map(customers.map(c=>[c.id,c])), [customers]);
 
@@ -142,6 +156,42 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
           </div>
         ))}
       </div>
+
+      {/* ── Building switcher ── */}
+      {buildings.length > 1 && (
+        <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-card">
+          <button
+            type="button"
+            onClick={() => setActiveBuildingId("__all__")}
+            className={cn(
+              "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all",
+              activeBuildingId === "__all__"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+            )}
+          >
+            <Building2 className="h-4 w-4" />
+            {locale === "zh" ? "全部楼栋" : "Tous"}
+          </button>
+          {buildings.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => setActiveBuildingId(b.id)}
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all",
+                activeBuildingId === b.id
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              <Building2 className="h-4 w-4" />
+              <span className="font-mono">{b.code}</span>
+              <span className="hidden sm:inline">{b.display_name}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── Filter bar ── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-card px-4 py-3 shadow-sm">

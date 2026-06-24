@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, X, AlertTriangle, FileText, DollarSign, LogOut, Printer, RefreshCw, Eye } from "lucide-react";
+import { Plus, X, AlertTriangle, FileText, DollarSign, LogOut, Printer, RefreshCw, Eye, Building2 } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
@@ -32,7 +32,7 @@ type LeaseUnitRow = UnitRow & {
   unit_business_flags?: UnitBusinessFlag[];
 };
 
-interface LeaseListProps { contracts: LeaseContractRow[]; units: LeaseUnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; locale: Locale }
+interface LeaseListProps { contracts: LeaseContractRow[]; units: LeaseUnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale }
 type PanelType = "new" | "detail" | "moveout" | null;
 const paymentCycles = ["monthly", "quarterly", "semiannual", "annual"];
 
@@ -40,7 +40,7 @@ function isManagedLeaseUnit(unit: LeaseUnitRow) {
   return unit.status === "sold" && unit.unit_business_flags?.some((flag) => flag.business_type === "long_lease" && flag.is_enabled);
 }
 
-export function LeaseList({ contracts, units, customers, payments, receivables, locale }: LeaseListProps) {
+export function LeaseList({ contracts, units, customers, payments, receivables, buildings, locale }: LeaseListProps) {
   const router = useRouter();
   const t = dictionaries[locale].leases;
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -57,7 +57,22 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const [moEndDate, setMoEndDate] = useState(new Date().toISOString().slice(0,10)); const [moUnpaid, setMoUnpaid] = useState(0);
   const [moUtility, setMoUtility] = useState(false); const [moDeduction, setMoDeduction] = useState(0); const [moRefund, setMoRefund] = useState(0);
 
-  const filtered = useMemo(() => statusFilter === "all" ? contracts : contracts.filter((c) => c.status === statusFilter), [contracts, statusFilter]);
+  // Building switcher
+  const [activeBuildingId, setActiveBuildingId] = useState<string>("__all__");
+
+  // Build unit -> building_id map
+  const unitBuildingMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const u of units) m.set(u.id, u.building_id);
+    return m;
+  }, [units]);
+
+  const filteredByBuilding = useMemo(() => {
+    if (activeBuildingId === "__all__") return contracts;
+    return contracts.filter((c) => unitBuildingMap.get(c.unit_id) === activeBuildingId);
+  }, [contracts, activeBuildingId, unitBuildingMap]);
+
+  const filtered = useMemo(() => statusFilter === "all" ? filteredByBuilding : filteredByBuilding.filter((c) => c.status === statusFilter), [filteredByBuilding, statusFilter]);
   const unitMap = useMemo(() => new Map(units.map((u) => [u.id, u])), [units]);
   const customerMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
 
@@ -173,6 +188,42 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
           </div>
         ))}
       </div>
+
+      {/* ── Building switcher ── */}
+      {buildings.length > 1 && (
+        <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-card">
+          <button
+            type="button"
+            onClick={() => setActiveBuildingId("__all__")}
+            className={cn(
+              "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all",
+              activeBuildingId === "__all__"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+            )}
+          >
+            <Building2 className="h-4 w-4" />
+            {locale === "zh" ? "全部楼栋" : "Tous"}
+          </button>
+          {buildings.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => setActiveBuildingId(b.id)}
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all",
+                activeBuildingId === b.id
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              <Building2 className="h-4 w-4" />
+              <span className="font-mono">{b.code}</span>
+              <span className="hidden sm:inline">{b.display_name}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── Filter bar + new contract ── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-card px-4 py-3 shadow-sm">
