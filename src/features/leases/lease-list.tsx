@@ -40,6 +40,15 @@ function isManagedLeaseUnit(unit: LeaseUnitRow) {
   return unit.status === "sold" && unit.unit_business_flags?.some((flag) => flag.business_type === "long_lease" && flag.is_enabled);
 }
 
+function isLegacyLeasePlaceholder(contract: LeaseContractRow, customer?: CustomerRow | null) {
+  return contract.contract_no.startsWith("LEGACY-LEASE-")
+    || Number(contract.monthly_rent_xof) <= 0
+    || Number(contract.deposit_amount_xof) <= 0
+    || contract.expected_end_date >= "2099-01-01"
+    || customer?.name.includes("资料待补")
+    || customer?.notes?.includes("legacy_placeholder=true");
+}
+
 export function LeaseList({ contracts, units, customers, payments, receivables, buildings, locale }: LeaseListProps) {
   const router = useRouter();
   const t = dictionaries[locale].leases;
@@ -263,6 +272,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 const isLongTerm = contract.expected_end_date >= "2099-01-01";
                 const rent = Number(contract.monthly_rent_xof);
                 const isManaged = unit ? isManagedLeaseUnit(unit) : false;
+                const isPlaceholder = isLegacyLeasePlaceholder(contract, customer);
                 return (
                   <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status={isManaged ? "managed" : "leased"}
                     onClick={() => openDetail(contract.id)}
@@ -274,6 +284,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                       </p>
                       <div className="flex h-5 items-center gap-1.5">
                         {isManaged && <Badge variant="success" className="h-5 bg-white/70 px-2 text-[10px] text-[#217365]">{locale === "zh" ? "代管" : "Gestion"}</Badge>}
+                        {isPlaceholder && <Badge variant="warning" className="h-5 px-2 text-[10px]">{locale === "zh" ? "资料待补" : "A compléter"}</Badge>}
                         <Badge variant={statusVariant[contract.status]} className="h-5 px-2 text-[10px]">{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
                       </div>
                     </div>

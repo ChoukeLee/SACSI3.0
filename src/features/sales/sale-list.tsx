@@ -98,6 +98,13 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const transText = (s:string)=>locale==="zh"?{not_started:"未开始",in_progress:"办理中",completed:"已完成"}[s]??s:{not_started:"Non debute",in_progress:"En cours",completed:"Termine"}[s]??s;
 
   const sellableUnits = useMemo(()=>units.filter(u=>(u.kind==="apartment"||u.kind==="parking")&&(u.status==="available"||u.status==="sold")),[units]);
+  const isLegacySalePlaceholder = (contract: SaleContractRow, customer?: CustomerRow | null) => (
+    contract.contract_no.startsWith("LEGACY-SALE-")
+    || contract.payment_plan_type === "legacy_pending"
+    || Number(contract.total_amount_xof) <= 0
+    || customer?.name.includes("资料待补")
+    || customer?.notes?.includes("legacy_placeholder=true")
+  );
 
 // ── Card helpers ──
 function SaleInfo({ label, value, good, warn, danger }: { label: string; value: string; good?: boolean; warn?: boolean; danger?: boolean }) {
@@ -216,17 +223,20 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
             </>}
           >
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-              {fc.map(contract=>{const unit=unitMap.get(contract.unit_id);const customer=customerMap.get(contract.customer_id);const s=getContractSummary(contract.id);const isRisk=s.overdue>0||(contract.status==="active"&&contract.transfer_status!=="completed");return(<RoomCard key={contract.id} roomNo={unit?.unit_no??"-"} status="sold" statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]} onClick={()=>openDetail(contract.id)} className={isRisk?"border-amber-200 shadow-[0_10px_24px_rgba(180,120,24,0.14)]":""}>
+              {fc.map(contract=>{const unit=unitMap.get(contract.unit_id);const customer=customerMap.get(contract.customer_id);const s=getContractSummary(contract.id);const isRisk=s.overdue>0||(contract.status==="active"&&contract.transfer_status!=="completed");const isPlaceholder=isLegacySalePlaceholder(contract,customer);return(<RoomCard key={contract.id} roomNo={unit?.unit_no??"-"} status="sold" statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]} onClick={()=>openDetail(contract.id)} className={isRisk?"border-amber-200 shadow-[0_10px_24px_rgba(180,120,24,0.14)]":""}>
                 {/* Name + status badge */}
                 <div className="flex items-start justify-between gap-1.5">
                   <p className="text-[13px] font-medium leading-tight truncate" title={customer?.name??""}>{customer?.name??"-"}</p>
-                  <Badge variant={statusVariant[contract.status]} className="shrink-0 text-[10px]">{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {isPlaceholder && <Badge variant="warning" className="text-[10px]">{locale==="zh"?"资料待补":"A compléter"}</Badge>}
+                    <Badge variant={statusVariant[contract.status]} className="text-[10px]">{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
+                  </div>
                 </div>
                 {/* Compact info row */}
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#5D7186]">
                   <span title={contract.contract_no} className="truncate max-w-[90px]">{contract.contract_no}</span>
                   <span>·</span>
-                  <span className="tabular-nums">{formatXof(Number(contract.total_amount_xof))}</span>
+                  <span className="tabular-nums">{Number(contract.total_amount_xof)>0?formatXof(Number(contract.total_amount_xof)):(locale==="zh"?"金额待补":"Montant à compléter")}</span>
                   {s.outstanding>0 && <span className="text-amber-600 font-medium">{formatXof(s.outstanding)} {locale==="zh"?"待收":"dû"}</span>}
                 </div>
                 {/* Transfer status + action buttons */}
