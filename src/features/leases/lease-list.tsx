@@ -67,7 +67,9 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const [moUtility, setMoUtility] = useState(false); const [moDeduction, setMoDeduction] = useState(0); const [moRefund, setMoRefund] = useState(0);
 
   // Building switcher
-  const [activeBuildingId, setActiveBuildingId] = useState<string>("__all__");
+  const [activeBuildingId, setActiveBuildingId] = useState<string>(() => (
+    buildings.find((building) => building.code === "SACSI11")?.id ?? buildings[0]?.id ?? ""
+  ));
 
   // Build unit -> building_id map
   const unitBuildingMap = useMemo(() => {
@@ -77,7 +79,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   }, [units]);
 
   const filteredByBuilding = useMemo(() => {
-    if (activeBuildingId === "__all__") return contracts;
+    if (!activeBuildingId) return contracts;
     return contracts.filter((c) => unitBuildingMap.get(c.unit_id) === activeBuildingId);
   }, [contracts, activeBuildingId, unitBuildingMap]);
 
@@ -88,7 +90,16 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const groupedContracts = useMemo(() => {
     const grouped = new Map<string, LeaseContractRow[]>();
     for (const contract of filtered) { const unit = unitMap.get(contract.unit_id); const floor = normalizeFloorLabel(unit?.floor_label ?? null, unit?.unit_no ?? ""); if (!grouped.has(floor)) grouped.set(floor, []); grouped.get(floor)!.push(contract); }
-    return Array.from(grouped.entries()).sort((a, b) => floorSortValue(a[0]) - floorSortValue(b[0]));
+    return Array.from(grouped.entries())
+      .map(([floor, floorContracts]) => [
+        floor,
+        [...floorContracts].sort((a, b) => {
+          const aUnit = unitMap.get(a.unit_id)?.unit_no ?? "";
+          const bUnit = unitMap.get(b.unit_id)?.unit_no ?? "";
+          return aUnit.localeCompare(bUnit, undefined, { numeric: true });
+        }),
+      ] as [string, LeaseContractRow[]])
+      .sort((a, b) => floorSortValue(a[0]) - floorSortValue(b[0]));
   }, [filtered, unitMap]);
 
   const getContractReceivableSummary = (contractId: string) => {
@@ -201,19 +212,6 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       {/* ── Building switcher ── */}
       {buildings.length > 1 && (
         <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-card">
-          <button
-            type="button"
-            onClick={() => setActiveBuildingId("__all__")}
-            className={cn(
-              "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all",
-              activeBuildingId === "__all__"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-accent hover:text-foreground"
-            )}
-          >
-            <Building2 className="h-4 w-4" />
-            {locale === "zh" ? "全部楼栋" : "Tous"}
-          </button>
           {buildings.map((b) => (
             <button
               key={b.id}
@@ -242,7 +240,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
               {s==="all"?(locale==="fr"?"Tous":"全部"):t.contractStatus[s as keyof typeof t.contractStatus]}
             </button>
           ))}
-          <span className="pl-1 text-xs text-muted-foreground">{filtered.length}/{contracts.length} {locale==="fr"?"contrats":"份合同"}</span>
+          <span className="pl-1 text-xs text-muted-foreground">{filtered.length}/{filteredByBuilding.length} {locale==="fr"?"contrats":"份合同"}</span>
         </div>
         <Button size="sm" onClick={openNew}><Plus className="h-4 w-4"/>{t.form.newContract}</Button>
       </div>

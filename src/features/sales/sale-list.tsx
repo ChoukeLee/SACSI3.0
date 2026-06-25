@@ -38,7 +38,9 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const [showFlexForm, setShowFlexForm] = useState(false);
 
   // Building switcher
-  const [activeBuildingId, setActiveBuildingId] = useState<string>("__all__");
+  const [activeBuildingId, setActiveBuildingId] = useState<string>(() => (
+    buildings.find((building) => building.code === "SACSI11")?.id ?? buildings[0]?.id ?? ""
+  ));
 
   const unitBuildingMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -47,7 +49,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   }, [units]);
 
   const filteredByBuilding = useMemo(() => {
-    if (activeBuildingId === "__all__") return contracts;
+    if (!activeBuildingId) return contracts;
     return contracts.filter((c) => unitBuildingMap.get(c.unit_id) === activeBuildingId);
   }, [contracts, activeBuildingId, unitBuildingMap]);
 
@@ -58,7 +60,16 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const groupedContracts = useMemo(() => {
     const g=new Map<string,SaleContractRow[]>();
     for(const c of filtered){const unit=unitMap.get(c.unit_id);const floor=normalizeFloorLabel(unit?.floor_label??null,unit?.unit_no??"");if(!g.has(floor))g.set(floor,[]);g.get(floor)!.push(c);}
-    return Array.from(g.entries()).sort((a,b)=>floorSortValue(a[0])-floorSortValue(b[0]));
+    return Array.from(g.entries())
+      .map(([floor, floorContracts]) => [
+        floor,
+        [...floorContracts].sort((a,b)=>{
+          const aUnit=unitMap.get(a.unit_id)?.unit_no??"";
+          const bUnit=unitMap.get(b.unit_id)?.unit_no??"";
+          return aUnit.localeCompare(bUnit, undefined, { numeric: true });
+        }),
+      ] as [string, SaleContractRow[]])
+      .sort((a,b)=>floorSortValue(a[0])-floorSortValue(b[0]));
   }, [filtered,unitMap]);
 
   const selected = selectedId?contracts.find(c=>c.id===selectedId):null;
@@ -167,19 +178,6 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
       {/* ── Building switcher ── */}
       {buildings.length > 1 && (
         <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-card">
-          <button
-            type="button"
-            onClick={() => setActiveBuildingId("__all__")}
-            className={cn(
-              "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all",
-              activeBuildingId === "__all__"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-accent hover:text-foreground"
-            )}
-          >
-            <Building2 className="h-4 w-4" />
-            {locale === "zh" ? "全部楼栋" : "Tous"}
-          </button>
           {buildings.map((b) => (
             <button
               key={b.id}
@@ -204,7 +202,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-card px-4 py-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           {["all","draft","active","terminated","expired"].map(s=>(<button key={s} onClick={()=>setStatusFilter(s)} className={cn(controlClass, "text-xs font-medium", statusFilter===s?"bg-primary text-primary-foreground shadow-sm":"text-muted-foreground hover:bg-accent")}>{s==="all"?(locale==="fr"?"Tous":"全部"):t.contractStatus[s as keyof typeof t.contractStatus]}</button>))}
-          <span className="pl-1 text-xs text-muted-foreground">{filtered.length}/{contracts.length} {locale==="fr"?"contrats":"份合同"}</span>
+          <span className="pl-1 text-xs text-muted-foreground">{filtered.length}/{filteredByBuilding.length} {locale==="fr"?"contrats":"份合同"}</span>
         </div>
         <Button size="sm" onClick={openNew}><Plus className="h-4 w-4"/>{t.form.newContract}</Button>
       </div>
