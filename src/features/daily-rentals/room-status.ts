@@ -173,7 +173,9 @@ export function buildBookingMap(
     const checkOut: string = resolveCalendarCheckOut(b, options);
     const start = toUtcDate(b.check_in);
     const end = toUtcDate(checkOut);
-    if (b.checkout_mode === "fixed") end.setUTCDate(end.getUTCDate() + 1);
+    if (b.checkout_mode === "fixed" && b.status !== "checked_out") {
+      end.setUTCDate(end.getUTCDate() + 1);
+    }
 
     const cursor = new Date(start);
     while (cursor < end) {

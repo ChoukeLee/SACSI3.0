@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getDailyRoomStateForDate } from "../src/features/daily-rentals/room-status";
+import { buildBookingMap, getDailyRoomStateForDate } from "../src/features/daily-rentals/room-status";
 import type { UnitRow, DailyBookingRow } from "../src/types/database";
 
 function unit(overrides: Partial<UnitRow> = {}): UnitRow {
@@ -155,5 +155,29 @@ describe("getDailyRoomStateForDate", () => {
       });
       expect(result.status).toBe("available");
     });
+  });
+});
+
+describe("buildBookingMap", () => {
+  it("does not reserve the checkout date for a fixed checked_out booking", () => {
+    const map = buildBookingMap(
+      [booking({ check_in: "2026-06-24", check_out: "2026-06-25", status: "checked_out" })],
+      { todayStr: "2026-06-25", tomorrowStr: "2026-06-26" },
+    );
+
+    const roomMap = map.get("u1");
+    expect(roomMap?.get("2026-06-24")?.status).toBe("checked_out");
+    expect(roomMap?.has("2026-06-25")).toBe(false);
+  });
+
+  it("still shows the checkout date for a fixed checked_in booking", () => {
+    const map = buildBookingMap(
+      [booking({ check_in: "2026-06-24", check_out: "2026-06-25", status: "checked_in" })],
+      { todayStr: "2026-06-25", tomorrowStr: "2026-06-26" },
+    );
+
+    const roomMap = map.get("u1");
+    expect(roomMap?.get("2026-06-24")?.status).toBe("checked_in");
+    expect(roomMap?.get("2026-06-25")?.status).toBe("checked_in");
   });
 });
