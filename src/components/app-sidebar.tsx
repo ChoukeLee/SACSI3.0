@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpDown, Banknote, BarChart3, Bell, Building2, CalendarDays, FileSignature, FileText, Layers, LayoutDashboard, Settings, Shield, ShieldCheck, Target, Users } from "lucide-react";
+import { ArrowUpDown, Banknote, BarChart3, Bell, Bot, Building2, CalendarDays, FileSignature, FileText, Layers, LayoutDashboard, Settings, Shield, ShieldCheck, Target, Users } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Logo } from "@/components/logo";
 import type { Locale } from "@/lib/i18n";
@@ -12,7 +12,7 @@ import { useNavigationTransition } from "@/components/navigation-transition-prov
 import { usePrefetch } from "@/components/navigation-prefetch";
 import type { UserRole } from "@/lib/auth";
 
-type NavKey = "management" | "units" | "dailyRentals" | "leases" | "sales" | "customers" | "finance" | "reports" | "todos" | "documents" | "dataQuality" | "auditLogs" | "dataExchange" | "bulkActions" | "targets" | "settings" | "security";
+type NavKey = "management" | "units" | "dailyRentals" | "leases" | "sales" | "customers" | "finance" | "reports" | "assistant" | "todos" | "documents" | "dataQuality" | "auditLogs" | "dataExchange" | "bulkActions" | "targets" | "settings" | "security";
 
 interface NavItem { key: NavKey; href: string; icon: typeof LayoutDashboard; activeMatch?: string }
 interface NavGroup { key: string; labelKey: string; items: NavItem[]; roles: UserRole[] }
@@ -33,6 +33,7 @@ const groups: NavGroup[] = [
     { key: "reports", href: "/reports", icon: BarChart3 },
   ]},
   { key: "operations", labelKey: "operations", roles: ["admin","boss","finance","front_desk"], items: [
+    { key: "assistant", href: "/assistant", icon: Bot },
     { key: "todos", href: "/todos", icon: Bell },
     { key: "documents", href: "/documents", icon: FileText },
     { key: "dataQuality", href: "/data-quality", icon: ShieldCheck },
@@ -51,7 +52,7 @@ const BOSS_HIDDEN = new Set<NavKey>(["bulkActions"]);
 const FINANCE_GROUPS = new Set(["home","business","financeCenter","operations","systemTools"]);
 const FINANCE_HIDDEN = new Set<NavKey>(["management","dailyRentals","bulkActions","security","targets","dataQuality","settings","leases","sales"]);
 const FRONT_GROUPS = new Set(["home","business","operations"]);
-const FRONT_KEYS = new Set<NavKey>(["management","units","dailyRentals","customers","todos","documents"]);
+const FRONT_KEYS = new Set<NavKey>(["management","units","dailyRentals","customers","assistant","todos","documents"]);
 
 function filter(role?: UserRole): NavGroup[] {
   if (!role || role === "admin") return groups;
