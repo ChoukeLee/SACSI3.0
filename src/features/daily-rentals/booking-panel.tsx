@@ -93,6 +93,14 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   }, [booking?.id]);
 
   const selectedUnit = unitId ? units.find((u) => u.id === unitId) : null;
+  const dailySelectableCustomers = useMemo(
+    () => customers.filter((customer) =>
+      !customer.is_blacklisted &&
+      !customer.has_active_lease_contract &&
+      !customer.has_active_sale_contract
+    ),
+    [customers],
+  );
   const bookingPayments = useMemo(() => payments.filter(p => p.source_id === booking?.id), [payments, booking]);
   const totalPaid = bookingPayments.reduce((s, p) => s + Number(p.amount), 0);
 
@@ -275,7 +283,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
               <label className={labelClass}>{t.booking.customer}</label>
               <select value={newCustomerId} onChange={e => setNewCustomerId(e.target.value)} className={inputClass}>
                 <option value="">{t.booking.noCustomer}</option>
-                {customers.filter(c => !c.is_blacklisted).map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ""}</option>)}
+                {dailySelectableCustomers.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ""}</option>)}
               </select>
             </div>
             <div>
@@ -339,7 +347,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                 <label className={labelClass}>{t.booking.customer}</label>
                 <select value={bfCustomerId} onChange={e => setBfCustomerId(e.target.value)} className={inputClass}>
                   <option value="">{t.booking.noCustomer}</option>
-                  {customers.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ""}</option>)}
+                  {dailySelectableCustomers.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ""}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
