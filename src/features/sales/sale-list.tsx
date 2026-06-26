@@ -181,6 +181,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
           value={activeBuildingId}
           onChange={setActiveBuildingId}
           ariaLabel={locale === "zh" ? "楼栋切换" : "Selection du batiment"}
+          className="self-start"
           items={buildings.map((b) => ({
             value: b.id,
             label: b.display_name || b.code,

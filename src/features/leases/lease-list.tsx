@@ -217,6 +217,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
           value={activeBuildingId}
           onChange={setActiveBuildingId}
           ariaLabel={locale === "zh" ? "楼栋切换" : "Selection du batiment"}
+          className="self-start"
           items={buildings.map((b) => ({
             value: b.id,
             label: b.display_name || b.code,

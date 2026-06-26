@@ -146,6 +146,7 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
           value={activeBuildingId ?? ""}
           onChange={handleBuildingChange}
           ariaLabel={locale === "zh" ? "楼栋切换" : "Selection du batiment"}
+          className="self-start"
           items={buildings.map((b) => ({
             value: b.id,
             label: b.display_name || b.code,
