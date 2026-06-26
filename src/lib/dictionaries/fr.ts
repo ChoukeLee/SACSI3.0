@@ -185,7 +185,7 @@
         confirmCheckIn: "Confirmer l'arrivee",
         confirmCheckOut: "Confirmer le depart",
         calculatedTotal: "Montant total calcule",
-        prepaidWarning: "Une avance est exigee, pas de paiement apres depart",
+        prepaidWarning: "Peut rester vide ou 0 ; le solde restera a encaisser",
         customerName: "Nom du client"
       },
       checkoutModeLabel: "Mode d'entree",

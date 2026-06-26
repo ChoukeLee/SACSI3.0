@@ -62,13 +62,13 @@ Transition functions: `allowConfirmBooking`, `allowCheckIn`, `allowCheckOut`, `a
 - **No open cleaning tasks** on the unit (even cross-booking).
 - **No other checked_in booking** on the unit.
 - Unit not `maintenance`, `locked`, `sold`, `leased`.
-- Fixed checkout: `prepaidAmount > 0`.
+- Payment is optional at check-in; unpaid balances remain in finance as receivables.
 
 ### Server Action (`checkIn`)
 1. Fetches unit status, open cleaning tasks, other checked_in bookings.
 2. Calls `allowCheckIn` with all checks.
-3. Inserts payment + ledger entry if prepaid.
-4. Calls `syncBookingFinance` to align all financial records.
+3. Inserts payment + ledger entry if prepaid amount is greater than 0.
+4. Calls `syncBookingFinance` after payment changes; zero-payment check-in keeps the existing receivable unpaid.
 
 ---
 

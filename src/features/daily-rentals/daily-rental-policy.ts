@@ -225,7 +225,7 @@ export interface CheckInPolicyInput {
 }
 
 export function allowCheckIn(input: CheckInPolicyInput): PolicyResult {
-  const { booking, prepaidAmount, hasOpenCleaningTask, otherCheckedInCount, unitStatus } = input;
+  const { booking, hasOpenCleaningTask, otherCheckedInCount, unitStatus } = input;
 
   if (booking.status !== "confirmed") return { allowed: false, reason: "bookingNotConfirmed" };
 
@@ -245,9 +245,6 @@ export function allowCheckIn(input: CheckInPolicyInput): PolicyResult {
     return { allowed: false, reason: "unitAlreadyOccupied" };
   }
 
-  if (booking.checkout_mode !== "open" && prepaidAmount <= 0) {
-    return { allowed: false, reason: "prepaymentRequired" };
-  }
   return { allowed: true };
 }
 

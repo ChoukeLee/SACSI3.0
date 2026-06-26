@@ -175,7 +175,6 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
 
   const handleCheckIn = async () => {
     const prepay = toN(prepaidAmount);
-    if (booking?.checkout_mode !== "open" && prepay <= 0) { setActionError(t.booking.prepaidWarning); return; }
     setSaving(true); const result = await checkIn(booking!.id, prepay);
     setSaving(false); if (!result.success) setActionError(formatError(result.error)); else { refresh(); onClose(); }
   };
@@ -501,7 +500,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
               {/* ── confirmed (no cleaning block) → primary = check_in ── */}
               {primaryAction?.action === "check_in" && (
                 <div className="space-y-2">
-                  <div><label className={labelClass}>{t.booking.prepaidAmount}{booking.checkout_mode !== "open" ? " *" : ""}</label><input type="number" value={prepaidAmount} onChange={e => setPrepaidAmount(e.target.value)} className={inputClass} /><p className="mt-0.5 text-xs text-muted-foreground/70">{t.booking.prepaidWarning}</p></div>
+                  <div><label className={labelClass}>{t.booking.prepaidAmount}</label><input type="number" value={prepaidAmount} onChange={e => setPrepaidAmount(e.target.value)} className={inputClass} /><p className="mt-0.5 text-xs text-muted-foreground/70">{t.booking.prepaidWarning}</p></div>
                   <Button variant="default" onClick={handleCheckIn} disabled={saving} className="w-full">{t.booking.checkIn}</Button>
                   <Button variant="outline" size="sm" onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(formatError(r.error)); }); }} disabled={saving} className="w-full justify-center text-accentRed-600 hover:bg-accentRed-50 hover:text-accentRed-700"><UserX className="h-3.5 w-3.5 mr-1" />{t.booking.cancelBooking}</Button>
                 </div>
@@ -806,8 +805,8 @@ function formatDailyRentalError(message: string | null | undefined, locale: Loca
       fr: "Cette chambre a deja un contrat de vente actif.",
     },
     prepaymentRequired: {
-      zh: "固定离店订单办理入住前必须至少收取一笔预付款。",
-      fr: "Une avance est requise avant l'arrivee pour un depart fixe.",
+      zh: "当前订单暂不能办理入住，请检查房态、保洁和订单状态。",
+      fr: "Cette reservation ne peut pas encore etre enregistree ; verifiez l'etat de la chambre et du dossier.",
     },
     bookingNotPendingReview: {
       zh: "只有待确认预订可以执行确认操作。",

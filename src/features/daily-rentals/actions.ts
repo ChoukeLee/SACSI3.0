@@ -320,7 +320,7 @@ export async function confirmBooking(bookingId: string): Promise<{ success: bool
   return { success: true };
 }
 
-// ── Check-in (open-ended bookings can check in without prepayment) ──
+// ── Check-in (payment is optional; finance state tracks unpaid balance) ──
 export async function checkIn(bookingId: string, prepaidAmount: number): Promise<{ success: boolean; error?: string }> {
   await guardWrite();
   const supabase = await createClient();
