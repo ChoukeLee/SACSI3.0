@@ -13,6 +13,44 @@ export type DailyPrimaryAction =
   | "view_settlement"
   | "readonly";
 
+export type DailyLodgingBusinessType =
+  | "upcoming_unpaid"
+  | "upcoming_paid"
+  | "fixed_checkout_unpaid"
+  | "fixed_checkout_paid"
+  | "open_checkout_unpaid"
+  | "open_checkout_paid"
+  | "checked_out_unpaid"
+  | "checked_out_paid"
+  | "cancelled";
+
+export interface DailyLodgingBusinessTypeInput {
+  status: DailyBookingStatus;
+  checkoutMode?: "fixed" | "open" | null;
+  paidAmount: number;
+  finalAmount: number;
+}
+
+export function getDailyLodgingBusinessType(input: DailyLodgingBusinessTypeInput): DailyLodgingBusinessType {
+  const isPaid = input.paidAmount >= input.finalAmount;
+
+  if (input.status === "cancelled") return "cancelled";
+
+  if (input.status === "checked_out") {
+    return isPaid ? "checked_out_paid" : "checked_out_unpaid";
+  }
+
+  if (input.status === "pending_review" || input.status === "confirmed") {
+    return isPaid ? "upcoming_paid" : "upcoming_unpaid";
+  }
+
+  if ((input.checkoutMode ?? "fixed") === "open") {
+    return isPaid ? "open_checkout_paid" : "open_checkout_unpaid";
+  }
+
+  return isPaid ? "fixed_checkout_paid" : "fixed_checkout_unpaid";
+}
+
 export interface GetPrimaryActionInput {
   bookingStatus?: DailyBookingStatus | null;
   roomDisplayStatus?: DailyRoomDisplayStatus;

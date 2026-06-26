@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { X, Check, UserX, Printer, DollarSign, Percent, Trash2, MoreHorizontal } from "lucide-react";
+import { X, Check, UserX, Printer, DollarSign, Percent, Trash2, MoreHorizontal, WalletCards, CalendarClock } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { CustomerSummary } from "./calendar";
 import { printDailyReceipt } from "@/features/print";
 import { calculateBilling } from "./billing";
-import { getPrimaryDailyAction } from "./daily-rental-policy";
+import { getDailyLodgingBusinessType, getPrimaryDailyAction, type DailyLodgingBusinessType } from "./daily-rental-policy";
 import {
   createBooking, createBackfillBooking, confirmBooking, checkIn, checkOut, completeCleaning, extendStay, cancelBooking,
   recordSupplementaryPayment, applyDiscount, deletePayment, setFixedCheckout,
@@ -111,6 +111,18 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
     ? relatedCleaningTask
     : unitCleaningTask;
   const billing = booking ? calculateBilling(booking) : null;
+  const finalDue = billing?.finalAmount ?? 0;
+  const outstanding = Math.max(0, finalDue - totalPaid);
+  const lodgingBusinessType = booking && billing
+    ? getDailyLodgingBusinessType({
+        status: booking.status as "pending_review" | "confirmed" | "checked_in" | "checked_out" | "cancelled",
+        checkoutMode: booking.checkout_mode,
+        paidAmount: totalPaid,
+        finalAmount: billing.finalAmount,
+      })
+    : null;
+  const lodgingBusinessLabel = lodgingBusinessType ? getLodgingBusinessTypeLabel(lodgingBusinessType, locale) : null;
+  const lodgingBusinessToneClass = lodgingBusinessType ? getLodgingBusinessTypeClass(lodgingBusinessType) : "";
   const primaryAction = booking
     ? getPrimaryDailyAction({
         bookingStatus: booking.status as "pending_review" | "confirmed" | "checked_in" | "checked_out" | "cancelled",
@@ -345,22 +357,52 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
 
           {/* Booking Detail */}
           {booking && !isBackfill && (<>
-            <div className="flex items-start justify-between">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 bg-accentAmber-50 text-accentAmber-700 ring-amber-200">{t.bookingStatus[booking.status as keyof typeof t.bookingStatus] ?? booking.status}</span>
-                <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", booking.checkout_mode === "open" ? "bg-accentAmber-50 text-accentAmber-700" : "bg-muted text-foreground/70")}>{booking.checkout_mode === "open" ? t.openEndedBadge : t.fixedBadge}</span>
+            <section className="rounded-xl border border-border bg-card p-4 shadow-xs">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-muted-foreground">{selectedUnit?.unit_no ?? booking.unit_id.slice(0, 8)}</p>
+                  <p className="mt-1 truncate text-base font-semibold text-foreground">{bookingCustomer?.name ?? booking.customer_id.slice(0, 8)}</p>
+                  {bookingCustomer?.phone && <p className="mt-0.5 text-xs text-muted-foreground">{bookingCustomer.phone}</p>}
+                </div>
+                <Button size="icon" variant="ghost" onClick={() => printDailyReceipt({ booking, unit: selectedUnit ?? null, customer: null }, locale)} aria-label={dictionaries[locale].settings.print.print} className="h-8 w-8 shrink-0">
+                  <Printer className="h-4 w-4" />
+                </Button>
               </div>
-              <Button size="icon" variant="ghost" onClick={() => printDailyReceipt({ booking, unit: selectedUnit ?? null, customer: null }, locale)} aria-label={dictionaries[locale].settings.print.print}>
-                <Printer className="h-4 w-4" />
-              </Button>
-            </div>
 
-            <div className="text-right text-sm"><p className="font-semibold text-foreground">{bookingCustomer?.name ?? booking.customer_id.slice(0, 8)}</p>{bookingCustomer?.phone && <p className="text-xs text-muted-foreground/70">{bookingCustomer.phone}</p>}</div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {lodgingBusinessLabel && (
+                  <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold", lodgingBusinessToneClass)}>
+                    <CalendarClock className="h-3.5 w-3.5" />
+                    {lodgingBusinessLabel}
+                  </span>
+                )}
+                <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-semibold text-foreground/75">
+                  {t.bookingStatus[booking.status as keyof typeof t.bookingStatus] ?? booking.status}
+                </span>
+                <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", booking.checkout_mode === "open" ? "border-accentAmber-200 bg-accentAmber-50 text-accentAmber-700" : "border-border bg-muted text-foreground/70")}>
+                  {booking.checkout_mode === "open" ? t.openEndedBadge : t.fixedBadge}
+                </span>
+              </div>
 
-            <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted p-3 text-sm">
-              <div><p className="text-xs text-muted-foreground/70">{t.booking.checkInDate}</p><p className="font-semibold text-foreground">{booking.check_in}</p></div>
-              <div><p className="text-xs text-muted-foreground/70">{booking.checkout_mode === "open" ? t.actualCheckOutDate : t.booking.checkOutDate}</p><p className="font-semibold text-foreground">{booking.checkout_mode === "open" ? (booking.actual_check_out ?? "—") : booking.check_out}</p></div>
-            </div>
+              <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-lg bg-muted px-3 py-2">
+                  <p className="text-xs text-muted-foreground">{t.booking.checkInDate}</p>
+                  <p className="mt-0.5 font-semibold text-foreground">{booking.check_in}</p>
+                </div>
+                <div className="rounded-lg bg-muted px-3 py-2">
+                  <p className="text-xs text-muted-foreground">{booking.checkout_mode === "open" ? t.actualCheckOutDate : t.booking.checkOutDate}</p>
+                  <p className="mt-0.5 font-semibold text-foreground">{booking.checkout_mode === "open" ? (booking.actual_check_out ?? "—") : booking.check_out}</p>
+                </div>
+              </div>
+
+              <div className={cn("mt-3 flex items-center justify-between rounded-lg border px-3 py-2 text-sm", outstanding > 0 ? "border-accentRed-200 bg-accentRed-50 text-accentRed-700" : "border-accentGreen-200 bg-accentGreen-50 text-accentGreen-700")}>
+                <span className="inline-flex items-center gap-1.5 font-semibold">
+                  <WalletCards className="h-4 w-4" />
+                  {outstanding > 0 ? t.billing.outstanding : t.billing.paid}
+                </span>
+                <span className="tabular-nums font-semibold">{outstanding > 0 ? formatXof(outstanding) : formatXof(totalPaid)}</span>
+              </div>
+            </section>
 
             <div className="space-y-1.5 text-sm">
               <div className="flex justify-between"><span className="text-foreground/70">{t.booking.nightlyPrice}</span><span>{formatXof(Number(booking.nightly_price_xof))}</span></div>
@@ -371,12 +413,12 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                   {billing.discount > 0 && <div className="flex justify-between text-accentGreen-600"><span>{t.billing.discount}</span><span>-{formatXof(billing.discount)}</span></div>}
                   <div className="flex justify-between border-t border-border pt-1 font-semibold"><span>{t.billing.finalAmount}</span><span>{formatXof(billing.finalAmount)}</span></div>
                   <div className="flex justify-between"><span className="text-foreground/70">{t.billing.paid}</span><span>{formatXof(totalPaid)}</span></div>
-                  {billing.outstanding > 0 && <div className="flex justify-between text-accentRed-600 font-semibold"><span>{t.billing.outstanding}</span><span>{formatXof(billing.outstanding)}</span></div>}
+                  {outstanding > 0 && <div className="flex justify-between text-accentRed-600 font-semibold"><span>{t.billing.outstanding}</span><span>{formatXof(outstanding)}</span></div>}
                 </>
               )}
             </div>
 
-            {billing?.eligibleForMonthlyDiscount && billing.outstanding > 0 && (
+            {billing?.eligibleForMonthlyDiscount && outstanding > 0 && (
               <div className="rounded-lg border border-amber-200 bg-accentAmber-50 p-3 text-xs text-accentAmber-700">
                 <Percent className="inline h-3.5 w-3.5 mr-1" />
                 {t.monthlyDiscountHint.replace("{nights}", String(billing.nights)).replace("{gross}", formatXof(billing.grossAmount))}
@@ -394,11 +436,19 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
               </div>
             )}
 
-            {/* ════════════════════════════════════════════════════════════
-                 Actions driven by getPrimaryDailyAction.
-                 Each status block: primary button first, then secondary / folds.
-                 ════════════════════════════════════════════════════════════ */}
-            <div className="space-y-2">
+            <section className="space-y-3 rounded-xl border border-border bg-muted/35 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{locale === "zh" ? "当前操作" : "Action actuelle"}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{locale === "zh" ? "系统按住宿类型和订单状态给出下一步" : "Action proposee selon le sejour et le statut"}</p>
+                </div>
+                {primaryAction && (
+                  <span className="shrink-0 rounded-full bg-card px-2.5 py-1 text-xs font-semibold text-muted-foreground ring-1 ring-border">
+                    {getPrimaryActionLabel(primaryAction.action, locale)}
+                  </span>
+                )}
+              </div>
+              <div className="space-y-2">
 
               {/* ── pending_review → primary = confirm ── */}
               {primaryAction?.action === "confirm" && (
@@ -460,15 +510,16 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                   >
                     <MoreHorizontal className="h-4 w-4 mr-1" />
                     {showAdvancedActions
-                      ? (locale === "zh" ? "收起辅助操作" : "Masquer")
-                      : (locale === "zh" ? "辅助操作" : "Plus d'actions")}
+                      ? (locale === "zh" ? "收起更多业务" : "Masquer")
+                      : (locale === "zh" ? "更多业务操作" : "Plus d'actions")}
                   </Button>
 
                   {showAdvancedActions && (
-                    <div className="space-y-3 rounded-lg border border-dashed border-muted-foreground/20 p-3">
+                    <div className="space-y-4 rounded-lg border border-dashed border-muted-foreground/25 bg-card p-3">
 
                       {/* Supplementary payment */}
-                      <div>
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-muted-foreground">{locale === "zh" ? "收款" : "Paiement"}</p>
                         <label className={labelClass}>{t.supplementaryPayment}</label>
                         <div className="flex items-center gap-2">
                           <input type="number" value={suppAmount} onChange={e => setSuppAmount(e.target.value)} className={inputClass} placeholder={t.booking.totalAmount} />
@@ -492,7 +543,8 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                       </div>
 
                       {/* Discount */}
-                      <div>
+                      <div className="space-y-2 border-t border-border pt-3">
+                        <p className="text-xs font-semibold text-muted-foreground">{locale === "zh" ? "金额调整" : "Ajustement"}</p>
                         <label className={labelClass}>{t.discount}</label>
                         <div className="grid grid-cols-2 gap-2">
                           <input type="number" value={discountAmount} onChange={e => setDiscountAmount(e.target.value)} className={inputClass} placeholder={t.discountAmount} />
@@ -503,7 +555,8 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
 
                       {/* Extend stay (fixed mode only) */}
                       {booking.checkout_mode === "fixed" && (
-                        <div>
+                        <div className="space-y-2 border-t border-border pt-3">
+                          <p className="text-xs font-semibold text-muted-foreground">{locale === "zh" ? "住宿安排" : "Sejour"}</p>
                           <label className={labelClass}>{t.booking.extendStay}</label>
                           <div className="flex items-center gap-2">
                             <input type="number" min={1} value={extendDays} onChange={e => setExtendDays(e.target.value)} className="h-9 w-16 rounded-lg border border-border px-2 text-sm shadow-sm transition-colors duration-fast hover:border-ring/30 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20" />
@@ -515,7 +568,8 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
 
                       {/* Set fixed checkout (open mode only) */}
                       {booking.checkout_mode === "open" && (
-                        <div>
+                        <div className="space-y-2 border-t border-border pt-3">
+                          <p className="text-xs font-semibold text-muted-foreground">{locale === "zh" ? "住宿安排" : "Sejour"}</p>
                           <p className="text-xs font-semibold text-accentBlue-700 mb-1">{t.setFixedCheckout}</p>
                           <p className="text-xs text-muted-foreground mb-2">{t.setFixedCheckoutDesc}</p>
                           <div className="flex items-center gap-2">
@@ -562,7 +616,8 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                       : (locale === "zh" ? "此房间当前不可操作" : "Aucune action disponible")}
                 </div>
               )}
-            </div>
+              </div>
+            </section>
             {actionError && <p className="text-sm text-accentRed-600" role="alert">{actionError}</p>}
           </>)}
         </div>
@@ -596,6 +651,49 @@ function addDays(dateStr: string, days: number): string {
   const date = new Date(`${dateStr}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+function getLodgingBusinessTypeLabel(type: DailyLodgingBusinessType, locale: Locale): string {
+  const labels: Record<DailyLodgingBusinessType, Record<Locale, string>> = {
+    upcoming_unpaid: { zh: "预订未入住未付款", fr: "Reservation non payee" },
+    upcoming_paid: { zh: "预订未入住已付款", fr: "Reservation payee" },
+    fixed_checkout_unpaid: { zh: "固定离店未付款", fr: "Depart fixe non paye" },
+    fixed_checkout_paid: { zh: "固定离店已付款", fr: "Depart fixe paye" },
+    open_checkout_unpaid: { zh: "未固定离店未付款", fr: "Depart ouvert non paye" },
+    open_checkout_paid: { zh: "未固定离店已付款", fr: "Depart ouvert paye" },
+    checked_out_unpaid: { zh: "已离店未付款", fr: "Depart effectue non paye" },
+    checked_out_paid: { zh: "已离店已付款", fr: "Depart effectue paye" },
+    cancelled: { zh: "已取消", fr: "Annule" },
+  };
+
+  return labels[type][locale];
+}
+
+function getLodgingBusinessTypeClass(type: DailyLodgingBusinessType): string {
+  if (type === "upcoming_paid" || type === "fixed_checkout_paid" || type === "open_checkout_paid" || type === "checked_out_paid") {
+    return "border-accentGreen-200 bg-accentGreen-50 text-accentGreen-700";
+  }
+  if (type === "checked_out_unpaid") {
+    return "border-accentRed-200 bg-accentRed-50 text-accentRed-700";
+  }
+  if (type === "cancelled") {
+    return "border-border bg-muted text-muted-foreground";
+  }
+  return "border-accentAmber-200 bg-accentAmber-50 text-accentAmber-700";
+}
+
+function getPrimaryActionLabel(action: ReturnType<typeof getPrimaryDailyAction>["action"], locale: Locale): string {
+  const labels: Record<ReturnType<typeof getPrimaryDailyAction>["action"], Record<Locale, string>> = {
+    create_booking: { zh: "创建订单", fr: "Creer" },
+    confirm: { zh: "确认预订", fr: "Confirmer" },
+    check_in: { zh: "办理入住", fr: "Arrivee" },
+    check_out: { zh: "办理退房", fr: "Depart" },
+    complete_cleaning: { zh: "完成保洁", fr: "Menage" },
+    view_settlement: { zh: "查看结算", fr: "Solde" },
+    readonly: { zh: "只读", fr: "Lecture seule" },
+  };
+
+  return labels[action][locale];
 }
 
 function formatDailyRentalError(message: string | null | undefined, locale: Locale): string {
