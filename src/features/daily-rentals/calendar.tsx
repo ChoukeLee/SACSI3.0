@@ -473,7 +473,7 @@ export function DailyCalendar({
             value={viewMode}
             onChange={setMode}
             ariaLabel={locale === "zh" ? "日历视图" : "Vue calendrier"}
-            className="h-9 rounded-lg"
+            className="h-9 self-start rounded-lg"
             items={[
               { value: "day", label: copy.day },
               { value: "week", label: copy.week },
