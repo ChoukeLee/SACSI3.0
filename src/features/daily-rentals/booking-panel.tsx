@@ -55,6 +55,8 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
 
   const [prepaidAmount, setPrepaidAmount] = useState("");
   const [suppAmount, setSuppAmount] = useState("");
+  const [suppPaymentDate, setSuppPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [suppReceiptNo, setSuppReceiptNo] = useState("");
   const [finalAmount, setFinalAmount] = useState("");
   const [actualCheckOut, setActualCheckOut] = useState(new Date().toISOString().slice(0, 10));
   const [discountAmount, setDiscountAmount] = useState("");
@@ -127,8 +129,17 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
     ? getPrimaryDailyAction({
         bookingStatus: booking.status as "pending_review" | "confirmed" | "checked_in" | "checked_out" | "cancelled",
         hasOpenCleaningTask: Boolean(effectiveCleaningTask),
+        hasOutstandingBalance: outstanding > 0,
       })
     : null;
+
+  useEffect(() => {
+    if (booking?.status === "checked_out" && outstanding > 0) {
+      setSuppAmount(String(outstanding));
+      setSuppPaymentDate(new Date().toISOString().slice(0, 10));
+      setSuppReceiptNo("");
+    }
+  }, [booking?.id, booking?.status, outstanding]);
 
   const toN = (s: string) => parseInt(s, 10) || 0;
 
@@ -177,7 +188,12 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   const handleSuppPayment = async () => {
     const amt = toN(suppAmount);
     if (amt <= 0) return;
-    setSaving(true); const result = await recordSupplementaryPayment({ bookingId: booking!.id, amount: amt });
+    setSaving(true); const result = await recordSupplementaryPayment({
+      bookingId: booking!.id,
+      amount: amt,
+      paymentDate: suppPaymentDate || undefined,
+      receiptNo: suppReceiptNo || undefined,
+    });
     setSaving(false); if (result.success) { refresh(); setSuppAmount(""); } else setActionError(formatError(result.error));
   };
 
@@ -525,6 +541,10 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                           <input type="number" value={suppAmount} onChange={e => setSuppAmount(e.target.value)} className={inputClass} placeholder={t.booking.totalAmount} />
                           <Button variant="secondary" size="sm" onClick={handleSuppPayment} disabled={saving || (parseInt(suppAmount,10)||0) <= 0} className="shrink-0"><DollarSign className="h-3 w-3" />{locale === "zh" ? "收" : "+"}</Button>
                         </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <DateInput value={suppPaymentDate} onChangeValue={setSuppPaymentDate} className={inputClass} />
+                          <input type="text" value={suppReceiptNo} onChange={e => setSuppReceiptNo(e.target.value)} className={inputClass} placeholder={locale === "zh" ? "收据号/备注" : "Recu / note"} />
+                        </div>
                         {bookingPayments.length > 0 && (
                           <ul className="mt-1.5 space-y-0.5 text-xs text-foreground/70">
                             {bookingPayments.map(p => (
@@ -584,6 +604,38 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
 
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* ── checked_out + unpaid → primary = collect_balance ── */}
+              {primaryAction?.action === "collect_balance" && (
+                <div className="space-y-3 rounded-lg border border-accentRed-200 bg-accentRed-50 p-3">
+                  <div>
+                    <p className="text-sm font-semibold text-accentRed-700">{locale === "zh" ? "补录离店未付款" : "Encaisser le solde"}</p>
+                    <p className="mt-0.5 text-xs text-accentRed-700/80">
+                      {locale === "zh"
+                        ? `当前仍欠 ${formatXof(outstanding)}，补录后会同步财务、流水和审计日志。`
+                        : `Solde restant ${formatXof(outstanding)}. Le paiement mettra a jour finance, ledger et audit.`}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelClass}>{t.supplementaryPayment}</label>
+                      <input type="number" value={suppAmount} onChange={e => setSuppAmount(e.target.value)} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>{locale === "zh" ? "收款日期" : "Date paiement"}</label>
+                      <DateInput value={suppPaymentDate} onChangeValue={setSuppPaymentDate} className={inputClass} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelClass}>{locale === "zh" ? "收据号/备注" : "Recu / note"}</label>
+                    <input type="text" value={suppReceiptNo} onChange={e => setSuppReceiptNo(e.target.value)} className={inputClass} placeholder={locale === "zh" ? "可选" : "Optionnel"} />
+                  </div>
+                  <Button variant="default" onClick={handleSuppPayment} disabled={saving || (parseInt(suppAmount, 10) || 0) <= 0} className="w-full">
+                    <DollarSign className="h-4 w-4" />
+                    {locale === "zh" ? "确认补录收款" : "Confirmer le paiement"}
+                  </Button>
                 </div>
               )}
 
@@ -688,6 +740,7 @@ function getPrimaryActionLabel(action: ReturnType<typeof getPrimaryDailyAction>[
     confirm: { zh: "确认预订", fr: "Confirmer" },
     check_in: { zh: "办理入住", fr: "Arrivee" },
     check_out: { zh: "办理退房", fr: "Depart" },
+    collect_balance: { zh: "补录收款", fr: "Encaisser" },
     complete_cleaning: { zh: "完成保洁", fr: "Menage" },
     view_settlement: { zh: "查看结算", fr: "Solde" },
     readonly: { zh: "只读", fr: "Lecture seule" },

@@ -9,6 +9,7 @@ export type DailyPrimaryAction =
   | "confirm"
   | "check_in"
   | "check_out"
+  | "collect_balance"
   | "complete_cleaning"
   | "view_settlement"
   | "readonly";
@@ -55,6 +56,7 @@ export interface GetPrimaryActionInput {
   bookingStatus?: DailyBookingStatus | null;
   roomDisplayStatus?: DailyRoomDisplayStatus;
   hasOpenCleaningTask?: boolean;
+  hasOutstandingBalance?: boolean;
   isPastDate?: boolean;
   unitStatus?: UnitStatus | null;
 }
@@ -63,7 +65,7 @@ export function getPrimaryDailyAction(input: GetPrimaryActionInput): {
   action: DailyPrimaryAction; allowed: boolean; reason?: string;
 } {
   const {
-    bookingStatus, roomDisplayStatus, hasOpenCleaningTask,
+    bookingStatus, roomDisplayStatus, hasOpenCleaningTask, hasOutstandingBalance,
     isPastDate, unitStatus,
   } = input;
 
@@ -115,6 +117,9 @@ export function getPrimaryDailyAction(input: GetPrimaryActionInput): {
       return { action: "check_out", allowed: true };
 
     case "checked_out":
+      if (hasOutstandingBalance) {
+        return { action: "collect_balance", allowed: true };
+      }
       if (hasOpenCleaningTask) {
         return { action: "complete_cleaning", allowed: true };
       }

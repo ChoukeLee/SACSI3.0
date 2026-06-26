@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { ReactNode } from "react";
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, History, Plus, Printer, SlidersHorizontal, X } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Plus, Printer, SlidersHorizontal, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { cn, formatXof, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
 import { COPY, BOOKING_STATUS_LABELS } from "./calendar-constants";
@@ -57,7 +57,6 @@ export function DailyCalendar({
   cleaningTasks,
   payments,
   locale,
-  userRole,
 }: CalendarProps) {
   const copy = COPY[locale];
   const bookingLabels = BOOKING_STATUS_LABELS[locale];
@@ -67,7 +66,6 @@ export function DailyCalendar({
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [newBookingUnitId, setNewBookingUnitId] = useState<string | null>(null);
   const [newBookingDate, setNewBookingDate] = useState<string | null>(null);
-  const [backfillOpen, setBackfillOpen] = useState(false);
   const [tick, setTick] = useState(0);
   const [optimisticBookings, setOptimisticBookings] = useState<DailyBookingRow[]>([]);
   const [optimisticCompletedCleaningIds, setOptimisticCompletedCleaningIds] = useState<Set<string>>(() => new Set());
@@ -429,12 +427,6 @@ export function DailyCalendar({
               <Printer className="h-3.5 w-3.5" />
               {locale === "zh" ? "打印" : "Imprimer"}
             </Button>
-            {userRole === "admin" && (
-              <Button variant="ghost" size="sm" onClick={() => { setBackfillOpen(true); setSelectedBookingId(null); setNewBookingUnitId(null); }} className={TOOLBAR_ITEM}>
-                <History className="h-3.5 w-3.5" />
-                {locale === "zh" ? "历史补录" : "Backfill"}
-              </Button>
-            )}
           </div>
         </div>
         <div className="grid gap-3 bg-card px-4 py-3 md:grid-cols-2 xl:grid-cols-4">
@@ -639,7 +631,7 @@ export function DailyCalendar({
         </div>
       </section>
 
-      {(panelBooking || newBookingUnitId || backfillOpen) && (
+      {(panelBooking || newBookingUnitId) && (
         <BookingPanel
           key={tick}
           booking={panelBooking}
@@ -650,12 +642,10 @@ export function DailyCalendar({
           cleaningTasks={visibleCleaningTasks}
           payments={payments}
           locale={locale}
-          backfillMode={backfillOpen}
           onClose={() => {
             setSelectedBookingId(null);
             setNewBookingUnitId(null);
             setNewBookingDate(null);
-            setBackfillOpen(false);
             setOptimisticBookings([]);
           }}
           onChanged={() => { setTick((t) => t + 1); setOptimisticBookings([]); }}

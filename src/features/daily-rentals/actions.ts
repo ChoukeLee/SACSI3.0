@@ -385,7 +385,7 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
   return { success: true };
 }
 
-// ── Supplementary payment (for open-ended bookings) ──
+// ── Supplementary payment (for in-house or checked-out daily bookings) ──
 export async function recordSupplementaryPayment(input: {
   bookingId: string; amount: number; paymentDate?: string; receiptNo?: string;
 }): Promise<{ success: boolean; error?: string }> {
@@ -394,8 +394,8 @@ export async function recordSupplementaryPayment(input: {
   const supabase = await createClient();
 
   const { data: booking } = await supabase.from("daily_bookings")
-    .select("*").eq("id", input.bookingId).eq("status", "checked_in").single();
-  if (!booking) return { success: false, error: "Booking not found or not checked in." };
+    .select("*").eq("id", input.bookingId).in("status", ["checked_in", "checked_out"]).single();
+  if (!booking) return { success: false, error: "Booking not found or not payable." };
 
   const { data: unit } = await supabase.from("units").select("building_id, unit_no").eq("id", booking.unit_id).single();
   const { data: payment } = await supabase.from("payments").insert({
@@ -417,7 +417,7 @@ export async function recordSupplementaryPayment(input: {
 
   await writeAuditLog({
     action: "supplementary_payment", entityType: "daily_booking", entityId: input.bookingId,
-    metadata: { amount: input.amount },
+    metadata: { amount: input.amount, payment_date: input.paymentDate ?? null, receipt_no: input.receiptNo ?? null },
   });
 
   await syncBookingFinance(supabase, input.bookingId);
