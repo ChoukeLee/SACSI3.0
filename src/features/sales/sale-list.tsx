@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, X, DollarSign, FileText, CalendarPlus, TrendingUp, AlertTriangle, Eye, Building2 } from "lucide-react";
+import { Plus, X, DollarSign, FileText, CalendarPlus, TrendingUp, AlertTriangle, Eye } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
@@ -13,7 +13,7 @@ import { DateInput } from "@/components/ui/date-input";
 import { RoomCard } from "@/components/room-card";
 import { RoomBoard } from "@/components/room-board";
 import { EmptyState } from "@/components/empty-state";
-import { controlClass } from "@/components/ui/operational";
+import { SegmentedControl, controlClass } from "@/components/ui/operational";
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import { createSaleContract, recordSalePayment, addFlexibleInstallment, updateTransferStatus, terminateSaleContract } from "./actions";
 
@@ -177,25 +177,15 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
 
       {/* ── Building switcher ── */}
       {buildings.length > 1 && (
-        <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-card">
-          {buildings.map((b) => (
-            <button
-              key={b.id}
-              type="button"
-              onClick={() => setActiveBuildingId(b.id)}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all",
-                activeBuildingId === b.id
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              )}
-            >
-              <Building2 className="h-4 w-4" />
-              <span className="font-mono">{b.code}</span>
-              <span className="hidden sm:inline">{b.display_name}</span>
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          value={activeBuildingId}
+          onChange={setActiveBuildingId}
+          ariaLabel={locale === "zh" ? "楼栋切换" : "Selection du batiment"}
+          items={buildings.map((b) => ({
+            value: b.id,
+            label: b.display_name || b.code,
+          }))}
+        />
       )}
 
       {/* ── Filter bar ── */}

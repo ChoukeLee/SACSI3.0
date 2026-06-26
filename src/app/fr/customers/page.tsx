@@ -2,6 +2,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { CustomerList } from "@/features/customers";
+import type { CustomerBuildingSummary } from "@/features/customers";
 import type { CustomerRow } from "@/types/database";
 
 
@@ -14,7 +15,7 @@ export default async function FrenchCustomersPage() {
 
   const [customersRes, unitsRes, leaseRes, saleRes, dailyRes] = await Promise.all([
     supabase.from("customers").select("*").order("name"),
-    supabase.from("units").select("id, unit_no"),
+    supabase.from("units").select("id, unit_no, buildings(id, code, display_name)"),
     supabase.from("lease_contracts").select("customer_id, unit_id, start_date").limit(2000),
     supabase.from("sale_contracts").select("customer_id, unit_id, signed_date").limit(2000),
     supabase.from("daily_bookings").select("customer_id, unit_id, check_in").limit(2000),
@@ -28,17 +29,36 @@ export default async function FrenchCustomersPage() {
     dailyCustomerIds: [...new Set((dailyRes.data ?? []).map((row) => row.customer_id).filter(Boolean))],
   };
 
-  // Build unit_no lookup
-  const unitMap = new Map<string, string>();
-  for (const u of (unitsRes.data ?? [])) unitMap.set(u.id, u.unit_no);
+  // Build unit lookup with building ownership.
+  const unitMap = new Map<string, { unitNo: string; building: CustomerBuildingSummary | null }>();
+  const buildingMap = new Map<string, CustomerBuildingSummary>();
+  for (const u of (unitsRes.data ?? [])) {
+    const rawBuilding = Array.isArray(u.buildings) ? u.buildings[0] : u.buildings;
+    const building = rawBuilding
+      ? {
+          id: rawBuilding.id,
+          code: rawBuilding.code,
+          label: rawBuilding.display_name || rawBuilding.code,
+        }
+      : null;
+    if (building) buildingMap.set(building.id, building);
+    unitMap.set(u.id, { unitNo: u.unit_no, building });
+  }
 
   // Customer â†’ room numbers
   const customerRooms: Record<string, string[]> = {};
+  const customerBuildings: Record<string, CustomerBuildingSummary[]> = {};
   const addRoom = (customerId: string, unitId: string) => {
-    const unitNo = unitMap.get(unitId);
-    if (!unitNo || !customerId) return;
+    const unit = unitMap.get(unitId);
+    if (!unit || !customerId) return;
     if (!customerRooms[customerId]) customerRooms[customerId] = [];
-    if (!customerRooms[customerId].includes(unitNo)) customerRooms[customerId].push(unitNo);
+    if (!customerRooms[customerId].includes(unit.unitNo)) customerRooms[customerId].push(unit.unitNo);
+    if (unit.building) {
+      if (!customerBuildings[customerId]) customerBuildings[customerId] = [];
+      if (!customerBuildings[customerId].some((building) => building.id === unit.building!.id)) {
+        customerBuildings[customerId].push(unit.building);
+      }
+    }
   };
   for (const r of (leaseRes.data ?? [])) addRoom(r.customer_id, r.unit_id);
   for (const r of (saleRes.data ?? [])) addRoom(r.customer_id, r.unit_id);
@@ -61,6 +81,8 @@ export default async function FrenchCustomersPage() {
       customers={(customersRes.data as CustomerRow[]) ?? []}
       customerSegments={customerSegments}
       customerRooms={customerRooms}
+      customerBuildings={customerBuildings}
+      buildingOptions={[...buildingMap.values()].sort((a, b) => a.code.localeCompare(b.code))}
       customerLastActivity={customerLastActivity}
       locale="fr"
     />

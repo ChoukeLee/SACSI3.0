@@ -19,6 +19,12 @@ import {
   removeCustomerBlacklist,
 } from "./actions";
 
+export interface CustomerBuildingSummary {
+  id: string;
+  code: string;
+  label: string;
+}
+
 interface CustomerListProps {
   customers: CustomerRow[];
   customerSegments?: {
@@ -27,6 +33,8 @@ interface CustomerListProps {
     dailyCustomerIds: string[];
   };
   customerRooms?: Record<string, string[]>;
+  customerBuildings?: Record<string, CustomerBuildingSummary[]>;
+  buildingOptions?: CustomerBuildingSummary[];
   customerLastActivity?: Record<string, string>;
   locale: Locale;
 }
@@ -35,9 +43,10 @@ type FormMode = { type: "add" } | { type: "edit"; customer: CustomerRow } | null
 type CustomerSegment = "all" | "lease" | "sale" | "daily" | "blacklisted";
 type CustomerGroup = "lease" | "sale" | "daily" | "uncategorized" | "blacklisted";
 
-export function CustomerList({ customers, customerSegments, customerRooms, customerLastActivity, locale }: CustomerListProps) {
+export function CustomerList({ customers, customerSegments, customerRooms, customerBuildings, buildingOptions, customerLastActivity, locale }: CustomerListProps) {
   const [search, setSearch] = useState("");
   const [segment, setSegment] = useState<CustomerSegment>("all");
+  const [buildingFilter, setBuildingFilter] = useState("__all__");
   const [formMode, setFormMode] = useState<FormMode>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [blacklistPanelId, setBlacklistPanelId] = useState<string | null>(null);
@@ -84,6 +93,11 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
     return rooms[0] ?? "";
   };
 
+  const primaryBuilding = (customerId: string) => {
+    const buildings = customerBuildings?.[customerId] ?? [];
+    return buildings[0] ?? null;
+  };
+
   // Group-first, then by room number, recent activity and name.
   const sorted = useMemo(() => {
     const activity = customerLastActivity ?? {};
@@ -95,6 +109,9 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       blacklisted: 4,
     };
     return [...customers].sort((a, b) => {
+      const aBuilding = primaryBuilding(a.id)?.label ?? "";
+      const bBuilding = primaryBuilding(b.id)?.label ?? "";
+      if (aBuilding !== bBuilding) return aBuilding.localeCompare(bBuilding);
       const groupOrder = groupRank[customerGroup(a)] - groupRank[customerGroup(b)];
       if (groupOrder !== 0) return groupOrder;
       const aRoom = primaryRoom(a.id);
@@ -108,9 +125,9 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       if (aAct !== bAct) return bAct.localeCompare(aAct);
       return a.name.localeCompare(b.name);
     });
-  }, [customers, segmentSets, customerRooms, customerLastActivity]);
+  }, [customers, segmentSets, customerRooms, customerBuildings, customerLastActivity]);
 
-  const filtered = useMemo(() => {
+  const filteredBase = useMemo(() => {
     const s = search.toLowerCase().trim();
     const rooms = customerRooms ?? {};
     return sorted.filter((c) => {
@@ -130,8 +147,16 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
     });
   }, [sorted, search, segment, segmentSets, customerRooms]);
 
+  const filtered = useMemo(() => {
+    if (buildingFilter === "__all__") return filteredBase;
+    return filteredBase.filter((customer) =>
+      (customerBuildings?.[customer.id] ?? []).some((building) => building.id === buildingFilter)
+    );
+  }, [filteredBase, customerBuildings, buildingFilter]);
+
   const selected = selectedId ? customers.find((c) => c.id === selectedId) : null;
   const selectedRooms = selected ? [...((customerRooms ?? {})[selected.id] ?? [])].sort(compareUnitNo) : [];
+  const selectedBuildings = selected ? (customerBuildings?.[selected.id] ?? []) : [];
 
   const customerTypeLabel = (c: CustomerRow) => {
     if (c.is_blacklisted) return locale === "zh" ? "黑名单" : "Liste noire";
@@ -243,6 +268,8 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
     saleTag: locale === "zh" ? "购房" : "Achat",
     dailyTag: locale === "zh" ? "日租" : "Jour",
     rooms: locale === "zh" ? "关联房源" : "Chambres",
+    allBuildings: locale === "zh" ? "全部楼栋" : "Tous batiments",
+    noBuilding: locale === "zh" ? "未关联楼栋" : "Sans batiment",
     stableFirst: locale === "zh" ? "稳定客户优先" : "Stables en premier",
   };
 
@@ -262,13 +289,51 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
     { key: "blacklisted", label: t.blacklisted, dot: "bg-accentRed-500" },
   ];
 
-  const visibleGroups = groupDefinitions
-    .filter((group) => segment === "all" || group.key === segment)
-    .map((group) => ({
-      ...group,
-      customers: filtered.filter((customer) => customerGroup(customer) === group.key),
+  const buildingTabs = [
+    { value: "__all__", label: t.allBuildings, count: filteredBase.length },
+    ...(buildingOptions ?? []).map((building) => ({
+      value: building.id,
+      label: building.label,
+      count: filteredBase.filter((customer) =>
+        (customerBuildings?.[customer.id] ?? []).some((item) => item.id === building.id)
+      ).length,
+    })),
+  ];
+
+  const activeBuildingGroups = buildingFilter === "__all__"
+    ? [
+        ...(buildingOptions ?? []).map((building) => ({
+          building,
+          customers: filtered.filter((customer) =>
+            (customerBuildings?.[customer.id] ?? []).some((item) => item.id === building.id)
+          ),
+        })),
+        {
+          building: null,
+          customers: filtered.filter((customer) => (customerBuildings?.[customer.id] ?? []).length === 0),
+        },
+      ]
+    : [
+        {
+          building: (buildingOptions ?? []).find((building) => building.id === buildingFilter) ?? null,
+          customers: filtered.filter((customer) =>
+            (customerBuildings?.[customer.id] ?? []).some((item) => item.id === buildingFilter)
+          ),
+        },
+      ];
+
+  const visibleBuildingGroups = activeBuildingGroups
+    .map((buildingGroup) => ({
+      ...buildingGroup,
+      businessGroups: groupDefinitions
+        .filter((group) => segment === "all" || group.key === segment)
+        .map((group) => ({
+          ...group,
+          customers: buildingGroup.customers.filter((customer) => customerGroup(customer) === group.key),
+        }))
+        .filter((group) => group.customers.length > 0),
     }))
-    .filter((group) => group.customers.length > 0);
+    .filter((buildingGroup) => buildingGroup.businessGroups.length > 0);
 
   const renderCustomerCard = (c: CustomerRow) => {
     const isSelected = selectedId === c.id;
@@ -277,6 +342,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
     const hasDaily = segmentSets.daily.has(c.id);
     const isStable = hasLease || hasSale;
     const rooms = [...((customerRooms ?? {})[c.id] ?? [])].sort(compareUnitNo);
+    const buildings = customerBuildings?.[c.id] ?? [];
 
     return (
       <button
@@ -318,6 +384,11 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
           )}
         </div>
         <div className="flex flex-wrap items-center gap-1">
+          {buildings.map((building) => (
+            <span key={building.id} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-foreground/70">
+              {building.label}
+            </span>
+          ))}
           {hasLease && <span className="rounded bg-[#DDECF7] px-1.5 py-0.5 text-[10px] font-medium text-[#2E6F9A]"><Home className="mr-0.5 inline h-3 w-3" />{t.leaseTag}</span>}
           {hasSale && <span className="rounded bg-[#EFE1CA] px-1.5 py-0.5 text-[10px] font-medium text-[#7B5A2B]"><CreditCard className="mr-0.5 inline h-3 w-3" />{t.saleTag}</span>}
           {hasDaily && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700"><BedDouble className="mr-0.5 inline h-3 w-3" />{t.dailyTag}</span>}
@@ -376,6 +447,14 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
               { value: "blacklisted", label: t.blacklistTab, count: stats.blacklisted },
             ]}
           />
+          {buildingTabs.length > 1 && (
+            <SegmentedControl
+              value={buildingFilter}
+              onChange={setBuildingFilter}
+              ariaLabel={locale === "zh" ? "楼栋分类" : "Batiment"}
+              items={buildingTabs}
+            />
+          )}
           <span className="pl-1 text-xs text-muted-foreground">
             {t.filtered(filtered.length, customers.length)}
             <span className="ml-2 text-[10px] opacity-60">{t.stableFirst}</span>
@@ -396,23 +475,34 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
         <EmptyState title={t.empty} action={<Button size="sm" onClick={openAdd}><Plus className="h-4 w-4" />{t.add}</Button>} />
       ) : (
         <div className="space-y-5">
-          {visibleGroups.map((group) => (
-            <section key={group.key} className="space-y-2">
-              <div className="flex items-center justify-between border-b border-border/70 pb-2">
+          {visibleBuildingGroups.map((buildingGroup) => (
+            <section key={buildingGroup.building?.id ?? "__no_building__"} className="space-y-3">
+              <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2">
                 <div className="flex items-center gap-2">
-                  <span className={cn("h-2.5 w-2.5 rounded-full", group.dot)} />
-                  <h2 className="text-sm font-medium">{group.label}</h2>
+                  <Home className="h-4 w-4 text-muted-foreground" />
+                  <h2 className="text-sm font-semibold">{buildingGroup.building?.label ?? t.noBuilding}</h2>
                   <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
-                    {group.customers.length}
+                    {buildingGroup.customers.length}
                   </span>
                 </div>
                 <span className="text-[11px] text-muted-foreground">
-                  {locale === "zh" ? "按房号、最近业务、姓名排序" : "Tri par chambre, activité, nom"}
+                  {locale === "zh" ? "按业务类型、房号、最近业务排序" : "Tri par type, chambre, activite"}
                 </span>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {group.customers.map(renderCustomerCard)}
-              </div>
+              {buildingGroup.businessGroups.map((group) => (
+                <div key={`${buildingGroup.building?.id ?? "__no_building__"}-${group.key}`} className="space-y-2">
+                  <div className="flex items-center gap-2 border-b border-border/70 pb-2">
+                    <span className={cn("h-2.5 w-2.5 rounded-full", group.dot)} />
+                    <h3 className="text-sm font-medium">{group.label}</h3>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
+                      {group.customers.length}
+                    </span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {group.customers.map(renderCustomerCard)}
+                  </div>
+                </div>
+              ))}
             </section>
           ))}
         </div>
@@ -441,6 +531,11 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
               {selected.notes && <p className="text-xs text-muted-foreground">{selected.notes}</p>}
               {selectedRooms.length > 0 && (
                 <p className="text-xs text-muted-foreground">{t.rooms}: {selectedRooms.join(", ")}</p>
+              )}
+              {selectedBuildings.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {locale === "zh" ? "所属楼栋" : "Batiment"}: {selectedBuildings.map((building) => building.label).join(", ")}
+                </p>
               )}
               {selected.is_blacklisted && (
                 <div className="mt-2 rounded border border-red-200 bg-red-50 p-2.5 text-xs">

@@ -7,7 +7,7 @@ import { dictionaries } from "@/lib/i18n";
 import { cn, formatXof, sortUnits } from "@/lib/utils";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
-import { FilterBar } from "@/components/ui/operational";
+import { FilterBar, SegmentedControl } from "@/components/ui/operational";
 import { PageHeader } from "@/components/page-header";
 import { UnitDetailPanel } from "./unit-detail-panel";
 import { UnitFilters } from "./unit-filters";
@@ -142,25 +142,15 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
     <div className="flex flex-col gap-6">
       {/* Building Switcher */}
       {buildings.length > 1 && (
-        <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-card">
-          {buildings.map((b) => (
-            <button
-              key={b.id}
-              type="button"
-              onClick={() => handleBuildingChange(b.id)}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all",
-                activeBuildingId === b.id
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              )}
-            >
-              <Building2 className="h-4 w-4" />
-              <span className="font-mono">{b.code}</span>
-              <span className="hidden sm:inline">{b.display_name}</span>
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          value={activeBuildingId ?? ""}
+          onChange={handleBuildingChange}
+          ariaLabel={locale === "zh" ? "楼栋切换" : "Selection du batiment"}
+          items={buildings.map((b) => ({
+            value: b.id,
+            label: b.display_name || b.code,
+          }))}
+        />
       )}
 
       <PageHeader
