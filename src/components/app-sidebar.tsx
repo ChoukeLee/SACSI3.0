@@ -89,7 +89,7 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
               priority
             />
           </span>
-          <span className="text-[15px] font-semibold italic leading-none text-sidebar-foreground whitespace-nowrap -mt-[1px]">{labels.brand}</span>
+          <span className="translate-y-[1px] text-[17px] font-semibold italic leading-none text-sidebar-foreground whitespace-nowrap">{labels.brand}</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
