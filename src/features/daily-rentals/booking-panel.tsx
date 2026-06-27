@@ -323,7 +323,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
               <div><label className={labelClass}>{t.booking.nightlyPrice}</label><input type="number" value={newNightlyPrice} onChange={e => setNewNightlyPrice(e.target.value)} className={inputClass} /></div>
               <div><label className={labelClass}>{t.booking.totalAmount}</label><p className="mt-2 text-sm font-semibold text-foreground">{newCheckoutMode === "fixed" ? `${newNights} ${t.booking.nights} = ${formatXof(newTotal)}` : `${t.booking.nights}×${newNightlyPrice.toLocaleString()} ${locale === "zh" ? "起" : "min"}`}</p></div>
             </div>
-            <div><label className={labelClass}>{t.booking.notes}</label><textarea value={newNotes} onChange={e => setNewNotes(e.target.value)} rows={2} className={inputClass} /></div>
+            <div><label className={labelClass}>{t.booking.notes}</label><textarea value={newNotes} onChange={e => setNewNotes(e.target.value)} rows={2} className={cn(inputClass, "resize-none overflow-y-auto")} /></div>
             {error && <p className="text-sm text-accentRed-600" role="alert">{error}</p>}
             <Button onClick={handleCreate} disabled={saving} className="w-full" variant="default">
               {saving ? "..." : t.booking.newBooking}
@@ -373,7 +373,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
               </div>
               <div>
                 <label className={labelClass}>{t.booking.notes}</label>
-                <textarea value={bfNotes} onChange={e => setBfNotes(e.target.value)} rows={2} className={inputClass} />
+                <textarea value={bfNotes} onChange={e => setBfNotes(e.target.value)} rows={2} className={cn(inputClass, "resize-none overflow-y-auto")} />
               </div>
               {bfError && <p className="text-sm text-accentRed-600" role="alert">{bfError}</p>}
               <Button onClick={handleBackfillCreate} disabled={saving} className="w-full" variant="default">

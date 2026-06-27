@@ -402,7 +402,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
                   </select>
                 </div>
               </div>
-              <div><label className={labelClass}>{t.entry.description}</label><textarea value={eDesc} onChange={(e) => setEDesc(e.target.value)} rows={3} className={inputClass} /></div>
+              <div><label className={labelClass}>{t.entry.description}</label><textarea value={eDesc} onChange={(e) => setEDesc(e.target.value)} rows={3} className={cn(inputClass, "resize-none overflow-y-auto")} /></div>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button onClick={handleSave} disabled={saving} className="w-full">{saving ? "..." : t.entry.save}</Button>
             </div>

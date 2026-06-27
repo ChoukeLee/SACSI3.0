@@ -166,7 +166,7 @@ export function ReceiptUpload({ locale, onClose }: Props) {
           <button type="button" onClick={() => setShowManualInput(!showManualInput)} className="text-[11px] text-muted-foreground underline">
             {showManualInput ? (zh ? "收起" : "Masquer") : (zh ? "或手动粘贴收据文字" : "Ou collez le texte du reçu")}
           </button>
-          {showManualInput && <textarea value={manualText} onChange={(e) => setManualText(e.target.value)} placeholder={zh ? "粘贴收据上的文字……" : "Collez le texte du reçu…"} rows={4} className={inputClass} />}
+          {showManualInput && <textarea value={manualText} onChange={(e) => setManualText(e.target.value)} placeholder={zh ? "粘贴收据上的文字……" : "Collez le texte du reçu…"} rows={4} className={cn(inputClass, "resize-none overflow-y-auto")} />}
 
           {!result && (
             <Button onClick={handleScan} disabled={loading} variant="default" className="w-full">

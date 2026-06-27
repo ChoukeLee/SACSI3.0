@@ -354,7 +354,7 @@ export function AssistantOperationsCenter({ locale, userRole }: { locale: Locale
               onChange={(event) => setMessage(event.target.value)}
               placeholder={t.placeholder}
               rows={4}
-              className={cn(controlClass, "h-auto min-h-[112px] w-full resize-y text-sm leading-6")}
+              className={cn(controlClass, "h-auto min-h-[112px] w-full resize-none overflow-y-auto text-sm leading-6")}
             />
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button onClick={generateDraft} disabled={loading != null || !message.trim()}>

@@ -151,7 +151,7 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
                 onChange={e => { setImpText(e.target.value); setImpResult(null); setImpSubmitResult(null); }}
                 rows={8}
                 placeholder={zh ? "将 CSV 内容粘贴到此处..." : "Collez le contenu CSV ici..."}
-                className="w-full rounded-md border bg-card px-3 py-2 text-sm font-mono shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60"
+                className="w-full resize-none overflow-y-auto rounded-md border bg-card px-3 py-2 text-sm font-mono shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60"
               />
             </div>
 
