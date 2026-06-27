@@ -2,12 +2,14 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Bell, Calendar, Clock, Search } from "lucide-react";
+import { AlertTriangle, ArrowRight, Bell, Calendar, Clock } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { cn, formatXof } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
+import { FilterBar, FilterGroup, SegmentedControl } from "@/components/ui/operational";
+import { SearchInput } from "@/components/ui/search-input";
 import type { TodoItem, TodoSource, TodoPriority } from "./todo-types";
 
 interface Props {
@@ -59,8 +61,6 @@ export function TodoCenter({ todos, locale }: Props) {
 
   const zh = locale === "zh";
 
-  const filterBtn = "h-9 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
-
   return (
     <div className="space-y-5">
       {/* Summary stats */}
@@ -81,28 +81,38 @@ export function TodoCenter({ todos, locale }: Props) {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} className={filterBtn}>
-          <option value="all">{zh ? "模块" : "Module"}: {zh ? "全部" : "Tous"}</option>
-          {(Object.entries(sourceLabels) as [TodoSource, string][]).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
-          ))}
-        </select>
-        <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} className={filterBtn}>
-          <option value="all">{zh ? "优先级" : "Priorité"}: {zh ? "全部" : "Tous"}</option>
-          <option value="high">{zh ? "紧急" : "Urgent"}</option>
-          <option value="medium">{zh ? "一般" : "Moyen"}</option>
-          <option value="low">{zh ? "低" : "Bas"}</option>
-        </select>
-        <div className="relative flex-1 min-w-[160px] max-w-[280px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input type="text" value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder={zh ? "搜索房号/客户..." : "Rechercher..."}
-            className="h-9 w-full rounded-md border bg-card pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60" />
-        </div>
-        <span className="text-sm text-muted-foreground ml-auto tabular-nums">{filtered.length} {zh ? "条" : "lignes"}</span>
-      </div>
+      <FilterBar meta={<span className="tabular-nums">{filtered.length} {zh ? "条" : "lignes"}</span>}>
+        <FilterGroup label={zh ? "模块" : "Module"}>
+          <SegmentedControl
+            value={sourceFilter}
+            onChange={setSourceFilter}
+            ariaLabel={zh ? "模块筛选" : "Filtre module"}
+            items={[
+              { value: "all", label: zh ? "全部" : "Tous" },
+              ...(Object.entries(sourceLabels) as [TodoSource, string][]).map(([value, label]) => ({ value, label })),
+            ]}
+          />
+        </FilterGroup>
+        <FilterGroup label={zh ? "优先级" : "Priorite"}>
+          <SegmentedControl
+            value={priorityFilter}
+            onChange={setPriorityFilter}
+            ariaLabel={zh ? "优先级筛选" : "Filtre priorite"}
+            items={[
+              { value: "all", label: zh ? "全部" : "Tous" },
+              { value: "high", label: zh ? "紧急" : "Urgent" },
+              { value: "medium", label: zh ? "一般" : "Moyen" },
+              { value: "low", label: zh ? "低" : "Bas" },
+            ]}
+          />
+        </FilterGroup>
+        <SearchInput
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={zh ? "搜索房号/客户..." : "Rechercher..."}
+          className="w-full sm:w-[280px]"
+        />
+      </FilterBar>
 
       {/* Todo list */}
       {filtered.length === 0 ? (

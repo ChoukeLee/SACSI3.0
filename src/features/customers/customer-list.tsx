@@ -2,13 +2,14 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Plus, AlertTriangle, UserX, UserCheck, X, Eye, Search, Phone, Home, CreditCard, BedDouble, Star } from "lucide-react";
+import { Plus, AlertTriangle, UserX, UserCheck, X, Eye, Phone, Home, CreditCard, BedDouble, Star } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { cn, compareUnitNo } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FilterBar, SegmentedControl, StatTile, controlClass } from "@/components/ui/operational";
+import { SearchInput } from "@/components/ui/search-input";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import type { CustomerRow } from "@/types/database";
@@ -423,16 +424,13 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
 
       <FilterBar
         meta={
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t.search}
-              className={cn("w-64 pl-9 pr-3", controlClass)}
-            />
-          </div>
+          <SearchInput
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t.search}
+            aria-label={t.search}
+            className="w-full sm:w-[300px]"
+          />
         }
       >
           <SegmentedControl

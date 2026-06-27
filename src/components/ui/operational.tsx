@@ -76,9 +76,24 @@ export function FilterBar({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-card sm:flex-row sm:items-center sm:justify-between", className)}>
+    <div className={cn("inline-flex max-w-full flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-card sm:flex-row sm:items-center sm:justify-between", className)}>
       <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>
       {meta && <div className="shrink-0 text-xs font-medium text-muted-foreground tabular-nums">{meta}</div>}
+    </div>
+  );
+}
+
+export function FilterGroup({
+  label,
+  children,
+}: {
+  label: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      <span className="shrink-0 text-xs font-semibold text-muted-foreground">{label}</span>
+      {children}
     </div>
   );
 }

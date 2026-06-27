@@ -9,10 +9,11 @@ import { DateInput } from "@/components/ui/date-input";
 import { Button } from "@/components/ui/button";
 import { BusinessTable, BusinessTbody, BusinessTd, BusinessTh, BusinessThead, BusinessRow, MoneyCell, DEFAULT_BUSINESS_TABLE_PAGE_SIZE } from "@/components/ui/business-table";
 import { DataVizCard, MiniLineChart } from "@/components/ui/data-viz";
-import { FilterBar, StatTile, controlClass } from "@/components/ui/operational";
+import { FilterBar, FilterGroup, SegmentedControl, StatTile, controlClass } from "@/components/ui/operational";
 import type { LedgerEntryRow } from "@/types/database";
 import { addLedgerEntry } from "./actions";
 import { ReceiptThumb } from "@/components/attachments/receipt-thumb";
+import { SearchInput } from "@/components/ui/search-input";
 
 function normalizeDepositPeriod(value: string): string {
   return value.trim().replace(/^(\d+)\s*months?$/i, "$1个月");
@@ -192,7 +193,6 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
     liability_in: "text-cyan-600", liability_out: "text-amber-600",
   };
 
-  const filterSelect = controlClass;
   const filterDate = cn("w-[150px]", controlClass);
 
   return (
@@ -227,27 +227,42 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
           </div>
         }
       >
+        <FilterGroup label={t.filters.dateRange}>
           <DateInput value={startDate} onChangeValue={setStartDate} className={filterDate} />
-          <span className="text-xs font-semibold text-muted-foreground">-</span>
+          <span className="px-0.5 text-xs font-semibold text-muted-foreground">-</span>
           <DateInput value={endDate} onChangeValue={setEndDate} className={filterDate} />
-          <select value={dirFilter} onChange={(e) => setDirFilter(e.target.value)} className={filterSelect}>
-            <option value="all">{t.filters.direction}: {t.filters.all}</option>
-            <option value="income">{t.directions.income}</option>
-            <option value="expense">{t.directions.expense}</option>
-            <option value="liability_in">{t.directions.liability_in}</option>
-            <option value="liability_out">{t.directions.liability_out}</option>
-          </select>
-          <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className={filterSelect}>
-            <option value="all">{t.filters.category}: {t.filters.all}</option>
-            {allCategories.map(c => <option key={c} value={c}>{t.categories[c as keyof typeof t.categories]}</option>)}
-          </select>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={locale === "zh" ? "搜索描述/房号..." : "Rechercher description, chambre..."}
-            className={cn("w-48", controlClass)}
+        </FilterGroup>
+        <FilterGroup label={t.filters.direction}>
+          <SegmentedControl
+            value={dirFilter}
+            onChange={setDirFilter}
+            ariaLabel={t.filters.direction}
+            items={[
+              { value: "all", label: t.filters.all },
+              { value: "income", label: t.directions.income },
+              { value: "expense", label: t.directions.expense },
+              { value: "liability_in", label: t.directions.liability_in },
+              { value: "liability_out", label: t.directions.liability_out },
+            ]}
           />
+        </FilterGroup>
+        <FilterGroup label={t.filters.category}>
+          <SegmentedControl
+            value={catFilter}
+            onChange={setCatFilter}
+            ariaLabel={t.filters.category}
+            items={[
+              { value: "all", label: t.filters.all },
+              ...allCategories.map((value) => ({ value, label: t.categories[value as keyof typeof t.categories] })),
+            ]}
+          />
+        </FilterGroup>
+        <SearchInput
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={locale === "zh" ? "搜索描述/房号..." : "Rechercher description, chambre..."}
+          className="w-full sm:w-[240px]"
+        />
       </FilterBar>
 
       {/* Table */}

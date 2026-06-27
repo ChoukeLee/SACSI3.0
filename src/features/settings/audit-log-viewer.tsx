@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Search, ChevronDown, ChevronUp, Clock, User, Tag, FileText, Eye } from "lucide-react";
+import { ChevronDown, ChevronUp, Clock, User, Tag, FileText, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { DateInput } from "@/components/ui/date-input";
 import { DEFAULT_BUSINESS_TABLE_PAGE_SIZE } from "@/components/ui/business-table";
+import { FilterBar, FilterGroup, SegmentedControl, controlClass } from "@/components/ui/operational";
+import { SearchInput } from "@/components/ui/search-input";
 import type { Locale } from "@/lib/i18n";
 import { auditActionLabel, auditEntityLabel } from "@/lib/audit-labels";
 
@@ -186,8 +188,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
 
   const zh = locale === "zh";
 
-  const filterSelect = "h-9 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
-  const filterDate = cn(filterSelect, "w-[140px]");
+  const filterDate = cn(controlClass, "w-[140px]");
 
   const formatTime = (iso: string) => {
     const d = new Date(iso);
@@ -298,29 +299,47 @@ export function AuditLogViewer({ logs, locale }: Props) {
   return (
     <div className="space-y-5">
       {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <DateInput value={dateFrom} onChangeValue={setDateFrom} className={filterDate} />
-        <span className="text-sm font-semibold text-muted-foreground">—</span>
-        <DateInput value={dateTo} onChangeValue={setDateTo} className={filterDate} />
-        <select value={actionFilter} onChange={e => setActionFilter(e.target.value)} className={filterSelect}>
-          <option value="all">{zh ? "操作" : "Action"}: {zh ? "全部" : "Tous"}</option>
-          {uniqueActions.map(a => <option key={a} value={a}>{actionLabel(a)}</option>)}
-        </select>
-        <select value={entityFilter} onChange={e => setEntityFilter(e.target.value)} className={filterSelect}>
-          <option value="all">{zh ? "模块" : "Module"}: {zh ? "全部" : "Tous"}</option>
-          {uniqueEntities.map(e => <option key={e} value={e}>{auditEntityLabel(e, locale)}</option>)}
-        </select>
-        <div className="relative flex-1 min-w-[160px] max-w-[280px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input type="text" value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder={zh ? "搜索房号/客户/合同..." : "Rechercher..."}
-            className="h-9 w-full rounded-md border bg-card pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60" />
-        </div>
-        <span className="text-sm text-muted-foreground ml-auto tabular-nums">
-          {filtered.length} / {logs.length} {zh ? "条" : "lignes"}
-        </span>
-      </div>
+      <FilterBar
+        meta={
+          <span className="tabular-nums">
+            {filtered.length} / {logs.length} {zh ? "条" : "lignes"}
+          </span>
+        }
+      >
+        <FilterGroup label={zh ? "日期" : "Date"}>
+          <DateInput value={dateFrom} onChangeValue={setDateFrom} className={filterDate} />
+          <span className="px-0.5 text-xs font-semibold text-muted-foreground">-</span>
+          <DateInput value={dateTo} onChangeValue={setDateTo} className={filterDate} />
+        </FilterGroup>
+        <FilterGroup label={zh ? "操作" : "Action"}>
+          <SegmentedControl
+            value={actionFilter}
+            onChange={setActionFilter}
+            ariaLabel={zh ? "操作筛选" : "Filtre action"}
+            items={[
+              { value: "all", label: zh ? "全部" : "Tous" },
+              ...uniqueActions.map((value) => ({ value, label: actionLabel(value) })),
+            ]}
+          />
+        </FilterGroup>
+        <FilterGroup label={zh ? "模块" : "Module"}>
+          <SegmentedControl
+            value={entityFilter}
+            onChange={setEntityFilter}
+            ariaLabel={zh ? "模块筛选" : "Filtre module"}
+            items={[
+              { value: "all", label: zh ? "全部" : "Tous" },
+              ...uniqueEntities.map((value) => ({ value, label: auditEntityLabel(value, locale) })),
+            ]}
+          />
+        </FilterGroup>
+        <SearchInput
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={zh ? "搜索房号/客户/合同..." : "Rechercher..."}
+          className="w-full sm:w-[280px]"
+        />
+      </FilterBar>
 
       {/* Table */}
       {filtered.length === 0 ? (

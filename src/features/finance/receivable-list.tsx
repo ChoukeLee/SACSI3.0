@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
 import { BusinessTable, BusinessTbody, BusinessTd, BusinessTh, BusinessThead, BusinessRow, MoneyCell } from "@/components/ui/business-table";
 import { DataVizCard, DonutChart } from "@/components/ui/data-viz";
-import { FilterBar, StatTile, controlClass } from "@/components/ui/operational";
+import { FilterBar, FilterGroup, SegmentedControl, StatTile, controlClass } from "@/components/ui/operational";
 import {
   calculateReceivableSummary,
   buildReceivableCsv,
@@ -176,8 +176,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
     return buildingMap.get(bid) ?? "—";
   };
 
-  const filterBtn = controlClass;
-  const filterDate = cn(filterBtn, "w-[150px]");
+  const filterDate = cn(controlClass, "w-[150px]");
 
   const collectionTone = summary.collectionRate >= 0.8 ? "green" : summary.collectionRate >= 0.5 ? "amber" : "red";
 
@@ -217,32 +216,55 @@ export function ReceivableList({ receivables, units, customers, buildings, local
           </div>
         }
       >
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={filterBtn}>
-          <option value="all">{t.filters.status}: {t.filters.all}</option>
-          {Object.entries(t.statuses).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} className={filterBtn}>
-          <option value="all">{t.filters.sourceType}: {t.filters.all}</option>
-          {Object.entries(t.sourceTypes).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        <select value={buildingFilter} onChange={e => setBuildingFilter(e.target.value)} className={filterBtn}>
-          <option value="all">{t.filters.building}: {t.filters.all}</option>
-          {buildings.map(b => <option key={b.id} value={b.id}>{b.display_name || b.code}</option>)}
-          <option value="__unassigned__">{locale === "zh" ? "未归属" : "Non attribué"}</option>
-        </select>
-        <DateInput
-          value={dateFrom}
-          onChangeValue={setDateFrom}
-          className={filterDate}
-          title={locale === "zh" ? "起始日期" : "Date début"}
-        />
-        <span className="text-xs font-semibold text-muted-foreground">-</span>
-        <DateInput
-          value={dateTo}
-          onChangeValue={setDateTo}
-          className={filterDate}
-          title={locale === "zh" ? "结束日期" : "Date fin"}
-        />
+        <FilterGroup label={t.filters.status}>
+          <SegmentedControl
+            value={statusFilter}
+            onChange={setStatusFilter}
+            ariaLabel={t.filters.status}
+            items={[
+              { value: "all", label: t.filters.all },
+              ...Object.entries(t.statuses).map(([value, label]) => ({ value, label })),
+            ]}
+          />
+        </FilterGroup>
+        <FilterGroup label={t.filters.sourceType}>
+          <SegmentedControl
+            value={sourceFilter}
+            onChange={setSourceFilter}
+            ariaLabel={t.filters.sourceType}
+            items={[
+              { value: "all", label: t.filters.all },
+              ...Object.entries(t.sourceTypes).map(([value, label]) => ({ value, label })),
+            ]}
+          />
+        </FilterGroup>
+        <FilterGroup label={t.filters.building}>
+          <SegmentedControl
+            value={buildingFilter}
+            onChange={setBuildingFilter}
+            ariaLabel={t.filters.building}
+            items={[
+              { value: "all", label: t.filters.all },
+              ...buildings.map((b) => ({ value: b.id, label: b.display_name || b.code })),
+              { value: "__unassigned__", label: locale === "zh" ? "未归属" : "Non attribue" },
+            ]}
+          />
+        </FilterGroup>
+        <FilterGroup label={locale === "zh" ? "日期" : "Date"}>
+          <DateInput
+            value={dateFrom}
+            onChangeValue={setDateFrom}
+            className={filterDate}
+            title={locale === "zh" ? "起始日期" : "Date debut"}
+          />
+          <span className="px-0.5 text-xs font-semibold text-muted-foreground">-</span>
+          <DateInput
+            value={dateTo}
+            onChangeValue={setDateTo}
+            className={filterDate}
+            title={locale === "zh" ? "结束日期" : "Date fin"}
+          />
+        </FilterGroup>
       </FilterBar>
 
       {/* Table */}

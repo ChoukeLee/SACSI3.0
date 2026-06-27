@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Download, Upload, FileText, AlertTriangle, Check, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { SegmentedControl } from "@/components/ui/operational";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type {
   ExportDataType, ImportDataType, ImportResult, ImportSubmitResult,
@@ -94,15 +95,13 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
   return (
     <div className="max-w-4xl space-y-5">
       {/* Tabs */}
-      <nav className="flex w-fit gap-1 rounded-lg border bg-muted/60 p-1 shadow-xs">
-        {tabs.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={cn("rounded-md px-4 py-2 text-sm font-semibold transition",
-              tab === t.key ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")}>
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      <SegmentedControl
+        value={tab}
+        onChange={setTab}
+        ariaLabel={zh ? "导入导出切换" : "Import export"}
+        className="self-start"
+        items={tabs.map((item) => ({ value: item.key, label: item.label }))}
+      />
 
       {/* Export Tab */}
       {tab === "export" && (

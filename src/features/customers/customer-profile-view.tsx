@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { printDocumentRecord } from "@/features/documents/templates/all-templates";
 import { ReceiptThumb } from "@/components/attachments/receipt-thumb";
+import { SegmentedControl } from "@/components/ui/operational";
 import type { DocumentRecord } from "@/features/documents/types";
 import type { CustomerProfileData } from "./customer-profile-service";
 
@@ -124,15 +125,18 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
         </div>
       )}
 
-      {/* ── Tabs ── */}
-      <nav className="flex gap-1 overflow-x-auto rounded-lg border bg-muted/60 p-1 shadow-xs" aria-label={L.tabs}>
-        {tabs.map((item) => (
-          <button key={item.key} type="button" onClick={() => setTab(item.key)}
-            className={cn("shrink-0 rounded-md px-4 py-2 text-sm font-semibold transition", tab === item.key ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")}>
-            {item.label}{item.count !== undefined && <span className="ml-1 opacity-75">({item.count})</span>}
-          </button>
-        ))}
-      </nav>
+      {/* Tabs */}
+      <SegmentedControl
+        value={tab}
+        onChange={setTab}
+        ariaLabel={L.tabs}
+        className="self-start"
+        items={tabs.map((item) => ({
+          value: item.key,
+          label: item.label,
+          count: item.count,
+        }))}
+      />
 
       {/* ── Tab Content ── */}
       {tab === "overview" && <OverviewTab stats={stats} customer={customer} L={L} data={data} />}

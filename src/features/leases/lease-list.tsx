@@ -14,7 +14,7 @@ import { RoomCard } from "@/components/room-card";
 import { RoomBoard } from "@/components/room-board";
 import { RoomLegend } from "@/components/room-legend";
 import { EmptyState } from "@/components/empty-state";
-import { SegmentedControl, controlClass } from "@/components/ui/operational";
+import { FilterBar, SegmentedControl, controlClass } from "@/components/ui/operational";
 import type { RoomVisualStatus } from "@/lib/status-styles";
 import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
@@ -226,17 +226,24 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       )}
 
       {/* ── Filter bar + new contract ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-card px-4 py-3 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          {["all","draft","active","terminated","expired"].map((s) => (
-            <button key={s} onClick={()=>setStatusFilter(s)} className={cn(controlClass, "text-xs font-medium", statusFilter===s ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-accent")}>
-              {s==="all"?(locale==="fr"?"Tous":"全部"):t.contractStatus[s as keyof typeof t.contractStatus]}
-            </button>
-          ))}
-          <span className="pl-1 text-xs text-muted-foreground">{filtered.length}/{filteredByBuilding.length} {locale==="fr"?"contrats":"份合同"}</span>
-        </div>
-        <Button size="sm" onClick={openNew}><Plus className="h-4 w-4"/>{t.form.newContract}</Button>
-      </div>
+      <FilterBar
+        meta={
+          <div className="flex items-center gap-3">
+            <span>{filtered.length}/{filteredByBuilding.length} {locale === "fr" ? "contrats" : "份合同"}</span>
+            <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" />{t.form.newContract}</Button>
+          </div>
+        }
+      >
+        <SegmentedControl
+          value={statusFilter}
+          onChange={setStatusFilter}
+          ariaLabel={locale === "zh" ? "合同状态筛选" : "Filtre statut contrat"}
+          items={["all", "draft", "active", "terminated", "expired"].map((value) => ({
+            value,
+            label: value === "all" ? (locale === "fr" ? "Tous" : "全部") : t.contractStatus[value as keyof typeof t.contractStatus],
+          }))}
+        />
+      </FilterBar>
 
       {/* ── Contract matrix (BusinessRoomCard) ── */}
       {groupedContracts.length === 0 ? (

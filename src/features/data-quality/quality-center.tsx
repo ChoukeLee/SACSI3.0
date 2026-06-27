@@ -3,14 +3,15 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Search, ShieldAlert, ChevronDown, ChevronUp, Wrench } from "lucide-react";
+import { AlertTriangle, ArrowRight, ShieldAlert, ChevronDown, ChevronUp, Wrench } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
-import { StatTile, controlClass } from "@/components/ui/operational";
+import { SearchInput } from "@/components/ui/search-input";
+import { FilterBar, FilterGroup, SegmentedControl, StatTile } from "@/components/ui/operational";
 import { repairDailyRentalIssue } from "@/features/daily-rentals/daily-rental-repair";
 import type { QualityIssue, QualityCategory, QualitySeverity } from "./quality-types";
 
@@ -91,8 +92,6 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
   const financeIssues = issues.filter(i => i.category === "finance").length;
   const unitIssues = issues.filter(i => i.category === "unit").length;
 
-  const filterBtn = controlClass;
-
   const zh = locale === "zh";
 
   return (
@@ -112,25 +111,38 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <select value={severityFilter} onChange={e => setSeverityFilter(e.target.value)} className={filterBtn}>
-          <option value="all">{zh ? "级别" : "Sévérité"}: {zh ? "全部" : "Tous"}</option>
-          <option value="high">{zh ? "高危" : "Élevé"}</option>
-          <option value="medium">{zh ? "中危" : "Moyen"}</option>
-          <option value="low">{zh ? "低危" : "Faible"}</option>
-        </select>
-        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className={filterBtn}>
-          <option value="all">{zh ? "类别" : "Catégorie"}: {zh ? "全部" : "Tous"}</option>
-          {(Object.entries(catLabels) as [QualityCategory, string][]).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        <div className="relative flex-1 min-w-[160px] max-w-[300px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder={zh ? "搜索异常..." : "Rechercher..."}
-            className={cn("w-full pl-9", controlClass)} />
-        </div>
-        <span className="text-sm text-muted-foreground ml-auto tabular-nums">{filtered.length} {zh ? "条" : "lignes"}</span>
-      </div>
+      <FilterBar meta={<span className="tabular-nums">{filtered.length} {zh ? "条" : "lignes"}</span>}>
+        <FilterGroup label={zh ? "级别" : "Severite"}>
+          <SegmentedControl
+            value={severityFilter}
+            onChange={setSeverityFilter}
+            ariaLabel={zh ? "级别筛选" : "Filtre severite"}
+            items={[
+              { value: "all", label: zh ? "全部" : "Tous" },
+              { value: "high", label: zh ? "高危" : "Eleve" },
+              { value: "medium", label: zh ? "中危" : "Moyen" },
+              { value: "low", label: zh ? "低危" : "Faible" },
+            ]}
+          />
+        </FilterGroup>
+        <FilterGroup label={zh ? "类别" : "Categorie"}>
+          <SegmentedControl
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+            ariaLabel={zh ? "类别筛选" : "Filtre categorie"}
+            items={[
+              { value: "all", label: zh ? "全部" : "Tous" },
+              ...(Object.entries(catLabels) as [QualityCategory, string][]).map(([value, label]) => ({ value, label })),
+            ]}
+          />
+        </FilterGroup>
+        <SearchInput
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={zh ? "搜索异常..." : "Rechercher..."}
+          className="w-full sm:w-[300px]"
+        />
+      </FilterBar>
 
       {/* Issues */}
       {filtered.length === 0 ? (

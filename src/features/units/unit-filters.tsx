@@ -2,6 +2,7 @@
 
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
+import { FilterGroup, SegmentedControl } from "@/components/ui/operational";
 import type { UnitStatus, UnitKind, BusinessType } from "@/types/domain";
 
 interface UnitFiltersProps {
@@ -25,9 +26,6 @@ const statusOptions: (UnitStatus | "all")[] = [
 const kindOptions: (UnitKind | "all")[] = ["all", "apartment", "parking", "storefront", "office"];
 const businessOptions: (BusinessType | "all")[] = ["all", "daily_rental", "long_lease", "sale"];
 
-const selectClass =
-  "h-9 rounded-md border bg-card px-3 text-xs font-medium shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
-
 export function UnitFilters({
   locale, selectedFloor, selectedStatus, selectedKind, selectedBusiness,
   floors, onFloorChange, onStatusChange, onKindChange, onBusinessChange,
@@ -36,44 +34,54 @@ export function UnitFilters({
   const statusLabels = dictionaries[locale].statuses;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <label className="text-xs font-semibold text-muted-foreground">
-        {t.filters.floor}
-      </label>
-      <select className={selectClass} value={selectedFloor} onChange={(e) => onFloorChange(e.target.value)}>
-        <option value="all">{t.filters.all}</option>
-        {floors.map((f) => <option key={f} value={f}>{f}</option>)}
-      </select>
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <FilterGroup label={t.filters.floor}>
+        <SegmentedControl
+          value={selectedFloor}
+          onChange={onFloorChange}
+          ariaLabel={t.filters.floor}
+          items={[
+            { value: "all", label: t.filters.all },
+            ...floors.map((floor) => ({ value: floor, label: floor })),
+          ]}
+        />
+      </FilterGroup>
 
-      <label className="text-xs font-semibold text-muted-foreground">
-        {t.filters.status}
-      </label>
-      <select className={selectClass} value={selectedStatus} onChange={(e) => onStatusChange(e.target.value)}>
-        <option value="all">{t.filters.all}</option>
-        {statusOptions.filter((s) => s !== "all").map((s) => (
-          <option key={s} value={s}>{statusLabels[s]}</option>
-        ))}
-      </select>
+      <FilterGroup label={t.filters.status}>
+        <SegmentedControl
+          value={selectedStatus}
+          onChange={onStatusChange}
+          ariaLabel={t.filters.status}
+          items={statusOptions.map((status) => ({
+            value: status,
+            label: status === "all" ? t.filters.all : statusLabels[status],
+          }))}
+        />
+      </FilterGroup>
 
-      <label className="text-xs font-semibold text-muted-foreground">
-        {t.filters.kind}
-      </label>
-      <select className={selectClass} value={selectedKind} onChange={(e) => onKindChange(e.target.value)}>
-        <option value="all">{t.filters.all}</option>
-        {kindOptions.filter((k) => k !== "all").map((k) => (
-          <option key={k} value={k}>{t.kinds[k]}</option>
-        ))}
-      </select>
+      <FilterGroup label={t.filters.kind}>
+        <SegmentedControl
+          value={selectedKind}
+          onChange={onKindChange}
+          ariaLabel={t.filters.kind}
+          items={kindOptions.map((kind) => ({
+            value: kind,
+            label: kind === "all" ? t.filters.all : t.kinds[kind],
+          }))}
+        />
+      </FilterGroup>
 
-      <label className="text-xs font-semibold text-muted-foreground">
-        {t.filters.business}
-      </label>
-      <select className={selectClass} value={selectedBusiness} onChange={(e) => onBusinessChange(e.target.value)}>
-        <option value="all">{t.filters.all}</option>
-        {businessOptions.filter((b) => b !== "all").map((b) => (
-          <option key={b} value={b}>{t.businessTypes[b]}</option>
-        ))}
-      </select>
+      <FilterGroup label={t.filters.business}>
+        <SegmentedControl
+          value={selectedBusiness}
+          onChange={onBusinessChange}
+          ariaLabel={t.filters.business}
+          items={businessOptions.map((business) => ({
+            value: business,
+            label: business === "all" ? t.filters.all : t.businessTypes[business],
+          }))}
+        />
+      </FilterGroup>
     </div>
   );
 }

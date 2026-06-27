@@ -6,6 +6,8 @@ import { cn, formatXof } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { DateInput } from "@/components/ui/date-input";
 import { EmptyState } from "@/components/empty-state";
+import { FilterBar, FilterGroup, SegmentedControl, controlClass } from "@/components/ui/operational";
+import { SearchInput } from "@/components/ui/search-input";
 import { printDocumentRecord } from "./templates/all-templates";
 import type { DocumentRecord, DocumentType, DocumentSource, Locale } from "./types";
 import {
@@ -75,42 +77,48 @@ export function DocumentCenter({ documents, locale }: Props) {
   const handlePrint = (d: DocumentRecord) => {
     printDocumentRecord(d, locale);
   };
-
-  const filterBtn = "h-9 rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
+  const filterDate = cn(controlClass, "w-[140px]");
 
   return (
     <div className="space-y-5">
       {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className={filterBtn}>
-          <option value="all">{zh ? "单据类型" : "Type"}: {zh ? "全部" : "Tout"}</option>
-          {(Object.entries(typeLabels) as [DocumentType, string][]).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
-          ))}
-        </select>
-        <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} className={filterBtn}>
-          <option value="all">{zh ? "业务来源" : "Source"}: {zh ? "全部" : "Tout"}</option>
-          {(Object.entries(sourceLabels) as [DocumentSource, string][]).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
-          ))}
-        </select>
-        <DateInput value={dateFrom} onChangeValue={setDateFrom} className={cn(filterBtn, "w-[140px]")} />
-        <span className="text-sm font-semibold text-muted-foreground">—</span>
-        <DateInput value={dateTo} onChangeValue={setDateTo} className={cn(filterBtn, "w-[140px]")} />
-        <div className="relative flex-1 min-w-[180px] max-w-[320px]">
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder={zh ? "搜索客户/房号/合同号..." : "Rechercher client/chambre/contrat..."}
-            className="h-9 w-full rounded-md border bg-card pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60"
+      <FilterBar
+        meta={<span className="tabular-nums">{filtered.length} {zh ? "条单据" : "documents"}</span>}
+      >
+        <FilterGroup label={zh ? "单据类型" : "Type"}>
+          <SegmentedControl
+            value={typeFilter}
+            onChange={setTypeFilter}
+            ariaLabel={zh ? "单据类型筛选" : "Filtre type"}
+            items={[
+              { value: "all", label: zh ? "全部" : "Tout" },
+              ...(Object.entries(typeLabels) as [DocumentType, string][]).map(([value, label]) => ({ value, label })),
+            ]}
           />
-        </div>
-        <span className="text-sm text-muted-foreground ml-auto">
-          {filtered.length} {zh ? "条单据" : "documents"}
-        </span>
-      </div>
+        </FilterGroup>
+        <FilterGroup label={zh ? "业务来源" : "Source"}>
+          <SegmentedControl
+            value={sourceFilter}
+            onChange={setSourceFilter}
+            ariaLabel={zh ? "业务来源筛选" : "Filtre source"}
+            items={[
+              { value: "all", label: zh ? "全部" : "Tout" },
+              ...(Object.entries(sourceLabels) as [DocumentSource, string][]).map(([value, label]) => ({ value, label })),
+            ]}
+          />
+        </FilterGroup>
+        <FilterGroup label={zh ? "日期" : "Date"}>
+          <DateInput value={dateFrom} onChangeValue={setDateFrom} className={filterDate} />
+          <span className="px-0.5 text-xs font-semibold text-muted-foreground">-</span>
+          <DateInput value={dateTo} onChangeValue={setDateTo} className={filterDate} />
+        </FilterGroup>
+        <SearchInput
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={zh ? "搜索客户/房号/合同号..." : "Rechercher client/chambre/contrat..."}
+          className="w-full sm:w-[320px]"
+        />
+      </FilterBar>
 
       <div className="flex gap-4">
         {/* Document list */}
@@ -233,13 +241,5 @@ export function DocumentCenter({ documents, locale }: Props) {
         )}
       </div>
     </div>
-  );
-}
-
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-    </svg>
   );
 }
