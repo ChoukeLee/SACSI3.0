@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 
 type LogoVariant = "full" | "full-horizontal" | "icon" | "icon-mono" | "brand";
 
+const LOGO_ASPECT_RATIO = 1180 / 306;
+
 interface LogoProps {
   variant?: LogoVariant;
   size?: number;
@@ -26,16 +28,16 @@ interface LogoProps {
 export function Logo({ variant = "full", size = 32, className, label }: LogoProps) {
   // Full logo — centered column layout, for login pages
   if (variant === "full") {
+    const markWidth = size * LOGO_ASPECT_RATIO;
     return (
       <div className={cn("inline-flex flex-col items-center gap-2", className)}>
-        <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <div className="relative shrink-0" style={{ width: markWidth, height: size }}>
           <Image
             src="/logo.png"
             alt="SACSI"
-            width={size * 2}
-            height={size * 2}
+            fill
+            sizes={`${Math.ceil(markWidth)}px`}
             className="object-contain"
-            style={{ width: size, height: size }}
             priority
           />
         </div>
@@ -52,16 +54,16 @@ export function Logo({ variant = "full", size = 32, className, label }: LogoProp
   // Full-horizontal — icon + text in a row, for compact headers
   if (variant === "full-horizontal") {
     const textSize = size * 0.55;
+    const markWidth = size * LOGO_ASPECT_RATIO;
     return (
       <div className={cn("inline-flex items-center gap-2", className)}>
-        <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <div className="relative shrink-0" style={{ width: markWidth, height: size }}>
           <Image
             src="/logo.png"
             alt="SACSI"
-            width={size * 2}
-            height={size * 2}
+            fill
+            sizes={`${Math.ceil(markWidth)}px`}
             className="object-contain"
-            style={{ width: size, height: size }}
             priority
           />
         </div>
@@ -78,18 +80,18 @@ export function Logo({ variant = "full", size = 32, className, label }: LogoProp
   // Brand — icon + 科建地产 text (for header and branded surfaces)
   if (variant === "brand") {
     const iconSize = size;
+    const markWidth = iconSize * LOGO_ASPECT_RATIO;
     const nameSize = size * 0.5;
     const subSize = size * 0.3;
     return (
       <div className={cn("inline-flex items-center gap-2.5", className)}>
-        <div className="relative shrink-0" style={{ width: iconSize, height: iconSize }}>
+        <div className="relative shrink-0" style={{ width: markWidth, height: iconSize }}>
           <Image
             src="/logo.png"
             alt="SACSI"
-            width={iconSize * 2}
-            height={iconSize * 2}
+            fill
+            sizes={`${Math.ceil(markWidth)}px`}
             className="object-contain"
-            style={{ width: iconSize, height: iconSize }}
             priority
           />
         </div>
@@ -116,12 +118,11 @@ export function Logo({ variant = "full", size = 32, className, label }: LogoProp
     return (
       <div className={cn("relative shrink-0", className)} style={{ width: size, height: size }}>
         <Image
-          src="/logo.png"
+          src="/favicon.png"
           alt="SACSI"
-          width={size * 2}
-          height={size * 2}
+          fill
+          sizes={`${size}px`}
           className="object-contain"
-          style={{ width: size, height: size }}
         />
       </div>
     );

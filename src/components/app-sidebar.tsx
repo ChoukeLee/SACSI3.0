@@ -79,7 +79,7 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar">
       <SidebarHeader className="gap-0 border-b border-sidebar-border px-4 h-12 relative">
         <div className="absolute top-0 left-4 flex items-center gap-3 h-full">
-          <Logo variant="icon" size={72} />
+          <Logo variant="icon" size={28} />
           <span className="text-xs font-semibold italic text-sidebar-foreground whitespace-nowrap -mt-[1px]">{labels.brand}</span>
         </div>
       </SidebarHeader>
