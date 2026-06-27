@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { ArrowUpDown, Banknote, BarChart3, Bell, Bot, Building2, CalendarDays, FileSignature, FileText, Layers, LayoutDashboard, Settings, Shield, ShieldCheck, Target, Users } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { Logo } from "@/components/logo";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { getDesktopNavLabels } from "@/lib/nav-labels";
@@ -79,7 +79,16 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar">
       <SidebarHeader className="gap-0 border-b border-sidebar-border px-4 h-12 relative">
         <div className="absolute top-0 left-4 flex items-center gap-3 h-full">
-          <Logo variant="icon" size={28} />
+          <span className="relative h-7 w-[108px] shrink-0">
+            <Image
+              src="/logo.png"
+              alt="SACSI"
+              fill
+              sizes="108px"
+              className="object-contain"
+              priority
+            />
+          </span>
           <span className="text-xs font-semibold italic text-sidebar-foreground whitespace-nowrap -mt-[1px]">{labels.brand}</span>
         </div>
       </SidebarHeader>
