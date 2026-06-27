@@ -590,7 +590,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
                 <p className="mt-1 text-[11px] text-muted-foreground">{formMode.type === "edit" ? t.docKeepBlank : t.docEncrypted}</p>
               </div>
               <div><label className={labelClass}>{t.phone}</label><input type="text" value={formPhone} onChange={(e) => setFormPhone(e.target.value)} className={inputClass} placeholder={t.phone} /></div>
-              <div><label className={labelClass}>{t.notes}</label><textarea value={formNotes} onChange={(e) => setFormNotes(e.target.value)} rows={3} className={cn(inputClass, "resize-none overflow-y-auto")} placeholder={t.notes} /></div>
+              <div><label className={labelClass}>{t.notes}</label><textarea value={formNotes} onChange={(e) => setFormNotes(e.target.value)} rows={3} className={cn(inputClass, "resize-none overflow-hidden")} placeholder={t.notes} /></div>
               {formError && <p className="text-sm text-red-600">{formError}</p>}
               <div className="flex items-center gap-3 pt-2">
                 <Button onClick={handleSave} disabled={saving}>{saving ? "..." : t.save}</Button>
@@ -611,7 +611,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
               <button onClick={() => setBlacklistPanelId(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"><X className="h-4 w-4" /></button>
             </div>
             <div className="space-y-4 px-5 py-5">
-              <div><label className={labelClass}>{t.blacklistReason} *</label><textarea value={blReason} onChange={(e) => setBlReason(e.target.value)} rows={3} className={cn(inputClass, "resize-none overflow-y-auto")} placeholder={t.blacklistReason} /></div>
+              <div><label className={labelClass}>{t.blacklistReason} *</label><textarea value={blReason} onChange={(e) => setBlReason(e.target.value)} rows={3} className={cn(inputClass, "resize-none overflow-hidden")} placeholder={t.blacklistReason} /></div>
               <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 <input type="checkbox" checked={blPermanent} onChange={(e) => setBlPermanent(e.target.checked)} className="h-4 w-4 rounded border" />{t.blacklistPermanent}
               </label>
