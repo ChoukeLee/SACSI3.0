@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
 import { controlClass } from "@/components/ui/operational";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
+import type { UnitStatus } from "@/types/domain";
 import type { CustomerSummary } from "./calendar";
 import { printDailyReceipt } from "@/features/print";
 import { calculateBilling } from "./billing";
@@ -27,13 +28,42 @@ interface BookingPanelProps {
   cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean; completed_at?: string | null }[];
   payments: { id: string; source_id: string; amount: number; payment_date: string }[];
   locale: Locale; onClose: () => void; onChanged: () => void;
+  onOptimisticClose?: () => void;
   onBookingCreated?: (booking: DailyBookingRow) => void;
+  onBookingPatched?: (bookingId: string, patch: Partial<DailyBookingRow>) => void;
+  onUnitStatusPatched?: (unitId: string, status: UnitStatus) => void;
+  onCleaningTaskAdded?: (task: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }) => void;
+  onCleaningTaskCompleted?: (taskId: string, unitId: string, status: UnitStatus) => void;
+  onPaymentAdded?: (payment: { id: string; source_id: string; amount: number; payment_date: string }) => void;
+  onOptimisticReset?: () => void;
+  onBackgroundOperation?: (label: string, state: "syncing" | "done" | "failed") => void;
   backfillMode?: boolean;
 }
 
 type AdvancedTask = "payment" | "discount" | "extend" | "fixedCheckout" | null;
 
-export function BookingPanel({ booking, unitId, defaultDate, units, customers, cleaningTasks, payments, locale, onClose, onChanged, onBookingCreated, backfillMode }: BookingPanelProps) {
+export function BookingPanel({
+  booking,
+  unitId,
+  defaultDate,
+  units,
+  customers,
+  cleaningTasks,
+  payments,
+  locale,
+  onClose,
+  onChanged,
+  onOptimisticClose,
+  onBookingCreated,
+  onBookingPatched,
+  onUnitStatusPatched,
+  onCleaningTaskAdded,
+  onCleaningTaskCompleted,
+  onPaymentAdded,
+  onOptimisticReset,
+  onBackgroundOperation,
+  backfillMode,
+}: BookingPanelProps) {
   const t = dictionaries[locale].dailyRentals;
   const router = useRouter();
   const isNew = !booking && !backfillMode;
@@ -70,6 +100,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showAdvancedActions, setShowAdvancedActions] = useState(false);
   const [activeAdvancedTask, setActiveAdvancedTask] = useState<AdvancedTask>(null);
+  const [pendingActionLabel, setPendingActionLabel] = useState("");
 
   // ── Backfill form state ──
   const [bfUnitId, setBfUnitId] = useState("");
@@ -159,69 +190,208 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
   const labelClass = "mb-1 block text-xs font-semibold text-muted-foreground";
   const formatError = (message?: string | null) => formatDailyRentalError(message, locale);
 
+  const runPanelAction = async (
+    label: string,
+    action: () => Promise<{ success: boolean; error?: string } | void>,
+    options: { closeImmediately?: boolean; clearAdvancedTask?: boolean } = {},
+  ) => {
+    setSaving(true);
+    setActionError("");
+    setError("");
+    setPendingActionLabel(label);
+    if (options.clearAdvancedTask) setActiveAdvancedTask(null);
+
+    if (options.closeImmediately) {
+      onBackgroundOperation?.(label, "syncing");
+      (onOptimisticClose ?? onClose)();
+      action().then((result) => {
+        if (result && !result.success) {
+          onOptimisticReset?.();
+          onBackgroundOperation?.(label, "failed");
+          return;
+        }
+        refresh();
+        onBackgroundOperation?.(label, "done");
+      }).catch((err) => {
+        console.error("Daily rental background action failed:", err);
+        onOptimisticReset?.();
+        onBackgroundOperation?.(label, "failed");
+      });
+      return;
+    }
+
+    try {
+      const result = await action();
+      if (result && !result.success) {
+        onOptimisticReset?.();
+        setActionError(formatError(result.error));
+        return;
+      }
+      refresh();
+    } catch (err) {
+      onOptimisticReset?.();
+      setActionError(err instanceof Error ? err.message : formatError("unknownError"));
+    } finally {
+      setSaving(false);
+      setPendingActionLabel("");
+    }
+  };
+
+  const makeOptimisticPayment = (amount: number, paymentDate: string) => ({
+    id: `optimistic-payment-${booking?.id ?? "new"}-${Date.now()}`,
+    source_id: booking!.id,
+    amount,
+    payment_date: paymentDate,
+  });
+
   const handleCreate = async () => {
     if (!newCustomerId) { setError(t.booking.noCustomer); return; }
     if (newCheckoutMode === "fixed" && newNights <= 0) { setError(formatError("invalidDateRange")); return; }
-    setSaving(true); setError("");
-    const result = await createBooking({
-      unitId: unitId!, customerId: newCustomerId, checkIn: newCheckIn,
-      checkOut: newCheckoutMode === "fixed" ? newCheckOut : undefined,
-      checkoutMode: newCheckoutMode, nightlyPriceXof: toN(newNightlyPrice) || 40000,
-      notes: newNotes || undefined,
+    setError("");
+    const nightlyPrice = toN(newNightlyPrice) || 40000;
+    const totalAmount = newCheckoutMode === "fixed" ? newTotal : nightlyPrice;
+    onBookingCreated?.({
+      id: `optimistic-booking-${unitId}-${Date.now()}`,
+      unit_id: unitId!,
+      customer_id: newCustomerId,
+      check_in: newCheckIn,
+      check_out: newCheckoutMode === "fixed" ? newCheckOut : null,
+      checkout_mode: newCheckoutMode,
+      actual_check_out: null,
+      nightly_price_xof: nightlyPrice,
+      total_amount_xof: totalAmount,
+      prepaid_amount_xof: 0,
+      billing_status: "need_top_up",
+      manual_discount_amount_xof: 0,
+      manual_discount_reason: null,
+      final_amount_xof: totalAmount,
+      status: "pending_review",
+      ota_source: null,
+      notes: newNotes || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     });
-    setSaving(false);
-    if (result.success) {
-      if (result.data) onBookingCreated?.(result.data);
-      refresh(); onClose();
-    }
-    else setError(formatError(result.error));
+    onUnitStatusPatched?.(unitId!, "reserved");
+    await runPanelAction(
+      locale === "zh" ? "正在新建预订" : "Creation en cours",
+      async () => createBooking({
+        unitId: unitId!, customerId: newCustomerId, checkIn: newCheckIn,
+        checkOut: newCheckoutMode === "fixed" ? newCheckOut : undefined,
+        checkoutMode: newCheckoutMode, nightlyPriceXof: nightlyPrice,
+        notes: newNotes || undefined,
+      }),
+      { closeImmediately: true },
+    );
   };
 
   const handleCheckIn = async () => {
     const prepay = toN(prepaidAmount);
-    setSaving(true); const result = await checkIn(booking!.id, prepay);
-    setSaving(false); if (!result.success) setActionError(formatError(result.error)); else { refresh(); onClose(); }
+    const optimisticPaid = totalPaid + prepay;
+    onBookingPatched?.(booking!.id, {
+      status: "checked_in",
+      prepaid_amount_xof: optimisticPaid,
+      billing_status: optimisticPaid >= finalDue ? "settled" : optimisticPaid > 0 ? "partially_paid" : "need_top_up",
+    });
+    onUnitStatusPatched?.(booking!.unit_id, "daily_occupied");
+    if (prepay > 0) onPaymentAdded?.(makeOptimisticPayment(prepay, new Date().toISOString().slice(0, 10)));
+    await runPanelAction(
+      locale === "zh" ? "正在办理入住" : "Arrivee en cours",
+      () => checkIn(booking!.id, prepay),
+      { closeImmediately: true },
+    );
   };
 
   const handleCheckOut = async () => {
-    setSaving(true);
     const disc = toN(discountAmount);
     const fin = toN(finalAmount);
-    const result = await checkOut(booking!.id, {
-      finalAmount: fin || undefined,
-      actualCheckOut: booking?.checkout_mode === "open" ? actualCheckOut : undefined,
-      discountAmount: disc || undefined,
-      discountReason: discountReason || undefined,
+    const checkoutDate = booking?.checkout_mode === "open" ? actualCheckOut : booking?.check_out ?? new Date().toISOString().slice(0, 10);
+    const nextFinal = fin || finalDue;
+    onBookingPatched?.(booking!.id, {
+      status: "checked_out",
+      actual_check_out: checkoutDate,
+      total_amount_xof: nextFinal,
+      final_amount_xof: nextFinal,
+      prepaid_amount_xof: totalPaid,
+      manual_discount_amount_xof: disc || booking!.manual_discount_amount_xof,
+      manual_discount_reason: disc > 0 ? (discountReason || null) : booking!.manual_discount_reason,
+      billing_status: totalPaid >= nextFinal ? "settled" : totalPaid > 0 ? "partially_paid" : "need_top_up",
     });
-    setSaving(false); if (!result.success) setActionError(formatError(result.error)); else { refresh(); onClose(); }
+    onUnitStatusPatched?.(booking!.unit_id, "cleaning_pending");
+    onCleaningTaskAdded?.({
+      id: `optimistic-cleaning-${booking!.id}-${Date.now()}`,
+      unit_id: booking!.unit_id,
+      daily_booking_id: booking!.id,
+      is_completed: false,
+    });
+    await runPanelAction(
+      locale === "zh" ? "正在办理退房" : "Depart en cours",
+      () => checkOut(booking!.id, {
+        finalAmount: fin || undefined,
+        actualCheckOut: booking?.checkout_mode === "open" ? actualCheckOut : undefined,
+        discountAmount: disc || undefined,
+        discountReason: discountReason || undefined,
+      }),
+      { closeImmediately: true },
+    );
   };
 
   const handleSuppPayment = async () => {
     const amt = toN(suppAmount);
     if (amt <= 0) return;
-    setSaving(true); const result = await recordSupplementaryPayment({
-      bookingId: booking!.id,
-      amount: amt,
-      paymentDate: suppPaymentDate || undefined,
-      receiptNo: suppReceiptNo || undefined,
+    const optimisticPaid = totalPaid + amt;
+    onPaymentAdded?.(makeOptimisticPayment(amt, suppPaymentDate || new Date().toISOString().slice(0, 10)));
+    onBookingPatched?.(booking!.id, {
+      prepaid_amount_xof: optimisticPaid,
+      billing_status: optimisticPaid >= finalDue ? "settled" : "partially_paid",
     });
-    setSaving(false); if (result.success) { refresh(); setSuppAmount(""); } else setActionError(formatError(result.error));
+    await runPanelAction(
+      locale === "zh" ? "正在记录收款" : "Paiement en cours",
+      () => recordSupplementaryPayment({
+        bookingId: booking!.id,
+        amount: amt,
+        paymentDate: suppPaymentDate || undefined,
+        receiptNo: suppReceiptNo || undefined,
+      }),
+      { closeImmediately: true, clearAdvancedTask: true },
+    );
+    setSuppAmount("");
   };
 
-  const handleDiscount = async () => {
+  const handleOptimisticDiscount = async () => {
     const amt = toN(discountAmount);
     if (amt <= 0) return;
-    setSaving(true); const result = await applyDiscount({ bookingId: booking!.id, amount: amt, reason: discountReason || "手动优惠" });
-    setSaving(false); if (result.success) { refresh(); setDiscountAmount(""); setDiscountReason(""); } else setActionError(formatError(result.error));
+    const nextFinal = Math.max(0, finalDue - amt);
+    onBookingPatched?.(booking!.id, {
+      manual_discount_amount_xof: amt,
+      manual_discount_reason: discountReason || "手动优惠",
+      final_amount_xof: nextFinal,
+      billing_status: totalPaid >= nextFinal ? "settled" : totalPaid > 0 ? "partially_paid" : "need_top_up",
+    });
+    await runPanelAction(
+      locale === "zh" ? "正在应用优惠" : "Remise en cours",
+      () => applyDiscount({ bookingId: booking!.id, amount: amt, reason: discountReason || "手动优惠" }),
+      { closeImmediately: true, clearAdvancedTask: true },
+    );
+    setDiscountAmount("");
+    setDiscountReason("");
   };
 
   const handleExtend = async () => {
     const days = toN(extendDays) || 1;
     const extraAmount = Math.round(Number(booking!.nightly_price_xof) * days);
     const nextCheckOut = booking!.check_out ? addDays(booking!.check_out, days) : "";
-    setSaving(true);
-    const result = await extendStay(booking!.id, nextCheckOut, days, extraAmount);
-    setSaving(false); if (!result.success) setActionError(formatError(result.error)); else { refresh(); onClose(); }
+    const nextFinal = finalDue + extraAmount;
+    onBookingPatched?.(booking!.id, {
+      check_out: nextCheckOut,
+      total_amount_xof: nextFinal,
+      final_amount_xof: nextFinal,
+      billing_status: totalPaid >= nextFinal ? "settled" : totalPaid > 0 ? "partially_paid" : "need_top_up",
+    });
+    await runPanelAction(
+      locale === "zh" ? "正在续住" : "Prolongation en cours",
+      () => extendStay(booking!.id, nextCheckOut, days, extraAmount),
+      { closeImmediately: true },
+    );
   };
 
   const fixedCheckOutNights = useMemo(() => {
@@ -231,38 +401,88 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
 
   const handleSetFixedCheckout = async () => {
     if (!fixedCheckOutDate) { setActionError(formatError("checkOutRequired")); return; }
-    setSaving(true);
-    const result = await setFixedCheckout(booking!.id, fixedCheckOutDate);
-    setSaving(false); if (!result.success) setActionError(formatError(result.error)); else { refresh(); onClose(); }
+    const nextFinal = fixedCheckOutNights * Number(booking!.nightly_price_xof);
+    onBookingPatched?.(booking!.id, {
+      checkout_mode: "fixed",
+      check_out: fixedCheckOutDate,
+      actual_check_out: null,
+      total_amount_xof: nextFinal,
+      final_amount_xof: nextFinal,
+      billing_status: totalPaid >= nextFinal ? "settled" : totalPaid > 0 ? "partially_paid" : "need_top_up",
+    });
+    await runPanelAction(
+      locale === "zh" ? "正在设置退房日" : "Date de depart en cours",
+      () => setFixedCheckout(booking!.id, fixedCheckOutDate),
+      { closeImmediately: true },
+    );
   };
 
   // ── Backfill handler ──
+  const handleConfirmBooking = async () => {
+    onBookingPatched?.(booking!.id, { status: "confirmed" });
+    onUnitStatusPatched?.(booking!.unit_id, "reserved");
+    await runPanelAction(
+      locale === "zh" ? "正在确认预订" : "Confirmation en cours",
+      () => confirmBooking(booking!.id),
+      { closeImmediately: true },
+    );
+  };
+
+  const handleCancelBooking = async () => {
+    onBookingPatched?.(booking!.id, { status: "cancelled" });
+    onUnitStatusPatched?.(booking!.unit_id, "available");
+    await runPanelAction(
+      locale === "zh" ? "正在取消预订" : "Annulation en cours",
+      () => cancelBooking(booking!.id),
+      { closeImmediately: true },
+    );
+  };
+
+  const handleCompleteCleaning = async () => {
+    if (!effectiveCleaningTask) return;
+    onCleaningTaskCompleted?.(effectiveCleaningTask.id, effectiveCleaningTask.unit_id, "available");
+    await runPanelAction(
+      locale === "zh" ? "正在完成保洁" : "Menage en cours",
+      async () => {
+        const result = await completeCleaning(effectiveCleaningTask.id);
+        if (result.success && result.taskId && result.unitId && result.unitStatus) {
+          onCleaningTaskCompleted?.(result.taskId, result.unitId, result.unitStatus);
+        }
+        return result;
+      },
+      { closeImmediately: true },
+    );
+  };
+
   const bfNights = useMemo(() => {
     if (!bfCheckIn || !bfCheckOut) return 0;
     return Math.max(1, Math.ceil((new Date(bfCheckOut).getTime() - new Date(bfCheckIn).getTime()) / (1000 * 60 * 60 * 24)));
   }, [bfCheckIn, bfCheckOut]);
   const bfTotal = bfNights * (parseInt(bfNightlyPrice, 10) || 0);
 
-  const handleBackfillCreate = async () => {
+  const handleOptimisticBackfillCreate = async () => {
     if (!bfUnitId) { setBfError(locale === "zh" ? "请选择房间。" : "Veuillez choisir une chambre."); return; }
     if (!bfCustomerId) { setBfError(t.booking.noCustomer); return; }
     if (!bfCheckIn || !bfCheckOut) { setBfError(formatError("invalidDateRange")); return; }
     if (!bfReason) { setBfError(locale === "zh" ? "请填写补录原因。" : "Veuillez indiquer la raison du backfill."); return; }
-    setSaving(true); setBfError("");
-    const result = await createBackfillBooking({
-      unitId: bfUnitId, customerId: bfCustomerId,
-      checkIn: bfCheckIn, checkOut: bfCheckOut,
-      nightlyPriceXof: parseInt(bfNightlyPrice, 10) || 40000,
-      prepaidAmountXof: parseInt(bfPaidAmount, 10) || 0,
-      reason: bfReason,
-      notes: bfNotes || undefined,
-    });
-    setSaving(false);
-    if (result.success) {
-      if (result.data) onBookingCreated?.(result.data);
-      refresh(); onClose();
-    }
-    else setBfError(formatError(result.error));
+    setBfError("");
+    await runPanelAction(
+      locale === "zh" ? "正在补录历史入住" : "Backfill en cours",
+      async () => {
+        const result = await createBackfillBooking({
+          unitId: bfUnitId, customerId: bfCustomerId,
+          checkIn: bfCheckIn, checkOut: bfCheckOut,
+          nightlyPriceXof: parseInt(bfNightlyPrice, 10) || 40000,
+          prepaidAmountXof: parseInt(bfPaidAmount, 10) || 0,
+          reason: bfReason,
+          notes: bfNotes || undefined,
+        });
+        if (result.success && result.data) onBookingCreated?.(result.data);
+        if (!result.success) setBfError(formatError(result.error));
+        return result;
+      },
+      { closeImmediately: true },
+    );
   };
 
   return (
@@ -280,6 +500,12 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
         </div>
 
         <div className="space-y-4 px-5 py-5">
+          {pendingActionLabel && (
+            <div className="rounded-lg border border-primary/15 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary" role="status" aria-live="polite">
+              {pendingActionLabel}
+            </div>
+          )}
+
           {/* New Booking */}
           {isNew && (<>
             <div>
@@ -376,7 +602,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                 <textarea value={bfNotes} onChange={e => setBfNotes(e.target.value)} rows={2} className={cn(inputClass, "resize-none overflow-hidden")} />
               </div>
               {bfError && <p className="text-sm text-accentRed-600" role="alert">{bfError}</p>}
-              <Button onClick={handleBackfillCreate} disabled={saving} className="w-full" variant="default">
+              <Button onClick={handleOptimisticBackfillCreate} disabled={saving} className="w-full" variant="default">
                 {saving ? "..." : (locale === "zh" ? "确认补录" : "Confirmer le backfill")}
               </Button>
             </div>
@@ -480,8 +706,8 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
               {/* ── pending_review → primary = confirm ── */}
               {primaryAction?.action === "confirm" && (
                 <div className="space-y-2">
-                  <Button variant="default" onClick={() => { setSaving(true); confirmBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(formatError(r.error)); }); }} disabled={saving} className="w-full">{t.booking.confirmBooking}</Button>
-                  <Button variant="outline" size="sm" onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(formatError(r.error)); }); }} disabled={saving} className="w-full justify-center text-accentRed-600 hover:bg-accentRed-50 hover:text-accentRed-700"><UserX className="h-3.5 w-3.5 mr-1" />{t.booking.cancelBooking}</Button>
+                  <Button variant="default" onClick={handleConfirmBooking} disabled={saving} className="w-full">{t.booking.confirmBooking}</Button>
+                  <Button variant="outline" size="sm" onClick={handleCancelBooking} disabled={saving} className="w-full justify-center text-accentRed-600 hover:bg-accentRed-50 hover:text-accentRed-700"><UserX className="h-3.5 w-3.5 mr-1" />{t.booking.cancelBooking}</Button>
                 </div>
               )}
 
@@ -494,7 +720,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                     </p>
                   </div>
                   {effectiveCleaningTask && (
-                    <Button variant="default" size="sm" onClick={() => { setSaving(true); completeCleaning(effectiveCleaningTask.id).then(() => { setSaving(false); refresh(); onClose(); }); }} disabled={saving} className="w-full">
+                    <Button variant="default" size="sm" onClick={handleCompleteCleaning} disabled={saving} className="w-full">
                       <Check className="h-3.5 w-3.5 mr-1" />{t.cleaning.markComplete}
                     </Button>
                   )}
@@ -506,7 +732,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                 <div className="space-y-2">
                   <div><label className={labelClass}>{t.booking.prepaidAmount}</label><input type="number" value={prepaidAmount} onChange={e => setPrepaidAmount(e.target.value)} className={inputClass} /><p className="mt-0.5 text-xs text-muted-foreground/70">{t.booking.prepaidWarning}</p></div>
                   <Button variant="default" onClick={handleCheckIn} disabled={saving} className="w-full">{t.booking.checkIn}</Button>
-                  <Button variant="outline" size="sm" onClick={() => { setSaving(true); cancelBooking(booking.id).then(r => { setSaving(false); if (r.success) { refresh(); onClose(); } else setActionError(formatError(r.error)); }); }} disabled={saving} className="w-full justify-center text-accentRed-600 hover:bg-accentRed-50 hover:text-accentRed-700"><UserX className="h-3.5 w-3.5 mr-1" />{t.booking.cancelBooking}</Button>
+                  <Button variant="outline" size="sm" onClick={handleCancelBooking} disabled={saving} className="w-full justify-center text-accentRed-600 hover:bg-accentRed-50 hover:text-accentRed-700"><UserX className="h-3.5 w-3.5 mr-1" />{t.booking.cancelBooking}</Button>
                 </div>
               )}
 
@@ -649,7 +875,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                                   <input type="number" value={discountAmount} onChange={e => setDiscountAmount(e.target.value)} className={inputClass} placeholder={t.discountAmount} />
                                   <input type="text" value={discountReason} onChange={e => setDiscountReason(e.target.value)} className={inputClass} placeholder={t.discountReason} />
                                 </div>
-                                <Button variant="secondary" size="sm" onClick={handleDiscount} disabled={saving || (parseInt(discountAmount,10)||0) <= 0} className="w-full"><Percent className="h-3 w-3 mr-1" />{t.applyDiscount}</Button>
+                                <Button variant="secondary" size="sm" onClick={handleOptimisticDiscount} disabled={saving || (parseInt(discountAmount,10)||0) <= 0} className="w-full"><Percent className="h-3 w-3 mr-1" />{t.applyDiscount}</Button>
                               </div>
                             )}
 
@@ -719,7 +945,7 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
                   <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-center">
                     <p className="text-xs font-semibold text-cyan-700 mb-2">{t.cleaning.pending}</p>
                     {effectiveCleaningTask && (
-                      <Button variant="default" size="sm" onClick={() => { setSaving(true); completeCleaning(effectiveCleaningTask.id).then(() => { setSaving(false); refresh(); onClose(); }); }} disabled={saving}>
+                      <Button variant="default" size="sm" onClick={handleCompleteCleaning} disabled={saving}>
                         <Check className="h-3.5 w-3.5 mr-1" />{t.cleaning.markComplete}
                       </Button>
                     )}
@@ -754,11 +980,25 @@ export function BookingPanel({ booking, unitId, defaultDate, units, customers, c
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => {
           if (!deleteTarget) return;
-          setDeleteLoading(true);
-          deletePayment(deleteTarget.id).then(() => {
-            setDeleteLoading(false);
-            setDeleteTarget(null);
+          const target = deleteTarget;
+          const label = locale === "zh" ? "正在删除收款" : "Suppression en cours";
+          setDeleteTarget(null);
+          setPendingActionLabel(label);
+          onBackgroundOperation?.(label, "syncing");
+          deletePayment(target.id).then((result) => {
+            if (result && !result.success) {
+              onOptimisticReset?.();
+              onBackgroundOperation?.(label, "failed");
+              return;
+            }
             refresh();
+            onBackgroundOperation?.(label, "done");
+          }).catch((err) => {
+            console.error("Daily rental payment deletion failed:", err);
+            onOptimisticReset?.();
+            onBackgroundOperation?.(label, "failed");
+          }).finally(() => {
+            setPendingActionLabel("");
           });
         }}
         title={locale === "zh" ? "删除收款记录" : "Supprimer le paiement"}

@@ -70,16 +70,27 @@ export function DailyCalendar({
   const [newBookingDate, setNewBookingDate] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [optimisticBookings, setOptimisticBookings] = useState<DailyBookingRow[]>([]);
+  const [optimisticBookingPatches, setOptimisticBookingPatches] = useState<Map<string, Partial<DailyBookingRow>>>(() => new Map());
+  const [optimisticPayments, setOptimisticPayments] = useState<{ id: string; source_id: string; amount: number; payment_date: string }[]>([]);
+  const [optimisticCleaningTasks, setOptimisticCleaningTasks] = useState<{ id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[]>([]);
   const [optimisticCompletedCleaningIds, setOptimisticCompletedCleaningIds] = useState<Set<string>>(() => new Set());
   const [optimisticUnitStatuses, setOptimisticUnitStatuses] = useState<Map<string, UnitStatus>>(() => new Map());
+  const [backgroundOperation, setBackgroundOperation] = useState<{ label: string; state: "syncing" | "done" | "failed" } | null>(null);
   const [cleaningTarget, setCleaningTarget] = useState<{ taskId: string; unitNo: string } | null>(null);
   const [cleaningLoading, setCleaningLoading] = useState(false);
   const calendarViewportRef = useRef<HTMLDivElement | null>(null);
 
   const bookings = useMemo(() => {
+    const applyPatch = (booking: DailyBookingRow) => {
+      const patch = optimisticBookingPatches.get(booking.id);
+      return patch ? { ...booking, ...patch } : booking;
+    };
     const seen = new Set(optimisticBookings.map((booking) => booking.id));
-    return [...optimisticBookings, ...serverBookings.filter((booking) => !seen.has(booking.id))];
-  }, [serverBookings, optimisticBookings]);
+    return [
+      ...optimisticBookings.map(applyPatch),
+      ...serverBookings.filter((booking) => !seen.has(booking.id)).map(applyPatch),
+    ];
+  }, [serverBookings, optimisticBookings, optimisticBookingPatches]);
 
   const visibleDailyUnits = useMemo(() => {
     if (optimisticUnitStatuses.size === 0) return dailyUnits;
@@ -90,13 +101,55 @@ export function DailyCalendar({
   }, [dailyUnits, optimisticUnitStatuses]);
 
   const visibleCleaningTasks = useMemo(() => {
-    if (optimisticCompletedCleaningIds.size === 0) return cleaningTasks;
-    return cleaningTasks.map((task) => (
+    const serverTaskIds = new Set(cleaningTasks.map((task) => task.id));
+    const pendingOptimisticTasks = optimisticCleaningTasks.filter((task) => !serverTaskIds.has(task.id));
+    const mergedTasks = [...pendingOptimisticTasks, ...cleaningTasks];
+    if (optimisticCompletedCleaningIds.size === 0) return mergedTasks;
+    return mergedTasks.map((task) => (
       optimisticCompletedCleaningIds.has(task.id) ? { ...task, is_completed: true } : task
     ));
-  }, [cleaningTasks, optimisticCompletedCleaningIds]);
+  }, [cleaningTasks, optimisticCleaningTasks, optimisticCompletedCleaningIds]);
+
+  const visiblePayments = useMemo(() => {
+    const serverPaymentIds = new Set(payments.map((payment) => payment.id));
+    return [
+      ...optimisticPayments.filter((payment) => !serverPaymentIds.has(payment.id)),
+      ...payments,
+    ];
+  }, [payments, optimisticPayments]);
 
   useEffect(() => {
+    setOptimisticBookings((prev) => {
+      if (prev.length === 0) return prev;
+      const next = prev.filter((optimisticBooking) => !serverBookings.some((booking) => (
+        booking.unit_id === optimisticBooking.unit_id &&
+        booking.customer_id === optimisticBooking.customer_id &&
+        booking.check_in === optimisticBooking.check_in &&
+        (booking.check_out ?? null) === (optimisticBooking.check_out ?? null)
+      )));
+      return next.length === prev.length ? prev : next;
+    });
+    setOptimisticBookingPatches((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Map(prev);
+      for (const booking of serverBookings) {
+        const patch = next.get(booking.id);
+        if (!patch) continue;
+        const isSynced = Object.entries(patch).every(([key, value]) => booking[key as keyof DailyBookingRow] === value);
+        if (isSynced) next.delete(booking.id);
+      }
+      return next.size === prev.size ? prev : next;
+    });
+    setOptimisticPayments((prev) => {
+      if (prev.length === 0) return prev;
+      return payments.length > 0 ? [] : prev;
+    });
+    setOptimisticCleaningTasks((prev) => {
+      if (prev.length === 0) return prev;
+      const serverOpenTaskKeys = new Set(cleaningTasks.filter((task) => !task.is_completed).map((task) => `${task.unit_id}:${task.daily_booking_id ?? ""}`));
+      const next = prev.filter((task) => !serverOpenTaskKeys.has(`${task.unit_id}:${task.daily_booking_id ?? ""}`));
+      return next.length === prev.length ? prev : next;
+    });
     setOptimisticCompletedCleaningIds((prev) => {
       if (prev.size === 0) return prev;
       const next = new Set(prev);
@@ -114,7 +167,7 @@ export function DailyCalendar({
       }
       return next.size === prev.size ? prev : next;
     });
-  }, [cleaningTasks, dailyUnits]);
+  }, [serverBookings, payments, cleaningTasks, dailyUnits]);
 
   const localeStr = locale === "fr" ? "fr-FR" : "zh-CN";
   const todayStr = toDateStr(new Date());
@@ -146,6 +199,24 @@ export function DailyCalendar({
     for (const customer of customers) map.set(customer.id, customer);
     return map;
   }, [customers]);
+
+  const clearOptimisticState = useCallback(() => {
+    setOptimisticBookings([]);
+    setOptimisticBookingPatches(new Map());
+    setOptimisticPayments([]);
+    setOptimisticCleaningTasks([]);
+    setOptimisticCompletedCleaningIds(new Set());
+    setOptimisticUnitStatuses(new Map());
+  }, []);
+
+  const reportBackgroundOperation = useCallback((label: string, state: "syncing" | "done" | "failed") => {
+    setBackgroundOperation({ label, state });
+    if (state !== "syncing") {
+      window.setTimeout(() => {
+        setBackgroundOperation((current) => current?.label === label && current.state === state ? null : current);
+      }, 2600);
+    }
+  }, []);
 
   const bookingById = useMemo(() => {
     const map = new Map<string, DailyBookingRow>();
@@ -223,7 +294,7 @@ export function DailyCalendar({
     const outstandingBookings: DailyBookingRow[] = [];
     const settledBookings: DailyBookingRow[] = [];
 
-    for (const p of payments) {
+    for (const p of visiblePayments) {
       if (p.payment_date.startsWith(currentMonth)) {
         monthCollected += Number(p.amount);
         collectedPayments.push(p);
@@ -252,7 +323,7 @@ export function DailyCalendar({
       monthCollected, currentOutstanding, monthSettled,
       collectedPayments, outstandingBookings, settledBookings,
     };
-  }, [bookings, payments, todayStr]);
+  }, [bookings, visiblePayments, todayStr]);
 
   const collectedPaymentGroups = useMemo(() => {
     const groups = new Map<string, {
@@ -400,6 +471,29 @@ export function DailyCalendar({
 
   return (
     <div data-daily-calendar-root className="relative isolate space-y-5">
+      {backgroundOperation && (
+        <div
+          className={cn(
+            "sticky top-14 z-30 flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-semibold shadow-card",
+            backgroundOperation.state === "failed"
+              ? "border-accentRed-200 bg-accentRed-50 text-accentRed-700"
+              : backgroundOperation.state === "done"
+                ? "border-accentGreen-200 bg-accentGreen-50 text-accentGreen-700"
+                : "border-primary/15 bg-primary/5 text-primary",
+          )}
+          role="status"
+          aria-live="polite"
+        >
+          <span>{backgroundOperation.label}</span>
+          <span className="font-medium">
+            {backgroundOperation.state === "syncing"
+              ? (locale === "zh" ? "后台同步中" : "Synchronisation")
+              : backgroundOperation.state === "done"
+                ? (locale === "zh" ? "已确认" : "Confirme")
+                : (locale === "zh" ? "失败，已回滚" : "Echec, annule")}
+          </span>
+        </div>
+      )}
       <section className="relative z-20 overflow-hidden rounded-xl border border-border bg-card shadow-card">
         <div className="flex flex-col gap-3 border-b border-border px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -642,16 +736,49 @@ export function DailyCalendar({
           units={visibleDailyUnits}
           customers={customers}
           cleaningTasks={visibleCleaningTasks}
-          payments={payments}
+          payments={visiblePayments}
           locale={locale}
           onClose={() => {
             setSelectedBookingId(null);
             setNewBookingUnitId(null);
             setNewBookingDate(null);
-            setOptimisticBookings([]);
+            clearOptimisticState();
           }}
-          onChanged={() => { setTick((t) => t + 1); setOptimisticBookings([]); }}
+          onOptimisticClose={() => {
+            setSelectedBookingId(null);
+            setNewBookingUnitId(null);
+            setNewBookingDate(null);
+          }}
+          onChanged={() => { setTick((t) => t + 1); }}
           onBookingCreated={(booking) => setOptimisticBookings((prev) => [booking, ...prev])}
+          onBookingPatched={(bookingId, patch) => setOptimisticBookingPatches((prev) => {
+            const next = new Map(prev);
+            next.set(bookingId, { ...(next.get(bookingId) ?? {}), ...patch });
+            return next;
+          })}
+          onUnitStatusPatched={(targetUnitId, status) => setOptimisticUnitStatuses((prev) => {
+            const next = new Map(prev);
+            next.set(targetUnitId, status);
+            return next;
+          })}
+          onCleaningTaskAdded={(task) => setOptimisticCleaningTasks((prev) => [task, ...prev])}
+          onCleaningTaskCompleted={(taskId, targetUnitId, status) => {
+            setOptimisticCompletedCleaningIds((prev) => {
+              const next = new Set(prev);
+              next.add(taskId);
+              return next;
+            });
+            setOptimisticUnitStatuses((prev) => {
+              const next = new Map(prev);
+              next.set(targetUnitId, status);
+              return next;
+            });
+          }}
+          onPaymentAdded={(payment) => setOptimisticPayments((prev) => [payment, ...prev])}
+          onOptimisticReset={() => {
+            clearOptimisticState();
+          }}
+          onBackgroundOperation={reportBackgroundOperation}
         />
       )}
 
