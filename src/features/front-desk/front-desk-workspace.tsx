@@ -8,9 +8,11 @@ import { formatXof, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { OperationStatusBanner } from "@/components/operation-status-banner";
 import type { DailyBookingRow, UnitRow, CustomerRow, PaymentRow } from "@/types/database";
 import { checkIn, checkOut as checkoutAction, recordSupplementaryPayment, cancelBooking, confirmBooking } from "@/features/daily-rentals/actions";
 import { computeRoomStates, getOccupiedRooms, getTodayCheckouts, getReservedRooms, getCleaningRooms, getAvailableRooms, getOtherRooms, type RoomState } from "@/features/mobile/room-state";
+import { useBackgroundOperationStatus, useOptimisticOperation } from "@/hooks/use-optimistic-operation";
 
 const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -77,6 +79,14 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
   const [copied, setCopied] = useState(false);
+  const { operation: backgroundOperation, reportOperation: reportBackgroundOperation } = useBackgroundOperationStatus();
+  const { pendingLabel, runOptimisticOperation } = useOptimisticOperation({
+    setBusy: setLoading,
+    clearErrors: () => setMsg(""),
+    onRefresh: () => router.refresh(),
+    onError: (message) => setMsg(message ?? (locale === "zh" ? "\u5931\u8d25" : "Erreur")),
+    reportBackgroundOperation,
+  });
 
   // ── Floor groups for matrix ──
   const floorGroups = useMemo(() => {
@@ -145,8 +155,38 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
 
   const roomCustomer = (rs: RoomState): string => rs.customer?.name ?? (rs.displayStatus==="available"?locale==="zh"?"可安排入住":"Disponible":locale==="zh"?"暂无":"-");
 
+  const doActionFast = async () => {
+    if (!selectedRoom?.booking) return;
+    const room = selectedRoom;
+    const action = popupAction;
+    const amount = popupAmount;
+    const receiptNo = popupReceiptNo;
+    const label = actionLabel(action, t);
+    await runOptimisticOperation(label, async () => {
+      let result: {success:boolean;error?:string} = {success:false};
+      switch(action) {
+        case "checkin": result=await checkIn(room.booking!.id,amount); break;
+        case "checkout": result=await checkoutAction(room.booking!.id,{}); break;
+        case "payment": result=await recordSupplementaryPayment({bookingId:room.booking!.id,amount,receiptNo:receiptNo||undefined}); break;
+        case "cancel": result=await cancelBooking(room.booking!.id); break;
+        case "confirm": result=await confirmBooking(room.booking!.id); break;
+      }
+      return result;
+    }, {
+      background: true,
+      release: () => {
+        setPopupAction(null);
+        setSelectedRoom(null);
+        setPopupAmount(0);
+        setPopupReceiptNo("");
+      },
+    });
+  };
+
   return (
     <div className="flex flex-col gap-4 pb-8">
+      <OperationStatusBanner operation={backgroundOperation} locale={locale} className="top-2" />
+
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
@@ -246,7 +286,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
                 {popupAction==="payment" && <div><input type="text" value={popupReceiptNo} onChange={e=>setPopupReceiptNo(e.target.value)} className="w-full rounded-md border px-3 py-2 text-sm" placeholder={locale==="zh"?"收据号":"Recu"}/></div>}
                 {msg && <p className="text-xs text-red-600">{msg}</p>}
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={doAction} disabled={loading}>{loading ? "..." : actionLabel(popupAction, t)}</Button>
+                  <Button size="sm" onClick={doActionFast} disabled={loading}>{pendingLabel || actionLabel(popupAction, t)}</Button>
                   <Button size="sm" variant="ghost" onClick={()=>setPopupAction(null)}>{locale==="zh"?"返回":"Retour"}</Button>
                 </div>
               </div>

@@ -12,6 +12,7 @@ import { MobileStatsBar } from "./mobile-stats-bar";
 import { MobileRoomCard } from "./mobile-room-card";
 import { MobileRoomDrawer } from "./mobile-room-drawer";
 import { ConfirmDialog } from "./confirm-dialog";
+import { OperationStatusBanner } from "@/components/operation-status-banner";
 import {
   computeRoomStates,
   getOccupiedRooms,
@@ -24,6 +25,7 @@ import {
   type RoomDisplayStatus,
 } from "./room-state";
 import { checkOut, completeCleaning } from "@/features/daily-rentals/actions";
+import { useBackgroundOperationStatus, useOptimisticOperation } from "@/hooks/use-optimistic-operation";
 
 interface MobileTodayWorkspaceProps {
   dailyUnits: UnitRow[];
@@ -108,6 +110,12 @@ export function MobileTodayWorkspace({
   const [checkoutTarget, setCheckoutTarget] = useState<RoomState | null>(null);
   const [cleaningTarget, setCleaningTarget] = useState<RoomState | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const { operation: backgroundOperation, reportOperation: reportBackgroundOperation } = useBackgroundOperationStatus();
+  const { runOptimisticOperation } = useOptimisticOperation({
+    setBusy: setActionLoading,
+    onRefresh: () => router.refresh(),
+    reportBackgroundOperation,
+  });
 
   const filteredRooms = useMemo(() => {
     switch (activeTab) {
@@ -158,34 +166,29 @@ export function MobileTodayWorkspace({
 
   const executeCheckOut = useCallback(async () => {
     if (!checkoutTarget?.booking) return;
-    setActionLoading(true);
-    try {
-      await checkOut(checkoutTarget.booking.id, {});
-      router.replace(window.location.pathname + window.location.search + (window.location.search ? '&' : '?') + '_t=' + Date.now());
-    } catch (e) {
-      console.error("Checkout failed:", e);
-    } finally {
-      setActionLoading(false);
-      setCheckoutTarget(null);
-    }
-  }, [checkoutTarget, router]);
+    const target = checkoutTarget;
+    await runOptimisticOperation(dictionaries[locale].mobile.actions.checkOut, async () => {
+      await checkOut(target.booking!.id, {});
+    }, {
+      background: true,
+      release: () => setCheckoutTarget(null),
+    });
+  }, [checkoutTarget, locale, runOptimisticOperation]);
 
   const executeCleaning = useCallback(async () => {
     if (!cleaningTarget?.cleaningTask) return;
-    setActionLoading(true);
-    try {
-      const result = await completeCleaning(cleaningTarget.cleaningTask.id);
+    const target = cleaningTarget;
+    await runOptimisticOperation(dictionaries[locale].mobile.actions.completeCleaning, async () => {
+      const result = await completeCleaning(target.cleaningTask!.id);
       if (result.success && result.taskId && result.unitId && result.unitStatus) {
         applyCompletedCleaning({ taskId: result.taskId, unitId: result.unitId, unitStatus: result.unitStatus });
-        router.refresh();
       }
-    } catch (e) {
-      console.error("Cleaning completion failed:", e);
-    } finally {
-      setActionLoading(false);
-      setCleaningTarget(null);
-    }
-  }, [applyCompletedCleaning, cleaningTarget, router]);
+      return result;
+    }, {
+      background: true,
+      release: () => setCleaningTarget(null),
+    });
+  }, [applyCompletedCleaning, cleaningTarget, locale, runOptimisticOperation]);
 
   const todayFormatted = new Date().toLocaleDateString(
     locale === "fr" ? "fr-FR" : "zh-CN",
@@ -194,6 +197,8 @@ export function MobileTodayWorkspace({
 
   return (
     <div className="space-y-4 pb-2">
+      <OperationStatusBanner operation={backgroundOperation} locale={locale} className="top-2" />
+
       <section className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
         <div className="flex items-start justify-between gap-3 px-4 py-4">
           <div className="min-w-0">
@@ -261,6 +266,7 @@ export function MobileTodayWorkspace({
         onClose={handleCloseDrawer}
         locale={locale}
         onCleaningCompleted={applyCompletedCleaning}
+        onBackgroundOperation={reportBackgroundOperation}
       />
 
       {/* Checkout confirmation */}

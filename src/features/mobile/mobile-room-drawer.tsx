@@ -17,6 +17,7 @@ import type { RoomState } from "./room-state";
 import type { UnitStatus } from "@/types/domain";
 import { checkOut, recordSupplementaryPayment, completeCleaning, extendStay } from "@/features/daily-rentals/actions";
 import { updateUnitStatus } from "@/features/units/actions";
+import { type BackgroundOperationReporter, useOptimisticOperation } from "@/hooks/use-optimistic-operation";
 
 function displayStatusToUnitStatus(s: RoomState["displayStatus"]): UnitStatus {
   switch (s) {
@@ -34,12 +35,34 @@ function displayStatusToUnitStatus(s: RoomState["displayStatus"]): UnitStatus {
   }
 }
 
+type MobileActionLabels = typeof dictionaries[keyof typeof dictionaries]["mobile"]["actions"];
+
+function drawerActionLabel(action: Exclude<DrawerAction, null>, labels: MobileActionLabels) {
+  switch (action.type) {
+    case "checkout":
+      return labels.checkOut;
+    case "payment":
+      return labels.recordPayment;
+    case "cleaning":
+      return labels.completeCleaning;
+    case "maintenance":
+      return labels.maintenance;
+    case "lock":
+      return labels.lock;
+    case "markAvailable":
+      return labels.markAvailable;
+    case "extendStay":
+      return labels.extendStay;
+  }
+}
+
 interface MobileRoomDrawerProps {
   room: RoomState | null;
   open: boolean;
   onClose: () => void;
   locale: Locale;
   onCleaningCompleted?: (result: { taskId: string; unitId: string; unitStatus: UnitStatus }) => void;
+  onBackgroundOperation?: BackgroundOperationReporter;
 }
 
 type DrawerAction =
@@ -52,7 +75,7 @@ type DrawerAction =
   | { type: "extendStay" }
   | null;
 
-export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningCompleted }: MobileRoomDrawerProps) {
+export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningCompleted, onBackgroundOperation }: MobileRoomDrawerProps) {
   const t = dictionaries[locale].mobile;
   const router = useRouter();
   const [action, setAction] = useState<DrawerAction>(null);
@@ -61,6 +84,11 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
   const [extendDate, setExtendDate] = useState("");
   const [phoneCopied, setPhoneCopied] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const { pendingLabel, runOptimisticOperation } = useOptimisticOperation({
+    setBusy: setLoading,
+    onRefresh: () => router.refresh(),
+    reportBackgroundOperation: onBackgroundOperation,
+  });
 
   const resetState = useCallback(() => {
     setAction(null);
@@ -104,41 +132,44 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
 
   const executeAction = async () => {
     if (!action || !room) return;
-    setLoading(true);
-    try {
-      if (action.type === "checkout" && room.booking) {
-        await checkOut(room.booking.id, {});
-      } else if (action.type === "payment" && room.booking && paymentAmount) {
-        const amt = Math.round(Number(paymentAmount));
-        if (amt <= 0) return;
-        await recordSupplementaryPayment({ bookingId: room.booking.id, amount: amt });
-      } else if (action.type === "cleaning" && room.cleaningTask) {
-        const result = await completeCleaning(room.cleaningTask.id);
+    const currentAction = action;
+    const currentRoom = room;
+    const amount = paymentAmount;
+    const checkoutDate = extendDate;
+    const label = drawerActionLabel(currentAction, actionLabels);
+    await runOptimisticOperation(label, async () => {
+      if (currentAction.type === "checkout" && currentRoom.booking) {
+        await checkOut(currentRoom.booking.id, {});
+      } else if (currentAction.type === "payment" && currentRoom.booking && amount) {
+        const amt = Math.round(Number(amount));
+        if (amt <= 0) return { success: false, error: "Invalid amount" };
+        await recordSupplementaryPayment({ bookingId: currentRoom.booking.id, amount: amt });
+      } else if (currentAction.type === "cleaning" && currentRoom.cleaningTask) {
+        const result = await completeCleaning(currentRoom.cleaningTask.id);
         if (result.success && result.taskId && result.unitId && result.unitStatus) {
           onCleaningCompleted?.({ taskId: result.taskId, unitId: result.unitId, unitStatus: result.unitStatus });
         }
-      } else if (action.type === "maintenance") {
-        await updateUnitStatus(room.unit.id, "maintenance");
-      } else if (action.type === "lock") {
-        await updateUnitStatus(room.unit.id, "locked");
-      } else if (action.type === "markAvailable") {
-        await updateUnitStatus(room.unit.id, "available");
-      } else if (action.type === "extendStay" && room.booking && extendDate) {
-        const currentCheckOut = room.booking.check_out ?? new Date().toISOString().slice(0, 10);
-        const newDate = new Date(extendDate);
+      } else if (currentAction.type === "maintenance") {
+        await updateUnitStatus(currentRoom.unit.id, "maintenance");
+      } else if (currentAction.type === "lock") {
+        await updateUnitStatus(currentRoom.unit.id, "locked");
+      } else if (currentAction.type === "markAvailable") {
+        await updateUnitStatus(currentRoom.unit.id, "available");
+      } else if (currentAction.type === "extendStay" && currentRoom.booking && checkoutDate) {
+        const currentCheckOut = currentRoom.booking.check_out ?? new Date().toISOString().slice(0, 10);
+        const newDate = new Date(checkoutDate);
         const oldDate = new Date(currentCheckOut);
         const extraNights = Math.max(1, Math.ceil((newDate.getTime() - oldDate.getTime()) / (1000 * 60 * 60 * 24)));
-        const extraAmount = Math.round(extraNights * Number(room.booking.nightly_price_xof));
-        await extendStay(room.booking.id, extendDate, extraNights, extraAmount);
+        const extraAmount = Math.round(extraNights * Number(currentRoom.booking.nightly_price_xof));
+        await extendStay(currentRoom.booking.id, checkoutDate, extraNights, extraAmount);
       }
-      resetState();
-      router.refresh();
-      onClose();
-    } catch (e) {
-      console.error("Action failed:", e);
-    } finally {
-      setLoading(false);
-    }
+    }, {
+      background: true,
+      release: () => {
+        resetState();
+        onClose();
+      },
+    });
   };
 
   const actionLabels = t.actions;
@@ -280,7 +311,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
                     onClick={executeAction}
                     disabled={loading || !paymentAmount || Number(paymentAmount) <= 0}
                   >
-                    {actionLabels.save}
+                    {pendingLabel || actionLabels.save}
                   </Button>
                 </div>
               </div>
@@ -311,7 +342,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
                     onClick={executeAction}
                     disabled={loading || !extendDate}
                   >
-                    {actionLabels.save}
+                    {pendingLabel || actionLabels.save}
                   </Button>
                 </div>
               </div>

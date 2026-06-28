@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
 import { controlClass } from "@/components/ui/operational";
+import { useOptimisticOperation } from "@/hooks/use-optimistic-operation";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import type { CustomerSummary } from "./calendar";
@@ -97,10 +98,8 @@ export function BookingPanel({
   const [fixedCheckOutDate, setFixedCheckOutDate] = useState("");
   const [actionError, setActionError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; amount: number } | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
   const [showAdvancedActions, setShowAdvancedActions] = useState(false);
   const [activeAdvancedTask, setActiveAdvancedTask] = useState<AdvancedTask>(null);
-  const [pendingActionLabel, setPendingActionLabel] = useState("");
 
   // ── Backfill form state ──
   const [bfUnitId, setBfUnitId] = useState("");
@@ -189,52 +188,28 @@ export function BookingPanel({
   const inputClass = cn("w-full bg-card", controlClass);
   const labelClass = "mb-1 block text-xs font-semibold text-muted-foreground";
   const formatError = (message?: string | null) => formatDailyRentalError(message, locale);
+  const { pendingLabel: pendingActionLabel, runOptimisticOperation } = useOptimisticOperation({
+    setBusy: setSaving,
+    clearErrors: () => {
+      setActionError("");
+      setError("");
+    },
+    onRollback: onOptimisticReset,
+    onRefresh: refresh,
+    onError: (message) => setActionError(formatError(message ?? "unknownError")),
+    reportBackgroundOperation: onBackgroundOperation,
+  });
 
   const runPanelAction = async (
     label: string,
     action: () => Promise<{ success: boolean; error?: string } | void>,
     options: { closeImmediately?: boolean; clearAdvancedTask?: boolean } = {},
   ) => {
-    setSaving(true);
-    setActionError("");
-    setError("");
-    setPendingActionLabel(label);
-    if (options.clearAdvancedTask) setActiveAdvancedTask(null);
-
-    if (options.closeImmediately) {
-      onBackgroundOperation?.(label, "syncing");
-      (onOptimisticClose ?? onClose)();
-      action().then((result) => {
-        if (result && !result.success) {
-          onOptimisticReset?.();
-          onBackgroundOperation?.(label, "failed");
-          return;
-        }
-        refresh();
-        onBackgroundOperation?.(label, "done");
-      }).catch((err) => {
-        console.error("Daily rental background action failed:", err);
-        onOptimisticReset?.();
-        onBackgroundOperation?.(label, "failed");
-      });
-      return;
-    }
-
-    try {
-      const result = await action();
-      if (result && !result.success) {
-        onOptimisticReset?.();
-        setActionError(formatError(result.error));
-        return;
-      }
-      refresh();
-    } catch (err) {
-      onOptimisticReset?.();
-      setActionError(err instanceof Error ? err.message : formatError("unknownError"));
-    } finally {
-      setSaving(false);
-      setPendingActionLabel("");
-    }
+    await runOptimisticOperation(label, action, {
+      background: options.closeImmediately,
+      release: options.closeImmediately ? (onOptimisticClose ?? onClose) : undefined,
+      beforeStart: options.clearAdvancedTask ? () => setActiveAdvancedTask(null) : undefined,
+    });
   };
 
   const makeOptimisticPayment = (amount: number, paymentDate: string) => ({
@@ -981,24 +956,10 @@ export function BookingPanel({
         onConfirm={() => {
           if (!deleteTarget) return;
           const target = deleteTarget;
-          const label = locale === "zh" ? "正在删除收款" : "Suppression en cours";
-          setDeleteTarget(null);
-          setPendingActionLabel(label);
-          onBackgroundOperation?.(label, "syncing");
-          deletePayment(target.id).then((result) => {
-            if (result && !result.success) {
-              onOptimisticReset?.();
-              onBackgroundOperation?.(label, "failed");
-              return;
-            }
-            refresh();
-            onBackgroundOperation?.(label, "done");
-          }).catch((err) => {
-            console.error("Daily rental payment deletion failed:", err);
-            onOptimisticReset?.();
-            onBackgroundOperation?.(label, "failed");
-          }).finally(() => {
-            setPendingActionLabel("");
+          const label = locale === "zh" ? "\u6b63\u5728\u5220\u9664\u6536\u6b3e" : "Suppression en cours";
+          void runOptimisticOperation(label, () => deletePayment(target.id), {
+            background: true,
+            release: () => setDeleteTarget(null),
           });
         }}
         title={locale === "zh" ? "删除收款记录" : "Supprimer le paiement"}
@@ -1007,7 +968,7 @@ export function BookingPanel({
           : ""}
         confirmLabel={locale === "zh" ? "确认删除" : "Supprimer"}
         locale={locale}
-        loading={deleteLoading}
+        loading={false}
       />
     </>
   );

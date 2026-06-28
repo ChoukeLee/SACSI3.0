@@ -8,6 +8,8 @@ import { cn, formatXof, normalizeFloorLabel, floorSortValue } from "@/lib/utils"
 import { COPY, BOOKING_STATUS_LABELS } from "./calendar-constants";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl, StatTile } from "@/components/ui/operational";
+import { OperationStatusBanner } from "@/components/operation-status-banner";
+import { useBackgroundOperationStatus } from "@/hooks/use-optimistic-operation";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import { BookingPanel } from "./booking-panel";
@@ -75,7 +77,7 @@ export function DailyCalendar({
   const [optimisticCleaningTasks, setOptimisticCleaningTasks] = useState<{ id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[]>([]);
   const [optimisticCompletedCleaningIds, setOptimisticCompletedCleaningIds] = useState<Set<string>>(() => new Set());
   const [optimisticUnitStatuses, setOptimisticUnitStatuses] = useState<Map<string, UnitStatus>>(() => new Map());
-  const [backgroundOperation, setBackgroundOperation] = useState<{ label: string; state: "syncing" | "done" | "failed" } | null>(null);
+  const { operation: backgroundOperation, reportOperation: reportBackgroundOperation } = useBackgroundOperationStatus();
   const [cleaningTarget, setCleaningTarget] = useState<{ taskId: string; unitNo: string } | null>(null);
   const [cleaningLoading, setCleaningLoading] = useState(false);
   const calendarViewportRef = useRef<HTMLDivElement | null>(null);
@@ -207,15 +209,6 @@ export function DailyCalendar({
     setOptimisticCleaningTasks([]);
     setOptimisticCompletedCleaningIds(new Set());
     setOptimisticUnitStatuses(new Map());
-  }, []);
-
-  const reportBackgroundOperation = useCallback((label: string, state: "syncing" | "done" | "failed") => {
-    setBackgroundOperation({ label, state });
-    if (state !== "syncing") {
-      window.setTimeout(() => {
-        setBackgroundOperation((current) => current?.label === label && current.state === state ? null : current);
-      }, 2600);
-    }
   }, []);
 
   const bookingById = useMemo(() => {
@@ -471,29 +464,7 @@ export function DailyCalendar({
 
   return (
     <div data-daily-calendar-root className="relative isolate space-y-5">
-      {backgroundOperation && (
-        <div
-          className={cn(
-            "sticky top-14 z-30 flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-semibold shadow-card",
-            backgroundOperation.state === "failed"
-              ? "border-accentRed-200 bg-accentRed-50 text-accentRed-700"
-              : backgroundOperation.state === "done"
-                ? "border-accentGreen-200 bg-accentGreen-50 text-accentGreen-700"
-                : "border-primary/15 bg-primary/5 text-primary",
-          )}
-          role="status"
-          aria-live="polite"
-        >
-          <span>{backgroundOperation.label}</span>
-          <span className="font-medium">
-            {backgroundOperation.state === "syncing"
-              ? (locale === "zh" ? "后台同步中" : "Synchronisation")
-              : backgroundOperation.state === "done"
-                ? (locale === "zh" ? "已确认" : "Confirme")
-                : (locale === "zh" ? "失败，已回滚" : "Echec, annule")}
-          </span>
-        </div>
-      )}
+      <OperationStatusBanner operation={backgroundOperation} locale={locale} />
       <section className="relative z-20 overflow-hidden rounded-xl border border-border bg-card shadow-card">
         <div className="flex flex-col gap-3 border-b border-border px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between">
           <div>
