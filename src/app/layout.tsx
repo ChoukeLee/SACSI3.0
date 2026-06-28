@@ -27,9 +27,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           (function(){
             try {
               if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-              if (location.pathname === '/daily-rentals' || location.pathname === '/fr/daily-rentals') {
-                window.scrollTo(0, 0);
-              }
               // Prevent flash of wrong theme
               const theme = localStorage.getItem('sacsi-theme');
               if (theme === 'dark') document.documentElement.classList.add('dark');

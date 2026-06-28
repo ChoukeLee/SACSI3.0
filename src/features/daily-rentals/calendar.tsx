@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Plus, Printer, SlidersHorizontal, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
@@ -418,15 +418,6 @@ export function DailyCalendar({
   }, [shareRows, locale]);
 
   const panelBooking = selectedBookingId ? bookingById.get(selectedBookingId) ?? null : null;
-
-  useLayoutEffect(() => {
-    if ("scrollRestoration" in window.history) {
-      window.history.scrollRestoration = "manual";
-    }
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
-  }, []);
 
   useEffect(() => {
     const viewport = calendarViewportRef.current;

@@ -70,10 +70,8 @@ export function BookingPanel({
   const isNew = !booking && !backfillMode;
   const isBackfill = !!backfillMode;
 
-  // router.refresh() (soft RSC re-fetch) can fail to propagate new bookings
-  // to the calendar grid. Hard navigation to current path guarantees fresh data.
   const refresh = () => {
-    router.replace(window.location.pathname + window.location.search + (window.location.search ? '&' : '?') + '_t=' + Date.now());
+    router.refresh();
     onChanged();
   };
 
