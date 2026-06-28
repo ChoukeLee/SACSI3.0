@@ -26,7 +26,12 @@ export function DateInput({ value, onChangeValue, className, onBlur, ...props }:
         "flex h-9 w-full rounded-lg border border-border bg-card px-3 py-1.5 text-[13px] shadow-xs outline-offset-2 transition-colors duration-fast placeholder:text-muted-foreground/60 hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60",
         className,
       )}
-      onChange={(event) => setDisplayValue(event.target.value)}
+      onChange={(event) => {
+        const nextValue = event.target.value;
+        setDisplayValue(nextValue);
+        const parsed = parseDateInput(nextValue);
+        if (parsed !== null) onChangeValue(parsed);
+      }}
       onBlur={(event) => {
         const parsed = parseDateInput(displayValue);
         if (parsed) {
