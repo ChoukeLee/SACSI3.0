@@ -33,7 +33,7 @@ export interface DailyLodgingBusinessTypeInput {
 }
 
 export function getDailyLodgingBusinessType(input: DailyLodgingBusinessTypeInput): DailyLodgingBusinessType {
-  const isPaid = input.finalAmount - input.paidAmount < 1;
+  const isPaid = input.finalAmount - input.paidAmount <= 1;
 
   if (input.status === "cancelled") return "cancelled";
 

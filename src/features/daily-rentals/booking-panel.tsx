@@ -155,7 +155,7 @@ export function BookingPanel({
   const billing = booking ? calculateBilling(booking) : null;
   const finalDue = billing?.finalAmount ?? 0;
   const rawOutstanding = finalDue - totalPaid;
-  const outstanding = rawOutstanding < 1 ? 0 : Math.max(0, rawOutstanding);
+  const outstanding = rawOutstanding <= 1 ? 0 : Math.max(0, rawOutstanding);
   const hasOutstandingBalance = outstanding > 0;
   const lodgingBusinessType = booking && billing
     ? getDailyLodgingBusinessType({
