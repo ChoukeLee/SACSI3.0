@@ -154,7 +154,9 @@ export function BookingPanel({
     : unitCleaningTask;
   const billing = booking ? calculateBilling(booking) : null;
   const finalDue = billing?.finalAmount ?? 0;
-  const outstanding = Math.max(0, finalDue - totalPaid);
+  const rawOutstanding = finalDue - totalPaid;
+  const outstanding = rawOutstanding < 1 ? 0 : Math.max(0, rawOutstanding);
+  const hasOutstandingBalance = outstanding > 0;
   const lodgingBusinessType = booking && billing
     ? getDailyLodgingBusinessType({
         status: booking.status as "pending_review" | "confirmed" | "checked_in" | "checked_out" | "cancelled",
@@ -169,17 +171,17 @@ export function BookingPanel({
     ? getPrimaryDailyAction({
         bookingStatus: booking.status as "pending_review" | "confirmed" | "checked_in" | "checked_out" | "cancelled",
         hasOpenCleaningTask: Boolean(effectiveCleaningTask),
-        hasOutstandingBalance: outstanding > 0,
+        hasOutstandingBalance,
       })
     : null;
 
   useEffect(() => {
-    if (booking?.status === "checked_out" && outstanding > 0) {
+    if (booking?.status === "checked_out" && hasOutstandingBalance) {
       setSuppAmount(String(outstanding));
       setSuppPaymentDate(new Date().toISOString().slice(0, 10));
       setSuppReceiptNo("");
     }
-  }, [booking?.id, booking?.status, outstanding]);
+  }, [booking?.id, booking?.status, hasOutstandingBalance, outstanding]);
 
   const toN = (s: string) => parseInt(s, 10) || 0;
 
@@ -621,12 +623,12 @@ export function BookingPanel({
                 </div>
               </div>
 
-              <div className={cn("mt-3 flex items-center justify-between rounded-lg border px-3 py-2 text-sm", outstanding > 0 ? "border-accentRed-200 bg-accentRed-50 text-accentRed-700" : "border-accentGreen-200 bg-accentGreen-50 text-accentGreen-700")}>
+              <div className={cn("mt-3 flex items-center justify-between rounded-lg border px-3 py-2 text-sm", hasOutstandingBalance ? "border-accentRed-200 bg-accentRed-50 text-accentRed-700" : "border-accentGreen-200 bg-accentGreen-50 text-accentGreen-700")}>
                 <span className="inline-flex items-center gap-1.5 font-semibold">
                   <WalletCards className="h-4 w-4" />
-                  {outstanding > 0 ? t.billing.outstanding : t.billing.paid}
+                  {hasOutstandingBalance ? t.billing.outstanding : t.billing.paid}
                 </span>
-                <span className="tabular-nums font-semibold">{outstanding > 0 ? formatXof(outstanding) : formatXof(totalPaid)}</span>
+                <span className="tabular-nums font-semibold">{hasOutstandingBalance ? formatXof(outstanding) : formatXof(totalPaid)}</span>
               </div>
             </section>
 
@@ -639,12 +641,12 @@ export function BookingPanel({
                   {billing.discount > 0 && <div className="flex justify-between text-accentGreen-600"><span>{t.billing.discount}</span><span>-{formatXof(billing.discount)}</span></div>}
                   <div className="flex justify-between border-t border-border pt-1 font-semibold"><span>{t.billing.finalAmount}</span><span>{formatXof(billing.finalAmount)}</span></div>
                   <div className="flex justify-between"><span className="text-foreground/70">{t.billing.paid}</span><span>{formatXof(totalPaid)}</span></div>
-                  {outstanding > 0 && <div className="flex justify-between text-accentRed-600 font-semibold"><span>{t.billing.outstanding}</span><span>{formatXof(outstanding)}</span></div>}
+                  {hasOutstandingBalance && <div className="flex justify-between text-accentRed-600 font-semibold"><span>{t.billing.outstanding}</span><span>{formatXof(outstanding)}</span></div>}
                 </>
               )}
             </div>
 
-            {billing?.eligibleForMonthlyDiscount && outstanding > 0 && (
+            {billing?.eligibleForMonthlyDiscount && hasOutstandingBalance && (
               <div className="rounded-lg border border-amber-200 bg-accentAmber-50 p-3 text-xs text-accentAmber-700">
                 <Percent className="inline h-3.5 w-3.5 mr-1" />
                 {t.monthlyDiscountHint.replace("{nights}", String(billing.nights)).replace("{gross}", formatXof(billing.grossAmount))}
