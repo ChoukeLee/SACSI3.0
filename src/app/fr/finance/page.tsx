@@ -1,13 +1,12 @@
-﻿import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
-import { LedgerList } from "@/features/finance";
-import { ReceivableList } from "@/features/finance/receivable-list";
-import { FinanceTabs } from "@/features/finance/finance-tabs";
+import { FinanceLazyView } from "@/features/finance/finance-lazy-view";
+import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
 import { PageHeader } from "@/components/page-header";
 import type { LedgerEntryRow, ReceivableRow, BuildingRow } from "@/types/database";
-
 
 interface AttachmentRow { id: string; storage_path: string; linked_id: string; file_type: string; ocr_text: string | null; ocr_provider: string | null; metadata: Record<string, unknown> | null; paper_archive_status: string; paper_archive_location: string | null; uploaded_at: string; }
 
@@ -17,10 +16,20 @@ export const revalidate = 0;
 export default async function FrenchFinancePage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!["admin","boss","finance"].includes(user.role)) redirect("/");
+  if (!["admin", "boss", "finance"].includes(user.role)) redirect("/");
 
+  return (
+    <div className="space-y-5">
+      <PageHeader title="Finance" description="Ecritures, creances et rapprochement des recus" />
+      <Suspense fallback={<OperationalPageSkeleton kind="table" rows={8} />}>
+        <FrenchFinanceData />
+      </Suspense>
+    </div>
+  );
+}
+
+async function FrenchFinanceData() {
   const supabase = await createClient();
-
   const { data: building } = await supabase.from("buildings").select("id").eq("code", "SACSI11").single();
   const buildingId = building?.id ?? null;
 
@@ -48,17 +57,5 @@ export default async function FrenchFinancePage() {
     if (!attachmentsRes.error) attachments = (attachmentsRes.data ?? []) as unknown as AttachmentRow[];
   }
 
-  return (
-    <div className="space-y-5">
-      <PageHeader
-        title="Finance"
-        description="Ecritures, creances et rapprochement des recus"
-      />
-      <FinanceTabs
-        ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale="fr" attachments={attachments} />}
-        receivables={<ReceivableList receivables={receivables} units={units} customers={customers} buildings={buildings} locale="fr" />}
-        locale="fr"
-      />
-    </div>
-  );
+  return <FinanceLazyView entries={entries} units={units} buildingId={buildingId} receivables={receivables} customers={customers} buildings={buildings} locale="fr" attachments={attachments} />;
 }

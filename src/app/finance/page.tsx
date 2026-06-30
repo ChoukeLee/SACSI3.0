@@ -1,14 +1,13 @@
-﻿import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
-import { LedgerList } from "@/features/finance";
-import { ReceivableList } from "@/features/finance/receivable-list";
-import { FinanceTabs } from "@/features/finance/finance-tabs";
+import { FinanceLazyView } from "@/features/finance/finance-lazy-view";
+import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
 import { PageHeader } from "@/components/page-header";
 import type { LedgerEntryRow, ReceivableRow, BuildingRow } from "@/types/database";
-
 
 interface AttachmentRow { id: string; storage_path: string; linked_id: string; file_type: string; ocr_text: string | null; ocr_provider: string | null; metadata: Record<string, unknown> | null; paper_archive_status: string; paper_archive_location: string | null; uploaded_at: string; }
 
@@ -21,8 +20,19 @@ export default async function FinancePage() {
   if (!["admin", "boss", "finance"].includes(user.role)) redirect("/");
 
   const t = dictionaries.zh.finance;
-  const supabase = await createClient();
 
+  return (
+    <div className="space-y-5">
+      <PageHeader title={t.title} description={t.description} />
+      <Suspense fallback={<OperationalPageSkeleton kind="table" rows={8} />}>
+        <FinanceData locale="zh" />
+      </Suspense>
+    </div>
+  );
+}
+
+async function FinanceData({ locale }: { locale: "zh" | "fr" }) {
+  const supabase = await createClient();
   const { data: building } = await supabase.from("buildings").select("id").eq("code", "SACSI11").single();
   const buildingId = building?.id ?? null;
 
@@ -50,17 +60,5 @@ export default async function FinancePage() {
     if (!attachmentsRes.error) attachments = (attachmentsRes.data ?? []) as unknown as AttachmentRow[];
   }
 
-  return (
-    <div className="space-y-5">
-      <PageHeader
-        title={t.title}
-        description={t.description}
-      />
-      <FinanceTabs
-        ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale="zh" attachments={attachments} />}
-        receivables={<ReceivableList receivables={receivables} units={units} customers={customers} buildings={buildings} locale="zh" />}
-        locale="zh"
-      />
-    </div>
-  );
+  return <FinanceLazyView entries={entries} units={units} buildingId={buildingId} receivables={receivables} customers={customers} buildings={buildings} locale={locale} attachments={attachments} />;
 }

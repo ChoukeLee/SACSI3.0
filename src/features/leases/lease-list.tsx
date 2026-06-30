@@ -137,11 +137,12 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
   const handleCreate = async () => { /* ... all existing validation logic kept ... */
     if (!fUnitId || !fCustomerId || !fStartDate || !fEndDate) { setError(locale==="zh"?"请填写必填字段":"Champs obligatoires"); return; }
-    setSaving(true); setError(""); const result = await createLeaseContract({ unitId:fUnitId, customerId:fCustomerId, contractNo:fContractNo||"", startDate:fStartDate, expectedEndDate:fEndDate, paymentCycle:fCycle as never, paymentDay:fPayDay, monthlyRentXof:fRent, depositAmountXof:fDeposit, depositReceived:fDepositReceived, rentFreeDays:fFreeDays, signerName:fSigner||undefined, status:fStatus });
-    setSaving(false); if(result.success) { setPanel(null); resetNewForm(); } else setError(result.error??"Failed");
+    setSaving(true); setError(""); setGenMsg(locale==="zh"?"正在后台新建合同":"Creation en arriere-plan"); setPanel(null);
+    const result = await createLeaseContract({ unitId:fUnitId, customerId:fCustomerId, contractNo:fContractNo||"", startDate:fStartDate, expectedEndDate:fEndDate, paymentCycle:fCycle as never, paymentDay:fPayDay, monthlyRentXof:fRent, depositAmountXof:fDeposit, depositReceived:fDepositReceived, rentFreeDays:fFreeDays, signerName:fSigner||undefined, status:fStatus });
+    setSaving(false); if(result.success) { resetNewForm(); setGenMsg(locale==="zh"?"合同已创建":"Contrat cree"); } else { setPanel("new"); setGenMsg(""); setError(result.error??"Failed"); }
   };
-  const handleActivate = async (id: string) => { setSaving(true); const result = await activateContract(id); setSaving(false); if(!result.success) setError(result.error??"Failed"); else setGenMsg(locale==="zh"?"合同已激活，应收已自动生成":"Contrat active, echeances generees"); };
-  const handleTerminate = async (id: string) => { setSaving(true); const result = await terminateContract(id); setSaving(false); if(!result.success) setError(result.error??"Failed"); };
+  const handleActivate = async (id: string) => { setSaving(true); setError(""); setGenMsg(locale==="zh"?"正在后台激活合同":"Activation en arriere-plan"); const result = await activateContract(id); setSaving(false); if(!result.success) { setGenMsg(""); setError(result.error??"Failed"); } else setGenMsg(locale==="zh"?"合同已激活，应收已自动生成":"Contrat active, echeances generees"); };
+  const handleTerminate = async (id: string) => { setSaving(true); setError(""); setGenMsg(locale==="zh"?"正在后台终止合同":"Resiliation en arriere-plan"); const result = await terminateContract(id); setSaving(false); if(!result.success) { setGenMsg(""); setError(result.error??"Failed"); } else setGenMsg(locale==="zh"?"合同已终止":"Contrat resilie"); };
   const handleGenerateReceivables = async (id: string) => {
     setSaving(true);
     setGenMsg("");
@@ -159,8 +160,8 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       }
     } else setError(result.error ?? "Failed");
   };
-  const handleCollectReceivable = async () => { if(!payReceivableId)return; setSaving(true);setError("");const result=await recordReceivablePayment({receivableId:payReceivableId,paymentDate:payDate,receiptNo:payReceiptNo||undefined});setSaving(false);if(result.success){setPayReceivableId(null);setPayReceiptNo("");}else setError(result.error??"Failed");};
-  const handleMoveOut = async () => { if(!selectedId)return;setSaving(true);setError("");const result=await processMoveOut({contractId:selectedId,actualEndDate:moEndDate,unpaidRentXof:moUnpaid,utilityCleared:moUtility,depositDeductionXof:moDeduction,depositRefundXof:moRefund});setSaving(false);if(result.success)setPanel(null);else setError(result.error??"Failed");};
+  const handleCollectReceivable = async () => { if(!payReceivableId)return; const currentReceivableId=payReceivableId; setSaving(true);setError("");setGenMsg(locale==="zh"?"正在后台记录收款":"Paiement en arriere-plan");setPayReceivableId(null);const result=await recordReceivablePayment({receivableId:currentReceivableId,paymentDate:payDate,receiptNo:payReceiptNo||undefined});setSaving(false);if(result.success){setPayReceiptNo("");setGenMsg(locale==="zh"?"收款已记录":"Paiement enregistre");}else {setPayReceivableId(currentReceivableId);setGenMsg("");setError(result.error??"Failed");}};
+  const handleMoveOut = async () => { if(!selectedId)return;const currentId=selectedId;setSaving(true);setError("");setGenMsg(locale==="zh"?"正在后台办理退租":"Sortie en arriere-plan");setPanel(null);const result=await processMoveOut({contractId:currentId,actualEndDate:moEndDate,unpaidRentXof:moUnpaid,utilityCleared:moUtility,depositDeductionXof:moDeduction,depositRefundXof:moRefund});setSaving(false);if(result.success)setGenMsg(locale==="zh"?"退租已办理":"Sortie traitee");else {setPanel("moveout");setGenMsg("");setError(result.error??"Failed");}};
 
   const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
   const labelClass = "block text-xs font-semibold text-muted-foreground mb-1";

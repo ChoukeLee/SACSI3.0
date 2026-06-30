@@ -34,6 +34,7 @@ interface UnitListProps {
   auditLogsMap: Record<string, AuditLogEntry[]>;
   buildings: BuildingInfo[];
   locale: Locale;
+  showHeader?: boolean;
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -49,9 +50,10 @@ const STATUS_DOT: Record<string, string> = {
 
 const LS_KEY = "sacsi_active_building_id";
 
-export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], auditLogsMap, buildings, locale }: UnitListProps) {
+export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], auditLogsMap, buildings, locale, showHeader = true }: UnitListProps) {
   const t = dictionaries[locale].units;
   const statusLabels = dictionaries[locale].statuses;
+  const [optimisticUnits, setOptimisticUnits] = useState<UnitRow[]>(units);
   const [selectedFloor, setSelectedFloor] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedKind, setSelectedKind] = useState("apartment");
@@ -62,6 +64,10 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
 
   // Building switcher with localStorage persistence
   const [activeBuildingId, setActiveBuildingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOptimisticUnits(units);
+  }, [units]);
 
   useEffect(() => {
     const saved = localStorage.getItem(LS_KEY);
@@ -82,8 +88,12 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
   // Filter units by active building
   const buildingUnits = useMemo(() => {
     if (!activeBuildingId) return [];
-    return units.filter((u) => u.building_id === activeBuildingId);
-  }, [units, activeBuildingId]);
+    return optimisticUnits.filter((u) => u.building_id === activeBuildingId);
+  }, [optimisticUnits, activeBuildingId]);
+
+  const patchUnitStatus = (unitId: string, status: UnitRow["status"]) => {
+    setOptimisticUnits((prev) => prev.map((unit) => unit.id === unitId ? { ...unit, status, updated_at: new Date().toISOString() } : unit));
+  };
 
   const activeBuilding = buildings.find((b) => b.id === activeBuildingId);
 
@@ -154,10 +164,12 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
         />
       )}
 
+      {showHeader && (
       <PageHeader
         title={activeBuilding ? `${activeBuilding.code} ${activeBuilding.display_name}` : (locale === "zh" ? "住宿资产" : "Actifs residentiels")}
         description={`${summary.apartments} ${locale === "zh" ? "套公寓" : "appartements"} · ${locale === "zh" ? "按楼层、状态和业务筛选房源" : "Filtrer par etage, statut et activite"}`}
       />
+      )}
 
       <div className="grid gap-2 sm:grid-cols-4 lg:grid-cols-7">
         {assetBlocks.map((block) => {
@@ -304,6 +316,8 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
           locale={locale}
           onClose={() => setDetailUnitId(null)}
           onStatusChanged={() => setRefreshKey((key) => key + 1)}
+          onStatusPatch={patchUnitStatus}
+          onStatusRollback={(unitId, status) => patchUnitStatus(unitId, status)}
         />
       )}
     </div>

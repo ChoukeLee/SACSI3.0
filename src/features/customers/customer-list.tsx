@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { Plus, AlertTriangle, UserX, UserCheck, X, Eye, Phone, Home, CreditCard, BedDouble, Star } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
@@ -38,13 +38,15 @@ interface CustomerListProps {
   buildingOptions?: CustomerBuildingSummary[];
   customerLastActivity?: Record<string, string>;
   locale: Locale;
+  showHeader?: boolean;
 }
 
 type FormMode = { type: "add" } | { type: "edit"; customer: CustomerRow } | null;
 type CustomerSegment = "all" | "lease" | "sale" | "daily" | "blacklisted";
 type CustomerGroup = "lease" | "sale" | "daily" | "uncategorized" | "blacklisted";
 
-export function CustomerList({ customers, customerSegments, customerRooms, customerBuildings, buildingOptions, customerLastActivity, locale }: CustomerListProps) {
+export function CustomerList({ customers, customerSegments, customerRooms, customerBuildings, buildingOptions, customerLastActivity, locale, showHeader = true }: CustomerListProps) {
+  const [optimisticCustomers, setOptimisticCustomers] = useState<CustomerRow[]>(customers);
   const [search, setSearch] = useState("");
   const [segment, setSegment] = useState<CustomerSegment>("all");
   const [buildingFilter, setBuildingFilter] = useState("__all__");
@@ -66,6 +68,10 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
   const [blError, setBlError] = useState("");
   const [blSaving, setBlSaving] = useState(false);
 
+  useEffect(() => {
+    setOptimisticCustomers(customers);
+  }, [customers]);
+
   const segmentSets = useMemo(() => {
     const lease = new Set(customerSegments?.leaseCustomerIds ?? []);
     const sale = new Set(customerSegments?.saleCustomerIds ?? []);
@@ -74,12 +80,12 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
   }, [customerSegments]);
 
   const stats = useMemo(() => ({
-    lease: customers.filter((c) => segmentSets.lease.has(c.id)).length,
-    sale: customers.filter((c) => segmentSets.sale.has(c.id)).length,
-    dailyOnly: customers.filter((c) => segmentSets.daily.has(c.id) && !segmentSets.lease.has(c.id) && !segmentSets.sale.has(c.id)).length,
-    blacklisted: customers.filter((c) => c.is_blacklisted).length,
-    all: customers.length,
-  }), [customers, segmentSets]);
+    lease: optimisticCustomers.filter((c) => segmentSets.lease.has(c.id)).length,
+    sale: optimisticCustomers.filter((c) => segmentSets.sale.has(c.id)).length,
+    dailyOnly: optimisticCustomers.filter((c) => segmentSets.daily.has(c.id) && !segmentSets.lease.has(c.id) && !segmentSets.sale.has(c.id)).length,
+    blacklisted: optimisticCustomers.filter((c) => c.is_blacklisted).length,
+    all: optimisticCustomers.length,
+  }), [optimisticCustomers, segmentSets]);
 
   const customerGroup = (c: CustomerRow): CustomerGroup => {
     if (c.is_blacklisted) return "blacklisted";
@@ -109,7 +115,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       uncategorized: 3,
       blacklisted: 4,
     };
-    return [...customers].sort((a, b) => {
+    return [...optimisticCustomers].sort((a, b) => {
       const aBuilding = primaryBuilding(a.id)?.label ?? "";
       const bBuilding = primaryBuilding(b.id)?.label ?? "";
       if (aBuilding !== bBuilding) return aBuilding.localeCompare(bBuilding);
@@ -126,7 +132,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       if (aAct !== bAct) return bAct.localeCompare(aAct);
       return a.name.localeCompare(b.name);
     });
-  }, [customers, segmentSets, customerRooms, customerBuildings, customerLastActivity]);
+  }, [optimisticCustomers, segmentSets, customerRooms, customerBuildings, customerLastActivity]);
 
   const filteredBase = useMemo(() => {
     const s = search.toLowerCase().trim();
@@ -155,7 +161,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
     );
   }, [filteredBase, customerBuildings, buildingFilter]);
 
-  const selected = selectedId ? customers.find((c) => c.id === selectedId) : null;
+  const selected = selectedId ? optimisticCustomers.find((c) => c.id === selectedId) : null;
   const selectedRooms = selected ? [...((customerRooms ?? {})[selected.id] ?? [])].sort(compareUnitNo) : [];
   const selectedBuildings = selected ? (customerBuildings?.[selected.id] ?? []) : [];
 
@@ -186,18 +192,59 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
     setFormMode({ type: "edit", customer }); setBlacklistPanelId(null);
   };
 
+  const buildOptimisticCustomer = (id: string, base?: CustomerRow): CustomerRow => {
+    const now = new Date().toISOString();
+    return {
+      id,
+      name: formName.trim(),
+      gender: formGender || null,
+      document_type: formDocType || null,
+      encrypted_document_no: formDocNo || base?.encrypted_document_no || null,
+      phone: formPhone || null,
+      notes: formNotes || null,
+      is_blacklisted: base?.is_blacklisted ?? false,
+      blacklist_reason: base?.blacklist_reason ?? null,
+      blacklist_operator_id: base?.blacklist_operator_id ?? null,
+      blacklist_date: base?.blacklist_date ?? null,
+      blacklist_permanent: base?.blacklist_permanent ?? false,
+      created_at: base?.created_at ?? now,
+      updated_at: now,
+    };
+  };
+
   const handleSave = async () => {
     if (!formName.trim() || formName.trim().length < 2) {
       setFormError(locale === "zh" ? "请输入客户姓名（至少2个字符）" : "Le nom doit comporter au moins 2 caractères");
       return;
     }
     setSaving(true); setFormError("");
+    const previousCustomers = optimisticCustomers;
     if (formMode?.type === "add") {
+      const tempId = `optimistic-customer-${Date.now()}`;
+      const optimistic = buildOptimisticCustomer(tempId);
+      setOptimisticCustomers((prev) => [optimistic, ...prev]);
+      setFormMode(null); resetForm();
       const result = await createCustomer({ name: formName.trim(), gender: formGender || null, document_type: formDocType || null, document_no_plain: formDocNo || undefined, phone: formPhone || null, notes: formNotes || null });
-      if (result.success) { setFormMode(null); resetForm(); } else setFormError(result.error ?? "Failed");
+      if (result.success && result.data) {
+        setOptimisticCustomers((prev) => prev.map((customer) => customer.id === tempId ? result.data! : customer));
+      } else {
+        setOptimisticCustomers(previousCustomers);
+        setFormMode({ type: "add" });
+        setFormError(result.error ?? "Failed");
+      }
     } else if (formMode?.type === "edit") {
+      const original = formMode.customer;
+      const optimistic = buildOptimisticCustomer(original.id, original);
+      setOptimisticCustomers((prev) => prev.map((customer) => customer.id === original.id ? optimistic : customer));
+      setFormMode(null); resetForm();
       const result = await updateCustomer(formMode.customer.id, { name: formName.trim(), gender: formGender || null, document_type: formDocType || null, document_no_plain: formDocNo || undefined, phone: formPhone || null, notes: formNotes || null });
-      if (result.success) { setFormMode(null); resetForm(); } else setFormError(result.error ?? "Failed");
+      if (result.success && result.data) {
+        setOptimisticCustomers((prev) => prev.map((customer) => customer.id === original.id ? result.data! : customer));
+      } else {
+        setOptimisticCustomers(previousCustomers);
+        setFormMode({ type: "edit", customer: original });
+        setFormError(result.error ?? "Failed");
+      }
     }
     setSaving(false);
   };
@@ -205,16 +252,42 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
   const handleBlacklist = async () => {
     if (!blReason.trim()) { setBlError(locale === "zh" ? "请填写拉黑原因" : "Le motif est obligatoire"); return; }
     setBlSaving(true); setBlError("");
+    const previousCustomers = optimisticCustomers;
+    const targetId = blacklistPanelId!;
+    const today = new Date().toISOString().slice(0, 10);
+    setOptimisticCustomers((prev) => prev.map((customer) => customer.id === targetId ? {
+      ...customer,
+      is_blacklisted: true,
+      blacklist_reason: blReason,
+      blacklist_date: today,
+      blacklist_permanent: blPermanent,
+      updated_at: new Date().toISOString(),
+    } : customer));
+    setBlacklistPanelId(null);
     const result = await setCustomerBlacklist(blacklistPanelId!, blReason, blPermanent);
-    if (result.success) { setBlacklistPanelId(null); setBlReason(""); setBlPermanent(true); } else setBlError(result.error ?? "Failed");
+    if (result.success) { setBlReason(""); setBlPermanent(true); } else { setOptimisticCustomers(previousCustomers); setBlacklistPanelId(targetId); setBlError(result.error ?? "Failed"); }
     setBlSaving(false);
   };
 
   const handleUnblacklist = async (id: string) => {
     setBlSaving(true);
-    await removeCustomerBlacklist(id);
-    setBlSaving(false);
+    const previousCustomers = optimisticCustomers;
+    setOptimisticCustomers((prev) => prev.map((customer) => customer.id === id ? {
+      ...customer,
+      is_blacklisted: false,
+      blacklist_reason: null,
+      blacklist_date: null,
+      blacklist_permanent: false,
+      updated_at: new Date().toISOString(),
+    } : customer));
     setBlacklistPanelId(null);
+    const result = await removeCustomerBlacklist(id);
+    if (!result.success) {
+      setOptimisticCustomers(previousCustomers);
+      setBlacklistPanelId(id);
+      setBlError(result.error ?? "Failed");
+    }
+    setBlSaving(false);
   };
 
   const isFormOpen = formMode !== null;
@@ -410,11 +483,13 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
   return (
     <div className="flex flex-col gap-6">
       {/* ── Page chrome ── */}
+      {showHeader && (
       <PageHeader
         title={locale === "zh" ? "客户管理" : "Gestion des clients"}
         description={`${stats.all} ${locale === "zh" ? "位客户" : "clients"} · ${locale === "zh" ? "按业务类型、房号和最近活动排序" : "Tries par activite, chambre et recence"}`}
         action={<Button size="sm" onClick={openAdd}><Plus className="h-4 w-4" />{t.add}</Button>}
       />
+      )}
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         {statBlocks.map(b => (

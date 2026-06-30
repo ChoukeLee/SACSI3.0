@@ -1,20 +1,26 @@
-﻿
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
-import { UnitList } from "@/features/units";
+import { UnitLazyView } from "@/features/units/unit-lazy-view";
+import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
 import type { UnitRow, UnitBusinessFlagRow } from "@/types/database";
-
 
 export default async function FrenchUnitsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!["admin","front_desk","finance","boss"].includes(user.role)) redirect("/");
+  if (!["admin", "front_desk", "finance", "boss"].includes(user.role)) redirect("/");
 
+  return (
+    <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
+      <FrenchUnitsData />
+    </Suspense>
+  );
+}
+
+async function FrenchUnitsData() {
   const supabase = await createClient();
-
-  // Fetch all active buildings
   const { data: allBuildings, error: bldErr } = await supabase
     .from("buildings")
     .select("id, code, display_name")
@@ -88,6 +94,5 @@ export default async function FrenchUnitsPage() {
     }
   }
 
-  return <UnitList units={units} businessFlagsMap={businessFlagsMap} managedLeaseUnitIds={managedLeaseUnitIds} auditLogsMap={auditLogsMap} buildings={allBuildings ?? []} locale="fr" />;
+  return <UnitLazyView units={units} businessFlagsMap={businessFlagsMap} managedLeaseUnitIds={managedLeaseUnitIds} auditLogsMap={auditLogsMap} buildings={allBuildings ?? []} locale="fr" />;
 }
-

@@ -1,19 +1,32 @@
-﻿import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
-import { SaleList } from "@/features/sales";
+import { SaleLazyView } from "@/features/sales/sale-lazy-view";
 import { DesktopOnly } from "@/features/mobile";
+import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
-
 
 export default async function FrenchSalesPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!["admin","front_desk","finance","boss"].includes(user.role)) redirect("/");
+  if (!["admin", "front_desk", "finance", "boss"].includes(user.role)) redirect("/");
 
+  return (
+    <>
+      <div className="lg:hidden"><DesktopOnly locale="fr" /></div>
+      <div className="hidden lg:block">
+        <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
+          <FrenchSalesData />
+        </Suspense>
+      </div>
+    </>
+  );
+}
+
+async function FrenchSalesData() {
   const supabase = await createClient();
-
   const { data: allBuildings, error: bldErr } = await supabase
     .from("buildings")
     .select("id, code, display_name")
@@ -26,7 +39,6 @@ export default async function FrenchSalesPage() {
   }
 
   const buildingIds = allBuildings?.map((b) => b.id) ?? [];
-
   let contracts: SaleContractRow[] = [];
   let schedules: SalePaymentScheduleRow[] = [];
   let units: UnitRow[] = [];
@@ -51,13 +63,5 @@ export default async function FrenchSalesPage() {
     if (!receivablesRes.error) receivables = receivablesRes.data;
   }
 
-  return (
-    <>
-      <div className="lg:hidden"><DesktopOnly locale="fr" /></div>
-      <div className="hidden lg:block">
-        <SaleList contracts={contracts} schedules={schedules} units={units} customers={customers} payments={payments} receivables={receivables} buildings={allBuildings ?? []} locale="fr" />
-      </div>
-    </>
-  );
+  return <SaleLazyView contracts={contracts} schedules={schedules} units={units} customers={customers} payments={payments} receivables={receivables} buildings={allBuildings ?? []} locale="fr" />;
 }
-

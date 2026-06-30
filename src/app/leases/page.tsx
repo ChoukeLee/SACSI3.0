@@ -1,22 +1,32 @@
-﻿import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
-import { LeaseList } from "@/features/leases";
+import { LeaseLazyView } from "@/features/leases/lease-lazy-view";
 import { DesktopOnly } from "@/features/mobile";
+import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
 import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
-
 
 export default async function LeasesPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!["admin", "front_desk", "finance", "boss"].includes(user.role)) redirect("/");
 
-  const t = dictionaries.zh.leases;
-  const supabase = await createClient();
+  return (
+    <>
+      <div className="lg:hidden"><DesktopOnly locale="zh" /></div>
+      <div className="hidden lg:block">
+        <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
+          <LeasesData locale="zh" />
+        </Suspense>
+      </div>
+    </>
+  );
+}
 
-  // Fetch all active buildings
+async function LeasesData({ locale }: { locale: "zh" | "fr" }) {
+  const supabase = await createClient();
   const { data: allBuildings, error: bldErr } = await supabase
     .from("buildings")
     .select("id, code, display_name")
@@ -29,7 +39,6 @@ export default async function LeasesPage() {
   }
 
   const buildingIds = allBuildings?.map((b) => b.id) ?? [];
-
   let contracts: LeaseContractRow[] = [];
   let units: UnitRow[] = [];
   let customers: CustomerRow[] = [];
@@ -51,17 +60,5 @@ export default async function LeasesPage() {
     if (!receivablesRes.error) receivables = receivablesRes.data;
   }
 
-  return (
-    <>
-      <div className="lg:hidden">
-        <DesktopOnly locale="zh" />
-      </div>
-      <div className="hidden lg:block">
-        <section>
-          <LeaseList contracts={contracts} units={units} customers={customers} payments={payments} receivables={receivables} buildings={allBuildings ?? []} locale="zh" />
-        </section>
-      </div>
-    </>
-  );
+  return <LeaseLazyView contracts={contracts} units={units} customers={customers} payments={payments} receivables={receivables} buildings={allBuildings ?? []} locale={locale} />;
 }
-

@@ -1,19 +1,32 @@
-﻿import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
-import { LeaseList } from "@/features/leases";
+import { LeaseLazyView } from "@/features/leases/lease-lazy-view";
 import { DesktopOnly } from "@/features/mobile";
+import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
 import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
-
 
 export default async function FrenchLeasesPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!["admin","front_desk","finance","boss"].includes(user.role)) redirect("/");
+  if (!["admin", "front_desk", "finance", "boss"].includes(user.role)) redirect("/");
 
+  return (
+    <>
+      <div className="lg:hidden"><DesktopOnly locale="fr" /></div>
+      <div className="hidden lg:block">
+        <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
+          <FrenchLeasesData />
+        </Suspense>
+      </div>
+    </>
+  );
+}
+
+async function FrenchLeasesData() {
   const supabase = await createClient();
-
   const { data: allBuildings, error: bldErr } = await supabase
     .from("buildings")
     .select("id, code, display_name")
@@ -26,7 +39,6 @@ export default async function FrenchLeasesPage() {
   }
 
   const buildingIds = allBuildings?.map((b) => b.id) ?? [];
-
   let contracts: LeaseContractRow[] = [];
   let units: UnitRow[] = [];
   let customers: CustomerRow[] = [];
@@ -48,13 +60,5 @@ export default async function FrenchLeasesPage() {
     if (!receivablesRes.error) receivables = receivablesRes.data;
   }
 
-  return (
-    <>
-      <div className="lg:hidden"><DesktopOnly locale="fr" /></div>
-      <div className="hidden lg:block">
-        <LeaseList contracts={contracts} units={units} customers={customers} payments={payments} receivables={receivables} buildings={allBuildings ?? []} locale="fr" />
-      </div>
-    </>
-  );
+  return <LeaseLazyView contracts={contracts} units={units} customers={customers} payments={payments} receivables={receivables} buildings={allBuildings ?? []} locale="fr" />;
 }
-

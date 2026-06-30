@@ -32,11 +32,13 @@ interface UnitDetailPanelProps {
   locale: Locale;
   onClose: () => void;
   onStatusChanged: () => void;
+  onStatusPatch?: (unitId: string, status: UnitStatus) => void;
+  onStatusRollback?: (unitId: string, status: UnitStatus) => void;
 }
 
 const manualStatuses: UnitStatus[] = ["available", "maintenance", "locked"];
 
-export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClose, onStatusChanged }: UnitDetailPanelProps) {
+export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClose, onStatusChanged, onStatusPatch, onStatusRollback }: UnitDetailPanelProps) {
   const t = dictionaries[locale].units;
   const statusLabels = dictionaries[locale].statuses;
   const [statusOpen, setStatusOpen] = useState(false);
@@ -44,14 +46,17 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
   const [error, setError] = useState("");
 
   const handleStatusChange = async (newStatus: UnitStatus) => {
+    const previousStatus = unit.status;
     setChanging(true);
     setError("");
+    setStatusOpen(false);
+    onStatusPatch?.(unit.id, newStatus);
     const result = await updateUnitStatus(unit.id, newStatus);
     setChanging(false);
     if (result.success) {
-      setStatusOpen(false);
       onStatusChanged();
     } else {
+      onStatusRollback?.(unit.id, previousStatus);
       setError(result.error ?? "Failed to update status.");
     }
   };

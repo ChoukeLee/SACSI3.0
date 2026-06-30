@@ -1,22 +1,26 @@
-﻿import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { dictionaries } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
-import { UnitList } from "@/features/units";
+import { UnitLazyView } from "@/features/units/unit-lazy-view";
+import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
 import type { UnitRow, UnitBusinessFlagRow } from "@/types/database";
-import type { BusinessType } from "@/types/domain";
-
 
 export default async function UnitsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!["admin", "front_desk", "finance", "boss"].includes(user.role)) redirect("/");
 
-  const t = dictionaries.zh.units;
-  const supabase = await createClient();
+  return (
+    <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
+      <UnitsData locale="zh" />
+    </Suspense>
+  );
+}
 
-  // Fetch all active buildings
+async function UnitsData({ locale }: { locale: "zh" | "fr" }) {
+  const supabase = await createClient();
   const { data: allBuildings, error: bldErr } = await supabase
     .from("buildings")
     .select("id, code, display_name")
@@ -61,16 +65,13 @@ export default async function UnitsPage() {
     }
   }
 
-  // Build business flags map
   const businessFlagsMap: Record<string, UnitBusinessFlagRow[]> = {};
   for (const flag of flags) {
     if (!businessFlagsMap[flag.unit_id]) businessFlagsMap[flag.unit_id] = [];
     businessFlagsMap[flag.unit_id].push(flag);
   }
 
-  // Audit logs map
   const auditLogsMap: Record<string, { id: string; action: string; metadata: Record<string, unknown>; created_at: string }[]> = {};
-
   if (buildingIds.length > 0 && units.length > 0) {
     const unitIds = units.map((u) => u.id);
     const { data: logs } = await supabase
@@ -97,16 +98,13 @@ export default async function UnitsPage() {
   }
 
   return (
-    <>
-      <UnitList
-        units={units}
-        businessFlagsMap={businessFlagsMap}
-        managedLeaseUnitIds={managedLeaseUnitIds}
-        auditLogsMap={auditLogsMap}
-        buildings={allBuildings ?? []}
-        locale="zh"
-      />
-    </>
+    <UnitLazyView
+      units={units}
+      businessFlagsMap={businessFlagsMap}
+      managedLeaseUnitIds={managedLeaseUnitIds}
+      auditLogsMap={auditLogsMap}
+      buildings={allBuildings ?? []}
+      locale={locale}
+    />
   );
 }
-

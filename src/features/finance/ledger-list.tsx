@@ -161,6 +161,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
 
   const handleSave = async () => {
     setSaving(true); setError("");
+    setShowNewEntry(false);
     const result = await addLedgerEntry({
       buildingId: buildingId ?? undefined,
       unitId: eUnitId || undefined,
@@ -170,9 +171,9 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
     });
     setSaving(false);
     if (result.success) {
-      setShowNewEntry(false);
       setEAmount(0); setEDesc(""); setEReceiptNo("");
     } else {
+      setShowNewEntry(true);
       setError(result.error ?? "Failed");
     }
   };
