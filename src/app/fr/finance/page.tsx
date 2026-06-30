@@ -11,6 +11,9 @@ import type { LedgerEntryRow, ReceivableRow, BuildingRow } from "@/types/databas
 
 interface AttachmentRow { id: string; storage_path: string; linked_id: string; file_type: string; ocr_text: string | null; ocr_provider: string | null; metadata: Record<string, unknown> | null; paper_archive_status: string; paper_archive_location: string | null; uploaded_at: string; }
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function FrenchFinancePage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -59,4 +62,3 @@ export default async function FrenchFinancePage() {
     </div>
   );
 }
-
