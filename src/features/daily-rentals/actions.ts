@@ -307,8 +307,15 @@ export async function confirmBooking(bookingId: string): Promise<{ success: bool
   const policy = allowConfirmBooking(booking);
   if (!policy.allowed) return { success: false, error: policy.reason };
 
-  const { error } = await supabase.from("daily_bookings").update({ status: "confirmed" }).eq("id", bookingId).eq("status", "pending_review");
+  const { data: updatedBooking, error } = await supabase
+    .from("daily_bookings")
+    .update({ status: "confirmed" })
+    .eq("id", bookingId)
+    .eq("status", "pending_review")
+    .select("id")
+    .maybeSingle();
   if (error) return { success: false, error: error.message };
+  if (!updatedBooking) return { success: false, error: "bookingNotPendingReview" };
   await writeAuditLog({ action: "confirm", entityType: "daily_booking", entityId: bookingId, metadata: {} });
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
@@ -345,11 +352,18 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
   });
   if (!policy.allowed) return { success: false, error: policy.reason };
 
-  await supabase.from("daily_bookings").update({
-    status: "checked_in",
-  }).eq("id", bookingId);
+  const { data: updatedBooking, error: bookingUpdateError } = await supabase
+    .from("daily_bookings")
+    .update({ status: "checked_in" })
+    .eq("id", bookingId)
+    .eq("status", "confirmed")
+    .select("id")
+    .maybeSingle();
+  if (bookingUpdateError) return { success: false, error: bookingUpdateError.message };
+  if (!updatedBooking) return { success: false, error: "bookingNotConfirmed" };
 
-  await supabase.from("units").update({ status: "daily_occupied" }).eq("id", booking.unit_id);
+  const { error: unitUpdateError } = await supabase.from("units").update({ status: "daily_occupied" }).eq("id", booking.unit_id);
+  if (unitUpdateError) return { success: false, error: unitUpdateError.message };
 
   if (prepaidAmount > 0) {
     const { data: unit } = await supabase.from("units").select("building_id, unit_no").eq("id", booking.unit_id).single();

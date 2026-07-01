@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { AlertTriangle, Banknote, Clock3, TrendingUp, WalletCards } from "lucide-react";
 import { getDailyRoomStateForDate } from "@/features/daily-rentals/room-status";
 import { calculateReceivableSummary } from "@/features/finance/receivable-summary";
@@ -199,13 +199,23 @@ export function UnitDataClient({
   saleSchedules: SalePaymentScheduleRow[]; cleaningTasks: { unit_id: string; is_completed: boolean }[];
   customers: CustomerRow[]; locale: Locale; t: ManagementDict;
 }) {
-  const [selectedBuildingId, setSelectedBuildingId] = useState<string>("__all__");
-  const [selectedStatus, setSelectedStatus] = useState<MgmtStatus | null>(null);
-
   const residentialUnits = useMemo(() => units.filter(u => u.kind === "apartment"), [units]);
   const activeBuildings = useMemo(() => buildings.filter(b => b.is_active), [buildings]);
+  const firstBuildingId = activeBuildings[0]?.id ?? "";
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string>(firstBuildingId);
+  const [selectedStatus, setSelectedStatus] = useState<MgmtStatus | null>(null);
+
+  useEffect(() => {
+    if (activeBuildings.length === 0) {
+      setSelectedBuildingId("");
+      return;
+    }
+    if (!activeBuildings.some((building) => building.id === selectedBuildingId)) {
+      setSelectedBuildingId(activeBuildings[0].id);
+    }
+  }, [activeBuildings, selectedBuildingId]);
+
   const filteredUnits = useMemo(() => {
-    if (selectedBuildingId === "__all__") return residentialUnits;
     return residentialUnits.filter(u => u.building_id === selectedBuildingId);
   }, [residentialUnits, selectedBuildingId]);
   const buildingUnits = useMemo(() => {
@@ -261,7 +271,7 @@ export function UnitDataClient({
           value={selectedBuildingId}
           onChange={setSelectedBuildingId}
           ariaLabel={locale === "zh" ? "楼栋筛选" : "Filtre bâtiment"}
-          items={[{ id: "__all__", display_name: t.allBuildings }, ...activeBuildings].map((b) => ({
+          items={activeBuildings.map((b) => ({
             value: b.id,
             label: b.display_name,
           }))}
@@ -346,7 +356,7 @@ export function UnitDataClient({
       )}
 
       {/* Room board */}
-      {(selectedBuildingId === "__all__" ? activeBuildings : activeBuildings.filter(b => b.id === selectedBuildingId)).map(building => {
+      {activeBuildings.filter(b => b.id === selectedBuildingId).map(building => {
         const bUnits = buildingUnits.get(building.id) ?? [];
         if (bUnits.length === 0) return null;
 
