@@ -36,6 +36,22 @@ async function guardWrite() {
 }
 async function guardCancel() { await requireRole("admin"); }
 
+async function applyUnitStatus(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  unitId: string,
+  status: UnitStatus,
+): Promise<{ success: true } | { success: false; error: string }> {
+  const { data, error } = await supabase
+    .from("units")
+    .update({ status })
+    .eq("id", unitId)
+    .select("id")
+    .maybeSingle();
+  if (error) return { success: false, error: error.message };
+  if (!data) return { success: false, error: "unitStatusNotUpdated" };
+  return { success: true };
+}
+
 // ── Conflict detection ──
 
 export async function checkConflicts(
@@ -156,7 +172,8 @@ export async function createBooking(input: {
 
   if (error) return { success: false, error: error.message };
 
-  await supabase.from("units").update({ status: "reserved" }).eq("id", input.unitId);
+  const unitStatusResult = await applyUnitStatus(supabase, input.unitId, "reserved");
+  if (!unitStatusResult.success) return unitStatusResult;
   await writeAuditLog({
     action: "create", entityType: "daily_booking", entityId: data.id,
     metadata: { unit_id: input.unitId, customer_id: input.customerId, check_in: input.checkIn, checkout_mode: mode },
@@ -362,8 +379,8 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
   if (bookingUpdateError) return { success: false, error: bookingUpdateError.message };
   if (!updatedBooking) return { success: false, error: "bookingNotConfirmed" };
 
-  const { error: unitUpdateError } = await supabase.from("units").update({ status: "daily_occupied" }).eq("id", booking.unit_id);
-  if (unitUpdateError) return { success: false, error: unitUpdateError.message };
+  const unitStatusResult = await applyUnitStatus(supabase, booking.unit_id, "daily_occupied");
+  if (!unitStatusResult.success) return unitStatusResult;
 
   if (prepaidAmount > 0) {
     const { data: unit } = await supabase.from("units").select("building_id, unit_no").eq("id", booking.unit_id).single();
@@ -525,18 +542,28 @@ export async function checkOut(bookingId: string, input: {
     update.manual_discount_reason = input.discountReason ?? null;
   }
 
-  await supabase.from("daily_bookings").update(update).eq("id", bookingId);
+  const { data: updatedBooking, error: bookingUpdateError } = await supabase
+    .from("daily_bookings")
+    .update(update)
+    .eq("id", bookingId)
+    .eq("status", "checked_in")
+    .select("id")
+    .maybeSingle();
+  if (bookingUpdateError) return { success: false, error: bookingUpdateError.message };
+  if (!updatedBooking) return { success: false, error: "bookingNotCheckedIn" };
 
   const checkoutUnitStatus = await getSetting<UnitStatus>("checkout_default_unit_status", "cleaning_pending");
-  await supabase.from("units").update({ status: checkoutUnitStatus }).eq("id", booking.unit_id);
+  const unitStatusResult = await applyUnitStatus(supabase, booking.unit_id, checkoutUnitStatus);
+  if (!unitStatusResult.success) return unitStatusResult;
 
   // Any unpaid balance remains as a receivable. Do not create a payment or
   // ledger income here unless money was actually collected.
 
   if (checkoutUnitStatus === "cleaning_pending") {
-    await supabase.from("cleaning_tasks").insert({
+    const { error: cleaningTaskError } = await supabase.from("cleaning_tasks").insert({
       unit_id: booking.unit_id, daily_booking_id: bookingId, is_completed: false,
     });
+    if (cleaningTaskError) return { success: false, error: cleaningTaskError.message };
   }
 
   await writeAuditLog({
@@ -575,11 +602,13 @@ export async function applyDiscount(input: {
   if (booking.status !== "checked_in") return { success: false, error: "Discount can only be applied to checked-in bookings." };
 
   const newFinal = Math.max(0, Number(booking.total_amount_xof) - gross);
-  await supabase.from("daily_bookings").update({
+  const { data: updatedBooking, error: bookingUpdateError } = await supabase.from("daily_bookings").update({
     manual_discount_amount_xof: gross,
     manual_discount_reason: input.reason,
     final_amount_xof: newFinal,
-  }).eq("id", input.bookingId);
+  }).eq("id", input.bookingId).eq("status", "checked_in").select("id").maybeSingle();
+  if (bookingUpdateError) return { success: false, error: bookingUpdateError.message };
+  if (!updatedBooking) return { success: false, error: "bookingNotCheckedIn" };
 
   const { data: receivables } = await supabase.from("receivables")
     .select("id").eq("source_type", "daily_booking").eq("source_id", input.bookingId).limit(1);
@@ -630,12 +659,14 @@ export async function setFixedCheckout(bookingId: string, newCheckOut: string): 
   const discount = Number(booking.manual_discount_amount_xof ?? 0);
   const newFinal = Math.max(0, newTotal - discount);
 
-  await supabase.from("daily_bookings").update({
+  const { data: updatedBooking, error: bookingUpdateError } = await supabase.from("daily_bookings").update({
     checkout_mode: "fixed",
     check_out: newCheckOut,
     total_amount_xof: newTotal,
     final_amount_xof: newFinal,
-  }).eq("id", bookingId);
+  }).eq("id", bookingId).eq("status", "checked_in").select("id").maybeSingle();
+  if (bookingUpdateError) return { success: false, error: bookingUpdateError.message };
+  if (!updatedBooking) return { success: false, error: "bookingNotCheckedIn" };
 
   await writeAuditLog({
     action: "set_fixed_checkout", entityType: "daily_booking", entityId: bookingId,
@@ -672,8 +703,8 @@ export async function completeCleaning(taskId: string): Promise<{ success: boole
   if (taskUpdateError) return { success: false, error: taskUpdateError.message };
 
   const nextStatus = await resolveUnitStatusAfterDailyChange(supabase, task.unit_id);
-  const { error: unitUpdateError } = await supabase.from("units").update({ status: nextStatus }).eq("id", task.unit_id);
-  if (unitUpdateError) return { success: false, error: unitUpdateError.message };
+  const unitStatusResult = await applyUnitStatus(supabase, task.unit_id, nextStatus);
+  if (!unitStatusResult.success) return unitStatusResult;
 
   const { data: unit } = await supabase.from("units").select("unit_no").eq("id", task.unit_id).single();
   try {
@@ -720,21 +751,25 @@ export async function extendStay(bookingId: string, newCheckOut: string, extraNi
 
   if (booking.checkout_mode === "open") {
     // For open-ended, just update is fine since there's no fixed check_out
-    await supabase.from("daily_bookings").update({
+    const { data: updatedBooking, error: bookingUpdateError } = await supabase.from("daily_bookings").update({
       total_amount_xof: newTotal,
       final_amount_xof: newFinal,
-    }).eq("id", bookingId);
+    }).eq("id", bookingId).eq("status", "checked_in").select("id").maybeSingle();
+    if (bookingUpdateError) return { success: false, error: bookingUpdateError.message };
+    if (!updatedBooking) return { success: false, error: "bookingNotCheckedIn" };
   } else {
     if (!booking.check_out || newCheckOut <= booking.check_out) {
       return { success: false, error: "New check-out date must be after current check-out date." };
     }
     const conflict = await checkConflicts(booking.unit_id, booking.check_out!, newCheckOut, bookingId);
     if (conflict.hasConflict) return { success: false, error: conflict.reason ?? "Conflict on extended dates." };
-    await supabase.from("daily_bookings").update({
+    const { data: updatedBooking, error: bookingUpdateError } = await supabase.from("daily_bookings").update({
       check_out: newCheckOut,
       total_amount_xof: newTotal,
       final_amount_xof: newFinal,
-    }).eq("id", bookingId);
+    }).eq("id", bookingId).eq("status", "checked_in").select("id").maybeSingle();
+    if (bookingUpdateError) return { success: false, error: bookingUpdateError.message };
+    if (!updatedBooking) return { success: false, error: "bookingNotCheckedIn" };
   }
 
   const { data: receivables } = await supabase.from("receivables")
@@ -768,9 +803,18 @@ export async function cancelBooking(bookingId: string): Promise<{ success: boole
   if (!booking) return { success: false, error: "Booking not found." };
   const policy = allowCancelBooking(booking);
   if (!policy.allowed) return { success: false, error: policy.reason };
-  await supabase.from("daily_bookings").update({ status: "cancelled" }).eq("id", bookingId);
+  const { data: updatedBooking, error: bookingUpdateError } = await supabase
+    .from("daily_bookings")
+    .update({ status: "cancelled" })
+    .eq("id", bookingId)
+    .in("status", ["pending_review", "confirmed"])
+    .select("id")
+    .maybeSingle();
+  if (bookingUpdateError) return { success: false, error: bookingUpdateError.message };
+  if (!updatedBooking) return { success: false, error: "bookingCannotBeCancelled" };
   const nextStatus = await resolveUnitStatusAfterDailyChange(supabase, booking.unit_id, { excludeBookingId: bookingId });
-  await supabase.from("units").update({ status: nextStatus }).eq("id", booking.unit_id);
+  const unitStatusResult = await applyUnitStatus(supabase, booking.unit_id, nextStatus);
+  if (!unitStatusResult.success) return unitStatusResult;
 
   // Reverse all payments + ledger entries for this booking
   const { data: bookingPayments } = await supabase
@@ -791,7 +835,8 @@ export async function cancelBooking(bookingId: string): Promise<{ success: boole
     metadata: { payments_reversed: bookingPayments?.length ?? 0 },
   });
   await cancelReceivablesForSource("daily_booking", bookingId);
-  await supabase.from("daily_bookings").update({ prepaid_amount_xof: 0 }).eq("id", bookingId);
+  const { error: resetPaymentError } = await supabase.from("daily_bookings").update({ prepaid_amount_xof: 0 }).eq("id", bookingId);
+  if (resetPaymentError) return { success: false, error: resetPaymentError.message };
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");

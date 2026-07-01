@@ -134,11 +134,16 @@ export function DailyCalendar({
     setOptimisticBookingPatches((prev) => {
       if (prev.size === 0) return prev;
       const next = new Map(prev);
+      const serverBookingIds = new Set(serverBookings.map((booking) => booking.id));
       for (const booking of serverBookings) {
         const patch = next.get(booking.id);
         if (!patch) continue;
-        const isSynced = Object.entries(patch).every(([key, value]) => booking[key as keyof DailyBookingRow] === value);
-        if (isSynced) next.delete(booking.id);
+        // Server data has refreshed for this booking. Keep the server as source
+        // of truth whether it accepted or rejected the optimistic patch.
+        next.delete(booking.id);
+      }
+      for (const bookingId of next.keys()) {
+        if (!serverBookingIds.has(bookingId)) next.delete(bookingId);
       }
       return next.size === prev.size ? prev : next;
     });
@@ -163,9 +168,16 @@ export function DailyCalendar({
     setOptimisticUnitStatuses((prev) => {
       if (prev.size === 0) return prev;
       const next = new Map(prev);
+      const serverUnitIds = new Set(dailyUnits.map((unit) => unit.id));
       for (const unit of dailyUnits) {
         const optimisticStatus = next.get(unit.id);
-        if (optimisticStatus && unit.status === optimisticStatus) next.delete(unit.id);
+        if (!optimisticStatus) continue;
+        // Server data has refreshed for this unit. Drop the temporary patch so
+        // partial backend failures do not linger as a false room status.
+        next.delete(unit.id);
+      }
+      for (const unitId of next.keys()) {
+        if (!serverUnitIds.has(unitId)) next.delete(unitId);
       }
       return next.size === prev.size ? prev : next;
     });
@@ -1315,8 +1327,7 @@ function getUnitTimelineStatus(
     }
   }
 
-  if (unit.status === "daily_occupied") return "occupied";
-  if (unit.status === "reserved") return "reserved";
+  if (unit.status === "daily_occupied" && todayStr && visibleDays.some((date) => toDateStr(date) === todayStr)) return "occupied";
   return "available";
 }
 
