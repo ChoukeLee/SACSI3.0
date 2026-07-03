@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { hasPermission, type CurrentUser } from "@/lib/auth";
 import { completeCleaning } from "@/features/daily-rentals/actions";
 import { allowCompleteCleaning } from "@/features/daily-rentals/daily-rental-policy";
-import { createDraftId, extractRoomNumbers, nowIso } from "../utils";
+import { createDraftId, extractRoomNumbers, findUnitsByRoomNumbers, nowIso } from "../utils";
 import type {
   AssistantOperationDraft,
   AssistantOperationDraftInput,
@@ -17,10 +17,13 @@ const COMPLETION_TERMS = /完成|完毕|好了|done|fait|termin/i;
 async function findPendingCleaningTasks(roomNumbers: string[]) {
   if (roomNumbers.length === 0) return [];
   const supabase = await createClient();
+  const units = await findUnitsByRoomNumbers(roomNumbers);
+  const unitIds = units.map((unit) => unit.id);
+  if (unitIds.length === 0) return [];
   const { data, error } = await supabase
     .from("cleaning_tasks")
     .select("id, unit_id, daily_booking_id, is_completed, completed_at, created_at, units!inner(id, unit_no, status)")
-    .in("units.unit_no", roomNumbers)
+    .in("unit_id", unitIds)
     .order("created_at", { ascending: false });
 
   if (error) throw error;

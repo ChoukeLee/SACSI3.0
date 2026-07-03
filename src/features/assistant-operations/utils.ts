@@ -90,8 +90,9 @@ export async function findUnitsByRoomNumbers(roomNumbers: string[]) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("units")
-    .select("id, unit_no, status, building_id, buildings(code), unit_business_flags(business_type, is_enabled, default_price_xof)")
-    .in("unit_no", roomNumbers);
+    .select("id, unit_no, status, building_id, buildings!inner(code), unit_business_flags(business_type, is_enabled, default_price_xof)")
+    .in("unit_no", roomNumbers)
+    .eq("buildings.code", "SACSI11");
   if (error) throw error;
   return (data ?? []) as Array<{
     id: string;
@@ -118,10 +119,13 @@ export async function findCustomersByName(name: string | undefined) {
 export async function findDailyBookingsForRooms(roomNumbers: string[]) {
   if (roomNumbers.length === 0) return [];
   const supabase = await createClient();
+  const units = await findUnitsByRoomNumbers(roomNumbers);
+  const unitIds = units.map((unit) => unit.id);
+  if (unitIds.length === 0) return [];
   const { data, error } = await supabase
     .from("daily_bookings")
     .select("id, unit_id, customer_id, check_in, check_out, checkout_mode, actual_check_out, nightly_price_xof, total_amount_xof, prepaid_amount_xof, final_amount_xof, billing_status, status, units!inner(id, unit_no, status), customers(id, name, phone)")
-    .in("units.unit_no", roomNumbers)
+    .in("unit_id", unitIds)
     .in("status", ["pending_review", "confirmed", "checked_in", "checked_out"])
     .order("check_in", { ascending: false });
   if (error) throw error;

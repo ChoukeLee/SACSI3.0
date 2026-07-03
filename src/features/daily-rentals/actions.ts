@@ -68,6 +68,24 @@ async function applyUnitStatus(
   return { success: true };
 }
 
+async function getDailyRentalUnit(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  unitId: string,
+) {
+  const { data, error } = await supabase
+    .from("units")
+    .select("id, building_id, unit_no, status, buildings!inner(code)")
+    .eq("id", unitId)
+    .maybeSingle();
+  if (error) return { success: false as const, error: error.message };
+  if (!data) return { success: false as const, error: "unitNotFound" };
+  const building = Array.isArray(data.buildings) ? data.buildings[0] : data.buildings;
+  if (building?.code !== "SACSI11") {
+    return { success: false as const, error: "dailyRentalOnlyAllowedInSacsi11" };
+  }
+  return { success: true as const, unit: data };
+}
+
 export interface DailyOperationSnapshot {
   booking: DailyBookingRow | null;
   unit: UnitRow | null;
@@ -188,13 +206,14 @@ export async function createBooking(input: {
   await guardWrite();
   const supabase = await createClient();
 
-  const { data: unitCheck } = await supabase.from("units").select("status").eq("id", input.unitId).single();
+  const unitCheck = await getDailyRentalUnit(supabase, input.unitId);
+  if (!unitCheck.success) return { success: false, error: unitCheck.error };
 
   const createPolicy = allowCreateBooking({
     checkIn: input.checkIn,
     checkOut: input.checkOut,
     checkoutMode: input.checkoutMode,
-    unitStatus: (unitCheck?.status ?? null) as UnitStatus | null,
+    unitStatus: (unitCheck.unit.status ?? null) as UnitStatus | null,
   });
   if (!createPolicy.allowed) return { success: false, error: createPolicy.reason };
 
@@ -246,9 +265,8 @@ export async function createBooking(input: {
   });
 
   // Create receivable for this booking
-  const { data: unit } = await supabase.from("units").select("building_id").eq("id", input.unitId).single();
   await createReceivable({
-    building_id: unit?.building_id ?? null,
+    building_id: unitCheck.unit.building_id ?? null,
     unit_id: input.unitId,
     customer_id: input.customerId,
     source_type: "daily_booking",
@@ -281,6 +299,8 @@ export async function createBackfillBooking(input: {
 }): Promise<DailyActionResult> {
   await requireRole("admin");
   const supabase = await createClient();
+  const unitCheck = await getDailyRentalUnit(supabase, input.unitId);
+  if (!unitCheck.success) return { success: false, error: unitCheck.error };
 
   // Validate dates
   if (!input.checkIn || !input.checkOut) return { success: false, error: "checkInRequired" };
@@ -321,9 +341,8 @@ export async function createBackfillBooking(input: {
   if (error) return { success: false, error: error.message };
 
   // Create receivable
-  const { data: unit } = await supabase.from("units").select("building_id, unit_no").eq("id", input.unitId).single();
   await createReceivable({
-    building_id: unit?.building_id ?? null,
+    building_id: unitCheck.unit.building_id ?? null,
     unit_id: input.unitId,
     customer_id: input.customerId,
     source_type: "daily_booking",
@@ -347,10 +366,10 @@ export async function createBackfillBooking(input: {
 
     if (payment) {
       await insertLedgerEntry(supabase, {
-        bookingId: data.id, unitId: input.unitId, buildingId: unit?.building_id ?? null,
+        bookingId: data.id, unitId: input.unitId, buildingId: unitCheck.unit.building_id ?? null,
         paymentId: payment.id, amount: paidAmount, direction: "income",
         entryDate: input.checkOut,
-        description: `日租历史补录 房间${unit?.unit_no ?? "?"}`,
+        description: `日租历史补录 房间${unitCheck.unit.unit_no ?? "?"}`,
       });
     }
   }
