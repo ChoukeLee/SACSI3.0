@@ -12,6 +12,7 @@ export interface OptimisticOperation {
 export type OptimisticOperationResult = {
   success: boolean;
   error?: string;
+  data?: unknown;
 };
 
 export type BackgroundOperationReporter = (label: string, state: OptimisticOperationState) => void;
@@ -46,8 +47,9 @@ interface RunOptimisticOperationOptions {
   background?: boolean;
   release?: () => void;
   beforeStart?: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (result?: OptimisticOperationResult | void) => void;
   onFailure?: () => void;
+  shouldRefresh?: (result?: OptimisticOperationResult | void) => boolean;
 }
 
 export function useOptimisticOperation({
@@ -93,9 +95,11 @@ export function useOptimisticOperation({
       else onError?.(message);
     };
 
-    const handleSuccess = () => {
-      onRefresh?.();
-      options.onSuccess?.();
+    const handleSuccess = (result?: OptimisticOperationResult | void) => {
+      options.onSuccess?.(result);
+      if (options.shouldRefresh ? options.shouldRefresh(result) : true) {
+        onRefresh?.();
+      }
       if (options.background) reportBackgroundOperation?.(label, "done");
     };
 
@@ -107,7 +111,7 @@ export function useOptimisticOperation({
           handleFailure(result.error);
           return;
         }
-        handleSuccess();
+        handleSuccess(result);
       }).catch((err) => {
         console.error("Optimistic background operation failed:", err);
         handleFailure(err instanceof Error ? err.message : undefined);
@@ -124,7 +128,7 @@ export function useOptimisticOperation({
         handleFailure(result.error);
         return;
       }
-      handleSuccess();
+      handleSuccess(result);
     } catch (err) {
       handleFailure(err instanceof Error ? err.message : undefined);
     } finally {

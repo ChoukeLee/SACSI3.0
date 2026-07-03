@@ -130,7 +130,7 @@ export const dailyCheckInBackfillOperation: AssistantOperationHandler = {
         notes: `AI assistant: ${draft.originalMessage}`,
       });
       if (!result.success) return { success: false, action: "daily_check_in_backfill", message: result.error ?? "bookingFailed", affectedRecords, metadata: { failedRoom: change.label } };
-      affectedRecords.push({ ...change, entityId: result.data?.id ?? change.entityId });
+      affectedRecords.push({ ...change, entityId: result.data?.booking?.id ?? change.entityId });
     }
     return { success: true, action: "daily_check_in_backfill", message: draft.locale === "zh" ? "日租预订已创建，并同步应收款。" : "Réservation créée avec créance synchronisée.", auditAction: "create_daily_booking", affectedRecords };
   },

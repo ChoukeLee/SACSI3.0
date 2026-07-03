@@ -21,6 +21,7 @@ import {
   createBooking, createBackfillBooking, confirmBooking, checkIn, checkOut, completeCleaning, extendStay, cancelBooking,
   recordSupplementaryPayment, applyDiscount, deletePayment, setFixedCheckout,
 } from "./actions";
+import type { DailyOperationSnapshot } from "./actions";
 import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
 
 interface BookingPanelProps {
@@ -36,6 +37,7 @@ interface BookingPanelProps {
   onCleaningTaskAdded?: (task: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }) => void;
   onCleaningTaskCompleted?: (taskId: string, unitId: string, status: UnitStatus) => void;
   onPaymentAdded?: (payment: { id: string; source_id: string; amount: number; payment_date: string }) => void;
+  onOperationSnapshot?: (snapshot: DailyOperationSnapshot) => void;
   onOptimisticReset?: () => void;
   onBackgroundOperation?: (label: string, state: "syncing" | "done" | "failed") => void;
   backfillMode?: boolean;
@@ -61,6 +63,7 @@ export function BookingPanel({
   onCleaningTaskAdded,
   onCleaningTaskCompleted,
   onPaymentAdded,
+  onOperationSnapshot,
   onOptimisticReset,
   onBackgroundOperation,
   backfillMode,
@@ -202,13 +205,17 @@ export function BookingPanel({
 
   const runPanelAction = async (
     label: string,
-    action: () => Promise<{ success: boolean; error?: string } | void>,
+    action: () => Promise<{ success: boolean; error?: string; data?: DailyOperationSnapshot } | void>,
     options: { closeImmediately?: boolean; clearAdvancedTask?: boolean } = {},
   ) => {
     await runOptimisticOperation(label, action, {
       background: options.closeImmediately,
       release: options.closeImmediately ? (onOptimisticClose ?? onClose) : undefined,
       beforeStart: options.clearAdvancedTask ? () => setActiveAdvancedTask(null) : undefined,
+      onSuccess: (result) => {
+        if (result?.data) onOperationSnapshot?.(result.data as DailyOperationSnapshot);
+      },
+      shouldRefresh: (result) => !result?.data,
     });
   };
 
@@ -452,7 +459,7 @@ export function BookingPanel({
           reason: bfReason,
           notes: bfNotes || undefined,
         });
-        if (result.success && result.data) onBookingCreated?.(result.data);
+        if (result.success && result.data?.booking) onBookingCreated?.(result.data.booking);
         if (!result.success) setBfError(formatError(result.error));
         return result;
       },
@@ -960,6 +967,10 @@ export function BookingPanel({
           void runOptimisticOperation(label, () => deletePayment(target.id), {
             background: true,
             release: () => setDeleteTarget(null),
+            onSuccess: (result) => {
+              if (result?.data) onOperationSnapshot?.(result.data as DailyOperationSnapshot);
+            },
+            shouldRefresh: (result) => !result?.data,
           });
         }}
         title={locale === "zh" ? "删除收款记录" : "Supprimer le paiement"}

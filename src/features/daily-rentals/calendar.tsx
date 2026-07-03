@@ -14,6 +14,7 @@ import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import { BookingPanel } from "./booking-panel";
 import { completeCleaning } from "./actions";
+import type { DailyOperationSnapshot } from "./actions";
 import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
 import { buildBookingMap, buildDailyRoomStateMap, getDailyRoomStateForDate } from "./room-status";
 import { getPrimaryDailyAction } from "./daily-rental-policy";
@@ -222,6 +223,64 @@ export function DailyCalendar({
     setOptimisticCompletedCleaningIds(new Set());
     setOptimisticUnitStatuses(new Map());
   }, []);
+
+  const applyOperationSnapshot = useCallback((snapshot: DailyOperationSnapshot) => {
+    if (snapshot.booking) {
+      const booking = snapshot.booking;
+      setOptimisticBookings((prev) => {
+        const withoutBooking = prev.filter((item) => item.id !== booking.id);
+        const existsOnServer = serverBookings.some((item) => item.id === booking.id);
+        return existsOnServer || booking.status === "cancelled" ? withoutBooking : [booking, ...withoutBooking];
+      });
+      setOptimisticBookingPatches((prev) => {
+        const next = new Map(prev);
+        next.set(booking.id, booking);
+        return next;
+      });
+    }
+    if (snapshot.unit) {
+      setOptimisticUnitStatuses((prev) => {
+        const next = new Map(prev);
+        next.set(snapshot.unit!.id, snapshot.unit!.status);
+        return next;
+      });
+    }
+    if (snapshot.booking) {
+      setOptimisticPayments((prev) => {
+        const snapshotIds = new Set(snapshot.payments.map((payment) => payment.id));
+        const withoutBookingPayments = prev.filter((payment) => payment.source_id !== snapshot.booking!.id);
+        return [
+          ...snapshot.payments.map((payment) => ({
+            id: payment.id,
+            source_id: payment.source_id ?? "",
+            amount: Number(payment.amount),
+            payment_date: payment.payment_date,
+          })),
+          ...withoutBookingPayments.filter((payment) => !snapshotIds.has(payment.id)),
+        ];
+      });
+    }
+    if (snapshot.unit) {
+      const openTasks = snapshot.cleaningTasks.filter((task) => !task.is_completed);
+      setOptimisticCleaningTasks((prev) => [
+        ...openTasks.map((task) => ({
+          id: task.id,
+          unit_id: task.unit_id,
+          daily_booking_id: task.daily_booking_id,
+          is_completed: task.is_completed,
+        })),
+        ...prev.filter((task) => task.unit_id !== snapshot.unit!.id),
+      ]);
+      setOptimisticCompletedCleaningIds((prev) => {
+        const next = new Set(prev);
+        for (const task of snapshot.cleaningTasks) {
+          if (task.is_completed) next.add(task.id);
+          else next.delete(task.id);
+        }
+        return next;
+      });
+    }
+  }, [serverBookings]);
 
   const bookingById = useMemo(() => {
     const map = new Map<string, DailyBookingRow>();
@@ -749,6 +808,7 @@ export function DailyCalendar({
             });
           }}
           onPaymentAdded={(payment) => setOptimisticPayments((prev) => [payment, ...prev])}
+          onOperationSnapshot={applyOperationSnapshot}
           onOptimisticReset={() => {
             clearOptimisticState();
           }}
@@ -763,6 +823,9 @@ export function DailyCalendar({
           if (!cleaningTarget) return;
           setCleaningLoading(true);
           completeCleaning(cleaningTarget.taskId).then((result) => {
+            if (result.success && result.data) {
+              applyOperationSnapshot(result.data);
+            }
             if (result.success && result.taskId && result.unitId && result.unitStatus) {
               setOptimisticCompletedCleaningIds((prev) => {
                 const next = new Set(prev);

@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireAuth, requireRole } from "@/lib/auth";
-import type { DailyBookingRow } from "@/types/database";
+import { requireAuth, requireRole, type CurrentUser } from "@/lib/auth";
+import type { CleaningTaskRow, DailyBookingRow, PaymentRow, ReceivableRow, UnitRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import {
   allowCancelBooking,
@@ -33,8 +33,24 @@ import { getSetting } from "@/lib/settings";
 async function guardWrite() {
   const user = await requireAuth();
   if (user.role === "boss") throw new Error("Boss role is read-only.");
+  return user;
 }
-async function guardCancel() { await requireRole("admin"); }
+async function guardCancel() {
+  return requireRole("admin");
+}
+
+function dailyRpcEnabled() {
+  return process.env.DAILY_RENTAL_RPC_ENABLED === "true";
+}
+
+function actorPayload(user: CurrentUser) {
+  return {
+    actor_id: user.id,
+    actor_role: user.role,
+    actor_email: user.email ?? null,
+    actor_display_name: user.displayName,
+  };
+}
 
 async function applyUnitStatus(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -50,6 +66,56 @@ async function applyUnitStatus(
   if (error) return { success: false, error: error.message };
   if (!data) return { success: false, error: "unitStatusNotUpdated" };
   return { success: true };
+}
+
+export interface DailyOperationSnapshot {
+  booking: DailyBookingRow | null;
+  unit: UnitRow | null;
+  receivables: ReceivableRow[];
+  payments: PaymentRow[];
+  cleaningTasks: CleaningTaskRow[];
+}
+
+type DailyActionResult = {
+  success: boolean;
+  error?: string;
+  data?: DailyOperationSnapshot;
+};
+
+async function getDailyOperationSnapshot(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  bookingId: string,
+  fallbackUnitId?: string | null,
+): Promise<DailyOperationSnapshot> {
+  const { data: booking } = await supabase
+    .from("daily_bookings")
+    .select("*")
+    .eq("id", bookingId)
+    .maybeSingle();
+  const unitId = (booking?.unit_id as string | undefined) ?? fallbackUnitId ?? null;
+  const [
+    { data: unit },
+    { data: receivables },
+    { data: payments },
+    { data: cleaningTasks },
+  ] = await Promise.all([
+    unitId
+      ? supabase.from("units").select("*").eq("id", unitId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from("receivables").select("*").eq("source_type", "daily_booking").eq("source_id", bookingId),
+    supabase.from("payments").select("*").eq("source_type", "daily_booking").eq("source_id", bookingId),
+    unitId
+      ? supabase.from("cleaning_tasks").select("*").eq("unit_id", unitId)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  return {
+    booking: (booking ?? null) as DailyBookingRow | null,
+    unit: (unit ?? null) as UnitRow | null,
+    receivables: (receivables ?? []) as ReceivableRow[],
+    payments: (payments ?? []) as PaymentRow[],
+    cleaningTasks: (cleaningTasks ?? []) as CleaningTaskRow[],
+  };
 }
 
 // ── Conflict detection ──
@@ -118,7 +184,7 @@ export async function createBooking(input: {
   unitId: string; customerId: string; checkIn: string;
   checkOut?: string; checkoutMode?: "fixed" | "open";
   nightlyPriceXof: number; notes?: string; otaSource?: string;
-}): Promise<{ success: boolean; data?: DailyBookingRow; error?: string }> {
+}): Promise<DailyActionResult> {
   await guardWrite();
   const supabase = await createClient();
 
@@ -203,7 +269,7 @@ export async function createBooking(input: {
   revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
-  return { success: true, data };
+  return { success: true, data: await getDailyOperationSnapshot(supabase, data.id, input.unitId) };
 }
 
 // ── Backfill (admin only) ──
@@ -212,7 +278,7 @@ export async function createBackfillBooking(input: {
   unitId: string; customerId: string; checkIn: string; checkOut: string;
   nightlyPriceXof: number; prepaidAmountXof: number; reason: string;
   notes?: string;
-}): Promise<{ success: boolean; data?: DailyBookingRow; error?: string }> {
+}): Promise<DailyActionResult> {
   await requireRole("admin");
   const supabase = await createClient();
 
@@ -312,13 +378,21 @@ export async function createBackfillBooking(input: {
   revalidatePath("/finance"); revalidatePath("/fr/finance");
   revalidatePath("/reports"); revalidatePath("/fr/reports");
 
-  return { success: true, data };
+  return { success: true, data: await getDailyOperationSnapshot(supabase, data.id, input.unitId) };
 }
 
 // ── Confirm ──
-export async function confirmBooking(bookingId: string): Promise<{ success: boolean; error?: string }> {
-  await guardWrite();
+export async function confirmBooking(bookingId: string): Promise<DailyActionResult> {
+  const user = await guardWrite();
   const supabase = await createClient();
+  if (dailyRpcEnabled()) {
+    const { data, error } = await supabase.rpc("daily_confirm_booking_rpc", {
+      p_booking_id: bookingId,
+      p_actor: actorPayload(user),
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data as DailyOperationSnapshot };
+  }
   const { data: booking } = await supabase.from("daily_bookings").select("*").eq("id", bookingId).single();
   if (!booking) return { success: false, error: "Booking not found." };
   const policy = allowConfirmBooking(booking);
@@ -341,13 +415,22 @@ export async function confirmBooking(bookingId: string): Promise<{ success: bool
   revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
-  return { success: true };
+  return { success: true, data: await getDailyOperationSnapshot(supabase, bookingId, booking.unit_id) };
 }
 
 // ── Check-in (payment is optional; finance state tracks unpaid balance) ──
-export async function checkIn(bookingId: string, prepaidAmount: number): Promise<{ success: boolean; error?: string }> {
-  await guardWrite();
+export async function checkIn(bookingId: string, prepaidAmount: number): Promise<DailyActionResult> {
+  const user = await guardWrite();
   const supabase = await createClient();
+  if (dailyRpcEnabled()) {
+    const { data, error } = await supabase.rpc("daily_check_in_booking_rpc", {
+      p_booking_id: bookingId,
+      p_prepaid_amount: prepaidAmount,
+      p_actor: actorPayload(user),
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data as DailyOperationSnapshot };
+  }
 
   const { data: booking } = await supabase.from("daily_bookings")
     .select("*").eq("id", bookingId).single();
@@ -413,13 +496,13 @@ export async function checkIn(bookingId: string, prepaidAmount: number): Promise
   revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
-  return { success: true };
+  return { success: true, data: await getDailyOperationSnapshot(supabase, bookingId, booking.unit_id) };
 }
 
 // ── Supplementary payment (for in-house or checked-out daily bookings) ──
 export async function recordSupplementaryPayment(input: {
   bookingId: string; amount: number; paymentDate?: string; receiptNo?: string;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<DailyActionResult> {
   await guardWrite();
   if (input.amount <= 0) return { success: false, error: "Amount must be positive." };
   const supabase = await createClient();
@@ -460,11 +543,11 @@ export async function recordSupplementaryPayment(input: {
   revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
-  return { success: true };
+  return { success: true, data: await getDailyOperationSnapshot(supabase, input.bookingId, booking.unit_id) };
 }
 
 // ── Reverse a supplementary payment ──
-export async function deletePayment(paymentId: string): Promise<{ success: boolean; error?: string }> {
+export async function deletePayment(paymentId: string): Promise<DailyActionResult> {
   await guardWrite();
   const supabase = await createClient();
 
@@ -498,16 +581,30 @@ export async function deletePayment(paymentId: string): Promise<{ success: boole
   revalidatePath("/finance"); revalidatePath("/fr/finance");
   revalidatePath("/reports"); revalidatePath("/fr/reports");
 
-  return { success: true };
+  return { success: true, data: await getDailyOperationSnapshot(supabase, payment.source_id, booking.unit_id) };
 }
 
 // ── Check-out (supports fixed + open modes with discount) ──
 export async function checkOut(bookingId: string, input: {
   finalAmount?: number; actualCheckOut?: string;
   discountAmount?: number; discountReason?: string;
-}): Promise<{ success: boolean; error?: string }> {
-  await guardWrite();
+}): Promise<DailyActionResult> {
+  const user = await guardWrite();
   const supabase = await createClient();
+  if (dailyRpcEnabled()) {
+    const checkoutUnitStatus = await getSetting<UnitStatus>("checkout_default_unit_status", "cleaning_pending");
+    const { data, error } = await supabase.rpc("daily_check_out_booking_rpc", {
+      p_booking_id: bookingId,
+      p_actual_check_out: input.actualCheckOut ?? new Date().toISOString().slice(0, 10),
+      p_final_amount: input.finalAmount ?? null,
+      p_discount_amount: input.discountAmount ?? 0,
+      p_discount_reason: input.discountReason ?? null,
+      p_checkout_unit_status: checkoutUnitStatus,
+      p_actor: actorPayload(user),
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data as DailyOperationSnapshot };
+  }
 
   const { data: booking } = await supabase.from("daily_bookings")
     .select("*").eq("id", bookingId).single();
@@ -586,13 +683,13 @@ export async function checkOut(bookingId: string, input: {
   revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
-  return { success: true };
+  return { success: true, data: await getDailyOperationSnapshot(supabase, bookingId, booking.unit_id) };
 }
 
 // ── Apply discount (without checking out) ──
 export async function applyDiscount(input: {
   bookingId: string; amount: number; reason: string;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<DailyActionResult> {
   await guardWrite();
   const supabase = await createClient();
   const gross = input.amount > 0 ? input.amount : 0;
@@ -629,12 +726,12 @@ export async function applyDiscount(input: {
   revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
-  return { success: true };
+  return { success: true, data: await getDailyOperationSnapshot(supabase, input.bookingId) };
 }
 
 // ── Set fixed checkout (convert open-ended → fixed) ──
 
-export async function setFixedCheckout(bookingId: string, newCheckOut: string): Promise<{ success: boolean; error?: string }> {
+export async function setFixedCheckout(bookingId: string, newCheckOut: string): Promise<DailyActionResult> {
   await guardWrite();
   const supabase = await createClient();
 
@@ -686,13 +783,23 @@ export async function setFixedCheckout(bookingId: string, newCheckOut: string): 
   revalidatePath("/finance"); revalidatePath("/fr/finance");
   revalidatePath("/reports"); revalidatePath("/fr/reports");
 
-  return { success: true };
+  return { success: true, data: await getDailyOperationSnapshot(supabase, bookingId, booking.unit_id) };
 }
 
 // ── Complete cleaning ──
-export async function completeCleaning(taskId: string): Promise<{ success: boolean; error?: string; taskId?: string; unitId?: string; unitStatus?: UnitStatus }> {
-  await guardWrite();
+export async function completeCleaning(taskId: string): Promise<DailyActionResult & { taskId?: string; unitId?: string; unitStatus?: UnitStatus }> {
+  const user = await guardWrite();
   const supabase = await createClient();
+  if (dailyRpcEnabled()) {
+    const { data, error } = await supabase.rpc("daily_complete_cleaning_rpc", {
+      p_task_id: taskId,
+      p_actor: actorPayload(user),
+    });
+    if (error) return { success: false, error: error.message };
+    const snapshot = data as DailyOperationSnapshot;
+    const unitStatus = snapshot.unit?.status;
+    return { success: true, data: snapshot, taskId, unitId: snapshot.unit?.id, unitStatus };
+  }
   const { data: task, error: taskError } = await supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed").eq("id", taskId).single();
   if (taskError || !task) return { success: false, error: "cleaningTaskNotFound" };
   const policy = allowCompleteCleaning(task);
@@ -733,10 +840,10 @@ export async function completeCleaning(taskId: string): Promise<{ success: boole
   revalidatePath("/data-quality"); revalidatePath("/fr/data-quality");
   revalidatePath("/settings/audit-logs"); revalidatePath("/fr/settings/audit-logs");
 
-  return { success: true, taskId: task.id, unitId: task.unit_id, unitStatus: nextStatus };
+  return { success: true, taskId: task.id, unitId: task.unit_id, unitStatus: nextStatus, data: await getDailyOperationSnapshot(supabase, task.daily_booking_id ?? "", task.unit_id) };
 }
 
-export async function extendStay(bookingId: string, newCheckOut: string, extraNights: number, extraAmount: number): Promise<{ success: boolean; error?: string }> {
+export async function extendStay(bookingId: string, newCheckOut: string, extraNights: number, extraAmount: number): Promise<DailyActionResult> {
   await guardWrite();
   if (extraNights <= 0 || extraAmount < 0) {
     return { success: false, error: "Invalid extension amount or nights." };
@@ -791,13 +898,21 @@ export async function extendStay(bookingId: string, newCheckOut: string, extraNi
   revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
-  return { success: true };
+  return { success: true, data: await getDailyOperationSnapshot(supabase, bookingId, booking.unit_id) };
 }
 
 // ── Cancel ──
-export async function cancelBooking(bookingId: string): Promise<{ success: boolean; error?: string }> {
-  await guardCancel();
+export async function cancelBooking(bookingId: string): Promise<DailyActionResult> {
+  const user = await guardCancel();
   const supabase = await createClient();
+  if (dailyRpcEnabled()) {
+    const { data, error } = await supabase.rpc("daily_cancel_booking_rpc", {
+      p_booking_id: bookingId,
+      p_actor: actorPayload(user),
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data as DailyOperationSnapshot };
+  }
   const { data: booking } = await supabase.from("daily_bookings")
     .select("id, unit_id, status").eq("id", bookingId).single();
   if (!booking) return { success: false, error: "Booking not found." };
@@ -844,5 +959,5 @@ export async function cancelBooking(bookingId: string): Promise<{ success: boole
   revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
-  return { success: true };
+  return { success: true, data: await getDailyOperationSnapshot(supabase, bookingId, booking.unit_id) };
 }
