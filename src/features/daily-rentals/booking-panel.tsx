@@ -483,9 +483,9 @@ export function BookingPanel({
 
         <div className="space-y-4 px-5 py-5">
           {pendingActionLabel && (
-            <div className="rounded-lg border border-primary/15 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary" role="status" aria-live="polite">
+            <span className="sr-only" role="status" aria-live="polite">
               {pendingActionLabel}
-            </div>
+            </span>
           )}
 
           {/* New Booking */}
