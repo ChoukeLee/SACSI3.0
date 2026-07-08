@@ -71,11 +71,11 @@ function computeUnitState(
   if (u.status === "sold" || activeSale) return { unit: u, status: "sold", sale: activeSale };
   const activeLease = leaseContracts.find(l => l.unit_id === u.id && l.status === "active") ?? null;
   if (u.status === "leased" || activeLease) return { unit: u, status: "leased", lease: activeLease };
+  if (isOwnerOccupiedUnit(u)) return { unit: u, status: "ownerOccupied" };
   const ds = getDailyRoomStateForDate({ unit: u, dateStr, bookings: dailyBookings, cleaningTasks });
   if (ds.status === "occupied" || ds.status === "checking_out_today") return { unit: u, status: "dailyOccupied", booking: ds.booking };
   if (ds.status === "reserved") return { unit: u, status: "reserved", booking: ds.booking };
   if (ds.status === "cleaning") return { unit: u, status: "cleaningPending" };
-  if (isOwnerOccupiedUnit(u)) return { unit: u, status: "ownerOccupied" };
   if (ds.status === "maintenance" || ds.status === "locked") return { unit: u, status: "maintenance" };
   return { unit: u, status: "available" };
 }
