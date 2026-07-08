@@ -16,6 +16,7 @@ export type RoomStatus =
   | "cleaning_pending"
   | "cleaningPending"
   | "maintenance"
+  | "ownerOccupied"
   | "available"
 
 export interface RoomCardAction {
@@ -39,6 +40,7 @@ const statusStyle: Record<RoomStatus, CardColors> = {
   cleaning_pending:{ bg: "bg-[#D9F7F0]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
   cleaningPending: { bg: "bg-[#D9F7F0]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
   maintenance:     { bg: "bg-[#FFE2EA]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
+  ownerOccupied:   { bg: "bg-[#F1F0ED]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
   available:       { bg: "bg-[#EAF7FF]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
 }
 

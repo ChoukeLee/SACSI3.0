@@ -12,6 +12,7 @@ import { RoomLegend } from "@/components/room-legend";
 import { DataVizCard, DonutChart, RadarChart } from "@/components/ui/data-viz";
 import { FilterBar, SegmentedControl, StatTile } from "@/components/ui/operational";
 import { getRoomCardActions } from "@/lib/room-card-actions";
+import { isOwnerOccupiedUnit } from "@/lib/unit-display";
 import type { Locale, ManagementDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { formatXof, cn, sortUnits } from "@/lib/utils";
@@ -23,7 +24,7 @@ import type {
 
 export type MgmtStatus =
   | "sold" | "leased" | "dailyOccupied" | "reserved"
-  | "cleaningPending" | "maintenance" | "available";
+  | "cleaningPending" | "maintenance" | "ownerOccupied" | "available";
 
 interface UnitState {
   unit: UnitRow; status: MgmtStatus;
@@ -34,6 +35,7 @@ interface FloorGroup { key: string; label: string; sortValue: number; states: Un
 export const STATUS_DOT: Record<MgmtStatus, string> = {
   sold: "#B88A48", leased: "#5E9BC5", dailyOccupied: "#62B6F5",
   reserved: "#E8C840", cleaningPending: "#5CC4B8", maintenance: "#F08090",
+  ownerOccupied: "#8F8D89",
   available: "#A0D0E8",
 };
 
@@ -73,6 +75,7 @@ function computeUnitState(
   if (ds.status === "occupied" || ds.status === "checking_out_today") return { unit: u, status: "dailyOccupied", booking: ds.booking };
   if (ds.status === "reserved") return { unit: u, status: "reserved", booking: ds.booking };
   if (ds.status === "cleaning") return { unit: u, status: "cleaningPending" };
+  if (isOwnerOccupiedUnit(u)) return { unit: u, status: "ownerOccupied" };
   if (ds.status === "maintenance" || ds.status === "locked") return { unit: u, status: "maintenance" };
   return { unit: u, status: "available" };
 }
@@ -85,6 +88,7 @@ function stateCustomerName(s: UnitState, cmap: Map<string, string>, locale: Loca
   if (s.status === "available") return locale === "zh" ? "空闲" : "Libre";
   if (s.status === "cleaningPending") return locale === "zh" ? "待洁" : "Ménage";
   if (s.status === "maintenance") return locale === "zh" ? "维修" : "Bloqué";
+  if (s.status === "ownerOccupied") return locale === "zh" ? "自用" : "Usage interne";
   return "";
 }
 function stateDateText(s: UnitState, locale: Locale): string {
@@ -230,7 +234,7 @@ export function UnitDataClient({
     [filteredUnits, dailyBookings, leaseContracts, saleContracts, cleaningTasks, todayStr],
   );
   const counts = useMemo(() => {
-    const c: Record<MgmtStatus, number> = { sold: 0, leased: 0, dailyOccupied: 0, reserved: 0, cleaningPending: 0, maintenance: 0, available: 0 };
+    const c: Record<MgmtStatus, number> = { sold: 0, leased: 0, dailyOccupied: 0, reserved: 0, cleaningPending: 0, maintenance: 0, ownerOccupied: 0, available: 0 };
     for (const s of unitStates) c[s.status]++; return c;
   }, [unitStates]);
 
@@ -252,7 +256,7 @@ export function UnitDataClient({
   }, [unitStates, leaseContracts, saleContracts, saleSchedules]);
 
   const totalRooms = filteredUnits.length;
-  const occupiedPct = totalRooms > 0 ? Math.round((counts.dailyOccupied + counts.leased + counts.sold) / totalRooms * 100) : 0;
+  const occupiedPct = totalRooms > 0 ? Math.round((counts.dailyOccupied + counts.leased + counts.sold + counts.ownerOccupied) / totalRooms * 100) : 0;
   const riskMax = Math.max(1, totalRooms, risks.leaseExpiring.length, risks.saleWithPending.length);
 
   return (
@@ -281,7 +285,7 @@ export function UnitDataClient({
             <span className="mr-2 text-xs font-medium text-muted-foreground">
               {t.sections.buildingStatus}
             </span>
-          {(["dailyOccupied", "reserved", "leased", "sold", "cleaningPending", "maintenance", "available"] as MgmtStatus[]).map(s => (
+          {(["dailyOccupied", "reserved", "leased", "sold", "cleaningPending", "maintenance", "ownerOccupied", "available"] as MgmtStatus[]).map(s => (
             <button
               key={s}
               type="button"
@@ -296,7 +300,7 @@ export function UnitDataClient({
             >
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: STATUS_DOT[s] }} />
               <span className="tabular-nums font-semibold">{counts[s]}</span>
-              <span className={selectedStatus === s ? "text-background/80" : "text-muted-foreground"}>{t.statuses[s]}</span>
+              <span className={selectedStatus === s ? "text-background/80" : "text-muted-foreground"}>{s === "ownerOccupied" ? (locale === "zh" ? "自用" : "Usage interne") : t.statuses[s]}</span>
             </button>
           ))}
           {selectedStatus && (
@@ -321,8 +325,8 @@ export function UnitDataClient({
           <DonutChart
             centerValue={`${occupiedPct}%`}
             centerLabel={locale === "zh" ? "占用" : "Occupé"}
-            items={(["dailyOccupied", "reserved", "leased", "sold", "cleaningPending", "maintenance", "available"] as MgmtStatus[]).map((status) => ({
-              label: t.statuses[status],
+            items={(["dailyOccupied", "reserved", "leased", "sold", "cleaningPending", "maintenance", "ownerOccupied", "available"] as MgmtStatus[]).map((status) => ({
+              label: status === "ownerOccupied" ? (locale === "zh" ? "自用" : "Usage interne") : t.statuses[status],
               value: counts[status],
               color: STATUS_DOT[status],
             }))}
@@ -366,7 +370,7 @@ export function UnitDataClient({
         const floorGroups = groupStatesByFloor(visibleBStates, locale);
         if (floorGroups.length === 0) return null;
 
-        const bOccupied = visibleBStates.filter(s => s.status === "dailyOccupied" || s.status === "leased" || s.status === "sold").length;
+        const bOccupied = visibleBStates.filter(s => s.status === "dailyOccupied" || s.status === "leased" || s.status === "sold" || s.status === "ownerOccupied").length;
         const bTotal = visibleBStates.length;
 
         return (
@@ -380,7 +384,7 @@ export function UnitDataClient({
                   {bOccupied}/{bTotal} {locale === "zh" ? "间已占用" : "occupés"}
                 </span>
               </div>
-              <RoomLegend items={(["dailyOccupied", "reserved", "leased", "sold", "cleaningPending", "maintenance", "available"] as MgmtStatus[]).map(s => ({ key: s, label: t.statuses[s], color: STATUS_DOT[s] }))} />
+              <RoomLegend items={(["dailyOccupied", "reserved", "leased", "sold", "cleaningPending", "maintenance", "ownerOccupied", "available"] as MgmtStatus[]).map(s => ({ key: s, label: s === "ownerOccupied" ? (locale === "zh" ? "自用" : "Usage interne") : t.statuses[s], color: STATUS_DOT[s] }))} />
             </>}
           >
             {floorGroups.map(group => (
@@ -401,6 +405,7 @@ export function UnitDataClient({
                         key={s.unit.id}
                         roomNo={s.unit.unit_no ?? "?"}
                         status={s.status}
+                        statusLabel={s.status === "ownerOccupied" ? (locale === "zh" ? "自用" : "Usage interne") : undefined}
                         customerName={stateCustomerName(s, customerNameById, locale)}
                         dateText={stateDateText(s, locale)}
                         href={detailHref}

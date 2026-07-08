@@ -197,6 +197,16 @@ export function getRoomCardActions(status: RoomStatus, ctx: ActionContext): Room
         },
       ]
 
+    case "ownerOccupied":
+      return [
+        {
+          key: "detail", label: locale === "zh" ? "详情" : "Detail",
+          icon: Eye,
+          onClick: ctx.onDetail,
+          href: !ctx.onDetail && ctx.detailHref ? ctx.detailHref : !ctx.onDetail ? r(locale, `/units/${unitId ?? ""}`) : undefined,
+        },
+      ]
+
     default:
       return []
   }

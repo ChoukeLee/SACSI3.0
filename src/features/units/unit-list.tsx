@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { FilterBar, SegmentedControl } from "@/components/ui/operational";
 import { PageHeader } from "@/components/page-header";
+import { getUnitOperationalLabel, isOwnerOccupiedUnit } from "@/lib/unit-display";
 import { UnitDetailPanel } from "./unit-detail-panel";
 import { UnitFilters } from "./unit-filters";
 import type { UnitRow, UnitBusinessFlagRow } from "@/types/database";
@@ -131,7 +132,8 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
     leased: apartments.filter((unit) => unit.status === "leased").length,
     managed: apartments.filter((unit) => unit.status === "sold" && managedLeaseUnitSet.has(unit.id)).length,
     sold: apartments.filter((unit) => unit.status === "sold").length,
-    maintenance: apartments.filter((unit) => unit.status === "maintenance" || unit.status === "locked" || unit.status === "cleaning_pending").length,
+    ownerOccupied: apartments.filter(isOwnerOccupiedUnit).length,
+    maintenance: apartments.filter((unit) => (unit.status === "maintenance" || unit.status === "locked" || unit.status === "cleaning_pending") && !isOwnerOccupiedUnit(unit)).length,
     nonApartment: nonApartments.length,
   }), [apartments, nonApartments, managedLeaseUnitSet]);
 
@@ -144,6 +146,7 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
     { key: "leased", label: statusLabels.leased, value: summary.leased, dot: "bg-[#5E9BC5]", icon: undefined },
     { key: "managed", label: locale === "zh" ? "代管出租" : "Gestion locative", value: summary.managed, dot: "bg-[#36A78F]", icon: undefined },
     { key: "sold", label: statusLabels.sold, value: summary.sold, dot: "bg-[#B88A48]", icon: undefined },
+    { key: "ownerOccupied", label: locale === "zh" ? "自用" : "Usage interne", value: summary.ownerOccupied, dot: "bg-[#8F8D89]", icon: undefined },
     { key: "maintenance", label: locale === "zh" ? "维护中" : "Maintenance", value: summary.maintenance, dot: "bg-[#F0A080]", icon: AlertTriangle },
     { key: "nonApartment", label: locale === "zh" ? "非住宿" : "Autres", value: summary.nonApartment, dot: "bg-muted-foreground", icon: Key },
   ];
@@ -171,7 +174,7 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
       />
       )}
 
-      <div className="grid gap-2 sm:grid-cols-4 lg:grid-cols-7">
+      <div className="grid gap-2 sm:grid-cols-4 lg:grid-cols-7 xl:grid-cols-8">
         {assetBlocks.map((block) => {
           const Icon = block.icon;
           const content = (
@@ -348,7 +351,7 @@ function UnitTableRow({
       <td><span className="font-mono text-xs font-bold">{unit.unit_no}</span></td>
       <td className="text-sm">{unit.floor_label}</td>
       <td className="text-sm text-muted-foreground">{t.kinds[unit.kind]}</td>
-      <td><StatusPill status={unit.status} locale={locale} managedLease={unit.status === "sold" && managedLease} /></td>
+      <td><StatusPill unit={unit} locale={locale} managedLease={unit.status === "sold" && managedLease} /></td>
       <td className="text-sm text-muted-foreground">{enabledFlags.map((flag) => t.businessTypes[flag.business_type]).join(" / ") || "-"}</td>
       {!compact && (
         <td className="table-cell-amount">{dailyFlag?.default_price_xof != null ? formatXof(dailyFlag.default_price_xof) : "-"}</td>
@@ -362,8 +365,11 @@ function UnitTableRow({
   );
 }
 
-function StatusPill({ status, locale, managedLease = false }: { status: string; locale: Locale; managedLease?: boolean }) {
-  const label = managedLease ? (locale === "zh" ? "已售代管" : "Vendu gere") : (dictionaries[locale].statuses as Record<string, string>)[status] ?? status;
+function StatusPill({ unit, locale, managedLease = false }: { unit: UnitRow; locale: Locale; managedLease?: boolean }) {
+  const displayStatus = isOwnerOccupiedUnit(unit) ? "ownerOccupied" : unit.status;
+  const label = managedLease
+    ? (locale === "zh" ? "已售代管" : "Vendu gere")
+    : getUnitOperationalLabel(unit, locale) ?? (dictionaries[locale].statuses as Record<string, string>)[unit.status] ?? unit.status;
   const styles: Record<string, string> = {
     sold: "bg-[#EFE1CA] text-[#17324D] ring-[#D8BF98]/70",
     leased: "bg-[#DDECF7] text-[#17324D] ring-[#AFCBE1]/70",
@@ -373,10 +379,11 @@ function StatusPill({ status, locale, managedLease = false }: { status: string; 
     available: "bg-[#EAF7FF] text-[#17324D] ring-[#C0DDF0]/60",
     maintenance: "bg-[#FFE2EA] text-[#17324D] ring-[#F5C0CC]/60",
     locked: "bg-muted text-muted-foreground ring-border",
+    ownerOccupied: "bg-[#F1F0ED] text-[#17324D] ring-[#D2CFCA]/70",
   };
 
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset", styles[status] ?? "")}>
+    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset", styles[displayStatus] ?? "")}>
       {label}
     </span>
   );
