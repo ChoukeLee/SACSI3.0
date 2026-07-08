@@ -22,6 +22,7 @@ export async function enrichAuditLogsWithUnitNumbers(
   logs: AuditLogRow[],
 ) {
   const unitByEntity = new Map<string, string>();
+  const actorById = await collectActorProfiles(supabase, logs);
 
   await Promise.all([
     collectUnitIds(supabase, logs, unitByEntity, "daily_booking", "daily_bookings"),
@@ -57,21 +58,46 @@ export async function enrichAuditLogsWithUnitNumbers(
   }
 
   return logs.map((log) => {
-    if (metadataString(log, "unit_no")) return log;
+    const actor = log.actor_id ? actorById.get(log.actor_id) : null;
+    const metadata = {
+      ...(log.metadata ?? {}),
+      ...(actor && !metadataString(log, "actor_display_name") ? { actor_display_name: actor.displayName } : {}),
+      ...(actor && !metadataString(log, "actor_role") ? { actor_role: actor.role } : {}),
+    };
 
     const metadataUnitId = metadataString(log, "unit_id");
     const entityUnitId = log.entity_id ? unitByEntity.get(entityKey(log.entity_type, log.entity_id)) ?? "" : "";
     const unitNo = unitIdToNo.get(metadataUnitId) ?? unitIdToNo.get(entityUnitId);
-    if (!unitNo) return log;
 
     return {
       ...log,
-      metadata: {
-        ...(log.metadata ?? {}),
-        unit_no: unitNo,
-      },
+      metadata: unitNo && !metadataString(log, "unit_no") ? { ...metadata, unit_no: unitNo } : metadata,
     };
   });
+}
+
+async function collectActorProfiles(
+  supabase: SupabaseServerClient,
+  logs: AuditLogRow[],
+) {
+  const actorIds = Array.from(new Set(logs.map((log) => log.actor_id).filter(Boolean))) as string[];
+  const actorById = new Map<string, { displayName: string; role: string }>();
+  if (actorIds.length === 0) return actorById;
+
+  const { data } = await supabase
+    .from("user_profiles")
+    .select("id, display_name, role")
+    .in("id", actorIds);
+
+  for (const actor of data ?? []) {
+    if (!actor.id) continue;
+    actorById.set(String(actor.id), {
+      displayName: String(actor.display_name ?? actor.id),
+      role: String(actor.role ?? ""),
+    });
+  }
+
+  return actorById;
 }
 
 async function collectUnitIds(
