@@ -9,7 +9,7 @@ export const getBuildings = cache(async () => {
 
 export const getUnits = cache(async () => {
   const supabase = await createClient();
-  const { data } = await supabase.from("units").select("id, unit_no, floor_label, kind, status, building_id").order("unit_no");
+  const { data } = await supabase.from("units").select("id, unit_no, floor_label, kind, status, building_id, notes").order("unit_no");
   return data ?? [];
 });
 
