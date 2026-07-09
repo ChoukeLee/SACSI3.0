@@ -1,6 +1,6 @@
 import type { UnitRow } from "@/types/database";
 
-const OWNER_OCCUPIED_PATTERN = /self-use|owner-occupied|owner occupied|internal office|自用|内部办公室|科建办公室/i;
+const OWNER_OCCUPIED_PATTERN = /self-use|owner-occupied|owner occupied|internal office|自用|自持|内部办公室|集团办公室|科建办公室|科建集团办公室/i;
 
 export function isOwnerOccupiedUnit(unit: Pick<UnitRow, "notes" | "status">): boolean {
   return unit.status === "locked" && OWNER_OCCUPIED_PATTERN.test(unit.notes ?? "");
