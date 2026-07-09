@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import { AlertTriangle, ArrowRight, Building2, ChevronDown, ChevronUp, Home, Key } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
-import { cn, formatXof, sortUnits } from "@/lib/utils";
+import { cn, compareFloorLabels, formatXof, sortUnits } from "@/lib/utils";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { FilterBar, SegmentedControl } from "@/components/ui/operational";
@@ -100,12 +100,7 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
 
   const floors = useMemo(() => {
     const set = new Set(buildingUnits.map((unit) => unit.floor_label));
-    return Array.from(set).sort((a, b) => {
-      const an = parseInt(a, 10);
-      const bn = parseInt(b, 10);
-      if (!Number.isNaN(an) && !Number.isNaN(bn)) return an - bn;
-      return a.localeCompare(b);
-    });
+    return Array.from(set).sort(compareFloorLabels);
   }, [buildingUnits]);
 
   const filtered = useMemo(() => {

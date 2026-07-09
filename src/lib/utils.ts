@@ -50,8 +50,10 @@ export function sortUnits<T extends { unit_no: string | null; floor_label?: stri
 
 export function normalizeFloorLabel(floorLabel: string | null, unitNo: string): string {
   if (floorLabel && floorLabel.trim()) {
+    const raw = floorLabel.trim();
+    if (/^(G|G层|G楼|GF|G\/F|GROUND|GROUND FLOOR|RDC|底层|地面层)$/i.test(raw)) return "G";
     // Strip "楼" and "层", extract the floor number, append "F"
-    const cleaned = floorLabel.trim().replace(/[楼层]/g, "").trim();
+    const cleaned = raw.replace(/[楼层]/g, "").trim();
     const match = cleaned.match(/\d+/);
     if (match) return `${match[0]}F`;
   }
@@ -61,6 +63,16 @@ export function normalizeFloorLabel(floorLabel: string | null, unitNo: string): 
 }
 
 export function floorSortValue(label: string): number {
-  const match = label.match(/\d+/);
-  return match ? Number.parseInt(match[0], 10) : 999;
+  const raw = String(label ?? "").trim();
+  if (!raw) return 9999;
+  if (/^(G|G层|G楼|GF|G\/F|GROUND|GROUND FLOOR|RDC|底层|地面层)$/i.test(raw)) return -1;
+  const cleaned = raw.replace(/[楼层]/g, "").trim();
+  const match = cleaned.match(/-?\d+/);
+  return match ? Number.parseInt(match[0], 10) : 9999;
+}
+
+export function compareFloorLabels(a: string | null | undefined, b: string | null | undefined) {
+  const diff = floorSortValue(String(a ?? "")) - floorSortValue(String(b ?? ""));
+  if (diff !== 0) return diff;
+  return String(a ?? "").localeCompare(String(b ?? ""), undefined, { numeric: true, sensitivity: "base" });
 }

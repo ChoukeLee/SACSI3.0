@@ -15,7 +15,7 @@ import { getRoomCardActions } from "@/lib/room-card-actions";
 import { isOwnerOccupiedUnit } from "@/lib/unit-display";
 import type { Locale, ManagementDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
-import { formatXof, cn, sortUnits } from "@/lib/utils";
+import { floorSortValue, formatXof, cn, sortUnits } from "@/lib/utils";
 import type {
   BuildingRow, UnitRow, DailyBookingRow, LeaseContractRow,
   SaleContractRow, SalePaymentScheduleRow, CustomerRow,
@@ -43,6 +43,8 @@ function firstNumber(v: string | null | undefined): number | null {
   const m = String(v ?? "").match(/\d+/); return m ? Number(m[0]) : null;
 }
 function getUnitFloorValue(u: UnitRow): number | null {
+  const rawFloor = String(u.floor_label ?? "").trim();
+  if (/^(G|G层|G楼|GF|G\/F|GROUND|GROUND FLOOR|RDC|底层|地面层)$/i.test(rawFloor)) return -1;
   const f = firstNumber(u.floor_label); if (f !== null) return f;
   const n = firstNumber(u.unit_no); if (n === null) return null;
   return n >= 100 ? Math.floor(n / 100) : n;
@@ -54,8 +56,8 @@ function groupStatesByFloor(states: UnitState[], locale: Locale): FloorGroup[] {
     const key = floor === null ? "__unknown__" : String(floor);
     const label = floor === null
       ? (locale === "zh" ? "未分层" : "Sans étage")
-      : (locale === "zh" ? `${floor}层` : `Étage ${floor}`);
-    if (!groups.has(key)) groups.set(key, { key, label, sortValue: floor ?? Number.MAX_SAFE_INTEGER, states: [] });
+      : floor === -1 ? (locale === "zh" ? "G层" : "RDC") : (locale === "zh" ? `${floor}层` : `Étage ${floor}`);
+    if (!groups.has(key)) groups.set(key, { key, label, sortValue: floor === null ? Number.MAX_SAFE_INTEGER : floorSortValue(s.unit.floor_label), states: [] });
     groups.get(key)!.states.push(s);
   }
   return [...groups.values()]

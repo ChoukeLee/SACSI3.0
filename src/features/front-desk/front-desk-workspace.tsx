@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { BedDouble, LogIn, LogOut, CreditCard, Plus, Copy, ClipboardCheck, AlertTriangle, Check, X, Calendar, Phone, User } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
-import { formatXof, cn } from "@/lib/utils";
+import { compareFloorLabels, formatXof, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -97,7 +97,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
       if (!g.has(f)) g.set(f, []);
       g.get(f)!.push(r);
     }
-    return Array.from(g.entries()).sort((a,b) => {const an=parseInt(a[0],10),bn=parseInt(b[0],10); return !isNaN(an)&&!isNaN(bn)?an-bn:a[0].localeCompare(b[0]);});
+    return Array.from(g.entries()).sort((a,b) => compareFloorLabels(a[0], b[0]));
   }, [roomStates]);
 
   // ── Broadcast message ──
