@@ -107,10 +107,10 @@ function stateCustomerName(s: UnitState, cmap: Map<string, string>, locale: Loca
   if (s.status === "leased" || s.status === "sold" || s.status === "dailyOccupied") {
     return locale === "zh" ? "待补充" : "À compléter";
   }
+  if (s.status === "ownerOccupied") return s.unit.layout || (locale === "zh" ? "科建集团办公室" : "Bureau Kejian Group");
   if (s.status === "available") return locale === "zh" ? "空闲" : "Libre";
   if (s.status === "cleaningPending") return locale === "zh" ? "待洁" : "Ménage";
   if (s.status === "maintenance") return locale === "zh" ? "维修" : "Bloqué";
-  if (s.status === "ownerOccupied") return locale === "zh" ? "自用" : "Usage interne";
   return "";
 }
 function stateDateText(s: UnitState, locale: Locale): string {
@@ -136,7 +136,7 @@ export function ManagementDashboard({
   const [financeDetail, setFinanceDetail] = useState<"receivable" | "collected" | "outstanding" | "overdue" | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<MgmtStatus | null>(null);
 
-  const residentialUnits = useMemo(() => units.filter(u => u.kind === "apartment"), [units]);
+  const residentialUnits = useMemo(() => units.filter(u => u.kind === "apartment" || isOwnerOccupiedUnit(u)), [units]);
   const activeBuildings = useMemo(() => buildings.filter(b => b.is_active), [buildings]);
   const filteredUnits = useMemo(() => {
     if (selectedBuildingId === "__all__") return residentialUnits;

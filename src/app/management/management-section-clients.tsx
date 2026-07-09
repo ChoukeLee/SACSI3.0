@@ -85,10 +85,10 @@ function shortDate(d: string | null | undefined): string {
 function stateCustomerName(s: UnitState, cmap: Map<string, string>, locale: Locale): string {
   const cid = s.booking?.customer_id ?? s.lease?.customer_id ?? s.sale?.customer_id ?? null;
   if (cid && cmap.has(cid)) return cmap.get(cid)!;
+  if (s.status === "ownerOccupied") return s.unit.layout || (locale === "zh" ? "科建集团办公室" : "Bureau Kejian Group");
   if (s.status === "available") return locale === "zh" ? "空闲" : "Libre";
   if (s.status === "cleaningPending") return locale === "zh" ? "待洁" : "Ménage";
   if (s.status === "maintenance") return locale === "zh" ? "维修" : "Bloqué";
-  if (s.status === "ownerOccupied") return locale === "zh" ? "自用" : "Usage interne";
   return "";
 }
 function stateDateText(s: UnitState, locale: Locale): string {
@@ -203,7 +203,7 @@ export function UnitDataClient({
   saleSchedules: SalePaymentScheduleRow[]; cleaningTasks: { unit_id: string; is_completed: boolean }[];
   customers: CustomerRow[]; locale: Locale; t: ManagementDict;
 }) {
-  const residentialUnits = useMemo(() => units.filter(u => u.kind === "apartment"), [units]);
+  const residentialUnits = useMemo(() => units.filter(u => u.kind === "apartment" || isOwnerOccupiedUnit(u)), [units]);
   const activeBuildings = useMemo(() => buildings.filter(b => b.is_active), [buildings]);
   const firstBuildingId = activeBuildings[0]?.id ?? "";
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>(firstBuildingId);
