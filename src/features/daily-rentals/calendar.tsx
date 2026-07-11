@@ -139,9 +139,9 @@ export function DailyCalendar({
       for (const booking of serverBookings) {
         const patch = next.get(booking.id);
         if (!patch) continue;
-        // Server data has refreshed for this booking. Keep the server as source
-        // of truth whether it accepted or rejected the optimistic patch.
-        next.delete(booking.id);
+        if (serverMatchesPatch(booking, patch)) {
+          next.delete(booking.id);
+        }
       }
       for (const bookingId of next.keys()) {
         if (!serverBookingIds.has(bookingId)) next.delete(bookingId);
@@ -150,7 +150,9 @@ export function DailyCalendar({
     });
     setOptimisticPayments((prev) => {
       if (prev.length === 0) return prev;
-      return payments.length > 0 ? [] : prev;
+      const serverPaymentIds = new Set(payments.map((payment) => payment.id));
+      const next = prev.filter((payment) => !serverPaymentIds.has(payment.id));
+      return next.length === prev.length ? prev : next;
     });
     setOptimisticCleaningTasks((prev) => {
       if (prev.length === 0) return prev;
@@ -173,9 +175,9 @@ export function DailyCalendar({
       for (const unit of dailyUnits) {
         const optimisticStatus = next.get(unit.id);
         if (!optimisticStatus) continue;
-        // Server data has refreshed for this unit. Drop the temporary patch so
-        // partial backend failures do not linger as a false room status.
-        next.delete(unit.id);
+        if (unit.status === optimisticStatus) {
+          next.delete(unit.id);
+        }
       }
       for (const unitId of next.keys()) {
         if (!serverUnitIds.has(unitId)) next.delete(unitId);
@@ -1440,4 +1442,14 @@ function addDays(date: Date, days: number): Date {
 
 function toDateStr(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+function serverMatchesPatch<T extends object>(serverRow: T, patch: Partial<T>): boolean {
+  const serverRecord = serverRow as Record<string, unknown>;
+  const patchRecord = patch as Record<string, unknown>;
+  for (const key of Object.keys(patchRecord)) {
+    if (!(key in serverRecord)) continue;
+    if ((serverRecord[key] ?? null) !== (patchRecord[key] ?? null)) return false;
+  }
+  return true;
 }

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { unstable_noStore as noStore } from "next/cache";
 import { sortUnits } from "@/lib/utils";
 import { DailyRentalsResponsiveView } from "@/features/daily-rentals/daily-rentals-responsive-view";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
@@ -16,6 +17,7 @@ interface DailyRentalDataProps {
  * Wrapped in Suspense in the page — streams in after the page shell.
  */
 export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps) {
+  noStore();
   const supabase = await createClient();
 
   const [buildingRes, customersRes, activeLeasesRes, activeSalesRes, cleaningRes, paymentsRes, bookingsRes] =
