@@ -39,14 +39,14 @@ interface UnitListProps {
 }
 
 const STATUS_DOT: Record<string, string> = {
-  sold: "bg-[#B88A48]",
+  sold: "bg-[#A0D0E8]",
   leased: "bg-[#5E9BC5]",
   daily_occupied: "bg-[#62B6F5]",
   reserved: "bg-[#E8C840]",
   cleaning_pending: "bg-[#5CC4B8]",
   maintenance: "bg-[#F08090]",
   locked: "bg-gray-400",
-  available: "bg-[#A0D0E8]",
+  available: "bg-[#B88A48]",
 };
 
 const LS_KEY = "sacsi_active_building_id";
@@ -136,11 +136,11 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
 
   const assetBlocks = [
     { key: "apartments", label: locale === "zh" ? "住宿房源" : "Appartements", value: summary.apartments, dot: "bg-foreground", icon: Home },
-    { key: "available", label: statusLabels.available, value: summary.available, dot: "bg-[#A0D0E8]", icon: undefined },
+    { key: "available", label: statusLabels.available, value: summary.available, dot: "bg-[#B88A48]", icon: undefined },
     { key: "daily", label: locale === "zh" ? "日租/预订" : "Jour", value: summary.daily, dot: "bg-[#5090C0]", icon: undefined },
     { key: "leased", label: statusLabels.leased, value: summary.leased, dot: "bg-[#5E9BC5]", icon: undefined },
     { key: "managed", label: locale === "zh" ? "代管出租" : "Gestion locative", value: summary.managed, dot: "bg-[#36A78F]", icon: undefined },
-    { key: "sold", label: statusLabels.sold, value: summary.sold, dot: "bg-[#B88A48]", icon: undefined },
+    { key: "sold", label: statusLabels.sold, value: summary.sold, dot: "bg-[#A0D0E8]", icon: undefined },
     { key: "ownerOccupied", label: locale === "zh" ? "自用" : "Usage interne", value: summary.ownerOccupied, dot: "bg-[#8F8D89]", icon: undefined },
     { key: "maintenance", label: locale === "zh" ? "维护中" : "Maintenance", value: summary.maintenance, dot: "bg-[#F0A080]", icon: AlertTriangle },
     { key: "nonApartment", label: locale === "zh" ? "非住宿" : "Autres", value: summary.nonApartment, dot: "bg-muted-foreground", icon: Key },
@@ -366,12 +366,12 @@ function StatusPill({ unit, locale, managedLease = false }: { unit: UnitRow; loc
     ? (locale === "zh" ? "已售代管" : "Vendu gere")
     : getUnitOperationalLabel(unit, locale) ?? (dictionaries[locale].statuses as Record<string, string>)[unit.status] ?? unit.status;
   const styles: Record<string, string> = {
-    sold: "bg-[#EFE1CA] text-[#17324D] ring-[#D8BF98]/70",
+    sold: "bg-[#EAF7FF] text-[#17324D] ring-[#C0DDF0]/60",
     leased: "bg-[#DDECF7] text-[#17324D] ring-[#AFCBE1]/70",
     daily_occupied: "bg-[#62B6F5]/10 text-[#1A6090] ring-[#62B6F5]/20",
     reserved: "bg-[#FFF6D8] text-[#17324D] ring-[#E8D5A0]/60",
     cleaning_pending: "bg-[#D9F7F0] text-[#17324D] ring-[#A8E8DB]/60",
-    available: "bg-[#EAF7FF] text-[#17324D] ring-[#C0DDF0]/60",
+    available: "bg-[#EFE1CA] text-[#17324D] ring-[#D8BF98]/70",
     maintenance: "bg-[#FFE2EA] text-[#17324D] ring-[#F5C0CC]/60",
     locked: "bg-muted text-muted-foreground ring-border",
     ownerOccupied: "bg-[#F1F0ED] text-[#17324D] ring-[#D2CFCA]/70",

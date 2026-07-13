@@ -41,12 +41,12 @@ export type StatusVisual = {
 /* ── Exact status → color mapping ── */
 export const roomStatusStyles: Record<RoomVisualStatus, StatusVisual> = {
   sold: {
-    card: "bg-[#EFE1CA] text-[#17324D]",
+    card: "bg-[#EAF7FF] text-[#17324D]",
     badge: "bg-white text-[#17324D]",
-    pill: "bg-[#EFE1CA] text-[#17324D] ring-[#D8BF98]/70",
-    dot: "bg-[#B88A48]",
-    stripe: "bg-[#B88A48]",
-    metric: "bg-[#EFE1CA] text-[#17324D]",
+    pill: "bg-[#EAF7FF] text-[#17324D] ring-[#C0DDF0]/60",
+    dot: "bg-[#A0D0E8]",
+    stripe: "bg-[#A0D0E8]",
+    metric: "bg-[#EAF7FF] text-[#17324D]",
   },
   leased: {
     card: "bg-[#DDECF7] text-[#17324D]",
@@ -73,12 +73,12 @@ export const roomStatusStyles: Record<RoomVisualStatus, StatusVisual> = {
     metric: "bg-[#FFF6D8] text-[#17324D]",
   },
   available: {
-    card: "bg-[#EAF7FF] text-[#17324D]",
+    card: "bg-[#EFE1CA] text-[#17324D]",
     badge: "bg-white text-[#17324D]",
-    pill: "bg-[#EAF7FF] text-[#17324D] ring-[#C0DDF0]/60",
-    dot: "bg-[#A0D0E8]",
-    stripe: "bg-[#A0D0E8]",
-    metric: "bg-[#EAF7FF] text-[#17324D]",
+    pill: "bg-[#EFE1CA] text-[#17324D] ring-[#D8BF98]/70",
+    dot: "bg-[#B88A48]",
+    stripe: "bg-[#B88A48]",
+    metric: "bg-[#EFE1CA] text-[#17324D]",
   },
   cleaningPending: {
     card: "bg-[#D9F7F0] text-[#17324D]",

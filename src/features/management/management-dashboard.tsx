@@ -53,10 +53,10 @@ interface Props {
 
 // ── Status colours (operational, not brand) ──
 const STATUS_DOT: Record<MgmtStatus, string> = {
-  sold: "#B88A48", leased: "#5E9BC5", dailyOccupied: "#62B6F5",
+  sold: "#A0D0E8", leased: "#5E9BC5", dailyOccupied: "#62B6F5",
   reserved: "#E8C840", cleaningPending: "#5CC4B8", maintenance: "#F08090",
   ownerOccupied: "#8F8D89",
-  available: "#A0D0E8",
+  available: "#B88A48",
 };
 
 // ── Helpers ──

@@ -31,7 +31,7 @@ export interface RoomCardAction {
 /* ── Status → color mapping ── */
 type CardColors = { bg: string; badge: string; nameColor: string; metaColor: string; btnBg: string };
 const statusStyle: Record<RoomStatus, CardColors> = {
-  sold:            { bg: "bg-[#EFE1CA]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
+  sold:            { bg: "bg-[#EAF7FF]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
   managed:         { bg: "bg-[#C6F0E7]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
   leased:          { bg: "bg-[#DDECF7]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
   daily_occupied:  { bg: "bg-[#62B6F5]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.95)]", metaColor: "text-[rgba(255,255,255,0.72)]", btnBg: "bg-white/[0.82]" },
@@ -41,7 +41,7 @@ const statusStyle: Record<RoomStatus, CardColors> = {
   cleaningPending: { bg: "bg-[#D9F7F0]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
   maintenance:     { bg: "bg-[#FFE2EA]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
   ownerOccupied:   { bg: "bg-[#F1F0ED]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
-  available:       { bg: "bg-[#EAF7FF]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
+  available:       { bg: "bg-[#EFE1CA]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
 }
 
 interface Props {
