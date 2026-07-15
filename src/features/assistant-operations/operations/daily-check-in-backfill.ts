@@ -64,7 +64,7 @@ export const dailyCheckInBackfillOperation: AssistantOperationHandler = {
         table: "daily_bookings",
         type: "insert" as const,
         entityId: null,
-        label: `Room ${roomNo}`,
+        label: `房间 ${roomNo}`,
         before: null,
         after: {
           unit_id: unit.id,

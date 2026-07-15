@@ -22,6 +22,16 @@ function normalizeDepositPeriod(value: string): string {
 function formatLedgerDescription(description: string | null | undefined): string {
   const raw = description?.trim();
   if (!raw) return "-";
+  const dailyPaid = raw.match(/^Daily rental paid room\s+(\S+)(?:\s+on\s+([\d-]+))?$/i);
+  if (dailyPaid) return `日租收款 房间${dailyPaid[1]}${dailyPaid[2] ? ` ${dailyPaid[2]}` : ""}`;
+  const dailyBalance = raw.match(/^Daily rental balance paid room\s+(\S+)$/i);
+  if (dailyBalance) return `日租补缴 房间${dailyBalance[1]}`;
+  const dailyPrepaid = raw.match(/^Daily rental prepaid top-up room\s+(\S+)$/i);
+  if (dailyPrepaid) return `日租预缴 房间${dailyPrepaid[1]}`;
+  const dailyCorrected = raw.match(/^Corrected daily rental payment room\s+(\S+)(?:\s+(.+))?$/i);
+  if (dailyCorrected) return `日租更正收款 房间${dailyCorrected[1]}${dailyCorrected[2] ? ` ${dailyCorrected[2]}` : ""}`;
+  const dailyMoved = raw.match(/^Daily rental payment room\s+(\S+)\s+moved from\s+(\S+)$/i);
+  if (dailyMoved) return `日租收款 房间${dailyMoved[1]} 从${dailyMoved[2]}调整`;
   const managedRent = raw.match(/^Room\s+(\S+)\s+managed lease rent received,\s*([\d-]+)\s+to\s+([\d-]+)$/i);
   if (managedRent) return `${managedRent[1]}房 代管长租租金 ${managedRent[2]} 至 ${managedRent[3]}`;
   const managedDeposit = raw.match(/^Room\s+(\S+)\s+managed lease deposit received\s+\(([^)]+)\)$/i);

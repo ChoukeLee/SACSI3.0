@@ -60,7 +60,7 @@ export const leaseNumberCleanupOperation: AssistantOperationHandler = {
         table: "lease_contracts",
         type: "update" as const,
         entityId: contract.id,
-        label: `Room ${roomNo}`,
+        label: `房间 ${roomNo}`,
         before: { contract_no: contract.contract_no },
         after: { contract_no: nextNo },
       }];

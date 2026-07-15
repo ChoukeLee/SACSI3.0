@@ -44,14 +44,14 @@ export const dailyCancelBookingOperation: AssistantOperationHandler = {
         table: "daily_bookings",
         type: "update" as const,
         entityId: booking.id,
-        label: `Room ${roomNo}`,
+        label: `房间 ${roomNo}`,
         before: { status: booking.status, check_in: booking.check_in, check_out: booking.check_out },
         after: { status: "cancelled" },
       }, {
         table: "receivables",
         type: "update" as const,
         entityId: null,
-        label: `Room ${roomNo}`,
+        label: `房间 ${roomNo}`,
         before: { source_id: booking.id },
         after: { status: "cancelled" },
       }];

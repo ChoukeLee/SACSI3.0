@@ -641,7 +641,14 @@ export async function checkOut(bookingId: string, input: {
   const nights = Math.max(1, Math.ceil((checkOutDate.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)));
   const grossAmount = Math.round(nights * Number(booking.nightly_price_xof));
   const discountAmount = Math.max(0, Number(input.discountAmount ?? 0));
-  const finalAmount = Math.max(0, input.finalAmount ?? (grossAmount - discountAmount));
+  if (discountAmount > 0 && !input.discountReason?.trim()) {
+    return { success: false, error: "discountReasonRequired" };
+  }
+  const calculatedFinalAmount = Math.max(0, grossAmount - discountAmount);
+  if (input.finalAmount != null && input.finalAmount !== calculatedFinalAmount) {
+    return { success: false, error: "finalAmountMustMatchCalculatedAmount" };
+  }
+  const finalAmount = calculatedFinalAmount;
 
   const currentPaid = await sumPayments(supabase, bookingId);
   const update: Record<string, unknown> = {
@@ -838,7 +845,7 @@ export async function completeCleaning(taskId: string): Promise<DailyActionResul
       action: "complete_cleaning",
       entityType: "cleaning_task",
       entityId: task.id,
-      entityLabel: unit?.unit_no ? `Room ${unit.unit_no}` : null,
+      entityLabel: unit?.unit_no ? `房间 ${unit.unit_no}` : null,
       beforeData: { is_completed: task.is_completed },
       afterData: { is_completed: true, completed_at: completedAt },
       metadata: {

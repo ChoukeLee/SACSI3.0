@@ -26,14 +26,14 @@ async function buildRoomCheckoutChanges(roomNumbers: string[], actualCheckOut: s
       table: "daily_bookings",
       type: "update" as const,
       entityId: booking.id,
-      label: `Room ${roomNo}`,
+      label: `房间 ${roomNo}`,
       before: { status: booking.status, actual_check_out: booking.actual_check_out },
       after: { status: "checked_out", actual_check_out: actualCheckOut },
     }, {
       table: "cleaning_tasks",
       type: "insert" as const,
       entityId: null,
-      label: `Room ${roomNo}`,
+      label: `房间 ${roomNo}`,
       before: null,
       after: { is_completed: false },
     }];
@@ -53,7 +53,7 @@ export const dailyCheckOutOperation: AssistantOperationHandler = {
     const warnings: string[] = [];
     if (roomNumbers.length > 0 && changes.length === 0) missing.push("checked_in_booking");
     for (const roomNo of roomNumbers) {
-      if (!changes.some((change) => change.label === `Room ${roomNo}` && change.table === "daily_bookings")) {
+      if (!changes.some((change) => change.label === `房间 ${roomNo}` && change.table === "daily_bookings")) {
         warnings.push(`${roomNo}: no checked-in booking found`);
       }
     }

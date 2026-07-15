@@ -285,9 +285,8 @@ export function BookingPanel({
 
   const handleCheckOut = async () => {
     const disc = toN(discountAmount);
-    const fin = toN(finalAmount);
     const checkoutDate = booking?.checkout_mode === "open" ? actualCheckOut : booking?.check_out ?? new Date().toISOString().slice(0, 10);
-    const nextFinal = fin || finalDue;
+    const nextFinal = finalDue;
     onBookingPatched?.(booking!.id, {
       status: "checked_out",
       actual_check_out: checkoutDate,
@@ -308,7 +307,6 @@ export function BookingPanel({
     await runPanelAction(
       locale === "zh" ? "正在办理退房" : "Depart en cours",
       () => checkOut(booking!.id, {
-        finalAmount: fin || undefined,
         actualCheckOut: booking?.checkout_mode === "open" ? actualCheckOut : undefined,
         discountAmount: disc || undefined,
         discountReason: discountReason || undefined,
@@ -730,10 +728,12 @@ export function BookingPanel({
                       </div>
                     )}
                     <label className={labelClass}>{t.booking.calculatedTotal}</label>
-                    <input type="number" value={finalAmount} onChange={e => setFinalAmount(e.target.value)} className={inputClass} />
+                    <div className="mt-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm font-semibold tabular-nums text-foreground">
+                      {formatXof(finalDue)}
+                    </div>
                   </div>
 
-                  <Button variant="default" onClick={handleCheckOut} disabled={saving} className="w-full"><Check className="h-4 w-4 mr-1" />{t.booking.confirmCheckOut} — {formatXof(parseInt(finalAmount,10)||0)}</Button>
+                  <Button variant="default" onClick={handleCheckOut} disabled={saving} className="w-full"><Check className="h-4 w-4 mr-1" />{t.booking.confirmCheckOut} — {formatXof(finalDue)}</Button>
 
                   {/* More actions: choose one task, then show one focused form */}
                   <div className="rounded-lg border border-border bg-card">

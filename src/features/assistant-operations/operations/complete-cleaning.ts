@@ -81,7 +81,7 @@ export const completeCleaningOperation: AssistantOperationHandler = {
         table: "cleaning_tasks",
         type: "update" as const,
         entityId: task.id,
-        label: `Room ${roomNo}`,
+        label: `房间 ${roomNo}`,
         before: { is_completed: task.is_completed, completed_at: task.completed_at },
         after: { is_completed: true },
       }];

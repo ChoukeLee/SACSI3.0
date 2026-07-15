@@ -4,11 +4,12 @@ import { createDraftId, extractAmountXof, extractDateHint, extractRoomNumbers, f
 import type { AssistantOperationDraft, AssistantOperationDraftInput, AssistantOperationExecutionResult, AssistantOperationHandler, AssistantOperationValidation } from "../types";
 
 const PAYMENT_TERMS = /收款|收了|收到|付款|补缴|租金|payment|paiement|loyer/i;
+const UNPAID_TERMS = /未付|未付款|未收|欠款/i;
 
 export const dailyPaymentOperation: AssistantOperationHandler = {
   action: "daily_payment",
   match(input) {
-    return PAYMENT_TERMS.test(input.message) && !/未付|未付款|未收|欠款/i.test(input.message) && extractRoomNumbers(input.message).length > 0;
+    return PAYMENT_TERMS.test(input.message) && !UNPAID_TERMS.test(input.message) && extractRoomNumbers(input.message).length > 0;
   },
   async buildDraft(input: AssistantOperationDraftInput): Promise<AssistantOperationDraft> {
     const roomNumbers = extractRoomNumbers(input.message);
@@ -25,21 +26,21 @@ export const dailyPaymentOperation: AssistantOperationHandler = {
     const changes = roomNumbers.flatMap((roomNo) => {
       const booking = checkedInByRoom.get(roomNo);
       if (!booking) {
-        warnings.push(`${roomNo}: no checked-in booking found`);
+        warnings.push(`${roomNo}: 未找到已入住的日租记录`);
         return [];
       }
       return [{
         table: "payments",
         type: "insert" as const,
         entityId: null,
-        label: `Room ${roomNo}`,
+        label: `房间 ${roomNo}`,
         before: null,
         after: { source_type: "daily_booking", source_id: booking.id, amount: amountXof ?? null, payment_date: paymentDate },
       }, {
         table: "ledger_entries",
         type: "insert" as const,
         entityId: null,
-        label: `Room ${roomNo}`,
+        label: `房间 ${roomNo}`,
         before: null,
         after: { direction: "income", amount: amountXof ?? null },
       }];
@@ -75,7 +76,7 @@ export const dailyPaymentOperation: AssistantOperationHandler = {
   },
   async execute(draft: AssistantOperationDraft, user: CurrentUser): Promise<AssistantOperationExecutionResult> {
     const validation = await this.validate(draft, user);
-    if (!validation.ok) return { success: false, action: "daily_payment", message: "Draft validation failed.", affectedRecords: [], metadata: { validation } };
+    if (!validation.ok) return { success: false, action: "daily_payment", message: "草稿校验失败。", affectedRecords: [], metadata: { validation } };
     const amount = Number(draft.metadata.amountXof);
     const paymentDate = String(draft.metadata.paymentDate ?? todayIso());
     const affectedRecords = [];
@@ -83,7 +84,7 @@ export const dailyPaymentOperation: AssistantOperationHandler = {
       const bookingId = String(change.after?.source_id ?? "");
       if (!bookingId) continue;
       const result = await recordSupplementaryPayment({ bookingId, amount, paymentDate });
-      if (!result.success) return { success: false, action: "daily_payment", message: result.error ?? "paymentFailed", affectedRecords, metadata: { failedBookingId: bookingId } };
+      if (!result.success) return { success: false, action: "daily_payment", message: result.error ?? "收款失败", affectedRecords, metadata: { failedBookingId: bookingId } };
       affectedRecords.push(change);
     }
     return { success: true, action: "daily_payment", message: draft.locale === "zh" ? "收款已记录，并同步财务。" : "Paiement enregistré et finance synchronisée.", auditAction: "supplementary_payment", affectedRecords, metadata: { amount, paymentDate } };

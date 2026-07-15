@@ -57,7 +57,7 @@ export const unitStatusUpdateOperation: AssistantOperationHandler = {
         table: "units",
         type: "update" as const,
         entityId: unit.id,
-        label: `Room ${roomNo}`,
+        label: `房间 ${roomNo}`,
         before: { status: unit.status },
         after: { status: targetStatus ?? null },
       }];
