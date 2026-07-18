@@ -41,6 +41,28 @@ const statusTone: Record<string, "success" | "destructive" | "warning" | "second
   draft: "secondary", expired: "secondary", terminated: "secondary", checked_out: "secondary",
 };
 
+function documentMoneyView(d: DocumentRecord, zh: boolean) {
+  const amount = Math.max(0, Number(d.amountXof) || 0);
+  const paid = Math.max(0, Number(d.paidAmountXof) || 0);
+  const outstanding = Math.max(0, amount - paid);
+  const hasPartialPayment = outstanding > 0 && paid > 0;
+  const isReceivableLike = d.docType === "daily_booking" || d.docType === "daily_checkout" || d.docType === "lease_reminder";
+  if (hasPartialPayment && isReceivableLike) {
+    return {
+      primary: outstanding,
+      label: zh ? "未收" : "Dû",
+      tone: "text-rose-600",
+      caption: `${zh ? "应收" : "Total"} ${formatXof(amount)} · ${zh ? "已收" : "Payé"} ${formatXof(paid)}`,
+    };
+  }
+  return {
+    primary: amount,
+    label: null,
+    tone: "text-foreground",
+    caption: hasPartialPayment ? `${zh ? "已收" : "Payé"} ${formatXof(paid)}` : null,
+  };
+}
+
 export function DocumentCenter({ documents, locale }: Props) {
   const typeLabels = DOC_TYPE_LABELS[locale];
   const sourceLabels = SOURCE_LABELS[locale];
@@ -142,46 +164,55 @@ export function DocumentCenter({ documents, locale }: Props) {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {filtered.map(d => (
-                      <tr
-                        key={d.id}
-                        className={cn(
-                          "transition-colors cursor-pointer hover:bg-accent/50",
-                          previewId === d.id && "bg-accent/50",
-                        )}
-                        onClick={() => setPreviewId(d.id)}
-                      >
-                        <td className="px-4 py-2.5">
-                          <Badge variant="secondary" className="text-xs">{typeLabels[d.docType]}</Badge>
-                        </td>
-                        <td className="px-4 py-2.5 max-w-[160px] truncate">{d.title}</td>
-                        <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{d.date}</td>
-                        <td className="px-4 py-2.5 font-mono">{d.unitNo || "—"}</td>
-                        <td className="px-4 py-2.5 max-w-[80px] truncate">{d.customerName || "—"}</td>
-                        <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatXof(d.amountXof)}</td>
-                        <td className="px-4 py-2.5">
-                          <Badge variant={statusTone[d.status] ?? "secondary"} className="text-xs">{stLabels[d.status] ?? d.status}</Badge>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={e => { e.stopPropagation(); setPreviewId(d.id); }}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                              title={zh ? "预览" : "Aperçu"}
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              onClick={e => { e.stopPropagation(); handlePrint(d); }}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                              title={zh ? "打印" : "Imprimer"}
-                            >
-                              <Printer className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {filtered.map(d => {
+                      const money = documentMoneyView(d, zh);
+                      return (
+                        <tr
+                          key={d.id}
+                          className={cn(
+                            "transition-colors cursor-pointer hover:bg-accent/50",
+                            previewId === d.id && "bg-accent/50",
+                          )}
+                          onClick={() => setPreviewId(d.id)}
+                        >
+                          <td className="px-4 py-2.5">
+                            <Badge variant="secondary" className="text-xs">{typeLabels[d.docType]}</Badge>
+                          </td>
+                          <td className="px-4 py-2.5 max-w-[160px] truncate">{d.title}</td>
+                          <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{d.date}</td>
+                          <td className="px-4 py-2.5 font-mono">{d.unitNo || "—"}</td>
+                          <td className="px-4 py-2.5 max-w-[80px] truncate">{d.customerName || "—"}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums">
+                            <div className={cn("font-semibold", money.tone)}>
+                              {money.label && <span className="mr-1 text-xs font-medium">{money.label}</span>}
+                              {formatXof(money.primary)}
+                            </div>
+                            {money.caption && <div className="mt-0.5 text-[12px] text-muted-foreground">{money.caption}</div>}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <Badge variant={statusTone[d.status] ?? "secondary"} className="text-xs">{stLabels[d.status] ?? d.status}</Badge>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={e => { e.stopPropagation(); setPreviewId(d.id); }}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                title={zh ? "预览" : "Aperçu"}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={e => { e.stopPropagation(); handlePrint(d); }}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                title={zh ? "打印" : "Imprimer"}
+                              >
+                                <Printer className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -213,7 +244,7 @@ export function DocumentCenter({ documents, locale }: Props) {
                 <div className="flex justify-between"><dt className="text-muted-foreground">{zh ? "客户" : "Client"}</dt><dd>{previewed.customerName || "—"}</dd></div>
                 {previewed.customerPhone && <div className="flex justify-between"><dt className="text-muted-foreground">{zh ? "电话" : "Tél"}</dt><dd>{previewed.customerPhone}</dd></div>}
                 {previewed.contractNo && <div className="flex justify-between"><dt className="text-muted-foreground">{zh ? "合同号" : "N° contrat"}</dt><dd className="font-mono">{previewed.contractNo}</dd></div>}
-                <div className="flex justify-between border-t pt-2"><dt className="text-muted-foreground">{zh ? "金额" : "Montant"}</dt><dd className="font-semibold">{formatXof(previewed.amountXof)}</dd></div>
+                <div className="flex justify-between border-t pt-2"><dt className="text-muted-foreground">{zh ? "应收" : "Total"}</dt><dd className="font-semibold">{formatXof(previewed.amountXof)}</dd></div>
                 {previewed.amountXof > 0 && (
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">{zh ? "已收" : "Payé"}</dt>

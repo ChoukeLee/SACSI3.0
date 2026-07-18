@@ -1000,11 +1000,12 @@ export function DailyCalendar({
                     <table className="w-full table-fixed text-left text-[13px]">
                       <colgroup>
                         <col className="w-[11%]" />
-                        <col className="w-[18%]" />
                         <col className="w-[17%]" />
-                        <col className="w-[17%]" />
-                        <col className="w-[22%]" />
                         <col className="w-[15%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[14%]" />
                       </colgroup>
                       <thead className="sticky top-0 z-10 bg-muted/50">
                         <tr className="text-left text-xs font-semibold text-muted-foreground">
@@ -1012,13 +1013,14 @@ export function DailyCalendar({
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "入住" : "Arrivee"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "退房" : "Depart"}</th>
-                          <th className="px-3 py-3 whitespace-nowrap text-right">{locale === "zh" ? "金额" : "Montant"}</th>
-                          <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "状态" : "Statut"}</th>
+                          <th className="px-3 py-3 whitespace-nowrap text-right">{locale === "zh" ? "应收" : "Total"}</th>
+                          <th className="px-3 py-3 whitespace-nowrap text-right">{locale === "zh" ? "已收" : "Paye"}</th>
+                          <th className="px-3 py-3 whitespace-nowrap text-right">{locale === "zh" ? "未收" : "Impaye"}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/50">
                         {financeStats.settledBookings.length === 0 ? (
-                          <tr><td colSpan={6} className="px-3 py-10 text-center text-muted-foreground/70">{locale === "zh" ? "本月暂无结算" : "Aucun reglement ce mois"}</td></tr>
+                          <tr><td colSpan={7} className="px-3 py-10 text-center text-muted-foreground/70">{locale === "zh" ? "本月暂无结算" : "Aucun reglement ce mois"}</td></tr>
                         ) : (
                           [...financeStats.settledBookings].sort((a, b) => {
                             const aD = (a.checkout_mode === "open" ? a.actual_check_out : a.check_out) ?? "";
@@ -1032,18 +1034,16 @@ export function DailyCalendar({
                             const u = visibleDailyUnits.find(u => u.id === b.unit_id);
                             const c = customerMap.get(b.customer_id);
                             const billing = calculateBilling(b, todayStr);
-                            const isPaid = billing.outstanding <= 0;
                             return (
                               <tr key={b.id} className="hover:bg-muted/50">
                                 <td className="px-3 py-2.5 whitespace-nowrap font-medium text-foreground">{u?.unit_no ?? "—"}</td>
                                 <td className="px-3 py-2.5 whitespace-nowrap text-foreground/80">{c?.name ?? "—"}</td>
                                 <td className="px-3 py-2.5 whitespace-nowrap text-foreground/70">{b.check_in}</td>
                                 <td className="px-3 py-2.5 whitespace-nowrap text-foreground/70">{b.checkout_mode === "open" ? b.actual_check_out : b.check_out}</td>
-                                <td className="px-3 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold text-foreground">{formatXof(billing.finalAmount)}</td>
-                                <td className="px-3 py-2.5 whitespace-nowrap">
-                                  <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-bold", isPaid ? "bg-accentGreen-50 text-accentGreen-700" : "bg-accentAmber-50 text-accentAmber-700")}>
-                                    {isPaid ? (locale === "zh" ? "已付清" : "Paye") : (locale === "zh" ? "未付清" : "Impaye")}
-                                  </span>
+                                <td className="px-3 py-2.5 whitespace-nowrap text-right tabular-nums text-foreground">{formatXof(billing.finalAmount)}</td>
+                                <td className="px-3 py-2.5 whitespace-nowrap text-right tabular-nums text-accentGreen-700">{formatXof(billing.paid)}</td>
+                                <td className={cn("px-3 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold", billing.outstanding > 0 ? "text-rose-600" : "text-accentGreen-700")}>
+                                  {billing.outstanding > 0 ? formatXof(billing.outstanding) : (locale === "zh" ? "已付清" : "Paye")}
                                 </td>
                               </tr>
                             );
