@@ -726,6 +726,7 @@ export function DailyCalendar({
                           isToday={isToday}
                           isStart={!prevSame}
                           isEnd={!nextSame}
+                          locale={locale}
                           copy={copy}
                           bookingLabels={bookingLabels}
                           onOpenBooking={(id) => {
@@ -1073,6 +1074,7 @@ function TimelineCell({
   isToday,
   isStart,
   isEnd,
+  locale,
   copy,
   bookingLabels,
   onOpenBooking,
@@ -1089,6 +1091,7 @@ function TimelineCell({
   isToday: boolean;
   isStart: boolean;
   isEnd: boolean;
+  locale: Locale;
   copy: (typeof COPY)[Locale];
   bookingLabels: Record<string, string>;
   onOpenBooking: (id: string) => void;
@@ -1101,9 +1104,16 @@ function TimelineCell({
   );
 
   if (isMaintenance) {
+    const statusLabel = unit.status === "locked"
+      ? (locale === "zh" ? "锁定" : "Bloque")
+      : copy.maintenance;
+    const statusTitle = unit.notes ? `${statusLabel} · ${unit.notes}` : statusLabel;
+
     return (
-      <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell">
-        <div className="absolute inset-x-1 top-1/2 h-7 -translate-y-1/2 rounded-lg bg-[#FFE2EA] border border-[#F5C0CC]" />
+      <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell" title={statusTitle}>
+        <div className="absolute inset-x-1 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center rounded-lg border border-[#F5C0CC] bg-[#FFE2EA] px-1.5 text-xs font-semibold text-[#17324D]">
+          <span className="truncate">{statusLabel}</span>
+        </div>
       </div>
     );
   }
