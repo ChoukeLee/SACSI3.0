@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   AlertTriangle,
   Banknote,
@@ -58,6 +58,7 @@ const STATUS_DOT: Record<MgmtStatus, string> = {
   ownerOccupied: "#8F8D89",
   available: "#B88A48",
 };
+const STATUS_ORDER: MgmtStatus[] = ["dailyOccupied", "reserved", "leased", "sold", "cleaningPending", "maintenance", "ownerOccupied", "available"];
 
 // ── Helpers ──
 function firstNumber(v: string | null | undefined): number | null {
@@ -159,6 +160,11 @@ export function ManagementDashboard({
     const c: Record<MgmtStatus, number> = { sold: 0, leased: 0, dailyOccupied: 0, reserved: 0, cleaningPending: 0, maintenance: 0, ownerOccupied: 0, available: 0 };
     for (const s of unitStates) c[s.status]++; return c;
   }, [unitStates]);
+  const visibleStatuses = useMemo(() => STATUS_ORDER.filter(status => counts[status] > 0), [counts]);
+
+  useEffect(() => {
+    if (selectedStatus && counts[selectedStatus] === 0) setSelectedStatus(null);
+  }, [counts, selectedStatus]);
 
   // Finance
   const now = new Date(); const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -252,7 +258,7 @@ export function ManagementDashboard({
         <span className="mr-2 text-xs font-semibold text-muted-foreground">
           {t.sections.buildingStatus}
         </span>
-        {(["dailyOccupied","reserved","leased","sold","cleaningPending","maintenance","ownerOccupied","available"] as MgmtStatus[]).map(s => (
+        {visibleStatuses.map(s => (
           <button
             key={s}
             type="button"
@@ -320,7 +326,7 @@ export function ManagementDashboard({
                   {bOccupied}/{bTotal} {locale === "zh" ? "间已占用" : "occupés"}
                 </span>
               </div>
-              <RoomLegend items={(["dailyOccupied","reserved","leased","sold","cleaningPending","maintenance","ownerOccupied","available"] as MgmtStatus[]).map(s => ({ key: s, label: s === "ownerOccupied" ? (locale === "zh" ? "自用" : "Usage interne") : t.statuses[s], color: STATUS_DOT[s] }))} />
+              <RoomLegend items={STATUS_ORDER.filter(s => bStates.some(state => state.status === s)).map(s => ({ key: s, label: s === "ownerOccupied" ? (locale === "zh" ? "自用" : "Usage interne") : t.statuses[s], color: STATUS_DOT[s] }))} />
             </>}
           >
 

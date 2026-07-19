@@ -947,17 +947,19 @@ export function DailyCalendar({
                   {financeDetail === "outstanding" && (
                     <table className="w-full table-fixed text-left text-[13px]">
                       <colgroup>
-                        <col className="w-[11%]" />
-                        <col className="w-[19%]" />
-                        <col className="w-[18%]" />
-                        <col className="w-[17%]" />
-                        <col className="w-[17%]" />
-                        <col className="w-[18%]" />
+                        <col className="w-[8%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[20%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[16%]" />
                       </colgroup>
                       <thead className="sticky top-0 z-10 bg-muted/50">
                         <tr className="text-left text-xs font-semibold text-muted-foreground">
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
+                          <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "入住备注" : "Note séjour"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "入住" : "Arrivee"}</th>
                           <th className="px-3 py-3 whitespace-nowrap text-right">{locale === "zh" ? "应收" : "Du"}</th>
                           <th className="px-3 py-3 whitespace-nowrap text-right">{locale === "zh" ? "已收" : "Encaisse"}</th>
@@ -966,7 +968,7 @@ export function DailyCalendar({
                       </thead>
                       <tbody className="divide-y divide-border/50">
                         {financeStats.outstandingBookings.length === 0 ? (
-                          <tr><td colSpan={6} className="px-3 py-10 text-center text-muted-foreground/70">{locale === "zh" ? "无未收款项" : "Aucun impaye"}</td></tr>
+                          <tr><td colSpan={7} className="px-3 py-10 text-center text-muted-foreground/70">{locale === "zh" ? "无未收款项" : "Aucun impaye"}</td></tr>
                         ) : (
                           [...financeStats.outstandingBookings].sort((a, b) => {
                             const aOut = calculateBilling(a, todayStr).outstanding;
@@ -985,6 +987,9 @@ export function DailyCalendar({
                               <tr key={b.id} className="hover:bg-muted/50">
                                 <td className="px-3 py-2.5 whitespace-nowrap font-medium text-foreground">{u?.unit_no ?? "—"}</td>
                                 <td className="px-3 py-2.5 whitespace-nowrap text-foreground/80">{c?.name ?? "—"}</td>
+                                <td className="overflow-hidden px-3 py-2.5 text-foreground/80">
+                                  <span className="block truncate" title={b.notes ?? undefined}>{b.notes || "—"}</span>
+                                </td>
                                 <td className="px-3 py-2.5 whitespace-nowrap text-foreground/70">{b.check_in}</td>
                                 <td className="px-3 py-2.5 whitespace-nowrap text-right tabular-nums text-foreground">{formatXof(billing.finalAmount)}</td>
                                 <td className="px-3 py-2.5 whitespace-nowrap text-right tabular-nums text-accentGreen-700">{formatXof(billing.paid)}</td>
@@ -1000,18 +1005,20 @@ export function DailyCalendar({
                   {financeDetail === "settled" && (
                     <table className="w-full table-fixed text-left text-[13px]">
                       <colgroup>
-                        <col className="w-[11%]" />
-                        <col className="w-[17%]" />
-                        <col className="w-[15%]" />
-                        <col className="w-[15%]" />
+                        <col className="w-[8%]" />
                         <col className="w-[14%]" />
+                        <col className="w-[20%]" />
                         <col className="w-[14%]" />
-                        <col className="w-[14%]" />
+                        <col className="w-[12%]" />
+                        <col className="w-[12%]" />
+                        <col className="w-[10%]" />
+                        <col className="w-[10%]" />
                       </colgroup>
                       <thead className="sticky top-0 z-10 bg-muted/50">
                         <tr className="text-left text-xs font-semibold text-muted-foreground">
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
+                          <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "入住备注" : "Note séjour"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "入住" : "Arrivee"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "退房" : "Depart"}</th>
                           <th className="px-3 py-3 whitespace-nowrap text-right">{locale === "zh" ? "应收" : "Total"}</th>
@@ -1021,7 +1028,7 @@ export function DailyCalendar({
                       </thead>
                       <tbody className="divide-y divide-border/50">
                         {financeStats.settledBookings.length === 0 ? (
-                          <tr><td colSpan={7} className="px-3 py-10 text-center text-muted-foreground/70">{locale === "zh" ? "本月暂无结算" : "Aucun reglement ce mois"}</td></tr>
+                          <tr><td colSpan={8} className="px-3 py-10 text-center text-muted-foreground/70">{locale === "zh" ? "本月暂无结算" : "Aucun reglement ce mois"}</td></tr>
                         ) : (
                           [...financeStats.settledBookings].sort((a, b) => {
                             const aD = (a.checkout_mode === "open" ? a.actual_check_out : a.check_out) ?? "";
@@ -1039,6 +1046,9 @@ export function DailyCalendar({
                               <tr key={b.id} className="hover:bg-muted/50">
                                 <td className="px-3 py-2.5 whitespace-nowrap font-medium text-foreground">{u?.unit_no ?? "—"}</td>
                                 <td className="px-3 py-2.5 whitespace-nowrap text-foreground/80">{c?.name ?? "—"}</td>
+                                <td className="overflow-hidden px-3 py-2.5 text-foreground/80">
+                                  <span className="block truncate" title={b.notes ?? undefined}>{b.notes || "—"}</span>
+                                </td>
                                 <td className="px-3 py-2.5 whitespace-nowrap text-foreground/70">{b.check_in}</td>
                                 <td className="px-3 py-2.5 whitespace-nowrap text-foreground/70">{b.checkout_mode === "open" ? b.actual_check_out : b.check_out}</td>
                                 <td className="px-3 py-2.5 whitespace-nowrap text-right tabular-nums text-foreground">{formatXof(billing.finalAmount)}</td>

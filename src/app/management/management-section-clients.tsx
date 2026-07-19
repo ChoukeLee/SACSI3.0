@@ -38,6 +38,7 @@ export const STATUS_DOT: Record<MgmtStatus, string> = {
   ownerOccupied: "#8F8D89",
   available: "#B88A48",
 };
+const STATUS_ORDER: MgmtStatus[] = ["dailyOccupied", "reserved", "leased", "sold", "cleaningPending", "maintenance", "ownerOccupied", "available"];
 
 function firstNumber(v: string | null | undefined): number | null {
   const m = String(v ?? "").match(/\d+/); return m ? Number(m[0]) : null;
@@ -239,6 +240,11 @@ export function UnitDataClient({
     const c: Record<MgmtStatus, number> = { sold: 0, leased: 0, dailyOccupied: 0, reserved: 0, cleaningPending: 0, maintenance: 0, ownerOccupied: 0, available: 0 };
     for (const s of unitStates) c[s.status]++; return c;
   }, [unitStates]);
+  const visibleStatuses = useMemo(() => STATUS_ORDER.filter(status => counts[status] > 0), [counts]);
+
+  useEffect(() => {
+    if (selectedStatus && counts[selectedStatus] === 0) setSelectedStatus(null);
+  }, [counts, selectedStatus]);
 
   const customerNameById = useMemo(() => {
     const m = new Map<string, string>();
@@ -287,7 +293,7 @@ export function UnitDataClient({
             <span className="mr-2 text-xs font-medium text-muted-foreground">
               {t.sections.buildingStatus}
             </span>
-          {(["dailyOccupied", "reserved", "leased", "sold", "cleaningPending", "maintenance", "ownerOccupied", "available"] as MgmtStatus[]).map(s => (
+          {visibleStatuses.map(s => (
             <button
               key={s}
               type="button"
@@ -327,7 +333,7 @@ export function UnitDataClient({
           <DonutChart
             centerValue={`${occupiedPct}%`}
             centerLabel={locale === "zh" ? "占用" : "Occupé"}
-            items={(["dailyOccupied", "reserved", "leased", "sold", "cleaningPending", "maintenance", "ownerOccupied", "available"] as MgmtStatus[]).map((status) => ({
+            items={visibleStatuses.map((status) => ({
               label: status === "ownerOccupied" ? (locale === "zh" ? "自用" : "Usage interne") : t.statuses[status],
               value: counts[status],
               color: STATUS_DOT[status],
@@ -386,7 +392,7 @@ export function UnitDataClient({
                   {bOccupied}/{bTotal} {locale === "zh" ? "间已占用" : "occupés"}
                 </span>
               </div>
-              <RoomLegend items={(["dailyOccupied", "reserved", "leased", "sold", "cleaningPending", "maintenance", "ownerOccupied", "available"] as MgmtStatus[]).map(s => ({ key: s, label: s === "ownerOccupied" ? (locale === "zh" ? "自用" : "Usage interne") : t.statuses[s], color: STATUS_DOT[s] }))} />
+              <RoomLegend items={STATUS_ORDER.filter(s => bStates.some(state => state.status === s)).map(s => ({ key: s, label: s === "ownerOccupied" ? (locale === "zh" ? "自用" : "Usage interne") : t.statuses[s], color: STATUS_DOT[s] }))} />
             </>}
           >
             {floorGroups.map(group => (
