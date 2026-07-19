@@ -150,8 +150,8 @@ export function FinanceDetailPanel({
 
   return (
     <>
-      <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-5xl" role="dialog" aria-label={labels.title}>
+      <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/30 backdrop-blur-sm md:left-[var(--app-drawer-left)]" onClick={onClose} />
+      <div className="fixed bottom-0 left-0 right-0 top-12 z-panel w-full overflow-auto border-l border-border bg-card shadow-panel md:left-[var(--app-drawer-left)]" role="dialog" aria-label={labels.title}>
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
           <div>

@@ -373,7 +373,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
       {/* New entry side panel */}
       {showNewEntry && (
         <>
-          <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setShowNewEntry(false)} />
+          <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm md:left-[var(--app-drawer-left)]" onClick={() => setShowNewEntry(false)} />
           <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]">
             <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
               <h3 className="text-[15px] font-semibold">{t.entry.title}</h3>

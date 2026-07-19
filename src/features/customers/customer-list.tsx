@@ -584,8 +584,8 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       {/* ── Selected detail drawer ── */}
       {selected && !isFormOpen && !isBlacklistOpen && (
         <>
-          <div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setSelectedId(null)} />
-          <div className="fixed inset-x-0 bottom-0 z-panel max-h-[88vh] overflow-auto rounded-t-xl border bg-card p-4 shadow-panel sm:inset-y-0 sm:left-auto sm:right-0 sm:w-full sm:max-w-lg sm:rounded-none sm:border-l">
+          <div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm md:left-[var(--app-drawer-left)] md:top-12" onClick={() => setSelectedId(null)} />
+          <div className="fixed inset-x-0 bottom-0 z-panel max-h-[88vh] overflow-auto rounded-t-xl border bg-card p-4 shadow-panel sm:bottom-0 sm:left-auto sm:right-0 sm:top-12 sm:w-full sm:max-w-lg sm:max-h-none sm:rounded-none sm:border-l">
             <div className="mb-4 flex items-start justify-between gap-3 border-b pb-3">
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-muted-foreground">{locale === "zh" ? "客户详情" : "Détail client"}</p>
@@ -642,7 +642,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       {/* ── Add/Edit Form Panel ── */}
       {isFormOpen && (
         <>
-          <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setFormMode(null)} />
+          <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm md:left-[var(--app-drawer-left)]" onClick={() => setFormMode(null)} />
           <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]">
             <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
               <h3 className="text-[15px] font-semibold">{formMode.type === "add" ? t.add : t.edit}</h3>
@@ -679,7 +679,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       {/* ── Blacklist form panel ── */}
       {isBlacklistOpen && (
         <>
-          <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setBlacklistPanelId(null)} />
+          <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm md:left-[var(--app-drawer-left)]" onClick={() => setBlacklistPanelId(null)} />
           <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[420px]">
             <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
               <h3 className="text-[15px] font-semibold">{t.blacklistAdd}</h3>
