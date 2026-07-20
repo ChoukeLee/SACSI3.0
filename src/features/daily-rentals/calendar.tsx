@@ -862,7 +862,7 @@ export function DailyCalendar({
       {financeDetail && (
         <>
           <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/30 backdrop-blur-sm" onClick={() => setFinanceDetail(null)} />
-          <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-4xl" role="dialog">
+          <div className="fixed bottom-0 left-0 right-0 top-12 z-panel w-full overflow-auto bg-card shadow-panel" role="dialog">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
               <div>
                 <h3 className="text-sm font-medium tracking-tight text-foreground">
@@ -900,9 +900,9 @@ export function DailyCalendar({
 
               {/* Table */}
               <div className="overflow-hidden rounded-xl border border-border">
-                <div className="overflow-x-auto">
+                <div className="overflow-hidden">
                   {financeDetail === "collected" && (
-                    <table className="w-full min-w-[760px] table-fixed text-left text-[13px]">
+                    <table className="w-full table-fixed text-left text-[13px]">
                       <colgroup>
                         <col className="w-[20%]" />
                         <col className="w-[22%]" />
@@ -945,15 +945,15 @@ export function DailyCalendar({
                   )}
 
                   {financeDetail === "outstanding" && (
-                    <table className="w-full min-w-[860px] table-fixed text-left text-[13px]">
+                    <table className="w-full table-fixed text-left text-[13px]">
                       <colgroup>
-                        <col className="w-[8%]" />
-                        <col className="w-[14%]" />
-                        <col className="w-[20%]" />
-                        <col className="w-[14%]" />
-                        <col className="w-[14%]" />
-                        <col className="w-[14%]" />
+                        <col className="w-[7%]" />
+                        <col className="w-[11%]" />
                         <col className="w-[16%]" />
+                        <col className="w-[11%]" />
+                        <col className="w-[17%]" />
+                        <col className="w-[17%]" />
+                        <col className="w-[21%]" />
                       </colgroup>
                       <thead className="sticky top-0 z-10 bg-muted/50">
                         <tr className="text-left text-xs font-semibold text-muted-foreground">
@@ -1003,16 +1003,16 @@ export function DailyCalendar({
                   )}
 
                   {financeDetail === "settled" && (
-                    <table className="w-full min-w-[860px] table-fixed text-left text-[13px]">
+                    <table className="w-full table-fixed text-left text-[13px]">
                       <colgroup>
                         <col className="w-[7%]" />
-                        <col className="w-[12%]" />
+                        <col className="w-[10%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[11%]" />
+                        <col className="w-[11%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[15%]" />
                         <col className="w-[17%]" />
-                        <col className="w-[12%]" />
-                        <col className="w-[12%]" />
-                        <col className="w-[14%]" />
-                        <col className="w-[14%]" />
-                        <col className="w-[12%]" />
                       </colgroup>
                       <thead className="sticky top-0 z-10 bg-muted/50">
                         <tr className="text-left text-xs font-semibold text-muted-foreground">
