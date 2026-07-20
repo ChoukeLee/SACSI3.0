@@ -296,6 +296,12 @@ export function DailyCalendar({
     return map;
   }, [visibleDailyUnits]);
 
+  const allUnitById = useMemo(() => {
+    const map = new Map<string, UnitRow>();
+    for (const unit of dailyUnits) map.set(unit.id, unit);
+    return map;
+  }, [dailyUnits]);
+
   const unitCleaningMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const task of visibleCleaningTasks) {
@@ -406,7 +412,7 @@ export function DailyCalendar({
 
     for (const payment of financeStats.collectedPayments) {
       const booking = payment.source_id ? bookingById.get(payment.source_id) ?? null : null;
-      const unit = booking ? unitById.get(booking.unit_id) ?? null : null;
+      const unit = booking ? allUnitById.get(booking.unit_id) ?? unitById.get(booking.unit_id) ?? null : null;
       const customer = booking ? customerMap.get(booking.customer_id) ?? null : null;
       const key = booking ? `booking:${booking.id}` : `payment:${payment.id}`;
       const stayEnd = booking
@@ -437,7 +443,7 @@ export function DailyCalendar({
     }
 
     return Array.from(groups.values()).sort((a, b) => b.sortDate.localeCompare(a.sortDate));
-  }, [bookingById, customerMap, unitById, financeStats.collectedPayments, locale]);
+  }, [bookingById, customerMap, allUnitById, unitById, financeStats.collectedPayments, locale]);
 
   const financeCards = useMemo(() => [
     { key: "collected", label: locale === "zh" ? "本月已收" : "Encaisse", value: formatXof(financeStats.monthCollected), tone: "green" as const },
@@ -976,11 +982,11 @@ export function DailyCalendar({
                             if (bOut !== aOut) return bOut - aOut;
                             const dateCompare = a.check_in.localeCompare(b.check_in);
                             if (dateCompare !== 0) return dateCompare;
-                            const aUnit = visibleDailyUnits.find(u => u.id === a.unit_id)?.unit_no ?? "";
-                            const bUnit = visibleDailyUnits.find(u => u.id === b.unit_id)?.unit_no ?? "";
+                            const aUnit = allUnitById.get(a.unit_id)?.unit_no ?? "";
+                            const bUnit = allUnitById.get(b.unit_id)?.unit_no ?? "";
                             return aUnit.localeCompare(bUnit, undefined, { numeric: true });
                           }).map(b => {
-                            const u = visibleDailyUnits.find(u => u.id === b.unit_id);
+                            const u = allUnitById.get(b.unit_id);
                             const c = customerMap.get(b.customer_id);
                             const billing = calculateBilling(b, todayStr);
                             return (
@@ -1035,11 +1041,11 @@ export function DailyCalendar({
                             const bD = (b.checkout_mode === "open" ? b.actual_check_out : b.check_out) ?? "";
                             const dateCompare = bD.localeCompare(aD);
                             if (dateCompare !== 0) return dateCompare;
-                            const aUnit = visibleDailyUnits.find(u => u.id === a.unit_id)?.unit_no ?? "";
-                            const bUnit = visibleDailyUnits.find(u => u.id === b.unit_id)?.unit_no ?? "";
+                            const aUnit = allUnitById.get(a.unit_id)?.unit_no ?? "";
+                            const bUnit = allUnitById.get(b.unit_id)?.unit_no ?? "";
                             return aUnit.localeCompare(bUnit, undefined, { numeric: true });
                           }).map(b => {
-                            const u = visibleDailyUnits.find(u => u.id === b.unit_id);
+                            const u = allUnitById.get(b.unit_id);
                             const c = customerMap.get(b.customer_id);
                             const billing = calculateBilling(b, todayStr);
                             return (
