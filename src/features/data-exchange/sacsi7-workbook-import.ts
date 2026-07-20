@@ -236,7 +236,7 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
   for (const unit of apartmentUnits) {
     const hasLease = leasedUnitNos.has(unit.unit_no);
     const hasSale = soldUnitNos.has(unit.unit_no);
-    const status = hasLease && hasSale ? "sold_managed" : hasSale ? "sold" : hasLease ? "leased" : "available";
+    const status = hasSale ? "sold" : hasLease ? "leased" : "available";
     const { error } = await supabase.from("units").update({ status }).eq("id", unit.id);
     if (error) throw new Error(`更新${unit.unit_no}房态失败：${error.message}`);
   }
