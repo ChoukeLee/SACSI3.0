@@ -117,7 +117,7 @@ export function createUnitRepo(client: SupabaseClient) {
         .eq("unit_business_flags.business_type", businessType)
         .eq("unit_business_flags.is_enabled", true)
         .order("unit_no");
-      if (businessType === "daily_rental") query = query.neq("code", "SACSI11-503");
+      if (businessType === "daily_rental") query = query.neq("unit_no", "503");
       const { data, error } = await query;
       if (error) throw error;
       return sortUnits(data as unknown as UnitRow[]);

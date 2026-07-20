@@ -63,9 +63,10 @@ async function FrenchUnitsData() {
   }
 
   const businessFlagsMap: Record<string, UnitBusinessFlagRow[]> = {};
-  const unitCodeById = new Map(units.map((unit) => [unit.id, unit.code]));
+  const sacsi11Id = allBuildings?.find((building) => building.code === "SACSI11")?.id;
+  const sacsi11503Id = units.find((unit) => unit.building_id === sacsi11Id && unit.unit_no === "503")?.id;
   for (const flag of flags) {
-    if (unitCodeById.get(flag.unit_id) === "SACSI11-503" && flag.business_type === "daily_rental") continue;
+    if (flag.unit_id === sacsi11503Id && flag.business_type === "daily_rental") continue;
     if (!businessFlagsMap[flag.unit_id]) businessFlagsMap[flag.unit_id] = [];
     businessFlagsMap[flag.unit_id].push(flag);
   }
