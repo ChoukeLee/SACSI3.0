@@ -54,7 +54,10 @@ async function LeasesData({ locale }: { locale: "zh" | "fr" }) {
       supabase.from("receivables").select("*").in("source_type", ["lease_contract"]).order("due_date", { ascending: false }).limit(2000),
     ]);
     if (!contractsRes.error) contracts = contractsRes.data;
-    if (!unitsRes.error) units = sortUnits(unitsRes.data);
+    if (!unitsRes.error) units = sortUnits(unitsRes.data.map((unit) => unit.code === "SACSI7-STOREFRONT" ? {
+      ...unit,
+      unit_business_flags: [...(unit.unit_business_flags ?? []), { business_type: "long_lease", is_enabled: true, default_price_xof: 1200000 }],
+    } : unit));
     if (!customersRes.error) customers = customersRes.data;
     if (!paymentsRes.error) payments = paymentsRes.data;
     if (!receivablesRes.error) receivables = receivablesRes.data;

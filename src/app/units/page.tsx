@@ -73,6 +73,10 @@ async function UnitsData({ locale }: { locale: "zh" | "fr" }) {
     if (!businessFlagsMap[flag.unit_id]) businessFlagsMap[flag.unit_id] = [];
     businessFlagsMap[flag.unit_id].push(flag);
   }
+  const sacsi7Storefront = units.find((unit) => unit.code === "SACSI7-STOREFRONT");
+  if (sacsi7Storefront && !businessFlagsMap[sacsi7Storefront.id]?.some((flag) => flag.business_type === "long_lease")) {
+    businessFlagsMap[sacsi7Storefront.id] = [...(businessFlagsMap[sacsi7Storefront.id] ?? []), { unit_id: sacsi7Storefront.id, business_type: "long_lease", is_enabled: true, default_price_xof: 1200000 }];
+  }
 
   const auditLogsMap: Record<string, { id: string; action: string; metadata: Record<string, unknown>; created_at: string }[]> = {};
   if (buildingIds.length > 0 && units.length > 0) {
