@@ -89,7 +89,7 @@ export async function previewSacsi7WorkbookImport(): Promise<Sacsi7ImportResult>
   };
 }
 
-export async function applySacsi7WorkbookImport(): Promise<Sacsi7ImportResult> {
+async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> {
   const user = await requireRole("admin");
   const { supabase, building, units: initialUnits, apartmentUnits } = await loadContext();
 
@@ -342,4 +342,12 @@ export async function applySacsi7WorkbookImport(): Promise<Sacsi7ImportResult> {
       storefrontAvailable: true, storefrontMonthlyRentXof: SACSI7_STOREFRONT_RENT_XOF,
     },
   };
+}
+
+export async function applySacsi7WorkbookImport(): Promise<Sacsi7ImportResult> {
+  try {
+    return await applySacsi7WorkbookImportInternal();
+  } catch (error) {
+    return { success: false, mode: "apply", message: error instanceof Error ? error.message : String(error), summary: {} };
+  }
 }
