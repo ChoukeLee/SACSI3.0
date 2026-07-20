@@ -9,6 +9,7 @@ import {
   SACSI7_STOREFRONT_RENT_XOF,
   sacsi7ExcludedCategories,
   sacsi7Leases,
+  sacsi7OwnerOccupiedUnits,
   sacsi7Sales,
   sacsi7TerminatedLeaseUnits,
   type Sacsi7Payment,
@@ -77,6 +78,7 @@ export async function previewSacsi7WorkbookImport(): Promise<Sacsi7ImportResult>
       existingSaleContracts: sales?.length ?? 0,
       targetActiveLeaseContracts: sacsi7Leases.length,
       targetLeasedApartmentUnits: new Set(sacsi7Leases.flatMap((lease) => lease.masterUnits ?? [lease.unitNo])).size,
+      targetOwnerOccupiedUnits: sacsi7OwnerOccupiedUnits.length,
       targetSaleContracts: sacsi7Sales.length,
       targetPayments: targetPayments.length,
       alreadyImportedPayments: existingPayments?.length ?? 0,
@@ -233,11 +235,16 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
 
   const leasedUnitNos = new Set(sacsi7Leases.flatMap((lease) => lease.masterUnits ?? [lease.unitNo]));
   const soldUnitNos = new Set(sacsi7Sales.map((sale) => sale.unitNo));
+  const ownerOccupiedByUnitNo = new Map(sacsi7OwnerOccupiedUnits.map((row) => [row.unitNo, row]));
   for (const unit of apartmentUnits) {
     const hasLease = leasedUnitNos.has(unit.unit_no);
     const hasSale = soldUnitNos.has(unit.unit_no);
-    const status = hasSale ? "sold" : hasLease ? "leased" : "available";
-    const { error } = await supabase.from("units").update({ status }).eq("id", unit.id);
+    const ownerOccupied = ownerOccupiedByUnitNo.get(unit.unit_no);
+    const status = ownerOccupied ? "locked" : hasSale ? "sold" : hasLease ? "leased" : "available";
+    const update = ownerOccupied
+      ? { status, notes: `自用员工宿舍；入住人：${ownerOccupied.occupant}；登记日期：${SACSI7_AS_OF}；来源：用户确认。` }
+      : { status };
+    const { error } = await supabase.from("units").update(update).eq("id", unit.id);
     if (error) throw new Error(`更新${unit.unit_no}房态失败：${error.message}`);
   }
 
@@ -328,7 +335,7 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
 
   await supabase.from("audit_logs").insert({
     action: "sacsi7_workbook_cover_import", entity_type: "building", entity_id: building.id, user_id: user.id,
-    metadata: { source: SACSI7_SOURCE, as_of: SACSI7_AS_OF, leases: sacsi7Leases.length, sales: sacsi7Sales.length, payments_created: paymentInserts.length, excluded: sacsi7ExcludedCategories },
+    metadata: { source: SACSI7_SOURCE, as_of: SACSI7_AS_OF, leases: sacsi7Leases.length, sales: sacsi7Sales.length, owner_occupied: sacsi7OwnerOccupiedUnits, payments_created: paymentInserts.length, excluded: sacsi7ExcludedCategories },
   });
   for (const path of ["/units", "/fr/units", "/leases", "/fr/leases", "/sales", "/fr/sales", "/finance", "/fr/finance"]) revalidatePath(path);
   return {
@@ -339,6 +346,7 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
       saleContracts: sacsi7Sales.length, saleContractsCreated: saleCreated, saleContractsUpdated: saleUpdated,
       saleSchedulesCreated, saleSchedulesUpdated,
       paymentsCreated: paymentInserts.length, receivablesCreated: receivableInserts.length, ledgersCreated: ledgerInserts.length,
+      ownerOccupiedUnits: sacsi7OwnerOccupiedUnits.length,
       storefrontAvailable: true, storefrontMonthlyRentXof: SACSI7_STOREFRONT_RENT_XOF,
     },
   };

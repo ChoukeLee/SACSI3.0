@@ -37,6 +37,11 @@ export const SACSI7_SOURCE = "7号公寓.xlsx Sheet1 A1:J100";
 export const SACSI7_AS_OF = "2026-07-20";
 export const SACSI7_STOREFRONT_RENT_XOF = wan(120);
 
+export const sacsi7OwnerOccupiedUnits = [
+  { unitNo: "703", occupant: "李军" },
+  { unitNo: "704", occupant: "李振咏" },
+] as const;
+
 export const sacsi7Leases: Sacsi7Lease[] = [
   { unitNo: "202", customer: "刘才生", monthlyRentXof: wan(140), depositXof: wan(280), startDate: "2026-07-01", expectedEndDate: "2026-12-31", payments: [] },
   { unitNo: "206", customer: "ABDOUL", monthlyRentXof: wan(115), depositXof: wan(230), startDate: "2026-01-23", expectedEndDate: "2026-12-31", payments: [
