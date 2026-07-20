@@ -31,6 +31,7 @@ export interface CustomerSummary {
 
 interface CalendarProps {
   dailyUnits: UnitRow[];
+  unitLookupUnits?: UnitRow[];
   bookings: DailyBookingRow[];
   customers: CustomerSummary[];
   cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[];
@@ -57,6 +58,7 @@ const TOOLBAR_META = cn(TOOLBAR_ITEM, "text-[13px] font-medium text-foreground t
 
 export function DailyCalendar({
   dailyUnits,
+  unitLookupUnits,
   bookings: serverBookings,
   customers,
   cleaningTasks,
@@ -299,8 +301,9 @@ export function DailyCalendar({
   const allUnitById = useMemo(() => {
     const map = new Map<string, UnitRow>();
     for (const unit of dailyUnits) map.set(unit.id, unit);
+    for (const unit of unitLookupUnits ?? []) map.set(unit.id, unit);
     return map;
-  }, [dailyUnits]);
+  }, [dailyUnits, unitLookupUnits]);
 
   const unitCleaningMap = useMemo(() => {
     const map = new Map<string, string>();

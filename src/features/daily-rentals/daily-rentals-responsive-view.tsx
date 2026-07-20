@@ -20,6 +20,7 @@ const DailyCalendar = dynamic(() => import("./calendar").then((mod) => ({ defaul
 
 interface DailyRentalsResponsiveViewProps {
   dailyUnits: UnitRow[];
+  unitLookupUnits?: UnitRow[];
   bookings: DailyBookingRow[];
   customers: CustomerSummary[];
   cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[];
@@ -30,6 +31,7 @@ interface DailyRentalsResponsiveViewProps {
 
 export function DailyRentalsResponsiveView({
   dailyUnits,
+  unitLookupUnits,
   bookings,
   customers,
   cleaningTasks,
@@ -63,6 +65,7 @@ export function DailyRentalsResponsiveView({
   return (
     <DailyCalendar
       dailyUnits={dailyUnits}
+      unitLookupUnits={unitLookupUnits}
       bookings={bookings}
       customers={customers}
       cleaningTasks={cleaningTasks}

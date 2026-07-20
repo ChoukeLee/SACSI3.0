@@ -44,6 +44,7 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
     ]);
 
   let dailyUnits: UnitRow[] = [];
+  let unitLookupUnits: UnitRow[] = [];
   let bookings: DailyBookingRow[] = [];
   let customers: CustomerSummary[] = [];
   let cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[] = [];
@@ -73,12 +74,29 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
       .neq("unit_no", "503")
       .in("status", ["available", "reserved", "daily_occupied", "cleaning_pending", "maintenance"])
       .order("unit_no");
-    if (!unitsErr) dailyUnits = sortUnits((unitsData as unknown as UnitRow[]) ?? []);
+    if (!unitsErr) {
+      dailyUnits = sortUnits((unitsData as unknown as UnitRow[]) ?? []);
+      unitLookupUnits = dailyUnits;
+      const visibleUnitIds = new Set(dailyUnits.map((unit) => unit.id));
+      const bookingUnitIds = Array.from(new Set(bookings.map((booking) => booking.unit_id).filter(Boolean)));
+      const missingBookingUnitIds = bookingUnitIds.filter((unitId) => !visibleUnitIds.has(unitId));
+      let historyUnits: UnitRow[] = [];
+      if (missingBookingUnitIds.length > 0) {
+        const { data: historyUnitsData, error: historyUnitsErr } = await supabase
+          .from("units")
+          .select("id, unit_no, floor_label, status, notes")
+          .eq("building_id", buildingId)
+          .in("id", missingBookingUnitIds);
+        if (!historyUnitsErr) historyUnits = (historyUnitsData as unknown as UnitRow[]) ?? [];
+      }
+      unitLookupUnits = sortUnits([...dailyUnits, ...historyUnits]);
+    }
   }
 
   return (
     <DailyRentalsResponsiveView
       dailyUnits={dailyUnits}
+      unitLookupUnits={unitLookupUnits}
       bookings={bookings}
       customers={customers}
       payments={payments}
