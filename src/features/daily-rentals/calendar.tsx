@@ -900,9 +900,9 @@ export function DailyCalendar({
 
               {/* Table */}
               <div className="overflow-hidden rounded-xl border border-border">
-                <div className="overflow-visible">
+                <div className="overflow-x-auto">
                   {financeDetail === "collected" && (
-                    <table className="w-full table-fixed text-left text-[13px]">
+                    <table className="w-full min-w-[760px] table-fixed text-left text-[13px]">
                       <colgroup>
                         <col className="w-[20%]" />
                         <col className="w-[22%]" />
@@ -945,7 +945,7 @@ export function DailyCalendar({
                   )}
 
                   {financeDetail === "outstanding" && (
-                    <table className="w-full table-fixed text-left text-[13px]">
+                    <table className="w-full min-w-[860px] table-fixed text-left text-[13px]">
                       <colgroup>
                         <col className="w-[8%]" />
                         <col className="w-[14%]" />
@@ -1003,16 +1003,16 @@ export function DailyCalendar({
                   )}
 
                   {financeDetail === "settled" && (
-                    <table className="w-full table-fixed text-left text-[13px]">
+                    <table className="w-full min-w-[860px] table-fixed text-left text-[13px]">
                       <colgroup>
-                        <col className="w-[8%]" />
-                        <col className="w-[14%]" />
-                        <col className="w-[20%]" />
-                        <col className="w-[14%]" />
+                        <col className="w-[7%]" />
+                        <col className="w-[12%]" />
+                        <col className="w-[17%]" />
                         <col className="w-[12%]" />
                         <col className="w-[12%]" />
-                        <col className="w-[10%]" />
-                        <col className="w-[10%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[12%]" />
                       </colgroup>
                       <thead className="sticky top-0 z-10 bg-muted/50">
                         <tr className="text-left text-xs font-semibold text-muted-foreground">
