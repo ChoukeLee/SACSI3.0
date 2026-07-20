@@ -185,8 +185,8 @@ export async function applySacsi11WorkbookImport(payloadText: string): Promise<S
     const { count, error: cancelError } = await supabase.from("receivables").update({ status: "cancelled", notes: "11号公寓Excel覆盖：取消历史零金额占位应收" }, { count: "exact" }).eq("source_type", "lease_contract").eq("source_id", contractId).eq("amount_xof", 0).neq("status", "cancelled");
     if (cancelError) throw new Error(`清理${row.unitNo}占位应收失败：${cancelError.message}`);
     zeroReceivablesCancelled += count ?? 0;
-    const { error: flagError } = await supabase.from("unit_business_flags").upsert({ unit_id: unit.id, business_type: "long_lease", is_enabled: true, default_price_xof: row.monthlyRentXof }, { onConflict: "unit_id,business_type" });
-    if (flagError) throw new Error(`更新${row.unitNo}长租价格失败：${flagError.message}`);
+    // All SACSI11 apartments already carry the long-lease business flag.
+    // Rent is sourced from the active contract; avoid touching this RLS-protected seed table.
   }
 
   // Cancel remaining placeholders only when their source contract belongs to one of the 72 SACSI11 apartments.
