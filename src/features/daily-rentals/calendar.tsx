@@ -862,7 +862,7 @@ export function DailyCalendar({
       {financeDetail && (
         <>
           <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/30 backdrop-blur-sm" onClick={() => setFinanceDetail(null)} />
-          <div className="fixed bottom-0 left-0 right-0 top-12 z-panel w-full overflow-auto border-l border-border bg-card shadow-panel md:left-[var(--sidebar-width)]" role="dialog">
+          <div className="fixed bottom-0 left-0 right-0 top-12 z-panel overflow-auto border-l border-border bg-card shadow-panel md:left-[var(--sidebar-width)]" role="dialog">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
               <div>
                 <h3 className="text-sm font-medium tracking-tight text-foreground">
