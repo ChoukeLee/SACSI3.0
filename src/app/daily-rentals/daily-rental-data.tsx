@@ -70,6 +70,7 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
       .eq("building_id", buildingId)
       .eq("unit_business_flags.business_type", "daily_rental")
       .eq("unit_business_flags.is_enabled", true)
+      .neq("unit_no", "503")
       .in("status", ["available", "reserved", "daily_occupied", "cleaning_pending", "maintenance"])
       .order("unit_no");
     if (!unitsErr) dailyUnits = sortUnits((unitsData as unknown as UnitRow[]) ?? []);

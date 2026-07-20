@@ -34,6 +34,7 @@ export async function FrontDeskData({ userRole, locale }: FrontDeskDataProps) {
         .eq("building_id", buildingId)
         .eq("unit_business_flags.business_type", "daily_rental")
         .eq("unit_business_flags.is_enabled", true)
+        .neq("unit_no", "503")
         .in("status", ["available", "reserved", "daily_occupied", "cleaning_pending", "maintenance"])
         .order("unit_no"),
       supabase

@@ -94,7 +94,7 @@ export async function findUnitsByRoomNumbers(roomNumbers: string[]) {
     .in("unit_no", roomNumbers)
     .eq("buildings.code", "SACSI11");
   if (error) throw error;
-  return (data ?? []) as Array<{
+  const units = (data ?? []) as Array<{
     id: string;
     unit_no: string;
     status: string;
@@ -102,6 +102,9 @@ export async function findUnitsByRoomNumbers(roomNumbers: string[]) {
     buildings: { code: string } | { code: string }[] | null;
     unit_business_flags?: Array<{ business_type: string; is_enabled: boolean; default_price_xof: number | null }> | null;
   }>;
+  return units.map((unit) => unit.unit_no === "503"
+    ? { ...unit, unit_business_flags: unit.unit_business_flags?.filter((flag) => flag.business_type !== "daily_rental") }
+    : unit);
 }
 
 export async function findCustomersByName(name: string | undefined) {

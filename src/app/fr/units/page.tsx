@@ -63,7 +63,9 @@ async function FrenchUnitsData() {
   }
 
   const businessFlagsMap: Record<string, UnitBusinessFlagRow[]> = {};
+  const unitCodeById = new Map(units.map((unit) => [unit.id, unit.code]));
   for (const flag of flags) {
+    if (unitCodeById.get(flag.unit_id) === "SACSI11-503" && flag.business_type === "daily_rental") continue;
     if (!businessFlagsMap[flag.unit_id]) businessFlagsMap[flag.unit_id] = [];
     businessFlagsMap[flag.unit_id].push(flag);
   }

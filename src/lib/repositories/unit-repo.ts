@@ -110,13 +110,15 @@ export function createUnitRepo(client: SupabaseClient) {
       buildingId: string,
       businessType: BusinessType
     ): Promise<UnitRow[]> {
-      const { data, error } = await client
+      let query = client
         .from("units")
         .select("*, unit_business_flags!inner(business_type, is_enabled, default_price_xof)")
         .eq("building_id", buildingId)
         .eq("unit_business_flags.business_type", businessType)
         .eq("unit_business_flags.is_enabled", true)
         .order("unit_no");
+      if (businessType === "daily_rental") query = query.neq("code", "SACSI11-503");
+      const { data, error } = await query;
       if (error) throw error;
       return sortUnits(data as unknown as UnitRow[]);
     },
