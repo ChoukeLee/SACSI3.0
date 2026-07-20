@@ -309,6 +309,7 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
         <UnitDetailPanel
           key={`${detailUnit.id}-${refreshKey}`}
           unit={detailUnit}
+          buildingName={activeBuilding?.display_name ?? activeBuilding?.code ?? "-"}
           businessFlags={businessFlagsMap[detailUnit.id] ?? []}
           auditLogs={auditLogsMap[detailUnit.id] ?? []}
           locale={locale}

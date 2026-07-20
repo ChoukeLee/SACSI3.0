@@ -27,6 +27,7 @@ interface AuditLogEntry {
 
 interface UnitDetailPanelProps {
   unit: UnitRow;
+  buildingName: string;
   businessFlags: UnitBusinessFlag[];
   auditLogs: AuditLogEntry[];
   locale: Locale;
@@ -38,7 +39,7 @@ interface UnitDetailPanelProps {
 
 const manualStatuses: UnitStatus[] = ["available", "maintenance", "locked"];
 
-export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClose, onStatusChanged, onStatusPatch, onStatusRollback }: UnitDetailPanelProps) {
+export function UnitDetailPanel({ unit, buildingName, businessFlags, auditLogs, locale, onClose, onStatusChanged, onStatusPatch, onStatusRollback }: UnitDetailPanelProps) {
   const t = dictionaries[locale].units;
   const statusLabels = dictionaries[locale].statuses;
   const [statusOpen, setStatusOpen] = useState(false);
@@ -87,7 +88,7 @@ export function UnitDetailPanel({ unit, businessFlags, auditLogs, locale, onClos
         <div className="space-y-5 px-5 py-5">
           <dl className="grid grid-cols-2 gap-x-5 gap-y-4 text-sm">
             {[
-              [t.detail.building, "11#公寓"],
+              [t.detail.building, buildingName],
               [t.detail.floor, unit.floor_label],
               [t.detail.kind, t.kinds[unit.kind]],
               [t.detail.status, null],
