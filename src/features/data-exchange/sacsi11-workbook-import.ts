@@ -62,12 +62,18 @@ async function loadContext(payload: ImportPayload) {
 export async function previewSacsi11WorkbookImport(payloadText: string): Promise<Sacsi11ImportResult> {
   await requireRole("admin");
   const payload = parsePayload(payloadText);
-  const { supabase, building, apartments } = await loadContext(payload);
+  const { supabase, apartments } = await loadContext(payload);
   const unitIds = apartments.map((unit) => unit.id);
+  const { data: leaseRows, error: leaseRowsError } = await supabase.from("lease_contracts").select("id").in("unit_id", unitIds);
+  if (leaseRowsError) throw new Error(leaseRowsError.message);
+  const leaseIds = (leaseRows ?? []).map((row) => row.id);
+  const zeroLeaseReceivablesQuery = leaseIds.length
+    ? supabase.from("receivables").select("id", { count: "exact", head: true }).eq("source_type", "lease_contract").in("source_id", leaseIds).eq("amount_xof", 0).neq("status", "cancelled")
+    : Promise.resolve({ count: 0, error: null });
   const [{ count: activeLeases }, { count: activeSales }, { count: zeroLeaseReceivables }] = await Promise.all([
     supabase.from("lease_contracts").select("id", { count: "exact", head: true }).in("unit_id", unitIds).eq("status", "active"),
     supabase.from("sale_contracts").select("id", { count: "exact", head: true }).in("unit_id", unitIds).eq("status", "active"),
-    supabase.from("receivables").select("id", { count: "exact", head: true }).eq("building_id", building.id).eq("source_type", "lease_contract").eq("amount_xof", 0).neq("status", "cancelled"),
+    zeroLeaseReceivablesQuery,
   ]);
   return {
     success: true,
@@ -183,8 +189,15 @@ export async function applySacsi11WorkbookImport(payloadText: string): Promise<S
     if (flagError) throw new Error(`更新${row.unitNo}长租价格失败：${flagError.message}`);
   }
 
-  // Cancel any remaining zero-value placeholder lease receivables in SACSI11.
-  const { count: remainingCancelled, error: remainingCancelError } = await supabase.from("receivables").update({ status: "cancelled", notes: "11号公寓Excel覆盖：取消历史零金额占位应收" }, { count: "exact" }).eq("building_id", building.id).eq("source_type", "lease_contract").eq("amount_xof", 0).neq("status", "cancelled");
+  // Cancel remaining placeholders only when their source contract belongs to one of the 72 SACSI11 apartments.
+  const apartmentIds = apartments.map((unit) => unit.id);
+  const { data: allLeaseRows, error: allLeaseRowsError } = await supabase.from("lease_contracts").select("id").in("unit_id", apartmentIds);
+  if (allLeaseRowsError) throw new Error(`读取11号公寓合同失败：${allLeaseRowsError.message}`);
+  const allLeaseIds = (allLeaseRows ?? []).map((row) => row.id);
+  const remainingResult = allLeaseIds.length
+    ? await supabase.from("receivables").update({ status: "cancelled", notes: "11号公寓Excel覆盖：取消历史零金额占位应收" }, { count: "exact" }).eq("source_type", "lease_contract").in("source_id", allLeaseIds).eq("amount_xof", 0).neq("status", "cancelled")
+    : { count: 0, error: null };
+  const { count: remainingCancelled, error: remainingCancelError } = remainingResult;
   if (remainingCancelError) throw new Error(`清理零金额应收失败：${remainingCancelError.message}`);
   zeroReceivablesCancelled += remainingCancelled ?? 0;
 
