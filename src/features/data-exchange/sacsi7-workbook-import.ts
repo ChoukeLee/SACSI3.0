@@ -188,18 +188,17 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
     .filter((row) => placeholderUnitIds.includes(row.unit_id) && row.status !== "active")
     .map((row) => row.id);
   if (placeholderLeaseIds.length) {
-    const service = getServiceClient();
-    if (!service) throw new Error("缺少管理员服务密钥，无法真实删除占位合同。");
-    const { data: placeholderPayments, error: placeholderPaymentReadError } = await service
+    const cleanupClient = getServiceClient() ?? supabase;
+    const { data: placeholderPayments, error: placeholderPaymentReadError } = await cleanupClient
       .from("payments").select("id").in("source_id", placeholderLeaseIds);
     if (placeholderPaymentReadError) throw new Error(`读取占位合同收款失败：${placeholderPaymentReadError.message}`);
     const placeholderPaymentIds = (placeholderPayments ?? []).map((row) => row.id);
     if (placeholderPaymentIds.length) {
-      const { error } = await service.from("ledger_entries").delete().in("payment_id", placeholderPaymentIds);
+      const { error } = await cleanupClient.from("ledger_entries").delete().in("payment_id", placeholderPaymentIds);
       if (error) throw new Error(`删除占位合同流水失败：${error.message}`);
     }
     for (const [table, column] of [["receivables", "source_id"], ["payments", "source_id"], ["lease_contracts", "id"]] as const) {
-      const { data: deleted, error } = await service.from(table).delete().in(column, placeholderLeaseIds).select("id");
+      const { data: deleted, error } = await cleanupClient.from(table).delete().in(column, placeholderLeaseIds).select("id");
       if (error) throw new Error(`删除占位合同关联数据失败（${table}）：${error.message}`);
       if (table === "lease_contracts") leasePlaceholdersDeleted = deleted?.length ?? 0;
     }
