@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -34,6 +35,13 @@ function receiptNo(scope: "L" | "S", unitNo: string, payment: Sacsi7Payment, ind
 function paymentNote(unitNo: string, payment: Sacsi7Payment, ref: string) {
   const paidThrough = payment.paidThrough ? `；已缴至${payment.paidThrough}` : "";
   return `import_ref=${ref}；来源：${SACSI7_SOURCE}；房号${unitNo}${paidThrough}；${payment.note}`;
+}
+
+function getServiceClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createAdminClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
 function allTargetPayments() {
@@ -180,19 +188,24 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
     .filter((row) => placeholderUnitIds.includes(row.unit_id) && row.status !== "active")
     .map((row) => row.id);
   if (placeholderLeaseIds.length) {
-    const { data: placeholderPayments, error: placeholderPaymentReadError } = await supabase
+    const service = getServiceClient();
+    if (!service) throw new Error("缺少管理员服务密钥，无法真实删除占位合同。");
+    const { data: placeholderPayments, error: placeholderPaymentReadError } = await service
       .from("payments").select("id").in("source_id", placeholderLeaseIds);
     if (placeholderPaymentReadError) throw new Error(`读取占位合同收款失败：${placeholderPaymentReadError.message}`);
     const placeholderPaymentIds = (placeholderPayments ?? []).map((row) => row.id);
     if (placeholderPaymentIds.length) {
-      const { error } = await supabase.from("ledger_entries").delete().in("payment_id", placeholderPaymentIds);
+      const { error } = await service.from("ledger_entries").delete().in("payment_id", placeholderPaymentIds);
       if (error) throw new Error(`删除占位合同流水失败：${error.message}`);
     }
     for (const [table, column] of [["receivables", "source_id"], ["payments", "source_id"], ["lease_contracts", "id"]] as const) {
-      const { error } = await supabase.from(table).delete().in(column, placeholderLeaseIds);
+      const { data: deleted, error } = await service.from(table).delete().in(column, placeholderLeaseIds).select("id");
       if (error) throw new Error(`删除占位合同关联数据失败（${table}）：${error.message}`);
+      if (table === "lease_contracts") leasePlaceholdersDeleted = deleted?.length ?? 0;
     }
-    leasePlaceholdersDeleted = placeholderLeaseIds.length;
+    if (leasePlaceholdersDeleted !== placeholderLeaseIds.length) {
+      throw new Error(`占位合同删除不完整：计划${placeholderLeaseIds.length}份，实际${leasePlaceholdersDeleted}份。`);
+    }
   }
 
   const saleContractByUnitNo = new Map<string, { id: string; customer_id: string }>();
