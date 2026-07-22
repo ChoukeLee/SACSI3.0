@@ -45,10 +45,9 @@ function getLeaseDataFlags(contract: LeaseContractRow, customer?: CustomerRow | 
     needsData: Number(contract.monthly_rent_xof) <= 0
       || Number(contract.deposit_amount_xof) <= 0
       || contract.expected_end_date >= "2099-01-01"
-      || contract.expected_end_confirmed === false
       || customer?.name.includes("资料待补")
+      || customer?.name.includes("待补充")
       || customer?.notes?.includes("legacy_placeholder=true"),
-    needsNumberCleanup: contract.contract_no.startsWith("LEGACY-LEASE-"),
   };
 }
 
@@ -282,6 +281,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 const rent = Number(contract.monthly_rent_xof);
                 const isManaged = unit ? isManagedLeaseUnit(unit) : false;
                 const dataFlags = getLeaseDataFlags(contract, customer);
+                const paidThrough = contract.paid_through_date;
                 return (
                   <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status={isManaged ? "managed" : "leased"}
                     onClick={() => openDetail(contract.id)}
@@ -294,18 +294,22 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                       <div className="flex h-5 items-center gap-1.5">
                         {isManaged && <Badge variant="success" className="h-5 bg-white/70 px-2 text-[10px] text-[#217365]">{locale === "zh" ? "代管" : "Gestion"}</Badge>}
                         {dataFlags.needsData && <Badge variant="warning" className="h-5 px-2 text-[10px]">{locale === "zh" ? "资料待补" : "A compléter"}</Badge>}
-                        {!dataFlags.needsData && dataFlags.needsNumberCleanup && <Badge variant="info" className="h-5 px-2 text-[10px]">{locale === "zh" ? "编号待整理" : "N° à vérifier"}</Badge>}
                         <Badge variant={statusVariant[contract.status]} className="h-5 px-2 text-[10px]">{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
                       </div>
                     </div>
                     {/* Rent + expiry */}
                     <div className="min-h-[48px] text-[11px] leading-relaxed text-[#5D7186]">
                       <p className="tabular-nums">{rent > 0 ? formatXof(rent) : (locale==="zh"?"租金未录入":"Loyer non saisi")}</p>
-                      <p className="tabular-nums">
-                        {contract.start_date} → {!endConfirmed ? (locale==="zh"?"到期日待补":"Fin à compléter") : isLongTerm ? (locale==="zh"?"长期有效":"Long terme") : contract.expected_end_date}
-                        {endConfirmed && !isLongTerm && daysLeft!==null&&daysLeft>=0&&daysLeft<=30 && <span className="ml-1 text-amber-600 font-medium">({daysLeft}j)</span>}
-                      </p>
-                      {contract.paid_through_date && <p className={cn("tabular-nums font-medium",isPaidThroughOverdue(contract)?"text-red-600":"text-emerald-700")}>{locale==="zh"?"已缴至":"Payé au"} {contract.paid_through_date}</p>}
+                      {paidThrough ? (
+                        <p className={cn("tabular-nums font-medium", isPaidThroughOverdue(contract) ? "text-red-600" : "text-emerald-700")}>
+                          {locale === "zh" ? "缴费期" : "Période payée"} {contract.start_date} → {paidThrough}
+                        </p>
+                      ) : (
+                        <p className="tabular-nums">
+                          {contract.start_date} → {!endConfirmed ? (locale === "zh" ? "缴租截至日待补" : "Paiement à compléter") : isLongTerm ? (locale === "zh" ? "长期有效" : "Long terme") : contract.expected_end_date}
+                          {endConfirmed && !isLongTerm && daysLeft!==null&&daysLeft>=0&&daysLeft<=30 && <span className="ml-1 text-amber-600 font-medium">({daysLeft}j)</span>}
+                        </p>
+                      )}
                     </div>
                     {/* Outstanding alert */}
                     {summary.outstanding > 0 && (
@@ -349,7 +353,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
             <div><dt className="text-xs text-muted-foreground">{t.form.unit}</dt><dd className="font-medium">{selectedUnit?.unit_no??"-"} ({selectedUnit?.floor_label??""})</dd></div>
             <div><dt className="text-xs text-muted-foreground">{t.form.customer}</dt><dd className="font-medium">{selectedCustomer?.name??"-"}</dd></div>
             <div><dt className="text-xs text-muted-foreground">{t.form.startDate}</dt><dd>{selected.start_date}</dd></div>
-            <div><dt className="text-xs text-muted-foreground">{t.form.expectedEndDate}</dt><dd>{isContractEndConfirmed(selected)?selected.expected_end_date:(locale==="zh"?"待补":"À compléter")}</dd></div>
+            <div><dt className="text-xs text-muted-foreground">{locale === "zh" ? "正式合同到期日" : t.form.expectedEndDate}</dt><dd>{isContractEndConfirmed(selected)?selected.expected_end_date:(locale==="zh"?"未确认":"Non confirmée")}</dd></div>
             <div><dt className="text-xs text-muted-foreground">{locale==="zh"?"缴租截至日":"Loyer payé au"}</dt><dd className={cn(selected.paid_through_date&&isPaidThroughOverdue(selected)?"font-medium text-red-600":"font-medium text-emerald-700")}>{selected.paid_through_date??(locale==="zh"?"待补":"À compléter")}</dd></div>
             {selected.actual_end_date&&<div><dt className="text-xs text-muted-foreground">{t.form.actualEndDate}</dt><dd>{selected.actual_end_date}</dd></div>}
             <div><dt className="text-xs text-muted-foreground">{t.form.paymentCycle}</dt><dd>{t.paymentCycle[selected.payment_cycle as keyof typeof t.paymentCycle]} / {selected.payment_day}号</dd></div>
