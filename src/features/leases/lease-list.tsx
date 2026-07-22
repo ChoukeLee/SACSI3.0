@@ -282,6 +282,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 const isManaged = unit ? isManagedLeaseUnit(unit) : false;
                 const dataFlags = getLeaseDataFlags(contract, customer);
                 const paidThrough = contract.paid_through_date;
+                const paidPeriodStartsBeforeCutoff = paidThrough ? contract.start_date <= paidThrough : false;
                 return (
                   <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status={isManaged ? "managed" : "leased"}
                     onClick={() => openDetail(contract.id)}
@@ -302,7 +303,9 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                       <p className="tabular-nums">{rent > 0 ? formatXof(rent) : (locale==="zh"?"租金未录入":"Loyer non saisi")}</p>
                       {paidThrough ? (
                         <p className={cn("tabular-nums font-medium", isPaidThroughOverdue(contract) ? "text-red-600" : "text-emerald-700")}>
-                          {locale === "zh" ? "缴费期" : "Période payée"} {contract.start_date} → {paidThrough}
+                          {paidPeriodStartsBeforeCutoff
+                            ? <>{locale === "zh" ? "缴费期" : "Période payée"} {contract.start_date} → {paidThrough}</>
+                            : <>{locale === "zh" ? "已缴至" : "Payé au"} {paidThrough}</>}
                         </p>
                       ) : (
                         <p className="tabular-nums">
