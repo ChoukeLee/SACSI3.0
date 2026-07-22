@@ -9,6 +9,7 @@ import {
   SACSI7_STOREFRONT_RENT_XOF,
   sacsi7ExcludedCategories,
   sacsi7Leases,
+  sacsi7OverdueRentReceivables,
   sacsi7OwnerOccupiedUnits,
   sacsi7Sales,
   sacsi7TerminatedLeaseUnits,
@@ -148,7 +149,7 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
   const leaseContractByUnitNo = new Map<string, { id: string; customer_id: string }>();
   let leaseCreated = 0;
   let leaseUpdated = 0;
-  let leaseTerminated = 0;
+  let leasePlaceholdersDeleted = 0;
 
   for (const lease of sacsi7Leases) {
     const unit = unitMap.get(lease.unitNo)!;
@@ -174,13 +175,24 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
     }
   }
 
-  for (const unitNo of sacsi7TerminatedLeaseUnits) {
-    const unit = unitMap.get(unitNo)!;
-    const existing = activeLeaseByUnitId.get(unit.id);
-    if (!existing) continue;
-    const { error } = await supabase.from("lease_contracts").update({ status: "terminated", actual_end_date: SACSI7_AS_OF }).eq("id", existing.id);
-    if (error) throw new Error(`终止${unitNo}占位长租失败：${error.message}`);
-    leaseTerminated += 1;
+  const placeholderUnitIds = sacsi7TerminatedLeaseUnits.map((unitNo) => unitMap.get(unitNo)!.id);
+  const placeholderLeaseIds = (existingLeases ?? [])
+    .filter((row) => placeholderUnitIds.includes(row.unit_id) && row.status !== "active")
+    .map((row) => row.id);
+  if (placeholderLeaseIds.length) {
+    const { data: placeholderPayments, error: placeholderPaymentReadError } = await supabase
+      .from("payments").select("id").in("source_id", placeholderLeaseIds);
+    if (placeholderPaymentReadError) throw new Error(`读取占位合同收款失败：${placeholderPaymentReadError.message}`);
+    const placeholderPaymentIds = (placeholderPayments ?? []).map((row) => row.id);
+    if (placeholderPaymentIds.length) {
+      const { error } = await supabase.from("ledger_entries").delete().in("payment_id", placeholderPaymentIds);
+      if (error) throw new Error(`删除占位合同流水失败：${error.message}`);
+    }
+    for (const [table, column] of [["receivables", "source_id"], ["payments", "source_id"], ["lease_contracts", "id"]] as const) {
+      const { error } = await supabase.from(table).delete().in(column, placeholderLeaseIds);
+      if (error) throw new Error(`删除占位合同关联数据失败（${table}）：${error.message}`);
+    }
+    leasePlaceholdersDeleted = placeholderLeaseIds.length;
   }
 
   const saleContractByUnitNo = new Map<string, { id: string; customer_id: string }>();
@@ -274,7 +286,7 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
 
   const allSourceIds = [...leaseContractByUnitNo.values(), ...saleContractByUnitNo.values()].map((row) => row.id);
   const [{ data: existingReceivables, error: receivableReadError }, { data: existingLedgers, error: ledgerReadError }] = await Promise.all([
-    supabase.from("receivables").select("id, notes").in("source_id", allSourceIds),
+    supabase.from("receivables").select("id, source_id, category, due_date, notes").in("source_id", allSourceIds),
     supabase.from("ledger_entries").select("id, payment_id").in("payment_id", [...paymentIdByRef.values()]),
   ]);
   if (receivableReadError) throw new Error(`读取应收失败：${receivableReadError.message}`);
@@ -309,6 +321,22 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
       });
     }
   }
+  for (const overdue of sacsi7OverdueRentReceivables) {
+    const contract = leaseContractByUnitNo.get(overdue.unitNo)!;
+    const unit = unitMap.get(overdue.unitNo)!;
+    const ref = `WB7-LEASE-ARREARS-${overdue.unitNo}-${overdue.dueDate}`;
+    const exists = (existingReceivables ?? []).some((row) =>
+      row.source_id === contract.id && row.category === "lease_rent" && row.due_date === overdue.dueDate,
+    );
+    if (exists || receivableRefs.has(ref)) continue;
+    receivableInserts.push({
+      building_id: building.id, unit_id: unit.id, customer_id: contract.customer_id,
+      source_type: "lease_contract", source_id: contract.id, category: "lease_rent",
+      title: `${overdue.unitNo} 已到期未缴租金`, due_date: overdue.dueDate,
+      amount_xof: overdue.amountXof, paid_amount_xof: 0, status: "overdue", currency: "XOF",
+      notes: `import_ref=${ref}；来源：${SACSI7_SOURCE}；缴租截至${overdue.paidThrough}；截至${SACSI7_AS_OF}未缴。`,
+    });
+  }
   for (const saleRow of sacsi7Sales.filter((row) => row.totalAmountXof > 0)) {
     const ref = `WB7-SALE-RECV-${saleRow.unitNo}`;
     if (receivableRefs.has(ref)) continue;
@@ -342,7 +370,7 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
     success: true, mode: "apply", message: "7号楼工作簿覆盖导入完成。",
     summary: {
       activeLeaseContracts: sacsi7Leases.length, leasedApartmentUnits: leasedUnitNos.size,
-      leaseContractsCreated: leaseCreated, leaseContractsUpdated: leaseUpdated, leasePlaceholdersTerminated: leaseTerminated,
+      leaseContractsCreated: leaseCreated, leaseContractsUpdated: leaseUpdated, leasePlaceholdersDeleted,
       saleContracts: sacsi7Sales.length, saleContractsCreated: saleCreated, saleContractsUpdated: saleUpdated,
       saleSchedulesCreated, saleSchedulesUpdated,
       paymentsCreated: paymentInserts.length, receivablesCreated: receivableInserts.length, ledgersCreated: ledgerInserts.length,

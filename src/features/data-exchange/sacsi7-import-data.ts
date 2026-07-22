@@ -27,6 +27,13 @@ export type Sacsi7Sale = {
   payments: Sacsi7Payment[];
 };
 
+export type Sacsi7OverdueRent = {
+  unitNo: string;
+  dueDate: string;
+  amountXof: number;
+  paidThrough: string;
+};
+
 const wan = (value: number) => Math.round(value * 10000);
 const sale = (date: string, amountWan: number, note: string): Sacsi7Payment => ({ date, amount: wan(amountWan), kind: "sale", note });
 const rent = (date: string, amountWan: number, paidThrough: string | undefined, note: string): Sacsi7Payment => ({ date, amount: wan(amountWan), kind: "rent", paidThrough, note });
@@ -34,7 +41,7 @@ const deposit = (date: string, amountWan: number, note: string): Sacsi7Payment =
 const cny = (date: string, amount: number, kind: "rent" | "deposit" | "sale", note: string): Sacsi7Payment => ({ date, amount, currency: "CNY", kind, note });
 
 export const SACSI7_SOURCE = "7号公寓.xlsx Sheet1 A1:J100";
-export const SACSI7_AS_OF = "2026-07-20";
+export const SACSI7_AS_OF = "2026-07-22";
 export const SACSI7_STOREFRONT_RENT_XOF = wan(120);
 
 export const sacsi7OwnerOccupiedUnits = [
@@ -129,6 +136,22 @@ export const sacsi7Sales: Sacsi7Sale[] = [
 ];
 
 export const sacsi7TerminatedLeaseUnits = ["606", "1102", "1103", "1104", "1105", "1106", "1201", "1202", "1203", "1204", "1205", "1206"];
+
+// Only amounts that are already due and still unpaid as of SACSI7_AS_OF.
+// 206 is paid through 2026-07-22, so its next rent is not overdue yet.
+export const sacsi7OverdueRentReceivables: Sacsi7OverdueRent[] = [
+  { unitNo: "306", dueDate: "2026-07-17", amountXof: wan(115), paidThrough: "2026-07-16" },
+  { unitNo: "503", dueDate: "2026-05-01", amountXof: wan(95), paidThrough: "2026-04-30" },
+  { unitNo: "503", dueDate: "2026-06-01", amountXof: wan(95), paidThrough: "2026-04-30" },
+  { unitNo: "503", dueDate: "2026-07-01", amountXof: wan(95), paidThrough: "2026-04-30" },
+  { unitNo: "906", dueDate: "2026-05-01", amountXof: wan(125), paidThrough: "2026-04-30" },
+  { unitNo: "906", dueDate: "2026-06-01", amountXof: wan(125), paidThrough: "2026-04-30" },
+  { unitNo: "906", dueDate: "2026-07-01", amountXof: wan(125), paidThrough: "2026-04-30" },
+  { unitNo: "1101", dueDate: "2026-04-01", amountXof: wan(1560), paidThrough: "2026-03-31" },
+  { unitNo: "1101", dueDate: "2026-05-01", amountXof: wan(1560), paidThrough: "2026-03-31" },
+  { unitNo: "1101", dueDate: "2026-06-01", amountXof: wan(1560), paidThrough: "2026-03-31" },
+  { unitNo: "1101", dueDate: "2026-07-01", amountXof: wan(1560), paidThrough: "2026-03-31" },
+];
 
 export const sacsi7ExcludedCategories = [
   "中介费及负数支出", "退款及前租户历史", "物业费", "水电及过户预付费", "注册费", "过户税代收代付", "无日期或无法唯一拆分的金额",
