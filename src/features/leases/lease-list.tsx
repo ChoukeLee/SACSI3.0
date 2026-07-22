@@ -45,10 +45,19 @@ function getLeaseDataFlags(contract: LeaseContractRow, customer?: CustomerRow | 
     needsData: Number(contract.monthly_rent_xof) <= 0
       || Number(contract.deposit_amount_xof) <= 0
       || contract.expected_end_date >= "2099-01-01"
+      || contract.expected_end_confirmed === false
       || customer?.name.includes("资料待补")
       || customer?.notes?.includes("legacy_placeholder=true"),
     needsNumberCleanup: contract.contract_no.startsWith("LEGACY-LEASE-"),
   };
+}
+
+function isContractEndConfirmed(contract: LeaseContractRow) {
+  return contract.expected_end_confirmed !== false;
+}
+
+function isPaidThroughOverdue(contract: LeaseContractRow) {
+  return !!contract.paid_through_date && contract.paid_through_date < new Date().toISOString().slice(0, 10);
 }
 
 export function LeaseList({ contracts, units, customers, payments, receivables, buildings, locale }: LeaseListProps) {
@@ -117,7 +126,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
   const dashboardStats = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10); const active = contracts.filter((c) => c.status === "active");
-    const expiring = active.filter((c) => { const days = Math.floor((new Date(c.expected_end_date).getTime() - Date.now()) / 86400000); return days >= 0 && days <= 30; }).length;
+    const expiring = active.filter((c) => { if (!isContractEndConfirmed(c)) return false; const days = Math.floor((new Date(c.expected_end_date).getTime() - Date.now()) / 86400000); return days >= 0 && days <= 30; }).length;
     let due = 0, overdue = 0;
     for (const r of receivables) { if (r.source_type !== "lease_contract" || r.status === "cancelled") continue; const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof); if (outstanding <= 0) continue; due += outstanding; if (r.status === "overdue" || r.due_date < today) overdue += outstanding; }
     return { active: active.length, rent: active.reduce((sum, c) => sum + Number(c.monthly_rent_xof), 0), expiring, due, overdue };
@@ -127,7 +136,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const contractPayments = useMemo(() => selectedId ? payments.filter((p) => p.source_id === selectedId) : [], [payments, selectedId]);
   const totalPaid = contractPayments.reduce((s, p) => s + Number(p.amount), 0);
   const receivableStats = useMemo(() => { let totalRec=0,totalPd=0,overdue=0; const today=new Date().toISOString().slice(0,10); for(const r of contractReceivables){totalRec+=Number(r.amount_xof);totalPd+=Number(r.paid_amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))overdue+=os;} return {totalReceivable:totalRec,totalPaid:totalPd,outstanding:totalRec-totalPd,overdue}; }, [contractReceivables]);
-  const contractRisk = useMemo(() => { if(!selected||selected.status!=="active")return {expiringSoon:false,daysLeft:0}; const today=new Date(); const diff=Math.floor((new Date(selected.expected_end_date).getTime()-today.getTime())/86400000); return {expiringSoon:diff<=30&&diff>=0,daysLeft:Math.max(0,diff)}; }, [selected]);
+  const contractRisk = useMemo(() => { if(!selected||selected.status!=="active"||!isContractEndConfirmed(selected))return {expiringSoon:false,daysLeft:0}; const today=new Date(); const diff=Math.floor((new Date(selected.expected_end_date).getTime()-today.getTime())/86400000); return {expiringSoon:diff<=30&&diff>=0,daysLeft:Math.max(0,diff)}; }, [selected]);
   const availableUnits = useMemo(() => units.filter((u) => u.kind === "apartment" && (u.status === "available" || isManagedLeaseUnit(u))), [units]);
 
   const resetNewForm = () => { setFContractNo(""); setFUnitId(""); setFCustomerId(""); setFStartDate(""); setFEndDate(""); setFCycle("monthly"); setFPayDay(5); setFRent(0); setFDeposit(0); setFDepositReceived(false); setFFreeDays(0); setFSigner(""); setFStatus("draft"); setError(""); };
@@ -266,9 +275,10 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 const unit = unitMap.get(contract.unit_id);
                 const customer = customerMap.get(contract.customer_id);
                 const summary = getContractReceivableSummary(contract.id);
-                const daysLeft = Math.floor((new Date(contract.expected_end_date).getTime() - Date.now()) / 86400000);
-                const isRisk = summary.overdue > 0 || (contract.status === "active" && daysLeft >= 0 && daysLeft <= 30);
-                const isLongTerm = contract.expected_end_date >= "2099-01-01";
+                const endConfirmed = isContractEndConfirmed(contract);
+                const daysLeft = endConfirmed ? Math.floor((new Date(contract.expected_end_date).getTime() - Date.now()) / 86400000) : null;
+                const isRisk = summary.overdue > 0 || (contract.status === "active" && daysLeft !== null && daysLeft >= 0 && daysLeft <= 30);
+                const isLongTerm = endConfirmed && contract.expected_end_date >= "2099-01-01";
                 const rent = Number(contract.monthly_rent_xof);
                 const isManaged = unit ? isManagedLeaseUnit(unit) : false;
                 const dataFlags = getLeaseDataFlags(contract, customer);
@@ -289,12 +299,13 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                       </div>
                     </div>
                     {/* Rent + expiry */}
-                    <div className="min-h-[34px] text-[11px] leading-relaxed text-[#5D7186]">
+                    <div className="min-h-[48px] text-[11px] leading-relaxed text-[#5D7186]">
                       <p className="tabular-nums">{rent > 0 ? formatXof(rent) : (locale==="zh"?"租金未录入":"Loyer non saisi")}</p>
                       <p className="tabular-nums">
-                        {contract.start_date} → {isLongTerm ? (locale==="zh"?"长期有效":"Long terme") : contract.expected_end_date}
-                        {!isLongTerm && daysLeft>=0&&daysLeft<=30 && <span className="ml-1 text-amber-600 font-medium">({daysLeft}j)</span>}
+                        {contract.start_date} → {!endConfirmed ? (locale==="zh"?"到期日待补":"Fin à compléter") : isLongTerm ? (locale==="zh"?"长期有效":"Long terme") : contract.expected_end_date}
+                        {endConfirmed && !isLongTerm && daysLeft!==null&&daysLeft>=0&&daysLeft<=30 && <span className="ml-1 text-amber-600 font-medium">({daysLeft}j)</span>}
                       </p>
+                      {contract.paid_through_date && <p className={cn("tabular-nums font-medium",isPaidThroughOverdue(contract)?"text-red-600":"text-emerald-700")}>{locale==="zh"?"已缴至":"Payé au"} {contract.paid_through_date}</p>}
                     </div>
                     {/* Outstanding alert */}
                     {summary.outstanding > 0 && (
@@ -338,7 +349,8 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
             <div><dt className="text-xs text-muted-foreground">{t.form.unit}</dt><dd className="font-medium">{selectedUnit?.unit_no??"-"} ({selectedUnit?.floor_label??""})</dd></div>
             <div><dt className="text-xs text-muted-foreground">{t.form.customer}</dt><dd className="font-medium">{selectedCustomer?.name??"-"}</dd></div>
             <div><dt className="text-xs text-muted-foreground">{t.form.startDate}</dt><dd>{selected.start_date}</dd></div>
-            <div><dt className="text-xs text-muted-foreground">{t.form.expectedEndDate}</dt><dd>{selected.expected_end_date}</dd></div>
+            <div><dt className="text-xs text-muted-foreground">{t.form.expectedEndDate}</dt><dd>{isContractEndConfirmed(selected)?selected.expected_end_date:(locale==="zh"?"待补":"À compléter")}</dd></div>
+            <div><dt className="text-xs text-muted-foreground">{locale==="zh"?"缴租截至日":"Loyer payé au"}</dt><dd className={cn(selected.paid_through_date&&isPaidThroughOverdue(selected)?"font-medium text-red-600":"font-medium text-emerald-700")}>{selected.paid_through_date??(locale==="zh"?"待补":"À compléter")}</dd></div>
             {selected.actual_end_date&&<div><dt className="text-xs text-muted-foreground">{t.form.actualEndDate}</dt><dd>{selected.actual_end_date}</dd></div>}
             <div><dt className="text-xs text-muted-foreground">{t.form.paymentCycle}</dt><dd>{t.paymentCycle[selected.payment_cycle as keyof typeof t.paymentCycle]} / {selected.payment_day}号</dd></div>
             <div><dt className="text-xs text-muted-foreground">{t.form.monthlyRent}</dt><dd className="font-semibold">{formatXof(Number(selected.monthly_rent_xof))}</dd></div>

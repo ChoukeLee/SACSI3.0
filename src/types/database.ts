@@ -115,6 +115,8 @@ export interface LeaseContractRow {
   contract_no: string;
   start_date: string;
   expected_end_date: string;
+  expected_end_confirmed?: boolean;
+  paid_through_date?: string | null;
   actual_end_date: string | null;
   payment_cycle: string;
   payment_day: number;

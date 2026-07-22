@@ -165,6 +165,7 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
     const data = {
       unit_id: unit.id, customer_id: customerId, contract_no: `WB7-LEASE-${lease.unitNo}`,
       start_date: lease.startDate, expected_end_date: lease.expectedEndDate, actual_end_date: null,
+      expected_end_confirmed: lease.expectedEndConfirmed, paid_through_date: lease.paidThroughDate,
       payment_cycle: "monthly", payment_day: Number(lease.startDate.slice(-2)), monthly_rent_xof: lease.monthlyRentXof,
       deposit_amount_xof: lease.depositXof, deposit_received: lease.payments.some((payment) => payment.kind === "deposit"),
       rent_free_days: 0, signer_name: null, attachment_url: null, status: "active",

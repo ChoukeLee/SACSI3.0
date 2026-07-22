@@ -14,6 +14,8 @@ export type Sacsi7Lease = {
   depositXof: number;
   startDate: string;
   expectedEndDate: string;
+  expectedEndConfirmed: boolean;
+  paidThroughDate: string;
   payments: Sacsi7Payment[];
   masterUnits?: string[];
 };
@@ -50,48 +52,48 @@ export const sacsi7OwnerOccupiedUnits = [
 ] as const;
 
 export const sacsi7Leases: Sacsi7Lease[] = [
-  { unitNo: "202", customer: "刘才生", monthlyRentXof: wan(140), depositXof: wan(280), startDate: "2026-07-01", expectedEndDate: "2026-12-31", payments: [] },
-  { unitNo: "206", customer: "ABDOUL", monthlyRentXof: wan(115), depositXof: wan(230), startDate: "2026-01-23", expectedEndDate: "2026-12-31", payments: [
+  { unitNo: "202", customer: "刘才生", monthlyRentXof: wan(140), depositXof: wan(280), startDate: "2026-07-01", expectedEndDate: "2026-12-31", expectedEndConfirmed: false, paidThroughDate: "2026-09-30", payments: [] },
+  { unitNo: "206", customer: "ABDOUL", monthlyRentXof: wan(115), depositXof: wan(230), startDate: "2026-01-23", expectedEndDate: "2026-12-31", expectedEndConfirmed: false, paidThroughDate: "2026-07-22", payments: [
     deposit("2026-02-23", 230, "押金2个月，天逻转交"), rent("2026-02-23", 230, "2026-03-22", "租金2个月"),
     rent("2026-04-13", 115, "2026-04-22", "支票付天逻"), rent("2026-05-07", 115, "2026-05-22", "支票付天逻"),
     rent("2026-06-10", 115, "2026-06-22", "支票付天逻"), rent("2026-07-13", 115, "2026-07-22", "支票付天逻"),
   ] },
-  { unitNo: "306", customer: "李文硕", monthlyRentXof: wan(115), depositXof: wan(230), startDate: "2026-04-17", expectedEndDate: "2026-12-31", payments: [
+  { unitNo: "306", customer: "李文硕", monthlyRentXof: wan(115), depositXof: wan(230), startDate: "2026-04-17", expectedEndDate: "2026-12-31", expectedEndConfirmed: false, paidThroughDate: "2026-07-16", payments: [
     deposit("2026-04-09", 230, "押金2个月"), rent("2026-04-09", 345, "2026-07-16", "租金3个月"),
   ] },
-  { unitNo: "503", customer: "AIE", monthlyRentXof: wan(95), depositXof: wan(190), startDate: "2025-11-01", expectedEndDate: "2026-12-31", payments: [
+  { unitNo: "503", customer: "AIE", monthlyRentXof: wan(95), depositXof: wan(190), startDate: "2025-11-01", expectedEndDate: "2026-12-31", expectedEndConfirmed: false, paidThroughDate: "2026-04-30", payments: [
     rent("2025-10-17", 95, "2025-11-30", "预付租金"), deposit("2025-10-27", 190, "押金2个月"),
     rent("2025-10-27", 95, "2025-12-31", "组合款中仅计明确租金，中介费未导入"),
     rent("2026-02-09", 95, "2026-01-31", "存高总账号"), rent("2026-03-18", 95, "2026-02-28", "存高总账号"),
     rent("2026-04-14", 90, "2026-03-31", "本次先付90万"), rent("2026-05-19", 5, "2026-03-31", "补付3月欠款5万"),
     rent("2026-05-19", 95, "2026-04-30", "付4月租金"),
   ] },
-  { unitNo: "706", customer: "享通世贸", monthlyRentXof: 0, depositXof: 0, startDate: "2026-03-25", expectedEndDate: "2026-09-24", payments: [
+  { unitNo: "706", customer: "享通世贸", monthlyRentXof: 0, depositXof: 0, startDate: "2026-03-25", expectedEndDate: "2026-09-24", expectedEndConfirmed: true, paidThroughDate: "2026-09-24", payments: [
     cny("2026-03-26", 15000, "rent", "人民币租金6个月，2500元/月"), cny("2026-04-27", 17000, "deposit", "人民币押金，微信付高峰"),
   ] },
-  { unitNo: "801", customer: "余辉", monthlyRentXof: wan(140), depositXof: wan(280), startDate: "2025-10-10", expectedEndDate: "2026-10-09", payments: [
+  { unitNo: "801", customer: "余辉", monthlyRentXof: wan(140), depositXof: wan(280), startDate: "2025-10-10", expectedEndDate: "2026-10-09", expectedEndConfirmed: true, paidThroughDate: "2026-10-09", payments: [
     rent("2025-10-03", 870, "2026-04-09", "与901合付1740万，按两套各半分配；押金280万为已报"),
     rent("2026-05-04", 840, "2026-10-09", "续付6个月"),
   ] },
-  { unitNo: "805", customer: "LOKATOR", monthlyRentXof: wan(125), depositXof: wan(300), startDate: "2025-05-16", expectedEndDate: "2026-12-31", payments: [
+  { unitNo: "805", customer: "LOKATOR", monthlyRentXof: wan(125), depositXof: wan(300), startDate: "2025-05-16", expectedEndDate: "2026-12-31", expectedEndConfirmed: false, paidThroughDate: "2026-08-15", payments: [
     deposit("2025-05-07", 300, "押金已报300万"), rent("2025-05-07", 375, "2025-08-15", "按125万/月计3个月；中介部分未导入"),
     rent("2025-09-26", 375, "2025-11-15", "支票付3个月"), rent("2026-01-23", 375, "2026-02-15", "支票付3个月"),
     rent("2026-05-21", 375, "2026-05-15", "付3个月"), rent("2026-07-01", 375, "2026-08-15", "付3个月"),
   ] },
-  { unitNo: "902", customer: "BOMBA", monthlyRentXof: wan(150), depositXof: wan(300), startDate: "2025-08-07", expectedEndDate: "2026-12-31", payments: [
+  { unitNo: "902", customer: "BOMBA", monthlyRentXof: wan(150), depositXof: wan(300), startDate: "2025-08-07", expectedEndDate: "2026-12-31", expectedEndConfirmed: false, paidThroughDate: "2026-08-07", payments: [
     deposit("2025-08-01", 300, "押金2个月已报"), rent("2025-08-01", 450, "2025-11-06", "租金3个月；中介费未导入"),
     rent("2025-12-03", 450, "2026-02-06", "续付3个月"), rent("2026-04-07", 450, "2026-05-07", "续付3个月"),
     rent("2026-07-03", 450, "2026-08-07", "续付3个月"),
   ] },
-  { unitNo: "906", customer: "刘海鹏王艺", monthlyRentXof: wan(125), depositXof: wan(250), startDate: "2025-11-01", expectedEndDate: "2026-12-31", payments: [
+  { unitNo: "906", customer: "刘海鹏王艺", monthlyRentXof: wan(125), depositXof: wan(250), startDate: "2025-11-01", expectedEndDate: "2026-12-31", expectedEndConfirmed: false, paidThroughDate: "2026-04-30", payments: [
     deposit("2026-02-23", 250, "押金2个月，天逻转交"), rent("2026-02-23", 500, "2026-02-28", "租金4个月"),
     rent("2026-03-28", 250, "2026-04-30", "付天逻2个月"),
   ] },
-  { unitNo: "1001", customer: "山东威海", monthlyRentXof: wan(150), depositXof: 0, startDate: "2026-03-30", expectedEndDate: "2026-09-19", payments: [] },
-  { unitNo: "1003", customer: "范坤", monthlyRentXof: wan(115), depositXof: wan(230), startDate: "2026-04-05", expectedEndDate: "2026-10-04", payments: [
+  { unitNo: "1001", customer: "山东威海", monthlyRentXof: wan(150), depositXof: 0, startDate: "2026-03-30", expectedEndDate: "2026-09-19", expectedEndConfirmed: true, paidThroughDate: "2026-09-19", payments: [] },
+  { unitNo: "1003", customer: "范坤", monthlyRentXof: wan(115), depositXof: wan(230), startDate: "2026-04-05", expectedEndDate: "2026-10-04", expectedEndConfirmed: true, paidThroughDate: "2026-10-04", payments: [
     deposit("2026-04-01", 230, "押金2个月"), rent("2026-04-01", 690, "2026-10-04", "租金6个月"),
   ] },
-  { unitNo: "1101", customer: "7号楼办公室租户（资料待补）", monthlyRentXof: wan(1560), depositXof: wan(3120), startDate: "2025-09-01", expectedEndDate: "2026-12-31", masterUnits: [
+  { unitNo: "1101", customer: "7号楼办公室租户（资料待补）", monthlyRentXof: wan(1560), depositXof: wan(3120), startDate: "2025-09-01", expectedEndDate: "2026-12-31", expectedEndConfirmed: false, paidThroughDate: "2026-03-31", masterUnits: [
     "1101", "1102", "1103", "1104", "1105", "1106", "1201", "1202", "1203", "1204", "1205", "1206",
   ], payments: [
     deposit("2025-09-11", 3120, "办公室整租押金2个月"), rent("2025-09-11", 4680, "2025-11-30", "办公室整租租金3个月"),
