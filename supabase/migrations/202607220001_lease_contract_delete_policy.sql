@@ -4,4 +4,4 @@ drop policy if exists "Authenticated can delete lease_contracts" on public.lease
 
 create policy "Authenticated can delete lease_contracts"
   on public.lease_contracts for delete
-  using (auth.role() = 'authenticated');
+  using (lower(coalesce(auth.jwt() ->> 'email', '')) = 'admin@sacsi.com');
