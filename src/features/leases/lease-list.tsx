@@ -139,7 +139,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     const today = new Date().toISOString().slice(0, 10);
     const upcomingLimit = addDaysToIso(today, 30);
     const buildingMap = new Map(buildings.map((building) => [building.id, building]));
-    const rows = contracts.flatMap((contract) => {
+    const rows = filteredByBuilding.flatMap((contract) => {
       if (contract.status !== "active") return [];
       const unit = unitMap.get(contract.unit_id);
       const customer = customerMap.get(contract.customer_id);
@@ -179,14 +179,15 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       overdue: rows.filter((row) => row.kind === "overdue").sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
       upcoming: rows.filter((row) => row.kind === "upcoming").sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
     };
-  }, [buildings, contracts, customerMap, receivables, unitMap]);
+  }, [buildings, customerMap, filteredByBuilding, receivables, unitMap]);
 
   const dashboardStats = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10); const active = contracts.filter((c) => c.status === "active");
+    const today = new Date().toISOString().slice(0, 10); const active = filteredByBuilding.filter((c) => c.status === "active");
+    const buildingContractIds = new Set(filteredByBuilding.map((contract) => contract.id));
     let due = 0, overdue = 0;
-    for (const r of receivables) { if (r.source_type !== "lease_contract" || r.status === "cancelled") continue; const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof); if (outstanding <= 0) continue; due += outstanding; if (r.status === "overdue" || r.due_date < today) overdue += outstanding; }
+    for (const r of receivables) { if (r.source_type !== "lease_contract" || r.status === "cancelled" || !r.source_id || !buildingContractIds.has(r.source_id)) continue; const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof); if (outstanding <= 0) continue; due += outstanding; if (r.status === "overdue" || r.due_date < today) overdue += outstanding; }
     return { active: active.length, rent: active.reduce((sum, c) => sum + Number(c.monthly_rent_xof), 0), expiring: leaseAttention.upcoming.length, overdueContracts: leaseAttention.overdue.length, due, overdue };
-  }, [contracts, leaseAttention, receivables]);
+  }, [filteredByBuilding, leaseAttention, receivables]);
 
   const contractReceivables = useMemo(() => selectedId ? receivables.filter(r => r.source_type === "lease_contract" && r.source_id === selectedId && r.status !== "cancelled") : [], [receivables, selectedId]);
   const contractPayments = useMemo(() => selectedId ? payments.filter((p) => p.source_id === selectedId) : [], [payments, selectedId]);
@@ -260,7 +261,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
             {locale === "zh" ? "长租合同" : "Contrats de location"}
           </h1>
           <span className="text-sm text-muted-foreground tabular-nums">
-            {contracts.length} {locale==="fr"?"contrats":"份合同"}
+            {filteredByBuilding.length} {locale==="fr"?"contrats":"份合同"}
           </span>
         </div>
       </div>
