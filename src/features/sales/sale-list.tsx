@@ -225,9 +225,9 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
               {fc.map(contract=>{const unit=unitMap.get(contract.unit_id);const customer=customerMap.get(contract.customer_id);const s=getContractSummary(contract.id);const isRisk=s.overdue>0||(contract.status==="active"&&contract.transfer_status!=="completed");const dataFlags=getSaleDataFlags(contract,customer);return(<RoomCard key={contract.id} roomNo={unit?.unit_no??"-"} status="sold" statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]} onClick={()=>openDetail(contract.id)} className={isRisk?"border-amber-200 shadow-[0_10px_24px_rgba(180,120,24,0.14)]":""}>
                 {/* Name + status badge */}
-                <div className="flex items-start justify-between gap-1.5">
+                <div className="flex min-h-[52px] items-start justify-between gap-1.5">
                   <p className="text-[13px] font-medium leading-tight truncate" title={customer?.name??""}>{customer?.name??"-"}</p>
-                  <div className="flex shrink-0 items-center gap-1">
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
                     {dataFlags.needsData && <Badge variant="warning" className="text-[10px]">{locale==="zh"?"资料待补":"A compléter"}</Badge>}
                     {!dataFlags.needsData && dataFlags.needsNumberCleanup && <Badge variant="info" className="text-[10px]">{locale==="zh"?"编号待整理":"N° à vérifier"}</Badge>}
                     <Badge variant={statusVariant[contract.status]} className="text-[10px]">{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
@@ -241,7 +241,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
                   {s.outstanding>0 && <span className="text-amber-600 font-medium">{formatXof(s.outstanding)} {locale==="zh"?"待收":"dû"}</span>}
                 </div>
                 {/* Transfer status + action buttons */}
-                <div className="mt-auto flex items-center justify-between gap-2 pt-3">
+                <div className="mt-auto flex items-center justify-between gap-2 border-t border-[rgba(23,50,77,0.06)] pt-3">
                   <span className={cn("text-[11px]", contract.transfer_status==="completed"?"text-emerald-600":"text-[#5D7186]")}>{transText(contract.transfer_status)}</span>
                   <div className="flex gap-1.5">
                     <SaleActionBtn icon={Eye} label={locale==="zh"?"查看":"Voir"} onClick={() => openDetail(contract.id)} />

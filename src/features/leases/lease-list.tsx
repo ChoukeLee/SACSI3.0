@@ -36,6 +36,7 @@ interface LeaseListProps { contracts: LeaseContractRow[]; units: LeaseUnitRow[];
 type PanelType = "new" | "detail" | "moveout" | "attention" | null;
 type AttentionTab = "overdue" | "upcoming";
 const paymentCycles = ["monthly", "quarterly", "semiannual", "annual"];
+type LeaseStatFilter = "active" | "rent" | "dueSoon" | "currentDue" | "overdue";
 
 function addDaysToIso(date: string, days: number) {
   const value = new Date(`${date}T00:00:00Z`);
@@ -74,6 +75,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const router = useRouter();
   const t = dictionaries[locale].leases;
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statFilter, setStatFilter] = useState<LeaseStatFilter | null>(null);
   const [panel, setPanel] = useState<PanelType>(null);
   const [attentionTab, setAttentionTab] = useState<AttentionTab>("overdue");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -105,9 +107,46 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     return contracts.filter((c) => unitBuildingMap.get(c.unit_id) === activeBuildingId);
   }, [contracts, activeBuildingId, unitBuildingMap]);
 
-  const filtered = useMemo(() => statusFilter === "all" ? filteredByBuilding : filteredByBuilding.filter((c) => c.status === statusFilter), [filteredByBuilding, statusFilter]);
   const unitMap = useMemo(() => new Map(units.map((u) => [u.id, u])), [units]);
   const customerMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
+
+  const receivablesByContract = useMemo(() => {
+    const m = new Map<string, ReceivableRow[]>();
+    for (const r of receivables) {
+      if (r.source_type !== "lease_contract" || r.status === "cancelled" || !r.source_id) continue;
+      const list = m.get(r.source_id) ?? [];
+      list.push(r);
+      m.set(r.source_id, list);
+    }
+    return m;
+  }, [receivables]);
+
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const dueSoonEnd = useMemo(() => addDaysToIso(todayStr, 15), [todayStr]);
+
+  const contractHasReceivable = (contractId: string, kind: "dueSoon" | "currentDue" | "overdue") => {
+    const related = receivablesByContract.get(contractId) ?? [];
+    return related.some((r) => {
+      const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
+      if (outstanding <= 0) return false;
+      const isOverdue = r.status === "overdue" || r.due_date < todayStr;
+      if (kind === "overdue") return isOverdue;
+      if (kind === "currentDue") return !isOverdue;
+      return !isOverdue && r.due_date >= todayStr && r.due_date <= dueSoonEnd;
+    });
+  };
+
+  const filteredByStatus = useMemo(() => (
+    statusFilter === "all" ? filteredByBuilding : filteredByBuilding.filter((c) => c.status === statusFilter)
+  ), [filteredByBuilding, statusFilter]);
+
+  const filtered = useMemo(() => {
+    if (!statFilter) return filteredByStatus;
+    if (statFilter === "active" || statFilter === "rent") return filteredByStatus.filter((c) => c.status === "active");
+    if (statFilter === "dueSoon") return filteredByStatus.filter((c) => contractHasReceivable(c.id, "dueSoon"));
+    if (statFilter === "currentDue") return filteredByStatus.filter((c) => contractHasReceivable(c.id, "currentDue"));
+    return filteredByStatus.filter((c) => contractHasReceivable(c.id, "overdue"));
+  }, [filteredByStatus, statFilter, receivablesByContract, todayStr, dueSoonEnd]);
 
   const groupedContracts = useMemo(() => {
     const grouped = new Map<string, LeaseContractRow[]>();
@@ -137,7 +176,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
   const leaseAttention = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-    const upcomingLimit = addDaysToIso(today, 30);
+    const upcomingLimit = addDaysToIso(today, 15);
     const buildingMap = new Map(buildings.map((building) => [building.id, building]));
     const rows = filteredByBuilding.flatMap((contract) => {
       if (contract.status !== "active") return [];
@@ -182,12 +221,30 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   }, [buildings, customerMap, filteredByBuilding, receivables, unitMap]);
 
   const dashboardStats = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10); const active = filteredByBuilding.filter((c) => c.status === "active");
-    const buildingContractIds = new Set(filteredByBuilding.map((contract) => contract.id));
-    let due = 0, overdue = 0;
-    for (const r of receivables) { if (r.source_type !== "lease_contract" || r.status === "cancelled" || !r.source_id || !buildingContractIds.has(r.source_id)) continue; const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof); if (outstanding <= 0) continue; due += outstanding; if (r.status === "overdue" || r.due_date < today) overdue += outstanding; }
-    return { active: active.length, rent: active.reduce((sum, c) => sum + Number(c.monthly_rent_xof), 0), expiring: leaseAttention.upcoming.length, overdueContracts: leaseAttention.overdue.length, due, overdue };
-  }, [filteredByBuilding, leaseAttention, receivables]);
+    const scopedContractIds = new Set(filteredByBuilding.map((c) => c.id));
+    const active = filteredByBuilding.filter((c) => c.status === "active");
+    let dueSoon = 0, currentDue = 0, overdue = 0;
+    for (const r of receivables) {
+      if (r.source_type !== "lease_contract" || r.status === "cancelled" || !r.source_id || !scopedContractIds.has(r.source_id)) continue;
+      const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
+      if (outstanding <= 0) continue;
+      const isOverdue = r.status === "overdue" || r.due_date < todayStr;
+      if (isOverdue) {
+        overdue += outstanding;
+      } else {
+        currentDue += outstanding;
+        if (r.due_date <= dueSoonEnd) dueSoon++;
+      }
+    }
+    return {
+      active: active.length,
+      rent: active.reduce((sum, c) => sum + Number(c.monthly_rent_xof), 0),
+      dueSoon,
+      currentDue,
+      overdue,
+      overdueContracts: leaseAttention.overdue.length,
+    };
+  }, [filteredByBuilding, leaseAttention.overdue.length, receivables, todayStr, dueSoonEnd]);
 
   const contractReceivables = useMemo(() => selectedId ? receivables.filter(r => r.source_type === "lease_contract" && r.source_id === selectedId && r.status !== "cancelled") : [], [receivables, selectedId]);
   const contractPayments = useMemo(() => selectedId ? payments.filter((p) => p.source_id === selectedId) : [], [payments, selectedId]);
@@ -241,12 +298,12 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   };
 
   const openAttention = (tab: AttentionTab) => { setAttentionTab(tab); setPanel("attention"); setSelectedId(null); };
-  const statBlocks = [
-    { key: "active", label: locale==="zh"?"生效合同":"Actifs", value: String(dashboardStats.active), hint: null, dot: "bg-accentGreen-500", action: null },
-    { key: "rent", label: locale==="zh"?"月租规模":"Loyer/mois", value: formatXof(dashboardStats.rent), hint: null, dot: "bg-accentBlue-500", action: null },
-    { key: "expiring", label: locale==="zh"?"30天内应缴":"À payer sous 30j", value: String(dashboardStats.expiring), hint: locale==="zh"?"点击查看收费名单":"Voir la liste", dot: dashboardStats.expiring > 0 ? "bg-accentAmber-500" : "bg-muted-foreground/40", action: () => openAttention("upcoming") },
-    { key: "due", label: locale==="zh"?"待收账款":"A recevoir", value: formatXof(dashboardStats.due), hint: null, dot: "bg-accentPurple-500", action: null },
-    { key: "overdue", label: locale==="zh"?"逾期金额":"Retard", value: formatXof(dashboardStats.overdue), hint: `${dashboardStats.overdueContracts}${locale==="zh"?"份 · 点击查看":" · voir"}`, dot: dashboardStats.overdue > 0 ? "bg-accentRed-500" : "bg-muted-foreground/40", action: () => openAttention("overdue") },
+  const statBlocks: Array<{ key: LeaseStatFilter; label: string; value: string; dot: string; hint: string }> = [
+    { key: "active", label: locale==="zh"?"生效合同":"Actifs", value: String(dashboardStats.active), dot: "bg-accentGreen-500", hint: locale==="zh"?"点击查看生效合同":"Voir les contrats actifs" },
+    { key: "rent", label: locale==="zh"?"月租规模":"Loyer/mois", value: formatXof(dashboardStats.rent), dot: "bg-accentBlue-500", hint: locale==="zh"?"点击查看产生月租的合同":"Voir les loyers actifs" },
+    { key: "dueSoon", label: locale==="zh"?"15天内应缴":"15j à payer", value: String(dashboardStats.dueSoon), dot: dashboardStats.dueSoon > 0 ? "bg-accentAmber-500" : "bg-muted-foreground/40", hint: locale==="zh"?"点击查看近期收费名单":"Voir les échéances proches" },
+    { key: "currentDue", label: locale==="zh"?"待收未逾期":"Dû non échu", value: formatXof(dashboardStats.currentDue), dot: "bg-accentPurple-500", hint: locale==="zh"?"点击查看未逾期待收":"Voir les montants non échus" },
+    { key: "overdue", label: locale==="zh"?"逾期金额":"Retard", value: formatXof(dashboardStats.overdue), dot: dashboardStats.overdue > 0 ? "bg-accentRed-500" : "bg-muted-foreground/40", hint: `${dashboardStats.overdueContracts}${locale==="zh"?"份 · 点击查看":" · voir"}` },
   ];
 
   return (
@@ -268,22 +325,31 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
       {/* ── Summary stats ── */}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        {statBlocks.map(b => {
-          const content = <>
+        {statBlocks.map(b => (
+          <button
+            key={b.key}
+            type="button"
+            onClick={() => {
+              setStatusFilter("all");
+              setStatFilter((current) => current === b.key ? null : b.key);
+            }}
+            aria-pressed={statFilter === b.key}
+            title={b.hint}
+            className={cn(
+              "flex min-h-[76px] flex-col rounded-xl border bg-card p-3 text-left text-card-foreground shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60",
+              statFilter === b.key ? "border-foreground/20 ring-1 ring-foreground/10" : "border-border",
+            )}
+          >
             <div className="flex min-w-0 items-center justify-between gap-3 pb-2">
               <p className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">{b.label}</p>
               <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", b.dot)} />
             </div>
-            <div className="flex items-end justify-between gap-2">
-              <p className="text-lg font-semibold leading-none tabular-nums text-foreground">{b.value}</p>
-              {b.hint && <span className="flex items-center text-[10px] font-medium text-muted-foreground">{b.hint}<ChevronRight className="ml-0.5 h-3 w-3" /></span>}
-            </div>
-          </>;
-          const cardClass = "flex min-h-[76px] flex-col rounded-xl border border-border bg-card p-3 text-left text-card-foreground shadow-card transition-all duration-200";
-          return b.action ? (
-            <button key={b.key} type="button" onClick={b.action} className={cn(cardClass, "cursor-pointer hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40")}>{content}</button>
-          ) : <div key={b.key} className={cardClass}>{content}</div>;
-        })}
+            <p className="text-lg font-semibold leading-none tabular-nums text-foreground">{b.value}</p>
+            <span className={cn("mt-2 text-[11px] font-medium", statFilter === b.key ? "text-foreground" : "text-muted-foreground")}>
+              {statFilter === b.key ? (locale === "zh" ? "筛选中" : "Filtré") : b.hint}
+            </span>
+          </button>
+        ))}
       </div>
 
       {/* ── Building switcher ── */}
@@ -305,13 +371,25 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
         meta={
           <div className="flex items-center gap-3">
             <span>{filtered.length}/{filteredByBuilding.length} {locale === "fr" ? "contrats" : "份合同"}</span>
+            {statFilter && (
+              <button
+                type="button"
+                onClick={() => setStatFilter(null)}
+                className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:border-border-strong hover:text-foreground"
+              >
+                {locale === "zh" ? "清除指标筛选" : "Effacer filtre"}
+              </button>
+            )}
             <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" />{t.form.newContract}</Button>
           </div>
         }
       >
         <SegmentedControl
           value={statusFilter}
-          onChange={setStatusFilter}
+          onChange={(value) => {
+            setStatusFilter(value);
+            setStatFilter(null);
+          }}
           ariaLabel={locale === "zh" ? "合同状态筛选" : "Filtre statut contrat"}
           items={["all", "draft", "active", "terminated", "expired"].map((value) => ({
             value,
@@ -354,18 +432,18 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                     onClick={() => openDetail(contract.id)}
                     className={isRisk ? "border-amber-200 shadow-[0_10px_24px_rgba(180,120,24,0.14)]" : ""}>
                     {/* Customer and tags */}
-                    <div className="flex min-h-[58px] flex-col justify-start gap-2">
+                    <div className="flex min-h-[62px] flex-col justify-start gap-2">
                       <p className="text-[13px] font-semibold leading-snug line-clamp-2 break-words" title={customer?.name ?? (locale==="zh"?"无客户":"Sans client")}>
                         {customer?.name ?? "—"}
                       </p>
-                      <div className="flex h-5 items-center gap-1.5">
+                      <div className="flex min-h-5 flex-wrap items-center gap-1.5">
                         {isManaged && <Badge variant="success" className="h-5 bg-white/70 px-2 text-[10px] text-[#217365]">{locale === "zh" ? "代管" : "Gestion"}</Badge>}
                         {dataFlags.needsData && <Badge variant="warning" className="h-5 px-2 text-[10px]">{locale === "zh" ? "资料待补" : "A compléter"}</Badge>}
                         <Badge variant={statusVariant[contract.status]} className="h-5 px-2 text-[10px]">{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
                       </div>
                     </div>
                     {/* Rent + expiry */}
-                    <div className="min-h-[48px] text-[11px] leading-relaxed text-[#5D7186]">
+                    <div className="min-h-[50px] text-[11px] leading-relaxed text-[#5D7186]">
                       <p className="tabular-nums">{rent > 0 ? formatXof(rent) : (locale==="zh"?"租金未录入":"Loyer non saisi")}</p>
                       {paidThrough ? (
                         <p className={cn("tabular-nums font-medium", isPaidThroughOverdue(contract) ? "text-red-600" : "text-emerald-700")}>
@@ -385,7 +463,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                       <p className="text-[11px] text-amber-600 font-medium leading-tight">{locale==="zh"?"待收":"Dû"}: {formatXof(summary.outstanding)}</p>
                     )}
                     {/* Action buttons */}
-                    <div className="mt-auto flex justify-end gap-1.5 pt-1">
+                    <div className="mt-auto flex justify-end gap-1.5 border-t border-[rgba(23,50,77,0.06)] pt-3">
                       <ActionBtn icon={Eye} label={locale==="zh"?"查看":"Voir"} onClick={() => openDetail(contract.id)} />
                       <ActionBtn icon={DollarSign} label={locale==="zh"?"收款":"Paiement"} onClick={() => { openDetail(contract.id); }} />
                       <ActionBtn icon={FileText} label={locale==="zh"?"合同":"Contrat"} onClick={() => { openDetail(contract.id); }} />
@@ -412,7 +490,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
               ariaLabel={locale === "zh" ? "收费提醒类型" : "Type de rappel"}
               items={[
                 { value: "overdue", label: `${locale === "zh" ? "已逾期" : "En retard"} ${leaseAttention.overdue.length}` },
-                { value: "upcoming", label: `${locale === "zh" ? "30天内应缴" : "Sous 30 jours"} ${leaseAttention.upcoming.length}` },
+                { value: "upcoming", label: `${locale === "zh" ? "15天内应缴" : "Sous 15 jours"} ${leaseAttention.upcoming.length}` },
               ]}
             />
             <p className="text-xs leading-relaxed text-muted-foreground">
