@@ -241,9 +241,9 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
                   {s.outstanding>0 && <span className="text-amber-600 font-medium">{formatXof(s.outstanding)} {locale==="zh"?"待收":"dû"}</span>}
                 </div>
                 {/* Transfer status + action buttons */}
-                <div className="mt-auto flex items-center justify-between gap-2 border-t border-[rgba(23,50,77,0.06)] pt-3">
+                <div className="mt-auto flex items-center justify-between gap-4 border-t border-[rgba(23,50,77,0.06)] pt-3">
                   <span className={cn("text-[11px]", contract.transfer_status==="completed"?"text-emerald-600":"text-[#5D7186]")}>{transText(contract.transfer_status)}</span>
-                  <div className="flex gap-1.5">
+                  <div className="flex justify-center gap-5">
                     <SaleActionBtn icon={Eye} label={locale==="zh"?"查看":"Voir"} onClick={() => openDetail(contract.id)} />
                     <SaleActionBtn icon={DollarSign} label={locale==="zh"?"回款":"Pmt"} onClick={() => { openDetail(contract.id); }} />
                     <SaleActionBtn icon={FileText} label={locale==="zh"?"单据":"Docs"} onClick={() => { openDetail(contract.id); }} />
