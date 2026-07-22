@@ -8,6 +8,7 @@ type UnitInput = { unitNo: string; areaSqm: number; layout: string };
 type LeaseInput = {
   unitNo: string; customerName: string; contractNo: string;
   startDate: string; expectedEndDate: string; paymentCycle: string; paymentDay: number;
+  expectedEndConfirmed?: boolean; paidThroughDate?: string | null;
   monthlyRentXof: number; depositAmountXof: number; depositReceived: boolean;
   signerName: string; status: "active";
 };
@@ -147,6 +148,8 @@ export async function applySacsi11WorkbookImport(payloadText: string): Promise<S
       const { data: updated, error } = await supabase.from("lease_contracts").update({
         customer_id: customerId, contract_no: row.contractNo, start_date: row.startDate,
         expected_end_date: row.expectedEndDate, actual_end_date: null,
+        expected_end_confirmed: row.expectedEndConfirmed ?? false,
+        paid_through_date: row.paidThroughDate ?? row.expectedEndDate,
         payment_cycle: row.paymentCycle, payment_day: row.paymentDay,
         monthly_rent_xof: row.monthlyRentXof, deposit_amount_xof: row.depositAmountXof,
         deposit_received: row.depositReceived, signer_name: row.signerName, status: "active",
@@ -161,6 +164,8 @@ export async function applySacsi11WorkbookImport(payloadText: string): Promise<S
         const { data: updated, error } = await supabase.from("lease_contracts").update({
           unit_id: unit.id, customer_id: customerId, start_date: row.startDate,
           expected_end_date: row.expectedEndDate, actual_end_date: null,
+          expected_end_confirmed: row.expectedEndConfirmed ?? false,
+          paid_through_date: row.paidThroughDate ?? row.expectedEndDate,
           payment_cycle: row.paymentCycle, payment_day: row.paymentDay,
           monthly_rent_xof: row.monthlyRentXof, deposit_amount_xof: row.depositAmountXof,
           deposit_received: row.depositReceived, signer_name: row.signerName, status: "active",
@@ -172,6 +177,8 @@ export async function applySacsi11WorkbookImport(payloadText: string): Promise<S
         const { data: created, error } = await supabase.from("lease_contracts").insert({
           unit_id: unit.id, customer_id: customerId, contract_no: row.contractNo,
           start_date: row.startDate, expected_end_date: row.expectedEndDate,
+          expected_end_confirmed: row.expectedEndConfirmed ?? false,
+          paid_through_date: row.paidThroughDate ?? row.expectedEndDate,
           payment_cycle: row.paymentCycle, payment_day: row.paymentDay,
           monthly_rent_xof: row.monthlyRentXof, deposit_amount_xof: row.depositAmountXof,
           deposit_received: row.depositReceived, rent_free_days: 0,
