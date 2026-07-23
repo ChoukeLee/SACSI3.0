@@ -217,7 +217,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const dashboardStats = useMemo(() => {
     const scopedContractIds = new Set(filteredByBuilding.map((c) => c.id));
     const active = filteredByBuilding.filter((c) => c.status === "active");
-    let dueSoon = 0, currentDue = 0, overdue = 0;
+    let currentDue = 0, overdue = 0;
     for (const r of receivables) {
       if (r.source_type !== "lease_contract" || r.status === "cancelled" || !r.source_id || !scopedContractIds.has(r.source_id)) continue;
       const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
@@ -227,18 +227,17 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
         overdue += outstanding;
       } else {
         currentDue += outstanding;
-        if (r.due_date <= dueSoonEnd) dueSoon++;
       }
     }
     return {
       active: active.length,
       rent: active.reduce((sum, c) => sum + Number(c.monthly_rent_xof), 0),
-      dueSoon,
+      dueSoon: leaseAttention.upcoming.length,
       currentDue,
       overdue,
       overdueContracts: leaseAttention.overdue.length,
     };
-  }, [filteredByBuilding, leaseAttention.overdue.length, receivables, todayStr, dueSoonEnd]);
+  }, [filteredByBuilding, leaseAttention.overdue.length, leaseAttention.upcoming.length, receivables, todayStr]);
 
   const leaseInsightContracts = useMemo(() => {
     return filteredByBuilding
@@ -341,6 +340,12 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       ? { lease_rent: "租金", lease_deposit: "押金", other_income: "其他" }
       : { lease_rent: "Loyer", lease_deposit: "Depot", other_income: "Autre" };
     return labels[category ?? ""] ?? (locale === "zh" ? "应收" : "Du");
+  };
+  const paymentKindLabel = (sourceType: string) => {
+    const labels: Record<string, string> = locale === "zh"
+      ? { lease_rent: "租金", lease_contract: "租金", lease_deposit: "押金", property_fee: "物业费" }
+      : { lease_rent: "Loyer", lease_contract: "Loyer", lease_deposit: "Dépôt", property_fee: "Charges" };
+    return labels[sourceType] ?? (locale === "zh" ? "收款" : "Paiement");
   };
 
   const openInsight = (key: LeaseStatFilter) => {
@@ -760,6 +765,39 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
               <div className={cn("rounded-md border px-3 py-2",contractRisk.expiringSoon?"border-amber-200 bg-amber-50":"border-emerald-200 bg-emerald-50")}><p className="text-muted-foreground">{t.risk.expiringSoon}</p><p className={cn("text-xs font-semibold",contractRisk.expiringSoon?"text-amber-700":"text-emerald-700")}>{contractRisk.expiringSoon?`${contractRisk.daysLeft} ${locale==="zh"?"天后到期":"j restants"}`:(locale==="zh"?"否":"Non")}</p></div>
             </div>
           </div>}
+
+          {/* Payment history */}
+          <div className="border-t pt-4">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <h4 className="text-sm font-semibold">{locale === "zh" ? "收款记录" : "Paiements"}</h4>
+              <span className="text-xs font-medium tabular-nums text-emerald-700">
+                {locale === "zh" ? "累计" : "Total"} {formatXof(totalPaid)}
+              </span>
+            </div>
+            {contractPayments.length === 0 ? (
+              <p className="text-xs text-muted-foreground">{locale === "zh" ? "暂无收款记录" : "Aucun paiement"}</p>
+            ) : (
+              <div className="space-y-1.5">
+                {contractPayments.map((payment) => (
+                  <div key={payment.id} className="rounded-lg border border-emerald-100 bg-emerald-50/40 px-3 py-2.5 text-[13px]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-emerald-800">{paymentKindLabel(payment.source_type)}</span>
+                          <span className="text-xs tabular-nums text-muted-foreground">{payment.payment_date}</span>
+                        </div>
+                        <p className="mt-1 truncate text-[11px] text-muted-foreground" title={payment.receipt_no ?? ""}>
+                          {payment.receipt_no || (locale === "zh" ? "无收据号" : "Sans reçu")}
+                        </p>
+                      </div>
+                      <span className="shrink-0 font-semibold tabular-nums text-emerald-700">{formatXof(Number(payment.amount))}</span>
+                    </div>
+                    {payment.notes && <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground" title={payment.notes}>{payment.notes}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Receivable list */}
           <div className="border-t pt-4">
