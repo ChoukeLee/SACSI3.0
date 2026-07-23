@@ -792,7 +792,6 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                       </div>
                       <span className="shrink-0 font-semibold tabular-nums text-emerald-700">{formatXof(Number(payment.amount))}</span>
                     </div>
-                    {payment.notes && <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground" title={payment.notes}>{payment.notes}</p>}
                   </div>
                 ))}
               </div>
