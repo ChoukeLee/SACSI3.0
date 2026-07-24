@@ -297,7 +297,9 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     [contractReceivables],
   );
   const contractPayments = useMemo(() => selectedId ? payments.filter((p) => p.source_id === selectedId) : [], [payments, selectedId]);
-  const totalPaid = contractPayments.reduce((s, p) => s + Number(p.amount), 0);
+  const totalIncome = contractPayments.reduce((sum, payment) => payment.source_type === "lease_agency_expense" ? sum : sum + Number(payment.amount), 0);
+  const totalExpense = contractPayments.reduce((sum, payment) => payment.source_type === "lease_agency_expense" ? sum + Number(payment.amount) : sum, 0);
+  const netFinancial = totalIncome - totalExpense;
   const receivableStats = useMemo(() => { let totalRec=0,totalPd=0,overdue=0; const today=new Date().toISOString().slice(0,10); for(const r of contractReceivables){totalRec+=Number(r.amount_xof);totalPd+=Number(r.paid_amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))overdue+=os;} return {totalReceivable:totalRec,totalPaid:totalPd,outstanding:totalRec-totalPd,overdue}; }, [contractReceivables]);
   const contractRisk = useMemo(() => { if(!selected||selected.status!=="active"||!isContractEndConfirmed(selected))return {expiringSoon:false,daysLeft:0}; const today=new Date(); const diff=Math.floor((new Date(selected.expected_end_date).getTime()-today.getTime())/86400000); return {expiringSoon:diff<=30&&diff>=0,daysLeft:Math.max(0,diff)}; }, [selected]);
   const availableUnits = useMemo(() => units.filter((u) => u.kind === "apartment" && (u.status === "available" || isManagedLeaseUnit(u))), [units]);
@@ -347,9 +349,9 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   };
   const paymentKindLabel = (sourceType: string) => {
     const labels: Record<string, string> = locale === "zh"
-      ? { lease_rent: "租金", lease_contract: "租金", lease_deposit: "押金", property_fee: "物业费" }
-      : { lease_rent: "Loyer", lease_contract: "Loyer", lease_deposit: "Dépôt", property_fee: "Charges" };
-    return labels[sourceType] ?? (locale === "zh" ? "收款" : "Paiement");
+      ? { lease_rent: "租金", lease_contract: "租金", lease_deposit: "押金", property_fee: "物业费", lease_agency_income: "中介费收入", lease_agency_expense: "中介费支出" }
+      : { lease_rent: "Loyer", lease_contract: "Loyer", lease_deposit: "Dépôt", property_fee: "Charges", lease_agency_income: "Revenu de commission", lease_agency_expense: "Dépense de commission" };
+    return labels[sourceType] ?? (locale === "zh" ? "财务记录" : "Écriture financière");
   };
 
   const openInsight = (key: LeaseStatFilter) => {
@@ -772,32 +774,36 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
           {/* Payment history */}
           <div className="border-t pt-4">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <h4 className="text-sm font-semibold">{locale === "zh" ? "收款记录" : "Paiements"}</h4>
-              <span className="text-xs font-medium tabular-nums text-emerald-700">
-                {locale === "zh" ? "累计" : "Total"} {formatXof(totalPaid)}
-              </span>
+            <div className="mb-2 space-y-1">
+              <h4 className="text-sm font-semibold">{locale === "zh" ? "财务记录" : "Écritures financières"}</h4>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium tabular-nums">
+                <span className="text-emerald-700">{locale === "zh" ? "收入" : "Revenus"} {formatXof(totalIncome)}</span>
+                <span className="text-red-600">{locale === "zh" ? "支出" : "Dépenses"} {formatXof(totalExpense)}</span>
+                <span className="text-slate-700">{locale === "zh" ? "净额" : "Net"} {formatXof(netFinancial)}</span>
+              </div>
             </div>
             {contractPayments.length === 0 ? (
-              <p className="text-xs text-muted-foreground">{locale === "zh" ? "暂无收款记录" : "Aucun paiement"}</p>
+              <p className="text-xs text-muted-foreground">{locale === "zh" ? "暂无财务记录" : "Aucune écriture financière"}</p>
             ) : (
               <div className="space-y-1.5">
-                {contractPayments.map((payment) => (
-                  <div key={payment.id} className="rounded-lg border border-emerald-100 bg-emerald-50/40 px-3 py-2.5 text-[13px]">
+                {contractPayments.map((payment) => {
+                  const isExpense = payment.source_type === "lease_agency_expense";
+                  return (
+                  <div key={payment.id} className={cn("rounded-lg border px-3 py-2.5 text-[13px]", isExpense ? "border-red-100 bg-red-50/50" : "border-emerald-100 bg-emerald-50/40")}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-emerald-800">{paymentKindLabel(payment.source_type)}</span>
+                          <span className={cn("font-semibold", isExpense ? "text-red-700" : "text-emerald-800")}>{paymentKindLabel(payment.source_type)}</span>
                           <span className="text-xs tabular-nums text-muted-foreground">{payment.payment_date}</span>
                         </div>
                         <p className="mt-1 truncate text-[11px] text-muted-foreground" title={payment.receipt_no ?? ""}>
                           {payment.receipt_no || (locale === "zh" ? "无收据号" : "Sans reçu")}
                         </p>
                       </div>
-                      <span className="shrink-0 font-semibold tabular-nums text-emerald-700">{formatXof(Number(payment.amount))}</span>
+                      <span className={cn("shrink-0 font-semibold tabular-nums", isExpense ? "text-red-600" : "text-emerald-700")}>{isExpense ? "- " : ""}{formatXof(Number(payment.amount))}</span>
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             )}
           </div>
