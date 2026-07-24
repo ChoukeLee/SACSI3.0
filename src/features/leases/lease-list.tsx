@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, X, AlertTriangle, FileText, DollarSign, LogOut, Printer, RefreshCw, Eye, CalendarClock, Phone, ChevronRight } from "lucide-react";
+import { Plus, X, AlertTriangle, FileText, DollarSign, LogOut, Printer, Eye, CalendarClock, Phone, ChevronRight } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
@@ -18,9 +18,9 @@ import { FilterBar, SegmentedControl, controlClass } from "@/components/ui/opera
 import type { RoomVisualStatus } from "@/lib/status-styles";
 import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
-import { contractStatusVariant as statusVariant, receivableStatusStyles as STATUS_STYLES, receivableRowBg as ROW_BG } from "@/lib/status-styles";
+import { contractStatusVariant as statusVariant } from "@/lib/status-styles";
 import { printLeaseContract } from "@/features/print";
-import { createLeaseContract, activateContract, terminateContract, recordReceivablePayment, generateLeaseReceivables, processMoveOut, recordLeaseFinancialEntry } from "./actions";
+import { createLeaseContract, activateContract, terminateContract, processMoveOut, recordLeaseFinancialEntry } from "./actions";
 import {
   buildLeaseContractNumber,
   buildLeaseFinancialReferencePrefix,
@@ -95,8 +95,6 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const [fPayDay, setFPayDay] = useState(5); const [fRent, setFRent] = useState(0); const [fDeposit, setFDeposit] = useState(0);
   const [fDepositReceived, setFDepositReceived] = useState(false); const [fFreeDays, setFFreeDays] = useState(0);
   const [fSigner, setFSigner] = useState(""); const [fStatus, setFStatus] = useState<ContractStatus>("draft");
-  const [payReceivableId, setPayReceivableId] = useState<string | null>(null);
-  const [payDate, setPayDate] = useState(new Date().toISOString().slice(0,10)); const [payReceiptNo, setPayReceiptNo] = useState("");
   const [moEndDate, setMoEndDate] = useState(new Date().toISOString().slice(0,10)); const [moUnpaid, setMoUnpaid] = useState(0);
   const [moUtility, setMoUtility] = useState(false); const [moDeduction, setMoDeduction] = useState(0); const [moRefund, setMoRefund] = useState(0);
   const [financeType, setFinanceType] = useState<LeaseFinancialBusinessType>("rent_income");
@@ -309,10 +307,6 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   }, [customerMap, filteredByBuilding, receivables, todayStr, unitMap]);
 
   const contractReceivables = useMemo(() => selectedId ? receivables.filter(r => r.source_type === "lease_contract" && r.source_id === selectedId && r.status !== "cancelled") : [], [receivables, selectedId]);
-  const openContractReceivables = useMemo(
-    () => contractReceivables.filter((row) => Number(row.amount_xof) - Number(row.paid_amount_xof) > 0),
-    [contractReceivables],
-  );
   const contractPayments = useMemo(() => selectedId ? payments.filter((p) => p.source_id === selectedId) : [], [payments, selectedId]);
   const totalIncome = contractPayments.reduce((sum, payment) => isLeaseFinancialExpenseSourceType(payment.source_type) ? sum : sum + Number(payment.amount), 0);
   const totalExpense = contractPayments.reduce((sum, payment) => isLeaseFinancialExpenseSourceType(payment.source_type) ? sum + Number(payment.amount) : sum, 0);
@@ -351,24 +345,6 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   };
   const handleActivate = async (id: string) => { setSaving(true); setError(""); setGenMsg(locale==="zh"?"正在后台激活合同":"Activation en arriere-plan"); const result = await activateContract(id); setSaving(false); if(!result.success) { setGenMsg(""); setError(result.error??"Failed"); } else setGenMsg(locale==="zh"?"合同已激活，应收已自动生成":"Contrat active, echeances generees"); };
   const handleTerminate = async (id: string) => { setSaving(true); setError(""); setGenMsg(locale==="zh"?"正在后台终止合同":"Resiliation en arriere-plan"); const result = await terminateContract(id); setSaving(false); if(!result.success) { setGenMsg(""); setError(result.error??"Failed"); } else setGenMsg(locale==="zh"?"合同已终止":"Contrat resilie"); };
-  const handleGenerateReceivables = async (id: string) => {
-    setSaving(true);
-    setGenMsg("");
-    setError("");
-    const result = await generateLeaseReceivables(id);
-    setSaving(false);
-    if (result.success) {
-      router.refresh();
-      if (result.count > 0) {
-        setGenMsg(t.receivable.generated.replace("{count}", String(result.count)));
-      } else if ((result.existingCount ?? 0) > 0) {
-        setGenMsg(locale === "zh" ? `应收已存在 ${result.existingCount} 条，已刷新列表` : `${result.existingCount} créance(s) déjà existante(s), liste actualisée`);
-      } else {
-        setGenMsg(locale === "zh" ? "未生成新的应收，请检查合同日期和支付周期" : "Aucune nouvelle créance générée, vérifiez les dates et le cycle");
-      }
-    } else setError(result.error ?? "Failed");
-  };
-  const handleCollectReceivable = async () => { if(!payReceivableId)return; const currentReceivableId=payReceivableId; setSaving(true);setError("");setGenMsg(locale==="zh"?"正在后台记录收款":"Paiement en arriere-plan");setPayReceivableId(null);const result=await recordReceivablePayment({receivableId:currentReceivableId,paymentDate:payDate,receiptNo:payReceiptNo||undefined});setSaving(false);if(result.success){setPayReceiptNo("");setGenMsg(locale==="zh"?"收款已记录":"Paiement enregistre");}else {setPayReceivableId(currentReceivableId);setGenMsg("");setError(result.error??"Failed");}};
   const handleMoveOut = async () => { if(!selectedId)return;const currentId=selectedId;setSaving(true);setError("");setGenMsg(locale==="zh"?"正在后台办理退租":"Sortie en arriere-plan");setPanel(null);const result=await processMoveOut({contractId:currentId,actualEndDate:moEndDate,unpaidRentXof:moUnpaid,utilityCleared:moUtility,depositDeductionXof:moDeduction,depositRefundXof:moRefund});setSaving(false);if(result.success)setGenMsg(locale==="zh"?"退租已办理":"Sortie traitee");else {setPanel("moveout");setGenMsg("");setError(result.error??"Failed");}};
   const handleFinanceEntry = async () => {
     if (!selectedId) return;
@@ -404,13 +380,6 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
   const labelClass = "block text-xs font-semibold text-muted-foreground mb-1";
 
-  const statusLabel = (status: string) => { const labels: Record<string,string> = locale==="zh" ? {pending:"待收",partial:"部分",paid:"已收",overdue:"逾期",cancelled:"已取消"} : {pending:"Attente",partial:"Partiel",paid:"Paye",overdue:"Retard",cancelled:"Annule"}; return labels[status]??status; };
-  const receivableKindLabel = (category: string | null | undefined) => {
-    const labels: Record<string, string> = locale === "zh"
-      ? { lease_rent: "租金", lease_deposit: "押金", other_income: "其他" }
-      : { lease_rent: "Loyer", lease_deposit: "Depot", other_income: "Autre" };
-    return labels[category ?? ""] ?? (locale === "zh" ? "应收" : "Du");
-  };
   const paymentKindLabel = (sourceType: string) => {
     const configured = getLeaseFinancialConfigBySourceType(sourceType);
     if (configured) return locale === "zh" ? configured.labelZh : configured.labelFr;
@@ -880,12 +849,6 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
             )}
           </div>
 
-          {/* Receivable list */}
-          <div className="border-t pt-4">
-            <div className="flex items-center justify-between mb-2"><h4 className="text-sm font-semibold">{locale==="zh"?"待收款项":"Créances ouvertes"}</h4>{selected.status==="active"&&<button onClick={()=>handleGenerateReceivables(selected.id)} disabled={saving} className={cn(controlClass, "text-xs font-medium disabled:opacity-40")}><RefreshCw className="h-3 w-3"/>{t.receivable.generate}</button>}</div>
-            {openContractReceivables.length===0?<p className="text-xs text-muted-foreground">{locale==="zh"?"暂无未结应收":"Aucune créance ouverte"}</p>:<div className="space-y-1.5">{openContractReceivables.map(r=>{const amount=Number(r.amount_xof);const paid=Number(r.paid_amount_xof);const os=Math.max(0,amount-paid);const od=os>0&&new Date(r.due_date).getTime()<Date.now()?Math.floor((Date.now()-new Date(r.due_date).getTime())/86400000):null;return(<div key={r.id} className={cn("flex items-center gap-3 rounded-lg border px-3 py-2 text-[13px] transition-colors hover:bg-accent/40",ROW_BG[r.status])}><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="font-semibold">{receivableKindLabel(r.category)}</span><span className="text-xs text-muted-foreground tabular-nums">{r.due_date}</span>{od!==null&&od>0&&<span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-600">+{od}d</span>}</div><p className="mt-0.5 text-xs text-muted-foreground">{paid>0?(locale==="zh"?"已收 ":"Payé ")+formatXof(paid):(locale==="zh"?"未收款":"Non payé")}</p></div><div className="text-right"><p className="font-semibold tabular-nums">{formatXof(amount)}</p><span className={cn("inline-flex rounded-full px-1.5 py-0.5 text-[11px] font-semibold",STATUS_STYLES[r.status])}>{statusLabel(r.status)}</span></div>{selected.status==="active"&&(payReceivableId===r.id?<span className="text-xs text-muted-foreground">{locale==="zh"?"收款中...":"En cours..."}</span>:<button onClick={()=>{setPayReceivableId(r.id);setPayDate(new Date().toISOString().slice(0,10));setPayReceiptNo("");setError("");}} className="rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground hover:opacity-90">{locale==="zh"?"收款":"Enc"}</button>)}</div>);})}</div>}
-            {payReceivableId&&<div className="mt-3 space-y-2 rounded-md border bg-card p-3"><div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-muted-foreground">{locale==="zh"?"收款日期":"Date"}</label><DateInput value={payDate} onChangeValue={setPayDate} className={inputClass}/></div><div><label className="text-xs text-muted-foreground">{locale==="zh"?"收据号":"Recu"}</label><input type="text" value={payReceiptNo} onChange={e=>setPayReceiptNo(e.target.value)} className={inputClass}/></div></div>{error&&<p className="text-xs text-red-600">{error}</p>}<div className="flex gap-2"><Button size="sm" onClick={handleCollectReceivable} disabled={saving}>{saving?"...":locale==="zh"?"确认收款":"Encaisser"}</Button><Button size="sm" variant="ghost" onClick={()=>{setPayReceivableId(null);setError("");}}>{locale==="zh"?"取消":"Annuler"}</Button></div></div>}
-          </div>
         </div>
       </PanelShell>)}
 
