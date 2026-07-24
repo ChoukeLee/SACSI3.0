@@ -152,7 +152,9 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   };
 
   const filteredByStatus = useMemo(() => (
-    statusFilter === "all" ? filteredByBuilding : filteredByBuilding.filter((c) => c.status === statusFilter)
+    statusFilter === "all"
+      ? filteredByBuilding.filter((c) => c.status !== "terminated")
+      : filteredByBuilding.filter((c) => c.status === statusFilter)
   ), [filteredByBuilding, statusFilter]);
 
   const filtered = filteredByStatus;
@@ -476,7 +478,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
           ariaLabel={locale === "zh" ? "合同状态筛选" : "Filtre statut contrat"}
           items={["all", "draft", "active", "terminated", "expired"].map((value) => ({
             value,
-            label: value === "all" ? (locale === "fr" ? "Tous" : "全部") : t.contractStatus[value as keyof typeof t.contractStatus],
+            label: value === "all" ? (locale === "fr" ? "En cours" : "当前") : t.contractStatus[value as keyof typeof t.contractStatus],
           }))}
         />
       </FilterBar>
