@@ -77,10 +77,11 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const selectedCustomer = selected?customers.find(c=>c.id===selected.customer_id):null;
 
   const dashboardStats = useMemo(()=>{
-    const active=contracts.filter(c=>c.status==="active");let received=0,receivable=0,overdue=0;const today=new Date().toISOString().slice(0,10);
-    for(const r of receivables){if(r.source_type!=="sale_contract"||r.status==="cancelled")continue;received+=Number(r.paid_amount_xof);receivable+=Number(r.amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))overdue+=os;}
+    const buildingContractIds=new Set(filteredByBuilding.map(c=>c.id));
+    const active=filteredByBuilding.filter(c=>c.status==="active");let received=0,receivable=0,overdue=0;const today=new Date().toISOString().slice(0,10);
+    for(const r of receivables){if(r.source_type!=="sale_contract"||r.status==="cancelled"||!r.source_id||!buildingContractIds.has(r.source_id))continue;received+=Number(r.paid_amount_xof);receivable+=Number(r.amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))overdue+=os;}
     return {active:active.length,total:active.reduce((s,c)=>s+Number(c.total_amount_xof),0),received,receivable,overdue,transferDone:active.filter(c=>c.transfer_status==="completed").length};
-  }, [contracts,receivables]);
+  }, [filteredByBuilding,receivables]);
 
   const contractSchedules = useMemo(()=>selectedId?schedules.filter(s=>s.sale_contract_id===selectedId).sort((a,b)=>a.installment_no-b.installment_no):[], [schedules,selectedId]);
   const contractReceivables = useMemo(()=>selectedId?receivables.filter(r=>r.source_type==="sale_contract"&&r.source_id===selectedId&&r.status!=="cancelled"):[], [receivables,selectedId]);
@@ -157,7 +158,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
             {locale === "zh" ? "出售合同" : "Contrats de vente"}
           </h1>
           <span className="text-sm text-muted-foreground tabular-nums">
-            {contracts.length} {locale==="fr"?"contrats":"份合同"}
+            {filteredByBuilding.length} {locale==="fr"?"contrats":"份合同"}
           </span>
         </div>
       </div>
