@@ -20,7 +20,17 @@ import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow 
 import type { ContractStatus } from "@/types/domain";
 import { contractStatusVariant as statusVariant, receivableStatusStyles as STATUS_STYLES, receivableRowBg as ROW_BG } from "@/lib/status-styles";
 import { printLeaseContract } from "@/features/print";
-import { createLeaseContract, activateContract, terminateContract, recordReceivablePayment, generateLeaseReceivables, processMoveOut } from "./actions";
+import { createLeaseContract, activateContract, terminateContract, recordReceivablePayment, generateLeaseReceivables, processMoveOut, recordLeaseFinancialEntry } from "./actions";
+import {
+  buildLeaseContractNumber,
+  buildLeaseFinancialReferencePrefix,
+  getLeaseFinancialConfig,
+  getLeaseFinancialConfigBySourceType,
+  isLeaseFinancialExpenseSourceType,
+  LEASE_FINANCIAL_BUSINESS_CONFIG,
+  LEASE_FINANCIAL_BUSINESS_TYPES,
+  type LeaseFinancialBusinessType,
+} from "./lease-financial-entry-types";
 
 interface UnitBusinessFlag {
   business_type: "daily_rental" | "long_lease" | "sale";
@@ -33,7 +43,7 @@ type LeaseUnitRow = UnitRow & {
 };
 
 interface LeaseListProps { contracts: LeaseContractRow[]; units: LeaseUnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale }
-type PanelType = "new" | "detail" | "moveout" | "attention" | "insight" | null;
+type PanelType = "new" | "detail" | "financeEntry" | "moveout" | "attention" | "insight" | null;
 type AttentionTab = "overdue" | "upcoming";
 const paymentCycles = ["monthly", "quarterly", "semiannual", "annual"];
 type LeaseStatFilter = "active" | "rent" | "dueSoon" | "currentDue" | "overdue";
@@ -89,6 +99,12 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const [payDate, setPayDate] = useState(new Date().toISOString().slice(0,10)); const [payReceiptNo, setPayReceiptNo] = useState("");
   const [moEndDate, setMoEndDate] = useState(new Date().toISOString().slice(0,10)); const [moUnpaid, setMoUnpaid] = useState(0);
   const [moUtility, setMoUtility] = useState(false); const [moDeduction, setMoDeduction] = useState(0); const [moRefund, setMoRefund] = useState(0);
+  const [financeType, setFinanceType] = useState<LeaseFinancialBusinessType>("rent_income");
+  const [financeDate, setFinanceDate] = useState(new Date().toISOString().slice(0, 10));
+  const [financeAmountWan, setFinanceAmountWan] = useState(0);
+  const [financePaidThrough, setFinancePaidThrough] = useState("");
+  const [financeMethod, setFinanceMethod] = useState<"cash" | "check" | "bank_transfer" | "offset" | "other">("other");
+  const [financeNotes, setFinanceNotes] = useState("");
 
   // Building switcher
   const [activeBuildingId, setActiveBuildingId] = useState<string>(() => (
@@ -109,6 +125,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
   const unitMap = useMemo(() => new Map(units.map((u) => [u.id, u])), [units]);
   const customerMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
+  const buildingMap = useMemo(() => new Map(buildings.map((b) => [b.id, b])), [buildings]);
 
   const receivablesByContract = useMemo(() => {
     const m = new Map<string, ReceivableRow[]>();
@@ -297,22 +314,39 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     [contractReceivables],
   );
   const contractPayments = useMemo(() => selectedId ? payments.filter((p) => p.source_id === selectedId) : [], [payments, selectedId]);
-  const totalIncome = contractPayments.reduce((sum, payment) => payment.source_type === "lease_agency_expense" ? sum : sum + Number(payment.amount), 0);
-  const totalExpense = contractPayments.reduce((sum, payment) => payment.source_type === "lease_agency_expense" ? sum + Number(payment.amount) : sum, 0);
+  const totalIncome = contractPayments.reduce((sum, payment) => isLeaseFinancialExpenseSourceType(payment.source_type) ? sum : sum + Number(payment.amount), 0);
+  const totalExpense = contractPayments.reduce((sum, payment) => isLeaseFinancialExpenseSourceType(payment.source_type) ? sum + Number(payment.amount) : sum, 0);
   const netFinancial = totalIncome - totalExpense;
   const receivableStats = useMemo(() => { let totalRec=0,totalPd=0,overdue=0; const today=new Date().toISOString().slice(0,10); for(const r of contractReceivables){totalRec+=Number(r.amount_xof);totalPd+=Number(r.paid_amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))overdue+=os;} return {totalReceivable:totalRec,totalPaid:totalPd,outstanding:totalRec-totalPd,overdue}; }, [contractReceivables]);
   const contractRisk = useMemo(() => { if(!selected||selected.status!=="active"||!isContractEndConfirmed(selected))return {expiringSoon:false,daysLeft:0}; const today=new Date(); const diff=Math.floor((new Date(selected.expected_end_date).getTime()-today.getTime())/86400000); return {expiringSoon:diff<=30&&diff>=0,daysLeft:Math.max(0,diff)}; }, [selected]);
   const availableUnits = useMemo(() => units.filter((u) => u.kind === "apartment" && (u.status === "available" || isManagedLeaseUnit(u))), [units]);
+  const selectedNewUnit = useMemo(() => units.find((unit) => unit.id === fUnitId), [fUnitId, units]);
+  const generatedLeaseContractNo = useMemo(() => {
+    if (!selectedNewUnit || !fStartDate) return "";
+    const building = buildingMap.get(selectedNewUnit.building_id);
+    return buildLeaseContractNumber(building?.code ?? "SACSI", selectedNewUnit.unit_no, fStartDate);
+  }, [buildingMap, fStartDate, selectedNewUnit]);
 
   const resetNewForm = () => { setFContractNo(""); setFUnitId(""); setFCustomerId(""); setFStartDate(""); setFEndDate(""); setFCycle("monthly"); setFPayDay(5); setFRent(0); setFDeposit(0); setFDepositReceived(false); setFFreeDays(0); setFSigner(""); setFStatus("draft"); setError(""); };
   const openNew = () => { resetNewForm(); setPanel("new"); setSelectedId(null); };
   const openDetail = (id: string) => { setSelectedId(id); setPanel("detail"); setError(""); };
+  const openFinanceEntry = () => {
+    setFinanceType("rent_income");
+    setFinanceDate(new Date().toISOString().slice(0, 10));
+    setFinanceAmountWan(0);
+    setFinancePaidThrough("");
+    setFinanceMethod("other");
+    setFinanceNotes("");
+    setError("");
+    setGenMsg("");
+    setPanel("financeEntry");
+  };
   const openMoveOut = (id: string) => { setSelectedId(id); setPanel("moveout"); setError(""); const os = receivableStats.outstanding; setMoUnpaid(os > 0 ? os : 0); setMoEndDate(new Date().toISOString().slice(0,10)); };
 
   const handleCreate = async () => { /* ... all existing validation logic kept ... */
     if (!fUnitId || !fCustomerId || !fStartDate || !fEndDate) { setError(locale==="zh"?"请填写必填字段":"Champs obligatoires"); return; }
     setSaving(true); setError(""); setGenMsg(locale==="zh"?"正在后台新建合同":"Creation en arriere-plan"); setPanel(null);
-    const result = await createLeaseContract({ unitId:fUnitId, customerId:fCustomerId, contractNo:fContractNo||"", startDate:fStartDate, expectedEndDate:fEndDate, paymentCycle:fCycle as never, paymentDay:fPayDay, monthlyRentXof:fRent, depositAmountXof:fDeposit, depositReceived:fDepositReceived, rentFreeDays:fFreeDays, signerName:fSigner||undefined, status:fStatus });
+    const result = await createLeaseContract({ unitId:fUnitId, customerId:fCustomerId, contractNo:generatedLeaseContractNo, startDate:fStartDate, expectedEndDate:fEndDate, paymentCycle:fCycle as never, paymentDay:fPayDay, monthlyRentXof:fRent, depositAmountXof:fDeposit, depositReceived:fDepositReceived, rentFreeDays:fFreeDays, signerName:fSigner||undefined, status:fStatus });
     setSaving(false); if(result.success) { resetNewForm(); setGenMsg(locale==="zh"?"合同已创建":"Contrat cree"); } else { setPanel("new"); setGenMsg(""); setError(result.error??"Failed"); }
   };
   const handleActivate = async (id: string) => { setSaving(true); setError(""); setGenMsg(locale==="zh"?"正在后台激活合同":"Activation en arriere-plan"); const result = await activateContract(id); setSaving(false); if(!result.success) { setGenMsg(""); setError(result.error??"Failed"); } else setGenMsg(locale==="zh"?"合同已激活，应收已自动生成":"Contrat active, echeances generees"); };
@@ -336,6 +370,36 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   };
   const handleCollectReceivable = async () => { if(!payReceivableId)return; const currentReceivableId=payReceivableId; setSaving(true);setError("");setGenMsg(locale==="zh"?"正在后台记录收款":"Paiement en arriere-plan");setPayReceivableId(null);const result=await recordReceivablePayment({receivableId:currentReceivableId,paymentDate:payDate,receiptNo:payReceiptNo||undefined});setSaving(false);if(result.success){setPayReceiptNo("");setGenMsg(locale==="zh"?"收款已记录":"Paiement enregistre");}else {setPayReceivableId(currentReceivableId);setGenMsg("");setError(result.error??"Failed");}};
   const handleMoveOut = async () => { if(!selectedId)return;const currentId=selectedId;setSaving(true);setError("");setGenMsg(locale==="zh"?"正在后台办理退租":"Sortie en arriere-plan");setPanel(null);const result=await processMoveOut({contractId:currentId,actualEndDate:moEndDate,unpaidRentXof:moUnpaid,utilityCleared:moUtility,depositDeductionXof:moDeduction,depositRefundXof:moRefund});setSaving(false);if(result.success)setGenMsg(locale==="zh"?"退租已办理":"Sortie traitee");else {setPanel("moveout");setGenMsg("");setError(result.error??"Failed");}};
+  const handleFinanceEntry = async () => {
+    if (!selectedId) return;
+    if (financeAmountWan <= 0) {
+      setError(locale === "zh" ? "请输入大于0的金额" : "Saisissez un montant supérieur à 0");
+      return;
+    }
+    if (getLeaseFinancialConfig(financeType).requiresPaidThrough && !financePaidThrough) {
+      setError(locale === "zh" ? "租金收入必须填写已缴至日期" : "La date payée au est obligatoire");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    const result = await recordLeaseFinancialEntry({
+      contractId: selectedId,
+      businessType: financeType,
+      paymentDate: financeDate,
+      amountXof: Math.round(financeAmountWan * 10000),
+      paidThroughDate: financePaidThrough || undefined,
+      paymentMethod: financeMethod,
+      notes: financeNotes || undefined,
+    });
+    setSaving(false);
+    if (result.success) {
+      setGenMsg(locale === "zh" ? `财务记录已保存：${result.referenceNo}` : `Écriture enregistrée : ${result.referenceNo}`);
+      setPanel("detail");
+      router.refresh();
+    } else {
+      setError(result.error ?? "Failed");
+    }
+  };
 
   const inputClass = "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
   const labelClass = "block text-xs font-semibold text-muted-foreground mb-1";
@@ -348,10 +412,10 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     return labels[category ?? ""] ?? (locale === "zh" ? "应收" : "Du");
   };
   const paymentKindLabel = (sourceType: string) => {
-    const labels: Record<string, string> = locale === "zh"
-      ? { lease_rent: "租金", lease_contract: "租金", lease_deposit: "押金", property_fee: "物业费", lease_agency_income: "中介费收入", lease_agency_expense: "中介费支出" }
-      : { lease_rent: "Loyer", lease_contract: "Loyer", lease_deposit: "Dépôt", property_fee: "Charges", lease_agency_income: "Revenu de commission", lease_agency_expense: "Dépense de commission" };
-    return labels[sourceType] ?? (locale === "zh" ? "财务记录" : "Écriture financière");
+    const configured = getLeaseFinancialConfigBySourceType(sourceType);
+    if (configured) return locale === "zh" ? configured.labelZh : configured.labelFr;
+    if (sourceType === "lease_contract") return locale === "zh" ? "租金收入" : "Revenu de loyer";
+    return locale === "zh" ? "财务记录" : "Écriture financière";
   };
 
   const openInsight = (key: LeaseStatFilter) => {
@@ -727,7 +791,10 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       {/* ── New Contract Panel ── */}
       {panel === "new" && (<PanelShell onClose={()=>setPanel(null)} title={t.form.newContract}>{/* form fields same as before, using shadcn tokens */}{/* kept compact */}
         <div className="space-y-4">
-          <div><label className={labelClass}>{t.form.contractNo} *</label><input type="text" value={fContractNo} onChange={e=>setFContractNo(e.target.value)} className={inputClass}/></div>
+          <div>
+            <label className={labelClass}>{locale === "zh" ? "合同编号（自动生成）" : "N° de contrat (automatique)"}</label>
+            <input type="text" value={generatedLeaseContractNo} readOnly placeholder={locale === "zh" ? "选择房源和起租日期后生成" : "Choisissez le logement et la date"} className={cn(inputClass, "bg-muted/50 text-muted-foreground")} />
+          </div>
           <div><label className={labelClass}>{t.form.unit} *</label><select value={fUnitId} onChange={e=>setFUnitId(e.target.value)} className={inputClass}><option value="">{t.form.noUnit}</option>{availableUnits.map(u=><option key={u.id} value={u.id}>{u.unit_no} ({u.floor_label}){isManagedLeaseUnit(u) ? (locale === "zh" ? " · 已售代管" : " · Gestion") : ""}</option>)}</select></div>
           <div><label className={labelClass}>{t.form.customer} *</label><select value={fCustomerId} onChange={e=>setFCustomerId(e.target.value)} className={inputClass}><option value="">{t.form.noCustomer}</option>{customers.filter(cc=>!cc.is_blacklisted).map(cc=><option key={cc.id} value={cc.id}>{cc.name} {cc.phone?`(${cc.phone})`:""}</option>)}</select></div>
           <div className="grid grid-cols-2 gap-3"><div><label className={labelClass}>{t.form.startDate}</label><DateInput value={fStartDate} onChangeValue={setFStartDate} className={inputClass}/></div><div><label className={labelClass}>{t.form.expectedEndDate}</label><DateInput value={fEndDate} onChangeValue={setFEndDate} className={inputClass}/></div></div>
@@ -774,20 +841,25 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
           {/* Payment history */}
           <div className="border-t pt-4">
-            <div className="mb-2 space-y-1">
-              <h4 className="text-sm font-semibold">{locale === "zh" ? "财务记录" : "Écritures financières"}</h4>
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold">{locale === "zh" ? "财务记录" : "Écritures financières"}</h4>
               <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium tabular-nums">
                 <span className="text-emerald-700">{locale === "zh" ? "收入" : "Revenus"} {formatXof(totalIncome)}</span>
                 <span className="text-red-600">{locale === "zh" ? "支出" : "Dépenses"} {formatXof(totalExpense)}</span>
                 <span className="text-slate-700">{locale === "zh" ? "净额" : "Net"} {formatXof(netFinancial)}</span>
               </div>
+              </div>
+              <Button size="sm" variant="outline" onClick={openFinanceEntry}>
+                <Plus className="h-3.5 w-3.5" />{locale === "zh" ? "新增记录" : "Ajouter"}
+              </Button>
             </div>
             {contractPayments.length === 0 ? (
               <p className="text-xs text-muted-foreground">{locale === "zh" ? "暂无财务记录" : "Aucune écriture financière"}</p>
             ) : (
               <div className="space-y-1.5">
                 {contractPayments.map((payment) => {
-                  const isExpense = payment.source_type === "lease_agency_expense";
+                  const isExpense = isLeaseFinancialExpenseSourceType(payment.source_type);
                   return (
                   <div key={payment.id} className={cn("rounded-lg border px-3 py-2.5 text-[13px]", isExpense ? "border-red-100 bg-red-50/50" : "border-emerald-100 bg-emerald-50/40")}>
                     <div className="flex items-start justify-between gap-3">
@@ -816,6 +888,78 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
           </div>
         </div>
       </PanelShell>)}
+
+      {panel === "financeEntry" && selected && (
+        <PanelShell
+          onClose={() => setPanel("detail")}
+          title={locale === "zh" ? "新增长租财务记录" : "Nouvelle écriture financière"}
+          badge={<Badge variant="secondary">{selectedUnit?.unit_no ?? "-"}</Badge>}
+        >
+          <div className="space-y-4">
+            <div className="rounded-xl border bg-muted/35 p-3 text-sm">
+              <p className="font-semibold">{selected.contract_no}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{selectedUnit?.unit_no ?? "-"} · {selectedCustomer?.name ?? "-"}</p>
+            </div>
+            <div>
+              <label className={labelClass}>{locale === "zh" ? "业务类型" : "Type d'opération"} *</label>
+              <select value={financeType} onChange={(event) => setFinanceType(event.target.value as LeaseFinancialBusinessType)} className={inputClass}>
+                {LEASE_FINANCIAL_BUSINESS_TYPES.map((type) => {
+                  const config = LEASE_FINANCIAL_BUSINESS_CONFIG[type];
+                  return <option key={type} value={type}>{locale === "zh" ? config.labelZh : config.labelFr}</option>;
+                })}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>{locale === "zh" ? "业务日期" : "Date"} *</label>
+                <DateInput value={financeDate} onChangeValue={setFinanceDate} className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>{locale === "zh" ? "金额（万 FCFA）" : "Montant (10k FCFA)"} *</label>
+                <input type="number" min={0} step="0.01" value={financeAmountWan || ""} onChange={(event) => setFinanceAmountWan(Number(event.target.value))} className={inputClass} />
+              </div>
+            </div>
+            {getLeaseFinancialConfig(financeType).requiresPaidThrough && (
+              <div>
+                <label className={labelClass}>{locale === "zh" ? "租金已缴至" : "Loyer payé au"} *</label>
+                <DateInput value={financePaidThrough} onChangeValue={setFinancePaidThrough} className={inputClass} />
+              </div>
+            )}
+            <div>
+              <label className={labelClass}>{locale === "zh" ? "收付方式" : "Mode de paiement"}</label>
+              <select value={financeMethod} onChange={(event) => setFinanceMethod(event.target.value as typeof financeMethod)} className={inputClass}>
+                <option value="other">{locale === "zh" ? "其他/待补" : "Autre / à compléter"}</option>
+                <option value="check">{locale === "zh" ? "支票" : "Chèque"}</option>
+                <option value="cash">{locale === "zh" ? "现金" : "Espèces"}</option>
+                <option value="bank_transfer">{locale === "zh" ? "银行转账" : "Virement"}</option>
+                <option value="offset">{locale === "zh" ? "抵扣/转款" : "Compensation"}</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>{locale === "zh" ? "自动业务编号" : "Référence automatique"}</label>
+              <input
+                type="text"
+                readOnly
+                value={`${buildLeaseFinancialReferencePrefix(selected.contract_no, financeType, financeDate)}-自动顺序`}
+                className={cn(inputClass, "bg-muted/50 text-xs text-muted-foreground")}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>{locale === "zh" ? "备注" : "Note"}</label>
+              <textarea rows={3} value={financeNotes} onChange={(event) => setFinanceNotes(event.target.value)} placeholder={locale === "zh" ? "可填写对应月份、原始凭证或特殊说明" : "Période, justificatif ou remarque"} className={inputClass} />
+            </div>
+            <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 text-xs leading-relaxed text-blue-800">
+              {locale === "zh"
+                ? "租金收入会同步“已缴至日期”并优先冲抵未结应收；押金收入会同步合同押金状态；支出类不会计入收入。"
+                : "Le loyer met à jour la date payée et règle d'abord les créances ouvertes. Le dépôt met à jour le statut du contrat."}
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <Button className="w-full" onClick={handleFinanceEntry} disabled={saving}>
+              {saving ? "..." : locale === "zh" ? "确认保存财务记录" : "Enregistrer"}
+            </Button>
+          </div>
+        </PanelShell>
+      )}
 
       {/* ── Move-out Panel ── */}
       {panel==="moveout"&&selected&&(<PanelShell onClose={()=>setPanel(null)} title={t.settlement.moveOut}>{/* form kept identical to original */}{/*...*/}<div className="space-y-4"><div><label className={labelClass}>{t.form.actualEndDate}</label><DateInput value={moEndDate} onChangeValue={setMoEndDate} className={inputClass}/></div><div><label className={labelClass}>{locale==="zh"?"未付租金":"Loyer impaye"}</label><input type="number" value={moUnpaid} onChange={e=>setMoUnpaid(Number(e.target.value))} className={inputClass}/></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={moUtility} onChange={e=>setMoUtility(e.target.checked)}/>{locale==="zh"?"水电已结清":"Charges reglees"}</label><div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-muted-foreground">{locale==="zh"?"押金抵扣":"Retenue depot"}</label><input type="number" value={moDeduction} onChange={e=>setMoDeduction(Number(e.target.value))} className={inputClass}/></div><div><label className="text-xs text-muted-foreground">{locale==="zh"?"押金退还":"Remb. depot"}</label><input type="number" value={moRefund} onChange={e=>setMoRefund(Number(e.target.value))} className={inputClass}/></div></div>{error&&<p className="text-sm text-red-600">{error}</p>}<Button className="w-full" onClick={handleMoveOut} disabled={saving}>{saving?"...":locale==="zh"?"确认退租":"Confirmer"}</Button></div></PanelShell>)}
