@@ -18,11 +18,13 @@ import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, Pay
 import { createSaleContract, recordSalePayment, addFlexibleInstallment, updateTransferStatus, terminateSaleContract } from "./actions";
 
 interface SaleListProps { contracts: SaleContractRow[]; schedules: SalePaymentScheduleRow[]; units: UnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale }
-type PanelType = "new" | "detail" | null;
+type PanelType = "new" | "detail" | "insight" | null;
+type SaleStatKey = "active" | "total" | "received" | "receivable" | "overdue" | "transfer";
 
 export function SaleList({ contracts, schedules, units, customers, payments, receivables, buildings, locale }: SaleListProps) {
   const t = dictionaries[locale].sales;
   const [statusFilter, setStatusFilter] = useState("all");
+  const [statFilter, setStatFilter] = useState<SaleStatKey | null>(null);
   const [panel, setPanel] = useState<PanelType>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
@@ -77,10 +79,42 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const selectedCustomer = selected?customers.find(c=>c.id===selected.customer_id):null;
 
   const dashboardStats = useMemo(()=>{
-    const active=contracts.filter(c=>c.status==="active");let received=0,receivable=0,overdue=0;const today=new Date().toISOString().slice(0,10);
-    for(const r of receivables){if(r.source_type!=="sale_contract"||r.status==="cancelled")continue;received+=Number(r.paid_amount_xof);receivable+=Number(r.amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))overdue+=os;}
+    const scopedContractIds = new Set(filteredByBuilding.map((c) => c.id));
+    const active=filteredByBuilding.filter(c=>c.status==="active");let received=0,receivable=0,overdue=0;const today=new Date().toISOString().slice(0,10);
+    for(const r of receivables){if(r.source_type!=="sale_contract"||r.status==="cancelled"||!r.source_id||!scopedContractIds.has(r.source_id))continue;received+=Number(r.paid_amount_xof);receivable+=Number(r.amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))overdue+=os;}
     return {active:active.length,total:active.reduce((s,c)=>s+Number(c.total_amount_xof),0),received,receivable,overdue,transferDone:active.filter(c=>c.transfer_status==="completed").length};
-  }, [contracts,receivables]);
+  }, [filteredByBuilding,receivables]);
+
+  const saleInsightContracts = useMemo(() => {
+    const today = new Date().toISOString().slice(0,10);
+    return filteredByBuilding
+      .map((contract) => {
+        const unit = unitMap.get(contract.unit_id);
+        const customer = customerMap.get(contract.customer_id);
+        const related = receivables.filter((r) => r.source_type === "sale_contract" && r.source_id === contract.id && r.status !== "cancelled");
+        let total = 0;
+        let paid = 0;
+        let overdue = 0;
+        let nextDue: string | null = null;
+        for (const r of related) {
+          const amount = Number(r.amount_xof);
+          const paidAmount = Number(r.paid_amount_xof);
+          const outstanding = Math.max(0, amount - paidAmount);
+          total += amount;
+          paid += paidAmount;
+          if (outstanding > 0 && (r.status === "overdue" || r.due_date < today)) overdue += outstanding;
+          if (outstanding > 0 && (!nextDue || r.due_date < nextDue)) nextDue = r.due_date;
+        }
+        return {
+          contract,
+          unit,
+          customer,
+          summary: { total, paid, outstanding: Math.max(0, total - paid), overdue, nextDue, count: related.length },
+        };
+      })
+      .filter((row) => row.unit)
+      .sort((a, b) => (a.unit?.unit_no ?? "").localeCompare(b.unit?.unit_no ?? "", undefined, { numeric: true }));
+  }, [customerMap, filteredByBuilding, receivables, unitMap]);
 
   const contractSchedules = useMemo(()=>selectedId?schedules.filter(s=>s.sale_contract_id===selectedId).sort((a,b)=>a.installment_no-b.installment_no):[], [schedules,selectedId]);
   const contractReceivables = useMemo(()=>selectedId?receivables.filter(r=>r.source_type==="sale_contract"&&r.source_id===selectedId&&r.status!=="cancelled"):[], [receivables,selectedId]);
@@ -96,6 +130,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
 
   const openNew = () => {setPanel("new");setSelectedId(null);setError("");};
   const openDetail = (id:string) => {setSelectedId(id);setPanel("detail");setError("");};
+  const openInsight = (key: SaleStatKey) => {setStatFilter(key);setPanel("insight");setSelectedId(null);setError("");};
 
   const handleCreate = async () => {if(!fUnitId||!fCustomerId||!fSignedDate||fTotalAmount<=0){setError(locale==="zh"?"请填写必填字段":"Champs obligatoires");return;}setSaving(true);setError("");setPanel(null);const r=await createSaleContract({unitId:fUnitId,customerId:fCustomerId,contractNo:fContractNo||"",signedDate:fSignedDate,totalAmountXof:fTotalAmount,paymentPlanType:fPlanType,numInstallments:fPlanType==="fixed_installment"?fNumInstallments:undefined,agencyCompany:fAgency||undefined,agentName:fAgent||undefined,agencyCommissionXof:fCommission,agencyCommissionPaid:fCommissionPaid});setSaving(false);if(!r.success){setPanel("new");setError(r.error??"Failed");}};
   const handlePay = async () => {if(!payScheduleId||payAmount<=0){setError(locale==="zh"?"请选择分期并输入金额":"Champs obligatoires");return;}const currentScheduleId=payScheduleId;setSaving(true);setError("");setPayScheduleId("");const r=await recordSalePayment({contractId:selectedId!,scheduleId:currentScheduleId,amount:payAmount,paymentDate:payDate,receiptNo:payReceiptNo||undefined});setSaving(false);if(r.success){setPayAmount(0);setPayReceiptNo("");}else {setPayScheduleId(currentScheduleId);setError(r.error??"Failed");}};
@@ -136,13 +171,13 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
   )
 }
 
-  const statBlocks = [
-    { key: "active", label: locale==="zh"?"生效出售":"Ventes actives", value: String(dashboardStats.active), dot: "bg-accentGreen-500" },
-    { key: "total", label: locale==="zh"?"合同总额":"Total contrats", value: formatXof(dashboardStats.total), dot: "bg-accentBlue-500" },
-    { key: "received", label: locale==="zh"?"已回款":"Recu", value: formatXof(dashboardStats.received), dot: "bg-accentGreen-500" },
-    { key: "receivable", label: locale==="zh"?"待回款":"A recevoir", value: formatXof(dashboardStats.receivable-dashboardStats.received), dot: "bg-accentAmber-500" },
-    { key: "overdue", label: locale==="zh"?"逾期回款":"Retard", value: formatXof(dashboardStats.overdue), dot: dashboardStats.overdue > 0 ? "bg-accentRed-500" : "bg-muted-foreground/40" },
-    { key: "transfer", label: locale==="zh"?"已过户":"Transfert", value: String(dashboardStats.transferDone), dot: "bg-accentPurple-500" },
+  const statBlocks: Array<{ key: SaleStatKey; label: string; value: string; dot: string; hint: string }> = [
+    { key: "active", label: locale==="zh"?"生效出售":"Ventes actives", value: String(dashboardStats.active), dot: "bg-accentGreen-500", hint: locale==="zh"?"打开生效出售侧栏":"Ouvrir les ventes actives" },
+    { key: "total", label: locale==="zh"?"合同总额":"Total contrats", value: formatXof(dashboardStats.total), dot: "bg-accentBlue-500", hint: locale==="zh"?"打开合同总额明细":"Ouvrir le detail des contrats" },
+    { key: "received", label: locale==="zh"?"已回款":"Recu", value: formatXof(dashboardStats.received), dot: "bg-accentGreen-500", hint: locale==="zh"?"打开已回款明细":"Ouvrir les encaissements" },
+    { key: "receivable", label: locale==="zh"?"待回款":"A recevoir", value: formatXof(dashboardStats.receivable-dashboardStats.received), dot: "bg-accentAmber-500", hint: locale==="zh"?"打开待回款侧栏":"Ouvrir les montants a recevoir" },
+    { key: "overdue", label: locale==="zh"?"逾期回款":"Retard", value: formatXof(dashboardStats.overdue), dot: dashboardStats.overdue > 0 ? "bg-accentRed-500" : "bg-muted-foreground/40", hint: locale==="zh"?"打开逾期回款侧栏":"Ouvrir les retards" },
+    { key: "transfer", label: locale==="zh"?"已过户":"Transfert", value: String(dashboardStats.transferDone), dot: "bg-accentPurple-500", hint: locale==="zh"?"打开过户明细":"Ouvrir les transferts" },
   ];
 
   return (
@@ -157,7 +192,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
             {locale === "zh" ? "出售合同" : "Contrats de vente"}
           </h1>
           <span className="text-sm text-muted-foreground tabular-nums">
-            {contracts.length} {locale==="fr"?"contrats":"份合同"}
+            {filteredByBuilding.length} {locale==="fr"?"contrats":"份合同"}
           </span>
         </div>
       </div>
@@ -165,13 +200,26 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
       {/* ── Summary stats ── */}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
         {statBlocks.map(b => (
-          <div key={b.key} className="flex min-h-[76px] flex-col rounded-xl border border-border bg-card p-3 text-card-foreground shadow-card transition-shadow duration-200">
+          <button
+            key={b.key}
+            type="button"
+            onClick={() => openInsight(b.key)}
+            aria-pressed={panel === "insight" && statFilter === b.key}
+            title={b.hint}
+            className={cn(
+              "flex min-h-[76px] flex-col rounded-xl border bg-card p-3 text-left text-card-foreground shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60",
+              panel === "insight" && statFilter === b.key ? "border-foreground/20 ring-1 ring-foreground/10" : "border-border",
+            )}
+          >
             <div className="flex min-w-0 items-center justify-between gap-3 pb-2">
               <p className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">{b.label}</p>
               <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", b.dot)} />
             </div>
             <p className="text-lg font-semibold leading-none tabular-nums text-foreground">{b.value}</p>
-          </div>
+            <span className={cn("mt-2 text-[11px] font-medium", panel === "insight" && statFilter === b.key ? "text-foreground" : "text-muted-foreground")}>
+              {panel === "insight" && statFilter === b.key ? (locale === "zh" ? "已打开" : "Ouvert") : b.hint}
+            </span>
+          </button>
         ))}
       </div>
 
@@ -255,6 +303,103 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
         ))
       )}
 
+      {/* ── KPI insight panel ── */}
+      {panel === "insight" && statFilter && (() => {
+        const titleMap: Record<SaleStatKey, string> = {
+          active: locale === "zh" ? "生效出售明细" : "Ventes actives",
+          total: locale === "zh" ? "合同总额明细" : "Total des contrats",
+          received: locale === "zh" ? "已回款明细" : "Encaissements",
+          receivable: locale === "zh" ? "待回款明细" : "Montants a recevoir",
+          overdue: locale === "zh" ? "逾期回款明细" : "Retards de paiement",
+          transfer: locale === "zh" ? "已过户明细" : "Transferts completes",
+        };
+        const activeRows = saleInsightContracts.filter((row) => row.contract.status === "active");
+        const insightRows = statFilter === "active"
+          ? activeRows
+          : statFilter === "total"
+            ? [...activeRows].sort((a, b) => Number(b.contract.total_amount_xof) - Number(a.contract.total_amount_xof))
+            : statFilter === "received"
+              ? saleInsightContracts.filter((row) => row.summary.paid > 0).sort((a, b) => b.summary.paid - a.summary.paid)
+              : statFilter === "receivable"
+                ? saleInsightContracts.filter((row) => row.summary.outstanding > 0).sort((a, b) => (a.summary.nextDue ?? "9999-12-31").localeCompare(b.summary.nextDue ?? "9999-12-31"))
+                : statFilter === "overdue"
+                  ? saleInsightContracts.filter((row) => row.summary.overdue > 0).sort((a, b) => b.summary.overdue - a.summary.overdue)
+                  : activeRows.filter((row) => row.contract.transfer_status === "completed");
+        const metricValue = statFilter === "active" || statFilter === "transfer"
+          ? String(insightRows.length)
+          : formatXof(insightRows.reduce((sum, row) => {
+              if (statFilter === "total") return sum + Number(row.contract.total_amount_xof);
+              if (statFilter === "received") return sum + row.summary.paid;
+              if (statFilter === "overdue") return sum + row.summary.overdue;
+              return sum + row.summary.outstanding;
+            }, 0));
+        const valueForRow = (row: typeof insightRows[number]) => {
+          if (statFilter === "received") return row.summary.paid;
+          if (statFilter === "overdue") return row.summary.overdue;
+          if (statFilter === "receivable") return row.summary.outstanding;
+          return Number(row.contract.total_amount_xof);
+        };
+        const badgeVariant = statFilter === "overdue" ? "destructive" : statFilter === "receivable" ? "warning" : statFilter === "transfer" ? "secondary" : "success";
+
+        return (
+          <SalePanelShell
+            onClose={() => setPanel(null)}
+            title={titleMap[statFilter]}
+            badge={<Badge variant={badgeVariant}>{insightRows.length}</Badge>}
+          >
+            <div className="space-y-4">
+              <div className={cn(
+                "rounded-xl border p-3",
+                statFilter === "overdue" ? "border-red-200 bg-red-50/50" :
+                statFilter === "receivable" ? "border-amber-200 bg-amber-50/50" :
+                "border-border bg-muted/35"
+              )}>
+                <p className="text-xs text-muted-foreground">{locale === "zh" ? "当前楼栋合计" : "Total du batiment"}</p>
+                <p className={cn(
+                  "mt-1 text-xl font-semibold tabular-nums",
+                  statFilter === "overdue" ? "text-red-700" : statFilter === "receivable" ? "text-amber-700" : "text-foreground"
+                )}>{metricValue}</p>
+              </div>
+              {insightRows.length === 0 ? (
+                <EmptyState title={locale === "zh" ? "当前没有对应合同" : "Aucun contrat correspondant"} />
+              ) : (
+                <div className="space-y-2.5">
+                  {insightRows.map((row) => (
+                    <div key={row.contract.id} className="rounded-xl border border-border bg-card p-3.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-semibold">{row.unit?.unit_no ?? "-"} · {row.customer?.name ?? (locale === "zh" ? "客户待补" : "Client a completer")}</span>
+                            <Badge variant={row.contract.transfer_status === "completed" ? "success" : "secondary"} className="h-5 px-2 text-[10px]">
+                              {transText(row.contract.transfer_status)}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 truncate text-xs text-muted-foreground">{row.contract.contract_no}</p>
+                        </div>
+                        <p className={cn(
+                          "shrink-0 text-sm font-semibold tabular-nums",
+                          statFilter === "overdue" ? "text-red-700" : statFilter === "receivable" ? "text-amber-700" : statFilter === "received" ? "text-emerald-700" : "text-foreground"
+                        )}>{formatXof(valueForRow(row))}</p>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+                        <span>{locale === "zh" ? "签约" : "Signe"} {row.contract.signed_date}</span>
+                        <span className="text-right">{locale === "zh" ? "总额" : "Total"} {formatXof(Number(row.contract.total_amount_xof))}</span>
+                        <span>{locale === "zh" ? "已回款" : "Recu"} {formatXof(row.summary.paid)}</span>
+                        <span className="text-right">{locale === "zh" ? "待回款" : "Reste"} {formatXof(row.summary.outstanding)}</span>
+                        {row.summary.nextDue && <span className="col-span-2">{locale === "zh" ? "最近应收" : "Prochaine echeance"} {row.summary.nextDue}</span>}
+                      </div>
+                      <Button size="sm" variant="outline" className="mt-3 w-full" onClick={() => openDetail(row.contract.id)}>
+                        {locale === "zh" ? "查看合同" : "Voir le contrat"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </SalePanelShell>
+        );
+      })()}
+
       {/* ── New Contract Panel ── */}
       {panel==="new"&&(<><div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={()=>setPanel(null)}/><div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]"><div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur"><h3 className="text-[15px] font-semibold">{t.form.newContract}</h3><button onClick={()=>setPanel(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"><X className="h-4 w-4"/></button></div>
         <div className="space-y-4 px-5 py-5"><div><label className={labelClass}>{t.form.contractNo}</label><input type="text" value={fContractNo} onChange={e=>setFContractNo(e.target.value)} className={inputClass}/></div><div><label className={labelClass}>{t.form.unit} *</label><select value={fUnitId} onChange={e=>setFUnitId(e.target.value)} className={inputClass}><option value="">{t.form.noUnit}</option>{sellableUnits.map(u=><option key={u.id} value={u.id}>{u.unit_no} ({u.floor_label})</option>)}</select></div><div><label className={labelClass}>{t.form.customer} *</label><select value={fCustomerId} onChange={e=>setFCustomerId(e.target.value)} className={inputClass}><option value="">{t.form.noCustomer}</option>{customers.filter(cc=>!cc.is_blacklisted).map(cc=><option key={cc.id} value={cc.id}>{cc.name}</option>)}</select></div>
@@ -287,4 +432,17 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
         </div></div></>)}
     </div>
   );
+}
+
+function SalePanelShell({ onClose, title, badge, children }: { onClose:()=>void; title:string; badge?:React.ReactNode; children:React.ReactNode }) {
+  return (<>
+    <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={onClose}/>
+    <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]">
+      <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
+        <div className="flex items-center gap-2"><h3 className="text-[15px] font-semibold">{title}</h3>{badge}</div>
+        <button onClick={onClose} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"><X className="h-4 w-4"/></button>
+      </div>
+      <div className="px-5 py-5">{children}</div>
+    </div>
+  </>);
 }
