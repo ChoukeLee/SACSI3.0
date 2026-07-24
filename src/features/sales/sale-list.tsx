@@ -78,10 +78,26 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
 
   const dashboardStats = useMemo(()=>{
     const buildingContractIds=new Set(filteredByBuilding.map(c=>c.id));
-    const active=filteredByBuilding.filter(c=>c.status==="active");let received=0,receivable=0,overdue=0;const today=new Date().toISOString().slice(0,10);
-    for(const r of receivables){if(r.source_type!=="sale_contract"||r.status==="cancelled"||!r.source_id||!buildingContractIds.has(r.source_id))continue;received+=Number(r.paid_amount_xof);receivable+=Number(r.amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))overdue+=os;}
-    return {active:active.length,total:active.reduce((s,c)=>s+Number(c.total_amount_xof),0),received,receivable,overdue,transferDone:active.filter(c=>c.transfer_status==="completed").length};
-  }, [filteredByBuilding,receivables]);
+    const active=filteredByBuilding.filter(c=>c.status==="active");
+    const activeIds=new Set(active.map(c=>c.id));
+    const paidByContract=new Map<string,number>();
+    const receivablePaidByContract=new Map<string,number>();
+    let overdue=0;
+    const today=new Date().toISOString().slice(0,10);
+    for(const p of payments){
+      if(!p.source_id||!activeIds.has(p.source_id)||!["sale","sale_contract"].includes(p.source_type))continue;
+      paidByContract.set(p.source_id,(paidByContract.get(p.source_id)??0)+Number(p.amount));
+    }
+    for(const r of receivables){
+      if(r.source_type!=="sale_contract"||r.status==="cancelled"||!r.source_id||!buildingContractIds.has(r.source_id))continue;
+      receivablePaidByContract.set(r.source_id,(receivablePaidByContract.get(r.source_id)??0)+Number(r.paid_amount_xof));
+      const os=Number(r.amount_xof)-Number(r.paid_amount_xof);
+      if(os>0&&(r.status==="overdue"||r.due_date<today))overdue+=os;
+    }
+    const total=active.reduce((s,c)=>s+Number(c.total_amount_xof),0);
+    const received=active.reduce((sum,c)=>sum+Math.max(paidByContract.get(c.id)??0,receivablePaidByContract.get(c.id)??0),0);
+    return {active:active.length,total,received,outstanding:Math.max(0,total-received),overdue,transferDone:active.filter(c=>c.transfer_status==="completed").length};
+  }, [filteredByBuilding,payments,receivables]);
 
   const contractSchedules = useMemo(()=>selectedId?schedules.filter(s=>s.sale_contract_id===selectedId).sort((a,b)=>a.installment_no-b.installment_no):[], [schedules,selectedId]);
   const contractReceivables = useMemo(()=>selectedId?receivables.filter(r=>r.source_type==="sale_contract"&&r.source_id===selectedId&&r.status!=="cancelled"):[], [receivables,selectedId]);
@@ -89,12 +105,25 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const totalPaidRec = useMemo(()=>contractReceivables.reduce((s,r)=>s+Number(r.paid_amount_xof),0),[contractReceivables]);
   const totalRec = useMemo(()=>contractReceivables.reduce((s,r)=>s+Number(r.amount_xof),0),[contractReceivables]);
   const totalOverdueRec = useMemo(()=>{let o=0;const today=new Date().toISOString().slice(0,10);for(const r of contractReceivables){const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))o+=os;}return o;},[contractReceivables]);
-  const totalPaidPayments = contractPayments.reduce((s,p)=>s+Number(p.amount),0);
-  const saleFinancialIncome = Math.max(totalPaidRec, totalPaidPayments);
-  const saleFinancialExpense = selected?.agency_commission_paid ? Number(selected.agency_commission_amount_xof ?? 0) : 0;
+  const totalPaidPayments = contractPayments
+    .filter(p=>["sale","sale_contract"].includes(p.source_type))
+    .reduce((s,p)=>s+Number(p.amount),0);
+  const explicitFinancialExpense = contractPayments
+    .filter(p=>p.source_type==="sale_agency_expense")
+    .reduce((s,p)=>s+Number(p.amount),0);
+  const legacyFinancialExpense = explicitFinancialExpense>0
+    ? 0
+    : selected?.agency_commission_paid
+      ? Number(selected.agency_commission_amount_xof ?? 0)
+      : 0;
+  const saleFinancialIncome = contractPayments
+    .filter(p=>p.source_type!=="sale_agency_expense")
+    .reduce((s,p)=>s+Number(p.amount),0);
+  const saleFinancialExpense = explicitFinancialExpense+legacyFinancialExpense;
   const saleFinancialNet = saleFinancialIncome - saleFinancialExpense;
+  const saleContractReceived = Math.max(totalPaidRec, totalPaidPayments);
   const selectedContractTotal = Number(selected?.total_amount_xof ?? 0);
-  const selectedOutstanding = Math.max(0, (totalRec > 0 ? totalRec : selectedContractTotal) - totalPaidRec);
+  const selectedOutstanding = Math.max(0, (totalRec > 0 ? totalRec : selectedContractTotal) - saleContractReceived);
 
   const getContractSummary = (cid: string) => {const rr=receivables.filter(r=>r.source_type==="sale_contract"&&r.source_id===cid&&r.status!=="cancelled");let t=0,p=0,o=0;const today=new Date().toISOString().slice(0,10);for(const r of rr){t+=Number(r.amount_xof);p+=Number(r.paid_amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))o+=os;}return {total:t,paid:p,outstanding:t-p,overdue:o};};
 
@@ -114,6 +143,9 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const schedLabel = (s: string) => { const l: Record<string,string>=locale==="zh"?{pending:"待付",paid:"已付",overdue:"逾期",cancelled:"取消"}:{pending:"Attente",paid:"Paye",overdue:"Retard",cancelled:"Annule"}; return l[s]??s; };
   const transText = (s:string)=>locale==="zh"?{not_started:"未开始",in_progress:"办理中",completed:"已完成"}[s]??s:{not_started:"Non debute",in_progress:"En cours",completed:"Termine"}[s]??s;
   const salePaymentKindLabel = (payment: PaymentRow) => {
+    if (payment.source_type === "sale_registration_fee") return locale === "zh" ? "注册金收入" : "Frais d'inscription";
+    if (payment.source_type === "sale_agency_income") return locale === "zh" ? "中介费收入" : "Commission reçue";
+    if (payment.source_type === "sale_agency_expense") return locale === "zh" ? "中介费支出" : "Commission versée";
     const text = `${payment.notes ?? ""} ${payment.receipt_no ?? ""}`;
     if (text.includes("车位")) return locale === "zh" ? "车位款收入" : "Paiement parking";
     if (text.includes("注册金")) return locale === "zh" ? "注册金收入" : "Frais d'inscription";
@@ -153,7 +185,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
     { key: "active", label: locale==="zh"?"生效出售":"Ventes actives", value: String(dashboardStats.active), dot: "bg-accentGreen-500" },
     { key: "total", label: locale==="zh"?"合同总额":"Total contrats", value: formatXof(dashboardStats.total), dot: "bg-accentBlue-500" },
     { key: "received", label: locale==="zh"?"已回款":"Recu", value: formatXof(dashboardStats.received), dot: "bg-accentGreen-500" },
-    { key: "receivable", label: locale==="zh"?"待回款":"A recevoir", value: formatXof(dashboardStats.receivable-dashboardStats.received), dot: "bg-accentAmber-500" },
+    { key: "receivable", label: locale==="zh"?"待回款":"A recevoir", value: formatXof(dashboardStats.outstanding), dot: "bg-accentAmber-500" },
     { key: "overdue", label: locale==="zh"?"逾期回款":"Retard", value: formatXof(dashboardStats.overdue), dot: dashboardStats.overdue > 0 ? "bg-accentRed-500" : "bg-muted-foreground/40" },
     { key: "transfer", label: locale==="zh"?"已过户":"Transfert", value: String(dashboardStats.transferDone), dot: "bg-accentPurple-500" },
   ];
@@ -292,7 +324,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
               </div>
               <div className="rounded-md border border-emerald-200 bg-emerald-50/50 px-3 py-2">
                 <p className="text-muted-foreground">{locale==="zh"?"累计已收":"Total reçu"}</p>
-                <p className="font-semibold tabular-nums text-emerald-700">{formatXof(saleFinancialIncome)}</p>
+                <p className="font-semibold tabular-nums text-emerald-700">{formatXof(saleContractReceived)}</p>
               </div>
               <div className={cn("rounded-md border px-3 py-2",selectedOutstanding>0?"border-amber-200 bg-amber-50/50":"border-emerald-200 bg-emerald-50/50")}>
                 <p className="text-muted-foreground">{locale==="zh"?"待回款":"Reste à recevoir"}</p>
@@ -320,28 +352,28 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
               <p className="text-xs text-muted-foreground">{locale==="zh"?"暂无逐笔财务记录":"Aucune écriture détaillée"}</p>
             ):(
               <div className="space-y-1.5">
-                {contractPayments.map(payment=>(
-                  <div key={payment.id} className="rounded-lg border border-emerald-100 bg-emerald-50/40 px-3 py-2.5 text-[13px]">
+                {contractPayments.map(payment=>{const isExpense=payment.source_type==="sale_agency_expense";return(
+                  <div key={payment.id} className={cn("rounded-lg border px-3 py-2.5 text-[13px]",isExpense?"border-red-100 bg-red-50/50":"border-emerald-100 bg-emerald-50/40")}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-emerald-800">{salePaymentKindLabel(payment)}</span>
+                          <span className={cn("font-semibold",isExpense?"text-red-700":"text-emerald-800")}>{salePaymentKindLabel(payment)}</span>
                           <span className="text-xs tabular-nums text-muted-foreground">{payment.payment_date}</span>
                         </div>
                         <p className="mt-1 truncate text-[11px] text-muted-foreground" title={payment.receipt_no??payment.notes??""}>{payment.receipt_no||payment.notes||(locale==="zh"?"无业务编号":"Sans référence")}</p>
                       </div>
-                      <span className="shrink-0 font-semibold tabular-nums text-emerald-700">{formatXof(Number(payment.amount))}</span>
+                      <span className={cn("shrink-0 font-semibold tabular-nums",isExpense?"text-red-600":"text-emerald-700")}>{isExpense?"- ":""}{formatXof(Number(payment.amount))}</span>
                     </div>
                   </div>
-                ))}
-                {saleFinancialExpense>0&&(
+                )})}
+                {legacyFinancialExpense>0&&(
                   <div className="rounded-lg border border-red-100 bg-red-50/50 px-3 py-2.5 text-[13px]">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <span className="font-semibold text-red-700">{locale==="zh"?"出售中介费支出":"Commission de vente"}</span>
                         <p className="mt-1 text-[11px] text-muted-foreground">{selected.agency_company||selected.agent_name||(locale==="zh"?"合同登记":"Contrat")}</p>
                       </div>
-                      <span className="shrink-0 font-semibold tabular-nums text-red-600">- {formatXof(saleFinancialExpense)}</span>
+                      <span className="shrink-0 font-semibold tabular-nums text-red-600">- {formatXof(legacyFinancialExpense)}</span>
                     </div>
                   </div>
                 )}
