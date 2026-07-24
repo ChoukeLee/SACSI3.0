@@ -9,6 +9,13 @@ import type { ContractStatus } from "@/types/domain";
 import {
   createReceivable, cancelReceivablesForSource,
 } from "@/features/finance/receivables";
+import {
+  buildLeaseContractNumber,
+  buildLeaseFinancialReferencePrefix,
+  getLeaseFinancialConfig,
+  LEASE_FINANCIAL_BUSINESS_TYPES,
+  type LeaseFinancialBusinessType,
+} from "./lease-financial-entry-types";
 
 // ── Permission guards ──
 async function guardLeaseWrite() {
@@ -164,9 +171,25 @@ export async function createLeaseContract(input: {
   await guardLeaseWrite();
   const supabase = await createClient();
 
-  if (!input.contractNo.trim()) {
-    return { success: false, error: "Contract number is required." };
-  }
+  const { data: contractUnit } = await supabase
+    .from("units")
+    .select("unit_no, building:buildings(code)")
+    .eq("id", input.unitId)
+    .single();
+  const contractBuilding = Array.isArray(contractUnit?.building) ? contractUnit.building[0] : contractUnit?.building;
+  const generatedContractNo = buildLeaseContractNumber(
+    contractBuilding?.code ?? "SACSI",
+    contractUnit?.unit_no ?? "UNIT",
+    input.startDate,
+  );
+  const requestedContractNo = input.contractNo.trim() || generatedContractNo;
+  const { data: samePrefix } = await supabase
+    .from("lease_contracts")
+    .select("contract_no")
+    .like("contract_no", `${requestedContractNo}%`);
+  const contractNo = samePrefix && samePrefix.some((row) => row.contract_no === requestedContractNo)
+    ? `${requestedContractNo}-${String(samePrefix.length + 1).padStart(2, "0")}`
+    : requestedContractNo;
 
   // Check blacklist
   const { data: customer } = await supabase
@@ -199,7 +222,7 @@ export async function createLeaseContract(input: {
     .insert({
       unit_id: input.unitId,
       customer_id: input.customerId,
-      contract_no: input.contractNo.trim(),
+      contract_no: contractNo,
       start_date: input.startDate,
       expected_end_date: input.expectedEndDate,
       payment_cycle: input.paymentCycle,
@@ -267,7 +290,7 @@ export async function createLeaseContract(input: {
       source_type: "lease_contract",
       source_id: data.id,
       category: "lease_deposit",
-      title: `押金 ${input.contractNo.trim()}`,
+      title: `押金 ${contractNo}`,
       due_date: input.startDate,
       amount_xof: input.depositAmountXof,
       paid_amount_xof: input.depositAmountXof,
@@ -280,13 +303,152 @@ export async function createLeaseContract(input: {
     action: "create",
     entity_type: "lease_contract",
     entity_id: data.id,
-    metadata: { contract_no: input.contractNo, unit_id: input.unitId },
+    metadata: { contract_no: contractNo, unit_id: input.unitId, generated_contract_no: !input.contractNo.trim() },
   });
 
   revalidatePath("/leases");
   revalidatePath("/fr/leases");
 
   return { success: true, data };
+}
+
+export async function recordLeaseFinancialEntry(input: {
+  contractId: string;
+  businessType: LeaseFinancialBusinessType;
+  paymentDate: string;
+  amountXof: number;
+  paidThroughDate?: string;
+  paymentMethod?: "cash" | "check" | "bank_transfer" | "offset" | "other";
+  notes?: string;
+}): Promise<{ success: boolean; referenceNo?: string; error?: string }> {
+  await guardLeaseFinance();
+  if (!LEASE_FINANCIAL_BUSINESS_TYPES.includes(input.businessType)) {
+    return { success: false, error: "不支持的业务类型。" };
+  }
+  if (!input.paymentDate || !Number.isFinite(input.amountXof) || input.amountXof <= 0) {
+    return { success: false, error: "请填写有效的日期和金额。" };
+  }
+
+  const config = getLeaseFinancialConfig(input.businessType);
+  if (config.requiresPaidThrough && !input.paidThroughDate) {
+    return { success: false, error: "租金收入必须填写已缴至日期。" };
+  }
+
+  const supabase = await createClient();
+  const { data: contract, error: contractError } = await supabase
+    .from("lease_contracts")
+    .select("id, unit_id, customer_id, contract_no, paid_through_date, deposit_amount_xof, unit:units(unit_no, building_id)")
+    .eq("id", input.contractId)
+    .single();
+  if (contractError || !contract) return { success: false, error: "未找到对应长租合同。" };
+
+  const unit = Array.isArray(contract.unit) ? contract.unit[0] : contract.unit;
+  const referencePrefix = buildLeaseFinancialReferencePrefix(contract.contract_no, input.businessType, input.paymentDate);
+  const { data: referenceRows } = await supabase
+    .from("payments")
+    .select("receipt_no")
+    .like("receipt_no", `${referencePrefix}-%`);
+  const referenceNo = `${referencePrefix}-${String((referenceRows?.length ?? 0) + 1).padStart(2, "0")}`;
+  const methodLabels = {
+    cash: "现金",
+    check: "支票",
+    bank_transfer: "银行转账",
+    offset: "抵扣/转款",
+    other: "其他/待补",
+  };
+  const noteParts = [
+    `业务类型：${config.labelZh}`,
+    `方式：${methodLabels[input.paymentMethod ?? "other"]}`,
+    input.paidThroughDate ? `已缴至：${input.paidThroughDate}` : "",
+    input.notes?.trim() ?? "",
+  ].filter(Boolean);
+
+  const { data: payment, error: paymentError } = await supabase
+    .from("payments")
+    .insert({
+      customer_id: contract.customer_id,
+      unit_id: contract.unit_id,
+      source_type: config.sourceType,
+      source_id: contract.id,
+      payment_date: input.paymentDate,
+      amount: input.amountXof,
+      currency: "XOF",
+      exchange_rate_to_xof: 1,
+      receipt_no: referenceNo,
+      notes: noteParts.join("；"),
+    })
+    .select("id")
+    .single();
+  if (paymentError || !payment) return { success: false, error: paymentError?.message ?? "财务记录保存失败。" };
+
+  const { error: ledgerError } = await supabase.from("ledger_entries").insert({
+    building_id: unit?.building_id ?? null,
+    unit_id: contract.unit_id,
+    payment_id: payment.id,
+    entry_date: input.paymentDate,
+    direction: config.ledgerDirection,
+    category: config.ledgerCategory,
+    amount_xof: input.amountXof,
+    description: `${config.labelZh} 房间${unit?.unit_no ?? "未设置"} 合同${contract.contract_no}`,
+  });
+  if (ledgerError) {
+    await supabase.from("payments").delete().eq("id", payment.id);
+    return { success: false, error: ledgerError.message };
+  }
+
+  if (input.businessType === "rent_income") {
+    const { data: openRent } = await supabase
+      .from("receivables")
+      .select("id, amount_xof, paid_amount_xof, due_date")
+      .eq("source_type", "lease_contract")
+      .eq("source_id", contract.id)
+      .eq("category", "lease_rent")
+      .in("status", ["pending", "partial", "overdue"])
+      .order("due_date");
+    let remaining = input.amountXof;
+    for (const row of openRent ?? []) {
+      if (remaining <= 0) break;
+      const outstanding = Math.max(0, Number(row.amount_xof) - Number(row.paid_amount_xof));
+      const applied = Math.min(outstanding, remaining);
+      if (applied <= 0) continue;
+      const paidAmount = Number(row.paid_amount_xof) + applied;
+      await supabase.from("receivables").update({
+        paid_amount_xof: paidAmount,
+        status: computeStatus(Number(row.amount_xof), paidAmount, row.due_date),
+      }).eq("id", row.id);
+      remaining -= applied;
+    }
+    if (!contract.paid_through_date || (input.paidThroughDate && input.paidThroughDate > contract.paid_through_date)) {
+      await supabase.from("lease_contracts").update({ paid_through_date: input.paidThroughDate }).eq("id", contract.id);
+    }
+  }
+
+  if (input.businessType === "deposit_income") {
+    const depositUpdate: { deposit_received: boolean; deposit_amount_xof?: number } = { deposit_received: true };
+    if (Number(contract.deposit_amount_xof) <= 0) depositUpdate.deposit_amount_xof = input.amountXof;
+    await supabase.from("lease_contracts").update(depositUpdate).eq("id", contract.id);
+  }
+
+  await supabase.from("audit_logs").insert({
+    action: "create",
+    entity_type: "lease_financial_entry",
+    entity_id: payment.id,
+    metadata: {
+      contract_id: contract.id,
+      contract_no: contract.contract_no,
+      business_type: input.businessType,
+      source_type: config.sourceType,
+      amount_xof: input.amountXof,
+      reference_no: referenceNo,
+    },
+  });
+
+  revalidatePath("/leases");
+  revalidatePath("/fr/leases");
+  revalidatePath("/finance");
+  revalidatePath("/fr/finance");
+  revalidatePath("/units");
+  return { success: true, referenceNo };
 }
 
 // ── Activate contract ──
