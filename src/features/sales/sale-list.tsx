@@ -87,7 +87,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
     let overdue=0;
     const today=new Date().toISOString().slice(0,10);
     for(const p of payments){
-      if(!p.source_id||!activeIds.has(p.source_id)||!["sale","sale_contract"].includes(p.source_type))continue;
+      if(!p.source_id||!activeIds.has(p.source_id)||!["sale","sale_contract","property_fee"].includes(p.source_type))continue;
       paidByContract.set(p.source_id,(paidByContract.get(p.source_id)??0)+Number(p.amount));
     }
     for(const r of receivables){
@@ -139,7 +139,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const totalRec = useMemo(()=>contractReceivables.reduce((s,r)=>s+Number(r.amount_xof),0),[contractReceivables]);
   const totalOverdueRec = useMemo(()=>{let o=0;const today=new Date().toISOString().slice(0,10);for(const r of contractReceivables){const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))o+=os;}return o;},[contractReceivables]);
   const totalPaidPayments = contractPayments
-    .filter(p=>["sale","sale_contract"].includes(p.source_type))
+    .filter(p=>["sale","sale_contract","property_fee"].includes(p.source_type))
     .reduce((s,p)=>s+Number(p.amount),0);
   const explicitFinancialExpense = contractPayments
     .filter(p=>p.source_type==="sale_agency_expense")
@@ -180,6 +180,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
     if (payment.source_type === "sale_registration_fee") return locale === "zh" ? "注册金收入" : "Frais d'inscription";
     if (payment.source_type === "sale_agency_income") return locale === "zh" ? "中介费收入" : "Commission reçue";
     if (payment.source_type === "sale_agency_expense") return locale === "zh" ? "中介费支出" : "Commission versée";
+    if (payment.source_type === "property_fee") return locale === "zh" ? "物业费收入" : "Frais de copropriété";
     const text = `${payment.notes ?? ""} ${payment.receipt_no ?? ""}`;
     if (text.includes("车位")) return locale === "zh" ? "车位款收入" : "Paiement parking";
     if (text.includes("注册金")) return locale === "zh" ? "注册金收入" : "Frais d'inscription";
