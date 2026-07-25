@@ -179,7 +179,11 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const salePaymentKindLabel = (payment: PaymentRow) => {
     if (payment.source_type === "sale_registration_fee") return locale === "zh" ? "注册金收入" : "Frais d'inscription";
     if (payment.source_type === "sale_agency_income") return locale === "zh" ? "中介费收入" : "Commission reçue";
-    if (payment.source_type === "sale_agency_expense") return locale === "zh" ? "中介费支出" : "Commission versée";
+    if (payment.source_type === "sale_agency_expense") {
+      const txt = `${payment.notes ?? ""} ${payment.receipt_no ?? ""}`;
+      if (txt.includes("退款") || txt.includes("REFUND")) return locale === "zh" ? "合同退款" : "Remboursement";
+      return locale === "zh" ? "中介费支出" : "Commission versée";
+    }
     if (payment.source_type === "property_fee") return locale === "zh" ? "物业费收入" : "Frais de copropriété";
     const text = `${payment.notes ?? ""} ${payment.receipt_no ?? ""}`;
     if (text.includes("车位")) return locale === "zh" ? "车位款收入" : "Paiement parking";
