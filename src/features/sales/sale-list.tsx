@@ -200,9 +200,16 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
     const receiptNo = payment.receipt_no?.toUpperCase() ?? "";
     if (payment.source_type === "sale_other_income") {
       if (text.includes("过户税")) return locale === "zh" ? "过户税代收" : "Taxe de transfert reçue";
+      if (text.includes("运费") || receiptNo.includes("DELIVERY")) return locale === "zh" ? "运费收入" : "Livraison reçue";
+      if (text.includes("安装费") || receiptNo.includes("INSTALLATION")) return locale === "zh" ? "安装费收入" : "Installation reçue";
+      if (text.includes("衣柜") || receiptNo.includes("FURNITURE")) return locale === "zh" ? "衣柜款收入" : "Mobilier reçu";
+      if (text.includes("临时收款") || receiptNo.includes("DEPOSIT")) return locale === "zh" ? "临时收款" : "Dépôt reçu";
       return locale === "zh" ? "其他收入" : "Autre revenu";
     }
-    if (payment.source_type === "sale_other_expense") return locale === "zh" ? "其他支出" : "Autre dépense";
+    if (payment.source_type === "sale_other_expense") {
+      if (text.includes("退款") || receiptNo.includes("REFUND") || receiptNo.includes("DEPREF")) return locale === "zh" ? "合同退款" : "Remboursement";
+      return locale === "zh" ? "其他支出" : "Autre dépense";
+    }
     if (payment.source_type === "sale_registration_fee") return locale === "zh" ? "注册金收入" : "Frais d'inscription";
     if (payment.source_type === "sale_agency_income") return locale === "zh" ? "中介费收入" : "Commission reçue";
     if (payment.source_type === "sale_agency_expense") {
