@@ -26,20 +26,23 @@ if (sale.signed_date !== "2022-09-20") throw new Error(`Unexpected 103 sale date
 await checked(
   supabase.from("sale_contracts").update({
     contract_no: "WB-SALE-SACSI4-103-20220920",
-    total_amount_xof: 65_000_000,
-    payment_plan_type: "\u5408\u540c\u603b\u4ef76500\u4e07\u5df2\u5305\u542b\u8f66\u4f4d\uff1b\u623f\u6b3e6000\u4e07+\u8f66\u4f4d\u6b3e500\u4e07\uff1b\u5df2\u7ed3\u6e05\u3002",
+    total_amount_xof: 70_000_000,
+    payment_plan_type: "\u623f\u6b3e6500\u4e07+\u8f66\u4f4d\u6b3e500\u4e07\uff1b\u5408\u540c\u603b\u4ef77000\u4e07\uff1b\u4e09\u7b14\u6536\u6b3e\u5df2\u7ed3\u6e05\u3002",
   }).eq("id", sale.id),
   "update 103 sale",
 );
 
-const consolidated = await checked(supabase.from("payments").select("id").eq("source_id", sale.id).eq("receipt_no", "S4-SALE-103-CONSOLIDATED").single(), "load 103 consolidated payment");
+const consolidated = await checked(
+  supabase.from("payments").select("id").eq("source_id", sale.id).in("receipt_no", ["S4-SALE-103-CONSOLIDATED", "WB4-SALE-103-20220920-HOUSE-01"]).single(),
+  "load 103 house payment",
+);
 await checked(
   supabase.from("payments").update({
     source_type: "sale_contract",
     payment_date: "2022-09-20",
-    amount: 60_000_000,
+    amount: 65_000_000,
     receipt_no: "WB4-SALE-103-20220920-HOUSE-01",
-    notes: "103\u623f\u6b3e6000\u4e07\uff1b\u539f6500\u4e07\u6c47\u603b\u6536\u6b3e\u62c6\u5206\uff1b\u5408\u540c\u603b\u4ef76500\u4e07\u5df2\u5305\u542b\u8f66\u4f4d\u3002",
+    notes: "103\u623f\u6b3e6500\u4e07\uff1b\u8f66\u4f4d\u6b3e500\u4e07\u53e6\u5217\uff1b\u5408\u540c\u603b\u4ef77000\u4e07\u3002",
   }).eq("id", consolidated.id),
   "split 103 house payment",
 );
@@ -48,9 +51,9 @@ await checked(
     unit_id: unit.id,
     direction: "income",
     category: "sale",
-    amount_xof: 60_000_000,
+    amount_xof: 65_000_000,
     amount_cny: null,
-    description: "103\u623f\u6b3e6000\u4e07\uff1b\u5408\u540c\u603b\u4ef7\u5df2\u5305\u542b\u8f66\u4f4d\u3002",
+    description: "103\u623f\u6b3e6500\u4e07\uff1b\u8f66\u4f4d\u6b3e500\u4e07\u53e6\u5217\u3002",
   }).eq("payment_id", consolidated.id),
   "update 103 house ledger",
 );
@@ -66,7 +69,7 @@ const parkingPayload = {
   currency: "XOF",
   exchange_rate_to_xof: 1,
   receipt_no: parkingReceipt,
-  notes: "103\u8f66\u4f4d\u6b3e500\u4e07\uff1b\u5df2\u5305\u542b\u57286500\u4e07\u5408\u540c\u603b\u4ef7\u5185\uff1b\u5df2\u7ed3\u6e05\u3002",
+  notes: "103\u8f66\u4f4d\u6b3e500\u4e07\uff1b\u57286500\u4e07\u623f\u6b3e\u4e4b\u5916\u5355\u5217\uff1b\u5df2\u7ed3\u6e05\u3002",
 };
 const parkingRows = await checked(supabase.from("payments").select("id").eq("source_id", sale.id).eq("receipt_no", parkingReceipt), "find 103 parking payment");
 if (parkingRows.length > 1) throw new Error(`Duplicate 103 parking payments: ${parkingRows.length}`);
@@ -87,7 +90,7 @@ const parkingLedgerPayload = {
   category: "sale",
   amount_xof: 5_000_000,
   amount_cny: null,
-  description: "103\u8f66\u4f4d\u6b3e500\u4e07\uff1b\u5df2\u5305\u542b\u5728\u5408\u540c\u603b\u4ef7\u5185\u3002",
+  description: "103\u8f66\u4f4d\u6b3e500\u4e07\uff1b\u623f\u6b3e\u4e4b\u5916\u5355\u5217\u3002",
 };
 const parkingLedgers = await checked(supabase.from("ledger_entries").select("id").eq("payment_id", parkingId), "find 103 parking ledger");
 if (parkingLedgers.length > 1) throw new Error(`Duplicate 103 parking ledgers: ${parkingLedgers.length}`);
@@ -98,15 +101,15 @@ const receivables = await checked(supabase.from("receivables").select("id").eq("
 if (receivables.length !== 1) throw new Error(`Expected one 103 receivable, got ${receivables.length}`);
 await checked(
   supabase.from("receivables").update({
-    amount_xof: 65_000_000,
-    paid_amount_xof: 65_000_000,
+    amount_xof: 70_000_000,
+    paid_amount_xof: 70_000_000,
     status: "paid",
-    notes: "\u6765\u6e90\uff1a4\u53f7\u516c\u5bd3.xlsx Sheet1\uff1b\u5408\u540c\u603b\u4ef76500\u4e07\u5df2\u5305\u542b\u8f66\u4f4d\uff1b\u623f\u6b3e6000\u4e07+\u8f66\u4f4d\u6b3e500\u4e07\uff1b\u5df2\u7ed3\u6e05\u3002",
+    notes: "\u6765\u6e90\uff1a4\u53f7\u516c\u5bd3.xlsx Sheet1\uff1b\u623f\u6b3e6500\u4e07+\u8f66\u4f4d\u6b3e500\u4e07\uff1b\u5408\u540c\u603b\u4ef77000\u4e07\uff1b\u5df2\u7ed3\u6e05\u3002",
   }).eq("id", receivables[0].id),
   "update 103 receivable",
 );
 await checked(
-  supabase.from("units").update({ notes: "\u6765\u6e90\uff1a4\u53f7\u516c\u5bd3.xlsx\uff1b\u4e1a\u4e3b\u5218\u4e03\u82b9\uff1b\u5408\u540c\u603b\u4ef76500\u4e07\u5df2\u5305\u542b\u8f66\u4f4d\uff1b\u623f\u6b3e6000\u4e07+\u8f66\u4f4d\u6b3e500\u4e07\uff1b\u5df2\u7ed3\u6e05\u3002" }).eq("id", unit.id),
+  supabase.from("units").update({ notes: "\u6765\u6e90\uff1a4\u53f7\u516c\u5bd3.xlsx\uff1b\u4e1a\u4e3b\u5218\u4e03\u82b9\uff1b\u623f\u6b3e6500\u4e07+\u8f66\u4f4d\u6b3e500\u4e07\uff1b\u5408\u540c\u603b\u4ef77000\u4e07\uff1b\u5df2\u7ed3\u6e05\u3002" }).eq("id", unit.id),
   "update unit 103 note",
 );
 await checked(
@@ -114,9 +117,9 @@ await checked(
     action: "reconcile_floor_lease_sale_data",
     entity_type: "building",
     entity_id: building.id,
-    metadata: { building_code: "SACSI4", unit: "103", total_xof: 65_000_000, house_xof: 60_000_000, parking_xof: 5_000_000, settled: true },
+    metadata: { building_code: "SACSI4", unit: "103", total_xof: 70_000_000, house_xof: 65_000_000, parking_xof: 5_000_000, settled: true, correction: "parking_excluded_from_original_total" },
   }),
   "write audit log",
 );
 
-console.log(JSON.stringify({ ok: true, unit: "103", total: 65_000_000, house: 60_000_000, parking: 5_000_000, settled: true }));
+console.log(JSON.stringify({ ok: true, unit: "103", total: 70_000_000, house: 65_000_000, parking: 5_000_000, settled: true }));
