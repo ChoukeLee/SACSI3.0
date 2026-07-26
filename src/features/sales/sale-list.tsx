@@ -22,6 +22,13 @@ interface SaleListProps { contracts: SaleContractRow[]; schedules: SalePaymentSc
 type PanelType = "new" | "detail" | "insight" | null;
 type SaleStatKey = "active" | "total" | "received" | "receivable" | "overdue" | "transfer";
 
+const paymentAmountXof = (payment: PaymentRow) => payment.currency === "XOF"
+  ? Number(payment.amount)
+  : Math.round(Number(payment.amount) * Number(payment.exchange_rate_to_xof));
+
+const formatCny = (amount: number) =>
+  `¥${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(amount)}`;
+
 export function SaleList({ contracts, schedules, units, customers, payments, receivables, buildings, locale }: SaleListProps) {
   const t = dictionaries[locale].sales;
   const [statFilter, setStatFilter] = useState<SaleStatKey | null>(null);
@@ -86,7 +93,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
     const today=new Date().toISOString().slice(0,10);
     for(const p of payments){
       if(!p.source_id||!activeIds.has(p.source_id)||!["sale","sale_contract","property_fee"].includes(p.source_type))continue;
-      paidByContract.set(p.source_id,(paidByContract.get(p.source_id)??0)+Number(p.amount));
+      paidByContract.set(p.source_id,(paidByContract.get(p.source_id)??0)+paymentAmountXof(p));
     }
     for(const r of receivables){
       if(r.source_type!=="sale_contract"||r.status==="cancelled"||!r.source_id||!buildingContractIds.has(r.source_id))continue;
@@ -95,7 +102,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
       if(os>0&&(r.status==="overdue"||r.due_date<today))overdue+=os;
     }
     const total=active.reduce((s,c)=>s+Number(c.total_amount_xof),0);
-    const received=active.reduce((sum,c)=>sum+Math.max(paidByContract.get(c.id)??0,receivablePaidByContract.get(c.id)??0),0);
+    const received=active.reduce((sum,c)=>sum+Math.min(Number(c.total_amount_xof),Math.max(paidByContract.get(c.id)??0,receivablePaidByContract.get(c.id)??0)),0);
     return {active:active.length,total,received,outstanding:Math.max(0,total-received),overdue,transferDone:active.filter(c=>c.transfer_status==="completed").length};
   }, [filteredByBuilding,payments,receivables]);
 
@@ -138,15 +145,15 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const totalOverdueRec = useMemo(()=>{let o=0;const today=new Date().toISOString().slice(0,10);for(const r of contractReceivables){const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))o+=os;}return o;},[contractReceivables]);
   const totalPaidPayments = contractPayments
     .filter(p=>["sale","sale_contract","property_fee"].includes(p.source_type))
-    .reduce((s,p)=>s+Number(p.amount),0);
+    .reduce((s,p)=>s+paymentAmountXof(p),0);
   const isSaleExpensePayment = (payment: PaymentRow) =>
     ["sale_agency_expense", "sale_other_expense"].includes(payment.source_type);
   const refundedSalePayments = contractPayments
     .filter(p=>p.source_type==="sale_agency_expense"&&`${p.notes??""} ${p.receipt_no??""}`.match(/退款|REFUND/))
-    .reduce((s,p)=>s+Number(p.amount),0);
+    .reduce((s,p)=>s+paymentAmountXof(p),0);
   const explicitFinancialExpense = contractPayments
     .filter(isSaleExpensePayment)
-    .reduce((s,p)=>s+Number(p.amount),0);
+    .reduce((s,p)=>s+paymentAmountXof(p),0);
   const legacyFinancialExpense = explicitFinancialExpense>0
     ? 0
     : selected?.agency_commission_paid
@@ -154,12 +161,16 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
       : 0;
   const saleFinancialIncome = contractPayments
     .filter(p=>!isSaleExpensePayment(p))
-    .reduce((s,p)=>s+Number(p.amount),0);
+    .reduce((s,p)=>s+paymentAmountXof(p),0);
   const saleFinancialExpense = explicitFinancialExpense+legacyFinancialExpense;
   const saleFinancialNet = saleFinancialIncome - saleFinancialExpense;
-  const saleContractReceived = Math.max(totalPaidRec, totalPaidPayments-refundedSalePayments);
   const selectedContractTotal = Number(selected?.total_amount_xof ?? 0);
+  const saleContractReceived = Math.min(selectedContractTotal, Math.max(totalPaidRec, totalPaidPayments-refundedSalePayments));
   const selectedOutstanding = Math.max(0, (totalRec > 0 ? totalRec : selectedContractTotal) - saleContractReceived);
+  const selectedCnyPayments = contractPayments.filter(p=>p.currency==="CNY"&&["sale","sale_contract","property_fee"].includes(p.source_type));
+  const selectedCnyReceived = selectedCnyPayments.reduce((sum,p)=>sum+Number(p.amount),0);
+  const selectedCnyRate = Number(selectedCnyPayments.find(p=>Number(p.exchange_rate_to_xof)>0)?.exchange_rate_to_xof??0);
+  const selectedCnyContractTotal = selectedCnyRate>0 ? Math.round(selectedContractTotal/selectedCnyRate) : 0;
 
   const getContractSummary = (cid: string) => {const rr=receivables.filter(r=>r.source_type==="sale_contract"&&r.source_id===cid&&r.status!=="cancelled");let t=0,p=0,o=0;const today=new Date().toISOString().slice(0,10);for(const r of rr){t+=Number(r.amount_xof);p+=Number(r.paid_amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))o+=os;}return {total:t,paid:p,outstanding:t-p,overdue:o};};
 
@@ -463,10 +474,12 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
               <div className="rounded-md border border-blue-200 bg-blue-50/50 px-3 py-2">
                 <p className="text-muted-foreground">{locale==="zh"?"合同总额":"Total contrat"}</p>
                 <p className="font-semibold tabular-nums text-blue-700">{formatXof(selectedContractTotal)}</p>
+                {selectedCnyContractTotal>0&&<p className="mt-0.5 tabular-nums text-blue-700">{locale==="zh"?"人民币合同额 ":"Montant CNY "}{formatCny(selectedCnyContractTotal)}</p>}
               </div>
               <div className="rounded-md border border-emerald-200 bg-emerald-50/50 px-3 py-2">
                 <p className="text-muted-foreground">{locale==="zh"?"累计已收":"Total reçu"}</p>
                 <p className="font-semibold tabular-nums text-emerald-700">{formatXof(saleContractReceived)}</p>
+                {selectedCnyReceived>0&&<p className="mt-0.5 tabular-nums text-emerald-700">{locale==="zh"?"人民币实收 ":"Reçu en CNY "}{formatCny(selectedCnyReceived)}</p>}
               </div>
               <div className={cn("rounded-md border px-3 py-2",selectedOutstanding>0?"border-amber-200 bg-amber-50/50":"border-emerald-200 bg-emerald-50/50")}>
                 <p className="text-muted-foreground">{locale==="zh"?"待回款":"Reste à recevoir"}</p>
@@ -494,7 +507,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
               <p className="text-xs text-muted-foreground">{locale==="zh"?"暂无逐笔财务记录":"Aucune écriture détaillée"}</p>
             ):(
               <div className="space-y-1.5">
-                {contractPayments.map(payment=>{const isExpense=isSaleExpensePayment(payment);return(
+                {contractPayments.map(payment=>{const isExpense=isSaleExpensePayment(payment);const isCny=payment.currency==="CNY";return(
                   <div key={payment.id} className={cn("rounded-lg border px-3 py-2.5 text-[13px]",isExpense?"border-red-100 bg-red-50/50":"border-emerald-100 bg-emerald-50/40")}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -504,7 +517,10 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
                         </div>
                         <p className="mt-1 truncate text-[11px] text-muted-foreground" title={payment.receipt_no??payment.notes??""}>{payment.receipt_no||payment.notes||(locale==="zh"?"无业务编号":"Sans référence")}</p>
                       </div>
-                      <span className={cn("shrink-0 font-semibold tabular-nums",isExpense?"text-red-600":"text-emerald-700")}>{isExpense?"- ":""}{formatXof(Number(payment.amount))}</span>
+                      <div className={cn("shrink-0 text-right tabular-nums",isExpense?"text-red-600":"text-emerald-700")}>
+                        <p className="font-semibold">{isExpense?"- ":""}{isCny?formatCny(Number(payment.amount)):formatXof(Number(payment.amount))}</p>
+                        {isCny&&<p className="mt-0.5 text-[11px] font-medium text-muted-foreground">{locale==="zh"?"折合 ":"Soit "}{formatXof(paymentAmountXof(payment))}</p>}
+                      </div>
                     </div>
                   </div>
                 )})}
