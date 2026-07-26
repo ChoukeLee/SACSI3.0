@@ -139,6 +139,9 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const totalPaidPayments = contractPayments
     .filter(p=>["sale","sale_contract","property_fee"].includes(p.source_type))
     .reduce((s,p)=>s+Number(p.amount),0);
+  const refundedSalePayments = contractPayments
+    .filter(p=>p.source_type==="sale_agency_expense"&&`${p.notes??""} ${p.receipt_no??""}`.match(/退款|REFUND/))
+    .reduce((s,p)=>s+Number(p.amount),0);
   const explicitFinancialExpense = contractPayments
     .filter(p=>p.source_type==="sale_agency_expense")
     .reduce((s,p)=>s+Number(p.amount),0);
@@ -152,7 +155,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
     .reduce((s,p)=>s+Number(p.amount),0);
   const saleFinancialExpense = explicitFinancialExpense+legacyFinancialExpense;
   const saleFinancialNet = saleFinancialIncome - saleFinancialExpense;
-  const saleContractReceived = Math.max(totalPaidRec, totalPaidPayments);
+  const saleContractReceived = Math.max(totalPaidRec, totalPaidPayments-refundedSalePayments);
   const selectedContractTotal = Number(selected?.total_amount_xof ?? 0);
   const selectedOutstanding = Math.max(0, (totalRec > 0 ? totalRec : selectedContractTotal) - saleContractReceived);
 
