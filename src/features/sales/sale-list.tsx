@@ -170,7 +170,12 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const selectedCnyPayments = contractPayments.filter(p=>p.currency==="CNY"&&["sale","sale_contract","property_fee"].includes(p.source_type));
   const selectedCnyReceived = selectedCnyPayments.reduce((sum,p)=>sum+Number(p.amount),0);
   const selectedCnyRate = Number(selectedCnyPayments.find(p=>Number(p.exchange_rate_to_xof)>0)?.exchange_rate_to_xof??0);
-  const selectedCnyContractTotal = selectedCnyRate>0 ? Math.round(selectedContractTotal/selectedCnyRate) : 0;
+  const selectedSaleIncomePayments = contractPayments.filter(p=>["sale","sale_contract","property_fee"].includes(p.source_type));
+  const selectedCnyContractTotal = selectedSaleIncomePayments.length>0
+    && selectedSaleIncomePayments.every(p=>p.currency==="CNY")
+    && selectedCnyRate>0
+    ? Math.round(selectedContractTotal/selectedCnyRate)
+    : 0;
 
   const getContractSummary = (cid: string) => {const rr=receivables.filter(r=>r.source_type==="sale_contract"&&r.source_id===cid&&r.status!=="cancelled");let t=0,p=0,o=0;const today=new Date().toISOString().slice(0,10);for(const r of rr){t+=Number(r.amount_xof);p+=Number(r.paid_amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))o+=os;}return {total:t,paid:p,outstanding:t-p,overdue:o};};
 
