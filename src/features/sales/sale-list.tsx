@@ -139,11 +139,13 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const totalPaidPayments = contractPayments
     .filter(p=>["sale","sale_contract","property_fee"].includes(p.source_type))
     .reduce((s,p)=>s+Number(p.amount),0);
+  const isSaleExpensePayment = (payment: PaymentRow) =>
+    ["sale_agency_expense", "sale_other_expense"].includes(payment.source_type);
   const refundedSalePayments = contractPayments
     .filter(p=>p.source_type==="sale_agency_expense"&&`${p.notes??""} ${p.receipt_no??""}`.match(/退款|REFUND/))
     .reduce((s,p)=>s+Number(p.amount),0);
   const explicitFinancialExpense = contractPayments
-    .filter(p=>p.source_type==="sale_agency_expense")
+    .filter(isSaleExpensePayment)
     .reduce((s,p)=>s+Number(p.amount),0);
   const legacyFinancialExpense = explicitFinancialExpense>0
     ? 0
@@ -151,7 +153,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
       ? Number(selected.agency_commission_amount_xof ?? 0)
       : 0;
   const saleFinancialIncome = contractPayments
-    .filter(p=>p.source_type!=="sale_agency_expense")
+    .filter(p=>!isSaleExpensePayment(p))
     .reduce((s,p)=>s+Number(p.amount),0);
   const saleFinancialExpense = explicitFinancialExpense+legacyFinancialExpense;
   const saleFinancialNet = saleFinancialIncome - saleFinancialExpense;
@@ -178,6 +180,12 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const schedLabel = (s: string) => { const l: Record<string,string>=locale==="zh"?{pending:"待付",paid:"已付",overdue:"逾期",cancelled:"取消"}:{pending:"Attente",paid:"Paye",overdue:"Retard",cancelled:"Annule"}; return l[s]??s; };
   const transText = (s:string)=>locale==="zh"?{not_started:"未开始",in_progress:"办理中",completed:"已完成"}[s]??s:{not_started:"Non debute",in_progress:"En cours",completed:"Termine"}[s]??s;
   const salePaymentKindLabel = (payment: PaymentRow) => {
+    const text = `${payment.notes ?? ""} ${payment.receipt_no ?? ""}`;
+    if (payment.source_type === "sale_other_income") {
+      if (text.includes("过户税")) return locale === "zh" ? "过户税代收" : "Taxe de transfert reçue";
+      return locale === "zh" ? "其他收入" : "Autre revenu";
+    }
+    if (payment.source_type === "sale_other_expense") return locale === "zh" ? "其他支出" : "Autre dépense";
     if (payment.source_type === "sale_registration_fee") return locale === "zh" ? "注册金收入" : "Frais d'inscription";
     if (payment.source_type === "sale_agency_income") return locale === "zh" ? "中介费收入" : "Commission reçue";
     if (payment.source_type === "sale_agency_expense") {
@@ -186,7 +194,6 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
       return locale === "zh" ? "中介费支出" : "Commission versée";
     }
     if (payment.source_type === "property_fee") return locale === "zh" ? "物业费收入" : "Frais de copropriété";
-    const text = `${payment.notes ?? ""} ${payment.receipt_no ?? ""}`;
     if (text.includes("车位")) return locale === "zh" ? "车位款收入" : "Paiement parking";
     if (text.includes("过户税")) return locale === "zh" ? "过户税代收" : "Taxe de transfert reçue";
     if (text.includes("注册金")) return locale === "zh" ? "注册金收入" : "Frais d'inscription";
@@ -487,7 +494,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
               <p className="text-xs text-muted-foreground">{locale==="zh"?"暂无逐笔财务记录":"Aucune écriture détaillée"}</p>
             ):(
               <div className="space-y-1.5">
-                {contractPayments.map(payment=>{const isExpense=payment.source_type==="sale_agency_expense";return(
+                {contractPayments.map(payment=>{const isExpense=isSaleExpensePayment(payment);return(
                   <div key={payment.id} className={cn("rounded-lg border px-3 py-2.5 text-[13px]",isExpense?"border-red-100 bg-red-50/50":"border-emerald-100 bg-emerald-50/40")}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
