@@ -52,7 +52,9 @@ export const sacsi7OwnerOccupiedUnits = [
 ] as const;
 
 export const sacsi7Leases: Sacsi7Lease[] = [
-  { unitNo: "202", customer: "刘才生", monthlyRentXof: wan(140), depositXof: wan(280), startDate: "2026-07-01", expectedEndDate: "2026-12-31", expectedEndConfirmed: false, paidThroughDate: "2026-09-30", payments: [] },
+  { unitNo: "202", customer: "刘才生", monthlyRentXof: wan(140), depositXof: wan(280), startDate: "2026-07-01", expectedEndDate: "2026-12-31", expectedEndConfirmed: false, paidThroughDate: "2026-09-30", payments: [
+    deposit("2026-07-01", 280, "押金2个月"), rent("2026-07-01", 420, "2026-09-30", "租金3个月"),
+  ] },
   { unitNo: "206", customer: "ABDOUL", monthlyRentXof: wan(115), depositXof: wan(230), startDate: "2026-01-23", expectedEndDate: "2026-12-31", expectedEndConfirmed: false, paidThroughDate: "2026-07-22", payments: [
     deposit("2026-02-23", 230, "押金2个月，天逻转交"), rent("2026-02-23", 230, "2026-03-22", "租金2个月"),
     rent("2026-04-13", 115, "2026-04-22", "支票付天逻"), rent("2026-05-07", 115, "2026-05-22", "支票付天逻"),
@@ -103,9 +105,9 @@ export const sacsi7Leases: Sacsi7Lease[] = [
 
 export const sacsi7Sales: Sacsi7Sale[] = [
   { unitNo: "101", customer: "罗玉新", totalAmountXof: wan(16000), signedDate: "2025-01-04", payments: [sale("2025-01-04",10000,"首付款"),sale("2025-01-08",6000,"尾款")] },
-  { unitNo: "201", customer: "Anzoumana", totalAmountXof: wan(50000), planNote: "与203、205共同以土地款结算；未拆分到单套", payments: [] },
-  { unitNo: "203", customer: "Anzoumana", totalAmountXof: 0, planNote: "与201、205共同以土地款结算；金额待拆分", payments: [] },
-  { unitNo: "205", customer: "Anzoumana", totalAmountXof: 0, planNote: "与201、203共同以土地款结算；金额待拆分", payments: [] },
+  { unitNo: "201", customer: "Anzoumana", totalAmountXof: wan(20889), signedDate: "2026-01-01", planNote: "与203、205共同以土地款非现金结算并已结清；房款19889万+车位款1000万；实际日期待补，2026-01-01为系统占位日", payments: [sale("2026-01-01",19889,"土地款抵房款；已结清；实际日期待补，当前为系统占位日"),sale("2026-01-01",1000,"车位款；土地款抵款；已结清；实际日期待补，当前为系统占位日")] },
+  { unitNo: "203", customer: "Anzoumana", totalAmountXof: wan(11608), signedDate: "2026-01-01", planNote: "与201、205共同以土地款非现金结算并已结清；房款10608万+车位款1000万；实际日期待补，2026-01-01为系统占位日", payments: [sale("2026-01-01",10608,"土地款抵房款；已结清；实际日期待补，当前为系统占位日"),sale("2026-01-01",1000,"车位款；土地款抵款；已结清；实际日期待补，当前为系统占位日")] },
+  { unitNo: "205", customer: "Anzoumana", totalAmountXof: wan(17503), signedDate: "2026-01-01", planNote: "与201、203共同以土地款非现金结算并已结清；房款16503万+车位款1000万；实际日期待补，2026-01-01为系统占位日", payments: [sale("2026-01-01",16503,"土地款抵房款；已结清；实际日期待补，当前为系统占位日"),sale("2026-01-01",1000,"车位款；土地款抵款；已结清；实际日期待补，当前为系统占位日")] },
   { unitNo: "301", customer: "张馨月", totalAmountXof: wan(17000), signedDate: "2024-05-07", payments: [sale("2024-05-07",1000,"定金"),sale("2024-07-04",6945,"房款"),sale("2024-08-23",2190,"房款"),sale("2024-08-23",1865,"房款"),sale("2024-09-28",2000,"支票房款"),sale("2024-12-02",2000,"支票房款"),sale("2025-12-16",1000,"车位款")] },
   { unitNo: "302", customer: "YAPOBI", totalAmountXof: wan(19500), signedDate: "2024-06-07", payments: [sale("2024-06-07",19500,"全款支票")] },
   { unitNo: "303", customer: "DIALLO", totalAmountXof: wan(10466.2), signedDate: "2025-11-17", payments: [sale("2025-11-17",966.2,"房款"),sale("2026-03-23",9500,"支票房款")] },

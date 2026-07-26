@@ -163,7 +163,7 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
     const unit = unitMap.get(lease.unitNo)!;
     const customerId = customerByName.get(lease.customer)!;
     const data = {
-      unit_id: unit.id, customer_id: customerId, contract_no: `WB7-LEASE-${lease.unitNo}`,
+      unit_id: unit.id, customer_id: customerId, contract_no: `WB-LEASE-SACSI7-${lease.unitNo}-${lease.startDate.replaceAll("-", "")}`,
       start_date: lease.startDate, expected_end_date: lease.expectedEndDate, actual_end_date: null,
       expected_end_confirmed: lease.expectedEndConfirmed, paid_through_date: lease.paidThroughDate,
       payment_cycle: "monthly", payment_day: Number(lease.startDate.slice(-2)), monthly_rent_xof: lease.monthlyRentXof,
@@ -215,9 +215,10 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
     const unit = unitMap.get(saleRow.unitNo)!;
     const customerId = customerByName.get(saleRow.customer)!;
     const existing = saleByUnitId.get(unit.id);
+    const signedDate = saleRow.signedDate ?? existing?.signed_date ?? SACSI7_AS_OF;
     const data = {
-      unit_id: unit.id, customer_id: customerId, contract_no: `WB7-SALE-${saleRow.unitNo}`,
-      signed_date: saleRow.signedDate ?? existing?.signed_date ?? SACSI7_AS_OF, transfer_date: null,
+      unit_id: unit.id, customer_id: customerId, contract_no: `WB-SALE-SACSI7-${saleRow.unitNo}-${signedDate.replaceAll("-", "")}`,
+      signed_date: signedDate, transfer_date: null,
       transfer_status: "not_started", title_certificate_no: null, agency_company: null, agent_name: null,
       agency_commission_amount_xof: null, agency_commission_paid: false,
       payment_plan_type: saleRow.planNote ?? "工作簿历史收款明细", total_amount_xof: saleRow.totalAmountXof,
@@ -279,17 +280,25 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
   if (paymentReadError) throw new Error(`读取已有收款失败：${paymentReadError.message}`);
   const paymentIdByRef = new Map((existingPaymentRows ?? []).map((row) => [row.receipt_no ?? "", row.id]));
   const paymentInserts: Record<string, unknown>[] = [];
+  let paymentsUpdated = 0;
   for (const row of flattened) {
-    if (paymentIdByRef.has(row.ref)) continue;
     const unit = unitMap.get(row.unitNo)!;
     const contract = row.scope === "L" ? leaseContractByUnitNo.get(row.unitNo)! : saleContractByUnitNo.get(row.unitNo)!;
-    paymentInserts.push({
+    const data = {
       customer_id: contract.customer_id, unit_id: unit.id,
       source_type: row.scope === "S" ? "sale_contract" : row.payment.kind === "deposit" ? "lease_deposit" : "lease_contract",
       source_id: contract.id, payment_date: row.payment.date, amount: row.payment.amount,
       currency: row.payment.currency ?? "XOF", exchange_rate_to_xof: row.payment.currency === "CNY" ? 0 : 1,
       receipt_no: row.ref, notes: paymentNote(row.unitNo, row.payment, row.ref),
-    });
+    };
+    const existingId = paymentIdByRef.get(row.ref);
+    if (existingId) {
+      const { error } = await supabase.from("payments").update(data).eq("id", existingId);
+      if (error) throw new Error(`更新${row.unitNo}收款失败：${error.message}`);
+      paymentsUpdated += 1;
+    } else {
+      paymentInserts.push(data);
+    }
   }
   if (paymentInserts.length) {
     const { data: inserted, error } = await supabase.from("payments").insert(paymentInserts).select("id, receipt_no");
@@ -305,9 +314,10 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
   if (receivableReadError) throw new Error(`读取应收失败：${receivableReadError.message}`);
   if (ledgerReadError) throw new Error(`读取流水失败：${ledgerReadError.message}`);
   const receivableRefs = new Set((existingReceivables ?? []).flatMap((row) => row.notes?.match(/import_ref=([^；;]+)/)?.[1] ?? []));
-  const ledgerPaymentIds = new Set((existingLedgers ?? []).map((row) => row.payment_id));
+  const ledgerIdByPaymentId = new Map((existingLedgers ?? []).map((row) => [row.payment_id, row.id]));
   const receivableInserts: Record<string, unknown>[] = [];
   const ledgerInserts: Record<string, unknown>[] = [];
+  let ledgersUpdated = 0;
   for (const row of flattened) {
     const unit = unitMap.get(row.unitNo)!;
     const contract = row.scope === "L" ? leaseContractByUnitNo.get(row.unitNo)! : saleContractByUnitNo.get(row.unitNo)!;
@@ -324,14 +334,20 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
         status: "paid", currency: "XOF", notes: note,
       });
     }
-    if (!ledgerPaymentIds.has(paymentId)) {
-      ledgerInserts.push({
-        building_id: building.id, unit_id: unit.id, payment_id: paymentId, entry_date: row.payment.date,
-        direction: row.payment.kind === "deposit" ? "liability_in" : "income",
-        category: row.scope === "S" ? "sale" : row.payment.kind === "deposit" ? "lease_deposit" : "lease_rent",
-        amount_xof: isCny ? 0 : row.payment.amount, amount_cny: isCny ? row.payment.amount : null,
-        description: `${row.unitNo} ${row.payment.note}${row.payment.paidThrough ? `；已缴至${row.payment.paidThrough}` : ""}`,
-      });
+    const ledgerData = {
+      building_id: building.id, unit_id: unit.id, payment_id: paymentId, entry_date: row.payment.date,
+      direction: row.payment.kind === "deposit" ? "liability_in" : "income",
+      category: row.scope === "S" ? "sale" : row.payment.kind === "deposit" ? "lease_deposit" : "lease_rent",
+      amount_xof: isCny ? 0 : row.payment.amount, amount_cny: isCny ? row.payment.amount : null,
+      description: `${row.unitNo} ${row.payment.note}${row.payment.paidThrough ? `；已缴至${row.payment.paidThrough}` : ""}`,
+    };
+    const existingLedgerId = ledgerIdByPaymentId.get(paymentId);
+    if (existingLedgerId) {
+      const { error } = await supabase.from("ledger_entries").update(ledgerData).eq("id", existingLedgerId);
+      if (error) throw new Error(`更新${row.unitNo}财务流水失败：${error.message}`);
+      ledgersUpdated += 1;
+    } else {
+      ledgerInserts.push(ledgerData);
     }
   }
   for (const overdue of sacsi7OverdueRentReceivables) {
@@ -386,7 +402,7 @@ async function applySacsi7WorkbookImportInternal(): Promise<Sacsi7ImportResult> 
       leaseContractsCreated: leaseCreated, leaseContractsUpdated: leaseUpdated, leasePlaceholdersDeleted,
       saleContracts: sacsi7Sales.length, saleContractsCreated: saleCreated, saleContractsUpdated: saleUpdated,
       saleSchedulesCreated, saleSchedulesUpdated,
-      paymentsCreated: paymentInserts.length, receivablesCreated: receivableInserts.length, ledgersCreated: ledgerInserts.length,
+      paymentsCreated: paymentInserts.length, paymentsUpdated, receivablesCreated: receivableInserts.length, ledgersCreated: ledgerInserts.length, ledgersUpdated,
       ownerOccupiedUnits: sacsi7OwnerOccupiedUnits.length,
       storefrontAvailable: true, storefrontMonthlyRentXof: SACSI7_STOREFRONT_RENT_XOF,
     },
