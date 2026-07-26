@@ -81,6 +81,16 @@ function isPaidThroughOverdue(contract: LeaseContractRow) {
   return !!contract.paid_through_date && contract.paid_through_date < new Date().toISOString().slice(0, 10);
 }
 
+function paymentAmountXof(payment: PaymentRow) {
+  return payment.currency === "XOF"
+    ? Number(payment.amount)
+    : Math.round(Number(payment.amount) * Number(payment.exchange_rate_to_xof));
+}
+
+function formatOriginalPaymentAmount(payment: PaymentRow) {
+  return `${payment.currency} ${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(Number(payment.amount))}`;
+}
+
 export function LeaseList({ contracts, units, customers, payments, receivables, buildings, locale }: LeaseListProps) {
   const router = useRouter();
   const t = dictionaries[locale].leases;
@@ -310,8 +320,8 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
   const contractReceivables = useMemo(() => selectedId ? receivables.filter(r => r.source_type === "lease_contract" && r.source_id === selectedId && r.status !== "cancelled") : [], [receivables, selectedId]);
   const contractPayments = useMemo(() => selectedId ? payments.filter((p) => p.source_id === selectedId) : [], [payments, selectedId]);
-  const totalIncome = contractPayments.reduce((sum, payment) => isLeaseFinancialExpenseSourceType(payment.source_type) ? sum : sum + Number(payment.amount), 0);
-  const totalExpense = contractPayments.reduce((sum, payment) => isLeaseFinancialExpenseSourceType(payment.source_type) ? sum + Number(payment.amount) : sum, 0);
+  const totalIncome = contractPayments.reduce((sum, payment) => isLeaseFinancialExpenseSourceType(payment.source_type) ? sum : sum + paymentAmountXof(payment), 0);
+  const totalExpense = contractPayments.reduce((sum, payment) => isLeaseFinancialExpenseSourceType(payment.source_type) ? sum + paymentAmountXof(payment) : sum, 0);
   const netFinancial = totalIncome - totalExpense;
   const receivableStats = useMemo(() => { let totalRec=0,totalPd=0,overdue=0; const today=new Date().toISOString().slice(0,10); for(const r of contractReceivables){totalRec+=Number(r.amount_xof);totalPd+=Number(r.paid_amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))overdue+=os;} return {totalReceivable:totalRec,totalPaid:totalPd,outstanding:totalRec-totalPd,overdue}; }, [contractReceivables]);
   const contractRisk = useMemo(() => { if(!selected||selected.status!=="active"||!isContractEndConfirmed(selected))return {expiringSoon:false,daysLeft:0}; const today=new Date(); const diff=Math.floor((new Date(selected.expected_end_date).getTime()-today.getTime())/86400000); return {expiringSoon:diff<=30&&diff>=0,daysLeft:Math.max(0,diff)}; }, [selected]);
@@ -385,6 +395,8 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const paymentKindLabel = (sourceType: string) => {
     const configured = getLeaseFinancialConfigBySourceType(sourceType);
     if (configured) return locale === "zh" ? configured.labelZh : configured.labelFr;
+    if (sourceType === "lease_deposit_deduction") return locale === "zh" ? "押金扣款" : "Retenue sur dépôt";
+    if (sourceType === "lease_rent_refund") return locale === "zh" ? "租金退款" : "Remboursement de loyer";
     if (sourceType === "lease_contract") return locale === "zh" ? "租金收入" : "Revenu de loyer";
     return locale === "zh" ? "财务记录" : "Écriture financière";
   };
@@ -843,7 +855,10 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                           {payment.receipt_no || (locale === "zh" ? "无收据号" : "Sans reçu")}
                         </p>
                       </div>
-                      <span className={cn("shrink-0 font-semibold tabular-nums", isExpense ? "text-red-600" : "text-emerald-700")}>{isExpense ? "- " : ""}{formatXof(Number(payment.amount))}</span>
+                      <div className="shrink-0 text-right tabular-nums">
+                        <p className={cn("font-semibold", isExpense ? "text-red-600" : "text-emerald-700")}>{isExpense ? "- " : ""}{payment.currency === "XOF" ? formatXof(Number(payment.amount)) : formatOriginalPaymentAmount(payment)}</p>
+                        {payment.currency !== "XOF" && <p className="mt-0.5 text-[11px] text-muted-foreground">{locale === "zh" ? "折合" : "Équiv."} {formatXof(paymentAmountXof(payment))}</p>}
+                      </div>
                     </div>
                   </div>
                 )})}

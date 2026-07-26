@@ -50,7 +50,7 @@ async function LeasesData({ locale }: { locale: "zh" | "fr" }) {
       supabase.from("lease_contracts").select("*").order("start_date", { ascending: false }).limit(200),
       supabase.from("units").select("*, unit_business_flags(business_type, is_enabled, default_price_xof)").in("building_id", buildingIds).order("unit_no"),
       supabase.from("customers").select("*").order("name"),
-      supabase.from("payments").select("*").in("source_type", ["lease_rent", "lease_deposit", "lease_contract", "property_fee", "lease_agency_income", "lease_agency_expense", "lease_furniture_income", "lease_deposit_refund", "lease_other_income", "lease_other_expense"]).order("payment_date", { ascending: false }).limit(1000),
+      supabase.from("payments").select("*").in("source_type", ["lease_rent", "lease_deposit", "lease_contract", "property_fee", "lease_agency_income", "lease_agency_expense", "lease_furniture_income", "lease_deposit_refund", "lease_deposit_deduction", "lease_rent_refund", "lease_other_income", "lease_other_expense"]).order("payment_date", { ascending: false }).limit(1000),
       supabase.from("receivables").select("*").in("source_type", ["lease_contract"]).order("due_date", { ascending: false }).limit(2000),
     ]);
     if (!contractsRes.error) contracts = contractsRes.data;

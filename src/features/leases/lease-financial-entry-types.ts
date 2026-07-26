@@ -119,6 +119,7 @@ export function getLeaseFinancialConfigBySourceType(sourceType: string) {
 }
 
 export function isLeaseFinancialExpenseSourceType(sourceType: string) {
+  if (sourceType === "lease_deposit_deduction" || sourceType === "lease_rent_refund") return true;
   const direction = getLeaseFinancialConfigBySourceType(sourceType)?.ledgerDirection;
   return direction === "expense" || direction === "liability_out";
 }
