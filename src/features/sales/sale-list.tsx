@@ -199,6 +199,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
     const text = `${payment.notes ?? ""} ${payment.receipt_no ?? ""}`;
     const receiptNo = payment.receipt_no?.toUpperCase() ?? "";
     if (payment.source_type === "sale_other_income") {
+      if (text.includes("车位") || receiptNo.includes("PARKING")) return locale === "zh" ? "车位款收入" : "Paiement parking";
       if (text.includes("过户税")) return locale === "zh" ? "过户税代收" : "Taxe de transfert reçue";
       if (text.includes("运费") || receiptNo.includes("DELIVERY")) return locale === "zh" ? "运费收入" : "Livraison reçue";
       if (text.includes("安装费") || receiptNo.includes("INSTALLATION")) return locale === "zh" ? "安装费收入" : "Installation reçue";
