@@ -1,0 +1,73 @@
+import fs from "node:fs";
+import { createClient } from "@supabase/supabase-js";
+
+const env = Object.fromEntries(
+  fs.readFileSync(".env.local", "utf8")
+    .split(/\r?\n/)
+    .filter((line) => line && !line.startsWith("#"))
+    .map((line) => {
+      const separator = line.indexOf("=");
+      return [line.slice(0, separator), line.slice(separator + 1)];
+    }),
+);
+const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+
+async function checked(query, label) {
+  const { data, error } = await query;
+  if (error) throw new Error(`${label}: ${error.message}`);
+  return data;
+}
+
+const building = await checked(supabase.from("buildings").select("id").eq("code", "SACSI4").single(), "load building");
+const unit = await checked(supabase.from("units").select("id").eq("building_id", building.id).eq("unit_no", "106").single(), "load unit 106");
+const sale = await checked(supabase.from("sale_contracts").select("id, customer_id, signed_date").eq("unit_id", unit.id).single(), "load 106 sale");
+if (sale.signed_date !== "2020-11-20") throw new Error(`Unexpected 106 sale date ${sale.signed_date}`);
+await checked(
+  supabase.from("sale_contracts").update({ contract_no: "WB-SALE-SACSI4-106-20201120", total_amount_xof: 65_000_000, payment_plan_type: "\u5408\u540c\u603b\u4ef76500\u4e07\uff0c\u65e0\u8f66\u4f4d\u8bb0\u5f55\uff1b2020-11-20\u65362000\u4e07\uff0c2021-06-16\u65364500\u4e07\uff1b\u5df2\u7ed3\u6e05\u3002" }).eq("id", sale.id),
+  "update 106 sale",
+);
+
+const consolidated = await checked(supabase.from("payments").select("id").eq("source_id", sale.id).eq("receipt_no", "S4-SALE-106-CONSOLIDATED").single(), "load 106 consolidated payment");
+await checked(
+  supabase.from("payments").update({ source_type: "sale_contract", payment_date: "2021-06-16", amount: 45_000_000, receipt_no: "WB4-SALE-106-20210616-HOUSE-02", notes: "106\u7b2c\u4e8c\u7b14\u623f\u6b3e4500\u4e07\uff1b\u5df2\u7ed3\u6e05\u3002" }).eq("id", consolidated.id),
+  "update 106 second payment",
+);
+await checked(
+  supabase.from("ledger_entries").update({ unit_id: unit.id, direction: "income", category: "sale", amount_xof: 45_000_000, amount_cny: null, description: "106\u7b2c\u4e8c\u7b14\u623f\u6b3e4500\u4e07\u3002" }).eq("payment_id", consolidated.id),
+  "update 106 second ledger",
+);
+
+const firstReceipt = "WB4-SALE-106-20201120-HOUSE-01";
+const firstPayload = { customer_id: sale.customer_id, unit_id: unit.id, source_type: "sale_contract", source_id: sale.id, payment_date: "2020-11-20", amount: 20_000_000, currency: "XOF", exchange_rate_to_xof: 1, receipt_no: firstReceipt, notes: "106\u7b2c\u4e00\u7b14\u623f\u6b3e2000\u4e07\u3002" };
+const firstRows = await checked(supabase.from("payments").select("id").eq("source_id", sale.id).eq("receipt_no", firstReceipt), "find 106 first payment");
+if (firstRows.length > 1) throw new Error(`Duplicate 106 first payments: ${firstRows.length}`);
+let firstId;
+if (firstRows.length === 1) {
+  firstId = firstRows[0].id;
+  await checked(supabase.from("payments").update(firstPayload).eq("id", firstId), "update 106 first payment");
+} else {
+  const inserted = await checked(supabase.from("payments").insert(firstPayload).select("id").single(), "insert 106 first payment");
+  firstId = inserted.id;
+}
+const firstLedgerPayload = { building_id: building.id, unit_id: unit.id, payment_id: firstId, entry_date: "2020-11-20", direction: "income", category: "sale", amount_xof: 20_000_000, amount_cny: null, description: "106\u7b2c\u4e00\u7b14\u623f\u6b3e2000\u4e07\u3002" };
+const firstLedgers = await checked(supabase.from("ledger_entries").select("id").eq("payment_id", firstId), "find 106 first ledger");
+if (firstLedgers.length > 1) throw new Error(`Duplicate 106 first ledgers: ${firstLedgers.length}`);
+if (firstLedgers.length === 1) await checked(supabase.from("ledger_entries").update(firstLedgerPayload).eq("id", firstLedgers[0].id), "update 106 first ledger");
+else await checked(supabase.from("ledger_entries").insert(firstLedgerPayload), "insert 106 first ledger");
+
+const receivables = await checked(supabase.from("receivables").select("id").eq("source_id", sale.id).eq("category", "sale_lump_sum"), "load 106 receivable");
+if (receivables.length !== 1) throw new Error(`Expected one 106 receivable, got ${receivables.length}`);
+await checked(
+  supabase.from("receivables").update({ amount_xof: 65_000_000, paid_amount_xof: 65_000_000, status: "paid", notes: "\u6765\u6e90\uff1a4\u53f7\u516c\u5bd3.xlsx Sheet1\uff1b\u5408\u540c\u603b\u4ef76500\u4e07\uff0c\u65e0\u8f66\u4f4d\u8bb0\u5f55\uff1b\u4e24\u7b14\u623f\u6b3e2000\u4e07+4500\u4e07\uff1b\u5df2\u7ed3\u6e05\u3002" }).eq("id", receivables[0].id),
+  "update 106 receivable",
+);
+await checked(
+  supabase.from("units").update({ notes: "\u6765\u6e90\uff1a4\u53f7\u516c\u5bd3.xlsx\uff1b\u4e1a\u4e3b\u5f20\u99a8\u6708\uff1b\u5408\u540c\u603b\u4ef76500\u4e07\uff0c\u65e0\u8f66\u4f4d\u8bb0\u5f55\uff1b\u5df2\u7ed3\u6e05\u3002" }).eq("id", unit.id),
+  "update unit 106 note",
+);
+await checked(
+  supabase.from("audit_logs").insert({ action: "reconcile_floor_lease_sale_data", entity_type: "building", entity_id: building.id, metadata: { building_code: "SACSI4", unit: "106", total_xof: 65_000_000, payment_count: 2, settled: true, parking_recorded: false } }),
+  "write audit log",
+);
+
+console.log(JSON.stringify({ ok: true, unit: "106", total: 65_000_000, paid: 65_000_000, settled: true }));
