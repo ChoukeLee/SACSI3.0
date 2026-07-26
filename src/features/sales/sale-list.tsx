@@ -192,6 +192,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const transText = (s:string)=>locale==="zh"?{not_started:"未开始",in_progress:"办理中",completed:"已完成"}[s]??s:{not_started:"Non debute",in_progress:"En cours",completed:"Termine"}[s]??s;
   const salePaymentKindLabel = (payment: PaymentRow) => {
     const text = `${payment.notes ?? ""} ${payment.receipt_no ?? ""}`;
+    const receiptNo = payment.receipt_no?.toUpperCase() ?? "";
     if (payment.source_type === "sale_other_income") {
       if (text.includes("过户税")) return locale === "zh" ? "过户税代收" : "Taxe de transfert reçue";
       return locale === "zh" ? "其他收入" : "Autre revenu";
@@ -205,6 +206,8 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
       return locale === "zh" ? "中介费支出" : "Commission versée";
     }
     if (payment.source_type === "property_fee") return locale === "zh" ? "物业费收入" : "Frais de copropriété";
+    if (receiptNo.includes("PARKING")) return locale === "zh" ? "车位款收入" : "Paiement parking";
+    if (receiptNo.includes("HOUSE")) return locale === "zh" ? "房款收入" : "Paiement du bien";
     if (text.includes("车位")) return locale === "zh" ? "车位款收入" : "Paiement parking";
     if (text.includes("过户税")) return locale === "zh" ? "过户税代收" : "Taxe de transfert reçue";
     if (text.includes("注册金")) return locale === "zh" ? "注册金收入" : "Frais d'inscription";
