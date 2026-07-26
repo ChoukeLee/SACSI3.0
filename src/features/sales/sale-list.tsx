@@ -185,6 +185,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
     if (payment.source_type === "property_fee") return locale === "zh" ? "物业费收入" : "Frais de copropriété";
     const text = `${payment.notes ?? ""} ${payment.receipt_no ?? ""}`;
     if (text.includes("车位")) return locale === "zh" ? "车位款收入" : "Paiement parking";
+    if (text.includes("过户税")) return locale === "zh" ? "过户税代收" : "Taxe de transfert reçue";
     if (text.includes("注册金")) return locale === "zh" ? "注册金收入" : "Frais d'inscription";
     if (text.includes("定金")) return locale === "zh" ? "定金收入" : "Acompte";
     return locale === "zh" ? "房款收入" : "Paiement du bien";
