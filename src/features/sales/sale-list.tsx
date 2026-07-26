@@ -13,9 +13,10 @@ import { DateInput } from "@/components/ui/date-input";
 import { RoomCard } from "@/components/room-card";
 import { RoomBoard } from "@/components/room-board";
 import { EmptyState } from "@/components/empty-state";
-import { FilterBar, SegmentedControl, controlClass } from "@/components/ui/operational";
+import { SegmentedControl } from "@/components/ui/operational";
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import { createSaleContract, recordSalePayment, addFlexibleInstallment, updateTransferStatus, terminateSaleContract } from "./actions";
+import { getEffectiveSaleContracts } from "./sale-contract-filters";
 
 interface SaleListProps { contracts: SaleContractRow[]; schedules: SalePaymentScheduleRow[]; units: UnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale }
 type PanelType = "new" | "detail" | "insight" | null;
@@ -23,7 +24,6 @@ type SaleStatKey = "active" | "total" | "received" | "receivable" | "overdue" | 
 
 export function SaleList({ contracts, schedules, units, customers, payments, receivables, buildings, locale }: SaleListProps) {
   const t = dictionaries[locale].sales;
-  const [statusFilter, setStatusFilter] = useState("all");
   const [statFilter, setStatFilter] = useState<SaleStatKey | null>(null);
   const [panel, setPanel] = useState<PanelType>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -51,17 +51,15 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   }, [units]);
 
   const filteredByBuilding = useMemo(() => {
-    if (!activeBuildingId) return contracts;
-    return contracts.filter((c) => unitBuildingMap.get(c.unit_id) === activeBuildingId);
+    return getEffectiveSaleContracts(contracts, unitBuildingMap, activeBuildingId);
   }, [contracts, activeBuildingId, unitBuildingMap]);
 
-  const filtered = useMemo(() => statusFilter==="all"?filteredByBuilding:filteredByBuilding.filter(c=>c.status===statusFilter), [filteredByBuilding,statusFilter]);
   const unitMap = useMemo(()=>new Map(units.map(u=>[u.id,u])), [units]);
   const customerMap = useMemo(()=>new Map(customers.map(c=>[c.id,c])), [customers]);
 
   const groupedContracts = useMemo(() => {
     const g=new Map<string,SaleContractRow[]>();
-    for(const c of filtered){const unit=unitMap.get(c.unit_id);const floor=normalizeFloorLabel(unit?.floor_label??null,unit?.unit_no??"");if(!g.has(floor))g.set(floor,[]);g.get(floor)!.push(c);}
+    for(const c of filteredByBuilding){const unit=unitMap.get(c.unit_id);const floor=normalizeFloorLabel(unit?.floor_label??null,unit?.unit_no??"");if(!g.has(floor))g.set(floor,[]);g.get(floor)!.push(c);}
     return Array.from(g.entries())
       .map(([floor, floorContracts]) => [
         floor,
@@ -72,7 +70,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
         }),
       ] as [string, SaleContractRow[]])
       .sort((a,b)=>floorSortValue(a[0])-floorSortValue(b[0]));
-  }, [filtered,unitMap]);
+  }, [filteredByBuilding,unitMap]);
 
   const selected = selectedId?contracts.find(c=>c.id===selectedId):null;
   const selectedUnit = selected?units.find(u=>u.id===selected.unit_id):null;
@@ -286,25 +284,9 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
         />
       )}
 
-      {/* ── Filter bar ── */}
-      <FilterBar
-        meta={
-          <div className="flex items-center gap-3">
-            <span>{filtered.length}/{filteredByBuilding.length} {locale === "fr" ? "contrats" : "份合同"}</span>
-            <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" />{t.form.newContract}</Button>
-          </div>
-        }
-      >
-        <SegmentedControl
-          value={statusFilter}
-          onChange={setStatusFilter}
-          ariaLabel={locale === "zh" ? "合同状态筛选" : "Filtre statut contrat"}
-          items={["all", "draft", "active", "terminated", "expired"].map((value) => ({
-            value,
-            label: value === "all" ? (locale === "fr" ? "Tous" : "全部") : t.contractStatus[value as keyof typeof t.contractStatus],
-          }))}
-        />
-      </FilterBar>
+      <div className="flex justify-end">
+        <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" />{t.form.newContract}</Button>
+      </div>
 
       {/* ── Contract matrix (BusinessRoomCard) ── */}
       {groupedContracts.length===0?(<EmptyState title={t.empty}/>):(

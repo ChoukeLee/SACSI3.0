@@ -48,7 +48,7 @@ async function FrenchSalesData() {
 
   if (buildingIds.length > 0) {
     const [contractsRes, schedulesRes, unitsRes, customersRes, paymentsRes, receivablesRes] = await Promise.all([
-      supabase.from("sale_contracts").select("*").order("signed_date", { ascending: false }).limit(200),
+      supabase.from("sale_contracts").select("*").eq("status", "active").order("signed_date", { ascending: false }).limit(200),
       supabase.from("sale_payment_schedule").select("*").order("installment_no").limit(300),
       supabase.from("units").select("*").in("building_id", buildingIds).order("unit_no"),
       supabase.from("customers").select("*").order("name"),
