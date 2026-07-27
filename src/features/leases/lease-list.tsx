@@ -95,6 +95,15 @@ function formatOriginalMonthlyRent(currency: string, amount: number) {
   return `${currency} ${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(amount)}`;
 }
 
+function getRecordedOriginalPayment(payment: PaymentRow) {
+  const metadata = payment.notes?.match(/original_currency=([A-Z]{3});original_amount=([\d.]+);original_period_months=(\d+)/);
+  if (!metadata) return null;
+  const amount = Number(metadata[2]);
+  const periodMonths = Number(metadata[3]);
+  if (amount <= 0 || periodMonths <= 0) return null;
+  return { currency: metadata[1], amount, periodMonths };
+}
+
 function getOriginalMonthlyRent(contract: LeaseContractRow, payments: PaymentRow[]) {
   const contractPayments = payments
     .filter((payment) => payment.source_id === contract.id && payment.source_type === "lease_rent")
@@ -109,11 +118,8 @@ function getOriginalMonthlyRent(contract: LeaseContractRow, payments: PaymentRow
   }
 
   for (const payment of contractPayments) {
-    const metadata = payment.notes?.match(/original_currency=([A-Z]{3});original_amount=([\d.]+);original_period_months=(\d+)/);
-    if (!metadata) continue;
-    const originalAmount = Number(metadata[2]);
-    const periodMonths = Number(metadata[3]);
-    if (originalAmount > 0 && periodMonths > 0) return { currency: metadata[1], amount: originalAmount / periodMonths };
+    const recordedOriginal = getRecordedOriginalPayment(payment);
+    if (recordedOriginal) return { currency: recordedOriginal.currency, amount: recordedOriginal.amount / recordedOriginal.periodMonths };
   }
   return null;
 }
@@ -888,6 +894,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
               <div className="space-y-1.5">
                 {contractPayments.map((payment) => {
                   const isExpense = isLeaseFinancialExpenseSourceType(payment.source_type);
+                  const recordedOriginal = getRecordedOriginalPayment(payment);
                   return (
                   <div key={payment.id} className={cn("rounded-lg border px-3 py-2.5 text-[13px]", isExpense ? "border-red-100 bg-red-50/50" : "border-emerald-100 bg-emerald-50/40")}>
                     <div className="flex items-start justify-between gap-3">
@@ -901,8 +908,10 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                         </p>
                       </div>
                       <div className="shrink-0 text-right tabular-nums">
-                        <p className={cn("font-semibold", isExpense ? "text-red-600" : "text-emerald-700")}>{isExpense ? "- " : ""}{payment.currency === "XOF" ? formatXof(Number(payment.amount)) : formatOriginalPaymentAmount(payment)}</p>
-                        {payment.currency !== "XOF" && <p className="mt-0.5 text-[11px] text-muted-foreground">{locale === "zh" ? "折合" : "Équiv."} {formatXof(paymentAmountXof(payment))}</p>}
+                        <p className={cn("font-semibold", isExpense ? "text-red-600" : "text-emerald-700")}>
+                          {isExpense ? "- " : ""}{recordedOriginal ? formatOriginalMonthlyRent(recordedOriginal.currency, recordedOriginal.amount) : payment.currency === "XOF" ? formatXof(Number(payment.amount)) : formatOriginalPaymentAmount(payment)}
+                        </p>
+                        {(payment.currency !== "XOF" || recordedOriginal) && <p className="mt-0.5 text-[11px] text-muted-foreground">{locale === "zh" ? "折合" : "Équiv."} {formatXof(paymentAmountXof(payment))}</p>}
                       </div>
                     </div>
                   </div>
