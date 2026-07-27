@@ -21,7 +21,7 @@ export async function loadUnit(unitNo, expectedArea = undefined) {
   return unit;
 }
 
-export async function prepareSaleUnit({ unitNo, expectedArea, customerName, legacyContractNo, customerNotes }) {
+export async function prepareSaleUnit({ unitNo, expectedArea, customerName, legacyContractNo, customerNotes, replaceLegacyCustomer = false }) {
   const unit = await loadUnit(unitNo, expectedArea);
   const [leases, sales] = await Promise.all([
     checked(supabase.from("lease_contracts").select("id, customer_id, contract_no").eq("unit_id", unit.id), `load ${unitNo} leases`),
@@ -44,7 +44,13 @@ export async function prepareSaleUnit({ unitNo, expectedArea, customerName, lega
     if (customers.length > 1) throw new Error(`Duplicate customer ${customerName}`);
     customerId = customers[0]?.id ?? (await checked(supabase.from("customers").insert({ name: customerName, notes: customerNotes, is_blacklisted: false }).select("id").single(), `insert ${customerName}`)).id;
   }
-  const customer = await checked(supabase.from("customers").select("name").eq("id", customerId).single(), `verify ${unitNo} customer`);
+  let customer = await checked(supabase.from("customers").select("name").eq("id", customerId).single(), `verify ${unitNo} customer`);
+  if (customer.name !== customerName && replaceLegacyCustomer) {
+    const preferred = await checked(supabase.from("customers").select("id, name").eq("name", customerName), `find preferred ${customerName}`);
+    if (preferred.length !== 1) throw new Error(`Unexpected preferred customer count for ${customerName}: ${preferred.length}`);
+    customerId = preferred[0].id;
+    customer = preferred[0];
+  }
   if (customer.name !== customerName) throw new Error(`Unexpected ${unitNo} customer: ${customer.name}`);
   await checked(supabase.from("customers").update({ notes: customerNotes }).eq("id", customerId), `update ${customerName}`);
   return { unit, customerId, existingSaleId: sales[0]?.id };
