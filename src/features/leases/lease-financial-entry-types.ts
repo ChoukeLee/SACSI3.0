@@ -168,5 +168,13 @@ export function buildLeaseFinancialReferencePrefix(
   paymentDate: string,
 ) {
   const unitReference = contractUnitReference(contractNo, buildingCode, unitNo);
-  return `${buildingReferencePrefix(buildingCode)}-LEASE-${unitReference}-${compactDate(paymentDate)}-${getLeaseFinancialConfig(type).code}`;
+  return `${buildingReferencePrefix(buildingCode)}-L-${unitReference}-${compactDate(paymentDate)}-${getLeaseFinancialConfig(type).code}`;
+}
+
+export function getNextLeaseFinancialSequence(receiptNos: Array<string | null>) {
+  const highestSequence = receiptNos.reduce((highest, receiptNo) => {
+    const match = receiptNo?.match(/-(\d+)$/);
+    return match ? Math.max(highest, Number(match[1])) : highest;
+  }, 0);
+  return highestSequence + 1;
 }

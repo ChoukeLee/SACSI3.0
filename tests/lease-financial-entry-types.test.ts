@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildLeaseContractNumber,
   buildLeaseFinancialReferencePrefix,
+  getNextLeaseFinancialSequence,
   getLeaseFinancialConfig,
   isLeaseFinancialExpenseSourceType,
 } from "@/features/leases/lease-financial-entry-types";
@@ -14,14 +15,25 @@ describe("lease financial business types", () => {
 
   it("builds standardized business-specific financial references", () => {
     expect(buildLeaseFinancialReferencePrefix("SACSI11", "103", "WB-LEASE-SACSI11-103-20260307", "rent_income", "2026-06-08"))
-      .toBe("WB11-LEASE-103-20260608-RENT");
+      .toBe("WB11-L-103-20260608-RENT");
     expect(buildLeaseFinancialReferencePrefix("SACSI11", "103", "WB-LEASE-SACSI11-103-20260307", "agency_expense", "2026-03-06"))
-      .toBe("WB11-LEASE-103-20260306-AGE");
+      .toBe("WB11-L-103-20260306-AGE");
   });
 
   it("preserves a standardized special-asset reference from the contract number", () => {
     expect(buildLeaseFinancialReferencePrefix("SACSI4", "大仓库", "WB-LEASE-SACSI4-WAREHOUSE-LARGE-20260501", "rent_income", "2026-07-01"))
-      .toBe("WB4-LEASE-WAREHOUSE-LARGE-20260701-RENT");
+      .toBe("WB4-L-WAREHOUSE-LARGE-20260701-RENT");
+  });
+
+  it("continues the existing contract-wide business sequence", () => {
+    expect(getNextLeaseFinancialSequence([
+      "WB7-L-503-20251017-RENT-01",
+      "WB7-L-503-20251027-DEP-02",
+      "WB7-L-503-20251027-RENT-03",
+      "WB7-L-503-20260519-RENT-08",
+      "WB7-L-503-20251101-AGENTIN",
+    ])).toBe(9);
+    expect(getNextLeaseFinancialSequence([])).toBe(1);
   });
 
   it("keeps income, liabilities, and expenses semantically distinct", () => {

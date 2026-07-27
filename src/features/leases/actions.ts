@@ -12,6 +12,7 @@ import {
 import {
   buildLeaseContractNumber,
   buildLeaseFinancialReferencePrefix,
+  getNextLeaseFinancialSequence,
   getLeaseFinancialConfig,
   LEASE_FINANCIAL_BUSINESS_TYPES,
   type LeaseFinancialBusinessType,
@@ -351,13 +352,14 @@ export async function recordLeaseFinancialEntry(input: {
     input.businessType,
     input.paymentDate,
   );
-  const { count: existingTypeCount, error: sequenceError } = await supabase
+  const { data: referenceRows, error: sequenceError } = await supabase
     .from("payments")
-    .select("id", { count: "exact", head: true })
+    .select("receipt_no")
     .eq("source_id", contract.id)
-    .eq("source_type", config.sourceType);
+    .not("receipt_no", "is", null);
   if (sequenceError) return { success: false, error: sequenceError.message };
-  const referenceNo = `${referencePrefix}-${String((existingTypeCount ?? 0) + 1).padStart(2, "0")}`;
+  const nextSequence = getNextLeaseFinancialSequence((referenceRows ?? []).map((row) => row.receipt_no));
+  const referenceNo = `${referencePrefix}-${String(nextSequence).padStart(2, "0")}`;
   const methodLabels = {
     cash: "现金",
     check: "支票",
