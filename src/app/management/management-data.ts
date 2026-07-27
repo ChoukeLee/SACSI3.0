@@ -94,7 +94,24 @@ export const getPayments = cache(async () => {
 
 export const getCustomers = cache(async () => {
   const supabase = await createClient();
-  const { data } = await supabase.from("customers").select("id, name").order("name").limit(200);
-  return data ?? [];
+  const pageSize = 1_000;
+  const customers: { id: string; name: string }[] = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("customers")
+      .select("id, name")
+      .order("name")
+      .order("id")
+      .range(from, from + pageSize - 1);
+    if (error) {
+      console.error("Failed to fetch management customers:", error);
+      break;
+    }
+    customers.push(...(data ?? []));
+    if (!data || data.length < pageSize) break;
+  }
+
+  return customers;
 });
 
