@@ -967,7 +967,13 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
               <input
                 type="text"
                 readOnly
-                value={`${buildLeaseFinancialReferencePrefix(selected.contract_no, financeType, financeDate)}-自动顺序`}
+                value={`${buildLeaseFinancialReferencePrefix(
+                  selectedUnit ? buildingMap.get(selectedUnit.building_id)?.code ?? "SACSI" : "SACSI",
+                  selectedUnit?.unit_no ?? "UNIT",
+                  selected.contract_no,
+                  financeType,
+                  financeDate,
+                )}-自动顺序`}
                 className={cn(inputClass, "bg-muted/50 text-xs text-muted-foreground")}
               />
             </div>

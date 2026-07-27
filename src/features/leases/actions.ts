@@ -337,18 +337,27 @@ export async function recordLeaseFinancialEntry(input: {
   const supabase = await createClient();
   const { data: contract, error: contractError } = await supabase
     .from("lease_contracts")
-    .select("id, unit_id, customer_id, contract_no, paid_through_date, deposit_amount_xof, unit:units(unit_no, building_id)")
+    .select("id, unit_id, customer_id, contract_no, paid_through_date, deposit_amount_xof, unit:units(unit_no, building_id, building:buildings(code))")
     .eq("id", input.contractId)
     .single();
   if (contractError || !contract) return { success: false, error: "未找到对应长租合同。" };
 
   const unit = Array.isArray(contract.unit) ? contract.unit[0] : contract.unit;
-  const referencePrefix = buildLeaseFinancialReferencePrefix(contract.contract_no, input.businessType, input.paymentDate);
-  const { data: referenceRows } = await supabase
+  const building = Array.isArray(unit?.building) ? unit.building[0] : unit?.building;
+  const referencePrefix = buildLeaseFinancialReferencePrefix(
+    building?.code ?? "SACSI",
+    unit?.unit_no ?? "UNIT",
+    contract.contract_no,
+    input.businessType,
+    input.paymentDate,
+  );
+  const { count: existingTypeCount, error: sequenceError } = await supabase
     .from("payments")
-    .select("receipt_no")
-    .like("receipt_no", `${referencePrefix}-%`);
-  const referenceNo = `${referencePrefix}-${String((referenceRows?.length ?? 0) + 1).padStart(2, "0")}`;
+    .select("id", { count: "exact", head: true })
+    .eq("source_id", contract.id)
+    .eq("source_type", config.sourceType);
+  if (sequenceError) return { success: false, error: sequenceError.message };
+  const referenceNo = `${referencePrefix}-${String((existingTypeCount ?? 0) + 1).padStart(2, "0")}`;
   const methodLabels = {
     cash: "现金",
     check: "支票",

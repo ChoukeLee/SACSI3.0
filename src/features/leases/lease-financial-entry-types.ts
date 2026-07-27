@@ -128,15 +128,45 @@ function compactDate(date: string) {
   return date.replaceAll("-", "");
 }
 
+function compactReferenceToken(value: string) {
+  return value.trim().toUpperCase().replace(/\s+/g, "-");
+}
+
+function buildingReferencePrefix(buildingCode: string) {
+  const match = /^SACSI(.+)$/i.exec(buildingCode.trim());
+  return match ? `WB${compactReferenceToken(match[1])}` : `WB-${compactReferenceToken(buildingCode)}`;
+}
+
+function contractUnitReference(contractNo: string, buildingCode: string, unitNo: string) {
+  const normalizedContractNo = contractNo.trim().toUpperCase();
+  const normalizedBuildingCode = compactReferenceToken(buildingCode);
+  const prefixes = [
+    `WB-LEASE-${normalizedBuildingCode}-`,
+    `LEASE-${normalizedBuildingCode}-`,
+  ];
+
+  for (const prefix of prefixes) {
+    if (!normalizedContractNo.startsWith(prefix)) continue;
+    const parts = normalizedContractNo.slice(prefix.length).split("-");
+    const dateIndex = parts.findIndex((part) => /^\d{8}$/.test(part));
+    if (dateIndex > 0) return parts.slice(0, dateIndex).join("-");
+  }
+
+  return compactReferenceToken(unitNo);
+}
+
 export function buildLeaseContractNumber(buildingCode: string, unitNo: string, startDate: string) {
   if (!buildingCode || !unitNo || !startDate) return "";
-  return `LEASE-${buildingCode}-${unitNo}-${compactDate(startDate)}`;
+  return `WB-LEASE-${compactReferenceToken(buildingCode)}-${compactReferenceToken(unitNo)}-${compactDate(startDate)}`;
 }
 
 export function buildLeaseFinancialReferencePrefix(
+  buildingCode: string,
+  unitNo: string,
   contractNo: string,
   type: LeaseFinancialBusinessType,
   paymentDate: string,
 ) {
-  return `${contractNo}-${getLeaseFinancialConfig(type).code}-${compactDate(paymentDate)}`;
+  const unitReference = contractUnitReference(contractNo, buildingCode, unitNo);
+  return `${buildingReferencePrefix(buildingCode)}-LEASE-${unitReference}-${compactDate(paymentDate)}-${getLeaseFinancialConfig(type).code}`;
 }
