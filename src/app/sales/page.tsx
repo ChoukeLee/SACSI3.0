@@ -55,7 +55,7 @@ async function SalesData({ locale }: { locale: "zh" | "fr" }) {
       supabase
         .from("payments")
         .select("*")
-        .in("source_type", ["sale", "sale_contract", "property_fee", "sale_registration_fee", "sale_agency_income", "sale_agency_expense", "sale_other_income", "sale_other_expense"])
+        .in("source_type", ["sale", "sale_contract", "property_fee", "parking_fee", "sale_registration_fee", "sale_agency_income", "sale_agency_expense", "sale_other_income", "sale_other_expense"])
         .order("payment_date", { ascending: false })
         .limit(1000),
       supabase.from("receivables").select("*").eq("source_type", "sale_contract").order("due_date").limit(300),

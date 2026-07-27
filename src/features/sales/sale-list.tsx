@@ -21,6 +21,7 @@ import { getEffectiveSaleContracts } from "./sale-contract-filters";
 interface SaleListProps { contracts: SaleContractRow[]; schedules: SalePaymentScheduleRow[]; units: UnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale }
 type PanelType = "new" | "detail" | "insight" | null;
 type SaleStatKey = "active" | "total" | "received" | "receivable" | "overdue" | "transfer";
+const SALE_RECEIPT_SOURCE_TYPES = new Set(["sale", "sale_contract", "property_fee", "parking_fee"]);
 
 const paymentAmountXof = (payment: PaymentRow) => payment.currency === "XOF"
   ? Number(payment.amount)
@@ -92,7 +93,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
     let overdue=0;
     const today=new Date().toISOString().slice(0,10);
     for(const p of payments){
-      if(!p.source_id||!activeIds.has(p.source_id)||!["sale","sale_contract","property_fee"].includes(p.source_type))continue;
+      if(!p.source_id||!activeIds.has(p.source_id)||!SALE_RECEIPT_SOURCE_TYPES.has(p.source_type))continue;
       paidByContract.set(p.source_id,(paidByContract.get(p.source_id)??0)+paymentAmountXof(p));
     }
     for(const r of receivables){
@@ -144,7 +145,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const totalRec = useMemo(()=>contractReceivables.reduce((s,r)=>s+Number(r.amount_xof),0),[contractReceivables]);
   const totalOverdueRec = useMemo(()=>{let o=0;const today=new Date().toISOString().slice(0,10);for(const r of contractReceivables){const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))o+=os;}return o;},[contractReceivables]);
   const totalPaidPayments = contractPayments
-    .filter(p=>["sale","sale_contract","property_fee"].includes(p.source_type))
+    .filter(p=>SALE_RECEIPT_SOURCE_TYPES.has(p.source_type))
     .reduce((s,p)=>s+paymentAmountXof(p),0);
   const isSaleExpensePayment = (payment: PaymentRow) =>
     ["sale_agency_expense", "sale_other_expense"].includes(payment.source_type);
@@ -167,10 +168,10 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const selectedContractTotal = Number(selected?.total_amount_xof ?? 0);
   const saleContractReceived = Math.min(selectedContractTotal, Math.max(totalPaidRec, totalPaidPayments-refundedSalePayments));
   const selectedOutstanding = Math.max(0, (totalRec > 0 ? totalRec : selectedContractTotal) - saleContractReceived);
-  const selectedCnyPayments = contractPayments.filter(p=>p.currency==="CNY"&&["sale","sale_contract","property_fee"].includes(p.source_type));
+  const selectedCnyPayments = contractPayments.filter(p=>p.currency==="CNY"&&SALE_RECEIPT_SOURCE_TYPES.has(p.source_type));
   const selectedCnyReceived = selectedCnyPayments.reduce((sum,p)=>sum+Number(p.amount),0);
   const selectedCnyRate = Number(selectedCnyPayments.find(p=>Number(p.exchange_rate_to_xof)>0)?.exchange_rate_to_xof??0);
-  const selectedSaleIncomePayments = contractPayments.filter(p=>["sale","sale_contract","property_fee"].includes(p.source_type));
+  const selectedSaleIncomePayments = contractPayments.filter(p=>SALE_RECEIPT_SOURCE_TYPES.has(p.source_type));
   const selectedCnyContractTotal = selectedSaleIncomePayments.length>0
     && selectedSaleIncomePayments.every(p=>p.currency==="CNY")
     && selectedCnyRate>0
@@ -218,6 +219,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
       if (txt.includes("退款") || txt.includes("REFUND")) return locale === "zh" ? "合同退款" : "Remboursement";
       return locale === "zh" ? "中介费支出" : "Commission versée";
     }
+    if (payment.source_type === "parking_fee") return locale === "zh" ? "车位款收入" : "Paiement parking";
     if (payment.source_type === "property_fee") return locale === "zh" ? "物业费收入" : "Frais de copropriété";
     if (receiptNo.includes("PARKING")) return locale === "zh" ? "车位款收入" : "Paiement parking";
     if (receiptNo.includes("HOUSE")) return locale === "zh" ? "房款收入" : "Paiement du bien";
