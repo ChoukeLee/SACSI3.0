@@ -319,18 +319,16 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
           if (outstanding > 0 && (r.status === "overdue" || r.due_date < todayStr)) overdue += outstanding;
           if (outstanding > 0 && (!nextDue || r.due_date < nextDue)) nextDue = r.due_date;
         }
-        const originalMonthlyRent = getOriginalMonthlyRent(contract, payments);
         return {
           contract,
           unit,
           customer,
-          originalMonthlyRent,
           summary: { total, paid, outstanding: Math.max(0, total - paid), overdue, nextDue, count: related.length },
         };
       })
       .filter((row) => row.unit)
       .sort((a, b) => (a.unit?.unit_no ?? "").localeCompare(b.unit?.unit_no ?? "", undefined, { numeric: true }));
-  }, [customerMap, filteredByBuilding, payments, receivables, todayStr, unitMap]);
+  }, [customerMap, filteredByBuilding, receivables, todayStr, unitMap]);
 
   const currentDueRows = useMemo(() => {
     const scopedContracts = new Map(filteredByBuilding.map((contract) => [contract.id, contract]));
@@ -734,11 +732,6 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                         </div>
                         <div className="shrink-0 text-right tabular-nums">
                           <p className="text-sm font-semibold">{formatXof(Number(row.contract.monthly_rent_xof))}</p>
-                          {row.originalMonthlyRent && (
-                            <p className="mt-0.5 text-[11px] text-muted-foreground">
-                              {locale === "zh" ? "原币约 " : "Devise d'origine env. "}{formatOriginalMonthlyRent(row.originalMonthlyRent.currency, row.originalMonthlyRent.amount)}/{locale === "zh" ? "月" : "mois"}
-                            </p>
-                          )}
                         </div>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
