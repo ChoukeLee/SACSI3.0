@@ -13,11 +13,10 @@ async function checked(query, label) {
 }
 
 const tenantName = "\u5c0f\u7c73";
-const exchangeRate = 10_997_600 / 19_200;
 const specs = {
-  "601": { area: 175.95, rentCny: 7_008, rentXof: 4_014_124 },
-  "602": { area: 156.39, rentCny: 6_229, rentXof: 3_567_919 },
-  "603": { area: 149.72, rentCny: 5_963, rentXof: 3_415_557 },
+  "601": { area: 175.95, originalShare: 7_008, rentXof: 4_014_124 },
+  "602": { area: 156.39, originalShare: 6_229, rentXof: 3_567_919 },
+  "603": { area: 149.72, originalShare: 5_963, rentXof: 3_415_557 },
 };
 const unitNos = Object.keys(specs);
 const building = await checked(supabase.from("buildings").select("id").eq("code", "SACSI5").single(), "load building");
@@ -48,8 +47,8 @@ for (const unitNo of unitNos) {
     : [`LEGACY-LEASE-SACSI5-${unitNo}`, contractNo];
   if (!allowedOldContracts.includes(lease.contract_no)) throw new Error(`Unexpected ${unitNo} contract: ${lease.contract_no}`);
   const monthlyRentXof = Math.round(spec.rentXof / 6);
-  const allocation = `${unitNo}\u6309\u9762\u79ef${spec.area}\u33a1\u5206\u644a\u4eba\u6c11\u5e01${spec.rentCny}\u5143\uff0c\u6298\u5408${spec.rentXof} FCFA`;
-  const notes = `\u6765\u6e90\uff1a5\u53f7\u516c\u5bd3(1).xlsx\uff1b\u5c0f\u7c73\u8054\u5408\u627f\u79df601\u3001602\u3001603\uff0c\u5373\u516d\u5c42\u7684\u4e00\u534a\uff1b\u79df\u671f2026-06-01\u81f32026-11-30\uff1b\u4e09\u95f4\u5408\u8ba12026-06-22\u4ed8\u4eba\u6c11\u5e0119200\u5143\uff0c\u6298\u54081099.76\u4e07FCFA\uff1b${allocation}\uff1b\u65e0\u62bc\u91d1\u3001\u7269\u4e1a\u8d39\u6216\u4ee3\u79df\u8bb0\u5f55\u3002`;
+  const allocation = `${unitNo}\u6309\u9762\u79ef${spec.area}\u33a1\u5206\u644a${spec.rentXof} FCFA`;
+  const notes = `\u6765\u6e90\uff1a5\u53f7\u516c\u5bd3(1).xlsx\uff1b\u5c0f\u7c73\u8054\u5408\u627f\u79df601\u3001602\u3001603\uff0c\u5373\u516d\u5c42\u7684\u4e00\u534a\uff1b\u79df\u671f2026-06-01\u81f32026-11-30\uff1bExcel\u8bb02026-06-22\u4ed819200\u201c\uffe5\u201d\u3001\u6298\u54081099.76\u4e07FCFA\uff0c\u4e24\u8005\u9690\u542b\u6c47\u7387\u7ea6572.79\uff0c\u4e0e\u4eba\u6c11\u5e01\u4e0d\u7b26\u800c\u4e0e\u7f8e\u5143\u6c47\u7387\u5339\u914d\uff1b\u539f\u5e01\u7b26\u53f7\u89c6\u4e3aExcel\u5f85\u6838\u5b9e\u9519\u8bef\uff0c\u4e0d\u518d\u6309CNY\u5165\u8d26\uff1b\u4ee5Excel\u660e\u786e\u6298\u5408\u91d11099.76\u4e07FCFA\u4f5c\u8d22\u52a1\u4e3b\u91d1\u989d\uff1b${allocation}\uff1b\u539f\u59cb19200\u9ad8\u5ea6\u7591\u4f3cUSD\uff0c\u5f85\u539f\u59cb\u4ed8\u6b3e\u51ed\u8bc1\u786e\u8ba4\uff1b\u65e0\u62bc\u91d1\u3001\u7269\u4e1a\u8d39\u6216\u4ee3\u79df\u8bb0\u5f55\u3002`;
   await checked(supabase.from("lease_contracts").update({
     contract_no: contractNo,
     start_date: "2026-06-01",
@@ -77,7 +76,7 @@ for (const unitNo of unitNos) {
   const receiptNo = `WB5-LEASE-${unitNo}-20260622-RENT-GROUP-01`;
   const paymentRows = await checked(supabase.from("payments").select("id").eq("source_id", lease.id), `find ${unitNo} payment`);
   if (paymentRows.length > 1) throw new Error(`Unexpected ${unitNo} payments`);
-  const paymentPayload = { customer_id: customer.id, unit_id: unit.id, source_type: "lease_rent", source_id: lease.id, payment_date: "2026-06-22", amount: spec.rentCny, currency: "CNY", exchange_rate_to_xof: exchangeRate, receipt_no: receiptNo, notes };
+  const paymentPayload = { customer_id: customer.id, unit_id: unit.id, source_type: "lease_rent", source_id: lease.id, payment_date: "2026-06-22", amount: spec.rentXof, currency: "XOF", exchange_rate_to_xof: 1, receipt_no: receiptNo, notes };
   let paymentId;
   if (paymentRows.length === 1) {
     paymentId = paymentRows[0].id;
@@ -88,7 +87,7 @@ for (const unitNo of unitNos) {
 
   const ledgerRows = await checked(supabase.from("ledger_entries").select("id").eq("payment_id", paymentId), `find ${unitNo} ledger`);
   if (ledgerRows.length > 1) throw new Error(`Duplicate ${unitNo} ledgers`);
-  const ledgerPayload = { building_id: building.id, unit_id: unit.id, payment_id: paymentId, entry_date: "2026-06-22", direction: "income", category: "lease_rent", amount_xof: spec.rentXof, amount_cny: spec.rentCny, description: notes };
+  const ledgerPayload = { building_id: building.id, unit_id: unit.id, payment_id: paymentId, entry_date: "2026-06-22", direction: "income", category: "lease_rent", amount_xof: spec.rentXof, amount_cny: null, description: notes };
   if (ledgerRows.length === 1) await checked(supabase.from("ledger_entries").update(ledgerPayload).eq("id", ledgerRows[0].id), `update ${unitNo} ledger`);
   else await checked(supabase.from("ledger_entries").insert(ledgerPayload), `insert ${unitNo} ledger`);
 
@@ -106,9 +105,9 @@ const verifiedPayments = await checked(supabase.from("payments").select("source_
 const verifiedReceivables = await checked(supabase.from("receivables").select("source_id, amount_xof, paid_amount_xof, status").in("source_id", verifiedLeases.map((lease) => lease.id)).neq("status", "cancelled"), "verify receivables");
 const verifiedLedgers = await checked(supabase.from("ledger_entries").select("unit_id, amount_xof, amount_cny, direction, category").in("unit_id", units.map((unit) => unit.id)), "verify ledgers");
 if (verifiedLeases.length !== 3 || verifiedLeases.some((lease) => lease.signer_name !== tenantName || lease.start_date !== "2026-06-01" || lease.expected_end_date !== "2026-11-30" || lease.status !== "active" || lease.paid_through_date !== "2026-11-30" || Number(lease.deposit_amount_xof) !== 0)) throw new Error("Unexpected verified leases");
-if (verifiedPayments.length !== 3 || verifiedPayments.some((payment) => payment.source_type !== "lease_rent" || payment.currency !== "CNY") || verifiedPayments.reduce((sum, payment) => sum + Number(payment.amount), 0) !== 19_200 || verifiedPayments.reduce((sum, payment) => sum + Math.round(Number(payment.amount) * Number(payment.exchange_rate_to_xof)), 0) !== 10_997_600) throw new Error("Unexpected verified payments");
+if (verifiedPayments.length !== 3 || verifiedPayments.some((payment) => payment.source_type !== "lease_rent" || payment.currency !== "XOF" || Number(payment.exchange_rate_to_xof) !== 1) || verifiedPayments.reduce((sum, payment) => sum + Number(payment.amount), 0) !== 10_997_600) throw new Error("Unexpected verified payments");
 if (verifiedReceivables.length !== 3 || verifiedReceivables.some((row) => row.status !== "paid" || Number(row.amount_xof) !== Number(row.paid_amount_xof)) || verifiedReceivables.reduce((sum, row) => sum + Number(row.amount_xof), 0) !== 10_997_600) throw new Error("Unexpected verified receivables");
-if (verifiedLedgers.length !== 3 || verifiedLedgers.some((row) => row.direction !== "income" || row.category !== "lease_rent") || verifiedLedgers.reduce((sum, row) => sum + Number(row.amount_xof), 0) !== 10_997_600 || verifiedLedgers.reduce((sum, row) => sum + Number(row.amount_cny), 0) !== 19_200) throw new Error("Unexpected verified ledgers");
+if (verifiedLedgers.length !== 3 || verifiedLedgers.some((row) => row.direction !== "income" || row.category !== "lease_rent" || row.amount_cny !== null) || verifiedLedgers.reduce((sum, row) => sum + Number(row.amount_xof), 0) !== 10_997_600) throw new Error("Unexpected verified ledgers");
 
-await checked(supabase.from("audit_logs").insert({ action: "reconcile_joint_unit_lease_data", entity_type: "building", entity_id: building.id, metadata: { building_code: "SACSI5", units: unitNos, tenant: tenantName, joint_lease: true, rented_scope: "6F half floor", allocation_basis: "area_sqm", total_area_sqm: 482.06, lease_start: "2026-06-01", lease_end: "2026-11-30", paid_through: "2026-11-30", rent_cny: 19_200, rent_xof: 10_997_600, exchange_rate_to_xof: exchangeRate, allocations: specs, deposit_xof: 0, property_fee_xof: 0, agency_recorded: false, supersedes_unit_601_only_interpretation: true } }), "write audit log");
-console.log(JSON.stringify({ ok: true, units: unitNos, tenant: tenantName, joint_lease: true, allocation_basis: "area_sqm", rent_cny: 19_200, rent_xof: 10_997_600, allocations: specs, paid_through: "2026-11-30" }));
+await checked(supabase.from("audit_logs").insert({ action: "correct_joint_lease_currency", entity_type: "building", entity_id: building.id, metadata: { building_code: "SACSI5", units: unitNos, tenant: tenantName, joint_lease: true, rented_scope: "6F half floor", allocation_basis: "area_sqm", total_area_sqm: 482.06, lease_start: "2026-06-01", lease_end: "2026-11-30", paid_through: "2026-11-30", workbook_original_amount: 19_200, workbook_original_symbol: "\uffe5", workbook_xof_equivalent: 10_997_600, implied_rate_to_xof: 10_997_600 / 19_200, cny_interpretation_rejected: true, likely_original_currency: "USD", likely_currency_pending_source_document: true, accounting_currency: "XOF", rent_xof: 10_997_600, allocations: specs, deposit_xof: 0, property_fee_xof: 0, agency_recorded: false } }), "write audit log");
+console.log(JSON.stringify({ ok: true, units: unitNos, tenant: tenantName, joint_lease: true, allocation_basis: "area_sqm", accounting_currency: "XOF", rent_xof: 10_997_600, original_amount: 19_200, original_currency_likely: "USD", original_currency_pending: true, allocations: specs, paid_through: "2026-11-30" }));
