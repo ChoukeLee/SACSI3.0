@@ -91,6 +91,10 @@ function formatOriginalPaymentAmount(payment: PaymentRow) {
   return `${payment.currency} ${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(Number(payment.amount))}`;
 }
 
+function formatOriginalMonthlyRent(currency: string, amount: number) {
+  return `${currency} ${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(amount)}`;
+}
+
 export function LeaseList({ contracts, units, customers, payments, receivables, buildings, locale }: LeaseListProps) {
   const router = useRouter();
   const t = dictionaries[locale].leases;
@@ -285,16 +289,24 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
           if (outstanding > 0 && (r.status === "overdue" || r.due_date < todayStr)) overdue += outstanding;
           if (outstanding > 0 && (!nextDue || r.due_date < nextDue)) nextDue = r.due_date;
         }
+        const originalCurrencyPayments = payments
+          .filter((payment) => payment.source_id === contract.id && payment.source_type === "lease_rent" && payment.currency !== "XOF" && Number(payment.exchange_rate_to_xof) > 0)
+          .sort((a, b) => b.payment_date.localeCompare(a.payment_date));
+        const originalCurrency = originalCurrencyPayments[0]?.currency;
+        const originalMonthlyRent = originalCurrency && originalCurrencyPayments.every((payment) => payment.currency === originalCurrency)
+          ? Number(contract.monthly_rent_xof) / Number(originalCurrencyPayments[0].exchange_rate_to_xof)
+          : null;
         return {
           contract,
           unit,
           customer,
+          originalMonthlyRent: originalMonthlyRent === null ? null : { currency: originalCurrency, amount: originalMonthlyRent },
           summary: { total, paid, outstanding: Math.max(0, total - paid), overdue, nextDue, count: related.length },
         };
       })
       .filter((row) => row.unit)
       .sort((a, b) => (a.unit?.unit_no ?? "").localeCompare(b.unit?.unit_no ?? "", undefined, { numeric: true }));
-  }, [customerMap, filteredByBuilding, receivables, todayStr, unitMap]);
+  }, [customerMap, filteredByBuilding, payments, receivables, todayStr, unitMap]);
 
   const currentDueRows = useMemo(() => {
     const scopedContracts = new Map(filteredByBuilding.map((contract) => [contract.id, contract]));
@@ -681,7 +693,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                   <p className="mt-1 text-lg font-semibold tabular-nums">{contractRows.length}</p>
                 </div>
                 <div className="rounded-xl border border-border bg-muted/35 p-3">
-                  <p className="text-xs text-muted-foreground">{locale === "zh" ? "月租合计" : "Loyer total"}</p>
+                  <p className="text-xs text-muted-foreground">{locale === "zh" ? "折合月租合计" : "Loyer total converti"}</p>
                   <p className="mt-1 text-lg font-semibold tabular-nums">{formatXof(contractRows.reduce((sum, row) => sum + Number(row.contract.monthly_rent_xof), 0))}</p>
                 </div>
               </div>
@@ -696,7 +708,14 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                           <p className="text-sm font-semibold">{row.unit?.unit_no ?? "-"} · {row.customer?.name ?? (locale === "zh" ? "客户待补" : "Client à compléter")}</p>
                           <p className="mt-1 text-xs text-muted-foreground">{locale === "zh" ? "已缴至" : "Payé au"} {row.contract.paid_through_date ?? (locale === "zh" ? "待补" : "À compléter")}</p>
                         </div>
-                        <p className="shrink-0 text-sm font-semibold tabular-nums">{formatXof(Number(row.contract.monthly_rent_xof))}</p>
+                        <div className="shrink-0 text-right tabular-nums">
+                          <p className="text-sm font-semibold">{formatXof(Number(row.contract.monthly_rent_xof))}</p>
+                          {row.originalMonthlyRent && (
+                            <p className="mt-0.5 text-[11px] text-muted-foreground">
+                              {locale === "zh" ? "原币约 " : "Devise d'origine env. "}{formatOriginalMonthlyRent(row.originalMonthlyRent.currency, row.originalMonthlyRent.amount)}/{locale === "zh" ? "月" : "mois"}
+                            </p>
+                          )}
+                        </div>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                         <span>{locale === "zh" ? "起租" : "Début"} {row.contract.start_date}</span>
