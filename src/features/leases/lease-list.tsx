@@ -95,6 +95,29 @@ function formatOriginalMonthlyRent(currency: string, amount: number) {
   return `${currency} ${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(amount)}`;
 }
 
+function getOriginalMonthlyRent(contract: LeaseContractRow, payments: PaymentRow[]) {
+  const contractPayments = payments
+    .filter((payment) => payment.source_id === contract.id && payment.source_type === "lease_rent")
+    .sort((a, b) => b.payment_date.localeCompare(a.payment_date));
+  const originalCurrencyPayments = contractPayments.filter((payment) => payment.currency !== "XOF" && Number(payment.exchange_rate_to_xof) > 0);
+  const originalCurrency = originalCurrencyPayments[0]?.currency;
+  if (originalCurrency && originalCurrencyPayments.every((payment) => payment.currency === originalCurrency)) {
+    return {
+      currency: originalCurrency,
+      amount: Number(contract.monthly_rent_xof) / Number(originalCurrencyPayments[0].exchange_rate_to_xof),
+    };
+  }
+
+  for (const payment of contractPayments) {
+    const metadata = payment.notes?.match(/original_currency=([A-Z]{3});original_amount=([\d.]+);original_period_months=(\d+)/);
+    if (!metadata) continue;
+    const originalAmount = Number(metadata[2]);
+    const periodMonths = Number(metadata[3]);
+    if (originalAmount > 0 && periodMonths > 0) return { currency: metadata[1], amount: originalAmount / periodMonths };
+  }
+  return null;
+}
+
 export function LeaseList({ contracts, units, customers, payments, receivables, buildings, locale }: LeaseListProps) {
   const router = useRouter();
   const t = dictionaries[locale].leases;
@@ -198,6 +221,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const selected = selectedId ? contracts.find((c) => c.id === selectedId) : null;
   const selectedUnit = selected ? units.find((u) => u.id === selected.unit_id) : null;
   const selectedCustomer = selected ? customers.find((c) => c.id === selected.customer_id) : null;
+  const selectedOriginalMonthlyRent = selected ? getOriginalMonthlyRent(selected, payments) : null;
 
   const leaseAttention = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -289,18 +313,12 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
           if (outstanding > 0 && (r.status === "overdue" || r.due_date < todayStr)) overdue += outstanding;
           if (outstanding > 0 && (!nextDue || r.due_date < nextDue)) nextDue = r.due_date;
         }
-        const originalCurrencyPayments = payments
-          .filter((payment) => payment.source_id === contract.id && payment.source_type === "lease_rent" && payment.currency !== "XOF" && Number(payment.exchange_rate_to_xof) > 0)
-          .sort((a, b) => b.payment_date.localeCompare(a.payment_date));
-        const originalCurrency = originalCurrencyPayments[0]?.currency;
-        const originalMonthlyRent = originalCurrency && originalCurrencyPayments.every((payment) => payment.currency === originalCurrency)
-          ? Number(contract.monthly_rent_xof) / Number(originalCurrencyPayments[0].exchange_rate_to_xof)
-          : null;
+        const originalMonthlyRent = getOriginalMonthlyRent(contract, payments);
         return {
           contract,
           unit,
           customer,
-          originalMonthlyRent: originalMonthlyRent === null ? null : { currency: originalCurrency, amount: originalMonthlyRent },
+          originalMonthlyRent,
           summary: { total, paid, outstanding: Math.max(0, total - paid), overdue, nextDue, count: related.length },
         };
       })
@@ -821,7 +839,15 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
             <div><dt className="text-xs text-muted-foreground">{locale==="zh"?"缴租截至日":"Loyer payé au"}</dt><dd className={cn(selected.paid_through_date&&isPaidThroughOverdue(selected)?"font-medium text-red-600":"font-medium text-emerald-700")}>{selected.paid_through_date??(locale==="zh"?"待补":"À compléter")}</dd></div>
             {selected.actual_end_date&&<div><dt className="text-xs text-muted-foreground">{t.form.actualEndDate}</dt><dd>{selected.actual_end_date}</dd></div>}
             <div><dt className="text-xs text-muted-foreground">{t.form.paymentCycle}</dt><dd>{t.paymentCycle[selected.payment_cycle as keyof typeof t.paymentCycle]} / {selected.payment_day}号</dd></div>
-            <div><dt className="text-xs text-muted-foreground">{t.form.monthlyRent}</dt><dd className="font-semibold">{formatXof(Number(selected.monthly_rent_xof))}</dd></div>
+            <div>
+              <dt className="text-xs text-muted-foreground">{t.form.monthlyRent}</dt>
+              <dd className="font-semibold">{formatXof(Number(selected.monthly_rent_xof))}</dd>
+              {selectedOriginalMonthlyRent && (
+                <dd className="mt-0.5 text-xs text-muted-foreground">
+                  {locale === "zh" ? "原币约 " : "Devise d'origine env. "}{formatOriginalMonthlyRent(selectedOriginalMonthlyRent.currency, selectedOriginalMonthlyRent.amount)}/{locale === "zh" ? "月" : "mois"}
+                </dd>
+              )}
+            </div>
             <div><dt className="text-xs text-muted-foreground">{t.form.deposit}</dt><dd>{formatXof(Number(selected.deposit_amount_xof))} {selected.deposit_received?t.form.depositPaid:t.form.depositUnpaid}</dd></div>
             {selected.rent_free_days>0&&<div><dt className="text-xs text-muted-foreground">{t.form.rentFreeDays}</dt><dd>{selected.rent_free_days}天</dd></div>}
             {selected.signer_name&&<div><dt className="text-xs text-muted-foreground">{t.form.signerName}</dt><dd>{selected.signer_name}</dd></div>}

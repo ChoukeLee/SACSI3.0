@@ -13,6 +13,7 @@ async function checked(query, label) {
 }
 
 const tenantName = "\u5c0f\u7c73";
+const exchangeRate = 10_997_600 / 19_200;
 const specs = {
   "601": { area: 175.95, originalShare: 7_008, rentXof: 4_014_124 },
   "602": { area: 156.39, originalShare: 6_229, rentXof: 3_567_919 },
@@ -48,7 +49,7 @@ for (const unitNo of unitNos) {
   if (!allowedOldContracts.includes(lease.contract_no)) throw new Error(`Unexpected ${unitNo} contract: ${lease.contract_no}`);
   const monthlyRentXof = Math.round(spec.rentXof / 6);
   const allocation = `${unitNo}\u6309\u9762\u79ef${spec.area}\u33a1\u5206\u644a${spec.rentXof} FCFA`;
-  const notes = `\u6765\u6e90\uff1a5\u53f7\u516c\u5bd3(1).xlsx\uff1b\u5c0f\u7c73\u8054\u5408\u627f\u79df601\u3001602\u3001603\uff0c\u5373\u516d\u5c42\u7684\u4e00\u534a\uff1b\u79df\u671f2026-06-01\u81f32026-11-30\uff1bExcel\u8bb02026-06-22\u4ed819200\u201c\uffe5\u201d\u3001\u6298\u54081099.76\u4e07FCFA\uff0c\u4e24\u8005\u9690\u542b\u6c47\u7387\u7ea6572.79\uff0c\u4e0e\u4eba\u6c11\u5e01\u4e0d\u7b26\u800c\u4e0e\u7f8e\u5143\u6c47\u7387\u5339\u914d\uff1b\u539f\u5e01\u7b26\u53f7\u89c6\u4e3aExcel\u5f85\u6838\u5b9e\u9519\u8bef\uff0c\u4e0d\u518d\u6309CNY\u5165\u8d26\uff1b\u4ee5Excel\u660e\u786e\u6298\u5408\u91d11099.76\u4e07FCFA\u4f5c\u8d22\u52a1\u4e3b\u91d1\u989d\uff1b${allocation}\uff1b\u539f\u59cb19200\u9ad8\u5ea6\u7591\u4f3cUSD\uff0c\u5f85\u539f\u59cb\u4ed8\u6b3e\u51ed\u8bc1\u786e\u8ba4\uff1b\u65e0\u62bc\u91d1\u3001\u7269\u4e1a\u8d39\u6216\u4ee3\u79df\u8bb0\u5f55\u3002`;
+  const notes = `\u6765\u6e90\uff1a5\u53f7\u516c\u5bd3(1).xlsx\uff1b\u5c0f\u7c73\u8054\u5408\u627f\u79df601\u3001602\u3001603\uff0c\u5373\u516d\u5c42\u7684\u4e00\u534a\uff1b\u79df\u671f2026-06-01\u81f32026-11-30\uff1bExcel\u8bb02026-06-22\u4ed819200\u201c\uffe5\u201d\u3001\u6298\u54081099.76\u4e07FCFA\uff0c\u4e24\u8005\u9690\u542b\u6c47\u7387\u7ea6572.79\uff0c\u4e0e\u4eba\u6c11\u5e01\u4e0d\u7b26\u800c\u4e0e\u7f8e\u5143\u6c47\u7387\u5339\u914d\uff1b\u539f\u5e01\u6309USD\u8bc6\u522b\uff0c\u4ee5Excel\u660e\u786e\u6298\u5408\u91d11099.76\u4e07FCFA\u4f5c\u8d22\u52a1\u4e3b\u91d1\u989d\uff1b${allocation}\uff1b\u65e0\u62bc\u91d1\u3001\u7269\u4e1a\u8d39\u6216\u4ee3\u79df\u8bb0\u5f55\u3002`;
   await checked(supabase.from("lease_contracts").update({
     contract_no: contractNo,
     start_date: "2026-06-01",
@@ -76,7 +77,8 @@ for (const unitNo of unitNos) {
   const receiptNo = `WB5-LEASE-${unitNo}-20260622-RENT-GROUP-01`;
   const paymentRows = await checked(supabase.from("payments").select("id").eq("source_id", lease.id), `find ${unitNo} payment`);
   if (paymentRows.length > 1) throw new Error(`Unexpected ${unitNo} payments`);
-  const paymentPayload = { customer_id: customer.id, unit_id: unit.id, source_type: "lease_rent", source_id: lease.id, payment_date: "2026-06-22", amount: spec.rentXof, currency: "XOF", exchange_rate_to_xof: 1, receipt_no: receiptNo, notes };
+  const paymentNotes = `${notes}\noriginal_currency=USD;original_amount=${spec.originalShare};original_period_months=6`;
+  const paymentPayload = { customer_id: customer.id, unit_id: unit.id, source_type: "lease_rent", source_id: lease.id, payment_date: "2026-06-22", amount: spec.rentXof, currency: "XOF", exchange_rate_to_xof: 1, receipt_no: receiptNo, notes: paymentNotes };
   let paymentId;
   if (paymentRows.length === 1) {
     paymentId = paymentRows[0].id;
@@ -109,5 +111,5 @@ if (verifiedPayments.length !== 3 || verifiedPayments.some((payment) => payment.
 if (verifiedReceivables.length !== 3 || verifiedReceivables.some((row) => row.status !== "paid" || Number(row.amount_xof) !== Number(row.paid_amount_xof)) || verifiedReceivables.reduce((sum, row) => sum + Number(row.amount_xof), 0) !== 10_997_600) throw new Error("Unexpected verified receivables");
 if (verifiedLedgers.length !== 3 || verifiedLedgers.some((row) => row.direction !== "income" || row.category !== "lease_rent" || row.amount_cny !== null) || verifiedLedgers.reduce((sum, row) => sum + Number(row.amount_xof), 0) !== 10_997_600) throw new Error("Unexpected verified ledgers");
 
-await checked(supabase.from("audit_logs").insert({ action: "correct_joint_lease_currency", entity_type: "building", entity_id: building.id, metadata: { building_code: "SACSI5", units: unitNos, tenant: tenantName, joint_lease: true, rented_scope: "6F half floor", allocation_basis: "area_sqm", total_area_sqm: 482.06, lease_start: "2026-06-01", lease_end: "2026-11-30", paid_through: "2026-11-30", workbook_original_amount: 19_200, workbook_original_symbol: "\uffe5", workbook_xof_equivalent: 10_997_600, implied_rate_to_xof: 10_997_600 / 19_200, cny_interpretation_rejected: true, likely_original_currency: "USD", likely_currency_pending_source_document: true, accounting_currency: "XOF", rent_xof: 10_997_600, allocations: specs, deposit_xof: 0, property_fee_xof: 0, agency_recorded: false } }), "write audit log");
-console.log(JSON.stringify({ ok: true, units: unitNos, tenant: tenantName, joint_lease: true, allocation_basis: "area_sqm", accounting_currency: "XOF", rent_xof: 10_997_600, original_amount: 19_200, original_currency_likely: "USD", original_currency_pending: true, allocations: specs, paid_through: "2026-11-30" }));
+await checked(supabase.from("audit_logs").insert({ action: "set_joint_lease_original_currency", entity_type: "building", entity_id: building.id, metadata: { building_code: "SACSI5", units: unitNos, tenant: tenantName, joint_lease: true, rented_scope: "6F half floor", allocation_basis: "area_sqm", total_area_sqm: 482.06, lease_start: "2026-06-01", lease_end: "2026-11-30", paid_through: "2026-11-30", workbook_original_amount: 19_200, workbook_original_symbol: "\uffe5", workbook_xof_equivalent: 10_997_600, exchange_rate_to_xof: exchangeRate, cny_interpretation_rejected: true, original_currency: "USD", accounting_currency: "XOF", rent_xof: 10_997_600, allocations: specs, deposit_xof: 0, property_fee_xof: 0, agency_recorded: false } }), "write audit log");
+console.log(JSON.stringify({ ok: true, units: unitNos, tenant: tenantName, joint_lease: true, allocation_basis: "area_sqm", accounting_currency: "XOF", rent_xof: 10_997_600, original_amount: 19_200, original_currency: "USD", allocations: specs, paid_through: "2026-11-30" }));
