@@ -31,6 +31,7 @@ import {
   LEASE_FINANCIAL_BUSINESS_TYPES,
   type LeaseFinancialBusinessType,
 } from "./lease-financial-entry-types";
+import { isOverdueReceivable, summarizeLeaseReceivables } from "./lease-receivable-summary";
 
 interface UnitBusinessFlag {
   business_type: "daily_rental" | "long_lease" | "sale";
@@ -239,20 +240,11 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       const customer = customerMap.get(contract.customer_id);
       if (!unit) return [];
       const related = receivables.filter((row) => row.source_type === "lease_contract" && row.source_id === contract.id && row.status !== "cancelled");
-      let outstanding = 0;
-      let overdueOutstanding = 0;
-      let earliestOutstandingDue: string | null = null;
-      for (const row of related) {
-        const balance = Math.max(0, Number(row.amount_xof) - Number(row.paid_amount_xof));
-        if (balance <= 0) continue;
-        outstanding += balance;
-        if (!earliestOutstandingDue || row.due_date < earliestOutstandingDue) earliestOutstandingDue = row.due_date;
-        if (row.status === "overdue" || row.due_date < today) overdueOutstanding += balance;
-      }
+      const summary = summarizeLeaseReceivables(related, today);
       const coverageDue = contract.paid_through_date ? addDaysToIso(contract.paid_through_date, 1) : null;
-      const dueDate = earliestOutstandingDue ?? coverageDue;
+      const dueDate = summary.earliestOverdueDue ?? summary.earliestOutstandingDue ?? coverageDue;
       if (!dueDate) return [];
-      const isOverdue = overdueOutstanding > 0 || dueDate < today;
+      const isOverdue = summary.overdue > 0 || dueDate < today;
       const isUpcoming = !isOverdue && dueDate <= upcomingLimit;
       if (!isOverdue && !isUpcoming) return [];
       const building = buildingMap.get(unit.building_id);
@@ -263,8 +255,12 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
         buildingName: building?.display_name || building?.code || "-",
         dueDate,
         paidThrough: contract.paid_through_date,
-        amount: outstanding > 0 ? outstanding : Number(contract.monthly_rent_xof),
-        amountIsEstimated: outstanding <= 0,
+        amount: summary.overdue > 0
+          ? summary.overdue
+          : summary.outstanding > 0
+            ? summary.outstanding
+            : Number(contract.monthly_rent_xof),
+        amountIsEstimated: summary.outstanding <= 0,
         days: diffIsoDays(today, dueDate),
         kind: isOverdue ? "overdue" as const : "upcoming" as const,
       }];
@@ -275,17 +271,44 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     };
   }, [buildings, customerMap, filteredByBuilding, receivables, unitMap]);
 
+  const actualOverdueRows = useMemo(() => {
+    const buildingById = new Map(buildings.map((building) => [building.id, building]));
+    return filteredByBuilding.flatMap((contract) => {
+      const unit = unitMap.get(contract.unit_id);
+      const customer = customerMap.get(contract.customer_id);
+      if (!unit) return [];
+
+      const related = receivables.filter((row) => row.source_type === "lease_contract" && row.source_id === contract.id);
+      const summary = summarizeLeaseReceivables(related, todayStr);
+      if (summary.overdue <= 0 || !summary.earliestOverdueDue) return [];
+
+      const building = buildingById.get(unit.building_id);
+      return [{
+        contract,
+        unit,
+        customer,
+        buildingName: building?.display_name || building?.code || "-",
+        dueDate: summary.earliestOverdueDue,
+        paidThrough: contract.paid_through_date,
+        amount: summary.overdue,
+        amountIsEstimated: false,
+        days: diffIsoDays(todayStr, summary.earliestOverdueDue),
+        kind: "overdue" as const,
+      }];
+    }).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  }, [buildings, customerMap, filteredByBuilding, receivables, todayStr, unitMap]);
+
   const dashboardStats = useMemo(() => {
     const scopedContractIds = new Set(filteredByBuilding.map((c) => c.id));
     const active = filteredByBuilding.filter((c) => c.status === "active");
-    let currentDue = 0, overdue = 0;
+    let currentDue = 0;
     for (const r of receivables) {
       if (r.source_type !== "lease_contract" || r.status === "cancelled" || !r.source_id || !scopedContractIds.has(r.source_id)) continue;
       const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
       if (outstanding <= 0) continue;
-      const isOverdue = r.status === "overdue" || r.due_date < todayStr;
+      const isOverdue = isOverdueReceivable(r, todayStr);
       if (isOverdue) {
-        overdue += outstanding;
+        continue;
       } else {
         currentDue += outstanding;
       }
@@ -295,10 +318,10 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       rent: active.reduce((sum, c) => sum + Number(c.monthly_rent_xof), 0),
       dueSoon: leaseAttention.upcoming.length,
       currentDue,
-      overdue,
-      overdueContracts: leaseAttention.overdue.length,
+      overdue: actualOverdueRows.reduce((sum, row) => sum + row.amount, 0),
+      overdueContracts: actualOverdueRows.length,
     };
-  }, [filteredByBuilding, leaseAttention.overdue.length, leaseAttention.upcoming.length, receivables, todayStr]);
+  }, [actualOverdueRows, filteredByBuilding, leaseAttention.upcoming.length, receivables, todayStr]);
 
   const leaseInsightContracts = useMemo(() => {
     return filteredByBuilding
@@ -618,7 +641,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
         };
         const activeRows = leaseInsightContracts.filter((row) => row.contract.status === "active");
         const rentRows = [...activeRows].sort((a, b) => Number(b.contract.monthly_rent_xof) - Number(a.contract.monthly_rent_xof));
-        const noticeRows = statFilter === "dueSoon" ? leaseAttention.upcoming : leaseAttention.overdue;
+        const noticeRows = statFilter === "dueSoon" ? leaseAttention.upcoming : actualOverdueRows;
 
         if (statFilter === "dueSoon" || statFilter === "overdue") {
           return (
