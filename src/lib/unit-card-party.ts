@@ -36,6 +36,13 @@ export function unitCardPartyFromNotes(unit: Pick<UnitRow, "notes">, status: Car
     ]);
   }
 
+  if (status === "ownerOccupied") {
+    return firstMatch(notes, [
+      /入住人[:：]\s*([^；;，,、\n]+)/,
+      /使用人[:：]\s*([^；;，,、\n]+)/,
+    ]);
+  }
+
   return null;
 }
 

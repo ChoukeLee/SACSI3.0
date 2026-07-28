@@ -12,6 +12,13 @@ describe("unit card party fallback", () => {
       .toBe("WB-LEASE-SACSI7-11-12F-20250901");
   });
 
+  it("shows the named occupant for an owner-occupied employee unit", () => {
+    expect(unitCardPartyFromNotes({ notes: "自用员工宿舍；入住人：李军；登记日期：2026-07-22。" }, "ownerOccupied"))
+      .toBe("李军");
+    expect(unitCardPartyFromNotes({ notes: "内部使用；使用人：李振咏；" }, "ownerOccupied"))
+      .toBe("李振咏");
+  });
+
   it("uses a role-specific label when the party is genuinely unknown", () => {
     expect(unitCardPartyFromNotes({ notes: "买方、售价及日期待确认。" }, "sold")).toBeNull();
     expect(unresolvedUnitCardParty("sold", "zh")).toBe("买方待确认");

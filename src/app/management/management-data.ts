@@ -28,7 +28,7 @@ export const getLeaseContracts = cache(async () => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("lease_contracts")
-    .select("id, unit_id, customer_id, status, expected_end_date, start_date")
+    .select("id, contract_no, unit_id, customer_id, status, expected_end_date, start_date")
     .in("status", ["active", "draft"])
     .order("start_date", { ascending: false })
     .limit(200);
