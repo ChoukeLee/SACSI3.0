@@ -14,6 +14,11 @@ import { FilterBar, SegmentedControl, StatTile } from "@/components/ui/operation
 import { getRoomCardActions } from "@/lib/room-card-actions";
 import { isOwnerOccupiedUnit } from "@/lib/unit-display";
 import { referencedLeaseContractNo, unitCardPartyFromNotes, unresolvedUnitCardParty } from "@/lib/unit-card-party";
+import {
+  getSacsi5OfficeFloorTag,
+  isSacsi5CompanyOwnedOffice,
+  isSacsi5FrontOfficeUnit,
+} from "@/lib/sacsi5-unit-display";
 import type { Locale, ManagementDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { floorSortValue, formatXof, cn, sortUnitsForBuilding } from "@/lib/utils";
@@ -212,7 +217,11 @@ export function UnitDataClient({
   saleSchedules: SalePaymentScheduleRow[]; cleaningTasks: { unit_id: string; is_completed: boolean }[];
   customers: CustomerRow[]; locale: Locale; t: ManagementDict;
 }) {
-  const residentialUnits = useMemo(() => units.filter(u => u.kind === "apartment" || isOwnerOccupiedUnit(u)), [units]);
+  const sacsi5BuildingId = useMemo(() => buildings.find(b => b.code === "SACSI5")?.id ?? null, [buildings]);
+  const operationalUnits = useMemo(
+    () => units.filter(u => u.kind === "apartment" || isOwnerOccupiedUnit(u) || (u.kind === "office" && u.building_id === sacsi5BuildingId)),
+    [units, sacsi5BuildingId],
+  );
   const activeBuildings = useMemo(() => buildings.filter(b => b.is_active), [buildings]);
   const firstBuildingId = activeBuildings[0]?.id ?? "";
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>(firstBuildingId);
@@ -229,13 +238,13 @@ export function UnitDataClient({
   }, [activeBuildings, selectedBuildingId]);
 
   const filteredUnits = useMemo(() => {
-    return residentialUnits.filter(u => u.building_id === selectedBuildingId);
-  }, [residentialUnits, selectedBuildingId]);
+    return operationalUnits.filter(u => u.building_id === selectedBuildingId);
+  }, [operationalUnits, selectedBuildingId]);
   const buildingUnits = useMemo(() => {
     const m = new Map<string, UnitRow[]>();
-    for (const b of activeBuildings) m.set(b.id, residentialUnits.filter(u => u.building_id === b.id));
+    for (const b of activeBuildings) m.set(b.id, operationalUnits.filter(u => u.building_id === b.id));
     return m;
-  }, [activeBuildings, residentialUnits]);
+  }, [activeBuildings, operationalUnits]);
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const unitStates = useMemo(
@@ -381,8 +390,23 @@ export function UnitDataClient({
         const bStates = sortUnitsForBuilding(bUnits, building.code).map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks, todayStr));
         const visibleBStates = selectedStatus ? bStates.filter(s => s.status === selectedStatus) : bStates;
         if (visibleBStates.length === 0) return null;
-        const floorGroups = groupStatesByFloor(visibleBStates, locale, building.code);
-        if (floorGroups.length === 0) return null;
+        const assetSections = building.code === "SACSI5"
+          ? [
+              {
+                key: "front-office",
+                label: locale === "zh" ? "前楼 · 办公室" : "Bâtiment avant · Bureaux",
+                description: locale === "zh" ? "1-9层商务楼层" : "Étages professionnels 1-9",
+                states: visibleBStates.filter(s => isSacsi5FrontOfficeUnit(building.code, s.unit)),
+              },
+              {
+                key: "residential",
+                label: locale === "zh" ? "公寓住宅" : "Appartements",
+                description: locale === "zh" ? "后楼及住宅楼层" : "Bâtiment arrière et étages résidentiels",
+                states: visibleBStates.filter(s => !isSacsi5FrontOfficeUnit(building.code, s.unit)),
+              },
+            ].filter(section => section.states.length > 0)
+          : [{ key: "all", label: null, description: null, states: visibleBStates }];
+        if (assetSections.length === 0) return null;
 
         const bOccupied = visibleBStates.filter(s => s.status === "dailyOccupied" || s.status === "leased" || s.status === "sold" || s.status === "ownerOccupied").length;
         const bTotal = visibleBStates.length;
@@ -401,35 +425,66 @@ export function UnitDataClient({
               <RoomLegend items={STATUS_ORDER.filter(s => bStates.some(state => state.status === s)).map(s => ({ key: s, label: s === "ownerOccupied" ? (locale === "zh" ? "自用" : "Usage interne") : t.statuses[s], color: STATUS_DOT[s] }))} />
             </>}
           >
-            {floorGroups.map(group => (
-              <div key={group.key} className={group.key !== floorGroups[0]?.key ? "mt-[18px]" : ""}>
-                <p className="mb-2 text-[12px] font-semibold text-[#5D7186]">{group.label} <span className="font-normal text-[#5D7186]/60">{group.states.length}</span></p>
-                <div className="grid grid-cols-6 gap-3.5">
-                  {group.states.map(s => {
-                    const detailHref = routeFor(locale, `/units/${s.unit.id}`);
-                    const actions = getRoomCardActions(s.status, {
-                      locale, unitId: s.unit.id, unitNo: s.unit.unit_no ?? undefined,
-                      detailHref,
-                      dailyHref: routeFor(locale, "/daily-rentals"),
-                      leaseHref: routeFor(locale, "/leases"),
-                      saleHref: routeFor(locale, "/sales"),
-                    });
+            {assetSections.map((section, sectionIndex) => {
+              const floorGroups = groupStatesByFloor(section.states, locale, building.code);
+              return (
+                <section key={section.key} className={sectionIndex > 0 ? "mt-7 border-t border-border/60 pt-5" : ""}>
+                  {section.label && (
+                    <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                      <h4 className="text-sm font-semibold text-foreground">{section.label}</h4>
+                      <span className="text-xs text-muted-foreground">{section.description}</span>
+                    </div>
+                  )}
+                  {floorGroups.map((group, groupIndex) => {
+                    const isFrontOffice = section.key === "front-office";
+                    const officeTag = isFrontOffice
+                      ? getSacsi5OfficeFloorTag(
+                          building.code,
+                          group.key,
+                          group.states.some(s => s.status === "leased"),
+                          group.states.some(s => isSacsi5CompanyOwnedOffice(building.code, s.unit)),
+                          locale,
+                        )
+                      : null;
                     return (
-                      <RoomCard
-                        key={s.unit.id}
-                        roomNo={s.unit.unit_no ?? "?"}
-                        status={s.status}
-                        statusLabel={s.status === "ownerOccupied" ? (locale === "zh" ? "自用" : "Usage interne") : undefined}
-                        customerName={stateCustomerName(s, customerNameById, locale)}
-                        dateText={stateDateText(s, locale)}
-                        href={detailHref}
-                        actions={actions}
-                      />
+                      <div key={group.key} className={groupIndex > 0 ? "mt-[18px]" : ""}>
+                        <div className="mb-2 flex min-h-5 items-center gap-2 text-[12px] text-[#5D7186]">
+                          <p className="font-semibold">{group.label} <span className="font-normal text-[#5D7186]/60">{group.states.length}</span></p>
+                          {officeTag && <span className="font-medium text-[#5D7186]">{officeTag}</span>}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3.5 md:grid-cols-3 xl:grid-cols-6">
+                          {group.states.map(s => {
+                            const detailHref = routeFor(locale, `/units/${s.unit.id}`);
+                            const actions = getRoomCardActions(s.status, {
+                              locale, unitId: s.unit.id, unitNo: s.unit.unit_no ?? undefined,
+                              detailHref,
+                              dailyHref: routeFor(locale, "/daily-rentals"),
+                              leaseHref: routeFor(locale, "/leases"),
+                              saleHref: routeFor(locale, "/sales"),
+                            });
+                            const companyOwnedOffice = isSacsi5CompanyOwnedOffice(building.code, s.unit);
+                            return (
+                              <RoomCard
+                                key={s.unit.id}
+                                roomNo={s.unit.unit_no ?? "?"}
+                                status={s.status}
+                                statusLabel={companyOwnedOffice
+                                  ? (locale === "zh" ? "公司自购 · 自用" : "Acheté · usage interne")
+                                  : s.status === "ownerOccupied" ? (locale === "zh" ? "自用" : "Usage interne") : undefined}
+                                customerName={stateCustomerName(s, customerNameById, locale)}
+                                dateText={stateDateText(s, locale)}
+                                href={detailHref}
+                                actions={actions}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
                     );
                   })}
-                </div>
-              </div>
-            ))}
+                </section>
+              );
+            })}
           </RoomBoard>
         );
       })}

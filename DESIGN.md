@@ -120,6 +120,17 @@ These can be improved around the edges:
 - Detail panels.
 - Data visualization around the existing calendar/cards.
 
+### 5# Building Room Board
+
+The 5# management room board must expose its mixed-use structure instead of presenting every unit as one undifferentiated residential matrix.
+
+- Divide the board into `前楼 · 办公室` and `公寓住宅` sections.
+- Treat the existing 1-9F front-building floor plates and any `office` unit as office inventory; do not create duplicate visual-only rooms.
+- Keep 6F office partitions `601-603` as their real contract-bound units and label the floor `半层出租` when a lease is active.
+- Show the 8F front-building office as `公司自购 · 自用`. Ownership is descriptive metadata; `自用` remains the operational status.
+- Preserve the approved room-card colors. Section headings, floor annotations, ownership labels, and spatial grouping must not introduce new room-status colors.
+- Keep rear-building apartments and residential floors in the apartment section, using the same floor ordering and existing room actions.
+
 ## Foundation Tokens
 
 ### Color
