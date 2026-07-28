@@ -15,9 +15,7 @@ import { getRoomCardActions } from "@/lib/room-card-actions";
 import { isOwnerOccupiedUnit } from "@/lib/unit-display";
 import { referencedLeaseContractNo, unitCardPartyFromNotes, unresolvedUnitCardParty } from "@/lib/unit-card-party";
 import {
-  getSacsi5OfficeFloorTag,
   isSacsi5CompanyOwnedOffice,
-  isSacsi5FrontOfficeUnit,
 } from "@/lib/sacsi5-unit-display";
 import type { Locale, ManagementDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -390,22 +388,9 @@ export function UnitDataClient({
         const bStates = sortUnitsForBuilding(bUnits, building.code).map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks, todayStr));
         const visibleBStates = selectedStatus ? bStates.filter(s => s.status === selectedStatus) : bStates;
         if (visibleBStates.length === 0) return null;
-        const assetSections = building.code === "SACSI5"
-          ? [
-              {
-                key: "front-office",
-                label: locale === "zh" ? "前楼 · 办公室" : "Bâtiment avant · Bureaux",
-                description: locale === "zh" ? "1-9层商务楼层" : "Étages professionnels 1-9",
-                states: visibleBStates.filter(s => isSacsi5FrontOfficeUnit(building.code, s.unit)),
-              },
-              {
-                key: "residential",
-                label: locale === "zh" ? "公寓住宅" : "Appartements",
-                description: locale === "zh" ? "后楼及住宅楼层" : "Bâtiment arrière et étages résidentiels",
-                states: visibleBStates.filter(s => !isSacsi5FrontOfficeUnit(building.code, s.unit)),
-              },
-            ].filter(section => section.states.length > 0)
-          : [{ key: "all", label: null, description: null, states: visibleBStates }];
+        // SACSI5's front office plates share their floor with apartment units.
+        // Keep them in one floor group so the cards can be compared side by side.
+        const assetSections = [{ key: "all", label: null, description: null, states: visibleBStates }];
         if (assetSections.length === 0) return null;
 
         const bOccupied = visibleBStates.filter(s => s.status === "dailyOccupied" || s.status === "leased" || s.status === "sold" || s.status === "ownerOccupied").length;
@@ -436,21 +421,10 @@ export function UnitDataClient({
                     </div>
                   )}
                   {floorGroups.map((group, groupIndex) => {
-                    const isFrontOffice = section.key === "front-office";
-                    const officeTag = isFrontOffice
-                      ? getSacsi5OfficeFloorTag(
-                          building.code,
-                          group.key,
-                          group.states.some(s => s.status === "leased"),
-                          group.states.some(s => isSacsi5CompanyOwnedOffice(building.code, s.unit)),
-                          locale,
-                        )
-                      : null;
                     return (
                       <div key={group.key} className={groupIndex > 0 ? "mt-[18px]" : ""}>
                         <div className="mb-2 flex min-h-5 items-center gap-2 text-[12px] text-[#5D7186]">
                           <p className="font-semibold">{group.label} <span className="font-normal text-[#5D7186]/60">{group.states.length}</span></p>
-                          {officeTag && <span className="font-medium text-[#5D7186]">{officeTag}</span>}
                         </div>
                         <div className="grid grid-cols-2 gap-3.5 md:grid-cols-3 xl:grid-cols-6">
                           {group.states.map(s => {
