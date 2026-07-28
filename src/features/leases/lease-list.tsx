@@ -583,7 +583,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 const paidPeriodStartsBeforeCutoff = paidThrough ? contract.start_date <= paidThrough : false;
                 return (
                   <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status={isManaged ? "managed" : "leased"}
-                    onClick={() => openDetail(contract.id)}
+                    onClick={() => openDetail(contract.id)}>
                     {/* Customer and tags */}
                     <div className="flex min-h-[62px] flex-col justify-start gap-2">
                       <p className="text-[13px] font-semibold leading-snug line-clamp-2 break-words" title={customer?.name ?? (locale==="zh"?"无客户":"Sans client")}>
