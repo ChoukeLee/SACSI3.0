@@ -36,13 +36,21 @@ const SOURCE_TYPE_LABELS: Record<string, { zh: string; fr: string }> = {
   other: { zh: "其他", fr: "Autre" },
 };
 
+const RECEIVABLE_STATUS_LABELS: Record<string, { zh: string; fr: string }> = {
+  paid: { zh: "已收", fr: "Payé" },
+  partial: { zh: "部分已收", fr: "Partiel" },
+  pending: { zh: "待收", fr: "En attente" },
+  overdue: { zh: "逾期", fr: "En retard" },
+  cancelled: { zh: "已取消", fr: "Annulé" },
+};
+
 const PANEL_LABELS: Record<DetailType, { zh: { title: string; desc: string }; fr: { title: string; desc: string } }> = {
   receivable: {
     zh: { title: "本月应收明细", desc: "到期日在本月的应收款项" },
     fr: { title: "Du du mois", desc: "Creances dues ce mois" },
   },
   collected: {
-    zh: { title: "本月应收已收明细", desc: "到期日在本月且已收款的应收项目" },
+    zh: { title: "本月到期应收已收明细", desc: "到期日在本月且已收款的应收项目，并非仅按本月收款日期统计" },
     fr: { title: "Encaisse sur les echeances du mois", desc: "Creances dues ce mois avec un montant encaisse" },
   },
   outstanding: {
@@ -136,6 +144,11 @@ export function FinanceDetailPanel({
     return SOURCE_TYPE_LABELS[key]?.[lang] ?? SOURCE_TYPE_LABELS[sourceType]?.[lang] ?? key;
   };
 
+  const getStatusLabel = (status: string) => {
+    const lang = locale === "fr" ? "fr" : "zh";
+    return RECEIVABLE_STATUS_LABELS[status]?.[lang] ?? status;
+  };
+
   const getOverdueDays = (dueDate: string) => {
     const due = new Date(dueDate);
     return Math.max(0, Math.floor((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)));
@@ -187,10 +200,11 @@ export function FinanceDetailPanel({
           <div className="overflow-hidden rounded-xl border border-border">
             <div className="max-h-[calc(100vh-260px)] overflow-auto">
               {(
-                <table className="w-full min-w-[980px] text-left text-[13px]">
+                <table className="w-full min-w-[1080px] text-left text-[13px]">
                   <thead className="sticky top-0 z-10 bg-muted/50">
                     <tr className="text-left text-xs font-semibold text-muted-foreground">
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "到期日" : "Echeance"}</th>
+                      <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "楼栋" : "Bâtiment"}</th>
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
                       <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "业务" : "Type"}</th>
@@ -203,7 +217,7 @@ export function FinanceDetailPanel({
                   <tbody className="divide-y divide-border/50">
                     {receivableData.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground/60">
+                        <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground/60">
                           {locale === "zh" ? "暂无数据" : "Aucune donnee"}
                         </td>
                       </tr>
@@ -220,8 +234,13 @@ export function FinanceDetailPanel({
                             <td className="px-4 py-2.5 whitespace-nowrap font-medium text-foreground">
                               {r.due_date}
                               {r.status === "overdue" && (
-                                <span className="ml-2 text-accentRed-500">+{overdueDays}j</span>
+                                <span className="ml-2 text-accentRed-500">
+                                  {locale === "zh" ? `逾期${overdueDays}天` : `+${overdueDays}j`}
+                                </span>
                               )}
+                            </td>
+                            <td className="px-4 py-2.5 whitespace-nowrap text-foreground/70">
+                              {getBuildingName(r.building_id ?? unitMap.get(r.unit_id ?? "")?.building_id ?? null)}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap text-foreground/70">
                               {getUnitInfo(r.unit_id)}
@@ -243,7 +262,7 @@ export function FinanceDetailPanel({
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap">
                               <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-semibold", STATUS_STYLES[r.status] ?? "bg-muted text-foreground/70")}>
-                                {r.status}
+                                {getStatusLabel(r.status)}
                               </span>
                             </td>
                           </tr>
