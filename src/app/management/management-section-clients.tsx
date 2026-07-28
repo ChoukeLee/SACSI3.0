@@ -13,9 +13,10 @@ import { DataVizCard, DonutChart, RadarChart } from "@/components/ui/data-viz";
 import { FilterBar, SegmentedControl, StatTile } from "@/components/ui/operational";
 import { getRoomCardActions } from "@/lib/room-card-actions";
 import { isOwnerOccupiedUnit } from "@/lib/unit-display";
+import { referencedLeaseContractNo, unitCardPartyFromNotes, unresolvedUnitCardParty } from "@/lib/unit-card-party";
 import type { Locale, ManagementDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
-import { floorSortValue, formatXof, cn, sortUnits } from "@/lib/utils";
+import { floorSortValue, formatXof, cn, sortUnitsForBuilding } from "@/lib/utils";
 import type {
   BuildingRow, UnitRow, DailyBookingRow, LeaseContractRow,
   SaleContractRow, SalePaymentScheduleRow, CustomerRow,
@@ -50,7 +51,7 @@ function getUnitFloorValue(u: UnitRow): number | null {
   const n = firstNumber(u.unit_no); if (n === null) return null;
   return n >= 100 ? Math.floor(n / 100) : n;
 }
-function groupStatesByFloor(states: UnitState[], locale: Locale): FloorGroup[] {
+function groupStatesByFloor(states: UnitState[], locale: Locale, buildingCode?: string | null): FloorGroup[] {
   const groups = new Map<string, FloorGroup>();
   for (const s of states) {
     const floor = getUnitFloorValue(s.unit);
@@ -62,7 +63,7 @@ function groupStatesByFloor(states: UnitState[], locale: Locale): FloorGroup[] {
     groups.get(key)!.states.push(s);
   }
   return [...groups.values()]
-    .map(g => ({ ...g, states: sortUnits(g.states.map(s => s.unit)).map(u => g.states.find(s => s.unit.id === u.id)!).filter(Boolean) }))
+    .map(g => ({ ...g, states: sortUnitsForBuilding(g.states.map(s => s.unit), buildingCode).map(u => g.states.find(s => s.unit.id === u.id)!).filter(Boolean) }))
     .sort((a, b) => a.sortValue - b.sortValue);
 }
 function computeUnitState(
@@ -73,7 +74,9 @@ function computeUnitState(
   const activeSale = saleContracts.find(s => s.unit_id === u.id && s.status === "active") ?? null;
   if (u.status === "sold" || activeSale) return { unit: u, status: "sold", sale: activeSale };
   const activeLease = leaseContracts.find(l => l.unit_id === u.id && l.status === "active") ?? null;
-  if (u.status === "leased" || activeLease) return { unit: u, status: "leased", lease: activeLease };
+  const referencedNo = referencedLeaseContractNo(u.notes);
+  const referencedLease = referencedNo ? leaseContracts.find(l => l.contract_no === referencedNo && l.status === "active") ?? null : null;
+  if (u.status === "leased" || activeLease || referencedLease) return { unit: u, status: "leased", lease: activeLease ?? referencedLease };
   if (isOwnerOccupiedUnit(u)) return { unit: u, status: "ownerOccupied" };
   const ds = getDailyRoomStateForDate({ unit: u, dateStr, bookings: dailyBookings, cleaningTasks });
   if (ds.status === "occupied" || ds.status === "checking_out_today") return { unit: u, status: "dailyOccupied", booking: ds.booking };
@@ -88,6 +91,9 @@ function shortDate(d: string | null | undefined): string {
 function stateCustomerName(s: UnitState, cmap: Map<string, string>, locale: Locale): string {
   const cid = s.booking?.customer_id ?? s.lease?.customer_id ?? s.sale?.customer_id ?? null;
   if (cid && cmap.has(cid)) return cmap.get(cid)!;
+  const noteParty = unitCardPartyFromNotes(s.unit, s.status);
+  if (noteParty) return noteParty;
+  if (s.status === "leased" || s.status === "sold" || s.status === "dailyOccupied") return unresolvedUnitCardParty(s.status, locale);
   if (s.status === "ownerOccupied") return s.unit.layout || (locale === "zh" ? "科建集团办公室" : "Bureau Kejian Group");
   if (s.status === "available") return locale === "zh" ? "空闲" : "Libre";
   if (s.status === "cleaningPending") return locale === "zh" ? "待洁" : "Ménage";
@@ -372,10 +378,10 @@ export function UnitDataClient({
         const bUnits = buildingUnits.get(building.id) ?? [];
         if (bUnits.length === 0) return null;
 
-        const bStates = sortUnits(bUnits).map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks, todayStr));
+        const bStates = sortUnitsForBuilding(bUnits, building.code).map(u => computeUnitState(u, dailyBookings, leaseContracts, saleContracts, cleaningTasks, todayStr));
         const visibleBStates = selectedStatus ? bStates.filter(s => s.status === selectedStatus) : bStates;
         if (visibleBStates.length === 0) return null;
-        const floorGroups = groupStatesByFloor(visibleBStates, locale);
+        const floorGroups = groupStatesByFloor(visibleBStates, locale, building.code);
         if (floorGroups.length === 0) return null;
 
         const bOccupied = visibleBStates.filter(s => s.status === "dailyOccupied" || s.status === "leased" || s.status === "sold" || s.status === "ownerOccupied").length;

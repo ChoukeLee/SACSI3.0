@@ -48,6 +48,15 @@ export function sortUnits<T extends { unit_no: string | null; floor_label?: stri
   return [...units].sort(compareUnits);
 }
 
+export function sortUnitsForBuilding<T extends { unit_no: string | null; floor_label?: string | null }>(units: T[], buildingCode?: string | null): T[] {
+  if (buildingCode !== "SACSI3") return sortUnits(units);
+
+  return [...units].sort((a, b) => {
+    const floorOrder = compareFloorLabels(a.floor_label, b.floor_label);
+    return floorOrder !== 0 ? floorOrder : compareUnitNo(a.unit_no, b.unit_no);
+  });
+}
+
 export function normalizeFloorLabel(floorLabel: string | null, unitNo: string): string {
   if (floorLabel && floorLabel.trim()) {
     const raw = floorLabel.trim();

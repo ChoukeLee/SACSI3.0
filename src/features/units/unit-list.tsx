@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import { AlertTriangle, ArrowRight, Building2, ChevronDown, ChevronUp, Home, Key } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
-import { cn, compareFloorLabels, formatXof, sortUnits } from "@/lib/utils";
+import { cn, compareFloorLabels, formatXof, sortUnitsForBuilding } from "@/lib/utils";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { FilterBar, SegmentedControl } from "@/components/ui/operational";
@@ -243,7 +243,7 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
                 </tr>
               </thead>
               <tbody>
-                {sortUnits(filtered).map((unit) => (
+                {sortUnitsForBuilding(filtered, activeBuilding?.code).map((unit) => (
                   <UnitTableRow
                     key={unit.id}
                     unit={unit}
@@ -286,7 +286,7 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
                     </tr>
                   </thead>
                   <tbody>
-                    {sortUnits(nonApartments).map((unit) => (
+                    {sortUnitsForBuilding(nonApartments, activeBuilding?.code).map((unit) => (
                       <UnitTableRow
                         key={unit.id}
                         unit={unit}
