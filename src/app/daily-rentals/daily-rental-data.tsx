@@ -20,10 +20,10 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
   noStore();
   const supabase = await createClient();
 
-  const [buildingRes, customersRes, activeLeasesRes, activeSalesRes, cleaningRes, paymentsRes, bookingsRes] =
+  const [buildingRes, dailyCustomerIdsRes, activeLeasesRes, activeSalesRes, cleaningRes, paymentsRes, bookingsRes] =
     await Promise.all([
       supabase.from("buildings").select("id").eq("code", "SACSI11").single(),
-      supabase.from("customers").select("id, name, phone, is_blacklisted").order("name"),
+      supabase.from("daily_bookings").select("customer_id"),
       supabase.from("lease_contracts").select("customer_id").eq("status", "active"),
       supabase.from("sale_contracts").select("customer_id").eq("status", "active"),
       supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed"),
@@ -50,14 +50,22 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
   let cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[] = [];
   let payments: { id: string; source_id: string; amount: number; payment_date: string }[] = [];
 
-  if (!customersRes.error) {
-    const activeLeaseCustomerIds = new Set((activeLeasesRes.data ?? []).map((row) => row.customer_id).filter(Boolean));
-    const activeSaleCustomerIds = new Set((activeSalesRes.data ?? []).map((row) => row.customer_id).filter(Boolean));
-    customers = (customersRes.data ?? []).map((customer) => ({
-      ...customer,
-      has_active_lease_contract: activeLeaseCustomerIds.has(customer.id),
-      has_active_sale_contract: activeSaleCustomerIds.has(customer.id),
-    }));
+  if (!dailyCustomerIdsRes.error) {
+    const dailyCustomerIds = [...new Set((dailyCustomerIdsRes.data ?? []).map((row) => row.customer_id).filter(Boolean))];
+    if (dailyCustomerIds.length > 0) {
+      const { data: dailyCustomersData } = await supabase
+        .from("customers")
+        .select("id, name, phone, is_blacklisted")
+        .in("id", dailyCustomerIds)
+        .order("name");
+      const activeLeaseCustomerIds = new Set((activeLeasesRes.data ?? []).map((row) => row.customer_id).filter(Boolean));
+      const activeSaleCustomerIds = new Set((activeSalesRes.data ?? []).map((row) => row.customer_id).filter(Boolean));
+      customers = (dailyCustomersData ?? []).map((customer) => ({
+        ...(customer as unknown as CustomerSummary),
+        has_active_lease_contract: activeLeaseCustomerIds.has(customer.id),
+        has_active_sale_contract: activeSaleCustomerIds.has(customer.id),
+      }));
+    }
   }
   if (!cleaningRes.error) cleaningTasks = cleaningRes.data ?? [];
   if (!paymentsRes.error) payments = paymentsRes.data ?? [];
