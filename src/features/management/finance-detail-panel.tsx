@@ -6,6 +6,7 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { receivableStatusStyles as STATUS_STYLES } from "@/lib/status-styles";
+import type { ManagementFinanceItem } from "@/features/management/finance-snapshot";
 import type {
   BuildingRow, UnitRow, ReceivableRow, CustomerRow,
 } from "@/types/database";
@@ -15,10 +16,12 @@ type DetailType = "receivable" | "collected" | "outstanding" | "overdue";
 interface Props {
   open: DetailType | null;
   onClose: () => void;
-  receivables: ReceivableRow[];
-  units: UnitRow[];
-  buildings: BuildingRow[];
-  customers: CustomerRow[];
+  items?: ManagementFinanceItem[];
+  asOf?: string;
+  receivables?: ReceivableRow[];
+  units?: UnitRow[];
+  buildings?: BuildingRow[];
+  customers?: CustomerRow[];
   locale: Locale;
 }
 
@@ -63,14 +66,12 @@ const PANEL_LABELS: Record<DetailType, { zh: { title: string; desc: string }; fr
   },
 };
 
-const now = new Date();
-const todayStr = now.toISOString().slice(0, 10);
-const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-
 export function FinanceDetailPanel({
-  open, onClose, receivables, units, buildings, customers, locale,
+  open, onClose, items, asOf, receivables = [], units = [], buildings = [], customers = [], locale,
 }: Props) {
   const t = dictionaries[locale].management;
+  const todayStr = asOf || new Date().toISOString().slice(0, 10);
+  const currentMonthPrefix = todayStr.slice(0, 7);
 
   const unitMap = useMemo(() => {
     const m = new Map<string, UnitRow>();
@@ -90,53 +91,66 @@ export function FinanceDetailPanel({
     return m;
   }, [customers]);
 
+  const sourceItems = useMemo<ManagementFinanceItem[]>(() => {
+    if (items) return items;
+
+    return receivables
+      .filter((r) =>
+        r.source_type !== "daily_booking"
+        && r.status !== "cancelled"
+        && r.due_date.startsWith(currentMonthPrefix))
+      .map((r) => {
+        const unit = r.unit_id ? unitMap.get(r.unit_id) : undefined;
+        const buildingId = r.building_id ?? unit?.building_id ?? null;
+        const building = buildingId ? buildingMap.get(buildingId) : undefined;
+        const amount = Math.max(Number(r.amount_xof), 0);
+        const paid = Math.min(Math.max(Number(r.paid_amount_xof), 0), amount);
+        const outstanding = Math.max(amount - paid, 0);
+        const status: ManagementFinanceItem["status"] = outstanding <= 0
+          ? "paid"
+          : r.due_date < todayStr
+            ? "overdue"
+            : paid > 0 ? "partial" : "pending";
+
+        return {
+          id: r.id,
+          dueDate: r.due_date,
+          sourceType: r.source_type,
+          category: r.category,
+          title: r.title,
+          amountXof: amount,
+          paidAmountXof: paid,
+          outstandingXof: outstanding,
+          status,
+          buildingId,
+          buildingCode: building?.code ?? null,
+          buildingName: building?.display_name ?? null,
+          unitId: r.unit_id,
+          unitNo: unit?.unit_no ?? null,
+          customerId: r.customer_id,
+          customerName: r.customer_id ? customerMap.get(r.customer_id)?.name ?? null : null,
+        };
+      });
+  }, [items, receivables, currentMonthPrefix, todayStr, unitMap, buildingMap, customerMap]);
+
   const receivableData = useMemo(() => {
     if (!open) return [];
-    let filtered = receivables.filter(r => r.source_type !== "daily_booking");
-
-    if (open === "receivable") {
-      // 本月应收: due_date in current month, exclude cancelled
-      filtered = filtered.filter(r => r.due_date.startsWith(currentMonthPrefix) && r.status !== "cancelled");
-    } else if (open === "collected") {
-      filtered = filtered.filter(r => r.due_date.startsWith(currentMonthPrefix) && r.status !== "cancelled" && Number(r.paid_amount_xof) > 0);
-    } else if (open === "outstanding") {
-      // 本月未收: due_date in current month, not paid/cancelled
-      filtered = filtered.filter(r => r.due_date.startsWith(currentMonthPrefix) && r.status !== "paid" && r.status !== "cancelled");
-    } else if (open === "overdue") {
-      // 逾期: dynamic — any unpaid receivable past its due date
-      filtered = filtered.filter(r => {
-        if (r.status === "cancelled" || r.status === "paid") return false;
-        return (Number(r.amount_xof) - Number(r.paid_amount_xof)) > 0 && r.due_date < todayStr;
-      });
-    }
-
-    return filtered.sort((a, b) => b.due_date.localeCompare(a.due_date));
-  }, [open, receivables]);
+    return sourceItems
+      .filter((item) => {
+        if (open === "collected") return item.paidAmountXof > 0;
+        if (open === "outstanding") return item.outstandingXof > 0;
+        if (open === "overdue") return item.status === "overdue";
+        return true;
+      })
+      .sort((a, b) => b.dueDate.localeCompare(a.dueDate));
+  }, [open, sourceItems]);
 
   if (!open) return null;
 
   const labels = PANEL_LABELS[open][locale === "fr" ? "fr" : "zh"];
 
-  const totalReceivable = receivableData.reduce((s, r) => s + Number(r.amount_xof), 0);
-  const totalPaid = receivableData.reduce((s, r) => s + Number(r.paid_amount_xof), 0);
-
-  const getUnitInfo = (unitId: string | null) => {
-    if (!unitId) return "—";
-    const u = unitMap.get(unitId);
-    return u ? `${u.unit_no}` : "—";
-  };
-
-  const getBuildingName = (buildingId: string | null) => {
-    if (!buildingId) return "—";
-    const b = buildingMap.get(buildingId);
-    return b?.display_name ?? "—";
-  };
-
-  const getCustomerName = (customerId: string | null) => {
-    if (!customerId) return "—";
-    const c = customerMap.get(customerId);
-    return c?.name ?? customerId.slice(0, 8);
-  };
+  const totalReceivable = receivableData.reduce((sum, item) => sum + item.amountXof, 0);
+  const totalPaid = receivableData.reduce((sum, item) => sum + item.paidAmountXof, 0);
 
   const getBusinessTypeLabel = (sourceType: string, category?: string | null) => {
     const key = category || sourceType;
@@ -149,10 +163,11 @@ export function FinanceDetailPanel({
     return RECEIVABLE_STATUS_LABELS[status]?.[lang] ?? status;
   };
 
-  const getOverdueDays = (dueDate: string) => {
-    const due = new Date(dueDate);
-    return Math.max(0, Math.floor((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)));
-  };
+  const getOverdueDays = (dueDate: string) =>
+    Math.max(0, Math.floor(
+      (new Date(`${todayStr}T00:00:00Z`).getTime() - new Date(`${dueDate}T00:00:00Z`).getTime())
+      / (1000 * 60 * 60 * 24),
+    ));
 
   return (
     <>
@@ -223,8 +238,10 @@ export function FinanceDetailPanel({
                       </tr>
                     ) : (
                       receivableData.map(r => {
-                        const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
-                        const overdueDays = getOverdueDays(r.due_date);
+                        const overdueDays = getOverdueDays(r.dueDate);
+                        const buildingLabel = r.buildingCode && r.buildingName && r.buildingCode !== r.buildingName
+                          ? `${r.buildingCode} · ${r.buildingName}`
+                          : r.buildingName ?? r.buildingCode ?? "—";
                         return (
                           <tr key={r.id} className={cn(
                             "hover:bg-muted/50 transition-colors",
@@ -232,7 +249,7 @@ export function FinanceDetailPanel({
                             r.status === "partial" && "bg-amber-50/30",
                           )}>
                             <td className="px-4 py-2.5 whitespace-nowrap font-medium text-foreground">
-                              {r.due_date}
+                              {r.dueDate}
                               {r.status === "overdue" && (
                                 <span className="ml-2 text-accentRed-500">
                                   {locale === "zh" ? `逾期${overdueDays}天` : `+${overdueDays}j`}
@@ -240,25 +257,25 @@ export function FinanceDetailPanel({
                               )}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap text-foreground/70">
-                              {getBuildingName(r.building_id ?? unitMap.get(r.unit_id ?? "")?.building_id ?? null)}
+                              {buildingLabel}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap text-foreground/70">
-                              {getUnitInfo(r.unit_id)}
+                              {r.unitNo ?? "—"}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap text-foreground/70">
-                              {getCustomerName(r.customer_id)}
+                              {r.customerName ?? "—"}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap text-foreground/60">
-                              {getBusinessTypeLabel(r.source_type, r.category)}
+                              {getBusinessTypeLabel(r.sourceType, r.category)}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold text-foreground">
-                              {formatXof(Number(r.amount_xof))}
+                              {formatXof(r.amountXof)}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums text-accentGreen-700">
-                              {formatXof(Number(r.paid_amount_xof))}
+                              {formatXof(r.paidAmountXof)}
                             </td>
-                            <td className={cn("px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold", outstanding > 0 ? "text-accentRed-600" : "text-muted-foreground/60")}>
-                              {formatXof(outstanding)}
+                            <td className={cn("px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold", r.outstandingXof > 0 ? "text-accentRed-600" : "text-muted-foreground/60")}>
+                              {formatXof(r.outstandingXof)}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap">
                               <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-semibold", STATUS_STYLES[r.status] ?? "bg-muted text-foreground/70")}>

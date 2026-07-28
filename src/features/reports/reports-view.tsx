@@ -134,11 +134,10 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
   const incomeData = useMemo(() => {
     let rec = 0, paid = 0, overdue = 0;
     const bySource: Record<string, { rec: number; paid: number }> = {};
-    const items = monthReceivables.length > 0 ? monthReceivables : receivables;
-    for (const r of items) { if (r.status==="cancelled") continue; const a=Number(r.amount_xof); const p=Number(r.paid_amount_xof); rec+=a; paid+=p; if(r.status==="overdue"||(r.due_date<today&&p<a)) overdue+=a-p; const s=r.source_type; bySource[s]=bySource[s]??{rec:0,paid:0}; bySource[s].rec+=a; bySource[s].paid+=p; }
+    for (const r of monthReceivables) { if (r.status==="cancelled") continue; const a=Number(r.amount_xof); const p=Math.min(Math.max(Number(r.paid_amount_xof),0),Math.max(a,0)); rec+=a; paid+=p; if(r.due_date<today&&p<a) overdue+=a-p; const s=r.source_type; bySource[s]=bySource[s]??{rec:0,paid:0}; bySource[s].rec+=a; bySource[s].paid+=p; }
     const prevPaid = prevPayments.reduce((s,p)=>s+Number(p.amount),0);
     return { rec, paid, overdue, unpaid: rec-paid, rate: rec>0?Math.round(paid/rec*100):0, bySource, prevPaid, paidChange: prevPaid>0?Math.round((paid-prevPaid)/prevPaid*100):0 };
-  }, [receivables, monthReceivables, prevPayments, today]);
+  }, [monthReceivables, prevPayments, today]);
 
   // ── Overdue Report ──
   const overdueData = useMemo(() => {
@@ -178,12 +177,12 @@ export function ReportsView({ entries: _entries, bookings, units, leaseContracts
     const expiring30d = active.filter(l => l.expected_end_date>=today && l.expected_end_date<=new Date(Date.now()+30*86400000).toISOString().slice(0,10));
     const expired = active.filter(l => l.expected_end_date<today);
     const terminated = leaseContracts.filter(l => l.status==="terminated");
-    const leaseRecs = receivables.filter(r => r.source_type==="lease_contract"&&r.status!=="cancelled");
+    const leaseRecs = monthReceivables.filter(r => r.source_type==="lease_contract"&&r.status!=="cancelled");
     const leaseRec = leaseRecs.reduce((s,r)=>s+Number(r.amount_xof),0);
     const leasePaid = leaseRecs.reduce((s,r)=>s+Number(r.paid_amount_xof),0);
     const leaseOverdue = leaseRecs.filter(r => { const os=Number(r.amount_xof)-Number(r.paid_amount_xof); return os>0&&(r.status==="overdue"||r.due_date<today); });
     return { active, expiring30d, expired, terminated, leaseRec, leasePaid, leaseOverdue, rate: leaseRec>0?Math.round(leasePaid/leaseRec*100):0 };
-  }, [leaseContracts, receivables, today]);
+  }, [leaseContracts, monthReceivables, today]);
 
   // ── Sale Report ──
   const saleData = useMemo(() => {

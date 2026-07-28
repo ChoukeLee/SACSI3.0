@@ -24,9 +24,6 @@ export interface KpiData {
   overdueAmount: number;
 }
 
-const today = new Date().toISOString().slice(0, 10);
-const monthPrefix = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
-
 export function computeKpiData(
   receivables: ReceivableRow[],
   units: UnitRow[],
@@ -34,13 +31,21 @@ export function computeKpiData(
   leaseContracts: LeaseContractRow[],
   saleContracts: SaleContractRow[],
 ): KpiData {
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
   // Receivables
   let totalRec = 0, totalPaid = 0, totalOverdue = 0;
   for (const r of receivables) {
     if (r.status === "cancelled") continue;
-    totalRec += Number(r.amount_xof);
-    totalPaid += Number(r.paid_amount_xof);
-    const os = Number(r.amount_xof) - Number(r.paid_amount_xof);
+    const amount = Math.max(Number(r.amount_xof), 0);
+    const paid = Math.min(Math.max(Number(r.paid_amount_xof), 0), amount);
+    const os = amount - paid;
+    if (r.due_date.startsWith(monthPrefix)) {
+      totalRec += amount;
+      totalPaid += paid;
+    }
     if (os > 0 && (r.status === "overdue" || r.due_date < today)) totalOverdue += os;
   }
   const collectionRate = totalRec > 0 ? Math.round((totalPaid / totalRec) * 100) : 0;

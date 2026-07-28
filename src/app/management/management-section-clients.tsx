@@ -3,8 +3,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { AlertTriangle, Banknote, Clock3, TrendingUp, WalletCards } from "lucide-react";
 import { getDailyRoomStateForDate } from "@/features/daily-rentals/room-status";
-import { calculateReceivableSummary } from "@/features/finance/receivable-summary";
 import { FinanceDetailPanel } from "@/features/management/finance-detail-panel";
+import type { ManagementFinanceSnapshot } from "@/features/management/finance-snapshot";
 import { RoomCard } from "@/components/room-card";
 import { RoomBoard } from "@/components/room-board";
 import { RoomLegend } from "@/components/room-legend";
@@ -119,16 +119,14 @@ function stateDateText(s: UnitState, locale: Locale): string {
 // ════════════════════════════════════════════════════════════
 
 export function FinanceSectionClient({
-  receivables, units, buildings, customers, locale, t,
+  snapshot, locale, t,
 }: {
-  receivables: ReceivableRow[];
-  units: UnitRow[]; buildings: BuildingRow[]; customers: CustomerRow[];
+  snapshot: ManagementFinanceSnapshot;
   locale: Locale; t: ManagementDict;
 }) {
   const [detail, setDetail] = useState<string | null>(null);
 
-  const nonDaily = useMemo(() => receivables.filter(r => r.source_type !== "daily_booking"), [receivables]);
-  const stats = useMemo(() => calculateReceivableSummary(nonDaily, { currentMonth: true }), [nonDaily]);
+  const stats = snapshot.summary;
   const blocks = [
     { key: "receivable", label: t.cockpit.receivableThisMonth, value: stats.totalReceivable, color: "accentBlue" as const, icon: TrendingUp },
     { key: "collected", label: locale === "zh" ? "本月应收已收" : "Encaisse sur les echeances du mois", value: stats.totalPaid, color: "accentGreen" as const, icon: Banknote },
@@ -181,10 +179,8 @@ export function FinanceSectionClient({
         <FinanceDetailPanel
           open={detail as "receivable" | "collected" | "outstanding" | "overdue"}
           onClose={() => setDetail(null)}
-          receivables={receivables}
-          units={units}
-          buildings={buildings}
-          customers={customers}
+          items={snapshot.items}
+          asOf={snapshot.asOf}
           locale={locale}
         />
       )}

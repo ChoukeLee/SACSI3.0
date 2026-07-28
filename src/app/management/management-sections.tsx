@@ -1,4 +1,4 @@
-import { getUnits, getDailyBookings, getLeaseContracts, getSaleContracts, getSaleSchedules, getCleaningTasks, getReceivables, getPayments, getCustomers } from "./management-data";
+import { getUnits, getDailyBookings, getLeaseContracts, getSaleContracts, getSaleSchedules, getCleaningTasks, getReceivables, getPayments, getCustomers, getManagementFinanceSnapshot } from "./management-data";
 import { runQualityChecks } from "@/features/data-quality";
 import { QualityDashboardWidget } from "@/features/data-quality";
 import { sortUnits } from "@/lib/utils";
@@ -14,25 +14,15 @@ import type {
 // ────────────────────────────────────────────────────────────
 
 export async function FinanceSection({
-  locale, t, buildings,
+  locale, t,
 }: {
   locale: Locale; t: ManagementDict; buildings: BuildingRow[];
 }) {
-  const [receivablesRaw, unitsRaw, customersRaw] = await Promise.all([
-    getReceivables(),
-    getUnits(),
-    getCustomers(),
-  ]);
-  const receivables = (receivablesRaw ?? []) as ReceivableRow[];
-  const units = sortUnits((unitsRaw ?? []) as UnitRow[]);
-  const customers = (customersRaw ?? []) as CustomerRow[];
+  const snapshot = await getManagementFinanceSnapshot();
 
   return (
     <FinanceSectionClient
-      receivables={receivables}
-      units={units}
-      customers={customers}
-      buildings={buildings}
+      snapshot={snapshot}
       locale={locale}
       t={t}
     />
