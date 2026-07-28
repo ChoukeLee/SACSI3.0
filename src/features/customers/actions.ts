@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser, requirePermission } from "@/lib/auth";
 import type { CustomerRow } from "@/types/database";
 
 // ── Form input types (only the fields a user can fill in) ──
@@ -19,12 +20,12 @@ export interface CustomerFormInput {
 // Centralized here so no page hardcodes encryption logic.
 // Replace with pgcrypto or app-layer encryption when ready.
 
-export async function encryptDocumentNo(plaintext: string): Promise<string> {
+async function encryptDocumentNo(plaintext: string): Promise<string> {
   // TODO: replace with real encryption (pgcrypto or libsodium)
   return plaintext;
 }
 
-export async function decryptDocumentNo(encrypted: string): Promise<string> {
+async function decryptDocumentNo(encrypted: string): Promise<string> {
   // TODO: replace with real decryption
   return encrypted;
 }
@@ -34,6 +35,7 @@ export async function decryptDocumentNo(encrypted: string): Promise<string> {
 export async function createCustomer(
   input: CustomerFormInput
 ): Promise<{ success: boolean; data?: CustomerRow; error?: string }> {
+  requirePermission(await getCurrentUser(), "customers:write");
   const supabase = await createClient();
 
   if (!input.name || input.name.trim().length < 2) {
@@ -69,6 +71,7 @@ export async function updateCustomer(
   id: string,
   input: CustomerFormInput
 ): Promise<{ success: boolean; data?: CustomerRow; error?: string }> {
+  requirePermission(await getCurrentUser(), "customers:write");
   const supabase = await createClient();
 
   const update: Record<string, unknown> = {};
@@ -119,6 +122,7 @@ export async function setCustomerBlacklist(
   reason: string,
   permanent: boolean
 ): Promise<{ success: boolean; error?: string }> {
+  requirePermission(await getCurrentUser(), "customers:write");
   if (!reason || reason.trim().length === 0) {
     return { success: false, error: "Blacklist reason is required." };
   }
@@ -153,6 +157,7 @@ export async function setCustomerBlacklist(
 export async function removeCustomerBlacklist(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
+  requirePermission(await getCurrentUser(), "customers:write");
   const supabase = await createClient();
 
   const { error } = await supabase

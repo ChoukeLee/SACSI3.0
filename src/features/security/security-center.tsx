@@ -9,9 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { runSecurityCheck, downloadBackup } from "./security-service";
 import type { SecurityCheckItem } from "./security-types";
 
-interface Props { locale: "zh" | "fr"; }
+interface Props { locale: "zh" | "fr"; canBackup: boolean; }
 
-export function SecurityCenter({ locale }: Props) {
+export function SecurityCenter({ locale, canBackup }: Props) {
   const zh = locale === "zh";
   const [checks, setChecks] = useState<SecurityCheckItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -76,7 +76,7 @@ export function SecurityCenter({ locale }: Props) {
       </Card>
 
       {/* Backup */}
-      <Card>
+      {canBackup && <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Download className="h-5 w-5 text-primary" />
@@ -93,7 +93,7 @@ export function SecurityCenter({ locale }: Props) {
           </Button>
           {backupMsg && <p className="text-sm text-emerald-600">{backupMsg}</p>}
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 }

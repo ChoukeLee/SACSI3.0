@@ -66,7 +66,7 @@ export const ROLE_EXPORT_TYPES: Record<DataExchangeRole, ExportDataType[]> = {
 
 export const ROLE_IMPORT_TYPES: Record<DataExchangeRole, ImportDataType[]> = {
   admin: ["customers","units","receivables","payments","lease_contracts","sale_contracts"],
-  boss: ["customers","units","receivables","payments","lease_contracts","sale_contracts"],
+  boss: [],
   finance: ["customers","receivables","payments"],
   front_desk: ["customers"],
 };

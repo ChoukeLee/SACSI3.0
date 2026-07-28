@@ -1,8 +1,13 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { sortUnits } from "@/lib/utils";
-import type { ExportDataType } from "./data-exchange-types";
+import {
+  ROLE_EXPORT_TYPES,
+  type DataExchangeRole,
+  type ExportDataType,
+} from "./data-exchange-types";
 
 function csvLine(fields: (string | number | null | undefined)[]): string {
   return fields.map(f => {
@@ -29,6 +34,14 @@ async function fetchCustomerMap(supabase: Awaited<ReturnType<typeof createClient
 }
 
 export async function exportData(type: ExportDataType, filters?: { dateFrom?: string; dateTo?: string; buildingId?: string }): Promise<string> {
+  const user = await getCurrentUser();
+  const allowed = user
+    ? ROLE_EXPORT_TYPES[user.role as DataExchangeRole] ?? []
+    : [];
+  if (!allowed.includes(type)) {
+    throw new Error("Export permission denied.");
+  }
+
   const supabase = await createClient();
   const rows: string[] = [];
   let header = "";

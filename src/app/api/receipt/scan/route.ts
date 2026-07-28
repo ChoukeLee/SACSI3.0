@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { extractReceiptTextFromImage } from "@/lib/receipt-ocr";
 
@@ -197,6 +197,9 @@ export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    if (!hasPermission(user, "finance:write")) {
+      return NextResponse.json({ error: "Finance write permission required" }, { status: 403 });
+    }
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -208,6 +211,14 @@ export async function POST(req: NextRequest) {
     let ocrError: string | null = null;
 
     if (file && file.size > 0) {
+      const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
+      if (!allowedTypes.has(file.type)) {
+        return NextResponse.json({ error: "Unsupported receipt file type" }, { status: 415 });
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        return NextResponse.json({ error: "Receipt file exceeds 10 MB" }, { status: 413 });
+      }
+
       // Save uploaded image
       const supabase = await createClient();
       const ext = file.name.split(".").pop() ?? "jpg";

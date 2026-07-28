@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireAuth, requireRole, type CurrentUser } from "@/lib/auth";
+import { requireRole, type CurrentUser } from "@/lib/auth";
 import type { CleaningTaskRow, DailyBookingRow, PaymentRow, ReceivableRow, UnitRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import {
@@ -30,9 +30,7 @@ import { getSetting } from "@/lib/settings";
 
 // ── Permission guards ──
 async function guardWrite() {
-  const user = await requireAuth();
-  if (user.role === "boss") throw new Error("Boss role is read-only.");
-  return user;
+  return requireRole("admin", "front_desk", "rental_sales");
 }
 async function guardCancel() {
   return requireRole("admin");

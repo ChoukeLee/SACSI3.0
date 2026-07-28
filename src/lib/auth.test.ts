@@ -33,4 +33,8 @@ describe("rental sales role", () => {
     expect(canAccessPage("rental_sales", "finance")).toBe(false);
     expect(canAccessPage("rental_sales", "settings")).toBe(false);
   });
+
+  it("denies unknown route sections by default", () => {
+    expect(canAccessPage("admin", "not-a-real-section")).toBe(false);
+  });
 });

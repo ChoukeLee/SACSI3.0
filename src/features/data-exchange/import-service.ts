@@ -3,7 +3,25 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
-import type { ImportDataType, ImportResult, ImportRow, ImportSubmitResult } from "./data-exchange-types";
+import {
+  ROLE_IMPORT_TYPES,
+  type DataExchangeRole,
+  type ImportDataType,
+  type ImportResult,
+  type ImportRow,
+  type ImportSubmitResult,
+} from "./data-exchange-types";
+
+async function requireImportType(type: ImportDataType) {
+  const user = await getCurrentUser();
+  const allowed = user
+    ? ROLE_IMPORT_TYPES[user.role as DataExchangeRole] ?? []
+    : [];
+  if (!user || !allowed.includes(type)) {
+    throw new Error("Import permission denied.");
+  }
+  return user;
+}
 
 function parseCsv(text: string): Record<string, string>[] {
   const rows: Record<string, string>[] = [];
@@ -51,6 +69,7 @@ function err(row: number, data: Record<string, string>, msg: string): ImportRow 
 }
 
 export async function previewImport(type: ImportDataType, csvText: string): Promise<ImportResult> {
+  await requireImportType(type);
   const rows = parseCsv(csvText);
   if (rows.length === 0) return { rows: [], okCount: 0, warnCount: 0, errCount: 0, canSubmit: false };
 
@@ -138,7 +157,7 @@ export async function previewImport(type: ImportDataType, csvText: string): Prom
 }
 
 export async function submitImport(type: ImportDataType, csvText: string): Promise<ImportSubmitResult> {
-  const user = await getCurrentUser();
+  const user = await requireImportType(type);
   const supabase = await createClient();
   const rows = parseCsv(csvText);
   const messages: string[] = [];

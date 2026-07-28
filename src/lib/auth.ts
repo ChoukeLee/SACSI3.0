@@ -82,10 +82,11 @@ const rolePermissions: Record<UserRole, string[]> = {
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const supabase = await createClient();
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user) return null;
-
-  const user = session.user;
+  // Server-side authorization must use a user verified by Supabase Auth.
+  // getSession() only reads the cookie payload and must not be trusted for
+  // permission decisions.
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) return null;
 
   // PERF: seed accounts skip the user_profiles DB query — they're resolved in-memory
   const seedProfile = getSeedAccountProfile(user.email);
@@ -105,10 +106,15 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     .eq("id", user.id)
     .single();
 
+  const role = profile?.role as UserRole | undefined;
+  if (!role || !Object.prototype.hasOwnProperty.call(rolePermissions, role)) {
+    return null;
+  }
+
   return {
     id: user.id,
     email: user.email,
-    role: (profile?.role as UserRole) ?? "front_desk",
+    role,
     displayName: profile?.display_name ?? user.email ?? "User",
   };
 });
@@ -159,6 +165,6 @@ const pageAccess: Record<string, UserRole[]> = {
  */
 export function canAccessPage(role: UserRole, section: string): boolean {
   const allowed = pageAccess[section];
-  if (!allowed) return true; // unknown sections default to open
+  if (!allowed) return false;
   return allowed.includes(role);
 }

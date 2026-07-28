@@ -11,7 +11,7 @@ export default async function SecurityPage() {
   return (
     <>
       <h1 className="mb-6 text-2xl font-semibold tracking-tight">安全中心</h1>
-      <section className="mt-8"><SecurityCenter locale="zh" /></section>
+      <section className="mt-8"><SecurityCenter locale="zh" canBackup={user.role === "admin"} /></section>
     </>
   );
 }

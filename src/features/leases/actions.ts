@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireAuth, requireRole } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { computeStatus } from "@/lib/repositories/receivable-repo";
 import type { LeaseContractRow, ReceivableRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
@@ -20,8 +20,7 @@ import {
 
 // ── Permission guards ──
 async function guardLeaseWrite() {
-  const user = await requireAuth();
-  if (user.role === "boss") throw new Error("Boss role is read-only.");
+  await requireRole("admin", "rental_sales");
 }
 async function guardLeaseFinance() { await requireRole("admin", "finance"); }
 

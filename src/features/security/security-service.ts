@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import type { BackupResult, SecurityCheckItem } from "./security-types";
 
 function csvLine(fields: (string|number|null|undefined)[]): string {
@@ -16,6 +16,7 @@ function backupValue(value: unknown): string | number | null {
 }
 
 export async function runSecurityCheck(): Promise<SecurityCheckItem[]> {
+  await requireRole("admin", "boss");
   const checks: SecurityCheckItem[] = [];
 
   // Supabase URL
@@ -54,6 +55,7 @@ export async function runSecurityCheck(): Promise<SecurityCheckItem[]> {
 }
 
 export async function downloadBackup(): Promise<BackupResult> {
+  await requireRole("admin");
   const supabase = await createClient();
   const tables = ["units", "customers", "daily_bookings", "lease_contracts", "sale_contracts", "sale_payment_schedule", "receivables", "payments", "ledger_entries", "system_settings", "business_targets", "audit_logs"];
   let totalRows = 0;

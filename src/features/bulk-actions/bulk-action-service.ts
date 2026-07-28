@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { sortUnits } from "@/lib/utils";
 import { writeAuditLog } from "@/lib/audit";
 import { createReceivable, cancelReceivablesForSource } from "@/features/finance/receivables";
@@ -16,6 +16,7 @@ function csvLine(fields: (string | number | null | undefined)[]): string {
 }
 
 export async function buildPreview(action: BulkActionType, ids: string[], extra?: Record<string, string>): Promise<BulkPreview> {
+  await requireRole("admin");
   const supabase = await createClient();
   const rows: PreviewRow[] = [];
   const warnings: string[] = [];
@@ -137,7 +138,7 @@ export async function buildPreview(action: BulkActionType, ids: string[], extra?
 }
 
 export async function executeBulk(action: BulkActionType, ids: string[], extra?: Record<string, string>): Promise<BulkResult> {
-  const user = await getCurrentUser();
+  const user = await requireRole("admin");
   const supabase = await createClient();
   let executed = 0, failed = 0, skipped = 0;
   const errors: string[] = [];

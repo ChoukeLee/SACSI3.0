@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requirePermission } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import type { UnitStatus } from "@/types/domain";
 
 const manualStatuses: UnitStatus[] = ["available", "maintenance", "locked"];
@@ -10,6 +12,8 @@ export async function updateUnitStatus(
   unitId: string,
   status: UnitStatus
 ): Promise<{ success: boolean; error?: string }> {
+  requirePermission(await getCurrentUser(), "units:write");
+
   if (!manualStatuses.includes(status)) {
     return {
       success: false,

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireAuth, requireRole } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { computeStatus } from "@/lib/repositories/receivable-repo";
 import type { SaleContractRow, SalePaymentScheduleRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
@@ -12,8 +12,7 @@ import {
 
 // ── Permission guards ──
 async function guardSaleWrite() {
-  const user = await requireAuth();
-  if (user.role === "boss" || user.role === "finance") throw new Error("Only admin or front_desk can modify sales.");
+  await requireRole("admin", "rental_sales");
 }
 async function guardSaleFinance() { await requireRole("admin", "finance"); }
 

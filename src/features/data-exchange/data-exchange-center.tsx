@@ -89,7 +89,9 @@ export function DataExchangeCenter({ locale, userRole }: Props) {
 
   const tabs = [
     { key: "export" as Tab, label: zh ? "导出" : "Export" },
-    { key: "import" as Tab, label: zh ? "导入" : "Import" },
+    ...(importTypes.length > 0
+      ? [{ key: "import" as Tab, label: zh ? "导入" : "Import" }]
+      : []),
   ];
 
   return (
