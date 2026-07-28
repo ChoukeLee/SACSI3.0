@@ -11,7 +11,6 @@ import {
   allowCheckOut,
   allowCompleteCleaning,
   allowConfirmBooking,
-  allowCreateBooking,
   resolveUnitStatusAfterDailyChange,
   todayIso,
 } from "./daily-rental-policy";
@@ -202,83 +201,23 @@ export async function createBooking(input: {
   unitId: string; customerId: string; checkIn: string;
   checkOut?: string; checkoutMode?: "fixed" | "open";
   nightlyPriceXof: number; notes?: string; otaSource?: string;
+  requestId: string;
 }): Promise<DailyActionResult> {
-  await guardWrite();
+  const user = await guardWrite();
   const supabase = await createClient();
-
-  const unitCheck = await getDailyRentalUnit(supabase, input.unitId);
-  if (!unitCheck.success) return { success: false, error: unitCheck.error };
-
-  const createPolicy = allowCreateBooking({
-    checkIn: input.checkIn,
-    checkOut: input.checkOut,
-    checkoutMode: input.checkoutMode,
-    unitStatus: (unitCheck.unit.status ?? null) as UnitStatus | null,
+  const { data, error } = await supabase.rpc("daily_create_booking_rpc", {
+    p_unit_id: input.unitId,
+    p_customer_id: input.customerId,
+    p_check_in: input.checkIn,
+    p_check_out: input.checkoutMode === "open" ? null : (input.checkOut ?? null),
+    p_checkout_mode: input.checkoutMode ?? "fixed",
+    p_nightly_price_xof: input.nightlyPriceXof,
+    p_notes: input.notes ?? null,
+    p_ota_source: input.otaSource ?? null,
+    p_request_id: input.requestId,
+    p_actor: actorPayload(user),
   });
-  if (!createPolicy.allowed) return { success: false, error: createPolicy.reason };
-
-  const { data: customer } = await supabase
-    .from("customers").select("is_blacklisted, blacklist_reason").eq("id", input.customerId).single();
-  if (customer?.is_blacklisted) {
-    return { success: false, error: `Customer is blacklisted: ${customer.blacklist_reason}` };
-  }
-
-  const mode = input.checkoutMode ?? "fixed";
-  const conflict = await checkConflicts(input.unitId, input.checkIn, input.checkOut, undefined);
-  if (conflict.hasConflict) {
-    return { success: false, error: conflict.reason ?? "Date conflict detected." };
-  }
-
-  // Calculate total for fixed mode; open mode starts with 1 night estimate
-  let totalAmount = 0;
-  if (mode === "fixed" && input.checkOut) {
-    const nights = Math.max(1, Math.ceil(
-      (new Date(input.checkOut).getTime() - new Date(input.checkIn).getTime()) / (1000 * 60 * 60 * 24)
-    ));
-    totalAmount = Math.round(input.nightlyPriceXof * nights);
-  } else {
-    totalAmount = input.nightlyPriceXof; // 1 night minimum for open
-  }
-
-  const { data, error } = await supabase.from("daily_bookings").insert({
-    unit_id: input.unitId, customer_id: input.customerId,
-    check_in: input.checkIn,
-    check_out: mode === "fixed" ? (input.checkOut ?? input.checkIn) : null,
-    checkout_mode: mode,
-    nightly_price_xof: input.nightlyPriceXof,
-    total_amount_xof: totalAmount,
-    final_amount_xof: totalAmount,
-    prepaid_amount_xof: 0,
-    billing_status: "need_top_up",
-    status: "pending_review",
-    ota_source: input.otaSource ?? null,
-    notes: input.notes ?? null,
-  }).select("*").single();
-
   if (error) return { success: false, error: error.message };
-
-  const unitStatusResult = await applyUnitStatus(supabase, input.unitId, "reserved");
-  if (!unitStatusResult.success) return unitStatusResult;
-  await writeAuditLog({
-    action: "create", entityType: "daily_booking", entityId: data.id,
-    metadata: { unit_id: input.unitId, customer_id: input.customerId, check_in: input.checkIn, checkout_mode: mode },
-  });
-
-  // Create receivable for this booking
-  await createReceivable({
-    building_id: unitCheck.unit.building_id ?? null,
-    unit_id: input.unitId,
-    customer_id: input.customerId,
-    source_type: "daily_booking",
-    source_id: data.id,
-    category: "daily_rental",
-    title: `日租 ${data.check_in}`,
-    due_date: input.checkIn,
-    amount_xof: totalAmount,
-    paid_amount_xof: 0,
-    status: "pending",
-    currency: "XOF",
-  });
 
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
@@ -287,7 +226,7 @@ export async function createBooking(input: {
   revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
-  return { success: true, data: await getDailyOperationSnapshot(supabase, data.id, input.unitId) };
+  return { success: true, data: data as DailyOperationSnapshot };
 }
 
 // ── Backfill (admin only) ──

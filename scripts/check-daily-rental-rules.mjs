@@ -48,6 +48,8 @@ const actions = read(join(features, "actions.ts"));
 const policy = read(join(features, "daily-rental-policy.ts"));
 const audit = read(join(features, "daily-rental-audit.ts"));
 const repair = read(join(features, "daily-rental-repair.ts"));
+const bookingPanel = read(join(features, "booking-panel.tsx"));
+const atomicCreateMigration = read(join(root, "supabase", "migrations", "202607280001_atomic_daily_booking_create.sql"));
 
 const createBookingBody = functionSection(actions, "createBooking");
 const createBackfillBody = functionSection(actions, "createBackfillBooking");
@@ -55,13 +57,20 @@ const checkInBody = functionSection(actions, "checkIn");
 const deletePaymentBody = functionSection(actions, "deletePayment");
 const cancelBookingBody = functionSection(actions, "cancelBooking");
 
-check(actions.includes("allowCreateBooking"), "actions.ts imports allowCreateBooking");
 check(actions.includes("allowCheckIn"), "actions.ts imports allowCheckIn");
 check(actions.includes("syncBookingFinance"), "actions.ts imports syncBookingFinance");
 check(actions.includes("insertLedgerEntry"), "actions.ts imports insertLedgerEntry");
 check(actions.includes("reverseLedgerEntriesForPayment"), "actions.ts imports reverseLedgerEntriesForPayment");
 
-check(hasCall(createBookingBody, "allowCreateBooking"), "createBooking calls allowCreateBooking");
+check(createBookingBody.includes('rpc("daily_create_booking_rpc"'), "createBooking uses the atomic database RPC");
+check(createBookingBody.includes("p_request_id: input.requestId"), "createBooking sends an idempotency request id");
+check(!createBookingBody.includes('.from("daily_bookings").insert'), "createBooking does not insert bookings outside the transaction");
+check(atomicCreateMigration.includes("for update"), "atomic create RPC locks the room before conflict checks");
+check(atomicCreateMigration.includes("creation_request_id"), "atomic create RPC enforces request idempotency");
+check(atomicCreateMigration.includes("insert into public.receivables"), "atomic create RPC creates the receivable");
+check(atomicCreateMigration.includes("insert into public.audit_logs"), "atomic create RPC writes the audit log");
+check(!bookingPanel.includes("optimistic-booking-"), "new booking UI does not render an uncommitted booking");
+check(bookingPanel.includes("closeOnSuccess: true"), "new booking panel closes only after server success");
 check(hasCall(createBackfillBody, "requireRole") && createBackfillBody.includes("admin"), "createBackfillBooking requires admin");
 check(createBackfillBody.includes("backfillMustBePastDate"), "createBackfillBooking blocks non-past check-in");
 check(!/from\(["']units["']\)\s*\.update/.test(createBackfillBody), "createBackfillBooking does not update units.status");

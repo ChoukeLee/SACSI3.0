@@ -50,6 +50,8 @@ interface RunOptimisticOperationOptions {
   onSuccess?: (result?: OptimisticOperationResult | void) => void;
   onFailure?: () => void;
   shouldRefresh?: (result?: OptimisticOperationResult | void) => boolean;
+  rollbackOnFailure?: boolean;
+  showPendingLabel?: boolean;
 }
 
 export function useOptimisticOperation({
@@ -85,11 +87,11 @@ export function useOptimisticOperation({
   ) => {
     setBusyIfMounted(true);
     clearErrors?.();
-    setPendingIfMounted(label);
+    if (options.showPendingLabel !== false) setPendingIfMounted(label);
     options.beforeStart?.();
 
     const handleFailure = (message?: string) => {
-      onRollback?.();
+      if (options.rollbackOnFailure !== false) onRollback?.();
       options.onFailure?.();
       if (options.background) reportBackgroundOperation?.(label, "failed");
       else onError?.(message);

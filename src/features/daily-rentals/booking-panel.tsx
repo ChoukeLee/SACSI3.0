@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { X, Check, UserX, Printer, DollarSign, Percent, Trash2, MoreHorizontal, WalletCards, CalendarClock } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
@@ -86,6 +86,7 @@ export function BookingPanel({
   const [newNotes, setNewNotes] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const createRequestIdRef = useRef<string | null>(null);
 
   const [prepaidAmount, setPrepaidAmount] = useState("");
   const [suppAmount, setSuppAmount] = useState("");
@@ -206,7 +207,13 @@ export function BookingPanel({
   const runPanelAction = async (
     label: string,
     action: () => Promise<{ success: boolean; error?: string; data?: DailyOperationSnapshot } | void>,
-    options: { closeImmediately?: boolean; clearAdvancedTask?: boolean } = {},
+    options: {
+      closeImmediately?: boolean;
+      closeOnSuccess?: boolean;
+      clearAdvancedTask?: boolean;
+      rollbackOnFailure?: boolean;
+      showPendingLabel?: boolean;
+    } = {},
   ) => {
     await runOptimisticOperation(label, action, {
       background: options.closeImmediately,
@@ -214,8 +221,11 @@ export function BookingPanel({
       beforeStart: options.clearAdvancedTask ? () => setActiveAdvancedTask(null) : undefined,
       onSuccess: (result) => {
         if (result?.data) onOperationSnapshot?.(result.data as DailyOperationSnapshot);
+        if (options.closeOnSuccess) (onOptimisticClose ?? onClose)();
       },
       shouldRefresh: (result) => !result?.data,
+      rollbackOnFailure: options.rollbackOnFailure,
+      showPendingLabel: options.showPendingLabel,
     });
   };
 
@@ -231,29 +241,8 @@ export function BookingPanel({
     if (newCheckoutMode === "fixed" && newNights <= 0) { setError(formatError("invalidDateRange")); return; }
     setError("");
     const nightlyPrice = toN(newNightlyPrice) || 40000;
-    const totalAmount = newCheckoutMode === "fixed" ? newTotal : nightlyPrice;
-    onBookingCreated?.({
-      id: `optimistic-booking-${unitId}-${Date.now()}`,
-      unit_id: unitId!,
-      customer_id: newCustomerId,
-      check_in: newCheckIn,
-      check_out: newCheckoutMode === "fixed" ? newCheckOut : null,
-      checkout_mode: newCheckoutMode,
-      actual_check_out: null,
-      nightly_price_xof: nightlyPrice,
-      total_amount_xof: totalAmount,
-      prepaid_amount_xof: 0,
-      billing_status: "need_top_up",
-      manual_discount_amount_xof: 0,
-      manual_discount_reason: null,
-      final_amount_xof: totalAmount,
-      status: "pending_review",
-      ota_source: null,
-      notes: newNotes || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-    onUnitStatusPatched?.(unitId!, "reserved");
+    const requestId = createRequestIdRef.current ?? crypto.randomUUID();
+    createRequestIdRef.current = requestId;
     await runPanelAction(
       locale === "zh" ? "正在新建预订" : "Creation en cours",
       async () => createBooking({
@@ -261,8 +250,13 @@ export function BookingPanel({
         checkOut: newCheckoutMode === "fixed" ? newCheckOut : undefined,
         checkoutMode: newCheckoutMode, nightlyPriceXof: nightlyPrice,
         notes: newNotes || undefined,
+        requestId,
       }),
-      { closeImmediately: true },
+      {
+        closeOnSuccess: true,
+        rollbackOnFailure: false,
+        showPendingLabel: false,
+      },
     );
   };
 
@@ -467,14 +461,17 @@ export function BookingPanel({
 
   return (
     <>
-      <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/25 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/25 backdrop-blur-sm"
+        onClick={() => { if (!saving) onClose(); }}
+      />
       <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]" role="dialog" aria-label={isNew ? t.booking.newBooking : t.booking.title}>
         <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
           <div>
             <h3 className="text-[15px] font-semibold">{isBackfill ? (locale === "zh" ? "历史补录" : "Backfill") : isNew ? t.booking.newBooking : t.booking.title}</h3>
             {selectedUnit && <p className="mt-0.5 text-xs text-muted-foreground">{selectedUnit.unit_no} ({selectedUnit.floor_label})</p>}
           </div>
-          <Button size="icon" variant="ghost" onClick={onClose} aria-label={locale === "zh" ? "关闭" : "Fermer"} className="h-8 w-8">
+          <Button size="icon" variant="ghost" onClick={onClose} disabled={saving} aria-label={locale === "zh" ? "关闭" : "Fermer"} className="h-8 w-8">
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -1082,6 +1079,26 @@ function formatDailyRentalError(message: string | null | undefined, locale: Loca
     saleConflict: {
       zh: "该房间已有生效出售合同，不能创建日租预订。",
       fr: "Cette chambre a deja un contrat de vente actif.",
+    },
+    customerBlacklisted: {
+      zh: "该客户已列入黑名单，不能创建预订。",
+      fr: "Ce client est sur liste noire et ne peut pas reserver.",
+    },
+    customerNotFound: {
+      zh: "未找到该客户，请刷新后重新选择。",
+      fr: "Client introuvable. Actualisez puis choisissez-le de nouveau.",
+    },
+    unitNotFound: {
+      zh: "未找到该房间，请刷新日历后重试。",
+      fr: "Chambre introuvable. Actualisez le calendrier puis reessayez.",
+    },
+    dailyRentalOnlyAllowedInSacsi11: {
+      zh: "日租订单只能创建在11#公寓。",
+      fr: "Les reservations journalieres sont limitees au bâtiment 11.",
+    },
+    requestIdRequired: {
+      zh: "订单请求无效，请关闭侧栏后重新创建。",
+      fr: "La demande est invalide. Fermez le panneau puis recommencez.",
     },
     prepaymentRequired: {
       zh: "当前订单暂不能办理入住，请检查房态、保洁和订单状态。",

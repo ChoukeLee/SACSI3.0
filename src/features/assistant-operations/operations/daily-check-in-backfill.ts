@@ -128,6 +128,7 @@ export const dailyCheckInBackfillOperation: AssistantOperationHandler = {
         checkoutMode: after.checkout_mode === "open" ? "open" : "fixed",
         nightlyPriceXof: Number(after.nightly_price_xof),
         notes: `AI assistant: ${draft.originalMessage}`,
+        requestId: crypto.randomUUID(),
       });
       if (!result.success) return { success: false, action: "daily_check_in_backfill", message: result.error ?? "bookingFailed", affectedRecords, metadata: { failedRoom: change.label } };
       affectedRecords.push({ ...change, entityId: result.data?.booking?.id ?? change.entityId });
