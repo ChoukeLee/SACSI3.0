@@ -18,21 +18,18 @@ export async function FinanceSection({
 }: {
   locale: Locale; t: ManagementDict; buildings: BuildingRow[];
 }) {
-  const [receivablesRaw, paymentsRaw, unitsRaw, customersRaw] = await Promise.all([
+  const [receivablesRaw, unitsRaw, customersRaw] = await Promise.all([
     getReceivables(),
-    getPayments(),
     getUnits(),
     getCustomers(),
   ]);
   const receivables = (receivablesRaw ?? []) as ReceivableRow[];
-  const payments = (paymentsRaw ?? []) as PaymentRow[];
   const units = sortUnits((unitsRaw ?? []) as UnitRow[]);
   const customers = (customersRaw ?? []) as CustomerRow[];
 
   return (
     <FinanceSectionClient
       receivables={receivables}
-      payments={payments}
       units={units}
       customers={customers}
       buildings={buildings}

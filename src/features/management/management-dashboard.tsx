@@ -12,7 +12,6 @@ import {
 import {
   calculateReceivableSummary,
 } from "@/features/finance/receivable-summary";
-import { getCurrentMonthNonDailyPayments, sumPayments } from "./finance-utils";
 import { getDailyRoomStateForDate } from "@/features/daily-rentals/room-status";
 import { RoomCard } from "@/components/room-card";
 import { RoomBoard } from "@/components/room-board";
@@ -169,11 +168,8 @@ export function ManagementDashboard({
   }, [counts, selectedStatus]);
 
   // Finance
-  const now = new Date(); const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const nonDailyReceivables = useMemo(() => receivables.filter(r => r.source_type !== "daily_booking"), [receivables]);
   const receivableMonthStats = useMemo(() => calculateReceivableSummary(nonDailyReceivables, { currentMonth: true }), [nonDailyReceivables]);
-  const currentMonthNonDailyPayments = useMemo(() => getCurrentMonthNonDailyPayments(payments, monthPrefix), [payments, monthPrefix]);
-  const currentMonthCollected = useMemo(() => sumPayments(currentMonthNonDailyPayments), [currentMonthNonDailyPayments]);
 
   // Lookups
   const customerNameById = useMemo(() => { const m = new Map<string, string>(); for (const c of customers) m.set(c.id, c.name); return m; }, [customers]);
@@ -195,7 +191,7 @@ export function ManagementDashboard({
 
   const financeBlocks = [
     { key: "receivable" as const, label: t.cockpit.receivableThisMonth, value: formatXof(receivableMonthStats.totalReceivable), icon: CalendarCheck, color: "accentBlue" },
-    { key: "collected" as const, label: t.cockpit.paidThisMonth, value: formatXof(currentMonthCollected), icon: TrendingUp, color: "accentGreen" },
+    { key: "collected" as const, label: locale === "zh" ? "本月应收已收" : "Encaisse sur les echeances du mois", value: formatXof(receivableMonthStats.totalPaid), icon: TrendingUp, color: "accentGreen" },
     { key: "outstanding" as const, label: t.cockpit.outstandingThisMonth, value: formatXof(receivableMonthStats.outstanding), icon: Clock, color: "accentAmber" },
     { key: "overdue" as const, label: t.cockpit.overdueThisMonth, value: formatXof(receivableMonthStats.overdue), icon: TrendingDown, color: "accentRed" },
   ];
@@ -367,7 +363,7 @@ export function ManagementDashboard({
       })}
 
       {qualityIssues && <QualityDashboardWidget issues={qualityIssues} locale={locale} variant="management" />}
-      <FinanceDetailPanel open={financeDetail} onClose={() => setFinanceDetail(null)} receivables={receivables} payments={payments} units={units} buildings={buildings} customers={customers} locale={locale} />
+      <FinanceDetailPanel open={financeDetail} onClose={() => setFinanceDetail(null)} receivables={receivables} units={units} buildings={buildings} customers={customers} locale={locale} />
     </div>
   );
 }

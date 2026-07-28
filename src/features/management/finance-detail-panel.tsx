@@ -6,9 +6,8 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { receivableStatusStyles as STATUS_STYLES } from "@/lib/status-styles";
-import { getCurrentMonthNonDailyPayments, sumPayments } from "./finance-utils";
 import type {
-  BuildingRow, UnitRow, ReceivableRow, PaymentRow, CustomerRow,
+  BuildingRow, UnitRow, ReceivableRow, CustomerRow,
 } from "@/types/database";
 
 type DetailType = "receivable" | "collected" | "outstanding" | "overdue";
@@ -17,7 +16,6 @@ interface Props {
   open: DetailType | null;
   onClose: () => void;
   receivables: ReceivableRow[];
-  payments: PaymentRow[];
   units: UnitRow[];
   buildings: BuildingRow[];
   customers: CustomerRow[];
@@ -44,8 +42,8 @@ const PANEL_LABELS: Record<DetailType, { zh: { title: string; desc: string }; fr
     fr: { title: "Du du mois", desc: "Creances dues ce mois" },
   },
   collected: {
-    zh: { title: "本月实收明细", desc: "本月实际收到的款项" },
-    fr: { title: "Encaisse du mois", desc: "Paiements recus ce mois" },
+    zh: { title: "本月应收已收明细", desc: "到期日在本月且已收款的应收项目" },
+    fr: { title: "Encaisse sur les echeances du mois", desc: "Creances dues ce mois avec un montant encaisse" },
   },
   outstanding: {
     zh: { title: "本月未收明细", desc: "本月到期但尚未收齐的款项" },
@@ -62,7 +60,7 @@ const todayStr = now.toISOString().slice(0, 10);
 const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
 export function FinanceDetailPanel({
-  open, onClose, receivables, payments, units, buildings, customers, locale,
+  open, onClose, receivables, units, buildings, customers, locale,
 }: Props) {
   const t = dictionaries[locale].management;
 
@@ -85,12 +83,14 @@ export function FinanceDetailPanel({
   }, [customers]);
 
   const receivableData = useMemo(() => {
-    if (!open || open === "collected") return [];
+    if (!open) return [];
     let filtered = receivables.filter(r => r.source_type !== "daily_booking");
 
     if (open === "receivable") {
       // 本月应收: due_date in current month, exclude cancelled
       filtered = filtered.filter(r => r.due_date.startsWith(currentMonthPrefix) && r.status !== "cancelled");
+    } else if (open === "collected") {
+      filtered = filtered.filter(r => r.due_date.startsWith(currentMonthPrefix) && r.status !== "cancelled" && Number(r.paid_amount_xof) > 0);
     } else if (open === "outstanding") {
       // 本月未收: due_date in current month, not paid/cancelled
       filtered = filtered.filter(r => r.due_date.startsWith(currentMonthPrefix) && r.status !== "paid" && r.status !== "cancelled");
@@ -105,19 +105,12 @@ export function FinanceDetailPanel({
     return filtered.sort((a, b) => b.due_date.localeCompare(a.due_date));
   }, [open, receivables]);
 
-  const paymentData = useMemo(() => {
-    if (open !== "collected") return [];
-
-    return getCurrentMonthNonDailyPayments(payments, currentMonthPrefix);
-  }, [open, payments]);
-
   if (!open) return null;
 
   const labels = PANEL_LABELS[open][locale === "fr" ? "fr" : "zh"];
 
   const totalReceivable = receivableData.reduce((s, r) => s + Number(r.amount_xof), 0);
   const totalPaid = receivableData.reduce((s, r) => s + Number(r.paid_amount_xof), 0);
-  const totalPaymentAmount = sumPayments(paymentData);
 
   const getUnitInfo = (unitId: string | null) => {
     if (!unitId) return "—";
@@ -169,8 +162,7 @@ export function FinanceDetailPanel({
 
         <div className="px-5 py-4 space-y-4">
           {/* Summary bar */}
-          {open !== "collected" && (
-            <div className="flex flex-wrap gap-4 rounded-xl bg-muted/50 px-4 py-3 text-sm">
+          <div className="flex flex-wrap gap-4 rounded-xl bg-muted/50 px-4 py-3 text-sm">
               <div>
                 <span className="text-muted-foreground">{locale === "zh" ? "笔数" : "Nb"}: </span>
                 <span className="font-semibold text-foreground">{receivableData.length}</span>
@@ -189,26 +181,12 @@ export function FinanceDetailPanel({
                   {formatXof(totalReceivable - totalPaid)}
                 </span>
               </div>
-            </div>
-          )}
-
-          {open === "collected" && (
-            <div className="flex flex-wrap gap-4 rounded-xl bg-muted/50 px-4 py-3 text-sm">
-              <div>
-                <span className="text-muted-foreground">{locale === "zh" ? "笔数" : "Nb"}: </span>
-                <span className="font-semibold text-foreground">{paymentData.length}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">{locale === "zh" ? "收款合计" : "Total encaisse"}: </span>
-                <span className="font-semibold text-accentGreen-700">{formatXof(totalPaymentAmount)}</span>
-              </div>
-            </div>
-          )}
+          </div>
 
           {/* Table */}
           <div className="overflow-hidden rounded-xl border border-border">
             <div className="max-h-[calc(100vh-260px)] overflow-auto">
-              {open !== "collected" ? (
+              {(
                 <table className="w-full min-w-[980px] text-left text-[13px]">
                   <thead className="sticky top-0 z-10 bg-muted/50">
                     <tr className="text-left text-xs font-semibold text-muted-foreground">
@@ -271,51 +249,6 @@ export function FinanceDetailPanel({
                           </tr>
                         );
                       })
-                    )}
-                  </tbody>
-                </table>
-              ) : (
-                <table className="w-full min-w-[820px] text-left text-[13px]">
-                  <thead className="sticky top-0 z-10 bg-muted/50">
-                    <tr className="text-left text-xs font-semibold text-muted-foreground">
-                      <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "收款日期" : "Date"}</th>
-                      <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
-                      <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
-                      <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "业务" : "Type"}</th>
-                      <th className="px-4 py-3 whitespace-nowrap text-right">{locale === "zh" ? "金额" : "Montant"}</th>
-                      <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "收据号" : "Recu"}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/50">
-                    {paymentData.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground/60">
-                          {locale === "zh" ? "暂无数据" : "Aucune donnee"}
-                        </td>
-                      </tr>
-                    ) : (
-                      paymentData.map(p => (
-                        <tr key={p.id} className="hover:bg-muted/50 transition-colors">
-                          <td className="px-4 py-2.5 whitespace-nowrap font-medium text-foreground">
-                            {p.payment_date}
-                          </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-foreground/70">
-                            {getUnitInfo(p.unit_id)}
-                          </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-foreground/70">
-                            {getCustomerName(p.customer_id)}
-                          </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-foreground/60">
-                            {getBusinessTypeLabel(p.source_type)}
-                          </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold text-foreground">
-                            {formatXof(Number(p.amount))}
-                          </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground font-mono text-xs">
-                            {p.receipt_no ?? "—"}
-                          </td>
-                        </tr>
-                      ))
                     )}
                   </tbody>
                 </table>
