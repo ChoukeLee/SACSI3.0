@@ -28,7 +28,7 @@ export async function login(formData: FormData) {
   if (user && seedProfile) {
     await supabase.from("user_profiles").upsert({
       id: user.id,
-      role: seedProfile.role,
+      role: seedProfile.databaseRole ?? seedProfile.role,
       display_name: seedProfile.displayName,
       updated_at: new Date().toISOString(),
     });

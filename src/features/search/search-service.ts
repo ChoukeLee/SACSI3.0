@@ -13,6 +13,7 @@ const PERMITTED_TYPES: Record<UserRole, SearchResultType[]> = {
   boss:        ["customer","unit","daily_booking","lease","sale","receivable","payment","document"],
   finance:     ["customer","unit","receivable","payment","document"],
   front_desk:  ["customer","unit","daily_booking","document"],
+  rental_sales:["customer","unit","daily_booking","lease","sale","document"],
 };
 
 function result(

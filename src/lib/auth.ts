@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 
-export type UserRole = "admin" | "boss" | "finance" | "front_desk";
+export type UserRole = "admin" | "boss" | "finance" | "front_desk" | "rental_sales";
 
 export interface CurrentUser {
   id: string;
@@ -10,11 +10,12 @@ export interface CurrentUser {
   displayName: string;
 }
 
-const seedAccountProfiles: Record<string, { role: UserRole; displayName: string }> = {
+const seedAccountProfiles: Record<string, { role: UserRole; displayName: string; databaseRole?: "front_desk" }> = {
   "admin@sacsi.com": { role: "admin", displayName: "Chouke" },
   "boss@sacsi.com": { role: "boss", displayName: "王老板" },
   "finance@sacsi.com": { role: "finance", displayName: "李财务" },
   "front@sacsi.com": { role: "front_desk", displayName: "Niamké" },
+  "ying@sacsi.com": { role: "rental_sales", displayName: "Ying", databaseRole: "front_desk" },
 };
 
 export function getSeedAccountProfile(email: string | undefined) {
@@ -65,6 +66,13 @@ const rolePermissions: Record<UserRole, string[]> = {
     "finance:read",
     "reports:read",
     "settings:read",
+  ],
+  rental_sales: [
+    "units:read", "units:write",
+    "customers:read", "customers:write",
+    "daily_rentals:read", "daily_rentals:write",
+    "leases:read", "leases:write",
+    "sales:read", "sales:write",
   ],
 };
 
@@ -138,10 +146,10 @@ const pageAccess: Record<string, UserRole[]> = {
   finance: ["admin", "boss", "finance"],
   settings: ["admin"],
   reports: ["admin", "boss", "finance"],
-  "daily-rentals": ["admin", "front_desk", "finance", "boss"],
-  leases: ["admin", "front_desk", "finance", "boss"],
-  sales: ["admin", "front_desk", "finance", "boss"],
-  customers: ["admin", "front_desk", "finance", "boss"],
+  "daily-rentals": ["admin", "front_desk", "finance", "boss", "rental_sales"],
+  leases: ["admin", "front_desk", "finance", "boss", "rental_sales"],
+  sales: ["admin", "front_desk", "finance", "boss", "rental_sales"],
+  customers: ["admin", "front_desk", "finance", "boss", "rental_sales"],
 };
 
 /**

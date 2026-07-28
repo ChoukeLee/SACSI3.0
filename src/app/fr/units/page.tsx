@@ -10,7 +10,7 @@ import type { UnitRow, UnitBusinessFlagRow } from "@/types/database";
 export default async function FrenchUnitsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!["admin", "front_desk", "finance", "boss"].includes(user.role)) redirect("/");
+  if (!["admin", "front_desk", "finance", "boss", "rental_sales"].includes(user.role)) redirect("/");
 
   return (
     <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>

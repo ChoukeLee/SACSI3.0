@@ -13,7 +13,7 @@ import { DailyRentalData } from "./daily-rental-data";
 export default async function DailyRentalsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!["admin", "front_desk", "finance", "boss"].includes(user.role)) redirect("/");
+  if (!["admin", "front_desk", "finance", "boss", "rental_sales"].includes(user.role)) redirect("/");
 
   return (
     <div data-daily-rentals-page>

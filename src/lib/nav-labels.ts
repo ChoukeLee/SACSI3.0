@@ -22,7 +22,7 @@ const desktop: Record<Locale, DesktopNavLabels> = {
     brand: "科建地产",
     building: "SACSI 11#",
     system: "SACSI",
-    roles: { admin: "管理员", boss: "老板", finance: "财务", front_desk: "前台" },
+    roles: { admin: "管理员", boss: "老板", finance: "财务", front_desk: "前台", rental_sales: "租售业务" },
     shell: { logout: "登出", langLabel: "FR" },
     groups: {
       home: "首页",
@@ -57,7 +57,7 @@ const desktop: Record<Locale, DesktopNavLabels> = {
     brand: "Kejian Immobilier",
     building: "SACSI · Phase 1",
     system: "SACSI",
-    roles: { admin: "Administrateur", boss: "Proprietaire", finance: "Comptable", front_desk: "Reception" },
+    roles: { admin: "Administrateur", boss: "Proprietaire", finance: "Comptable", front_desk: "Reception", rental_sales: "Location et vente" },
     shell: { logout: "Déconnexion", langLabel: "ZH" },
     groups: {
       home: "Accueil",

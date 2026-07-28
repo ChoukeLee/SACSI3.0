@@ -11,6 +11,7 @@ import { getDesktopNavLabels } from "@/lib/nav-labels";
 import { useNavigationTransition } from "@/components/navigation-transition-provider";
 import { usePrefetch } from "@/components/navigation-prefetch";
 import type { UserRole } from "@/lib/auth";
+import { navigationGroupsForRole } from "@/lib/navigation-access";
 
 type NavKey = "management" | "units" | "dailyRentals" | "leases" | "sales" | "customers" | "finance" | "reports" | "assistant" | "todos" | "documents" | "dataQuality" | "auditLogs" | "dataExchange" | "bulkActions" | "targets" | "settings" | "security";
 
@@ -48,26 +49,12 @@ const groups: NavGroup[] = [
   ]},
 ];
 
-const BOSS_HIDDEN = new Set<NavKey>(["bulkActions"]);
-const FINANCE_GROUPS = new Set(["home","business","financeCenter","operations","systemTools"]);
-const FINANCE_HIDDEN = new Set<NavKey>(["management","dailyRentals","bulkActions","security","targets","dataQuality","settings","leases","sales"]);
-const FRONT_GROUPS = new Set(["home","business","operations"]);
-const FRONT_KEYS = new Set<NavKey>(["management","units","dailyRentals","customers","assistant","todos","documents"]);
-
-function filter(role?: UserRole): NavGroup[] {
-  if (!role || role === "admin") return groups;
-  if (role === "boss") return groups.map(g => ({...g, items: g.items.filter(i => !BOSS_HIDDEN.has(i.key))})).filter(g => g.items.length > 0);
-  if (role === "finance") return groups.filter(g => FINANCE_GROUPS.has(g.key)).map(g => ({...g, items: g.items.filter(i => !FINANCE_HIDDEN.has(i.key))})).filter(g => g.items.length > 0);
-  if (role === "front_desk") return groups.filter(g => FRONT_GROUPS.has(g.key)).map(g => ({...g, items: g.items.filter(i => FRONT_KEYS.has(i.key))})).filter(g => g.items.length > 0);
-  return [];
-}
-
 export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: UserRole }) {
   const pathname = usePathname();
   const { pendingHref, startNavigation } = useNavigationTransition();
   const prefetch = usePrefetch();
   const labels = getDesktopNavLabels(locale);
-  const visible = filter(userRole);
+  const visible = navigationGroupsForRole(groups, userRole);
   const activeHref = pendingHref ?? pathname;
 
   const isActive = (item: NavItem) => {
