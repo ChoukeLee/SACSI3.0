@@ -33,7 +33,7 @@ type CardColors = { bg: string; badge: string; nameColor: string; metaColor: str
 const statusStyle: Record<RoomStatus, CardColors> = {
   sold:            { bg: "bg-[#EAF7FF]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
   managed:         { bg: "bg-[#C6F0E7]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
-  leased:          { bg: "border-[#A5AFB8] bg-[#B8C0C8]", badge: "bg-white text-[#17324D]", nameColor: "text-[#17324D]", metaColor: "text-[#465B6D]", btnBg: "bg-white/[0.92]" },
+  leased:          { bg: "bg-[#B8C0C8]", badge: "bg-white text-[#17324D]", nameColor: "text-[#17324D]", metaColor: "text-[#465B6D]", btnBg: "bg-white/[0.92]" },
   daily_occupied:  { bg: "bg-[#62B6F5]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.95)]", metaColor: "text-[rgba(255,255,255,0.72)]", btnBg: "bg-white/[0.82]" },
   dailyOccupied:   { bg: "bg-[#62B6F5]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.95)]", metaColor: "text-[rgba(255,255,255,0.72)]", btnBg: "bg-white/[0.82]" },
   reserved:        { bg: "bg-[#FFF6D8]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#5D7186]",                    btnBg: "bg-white/[0.88]" },
