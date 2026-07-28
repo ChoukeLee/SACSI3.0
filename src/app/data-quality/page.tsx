@@ -3,7 +3,15 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
 import { DesktopOnly } from "@/features/mobile";
-import { BusinessRepairCenter, QualityCenter, runQualityChecks } from "@/features/data-quality";
+import {
+  BusinessRepairCenter,
+  QualityCenter,
+  runQualityChecks,
+} from "@/features/data-quality";
+import {
+  fetchDatabaseQualityIssues,
+  mergeDatabaseQualityIssues,
+} from "@/features/data-quality/database-quality-service";
 import { scanDailyRentalIssues } from "@/features/daily-rentals/daily-rental-audit";
 import type { TodoRole } from "@/features/data-quality/quality-types";
 import type {
@@ -32,6 +40,7 @@ export default async function DataQualityPage() {
     { data: cleaningTasks },
     { data: ledgerEntries },
     { data: auditLogs },
+    databaseIssues,
   ] = await Promise.all([
     supabase.from("units").select("*").order("unit_no").limit(500),
     supabase.from("customers").select("*").order("name").limit(500),
@@ -44,6 +53,7 @@ export default async function DataQualityPage() {
     supabase.from("cleaning_tasks").select("*").limit(500),
     supabase.from("ledger_entries").select("*").order("entry_date", { ascending: false }).limit(1000),
     supabase.from("audit_logs").select("*").in("entity_type", ["daily_booking", "unit"]).order("created_at", { ascending: false }).limit(500),
+    fetchDatabaseQualityIssues("zh"),
   ]);
 
   const existingIssues = runQualityChecks({
@@ -67,7 +77,10 @@ export default async function DataQualityPage() {
     auditLogs: (auditLogs ?? []),
   });
 
-  const allIssues = [...existingIssues, ...drIssues];
+  const allIssues = mergeDatabaseQualityIssues(
+    [...existingIssues, ...drIssues],
+    databaseIssues,
+  );
 
   return (
     <>
