@@ -21,6 +21,7 @@ describe("rental sales role", () => {
     expect(hasPermission(rentalSalesUser, "daily_rentals:write")).toBe(true);
     expect(hasPermission(rentalSalesUser, "leases:write")).toBe(true);
     expect(hasPermission(rentalSalesUser, "sales:write")).toBe(true);
+    expect(hasPermission(rentalSalesUser, "audit_logs:read")).toBe(true);
     expect(hasPermission(rentalSalesUser, "finance:read")).toBe(false);
     expect(hasPermission(rentalSalesUser, "settings:read")).toBe(false);
   });

@@ -11,7 +11,7 @@ export const revalidate = 0;
 export default async function FrenchAuditLogsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!["admin", "boss", "finance"].includes(user.role)) redirect("/");
+  if (!["admin", "boss", "finance", "rental_sales"].includes(user.role)) redirect("/");
 
   const supabase = await createClient();
 

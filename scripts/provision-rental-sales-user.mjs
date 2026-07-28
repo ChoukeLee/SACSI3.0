@@ -102,6 +102,7 @@ await checked(
       application_role: "rental_sales",
       database_role: "front_desk",
       access_groups: ["home", "business"],
+      access_items: ["audit_logs"],
     },
   }),
   "write audit log",
@@ -114,5 +115,6 @@ console.log(JSON.stringify({
   display_name: displayName,
   application_role: "rental_sales",
   access_groups: ["home", "business"],
+  access_items: ["audit_logs"],
   credential_verified: true,
 }));

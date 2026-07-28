@@ -73,6 +73,7 @@ const rolePermissions: Record<UserRole, string[]> = {
     "daily_rentals:read", "daily_rentals:write",
     "leases:read", "leases:write",
     "sales:read", "sales:write",
+    "audit_logs:read",
   ],
 };
 

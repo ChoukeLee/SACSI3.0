@@ -14,7 +14,8 @@ const FINANCE_GROUPS = new Set(["home", "business", "financeCenter", "operations
 const FINANCE_HIDDEN = new Set(["management", "dailyRentals", "bulkActions", "security", "targets", "dataQuality", "settings", "leases", "sales"]);
 const FRONT_GROUPS = new Set(["home", "business", "operations"]);
 const FRONT_KEYS = new Set(["management", "units", "dailyRentals", "customers", "assistant", "todos", "documents"]);
-const RENTAL_SALES_GROUPS = new Set(["home", "business"]);
+const RENTAL_SALES_GROUPS = new Set(["home", "business", "operations"]);
+const RENTAL_SALES_KEYS = new Set(["management", "units", "dailyRentals", "leases", "sales", "customers", "auditLogs"]);
 
 export function navigationGroupsForRole<TItem extends NavigationItem, TGroup extends NavigationGroup<TItem>>(
   groups: TGroup[],
@@ -33,6 +34,9 @@ export function navigationGroupsForRole<TItem extends NavigationItem, TGroup ext
     ...group,
     items: group.items.filter((item) => FRONT_KEYS.has(item.key)),
   })).filter((group) => group.items.length > 0) as TGroup[];
-  if (role === "rental_sales") return groups.filter((group) => RENTAL_SALES_GROUPS.has(group.key));
+  if (role === "rental_sales") return groups.filter((group) => RENTAL_SALES_GROUPS.has(group.key)).map((group) => ({
+    ...group,
+    items: group.items.filter((item) => RENTAL_SALES_KEYS.has(item.key)),
+  })).filter((group) => group.items.length > 0) as TGroup[];
   return [];
 }
