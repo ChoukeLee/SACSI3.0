@@ -342,7 +342,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
             </>}
           >
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-              {fc.map(contract=>{const unit=unitMap.get(contract.unit_id);const customer=customerMap.get(contract.customer_id);const s=getContractSummary(contract.id);const isRisk=s.overdue>0||(contract.status==="active"&&contract.transfer_status!=="completed");const dataFlags=getSaleDataFlags(contract,customer);return(<RoomCard key={contract.id} roomNo={unit?.unit_no??"-"} status="sold" statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]} onClick={()=>openDetail(contract.id)} className={isRisk?"border-amber-200 shadow-[0_10px_24px_rgba(180,120,24,0.14)]":""}>
+              {fc.map(contract=>{const unit=unitMap.get(contract.unit_id);const customer=customerMap.get(contract.customer_id);const s=getContractSummary(contract.id);const dataFlags=getSaleDataFlags(contract,customer);return(<RoomCard key={contract.id} roomNo={unit?.unit_no??"-"} status="sold" statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]} onClick={()=>openDetail(contract.id)}>
                 {/* Name + status badge */}
                 <div className="flex min-h-[52px] items-start justify-between gap-1.5">
                   <p className="text-[13px] font-medium leading-tight truncate" title={customer?.name??""}>{customer?.name??"-"}</p>

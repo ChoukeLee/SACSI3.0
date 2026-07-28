@@ -584,7 +584,6 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 return (
                   <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status={isManaged ? "managed" : "leased"}
                     onClick={() => openDetail(contract.id)}
-                    className={isRisk ? "border-amber-200 shadow-[0_10px_24px_rgba(180,120,24,0.14)]" : ""}>
                     {/* Customer and tags */}
                     <div className="flex min-h-[62px] flex-col justify-start gap-2">
                       <p className="text-[13px] font-semibold leading-snug line-clamp-2 break-words" title={customer?.name ?? (locale==="zh"?"无客户":"Sans client")}>
