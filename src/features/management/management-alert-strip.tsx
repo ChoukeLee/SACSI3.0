@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Bell } from "lucide-react";
+import { AlertTriangle, ArrowRight, Bell, CalendarCheck, Clock, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/lib/i18n";
-import type { AlertItem } from "./management-alerts";
+import type { AlertIcon, AlertItem } from "./management-alerts";
 
 interface AlertStripProps {
   alerts: AlertItem[];
@@ -12,7 +12,13 @@ interface AlertStripProps {
 }
 
 function AlertCard({ item }: { item: AlertItem }) {
-  const Icon = item.icon;
+  const icons = {
+    alert: AlertTriangle,
+    calendar: CalendarCheck,
+    clock: Clock,
+    "credit-card": CreditCard,
+  } satisfies Record<AlertIcon, typeof AlertTriangle>;
+  const Icon = icons[item.icon];
   const colors = {
     red:   "border-l-accentRed-500 bg-accentRed-50/60 hover:bg-accentRed-50",
     amber: "border-l-accentAmber-500 bg-accentAmber-50/60 hover:bg-accentAmber-50",

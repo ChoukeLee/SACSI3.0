@@ -1,6 +1,7 @@
-import { AlertTriangle, CalendarCheck, Clock, CreditCard } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { formatXof } from "@/lib/utils";
+
+export type AlertIcon = "alert" | "calendar" | "clock" | "credit-card";
 
 export interface AlertItem {
   key: string;
@@ -9,7 +10,7 @@ export interface AlertItem {
   detail?: string;
   href: string;
   tone: "red" | "amber" | "blue";
-  icon: typeof AlertTriangle;
+  icon: AlertIcon;
 }
 
 export function computeAlerts(params: {
@@ -31,7 +32,7 @@ export function computeAlerts(params: {
       detail: zh ? `合计 ${formatXof(params.overdueTotal)}` : `Total ${formatXof(params.overdueTotal)}`,
       href: "/management#finance",
       tone: "red",
-      icon: AlertTriangle,
+      icon: "alert",
     });
   }
 
@@ -42,7 +43,7 @@ export function computeAlerts(params: {
       count: params.todayCheckouts,
       href: "/daily-rentals",
       tone: "amber",
-      icon: CalendarCheck,
+      icon: "calendar",
     });
   }
 
@@ -53,7 +54,7 @@ export function computeAlerts(params: {
       count: params.todayCheckins,
       href: "/daily-rentals",
       tone: "blue",
-      icon: Clock,
+      icon: "clock",
     });
   }
 
@@ -64,7 +65,7 @@ export function computeAlerts(params: {
       count: params.expiringLeases,
       href: "/leases",
       tone: "blue",
-      icon: CreditCard,
+      icon: "credit-card",
     });
   }
 

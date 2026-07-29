@@ -18,7 +18,9 @@ describe("management home workbench", () => {
       label: "逾期欠款",
       count: 3,
       href: "/management#finance",
+      icon: "alert",
     });
+    expect(JSON.parse(JSON.stringify(alerts))).toEqual(alerts);
   });
 
   it("keeps only actionable daily and lease reminders", () => {
