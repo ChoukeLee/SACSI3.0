@@ -3,12 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { LogOut, UserRound } from "lucide-react";
-import type { Locale, ShellDict } from "@/lib/i18n";
+import { LogOut, Settings, UserRound } from "lucide-react";
+import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import type { UserRole } from "@/lib/auth";
-import { NotificationBell } from "@/features/notifications";
-import { GlobalSearch } from "@/features/search";
 import { createClient } from "@/lib/supabase/client";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -29,11 +27,9 @@ function NavigationLoadingBar() {
 }
 
 export function AppShell({
-  children, locale = "zh", userRole, userDisplayName, notifications = [], notifT,
+  children, locale = "zh", userRole, userDisplayName,
 }: {
   children: React.ReactNode; locale?: Locale; userRole?: UserRole; userDisplayName?: string;
-  notifications?: { id: string; title: string; body: string; read_at: string | null; created_at: string; due_at: string | null }[];
-  notifT: ShellDict["notifications"];
 }) {
   return (
     <NavigationTransitionProvider>
@@ -41,8 +37,6 @@ export function AppShell({
         locale={locale}
         userRole={userRole}
         userDisplayName={userDisplayName}
-        notifications={notifications}
-        notifT={notifT}
       >
         {children}
       </AppShellInner>
@@ -51,11 +45,9 @@ export function AppShell({
 }
 
 function AppShellInner({
-  children, locale, userRole, userDisplayName, notifications, notifT,
+  children, locale, userRole, userDisplayName,
 }: {
   children: React.ReactNode; locale: Locale; userRole?: UserRole; userDisplayName?: string;
-  notifications: { id: string; title: string; body: string; read_at: string | null; created_at: string; due_at: string | null }[];
-  notifT: ShellDict["notifications"];
 }) {
   const pathname = usePathname();
   const { isNavigating } = useNavigationTransition();
@@ -101,24 +93,32 @@ function AppShellInner({
       <SidebarInset>
         <NavigationLoadingBar />
         <header className="sticky top-0 z-sticky flex h-12 shrink-0 items-center border-b border-border bg-card/95 shadow-xs backdrop-blur supports-[backdrop-filter]:bg-card/90">
-          <div className="grid w-full grid-cols-[minmax(200px,320px)_minmax(180px,1fr)_minmax(200px,320px)] items-center gap-3 px-4">
+          <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 px-4">
             <div className="flex min-w-0 items-center gap-2">
               <SidebarTrigger className="hidden lg:flex" />
             </div>
-            <div className="flex min-w-0 justify-center">
-              <div className="w-full max-w-[220px]">
-                <GlobalSearch locale={locale} />
-              </div>
-            </div>
+            <div />
             <div className="ml-auto flex h-9 items-center gap-1 rounded-lg border border-border bg-muted/55 p-0.5 shadow-xs">
-              <NotificationBell notifications={notifications} t={notifT} locale={locale} />
-              <Link
-                href={routeFor(otherLocale, pathname)}
-                prefetch={false}
-                className="inline-flex h-8 items-center rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
-              >
-                {labels.shell.langLabel}
-              </Link>
+              {userRole !== "front_desk" && (
+                <Link
+                  href={routeFor(otherLocale, pathname)}
+                  prefetch={false}
+                  className="inline-flex h-8 items-center rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+                >
+                  {labels.shell.langLabel}
+                </Link>
+              )}
+              {userRole === "admin" && (
+                <Link
+                  href={routeFor(locale, "/settings")}
+                  prefetch={false}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+                  aria-label={locale === "zh" ? "系统维护" : "Maintenance système"}
+                  title={locale === "zh" ? "系统维护" : "Maintenance système"}
+                >
+                  <Settings className="h-4 w-4" />
+                </Link>
+              )}
               {roleLabel && (
                 <span className="hidden h-8 items-center gap-1.5 rounded-md bg-card px-2.5 text-xs font-medium text-foreground shadow-xs sm:inline-flex">
                   <UserRound className="h-3.5 w-3.5 text-muted-foreground" />

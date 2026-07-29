@@ -5,7 +5,7 @@ import { AssistantOperationsCenter } from "@/features/assistant-operations/assis
 export default async function AssistantFrPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (user.role === "rental_sales") redirect("/fr");
+  if (user.role === "rental_sales" || user.role === "front_desk") redirect("/fr");
 
   return <AssistantOperationsCenter locale="fr" userRole={user.role} />;
 }

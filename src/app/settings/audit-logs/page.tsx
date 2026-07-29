@@ -11,24 +11,15 @@ export const revalidate = 0;
 export default async function AuditLogsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!["admin", "boss", "finance", "rental_sales"].includes(user.role)) redirect("/");
+  if (user.role !== "admin") redirect("/");
 
   const supabase = await createClient();
 
-  let query = supabase
+  const query = supabase
     .from("audit_logs")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(500);
-
-  // Finance role: filter to financial entities only
-  if (user.role === "finance") {
-    query = query.in("entity_type", [
-      "payment", "receivable", "ledger_entry",
-      "lease_contract", "sale_contract", "daily_booking",
-    ]);
-  }
-  // Admin/boss: get all (RLS also enforces this server-side)
 
   const { data } = await query;
   const logs = await enrichAuditLogsWithUnitNumbers(supabase, (data ?? []) as unknown as AuditLogRow[]);

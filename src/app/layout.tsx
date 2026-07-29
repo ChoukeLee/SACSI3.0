@@ -3,7 +3,6 @@ import { AppShellWrapper } from "@/components/app-shell-wrapper";
 import { ToastProvider } from "@/components/toast";
 import { ThemeProvider } from "@/components/theme-provider";
 import { getCurrentUser } from "@/lib/auth";
-import { notificationStrings } from "@/lib/dictionaries/notifications";
 
 import "./globals.css";
 
@@ -40,8 +39,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <AppShellWrapper
               userRole={user?.role}
               userDisplayName={user?.displayName}
-              notifT={notificationStrings.zh}
-              notifTFr={notificationStrings.fr}
             >
               {children}
             </AppShellWrapper>

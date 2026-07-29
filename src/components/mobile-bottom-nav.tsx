@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, CalendarDays, Home, Users } from "lucide-react";
+import { Building2, CalendarDays, FileSignature, Home } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { getMobileNavLabels } from "@/lib/nav-labels";
@@ -13,11 +13,12 @@ import { cn } from "@/lib/utils";
 const mobileTabs = [
   { key: "workbench" as const, href: "/", icon: Home },
   { key: "daily" as const, href: "/daily-rentals", icon: CalendarDays },
+  { key: "leases" as const, href: "/leases", icon: FileSignature },
+  { key: "sales" as const, href: "/sales", icon: Building2 },
   { key: "units" as const, href: "/units", icon: Building2 },
-  { key: "profile" as const, href: "/customers", icon: Users },
 ];
 
-export function MobileBottomNav({ locale, userRole: _userRole }: { locale: Locale; userRole?: string }) {
+export function MobileBottomNav({ locale, userRole }: { locale: Locale; userRole?: string }) {
   const pathname = usePathname();
   const { pendingHref, startNavigation } = useNavigationTransition();
   const prefetch = usePrefetch();
@@ -30,10 +31,11 @@ export function MobileBottomNav({ locale, userRole: _userRole }: { locale: Local
     return activeHref === localized || activeHref.startsWith(localized);
   };
 
-  const resolveHref = (href: string) => {
-    if (href === "/" && _userRole === "front_desk") return routeFor(locale, "/daily-rentals");
-    return routeFor(locale, href);
-  };
+  const visibleTabs = userRole === "front_desk"
+    ? mobileTabs.filter((item) => item.key === "daily" || item.key === "leases")
+    : mobileTabs;
+
+  const resolveHref = (href: string) => routeFor(locale, href);
 
   return (
     <nav
@@ -42,7 +44,7 @@ export function MobileBottomNav({ locale, userRole: _userRole }: { locale: Local
       style={{ paddingBottom: "var(--safe-bottom)" }}
     >
       <div className="flex items-center justify-around px-1">
-        {mobileTabs.map((item) => {
+        {visibleTabs.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
           const label = labels[item.key];

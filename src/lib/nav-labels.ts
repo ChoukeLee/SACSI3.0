@@ -13,8 +13,9 @@ export interface DesktopNavLabels {
 export interface MobileNavLabels {
   workbench: string;
   daily: string;
+  leases: string;
+  sales: string;
   units: string;
-  profile: string;
 }
 
 const desktop: Record<Locale, DesktopNavLabels> = {
@@ -25,6 +26,7 @@ const desktop: Record<Locale, DesktopNavLabels> = {
     roles: { admin: "管理员", boss: "老板", finance: "财务", front_desk: "前台", rental_sales: "租售业务" },
     shell: { logout: "登出", langLabel: "FR" },
     groups: {
+      core: "核心业务",
       home: "首页",
       business: "租售业务",
       financeCenter: "财务中心",
@@ -33,11 +35,11 @@ const desktop: Record<Locale, DesktopNavLabels> = {
     },
     nav: {
       workbench: "工作台",
-      management: "经营驾驶舱",
-      units: "房源总览",
-      dailyRentals: "日租业务",
-      leases: "长租业务",
-      sales: "出售业务",
+      management: "首页",
+      units: "房源",
+      dailyRentals: "日租",
+      leases: "长租",
+      sales: "出售",
       customers: "客户档案",
       finance: "应收与收款",
       reports: "财务报表",
@@ -60,6 +62,7 @@ const desktop: Record<Locale, DesktopNavLabels> = {
     roles: { admin: "Administrateur", boss: "Proprietaire", finance: "Comptable", front_desk: "Reception", rental_sales: "Location et vente" },
     shell: { logout: "Déconnexion", langLabel: "ZH" },
     groups: {
+      core: "Travail",
       home: "Accueil",
       business: "Activites",
       financeCenter: "Finance",
@@ -68,11 +71,11 @@ const desktop: Record<Locale, DesktopNavLabels> = {
     },
     nav: {
       workbench: "Tableau de bord",
-      management: "Direction",
-      units: "Lots",
+      management: "Accueil",
+      units: "Logements",
       dailyRentals: "Location jour",
-      leases: "Baux",
-      sales: "Ventes",
+      leases: "Location longue",
+      sales: "Vente",
       customers: "Clients",
       finance: "Creances",
       reports: "Rapports",
@@ -91,8 +94,8 @@ const desktop: Record<Locale, DesktopNavLabels> = {
 };
 
 const mobile: Record<Locale, MobileNavLabels> = {
-  zh: { workbench: "工作台", daily: "日租", units: "房源", profile: "客户" },
-  fr: { workbench: "Accueil", daily: "Jour", units: "Lots", profile: "Clients" },
+  zh: { workbench: "首页", daily: "日租", leases: "长租", sales: "出售", units: "房源" },
+  fr: { workbench: "Accueil", daily: "Jour", leases: "Longue", sales: "Vente", units: "Lots" },
 };
 
 export function getDesktopNavLabels(locale: Locale): DesktopNavLabels {

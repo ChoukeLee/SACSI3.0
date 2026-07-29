@@ -12,6 +12,7 @@ export default async function LeasesPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!["admin", "front_desk", "finance", "boss", "rental_sales"].includes(user.role)) redirect("/");
+  if (user.role === "front_desk") redirect("/fr/leases");
 
   return (
     <>

@@ -2,26 +2,32 @@ import { describe, expect, it } from "vitest";
 import { navigationGroupsForRole } from "./navigation-access";
 
 const groups = [
-  { key: "home", items: [{ key: "management" }, { key: "units" }] },
-  { key: "business", items: [{ key: "dailyRentals" }, { key: "leases" }, { key: "sales" }, { key: "customers" }] },
-  { key: "financeCenter", items: [{ key: "finance" }] },
-  { key: "operations", items: [{ key: "assistant" }, { key: "auditLogs" }] },
-  { key: "systemTools", items: [{ key: "settings" }] },
+  { key: "core", items: [
+    { key: "management" },
+    { key: "dailyRentals" },
+    { key: "leases" },
+    { key: "sales" },
+    { key: "units" },
+  ] },
 ];
 
-describe("rental sales navigation", () => {
-  it("shows only home and rental/sales business groups", () => {
+describe("role navigation", () => {
+  it("shows all five core modules to rental sales", () => {
     const visible = navigationGroupsForRole(groups, "rental_sales");
-
-    expect(visible.map((group) => group.key)).toEqual(["home", "business", "operations"]);
     expect(visible.flatMap((group) => group.items.map((item) => item.key))).toEqual([
       "management",
-      "units",
       "dailyRentals",
       "leases",
       "sales",
-      "customers",
-      "auditLogs",
+      "units",
+    ]);
+  });
+
+  it("limits front desk to daily operations and read-only lease entry", () => {
+    const visible = navigationGroupsForRole(groups, "front_desk");
+    expect(visible.flatMap((group) => group.items.map((item) => item.key))).toEqual([
+      "dailyRentals",
+      "leases",
     ]);
   });
 });

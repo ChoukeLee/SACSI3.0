@@ -8,6 +8,13 @@ const rentalSalesUser: CurrentUser = {
   displayName: "Ying",
 };
 
+const frontDeskUser: CurrentUser = {
+  id: "front-desk-user",
+  email: "front@sacsi.com",
+  role: "front_desk",
+  displayName: "Niamké",
+};
+
 describe("rental sales role", () => {
   it("maps the Ying account to the application role and supported database role", () => {
     expect(getSeedAccountProfile("YING@SACSI.COM")).toEqual({
@@ -36,5 +43,23 @@ describe("rental sales role", () => {
 
   it("denies unknown route sections by default", () => {
     expect(canAccessPage("admin", "not-a-real-section")).toBe(false);
+  });
+});
+
+describe("front desk role", () => {
+  it("can operate daily rentals and read leases only", () => {
+    expect(hasPermission(frontDeskUser, "daily_rentals:write")).toBe(true);
+    expect(hasPermission(frontDeskUser, "leases:read")).toBe(true);
+    expect(hasPermission(frontDeskUser, "leases:write")).toBe(false);
+    expect(hasPermission(frontDeskUser, "sales:read")).toBe(false);
+    expect(hasPermission(frontDeskUser, "finance:read")).toBe(false);
+    expect(hasPermission(frontDeskUser, "settings:read")).toBe(false);
+  });
+
+  it("cannot open sales or customer sections", () => {
+    expect(canAccessPage("front_desk", "daily-rentals")).toBe(true);
+    expect(canAccessPage("front_desk", "leases")).toBe(true);
+    expect(canAccessPage("front_desk", "sales")).toBe(false);
+    expect(canAccessPage("front_desk", "customers")).toBe(false);
   });
 });

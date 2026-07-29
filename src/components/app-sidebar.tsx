@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { ArrowUpDown, Banknote, BarChart3, Bell, Bot, Building2, CalendarDays, FileSignature, FileText, Layers, LayoutDashboard, Settings, Shield, ShieldCheck, Target, Users } from "lucide-react";
+import { Building2, CalendarDays, FileSignature, LayoutDashboard } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -13,39 +13,18 @@ import { usePrefetch } from "@/components/navigation-prefetch";
 import type { UserRole } from "@/lib/auth";
 import { navigationGroupsForRole } from "@/lib/navigation-access";
 
-type NavKey = "management" | "units" | "dailyRentals" | "leases" | "sales" | "customers" | "finance" | "reports" | "assistant" | "todos" | "documents" | "dataQuality" | "auditLogs" | "dataExchange" | "bulkActions" | "targets" | "settings" | "security";
+type NavKey = "management" | "units" | "dailyRentals" | "leases" | "sales";
 
 interface NavItem { key: NavKey; href: string; icon: typeof LayoutDashboard; activeMatch?: string }
 interface NavGroup { key: string; labelKey: string; items: NavItem[]; roles: UserRole[] }
 
 const groups: NavGroup[] = [
-  { key: "home", labelKey: "home", roles: ["admin","boss","finance","front_desk"], items: [
+  { key: "core", labelKey: "core", roles: ["admin", "boss", "finance", "front_desk", "rental_sales"], items: [
     { key: "management", href: "/management", icon: LayoutDashboard },
-    { key: "units", href: "/units", icon: Building2, activeMatch: "/units" },
-  ]},
-  { key: "business", labelKey: "business", roles: ["admin","boss","finance","front_desk"], items: [
     { key: "dailyRentals", href: "/daily-rentals", icon: CalendarDays },
     { key: "leases", href: "/leases", icon: FileSignature },
     { key: "sales", href: "/sales", icon: Building2 },
-    { key: "customers", href: "/customers", icon: Users, activeMatch: "/customers" },
-  ]},
-  { key: "financeCenter", labelKey: "financeCenter", roles: ["admin","boss","finance"], items: [
-    { key: "finance", href: "/finance", icon: Banknote },
-    { key: "reports", href: "/reports", icon: BarChart3 },
-  ]},
-  { key: "operations", labelKey: "operations", roles: ["admin","boss","finance","front_desk"], items: [
-    { key: "assistant", href: "/assistant", icon: Bot },
-    { key: "todos", href: "/todos", icon: Bell },
-    { key: "documents", href: "/documents", icon: FileText },
-    { key: "dataQuality", href: "/data-quality", icon: ShieldCheck },
-    { key: "auditLogs", href: "/settings/audit-logs", icon: Shield, activeMatch: "/settings/audit-logs" },
-  ]},
-  { key: "systemTools", labelKey: "systemTools", roles: ["admin","boss","finance"], items: [
-    { key: "dataExchange", href: "/data-exchange", icon: ArrowUpDown },
-    { key: "bulkActions", href: "/bulk-actions", icon: Layers },
-    { key: "targets", href: "/management/targets", icon: Target, activeMatch: "/management/targets" },
-    { key: "settings", href: "/settings", icon: Settings },
-    { key: "security", href: "/settings/security", icon: Shield, activeMatch: "/settings/security" },
+    { key: "units", href: "/units", icon: Building2, activeMatch: "/units" },
   ]},
 ];
 

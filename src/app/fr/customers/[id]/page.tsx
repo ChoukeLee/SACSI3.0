@@ -9,7 +9,7 @@ export default async function FrenchCustomerProfilePage({ params }: { params: Pr
   const { id } = await params;
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!["admin", "boss", "finance", "front_desk", "rental_sales"].includes(user.role)) redirect("/");
+  if (!["admin", "boss", "finance", "rental_sales"].includes(user.role)) redirect("/");
 
   const profile = await fetchCustomerProfile(id);
   if (!profile) notFound();

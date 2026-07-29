@@ -34,5 +34,18 @@ export async function login(formData: FormData) {
     });
   }
 
+  if (seedProfile?.role === "front_desk") {
+    redirect("/fr/daily-rentals");
+  }
+
+  if (user && !seedProfile) {
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile?.role === "front_desk") redirect("/fr/daily-rentals");
+  }
+
   redirect("/");
 }

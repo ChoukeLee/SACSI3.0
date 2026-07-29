@@ -6,7 +6,7 @@ export default async function HomePage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  if (user.role === "front_desk") redirect("/daily-rentals");
+  if (user.role === "front_desk") redirect("/fr/daily-rentals");
   if (user.role === "finance") redirect("/finance");
 
   redirect("/management");

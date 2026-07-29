@@ -24,7 +24,7 @@ export const revalidate = 60;
 export default async function FrenchDataQualityPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!["admin", "boss"].includes(user.role)) redirect("/");
+  if (user.role !== "admin") redirect("/");
 
   const supabase = await createClient();
 

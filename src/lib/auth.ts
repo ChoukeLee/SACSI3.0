@@ -18,6 +18,12 @@ const seedAccountProfiles: Record<string, { role: UserRole; displayName: string;
   "ying@sacsi.com": { role: "rental_sales", displayName: "Ying", databaseRole: "front_desk" },
 };
 
+export const configuredAccountSummaries = Object.entries(seedAccountProfiles).map(([email, profile]) => ({
+  email,
+  displayName: profile.displayName,
+  role: profile.role,
+}));
+
 export function getSeedAccountProfile(email: string | undefined) {
   if (!email) return null;
   return seedAccountProfiles[email.toLowerCase()] ?? null;
@@ -58,14 +64,10 @@ const rolePermissions: Record<UserRole, string[]> = {
     "settings:read",
   ],
   front_desk: [
-    "units:read", "units:write",
-    "customers:read", "customers:write",
+    "units:read",
+    "customers:read",
     "daily_rentals:read", "daily_rentals:write",
     "leases:read",
-    "sales:read",
-    "finance:read",
-    "reports:read",
-    "settings:read",
   ],
   rental_sales: [
     "units:read", "units:write",
@@ -155,8 +157,8 @@ const pageAccess: Record<string, UserRole[]> = {
   reports: ["admin", "boss", "finance"],
   "daily-rentals": ["admin", "front_desk", "finance", "boss", "rental_sales"],
   leases: ["admin", "front_desk", "finance", "boss", "rental_sales"],
-  sales: ["admin", "front_desk", "finance", "boss", "rental_sales"],
-  customers: ["admin", "front_desk", "finance", "boss", "rental_sales"],
+  sales: ["admin", "finance", "boss", "rental_sales"],
+  customers: ["admin", "finance", "boss", "rental_sales"],
 };
 
 /**
