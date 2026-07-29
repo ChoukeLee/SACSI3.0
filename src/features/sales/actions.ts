@@ -16,6 +16,33 @@ async function guardSaleWrite() {
 }
 async function guardSaleFinance() { await requireRole("admin", "finance"); }
 
+export async function recordSalePaymentAtomic(input: {
+  contractId: string;
+  scheduleId: string;
+  amount: number;
+  paymentDate: string;
+  receiptNo?: string;
+  requestId: string;
+}): Promise<{ success: boolean; error?: string }> {
+  await guardSaleFinance();
+  if (!input.requestId || !input.paymentDate || input.amount <= 0) {
+    return { success: false, error: "Invalid payment request." };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("record_sale_payment_rpc", {
+    p_contract_id: input.contractId,
+    p_schedule_id: input.scheduleId,
+    p_amount: input.amount,
+    p_payment_date: input.paymentDate,
+    p_receipt_no: input.receiptNo ?? null,
+    p_request_id: input.requestId,
+  });
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/sales");
+  revalidatePath("/fr/sales");
+  return { success: true };
+}
+
 // ── Create sale contract ──
 
 export async function createSaleContract(input: {
@@ -423,6 +450,7 @@ export async function updateTransferStatus(
   transferDate?: string,
   titleCertificateNo?: string
 ): Promise<{ success: boolean; error?: string }> {
+  await guardSaleWrite();
   const supabase = await createClient();
   const update: Record<string, unknown> = { transfer_status: status };
   if (transferDate) update.transfer_date = transferDate;

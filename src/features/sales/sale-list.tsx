@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Plus, X, DollarSign, FileText, CalendarPlus, TrendingUp, AlertTriangle, Eye } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
@@ -15,7 +15,7 @@ import { RoomBoard } from "@/components/room-board";
 import { EmptyState } from "@/components/empty-state";
 import { SegmentedControl } from "@/components/ui/operational";
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
-import { createSaleContract, recordSalePayment, addFlexibleInstallment, updateTransferStatus, terminateSaleContract } from "./actions";
+import { createSaleContract, recordSalePaymentAtomic, addFlexibleInstallment, updateTransferStatus, terminateSaleContract } from "./actions";
 import { getEffectiveSaleContracts } from "./sale-contract-filters";
 
 interface SaleListProps { contracts: SaleContractRow[]; schedules: SalePaymentScheduleRow[]; units: UnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale }
@@ -42,6 +42,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const [fAgency, setFAgency] = useState(""); const [fAgent, setFAgent] = useState(""); const [fCommission, setFCommission] = useState(0); const [fCommissionPaid, setFCommissionPaid] = useState(false);
   const [payScheduleId, setPayScheduleId] = useState(""); const [payAmount, setPayAmount] = useState(0);
   const [payDate, setPayDate] = useState(new Date().toISOString().slice(0,10)); const [payReceiptNo, setPayReceiptNo] = useState("");
+  const payRequestIdRef = useRef<string | null>(null);
   const [flexDueDate, setFlexDueDate] = useState(""); const [flexAmount, setFlexAmount] = useState(0);
   const [trStatus, setTrStatus] = useState("not_started"); const [trDate, setTrDate] = useState(""); const [trCertNo, setTrCertNo] = useState("");
   const [termReason, setTermReason] = useState("");
@@ -187,7 +188,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const openInsight = (key: SaleStatKey) => {setStatFilter(key);setPanel("insight");setSelectedId(null);setError("");};
 
   const handleCreate = async () => {if(!fUnitId||!fCustomerId||!fSignedDate||fTotalAmount<=0){setError(locale==="zh"?"请填写必填字段":"Champs obligatoires");return;}setSaving(true);setError("");setPanel(null);const r=await createSaleContract({unitId:fUnitId,customerId:fCustomerId,contractNo:fContractNo||"",signedDate:fSignedDate,totalAmountXof:fTotalAmount,paymentPlanType:fPlanType,numInstallments:fPlanType==="fixed_installment"?fNumInstallments:undefined,agencyCompany:fAgency||undefined,agentName:fAgent||undefined,agencyCommissionXof:fCommission,agencyCommissionPaid:fCommissionPaid});setSaving(false);if(!r.success){setPanel("new");setError(r.error??"Failed");}};
-  const handlePay = async () => {if(!payScheduleId||payAmount<=0){setError(locale==="zh"?"请选择分期并输入金额":"Champs obligatoires");return;}const currentScheduleId=payScheduleId;setSaving(true);setError("");setPayScheduleId("");const r=await recordSalePayment({contractId:selectedId!,scheduleId:currentScheduleId,amount:payAmount,paymentDate:payDate,receiptNo:payReceiptNo||undefined});setSaving(false);if(r.success){setPayAmount(0);setPayReceiptNo("");}else {setPayScheduleId(currentScheduleId);setError(r.error??"Failed");}};
+  const handlePay = async () => {if(!payScheduleId||payAmount<=0){setError(locale==="zh"?"请选择分期并输入金额":"Champs obligatoires");return;}const currentScheduleId=payScheduleId;const requestId=payRequestIdRef.current??crypto.randomUUID();payRequestIdRef.current=requestId;setSaving(true);setError("");setPayScheduleId("");const r=await recordSalePaymentAtomic({contractId:selectedId!,scheduleId:currentScheduleId,amount:payAmount,paymentDate:payDate,receiptNo:payReceiptNo||undefined,requestId});setSaving(false);if(r.success){payRequestIdRef.current=null;setPayAmount(0);setPayReceiptNo("");}else {setPayScheduleId(currentScheduleId);setError(r.error??"Failed");}};
   const handleAddFlex = async () => {if(!flexDueDate||flexAmount<=0){setError(locale==="zh"?"请填写到期日和金额":"Champs obligatoires");return;}setSaving(true);setError("");setShowFlexForm(false);const r=await addFlexibleInstallment({contractId:selectedId!,installmentNo:contractSchedules.length+1,dueDate:flexDueDate,amountXof:flexAmount});setSaving(false);if(r.success){setFlexDueDate("");setFlexAmount(0);}else {setShowFlexForm(true);setError(r.error??"Failed");}};
   const handleTransfer = async () => {if(!trDate){setError(locale==="zh"?"请选择过户日期":"Champs obligatoires");return;}const currentId=selectedId!;setSaving(true);setError("");setPanel(null);const r=await updateTransferStatus(currentId,trStatus,trDate,trCertNo||undefined);setSaving(false);if(!r.success){setSelectedId(currentId);setPanel("detail");setError(r.error??"Failed");}};
   const handleTerminateSale = async () => {const currentId=selectedId!;setSaving(true);setError("");setPanel(null);const r=await terminateSaleContract(currentId,termReason||(locale==="zh"?"手动终止":"Manuel"));setSaving(false);if(!r.success){setSelectedId(currentId);setPanel("detail");setError(r.error??"Failed");}};
