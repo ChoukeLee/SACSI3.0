@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { AlertTriangle, Banknote, Clock3, TrendingUp, WalletCards } from "lucide-react";
+import { Banknote, Clock3, TrendingUp, WalletCards } from "lucide-react";
 import { getDailyRoomStateForDate } from "@/features/daily-rentals/room-status";
 import { FinanceDetailPanel } from "@/features/management/finance-detail-panel";
 import type { ManagementFinanceSnapshot } from "@/features/management/finance-snapshot";
 import { RoomCard } from "@/components/room-card";
 import { RoomBoard } from "@/components/room-board";
 import { RoomLegend } from "@/components/room-legend";
-import { DataVizCard, DonutChart, RadarChart } from "@/components/ui/data-viz";
 import { FilterBar, SegmentedControl, StatTile } from "@/components/ui/operational";
 import { getRoomCardActions } from "@/lib/room-card-actions";
 import { isOwnerOccupiedUnit } from "@/lib/unit-display";
@@ -21,8 +20,7 @@ import { routeFor } from "@/lib/i18n";
 import { floorSortValue, formatXof, cn, sortUnitsForBuilding } from "@/lib/utils";
 import type {
   BuildingRow, UnitRow, DailyBookingRow, LeaseContractRow,
-  SaleContractRow, SalePaymentScheduleRow, CustomerRow,
-  ReceivableRow, PaymentRow,
+  SaleContractRow, CustomerRow,
 } from "@/types/database";
 
 export type MgmtStatus =
@@ -128,19 +126,27 @@ export function FinanceSectionClient({
 
   const stats = snapshot.summary;
   const blocks = [
-    { key: "receivable", label: t.cockpit.receivableThisMonth, value: stats.totalReceivable, color: "accentBlue" as const, icon: TrendingUp },
-    { key: "collected", label: locale === "zh" ? "本月应收已收" : "Encaisse sur les echeances du mois", value: stats.totalPaid, color: "accentGreen" as const, icon: Banknote },
-    { key: "outstanding", label: t.cockpit.outstandingThisMonth, value: stats.outstanding, color: "accentAmber" as const, icon: WalletCards },
-    { key: "overdue", label: t.cockpit.overdueThisMonth, value: stats.overdue, color: "accentRed" as const, icon: Clock3 },
+    { key: "receivable", label: locale === "zh" ? "本月到期应收" : t.cockpit.receivableThisMonth, value: stats.totalReceivable, color: "accentBlue" as const, icon: TrendingUp },
+    { key: "collected", label: locale === "zh" ? "本月到期已收" : "Encaisse sur les echeances du mois", value: stats.totalPaid, color: "accentGreen" as const, icon: Banknote },
+    { key: "outstanding", label: locale === "zh" ? "本月到期未收" : t.cockpit.outstandingThisMonth, value: stats.outstanding, color: "accentAmber" as const, icon: WalletCards },
+    { key: "overdue", label: locale === "zh" ? "本月到期逾期" : t.cockpit.overdueThisMonth, value: stats.overdue, color: "accentRed" as const, icon: Clock3 },
   ];
 
   return (
     <>
-      <div className="rounded-xl border border-border bg-card p-3 shadow-card">
+      <div id="finance" className="scroll-mt-20 rounded-xl border border-border bg-card p-3 shadow-card">
         <div className="mb-3 flex items-center justify-between gap-3 px-1">
           <div>
             <h2 className="text-[15px] font-semibold tracking-tight">{locale === "zh" ? "财务概览" : "Vue financiere"}</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">{locale === "zh" ? "点击指标查看明细" : "Cliquez un indicateur pour le detail"}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {locale === "zh"
+                ? `长租、出售及历史应收 · ${stats.count} 笔 · 点击指标查看明细`
+                : `${stats.count} échéances · Cliquez un indicateur pour le détail`}
+            </p>
+          </div>
+          <div className="hidden text-right sm:block">
+            <p className="text-lg font-semibold tabular-nums">{Math.round(stats.collectionRate * 100)}%</p>
+            <p className="text-[11px] text-muted-foreground">{locale === "zh" ? "本月到期回款率" : "Taux de recouvrement"}</p>
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -160,21 +166,6 @@ export function FinanceSectionClient({
           })}
         </div>
       </div>
-      <DataVizCard
-        title={locale === "zh" ? "本月回款结构" : "Structure mensuelle"}
-        description={locale === "zh" ? "已收、未收与逾期拆分" : "Payé, restant et en retard"}
-        metric={`${Math.round(stats.collectionRate * 100)}%`}
-      >
-        <DonutChart
-          centerValue={`${Math.round(stats.collectionRate * 100)}%`}
-          centerLabel={locale === "zh" ? "回款率" : "Taux"}
-          items={[
-            { label: locale === "zh" ? "本月应收已收" : "Encaisse sur les echeances du mois", value: stats.totalPaid, tone: "green" },
-            { label: t.cockpit.outstandingThisMonth, value: Math.max(stats.outstanding - stats.overdue, 0), tone: "amber" },
-            { label: t.cockpit.overdueThisMonth, value: stats.overdue, tone: "red" },
-          ]}
-        />
-      </DataVizCard>
       {detail != null && (
         <FinanceDetailPanel
           open={detail as "receivable" | "collected" | "outstanding" | "overdue"}
@@ -194,11 +185,11 @@ export function FinanceSectionClient({
 
 export function UnitDataClient({
   buildings, units, dailyBookings, leaseContracts, saleContracts,
-  saleSchedules, cleaningTasks, customers, locale, t,
+  cleaningTasks, customers, locale, t,
 }: {
   buildings: BuildingRow[]; units: UnitRow[]; dailyBookings: DailyBookingRow[];
   leaseContracts: LeaseContractRow[]; saleContracts: SaleContractRow[];
-  saleSchedules: SalePaymentScheduleRow[]; cleaningTasks: { unit_id: string; is_completed: boolean }[];
+  cleaningTasks: { unit_id: string; is_completed: boolean }[];
   customers: CustomerRow[]; locale: Locale; t: ManagementDict;
 }) {
   const sacsi5BuildingId = useMemo(() => buildings.find(b => b.code === "SACSI5")?.id ?? null, [buildings]);
@@ -251,20 +242,8 @@ export function UnitDataClient({
     return m;
   }, [customers]);
 
-  const risks = useMemo(() => {
-    const cleaning = unitStates.filter(s => s.status === "cleaningPending").length;
-    const maintenance = unitStates.filter(s => s.status === "maintenance").length;
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() + 30); const cutoffStr = cutoff.toISOString().slice(0, 10);
-    const todayStr2 = new Date().toISOString().slice(0, 10);
-    const leaseExpiring = leaseContracts.filter(l => l.status === "active" && l.expected_end_date >= todayStr2 && l.expected_end_date <= cutoffStr);
-    const activeSales = saleContracts.filter(s => s.status === "active");
-    const saleWithPending = activeSales.filter(s => saleSchedules.some(sch => sch.sale_contract_id === s.id && sch.status !== "paid"));
-    return { cleaning, maintenance, leaseExpiring, saleWithPending };
-  }, [unitStates, leaseContracts, saleContracts, saleSchedules]);
-
   const totalRooms = filteredUnits.length;
   const occupiedPct = totalRooms > 0 ? Math.round((counts.dailyOccupied + counts.leased + counts.sold + counts.ownerOccupied) / totalRooms * 100) : 0;
-  const riskMax = Math.max(1, totalRooms, risks.leaseExpiring.length, risks.saleWithPending.length);
 
   return (
     <>
@@ -322,49 +301,6 @@ export function UnitDataClient({
           </div>
         </div>
       </FilterBar>
-
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-        <DataVizCard
-          title={locale === "zh" ? "房态结构" : "Structure des chambres"}
-          description={locale === "zh" ? "保留现有房态颜色，只统一呈现方式" : "Couleurs métier conservées"}
-          metric={`${totalRooms} ${locale === "zh" ? "间" : "unités"}`}
-        >
-          <DonutChart
-            centerValue={`${occupiedPct}%`}
-            centerLabel={locale === "zh" ? "占用" : "Occupé"}
-            items={visibleStatuses.map((status) => ({
-              label: status === "ownerOccupied" ? (locale === "zh" ? "自用" : "Usage interne") : t.statuses[status],
-              value: counts[status],
-              color: STATUS_DOT[status],
-            }))}
-          />
-        </DataVizCard>
-        <DataVizCard
-          title={locale === "zh" ? "运营风险雷达" : "Radar opérationnel"}
-          description={locale === "zh" ? "保洁、维修、到期与回款压力" : "Ménage, maintenance, échéances, paiements"}
-        >
-          <RadarChart
-            axes={[
-              { label: locale === "zh" ? "待保洁" : "Ménage", value: risks.cleaning / riskMax, tone: "amber" },
-              { label: locale === "zh" ? "维修" : "Maintenance", value: risks.maintenance / riskMax, tone: "red" },
-              { label: locale === "zh" ? "合同到期" : "Baux", value: risks.leaseExpiring.length / riskMax, tone: "blue" },
-              { label: locale === "zh" ? "出售回款" : "Ventes", value: risks.saleWithPending.length / riskMax, tone: "green" },
-            ]}
-          />
-        </DataVizCard>
-      </div>
-
-      {/* Risk alerts */}
-      {(risks.cleaning > 0 || risks.maintenance > 0 || risks.leaseExpiring.length > 0 || risks.saleWithPending.length > 0) && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-accentRed-100 bg-accentRed-50/70 px-4 py-2.5 text-sm shadow-xs">
-          <AlertTriangle className="h-4 w-4 text-accentRed-500 shrink-0" />
-          <span className="text-xs font-semibold text-accentRed-700">{locale === "zh" ? "待处理" : "Attention"}:</span>
-          {risks.cleaning > 0 && <span className="text-xs text-accentRed-600">{risks.cleaning} {locale === "zh" ? "间待保洁" : "ménages"}</span>}
-          {risks.maintenance > 0 && <span className="text-xs text-accentRed-600">{risks.maintenance} {locale === "zh" ? "间维修" : "maintenance"}</span>}
-          {risks.leaseExpiring.length > 0 && <span className="text-xs text-accentRed-600">{risks.leaseExpiring.length} {locale === "zh" ? "份合同将到期" : "baux expirant"}</span>}
-          {risks.saleWithPending.length > 0 && <span className="text-xs text-accentRed-600">{risks.saleWithPending.length} {locale === "zh" ? "笔出售待回款" : "ventes en attente"}</span>}
-        </div>
-      )}
 
       {/* Room board */}
       {activeBuildings.filter(b => b.id === selectedBuildingId).map(building => {

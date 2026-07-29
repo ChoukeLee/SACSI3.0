@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { AlertStrip, computeAlerts } from "@/features/management/management-alert-strip";
+import { AlertStrip } from "@/features/management/management-alert-strip";
+import { computeAlerts } from "@/features/management/management-alerts";
 import type { Locale } from "@/lib/i18n";
 
 interface Props { locale: Locale; }
@@ -10,11 +11,13 @@ export async function ManagementAlertSection({ locale }: Props) {
     const today = new Date().toISOString().slice(0, 10);
     const next30d = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
 
-    const [overdueRes, checkoutRes, checkinRes, pendingRes, leaseRes] = await Promise.all([
-      supabase.from("receivables").select("amount_xof, paid_amount_xof, status, due_date").neq("status", "cancelled"),
+    const [overdueRes, checkoutRes, checkinRes, leaseRes] = await Promise.all([
+      supabase.from("receivables")
+        .select("amount_xof, paid_amount_xof, status, due_date")
+        .neq("source_type", "daily_booking")
+        .neq("status", "cancelled"),
       supabase.from("daily_bookings").select("id").eq("check_out", today).in("status", ["confirmed","checked_in"]),
       supabase.from("daily_bookings").select("id").eq("check_in", today).in("status", ["confirmed","pending_review"]),
-      supabase.from("daily_bookings").select("id").eq("status", "pending_review"),
       supabase.from("lease_contracts").select("id").eq("status", "active").gte("expected_end_date", today).lte("expected_end_date", next30d),
     ]);
 
@@ -29,7 +32,6 @@ export async function ManagementAlertSection({ locale }: Props) {
       todayCheckouts: (checkoutRes.data ?? []).length,
       todayCheckins: (checkinRes.data ?? []).length,
       expiringLeases: (leaseRes.data ?? []).length,
-      pendingReviewBookings: (pendingRes.data ?? []).length,
       locale,
     });
 

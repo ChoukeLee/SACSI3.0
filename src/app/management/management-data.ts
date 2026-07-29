@@ -57,50 +57,10 @@ export const getSaleContracts = cache(async () => {
   );
 });
 
-export const getSaleSchedules = cache(async () => {
-  const supabase = await createClient();
-  return fetchAllPages(
-    (from, to) => supabase.from("sale_payment_schedule")
-      .select("id, sale_contract_id, status, due_date")
-      .order("due_date", { ascending: false }).order("id").range(from, to),
-    "management sale schedules",
-  );
-});
-
 export const getCleaningTasks = cache(async () => {
   const supabase = await createClient();
   const { data } = await supabase.from("cleaning_tasks").select("id, unit_id, is_completed");
   return data ?? [];
-});
-
-export const getLedgerEntries = cache(async () => {
-  const supabase = await createClient();
-  return fetchAllPages(
-    (from, to) => supabase.from("ledger_entries")
-      .select("id, building_id, unit_id, entry_date, direction, category, amount_xof, description")
-      .order("entry_date", { ascending: false }).order("id").range(from, to),
-    "management ledger entries",
-  );
-});
-
-export const getReceivables = cache(async () => {
-  const supabase = await createClient();
-  return fetchAllPages(
-    (from, to) => supabase.from("receivables")
-      .select("id, unit_id, customer_id, building_id, amount_xof, paid_amount_xof, due_date, status, source_type, category")
-      .order("due_date", { ascending: false }).order("id").range(from, to),
-    "management receivables",
-  );
-});
-
-export const getPayments = cache(async () => {
-  const supabase = await createClient();
-  return fetchAllPages(
-    (from, to) => supabase.from("payments")
-      .select("id, source_id, source_type, amount, payment_date, customer_id, unit_id, receipt_no")
-      .order("payment_date", { ascending: false }).order("id").range(from, to),
-    "management payments",
-  );
 });
 
 export const getCustomers = cache(async () => {

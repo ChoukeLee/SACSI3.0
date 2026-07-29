@@ -18,10 +18,10 @@ export function ManagementPageShell({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-medium text-muted-foreground">
-            {locale === "zh" ? "经营驾驶舱" : "Tableau de bord"}
+            {locale === "zh" ? "今日经营" : "Activité du jour"}
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-              {t.allBuildings}
+              {locale === "zh" ? "首页" : t.allBuildings}
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">

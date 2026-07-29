@@ -3,11 +3,11 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { dictionaries } from "@/lib/i18n";
 import { getBuildings } from "@/app/management/management-data";
-import { FinanceSection, UnitDataSection, QualitySection } from "@/app/management/management-sections";
+import { FinanceSection, UnitDataSection } from "@/app/management/management-sections";
 import { ManagementPageShell } from "@/app/management/management-page-shell";
 import {
   FinanceStripSkeleton, StatusOverviewSkeleton,
-  RoomBoardSkeleton, QualityWidgetSkeleton,
+  RoomBoardSkeleton,
 } from "@/app/management/management-skeletons";
 import type { BuildingRow } from "@/types/database";
 
@@ -39,10 +39,6 @@ export default async function FrenchManagementPage() {
         <UnitDataSection buildings={buildings} locale="fr" t={t} />
       </Suspense>
 
-      {/* Quality widget â€” loads independently */}
-      <Suspense fallback={<QualityWidgetSkeleton />}>
-        <QualitySection locale="fr" userRole={user.role} />
-      </Suspense>
     </ManagementPageShell>
   );
 }
