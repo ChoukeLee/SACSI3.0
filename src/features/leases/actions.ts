@@ -12,7 +12,6 @@ import {
 import {
   buildLeaseContractNumber,
   buildLeaseFinancialReferencePrefix,
-  getNextLeaseFinancialSequence,
   getLeaseFinancialConfig,
   LEASE_FINANCIAL_BUSINESS_TYPES,
   type LeaseFinancialBusinessType,
@@ -320,6 +319,7 @@ export async function recordLeaseFinancialEntry(input: {
   paidThroughDate?: string;
   paymentMethod?: "cash" | "check" | "bank_transfer" | "offset" | "other";
   notes?: string;
+  requestId?: string;
 }): Promise<{ success: boolean; referenceNo?: string; error?: string }> {
   await guardLeaseFinance();
   if (!LEASE_FINANCIAL_BUSINESS_TYPES.includes(input.businessType)) {
@@ -351,114 +351,28 @@ export async function recordLeaseFinancialEntry(input: {
     input.businessType,
     input.paymentDate,
   );
-  const { data: referenceRows, error: sequenceError } = await supabase
-    .from("payments")
-    .select("receipt_no")
-    .eq("source_id", contract.id)
-    .not("receipt_no", "is", null);
-  if (sequenceError) return { success: false, error: sequenceError.message };
-  const nextSequence = getNextLeaseFinancialSequence((referenceRows ?? []).map((row) => row.receipt_no));
-  const referenceNo = `${referencePrefix}-${String(nextSequence).padStart(2, "0")}`;
-  const methodLabels = {
-    cash: "现金",
-    check: "支票",
-    bank_transfer: "银行转账",
-    offset: "抵扣/转款",
-    other: "其他/待补",
-  };
-  const noteParts = [
-    `业务类型：${config.labelZh}`,
-    `方式：${methodLabels[input.paymentMethod ?? "other"]}`,
-    input.paidThroughDate ? `已缴至：${input.paidThroughDate}` : "",
-    input.notes?.trim() ?? "",
-  ].filter(Boolean);
-
-  const { data: payment, error: paymentError } = await supabase
-    .from("payments")
-    .insert({
-      customer_id: contract.customer_id,
-      unit_id: contract.unit_id,
-      source_type: config.sourceType,
-      source_id: contract.id,
-      payment_date: input.paymentDate,
-      amount: input.amountXof,
-      currency: "XOF",
-      exchange_rate_to_xof: 1,
-      receipt_no: referenceNo,
-      notes: noteParts.join("；"),
-    })
-    .select("id")
-    .single();
-  if (paymentError || !payment) return { success: false, error: paymentError?.message ?? "财务记录保存失败。" };
-
-  const { error: ledgerError } = await supabase.from("ledger_entries").insert({
-    building_id: unit?.building_id ?? null,
-    unit_id: contract.unit_id,
-    payment_id: payment.id,
-    entry_date: input.paymentDate,
-    direction: config.ledgerDirection,
-    category: config.ledgerCategory,
-    amount_xof: input.amountXof,
-    description: `${config.labelZh} 房间${unit?.unit_no ?? "未设置"} 合同${contract.contract_no}`,
+  const requestId = input.requestId ?? crypto.randomUUID();
+  const { data, error } = await supabase.rpc("record_lease_financial_entry_rpc", {
+    p_contract_id: contract.id,
+    p_business_type: input.businessType,
+    p_payment_date: input.paymentDate,
+    p_amount_xof: input.amountXof,
+    p_paid_through_date: input.paidThroughDate ?? null,
+    p_payment_method: input.paymentMethod ?? "cash",
+    p_notes: input.notes?.trim() || null,
+    p_reference_prefix: referencePrefix,
+    p_request_id: requestId,
   });
-  if (ledgerError) {
-    await supabase.from("payments").delete().eq("id", payment.id);
-    return { success: false, error: ledgerError.message };
-  }
-
-  if (input.businessType === "rent_income") {
-    const { data: openRent } = await supabase
-      .from("receivables")
-      .select("id, amount_xof, paid_amount_xof, due_date")
-      .eq("source_type", "lease_contract")
-      .eq("source_id", contract.id)
-      .eq("category", "lease_rent")
-      .in("status", ["pending", "partial", "overdue"])
-      .order("due_date");
-    let remaining = input.amountXof;
-    for (const row of openRent ?? []) {
-      if (remaining <= 0) break;
-      const outstanding = Math.max(0, Number(row.amount_xof) - Number(row.paid_amount_xof));
-      const applied = Math.min(outstanding, remaining);
-      if (applied <= 0) continue;
-      const paidAmount = Number(row.paid_amount_xof) + applied;
-      await supabase.from("receivables").update({
-        paid_amount_xof: paidAmount,
-        status: computeStatus(Number(row.amount_xof), paidAmount, row.due_date),
-      }).eq("id", row.id);
-      remaining -= applied;
-    }
-    if (!contract.paid_through_date || (input.paidThroughDate && input.paidThroughDate > contract.paid_through_date)) {
-      await supabase.from("lease_contracts").update({ paid_through_date: input.paidThroughDate }).eq("id", contract.id);
-    }
-  }
-
-  if (input.businessType === "deposit_income") {
-    const depositUpdate: { deposit_received: boolean; deposit_amount_xof?: number } = { deposit_received: true };
-    if (Number(contract.deposit_amount_xof) <= 0) depositUpdate.deposit_amount_xof = input.amountXof;
-    await supabase.from("lease_contracts").update(depositUpdate).eq("id", contract.id);
-  }
-
-  await supabase.from("audit_logs").insert({
-    action: "create",
-    entity_type: "lease_financial_entry",
-    entity_id: payment.id,
-    metadata: {
-      contract_id: contract.id,
-      contract_no: contract.contract_no,
-      business_type: input.businessType,
-      source_type: config.sourceType,
-      amount_xof: input.amountXof,
-      reference_no: referenceNo,
-    },
-  });
+  if (error) return { success: false, error: error.message };
+  const payload = data as { success?: boolean; reference_no?: string } | null;
+  if (!payload?.success || !payload.reference_no) return { success: false, error: "财务记录保存失败。" };
 
   revalidatePath("/leases");
   revalidatePath("/fr/leases");
   revalidatePath("/finance");
   revalidatePath("/fr/finance");
   revalidatePath("/units");
-  return { success: true, referenceNo };
+  return { success: true, referenceNo: payload.reference_no };
 }
 
 // ── Activate contract ──

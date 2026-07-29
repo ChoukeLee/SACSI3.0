@@ -18,14 +18,14 @@ export default async function FrenchLeasesPage() {
       <div className="lg:hidden"><DesktopOnly locale="fr" /></div>
       <div className="hidden lg:block">
         <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
-          <FrenchLeasesData />
+          <FrenchLeasesData canCreate={user.role === "admin"} canRecordFinance={user.role === "admin" || user.role === "finance"} />
         </Suspense>
       </div>
     </>
   );
 }
 
-async function FrenchLeasesData() {
+async function FrenchLeasesData({ canCreate, canRecordFinance }: { canCreate: boolean; canRecordFinance: boolean }) {
   const supabase = await createClient();
   const { data: allBuildings, error: bldErr } = await supabase
     .from("buildings")
@@ -46,12 +46,39 @@ async function FrenchLeasesData() {
   let receivables: ReceivableRow[] = [];
 
   if (buildingIds.length > 0) {
+    const contractsPromise = (async () => {
+      const rows: LeaseContractRow[] = [];
+      for (let from = 0; ; from += 1000) {
+        const page = await supabase.from("lease_contracts").select("*").order("start_date", { ascending: false }).order("id", { ascending: false }).range(from, from + 999);
+        if (page.error) return { data: null, error: page.error };
+        rows.push(...page.data);
+        if (page.data.length < 1000) return { data: rows, error: null };
+      }
+    })();
+    const paymentsPromise = (async () => {
+      const rows: PaymentRow[] = [];
+      for (let from = 0; ; from += 1000) {
+        const page = await supabase.from("payments").select("*").in("source_type", ["lease_rent", "lease_deposit", "lease_contract", "property_fee", "lease_agency_income", "lease_agency_expense", "lease_furniture_income", "lease_deposit_refund", "lease_deposit_deduction", "lease_rent_refund", "lease_other_income", "lease_other_expense"]).order("payment_date", { ascending: false }).order("id", { ascending: false }).range(from, from + 999);
+        if (page.error) return { data: null, error: page.error };
+        rows.push(...page.data);
+        if (page.data.length < 1000) return { data: rows, error: null };
+      }
+    })();
+    const receivablesPromise = (async () => {
+      const rows: ReceivableRow[] = [];
+      for (let from = 0; ; from += 1000) {
+        const page = await supabase.from("receivables").select("*").eq("source_type", "lease_contract").order("due_date", { ascending: false }).order("id", { ascending: false }).range(from, from + 999);
+        if (page.error) return { data: null, error: page.error };
+        rows.push(...page.data);
+        if (page.data.length < 1000) return { data: rows, error: null };
+      }
+    })();
     const [contractsRes, unitsRes, customersRes, paymentsRes, receivablesRes] = await Promise.all([
-      supabase.from("lease_contracts").select("*").order("start_date", { ascending: false }).limit(200),
+      contractsPromise,
       supabase.from("units").select("*, unit_business_flags(business_type, is_enabled, default_price_xof)").in("building_id", buildingIds).order("unit_no"),
       supabase.from("customers").select("*").order("name"),
-      supabase.from("payments").select("*").in("source_type", ["lease_rent", "lease_deposit", "lease_contract", "property_fee", "lease_agency_income", "lease_agency_expense", "lease_furniture_income", "lease_deposit_refund", "lease_deposit_deduction", "lease_rent_refund", "lease_other_income", "lease_other_expense"]).order("payment_date", { ascending: false }).limit(1000),
-      supabase.from("receivables").select("*").in("source_type", ["lease_contract"]).order("due_date", { ascending: false }).limit(2000),
+      paymentsPromise,
+      receivablesPromise,
     ]);
     if (!contractsRes.error) contracts = contractsRes.data;
     if (!unitsRes.error) units = sortUnits(unitsRes.data.map((unit) => unit.code === "SACSI7-STOREFRONT" ? {
@@ -63,5 +90,5 @@ async function FrenchLeasesData() {
     if (!receivablesRes.error) receivables = receivablesRes.data;
   }
 
-  return <LeaseLazyView contracts={contracts} units={units} customers={customers} payments={payments} receivables={receivables} buildings={allBuildings ?? []} locale="fr" />;
+  return <LeaseLazyView contracts={contracts} units={units} customers={customers} payments={payments} receivables={receivables} buildings={allBuildings ?? []} locale="fr" canCreate={canCreate} canRecordFinance={canRecordFinance} />;
 }
