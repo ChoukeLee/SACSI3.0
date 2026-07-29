@@ -118,7 +118,6 @@ export function BookingPanel({
   const selectedUnit = unitId ? units.find((u) => u.id === unitId) : null;
   const dailySelectableCustomers = useMemo(
     () => customers.filter((customer) =>
-      !customer.is_blacklisted &&
       !customer.has_active_lease_contract &&
       !customer.has_active_sale_contract
     ),

@@ -39,7 +39,6 @@ const rolePermissions: Record<UserRole, string[]> = {
     "leases:read", "leases:write", "leases:delete",
     "sales:read", "sales:write", "sales:delete",
     "finance:read", "finance:write", "finance:export",
-    "reports:read", "reports:export",
     "settings:read", "settings:write",
     "users:manage",
   ],
@@ -50,7 +49,6 @@ const rolePermissions: Record<UserRole, string[]> = {
     "leases:read",
     "sales:read",
     "finance:read",
-    "reports:read", "reports:export",
     "settings:read",
   ],
   finance: [
@@ -60,7 +58,6 @@ const rolePermissions: Record<UserRole, string[]> = {
     "leases:read",
     "sales:read",
     "finance:read", "finance:write", "finance:export",
-    "reports:read", "reports:export",
     "settings:read",
   ],
   front_desk: [
@@ -70,7 +67,7 @@ const rolePermissions: Record<UserRole, string[]> = {
     "leases:read",
   ],
   rental_sales: [
-    "units:read", "units:write",
+    "units:read",
     "customers:read", "customers:write",
     "daily_rentals:read", "daily_rentals:write",
     "leases:read", "leases:write",
@@ -154,7 +151,6 @@ const pageAccess: Record<string, UserRole[]> = {
   management: ["admin", "boss", "finance"],
   finance: ["admin", "boss", "finance"],
   settings: ["admin"],
-  reports: ["admin", "boss", "finance"],
   "daily-rentals": ["admin", "front_desk", "finance", "boss", "rental_sales"],
   leases: ["admin", "front_desk", "finance", "boss", "rental_sales"],
   sales: ["admin", "finance", "boss", "rental_sales"],

@@ -6,8 +6,4 @@ export type { CustomerProfileData } from "./customer-profile-service";
 export {
   createCustomer,
   updateCustomer,
-  setCustomerBlacklist,
-  removeCustomerBlacklist,
 } from "./actions";
-export { checkBlacklist } from "./blacklist-check";
-export type { BlacklistCheckResult } from "./blacklist-check";

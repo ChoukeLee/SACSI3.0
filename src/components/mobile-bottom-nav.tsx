@@ -27,7 +27,7 @@ export function MobileBottomNav({ locale, userRole }: { locale: Locale; userRole
 
   const isActive = (href: string) => {
     const localized = routeFor(locale, href);
-    if (href === "/") return activeHref === "/" || activeHref === "/fr" || activeHref === "/front-desk" || activeHref === "/fr/front-desk";
+    if (href === "/") return activeHref === "/" || activeHref === "/fr";
     return activeHref === localized || activeHref.startsWith(localized);
   };
 

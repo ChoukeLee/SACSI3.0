@@ -36,10 +36,10 @@ describe("hasPermission", () => {
     it("cannot manage users", () => {
       expect(hasPermission(user("boss"), "users:manage")).toBe(false);
     });
-    it("can read reports and export", () => {
+    it("has no retired report-center permissions", () => {
       const u = user("boss");
-      expect(hasPermission(u, "reports:read")).toBe(true);
-      expect(hasPermission(u, "reports:export")).toBe(true);
+      expect(hasPermission(u, "reports:read")).toBe(false);
+      expect(hasPermission(u, "reports:export")).toBe(false);
     });
   });
 

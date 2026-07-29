@@ -18,14 +18,14 @@ export default async function SalesPage() {
       <div className="lg:hidden"><DesktopOnly locale="zh" /></div>
       <div className="hidden lg:block">
         <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
-          <SalesData locale="zh" />
+          <SalesData locale="zh" role={user.role} />
         </Suspense>
       </div>
     </>
   );
 }
 
-async function SalesData({ locale }: { locale: "zh" | "fr" }) {
+async function SalesData({ locale, role }: { locale: "zh" | "fr"; role: string }) {
   const supabase = await createClient();
   const { data: allBuildings, error: bldErr } = await supabase
     .from("buildings")
@@ -48,8 +48,8 @@ async function SalesData({ locale }: { locale: "zh" | "fr" }) {
 
   if (buildingIds.length > 0) {
     const [contractsRes, schedulesRes, unitsRes, customersRes, paymentsRes, receivablesRes] = await Promise.all([
-      supabase.from("sale_contracts").select("*").eq("status", "active").order("signed_date", { ascending: false }).limit(200),
-      supabase.from("sale_payment_schedule").select("*").order("installment_no").limit(300),
+      supabase.from("sale_contracts").select("*").order("signed_date", { ascending: false }).limit(1000),
+      supabase.from("sale_payment_schedule").select("*").order("installment_no").limit(5000),
       supabase.from("units").select("*").in("building_id", buildingIds).order("unit_no"),
       supabase.from("customers").select("*").order("name"),
       supabase
@@ -57,8 +57,8 @@ async function SalesData({ locale }: { locale: "zh" | "fr" }) {
         .select("*")
         .in("source_type", ["sale", "sale_contract", "property_fee", "parking_fee", "sale_registration_fee", "sale_agency_income", "sale_agency_expense", "sale_other_income", "sale_other_expense"])
         .order("payment_date", { ascending: false })
-        .limit(1000),
-      supabase.from("receivables").select("*").eq("source_type", "sale_contract").order("due_date").limit(300),
+        .limit(5000),
+      supabase.from("receivables").select("*").eq("source_type", "sale_contract").order("due_date").limit(5000),
     ]);
     if (!contractsRes.error) contracts = contractsRes.data;
     if (!schedulesRes.error) schedules = schedulesRes.data;
@@ -68,5 +68,5 @@ async function SalesData({ locale }: { locale: "zh" | "fr" }) {
     if (!receivablesRes.error) receivables = receivablesRes.data;
   }
 
-  return <SaleLazyView contracts={contracts} schedules={schedules} units={units} customers={customers} payments={payments} receivables={receivables} buildings={allBuildings ?? []} locale={locale} />;
+  return <SaleLazyView contracts={contracts} schedules={schedules} units={units} customers={customers} payments={payments} receivables={receivables} buildings={allBuildings ?? []} locale={locale} canCreate={role === "admin"} canRecordFinance={role === "admin" || role === "finance"} canManage={role === "admin"} />;
 }

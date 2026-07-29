@@ -210,7 +210,6 @@ export async function createBooking(input: {
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
   revalidatePath("/finance"); revalidatePath("/fr/finance");
-  revalidatePath("/reports"); revalidatePath("/fr/reports");
   
 
   return { success: true, data: data as DailyOperationSnapshot };
@@ -235,12 +234,6 @@ export async function createBackfillBooking(input: {
   if (input.checkOut > todayIso()) return { success: false, error: "backfillMustBeCompleted" };
   if (input.nightlyPriceXof <= 0) return { success: false, error: "invalidPrice" };
   if (input.prepaidAmountXof < 0) return { success: false, error: "invalidPrepaid" };
-
-  const { data: customer } = await supabase
-    .from("customers").select("is_blacklisted, blacklist_reason").eq("id", input.customerId).single();
-  if (customer?.is_blacklisted) {
-    return { success: false, error: `Customer is blacklisted: ${customer.blacklist_reason}` };
-  }
 
   const nights = Math.max(1, Math.ceil(
     (new Date(input.checkOut).getTime() - new Date(input.checkIn).getTime()) / (1000 * 60 * 60 * 24)
@@ -321,7 +314,6 @@ export async function createBackfillBooking(input: {
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
   revalidatePath("/finance"); revalidatePath("/fr/finance");
-  revalidatePath("/reports"); revalidatePath("/fr/reports");
 
   return { success: true, data: await getDailyOperationSnapshot(supabase, data.id, input.unitId) };
 }

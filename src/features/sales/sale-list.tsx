@@ -1,24 +1,20 @@
 "use client";
 
 import { useState, useMemo, useRef } from "react";
-import { Plus, X, DollarSign, FileText, CalendarPlus, TrendingUp, AlertTriangle, Eye } from "lucide-react";
+import { Plus, X, DollarSign, CalendarPlus, TrendingUp, AlertTriangle, Eye, Search } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
-import { formatXof, cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
+import { formatXof, cn } from "@/lib/utils";
 import { contractStatusVariant as statusVariant } from "@/lib/status-styles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { DateInput } from "@/components/ui/date-input";
-import { RoomCard } from "@/components/room-card";
-import { RoomBoard } from "@/components/room-board";
 import { EmptyState } from "@/components/empty-state";
 import { SegmentedControl } from "@/components/ui/operational";
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import { createSaleContract, recordSalePaymentAtomic, addFlexibleInstallment, updateTransferStatus, terminateSaleContract } from "./actions";
-import { getEffectiveSaleContracts } from "./sale-contract-filters";
 
-interface SaleListProps { contracts: SaleContractRow[]; schedules: SalePaymentScheduleRow[]; units: UnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale }
+interface SaleListProps { contracts: SaleContractRow[]; schedules: SalePaymentScheduleRow[]; units: UnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale; canCreate: boolean; canRecordFinance: boolean; canManage: boolean }
 type PanelType = "new" | "detail" | "insight" | null;
 type SaleStatKey = "active" | "total" | "received" | "receivable" | "overdue" | "transfer";
 const SALE_RECEIPT_SOURCE_TYPES = new Set(["sale", "sale_contract", "property_fee", "parking_fee"]);
@@ -30,7 +26,7 @@ const paymentAmountXof = (payment: PaymentRow) => payment.currency === "XOF"
 const formatCny = (amount: number) =>
   `¥${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(amount)}`;
 
-export function SaleList({ contracts, schedules, units, customers, payments, receivables, buildings, locale }: SaleListProps) {
+export function SaleList({ contracts, schedules, units, customers, payments, receivables, buildings, locale, canCreate, canRecordFinance, canManage }: SaleListProps) {
   const t = dictionaries[locale].sales;
   const [statFilter, setStatFilter] = useState<SaleStatKey | null>(null);
   const [panel, setPanel] = useState<PanelType>(null);
@@ -43,10 +39,13 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const [payScheduleId, setPayScheduleId] = useState(""); const [payAmount, setPayAmount] = useState(0);
   const [payDate, setPayDate] = useState(new Date().toISOString().slice(0,10)); const [payReceiptNo, setPayReceiptNo] = useState("");
   const payRequestIdRef = useRef<string | null>(null);
+  const createRequestIdRef = useRef<string | null>(null);
   const [flexDueDate, setFlexDueDate] = useState(""); const [flexAmount, setFlexAmount] = useState(0);
   const [trStatus, setTrStatus] = useState("not_started"); const [trDate, setTrDate] = useState(""); const [trCertNo, setTrCertNo] = useState("");
   const [termReason, setTermReason] = useState("");
   const [showFlexForm, setShowFlexForm] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("current");
+  const [search, setSearch] = useState("");
 
   // Building switcher
   const [activeBuildingId, setActiveBuildingId] = useState<string>(() => (
@@ -59,27 +58,15 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
     return m;
   }, [units]);
 
-  const filteredByBuilding = useMemo(() => {
-    return getEffectiveSaleContracts(contracts, unitBuildingMap, activeBuildingId);
-  }, [contracts, activeBuildingId, unitBuildingMap]);
+  const filteredByBuilding = useMemo(() => contracts.filter((contract) => (
+    (!activeBuildingId || unitBuildingMap.get(contract.unit_id) === activeBuildingId)
+    && (statusFilter === "current"
+      ? contract.status !== "terminated" && contract.status !== "expired"
+      : contract.status === statusFilter)
+  )), [contracts, activeBuildingId, statusFilter, unitBuildingMap]);
 
   const unitMap = useMemo(()=>new Map(units.map(u=>[u.id,u])), [units]);
   const customerMap = useMemo(()=>new Map(customers.map(c=>[c.id,c])), [customers]);
-
-  const groupedContracts = useMemo(() => {
-    const g=new Map<string,SaleContractRow[]>();
-    for(const c of filteredByBuilding){const unit=unitMap.get(c.unit_id);const floor=normalizeFloorLabel(unit?.floor_label??null,unit?.unit_no??"");if(!g.has(floor))g.set(floor,[]);g.get(floor)!.push(c);}
-    return Array.from(g.entries())
-      .map(([floor, floorContracts]) => [
-        floor,
-        [...floorContracts].sort((a,b)=>{
-          const aUnit=unitMap.get(a.unit_id)?.unit_no??"";
-          const bUnit=unitMap.get(b.unit_id)?.unit_no??"";
-          return aUnit.localeCompare(bUnit, undefined, { numeric: true });
-        }),
-      ] as [string, SaleContractRow[]])
-      .sort((a,b)=>floorSortValue(a[0])-floorSortValue(b[0]));
-  }, [filteredByBuilding,unitMap]);
 
   const selected = selectedId?contracts.find(c=>c.id===selectedId):null;
   const selectedUnit = selected?units.find(u=>u.id===selected.unit_id):null;
@@ -187,7 +174,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const openDetail = (id:string) => {setSelectedId(id);setPanel("detail");setError("");};
   const openInsight = (key: SaleStatKey) => {setStatFilter(key);setPanel("insight");setSelectedId(null);setError("");};
 
-  const handleCreate = async () => {if(!fUnitId||!fCustomerId||!fSignedDate||fTotalAmount<=0){setError(locale==="zh"?"请填写必填字段":"Champs obligatoires");return;}setSaving(true);setError("");setPanel(null);const r=await createSaleContract({unitId:fUnitId,customerId:fCustomerId,contractNo:fContractNo||"",signedDate:fSignedDate,totalAmountXof:fTotalAmount,paymentPlanType:fPlanType,numInstallments:fPlanType==="fixed_installment"?fNumInstallments:undefined,agencyCompany:fAgency||undefined,agentName:fAgent||undefined,agencyCommissionXof:fCommission,agencyCommissionPaid:fCommissionPaid});setSaving(false);if(!r.success){setPanel("new");setError(r.error??"Failed");}};
+  const handleCreate = async () => {if(!fUnitId||!fCustomerId||!fSignedDate||fTotalAmount<=0){setError(locale==="zh"?"请填写必填字段":"Champs obligatoires");return;}const requestId=createRequestIdRef.current??crypto.randomUUID();createRequestIdRef.current=requestId;setSaving(true);setError("");const r=await createSaleContract({unitId:fUnitId,customerId:fCustomerId,contractNo:fContractNo||"",signedDate:fSignedDate,totalAmountXof:fTotalAmount,paymentPlanType:fPlanType,numInstallments:fPlanType==="fixed_installment"?fNumInstallments:undefined,agencyCompany:fAgency||undefined,agentName:fAgent||undefined,agencyCommissionXof:fCommission,agencyCommissionPaid:fCommissionPaid,requestId});setSaving(false);if(r.success){createRequestIdRef.current=null;setPanel(null);}else{setError(r.error??"Failed");}};
   const handlePay = async () => {if(!payScheduleId||payAmount<=0){setError(locale==="zh"?"请选择分期并输入金额":"Champs obligatoires");return;}const currentScheduleId=payScheduleId;const requestId=payRequestIdRef.current??crypto.randomUUID();payRequestIdRef.current=requestId;setSaving(true);setError("");setPayScheduleId("");const r=await recordSalePaymentAtomic({contractId:selectedId!,scheduleId:currentScheduleId,amount:payAmount,paymentDate:payDate,receiptNo:payReceiptNo||undefined,requestId});setSaving(false);if(r.success){payRequestIdRef.current=null;setPayAmount(0);setPayReceiptNo("");}else {setPayScheduleId(currentScheduleId);setError(r.error??"Failed");}};
   const handleAddFlex = async () => {if(!flexDueDate||flexAmount<=0){setError(locale==="zh"?"请填写到期日和金额":"Champs obligatoires");return;}setSaving(true);setError("");setShowFlexForm(false);const r=await addFlexibleInstallment({contractId:selectedId!,installmentNo:contractSchedules.length+1,dueDate:flexDueDate,amountXof:flexAmount});setSaving(false);if(r.success){setFlexDueDate("");setFlexAmount(0);}else {setShowFlexForm(true);setError(r.error??"Failed");}};
   const handleTransfer = async () => {if(!trDate){setError(locale==="zh"?"请选择过户日期":"Champs obligatoires");return;}const currentId=selectedId!;setSaving(true);setError("");setPanel(null);const r=await updateTransferStatus(currentId,trStatus,trDate,trCertNo||undefined);setSaving(false);if(!r.success){setSelectedId(currentId);setPanel("detail");setError(r.error??"Failed");}};
@@ -240,6 +227,32 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
     needsNumberCleanup: contract.contract_no.startsWith("LEGACY-SALE-"),
   });
 
+  const ledgerRows = useMemo(() => {
+    const keyword = search.trim().toLocaleLowerCase();
+    return filteredByBuilding.map((contract) => {
+      const unit = unitMap.get(contract.unit_id);
+      const customer = customerMap.get(contract.customer_id);
+      const relatedReceivables = receivables.filter((row) => row.source_type === "sale_contract" && row.source_id === contract.id && row.status !== "cancelled");
+      const relatedPayments = payments.filter((row) => row.source_id === contract.id && SALE_RECEIPT_SOURCE_TYPES.has(row.source_type));
+      const receivedByPayments = relatedPayments.reduce((sum, row) => sum + paymentAmountXof(row), 0);
+      const receivedByReceivables = relatedReceivables.reduce((sum, row) => sum + Number(row.paid_amount_xof), 0);
+      const received = Math.min(Number(contract.total_amount_xof), Math.max(receivedByPayments, receivedByReceivables));
+      const outstanding = Math.max(0, Number(contract.total_amount_xof) - received);
+      const nextDue = relatedReceivables
+        .filter((row) => Number(row.amount_xof) > Number(row.paid_amount_xof))
+        .map((row) => row.due_date)
+        .sort()[0] ?? null;
+      return { contract, unit, customer, received, outstanding, nextDue };
+    }).filter((row) => !keyword || [
+      row.unit?.unit_no,
+      row.customer?.name,
+      row.customer?.phone,
+      row.customer?.notes,
+      row.contract.contract_no,
+    ].some((value) => value?.toLocaleLowerCase().includes(keyword)))
+      .sort((a, b) => (a.unit?.unit_no ?? "").localeCompare(b.unit?.unit_no ?? "", undefined, { numeric: true }));
+  }, [customerMap, filteredByBuilding, payments, receivables, search, unitMap]);
+
 // ── Card helpers ──
 function SaleInfo({ label, value, good, warn, danger }: { label: string; value: string; good?: boolean; warn?: boolean; danger?: boolean }) {
   return (
@@ -285,196 +298,79 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
         </div>
       </div>
 
-      {/* ── Summary stats ── */}
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
-        {statBlocks.map(b => (
-          <button
-            key={b.key}
-            type="button"
-            onClick={() => openInsight(b.key)}
-            aria-pressed={panel === "insight" && statFilter === b.key}
-            title={b.hint}
-            className={cn(
-              "flex min-h-[76px] flex-col rounded-xl border bg-card p-3 text-left text-card-foreground shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60",
-              panel === "insight" && statFilter === b.key ? "border-foreground/20 ring-1 ring-foreground/10" : "border-border",
-            )}
-          >
-            <div className="flex min-w-0 items-center justify-between gap-3 pb-2">
-              <p className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">{b.label}</p>
-              <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", b.dot)} />
-            </div>
-            <p className="text-lg font-semibold leading-none tabular-nums text-foreground">{b.value}</p>
-            <span className={cn("mt-2 text-[11px] font-medium", panel === "insight" && statFilter === b.key ? "text-foreground" : "text-muted-foreground")}>
-              {panel === "insight" && statFilter === b.key ? (locale === "zh" ? "已打开" : "Ouvert") : b.hint}
-            </span>
-          </button>
-        ))}
+      <div className="grid grid-cols-4 gap-3">
+        <SummaryCard label={locale === "zh" ? "生效合同" : "Contrats actifs"} value={`${dashboardStats.active}`} />
+        <SummaryCard label={locale === "zh" ? "合同总额" : "Total contrats"} value={formatXof(dashboardStats.total)} />
+        <SummaryCard label={locale === "zh" ? "累计回款" : "Total reçu"} value={formatXof(dashboardStats.received)} />
+        <SummaryCard label={locale === "zh" ? "待回款" : "Reste à recevoir"} value={formatXof(dashboardStats.outstanding)} tone={dashboardStats.outstanding > 0 ? "amber" : "normal"} />
       </div>
 
-      {/* ── Building switcher ── */}
-      {buildings.length > 1 && (
-        <SegmentedControl
-          value={activeBuildingId}
-          onChange={setActiveBuildingId}
-          ariaLabel={locale === "zh" ? "楼栋切换" : "Selection du batiment"}
-          className="self-start"
-          items={buildings.map((b) => ({
-            value: b.id,
-            label: b.display_name || b.code,
-          }))}
-        />
-      )}
-
-      <div className="flex justify-end">
-        <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" />{t.form.newContract}</Button>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {buildings.length > 1 && (
+            <SegmentedControl
+              value={activeBuildingId}
+              onChange={setActiveBuildingId}
+              ariaLabel={locale === "zh" ? "楼栋筛选" : "Filtre bâtiment"}
+              items={buildings.map((building) => ({ value: building.id, label: building.display_name || building.code }))}
+            />
+          )}
+          <SegmentedControl
+            value={statusFilter}
+            onChange={setStatusFilter}
+            ariaLabel={locale === "zh" ? "合同状态" : "Statut"}
+            items={[
+              { value: "current", label: locale === "zh" ? "当前" : "En cours" },
+              { value: "active", label: t.contractStatus.active },
+              { value: "terminated", label: t.contractStatus.terminated },
+              { value: "expired", label: t.contractStatus.expired },
+            ]}
+          />
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={locale === "zh" ? "房号、客户、合同号" : "Lot, client, contrat"} className="h-9 w-56 rounded-md border bg-background pl-9 pr-3 text-sm" />
+          </label>
+        </div>
+        {canCreate && <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" />{t.form.newContract}</Button>}
       </div>
 
-      {/* ── Contract matrix (BusinessRoomCard) ── */}
-      {groupedContracts.length===0?(<EmptyState title={t.empty}/>):(
-        groupedContracts.map(([floor,fc])=>(
-          <RoomBoard
-            key={floor}
-            header={<>
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-                <h3 className="text-sm font-semibold">{floor}</h3>
-              </div>
-              <span className="text-[12px] font-medium text-[#5D7186]">{fc.length} {locale==="fr"?"contrats":"份合同"}</span>
-            </>}
-          >
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-              {fc.map(contract=>{const unit=unitMap.get(contract.unit_id);const customer=customerMap.get(contract.customer_id);const s=getContractSummary(contract.id);const dataFlags=getSaleDataFlags(contract,customer);return(<RoomCard key={contract.id} roomNo={unit?.unit_no??"-"} status="sold" statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]} onClick={()=>openDetail(contract.id)}>
-                {/* Name + status badge */}
-                <div className="flex min-h-[52px] items-start justify-between gap-1.5">
-                  <p className="text-[13px] font-medium leading-tight truncate" title={customer?.name??""}>{customer?.name??"-"}</p>
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
-                    {dataFlags.needsData && <Badge variant="warning" className="text-[10px]">{locale==="zh"?"资料待补":"A compléter"}</Badge>}
-                    {!dataFlags.needsData && dataFlags.needsNumberCleanup && <Badge variant="info" className="text-[10px]">{locale==="zh"?"编号待整理":"N° à vérifier"}</Badge>}
-                    <Badge variant={statusVariant[contract.status]} className="text-[10px]">{t.contractStatus[contract.status as keyof typeof t.contractStatus]}</Badge>
-                  </div>
-                </div>
-                {/* Compact info row */}
-                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#5D7186]">
-                  <span title={contract.contract_no} className="truncate max-w-[90px]">{contract.contract_no}</span>
-                  <span>·</span>
-                  <span className="tabular-nums">{Number(contract.total_amount_xof)>0?formatXof(Number(contract.total_amount_xof)):(locale==="zh"?"金额待补":"Montant à compléter")}</span>
-                  {s.outstanding>0 && <span className="text-amber-600 font-medium">{formatXof(s.outstanding)} {locale==="zh"?"待收":"dû"}</span>}
-                </div>
-                {/* Transfer status + action buttons */}
-                <div className="mt-auto flex items-center justify-between gap-4 border-t border-[rgba(23,50,77,0.06)] pt-3">
-                  <span className={cn("text-[11px]", contract.transfer_status==="completed"?"text-emerald-600":"text-[#5D7186]")}>{transText(contract.transfer_status)}</span>
-                  <div className="flex justify-center gap-5">
-                    <SaleActionBtn icon={Eye} label={locale==="zh"?"查看":"Voir"} onClick={() => openDetail(contract.id)} />
-                    <SaleActionBtn icon={DollarSign} label={locale==="zh"?"回款":"Pmt"} onClick={() => { openDetail(contract.id); }} />
-                    <SaleActionBtn icon={FileText} label={locale==="zh"?"单据":"Docs"} onClick={() => { openDetail(contract.id); }} />
-                  </div>
-                </div>
-              </RoomCard>);})}
-            </div>
-          </RoomBoard>
-        ))
+      {ledgerRows.length === 0 ? <EmptyState title={t.empty} /> : (
+        <div className="table-shell overflow-x-auto">
+          <table className="min-w-[1260px] w-full">
+            <thead><tr>
+              <th>{locale === "zh" ? "楼栋 / 房号" : "Bâtiment / lot"}</th>
+              <th>{locale === "zh" ? "买方" : "Acheteur"}</th>
+              <th>{locale === "zh" ? "合同" : "Contrat"}</th>
+              <th>{locale === "zh" ? "合同总额" : "Montant total"}</th>
+              <th>{locale === "zh" ? "已回款" : "Reçu"}</th>
+              <th>{locale === "zh" ? "待回款" : "Reste"}</th>
+              <th>{locale === "zh" ? "下次应收" : "Prochaine échéance"}</th>
+              <th>{locale === "zh" ? "过户" : "Transfert"}</th>
+              <th>{locale === "zh" ? "状态" : "Statut"}</th>
+              <th className="w-16" />
+            </tr></thead>
+            <tbody>{ledgerRows.map((row) => {
+              const building = buildings.find((item) => item.id === row.unit?.building_id);
+              return <tr key={row.contract.id} className="cursor-pointer" onClick={() => openDetail(row.contract.id)}>
+                <td><span className="font-semibold">{building?.code ?? "-"}</span> · <span className="font-mono">{row.unit?.unit_no ?? "-"}</span></td>
+                <td><p className="font-medium">{row.customer?.name ?? "-"}</p><p className="max-w-48 truncate text-xs text-muted-foreground">{row.customer?.notes ?? row.customer?.phone ?? ""}</p></td>
+                <td><p className="font-medium">{row.contract.contract_no}</p><p className="text-xs text-muted-foreground">{row.contract.signed_date}</p></td>
+                <td className="table-cell-amount">{formatXof(Number(row.contract.total_amount_xof))}</td>
+                <td className="table-cell-amount text-emerald-700">{formatXof(row.received)}</td>
+                <td className={cn("table-cell-amount", row.outstanding > 0 && "text-amber-700")}>{formatXof(row.outstanding)}</td>
+                <td>{row.nextDue ?? "-"}</td>
+                <td><Badge variant={row.contract.transfer_status === "completed" ? "success" : "secondary"}>{transText(row.contract.transfer_status)}</Badge></td>
+                <td><Badge variant={statusVariant[row.contract.status]}>{t.contractStatus[row.contract.status as keyof typeof t.contractStatus]}</Badge></td>
+                <td><Button size="icon" variant="ghost" onClick={(event) => { event.stopPropagation(); openDetail(row.contract.id); }}><Eye className="h-4 w-4" /></Button></td>
+              </tr>;
+            })}</tbody>
+          </table>
+        </div>
       )}
-
-      {/* ── KPI insight panel ── */}
-      {panel === "insight" && statFilter && (() => {
-        const titleMap: Record<SaleStatKey, string> = {
-          active: locale === "zh" ? "生效出售明细" : "Ventes actives",
-          total: locale === "zh" ? "合同总额明细" : "Total des contrats",
-          received: locale === "zh" ? "已回款明细" : "Encaissements",
-          receivable: locale === "zh" ? "待回款明细" : "Montants a recevoir",
-          overdue: locale === "zh" ? "逾期回款明细" : "Retards de paiement",
-          transfer: locale === "zh" ? "已过户明细" : "Transferts completes",
-        };
-        const activeRows = saleInsightContracts.filter((row) => row.contract.status === "active");
-        const insightRows = statFilter === "active"
-          ? activeRows
-          : statFilter === "total"
-            ? [...activeRows].sort((a, b) => Number(b.contract.total_amount_xof) - Number(a.contract.total_amount_xof))
-            : statFilter === "received"
-              ? saleInsightContracts.filter((row) => row.summary.paid > 0).sort((a, b) => b.summary.paid - a.summary.paid)
-              : statFilter === "receivable"
-                ? saleInsightContracts.filter((row) => row.summary.outstanding > 0).sort((a, b) => (a.summary.nextDue ?? "9999-12-31").localeCompare(b.summary.nextDue ?? "9999-12-31"))
-                : statFilter === "overdue"
-                  ? saleInsightContracts.filter((row) => row.summary.overdue > 0).sort((a, b) => b.summary.overdue - a.summary.overdue)
-                  : activeRows.filter((row) => row.contract.transfer_status === "completed");
-        const metricValue = statFilter === "active" || statFilter === "transfer"
-          ? String(insightRows.length)
-          : formatXof(insightRows.reduce((sum, row) => {
-              if (statFilter === "total") return sum + Number(row.contract.total_amount_xof);
-              if (statFilter === "received") return sum + row.summary.paid;
-              if (statFilter === "overdue") return sum + row.summary.overdue;
-              return sum + row.summary.outstanding;
-            }, 0));
-        const valueForRow = (row: typeof insightRows[number]) => {
-          if (statFilter === "received") return row.summary.paid;
-          if (statFilter === "overdue") return row.summary.overdue;
-          if (statFilter === "receivable") return row.summary.outstanding;
-          return Number(row.contract.total_amount_xof);
-        };
-        const badgeVariant = statFilter === "overdue" ? "destructive" : statFilter === "receivable" ? "warning" : statFilter === "transfer" ? "secondary" : "success";
-
-        return (
-          <SalePanelShell
-            onClose={() => setPanel(null)}
-            title={titleMap[statFilter]}
-            badge={<Badge variant={badgeVariant}>{insightRows.length}</Badge>}
-          >
-            <div className="space-y-4">
-              <div className={cn(
-                "rounded-xl border p-3",
-                statFilter === "overdue" ? "border-red-200 bg-red-50/50" :
-                statFilter === "receivable" ? "border-amber-200 bg-amber-50/50" :
-                "border-border bg-muted/35"
-              )}>
-                <p className="text-xs text-muted-foreground">{locale === "zh" ? "当前楼栋合计" : "Total du batiment"}</p>
-                <p className={cn(
-                  "mt-1 text-xl font-semibold tabular-nums",
-                  statFilter === "overdue" ? "text-red-700" : statFilter === "receivable" ? "text-amber-700" : "text-foreground"
-                )}>{metricValue}</p>
-              </div>
-              {insightRows.length === 0 ? (
-                <EmptyState title={locale === "zh" ? "当前没有对应合同" : "Aucun contrat correspondant"} />
-              ) : (
-                <div className="space-y-2.5">
-                  {insightRows.map((row) => (
-                    <div key={row.contract.id} className="rounded-xl border border-border bg-card p-3.5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-semibold">{row.unit?.unit_no ?? "-"} · {row.customer?.name ?? (locale === "zh" ? "客户待补" : "Client a completer")}</span>
-                            <Badge variant={row.contract.transfer_status === "completed" ? "success" : "secondary"} className="h-5 px-2 text-[10px]">
-                              {transText(row.contract.transfer_status)}
-                            </Badge>
-                          </div>
-                          <p className="mt-1 truncate text-xs text-muted-foreground">{row.contract.contract_no}</p>
-                        </div>
-                        <p className={cn(
-                          "shrink-0 text-sm font-semibold tabular-nums",
-                          statFilter === "overdue" ? "text-red-700" : statFilter === "receivable" ? "text-amber-700" : statFilter === "received" ? "text-emerald-700" : "text-foreground"
-                        )}>{formatXof(valueForRow(row))}</p>
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
-                        <span>{locale === "zh" ? "签约" : "Signe"} {row.contract.signed_date}</span>
-                        <span className="text-right">{locale === "zh" ? "总额" : "Total"} {formatXof(Number(row.contract.total_amount_xof))}</span>
-                        <span>{locale === "zh" ? "已回款" : "Recu"} {formatXof(row.summary.paid)}</span>
-                        <span className="text-right">{locale === "zh" ? "待回款" : "Reste"} {formatXof(row.summary.outstanding)}</span>
-                        {row.summary.nextDue && <span className="col-span-2">{locale === "zh" ? "最近应收" : "Prochaine echeance"} {row.summary.nextDue}</span>}
-                      </div>
-                      <Button size="sm" variant="outline" className="mt-3 w-full" onClick={() => openDetail(row.contract.id)}>
-                        {locale === "zh" ? "查看合同" : "Voir le contrat"}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </SalePanelShell>
-        );
-      })()}
 
       {/* ── New Contract Panel ── */}
       {panel==="new"&&(<><div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={()=>setPanel(null)}/><div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]"><div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur"><h3 className="text-[15px] font-semibold">{t.form.newContract}</h3><button onClick={()=>setPanel(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"><X className="h-4 w-4"/></button></div>
-        <div className="space-y-4 px-5 py-5"><div><label className={labelClass}>{t.form.contractNo}</label><input type="text" value={fContractNo} onChange={e=>setFContractNo(e.target.value)} className={inputClass}/></div><div><label className={labelClass}>{t.form.unit} *</label><select value={fUnitId} onChange={e=>setFUnitId(e.target.value)} className={inputClass}><option value="">{t.form.noUnit}</option>{sellableUnits.map(u=><option key={u.id} value={u.id}>{u.unit_no} ({u.floor_label})</option>)}</select></div><div><label className={labelClass}>{t.form.customer} *</label><select value={fCustomerId} onChange={e=>setFCustomerId(e.target.value)} className={inputClass}><option value="">{t.form.noCustomer}</option>{customers.filter(cc=>!cc.is_blacklisted).map(cc=><option key={cc.id} value={cc.id}>{cc.name}</option>)}</select></div>
+          <div className="space-y-4 px-5 py-5"><div><label className={labelClass}>{t.form.contractNo}</label><input type="text" value={fContractNo} onChange={e=>setFContractNo(e.target.value)} className={inputClass}/></div><div><label className={labelClass}>{t.form.unit} *</label><select value={fUnitId} onChange={e=>setFUnitId(e.target.value)} className={inputClass}><option value="">{t.form.noUnit}</option>{sellableUnits.map(u=><option key={u.id} value={u.id}>{u.unit_no} ({u.floor_label})</option>)}</select></div><div><label className={labelClass}>{t.form.customer} *</label><select value={fCustomerId} onChange={e=>setFCustomerId(e.target.value)} className={inputClass}><option value="">{t.form.noCustomer}</option>{customers.map(cc=><option key={cc.id} value={cc.id}>{cc.name}</option>)}</select></div>
           <div className="grid grid-cols-2 gap-3"><div><label className={labelClass}>{t.form.signedDate}</label><DateInput value={fSignedDate} onChangeValue={setFSignedDate} className={inputClass}/></div><div><label className={labelClass}>{t.form.totalAmount} *</label><input type="number" value={fTotalAmount} onChange={e=>setFTotalAmount(Number(e.target.value))} className={inputClass}/></div></div>
           <div><label className={labelClass}>{locale==="zh"?"付款计划":"Plan"}</label><select value={fPlanType} onChange={e=>setFPlanType(e.target.value)} className={inputClass}><option value="lump_sum">{t.paymentPlan.lump_sum}</option><option value="fixed_installment">{t.paymentPlan.fixed_installment}</option><option value="flexible_installment">{t.paymentPlan.flexible_installment}</option></select></div>
           {fPlanType==="fixed_installment"&&<div><label className={labelClass}>{locale==="zh"?"分期数":"Nb echeances"}</label><input type="number" min={2} max={24} value={fNumInstallments} onChange={e=>setFNumInstallments(Number(e.target.value))} className={inputClass}/></div>}
@@ -511,7 +407,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
             </div>
           </div>
 
-          {selected.status==="active"&&<div className="grid grid-cols-2 gap-2"><Button size="sm" onClick={()=>{setPayScheduleId(contractSchedules.find(s=>s.status!=="paid")?.id??"");setPayAmount(0);}}><DollarSign className="h-4 w-4"/>{locale==="zh"?"收款":"Paiement"}</Button><Button size="sm" variant="outline" onClick={()=>{setShowFlexForm(true);setFlexDueDate("");setFlexAmount(0);setError("");}}><CalendarPlus className="h-4 w-4"/>{locale==="zh"?"新增分期":"+Echeance"}</Button><Button size="sm" variant="outline" onClick={()=>{setTrDate(new Date().toISOString().slice(0,10));setTrStatus(selected.transfer_status);}}><TrendingUp className="h-4 w-4"/>{locale==="zh"?"过户":"Transfert"}</Button><Button size="sm" variant="ghost" onClick={handleTerminateSale}><AlertTriangle className="h-4 w-4"/>{locale==="zh"?"终止":"Resilier"}</Button></div>}
+          {selected.status==="active"&&(canRecordFinance||canManage)&&<div className="grid grid-cols-2 gap-2">{canRecordFinance&&<Button size="sm" onClick={()=>{setPayScheduleId(contractSchedules.find(s=>s.status!=="paid")?.id??"");setPayAmount(0);}}><DollarSign className="h-4 w-4"/>{locale==="zh"?"收款":"Paiement"}</Button>}{canManage&&<Button size="sm" variant="outline" onClick={()=>{setShowFlexForm(true);setFlexDueDate("");setFlexAmount(0);setError("");}}><CalendarPlus className="h-4 w-4"/>{locale==="zh"?"新增分期":"+Echeance"}</Button>}{canManage&&<Button size="sm" variant="outline" onClick={()=>{setTrDate(new Date().toISOString().slice(0,10));setTrStatus(selected.transfer_status);}}><TrendingUp className="h-4 w-4"/>{locale==="zh"?"过户":"Transfert"}</Button>}{canManage&&<Button size="sm" variant="ghost" onClick={handleTerminateSale}><AlertTriangle className="h-4 w-4"/>{locale==="zh"?"终止":"Resilier"}</Button>}</div>}
 
           <div className="border-t pt-4">
             <div className="mb-2 space-y-1">
@@ -587,4 +483,13 @@ function SalePanelShell({ onClose, title, badge, children }: { onClose:()=>void;
       <div className="px-5 py-5">{children}</div>
     </div>
   </>);
+}
+
+function SummaryCard({ label, value, tone = "normal" }: { label: string; value: string; tone?: "normal" | "amber" }) {
+  return (
+    <div className="rounded-xl border bg-card p-4 shadow-card">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={cn("mt-2 text-lg font-semibold tabular-nums", tone === "amber" && "text-amber-700")}>{value}</p>
+    </div>
+  );
 }

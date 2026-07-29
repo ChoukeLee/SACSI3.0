@@ -14,12 +14,12 @@ export default async function FrenchUnitsPage() {
 
   return (
     <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
-      <FrenchUnitsData />
+      <FrenchUnitsData canEdit={user.role === "admin"} />
     </Suspense>
   );
 }
 
-async function FrenchUnitsData() {
+async function FrenchUnitsData({ canEdit }: { canEdit: boolean }) {
   const supabase = await createClient();
   const { data: allBuildings, error: bldErr } = await supabase
     .from("buildings")
@@ -101,5 +101,5 @@ async function FrenchUnitsData() {
     }
   }
 
-  return <UnitLazyView units={units} businessFlagsMap={businessFlagsMap} managedLeaseUnitIds={managedLeaseUnitIds} auditLogsMap={auditLogsMap} buildings={allBuildings ?? []} locale="fr" />;
+  return <UnitLazyView units={units} businessFlagsMap={businessFlagsMap} managedLeaseUnitIds={managedLeaseUnitIds} auditLogsMap={auditLogsMap} buildings={allBuildings ?? []} locale="fr" canEdit={canEdit} />;
 }

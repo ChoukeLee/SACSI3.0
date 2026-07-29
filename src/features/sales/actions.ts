@@ -58,135 +58,32 @@ export async function createSaleContract(input: {
   agentName?: string;
   agencyCommissionXof?: number;
   agencyCommissionPaid?: boolean;
+  requestId: string;
 }): Promise<{ success: boolean; data?: SaleContractRow; error?: string }> {
   await guardSaleWrite();
   const supabase = await createClient();
 
-  if (!input.contractNo.trim()) {
-    return { success: false, error: "Contract number is required." };
-  }
-
-  // Check blacklist
-  const { data: customer } = await supabase
-    .from("customers")
-    .select("is_blacklisted, blacklist_reason")
-    .eq("id", input.customerId)
-    .single();
-  if (customer?.is_blacklisted) {
-    return { success: false, error: `Customer is blacklisted: ${customer.blacklist_reason}` };
-  }
-
-  // Insert contract
-  const { data: contract, error } = await supabase
-    .from("sale_contracts")
-    .insert({
-      unit_id: input.unitId,
-      customer_id: input.customerId,
-      contract_no: input.contractNo.trim(),
-      signed_date: input.signedDate,
-      transfer_date: input.transferDate ?? null,
-      transfer_status: "not_started",
-      title_certificate_no: null,
-      agency_company: input.agencyCompany ?? null,
-      agent_name: input.agentName ?? null,
-      agency_commission_amount_xof: input.agencyCommissionXof ?? null,
-      agency_commission_paid: input.agencyCommissionPaid ?? false,
-      payment_plan_type: input.paymentPlanType,
-      total_amount_xof: input.totalAmountXof,
-      status: "active",
-    })
-    .select("*")
-    .single();
-
-  if (error) {
-    if (error.code === "23505") return { success: false, error: "Contract number already exists." };
-    return { success: false, error: error.message };
-  }
-
-  // Generate payment schedule
-  const schedule = buildSchedule(contract.id, input);
-  if (schedule.length > 0) {
-    await supabase.from("sale_payment_schedule").insert(schedule);
-  }
-
-  // Update unit status to sold
-  await supabase.from("units").update({ status: "sold" }).eq("id", input.unitId);
-
-  // Create receivables from the payment schedule
-  const { data: unit } = await supabase.from("units").select("building_id").eq("id", input.unitId).single();
-  for (const inst of schedule) {
-    const category = input.paymentPlanType === "lump_sum" ? "sale_lump_sum" as const : "sale_installment" as const;
-    await createReceivable({
-      building_id: unit?.building_id ?? null,
-      unit_id: input.unitId,
-      customer_id: input.customerId,
-      source_type: "sale_contract",
-      source_id: contract.id,
-      category,
-      title: input.paymentPlanType === "lump_sum"
-        ? `出售房款 ${input.contractNo}`
-        : `出售分期 ${input.contractNo} 第${inst.installment_no}期`,
-      due_date: inst.due_date,
-      amount_xof: inst.amount_xof,
-      paid_amount_xof: 0,
-      status: "pending",
-      currency: "XOF",
-    });
-  }
-
-  // Sync initial overdue statuses
-  await syncSaleOverdueStatuses(contract.id);
-
-  await supabase.from("audit_logs").insert({
-    action: "create",
-    entity_type: "sale_contract",
-    entity_id: contract.id,
-    metadata: { contract_no: input.contractNo, payment_plan: input.paymentPlanType },
+  const { data, error } = await supabase.rpc("create_sale_contract_rpc", {
+    p_unit_id: input.unitId,
+    p_customer_id: input.customerId,
+    p_contract_no: input.contractNo,
+    p_signed_date: input.signedDate,
+    p_total_amount_xof: input.totalAmountXof,
+    p_payment_plan_type: input.paymentPlanType,
+    p_num_installments: input.numInstallments ?? null,
+    p_transfer_date: input.transferDate ?? null,
+    p_agency_company: input.agencyCompany ?? null,
+    p_agent_name: input.agentName ?? null,
+    p_agency_commission_xof: input.agencyCommissionXof ?? null,
+    p_agency_commission_paid: input.agencyCommissionPaid ?? false,
+    p_request_id: input.requestId,
   });
+  if (error) return { success: false, error: error.message };
 
   revalidatePath("/sales");
   revalidatePath("/fr/sales");
-  return { success: true, data: contract };
-}
-
-function buildSchedule(
-  contractId: string,
-  input: { paymentPlanType: string; totalAmountXof: number; numInstallments?: number; signedDate: string }
-) {
-  const schedule: { sale_contract_id: string; installment_no: number; due_date: string; amount_xof: number; status: string }[] = [];
-
-  if (input.paymentPlanType === "lump_sum") {
-    schedule.push({
-      sale_contract_id: contractId,
-      installment_no: 1,
-      due_date: input.signedDate,
-      amount_xof: input.totalAmountXof,
-      status: "pending",
-    });
-  } else if (input.paymentPlanType === "fixed_installment" && input.numInstallments && input.numInstallments > 1) {
-    const perInstallment = Math.round(input.totalAmountXof / input.numInstallments);
-    let remainder = input.totalAmountXof - perInstallment * input.numInstallments;
-    const startDate = new Date(input.signedDate);
-    for (let i = 0; i < input.numInstallments; i++) {
-      const dueDate = new Date(startDate);
-      dueDate.setMonth(dueDate.getMonth() + (i + 1) * 1);
-      let amount = perInstallment;
-      if (i === input.numInstallments - 1 && remainder !== 0) {
-        amount += remainder;
-        remainder = 0;
-      }
-      schedule.push({
-        sale_contract_id: contractId,
-        installment_no: i + 1,
-        due_date: dueDate.toISOString().slice(0, 10),
-        amount_xof: amount,
-        status: "pending",
-      });
-    }
-  }
-  // For flexible, installments are added manually by the user later
-
-  return schedule;
+  const contractId = (data as { contract_id?: string } | null)?.contract_id;
+  return { success: true, data: contractId ? ({ id: contractId } as SaleContractRow) : undefined };
 }
 
 // ── Find matching receivable for a schedule ──

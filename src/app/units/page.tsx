@@ -14,12 +14,12 @@ export default async function UnitsPage() {
 
   return (
     <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
-      <UnitsData locale="zh" />
+      <UnitsData locale="zh" canEdit={user.role === "admin"} />
     </Suspense>
   );
 }
 
-async function UnitsData({ locale }: { locale: "zh" | "fr" }) {
+async function UnitsData({ locale, canEdit }: { locale: "zh" | "fr"; canEdit: boolean }) {
   const supabase = await createClient();
   const { data: allBuildings, error: bldErr } = await supabase
     .from("buildings")
@@ -112,6 +112,7 @@ async function UnitsData({ locale }: { locale: "zh" | "fr" }) {
       auditLogsMap={auditLogsMap}
       buildings={allBuildings ?? []}
       locale={locale}
+      canEdit={canEdit}
     />
   );
 }

@@ -33,7 +33,7 @@ const CYCLE_MULTIPLIER: Record<string, number> = {
 
 // ── Generate lease rent receivables ──
 
-export async function generateLeaseReceivables(
+async function generateLeaseReceivables(
   contractId: string,
 ): Promise<{ success: boolean; count: number; existingCount?: number; error?: string }> {
   await guardLeaseWrite();
@@ -189,16 +189,6 @@ export async function createLeaseContract(input: {
   const contractNo = samePrefix && samePrefix.some((row) => row.contract_no === requestedContractNo)
     ? `${requestedContractNo}-${String(samePrefix.length + 1).padStart(2, "0")}`
     : requestedContractNo;
-
-  // Check blacklist
-  const { data: customer } = await supabase
-    .from("customers")
-    .select("is_blacklisted, blacklist_reason")
-    .eq("id", input.customerId)
-    .single();
-  if (customer?.is_blacklisted) {
-    return { success: false, error: `Customer is blacklisted: ${customer.blacklist_reason}` };
-  }
 
   // Check active contract on this unit
   const { data: existing } = await supabase
@@ -467,7 +457,7 @@ export async function terminateContract(
 
 // ── Pay a specific receivable (full payment only) ──
 
-export async function recordReceivablePayment(input: {
+async function recordReceivablePayment(input: {
   receivableId: string;
   paymentDate: string;
   receiptNo?: string;
@@ -548,7 +538,7 @@ export async function recordReceivablePayment(input: {
 
 // ── Move-out settlement (enhanced) ──
 
-export async function processMoveOut(input: {
+async function processMoveOut(input: {
   contractId: string;
   actualEndDate: string;
   unpaidRentXof: number;
@@ -714,7 +704,7 @@ export async function processMoveOut(input: {
 
 // ── Overdue reminders ──
 
-export async function generateOverdueReminders(
+async function generateOverdueReminders(
   buildingId: string
 ): Promise<{ success: boolean; count: number }> {
   const supabase = await createClient();
@@ -808,7 +798,7 @@ export async function generateOverdueReminders(
 
 // ── Get receivables for a contract (read-only, used in UI) ──
 
-export async function getContractReceivables(
+async function getContractReceivables(
   contractId: string
 ): Promise<ReceivableRow[]> {
   const supabase = await createClient();

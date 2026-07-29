@@ -66,7 +66,6 @@ export async function createCustomer(
 
   return { success: true, data };
 }
-
 export async function updateCustomer(
   id: string,
   input: CustomerFormInput
@@ -113,74 +112,4 @@ export async function updateCustomer(
   });
 
   return { success: true, data };
-}
-
-// ── Blacklist ──
-
-export async function setCustomerBlacklist(
-  id: string,
-  reason: string,
-  permanent: boolean
-): Promise<{ success: boolean; error?: string }> {
-  requirePermission(await getCurrentUser(), "customers:write");
-  if (!reason || reason.trim().length === 0) {
-    return { success: false, error: "Blacklist reason is required." };
-  }
-
-  const supabase = await createClient();
-
-  const { error } = await supabase
-    .from("customers")
-    .update({
-      is_blacklisted: true,
-      blacklist_reason: reason.trim(),
-      blacklist_date: new Date().toISOString().slice(0, 10),
-      blacklist_permanent: permanent,
-    })
-    .eq("id", id);
-
-  if (error) return { success: false, error: error.message };
-
-  await supabase.from("audit_logs").insert({
-    action: "blacklist_add",
-    entity_type: "customer",
-    entity_id: id,
-    metadata: { reason: reason.trim(), permanent },
-  });
-
-  revalidatePath("/customers");
-  revalidatePath("/fr/customers");
-
-  return { success: true };
-}
-
-export async function removeCustomerBlacklist(
-  id: string
-): Promise<{ success: boolean; error?: string }> {
-  requirePermission(await getCurrentUser(), "customers:write");
-  const supabase = await createClient();
-
-  const { error } = await supabase
-    .from("customers")
-    .update({
-      is_blacklisted: false,
-      blacklist_reason: null,
-      blacklist_date: null,
-      blacklist_permanent: false,
-    })
-    .eq("id", id);
-
-  if (error) return { success: false, error: error.message };
-
-  await supabase.from("audit_logs").insert({
-    action: "blacklist_remove",
-    entity_type: "customer",
-    entity_id: id,
-    metadata: {},
-  });
-
-  revalidatePath("/customers");
-  revalidatePath("/fr/customers");
-
-  return { success: true };
 }

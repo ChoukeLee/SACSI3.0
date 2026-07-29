@@ -13,12 +13,7 @@ import { SearchInput } from "@/components/ui/search-input";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import type { CustomerRow } from "@/types/database";
-import {
-  createCustomer,
-  updateCustomer,
-  setCustomerBlacklist,
-  removeCustomerBlacklist,
-} from "./actions";
+import { createCustomer, updateCustomer } from "./actions";
 
 export interface CustomerBuildingSummary {
   id: string;
@@ -52,7 +47,6 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
   const [buildingFilter, setBuildingFilter] = useState("__all__");
   const [formMode, setFormMode] = useState<FormMode>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [blacklistPanelId, setBlacklistPanelId] = useState<string | null>(null);
 
   const [formName, setFormName] = useState("");
   const [formGender, setFormGender] = useState("");
@@ -63,10 +57,6 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const [blReason, setBlReason] = useState("");
-  const [blPermanent, setBlPermanent] = useState(true);
-  const [blError, setBlError] = useState("");
-  const [blSaving, setBlSaving] = useState(false);
 
   useEffect(() => {
     setOptimisticCustomers(customers);
@@ -185,11 +175,11 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
     setFormName(""); setFormGender(""); setFormDocType(""); setFormDocNo(""); setFormPhone(""); setFormNotes(""); setFormError("");
   };
 
-  const openAdd = () => { resetForm(); setFormMode({ type: "add" }); setSelectedId(null); setBlacklistPanelId(null); };
+  const openAdd = () => { resetForm(); setFormMode({ type: "add" }); setSelectedId(null); };
   const openEdit = (customer: CustomerRow) => {
     setFormName(customer.name); setFormGender(customer.gender ?? ""); setFormDocType(customer.document_type ?? "");
     setFormDocNo(""); setFormPhone(customer.phone ?? ""); setFormNotes(customer.notes ?? ""); setFormError("");
-    setFormMode({ type: "edit", customer }); setBlacklistPanelId(null);
+    setFormMode({ type: "edit", customer });
   };
 
   const buildOptimisticCustomer = (id: string, base?: CustomerRow): CustomerRow => {
@@ -249,49 +239,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
     setSaving(false);
   };
 
-  const handleBlacklist = async () => {
-    if (!blReason.trim()) { setBlError(locale === "zh" ? "请填写拉黑原因" : "Le motif est obligatoire"); return; }
-    setBlSaving(true); setBlError("");
-    const previousCustomers = optimisticCustomers;
-    const targetId = blacklistPanelId!;
-    const today = new Date().toISOString().slice(0, 10);
-    setOptimisticCustomers((prev) => prev.map((customer) => customer.id === targetId ? {
-      ...customer,
-      is_blacklisted: true,
-      blacklist_reason: blReason,
-      blacklist_date: today,
-      blacklist_permanent: blPermanent,
-      updated_at: new Date().toISOString(),
-    } : customer));
-    setBlacklistPanelId(null);
-    const result = await setCustomerBlacklist(blacklistPanelId!, blReason, blPermanent);
-    if (result.success) { setBlReason(""); setBlPermanent(true); } else { setOptimisticCustomers(previousCustomers); setBlacklistPanelId(targetId); setBlError(result.error ?? "Failed"); }
-    setBlSaving(false);
-  };
-
-  const handleUnblacklist = async (id: string) => {
-    setBlSaving(true);
-    const previousCustomers = optimisticCustomers;
-    setOptimisticCustomers((prev) => prev.map((customer) => customer.id === id ? {
-      ...customer,
-      is_blacklisted: false,
-      blacklist_reason: null,
-      blacklist_date: null,
-      blacklist_permanent: false,
-      updated_at: new Date().toISOString(),
-    } : customer));
-    setBlacklistPanelId(null);
-    const result = await removeCustomerBlacklist(id);
-    if (!result.success) {
-      setOptimisticCustomers(previousCustomers);
-      setBlacklistPanelId(id);
-      setBlError(result.error ?? "Failed");
-    }
-    setBlSaving(false);
-  };
-
   const isFormOpen = formMode !== null;
-  const isBlacklistOpen = blacklistPanelId !== null;
 
   const inputClass = cn("w-full", controlClass);
   const labelClass = "block text-xs font-semibold text-muted-foreground mb-1";
@@ -424,7 +372,6 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
         onClick={() => {
           setSelectedId(isSelected ? null : c.id);
           setFormMode(null);
-          setBlacklistPanelId(null);
         }}
         className={cn(
           "flex flex-col gap-1.5 rounded-xl border bg-card p-3.5 text-left shadow-sm transition-all hover:shadow-md",
@@ -582,7 +529,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       )}
 
       {/* ── Selected detail drawer ── */}
-      {selected && !isFormOpen && !isBlacklistOpen && (
+      {selected && !isFormOpen && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setSelectedId(null)} />
           <div className="fixed inset-x-0 bottom-0 z-panel max-h-[88vh] overflow-auto rounded-t-xl border bg-card p-4 shadow-panel sm:inset-y-0 sm:left-auto sm:right-0 sm:w-full sm:max-w-lg sm:rounded-none sm:border-l">
@@ -623,16 +570,6 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
                 <Link href={routeFor(locale, `/customers/${selected.id}`)}><Eye className="h-3.5 w-3.5" />{t.profile}</Link>
               </Button>
               <Button size="sm" variant="ghost" onClick={() => openEdit(selected)}>{t.edit}</Button>
-              {selected.is_blacklisted ? (
-                <Button size="sm" variant="outline" onClick={() => handleUnblacklist(selected.id)} disabled={blSaving}>
-                  <UserCheck className="h-3.5 w-3.5" />{t.blacklistRemove}
-                </Button>
-              ) : (
-                <Button size="sm" variant="outline" onClick={() => { setBlacklistPanelId(selected.id); setBlReason(""); setBlPermanent(true); setBlError(""); }}
-                  className="border-red-200 text-red-700 hover:bg-red-50">
-                  <UserX className="h-3.5 w-3.5" />{t.blacklistAdd}
-                </Button>
-              )}
             </div>
             </div>
           </div>
@@ -676,29 +613,6 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
         </>
       )}
 
-      {/* ── Blacklist form panel ── */}
-      {isBlacklistOpen && (
-        <>
-          <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setBlacklistPanelId(null)} />
-          <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[420px]">
-            <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
-              <h3 className="text-[15px] font-semibold">{t.blacklistAdd}</h3>
-              <button onClick={() => setBlacklistPanelId(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"><X className="h-4 w-4" /></button>
-            </div>
-            <div className="space-y-4 px-5 py-5">
-              <div><label className={labelClass}>{t.blacklistReason} *</label><textarea value={blReason} onChange={(e) => setBlReason(e.target.value)} rows={3} className={cn(inputClass, "resize-none overflow-hidden")} placeholder={t.blacklistReason} /></div>
-              <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                <input type="checkbox" checked={blPermanent} onChange={(e) => setBlPermanent(e.target.checked)} className="h-4 w-4 rounded border" />{t.blacklistPermanent}
-              </label>
-              {blError && <p className="text-sm text-red-600">{blError}</p>}
-              <div className="flex items-center gap-3 pt-2">
-                <Button onClick={handleBlacklist} disabled={blSaving} variant="destructive"><UserX className="h-4 w-4" />{blSaving ? "..." : t.blacklistAdd}</Button>
-                <Button variant="ghost" onClick={() => setBlacklistPanelId(null)}>{t.cancel}</Button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }

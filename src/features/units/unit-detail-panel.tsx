@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { X, Camera, ChevronDown } from "lucide-react";
+import { X, ChevronDown } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
-import { dictionaries, routeFor } from "@/lib/i18n";
+import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -33,13 +32,12 @@ interface UnitDetailPanelProps {
   locale: Locale;
   onClose: () => void;
   onStatusChanged: () => void;
-  onStatusPatch?: (unitId: string, status: UnitStatus) => void;
-  onStatusRollback?: (unitId: string, status: UnitStatus) => void;
+  canEdit: boolean;
 }
 
 const manualStatuses: UnitStatus[] = ["available", "maintenance", "locked"];
 
-export function UnitDetailPanel({ unit, buildingName, businessFlags, auditLogs, locale, onClose, onStatusChanged, onStatusPatch, onStatusRollback }: UnitDetailPanelProps) {
+export function UnitDetailPanel({ unit, buildingName, businessFlags, auditLogs, locale, onClose, onStatusChanged, canEdit }: UnitDetailPanelProps) {
   const t = dictionaries[locale].units;
   const statusLabels = dictionaries[locale].statuses;
   const [statusOpen, setStatusOpen] = useState(false);
@@ -47,17 +45,14 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, auditLogs, 
   const [error, setError] = useState("");
 
   const handleStatusChange = async (newStatus: UnitStatus) => {
-    const previousStatus = unit.status;
     setChanging(true);
     setError("");
     setStatusOpen(false);
-    onStatusPatch?.(unit.id, newStatus);
     const result = await updateUnitStatus(unit.id, newStatus);
     setChanging(false);
     if (result.success) {
       onStatusChanged();
     } else {
-      onStatusRollback?.(unit.id, previousStatus);
       setError(result.error ?? "Failed to update status.");
     }
   };
@@ -78,7 +73,6 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, auditLogs, 
             <p className="mt-0.5 font-mono text-xs text-muted-foreground">{unit.code}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button asChild size="sm"><Link href={routeFor(locale, `/units/${unit.id}`)}>{locale === "zh" ? "完整档案" : "Dossier"}</Link></Button>
             <Button size="icon" variant="ghost" onClick={onClose} aria-label={locale === "zh" ? "关闭" : "Fermer"}>
               <X className="h-4 w-4" />
             </Button>
@@ -122,20 +116,11 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, auditLogs, 
           </div>
 
           <div>
-            <h4 className="text-xs font-semibold text-muted-foreground">{t.detail.photos}</h4>
-            <div className="mt-2 flex gap-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed bg-muted text-muted-foreground/40"><Camera className="h-6 w-6" /></div>
-              ))}
-            </div>
-          </div>
-
-          <div>
             <h4 className="text-xs font-semibold text-muted-foreground">{t.detail.notes}</h4>
             <p className="mt-1.5 text-sm leading-relaxed">{unit.notes ?? t.detail.noNotes}</p>
           </div>
 
-          <div className="relative">
+          {canEdit && <div className="relative">
             <h4 className="text-xs font-semibold text-muted-foreground">{t.actions.changeStatus}</h4>
             <div className="mt-2">
               <button onClick={() => setStatusOpen(!statusOpen)} disabled={changing}
@@ -159,7 +144,7 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, auditLogs, 
               )}
             </div>
             {error && <p className="mt-2 text-xs text-red-600" role="alert">{error}</p>}
-          </div>
+          </div>}
 
           <div>
             <h4 className="text-xs font-semibold text-muted-foreground">{t.detail.statusHistory}</h4>
