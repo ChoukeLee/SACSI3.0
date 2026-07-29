@@ -1,2 +1,10 @@
 import { redirect } from "next/navigation";
-export default function OverviewRedirect() { redirect("/daily-rentals"); }
+import { getCurrentUser } from "@/lib/auth";
+import { DailyOccupancyOverviewData } from "../occupancy-overview-data";
+
+export default async function DailyOccupancyOverviewPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (user.role === "front_desk") redirect("/fr/daily-rentals/overview");
+  return <DailyOccupancyOverviewData locale="zh" />;
+}

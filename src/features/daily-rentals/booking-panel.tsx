@@ -17,7 +17,7 @@ import { printDailyReceipt } from "@/features/print";
 import { calculateBilling } from "./billing";
 import { getDailyLodgingBusinessType, getPrimaryDailyAction, type DailyLodgingBusinessType } from "./daily-rental-policy";
 import {
-  createBooking, createBackfillBooking, confirmBooking, checkIn, checkOut, completeCleaning, extendStay, cancelBooking,
+  createBooking, createBackfillBooking, checkIn, checkOut, completeCleaning, extendStay, cancelBooking,
   recordSupplementaryPayment, applyDiscount, reversePayment, setFixedCheckout,
 } from "./actions";
 import type { DailyOperationSnapshot } from "./actions";
@@ -301,13 +301,6 @@ export function BookingPanel({
   };
 
   // ── Backfill handler ──
-  const handleConfirmBooking = async () => {
-    await runPanelAction(
-      () => confirmBooking(booking!.id),
-      { closeOnSuccess: true },
-    );
-  };
-
   const handleCancelBooking = async () => {
     await runPanelAction(
       () => cancelBooking(booking!.id),
@@ -598,14 +591,6 @@ export function BookingPanel({
                 )}
               </div>
               <div className="space-y-2">
-
-              {/* ── pending_review → primary = confirm ── */}
-              {primaryAction?.action === "confirm" && (
-                <div className="space-y-2">
-                  <Button variant="default" onClick={handleConfirmBooking} disabled={saving} className="w-full">{t.booking.confirmBooking}</Button>
-                  <Button variant="outline" size="sm" onClick={handleCancelBooking} disabled={saving} className="w-full justify-center text-accentRed-600 hover:bg-accentRed-50 hover:text-accentRed-700"><UserX className="h-3.5 w-3.5 mr-1" />{t.booking.cancelBooking}</Button>
-                </div>
-              )}
 
               {/* ── confirmed + cleaning blocked → primary = complete_cleaning ── */}
               {primaryAction?.action === "complete_cleaning" && booking.status === "confirmed" && (

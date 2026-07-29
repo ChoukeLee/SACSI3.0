@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Plus, Printer, SlidersHorizontal, X } from "lucide-react";
+import Link from "next/link";
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Maximize2, Plus, Printer, SlidersHorizontal, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { cn, formatXof, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
 import { COPY, BOOKING_STATUS_LABELS } from "./calendar-constants";
@@ -68,9 +69,11 @@ export function DailyCalendar({
   cleaningTasks,
   payments,
   locale,
+  userRole,
 }: CalendarProps) {
   const copy = COPY[locale];
   const bookingLabels = BOOKING_STATUS_LABELS[locale];
+  const canCreateBooking = userRole === "admin";
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [roomFilter, setRoomFilter] = useState<RoomFilter>("all");
@@ -572,6 +575,13 @@ export function DailyCalendar({
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               {copied ? (locale === "zh" ? "已复制" : "Copie") : (locale === "zh" ? "复制群消息" : "Copier")}
             </Button>
+            <Link
+              href={locale === "fr" ? "/fr/daily-rentals/overview" : "/daily-rentals/overview"}
+              className={cn(TOOLBAR_ITEM, "no-print")}
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+              {locale === "zh" ? "独立总览" : "Vue seule"}
+            </Link>
             <Button variant="ghost" size="sm" onClick={() => window.print()} className={cn(TOOLBAR_ITEM, "no-print")}>
               <Printer className="h-3.5 w-3.5" />
               {locale === "zh" ? "打印" : "Imprimer"}
@@ -594,7 +604,13 @@ export function DailyCalendar({
         <div className="flex flex-col gap-3 border-b border-border px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-[15px] font-semibold tracking-tight">{copy.timeline}</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">{copy.subtitle}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {canCreateBooking
+                ? copy.subtitle
+                : (locale === "zh"
+                    ? "点击订单或房态办理入住、退房和完成保洁。"
+                    : "Ouvrez une réservation pour l'arrivée, le départ ou le ménage.")}
+            </p>
           </div>
 
           <div className={TOOLBAR_SURFACE}>
@@ -747,6 +763,7 @@ export function DailyCalendar({
                           locale={locale}
                           copy={copy}
                           bookingLabels={bookingLabels}
+                          canCreateBooking={canCreateBooking}
                           onOpenBooking={(id) => {
                             setSelectedBookingId(id);
                             setNewBookingUnitId(null);
@@ -1084,6 +1101,7 @@ function TimelineCell({
   locale,
   copy,
   bookingLabels,
+  canCreateBooking,
   onOpenBooking,
   onNewBooking,
   onCompleteCleaning,
@@ -1101,6 +1119,7 @@ function TimelineCell({
   locale: Locale;
   copy: (typeof COPY)[Locale];
   bookingLabels: Record<string, string>;
+  canCreateBooking: boolean;
   onOpenBooking: (id: string) => void;
   onNewBooking: () => void;
   onCompleteCleaning?: () => void;
@@ -1236,6 +1255,10 @@ function TimelineCell({
 
   const isPast = dateStr < todayStr;
   if (isPast) {
+    return <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell" />;
+  }
+
+  if (!canCreateBooking) {
     return <div className={baseCell} style={{ height: ROW_HEIGHT }} role="gridcell" />;
   }
 

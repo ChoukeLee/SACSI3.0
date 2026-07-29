@@ -190,7 +190,7 @@ export async function createBooking(input: {
   nightlyPriceXof: number; notes?: string; otaSource?: string;
   requestId: string;
 }): Promise<DailyActionResult> {
-  const user = await guardWrite();
+  const user = await requireRole("admin");
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("daily_create_booking_rpc", {
     p_unit_id: input.unitId,

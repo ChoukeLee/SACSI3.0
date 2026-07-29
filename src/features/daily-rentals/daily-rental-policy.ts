@@ -104,7 +104,7 @@ export function getPrimaryDailyAction(input: GetPrimaryActionInput): {
   // Has a booking: map the primary action by status.
   switch (bookingStatus) {
     case "pending_review":
-      return { action: "confirm", allowed: true };
+      return { action: "readonly", allowed: false, reason: "legacy_pending_review" };
 
     case "confirmed":
       // Cannot check in while cleaning is pending on the unit
@@ -271,8 +271,8 @@ export function getDailyBookingActionState(
   options: { hasOpenCleaningTask?: boolean } = {},
 ): DailyBookingActionState {
   const status = booking.status as DailyBookingStatus;
-  const canConfirm = status === "pending_review";
-  const canCancel = status === "pending_review" || status === "confirmed";
+  const canConfirm = false;
+  const canCancel = status === "confirmed";
   const canCheckIn = status === "confirmed";
   const canTakePayment = status === "checked_in";
   const canCheckOut = status === "checked_in";

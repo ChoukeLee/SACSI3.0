@@ -71,14 +71,14 @@ export const UNIT_STATUS_LABELS: Record<Locale, Record<UnitStatus, string>> = {
 
 export const BOOKING_STATUS_LABELS: Record<Locale, Record<string, string>> = {
   zh: {
-    pending_review: "待审核",
+    pending_review: "历史待处理",
     confirmed: "已确认",
     checked_in: "已入住",
     checked_out: "已退房",
     cancelled: "已取消",
   },
   fr: {
-    pending_review: "A valider",
+    pending_review: "Ancien statut",
     confirmed: "Confirme",
     checked_in: "Arrive",
     checked_out: "Parti",
