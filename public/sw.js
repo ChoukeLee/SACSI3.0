@@ -1,9 +1,10 @@
-// SACSI PWA Service Worker — offline support for core assets
-const CACHE = "sacsi-v1";
+// SACSI PWA Service Worker — cache branded static assets only.
+// Business pages, RSC payloads and Next.js chunks must always come from the
+// current deployment so financial and operational data cannot become stale.
+const CACHE = "sacsi-static-v2";
 
-// Static assets safe to cache aggressively (rarely change)
+// Static assets that contain no business data and rarely change.
 const STATIC_ASSETS = [
-  "/",
   "/manifest.json",
   "/logo.png",
   "/favicon.ico",
@@ -30,37 +31,16 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Fetch strategy: cache-first for static assets, network-first for everything else
+// Fetch strategy: cache-first for listed static assets; bypass everything else.
 self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") return;
+
   const url = new URL(event.request.url);
 
-  // Cache-first for static assets
-  if (STATIC_ASSETS.some((a) => url.pathname.endsWith(a) || url.pathname === a)) {
+  // Cache only the exact branded assets listed above.
+  if (url.origin === self.location.origin && STATIC_ASSETS.includes(url.pathname)) {
     event.respondWith(
       caches.match(event.request).then((cached) => cached || fetch(event.request))
     );
-    return;
   }
-
-  // Network-first for everything else (Next.js chunks, API, HTML)
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Cache successful responses for next time
-        const clone = response.clone();
-        caches.open(CACHE).then((cache) => cache.put(event.request, clone));
-        return response;
-      })
-      .catch(() => {
-        // Offline: try cache, then show offline page
-        return caches.match(event.request).then((cached) => {
-          if (cached) return cached;
-          // If requesting a page, show cached root
-          if (event.request.mode === "navigate") {
-            return caches.match("/");
-          }
-          return new Response("Offline", { status: 503 });
-        });
-      })
-  );
 });
