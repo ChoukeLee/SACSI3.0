@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, Plus, Printer, Search, X } from "lucide-react";
+import { Eye, Plus, Printer, Search } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { cn, formatXof, sortUnits } from "@/lib/utils";
@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
 import { EmptyState } from "@/components/empty-state";
-import { SegmentedControl } from "@/components/ui/operational";
+import { FilterBar, MetricGrid, OperationalPage, RightDrawer, SegmentedControl, StatTile } from "@/components/ui/operational";
+import { BusinessTable } from "@/components/ui/business-table";
 import type { CustomerRow, LeaseContractRow, PaymentRow, ReceivableRow, UnitRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
 import { contractStatusVariant } from "@/lib/status-styles";
@@ -213,27 +214,32 @@ export function LeaseLedger({
   };
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-medium text-muted-foreground">{locale === "zh" ? "租售业务" : "Locations et ventes"}</p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight">{locale === "zh" ? "长租台账" : "Registre des locations"}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {locale === "zh" ? "以合同、实际收款和未结应收为准" : "Contrats, encaissements réels et créances ouvertes"}
-          </p>
-        </div>
-        {canCreate && <Button onClick={() => { setError(""); setPanel("new"); }}><Plus className="h-4 w-4" />{locale === "zh" ? "新建长租" : "Nouveau bail"}</Button>}
-      </div>
+    <OperationalPage
+      eyebrow={locale === "zh" ? "租赁业务" : "Locations"}
+      title={locale === "zh" ? "长租合同" : "Contrats de location"}
+      description={`${scopedRows.length} ${locale === "zh" ? "份合同" : "contrats"} · ${locale === "zh" ? "以合同、实际收款和未结应收为准" : "Contrats, encaissements réels et créances ouvertes"}`}
+      action={canCreate ? <Button onClick={() => { setError(""); setPanel("new"); }}><Plus className="h-4 w-4" />{locale === "zh" ? "新增长租" : "Nouveau bail"}</Button> : null}
+    >
+      <MetricGrid columns={4}>
+        <StatTile tone="green" label={locale === "zh" ? "生效合同" : "Contrats actifs"} value={`${summary.active}`} caption={locale === "zh" ? "点击查看生效合同" : "Voir les contrats actifs"} />
+        <StatTile tone="blue" label={locale === "zh" ? "月租规模" : "Loyer mensuel"} value={formatXof(summary.monthlyRent)} caption={locale === "zh" ? "当前筛选范围" : "Périmètre filtré"} />
+        <StatTile tone={summary.outstanding - summary.overdue > 0 ? "amber" : "green"} label={locale === "zh" ? "待收未逾期" : "Reste à recevoir"} value={formatXof(Math.max(0, summary.outstanding - summary.overdue))} caption={locale === "zh" ? "不含逾期金额" : "Hors retard"} />
+        <StatTile tone={summary.overdue > 0 ? "red" : "neutral"} label={locale === "zh" ? "逾期金额" : "Dont en retard"} value={formatXof(summary.overdue)} caption={summary.overdue > 0 ? (locale === "zh" ? "点击进入催收" : "À traiter") : (locale === "zh" ? "暂无逾期" : "Aucun retard")} />
+      </MetricGrid>
 
-      <div className="grid grid-cols-4 gap-3">
-        <SummaryCard label={locale === "zh" ? "生效合同" : "Contrats actifs"} value={`${summary.active}`} />
-        <SummaryCard label={locale === "zh" ? "月租合计" : "Loyer mensuel"} value={formatXof(summary.monthlyRent)} />
-        <SummaryCard label={locale === "zh" ? "未收合计" : "Reste à recevoir"} value={formatXof(summary.outstanding)} tone={summary.outstanding > 0 ? "amber" : "normal"} />
-        <SummaryCard label={locale === "zh" ? "其中逾期" : "Dont en retard"} value={formatXof(summary.overdue)} tone={summary.overdue > 0 ? "red" : "normal"} />
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3">
-        <div className="flex flex-wrap items-center gap-3">
+      <FilterBar
+        meta={
+          <label className="flex h-9 min-w-64 items-center gap-2 rounded-lg border border-input bg-card px-3 text-sm shadow-xs">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="min-w-0 flex-1 bg-transparent outline-none"
+              placeholder={locale === "zh" ? "搜索房号、租客、电话、备注" : "Rechercher logement, locataire, note"}
+            />
+          </label>
+        }
+      >
           {buildings.length > 1 && (
             <SegmentedControl
               value={activeBuildingId}
@@ -257,22 +263,10 @@ export function LeaseLedger({
               { value: "expired", label: t.contractStatus.expired },
             ]}
           />
-        </div>
-        <label className="flex h-9 min-w-64 items-center gap-2 rounded-md border bg-background px-3 text-sm">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            className="min-w-0 flex-1 bg-transparent outline-none"
-            placeholder={locale === "zh" ? "搜索房号、租客、电话、备注" : "Rechercher logement, locataire, note"}
-          />
-        </label>
-      </div>
+      </FilterBar>
 
-      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        {scopedRows.length === 0 ? <EmptyState title={t.empty} /> : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1420px] border-collapse text-sm">
+      {scopedRows.length === 0 ? <EmptyState title={t.empty} /> : (
+        <BusinessTable minWidth="min-w-[1420px]">
               <thead className="bg-muted/55 text-left text-xs text-muted-foreground">
                 <tr>
                   <th className="whitespace-nowrap px-4 py-3 font-medium">{locale === "zh" ? "楼栋 / 房号" : "Bâtiment / Lot"}</th>
@@ -328,10 +322,8 @@ export function LeaseLedger({
                   );
                 })}
               </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+        </BusinessTable>
+      )}
 
       {panel === "detail" && selected && (
         <DetailPanel
@@ -371,7 +363,7 @@ export function LeaseLedger({
           onSuccess={() => { setPanel(null); router.refresh(); }}
         />
       )}
-    </div>
+    </OperationalPage>
   );
 }
 
@@ -389,15 +381,6 @@ type LedgerRow = {
   nextDue: string | null;
   originalRent: { currency: string; amount: number } | null;
 };
-
-function SummaryCard({ label, value, tone = "normal" }: { label: string; value: string; tone?: "normal" | "amber" | "red" }) {
-  return (
-    <div className="rounded-xl border bg-card p-4 shadow-sm">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className={cn("mt-2 text-lg font-semibold tabular-nums", tone === "amber" && "text-amber-700", tone === "red" && "text-red-600")}>{value}</p>
-    </div>
-  );
-}
 
 function DetailPanel({
   row,
@@ -614,15 +597,14 @@ function Info({ label, value, wide }: { label: string; value: string; wide?: boo
 
 function PanelShell({ title, onClose, actions, children }: { title: string; onClose: () => void; actions?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <>
-      <div className="fixed inset-x-0 bottom-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={onClose} />
-      <aside className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-[560px] overflow-y-auto border-l bg-card shadow-2xl">
-        <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b bg-card/95 px-5 backdrop-blur">
-          <h3 className="font-semibold">{title}</h3>
-          <div className="flex items-center gap-1">{actions}<button onClick={onClose} className="rounded-md p-2 hover:bg-muted"><X className="h-4 w-4" /></button></div>
-        </div>
-        <div className="p-5">{children}</div>
-      </aside>
-    </>
+    <RightDrawer
+      open
+      title={title}
+      onClose={onClose}
+      width="wide"
+      footer={actions ? <div className="flex items-center justify-end gap-2">{actions}</div> : undefined}
+    >
+      {children}
+    </RightDrawer>
   );
 }

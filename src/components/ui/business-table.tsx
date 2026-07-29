@@ -17,16 +17,18 @@ export function BusinessTable({
   children,
   minWidth,
   className,
+  shellClassName,
 }: {
   children: ReactNode;
   minWidth?: string;
   className?: string;
+  shellClassName?: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
+    <div className={cn("overflow-hidden rounded-xl border border-border bg-card shadow-card", shellClassName)}>
       <div className="overflow-x-auto">
         <table
-          className={cn("w-full table-fixed text-left text-[13px]", minWidth, className)}
+          className={cn("w-full text-left text-[13px]", minWidth ?? "min-w-full", className)}
         >
           {children}
         </table>
@@ -58,7 +60,7 @@ export function BusinessTh({
   className?: string;
 }) {
   return (
-    <th className={cn("h-10 whitespace-nowrap px-4 py-2.5 align-middle", alignClass[align], className)}>
+    <th className={cn("h-10 whitespace-nowrap px-4 py-2.5 align-middle font-semibold", alignClass[align], className)}>
       {children}
     </th>
   );

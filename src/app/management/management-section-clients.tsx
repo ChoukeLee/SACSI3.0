@@ -8,7 +8,7 @@ import type { ManagementFinanceSnapshot } from "@/features/management/finance-sn
 import { RoomCard } from "@/components/room-card";
 import { RoomBoard } from "@/components/room-board";
 import { RoomLegend } from "@/components/room-legend";
-import { FilterBar, SegmentedControl, StatTile } from "@/components/ui/operational";
+import { FilterBar, MetricGrid, SegmentedControl, StatTile } from "@/components/ui/operational";
 import { getRoomCardActions } from "@/lib/room-card-actions";
 import { isOwnerOccupiedUnit } from "@/lib/unit-display";
 import { referencedLeaseContractNo, unitCardPartyFromNotes, unresolvedUnitCardParty } from "@/lib/unit-card-party";
@@ -149,7 +149,7 @@ export function FinanceSectionClient({
             <p className="text-[11px] text-muted-foreground">{locale === "zh" ? "本月到期回款率" : "Taux de recouvrement"}</p>
           </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricGrid columns={4}>
           {blocks.map(block => {
             const filled = block.key === detail;
             return (
@@ -164,7 +164,7 @@ export function FinanceSectionClient({
               />
             );
           })}
-        </div>
+        </MetricGrid>
       </div>
       {detail != null && (
         <FinanceDetailPanel

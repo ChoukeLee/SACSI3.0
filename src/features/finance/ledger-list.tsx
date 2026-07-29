@@ -9,7 +9,7 @@ import { DateInput } from "@/components/ui/date-input";
 import { Button } from "@/components/ui/button";
 import { BusinessTable, BusinessTbody, BusinessTd, BusinessTh, BusinessThead, BusinessRow, MoneyCell, DEFAULT_BUSINESS_TABLE_PAGE_SIZE } from "@/components/ui/business-table";
 import { DataVizCard, MiniLineChart } from "@/components/ui/data-viz";
-import { FilterBar, FilterGroup, SegmentedControl, StatTile, controlClass } from "@/components/ui/operational";
+import { FilterBar, FilterGroup, MetricGrid, SegmentedControl, StatTile, controlClass } from "@/components/ui/operational";
 import type { LedgerEntryRow } from "@/types/database";
 import { addLedgerEntry } from "./actions";
 import { ReceiptThumb } from "@/components/attachments/receipt-thumb";
@@ -208,11 +208,11 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-2 sm:grid-cols-3">
+      <MetricGrid columns={3}>
         <StatTile tone="green" label={t.summary.totalIncome} value={formatXof(summary.income)} />
         <StatTile tone="red" label={t.summary.totalExpense} value={formatXof(summary.expense)} />
         <StatTile tone={summary.net >= 0 ? "blue" : "amber"} label={t.summary.netBalance} value={formatXof(summary.net)} />
-      </div>
+      </MetricGrid>
 
       <DataVizCard
         title={locale === "zh" ? "近 6 个月净现金流" : "Flux net sur 6 mois"}

@@ -8,7 +8,7 @@ import { routeFor } from "@/lib/i18n";
 import { cn, compareUnitNo } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FilterBar, SegmentedControl, StatTile, controlClass } from "@/components/ui/operational";
+import { FilterBar, MetricGrid, SegmentedControl, StatTile, controlClass } from "@/components/ui/operational";
 import { SearchInput } from "@/components/ui/search-input";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -438,11 +438,11 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       />
       )}
 
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+      <MetricGrid columns={5}>
         {statBlocks.map(b => (
           <StatTile key={b.key} label={b.label} value={b.value} tone={b.key === "blacklisted" ? "red" : b.key === "lease" ? "leased" : b.key === "sale" ? "sold" : b.key === "daily" ? "blue" : "neutral"} />
         ))}
-      </div>
+      </MetricGrid>
 
       <FilterBar
         meta={

@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
 import { EmptyState } from "@/components/empty-state";
-import { SegmentedControl } from "@/components/ui/operational";
+import { FilterBar, MetricGrid, OperationalPage, SegmentedControl, StatTile } from "@/components/ui/operational";
+import { BusinessTable } from "@/components/ui/business-table";
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import { createSaleContract, recordSalePaymentAtomic, addFlexibleInstallment, updateTransferStatus, terminateSaleContract } from "./actions";
 
@@ -271,42 +272,29 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
     </button>
   )
 }
-
-  const statBlocks: Array<{ key: SaleStatKey; label: string; value: string; dot: string; hint: string }> = [
-    { key: "active", label: locale==="zh"?"生效出售":"Ventes actives", value: String(dashboardStats.active), dot: "bg-accentGreen-500", hint: locale==="zh"?"打开生效出售侧栏":"Ouvrir les ventes actives" },
-    { key: "total", label: locale==="zh"?"合同总额":"Total contrats", value: formatXof(dashboardStats.total), dot: "bg-accentBlue-500", hint: locale==="zh"?"打开合同总额明细":"Ouvrir le detail des contrats" },
-    { key: "received", label: locale==="zh"?"已回款":"Recu", value: formatXof(dashboardStats.received), dot: "bg-accentGreen-500", hint: locale==="zh"?"打开已回款明细":"Ouvrir les encaissements" },
-    { key: "receivable", label: locale==="zh"?"待回款":"A recevoir", value: formatXof(dashboardStats.outstanding), dot: "bg-accentAmber-500", hint: locale==="zh"?"打开待回款侧栏":"Ouvrir les montants a recevoir" },
-    { key: "overdue", label: locale==="zh"?"逾期回款":"Retard", value: formatXof(dashboardStats.overdue), dot: dashboardStats.overdue > 0 ? "bg-accentRed-500" : "bg-muted-foreground/40", hint: locale==="zh"?"打开逾期回款侧栏":"Ouvrir les retards" },
-    { key: "transfer", label: locale==="zh"?"已过户":"Transfert", value: String(dashboardStats.transferDone), dot: "bg-accentPurple-500", hint: locale==="zh"?"打开过户明细":"Ouvrir les transferts" },
-  ];
-
   return (
-    <div className="flex flex-col gap-6">
-      {/* ── Page chrome ── */}
-      <div className="flex flex-col gap-1">
-        <p className="text-xs font-medium text-muted-foreground">
-          {locale === "zh" ? "出售业务" : "Ventes"}
-        </p>
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-xl font-semibold tracking-tight">
-            {locale === "zh" ? "出售合同" : "Contrats de vente"}
-          </h1>
-          <span className="text-sm text-muted-foreground tabular-nums">
-            {filteredByBuilding.length} {locale==="fr"?"contrats":"份合同"}
-          </span>
-        </div>
-      </div>
+    <OperationalPage
+      eyebrow={locale === "zh" ? "出售业务" : "Ventes"}
+      title={locale === "zh" ? "出售合同" : "Contrats de vente"}
+      description={`${filteredByBuilding.length} ${locale === "fr" ? "contrats" : "份合同"} · ${locale === "zh" ? "合同、回款与过户状态统一管理" : "Suivi des contrats, paiements et transferts"}`}
+      action={canCreate ? <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" />{t.form.newContract}</Button> : null}
+    >
+      <MetricGrid columns={5}>
+        <StatTile tone="green" label={locale === "zh" ? "生效出售" : "Ventes actives"} value={`${dashboardStats.active}`} caption={locale === "zh" ? "点击查看生效出售" : "Voir les ventes actives"} onClick={() => openInsight("active")} active={statFilter === "active"} />
+        <StatTile tone="blue" label={locale === "zh" ? "合同总额" : "Total contrats"} value={formatXof(dashboardStats.total)} caption={locale === "zh" ? "按楼栋动态汇总" : "Total filtré"} onClick={() => openInsight("total")} active={statFilter === "total"} />
+        <StatTile tone="green" label={locale === "zh" ? "已回款" : "Total reçu"} value={formatXof(dashboardStats.received)} caption={locale === "zh" ? "实际到账" : "Encaissements"} onClick={() => openInsight("received")} active={statFilter === "received"} />
+        <StatTile tone={dashboardStats.outstanding > 0 ? "amber" : "green"} label={locale === "zh" ? "待回款" : "Reste à recevoir"} value={formatXof(dashboardStats.outstanding)} caption={locale === "zh" ? "未逾期与逾期合计" : "Reste total"} onClick={() => openInsight("receivable")} active={statFilter === "receivable"} />
+        <StatTile tone={dashboardStats.overdue > 0 ? "red" : "neutral"} label={locale === "zh" ? "逾期回款" : "Retard"} value={formatXof(dashboardStats.overdue)} caption={dashboardStats.overdue > 0 ? (locale === "zh" ? "点击查看风险" : "À traiter") : (locale === "zh" ? "暂无逾期" : "Aucun retard")} onClick={() => openInsight("overdue")} active={statFilter === "overdue"} />
+      </MetricGrid>
 
-      <div className="grid grid-cols-4 gap-3">
-        <SummaryCard label={locale === "zh" ? "生效合同" : "Contrats actifs"} value={`${dashboardStats.active}`} />
-        <SummaryCard label={locale === "zh" ? "合同总额" : "Total contrats"} value={formatXof(dashboardStats.total)} />
-        <SummaryCard label={locale === "zh" ? "累计回款" : "Total reçu"} value={formatXof(dashboardStats.received)} />
-        <SummaryCard label={locale === "zh" ? "待回款" : "Reste à recevoir"} value={formatXof(dashboardStats.outstanding)} tone={dashboardStats.outstanding > 0 ? "amber" : "normal"} />
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3">
-        <div className="flex flex-wrap items-center gap-3">
+      <FilterBar
+        meta={
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={locale === "zh" ? "房号、客户、合同号" : "Lot, client, contrat"} className="h-9 w-56 rounded-lg border border-input bg-card pl-9 pr-3 text-sm shadow-xs outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60" />
+          </label>
+        }
+      >
           {buildings.length > 1 && (
             <SegmentedControl
               value={activeBuildingId}
@@ -326,17 +314,10 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
               { value: "expired", label: t.contractStatus.expired },
             ]}
           />
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={locale === "zh" ? "房号、客户、合同号" : "Lot, client, contrat"} className="h-9 w-56 rounded-md border bg-background pl-9 pr-3 text-sm" />
-          </label>
-        </div>
-        {canCreate && <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" />{t.form.newContract}</Button>}
-      </div>
+      </FilterBar>
 
       {ledgerRows.length === 0 ? <EmptyState title={t.empty} /> : (
-        <div className="table-shell overflow-x-auto">
-          <table className="min-w-[1260px] w-full">
+        <BusinessTable minWidth="min-w-[1260px]">
             <thead><tr>
               <th>{locale === "zh" ? "楼栋 / 房号" : "Bâtiment / lot"}</th>
               <th>{locale === "zh" ? "买方" : "Acheteur"}</th>
@@ -364,8 +345,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
                 <td><Button size="icon" variant="ghost" onClick={(event) => { event.stopPropagation(); openDetail(row.contract.id); }}><Eye className="h-4 w-4" /></Button></td>
               </tr>;
             })}</tbody>
-          </table>
-        </div>
+        </BusinessTable>
       )}
 
       {/* ── New Contract Panel ── */}
@@ -468,7 +448,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
           {/* Transfer form */}
           {selected.status==="active"&&trDate&&(<div className="space-y-2 rounded-md border bg-card p-3"><div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-muted-foreground">{locale==="zh"?"过户状态":"Transfert"}</label><select value={trStatus} onChange={e=>setTrStatus(e.target.value)} className={inputClass}><option value="not_started">{transText("not_started")}</option><option value="in_progress">{transText("in_progress")}</option><option value="completed">{transText("completed")}</option></select></div><div><label className="text-xs text-muted-foreground">{locale==="zh"?"过户日期":"Date"}</label><DateInput value={trDate} onChangeValue={setTrDate} className={inputClass}/></div><div className="col-span-2"><label className="text-xs text-muted-foreground">{locale==="zh"?"产权证号":"Titre"}</label><input type="text" value={trCertNo} onChange={e=>setTrCertNo(e.target.value)} className={inputClass}/></div></div>{error&&<p className="text-xs text-red-600">{error}</p>}<div className="flex gap-2"><Button size="sm" onClick={handleTransfer} disabled={saving}>{saving?"...":locale==="zh"?"保存":"OK"}</Button><Button size="sm" variant="ghost" onClick={()=>{setTrDate("");}}>{locale==="zh"?"取消":"Annuler"}</Button></div></div>)}
         </div></div></>)}
-    </div>
+    </OperationalPage>
   );
 }
 
@@ -483,13 +463,4 @@ function SalePanelShell({ onClose, title, badge, children }: { onClose:()=>void;
       <div className="px-5 py-5">{children}</div>
     </div>
   </>);
-}
-
-function SummaryCard({ label, value, tone = "normal" }: { label: string; value: string; tone?: "normal" | "amber" }) {
-  return (
-    <div className="rounded-xl border bg-card p-4 shadow-card">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={cn("mt-2 text-lg font-semibold tabular-nums", tone === "amber" && "text-amber-700")}>{value}</p>
-    </div>
-  );
 }

@@ -21,7 +21,7 @@ import { isOwnerOccupiedUnit } from "@/lib/unit-display";
 import { referencedLeaseContractNo, unitCardPartyFromNotes, unresolvedUnitCardParty } from "@/lib/unit-card-party";
 import { FinanceDetailPanel } from "./finance-detail-panel";
 import { QualityDashboardWidget } from "@/features/data-quality";
-import { StatTile } from "@/components/ui/operational";
+import { MetricGrid, StatTile } from "@/components/ui/operational";
 import type { QualityIssue } from "@/features/data-quality/quality-types";
 import type { Locale, ManagementDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -231,7 +231,7 @@ export function ManagementDashboard({
       </div>
 
       {/* ── Finance strip ── */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <MetricGrid columns={4}>
         {financeBlocks.map(block => {
           const Icon = block.icon;
           const tone = block.color === "accentGreen" ? "green"
@@ -249,7 +249,7 @@ export function ManagementDashboard({
             />
           );
         })}
-      </div>
+      </MetricGrid>
 
       {/* ── Status overview bar ── */}
       <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border/60 bg-card px-4 py-3">

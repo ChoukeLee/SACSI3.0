@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { SearchInput } from "@/components/ui/search-input";
-import { FilterBar, FilterGroup, SegmentedControl, StatTile } from "@/components/ui/operational";
+import { FilterBar, FilterGroup, MetricGrid, SegmentedControl, StatTile } from "@/components/ui/operational";
 import { repairDailyRentalIssue } from "@/features/daily-rentals/daily-rental-repair";
 import type { QualityIssue, QualityCategory, QualitySeverity } from "./quality-types";
 
@@ -97,7 +97,7 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
   return (
     <div className="space-y-5">
       {/* Summary */}
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+      <MetricGrid columns={6}>
         {[{ key:"total", label:zh?"全部异常":"Total", value:String(issues.length), dot:"bg-accentBlue-500" },
           { key:"high", label:zh?"高危":"Élevé", value:String(high), dot:"bg-accentRed-500" },
           { key:"medium", label:zh?"中危":"Moyen", value:String(medium), dot:"bg-accentAmber-500" },
@@ -108,7 +108,7 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
           const tone = b.dot.includes("Red") ? "red" : b.dot.includes("Amber") ? "amber" : b.dot.includes("Green") ? "green" : "blue";
           return <StatTile key={b.key} label={b.label} value={b.value} tone={tone as "red" | "amber" | "green" | "blue"} />;
         })}
-      </div>
+      </MetricGrid>
 
       {/* Filters */}
       <FilterBar meta={<span className="tabular-nums">{filtered.length} {zh ? "条" : "lignes"}</span>}>

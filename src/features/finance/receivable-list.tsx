@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
 import { BusinessTable, BusinessTbody, BusinessTd, BusinessTh, BusinessThead, BusinessRow, MoneyCell } from "@/components/ui/business-table";
 import { DataVizCard, DonutChart } from "@/components/ui/data-viz";
-import { FilterBar, FilterGroup, SegmentedControl, StatTile, controlClass } from "@/components/ui/operational";
+import { FilterBar, FilterGroup, MetricGrid, SegmentedControl, StatTile, controlClass } from "@/components/ui/operational";
 import {
   calculateReceivableSummary,
   buildReceivableCsv,
@@ -182,13 +182,13 @@ export function ReceivableList({ receivables, units, customers, buildings, local
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+      <MetricGrid columns={5}>
         <StatTile tone="blue" label={t.summary.totalReceivable} value={formatXof(summary.totalReceivable)} />
         <StatTile tone="green" label={t.summary.totalPaid} value={formatXof(summary.totalPaid)} />
         <StatTile tone="amber" label={t.summary.totalOutstanding} value={formatXof(summary.outstanding)} />
         <StatTile tone="red" label={t.summary.totalOverdue} value={formatXof(summary.overdue)} />
         <StatTile tone={collectionTone} label={t.summary.collectionRate} value={`${(summary.collectionRate * 100).toFixed(1)}%`} />
-      </div>
+      </MetricGrid>
 
       <DataVizCard
         title={locale === "zh" ? "应收结构" : "Structure des créances"}

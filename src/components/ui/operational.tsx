@@ -1,4 +1,5 @@
 import * as React from "react";
+import { X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -66,6 +67,124 @@ export function StatTile({
   );
 }
 
+export function OperationalPage({
+  eyebrow,
+  title,
+  description,
+  action,
+  children,
+  className,
+}: {
+  eyebrow?: React.ReactNode;
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex flex-col gap-6", className)}>
+      <section className="rounded-xl border border-border bg-card px-5 py-4 shadow-card">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            {eyebrow && <p className="text-xs font-medium text-muted-foreground">{eyebrow}</p>}
+            <h1 className="mt-1 text-[22px] font-semibold leading-tight tracking-normal text-foreground">{title}</h1>
+            {description && <p className="mt-1 max-w-3xl text-[13px] leading-5 text-muted-foreground">{description}</p>}
+          </div>
+          {action && <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div>}
+        </div>
+      </section>
+      {children}
+    </div>
+  );
+}
+
+export function MetricGrid({
+  children,
+  columns = 5,
+  className,
+}: {
+  children: React.ReactNode;
+  columns?: 3 | 4 | 5 | 6;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "grid gap-3 sm:grid-cols-2",
+        columns === 3 && "xl:grid-cols-3",
+        columns === 4 && "xl:grid-cols-4",
+        columns === 5 && "lg:grid-cols-3 xl:grid-cols-5",
+        columns === 6 && "lg:grid-cols-3 xl:grid-cols-6",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function RightDrawer({
+  open,
+  title,
+  subtitle,
+  onClose,
+  children,
+  footer,
+  width = "standard",
+  className,
+}: {
+  open: boolean;
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
+  onClose: () => void;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+  width?: "compact" | "standard" | "wide" | "table";
+  className?: string;
+}) {
+  if (!open) return null;
+  const widthClass = {
+    compact: "lg:max-w-[420px]",
+    standard: "lg:max-w-[480px]",
+    wide: "lg:max-w-[560px]",
+    table: "lg:max-w-5xl",
+  }[width];
+
+  return (
+    <>
+      <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={onClose} />
+      <aside
+        className={cn(
+          "fixed bottom-0 right-0 top-12 z-panel flex w-full max-w-full flex-col border-l border-border bg-card shadow-panel",
+          widthClass,
+          className,
+        )}
+        role="dialog"
+        aria-modal="true"
+        aria-label={typeof title === "string" ? title : undefined}
+      >
+        <div className="sticky top-0 z-10 flex min-h-16 items-start justify-between gap-4 border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
+          <div className="min-w-0">
+            <h2 className="truncate text-[15px] font-semibold leading-6 text-foreground">{title}</h2>
+            {subtitle && <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{subtitle}</p>}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto px-5 py-5">{children}</div>
+        {footer && <div className="sticky bottom-0 border-t border-border bg-card/95 px-5 py-4 backdrop-blur">{footer}</div>}
+      </aside>
+    </>
+  );
+}
+
 export function FilterBar({
   children,
   meta,
@@ -76,7 +195,7 @@ export function FilterBar({
   className?: string;
 }) {
   return (
-    <div className={cn("inline-flex max-w-full flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-card sm:flex-row sm:items-center sm:justify-between", className)}>
+    <div className={cn("flex max-w-full flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-card sm:flex-row sm:items-center sm:justify-between", className)}>
       <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>
       {meta && <div className="shrink-0 text-xs font-medium text-muted-foreground tabular-nums">{meta}</div>}
     </div>

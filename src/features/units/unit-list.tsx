@@ -8,7 +8,7 @@ import { dictionaries } from "@/lib/i18n";
 import { cn, compareFloorLabels, formatXof, sortUnitsForBuilding } from "@/lib/utils";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
-import { FilterBar, SegmentedControl } from "@/components/ui/operational";
+import { FilterBar, MetricGrid, SegmentedControl, StatTile } from "@/components/ui/operational";
 import { PageHeader } from "@/components/page-header";
 import { getUnitOperationalLabel, isOwnerOccupiedUnit } from "@/lib/unit-display";
 import { UnitDetailPanel } from "./unit-detail-panel";
@@ -163,43 +163,21 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
       />
       )}
 
-      <div className="grid gap-3 sm:grid-cols-4">
+      <MetricGrid columns={4}>
         {assetBlocks.filter((block) => ["apartments", "available", "leased", "maintenance"].includes(block.key)).map((block) => {
           const Icon = block.icon;
-          const content = (
-            <>
-              <div className="flex min-w-0 items-center justify-between gap-3 pb-2">
-                <p className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">{block.label}</p>
-                {Icon ? (
-                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-                ) : (
-                  <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", block.dot)} />
-                )}
-              </div>
-              <p className="text-lg font-semibold leading-none tabular-nums text-foreground">{block.value}</p>
-            </>
-          );
-
-          if (block.key === "nonApartment") {
-            return (
-              <button
-                key={block.key}
-                type="button"
-                onClick={() => setShowNonApartments(true)}
-                className="flex min-h-[76px] flex-col rounded-xl border border-border bg-card p-3 text-left text-card-foreground shadow-card transition-shadow duration-200 hover:shadow-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-              >
-                {content}
-              </button>
-            );
-          }
-
+          const tone = block.key === "available" ? "sold" : block.key === "leased" ? "leased" : block.key === "maintenance" ? "red" : "neutral";
           return (
-            <div key={block.key} className="flex min-h-[76px] flex-col rounded-xl border border-border bg-card p-3 text-card-foreground shadow-card transition-shadow duration-200">
-              {content}
-            </div>
+            <StatTile
+              key={block.key}
+              label={block.label}
+              value={block.value}
+              tone={tone}
+              icon={Icon}
+            />
           );
         })}
-      </div>
+      </MetricGrid>
 
       <FilterBar
         meta={`${filtered.length} / ${buildingUnits.length} ${locale === "fr" ? "lots" : "套房源"}`}
