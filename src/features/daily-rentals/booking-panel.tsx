@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
 import { controlClass } from "@/components/ui/operational";
-import { useOptimisticOperation } from "@/hooks/use-optimistic-operation";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import type { CustomerSummary } from "./calendar";
@@ -19,7 +18,7 @@ import { calculateBilling } from "./billing";
 import { getDailyLodgingBusinessType, getPrimaryDailyAction, type DailyLodgingBusinessType } from "./daily-rental-policy";
 import {
   createBooking, createBackfillBooking, confirmBooking, checkIn, checkOut, completeCleaning, extendStay, cancelBooking,
-  recordSupplementaryPayment, applyDiscount, deletePayment, setFixedCheckout,
+  recordSupplementaryPayment, applyDiscount, reversePayment, setFixedCheckout,
 } from "./actions";
 import type { DailyOperationSnapshot } from "./actions";
 import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
@@ -28,18 +27,17 @@ interface BookingPanelProps {
   booking: DailyBookingRow | null; unitId: string | null; defaultDate?: string;
   units: UnitRow[]; customers: CustomerSummary[];
   cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean; completed_at?: string | null }[];
-  payments: { id: string; source_id: string; amount: number; payment_date: string }[];
+  payments: {
+    id: string;
+    source_id: string;
+    amount: number;
+    payment_date: string;
+    reversal_of_payment_id?: string | null;
+  }[];
   locale: Locale; onClose: () => void; onChanged: () => void;
-  onOptimisticClose?: () => void;
   onBookingCreated?: (booking: DailyBookingRow) => void;
-  onBookingPatched?: (bookingId: string, patch: Partial<DailyBookingRow>) => void;
-  onUnitStatusPatched?: (unitId: string, status: UnitStatus) => void;
-  onCleaningTaskAdded?: (task: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }) => void;
   onCleaningTaskCompleted?: (taskId: string, unitId: string, status: UnitStatus) => void;
-  onPaymentAdded?: (payment: { id: string; source_id: string; amount: number; payment_date: string }) => void;
   onOperationSnapshot?: (snapshot: DailyOperationSnapshot) => void;
-  onOptimisticReset?: () => void;
-  onBackgroundOperation?: (label: string, state: "syncing" | "done" | "failed") => void;
   backfillMode?: boolean;
 }
 
@@ -56,16 +54,9 @@ export function BookingPanel({
   locale,
   onClose,
   onChanged,
-  onOptimisticClose,
   onBookingCreated,
-  onBookingPatched,
-  onUnitStatusPatched,
-  onCleaningTaskAdded,
   onCleaningTaskCompleted,
-  onPaymentAdded,
   onOperationSnapshot,
-  onOptimisticReset,
-  onBackgroundOperation,
   backfillMode,
 }: BookingPanelProps) {
   const t = dictionaries[locale].dailyRentals;
@@ -92,7 +83,6 @@ export function BookingPanel({
   const [suppAmount, setSuppAmount] = useState("");
   const [suppPaymentDate, setSuppPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [suppReceiptNo, setSuppReceiptNo] = useState("");
-  const [finalAmount, setFinalAmount] = useState("");
   const [actualCheckOut, setActualCheckOut] = useState(new Date().toISOString().slice(0, 10));
   const [discountAmount, setDiscountAmount] = useState("");
   const [discountReason, setDiscountReason] = useState("");
@@ -100,6 +90,7 @@ export function BookingPanel({
   const [fixedCheckOutDate, setFixedCheckOutDate] = useState("");
   const [actionError, setActionError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; amount: number } | null>(null);
+  const [reversalReason, setReversalReason] = useState("");
   const [showAdvancedActions, setShowAdvancedActions] = useState(false);
   const [activeAdvancedTask, setActiveAdvancedTask] = useState<AdvancedTask>(null);
 
@@ -119,10 +110,6 @@ export function BookingPanel({
   }, [defaultDate]);
 
   useEffect(() => {
-    if (booking) { setFinalAmount(String(booking.final_amount_xof ?? booking.total_amount_xof)); }
-  }, [booking]);
-
-  useEffect(() => {
     setShowAdvancedActions(false);
     setActiveAdvancedTask(null);
     setActionError("");
@@ -139,6 +126,10 @@ export function BookingPanel({
   );
   const bookingPayments = useMemo(() => payments.filter(p => p.source_id === booking?.id), [payments, booking]);
   const totalPaid = bookingPayments.reduce((s, p) => s + Number(p.amount), 0);
+  const reversedPaymentIds = useMemo(
+    () => new Set(bookingPayments.map((payment) => payment.reversal_of_payment_id).filter(Boolean)),
+    [bookingPayments],
+  );
 
   const newNights = useMemo(() => {
     if (!newCheckIn || !newCheckOut) return 0;
@@ -192,49 +183,32 @@ export function BookingPanel({
   const inputClass = cn("w-full bg-card", controlClass);
   const labelClass = "mb-1 block text-xs font-semibold text-muted-foreground";
   const formatError = (message?: string | null) => formatDailyRentalError(message, locale);
-  const { pendingLabel: pendingActionLabel, runOptimisticOperation } = useOptimisticOperation({
-    setBusy: setSaving,
-    clearErrors: () => {
-      setActionError("");
-      setError("");
-    },
-    onRollback: onOptimisticReset,
-    onRefresh: refresh,
-    onError: (message) => setActionError(formatError(message ?? "unknownError")),
-    reportBackgroundOperation: onBackgroundOperation,
-  });
-
   const runPanelAction = async (
-    label: string,
     action: () => Promise<{ success: boolean; error?: string; data?: DailyOperationSnapshot } | void>,
     options: {
-      closeImmediately?: boolean;
       closeOnSuccess?: boolean;
       clearAdvancedTask?: boolean;
-      rollbackOnFailure?: boolean;
-      showPendingLabel?: boolean;
     } = {},
   ) => {
-    await runOptimisticOperation(label, action, {
-      background: options.closeImmediately,
-      release: options.closeImmediately ? (onOptimisticClose ?? onClose) : undefined,
-      beforeStart: options.clearAdvancedTask ? () => setActiveAdvancedTask(null) : undefined,
-      onSuccess: (result) => {
-        if (result?.data) onOperationSnapshot?.(result.data as DailyOperationSnapshot);
-        if (options.closeOnSuccess) (onOptimisticClose ?? onClose)();
-      },
-      shouldRefresh: (result) => !result?.data,
-      rollbackOnFailure: options.rollbackOnFailure,
-      showPendingLabel: options.showPendingLabel,
-    });
+    setSaving(true);
+    setActionError("");
+    setError("");
+    if (options.clearAdvancedTask) setActiveAdvancedTask(null);
+    try {
+      const result = await action();
+      if (result && result.success === false) {
+        setActionError(formatError(result.error ?? "unknownError"));
+        return;
+      }
+      if (result?.data) onOperationSnapshot?.(result.data);
+      else refresh();
+      if (options.closeOnSuccess) onClose();
+    } catch (operationError) {
+      setActionError(formatError(operationError instanceof Error ? operationError.message : "unknownError"));
+    } finally {
+      setSaving(false);
+    }
   };
-
-  const makeOptimisticPayment = (amount: number, paymentDate: string) => ({
-    id: `optimistic-payment-${booking?.id ?? "new"}-${Date.now()}`,
-    source_id: booking!.id,
-    amount,
-    payment_date: paymentDate,
-  });
 
   const handleCreate = async () => {
     if (!newCustomerId) { setError(t.booking.noCustomer); return; }
@@ -244,7 +218,6 @@ export function BookingPanel({
     const requestId = createRequestIdRef.current ?? crypto.randomUUID();
     createRequestIdRef.current = requestId;
     await runPanelAction(
-      locale === "zh" ? "正在新建预订" : "Creation en cours",
       async () => createBooking({
         unitId: unitId!, customerId: newCustomerId, checkIn: newCheckIn,
         checkOut: newCheckoutMode === "fixed" ? newCheckOut : undefined,
@@ -252,99 +225,53 @@ export function BookingPanel({
         notes: newNotes || undefined,
         requestId,
       }),
-      {
-        closeOnSuccess: true,
-        rollbackOnFailure: false,
-        showPendingLabel: false,
-      },
+      { closeOnSuccess: true },
     );
   };
 
   const handleCheckIn = async () => {
     const prepay = toN(prepaidAmount);
-    const optimisticPaid = totalPaid + prepay;
-    onBookingPatched?.(booking!.id, {
-      status: "checked_in",
-      prepaid_amount_xof: optimisticPaid,
-      billing_status: optimisticPaid >= finalDue ? "settled" : optimisticPaid > 0 ? "partially_paid" : "need_top_up",
-    });
-    onUnitStatusPatched?.(booking!.unit_id, "daily_occupied");
-    if (prepay > 0) onPaymentAdded?.(makeOptimisticPayment(prepay, new Date().toISOString().slice(0, 10)));
+    const requestId = prepay > 0 ? crypto.randomUUID() : undefined;
     await runPanelAction(
-      locale === "zh" ? "正在办理入住" : "Arrivee en cours",
-      () => checkIn(booking!.id, prepay),
-      { closeImmediately: true },
+      () => checkIn(booking!.id, prepay, requestId),
+      { closeOnSuccess: true },
     );
   };
 
   const handleCheckOut = async () => {
     const disc = toN(discountAmount);
-    const checkoutDate = booking?.checkout_mode === "open" ? actualCheckOut : booking?.check_out ?? new Date().toISOString().slice(0, 10);
-    const nextFinal = finalDue;
-    onBookingPatched?.(booking!.id, {
-      status: "checked_out",
-      actual_check_out: checkoutDate,
-      total_amount_xof: nextFinal,
-      final_amount_xof: nextFinal,
-      prepaid_amount_xof: totalPaid,
-      manual_discount_amount_xof: disc || booking!.manual_discount_amount_xof,
-      manual_discount_reason: disc > 0 ? (discountReason || null) : booking!.manual_discount_reason,
-      billing_status: totalPaid >= nextFinal ? "settled" : totalPaid > 0 ? "partially_paid" : "need_top_up",
-    });
-    onUnitStatusPatched?.(booking!.unit_id, "cleaning_pending");
-    onCleaningTaskAdded?.({
-      id: `optimistic-cleaning-${booking!.id}-${Date.now()}`,
-      unit_id: booking!.unit_id,
-      daily_booking_id: booking!.id,
-      is_completed: false,
-    });
     await runPanelAction(
-      locale === "zh" ? "正在办理退房" : "Depart en cours",
       () => checkOut(booking!.id, {
         actualCheckOut: booking?.checkout_mode === "open" ? actualCheckOut : undefined,
         discountAmount: disc || undefined,
         discountReason: discountReason || undefined,
       }),
-      { closeImmediately: true },
+      { closeOnSuccess: true },
     );
   };
 
   const handleSuppPayment = async () => {
     const amt = toN(suppAmount);
     if (amt <= 0) return;
-    const optimisticPaid = totalPaid + amt;
-    onPaymentAdded?.(makeOptimisticPayment(amt, suppPaymentDate || new Date().toISOString().slice(0, 10)));
-    onBookingPatched?.(booking!.id, {
-      prepaid_amount_xof: optimisticPaid,
-      billing_status: optimisticPaid >= finalDue ? "settled" : "partially_paid",
-    });
     await runPanelAction(
-      locale === "zh" ? "正在记录收款" : "Paiement en cours",
       () => recordSupplementaryPayment({
         bookingId: booking!.id,
         amount: amt,
         paymentDate: suppPaymentDate || undefined,
         receiptNo: suppReceiptNo || undefined,
+        requestId: crypto.randomUUID(),
       }),
-      { closeImmediately: true, clearAdvancedTask: true },
+      { closeOnSuccess: true, clearAdvancedTask: true },
     );
     setSuppAmount("");
   };
 
-  const handleOptimisticDiscount = async () => {
+  const handleDiscount = async () => {
     const amt = toN(discountAmount);
     if (amt <= 0) return;
-    const nextFinal = Math.max(0, finalDue - amt);
-    onBookingPatched?.(booking!.id, {
-      manual_discount_amount_xof: amt,
-      manual_discount_reason: discountReason || "手动优惠",
-      final_amount_xof: nextFinal,
-      billing_status: totalPaid >= nextFinal ? "settled" : totalPaid > 0 ? "partially_paid" : "need_top_up",
-    });
     await runPanelAction(
-      locale === "zh" ? "正在应用优惠" : "Remise en cours",
       () => applyDiscount({ bookingId: booking!.id, amount: amt, reason: discountReason || "手动优惠" }),
-      { closeImmediately: true, clearAdvancedTask: true },
+      { closeOnSuccess: true, clearAdvancedTask: true },
     );
     setDiscountAmount("");
     setDiscountReason("");
@@ -354,17 +281,9 @@ export function BookingPanel({
     const days = toN(extendDays) || 1;
     const extraAmount = Math.round(Number(booking!.nightly_price_xof) * days);
     const nextCheckOut = booking!.check_out ? addDays(booking!.check_out, days) : "";
-    const nextFinal = finalDue + extraAmount;
-    onBookingPatched?.(booking!.id, {
-      check_out: nextCheckOut,
-      total_amount_xof: nextFinal,
-      final_amount_xof: nextFinal,
-      billing_status: totalPaid >= nextFinal ? "settled" : totalPaid > 0 ? "partially_paid" : "need_top_up",
-    });
     await runPanelAction(
-      locale === "zh" ? "正在续住" : "Prolongation en cours",
-      () => extendStay(booking!.id, nextCheckOut, days, extraAmount),
-      { closeImmediately: true },
+      () => extendStay(booking!.id, nextCheckOut, days, extraAmount, crypto.randomUUID()),
+      { closeOnSuccess: true },
     );
   };
 
@@ -375,48 +294,30 @@ export function BookingPanel({
 
   const handleSetFixedCheckout = async () => {
     if (!fixedCheckOutDate) { setActionError(formatError("checkOutRequired")); return; }
-    const nextFinal = fixedCheckOutNights * Number(booking!.nightly_price_xof);
-    onBookingPatched?.(booking!.id, {
-      checkout_mode: "fixed",
-      check_out: fixedCheckOutDate,
-      actual_check_out: null,
-      total_amount_xof: nextFinal,
-      final_amount_xof: nextFinal,
-      billing_status: totalPaid >= nextFinal ? "settled" : totalPaid > 0 ? "partially_paid" : "need_top_up",
-    });
     await runPanelAction(
-      locale === "zh" ? "正在设置退房日" : "Date de depart en cours",
       () => setFixedCheckout(booking!.id, fixedCheckOutDate),
-      { closeImmediately: true },
+      { closeOnSuccess: true },
     );
   };
 
   // ── Backfill handler ──
   const handleConfirmBooking = async () => {
-    onBookingPatched?.(booking!.id, { status: "confirmed" });
-    onUnitStatusPatched?.(booking!.unit_id, "reserved");
     await runPanelAction(
-      locale === "zh" ? "正在确认预订" : "Confirmation en cours",
       () => confirmBooking(booking!.id),
-      { closeImmediately: true },
+      { closeOnSuccess: true },
     );
   };
 
   const handleCancelBooking = async () => {
-    onBookingPatched?.(booking!.id, { status: "cancelled" });
-    onUnitStatusPatched?.(booking!.unit_id, "available");
     await runPanelAction(
-      locale === "zh" ? "正在取消预订" : "Annulation en cours",
       () => cancelBooking(booking!.id),
-      { closeImmediately: true },
+      { closeOnSuccess: true },
     );
   };
 
   const handleCompleteCleaning = async () => {
     if (!effectiveCleaningTask) return;
-    onCleaningTaskCompleted?.(effectiveCleaningTask.id, effectiveCleaningTask.unit_id, "available");
     await runPanelAction(
-      locale === "zh" ? "正在完成保洁" : "Menage en cours",
       async () => {
         const result = await completeCleaning(effectiveCleaningTask.id);
         if (result.success && result.taskId && result.unitId && result.unitStatus) {
@@ -424,8 +325,33 @@ export function BookingPanel({
         }
         return result;
       },
-      { closeImmediately: true },
+      { closeOnSuccess: true },
     );
+  };
+
+  const handleReversePayment = async () => {
+    if (!deleteTarget || !reversalReason.trim()) return;
+    setSaving(true);
+    setActionError("");
+    try {
+      const result = await reversePayment({
+        paymentId: deleteTarget.id,
+        reason: reversalReason.trim(),
+        requestId: crypto.randomUUID(),
+      });
+      if (!result.success) {
+        setActionError(formatError(result.error ?? "unknownError"));
+        return;
+      }
+      if (result.data) onOperationSnapshot?.(result.data);
+      else refresh();
+      setDeleteTarget(null);
+      setReversalReason("");
+    } catch (operationError) {
+      setActionError(formatError(operationError instanceof Error ? operationError.message : "unknownError"));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const bfNights = useMemo(() => {
@@ -434,14 +360,13 @@ export function BookingPanel({
   }, [bfCheckIn, bfCheckOut]);
   const bfTotal = bfNights * (parseInt(bfNightlyPrice, 10) || 0);
 
-  const handleOptimisticBackfillCreate = async () => {
+  const handleBackfillCreate = async () => {
     if (!bfUnitId) { setBfError(locale === "zh" ? "请选择房间。" : "Veuillez choisir une chambre."); return; }
     if (!bfCustomerId) { setBfError(t.booking.noCustomer); return; }
     if (!bfCheckIn || !bfCheckOut) { setBfError(formatError("invalidDateRange")); return; }
     if (!bfReason) { setBfError(locale === "zh" ? "请填写补录原因。" : "Veuillez indiquer la raison du backfill."); return; }
     setBfError("");
     await runPanelAction(
-      locale === "zh" ? "正在补录历史入住" : "Backfill en cours",
       async () => {
         const result = await createBackfillBooking({
           unitId: bfUnitId, customerId: bfCustomerId,
@@ -455,7 +380,7 @@ export function BookingPanel({
         if (!result.success) setBfError(formatError(result.error));
         return result;
       },
-      { closeImmediately: true },
+      { closeOnSuccess: true },
     );
   };
 
@@ -477,12 +402,6 @@ export function BookingPanel({
         </div>
 
         <div className="space-y-4 px-5 py-5">
-          {pendingActionLabel && (
-            <span className="sr-only" role="status" aria-live="polite">
-              {pendingActionLabel}
-            </span>
-          )}
-
           {/* New Booking */}
           {isNew && (<>
             <div>
@@ -579,7 +498,7 @@ export function BookingPanel({
                 <textarea value={bfNotes} onChange={e => setBfNotes(e.target.value)} rows={2} className={cn(inputClass, "resize-none overflow-hidden")} />
               </div>
               {bfError && <p className="text-sm text-accentRed-600" role="alert">{bfError}</p>}
-              <Button onClick={handleOptimisticBackfillCreate} disabled={saving} className="w-full" variant="default">
+              <Button onClick={handleBackfillCreate} disabled={saving} className="w-full" variant="default">
                 {saving ? "..." : (locale === "zh" ? "确认补录" : "Confirmer le backfill")}
               </Button>
             </div>
@@ -832,15 +751,22 @@ export function BookingPanel({
                                 </div>
                                 {bookingPayments.length > 0 && (
                                   <ul className="mt-2 space-y-1 text-xs text-foreground/70">
-                                    {bookingPayments.map(p => (
+                                    {bookingPayments.filter((payment) => Number(payment.amount) > 0).map(p => (
                                       <li key={p.id} className="flex items-center justify-between rounded-md bg-muted/50 px-2 py-1 group">
                                         <span>{p.payment_date} <span className="font-semibold">{formatXof(Number(p.amount))}</span></span>
-                                        <button
-                                          type="button"
-                                          className="rounded p-0.5 text-muted-foreground/70 opacity-60 transition hover:bg-accentRed-50 hover:text-accentRed-600 group-hover:opacity-100"
-                                          onClick={() => setDeleteTarget({ id: p.id, amount: Number(p.amount) })}
-                                          title={locale === "zh" ? "删除此收款" : "Supprimer ce paiement"}
-                                        ><Trash2 className="h-3 w-3" /></button>
+                                        {reversedPaymentIds.has(p.id) ? (
+                                          <span className="text-[11px] text-muted-foreground">{locale === "zh" ? "已冲销" : "Annule"}</span>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            className="rounded p-0.5 text-muted-foreground/70 opacity-60 transition hover:bg-accentRed-50 hover:text-accentRed-600 group-hover:opacity-100"
+                                            onClick={() => {
+                                              setDeleteTarget({ id: p.id, amount: Number(p.amount) });
+                                              setReversalReason("");
+                                            }}
+                                            title={locale === "zh" ? "冲销此收款" : "Annuler ce paiement"}
+                                          ><Trash2 className="h-3 w-3" /></button>
+                                        )}
                                       </li>
                                     ))}
                                   </ul>
@@ -854,7 +780,7 @@ export function BookingPanel({
                                   <input type="number" value={discountAmount} onChange={e => setDiscountAmount(e.target.value)} className={inputClass} placeholder={t.discountAmount} />
                                   <input type="text" value={discountReason} onChange={e => setDiscountReason(e.target.value)} className={inputClass} placeholder={t.discountReason} />
                                 </div>
-                                <Button variant="secondary" size="sm" onClick={handleOptimisticDiscount} disabled={saving || (parseInt(discountAmount,10)||0) <= 0} className="w-full"><Percent className="h-3 w-3 mr-1" />{t.applyDiscount}</Button>
+                                <Button variant="secondary" size="sm" onClick={handleDiscount} disabled={saving || (parseInt(discountAmount,10)||0) <= 0} className="w-full"><Percent className="h-3 w-3 mr-1" />{t.applyDiscount}</Button>
                               </div>
                             )}
 
@@ -956,28 +882,33 @@ export function BookingPanel({
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() => {
-          if (!deleteTarget) return;
-          const target = deleteTarget;
-          const label = locale === "zh" ? "\u6b63\u5728\u5220\u9664\u6536\u6b3e" : "Suppression en cours";
-          void runOptimisticOperation(label, () => deletePayment(target.id), {
-            background: true,
-            release: () => setDeleteTarget(null),
-            onSuccess: (result) => {
-              if (result?.data) onOperationSnapshot?.(result.data as DailyOperationSnapshot);
-            },
-            shouldRefresh: (result) => !result?.data,
-          });
+        onClose={() => {
+          if (saving) return;
+          setDeleteTarget(null);
+          setReversalReason("");
         }}
-        title={locale === "zh" ? "删除收款记录" : "Supprimer le paiement"}
+        onConfirm={() => void handleReversePayment()}
+        title={locale === "zh" ? "冲销收款记录" : "Annuler le paiement"}
         description={deleteTarget
-          ? (locale === "zh" ? `确认删除这笔 ${formatXof(deleteTarget.amount)} 的收款？此操作不可撤销。` : `Confirmer la suppression de ce paiement de ${formatXof(deleteTarget.amount)} ? Cette action est irreversible.`)
+          ? (locale === "zh"
+              ? `原收款 ${formatXof(deleteTarget.amount)} 将被保留，并新增等额冲销流水。`
+              : `Le paiement original de ${formatXof(deleteTarget.amount)} sera conserve avec une ecriture d'annulation.`)
           : ""}
-        confirmLabel={locale === "zh" ? "确认删除" : "Supprimer"}
+        confirmLabel={locale === "zh" ? "确认冲销" : "Confirmer"}
         locale={locale}
-        loading={false}
-      />
+        loading={saving}
+        confirmDisabled={!reversalReason.trim()}
+      >
+        <div className="mb-4">
+          <label className={labelClass}>{locale === "zh" ? "冲销原因（必填）" : "Motif obligatoire"}</label>
+          <textarea
+            value={reversalReason}
+            onChange={(event) => setReversalReason(event.target.value)}
+            className={cn(inputClass, "min-h-20 resize-y py-2")}
+            placeholder={locale === "zh" ? "例如：重复收款、金额录入错误" : "Ex. doublon ou montant incorrect"}
+          />
+        </div>
+      </ConfirmDialog>
     </>
   );
 }

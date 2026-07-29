@@ -50,17 +50,16 @@ const audit = read(join(features, "daily-rental-audit.ts"));
 const repair = read(join(features, "daily-rental-repair.ts"));
 const bookingPanel = read(join(features, "booking-panel.tsx"));
 const atomicCreateMigration = read(join(root, "supabase", "migrations", "202607280001_atomic_daily_booking_create.sql"));
+const atomicFinanceMigration = read(join(root, "supabase", "migrations", "202607290001_atomic_daily_finance_operations.sql"));
 
 const createBookingBody = functionSection(actions, "createBooking");
 const createBackfillBody = functionSection(actions, "createBackfillBooking");
 const checkInBody = functionSection(actions, "checkIn");
-const deletePaymentBody = functionSection(actions, "deletePayment");
+const recordPaymentBody = functionSection(actions, "recordSupplementaryPayment");
+const reversePaymentBody = functionSection(actions, "reversePayment");
+const checkOutBody = functionSection(actions, "checkOut");
+const extendStayBody = functionSection(actions, "extendStay");
 const cancelBookingBody = functionSection(actions, "cancelBooking");
-
-check(actions.includes("allowCheckIn"), "actions.ts imports allowCheckIn");
-check(actions.includes("syncBookingFinance"), "actions.ts imports syncBookingFinance");
-check(actions.includes("insertLedgerEntry"), "actions.ts imports insertLedgerEntry");
-check(actions.includes("reverseLedgerEntriesForPayment"), "actions.ts imports reverseLedgerEntriesForPayment");
 
 check(createBookingBody.includes('rpc("daily_create_booking_rpc"'), "createBooking uses the atomic database RPC");
 check(createBookingBody.includes("p_request_id: input.requestId"), "createBooking sends an idempotency request id");
@@ -76,15 +75,26 @@ check(createBackfillBody.includes("backfillMustBePastDate"), "createBackfillBook
 check(!/from\(["']units["']\)\s*\.update/.test(createBackfillBody), "createBackfillBooking does not update units.status");
 check(createBackfillBody.includes("[\u5386\u53f2\u8865\u5f55]"), "createBackfillBooking prefixes notes with [historical backfill]");
 
-check(hasCall(checkInBody, "allowCheckIn"), "checkIn calls allowCheckIn");
-check(checkInBody.includes("cleaning_tasks") || checkInBody.includes("hasOpenCleaningTask"), "checkIn checks open cleaning tasks");
-check(checkInBody.includes("otherCheckedIn") || checkInBody.includes("otherCheckedInCount"), "checkIn checks other checked-in bookings");
-check(checkInBody.includes("syncBookingFinance"), "checkIn syncs booking finance after payment changes");
+check(checkInBody.includes('rpc("daily_check_in_booking_rpc"'), "checkIn uses the atomic database RPC");
+check(recordPaymentBody.includes('rpc("daily_record_payment_rpc"'), "supplementary payment uses the atomic database RPC");
+check(recordPaymentBody.includes("p_request_id: input.requestId"), "supplementary payment sends an idempotency request id");
+check(reversePaymentBody.includes('rpc("daily_reverse_payment_rpc"'), "payment correction uses a reversal RPC");
+check(reversePaymentBody.includes("p_reason: input.reason"), "payment reversal requires a reason");
+check(!actions.includes('.from("payments").delete'), "daily actions never physically delete payment records");
+check(checkOutBody.includes('rpc("daily_check_out_booking_rpc"'), "check-out uses the atomic database RPC");
+check(extendStayBody.includes('rpc("daily_extend_stay_rpc"'), "stay extension uses the atomic database RPC");
+check(extendStayBody.includes("p_request_id: requestId"), "stay extension sends an idempotency request id");
+check(cancelBookingBody.includes('rpc("daily_cancel_booking_rpc"'), "cancellation uses the atomic database RPC");
 
-check(deletePaymentBody.includes("reverseLedgerEntriesForPayment"), "deletePayment reverses ledger entries");
-check(deletePaymentBody.includes("syncBookingFinance"), "deletePayment syncs booking finance");
-check(cancelBookingBody.includes("cancelReceivablesForSource"), "cancelBooking cancels receivables");
-check(cancelBookingBody.includes("reverseLedgerEntriesForPayment"), "cancelBooking reverses payment ledger entries");
+check(atomicFinanceMigration.includes("where request_id = p_request_id"), "daily payment RPCs reuse the global payment idempotency key");
+check(atomicFinanceMigration.includes("requestIdConflict"), "daily finance RPCs reject request id conflicts");
+check(atomicFinanceMigration.includes("paymentExceedsOutstanding"), "daily finance RPCs reject overpayment");
+check(atomicFinanceMigration.includes("reversal_of_payment_id"), "payment reversal retains a link to the original payment");
+check(atomicFinanceMigration.includes("reversalReasonRequired"), "payment reversal requires a reason in the database");
+check(!atomicFinanceMigration.includes("delete from public.payments"), "daily finance migration never deletes payment history");
+check(atomicFinanceMigration.includes("checkoutMustCreateCleaning"), "check-out always creates a cleaning state");
+check(atomicFinanceMigration.includes("daily_operation_requests"), "non-payment additive operations have idempotency records");
+check(atomicFinanceMigration.includes("if v_paid <> 0 then raise exception 'bookingHasPayments'"), "paid bookings cannot be directly cancelled");
 
 check(policy.includes("export function allowCreateBooking"), "daily-rental-policy exports allowCreateBooking");
 check(policy.includes("export function allowCheckIn"), "daily-rental-policy exports allowCheckIn");

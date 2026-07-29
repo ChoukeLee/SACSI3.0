@@ -4,6 +4,7 @@ import { AlertTriangle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
+import type { ReactNode } from "react";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -15,6 +16,8 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   locale: Locale;
   loading?: boolean;
+  confirmDisabled?: boolean;
+  children?: ReactNode;
 }
 
 export function ConfirmDialog({
@@ -27,6 +30,8 @@ export function ConfirmDialog({
   cancelLabel,
   locale,
   loading = false,
+  confirmDisabled = false,
+  children,
 }: ConfirmDialogProps) {
   if (!open) return null;
 
@@ -56,6 +61,8 @@ export function ConfirmDialog({
           </div>
         </div>
 
+        {children}
+
         <div className="flex gap-3 justify-end">
           <Button variant="ghost" size="sm" onClick={onClose} disabled={loading}>
             {cancelLabel ?? t.cancel}
@@ -64,7 +71,7 @@ export function ConfirmDialog({
             variant="default"
             size="sm"
             onClick={onConfirm}
-            disabled={loading}
+            disabled={loading || confirmDisabled}
           >
             {confirmLabel ?? t.confirm}
           </Button>

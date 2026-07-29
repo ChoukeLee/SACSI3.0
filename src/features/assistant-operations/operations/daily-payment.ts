@@ -83,7 +83,12 @@ export const dailyPaymentOperation: AssistantOperationHandler = {
     for (const change of draft.changes.filter((item) => item.table === "payments")) {
       const bookingId = String(change.after?.source_id ?? "");
       if (!bookingId) continue;
-      const result = await recordSupplementaryPayment({ bookingId, amount, paymentDate });
+      const result = await recordSupplementaryPayment({
+        bookingId,
+        amount,
+        paymentDate,
+        requestId: crypto.randomUUID(),
+      });
       if (!result.success) return { success: false, action: "daily_payment", message: result.error ?? "收款失败", affectedRecords, metadata: { failedBookingId: bookingId } };
       affectedRecords.push(change);
     }

@@ -143,7 +143,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
       switch(popupAction) {
         case "checkin": result=await checkIn(selectedRoom.booking.id,popupAmount); break;
         case "checkout": result=await checkoutAction(selectedRoom.booking.id,{}); break;
-        case "payment": result=await recordSupplementaryPayment({bookingId:selectedRoom.booking.id,amount:popupAmount,receiptNo:popupReceiptNo||undefined}); break;
+        case "payment": result=await recordSupplementaryPayment({bookingId:selectedRoom.booking.id,amount:popupAmount,receiptNo:popupReceiptNo||undefined,requestId:crypto.randomUUID()}); break;
         case "cancel": result=await cancelBooking(selectedRoom.booking.id); break;
         case "confirm": result=await confirmBooking(selectedRoom.booking.id); break;
       }
@@ -167,7 +167,7 @@ export function FrontDeskWorkspace({ dailyUnits, bookings, customers, payments, 
       switch(action) {
         case "checkin": result=await checkIn(room.booking!.id,amount); break;
         case "checkout": result=await checkoutAction(room.booking!.id,{}); break;
-        case "payment": result=await recordSupplementaryPayment({bookingId:room.booking!.id,amount,receiptNo:receiptNo||undefined}); break;
+        case "payment": result=await recordSupplementaryPayment({bookingId:room.booking!.id,amount,receiptNo:receiptNo||undefined,requestId:crypto.randomUUID()}); break;
         case "cancel": result=await cancelBooking(room.booking!.id); break;
         case "confirm": result=await confirmBooking(room.booking!.id); break;
       }

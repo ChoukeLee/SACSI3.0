@@ -143,7 +143,11 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
       } else if (currentAction.type === "payment" && currentRoom.booking && amount) {
         const amt = Math.round(Number(amount));
         if (amt <= 0) return { success: false, error: "Invalid amount" };
-        await recordSupplementaryPayment({ bookingId: currentRoom.booking.id, amount: amt });
+        await recordSupplementaryPayment({
+          bookingId: currentRoom.booking.id,
+          amount: amt,
+          requestId: crypto.randomUUID(),
+        });
       } else if (currentAction.type === "cleaning" && currentRoom.cleaningTask) {
         const result = await completeCleaning(currentRoom.cleaningTask.id);
         if (result.success && result.taskId && result.unitId && result.unitStatus) {
@@ -161,7 +165,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
         const oldDate = new Date(currentCheckOut);
         const extraNights = Math.max(1, Math.ceil((newDate.getTime() - oldDate.getTime()) / (1000 * 60 * 60 * 24)));
         const extraAmount = Math.round(extraNights * Number(currentRoom.booking.nightly_price_xof));
-        await extendStay(currentRoom.booking.id, checkoutDate, extraNights, extraAmount);
+        await extendStay(currentRoom.booking.id, checkoutDate, extraNights, extraAmount, crypto.randomUUID());
       }
     }, {
       background: true,

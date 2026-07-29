@@ -8,8 +8,6 @@ import { cn, formatXof, normalizeFloorLabel, floorSortValue } from "@/lib/utils"
 import { COPY, BOOKING_STATUS_LABELS } from "./calendar-constants";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl, StatTile } from "@/components/ui/operational";
-import { OperationStatusBanner } from "@/components/operation-status-banner";
-import { useBackgroundOperationStatus } from "@/hooks/use-optimistic-operation";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import { BookingPanel } from "./booking-panel";
@@ -35,7 +33,13 @@ interface CalendarProps {
   bookings: DailyBookingRow[];
   customers: CustomerSummary[];
   cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[];
-  payments: { id: string; source_id: string; amount: number; payment_date: string }[];
+  payments: {
+    id: string;
+    source_id: string;
+    amount: number;
+    payment_date: string;
+    reversal_of_payment_id?: string | null;
+  }[];
   locale: Locale;
   userRole?: string;
 }
@@ -76,11 +80,16 @@ export function DailyCalendar({
   const [tick, setTick] = useState(0);
   const [optimisticBookings, setOptimisticBookings] = useState<DailyBookingRow[]>([]);
   const [optimisticBookingPatches, setOptimisticBookingPatches] = useState<Map<string, Partial<DailyBookingRow>>>(() => new Map());
-  const [optimisticPayments, setOptimisticPayments] = useState<{ id: string; source_id: string; amount: number; payment_date: string }[]>([]);
+  const [optimisticPayments, setOptimisticPayments] = useState<{
+    id: string;
+    source_id: string;
+    amount: number;
+    payment_date: string;
+    reversal_of_payment_id?: string | null;
+  }[]>([]);
   const [optimisticCleaningTasks, setOptimisticCleaningTasks] = useState<{ id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[]>([]);
   const [optimisticCompletedCleaningIds, setOptimisticCompletedCleaningIds] = useState<Set<string>>(() => new Set());
   const [optimisticUnitStatuses, setOptimisticUnitStatuses] = useState<Map<string, UnitStatus>>(() => new Map());
-  const { operation: backgroundOperation, reportOperation: reportBackgroundOperation } = useBackgroundOperationStatus();
   const [cleaningTarget, setCleaningTarget] = useState<{ taskId: string; unitNo: string } | null>(null);
   const [cleaningLoading, setCleaningLoading] = useState(false);
   const calendarViewportRef = useRef<HTMLDivElement | null>(null);
@@ -259,6 +268,7 @@ export function DailyCalendar({
             source_id: payment.source_id ?? "",
             amount: Number(payment.amount),
             payment_date: payment.payment_date,
+            reversal_of_payment_id: payment.reversal_of_payment_id ?? null,
           })),
           ...withoutBookingPayments.filter((payment) => !snapshotIds.has(payment.id)),
         ];
@@ -537,7 +547,6 @@ export function DailyCalendar({
 
   return (
     <div data-daily-calendar-root className="relative isolate space-y-5">
-      <OperationStatusBanner operation={backgroundOperation} locale={locale} />
       <section className="relative z-20 overflow-hidden rounded-xl border border-border bg-card shadow-card">
         <div className="flex flex-col gap-3 border-b border-border px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -789,24 +798,8 @@ export function DailyCalendar({
             setNewBookingDate(null);
             clearOptimisticState();
           }}
-          onOptimisticClose={() => {
-            setSelectedBookingId(null);
-            setNewBookingUnitId(null);
-            setNewBookingDate(null);
-          }}
           onChanged={() => { setTick((t) => t + 1); }}
           onBookingCreated={(booking) => setOptimisticBookings((prev) => [booking, ...prev])}
-          onBookingPatched={(bookingId, patch) => setOptimisticBookingPatches((prev) => {
-            const next = new Map(prev);
-            next.set(bookingId, { ...(next.get(bookingId) ?? {}), ...patch });
-            return next;
-          })}
-          onUnitStatusPatched={(targetUnitId, status) => setOptimisticUnitStatuses((prev) => {
-            const next = new Map(prev);
-            next.set(targetUnitId, status);
-            return next;
-          })}
-          onCleaningTaskAdded={(task) => setOptimisticCleaningTasks((prev) => [task, ...prev])}
           onCleaningTaskCompleted={(taskId, targetUnitId, status) => {
             setOptimisticCompletedCleaningIds((prev) => {
               const next = new Set(prev);
@@ -819,12 +812,7 @@ export function DailyCalendar({
               return next;
             });
           }}
-          onPaymentAdded={(payment) => setOptimisticPayments((prev) => [payment, ...prev])}
           onOperationSnapshot={applyOperationSnapshot}
-          onOptimisticReset={() => {
-            clearOptimisticState();
-          }}
-          onBackgroundOperation={reportBackgroundOperation}
         />
       )}
 

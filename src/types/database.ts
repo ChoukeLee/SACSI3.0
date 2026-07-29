@@ -189,6 +189,10 @@ export interface PaymentRow {
   exchange_rate_to_xof: number;
   receipt_no: string | null;
   notes: string | null;
+  request_id?: string | null;
+  request_kind?: string | null;
+  reversal_of_payment_id?: string | null;
+  reversal_reason?: string | null;
   created_at: string;
 }
 
