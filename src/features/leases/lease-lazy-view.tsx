@@ -1,7 +1,13 @@
 "use client";
 
-import { LeaseLedger } from "@/features/leases/lease-ledger";
+import dynamic from "next/dynamic";
+import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
 
-export function LeaseLazyView(props: React.ComponentProps<typeof LeaseLedger>) {
-  return <LeaseLedger {...props} />;
+const LeaseList = dynamic(() => import("@/features/leases/lease-list").then((mod) => ({ default: mod.LeaseList })), {
+  loading: () => <OperationalPageSkeleton kind="records" rows={8} />,
+  ssr: false,
+});
+
+export function LeaseLazyView(props: React.ComponentProps<typeof LeaseList>) {
+  return <LeaseList {...props} />;
 }

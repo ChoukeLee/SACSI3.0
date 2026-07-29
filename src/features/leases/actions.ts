@@ -538,7 +538,7 @@ async function recordReceivablePayment(input: {
 
 // ── Move-out settlement (enhanced) ──
 
-async function processMoveOut(input: {
+export async function processMoveOut(input: {
   contractId: string;
   actualEndDate: string;
   unpaidRentXof: number;
