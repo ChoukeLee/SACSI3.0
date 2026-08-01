@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, X, AlertTriangle, FileText, DollarSign, LogOut, Printer, Eye, CalendarClock, Phone, ChevronRight } from "lucide-react";
+import { Plus, AlertTriangle, FileText, DollarSign, LogOut, Printer, Eye, CalendarClock, Phone, ChevronRight } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
@@ -14,7 +14,7 @@ import { RoomCard } from "@/components/room-card";
 import { RoomBoard } from "@/components/room-board";
 import { RoomLegend } from "@/components/room-legend";
 import { EmptyState } from "@/components/empty-state";
-import { FilterBar, SegmentedControl, controlClass } from "@/components/ui/operational";
+import { FilterBar, MetricGrid, OperationalPage, RightDrawer, SegmentedControl, StatTile, controlClass } from "@/components/ui/operational";
 import type { RoomVisualStatus } from "@/lib/status-styles";
 import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
@@ -133,7 +133,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const [panel, setPanel] = useState<PanelType>(null);
   const [attentionTab, setAttentionTab] = useState<AttentionTab>("overdue");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [error, setError] = useState(""); const [saving, setSaving] = useState(false); const [genMsg, setGenMsg] = useState("");
+  const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
   const [fContractNo, setFContractNo] = useState(""); const [fUnitId, setFUnitId] = useState(""); const [fCustomerId, setFCustomerId] = useState("");
   const [fStartDate, setFStartDate] = useState(""); const [fEndDate, setFEndDate] = useState(""); const [fCycle, setFCycle] = useState("monthly");
   const [fPayDay, setFPayDay] = useState(5); const [fRent, setFRent] = useState(0); const [fDeposit, setFDeposit] = useState(0);
@@ -147,6 +147,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const [financePaidThrough, setFinancePaidThrough] = useState("");
   const [financeMethod, setFinanceMethod] = useState<"cash" | "check" | "bank_transfer" | "offset" | "other">("other");
   const [financeNotes, setFinanceNotes] = useState("");
+  const financeRequestIdRef = useRef<string | null>(null);
 
   // Building switcher
   const [activeBuildingId, setActiveBuildingId] = useState<string>(() => (
@@ -400,21 +401,21 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     setFinancePaidThrough("");
     setFinanceMethod("other");
     setFinanceNotes("");
+    financeRequestIdRef.current = null;
     setError("");
-    setGenMsg("");
     setPanel("financeEntry");
   };
   const openMoveOut = (id: string) => { setSelectedId(id); setPanel("moveout"); setError(""); const os = receivableStats.outstanding; setMoUnpaid(os > 0 ? os : 0); setMoEndDate(new Date().toISOString().slice(0,10)); };
 
   const handleCreate = async () => { /* ... all existing validation logic kept ... */
     if (!fUnitId || !fCustomerId || !fStartDate || !fEndDate) { setError(locale==="zh"?"请填写必填字段":"Champs obligatoires"); return; }
-    setSaving(true); setError(""); setGenMsg(locale==="zh"?"正在后台新建合同":"Creation en arriere-plan"); setPanel(null);
+    setSaving(true); setError("");
     const result = await createLeaseContract({ unitId:fUnitId, customerId:fCustomerId, contractNo:generatedLeaseContractNo, startDate:fStartDate, expectedEndDate:fEndDate, paymentCycle:fCycle as never, paymentDay:fPayDay, monthlyRentXof:fRent, depositAmountXof:fDeposit, depositReceived:fDepositReceived, rentFreeDays:fFreeDays, signerName:fSigner||undefined, status:fStatus });
-    setSaving(false); if(result.success) { resetNewForm(); setGenMsg(locale==="zh"?"合同已创建":"Contrat cree"); } else { setPanel("new"); setGenMsg(""); setError(result.error??"Failed"); }
+    setSaving(false); if(result.success) { resetNewForm(); setPanel(null); router.refresh(); } else { setError(result.error??"Failed"); }
   };
-  const handleActivate = async (id: string) => { setSaving(true); setError(""); setGenMsg(locale==="zh"?"正在后台激活合同":"Activation en arriere-plan"); const result = await activateContract(id); setSaving(false); if(!result.success) { setGenMsg(""); setError(result.error??"Failed"); } else setGenMsg(locale==="zh"?"合同已激活，应收已自动生成":"Contrat active, echeances generees"); };
-  const handleTerminate = async (id: string) => { setSaving(true); setError(""); setGenMsg(locale==="zh"?"正在后台终止合同":"Resiliation en arriere-plan"); const result = await terminateContract(id); setSaving(false); if(!result.success) { setGenMsg(""); setError(result.error??"Failed"); } else setGenMsg(locale==="zh"?"合同已终止":"Contrat resilie"); };
-  const handleMoveOut = async () => { if(!selectedId)return;const currentId=selectedId;setSaving(true);setError("");setGenMsg(locale==="zh"?"正在后台办理退租":"Sortie en arriere-plan");setPanel(null);const result=await processMoveOut({contractId:currentId,actualEndDate:moEndDate,unpaidRentXof:moUnpaid,utilityCleared:moUtility,depositDeductionXof:moDeduction,depositRefundXof:moRefund});setSaving(false);if(result.success)setGenMsg(locale==="zh"?"退租已办理":"Sortie traitee");else {setPanel("moveout");setGenMsg("");setError(result.error??"Failed");}};
+  const handleActivate = async (id: string) => { setSaving(true); setError(""); const result = await activateContract(id); setSaving(false); if(!result.success) setError(result.error??"Failed"); else router.refresh(); };
+  const handleTerminate = async (id: string) => { setSaving(true); setError(""); const result = await terminateContract(id); setSaving(false); if(!result.success) setError(result.error??"Failed"); else router.refresh(); };
+  const handleMoveOut = async () => { if(!selectedId)return;const currentId=selectedId;setSaving(true);setError("");const result=await processMoveOut({contractId:currentId,actualEndDate:moEndDate,unpaidRentXof:moUnpaid,utilityCleared:moUtility,depositDeductionXof:moDeduction,depositRefundXof:moRefund});setSaving(false);if(result.success){setPanel(null);router.refresh();}else setError(result.error??"Failed");};
   const handleFinanceEntry = async () => {
     if (!selectedId) return;
     if (financeAmountWan <= 0) {
@@ -427,6 +428,8 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     }
     setSaving(true);
     setError("");
+    const requestId = financeRequestIdRef.current ?? crypto.randomUUID();
+    financeRequestIdRef.current = requestId;
     const result = await recordLeaseFinancialEntry({
       contractId: selectedId,
       businessType: financeType,
@@ -435,10 +438,11 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       paidThroughDate: financePaidThrough || undefined,
       paymentMethod: financeMethod,
       notes: financeNotes || undefined,
+      requestId,
     });
     setSaving(false);
     if (result.success) {
-      setGenMsg(locale === "zh" ? `财务记录已保存：${result.referenceNo}` : `Écriture enregistrée : ${result.referenceNo}`);
+      financeRequestIdRef.current = null;
       setPanel("detail");
       router.refresh();
     } else {
@@ -474,49 +478,29 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   ];
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* ── Page chrome ── */}
-      <div className="flex flex-col gap-1">
-        <p className="text-xs font-medium text-muted-foreground">
-          {locale === "zh" ? "长租业务" : "Baux"}
-        </p>
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-xl font-semibold tracking-tight">
-            {locale === "zh" ? "长租合同" : "Contrats de location"}
-          </h1>
-          <span className="text-sm text-muted-foreground tabular-nums">
-            {filteredByBuilding.length} {locale==="fr"?"contrats":"份合同"}
-          </span>
-        </div>
-      </div>
+    <OperationalPage
+      eyebrow={locale === "zh" ? "租赁业务" : "Location"}
+      title={locale === "zh" ? "长租合同" : "Contrats de location"}
+      description={`${filteredByBuilding.length} ${locale === "zh" ? "份合同 · 以实际收款和未结应收为准" : "contrats · encaissements réels"}`}
+      action={canCreate ? <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" />{t.form.newContract}</Button> : undefined}
+    >
 
       {/* ── Summary stats ── */}
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+      <MetricGrid columns={5}>
         {statBlocks.map(b => (
-          <button
+          <StatTile
             key={b.key}
-            type="button"
+            label={b.label}
+            value={b.value}
+            caption={panel === "insight" && statFilter === b.key ? (locale === "zh" ? "明细已打开" : "Détail ouvert") : b.hint}
+            tone={b.key === "overdue" ? "red" : b.key === "dueSoon" ? "amber" : b.key === "currentDue" ? "purple" : b.key === "active" ? "green" : "blue"}
             onClick={() => {
               openInsight(b.key);
             }}
-            aria-pressed={panel === "insight" && statFilter === b.key}
-            title={b.hint}
-            className={cn(
-              "flex min-h-[76px] flex-col rounded-xl border bg-card p-3 text-left text-card-foreground shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60",
-              panel === "insight" && statFilter === b.key ? "border-foreground/20 ring-1 ring-foreground/10" : "border-border",
-            )}
-          >
-            <div className="flex min-w-0 items-center justify-between gap-3 pb-2">
-              <p className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">{b.label}</p>
-              <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", b.dot)} />
-            </div>
-            <p className="text-lg font-semibold leading-none tabular-nums text-foreground">{b.value}</p>
-            <span className={cn("mt-2 text-[11px] font-medium", panel === "insight" && statFilter === b.key ? "text-foreground" : "text-muted-foreground")}>
-              {panel === "insight" && statFilter === b.key ? (locale === "zh" ? "已打开" : "Ouvert") : b.hint}
-            </span>
-          </button>
+            active={panel === "insight" && statFilter === b.key}
+          />
         ))}
-      </div>
+      </MetricGrid>
 
       {/* ── Building switcher ── */}
       {buildings.length > 1 && (
@@ -537,7 +521,6 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
         meta={
           <div className="flex items-center gap-3">
             <span>{filtered.length}/{filteredByBuilding.length} {locale === "fr" ? "contrats" : "份合同"}</span>
-            {canCreate && <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" />{t.form.newContract}</Button>}
           </div>
         }
       >
@@ -853,7 +836,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       {panel==="detail"&&selected&&(<PanelShell onClose={()=>setPanel(null)} title={selected.contract_no} badge={<Badge variant={statusVariant[selected.status]}>{t.contractStatus[selected.status as keyof typeof t.contractStatus]}</Badge>} actions={<button onClick={()=>printLeaseContract({contract:selected,unit:selectedUnit??null,customer:selectedCustomer??null,receivables:contractReceivables},locale)} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground" title={dictionaries[locale].settings.print.print}><Printer className="h-4 w-4"/></button>}>
         <div className="space-y-4">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <div><dt className="text-xs text-muted-foreground">{t.form.unit}</dt><dd className="font-medium">{selectedUnit?.unit_no??"-"} ({selectedUnit?.floor_label??""})</dd></div>
+            <div><dt className="text-xs text-muted-foreground">{locale === "zh" ? "楼栋 / 房号" : "Bâtiment / Lot"}</dt><dd className="font-medium">{selectedUnit ? buildingMap.get(selectedUnit.building_id)?.display_name || buildingMap.get(selectedUnit.building_id)?.code || "-" : "-"} · {selectedUnit?.unit_no??"-"}</dd></div>
             <div><dt className="text-xs text-muted-foreground">{t.form.customer}</dt><dd className="font-medium">{selectedCustomer?.name??"-"}</dd></div>
             <div><dt className="text-xs text-muted-foreground">{t.form.startDate}</dt><dd>{selected.start_date}</dd></div>
             <div><dt className="text-xs text-muted-foreground">{locale === "zh" ? "正式合同到期日" : t.form.expectedEndDate}</dt><dd>{isContractEndConfirmed(selected)?selected.expected_end_date:(locale==="zh"?"未确认":"Non confirmée")}</dd></div>
@@ -875,8 +858,6 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
           </dl>
           {selected.status==="draft"&&<Button className="w-full" variant="default" onClick={()=>handleActivate(selected.id)} disabled={saving}>{saving?"...":t.form.activateContract}</Button>}
           {selected.status==="active"&&<Button className="w-full" variant="outline" onClick={()=>openMoveOut(selected.id)}><LogOut className="mr-1 inline h-4 w-4"/>{t.settlement.moveOut}</Button>}
-          {genMsg&&<p className="text-xs text-emerald-600 font-medium">{genMsg}</p>}
-
           {/* Risk indicators */}
           {selected.status==="active"&&<div className="border-t pt-4">
             <h4 className="flex items-center gap-1.5 text-sm font-semibold"><AlertTriangle className="h-3.5 w-3.5 text-amber-500"/>{locale==="zh"?"风险概览":"Apercu des risques"}</h4>
@@ -1018,7 +999,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
       {/* ── Move-out Panel ── */}
       {panel==="moveout"&&selected&&(<PanelShell onClose={()=>setPanel(null)} title={t.settlement.moveOut}>{/* form kept identical to original */}{/*...*/}<div className="space-y-4"><div><label className={labelClass}>{t.form.actualEndDate}</label><DateInput value={moEndDate} onChangeValue={setMoEndDate} className={inputClass}/></div><div><label className={labelClass}>{locale==="zh"?"未付租金":"Loyer impaye"}</label><input type="number" value={moUnpaid} onChange={e=>setMoUnpaid(Number(e.target.value))} className={inputClass}/></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={moUtility} onChange={e=>setMoUtility(e.target.checked)}/>{locale==="zh"?"水电已结清":"Charges reglees"}</label><div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-muted-foreground">{locale==="zh"?"押金抵扣":"Retenue depot"}</label><input type="number" value={moDeduction} onChange={e=>setMoDeduction(Number(e.target.value))} className={inputClass}/></div><div><label className="text-xs text-muted-foreground">{locale==="zh"?"押金退还":"Remb. depot"}</label><input type="number" value={moRefund} onChange={e=>setMoRefund(Number(e.target.value))} className={inputClass}/></div></div>{error&&<p className="text-sm text-red-600">{error}</p>}<Button className="w-full" onClick={handleMoveOut} disabled={saving}>{saving?"...":locale==="zh"?"确认退租":"Confirmer"}</Button></div></PanelShell>)}
-    </div>
+    </OperationalPage>
   );
 }
 
@@ -1043,14 +1024,5 @@ function ActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label: st
 
 // ── Shared panel shell ──
 function PanelShell({ onClose, title, badge, actions, children }: { onClose:()=>void; title:string; badge?:React.ReactNode; actions?:React.ReactNode; children:React.ReactNode }) {
-  return (<>
-    <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={onClose}/>
-    <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]">
-      <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
-        <div className="flex items-center gap-2"><h3 className="text-[15px] font-semibold">{title}</h3>{badge}</div>
-        <div className="flex items-center gap-1">{actions}<button onClick={onClose} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"><X className="h-4 w-4"/></button></div>
-      </div>
-      <div className="px-5 py-5">{children}</div>
-    </div>
-  </>);
+  return <RightDrawer open title={title} badge={badge} actions={actions} onClose={onClose}>{children}</RightDrawer>;
 }

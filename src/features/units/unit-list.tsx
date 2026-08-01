@@ -8,8 +8,10 @@ import { dictionaries } from "@/lib/i18n";
 import { cn, compareFloorLabels, formatXof, sortUnitsForBuilding } from "@/lib/utils";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
-import { FilterBar, MetricGrid, SegmentedControl, StatTile } from "@/components/ui/operational";
-import { PageHeader } from "@/components/page-header";
+import { FilterBar, MetricGrid, OperationalPage, SegmentedControl, StatTile } from "@/components/ui/operational";
+import { RoomCard } from "@/components/room-card";
+import type { RoomStatus } from "@/components/room-card";
+import { RoomBoard } from "@/components/room-board";
 import { getUnitOperationalLabel, isOwnerOccupiedUnit } from "@/lib/unit-display";
 import { UnitDetailPanel } from "./unit-detail-panel";
 import { UnitFilters } from "./unit-filters";
@@ -36,7 +38,6 @@ interface UnitListProps {
   auditLogsMap: Record<string, AuditLogEntry[]>;
   buildings: BuildingInfo[];
   locale: Locale;
-  showHeader?: boolean;
   canEdit: boolean;
 }
 
@@ -53,7 +54,7 @@ const STATUS_DOT: Record<string, string> = {
 
 const LS_KEY = "sacsi_active_building_id";
 
-export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], auditLogsMap, buildings, locale, showHeader = true, canEdit }: UnitListProps) {
+export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], auditLogsMap, buildings, locale, canEdit }: UnitListProps) {
   const router = useRouter();
   const t = dictionaries[locale].units;
   const statusLabels = dictionaries[locale].statuses;
@@ -128,6 +129,18 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
 
   const detailUnit = detailUnitId ? buildingUnits.find((unit) => unit.id === detailUnitId) : null;
 
+  const apartmentFloorGroups = useMemo(() => {
+    const groups = new Map<string, UnitRow[]>();
+    for (const unit of filtered.filter((item) => item.kind === "apartment")) {
+      const label = unit.floor_label || (locale === "zh" ? "未分层" : "Sans étage");
+      if (!groups.has(label)) groups.set(label, []);
+      groups.get(label)!.push(unit);
+    }
+    return [...groups.entries()]
+      .sort(([a], [b]) => compareFloorLabels(a, b))
+      .map(([floor, rows]) => [floor, sortUnitsForBuilding(rows, activeBuilding?.code)] as const);
+  }, [activeBuilding?.code, filtered, locale]);
+
   const assetBlocks = [
     { key: "apartments", label: locale === "zh" ? "住宿房源" : "Appartements", value: summary.apartments, dot: "bg-foreground", icon: Home },
     { key: "available", label: statusLabels.available, value: summary.available, dot: "bg-[#B88A48]", icon: undefined },
@@ -141,7 +154,11 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
   ];
 
   return (
-    <div className="flex flex-col gap-6">
+    <OperationalPage
+      eyebrow={locale === "zh" ? "房源管理" : "Gestion des biens"}
+      title={activeBuilding ? `${activeBuilding.display_name || activeBuilding.code}` : (locale === "zh" ? "房源" : "Biens")}
+      description={`${summary.apartments} ${locale === "zh" ? "套住宿房源 · 点击卡片查看和修改房态" : "appartements · cliquez pour consulter"}`}
+    >
       {/* Building Switcher */}
       {buildings.length > 1 && (
         <SegmentedControl
@@ -154,13 +171,6 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
             label: b.display_name || b.code,
           }))}
         />
-      )}
-
-      {showHeader && (
-      <PageHeader
-        title={activeBuilding ? `${activeBuilding.code} ${activeBuilding.display_name}` : (locale === "zh" ? "住宿资产" : "Actifs residentiels")}
-        description={`${summary.apartments} ${locale === "zh" ? "套公寓" : "appartements"} · ${locale === "zh" ? "按楼层、状态和业务筛选房源" : "Filtrer par etage, statut et activite"}`}
-      />
       )}
 
       <MetricGrid columns={4}>
@@ -196,39 +206,54 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
         />
       </FilterBar>
 
-      {filtered.length === 0 ? (
+      {apartmentFloorGroups.length === 0 ? (
         <EmptyState
           icon={<Building2 className="h-10 w-10" />}
           title={t.empty}
           description={locale === "zh" ? "请先在设置中导入楼栋和房间" : "Importez d'abord l'immeuble dans Paramètres"}
         />
       ) : (
-        <div className="table-shell">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr>
-                  {t.headers.map((header) => (
-                    <th key={header}>{header}</th>
-                  ))}
-                  <th className="w-10" />
-                </tr>
-              </thead>
-              <tbody>
-                {sortUnitsForBuilding(filtered, activeBuilding?.code).map((unit) => (
-                  <UnitTableRow
-                    key={unit.id}
-                    unit={unit}
-                    locale={locale}
-                    flags={businessFlagsMap[unit.id] ?? []}
-                    managedLease={managedLeaseUnitSet.has(unit.id)}
-                    onOpen={() => setDetailUnitId(unit.id)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <RoomBoard
+          header={<>
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+              <h2 className="text-sm font-semibold">{activeBuilding?.display_name || activeBuilding?.code}</h2>
+            </div>
+            <span className="text-xs font-medium text-muted-foreground">{apartmentFloorGroups.reduce((sum, [, rows]) => sum + rows.length, 0)} {locale === "zh" ? "套" : "lots"}</span>
+          </>}
+        >
+          {apartmentFloorGroups.map(([floor, rows], index) => (
+            <section key={floor} className={index > 0 ? "mt-5 border-t border-border/60 pt-5" : ""}>
+              <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <h3 className="font-semibold text-foreground">{floor}</h3>
+                <span className="tabular-nums">{rows.length}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+                {rows.map((unit) => {
+                  const flags = (businessFlagsMap[unit.id] ?? []).filter((flag) => flag.is_enabled);
+                  const dailyFlag = flags.find((flag) => flag.business_type === "daily_rental");
+                  const managedLease = unit.status === "sold" && managedLeaseUnitSet.has(unit.id);
+                  const status: RoomStatus = managedLease
+                    ? "managed"
+                    : unit.status === "locked" ? "maintenance" : unit.status as RoomStatus;
+                  return (
+                    <RoomCard
+                      key={unit.id}
+                      roomNo={unit.unit_no}
+                      status={status}
+                      customerName={managedLease ? (locale === "zh" ? "已售代管" : "Vendu géré") : getUnitOperationalLabel(unit, locale) ?? statusLabels[unit.status]}
+                      dateText={dailyFlag?.default_price_xof != null
+                        ? `${flags.map((flag) => t.businessTypes[flag.business_type]).join(" / ")} · ${formatXof(dailyFlag.default_price_xof)}`
+                        : flags.map((flag) => t.businessTypes[flag.business_type]).join(" / ") || unit.floor_label}
+                      onClick={() => setDetailUnitId(unit.id)}
+                      actions={[{ key: "detail", label: locale === "zh" ? "查看房源" : "Voir", icon: ArrowRight, onClick: () => setDetailUnitId(unit.id) }]}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </RoomBoard>
       )}
 
       {nonApartments.length > 0 && (
@@ -290,7 +315,7 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
           onStatusChanged={() => { setRefreshKey((key) => key + 1); router.refresh(); }}
         />
       )}
-    </div>
+    </OperationalPage>
   );
 }
 

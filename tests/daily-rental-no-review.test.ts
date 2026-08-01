@@ -28,7 +28,9 @@ describe("daily rental no-review flow", () => {
     expect(panel).not.toMatch(/confirmBooking\(/);
   });
 
-  it("keeps a separate occupancy overview route", () => {
-    expect(calendar).toMatch(/daily-rentals\/overview/);
+  it("keeps occupancy information in the main calendar without a separate overview route", () => {
+    expect(calendar).not.toMatch(/daily-rentals\/overview/);
+    expect(calendar).toContain('"日租概览"');
+    expect(calendar).toContain("shareRows.map");
   });
 });

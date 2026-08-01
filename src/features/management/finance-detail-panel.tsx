@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import { X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
+import { RightDrawer } from "@/components/ui/operational";
 import { receivableStatusStyles as STATUS_STYLES } from "@/lib/status-styles";
 import type { ManagementFinanceItem } from "@/features/management/finance-snapshot";
 import type {
@@ -170,25 +170,8 @@ export function FinanceDetailPanel({
     ));
 
   return (
-    <>
-      <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-5xl" role="dialog" aria-label={labels.title}>
-        {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
-          <div>
-            <h3 className="text-sm font-medium tracking-tight text-foreground">{labels.title}</h3>
-            <p className="text-xs text-muted-foreground">{labels.desc}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-            aria-label={locale === "zh" ? "关闭" : "Fermer"}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="px-5 py-4 space-y-4">
+    <RightDrawer open title={labels.title} subtitle={labels.desc} onClose={onClose} width="table">
+        <div className="space-y-4">
           {/* Summary bar */}
           <div className="flex flex-wrap gap-4 rounded-xl bg-muted/50 px-4 py-3 text-sm">
               <div>
@@ -292,7 +275,6 @@ export function FinanceDetailPanel({
             </div>
           </div>
         </div>
-      </div>
-    </>
+    </RightDrawer>
   );
 }

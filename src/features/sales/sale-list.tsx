@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo, useRef } from "react";
-import { Plus, X, DollarSign, FileText, CalendarPlus, TrendingUp, AlertTriangle, Eye } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, DollarSign, FileText, CalendarPlus, TrendingUp, AlertTriangle, Eye } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
@@ -13,13 +14,14 @@ import { DateInput } from "@/components/ui/date-input";
 import { RoomCard } from "@/components/room-card";
 import { RoomBoard } from "@/components/room-board";
 import { EmptyState } from "@/components/empty-state";
-import { SegmentedControl } from "@/components/ui/operational";
+import { FilterBar, MetricGrid, OperationalPage, RightDrawer, SegmentedControl, StatTile } from "@/components/ui/operational";
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import { createSaleContract, recordSalePaymentAtomic, addFlexibleInstallment, updateTransferStatus, terminateSaleContract } from "./actions";
 
 interface SaleListProps { contracts: SaleContractRow[]; schedules: SalePaymentScheduleRow[]; units: UnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale; canCreate?: boolean; canRecordFinance?: boolean; canManage?: boolean }
 type PanelType = "new" | "detail" | "insight" | null;
 type SaleStatKey = "active" | "total" | "received" | "receivable" | "overdue" | "transfer";
+type SaleStatusFilter = "current" | "all" | "terminated" | "expired";
 const SALE_RECEIPT_SOURCE_TYPES = new Set(["sale", "sale_contract", "property_fee", "parking_fee"]);
 
 const paymentAmountXof = (payment: PaymentRow) => payment.currency === "XOF"
@@ -30,8 +32,10 @@ const formatCny = (amount: number) =>
   `¥${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(amount)}`;
 
 export function SaleList({ contracts, schedules, units, customers, payments, receivables, buildings, locale, canCreate = true, canRecordFinance = true, canManage = true }: SaleListProps) {
+  const router = useRouter();
   const t = dictionaries[locale].sales;
   const [statFilter, setStatFilter] = useState<SaleStatKey | null>(null);
+  const [statusFilter, setStatusFilter] = useState<SaleStatusFilter>("current");
   const [panel, setPanel] = useState<PanelType>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
@@ -61,11 +65,12 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
 
   const filteredByBuilding = useMemo(() => {
     return contracts.filter((contract) => (
-      contract.status !== "terminated"
-      && contract.status !== "expired"
-      && (!activeBuildingId || unitBuildingMap.get(contract.unit_id) === activeBuildingId)
+      (!activeBuildingId || unitBuildingMap.get(contract.unit_id) === activeBuildingId)
+      && (statusFilter === "all"
+        || (statusFilter === "current" && contract.status !== "terminated" && contract.status !== "expired")
+        || contract.status === statusFilter)
     ));
-  }, [contracts, activeBuildingId, unitBuildingMap]);
+  }, [contracts, activeBuildingId, statusFilter, unitBuildingMap]);
 
   const unitMap = useMemo(()=>new Map(units.map(u=>[u.id,u])), [units]);
   const customerMap = useMemo(()=>new Map(customers.map(c=>[c.id,c])), [customers]);
@@ -88,6 +93,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const selected = selectedId?contracts.find(c=>c.id===selectedId):null;
   const selectedUnit = selected?units.find(u=>u.id===selected.unit_id):null;
   const selectedCustomer = selected?customers.find(c=>c.id===selected.customer_id):null;
+  const selectedBuilding = selectedUnit ? buildings.find((building) => building.id === selectedUnit.building_id) : null;
 
   const dashboardStats = useMemo(()=>{
     const buildingContractIds=new Set(filteredByBuilding.map(c=>c.id));
@@ -191,8 +197,8 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const openDetail = (id:string) => {setSelectedId(id);setPanel("detail");setError("");};
   const openInsight = (key: SaleStatKey) => {setStatFilter(key);setPanel("insight");setSelectedId(null);setError("");};
 
-  const handleCreate = async () => {if(!fUnitId||!fCustomerId||!fSignedDate||fTotalAmount<=0){setError(locale==="zh"?"请填写必填字段":"Champs obligatoires");return;}const requestId=createRequestIdRef.current??crypto.randomUUID();createRequestIdRef.current=requestId;setSaving(true);setError("");setPanel(null);const r=await createSaleContract({unitId:fUnitId,customerId:fCustomerId,contractNo:fContractNo||"",signedDate:fSignedDate,totalAmountXof:fTotalAmount,paymentPlanType:fPlanType,numInstallments:fPlanType==="fixed_installment"?fNumInstallments:undefined,agencyCompany:fAgency||undefined,agentName:fAgent||undefined,agencyCommissionXof:fCommission,agencyCommissionPaid:fCommissionPaid,requestId});setSaving(false);if(r.success){createRequestIdRef.current=null;}else{setPanel("new");setError(r.error??"Failed");}};
-  const handlePay = async () => {if(!payScheduleId||payAmount<=0){setError(locale==="zh"?"请选择分期并输入金额":"Champs obligatoires");return;}const currentScheduleId=payScheduleId;const requestId=payRequestIdRef.current??crypto.randomUUID();payRequestIdRef.current=requestId;setSaving(true);setError("");setPayScheduleId("");const r=await recordSalePaymentAtomic({contractId:selectedId!,scheduleId:currentScheduleId,amount:payAmount,paymentDate:payDate,receiptNo:payReceiptNo||undefined,requestId});setSaving(false);if(r.success){payRequestIdRef.current=null;setPayAmount(0);setPayReceiptNo("");}else {setPayScheduleId(currentScheduleId);setError(r.error??"Failed");}};
+  const handleCreate = async () => {if(!fUnitId||!fCustomerId||!fSignedDate||fTotalAmount<=0){setError(locale==="zh"?"请填写必填字段":"Champs obligatoires");return;}const requestId=createRequestIdRef.current??crypto.randomUUID();createRequestIdRef.current=requestId;setSaving(true);setError("");const r=await createSaleContract({unitId:fUnitId,customerId:fCustomerId,contractNo:fContractNo||"",signedDate:fSignedDate,totalAmountXof:fTotalAmount,paymentPlanType:fPlanType,numInstallments:fPlanType==="fixed_installment"?fNumInstallments:undefined,agencyCompany:fAgency||undefined,agentName:fAgent||undefined,agencyCommissionXof:fCommission,agencyCommissionPaid:fCommissionPaid,requestId});setSaving(false);if(r.success){createRequestIdRef.current=null;setPanel(null);router.refresh();}else{setError(r.error??"Failed");}};
+  const handlePay = async () => {if(!payScheduleId||payAmount<=0){setError(locale==="zh"?"请选择分期并输入金额":"Champs obligatoires");return;}const currentScheduleId=payScheduleId;const requestId=payRequestIdRef.current??crypto.randomUUID();payRequestIdRef.current=requestId;setSaving(true);setError("");const r=await recordSalePaymentAtomic({contractId:selectedId!,scheduleId:currentScheduleId,amount:payAmount,paymentDate:payDate,receiptNo:payReceiptNo||undefined,requestId});setSaving(false);if(r.success){payRequestIdRef.current=null;setPayScheduleId("");setPayAmount(0);setPayReceiptNo("");router.refresh();}else setError(r.error??"Failed");};
   const handleAddFlex = async () => {if(!flexDueDate||flexAmount<=0){setError(locale==="zh"?"请填写到期日和金额":"Champs obligatoires");return;}setSaving(true);setError("");setShowFlexForm(false);const r=await addFlexibleInstallment({contractId:selectedId!,installmentNo:contractSchedules.length+1,dueDate:flexDueDate,amountXof:flexAmount});setSaving(false);if(r.success){setFlexDueDate("");setFlexAmount(0);}else {setShowFlexForm(true);setError(r.error??"Failed");}};
   const handleTransfer = async () => {if(!trDate){setError(locale==="zh"?"请选择过户日期":"Champs obligatoires");return;}const currentId=selectedId!;setSaving(true);setError("");setPanel(null);const r=await updateTransferStatus(currentId,trStatus,trDate,trCertNo||undefined);setSaving(false);if(!r.success){setSelectedId(currentId);setPanel("detail");setError(r.error??"Failed");}};
   const handleTerminateSale = async () => {const currentId=selectedId!;setSaving(true);setError("");setPanel(null);const r=await terminateSaleContract(currentId,termReason||(locale==="zh"?"手动终止":"Manuel"));setSaving(false);if(!r.success){setSelectedId(currentId);setPanel("detail");setError(r.error??"Failed");}};
@@ -273,65 +279,49 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
   ];
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* ── Page chrome ── */}
-      <div className="flex flex-col gap-1">
-        <p className="text-xs font-medium text-muted-foreground">
-          {locale === "zh" ? "出售业务" : "Ventes"}
-        </p>
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-xl font-semibold tracking-tight">
-            {locale === "zh" ? "出售合同" : "Contrats de vente"}
-          </h1>
-          <span className="text-sm text-muted-foreground tabular-nums">
-            {filteredByBuilding.length} {locale==="fr"?"contrats":"份合同"}
-          </span>
-        </div>
-      </div>
+    <OperationalPage
+      eyebrow={locale === "zh" ? "出售业务" : "Ventes"}
+      title={locale === "zh" ? "出售合同" : "Contrats de vente"}
+      description={`${filteredByBuilding.length} ${locale === "zh" ? "份合同 · 汇总统一按 FCFA 结算" : "contrats · total en FCFA"}`}
+      action={canCreate ? <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" />{t.form.newContract}</Button> : undefined}
+    >
 
       {/* ── Summary stats ── */}
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+      <MetricGrid columns={6}>
         {statBlocks.map(b => (
-          <button
+          <StatTile
             key={b.key}
-            type="button"
+            label={b.label}
+            value={b.value}
+            caption={panel === "insight" && statFilter === b.key ? (locale === "zh" ? "明细已打开" : "Détail ouvert") : b.hint}
+            tone={b.key === "overdue" ? "red" : b.key === "receivable" ? "amber" : b.key === "transfer" ? "purple" : b.key === "active" || b.key === "received" ? "green" : "blue"}
             onClick={() => openInsight(b.key)}
-            aria-pressed={panel === "insight" && statFilter === b.key}
-            title={b.hint}
-            className={cn(
-              "flex min-h-[76px] flex-col rounded-xl border bg-card p-3 text-left text-card-foreground shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60",
-              panel === "insight" && statFilter === b.key ? "border-foreground/20 ring-1 ring-foreground/10" : "border-border",
-            )}
-          >
-            <div className="flex min-w-0 items-center justify-between gap-3 pb-2">
-              <p className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">{b.label}</p>
-              <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", b.dot)} />
-            </div>
-            <p className="text-lg font-semibold leading-none tabular-nums text-foreground">{b.value}</p>
-            <span className={cn("mt-2 text-[11px] font-medium", panel === "insight" && statFilter === b.key ? "text-foreground" : "text-muted-foreground")}>
-              {panel === "insight" && statFilter === b.key ? (locale === "zh" ? "已打开" : "Ouvert") : b.hint}
-            </span>
-          </button>
+            active={panel === "insight" && statFilter === b.key}
+          />
         ))}
-      </div>
+      </MetricGrid>
 
-      {/* ── Building switcher ── */}
-      {buildings.length > 1 && (
+      <FilterBar meta={`${filteredByBuilding.length} ${locale === "zh" ? "份合同" : "contrats"}`}>
+        {buildings.length > 1 && (
+          <SegmentedControl
+            value={activeBuildingId}
+            onChange={setActiveBuildingId}
+            ariaLabel={locale === "zh" ? "楼栋切换" : "Selection du batiment"}
+            items={buildings.map((b) => ({ value: b.id, label: b.display_name || b.code }))}
+          />
+        )}
         <SegmentedControl
-          value={activeBuildingId}
-          onChange={setActiveBuildingId}
-          ariaLabel={locale === "zh" ? "楼栋切换" : "Selection du batiment"}
-          className="self-start"
-          items={buildings.map((b) => ({
-            value: b.id,
-            label: b.display_name || b.code,
-          }))}
+          value={statusFilter}
+          onChange={(value) => setStatusFilter(value as SaleStatusFilter)}
+          ariaLabel={locale === "zh" ? "出售合同状态" : "Statut des contrats de vente"}
+          items={[
+            { value: "current", label: locale === "zh" ? "当前合同" : "En cours" },
+            { value: "all", label: locale === "zh" ? "全部" : "Tous" },
+            { value: "terminated", label: locale === "zh" ? "已终止" : "Résiliés" },
+            { value: "expired", label: locale === "zh" ? "已过期" : "Expirés" },
+          ]}
         />
-      )}
-
-      <div className="flex justify-end">
-        {canCreate && <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" />{t.form.newContract}</Button>}
-      </div>
+      </FilterBar>
 
       {/* ── Contract matrix (BusinessRoomCard) ── */}
       {groupedContracts.length===0?(<EmptyState title={t.empty}/>):(
@@ -477,19 +467,19 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
       })()}
 
       {/* ── New Contract Panel ── */}
-      {canCreate && panel==="new"&&(<><div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={()=>setPanel(null)}/><div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]"><div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur"><h3 className="text-[15px] font-semibold">{t.form.newContract}</h3><button onClick={()=>setPanel(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"><X className="h-4 w-4"/></button></div>
-        <div className="space-y-4 px-5 py-5"><div><label className={labelClass}>{t.form.contractNo}</label><input type="text" value={fContractNo} onChange={e=>setFContractNo(e.target.value)} className={inputClass}/></div><div><label className={labelClass}>{t.form.unit} *</label><select value={fUnitId} onChange={e=>setFUnitId(e.target.value)} className={inputClass}><option value="">{t.form.noUnit}</option>{sellableUnits.map(u=><option key={u.id} value={u.id}>{u.unit_no} ({u.floor_label})</option>)}</select></div><div><label className={labelClass}>{t.form.customer} *</label><select value={fCustomerId} onChange={e=>setFCustomerId(e.target.value)} className={inputClass}><option value="">{t.form.noCustomer}</option>{customers.filter(cc=>!cc.is_blacklisted).map(cc=><option key={cc.id} value={cc.id}>{cc.name}</option>)}</select></div>
+      {canCreate && panel==="new"&&(<SalePanelShell onClose={()=>setPanel(null)} title={t.form.newContract}>
+        <div className="space-y-4"><div><label className={labelClass}>{t.form.contractNo}</label><input type="text" value={fContractNo} onChange={e=>setFContractNo(e.target.value)} className={inputClass}/></div><div><label className={labelClass}>{t.form.unit} *</label><select value={fUnitId} onChange={e=>setFUnitId(e.target.value)} className={inputClass}><option value="">{t.form.noUnit}</option>{sellableUnits.map(u=><option key={u.id} value={u.id}>{u.unit_no} ({u.floor_label})</option>)}</select></div><div><label className={labelClass}>{t.form.customer} *</label><select value={fCustomerId} onChange={e=>setFCustomerId(e.target.value)} className={inputClass}><option value="">{t.form.noCustomer}</option>{customers.filter(cc=>!cc.is_blacklisted).map(cc=><option key={cc.id} value={cc.id}>{cc.name}</option>)}</select></div>
           <div className="grid grid-cols-2 gap-3"><div><label className={labelClass}>{t.form.signedDate}</label><DateInput value={fSignedDate} onChangeValue={setFSignedDate} className={inputClass}/></div><div><label className={labelClass}>{t.form.totalAmount} *</label><input type="number" value={fTotalAmount} onChange={e=>setFTotalAmount(Number(e.target.value))} className={inputClass}/></div></div>
           <div><label className={labelClass}>{locale==="zh"?"付款计划":"Plan"}</label><select value={fPlanType} onChange={e=>setFPlanType(e.target.value)} className={inputClass}><option value="lump_sum">{t.paymentPlan.lump_sum}</option><option value="fixed_installment">{t.paymentPlan.fixed_installment}</option><option value="flexible_installment">{t.paymentPlan.flexible_installment}</option></select></div>
           {fPlanType==="fixed_installment"&&<div><label className={labelClass}>{locale==="zh"?"分期数":"Nb echeances"}</label><input type="number" min={2} max={24} value={fNumInstallments} onChange={e=>setFNumInstallments(Number(e.target.value))} className={inputClass}/></div>}
           <div className="grid grid-cols-2 gap-3"><div><label className={labelClass}>{locale==="zh"?"中介公司":"Agence"}</label><input type="text" value={fAgency} onChange={e=>setFAgency(e.target.value)} className={inputClass}/></div><div><label className={labelClass}>{locale==="zh"?"中介":"Agent"}</label><input type="text" value={fAgent} onChange={e=>setFAgent(e.target.value)} className={inputClass}/></div></div>
           <div className="grid grid-cols-2 gap-3"><div><label className={labelClass}>{locale==="zh"?"佣金":"Commission"}</label><input type="number" value={fCommission} onChange={e=>setFCommission(Number(e.target.value))} className={inputClass}/></div><label className="flex items-center gap-2 text-sm pt-6"><input type="checkbox" checked={fCommissionPaid} onChange={e=>setFCommissionPaid(e.target.checked)}/>{locale==="zh"?"佣金已付":"Com. payee"}</label></div>
-          {error&&<p className="text-sm text-red-600">{error}</p>}<Button className="w-full" onClick={handleCreate} disabled={saving}>{saving?"...":t.form.newContract}</Button></div></div></>)}
+          {error&&<p className="text-sm text-red-600">{error}</p>}<Button className="w-full" onClick={handleCreate} disabled={saving}>{saving?"...":t.form.newContract}</Button></div></SalePanelShell>)}
 
       {/* ── Detail Panel ── */}
-      {panel==="detail"&&selected&&(<><div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={()=>setPanel(null)}/><div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]"><div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur"><div><h3 className="text-[15px] font-semibold">{selected.contract_no}</h3><Badge variant={statusVariant[selected.status]}>{t.contractStatus[selected.status as keyof typeof t.contractStatus]}</Badge></div><button onClick={()=>setPanel(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"><X className="h-4 w-4"/></button></div>
-        <div className="space-y-4 px-5 py-5">
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm"><div><dt className="text-xs text-muted-foreground">{t.form.unit}</dt><dd className="font-medium">{selectedUnit?.unit_no??"-"} ({selectedUnit?.floor_label??""})</dd></div><div><dt className="text-xs text-muted-foreground">{t.form.customer}</dt><dd className="font-medium">{selectedCustomer?.name??"-"}</dd></div><div><dt className="text-xs text-muted-foreground">{t.form.signedDate}</dt><dd>{selected.signed_date}</dd></div><div><dt className="text-xs text-muted-foreground">{t.form.totalAmount}</dt><dd className="font-semibold">{formatXof(Number(selected.total_amount_xof))}</dd></div><div><dt className="text-xs text-muted-foreground">{locale==="zh"?"过户状态":"Transfert"}</dt><dd className={cn("font-medium",selected.transfer_status==="completed"?"text-emerald-600":"")}>{transText(selected.transfer_status)}</dd></div></dl>
+      {panel==="detail"&&selected&&(<SalePanelShell onClose={()=>setPanel(null)} title={selected.contract_no} badge={<Badge variant={statusVariant[selected.status]}>{t.contractStatus[selected.status as keyof typeof t.contractStatus]}</Badge>}>
+        <div className="space-y-4">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm"><div><dt className="text-xs text-muted-foreground">{locale === "zh" ? "楼栋 / 房号" : "Bâtiment / Lot"}</dt><dd className="font-medium">{selectedBuilding?.display_name || selectedBuilding?.code || "-"} · {selectedUnit?.unit_no??"-"}</dd></div><div><dt className="text-xs text-muted-foreground">{t.form.customer}</dt><dd className="font-medium">{selectedCustomer?.name??"-"}</dd></div><div><dt className="text-xs text-muted-foreground">{t.form.signedDate}</dt><dd>{selected.signed_date}</dd></div><div><dt className="text-xs text-muted-foreground">{t.form.totalAmount}</dt><dd className="font-semibold">{formatXof(Number(selected.total_amount_xof))}</dd></div><div><dt className="text-xs text-muted-foreground">{locale==="zh"?"过户状态":"Transfert"}</dt><dd className={cn("font-medium",selected.transfer_status==="completed"?"text-emerald-600":"")}>{transText(selected.transfer_status)}</dd></div></dl>
 
           <div className="border-t pt-4">
             <h4 className="flex items-center gap-1.5 text-sm font-semibold"><AlertTriangle className="h-3.5 w-3.5 text-amber-500"/>{locale==="zh"?"合同概览":"Aperçu du contrat"}</h4>
@@ -575,20 +565,11 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
 
           {/* Transfer form */}
           {canManage&&selected.status==="active"&&trDate&&(<div className="space-y-2 rounded-md border bg-card p-3"><div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-muted-foreground">{locale==="zh"?"过户状态":"Transfert"}</label><select value={trStatus} onChange={e=>setTrStatus(e.target.value)} className={inputClass}><option value="not_started">{transText("not_started")}</option><option value="in_progress">{transText("in_progress")}</option><option value="completed">{transText("completed")}</option></select></div><div><label className="text-xs text-muted-foreground">{locale==="zh"?"过户日期":"Date"}</label><DateInput value={trDate} onChangeValue={setTrDate} className={inputClass}/></div><div className="col-span-2"><label className="text-xs text-muted-foreground">{locale==="zh"?"产权证号":"Titre"}</label><input type="text" value={trCertNo} onChange={e=>setTrCertNo(e.target.value)} className={inputClass}/></div></div>{error&&<p className="text-xs text-red-600">{error}</p>}<div className="flex gap-2"><Button size="sm" onClick={handleTransfer} disabled={saving}>{saving?"...":locale==="zh"?"保存":"OK"}</Button><Button size="sm" variant="ghost" onClick={()=>{setTrDate("");}}>{locale==="zh"?"取消":"Annuler"}</Button></div></div>)}
-        </div></div></>)}
-    </div>
+        </div></SalePanelShell>)}
+    </OperationalPage>
   );
 }
 
 function SalePanelShell({ onClose, title, badge, children }: { onClose:()=>void; title:string; badge?:React.ReactNode; children:React.ReactNode }) {
-  return (<>
-    <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={onClose}/>
-    <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]">
-      <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
-        <div className="flex items-center gap-2"><h3 className="text-[15px] font-semibold">{title}</h3>{badge}</div>
-        <button onClick={onClose} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"><X className="h-4 w-4"/></button>
-      </div>
-      <div className="px-5 py-5">{children}</div>
-    </div>
-  </>);
+  return <RightDrawer open title={title} badge={badge} onClose={onClose}>{children}</RightDrawer>;
 }

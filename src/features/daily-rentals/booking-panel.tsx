@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { X, Check, UserX, Printer, DollarSign, Percent, Trash2, MoreHorizontal, WalletCards, CalendarClock } from "lucide-react";
+import { Check, UserX, Printer, DollarSign, Percent, Trash2, MoreHorizontal, WalletCards, CalendarClock } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
-import { controlClass } from "@/components/ui/operational";
+import { RightDrawer, controlClass } from "@/components/ui/operational";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import type { CustomerSummary } from "./calendar";
@@ -378,22 +378,13 @@ export function BookingPanel({
 
   return (
     <>
-      <div
-        className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/25 backdrop-blur-sm"
-        onClick={() => { if (!saving) onClose(); }}
-      />
-      <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]" role="dialog" aria-label={isNew ? t.booking.newBooking : t.booking.title}>
-        <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
-          <div>
-            <h3 className="text-[15px] font-semibold">{isBackfill ? (locale === "zh" ? "历史补录" : "Backfill") : isNew ? t.booking.newBooking : t.booking.title}</h3>
-            {selectedUnit && <p className="mt-0.5 text-xs text-muted-foreground">{selectedUnit.unit_no} ({selectedUnit.floor_label})</p>}
-          </div>
-          <Button size="icon" variant="ghost" onClick={onClose} disabled={saving} aria-label={locale === "zh" ? "关闭" : "Fermer"} className="h-8 w-8">
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <div className="space-y-4 px-5 py-5">
+      <RightDrawer
+        open
+        title={isBackfill ? (locale === "zh" ? "历史补录" : "Backfill") : isNew ? t.booking.newBooking : t.booking.title}
+        subtitle={selectedUnit ? `11# · ${selectedUnit.unit_no} · ${selectedUnit.floor_label}` : undefined}
+        onClose={() => { if (!saving) onClose(); }}
+      >
+        <div className="space-y-4">
           {/* New Booking */}
           {isNew && (<>
             <div>
@@ -862,7 +853,7 @@ export function BookingPanel({
             {actionError && <p className="text-sm text-accentRed-600" role="alert">{actionError}</p>}
           </>)}
         </div>
-      </div>
+      </RightDrawer>
 
       <ConfirmDialog
         open={deleteTarget !== null}

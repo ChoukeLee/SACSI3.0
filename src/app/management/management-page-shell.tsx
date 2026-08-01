@@ -2,6 +2,7 @@
 
 import type { Locale, ManagementDict } from "@/lib/i18n";
 import type { BuildingRow } from "@/types/database";
+import { OperationalPage } from "@/components/ui/operational";
 
 export function ManagementPageShell({
   buildings, locale, t, children,
@@ -12,31 +13,22 @@ export function ManagementPageShell({
   const buildingCount = buildings.filter((building) => building.is_active).length;
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* ── Chrome: title + date (renders immediately — buildings is lightweight) ── */}
-      <div className="border-b border-border pb-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-muted-foreground">
-            {locale === "zh" ? "今日经营" : "Activité du jour"}
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-              {locale === "zh" ? "首页" : t.allBuildings}
-            </h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+    <OperationalPage
+      eyebrow={locale === "zh" ? "今日经营" : "Activité du jour"}
+      title={locale === "zh" ? "首页" : t.allBuildings}
+      description={locale === "zh" ? "财务、房态和楼栋经营信息" : "Finance, occupation et immeubles"}
+      action={
+        <>
             <span className="rounded-lg border border-border bg-muted/70 px-3 py-1.5 text-xs font-medium text-muted-foreground tabular-nums">
               {new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long", month: "short", day: "numeric" })}
             </span>
             <span className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-xs tabular-nums">
               {buildingCount} {locale === "zh" ? "栋在管" : "actifs"}
             </span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Content sections (rendered by server as children) ── */}
+        </>
+      }
+    >
       {children}
-    </div>
+    </OperationalPage>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { X, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { RightDrawer } from "@/components/ui/operational";
 import type { UnitRow } from "@/types/database";
 import type { UnitStatus, BusinessType } from "@/types/domain";
 import { updateUnitStatus } from "./actions";
@@ -64,22 +65,8 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, auditLogs, 
   );
 
   return (
-    <>
-      <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]" role="dialog" aria-label={t.detail.title}>
-        <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
-          <div>
-            <h2 className="text-sm font-medium tracking-tight text-foreground">{t.detail.title}</h2>
-            <p className="mt-0.5 font-mono text-xs text-muted-foreground">{unit.code}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button size="icon" variant="ghost" onClick={onClose} aria-label={locale === "zh" ? "关闭" : "Fermer"}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="space-y-5 px-5 py-5">
+    <RightDrawer open title={t.detail.title} subtitle={`${buildingName} · ${unit.unit_no}`} onClose={onClose}>
+        <div className="space-y-5">
           <dl className="grid grid-cols-2 gap-x-5 gap-y-4 text-sm">
             {[
               [t.detail.building, buildingName],
@@ -173,7 +160,6 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, auditLogs, 
             )}
           </div>
         </div>
-      </div>
-    </>
+    </RightDrawer>
   );
 }

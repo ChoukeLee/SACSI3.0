@@ -128,6 +128,8 @@ export function RightDrawer({
   open,
   title,
   subtitle,
+  badge,
+  actions,
   onClose,
   children,
   footer,
@@ -137,6 +139,8 @@ export function RightDrawer({
   open: boolean;
   title: React.ReactNode;
   subtitle?: React.ReactNode;
+  badge?: React.ReactNode;
+  actions?: React.ReactNode;
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
@@ -166,17 +170,23 @@ export function RightDrawer({
       >
         <div className="sticky top-0 z-10 flex min-h-16 items-start justify-between gap-4 border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
           <div className="min-w-0">
-            <h2 className="truncate text-[15px] font-semibold leading-6 text-foreground">{title}</h2>
+            <div className="flex min-w-0 items-center gap-2">
+              <h2 className="truncate text-[15px] font-semibold leading-6 text-foreground">{title}</h2>
+              {badge}
+            </div>
             {subtitle && <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{subtitle}</p>}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            {actions}
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-auto px-5 py-5">{children}</div>
         {footer && <div className="sticky bottom-0 border-t border-border bg-card/95 px-5 py-4 backdrop-blur">{footer}</div>}

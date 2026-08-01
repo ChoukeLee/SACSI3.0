@@ -2,8 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
-import Link from "next/link";
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Maximize2, Plus, Printer, SlidersHorizontal, X } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Plus, Printer, SlidersHorizontal, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { cn, formatXof, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
 import { COPY, BOOKING_STATUS_LABELS } from "./calendar-constants";
@@ -575,13 +574,6 @@ export function DailyCalendar({
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               {copied ? (locale === "zh" ? "已复制" : "Copie") : (locale === "zh" ? "复制群消息" : "Copier")}
             </Button>
-            <Link
-              href={locale === "fr" ? "/fr/daily-rentals/overview" : "/daily-rentals/overview"}
-              className={cn(TOOLBAR_ITEM, "no-print")}
-            >
-              <Maximize2 className="h-3.5 w-3.5" />
-              {locale === "zh" ? "独立总览" : "Vue seule"}
-            </Link>
             <Button variant="ghost" size="sm" onClick={() => window.print()} className={cn(TOOLBAR_ITEM, "no-print")}>
               <Printer className="h-3.5 w-3.5" />
               {locale === "zh" ? "打印" : "Imprimer"}

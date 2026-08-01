@@ -4,7 +4,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { dictionaries } from "@/lib/i18n";
 import { getBuildings } from "./management-data";
 import { FinanceSection, UnitDataSection } from "./management-sections";
-import { ManagementAlertSection } from "./management-alert-section";
 import { ManagementPageShell } from "./management-page-shell";
 import {
   FinanceStripSkeleton, StatusOverviewSkeleton,
@@ -22,11 +21,6 @@ export default async function ManagementPage() {
 
   return (
     <ManagementPageShell buildings={buildings} locale="zh" t={t}>
-      {/* Alert strip — urgent items needing attention */}
-      <Suspense fallback={null}>
-        <ManagementAlertSection locale="zh" />
-      </Suspense>
-
       {/* Finance strip */}
       <Suspense fallback={<FinanceStripSkeleton />}>
         <FinanceSection locale="zh" t={t} buildings={buildings} />
