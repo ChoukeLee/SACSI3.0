@@ -155,11 +155,6 @@ function contractUnitReference(contractNo: string, buildingCode: string, unitNo:
   return compactReferenceToken(unitNo);
 }
 
-export function buildLeaseContractNumber(buildingCode: string, unitNo: string, startDate: string) {
-  if (!buildingCode || !unitNo || !startDate) return "";
-  return `WB-LEASE-${compactReferenceToken(buildingCode)}-${compactReferenceToken(unitNo)}-${compactDate(startDate)}`;
-}
-
 export function buildLeaseFinancialReferencePrefix(
   buildingCode: string,
   unitNo: string,
@@ -178,3 +173,4 @@ export function getNextLeaseFinancialSequence(receiptNos: Array<string | null>) 
   }, 0);
   return highestSequence + 1;
 }
+export { buildLeaseContractNumber } from "@/lib/contract-number";

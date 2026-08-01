@@ -17,6 +17,7 @@ import { EmptyState } from "@/components/empty-state";
 import { FilterBar, MetricGrid, OperationalPage, RightDrawer, SegmentedControl, StatTile } from "@/components/ui/operational";
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import { createSaleContract, recordSalePaymentAtomic, addFlexibleInstallment, updateTransferStatus, terminateSaleContract } from "./actions";
+import { buildSaleContractNumber } from "@/lib/contract-number";
 
 interface SaleListProps { contracts: SaleContractRow[]; schedules: SalePaymentScheduleRow[]; units: UnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale; canCreate?: boolean; canRecordFinance?: boolean; canManage?: boolean }
 type PanelType = "new" | "detail" | "insight" | null;
@@ -39,7 +40,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const [panel, setPanel] = useState<PanelType>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
-  const [fContractNo, setFContractNo] = useState(""); const [fUnitId, setFUnitId] = useState(""); const [fCustomerId, setFCustomerId] = useState("");
+  const [fUnitId, setFUnitId] = useState(""); const [fCustomerId, setFCustomerId] = useState("");
   const [fSignedDate, setFSignedDate] = useState(new Date().toISOString().slice(0,10)); const [fTotalAmount, setFTotalAmount] = useState(0);
   const [fPlanType, setFPlanType] = useState("lump_sum"); const [fNumInstallments, setFNumInstallments] = useState(3);
   const [fAgency, setFAgency] = useState(""); const [fAgent, setFAgent] = useState(""); const [fCommission, setFCommission] = useState(0); const [fCommissionPaid, setFCommissionPaid] = useState(false);
@@ -74,6 +75,12 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
 
   const unitMap = useMemo(()=>new Map(units.map(u=>[u.id,u])), [units]);
   const customerMap = useMemo(()=>new Map(customers.map(c=>[c.id,c])), [customers]);
+  const selectedNewUnit = useMemo(() => unitMap.get(fUnitId), [fUnitId, unitMap]);
+  const generatedSaleContractNo = useMemo(() => {
+    if (!selectedNewUnit || !fSignedDate) return "";
+    const building = buildings.find((item) => item.id === selectedNewUnit.building_id);
+    return buildSaleContractNumber(building?.code ?? "SACSI", selectedNewUnit.unit_no, fSignedDate);
+  }, [buildings, fSignedDate, selectedNewUnit]);
 
   const groupedContracts = useMemo(() => {
     const g=new Map<string,SaleContractRow[]>();
@@ -197,7 +204,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const openDetail = (id:string) => {setSelectedId(id);setPanel("detail");setError("");};
   const openInsight = (key: SaleStatKey) => {setStatFilter(key);setPanel("insight");setSelectedId(null);setError("");};
 
-  const handleCreate = async () => {if(!fUnitId||!fCustomerId||!fSignedDate||fTotalAmount<=0){setError(locale==="zh"?"请填写必填字段":"Champs obligatoires");return;}const requestId=createRequestIdRef.current??crypto.randomUUID();createRequestIdRef.current=requestId;setSaving(true);setError("");const r=await createSaleContract({unitId:fUnitId,customerId:fCustomerId,contractNo:fContractNo||"",signedDate:fSignedDate,totalAmountXof:fTotalAmount,paymentPlanType:fPlanType,numInstallments:fPlanType==="fixed_installment"?fNumInstallments:undefined,agencyCompany:fAgency||undefined,agentName:fAgent||undefined,agencyCommissionXof:fCommission,agencyCommissionPaid:fCommissionPaid,requestId});setSaving(false);if(r.success){createRequestIdRef.current=null;setPanel(null);router.refresh();}else{setError(r.error??"Failed");}};
+  const handleCreate = async () => {if(!fUnitId||!fCustomerId||!fSignedDate||fTotalAmount<=0){setError(locale==="zh"?"请填写必填字段":"Champs obligatoires");return;}const requestId=createRequestIdRef.current??crypto.randomUUID();createRequestIdRef.current=requestId;setSaving(true);setError("");const r=await createSaleContract({unitId:fUnitId,customerId:fCustomerId,contractNo:generatedSaleContractNo,signedDate:fSignedDate,totalAmountXof:fTotalAmount,paymentPlanType:fPlanType,numInstallments:fPlanType==="fixed_installment"?fNumInstallments:undefined,agencyCompany:fAgency||undefined,agentName:fAgent||undefined,agencyCommissionXof:fCommission,agencyCommissionPaid:fCommissionPaid,requestId});setSaving(false);if(r.success){createRequestIdRef.current=null;setPanel(null);router.refresh();}else{setError(r.error??"Failed");}};
   const handlePay = async () => {if(!payScheduleId||payAmount<=0){setError(locale==="zh"?"请选择分期并输入金额":"Champs obligatoires");return;}const currentScheduleId=payScheduleId;const requestId=payRequestIdRef.current??crypto.randomUUID();payRequestIdRef.current=requestId;setSaving(true);setError("");const r=await recordSalePaymentAtomic({contractId:selectedId!,scheduleId:currentScheduleId,amount:payAmount,paymentDate:payDate,receiptNo:payReceiptNo||undefined,requestId});setSaving(false);if(r.success){payRequestIdRef.current=null;setPayScheduleId("");setPayAmount(0);setPayReceiptNo("");router.refresh();}else setError(r.error??"Failed");};
   const handleAddFlex = async () => {if(!flexDueDate||flexAmount<=0){setError(locale==="zh"?"请填写到期日和金额":"Champs obligatoires");return;}setSaving(true);setError("");setShowFlexForm(false);const r=await addFlexibleInstallment({contractId:selectedId!,installmentNo:contractSchedules.length+1,dueDate:flexDueDate,amountXof:flexAmount});setSaving(false);if(r.success){setFlexDueDate("");setFlexAmount(0);}else {setShowFlexForm(true);setError(r.error??"Failed");}};
   const handleTransfer = async () => {if(!trDate){setError(locale==="zh"?"请选择过户日期":"Champs obligatoires");return;}const currentId=selectedId!;setSaving(true);setError("");setPanel(null);const r=await updateTransferStatus(currentId,trStatus,trDate,trCertNo||undefined);setSaving(false);if(!r.success){setSelectedId(currentId);setPanel("detail");setError(r.error??"Failed");}};
@@ -468,7 +475,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
 
       {/* ── New Contract Panel ── */}
       {canCreate && panel==="new"&&(<SalePanelShell onClose={()=>setPanel(null)} title={t.form.newContract}>
-        <div className="space-y-4"><div><label className={labelClass}>{t.form.contractNo}</label><input type="text" value={fContractNo} onChange={e=>setFContractNo(e.target.value)} className={inputClass}/></div><div><label className={labelClass}>{t.form.unit} *</label><select value={fUnitId} onChange={e=>setFUnitId(e.target.value)} className={inputClass}><option value="">{t.form.noUnit}</option>{sellableUnits.map(u=><option key={u.id} value={u.id}>{u.unit_no} ({u.floor_label})</option>)}</select></div><div><label className={labelClass}>{t.form.customer} *</label><select value={fCustomerId} onChange={e=>setFCustomerId(e.target.value)} className={inputClass}><option value="">{t.form.noCustomer}</option>{customers.filter(cc=>!cc.is_blacklisted).map(cc=><option key={cc.id} value={cc.id}>{cc.name}</option>)}</select></div>
+        <div className="space-y-4"><div><label className={labelClass}>{locale === "zh" ? "合同编号（自动生成）" : "N° de contrat (automatique)"}</label><input type="text" value={generatedSaleContractNo} readOnly placeholder={locale === "zh" ? "选择房源后生成" : "Choisissez le logement"} className={cn(inputClass, "bg-muted/50 text-muted-foreground")}/></div><div><label className={labelClass}>{t.form.unit} *</label><select value={fUnitId} onChange={e=>setFUnitId(e.target.value)} className={inputClass}><option value="">{t.form.noUnit}</option>{sellableUnits.map(u=><option key={u.id} value={u.id}>{u.unit_no} ({u.floor_label})</option>)}</select></div><div><label className={labelClass}>{t.form.customer} *</label><select value={fCustomerId} onChange={e=>setFCustomerId(e.target.value)} className={inputClass}><option value="">{t.form.noCustomer}</option>{customers.filter(cc=>!cc.is_blacklisted).map(cc=><option key={cc.id} value={cc.id}>{cc.name}</option>)}</select></div>
           <div className="grid grid-cols-2 gap-3"><div><label className={labelClass}>{t.form.signedDate}</label><DateInput value={fSignedDate} onChangeValue={setFSignedDate} className={inputClass}/></div><div><label className={labelClass}>{t.form.totalAmount} *</label><input type="number" value={fTotalAmount} onChange={e=>setFTotalAmount(Number(e.target.value))} className={inputClass}/></div></div>
           <div><label className={labelClass}>{locale==="zh"?"付款计划":"Plan"}</label><select value={fPlanType} onChange={e=>setFPlanType(e.target.value)} className={inputClass}><option value="lump_sum">{t.paymentPlan.lump_sum}</option><option value="fixed_installment">{t.paymentPlan.fixed_installment}</option><option value="flexible_installment">{t.paymentPlan.flexible_installment}</option></select></div>
           {fPlanType==="fixed_installment"&&<div><label className={labelClass}>{locale==="zh"?"分期数":"Nb echeances"}</label><input type="number" min={2} max={24} value={fNumInstallments} onChange={e=>setFNumInstallments(Number(e.target.value))} className={inputClass}/></div>}

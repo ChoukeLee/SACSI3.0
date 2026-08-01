@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth";
 import { computeStatus } from "@/lib/repositories/receivable-repo";
 import type { SaleContractRow, SalePaymentScheduleRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
+import { buildSaleContractNumber } from "@/lib/contract-number";
 import {
   createReceivable, cancelReceivablesForSource,
 } from "@/features/finance/receivables";
@@ -63,10 +64,31 @@ export async function createSaleContract(input: {
   await guardSaleWrite();
   const supabase = await createClient();
 
+  const { data: contractUnit, error: unitError } = await supabase
+    .from("units")
+    .select("unit_no, building:buildings(code)")
+    .eq("id", input.unitId)
+    .single();
+  if (unitError || !contractUnit) return { success: false, error: unitError?.message ?? "Unit not found." };
+  const contractBuilding = Array.isArray(contractUnit.building) ? contractUnit.building[0] : contractUnit.building;
+  const generatedContractNo = buildSaleContractNumber(
+    contractBuilding?.code ?? "SACSI",
+    contractUnit.unit_no,
+    input.signedDate,
+  );
+  const { data: samePrefix, error: numberError } = await supabase
+    .from("sale_contracts")
+    .select("contract_no")
+    .like("contract_no", `${generatedContractNo}%`);
+  if (numberError) return { success: false, error: numberError.message };
+  const contractNo = samePrefix?.some((row) => row.contract_no === generatedContractNo)
+    ? `${generatedContractNo}-${String(samePrefix.length + 1).padStart(2, "0")}`
+    : generatedContractNo;
+
   const { data, error } = await supabase.rpc("create_sale_contract_rpc", {
     p_unit_id: input.unitId,
     p_customer_id: input.customerId,
-    p_contract_no: input.contractNo,
+    p_contract_no: contractNo,
     p_signed_date: input.signedDate,
     p_total_amount_xof: input.totalAmountXof,
     p_payment_plan_type: input.paymentPlanType,

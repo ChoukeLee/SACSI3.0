@@ -181,7 +181,7 @@ export async function createLeaseContract(input: {
     contractUnit?.unit_no ?? "UNIT",
     input.startDate,
   );
-  const requestedContractNo = input.contractNo.trim() || generatedContractNo;
+  const requestedContractNo = generatedContractNo;
   const { data: samePrefix } = await supabase
     .from("lease_contracts")
     .select("contract_no")
@@ -292,7 +292,7 @@ export async function createLeaseContract(input: {
     action: "create",
     entity_type: "lease_contract",
     entity_id: data.id,
-    metadata: { contract_no: contractNo, unit_id: input.unitId, generated_contract_no: !input.contractNo.trim() },
+    metadata: { contract_no: contractNo, unit_id: input.unitId, generated_contract_no: true },
   });
 
   revalidatePath("/leases");
