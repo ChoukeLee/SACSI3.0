@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ interface Props {
   onClose: () => void;
   items?: ManagementFinanceItem[];
   asOf?: string;
+  defaultMonth?: string;
   receivables?: ReceivableRow[];
   units?: UnitRow[];
   buildings?: BuildingRow[];
@@ -49,29 +50,77 @@ const RECEIVABLE_STATUS_LABELS: Record<string, { zh: string; fr: string }> = {
 
 const PANEL_LABELS: Record<DetailType, { zh: { title: string; desc: string }; fr: { title: string; desc: string } }> = {
   receivable: {
-    zh: { title: "截至本月应收明细", desc: "到期日在本月末之前的长租、出售及历史应收款项" },
+    zh: { title: "应收明细", desc: "按月份查看长租、出售及历史应收款项" },
     fr: { title: "Du du mois", desc: "Creances dues ce mois" },
   },
   collected: {
-    zh: { title: "截至本月已收明细", desc: "到期日在本月末之前且已收款的长租、出售及历史应收项目" },
+    zh: { title: "已收明细", desc: "按月份查看已收款的长租、出售及历史应收项目" },
     fr: { title: "Encaisse sur les echeances du mois", desc: "Creances dues ce mois avec un montant encaisse" },
   },
   outstanding: {
-    zh: { title: "截至本月未收明细", desc: "到期日在本月末之前但尚未收齐的款项" },
+    zh: { title: "未收明细", desc: "按月份查看尚未收齐的款项" },
     fr: { title: "Impaye du mois", desc: "Creances impayees ce mois" },
   },
   overdue: {
-    zh: { title: "截至今日逾期明细", desc: "已超过到期日仍未收齐的款项" },
+    zh: { title: "逾期明细", desc: "按月份查看已超过到期日仍未收齐的款项" },
     fr: { title: "Retard du mois", desc: "Creances en retard de paiement" },
   },
 };
 
+function getMonthKey(date: string | null | undefined) {
+  const value = String(date ?? "");
+  return /^\d{4}-\d{2}/.test(value) ? value.slice(0, 7) : "";
+}
+
+function shiftMonth(monthKey: string, offset: number) {
+  const match = monthKey.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return monthKey;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1 + offset, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatMonthLabel(monthKey: string, locale: Locale) {
+  const match = monthKey.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return monthKey;
+  return locale === "zh" ? `${match[1]}年${Number(match[2])}月` : monthKey;
+}
+
+function summarizeItems(items: ManagementFinanceItem[]) {
+  const totalReceivable = items.reduce((sum, item) => sum + item.amountXof, 0);
+  const totalPaid = items.reduce((sum, item) => sum + item.paidAmountXof, 0);
+  const outstanding = items.reduce((sum, item) => sum + item.outstandingXof, 0);
+  const overdue = items
+    .filter((item) => item.status === "overdue")
+    .reduce((sum, item) => sum + item.outstandingXof, 0);
+  return {
+    totalReceivable,
+    totalPaid,
+    outstanding,
+    overdue,
+    count: items.length,
+    collectionRate: totalReceivable > 0 ? totalPaid / totalReceivable : 0,
+  };
+}
+
+function getMetricValue(type: DetailType, summary: ReturnType<typeof summarizeItems>) {
+  if (type === "collected") return summary.totalPaid;
+  if (type === "outstanding") return summary.outstanding;
+  if (type === "overdue") return summary.overdue;
+  return summary.totalReceivable;
+}
+
 export function FinanceDetailPanel({
-  open, onClose, items, asOf, receivables = [], units = [], buildings = [], customers = [], locale,
+  open, onClose, items, asOf, defaultMonth, receivables = [], units = [], buildings = [], customers = [], locale,
 }: Props) {
   const t = dictionaries[locale].management;
   const todayStr = asOf || new Date().toISOString().slice(0, 10);
   const currentMonthPrefix = todayStr.slice(0, 7);
+  const initialMonth = defaultMonth || currentMonthPrefix;
+  const [selectedMonth, setSelectedMonth] = useState(initialMonth);
+
+  useEffect(() => {
+    setSelectedMonth(initialMonth);
+  }, [initialMonth, open]);
 
   const unitMap = useMemo(() => {
     const m = new Map<string, UnitRow>();
@@ -97,8 +146,7 @@ export function FinanceDetailPanel({
     return receivables
       .filter((r) =>
         r.source_type !== "daily_booking"
-        && r.status !== "cancelled"
-        && r.due_date.startsWith(currentMonthPrefix))
+        && r.status !== "cancelled")
       .map((r) => {
         const unit = r.unit_id ? unitMap.get(r.unit_id) : undefined;
         const buildingId = r.building_id ?? unit?.building_id ?? null;
@@ -131,11 +179,45 @@ export function FinanceDetailPanel({
           customerName: r.customer_id ? customerMap.get(r.customer_id)?.name ?? null : null,
         };
       });
-  }, [items, receivables, currentMonthPrefix, todayStr, unitMap, buildingMap, customerMap]);
+  }, [items, receivables, todayStr, unitMap, buildingMap, customerMap]);
+
+  const availableMonths = useMemo(() => {
+    const months = new Set<string>([initialMonth]);
+    for (const item of sourceItems) {
+      const month = getMonthKey(item.dueDate);
+      if (month) months.add(month);
+    }
+    return [...months].sort((a, b) => b.localeCompare(a));
+  }, [initialMonth, sourceItems]);
+
+  const selectedMonthItems = useMemo(
+    () => sourceItems.filter((item) => getMonthKey(item.dueDate) === selectedMonth),
+    [sourceItems, selectedMonth],
+  );
+
+  const selectedMonthSummary = useMemo(() => summarizeItems(selectedMonthItems), [selectedMonthItems]);
+  const previousMonthSummary = useMemo(() => {
+    const previousMonth = shiftMonth(selectedMonth, -1);
+    return summarizeItems(sourceItems.filter((item) => getMonthKey(item.dueDate) === previousMonth));
+  }, [sourceItems, selectedMonth]);
+
+  const trendMonths = useMemo(() => {
+    const seed = selectedMonth || initialMonth;
+    return Array.from({ length: 6 }, (_, index) => shiftMonth(seed, index - 5));
+  }, [initialMonth, selectedMonth]);
+
+  const trend = useMemo(() => trendMonths.map((month) => {
+    const summary = summarizeItems(sourceItems.filter((item) => getMonthKey(item.dueDate) === month));
+    return {
+      month,
+      value: getMetricValue(open ?? "receivable", summary),
+      rate: summary.collectionRate,
+    };
+  }), [open, sourceItems, trendMonths]);
 
   const receivableData = useMemo(() => {
     if (!open) return [];
-    return sourceItems
+    return selectedMonthItems
       .filter((item) => {
         if (open === "collected") return item.paidAmountXof > 0;
         if (open === "outstanding") return item.outstandingXof > 0;
@@ -143,7 +225,7 @@ export function FinanceDetailPanel({
         return true;
       })
       .sort((a, b) => b.dueDate.localeCompare(a.dueDate));
-  }, [open, sourceItems]);
+  }, [open, selectedMonthItems]);
 
   if (!open) return null;
 
@@ -151,6 +233,10 @@ export function FinanceDetailPanel({
 
   const totalReceivable = receivableData.reduce((sum, item) => sum + item.amountXof, 0);
   const totalPaid = receivableData.reduce((sum, item) => sum + item.paidAmountXof, 0);
+  const selectedMetric = getMetricValue(open, selectedMonthSummary);
+  const previousMetric = getMetricValue(open, previousMonthSummary);
+  const delta = previousMetric > 0 ? (selectedMetric - previousMetric) / previousMetric : null;
+  const trendMax = Math.max(...trend.map((point) => point.value), 1);
 
   const getBusinessTypeLabel = (sourceType: string, category?: string | null) => {
     const key = category || sourceType;
@@ -172,6 +258,68 @@ export function FinanceDetailPanel({
   return (
     <RightDrawer open title={labels.title} subtitle={labels.desc} onClose={onClose} width="table">
         <div className="space-y-4">
+          <div className="rounded-xl border border-border bg-card p-3 shadow-xs">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-muted-foreground">{locale === "zh" ? "统计月份" : "Mois"}</p>
+                <div className="mt-2 flex max-w-full gap-1 overflow-x-auto rounded-lg border border-border bg-muted/70 p-1">
+                  {availableMonths.slice(0, 12).map((month) => (
+                    <button
+                      key={month}
+                      type="button"
+                      onClick={() => setSelectedMonth(month)}
+                      className={cn(
+                        "shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold tabular-nums transition-colors",
+                        selectedMonth === month
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:bg-card hover:text-foreground",
+                      )}
+                    >
+                      {formatMonthLabel(month, locale)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid min-w-[320px] grid-cols-3 gap-2 text-sm">
+                <div className="rounded-lg bg-muted/50 px-3 py-2">
+                  <p className="text-xs text-muted-foreground">{locale === "zh" ? "本月指标" : "Mois courant"}</p>
+                  <p className="mt-1 font-semibold tabular-nums">{formatXof(selectedMetric)}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 px-3 py-2">
+                  <p className="text-xs text-muted-foreground">{locale === "zh" ? "上月同项" : "Mois precedent"}</p>
+                  <p className="mt-1 font-semibold tabular-nums">{formatXof(previousMetric)}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 px-3 py-2">
+                  <p className="text-xs text-muted-foreground">{locale === "zh" ? "环比" : "Variation"}</p>
+                  <p className={cn(
+                    "mt-1 font-semibold tabular-nums",
+                    delta == null ? "text-muted-foreground" : delta >= 0 ? "text-accentGreen-700" : "text-accentRed-600",
+                  )}>
+                    {delta == null ? "—" : `${delta >= 0 ? "+" : ""}${Math.round(delta * 100)}%`}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 flex h-20 items-end gap-2 border-t border-border/60 pt-3">
+              {trend.map((point) => (
+                <div key={point.month} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+                  <div className="flex h-12 w-full items-end justify-center">
+                    <span
+                      className={cn(
+                        "block w-full max-w-10 rounded-t-md",
+                        point.month === selectedMonth ? "bg-primary" : "bg-muted-foreground/25",
+                      )}
+                      style={{ height: `${Math.max(8, Math.round((point.value / trendMax) * 48))}px` }}
+                    />
+                  </div>
+                  <span className="max-w-full truncate text-[11px] font-medium text-muted-foreground tabular-nums">
+                    {formatMonthLabel(point.month, locale)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Summary bar */}
           <div className="flex flex-wrap gap-4 rounded-xl bg-muted/50 px-4 py-3 text-sm">
               <div>

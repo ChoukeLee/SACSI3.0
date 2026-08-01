@@ -200,12 +200,17 @@ export function FinanceSectionClient({
       : snapshot.items,
     [snapshot.items, selectedBuildingId],
   );
-  const stats = useMemo(() => summarizeFinanceItems(filteredItems), [filteredItems]);
+  const currentMonthKey = (snapshot.monthStart || snapshot.asOf || new Date().toISOString().slice(0, 10)).slice(0, 7);
+  const currentMonthItems = useMemo(
+    () => filteredItems.filter((item) => item.dueDate.startsWith(currentMonthKey)),
+    [filteredItems, currentMonthKey],
+  );
+  const stats = useMemo(() => summarizeFinanceItems(currentMonthItems), [currentMonthItems]);
   const blocks = [
-    { key: "receivable", label: locale === "zh" ? "截至本月应收" : t.cockpit.receivableThisMonth, value: stats.totalReceivable, color: "accentBlue" as const, icon: TrendingUp },
-    { key: "collected", label: locale === "zh" ? "截至本月已收" : "Encaisse sur les echeances du mois", value: stats.totalPaid, color: "accentGreen" as const, icon: Banknote },
-    { key: "outstanding", label: locale === "zh" ? "截至本月未收" : t.cockpit.outstandingThisMonth, value: stats.outstanding, color: "accentAmber" as const, icon: WalletCards },
-    { key: "overdue", label: locale === "zh" ? "截至今日逾期" : t.cockpit.overdueThisMonth, value: stats.overdue, color: "accentRed" as const, icon: Clock3 },
+    { key: "receivable", label: locale === "zh" ? "本月应收" : t.cockpit.receivableThisMonth, value: stats.totalReceivable, color: "accentBlue" as const, icon: TrendingUp },
+    { key: "collected", label: locale === "zh" ? "本月已收" : "Encaisse du mois", value: stats.totalPaid, color: "accentGreen" as const, icon: Banknote },
+    { key: "outstanding", label: locale === "zh" ? "本月未收" : t.cockpit.outstandingThisMonth, value: stats.outstanding, color: "accentAmber" as const, icon: WalletCards },
+    { key: "overdue", label: locale === "zh" ? "本月逾期" : t.cockpit.overdueThisMonth, value: stats.overdue, color: "accentRed" as const, icon: Clock3 },
   ];
 
   return (
@@ -216,13 +221,13 @@ export function FinanceSectionClient({
             <h2 className="text-[15px] font-semibold tracking-tight">{locale === "zh" ? "财务概览" : "Vue financiere"}</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {locale === "zh"
-                ? `${selectedBuildingName ?? "全部楼栋"} · 长租、出售及历史应收 · 截至本月末 ${stats.count} 笔 · 点击指标查看明细`
-                : `${selectedBuildingName ?? "Tous les bâtiments"} · ${stats.count} échéances · Cliquez un indicateur pour le détail`}
+                ? `${selectedBuildingName ?? "全部楼栋"} · 长租、出售及历史应收 · 本月 ${stats.count} 笔 · 点击指标查看历史与环比`
+                : `${selectedBuildingName ?? "Tous les bâtiments"} · ${stats.count} échéances ce mois · Cliquez pour l'historique`}
             </p>
           </div>
           <div className="hidden text-right sm:block">
             <p className="text-lg font-semibold tabular-nums">{Math.round(stats.collectionRate * 100)}%</p>
-            <p className="text-[11px] text-muted-foreground">{locale === "zh" ? "截至本月回款率" : "Taux de recouvrement"}</p>
+            <p className="text-[11px] text-muted-foreground">{locale === "zh" ? "本月回款率" : "Taux de recouvrement"}</p>
           </div>
         </div>
         <MetricGrid columns={4}>
@@ -248,6 +253,7 @@ export function FinanceSectionClient({
           onClose={() => setDetail(null)}
           items={filteredItems}
           asOf={snapshot.asOf}
+          defaultMonth={currentMonthKey}
           locale={locale}
         />
       )}
