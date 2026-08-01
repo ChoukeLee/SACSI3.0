@@ -357,6 +357,20 @@ export async function recordLeaseFinancialEntry(input: {
   const payload = data as { success?: boolean; reference_no?: string } | null;
   if (!payload?.success || !payload.reference_no) return { success: false, error: "财务记录保存失败。" };
 
+  if (config.requiresPaidThrough && input.paidThroughDate) {
+    const latestPaidThrough = !contract.paid_through_date || input.paidThroughDate > contract.paid_through_date
+      ? input.paidThroughDate
+      : contract.paid_through_date;
+    const { error: endDateError } = await supabase
+      .from("lease_contracts")
+      .update({
+        expected_end_date: latestPaidThrough,
+        expected_end_confirmed: true,
+      })
+      .eq("id", contract.id);
+    if (endDateError) return { success: false, error: "收款已保存，但合同到期日同步失败，请重试。" };
+  }
+
   revalidatePath("/leases");
   revalidatePath("/fr/leases");
   revalidatePath("/finance");
