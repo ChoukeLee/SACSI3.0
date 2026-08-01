@@ -40,7 +40,6 @@ async function getManagementFinanceSnapshotFallback(): Promise<ManagementFinance
         .select("id, due_date, source_type, category, title, amount_xof, paid_amount_xof, building_id, unit_id, customer_id, status")
         .neq("source_type", "daily_booking")
         .neq("status", "cancelled")
-        .gte("due_date", monthStartText)
         .lt("due_date", monthEndText)
         .order("due_date", { ascending: false })
         .order("id")

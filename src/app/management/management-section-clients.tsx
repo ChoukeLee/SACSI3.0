@@ -34,8 +34,8 @@ interface UnitState {
 interface FloorGroup { key: string; label: string; sortValue: number; states: UnitState[] }
 
 export const STATUS_DOT: Record<MgmtStatus, string> = {
-  sold: "#A0D0E8", leased: "#B8C0C8", dailyOccupied: "#62B6F5",
-  reserved: "#E8C840", cleaningPending: "#5CC4B8", maintenance: "#F08090",
+  sold: "#69B8E3", leased: "#6D879C", dailyOccupied: "#1E83CC",
+  reserved: "#D39B0B", cleaningPending: "#50BFAE", maintenance: "#EA637E",
   ownerOccupied: "#8F8D89",
   available: "#B88A48",
 };
@@ -126,10 +126,10 @@ export function FinanceSectionClient({
 
   const stats = snapshot.summary;
   const blocks = [
-    { key: "receivable", label: locale === "zh" ? "本月到期应收" : t.cockpit.receivableThisMonth, value: stats.totalReceivable, color: "accentBlue" as const, icon: TrendingUp },
-    { key: "collected", label: locale === "zh" ? "本月到期已收" : "Encaisse sur les echeances du mois", value: stats.totalPaid, color: "accentGreen" as const, icon: Banknote },
-    { key: "outstanding", label: locale === "zh" ? "本月到期未收" : t.cockpit.outstandingThisMonth, value: stats.outstanding, color: "accentAmber" as const, icon: WalletCards },
-    { key: "overdue", label: locale === "zh" ? "本月到期逾期" : t.cockpit.overdueThisMonth, value: stats.overdue, color: "accentRed" as const, icon: Clock3 },
+    { key: "receivable", label: locale === "zh" ? "截至本月应收" : t.cockpit.receivableThisMonth, value: stats.totalReceivable, color: "accentBlue" as const, icon: TrendingUp },
+    { key: "collected", label: locale === "zh" ? "截至本月已收" : "Encaisse sur les echeances du mois", value: stats.totalPaid, color: "accentGreen" as const, icon: Banknote },
+    { key: "outstanding", label: locale === "zh" ? "截至本月未收" : t.cockpit.outstandingThisMonth, value: stats.outstanding, color: "accentAmber" as const, icon: WalletCards },
+    { key: "overdue", label: locale === "zh" ? "截至今日逾期" : t.cockpit.overdueThisMonth, value: stats.overdue, color: "accentRed" as const, icon: Clock3 },
   ];
 
   return (
@@ -140,13 +140,13 @@ export function FinanceSectionClient({
             <h2 className="text-[15px] font-semibold tracking-tight">{locale === "zh" ? "财务概览" : "Vue financiere"}</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {locale === "zh"
-                ? `长租、出售及历史应收 · ${stats.count} 笔 · 点击指标查看明细`
+                ? `长租、出售及历史应收 · 截至本月末 ${stats.count} 笔 · 点击指标查看明细`
                 : `${stats.count} échéances · Cliquez un indicateur pour le détail`}
             </p>
           </div>
           <div className="hidden text-right sm:block">
             <p className="text-lg font-semibold tabular-nums">{Math.round(stats.collectionRate * 100)}%</p>
-            <p className="text-[11px] text-muted-foreground">{locale === "zh" ? "本月到期回款率" : "Taux de recouvrement"}</p>
+            <p className="text-[11px] text-muted-foreground">{locale === "zh" ? "截至本月回款率" : "Taux de recouvrement"}</p>
           </div>
         </div>
         <MetricGrid columns={4}>

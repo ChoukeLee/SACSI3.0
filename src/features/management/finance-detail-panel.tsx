@@ -49,19 +49,19 @@ const RECEIVABLE_STATUS_LABELS: Record<string, { zh: string; fr: string }> = {
 
 const PANEL_LABELS: Record<DetailType, { zh: { title: string; desc: string }; fr: { title: string; desc: string } }> = {
   receivable: {
-    zh: { title: "本月应收明细", desc: "到期日在本月的应收款项" },
+    zh: { title: "截至本月应收明细", desc: "到期日在本月末之前的长租、出售及历史应收款项" },
     fr: { title: "Du du mois", desc: "Creances dues ce mois" },
   },
   collected: {
-    zh: { title: "本月到期应收已收明细", desc: "到期日在本月且已收款的应收项目，并非仅按本月收款日期统计" },
+    zh: { title: "截至本月已收明细", desc: "到期日在本月末之前且已收款的长租、出售及历史应收项目" },
     fr: { title: "Encaisse sur les echeances du mois", desc: "Creances dues ce mois avec un montant encaisse" },
   },
   outstanding: {
-    zh: { title: "本月未收明细", desc: "本月到期但尚未收齐的款项" },
+    zh: { title: "截至本月未收明细", desc: "到期日在本月末之前但尚未收齐的款项" },
     fr: { title: "Impaye du mois", desc: "Creances impayees ce mois" },
   },
   overdue: {
-    zh: { title: "本月逾期明细", desc: "已超过到期日仍未收齐的款项" },
+    zh: { title: "截至今日逾期明细", desc: "已超过到期日仍未收齐的款项" },
     fr: { title: "Retard du mois", desc: "Creances en retard de paiement" },
   },
 };
