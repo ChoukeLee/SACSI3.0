@@ -100,6 +100,74 @@ function stateCustomerName(s: UnitState, cmap: Map<string, string>, locale: Loca
   if (s.status === "maintenance") return locale === "zh" ? "维修" : "Bloqué";
   return "";
 }
+
+function summarizeFinanceItems(items: ManagementFinanceSnapshot["items"]): ManagementFinanceSnapshot["summary"] {
+  const totalReceivable = items.reduce((sum, item) => sum + item.amountXof, 0);
+  const totalPaid = items.reduce((sum, item) => sum + item.paidAmountXof, 0);
+  const outstanding = items.reduce((sum, item) => sum + item.outstandingXof, 0);
+  const overdue = items
+    .filter((item) => item.status === "overdue")
+    .reduce((sum, item) => sum + item.outstandingXof, 0);
+
+  return {
+    totalReceivable,
+    totalPaid,
+    outstanding,
+    overdue,
+    count: items.length,
+    collectionRate: totalReceivable > 0 ? totalPaid / totalReceivable : 0,
+  };
+}
+
+export function ManagementOverviewClient({
+  snapshot, buildings, units, dailyBookings, leaseContracts, saleContracts,
+  cleaningTasks, customers, locale, t,
+}: {
+  snapshot: ManagementFinanceSnapshot;
+  buildings: BuildingRow[]; units: UnitRow[]; dailyBookings: DailyBookingRow[];
+  leaseContracts: LeaseContractRow[]; saleContracts: SaleContractRow[];
+  cleaningTasks: { unit_id: string; is_completed: boolean }[];
+  customers: CustomerRow[]; locale: Locale; t: ManagementDict;
+}) {
+  const activeBuildings = useMemo(() => buildings.filter((building) => building.is_active), [buildings]);
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string>(activeBuildings[0]?.id ?? "");
+  const selectedBuilding = activeBuildings.find((building) => building.id === selectedBuildingId) ?? activeBuildings[0] ?? null;
+
+  useEffect(() => {
+    if (activeBuildings.length === 0) {
+      setSelectedBuildingId("");
+      return;
+    }
+    if (!activeBuildings.some((building) => building.id === selectedBuildingId)) {
+      setSelectedBuildingId(activeBuildings[0].id);
+    }
+  }, [activeBuildings, selectedBuildingId]);
+
+  return (
+    <>
+      <FinanceSectionClient
+        snapshot={snapshot}
+        selectedBuildingId={selectedBuilding?.id ?? null}
+        selectedBuildingName={selectedBuilding?.display_name ?? null}
+        locale={locale}
+        t={t}
+      />
+      <UnitDataClient
+        buildings={buildings}
+        units={units}
+        dailyBookings={dailyBookings}
+        leaseContracts={leaseContracts}
+        saleContracts={saleContracts}
+        cleaningTasks={cleaningTasks}
+        customers={customers}
+        selectedBuildingId={selectedBuilding?.id ?? ""}
+        onSelectedBuildingIdChange={setSelectedBuildingId}
+        locale={locale}
+        t={t}
+      />
+    </>
+  );
+}
 function stateDateText(s: UnitState, locale: Locale): string {
   if (s.booking) {
     const st = shortDate(s.booking.check_in);
@@ -117,14 +185,22 @@ function stateDateText(s: UnitState, locale: Locale): string {
 // ════════════════════════════════════════════════════════════
 
 export function FinanceSectionClient({
-  snapshot, locale, t,
+  snapshot, selectedBuildingId, selectedBuildingName, locale, t,
 }: {
   snapshot: ManagementFinanceSnapshot;
+  selectedBuildingId?: string | null;
+  selectedBuildingName?: string | null;
   locale: Locale; t: ManagementDict;
 }) {
   const [detail, setDetail] = useState<string | null>(null);
 
-  const stats = snapshot.summary;
+  const filteredItems = useMemo(
+    () => selectedBuildingId
+      ? snapshot.items.filter((item) => item.buildingId === selectedBuildingId)
+      : snapshot.items,
+    [snapshot.items, selectedBuildingId],
+  );
+  const stats = useMemo(() => summarizeFinanceItems(filteredItems), [filteredItems]);
   const blocks = [
     { key: "receivable", label: locale === "zh" ? "截至本月应收" : t.cockpit.receivableThisMonth, value: stats.totalReceivable, color: "accentBlue" as const, icon: TrendingUp },
     { key: "collected", label: locale === "zh" ? "截至本月已收" : "Encaisse sur les echeances du mois", value: stats.totalPaid, color: "accentGreen" as const, icon: Banknote },
@@ -140,8 +216,8 @@ export function FinanceSectionClient({
             <h2 className="text-[15px] font-semibold tracking-tight">{locale === "zh" ? "财务概览" : "Vue financiere"}</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {locale === "zh"
-                ? `长租、出售及历史应收 · 截至本月末 ${stats.count} 笔 · 点击指标查看明细`
-                : `${stats.count} échéances · Cliquez un indicateur pour le détail`}
+                ? `${selectedBuildingName ?? "全部楼栋"} · 长租、出售及历史应收 · 截至本月末 ${stats.count} 笔 · 点击指标查看明细`
+                : `${selectedBuildingName ?? "Tous les bâtiments"} · ${stats.count} échéances · Cliquez un indicateur pour le détail`}
             </p>
           </div>
           <div className="hidden text-right sm:block">
@@ -170,7 +246,7 @@ export function FinanceSectionClient({
         <FinanceDetailPanel
           open={detail as "receivable" | "collected" | "outstanding" | "overdue"}
           onClose={() => setDetail(null)}
-          items={snapshot.items}
+          items={filteredItems}
           asOf={snapshot.asOf}
           locale={locale}
         />
@@ -185,12 +261,15 @@ export function FinanceSectionClient({
 
 export function UnitDataClient({
   buildings, units, dailyBookings, leaseContracts, saleContracts,
-  cleaningTasks, customers, locale, t,
+  cleaningTasks, customers, selectedBuildingId, onSelectedBuildingIdChange, locale, t,
 }: {
   buildings: BuildingRow[]; units: UnitRow[]; dailyBookings: DailyBookingRow[];
   leaseContracts: LeaseContractRow[]; saleContracts: SaleContractRow[];
   cleaningTasks: { unit_id: string; is_completed: boolean }[];
-  customers: CustomerRow[]; locale: Locale; t: ManagementDict;
+  customers: CustomerRow[];
+  selectedBuildingId: string;
+  onSelectedBuildingIdChange: (buildingId: string) => void;
+  locale: Locale; t: ManagementDict;
 }) {
   const sacsi5BuildingId = useMemo(() => buildings.find(b => b.code === "SACSI5")?.id ?? null, [buildings]);
   const operationalUnits = useMemo(
@@ -198,19 +277,17 @@ export function UnitDataClient({
     [units, sacsi5BuildingId],
   );
   const activeBuildings = useMemo(() => buildings.filter(b => b.is_active), [buildings]);
-  const firstBuildingId = activeBuildings[0]?.id ?? "";
-  const [selectedBuildingId, setSelectedBuildingId] = useState<string>(firstBuildingId);
   const [selectedStatus, setSelectedStatus] = useState<MgmtStatus | null>(null);
 
   useEffect(() => {
     if (activeBuildings.length === 0) {
-      setSelectedBuildingId("");
+      onSelectedBuildingIdChange("");
       return;
     }
     if (!activeBuildings.some((building) => building.id === selectedBuildingId)) {
-      setSelectedBuildingId(activeBuildings[0].id);
+      onSelectedBuildingIdChange(activeBuildings[0].id);
     }
-  }, [activeBuildings, selectedBuildingId]);
+  }, [activeBuildings, onSelectedBuildingIdChange, selectedBuildingId]);
 
   const filteredUnits = useMemo(() => {
     return operationalUnits.filter(u => u.building_id === selectedBuildingId);
@@ -259,7 +336,7 @@ export function UnitDataClient({
         </span>
         <SegmentedControl
           value={selectedBuildingId}
-          onChange={setSelectedBuildingId}
+          onChange={onSelectedBuildingIdChange}
           ariaLabel={locale === "zh" ? "楼栋筛选" : "Filtre bâtiment"}
           items={activeBuildings.map((b) => ({
             value: b.id,

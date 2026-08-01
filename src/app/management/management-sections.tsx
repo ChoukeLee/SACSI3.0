@@ -1,6 +1,6 @@
 import { getUnits, getDailyBookings, getLeaseContracts, getSaleContracts, getCleaningTasks, getCustomers, getManagementFinanceSnapshot } from "./management-data";
 import { sortUnits } from "@/lib/utils";
-import { FinanceSectionClient, UnitDataClient } from "./management-section-clients";
+import { FinanceSectionClient, ManagementOverviewClient } from "./management-section-clients";
 import type { Locale, ManagementDict } from "@/lib/i18n";
 import type {
   BuildingRow, UnitRow, DailyBookingRow, LeaseContractRow,
@@ -37,10 +37,10 @@ export async function UnitDataSection({
 }) {
   const [
     unitsRaw, dailyBookingsRaw, leaseContractsRaw, saleContractsRaw,
-    cleaningTasksRaw, customersRaw,
+    cleaningTasksRaw, customersRaw, snapshot,
   ] = await Promise.all([
     getUnits(), getDailyBookings(), getLeaseContracts(),
-    getSaleContracts(), getCleaningTasks(), getCustomers(),
+    getSaleContracts(), getCleaningTasks(), getCustomers(), getManagementFinanceSnapshot(),
   ]);
 
   const units = sortUnits((unitsRaw ?? []) as UnitRow[]);
@@ -51,7 +51,8 @@ export async function UnitDataSection({
   const customers = (customersRaw ?? []) as CustomerRow[];
 
   return (
-    <UnitDataClient
+    <ManagementOverviewClient
+      snapshot={snapshot}
       buildings={buildings}
       units={units}
       dailyBookings={dailyBookings}

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { dictionaries } from "@/lib/i18n";
 import { getBuildings } from "./management-data";
-import { FinanceSection, UnitDataSection } from "./management-sections";
+import { UnitDataSection } from "./management-sections";
 import { ManagementPageShell } from "./management-page-shell";
 import {
   FinanceStripSkeleton, StatusOverviewSkeleton,
@@ -21,15 +21,11 @@ export default async function ManagementPage() {
 
   return (
     <ManagementPageShell buildings={buildings} locale="zh" t={t}>
-      {/* Finance strip */}
-      <Suspense fallback={<FinanceStripSkeleton />}>
-        <FinanceSection locale="zh" t={t} buildings={buildings} />
-      </Suspense>
-
       {/* Unit data: building selector + status + risk alerts + room board */}
       <Suspense
         fallback={
           <div className="flex flex-col gap-4">
+            <FinanceStripSkeleton />
             <StatusOverviewSkeleton />
             <RoomBoardSkeleton />
           </div>

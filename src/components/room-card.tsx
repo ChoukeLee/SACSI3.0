@@ -29,19 +29,19 @@ export interface RoomCardAction {
 }
 
 /* ── Status → color mapping ── */
-type CardColors = { bg: string; border: string; accent: string; badge: string; nameColor: string; metaColor: string; btnBg: string };
+type CardColors = { bg: string; badge: string; nameColor: string; metaColor: string; btnBg: string };
 const statusStyle: Record<RoomStatus, CardColors> = {
-  sold:            { bg: "bg-[#D7F0FF]", border: "border-[#91CDEE]", accent: "bg-[#69B8E3]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#4D6780]",                    btnBg: "bg-white/[0.90]" },
-  managed:         { bg: "bg-[#B7EBDD]", border: "border-[#68C8B8]", accent: "bg-[#48B9A8]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#456F67]",                    btnBg: "bg-white/[0.90]" },
-  leased:          { bg: "bg-[#C9D3DE]", border: "border-[#8EA4B7]", accent: "bg-[#6D879C]", badge: "bg-white text-[#17324D]", nameColor: "text-[#17324D]", metaColor: "text-[#465B6D]", btnBg: "bg-white/[0.92]" },
-  daily_occupied:  { bg: "bg-[#58AEEF]", border: "border-[#2D91D8]", accent: "bg-[#1E83CC]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.98)]", metaColor: "text-[rgba(255,255,255,0.78)]", btnBg: "bg-white/[0.84]" },
-  dailyOccupied:   { bg: "bg-[#58AEEF]", border: "border-[#2D91D8]", accent: "bg-[#1E83CC]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.98)]", metaColor: "text-[rgba(255,255,255,0.78)]", btnBg: "bg-white/[0.84]" },
-  reserved:        { bg: "bg-[#FFE8A6]", border: "border-[#E2BE39]", accent: "bg-[#D39B0B]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#735F24]",                    btnBg: "bg-white/[0.90]" },
-  cleaning_pending:{ bg: "bg-[#BFEFE6]", border: "border-[#70CEC0]", accent: "bg-[#50BFAE]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#456F67]",                    btnBg: "bg-white/[0.90]" },
-  cleaningPending: { bg: "bg-[#BFEFE6]", border: "border-[#70CEC0]", accent: "bg-[#50BFAE]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#456F67]",                    btnBg: "bg-white/[0.90]" },
-  maintenance:     { bg: "bg-[#FFC9D5]", border: "border-[#F18AA0]", accent: "bg-[#EA637E]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#7A5360]",                    btnBg: "bg-white/[0.90]" },
-  ownerOccupied:   { bg: "bg-[#E2DFD8]", border: "border-[#BDB7AC]", accent: "bg-[#8F8D89]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#62615D]",                    btnBg: "bg-white/[0.90]" },
-  available:       { bg: "bg-[#E7CD9A]", border: "border-[#C7974B]", accent: "bg-[#B88A48]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#6F552D]",                    btnBg: "bg-white/[0.90]" },
+  sold:            { bg: "bg-[#D7F0FF]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#4D6780]",                    btnBg: "bg-white/[0.90]" },
+  managed:         { bg: "bg-[#B7EBDD]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#456F67]",                    btnBg: "bg-white/[0.90]" },
+  leased:          { bg: "bg-[#C9D3DE]", badge: "bg-white text-[#17324D]", nameColor: "text-[#17324D]", metaColor: "text-[#465B6D]", btnBg: "bg-white/[0.92]" },
+  daily_occupied:  { bg: "bg-[#58AEEF]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.98)]", metaColor: "text-[rgba(255,255,255,0.78)]", btnBg: "bg-white/[0.84]" },
+  dailyOccupied:   { bg: "bg-[#58AEEF]", badge: "bg-white/[0.94] text-[#17324D]", nameColor: "text-[rgba(255,255,255,0.98)]", metaColor: "text-[rgba(255,255,255,0.78)]", btnBg: "bg-white/[0.84]" },
+  reserved:        { bg: "bg-[#FFE8A6]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#735F24]",                    btnBg: "bg-white/[0.90]" },
+  cleaning_pending:{ bg: "bg-[#BFEFE6]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#456F67]",                    btnBg: "bg-white/[0.90]" },
+  cleaningPending: { bg: "bg-[#BFEFE6]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#456F67]",                    btnBg: "bg-white/[0.90]" },
+  maintenance:     { bg: "bg-[#FFC9D5]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#7A5360]",                    btnBg: "bg-white/[0.90]" },
+  ownerOccupied:   { bg: "bg-[#E2DFD8]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#62615D]",                    btnBg: "bg-white/[0.90]" },
+  available:       { bg: "bg-[#E7CD9A]", badge: "bg-white text-[#17324D]",        nameColor: "text-[#17324D]",                   metaColor: "text-[#6F552D]",                    btnBg: "bg-white/[0.90]" },
 }
 
 interface Props {
@@ -100,11 +100,9 @@ export function RoomCard({ roomNo, status, statusLabel, customerName, dateText, 
   if (children) {
     const inner = (
       <div className={cn(
-        "relative flex h-full min-h-[236px] flex-col gap-3 overflow-hidden rounded-lg border p-4 shadow-[0_8px_18px_rgba(25,58,92,0.08)]",
-        s.border,
+        "flex h-full min-h-[236px] flex-col gap-3 rounded-lg border border-[rgba(23,50,77,0.08)] p-4 shadow-[0_8px_18px_rgba(25,58,92,0.08)]",
         s.bg, s.nameColor, className,
       )}>
-        <span className={cn("absolute inset-x-0 top-0 h-1", s.accent)} />
         <div className="flex items-center justify-between gap-2">
           <span className={cn("inline-flex rounded-full px-2 py-1 font-mono text-xs font-bold", s.badge)}>{roomNo}</span>
           <span className={cn("h-2 w-2 rounded-full", s.nameColor, "opacity-40")} />
@@ -121,11 +119,10 @@ export function RoomCard({ roomNo, status, statusLabel, customerName, dateText, 
   /* ── Matrix variant — hotel PMS card ── */
   const inner = (
     <div className={cn(
-      "relative h-[106px] w-full overflow-hidden rounded-[10px] border shadow-[0_8px_18px_rgba(25,58,92,0.08)]",
+      "relative h-[106px] w-full rounded-[10px] border border-[rgba(23,50,77,0.08)] shadow-[0_8px_18px_rgba(25,58,92,0.08)]",
       "font-[\"Segoe_UI\",\"PingFang_SC\",\"Microsoft_YaHei\",system-ui,sans-serif]",
-      s.border, s.bg, className,
+      s.bg, className,
     )}>
-      <span className={cn("absolute inset-x-0 top-0 h-[3px]", s.accent)} />
       <span className={cn(
         "absolute top-[11px] left-3 inline-flex h-[24px] min-w-[42px] items-center justify-center rounded-full px-[9px] text-center text-[13px] font-bold leading-[24px]",
         "shadow-[0_1px_2px_rgba(25,58,92,0.06)]",
