@@ -43,7 +43,7 @@ type LeaseUnitRow = UnitRow & {
   unit_business_flags?: UnitBusinessFlag[];
 };
 
-interface LeaseListProps { contracts: LeaseContractRow[]; units: LeaseUnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale; canCreate?: boolean; canRecordFinance?: boolean }
+interface LeaseListProps { contracts: LeaseContractRow[]; units: LeaseUnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale; canCreate?: boolean; canRecordFinance?: boolean; canActivate?: boolean; canMoveOut?: boolean }
 type PanelType = "new" | "detail" | "financeEntry" | "moveout" | "attention" | "insight" | null;
 type AttentionTab = "overdue" | "upcoming";
 const paymentCycles = ["monthly", "quarterly", "semiannual", "annual"];
@@ -125,7 +125,7 @@ function getOriginalMonthlyRent(contract: LeaseContractRow, payments: PaymentRow
   return null;
 }
 
-export function LeaseList({ contracts, units, customers, payments, receivables, buildings, locale, canCreate = true, canRecordFinance = true }: LeaseListProps) {
+export function LeaseList({ contracts, units, customers, payments, receivables, buildings, locale, canCreate = true, canRecordFinance = true, canActivate = true, canMoveOut = true }: LeaseListProps) {
   const router = useRouter();
   const t = dictionaries[locale].leases;
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -856,8 +856,8 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
             {selected.rent_free_days>0&&<div><dt className="text-xs text-muted-foreground">{t.form.rentFreeDays}</dt><dd>{selected.rent_free_days}天</dd></div>}
             {selected.signer_name&&<div><dt className="text-xs text-muted-foreground">{t.form.signerName}</dt><dd>{selected.signer_name}</dd></div>}
           </dl>
-          {selected.status==="draft"&&<Button className="w-full" variant="default" onClick={()=>handleActivate(selected.id)} disabled={saving}>{saving?"...":t.form.activateContract}</Button>}
-          {selected.status==="active"&&<Button className="w-full" variant="outline" onClick={()=>openMoveOut(selected.id)}><LogOut className="mr-1 inline h-4 w-4"/>{t.settlement.moveOut}</Button>}
+          {canActivate&&selected.status==="draft"&&<Button className="w-full" variant="default" onClick={()=>handleActivate(selected.id)} disabled={saving}>{saving?"...":t.form.activateContract}</Button>}
+          {canMoveOut&&selected.status==="active"&&<Button className="w-full" variant="outline" onClick={()=>openMoveOut(selected.id)}><LogOut className="mr-1 inline h-4 w-4"/>{t.settlement.moveOut}</Button>}
           {/* Risk indicators */}
           {selected.status==="active"&&<div className="border-t pt-4">
             <h4 className="flex items-center gap-1.5 text-sm font-semibold"><AlertTriangle className="h-3.5 w-3.5 text-amber-500"/>{locale==="zh"?"风险概览":"Apercu des risques"}</h4>

@@ -39,6 +39,7 @@ interface BookingPanelProps {
   onCleaningTaskCompleted?: (taskId: string, unitId: string, status: UnitStatus) => void;
   onOperationSnapshot?: (snapshot: DailyOperationSnapshot) => void;
   backfillMode?: boolean;
+  readOnly?: boolean;
 }
 
 type AdvancedTask = "payment" | "discount" | "extend" | "fixedCheckout" | null;
@@ -58,6 +59,7 @@ export function BookingPanel({
   onCleaningTaskCompleted,
   onOperationSnapshot,
   backfillMode,
+  readOnly = false,
 }: BookingPanelProps) {
   const t = dictionaries[locale].dailyRentals;
   const router = useRouter();
@@ -568,7 +570,7 @@ export function BookingPanel({
               </div>
             )}
 
-            <section className="space-y-3 rounded-xl border border-border bg-muted/35 p-3">
+            {!readOnly && <section className="space-y-3 rounded-xl border border-border bg-muted/35 p-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-foreground">{locale === "zh" ? "当前操作" : "Action actuelle"}</p>
@@ -849,7 +851,7 @@ export function BookingPanel({
                 </div>
               )}
               </div>
-            </section>
+            </section>}
             {actionError && <p className="text-sm text-accentRed-600" role="alert">{actionError}</p>}
           </>)}
         </div>

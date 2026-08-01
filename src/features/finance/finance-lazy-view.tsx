@@ -29,12 +29,13 @@ interface Props {
   buildings: BuildingRow[];
   attachments: AttachmentRow[];
   locale: Locale;
+  canWrite?: boolean;
 }
 
-export function FinanceLazyView({ entries, units, buildingId, receivables, customers, buildings, attachments, locale }: Props) {
+export function FinanceLazyView({ entries, units, buildingId, receivables, customers, buildings, attachments, locale, canWrite = true }: Props) {
   return (
     <FinanceTabs
-      ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale={locale} attachments={attachments} />}
+      ledger={<LedgerList entries={entries} units={units} buildingId={buildingId} locale={locale} attachments={attachments} canWrite={canWrite} />}
       receivables={<ReceivableList receivables={receivables} units={units} customers={customers} buildings={buildings} locale={locale} />}
       locale={locale}
     />

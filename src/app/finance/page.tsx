@@ -25,13 +25,13 @@ export default async function FinancePage() {
     <div className="space-y-5">
       <PageHeader title={t.title} description={t.description} />
       <Suspense fallback={<OperationalPageSkeleton kind="table" rows={8} />}>
-        <FinanceData locale="zh" />
+        <FinanceData locale="zh" canWrite={user.role === "admin" || user.role === "finance"} />
       </Suspense>
     </div>
   );
 }
 
-async function FinanceData({ locale }: { locale: "zh" | "fr" }) {
+async function FinanceData({ locale, canWrite }: { locale: "zh" | "fr"; canWrite: boolean }) {
   const supabase = await createClient();
   const { data: building } = await supabase.from("buildings").select("id").eq("code", "SACSI11").single();
   const buildingId = building?.id ?? null;
@@ -60,5 +60,5 @@ async function FinanceData({ locale }: { locale: "zh" | "fr" }) {
     if (!attachmentsRes.error) attachments = (attachmentsRes.data ?? []) as unknown as AttachmentRow[];
   }
 
-  return <FinanceLazyView entries={entries} units={units} buildingId={buildingId} receivables={receivables} customers={customers} buildings={buildings} locale={locale} attachments={attachments} />;
+  return <FinanceLazyView entries={entries} units={units} buildingId={buildingId} receivables={receivables} customers={customers} buildings={buildings} locale={locale} attachments={attachments} canWrite={canWrite} />;
 }

@@ -15,6 +15,13 @@ const frontDeskUser: CurrentUser = {
   displayName: "Niamké",
 };
 
+const bossUser: CurrentUser = {
+  id: "boss-user",
+  email: "boss@sacsi.com",
+  role: "boss",
+  displayName: "GAO",
+};
+
 describe("rental sales role", () => {
   it("maps the Ying account to the application role and supported database role", () => {
     expect(getSeedAccountProfile("YING@SACSI.COM")).toEqual({
@@ -28,7 +35,7 @@ describe("rental sales role", () => {
     expect(hasPermission(rentalSalesUser, "daily_rentals:write")).toBe(true);
     expect(hasPermission(rentalSalesUser, "leases:write")).toBe(true);
     expect(hasPermission(rentalSalesUser, "sales:write")).toBe(true);
-    expect(hasPermission(rentalSalesUser, "audit_logs:read")).toBe(true);
+    expect(hasPermission(rentalSalesUser, "audit_logs:read")).toBe(false);
     expect(hasPermission(rentalSalesUser, "finance:read")).toBe(false);
     expect(hasPermission(rentalSalesUser, "settings:read")).toBe(false);
   });
@@ -43,6 +50,48 @@ describe("rental sales role", () => {
 
   it("denies unknown route sections by default", () => {
     expect(canAccessPage("admin", "not-a-real-section")).toBe(false);
+  });
+});
+
+describe("boss role", () => {
+  it("uses the standardized display name", () => {
+    expect(getSeedAccountProfile("BOSS@SACSI.COM")).toEqual({
+      role: "boss",
+      displayName: "GAO",
+    });
+  });
+
+  it("has full business read access without mutation or settings access", () => {
+    for (const permission of [
+      "units:read",
+      "customers:read",
+      "daily_rentals:read",
+      "leases:read",
+      "sales:read",
+      "finance:read",
+      "finance:export",
+      "audit_logs:read",
+    ]) {
+      expect(hasPermission(bossUser, permission)).toBe(true);
+    }
+    for (const permission of [
+      "units:write",
+      "customers:write",
+      "daily_rentals:write",
+      "leases:write",
+      "sales:write",
+      "finance:write",
+      "settings:read",
+    ]) {
+      expect(hasPermission(bossUser, permission)).toBe(false);
+    }
+  });
+
+  it("can open all business pages and read-only audit logs", () => {
+    for (const section of ["management", "finance", "daily-rentals", "leases", "sales", "customers", "audit-logs"]) {
+      expect(canAccessPage("boss", section)).toBe(true);
+    }
+    expect(canAccessPage("boss", "settings")).toBe(false);
   });
 });
 

@@ -14,12 +14,12 @@ export default async function FrenchCustomersPage() {
 
   return (
     <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
-      <FrenchCustomersData />
+      <FrenchCustomersData canEdit={user.role !== "boss"} />
     </Suspense>
   );
 }
 
-async function FrenchCustomersData() {
+async function FrenchCustomersData({ canEdit }: { canEdit: boolean }) {
   const supabase = await createClient();
 
   const [customersRes, unitsRes, leaseRes, saleRes, dailyRes] = await Promise.all([
@@ -83,6 +83,7 @@ async function FrenchCustomersData() {
       buildingOptions={[...buildingMap.values()].sort((a, b) => a.code.localeCompare(b.code))}
       customerLastActivity={customerLastActivity}
       locale="fr"
+      canEdit={canEdit}
     />
   );
 }

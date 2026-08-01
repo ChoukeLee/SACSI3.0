@@ -65,6 +65,7 @@ interface LedgerListProps {
   buildingId: string | null;
   locale: Locale;
   attachments?: AttachmentRow[];
+  canWrite?: boolean;
 }
 
 const allCategories = [
@@ -77,7 +78,7 @@ const inputClass = cn("w-full", controlClass);
 const labelClass = "block mb-1 text-xs font-semibold text-muted-foreground";
 const pageSize = DEFAULT_BUSINESS_TABLE_PAGE_SIZE;
 
-export function LedgerList({ entries, units, buildingId, locale, attachments }: LedgerListProps) {
+export function LedgerList({ entries, units, buildingId, locale, attachments, canWrite = true }: LedgerListProps) {
   const t = dictionaries[locale].finance;
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -232,9 +233,11 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
             <Button onClick={handleExportCsv} disabled={filtered.length === 0} variant="outline" size="sm">
               <Download className="h-4 w-4" />{t.export.csv}
             </Button>
-            <Button onClick={() => setShowNewEntry(true)} size="sm">
-              <Plus className="h-4 w-4" />{t.entry.title}
-            </Button>
+            {canWrite && (
+              <Button onClick={() => setShowNewEntry(true)} size="sm">
+                <Plus className="h-4 w-4" />{t.entry.title}
+              </Button>
+            )}
           </div>
         }
       >
@@ -371,7 +374,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments }: 
       <p className="text-xs text-muted-foreground">{filtered.length} {locale === "fr" ? "écritures" : "条记录"}</p>
 
       {/* New entry side panel */}
-      {showNewEntry && (
+      {canWrite && showNewEntry && (
         <>
           <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setShowNewEntry(false)} />
           <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]">

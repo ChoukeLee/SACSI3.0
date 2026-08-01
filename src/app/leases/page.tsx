@@ -19,14 +19,14 @@ export default async function LeasesPage() {
       <div className="lg:hidden"><DesktopOnly locale="zh" /></div>
       <div className="hidden lg:block">
         <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
-          <LeasesData locale="zh" canCreate={user.role === "admin"} canRecordFinance={user.role === "admin" || user.role === "finance"} />
+          <LeasesData locale="zh" canCreate={user.role === "admin" || user.role === "rental_sales"} canRecordFinance={user.role === "admin" || user.role === "finance"} canActivate={user.role === "admin" || user.role === "rental_sales"} canMoveOut={user.role === "admin" || user.role === "finance"} />
         </Suspense>
       </div>
     </>
   );
 }
 
-async function LeasesData({ locale, canCreate, canRecordFinance }: { locale: "zh" | "fr"; canCreate: boolean; canRecordFinance: boolean }) {
+async function LeasesData({ locale, canCreate, canRecordFinance, canActivate, canMoveOut }: { locale: "zh" | "fr"; canCreate: boolean; canRecordFinance: boolean; canActivate: boolean; canMoveOut: boolean }) {
   const supabase = await createClient();
   const { data: allBuildings, error: bldErr } = await supabase
     .from("buildings")
@@ -114,5 +114,5 @@ async function LeasesData({ locale, canCreate, canRecordFinance }: { locale: "zh
     if (!receivablesRes.error) receivables = receivablesRes.data;
   }
 
-  return <LeaseLazyView contracts={contracts} units={units} customers={customers} payments={payments} receivables={receivables} buildings={allBuildings ?? []} locale={locale} canCreate={canCreate} canRecordFinance={canRecordFinance} />;
+  return <LeaseLazyView contracts={contracts} units={units} customers={customers} payments={payments} receivables={receivables} buildings={allBuildings ?? []} locale={locale} canCreate={canCreate} canRecordFinance={canRecordFinance} canActivate={canActivate} canMoveOut={canMoveOut} />;
 }

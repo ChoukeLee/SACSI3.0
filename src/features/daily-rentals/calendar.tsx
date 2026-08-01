@@ -73,6 +73,7 @@ export function DailyCalendar({
   const copy = COPY[locale];
   const bookingLabels = BOOKING_STATUS_LABELS[locale];
   const canCreateBooking = userRole === "admin";
+  const canOperateDaily = userRole === "admin" || userRole === "front_desk" || userRole === "rental_sales";
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [roomFilter, setRoomFilter] = useState<RoomFilter>("all");
@@ -756,6 +757,7 @@ export function DailyCalendar({
                           copy={copy}
                           bookingLabels={bookingLabels}
                           canCreateBooking={canCreateBooking}
+                          canOperateDaily={canOperateDaily}
                           onOpenBooking={(id) => {
                             setSelectedBookingId(id);
                             setNewBookingUnitId(null);
@@ -801,6 +803,7 @@ export function DailyCalendar({
           cleaningTasks={visibleCleaningTasks}
           payments={visiblePayments}
           locale={locale}
+          readOnly={!canOperateDaily}
           onClose={() => {
             setSelectedBookingId(null);
             setNewBookingUnitId(null);
@@ -1094,6 +1097,7 @@ function TimelineCell({
   copy,
   bookingLabels,
   canCreateBooking,
+  canOperateDaily,
   onOpenBooking,
   onNewBooking,
   onCompleteCleaning,
@@ -1112,6 +1116,7 @@ function TimelineCell({
   copy: (typeof COPY)[Locale];
   bookingLabels: Record<string, string>;
   canCreateBooking: boolean;
+  canOperateDaily: boolean;
   onOpenBooking: (id: string) => void;
   onNewBooking: () => void;
   onCompleteCleaning?: () => void;
@@ -1183,7 +1188,8 @@ function TimelineCell({
         <button
           type="button"
           className="absolute inset-x-1 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center gap-1 rounded-lg bg-[#D9F7F0] border border-[#A8E8DB] text-xs font-bold text-[#17324D] transition-all hover:bg-[#C0EFE4] hover:shadow-sm focus-visible:ring-ring"
-          onClick={() => onCompleteCleaning?.()}
+          disabled={!canOperateDaily}
+          onClick={() => canOperateDaily && onCompleteCleaning?.()}
         >
           {copy.cleaning}
           {upcomingName && (

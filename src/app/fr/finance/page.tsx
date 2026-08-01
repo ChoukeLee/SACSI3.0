@@ -22,13 +22,13 @@ export default async function FrenchFinancePage() {
     <div className="space-y-5">
       <PageHeader title="Finance" description="Ecritures, creances et rapprochement des recus" />
       <Suspense fallback={<OperationalPageSkeleton kind="table" rows={8} />}>
-        <FrenchFinanceData />
+        <FrenchFinanceData canWrite={user.role === "admin" || user.role === "finance"} />
       </Suspense>
     </div>
   );
 }
 
-async function FrenchFinanceData() {
+async function FrenchFinanceData({ canWrite }: { canWrite: boolean }) {
   const supabase = await createClient();
   const { data: building } = await supabase.from("buildings").select("id").eq("code", "SACSI11").single();
   const buildingId = building?.id ?? null;
@@ -57,5 +57,5 @@ async function FrenchFinanceData() {
     if (!attachmentsRes.error) attachments = (attachmentsRes.data ?? []) as unknown as AttachmentRow[];
   }
 
-  return <FinanceLazyView entries={entries} units={units} buildingId={buildingId} receivables={receivables} customers={customers} buildings={buildings} locale="fr" attachments={attachments} />;
+  return <FinanceLazyView entries={entries} units={units} buildingId={buildingId} receivables={receivables} customers={customers} buildings={buildings} locale="fr" attachments={attachments} canWrite={canWrite} />;
 }

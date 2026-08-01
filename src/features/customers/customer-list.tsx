@@ -34,13 +34,14 @@ interface CustomerListProps {
   customerLastActivity?: Record<string, string>;
   locale: Locale;
   showHeader?: boolean;
+  canEdit?: boolean;
 }
 
 type FormMode = { type: "add" } | { type: "edit"; customer: CustomerRow } | null;
 type CustomerSegment = "all" | "lease" | "sale" | "daily" | "blacklisted";
 type CustomerGroup = "lease" | "sale" | "daily" | "uncategorized" | "blacklisted";
 
-export function CustomerList({ customers, customerSegments, customerRooms, customerBuildings, buildingOptions, customerLastActivity, locale, showHeader = true }: CustomerListProps) {
+export function CustomerList({ customers, customerSegments, customerRooms, customerBuildings, buildingOptions, customerLastActivity, locale, showHeader = true, canEdit = true }: CustomerListProps) {
   const [optimisticCustomers, setOptimisticCustomers] = useState<CustomerRow[]>(customers);
   const [search, setSearch] = useState("");
   const [segment, setSegment] = useState<CustomerSegment>("all");
@@ -434,7 +435,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       <PageHeader
         title={locale === "zh" ? "客户管理" : "Gestion des clients"}
         description={`${stats.all} ${locale === "zh" ? "位客户" : "clients"} · ${locale === "zh" ? "按业务类型、房号和最近活动排序" : "Tries par activite, chambre et recence"}`}
-        action={<Button size="sm" onClick={openAdd}><Plus className="h-4 w-4" />{t.add}</Button>}
+        action={canEdit ? <Button size="sm" onClick={openAdd}><Plus className="h-4 w-4" />{t.add}</Button> : undefined}
       />
       )}
 
@@ -492,7 +493,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
 
       {/* ── Customer cards list ── */}
       {filtered.length === 0 ? (
-        <EmptyState title={t.empty} action={<Button size="sm" onClick={openAdd}><Plus className="h-4 w-4" />{t.add}</Button>} />
+        <EmptyState title={t.empty} action={canEdit ? <Button size="sm" onClick={openAdd}><Plus className="h-4 w-4" />{t.add}</Button> : undefined} />
       ) : (
         <div className="space-y-5">
           {visibleBuildingGroups.map((buildingGroup) => (
@@ -569,7 +570,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
               <Button asChild size="sm" variant="outline">
                 <Link href={routeFor(locale, `/customers/${selected.id}`)}><Eye className="h-3.5 w-3.5" />{t.profile}</Link>
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => openEdit(selected)}>{t.edit}</Button>
+              {canEdit && <Button size="sm" variant="ghost" onClick={() => openEdit(selected)}>{t.edit}</Button>}
             </div>
             </div>
           </div>
@@ -577,7 +578,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       )}
 
       {/* ── Add/Edit Form Panel ── */}
-      {isFormOpen && (
+      {canEdit && isFormOpen && (
         <>
           <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setFormMode(null)} />
           <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]">

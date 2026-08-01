@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { LogOut, Settings, UserRound } from "lucide-react";
+import { LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import type { UserRole } from "@/lib/auth";
@@ -117,6 +117,17 @@ function AppShellInner({
                   title={locale === "zh" ? "系统维护" : "Maintenance système"}
                 >
                   <Settings className="h-4 w-4" />
+                </Link>
+              )}
+              {userRole === "boss" && (
+                <Link
+                  href={routeFor(locale, "/settings/audit-logs")}
+                  prefetch={false}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+                  aria-label={locale === "zh" ? "审计日志" : "Journal d'audit"}
+                  title={locale === "zh" ? "审计日志" : "Journal d'audit"}
+                >
+                  <ShieldCheck className="h-4 w-4" />
                 </Link>
               )}
               {roleLabel && (

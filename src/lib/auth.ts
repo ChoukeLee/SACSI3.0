@@ -12,7 +12,7 @@ export interface CurrentUser {
 
 const seedAccountProfiles: Record<string, { role: UserRole; displayName: string; databaseRole?: "front_desk" }> = {
   "admin@sacsi.com": { role: "admin", displayName: "Chouke" },
-  "boss@sacsi.com": { role: "boss", displayName: "王老板" },
+  "boss@sacsi.com": { role: "boss", displayName: "GAO" },
   "finance@sacsi.com": { role: "finance", displayName: "李财务" },
   "front@sacsi.com": { role: "front_desk", displayName: "Niamké" },
   "ying@sacsi.com": { role: "rental_sales", displayName: "Ying", databaseRole: "front_desk" },
@@ -48,8 +48,8 @@ const rolePermissions: Record<UserRole, string[]> = {
     "daily_rentals:read",
     "leases:read",
     "sales:read",
-    "finance:read",
-    "settings:read",
+    "finance:read", "finance:export",
+    "audit_logs:read",
   ],
   finance: [
     "units:read",
@@ -58,7 +58,6 @@ const rolePermissions: Record<UserRole, string[]> = {
     "leases:read",
     "sales:read",
     "finance:read", "finance:write", "finance:export",
-    "settings:read",
   ],
   front_desk: [
     "units:read",
@@ -72,7 +71,6 @@ const rolePermissions: Record<UserRole, string[]> = {
     "daily_rentals:read", "daily_rentals:write",
     "leases:read", "leases:write",
     "sales:read", "sales:write",
-    "audit_logs:read",
   ],
 };
 
@@ -155,6 +153,7 @@ const pageAccess: Record<string, UserRole[]> = {
   leases: ["admin", "front_desk", "finance", "boss", "rental_sales"],
   sales: ["admin", "finance", "boss", "rental_sales"],
   customers: ["admin", "finance", "boss", "rental_sales"],
+  "audit-logs": ["admin", "boss"],
 };
 
 /**

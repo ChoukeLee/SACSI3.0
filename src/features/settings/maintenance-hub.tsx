@@ -36,6 +36,23 @@ const roleLabels: Record<Locale, Record<UserRole, string>> = {
   },
 };
 
+const roleScopes: Record<Locale, Record<UserRole, string>> = {
+  zh: {
+    admin: "全部功能与系统维护",
+    boss: "首页、房源、日租、长租、出售、客户、财务及审计日志（只读）",
+    finance: "客户与财务可登记；其他授权业务只读",
+    front_desk: "日租操作；长租只读",
+    rental_sales: "客户、日租、长租及出售业务操作",
+  },
+  fr: {
+    admin: "Toutes les fonctions et la maintenance système",
+    boss: "Accueil, biens, locations, ventes, clients, finance et audit (lecture seule)",
+    finance: "Saisie clients et finance ; autres activités en lecture",
+    front_desk: "Opérations journalières ; baux en lecture",
+    rental_sales: "Clients, locations journalières, baux et ventes",
+  },
+};
+
 export function MaintenanceHub({ locale, accounts, buildings }: MaintenanceHubProps) {
   const zh = locale === "zh";
 
@@ -72,6 +89,7 @@ export function MaintenanceHub({ locale, accounts, buildings }: MaintenanceHubPr
                   <th className="px-4 py-2.5">{zh ? "账号" : "Compte"}</th>
                   <th className="px-4 py-2.5">{zh ? "显示名" : "Nom"}</th>
                   <th className="px-4 py-2.5">{zh ? "系统身份" : "Rôle"}</th>
+                  <th className="px-4 py-2.5">{zh ? "权限范围" : "Périmètre"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -82,6 +100,7 @@ export function MaintenanceHub({ locale, accounts, buildings }: MaintenanceHubPr
                     <td className="px-4 py-2.5">
                       <Badge variant="secondary">{roleLabels[locale][account.role]}</Badge>
                     </td>
+                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{roleScopes[locale][account.role]}</td>
                   </tr>
                 ))}
               </tbody>
