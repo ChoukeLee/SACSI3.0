@@ -16,9 +16,11 @@ const WEEKDAYS = {
 
 export function DateInput({ value, onChangeValue, className, onBlur, min, max, disabled, ...props }: DateInputProps) {
   const wrapperRef = React.useRef<HTMLSpanElement>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
   const [open, setOpen] = React.useState(false);
   const [viewMonth, setViewMonth] = React.useState(() => getMonthStart(value || todayIso()));
   const [locale, setLocale] = React.useState<"zh" | "fr">("zh");
+  const [panelPosition, setPanelPosition] = React.useState({ left: 0, top: 0 });
 
   React.useEffect(() => {
     if (isIsoDate(value)) setViewMonth(getMonthStart(value));
@@ -30,11 +32,28 @@ export function DateInput({ value, onChangeValue, className, onBlur, min, max, d
 
   React.useEffect(() => {
     if (!open) return;
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!wrapperRef.current?.contains(event.target as Node)) setOpen(false);
+    const updatePosition = () => {
+      const rect = wrapperRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const width = Math.min(280, window.innerWidth - 32);
+      const left = Math.min(Math.max(16, rect.left), window.innerWidth - width - 16);
+      const top = Math.min(rect.bottom + 6, window.innerHeight - 360);
+      setPanelPosition({ left, top: Math.max(16, top) });
     };
+    updatePosition();
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!wrapperRef.current?.contains(target) && !panelRef.current?.contains(target)) setOpen(false);
+    };
+    const handleViewportChange = () => updatePosition();
     document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+    };
   }, [open]);
 
   const minDate = typeof min === "string" && isIsoDate(min) ? min : null;
@@ -86,7 +105,11 @@ export function DateInput({ value, onChangeValue, className, onBlur, min, max, d
         strokeWidth={1.8}
       />
       {open && !disabled && (
-        <div className="absolute right-0 top-[calc(100%+6px)] z-dropdown w-[min(280px,calc(100vw-2rem))] rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-dropdown">
+        <div
+          ref={panelRef}
+          className="fixed z-dropdown w-[min(280px,calc(100vw-2rem))] rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-dropdown"
+          style={{ left: panelPosition.left, top: panelPosition.top }}
+        >
           <div className="mb-3 flex items-center justify-between">
             <button
               type="button"
