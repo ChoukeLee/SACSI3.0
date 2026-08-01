@@ -17,6 +17,7 @@ import { UnitDetailPanel } from "./unit-detail-panel";
 import { UnitFilters } from "./unit-filters";
 import type { UnitRow, UnitBusinessFlagRow } from "@/types/database";
 import type { BusinessType } from "@/types/domain";
+import type { UnitPartySummary } from "./unit-party-summary";
 
 interface AuditLogEntry {
   id: string;
@@ -35,6 +36,7 @@ interface UnitListProps {
   units: UnitRow[];
   businessFlagsMap: Record<string, UnitBusinessFlagRow[]>;
   managedLeaseUnitIds?: string[];
+  unitPartySummaries?: Record<string, UnitPartySummary>;
   auditLogsMap: Record<string, AuditLogEntry[]>;
   buildings: BuildingInfo[];
   locale: Locale;
@@ -54,7 +56,7 @@ const STATUS_DOT: Record<string, string> = {
 
 const LS_KEY = "sacsi_active_building_id";
 
-export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], auditLogsMap, buildings, locale, canEdit }: UnitListProps) {
+export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], unitPartySummaries = {}, auditLogsMap, buildings, locale, canEdit }: UnitListProps) {
   const router = useRouter();
   const t = dictionaries[locale].units;
   const statusLabels = dictionaries[locale].statuses;
@@ -233,18 +235,29 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], au
                   const flags = (businessFlagsMap[unit.id] ?? []).filter((flag) => flag.is_enabled);
                   const dailyFlag = flags.find((flag) => flag.business_type === "daily_rental");
                   const managedLease = unit.status === "sold" && managedLeaseUnitSet.has(unit.id);
+                  const party = unitPartySummaries[unit.id];
                   const status: RoomStatus = managedLease
                     ? "managed"
                     : unit.status === "locked" ? "maintenance" : unit.status as RoomStatus;
+                  const customerName = unit.status === "daily_occupied" || unit.status === "reserved"
+                    ? party?.dailyCustomerName
+                    : unit.status === "leased" || managedLease
+                      ? party?.leaseCustomerName
+                      : unit.status === "sold" ? party?.saleCustomerName : undefined;
+                  const businessDateText = unit.status === "leased" || managedLease
+                    ? party?.leaseEndDate
+                      ? `${locale === "zh" ? "到期" : "Fin"} ${party.leaseEndConfirmed === false ? (locale === "zh" ? "未确认" : "non confirmée") : party.leaseEndDate}`
+                      : undefined
+                    : unit.status === "daily_occupied" || unit.status === "reserved" ? party?.dailyDateText : undefined;
                   return (
                     <RoomCard
                       key={unit.id}
                       roomNo={unit.unit_no}
                       status={status}
-                      customerName={managedLease ? (locale === "zh" ? "已售代管" : "Vendu géré") : getUnitOperationalLabel(unit, locale) ?? statusLabels[unit.status]}
-                      dateText={dailyFlag?.default_price_xof != null
+                      customerName={customerName || (managedLease ? (locale === "zh" ? "已售代管" : "Vendu géré") : getUnitOperationalLabel(unit, locale) ?? statusLabels[unit.status])}
+                      dateText={businessDateText || (dailyFlag?.default_price_xof != null
                         ? `${flags.map((flag) => t.businessTypes[flag.business_type]).join(" / ")} · ${formatXof(dailyFlag.default_price_xof)}`
-                        : flags.map((flag) => t.businessTypes[flag.business_type]).join(" / ") || unit.floor_label}
+                        : flags.map((flag) => t.businessTypes[flag.business_type]).join(" / ") || unit.floor_label)}
                       onClick={() => setDetailUnitId(unit.id)}
                       actions={[{ key: "detail", label: locale === "zh" ? "查看房源" : "Voir", icon: ArrowRight, onClick: () => setDetailUnitId(unit.id) }]}
                     />

@@ -4,6 +4,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
 import { UnitLazyView } from "@/features/units/unit-lazy-view";
+import { getUnitPartySummaries } from "@/features/units/unit-party-summary";
+import type { UnitPartySummary } from "@/features/units/unit-party-summary";
 import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
 import type { UnitRow, UnitBusinessFlagRow } from "@/types/database";
 
@@ -36,6 +38,7 @@ async function UnitsData({ locale, canEdit }: { locale: "zh" | "fr"; canEdit: bo
   let units: UnitRow[] = [];
   let flags: UnitBusinessFlagRow[] = [];
   let managedLeaseUnitIds: string[] = [];
+  let unitPartySummaries: Record<string, UnitPartySummary> = {};
 
   const [flagsRes] = await Promise.all([
     supabase.from("unit_business_flags").select("unit_id, business_type, is_enabled, default_price_xof"),
@@ -55,13 +58,9 @@ async function UnitsData({ locale, canEdit }: { locale: "zh" | "fr"; canEdit: bo
 
     if (units.length > 0) {
       const unitIds = units.map((unit) => unit.id);
-      const { data: activeLeases, error: activeLeasesErr } = await supabase
-        .from("lease_contracts")
-        .select("unit_id")
-        .eq("status", "active")
-        .in("unit_id", unitIds);
-      if (activeLeasesErr) console.error("Failed to fetch active lease units:", activeLeasesErr);
-      else managedLeaseUnitIds = Array.from(new Set((activeLeases ?? []).map((lease) => lease.unit_id)));
+      const partyData = await getUnitPartySummaries(supabase, unitIds);
+      managedLeaseUnitIds = partyData.activeLeaseUnitIds;
+      unitPartySummaries = partyData.summaries;
     }
   }
 
@@ -109,6 +108,7 @@ async function UnitsData({ locale, canEdit }: { locale: "zh" | "fr"; canEdit: bo
       units={units}
       businessFlagsMap={businessFlagsMap}
       managedLeaseUnitIds={managedLeaseUnitIds}
+      unitPartySummaries={unitPartySummaries}
       auditLogsMap={auditLogsMap}
       buildings={allBuildings ?? []}
       locale={locale}

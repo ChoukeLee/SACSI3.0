@@ -36,4 +36,14 @@ describe("core UI architecture", () => {
     expect(existsSync(resolve(root, "src/app/daily-rentals/overview/page.tsx"))).toBe(false);
     expect(existsSync(resolve(root, "src/app/fr/daily-rentals/overview/page.tsx"))).toBe(false);
   });
+
+  it("shows real customer and lease expiry information on unit cards", () => {
+    const units = read("src/features/units/unit-list.tsx");
+    const partySummary = read("src/features/units/unit-party-summary.ts");
+    expect(units).toContain("party?.dailyCustomerName");
+    expect(units).toContain("party?.leaseCustomerName");
+    expect(units).toContain("party?.saleCustomerName");
+    expect(units).toContain("party?.leaseEndDate");
+    expect(partySummary).toContain('from("customers").select("id, name")');
+  });
 });
