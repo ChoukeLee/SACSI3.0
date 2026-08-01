@@ -259,10 +259,10 @@ export function FinanceDetailPanel({
     <RightDrawer open title={labels.title} subtitle={labels.desc} onClose={onClose} width="table">
         <div className="space-y-4">
           <div className="rounded-xl border border-border bg-card p-3 shadow-xs">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold text-muted-foreground">{locale === "zh" ? "统计月份" : "Mois"}</p>
-                <div className="mt-2 flex max-w-full gap-1 overflow-x-auto rounded-lg border border-border bg-muted/70 p-1">
+                <div className="mt-2 flex max-w-full flex-wrap gap-1 rounded-lg border border-border bg-muted/70 p-1">
                   {availableMonths.slice(0, 12).map((month) => (
                     <button
                       key={month}
@@ -280,7 +280,7 @@ export function FinanceDetailPanel({
                   ))}
                 </div>
               </div>
-              <div className="grid min-w-[320px] grid-cols-3 gap-2 text-sm">
+              <div className="grid min-w-0 grid-cols-3 gap-2 text-sm xl:w-[400px]">
                 <div className="rounded-lg bg-muted/50 px-3 py-2">
                   <p className="text-xs text-muted-foreground">{locale === "zh" ? "本月指标" : "Mois courant"}</p>
                   <p className="mt-1 font-semibold tabular-nums">{formatXof(selectedMetric)}</p>
@@ -344,20 +344,31 @@ export function FinanceDetailPanel({
 
           {/* Table */}
           <div className="overflow-hidden rounded-xl border border-border">
-            <div className="max-h-[calc(100vh-260px)] overflow-auto">
+            <div className="max-h-[calc(100vh-260px)] overflow-y-auto overflow-x-hidden">
               {(
-                <table className="w-full min-w-[1080px] text-left text-[13px]">
+                <table className="w-full table-fixed text-left text-[13px]">
+                  <colgroup>
+                    <col className="w-[13%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[8%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[7%]" />
+                  </colgroup>
                   <thead className="sticky top-0 z-10 bg-muted/50">
                     <tr className="text-left text-xs font-semibold text-muted-foreground">
-                      <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "到期日" : "Echeance"}</th>
-                      <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "楼栋" : "Bâtiment"}</th>
-                      <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
-                      <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
-                      <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "业务" : "Type"}</th>
-                      <th className="px-4 py-3 whitespace-nowrap text-right">{locale === "zh" ? "应收" : "Du"}</th>
-                      <th className="px-4 py-3 whitespace-nowrap text-right">{locale === "zh" ? "已收" : "Encaisse"}</th>
-                      <th className="px-4 py-3 whitespace-nowrap text-right">{locale === "zh" ? "未收" : "Impaye"}</th>
-                      <th className="px-4 py-3 whitespace-nowrap">{locale === "zh" ? "状态" : "Statut"}</th>
+                      <th className="px-3 py-3">{locale === "zh" ? "到期日" : "Echeance"}</th>
+                      <th className="px-3 py-3">{locale === "zh" ? "楼栋" : "Bâtiment"}</th>
+                      <th className="px-3 py-3">{locale === "zh" ? "房号" : "Chambre"}</th>
+                      <th className="px-3 py-3">{locale === "zh" ? "客户" : "Client"}</th>
+                      <th className="px-3 py-3">{locale === "zh" ? "业务" : "Type"}</th>
+                      <th className="px-3 py-3 text-right">{locale === "zh" ? "应收" : "Du"}</th>
+                      <th className="px-3 py-3 text-right">{locale === "zh" ? "已收" : "Encaisse"}</th>
+                      <th className="px-3 py-3 text-right">{locale === "zh" ? "未收" : "Impaye"}</th>
+                      <th className="px-3 py-3">{locale === "zh" ? "状态" : "Statut"}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
@@ -379,36 +390,38 @@ export function FinanceDetailPanel({
                             r.status === "overdue" && "bg-accentRed-50/30",
                             r.status === "partial" && "bg-amber-50/30",
                           )}>
-                            <td className="px-4 py-2.5 whitespace-nowrap font-medium text-foreground">
-                              {r.dueDate}
+                            <td className="px-3 py-2.5 font-medium text-foreground">
+                              <span className="block truncate tabular-nums" title={r.dueDate}>{r.dueDate}</span>
                               {r.status === "overdue" && (
-                                <span className="ml-2 text-accentRed-500">
+                                <span className="block truncate text-xs text-accentRed-500">
                                   {locale === "zh" ? `逾期${overdueDays}天` : `+${overdueDays}j`}
                                 </span>
                               )}
                             </td>
-                            <td className="px-4 py-2.5 whitespace-nowrap text-foreground/70">
-                              {buildingLabel}
+                            <td className="px-3 py-2.5 text-foreground/70">
+                              <span className="block truncate" title={buildingLabel}>{buildingLabel}</span>
                             </td>
-                            <td className="px-4 py-2.5 whitespace-nowrap text-foreground/70">
-                              {r.unitNo ?? "—"}
+                            <td className="px-3 py-2.5 text-foreground/70">
+                              <span className="block truncate" title={r.unitNo ?? undefined}>{r.unitNo ?? "—"}</span>
                             </td>
-                            <td className="px-4 py-2.5 whitespace-nowrap text-foreground/70">
-                              {r.customerName ?? "—"}
+                            <td className="px-3 py-2.5 text-foreground/70">
+                              <span className="block truncate" title={r.customerName ?? undefined}>{r.customerName ?? "—"}</span>
                             </td>
-                            <td className="px-4 py-2.5 whitespace-nowrap text-foreground/60">
-                              {getBusinessTypeLabel(r.sourceType, r.category)}
+                            <td className="px-3 py-2.5 text-foreground/60">
+                              <span className="block truncate" title={getBusinessTypeLabel(r.sourceType, r.category)}>
+                                {getBusinessTypeLabel(r.sourceType, r.category)}
+                              </span>
                             </td>
-                            <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold text-foreground">
-                              {formatXof(r.amountXof)}
+                            <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-foreground">
+                              <span className="block truncate" title={formatXof(r.amountXof)}>{formatXof(r.amountXof)}</span>
                             </td>
-                            <td className="px-4 py-2.5 whitespace-nowrap text-right tabular-nums text-accentGreen-700">
-                              {formatXof(r.paidAmountXof)}
+                            <td className="px-3 py-2.5 text-right tabular-nums text-accentGreen-700">
+                              <span className="block truncate" title={formatXof(r.paidAmountXof)}>{formatXof(r.paidAmountXof)}</span>
                             </td>
-                            <td className={cn("px-4 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold", r.outstandingXof > 0 ? "text-accentRed-600" : "text-muted-foreground/60")}>
-                              {formatXof(r.outstandingXof)}
+                            <td className={cn("px-3 py-2.5 text-right tabular-nums font-semibold", r.outstandingXof > 0 ? "text-accentRed-600" : "text-muted-foreground/60")}>
+                              <span className="block truncate" title={formatXof(r.outstandingXof)}>{formatXof(r.outstandingXof)}</span>
                             </td>
-                            <td className="px-4 py-2.5 whitespace-nowrap">
+                            <td className="px-3 py-2.5">
                               <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-semibold", STATUS_STYLES[r.status] ?? "bg-muted text-foreground/70")}>
                                 {getStatusLabel(r.status)}
                               </span>
