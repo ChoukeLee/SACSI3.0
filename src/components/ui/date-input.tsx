@@ -86,7 +86,7 @@ export function DateInput({ value, onChangeValue, className, onBlur, min, max, d
         strokeWidth={1.8}
       />
       {open && !disabled && (
-        <div className="absolute left-0 top-[calc(100%+6px)] z-dropdown w-[280px] rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-dropdown">
+        <div className="absolute right-0 top-[calc(100%+6px)] z-dropdown w-[min(280px,calc(100vw-2rem))] rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-dropdown">
           <div className="mb-3 flex items-center justify-between">
             <button
               type="button"

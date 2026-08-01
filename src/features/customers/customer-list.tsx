@@ -533,7 +533,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       {selected && !isFormOpen && (
         <>
           <div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setSelectedId(null)} />
-          <div className="fixed inset-x-0 bottom-0 z-panel max-h-[88vh] overflow-auto rounded-t-xl border bg-card p-4 shadow-panel sm:inset-y-0 sm:left-auto sm:right-0 sm:w-full sm:max-w-lg sm:rounded-none sm:border-l">
+          <div className="fixed inset-x-0 bottom-0 z-panel max-h-[88vh] overflow-y-auto overflow-x-hidden rounded-t-xl border bg-card p-4 shadow-panel sm:inset-y-0 sm:left-auto sm:right-0 sm:w-full sm:max-w-lg sm:rounded-none sm:border-l">
             <div className="mb-4 flex items-start justify-between gap-3 border-b pb-3">
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-muted-foreground">{locale === "zh" ? "客户详情" : "Détail client"}</p>
@@ -581,7 +581,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       {canEdit && isFormOpen && (
         <>
           <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setFormMode(null)} />
-          <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-auto border-l border-border bg-card shadow-panel lg:max-w-[480px]">
+          <div className="fixed bottom-0 right-0 top-12 z-panel w-full max-w-full overflow-y-auto overflow-x-hidden border-l border-border bg-card shadow-panel lg:max-w-[480px]">
             <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
               <h3 className="text-[15px] font-semibold">{formMode.type === "add" ? t.add : t.edit}</h3>
               <button onClick={() => setFormMode(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"><X className="h-4 w-4" /></button>

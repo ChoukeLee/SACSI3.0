@@ -188,7 +188,7 @@ export function RightDrawer({
             </button>
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto px-5 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 py-5">{children}</div>
         {footer && <div className="sticky bottom-0 border-t border-border bg-card/95 px-5 py-4 backdrop-blur">{footer}</div>}
       </aside>
     </>
