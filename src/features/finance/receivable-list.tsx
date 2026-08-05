@@ -286,7 +286,13 @@ export function ReceivableList({ receivables, units, customers, buildings, local
                       <MoneyCell tone="income">{formatXof(Number(r.paid_amount_xof))}</MoneyCell>
                       <MoneyCell tone={os > 0 ? "expense" : "income"}>{formatXof(os)}</MoneyCell>
                       <BusinessTd align="center">
-                        <Badge variant={statusTone[r.status] ?? "secondary"}>{t.statuses[r.status as keyof typeof t.statuses] ?? statusDisplayLabel(r.status, locale)}</Badge>
+                        <Badge
+                          variant={statusTone[r.status] ?? "secondary"}
+                          className="min-w-[58px] justify-center whitespace-nowrap"
+                          style={{ whiteSpace: "nowrap", wordBreak: "keep-all" }}
+                        >
+                          {t.statuses[r.status as keyof typeof t.statuses] ?? statusDisplayLabel(r.status, locale)}
+                        </Badge>
                       </BusinessTd>
                       <BusinessTd align="right" className="tabular-nums">
                         {od !== null && od > 0 ? (
