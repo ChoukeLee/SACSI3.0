@@ -157,10 +157,10 @@ export function RightDrawer({
 
   return (
     <>
-      <div className="fixed bottom-0 left-0 right-0 top-[var(--app-topbar-offset)] z-overlay bg-black/20 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={onClose} />
       <aside
         className={cn(
-          "fixed bottom-0 right-0 top-[var(--app-topbar-offset)] z-panel flex w-full max-w-full flex-col border-l border-border bg-card shadow-panel",
+          "fixed bottom-0 right-0 top-12 z-panel flex w-full max-w-full flex-col border-l border-border bg-card shadow-panel",
           widthClass,
           className,
         )}

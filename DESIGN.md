@@ -973,7 +973,7 @@ Rules:
 Rules:
 
 - Topbar is utility chrome, not a marketing header.
-- Topbar and the route surface meet directly. Keep one bottom border only; do not insert a full-width background gutter, margin, padding, or shadow band between them. Full-height drawers and overlays must use the shared measured topbar offset, never a hardcoded `top` value.
+- Normal pages keep the standard outer content gutter below the topbar. Full-screen secondary detail layers must begin visually at the topbar edge without exposing the page behind them; use an in-layer topbar spacer instead of shifting the underlying route surface.
 - Language, user, notification, logout should use same icon/utility button family.
 - Do not mix pill styles in the same topbar.
 

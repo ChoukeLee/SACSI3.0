@@ -47,24 +47,21 @@ describe("core UI architecture", () => {
     expect(partySummary).toContain('from("customers").select("id, name")');
   });
 
-  it("joins the topbar directly to the page surface without a global gutter", () => {
+  it("keeps the normal page gutter below the topbar", () => {
     const shell = read("src/components/app-shell.tsx");
     const mainTag = shell.match(/<main data-app-main className="([^"]+)"/);
 
-    expect(mainTag?.[1]).toContain("pt-0");
-    expect(mainTag?.[1]).not.toMatch(/(?:^|\s)(?:p|py|pt)-(?:4|5|6)(?:\s|$)/);
+    expect(mainTag?.[1]).toContain("p-4");
+    expect(mainTag?.[1]).toContain("sm:p-5");
+    expect(mainTag?.[1]).toContain("lg:p-6");
   });
 
-  it("aligns every full-height panel to the measured topbar edge", () => {
-    const shell = read("src/components/app-shell.tsx");
-    const operational = read("src/components/ui/operational.tsx");
+  it("keeps the daily finance detail flush below the topbar without moving the page", () => {
     const daily = read("src/features/daily-rentals/calendar.tsx");
 
-    expect(shell).toContain("--app-topbar-offset");
-    expect(shell).toContain("getBoundingClientRect().height");
-    expect(operational).toContain("top-[var(--app-topbar-offset)]");
-    expect(daily).toContain("top-[var(--app-topbar-offset)]");
-    expect(operational).not.toMatch(/fixed[^"\n]*\btop-12\b/);
-    expect(daily).not.toMatch(/fixed[^"\n]*\btop-12\b/);
+    expect(daily).toContain('className="pointer-events-none fixed inset-0 z-panel flex flex-col');
+    expect(daily).toContain('aria-hidden className="h-12 shrink-0"');
+    expect(daily).toContain('pointer-events-auto min-h-0 flex-1 overflow-y-auto');
+    expect(daily).not.toContain("top-[var(--app-topbar-offset)]");
   });
 });

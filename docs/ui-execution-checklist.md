@@ -12,7 +12,7 @@ This checklist turns `DESIGN.md` into a strict implementation gate. Use it befor
 
 | Area | Must Standardize | Main Reference | Pass Condition |
 |---|---|---|---|
-| Topbar | building selector, global search, notifications, language, user, logout | Cal.com, Linear | 32px controls, quiet account cluster, one bottom divider and no gutter before page content |
+| Topbar | building selector, global search, notifications, language, user, logout | Cal.com, Linear | 32px controls, quiet account cluster, normal page gutter; secondary full-screen layers expose no strip of the page behind |
 | Sidebar | brand block, group labels, nav rows, active state, collapsed mode | Linear, Notion | one active style, 36-40px rows, no heavy section labels |
 | Page header | title, description, primary action, page meta | Cal.com | compact height, title does not compete with KPI values |
 | Buttons | primary, secondary, tertiary, icon, toolbar, danger | 21st.dev, Cal.com | one primary per toolbar, shared height/radius, secondary actions visually quieter |
