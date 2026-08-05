@@ -214,7 +214,7 @@ export function ReceiptUpload({ locale, onClose }: Props) {
 
             <div className="grid grid-cols-2 gap-3">
               <div><label className={labelClass}>{zh ? "房号 *" : "Chambre *"}</label><Input value={editRoom} onChange={(e) => setEditRoom(e.target.value)} className={cn(inputClass, !result.draft.room_no && "border-amber-400 bg-amber-50")} /></div>
-              <div><label className={labelClass}>{zh ? "金额 (XOF) *" : "Montant *"}</label><Input type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className={cn(inputClass, !result.draft.amount_xof && "border-amber-400 bg-amber-50")} /></div>
+              <div><label className={labelClass}>{zh ? "金额（FCFA）*" : "Montant (FCFA) *"}</label><Input type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className={cn(inputClass, !result.draft.amount_xof && "border-amber-400 bg-amber-50")} /></div>
               <div><label className={labelClass}>{zh ? "收据日期 *" : "Date *"}</label><Input value={editDate} onChange={(e) => setEditDate(e.target.value)} className={cn(inputClass, !result.draft.receipt_date && "border-amber-400 bg-amber-50")} /></div>
               <div><label className={labelClass}>{zh ? "收据号" : "No reçu"}</label><Input value={editReceiptNo} onChange={(e) => setEditReceiptNo(e.target.value)} className={inputClass} /></div>
               <div><label className={labelClass}>{zh ? "周期开始" : "Début période"}</label><Input value={editPeriodStart} onChange={(e) => setEditPeriodStart(e.target.value)} className={inputClass} /></div>

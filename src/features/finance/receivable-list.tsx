@@ -5,6 +5,7 @@ import { Download } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
+import { financialBusinessLabel, statusDisplayLabel } from "@/lib/display-labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
@@ -46,31 +47,6 @@ const rowBg: Record<string, string> = {
   overdue: "bg-red-50/30",
   cancelled: "opacity-60",
 };
-
-function receivableBusinessLabel(r: ReceivableRow, locale: Locale) {
-  const zh: Record<string, string> = {
-    daily_booking: "日租房费",
-    lease_rent: "长租租金",
-    lease_deposit: "长租押金",
-    sale_installment: "出售分期",
-    sale_lump_sum: "出售全款",
-    sale_contract: "出售",
-    manual: "手工应收",
-    other: "其他应收",
-  };
-  const fr: Record<string, string> = {
-    daily_booking: "Location jour",
-    lease_rent: "Loyer longue durée",
-    lease_deposit: "Dépôt longue durée",
-    sale_installment: "Vente échelonnée",
-    sale_lump_sum: "Vente comptant",
-    sale_contract: "Vente",
-    manual: "Créance manuelle",
-    other: "Autre créance",
-  };
-  const labels = locale === "fr" ? fr : zh;
-  return labels[r.category || ""] ?? labels[r.source_type] ?? r.source_type;
-}
 
 export function ReceivableList({ receivables, units, customers, buildings, locale }: Props) {
   const t = dictionaries[locale].receivables;
@@ -152,6 +128,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
       daily_rental: t.categories.daily_rental,
       lease_rent: t.categories.lease_rent,
       lease_deposit: t.categories.lease_deposit,
+      property_fee: t.categories.property_fee,
       sale_installment: t.categories.sale_installment,
       sale_lump_sum: t.categories.sale_lump_sum,
       other: t.categories.other,
@@ -301,7 +278,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
                       <BusinessTd className="max-w-[120px] truncate">{customerMap.get(r.customer_id ?? "") ?? "-"}</BusinessTd>
                       <BusinessTd align="center">
                         <Badge variant="secondary" className="text-xs">
-                          {receivableBusinessLabel(r, locale)}
+                          {financialBusinessLabel(r.source_type, locale, r.category)}
                         </Badge>
                       </BusinessTd>
                       <BusinessTd className="max-w-[180px] truncate">{r.title}</BusinessTd>
@@ -309,7 +286,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
                       <MoneyCell tone="income">{formatXof(Number(r.paid_amount_xof))}</MoneyCell>
                       <MoneyCell tone={os > 0 ? "expense" : "income"}>{formatXof(os)}</MoneyCell>
                       <BusinessTd align="center">
-                        <Badge variant={statusTone[r.status] ?? "secondary"}>{t.statuses[r.status as keyof typeof t.statuses] ?? r.status}</Badge>
+                        <Badge variant={statusTone[r.status] ?? "secondary"}>{t.statuses[r.status as keyof typeof t.statuses] ?? statusDisplayLabel(r.status, locale)}</Badge>
                       </BusinessTd>
                       <BusinessTd align="right" className="tabular-nums">
                         {od !== null && od > 0 ? (

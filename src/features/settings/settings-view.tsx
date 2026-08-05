@@ -138,7 +138,7 @@ export function SettingsView({ buildings, companyInfo, locale }: SettingsViewPro
               <p className="text-xs text-muted-foreground mt-0.5">{t.pricing.dailyDefaultDesc}</p>
               <div className="mt-2 flex items-center gap-2">
                 <input type="number" defaultValue={40000} className="w-32 rounded-md border bg-card px-3 py-2 text-sm" />
-                <span className="text-sm text-muted-foreground">XOF</span>
+                <span className="text-sm text-muted-foreground">FCFA</span>
               </div>
             </div>
             <div className="rounded-md border p-4">

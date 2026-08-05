@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
+import { financialBusinessLabel, statusDisplayLabel } from "@/lib/display-labels";
 import { RightDrawer } from "@/components/ui/operational";
 import { receivableStatusStyles as STATUS_STYLES } from "@/lib/status-styles";
 import type { ManagementFinanceItem } from "@/features/management/finance-snapshot";
@@ -25,28 +26,6 @@ interface Props {
   customers?: CustomerRow[];
   locale: Locale;
 }
-
-const SOURCE_TYPE_LABELS: Record<string, { zh: string; fr: string }> = {
-  daily_booking: { zh: "日租", fr: "Journalier" },
-  lease_contract: { zh: "长租", fr: "Bail" },
-  sale_contract: { zh: "售房", fr: "Vente" },
-  manual: { zh: "手动", fr: "Manuel" },
-  daily_rental: { zh: "日租房费", fr: "Sejour journalier" },
-  lease_rent: { zh: "长租租金", fr: "Loyer longue duree" },
-  lease_deposit: { zh: "长租押金", fr: "Depot location" },
-  sale_installment: { zh: "出售分期", fr: "Echeance vente" },
-  sale_lump_sum: { zh: "出售全款", fr: "Vente comptant" },
-  other_income: { zh: "其他收入", fr: "Autre revenu" },
-  other: { zh: "其他", fr: "Autre" },
-};
-
-const RECEIVABLE_STATUS_LABELS: Record<string, { zh: string; fr: string }> = {
-  paid: { zh: "已收", fr: "Payé" },
-  partial: { zh: "部分已收", fr: "Partiel" },
-  pending: { zh: "待收", fr: "En attente" },
-  overdue: { zh: "逾期", fr: "En retard" },
-  cancelled: { zh: "已取消", fr: "Annulé" },
-};
 
 const PANEL_LABELS: Record<DetailType, { zh: { title: string; desc: string }; fr: { title: string; desc: string } }> = {
   receivable: {
@@ -239,14 +218,11 @@ export function FinanceDetailPanel({
   const trendMax = Math.max(...trend.map((point) => point.value), 1);
 
   const getBusinessTypeLabel = (sourceType: string, category?: string | null) => {
-    const key = category || sourceType;
-    const lang = locale === "fr" ? "fr" : "zh";
-    return SOURCE_TYPE_LABELS[key]?.[lang] ?? SOURCE_TYPE_LABELS[sourceType]?.[lang] ?? key;
+    return financialBusinessLabel(sourceType, locale, category);
   };
 
   const getStatusLabel = (status: string) => {
-    const lang = locale === "fr" ? "fr" : "zh";
-    return RECEIVABLE_STATUS_LABELS[status]?.[lang] ?? status;
+    return statusDisplayLabel(status, locale);
   };
 
   const getOverdueDays = (dueDate: string) =>

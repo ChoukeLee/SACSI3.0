@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowRight, Building2, ChevronDown, ChevronUp, Home, Key
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { cn, compareFloorLabels, formatXof, sortUnitsForBuilding } from "@/lib/utils";
+import { statusDisplayLabel } from "@/lib/display-labels";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { FilterBar, MetricGrid, OperationalPage, SegmentedControl, StatTile } from "@/components/ui/operational";
@@ -374,7 +375,7 @@ function StatusPill({ unit, locale, managedLease = false }: { unit: UnitRow; loc
   const displayStatus = isOwnerOccupiedUnit(unit) ? "ownerOccupied" : unit.status;
   const label = managedLease
     ? (locale === "zh" ? "已售代管" : "Vendu gere")
-    : getUnitOperationalLabel(unit, locale) ?? (dictionaries[locale].statuses as Record<string, string>)[unit.status] ?? unit.status;
+    : getUnitOperationalLabel(unit, locale) ?? (dictionaries[locale].statuses as Record<string, string>)[unit.status] ?? statusDisplayLabel(unit.status, locale);
   const styles: Record<string, string> = {
     sold: "bg-[#EAF7FF] text-[#17324D] ring-[#C0DDF0]/60",
     leased: "bg-[#DDECF7] text-[#17324D] ring-[#AFCBE1]/70",

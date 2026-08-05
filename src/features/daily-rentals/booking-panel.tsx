@@ -6,6 +6,7 @@ import { Check, UserX, Printer, DollarSign, Percent, Trash2, MoreHorizontal, Wal
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
+import { statusDisplayLabel } from "@/lib/display-labels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
@@ -511,7 +512,7 @@ export function BookingPanel({
                   </span>
                 )}
                 <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-semibold text-foreground/75">
-                  {t.bookingStatus[booking.status as keyof typeof t.bookingStatus] ?? booking.status}
+                  {t.bookingStatus[booking.status as keyof typeof t.bookingStatus] ?? statusDisplayLabel(booking.status, locale)}
                 </span>
                 <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", booking.checkout_mode === "open" ? "border-accentAmber-200 bg-accentAmber-50 text-accentAmber-700" : "border-border bg-muted text-foreground/70")}>
                   {booking.checkout_mode === "open" ? t.openEndedBadge : t.fixedBadge}

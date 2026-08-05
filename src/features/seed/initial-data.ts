@@ -104,7 +104,7 @@ export const moduleCards: ModuleCard[] = [
     title: "日租业务",
     description: "21间固定日租房、预订、入住、退房、保洁",
     href: "/daily-rentals",
-    metric: "40,000 XOF/晚",
+    metric: "40,000 FCFA/晚",
     accent: "green"
   },
   {

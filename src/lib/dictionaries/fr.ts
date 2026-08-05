@@ -56,13 +56,13 @@
       description: "La premiere phase active seulement l'immeuble 11, tout en gardant une structure extensible pour plusieurs immeubles.",
       metrics: {
         mainUnits: ["Appartements", "72 lots", "1-12F, 101-106 par etage"],
-        dailyUnits: ["Location jour", "21 chambres", "Prix standard 40 000 XOF/nuit"],
+        dailyUnits: ["Location jour", "21 chambres", "Prix standard 40 000 FCFA/nuit"],
         businessTypes: ["Activites", "3 types", "Jour, longue duree, vente"],
         futureBuildings: ["Extension", "5 immeubles", "3#/4#/5#/6#/7# a importer"]
       },
       modules: [
         ["Lots de l'immeuble 11", "Appartements, parkings, activites et statuts", "72 lots + parking", "/units"],
-        ["Location journaliere", "21 chambres, reservation, arrivee, depart, menage", "40 000 XOF/nuit", "/daily-rentals"],
+        ["Location journaliere", "21 chambres, reservation, arrivee, depart, menage", "40 000 FCFA/nuit", "/daily-rentals"],
         ["Location longue duree", "Contrats, loyers dus, cautions, sortie", "Prix par typologie", "/leases"],
         ["Vente", "Contrats de vente, paiements, transfert", "Lots + parkings", "/sales"]
       ]
@@ -113,7 +113,7 @@
         layout: "Typologie",
         furnishing: "Ameublement",
         dailyPrice: "Prix journalier",
-        dailyPriceUnit: "XOF/nuit",
+        dailyPriceUnit: "FCFA/nuit",
         supportedBusiness: "Activites autorisees",
         notes: "Remarques",
         noNotes: "Aucune remarque",
@@ -130,7 +130,7 @@
       description: "Seulement 21 chambres fixes de l'immeuble 11. Les conflits avec les baux longs doivent etre bloques.",
       metrics: [
         ["Chambres", "21", "Liste marquee en base"],
-        ["Prix par defaut", "40 000 XOF", "Ajustable dans la commande"],
+        ["Prix par defaut", "40 000 FCFA", "Ajustable dans la commande"],
         ["Paiement", "Avance", "Pas de paiement apres depart"]
       ],
       steps: [
@@ -248,7 +248,7 @@
       },
       discountRule: {
         title: "Regle de remise mensuelle",
-        example: "Exemple : 30 nuits x 4 000 = 120 000 XOF, remise manuelle possible a 110 000 XOF.",
+        example: "Exemple : 30 nuits x 4 000 = 120 000 FCFA, remise possible à 110 000 FCFA.",
         note: "La remise est confirmee manuellement par l'administrateur et journalisee."
       },
       empty: "Aucune chambre journaliere occupee.",
@@ -499,8 +499,8 @@
     },
     finance: {
       title: "Flux financiers",
-      description: "Journal unique pour revenus journaliers, loyers, cautions, ventes et autres flux. Rapports en XOF.",
-      metrics: [["Devises", "XOF/CNY", "Taux saisi manuellement"], ["Recu", "Champ requis", "Correspond au recu papier"], ["Comptabilite", "API reservee", "Export Excel/CSV d'abord"]],
+      description: "Journal unique pour revenus journaliers, loyers, cautions, ventes et autres flux. Rapports en FCFA.",
+      metrics: [["Devises", "FCFA/CNY", "Taux saisi manuellement"], ["Recu", "Champ requis", "Correspond au recu papier"], ["Comptabilite", "API reservee", "Export Excel/CSV d'abord"]],
       empty: "Aucune ecriture comptable.",
       directions: {
         income: "Revenu",
@@ -512,7 +512,25 @@
         daily_rental: "Revenu journalier",
         lease_rent: "Loyer longue duree",
         lease_deposit: "Caution location",
+        lease_deposit_refund: "Remboursement caution location",
+        lease_deposit_deduction: "Retenue sur caution location",
+        lease_agency_income: "Commission location recue",
+        lease_agency_expense: "Commission location versee",
+        property_fee: "Charges de copropriete",
+        furniture_fee: "Frais de mobilier",
+        agency_fee: "Commission agence",
         sale: "Vente",
+        sale_contract: "Paiement contrat de vente",
+        sale_agency_income: "Commission vente recue",
+        sale_agency_expense: "Commission vente versee",
+        sale_agency_clearing: "Reglement commission vente",
+        sale_registration_fee: "Frais d'enregistrement vente",
+        sale_transfer_tax: "Taxe de mutation",
+        sale_deposit_refund: "Remboursement acompte vente",
+        sale_furniture: "Mobilier vendu",
+        sale_furniture_income: "Revenu mobilier vendu",
+        sale_non_cash_consideration: "Contrepartie non monetaire",
+        sale_other_income: "Autre revenu de vente",
         other_income: "Autre revenu",
         maintenance: "Maintenance",
         cleaning_wages: "Salaire menage",
@@ -538,8 +556,8 @@
         category: "Categorie",
         amount: "Montant",
         currency: "Devise",
-        exchangeRate: "Taux (XOF=1)",
-        amountXof: "Equivalent XOF",
+        exchangeRate: "Taux (FCFA=1)",
+        amountXof: "Equivalent FCFA",
         description: "Description",
         receiptNo: "N° recu",
         building: "Immeuble",
@@ -564,7 +582,7 @@
       items: ["Synthese mensuelle", "Profit immeuble 11", "Taux d'occupation jour", "Vacance longue duree", "Encaissement ventes", "Tresorerie"],
       placeholder: "A connecter a Supabase, graphiques et exports.",
       dateRange: "Periode",
-      unit: "10k XOF",
+      unit: "10k FCFA",
       empty: "Aucune donnee sur la periode",
       emailSchedule: "Envoi programme — a implementer",
       monthlySummary: {
@@ -773,6 +791,7 @@
         daily_rental: "Location jour",
         lease_rent: "Loyer LT",
         lease_deposit: "Depot LT",
+        property_fee: "Charges de copropriete",
         sale_installment: "Echeance vente",
         sale_lump_sum: "Vente comptant",
         other: "Autre",

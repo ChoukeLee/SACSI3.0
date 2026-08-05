@@ -5,6 +5,7 @@ import { Plus, X, Download } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
+import { financialBusinessLabel } from "@/lib/display-labels";
 import { DateInput } from "@/components/ui/date-input";
 import { Button } from "@/components/ui/button";
 import { BusinessTable, BusinessTbody, BusinessTd, BusinessTh, BusinessThead, BusinessRow, MoneyCell, DEFAULT_BUSINESS_TABLE_PAGE_SIZE } from "@/components/ui/business-table";
@@ -300,7 +301,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments, ca
                   <BusinessTh>{t.filters.dateRange}</BusinessTh>
                   <BusinessTh align="center">{t.filters.direction}</BusinessTh>
                   <BusinessTh>{t.filters.category}</BusinessTh>
-                  <BusinessTh align="right">XOF</BusinessTh>
+                  <BusinessTh align="right">FCFA</BusinessTh>
                   <BusinessTh>{t.entry.description}</BusinessTh>
                   {attachments && attachments.length > 0 && <BusinessTh align="center"></BusinessTh>}
                 </tr>
@@ -316,7 +317,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments, ca
                       </BusinessTd>
                       <BusinessTd>
                         <div className="truncate">
-                          <span>{t.categories[e.category as keyof typeof t.categories] ?? e.category}</span>
+                          <span>{financialBusinessLabel(e.category, locale)}</span>
                           {unit && <span className="ml-1 text-muted-foreground">({unit.unit_no})</span>}
                         </div>
                       </BusinessTd>
@@ -400,7 +401,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments, ca
                 </select>
               </div>
               <div>
-                <label className={labelClass}>{t.entry.amount} (XOF)</label>
+                <label className={labelClass}>{t.entry.amount} (FCFA)</label>
                 <input type="number" value={eAmount} onChange={(e) => setEAmount(Number(e.target.value))} className={inputClass} />
               </div>
               <div className="rounded-md bg-muted p-2 text-center text-sm font-semibold">

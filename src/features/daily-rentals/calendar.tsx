@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Plus, Printer, SlidersHorizontal, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { cn, formatXof, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
+import { statusDisplayLabel } from "@/lib/display-labels";
 import { COPY, BOOKING_STATUS_LABELS } from "./calendar-constants";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl, StatTile } from "@/components/ui/operational";
@@ -1168,7 +1169,7 @@ function TimelineCell({
             <span className="min-w-0">
               <span className="block truncate text-xs font-semibold leading-3">{name}</span>
               <span className="block truncate text-[8px] font-semibold opacity-85">
-                {bookingLabels[booking.status] ?? booking.status}
+                {bookingLabels[booking.status] ?? statusDisplayLabel(booking.status, locale)}
               </span>
             </span>
           )}
@@ -1227,7 +1228,7 @@ function TimelineCell({
             <span className="min-w-0">
               <span className="block truncate text-xs font-semibold leading-3">{name}</span>
               <span className="block truncate text-[8px] font-semibold opacity-85">
-                {bookingLabels[booking.status] ?? booking.status}
+                {bookingLabels[booking.status] ?? statusDisplayLabel(booking.status, locale)}
               </span>
             </span>
           )}

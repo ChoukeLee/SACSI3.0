@@ -56,13 +56,13 @@
       description: "首期只启用 11#公寓，但所有数据结构保留多楼栋扩展字段。这里先承载日租、长租、出售三条业务线的总览入口。",
       metrics: {
         mainUnits: ["主楼房源", "72户", "1-12F，每层 101-106"],
-        dailyUnits: ["日租房源", "21间", "固定房间，统一 40,000 XOF/晚"],
+        dailyUnits: ["日租房源", "21间", "固定房间，统一 40,000 FCFA/晚"],
         businessTypes: ["业务类型", "3类", "日租、长租、出售"],
         futureBuildings: ["扩展楼栋", "5栋预留", "3#/4#/5#/6#/7# 后续导入"]
       },
       modules: [
         ["11#房源总览", "主楼、车库、业务属性和房态管理", "72户 + 车库", "/units"],
-        ["日租业务", "21间固定日租房、预订、入住、退房、保洁", "40,000 XOF/晚", "/daily-rentals"],
+        ["日租业务", "21间固定日租房、预订、入住、退房、保洁", "40,000 FCFA/晚", "/daily-rentals"],
         ["长租业务", "合同、应收、押金、退租结算", "按户型定价", "/leases"],
         ["出售业务", "出售合同、分期收款、过户跟进", "房源 + 车位", "/sales"]
       ]
@@ -113,7 +113,7 @@
         layout: "户型",
         furnishing: "家具配置",
         dailyPrice: "日租价格",
-        dailyPriceUnit: "XOF/晚",
+        dailyPriceUnit: "FCFA/晚",
         supportedBusiness: "支持业务",
         notes: "备注",
         noNotes: "暂无备注",
@@ -130,7 +130,7 @@
       description: "仅 11#固定 21 间房支持日租。需要检测长租占用冲突，后续接入 OTA 双向同步。",
       metrics: [
         ["日租房源", "21间", "固定名单由数据库标记"],
-        ["默认价格", "40,000 XOF", "可在订单中手动调整"],
+        ["默认价格", "40,000 FCFA", "可在订单中手动调整"],
         ["付款规则", "可欠款", "未收款由财务待付余额追踪"]
       ],
       steps: [
@@ -248,7 +248,7 @@
       },
       discountRule: {
         title: "满月优惠规则",
-        example: "例如 30晚 x 4,000 = 120,000 XOF，可手动优惠收 110,000 XOF。",
+        example: "例如30晚×4,000 FCFA=120,000 FCFA，可手动优惠为110,000 FCFA。",
         note: "优惠金额由管理员在结算时手动确认并写入审计日志。"
       },
       empty: "当前没有日租占用房间。",
@@ -499,8 +499,8 @@
     },
     finance: {
       title: "财务流水",
-      description: "统一记录日租收入、长租租金、押金、出售房款和其他收支；报表统一换算为万 XOF。",
-      metrics: [["币种", "XOF/CNY", "汇率手动录入"], ["收据编号", "必留字段", "匹配公司纸质收据"], ["会计接口", "预留 API", "当前先导出 Excel/CSV"]],
+      description: "统一记录日租收入、长租租金、押金、出售房款和其他收支；报表统一换算为万FCFA。",
+      metrics: [["币种", "FCFA/人民币", "汇率手动录入"], ["收据编号", "必留字段", "匹配公司纸质收据"], ["会计接口", "预留接口", "当前先导出Excel/CSV"]],
       empty: "暂无财务流水记录。",
       directions: {
         income: "收入",
@@ -512,7 +512,25 @@
         daily_rental: "日租收入",
         lease_rent: "长租租金",
         lease_deposit: "长租押金",
+        lease_deposit_refund: "退还长租押金",
+        lease_deposit_deduction: "扣除长租押金",
+        lease_agency_income: "长租中介费收入",
+        lease_agency_expense: "长租中介费支出",
+        property_fee: "物业费",
+        furniture_fee: "家具费",
+        agency_fee: "中介费",
         sale: "出售房款",
+        sale_contract: "出售合同款",
+        sale_agency_income: "出售中介费收入",
+        sale_agency_expense: "出售中介费支出",
+        sale_agency_clearing: "出售中介费结算",
+        sale_registration_fee: "出售登记费",
+        sale_transfer_tax: "出售过户税费",
+        sale_deposit_refund: "退还出售定金",
+        sale_furniture: "出售家具款",
+        sale_furniture_income: "出售家具收入",
+        sale_non_cash_consideration: "出售非现金对价",
+        sale_other_income: "出售其他收入",
         other_income: "其他收入",
         maintenance: "维修费",
         cleaning_wages: "保洁工资",
@@ -538,8 +556,8 @@
         category: "类别",
         amount: "金额",
         currency: "币种",
-        exchangeRate: "汇率(XOF=1)",
-        amountXof: "折合XOF",
+        exchangeRate: "汇率（FCFA=1）",
+        amountXof: "折合FCFA",
         description: "说明",
         receiptNo: "收据编号",
         building: "关联楼栋",
@@ -564,7 +582,7 @@
       items: ["月度收支总表", "11#利润表", "日租入住率", "长租空置率", "出售回款进度", "现金流量表"],
       placeholder: "后续接入 Supabase 查询、图表和导出。",
       dateRange: "报表期间",
-      unit: "万 XOF",
+      unit: "万FCFA",
       empty: "所选期间暂无数据",
       emailSchedule: "定时发送邮箱 — 后续实现",
       monthlySummary: {
@@ -773,6 +791,7 @@
         daily_rental: "日租收入",
         lease_rent: "长租租金",
         lease_deposit: "长租押金",
+        property_fee: "物业费",
         sale_installment: "出售分期",
         sale_lump_sum: "出售一次性",
         other: "其他",

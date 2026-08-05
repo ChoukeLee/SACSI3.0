@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FileText, ImageUp, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { currencyDisplayLabel, financialBusinessLabel, statusDisplayLabel } from "@/lib/display-labels";
 
 interface AttachmentMeta {
   id: string;
@@ -66,8 +67,8 @@ export function ReceiptThumb({ attachment, locale }: Props) {
               <div className="space-y-1 text-[12px] text-muted-foreground">
                 {meta.receipt_no != null && <p>{zh ? "收据号" : "No"}: {String(meta.receipt_no)}</p>}
                 {meta.receipt_date != null && <p>{zh ? "日期" : "Date"}: {String(meta.receipt_date)}</p>}
-                {meta.amount_xof != null && <p>{zh ? "金额" : "Montant"}: {Number(meta.amount_xof).toLocaleString()} XOF</p>}
-                {meta.business_type != null && <p>{zh ? "类型" : "Type"}: {String(meta.business_type)}</p>}
+                {meta.amount_xof != null && <p>{zh ? "金额" : "Montant"}: {Number(meta.amount_xof).toLocaleString()} {currencyDisplayLabel("XOF", locale)}</p>}
+                {meta.business_type != null && <p>{zh ? "类型" : "Type"}: {financialBusinessLabel(String(meta.business_type), locale)}</p>}
               </div>
 
               {attachment.ocr_text && (
@@ -78,7 +79,7 @@ export function ReceiptThumb({ attachment, locale }: Props) {
               )}
 
               <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
-                <span>{zh ? "纸质归档" : "Archive"}: <span className={cn("font-semibold", attachment.paper_archive_status === "archived" ? "text-green-600" : attachment.paper_archive_status === "missing" ? "text-red-600" : "text-amber-600")}>{attachment.paper_archive_status ?? "pending"}</span></span>
+                <span>{zh ? "纸质归档" : "Archive"}: <span className={cn("font-semibold", attachment.paper_archive_status === "archived" ? "text-green-600" : attachment.paper_archive_status === "missing" ? "text-red-600" : "text-amber-600")}>{statusDisplayLabel(attachment.paper_archive_status ?? "pending", locale)}</span></span>
                 {attachment.paper_archive_location && <span>{attachment.paper_archive_location}</span>}
                 {attachment.uploaded_at && <span className="ml-auto">{new Date(attachment.uploaded_at).toLocaleDateString()}</span>}
               </div>

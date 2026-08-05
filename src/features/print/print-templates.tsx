@@ -1,6 +1,7 @@
 "use client";
 
 import { formatXof } from "@/lib/utils";
+import { paymentPlanDisplayLabel, statusDisplayLabel } from "@/lib/display-labels";
 import type {
   CustomerRow,
   DailyBookingRow,
@@ -140,7 +141,7 @@ export function printLeaseContract(data: LeaseContractPrintData, locale: "zh" | 
     partial: labels.partialStatus,
     overdue: labels.overdueStatus,
     cancelled: labels.cancelledStatus,
-  }[status] ?? status);
+  }[status] ?? statusDisplayLabel(status, locale));
   const kindLabel = (category: string) => ({
     lease_rent: labels.rent,
     lease_deposit: labels.leaseDeposit,
@@ -216,16 +217,8 @@ export function printSaleContract(data: SaleContractPrintData, locale: "zh" | "f
   const paid = Math.max(0, Number(data.paidAmountXof));
   const total = Number(data.contract.total_amount_xof);
   const outstanding = Math.max(0, total - paid);
-  const paymentPlan = ({
-    lump_sum: locale === "zh" ? "一次性付清" : "Comptant",
-    fixed_installment: locale === "zh" ? "固定分期" : "Échéancier fixe",
-    flexible_installment: locale === "zh" ? "灵活分期" : "Échéancier libre",
-  } as Record<string, string>)[data.contract.payment_plan_type] ?? data.contract.payment_plan_type;
-  const transferStatus = ({
-    not_started: locale === "zh" ? "未开始" : "Non commencé",
-    in_progress: locale === "zh" ? "办理中" : "En cours",
-    completed: locale === "zh" ? "已完成" : "Terminé",
-  } as Record<string, string>)[data.contract.transfer_status] ?? data.contract.transfer_status;
+  const paymentPlan = paymentPlanDisplayLabel(data.contract.payment_plan_type, locale);
+  const transferStatus = statusDisplayLabel(data.contract.transfer_status, locale);
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${labels.title}</title>${a4Styles}</head><body>
     <div class="header"><div class="company">${labels.company}</div><div class="meta">${labels.title}</div></div>
     <h1>${labels.title}</h1>

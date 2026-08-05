@@ -1,4 +1,5 @@
 import type { QualityIssue, QualitySeverity, QualityCategory } from "@/features/data-quality/quality-types";
+import { statusDisplayLabel } from "@/lib/display-labels";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -78,9 +79,9 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
           const bIdA = a.id as string, bIdB = b.id as string;
           issues.push(iss(
             `dr_overlap_${bIdA.slice(0, 8)}_${bIdB.slice(0, 8)}`, "high", "daily_rental",
-            `Overlapping bookings ${label}`,
-            `Room ${label} has overlapping active bookings: ${a.check_in}→${aOut} (${a.status}) and ${b.check_in}→${bOut} (${b.status})`,
-            "Manual review required. Cannot auto-fix.",
+            `日租订单日期重叠 ${label}`,
+            `房间 ${label} 存在日期重叠的有效订单：${a.check_in}→${aOut}（${statusDisplayLabel(String(a.status), "zh")}）与 ${b.check_in}→${bOut}（${statusDisplayLabel(String(b.status), "zh")}）`,
+            "需要人工核实，系统不会自动修改。",
             "daily_booking", bIdA, label, [bIdA, bIdB], `/daily-rentals`,
           ));
         }
@@ -107,18 +108,18 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
       if (ciList.length === 1) {
         issues.push(iss(
           `dr_ci_not_occupied_${bId.slice(0, 8)}`, "high", "daily_rental",
-          `Checked-in but unit status mismatch ${label}`,
-          `Room ${label} has a checked_in booking but unit.status=${unit.status}`,
-          "Fix: set unit.status to daily_occupied.",
+          `已入住订单与房态不一致 ${label}`,
+          `房间 ${label} 存在已入住订单，但房态为${statusDisplayLabel(String(unit.status), "zh")}`,
+          "将房态修正为日租中。",
           "unit", uid, label, [bId], `/units/${uid}`,
           true, uid,
         ));
       } else {
         issues.push(iss(
           `dr_ci_multi_occupied_${uid.slice(0, 8)}`, "high", "daily_rental",
-          `Multiple checked-in bookings ${label}`,
-          `Room ${label} has ${ciList.length} checked_in bookings and unit.status=${unit.status}`,
-          "Manual review required. Cannot auto-fix.",
+          `同一房间存在多笔入住订单 ${label}`,
+          `房间 ${label} 存在 ${ciList.length} 笔已入住订单，当前房态为${statusDisplayLabel(String(unit.status), "zh")}`,
+          "需要人工核实，系统不会自动修改。",
           "unit", uid, label, ciList.map(b => b.id as string), `/units/${uid}`,
         ));
       }
@@ -130,9 +131,9 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
     if (!checkedInByUnit.has(uid) || checkedInByUnit.get(uid)!.length === 0) {
       issues.push(iss(
         `dr_occupied_no_ci_${uid.slice(0, 8)}`, "high", "daily_rental",
-        `Unit marked occupied but no booking ${u.unit_no ?? uid.slice(0, 8)}`,
-        `Room ${u.unit_no ?? uid} unit.status=daily_occupied but no checked_in booking`,
-        "Manual review required.",
+        `房态为日租中但没有入住订单 ${u.unit_no ?? uid.slice(0, 8)}`,
+        `房间 ${u.unit_no ?? uid} 当前为日租中，但没有已入住订单`,
+        "需要人工核实。",
         "unit", uid, u.unit_no as string ?? uid, [], `/units/${uid}`,
       ));
     }
@@ -160,9 +161,9 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
       if (!hasFutureBooking) {
         issues.push(iss(
           `dr_clean_not_status_${uid.slice(0, 8)}`, "medium", "daily_rental",
-          `Open cleaning but wrong unit status ${label}`,
-          `Room ${label} has ${tasks.length} open cleaning tasks but unit.status=${unit.status}`,
-          "Fix: set unit.status to cleaning_pending.",
+          `待办保洁与房态不一致 ${label}`,
+          `房间 ${label} 存在 ${tasks.length} 项未完成保洁任务，但房态为${statusDisplayLabel(String(unit.status), "zh")}`,
+          "将房态修正为待保洁。",
           "unit", uid, label, tasks.map(t => t.id as string), `/units/${uid}`,
           true, uid,
         ));
@@ -175,9 +176,9 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
     if (!openCleaningByUnit.has(uid) || openCleaningByUnit.get(uid)!.length === 0) {
       issues.push(iss(
         `dr_clean_status_no_task_${uid.slice(0, 8)}`, "medium", "daily_rental",
-        `Unit marked cleaning but no task ${u.unit_no ?? uid.slice(0, 8)}`,
-        `Room ${u.unit_no ?? uid} unit.status=cleaning_pending but no open cleaning task`,
-        "Fix: set unit.status to available.",
+        `房态为待保洁但没有保洁任务 ${u.unit_no ?? uid.slice(0, 8)}`,
+        `房间 ${u.unit_no ?? uid} 当前为待保洁，但没有未完成的保洁任务`,
+        "将房态修正为空闲。",
         "unit", uid, u.unit_no as string ?? uid, [], `/units/${uid}`,
         true, uid,
       ));
@@ -200,9 +201,9 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
       const label = unit ? `${unit.unit_no ?? "?"}` : "?";
       issues.push(iss(
         `dr_fin_prepaid_${bId.slice(0, 8)}`, "high", "finance",
-        `Prepaid mismatch ${label}`,
-        `Booking ${bId.slice(0, 8)} prepaid=${bookingPrepaid}, payment sum=${paymentSum}`,
-        "Fix: run syncBookingFinance.",
+        `订单预付金额不一致 ${label}`,
+        `订单 ${bId.slice(0, 8)} 记录的预付金额为 ${bookingPrepaid}，关联收款合计为 ${paymentSum}`,
+        "重新同步订单财务数据。",
         "daily_booking", bId, label, [bId], `/daily-rentals`,
         true, bId,
       ));
@@ -248,9 +249,9 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
       const label = unit ? `${unit.unit_no ?? "?"}` : "?";
       issues.push(iss(
         `dr_fin_rec_paid_${rId.slice(0, 8)}`, "high", "finance",
-        `Receivable paid mismatch ${label}`,
-        `Receivable ${rId.slice(0, 8)} paid=${recPaid}, payment sum=${paymentSum}`,
-        "Fix: run syncBookingFinance.",
+        `应收已收金额不一致 ${label}`,
+        `应收 ${rId.slice(0, 8)} 记录的已收金额为 ${recPaid}，关联收款合计为 ${paymentSum}`,
+        "重新同步订单财务数据。",
         "receivable", rId, label, [srcId], "/finance",
         true, srcId,
       ));
@@ -272,9 +273,9 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
       const label = unit ? `${unit.unit_no ?? "?"}` : "?";
       issues.push(iss(
         `dr_fin_rec_amt_${String(r.id).slice(0, 40)}`, "high", "finance",
-        `Receivable amount mismatch ${label}`,
-        `Receivable amount=${recAmount}, booking.final=${bkFinal}`,
-        "Fix: run syncBookingFinance.",
+        `应收金额与订单不一致 ${label}`,
+        `应收金额为 ${recAmount}，订单最终金额为 ${bkFinal}`,
+        "重新同步订单财务数据。",
         "receivable", r.id as string, label, [srcId], "/finance",
         true, srcId,
       ));
@@ -298,9 +299,9 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
       const label = unit ? `${unit.unit_no ?? "?"}` : "?";
       issues.push(iss(
         `dr_fin_billing_${bId.slice(0, 8)}`, "medium", "finance",
-        `Billing status mismatch ${label}`,
-        `Billing=${b.billing_status}, expected=${expected}`,
-        "Fix: run syncBookingFinance.",
+        `订单计费状态不一致 ${label}`,
+        `当前计费状态为${statusDisplayLabel(String(b.billing_status), "zh")}，应为${statusDisplayLabel(expected, "zh")}`,
+        "重新同步订单财务数据。",
         "daily_booking", bId, label, [bId], `/daily-rentals`,
         true, bId,
       ));
@@ -317,9 +318,9 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
       const label = unit ? `${unit.unit_no ?? "?"}` : "?";
       issues.push(iss(
         `dr_fin_no_ledger_${pId.slice(0, 8)}`, "high", "finance",
-        `Payment missing ledger ${label}`,
-        `Payment ${pId.slice(0, 8)} amount ${p.amount} has no ledger entry`,
-        "Manual review required. Cannot auto-fix.",
+        `收款缺少财务流水 ${label}`,
+        `收款 ${pId.slice(0, 8)} 金额 ${p.amount}，但没有关联财务流水`,
+        "需要人工核实，系统不会自动修改。",
         "payment", pId, label, [p.source_id as string], "/finance",
       ));
     }
@@ -333,9 +334,9 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
     if (!paymentIds.has(ePid)) {
       issues.push(iss(
         `dr_fin_orphan_ledger_${String(e.id).slice(0, 40)}`, "medium", "finance",
-        `Orphan ledger entry`,
-        `Ledger entry references deleted payment ${ePid.slice(0, 8)}`,
-        "Manual review required. Cannot auto-fix.",
+        `财务流水关联的收款不存在`,
+        `财务流水关联了一笔已不存在的收款 ${ePid.slice(0, 8)}`,
+        "需要人工核实，系统不会自动修改。",
         "ledger_entry", e.id as string, ePid.slice(0, 8), [], "/finance",
       ));
     }
@@ -355,9 +356,9 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
     if ((b.check_out as string) >= today) {
       issues.push(iss(
         `dr_bf_future_${bId.slice(0, 8)}`, "medium", "daily_rental",
-        `Backfill future date ${label}`,
-        `Backfill booking ${bId.slice(0, 8)} check_out=${b.check_out} should be past`,
-        "Manual review required.",
+        `历史补录订单日期在未来 ${label}`,
+        `历史补录订单 ${bId.slice(0, 8)} 的退房日期为 ${b.check_out}，应为过去日期`,
+        "需要人工核实。",
         "daily_booking", bId, label, [bId], `/daily-rentals`,
       ));
     }
@@ -369,9 +370,9 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
     if (!hasAudit) {
       issues.push(iss(
         `dr_bf_no_audit_${bId.slice(0, 8)}`, "low", "daily_rental",
-        `Backfill missing audit ${label}`,
-        `Backfill booking ${bId.slice(0, 8)} missing audit log`,
-        "Fix: insert audit log.",
+        `历史补录缺少操作日志 ${label}`,
+        `历史补录订单 ${bId.slice(0, 8)} 没有对应的操作日志`,
+        "补充操作日志。",
         "daily_booking", bId, label, [bId], `/daily-rentals`,
         true, bId,
       ));
@@ -381,9 +382,9 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
     if (unit && (unit.status as string) === "reserved") {
       issues.push(iss(
         `dr_bf_unit_status_${bId.slice(0, 8)}`, "medium", "daily_rental",
-        `Backfill affects unit status ${label}`,
-        `Backfill booking ${bId.slice(0, 8)} unit.status=reserved`,
-        "Fix: correct unit.status.",
+        `历史补录影响当前房态 ${label}`,
+        `历史补录订单 ${bId.slice(0, 8)} 导致当前房态为已预订`,
+        "修正当前房态。",
         "unit", unit.id as string, label, [bId], `/units/${unit.id}`,
         true, unit.id as string,
       ));

@@ -1,6 +1,7 @@
 "use client";
 
 import { formatXof } from "@/lib/utils";
+import { paymentPlanDisplayLabel, statusDisplayLabel } from "@/lib/display-labels";
 import type { DocumentRecord, Locale } from "../types";
 
 // ── Print infrastructure ──
@@ -72,12 +73,12 @@ function infoTable(rows: [string, string][]) {
   return `<table class="info">${rows.map(([l, v]) => `<tr><td class="lbl">${l}</td><td class="val">${v}</td></tr>`).join("")}</table>`;
 }
 
-function statusBadge(status: string, labels: Record<string, string>) {
+function statusBadge(status: string, labels: Record<string, string>, locale: Locale) {
   const cls = status === "paid" || status === "checked_out" ? "st-paid"
     : status === "overdue" ? "st-overdue"
     : status === "pending" || status === "pending_review" ? "st-pending"
     : "st-active";
-  return `<span class="status-badge ${cls}">${labels[status] ?? status}</span>`;
+  return `<span class="status-badge ${cls}">${labels[status] ?? statusDisplayLabel(status, locale)}</span>`;
 }
 
 function sigBlock(tenant: string, staff: string) {
@@ -153,7 +154,7 @@ export function printLeaseContractDoc(data: DocumentRecord, locale: Locale) {
       [L.paymentCycle, `${cycleLabels[String(c.payment_cycle ?? "")] ?? c.payment_cycle} / ${c.payment_day ?? "-"}号`],
       [L.monthlyRent, formatXof(Number(c.monthly_rent_xof ?? 0))],
       [L.deposit, `${formatXof(Number(c.deposit_amount_xof ?? 0))} ${c.deposit_received ? (locale === "zh" ? "✓已收" : "✓Recu") : (locale === "zh" ? "未收" : "Non recu")}`],
-      [(locale === "zh" ? "合同状态" : "Statut"), statusBadge(data.status, L.statusLabels)],
+      [(locale === "zh" ? "合同状态" : "Statut"), statusBadge(data.status, L.statusLabels, locale)],
     ])}
     ${sigBlock(L.signTenant, L.signStaff)}
     <div class="footer">${L.company} · ${L.building} · ${new Date().toLocaleDateString()}</div>`;
@@ -180,7 +181,7 @@ export function printLeaseReceiptDoc(data: DocumentRecord, locale: Locale) {
       ${unpaid > 0 ? `<tr><td class="lbl" style="color:#dc2626">${L.outstanding}</td><td class="val" style="color:#dc2626;font-weight:700">${formatXof(unpaid)}</td></tr>` : ""}
     </table>
     <div class="total-row"><span class="lbl">${L.amount}</span><span class="val">${formatXof(data.amountXof)}</span></div>
-    <p style="font-size:10px;color:#64748b;margin-top:8px">${statusBadge(data.status, L.statusLabels)}</p>
+    <p style="font-size:10px;color:#64748b;margin-top:8px">${statusBadge(data.status, L.statusLabels, locale)}</p>
     ${sigBlock(L.signTenant, L.signStaff)}
     <div class="footer">${L.company} · ${L.building} · ${new Date().toLocaleDateString()}</div>`;
   printDoc(data.title, body);
@@ -201,7 +202,7 @@ export function printLeaseReminderDoc(data: DocumentRecord, locale: Locale) {
       [L.amount, formatXof(data.amountXof)],
       [L.paid, formatXof(data.paidAmountXof)],
       [L.outstanding, `<span style="color:#dc2626;font-weight:700">${formatXof(unpaid > 0 ? unpaid : 0)}</span>`],
-      [(locale === "zh" ? "状态" : "Statut"), statusBadge(data.status, L.statusLabels)],
+      [(locale === "zh" ? "状态" : "Statut"), statusBadge(data.status, L.statusLabels, locale)],
     ])}
     ${sigBlock(L.signStaff, L.signDate)}
     <div class="footer">${L.company} · ${L.building} · ${new Date().toLocaleDateString()}</div>`;
@@ -229,7 +230,7 @@ export function printDailyBookingDoc(data: DocumentRecord, locale: Locale) {
       <tr><td class="lbl">${L.prepaid}</td><td class="val" style="color:#16a34a">${formatXof(data.paidAmountXof)}</td></tr>
       ${(data.amountXof - data.paidAmountXof) > 0 ? `<tr><td class="lbl" style="color:#dc2626">${L.outstanding}</td><td class="val" style="color:#dc2626;font-weight:700">${formatXof(data.amountXof - data.paidAmountXof)}</td></tr>` : ""}
     </table>
-    <p style="font-size:10px;color:#64748b;margin-top:6px">${statusBadge(data.status, L.statusLabels)} · ${L.billingStatus}: ${String(c.billing_status ?? "-")}</p>
+    <p style="font-size:10px;color:#64748b;margin-top:6px">${statusBadge(data.status, L.statusLabels, locale)} · ${L.billingStatus}: ${c.billing_status ? statusDisplayLabel(String(c.billing_status), locale) : "-"}</p>
     ${sigBlock(L.signTenant, L.signStaff)}
     <div class="footer">${L.company} · ${L.building} · ${new Date().toLocaleDateString()}</div>`;
   printDoc(data.title, body);
@@ -253,7 +254,7 @@ export function printDailyReceiptDoc(data: DocumentRecord, locale: Locale) {
       <tr><td class="lbl">${L.paid}</td><td class="val" style="color:#16a34a">${formatXof(data.paidAmountXof)}</td></tr>
       ${unpaid > 0 ? `<tr><td class="lbl" style="color:#dc2626">${L.outstanding}</td><td class="val" style="color:#dc2626;font-weight:700">${formatXof(unpaid)}</td></tr>` : ""}
     </table>
-    <p style="font-size:10px;color:#64748b;margin-top:6px">${statusBadge(data.status, L.statusLabels)}</p>
+    <p style="font-size:10px;color:#64748b;margin-top:6px">${statusBadge(data.status, L.statusLabels, locale)}</p>
     ${sigBlock(L.signTenant, L.signStaff)}
     <div class="footer">${L.company} · ${L.building} · ${new Date().toLocaleDateString()}</div>`;
   printDoc(data.title, body);
@@ -279,7 +280,7 @@ export function printDailyCheckoutDoc(data: DocumentRecord, locale: Locale) {
       <tr><td class="lbl">${L.prepaid}</td><td class="val" style="color:#16a34a">${formatXof(data.paidAmountXof)}</td></tr>
       ${unpaid > 0 ? `<tr><td class="lbl" style="color:#dc2626">${L.outstanding}</td><td class="val" style="color:#dc2626;font-weight:700">${formatXof(unpaid)}</td></tr>` : ""}
     </table>
-    <p style="font-size:10px;color:#64748b;margin-top:6px">${statusBadge(data.status, L.statusLabels)}</p>
+    <p style="font-size:10px;color:#64748b;margin-top:6px">${statusBadge(data.status, L.statusLabels, locale)}</p>
     ${sigBlock(L.signTenant, L.signStaff)}
     <div class="footer">${L.company} · ${L.building} · ${new Date().toLocaleDateString()}</div>`;
   printDoc(data.title, body);
@@ -288,10 +289,6 @@ export function printDailyCheckoutDoc(data: DocumentRecord, locale: Locale) {
 export function printSaleContractDoc(data: DocumentRecord, locale: Locale) {
   const L = locale === "zh" ? zh() : fr();
   const c = data.raw as Record<string, unknown>;
-  const planLabels: Record<string, string> = locale === "zh"
-    ? { lump_sum: "一次性付清", fixed_installment: "固定分期", flexible_installment: "灵活分期" }
-    : { lump_sum: "Comptant", fixed_installment: "Echeancier fixe", flexible_installment: "Libre" };
-
   const body = `
     ${headerHtml(L.company, data.title)}
     ${infoTable([
@@ -301,7 +298,7 @@ export function printSaleContractDoc(data: DocumentRecord, locale: Locale) {
       [L.phone, data.customerPhone ?? "-"],
       [(locale === "zh" ? "签约日期" : "Date signature"), String(c.signed_date ?? "-")],
       [L.totalPrice, formatXof(data.amountXof)],
-      [(locale === "zh" ? "付款方式" : "Plan"), planLabels[String(c.payment_plan_type ?? "")] ?? String(c.payment_plan_type ?? "-")],
+      [(locale === "zh" ? "付款方式" : "Plan"), paymentPlanDisplayLabel(String(c.payment_plan_type ?? ""), locale)],
     ])}
     <table class="data">
       <tr><td class="lbl">${L.amount}</td><td class="val">${formatXof(data.amountXof)}</td></tr>
@@ -309,8 +306,8 @@ export function printSaleContractDoc(data: DocumentRecord, locale: Locale) {
       ${(data.amountXof - data.paidAmountXof) > 0 ? `<tr><td class="lbl" style="color:#dc2626">${L.outstanding}</td><td class="val" style="color:#dc2626;font-weight:700">${formatXof(data.amountXof - data.paidAmountXof)}</td></tr>` : ""}
     </table>
     <p style="font-size:10px;color:#64748b;margin-top:6px">
-      ${statusBadge(data.status, L.statusLabels)} ·
-      ${(locale === "zh" ? "过户" : "Transfert")}: ${(L.statusLabels as Record<string, string>)[String(c.transfer_status ?? "")] ?? String(c.transfer_status ?? "-")}
+      ${statusBadge(data.status, L.statusLabels, locale)} ·
+      ${(locale === "zh" ? "过户" : "Transfert")}: ${statusDisplayLabel(String(c.transfer_status ?? ""), locale)}
     </p>
     ${sigBlock(L.signTenant, L.signStaff)}
     <div class="footer">${L.company} · ${L.building} · ${new Date().toLocaleDateString()}</div>`;
@@ -336,7 +333,7 @@ export function printSaleReceiptDoc(data: DocumentRecord, locale: Locale) {
       <tr><td class="lbl">${L.paid}</td><td class="val" style="color:#16a34a">${formatXof(data.paidAmountXof)}</td></tr>
       ${unpaid > 0 ? `<tr><td class="lbl" style="color:#dc2626">${L.outstanding}</td><td class="val" style="color:#dc2626;font-weight:700">${formatXof(unpaid)}</td></tr>` : ""}
     </table>
-    <p style="font-size:10px;color:#64748b;margin-top:6px">${statusBadge(data.status, L.statusLabels)}</p>
+    <p style="font-size:10px;color:#64748b;margin-top:6px">${statusBadge(data.status, L.statusLabels, locale)}</p>
     ${sigBlock(L.signTenant, L.signStaff)}
     <div class="footer">${L.company} · ${L.building} · ${new Date().toLocaleDateString()}</div>`;
   printDoc(data.title, body);

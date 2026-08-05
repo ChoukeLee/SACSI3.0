@@ -9,6 +9,7 @@ import {
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
+import { financialBusinessLabel, statusDisplayLabel } from "@/lib/display-labels";
 import { auditActionLabel, auditEntityLabel } from "@/lib/audit-labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -93,7 +94,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-xl font-semibold">{customer.name}</h1>
-              <CustomerStatusBadge status={customerStatus} labels={L} />
+              <CustomerStatusBadge status={customerStatus} labels={L} locale={locale} />
               {customer.is_blacklisted && <AlertTriangle className="h-5 w-5 text-red-500" />}
             </div>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
@@ -139,7 +140,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
       />
 
       {/* ── Tab Content ── */}
-      {tab === "overview" && <OverviewTab stats={stats} customer={customer} L={L} data={data} />}
+      {tab === "overview" && <OverviewTab stats={stats} customer={customer} L={L} data={data} locale={locale} />}
       {tab === "daily" && <DailyTab data={data} L={L} locale={locale} />}
       {tab === "lease" && <LeaseTab data={data} L={L} locale={locale} />}
       {tab === "sale" && <SaleTab data={data} L={L} locale={locale} />}
@@ -157,7 +158,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
 }
 
 // ── Overview Tab ──
-function OverviewTab({ stats, customer, L, data }: { stats: { totalRec: number; totalPaid: number; totalOverdue: number; unpaid: number; latestPayment: { payment_date: string; amount: number } | null; latestBooking: { check_in: string; status: string } | null; activeDaily: number; activeLease: number; activeSale: number }; customer: CustomerProfileData["customer"]; L: ReturnType<typeof labels>; data: CustomerProfileData }) {
+function OverviewTab({ stats, customer, L, data, locale }: { stats: { totalRec: number; totalPaid: number; totalOverdue: number; unpaid: number; latestPayment: { payment_date: string; amount: number } | null; latestBooking: { check_in: string; status: string } | null; activeDaily: number; activeLease: number; activeSale: number }; customer: CustomerProfileData["customer"]; L: ReturnType<typeof labels>; data: CustomerProfileData; locale: Locale }) {
   const dailyStatusLabels: Record<string, string> = {
     pending_review: L.dailyPending, confirmed: L.dailyConfirmed, checked_in: L.dailyCheckedIn, checked_out: L.dailyCheckedOut, cancelled: L.dailyCancelled,
   };
@@ -172,7 +173,7 @@ function OverviewTab({ stats, customer, L, data }: { stats: { totalRec: number; 
 
       <div className="grid gap-2 md:grid-cols-3">
         <InfoCard label={L.lastPayment} value={stats.latestPayment ? `${stats.latestPayment.payment_date} · ${formatXof(Number(stats.latestPayment.amount))}` : L.noData} />
-        <InfoCard label={L.lastBooking} value={stats.latestBooking ? `${stats.latestBooking.check_in} · ${dailyStatusLabels[stats.latestBooking.status] ?? stats.latestBooking.status}` : L.noData} />
+        <InfoCard label={L.lastBooking} value={stats.latestBooking ? `${stats.latestBooking.check_in} · ${dailyStatusLabels[stats.latestBooking.status] ?? statusDisplayLabel(stats.latestBooking.status, locale)}` : L.noData} />
         <InfoCard label={L.currentBusiness} value={businessSummary(stats, L)} />
       </div>
 
@@ -224,7 +225,7 @@ function FinanceTab({ data, L, locale }: { data: CustomerProfileData; L: ReturnT
               const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
               return <tr key={r.id} className={cn("transition-colors hover:bg-accent/50", r.status === "overdue" && "bg-red-50/30")}>
                 <td className="px-4 py-2.5">{r.due_date}</td>
-                <td className="px-4 py-2.5 text-muted-foreground">{L.sourceLabels[r.source_type] ?? r.source_type}</td>
+                <td className="px-4 py-2.5 text-muted-foreground">{financialBusinessLabel(r.source_type, locale, r.category)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatXof(Number(r.amount_xof))}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600 font-medium">{formatXof(Number(r.paid_amount_xof))}</td>
                 <td className="px-4 py-2.5"><Badge variant={outstanding > 0 ? (r.status === "overdue" ? "destructive" : "warning") : "success"}>{outstanding > 0 ? formatXof(outstanding) : L.settled}</Badge></td>
@@ -265,7 +266,7 @@ function DailyTab({ data, L, locale }: { data: CustomerProfileData; L: ReturnTyp
       cells: [
         unit?.unit_no ?? "?",
         b.check_in + " → " + (b.check_out ?? L.openEnded),
-        <Badge key="s" variant={dailyStatusTone(b.status)}>{L.dailyStatusLabels[b.status] ?? b.status}</Badge>,
+        <Badge key="s" variant={dailyStatusTone(b.status)}>{L.dailyStatusLabels[b.status] ?? statusDisplayLabel(b.status, locale)}</Badge>,
         <span key="a" className="tabular-nums font-medium">{formatXof(Number(b.total_amount_xof))}</span>,
         <TextLink key="v" href={routeFor(locale, "/daily-rentals")}>{L.view}</TextLink>,
       ],
@@ -282,7 +283,7 @@ function LeaseTab({ data, L, locale }: { data: CustomerProfileData; L: ReturnTyp
         unit?.unit_no ?? "?", lc.contract_no,
         lc.start_date + " → " + lc.expected_end_date,
         <span key="a" className="tabular-nums font-medium">{formatXof(Number(lc.monthly_rent_xof))}</span>,
-        <Badge key="s" variant={contractTone(lc.status)}>{L.contractStatusLabels[lc.status] ?? lc.status}</Badge>,
+        <Badge key="s" variant={contractTone(lc.status)}>{L.contractStatusLabels[lc.status] ?? statusDisplayLabel(lc.status, locale)}</Badge>,
         <TextLink key="v" href={routeFor(locale, "/leases")}>{L.view}</TextLink>,
       ],
     };
@@ -297,7 +298,7 @@ function SaleTab({ data, L, locale }: { data: CustomerProfileData; L: ReturnType
       cells: [
         unit?.unit_no ?? "?", sc.contract_no,
         <span key="a" className="tabular-nums font-medium">{formatXof(Number(sc.total_amount_xof))}</span>,
-        <Badge key="s" variant={contractTone(sc.status)}>{L.contractStatusLabels[sc.status] ?? sc.status}</Badge>,
+        <Badge key="s" variant={contractTone(sc.status)}>{L.contractStatusLabels[sc.status] ?? statusDisplayLabel(sc.status, locale)}</Badge>,
         <TextLink key="v" href={routeFor(locale, "/sales")}>{L.view}</TextLink>,
       ],
     };
@@ -343,7 +344,7 @@ function TextLink({ href, children }: { href: string; children: React.ReactNode 
   return <Link href={href} className="text-xs font-semibold text-primary hover:underline">{children}</Link>;
 }
 
-function CustomerStatusBadge({ status, labels: labelSet }: { status: string; labels: ReturnType<typeof labels> }) {
+function CustomerStatusBadge({ status, labels: labelSet, locale }: { status: string; labels: ReturnType<typeof labels>; locale: Locale }) {
   const variant: Record<string, BadgeTone> = { active: "success", inactive: "secondary", overdue: "destructive", blacklisted: "destructive" };
   const text: Record<string, string> = {
     active: labelSet.active,
@@ -351,7 +352,7 @@ function CustomerStatusBadge({ status, labels: labelSet }: { status: string; lab
     overdue: labelSet.overdue,
     blacklisted: labelSet.blacklisted,
   };
-  return <Badge variant={variant[status] ?? "secondary"}>{text[status] ?? status}</Badge>;
+  return <Badge variant={variant[status] ?? "secondary"}>{text[status] ?? statusDisplayLabel(status, locale)}</Badge>;
 }
 
 function businessSummary(stats: { activeDaily: number; activeLease: number; activeSale: number }, L: ReturnType<typeof labels>) {

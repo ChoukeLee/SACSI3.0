@@ -4,6 +4,7 @@ import type {
 } from "@/types/database";
 import type { QualityIssue, QualityCategory, QualitySeverity, TodoRole } from "./quality-types";
 import { CATEGORY_ROLES } from "./quality-types";
+import { statusDisplayLabel } from "@/lib/display-labels";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -53,8 +54,8 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
       if (activeLease) issues.push(issue(
         `unit_avail_leased_${unit.id}`, "high", "unit",
         `房态异常 ${unit.unit_no}: 显示空闲但有生效长租`,
-        `${unit.unit_no} 房态为 available，但存在生效长租合同 ${activeLease.contract_no}`,
-        "检查合同状态或手动修正房态为 leased",
+        `${unit.unit_no} 房态为空闲，但存在生效长租合同 ${activeLease.contract_no}`,
+        "检查合同状态或手动修正房态为长租中",
         "unit", unit.id, label, [activeLease.id], "/leases",
       ));
 
@@ -62,8 +63,8 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
       if (activeDaily) issues.push(issue(
         `unit_avail_daily_${unit.id}`, "high", "unit",
         `房态异常 ${unit.unit_no}: 显示空闲但有日租入住`,
-        `${unit.unit_no} 房态为 available，但存在 checked_in 日租 ${activeDaily.check_in}`,
-        "检查日租状态或手动修正房态为 daily_occupied",
+        `${unit.unit_no} 房态为空闲，但存在已入住日租 ${activeDaily.check_in}`,
+        "检查日租状态或手动修正房态为日租占用",
         "unit", unit.id, label, [activeDaily.id], "/daily-rentals",
       ));
     }
@@ -74,7 +75,7 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
       if (activeDaily) issues.push(issue(
         `unit_sold_daily_${unit.id}`, "high", "unit",
         `已售房源存在日租入住 ${unit.unit_no}`,
-        `${unit.unit_no} 房态为 sold，但存在 checked_in 日租 ${activeDaily.check_in}`,
+        `${unit.unit_no} 房态为已售，但存在已入住日租 ${activeDaily.check_in}`,
         "检查日租记录；已售房源不应存在日租入住",
         "unit", unit.id, label, [activeDaily.id], "/daily-rentals",
       ));
@@ -86,7 +87,7 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
     if (hasLease && hasDaily) issues.push(issue(
       `unit_conflict_${unit.id}`, "high", "unit",
       `房源冲突 ${unit.unit_no}: 同时存在长租和日租占用`,
-      `${unit.unit_no} 同时存在生效长租和 checked_in 日租`,
+      `${unit.unit_no} 同时存在生效长租和已入住日租`,
       "确认实际占用方式，取消冲突一方",
       "unit", unit.id, label, [], "/units",
     ));
@@ -96,8 +97,8 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
       issues.push(issue(
         `unit_status_mismatch_daily_${unit.id}`, "medium", "daily_rental",
         `日租房态不匹配 ${unit.unit_no}`,
-        `${unit.unit_no} checked_in 但房态为 ${unit.status} 而非 daily_occupied`,
-        "手动修正房态为 daily_occupied",
+        `${unit.unit_no} 日租已入住，但房态为${statusDisplayLabel(unit.status, "zh")}，而非日租占用`,
+        "手动修正房态为日租占用",
         "unit", unit.id, label, [], "/units",
       ));
     }
@@ -110,7 +111,7 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
         if (!anySale) issues.push(issue(
           `unit_sold_no_contract_${unit.id}`, "medium", "unit",
           `已售房源缺少合同 ${unit.unit_no}`,
-          `${unit.unit_no} 房态为 sold 但无出售合同记录`,
+          `${unit.unit_no} 房态为已售但无出售合同记录`,
           "核实房源状态或创建出售合同",
           "unit", unit.id, label, [], "/units",
         ));
@@ -200,7 +201,7 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
   }
   for (const [, list] of dailyByUnit) {
     if (list.length < 2) continue;
-    const names = list.map(b => `${b.check_in} (${b.status})`).join(", ");
+    const names = list.map(b => `${b.check_in}（${statusDisplayLabel(b.status, "zh")}）`).join("、");
     issues.push(issue(
       `daily_dup_${list[0].unit_id}_${list[0].id}`, "high", "daily_rental",
       `同一房间多笔活跃预订`,
@@ -218,7 +219,7 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
     issues.push(issue(
       `daily_stale_pending_${b.id}`, "medium", "daily_rental",
       `待审核预订已过期 ${b.check_in}`,
-      `预订 ${b.check_in} 状态仍为 pending_review，已过入住日`,
+      `预订 ${b.check_in} 状态仍为待确认，已过入住日`,
       "确认或取消该预订",
       "daily_booking", b.id, b.check_in, [], "/daily-rentals",
     ));
@@ -232,8 +233,8 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
       issues.push(issue(
         `daily_status_mismatch_${b.id}`, "medium", "daily_rental",
         `日租房态不匹配 ${unit.unit_no}`,
-        `${unit.unit_no} checked_in 但房态为 ${unit.status}`,
-        "修正房态为 daily_occupied",
+        `${unit.unit_no} 日租已入住，但房态为${statusDisplayLabel(unit.status, "zh")}`,
+        "修正房态为日租占用",
         "daily_booking", b.id, unit.unit_no, [unit.id], "/daily-rentals",
       ));
     }
@@ -275,8 +276,8 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
       issues.push(issue(
         `lease_unit_status_${lc.id}`, "high", "lease",
         `长租房态不匹配 ${lc.contract_no}`,
-        `合同生效中但房源 ${unit.unit_no} 房态为 ${unit.status} 而非 leased`,
-        "修正房态为 leased",
+        `合同生效中但房源 ${unit.unit_no} 房态为${statusDisplayLabel(unit.status, "zh")}，而非长租中`,
+        "修正房态为长租中",
         "lease_contract", lc.id, label, [unit.id], "/leases",
       ));
     }
@@ -286,8 +287,8 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
       issues.push(issue(
         `lease_expired_active_${lc.id}`, "high", "lease",
         `合同已到期仍活跃 ${lc.contract_no}`,
-        `合同 ${lc.contract_no} 到期 ${lc.expected_end_date}，状态仍为 active`,
-        "执行退租结算或将状态改为 expired/terminated",
+        `合同 ${lc.contract_no} 到期 ${lc.expected_end_date}，状态仍为生效`,
+        "执行退租结算或将状态改为已过期或已终止",
         "lease_contract", lc.id, label, [], "/leases",
       ));
     }
@@ -335,7 +336,7 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
     if (sc.status === "active" && unit && unit.status !== "sold") {
       issues.push(issue(
         `sale_unit_status_${sc.id}`, "high", "sale", `出售房态不匹配 ${sc.contract_no}`,
-        `合同生效中但房源 ${unit.unit_no} 房态为 ${unit.status} 而非 sold`, "修正房态为 sold",
+        `合同生效中但房源 ${unit.unit_no} 房态为${statusDisplayLabel(unit.status, "zh")}，而非已售`, "修正房态为已售",
         "sale_contract", sc.id, label, [unit.id], "/sales",
       ));
     }
@@ -371,7 +372,7 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
     if (r.status !== "overdue" && r.due_date < today && paid < amount) {
       issues.push(issue(
         `rec_unmarked_overdue_${r.id}`, "medium", "finance", `逾期未标记 ${r.title}`,
-        `${r.title} due ${r.due_date}，未收 ${amount - paid}，但状态为 ${r.status} 而非 overdue`,
+        `${r.title} 应收日期 ${r.due_date}，未收 ${amount - paid}，但状态为${statusDisplayLabel(r.status, "zh")}，而非逾期`,
         "系统将自动同步逾期状态", "receivable", r.id, r.title, [], "/finance",
       ));
     }
