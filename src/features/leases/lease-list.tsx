@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, AlertTriangle, FileText, DollarSign, LogOut, Printer, Eye, CalendarClock, Phone, ChevronRight } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
@@ -131,6 +131,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [statFilter, setStatFilter] = useState<LeaseStatFilter | null>(null);
   const [panel, setPanel] = useState<PanelType>(null);
+  const [detailSection, setDetailSection] = useState<"overview" | "finance">("overview");
   const [attentionTab, setAttentionTab] = useState<AttentionTab>("overdue");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
@@ -148,6 +149,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const [financeMethod, setFinanceMethod] = useState<"cash" | "check" | "bank_transfer" | "offset" | "other">("other");
   const [financeNotes, setFinanceNotes] = useState("");
   const financeRequestIdRef = useRef<string | null>(null);
+  const financeSectionRef = useRef<HTMLDivElement | null>(null);
 
   // Building switcher
   const [activeBuildingId, setActiveBuildingId] = useState<string>(() => (
@@ -393,7 +395,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
   const resetNewForm = () => { setFContractNo(""); setFUnitId(""); setFCustomerId(""); setFStartDate(""); setFEndDate(""); setFCycle("monthly"); setFPayDay(5); setFRent(0); setFDeposit(0); setFDepositReceived(false); setFFreeDays(0); setFSigner(""); setFStatus("draft"); setError(""); };
   const openNew = () => { resetNewForm(); setPanel("new"); setSelectedId(null); };
-  const openDetail = (id: string) => { setSelectedId(id); setPanel("detail"); setError(""); };
+  const openDetail = (id: string, section: "overview" | "finance" = "overview") => { setSelectedId(id); setDetailSection(section); setPanel("detail"); setError(""); };
   const openFinanceEntry = () => {
     setFinanceType("rent_income");
     setFinanceDate(new Date().toISOString().slice(0, 10));
@@ -406,6 +408,12 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     setPanel("financeEntry");
   };
   const openMoveOut = (id: string) => { setSelectedId(id); setPanel("moveout"); setError(""); const os = receivableStats.outstanding; setMoUnpaid(os > 0 ? os : 0); setMoEndDate(new Date().toISOString().slice(0,10)); };
+
+  useEffect(() => {
+    if (panel !== "detail" || detailSection !== "finance") return;
+    const frame = window.requestAnimationFrame(() => financeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [detailSection, panel, selectedId]);
 
   const handleCreate = async () => { /* ... all existing validation logic kept ... */
     if (!fUnitId || !fCustomerId || !fStartDate || !fEndDate) { setError(locale==="zh"?"请填写必填字段":"Champs obligatoires"); return; }
@@ -600,9 +608,9 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                     )}
                     {/* Action buttons */}
                     <div className="mt-auto flex justify-center gap-5 border-t border-[rgba(23,50,77,0.06)] pt-3">
-                      <ActionBtn icon={Eye} label={locale==="zh"?"查看":"Voir"} onClick={() => openDetail(contract.id)} />
-                      <ActionBtn icon={DollarSign} label={locale==="zh"?"收款":"Paiement"} onClick={() => { openDetail(contract.id); }} />
-                      <ActionBtn icon={FileText} label={locale==="zh"?"合同":"Contrat"} onClick={() => { openDetail(contract.id); }} />
+                      <ActionBtn icon={Eye} label={locale==="zh"?"查看详情":"Voir les détails"} onClick={() => openDetail(contract.id)} />
+                      <ActionBtn icon={DollarSign} label={locale==="zh"?"查看财务":"Voir les finances"} onClick={() => openDetail(contract.id, "finance")} />
+                      <ActionBtn icon={FileText} label={locale==="zh"?"合同/打印":"Contrat / imprimer"} onClick={() => printLeaseContract({ contract, unit: unit ?? null, customer: customer ?? null, receivables: receivables.filter((row) => row.source_type === "lease_contract" && row.source_id === contract.id && row.status !== "cancelled") }, locale)} />
                     </div>
                   </RoomCard>
                 );
@@ -870,7 +878,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
           </div>}
 
           {/* Payment history */}
-          <div className="border-t pt-4">
+          <div ref={financeSectionRef} className={cn("scroll-mt-20 border-t pt-4", detailSection === "finance" && "-mx-2 rounded-xl px-2 ring-2 ring-primary/20")}>
             <div className="mb-2 flex items-start justify-between gap-3">
               <div className="space-y-1">
                 <h4 className="text-sm font-semibold">{locale === "zh" ? "财务记录" : "Écritures financières"}</h4>

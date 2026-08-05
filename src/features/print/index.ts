@@ -1,5 +1,6 @@
 export {
   printLeaseContract,
+  printSaleContract,
   printDailyReceipt,
   printCleaningTask,
   printMoveOutSettlement,
@@ -7,6 +8,7 @@ export {
 } from "./print-templates";
 export type {
   LeaseContractPrintData,
+  SaleContractPrintData,
   DailyReceiptPrintData,
   CleaningTaskPrintData,
   MoveOutSettlementData,

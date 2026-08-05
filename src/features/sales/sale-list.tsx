@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, DollarSign, FileText, CalendarPlus, TrendingUp, AlertTriangle, Eye } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
@@ -18,6 +18,7 @@ import { FilterBar, MetricGrid, OperationalPage, RightDrawer, SegmentedControl, 
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
 import { createSaleContract, recordSalePaymentAtomic, addFlexibleInstallment, updateTransferStatus, terminateSaleContract } from "./actions";
 import { buildSaleContractNumber } from "@/lib/contract-number";
+import { printSaleContract } from "@/features/print";
 
 interface SaleListProps { contracts: SaleContractRow[]; schedules: SalePaymentScheduleRow[]; units: UnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale; canCreate?: boolean; canRecordFinance?: boolean; canManage?: boolean }
 type PanelType = "new" | "detail" | "insight" | null;
@@ -38,6 +39,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const [statFilter, setStatFilter] = useState<SaleStatKey | null>(null);
   const [statusFilter, setStatusFilter] = useState<SaleStatusFilter>("current");
   const [panel, setPanel] = useState<PanelType>(null);
+  const [detailSection, setDetailSection] = useState<"overview" | "finance">("overview");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
   const [fUnitId, setFUnitId] = useState(""); const [fCustomerId, setFCustomerId] = useState("");
@@ -52,6 +54,7 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const [trStatus, setTrStatus] = useState("not_started"); const [trDate, setTrDate] = useState(""); const [trCertNo, setTrCertNo] = useState("");
   const [termReason, setTermReason] = useState("");
   const [showFlexForm, setShowFlexForm] = useState(false);
+  const financeSectionRef = useRef<HTMLDivElement | null>(null);
 
   // Building switcher
   const [activeBuildingId, setActiveBuildingId] = useState<string>(() => (
@@ -201,8 +204,25 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const getSchedStatus = (s: SalePaymentScheduleRow, rr: ReceivableRow[]) => {const rec=rr.find(r=>r.due_date===s.due_date&&Math.abs(Number(r.amount_xof)-Number(s.amount_xof))<1);if(!rec||rec.status==="cancelled")return s.status;return rec.status==="paid"?"paid":Number(rec.paid_amount_xof)>0&&Number(rec.paid_amount_xof)<Number(rec.amount_xof)?"partial":rec.status==="overdue"?"overdue":s.status==="paid"?"paid":"pending";};
 
   const openNew = () => {setPanel("new");setSelectedId(null);setError("");};
-  const openDetail = (id:string) => {setSelectedId(id);setPanel("detail");setError("");};
+  const openDetail = (id:string, section: "overview" | "finance" = "overview") => {setSelectedId(id);setDetailSection(section);setPanel("detail");setError("");};
   const openInsight = (key: SaleStatKey) => {setStatFilter(key);setPanel("insight");setSelectedId(null);setError("");};
+
+  const printContract = (contract: SaleContractRow) => {
+    const unit = unitMap.get(contract.unit_id) ?? null;
+    const customer = customerMap.get(contract.customer_id) ?? null;
+    const relatedReceivables = receivables.filter((row) => row.source_type === "sale_contract" && row.source_id === contract.id && row.status !== "cancelled");
+    const receivablePaid = relatedReceivables.reduce((sum, row) => sum + Number(row.paid_amount_xof), 0);
+    const paymentPaid = payments
+      .filter((payment) => payment.source_id === contract.id && SALE_RECEIPT_SOURCE_TYPES.has(payment.source_type))
+      .reduce((sum, payment) => sum + paymentAmountXof(payment), 0);
+    printSaleContract({ contract, unit, customer, paidAmountXof: Math.min(Number(contract.total_amount_xof), Math.max(receivablePaid, paymentPaid)) }, locale);
+  };
+
+  useEffect(() => {
+    if (panel !== "detail" || detailSection !== "finance") return;
+    const frame = window.requestAnimationFrame(() => financeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [detailSection, panel, selectedId]);
 
   const handleCreate = async () => {if(!fUnitId||!fCustomerId||!fSignedDate||fTotalAmount<=0){setError(locale==="zh"?"请填写必填字段":"Champs obligatoires");return;}const requestId=createRequestIdRef.current??crypto.randomUUID();createRequestIdRef.current=requestId;setSaving(true);setError("");const r=await createSaleContract({unitId:fUnitId,customerId:fCustomerId,contractNo:generatedSaleContractNo,signedDate:fSignedDate,totalAmountXof:fTotalAmount,paymentPlanType:fPlanType,numInstallments:fPlanType==="fixed_installment"?fNumInstallments:undefined,agencyCompany:fAgency||undefined,agentName:fAgent||undefined,agencyCommissionXof:fCommission,agencyCommissionPaid:fCommissionPaid,requestId});setSaving(false);if(r.success){createRequestIdRef.current=null;setPanel(null);router.refresh();}else{setError(r.error??"Failed");}};
   const handlePay = async () => {if(!payScheduleId||payAmount<=0){setError(locale==="zh"?"请选择分期并输入金额":"Champs obligatoires");return;}const currentScheduleId=payScheduleId;const requestId=payRequestIdRef.current??crypto.randomUUID();payRequestIdRef.current=requestId;setSaving(true);setError("");const r=await recordSalePaymentAtomic({contractId:selectedId!,scheduleId:currentScheduleId,amount:payAmount,paymentDate:payDate,receiptNo:payReceiptNo||undefined,requestId});setSaving(false);if(r.success){payRequestIdRef.current=null;setPayScheduleId("");setPayAmount(0);setPayReceiptNo("");router.refresh();}else setError(r.error??"Failed");};
@@ -365,9 +385,9 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
                 <div className="mt-auto flex items-center justify-between gap-4 border-t border-[rgba(23,50,77,0.06)] pt-3">
                   <span className={cn("text-[11px]", contract.transfer_status==="completed"?"text-emerald-600":"text-[#5D7186]")}>{transText(contract.transfer_status)}</span>
                   <div className="flex justify-center gap-5">
-                    <SaleActionBtn icon={Eye} label={locale==="zh"?"查看":"Voir"} onClick={() => openDetail(contract.id)} />
-                    <SaleActionBtn icon={DollarSign} label={locale==="zh"?"回款":"Pmt"} onClick={() => { openDetail(contract.id); }} />
-                    <SaleActionBtn icon={FileText} label={locale==="zh"?"单据":"Docs"} onClick={() => { openDetail(contract.id); }} />
+                    <SaleActionBtn icon={Eye} label={locale==="zh"?"查看详情":"Voir les détails"} onClick={() => openDetail(contract.id)} />
+                    <SaleActionBtn icon={DollarSign} label={locale==="zh"?"查看财务":"Voir les finances"} onClick={() => openDetail(contract.id, "finance")} />
+                    <SaleActionBtn icon={FileText} label={locale==="zh"?"合同/打印":"Contrat / imprimer"} onClick={() => printContract(contract)} />
                   </div>
                 </div>
               </RoomCard>);})}
@@ -514,7 +534,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
 
           {selected.status==="active"&&<div className="grid grid-cols-2 gap-2">{canRecordFinance&&<Button size="sm" onClick={()=>{setPayScheduleId(contractSchedules.find(s=>s.status!=="paid")?.id??"");setPayAmount(0);}}><DollarSign className="h-4 w-4"/>{locale==="zh"?"收款":"Paiement"}</Button>}{canManage&&<Button size="sm" variant="outline" onClick={()=>{setShowFlexForm(true);setFlexDueDate("");setFlexAmount(0);setError("");}}><CalendarPlus className="h-4 w-4"/>{locale==="zh"?"新增分期":"+Echeance"}</Button>}{canManage&&<Button size="sm" variant="outline" onClick={()=>{setTrDate(new Date().toISOString().slice(0,10));setTrStatus(selected.transfer_status);}}><TrendingUp className="h-4 w-4"/>{locale==="zh"?"过户":"Transfert"}</Button>}{canManage&&<Button size="sm" variant="ghost" onClick={handleTerminateSale}><AlertTriangle className="h-4 w-4"/>{locale==="zh"?"终止":"Resilier"}</Button>}</div>}
 
-          <div className="border-t pt-4">
+          <div ref={financeSectionRef} className={cn("scroll-mt-20 border-t pt-4", detailSection === "finance" && "-mx-2 rounded-xl px-2 ring-2 ring-primary/20")}>
             <div className="mb-2 space-y-1">
               <h4 className="text-sm font-semibold">{locale==="zh"?"财务记录":"Écritures financières"}</h4>
               <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium tabular-nums">

@@ -5,6 +5,7 @@ import type {
   CustomerRow,
   DailyBookingRow,
   LeaseContractRow,
+  SaleContractRow,
   ReceivableRow,
   UnitRow,
 } from "@/types/database";
@@ -185,6 +186,66 @@ export function printLeaseContract(data: LeaseContractPrintData, locale: "zh" | 
     <div class="signature">
       <div class="sig-line">${labels.tenant}: ${data.customer?.name ?? "___________"}</div>
       <div class="sig-line">${labels.landlord}: ${labels.company}</div>
+    </div>
+    <div class="footer">${labels.company} - ${new Date().toLocaleDateString()}</div>
+  </body></html>`;
+  openPrintWindow(html);
+}
+
+export interface SaleContractPrintData {
+  contract: SaleContractRow;
+  unit: UnitRow | null;
+  customer: CustomerRow | null;
+  paidAmountXof: number;
+}
+
+export function printSaleContract(data: SaleContractPrintData, locale: "zh" | "fr") {
+  const labels = locale === "zh"
+    ? {
+        title: "出售合同摘要单", company: "科建地产", contractNo: "合同编号", unit: "房源",
+        customer: "客户", signedDate: "签约日期", total: "合同总额", paid: "累计已收",
+        outstanding: "待回款", paymentPlan: "付款方式", transfer: "过户状态",
+        buyer: "买方", seller: "卖方",
+      }
+    : {
+        title: "Résumé du contrat de vente", company: "Kejian Immobilier", contractNo: "N° contrat", unit: "Logement",
+        customer: "Client", signedDate: "Date signature", total: "Total contrat", paid: "Total reçu",
+        outstanding: "Reste à recevoir", paymentPlan: "Plan de paiement", transfer: "Transfert",
+        buyer: "Acheteur", seller: "Vendeur",
+      };
+  const paid = Math.max(0, Number(data.paidAmountXof));
+  const total = Number(data.contract.total_amount_xof);
+  const outstanding = Math.max(0, total - paid);
+  const paymentPlan = ({
+    lump_sum: locale === "zh" ? "一次性付清" : "Comptant",
+    fixed_installment: locale === "zh" ? "固定分期" : "Échéancier fixe",
+    flexible_installment: locale === "zh" ? "灵活分期" : "Échéancier libre",
+  } as Record<string, string>)[data.contract.payment_plan_type] ?? data.contract.payment_plan_type;
+  const transferStatus = ({
+    not_started: locale === "zh" ? "未开始" : "Non commencé",
+    in_progress: locale === "zh" ? "办理中" : "En cours",
+    completed: locale === "zh" ? "已完成" : "Terminé",
+  } as Record<string, string>)[data.contract.transfer_status] ?? data.contract.transfer_status;
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${labels.title}</title>${a4Styles}</head><body>
+    <div class="header"><div class="company">${labels.company}</div><div class="meta">${labels.title}</div></div>
+    <h1>${labels.title}</h1>
+    <div class="row"><span class="label">${labels.contractNo}</span><span class="value">${data.contract.contract_no}</span></div>
+    <table>
+      <tr><td class="label">${labels.unit}</td><td class="value">${data.unit?.unit_no ?? "-"} (${data.unit?.floor_label ?? ""})</td></tr>
+      <tr><td class="label">${labels.customer}</td><td class="value">${data.customer?.name ?? "-"}</td></tr>
+      <tr><td class="label">${labels.signedDate}</td><td class="value">${data.contract.signed_date}</td></tr>
+      <tr><td class="label">${labels.paymentPlan}</td><td class="value">${paymentPlan}</td></tr>
+      <tr><td class="label">${labels.transfer}</td><td class="value">${transferStatus}</td></tr>
+    </table>
+    <h2>${labels.title}</h2>
+    <div class="total-grid">
+      <div class="total-box"><span class="label">${labels.total}</span><span class="value">${formatXof(total)}</span></div>
+      <div class="total-box"><span class="label">${labels.paid}</span><span class="value">${formatXof(paid)}</span></div>
+      <div class="total-box"><span class="label">${labels.outstanding}</span><span class="value">${formatXof(outstanding)}</span></div>
+    </div>
+    <div class="signature">
+      <div class="sig-line">${labels.buyer}: ${data.customer?.name ?? "___________"}</div>
+      <div class="sig-line">${labels.seller}: ${labels.company}</div>
     </div>
     <div class="footer">${labels.company} - ${new Date().toLocaleDateString()}</div>
   </body></html>`;
