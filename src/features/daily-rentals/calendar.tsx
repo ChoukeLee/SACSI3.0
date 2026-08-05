@@ -871,8 +871,8 @@ export function DailyCalendar({
       {/* Finance detail panel */}
       {financeDetail && (
         <>
-          <div className="absolute inset-0 z-overlay bg-black/30 backdrop-blur-sm" onClick={() => setFinanceDetail(null)} />
-          <div className="absolute inset-0 z-panel flex flex-col overflow-hidden border-l border-border bg-card shadow-panel" role="dialog">
+          <div className="absolute inset-0 z-overlay !mt-0 bg-black/30 backdrop-blur-sm" onClick={() => setFinanceDetail(null)} />
+          <div className="absolute inset-0 z-panel !mt-0 flex flex-col overflow-hidden border-l border-border bg-card shadow-panel" role="dialog">
             <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
               <div>

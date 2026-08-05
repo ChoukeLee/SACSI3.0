@@ -60,7 +60,8 @@ describe("core UI architecture", () => {
     const daily = read("src/features/daily-rentals/calendar.tsx");
 
     expect(daily).toContain('data-daily-calendar-root className="isolate space-y-5"');
-    expect(daily).toContain('className="absolute inset-0 z-panel flex flex-col');
+    expect(daily).toContain('className="absolute inset-0 z-panel !mt-0 flex flex-col');
+    expect(daily).toContain('className="absolute inset-0 z-overlay !mt-0');
     expect(daily).not.toContain('aria-hidden className="h-12 shrink-0"');
     expect(daily).not.toContain('className="fixed inset-0 z-panel');
     expect(daily).not.toContain("top-[var(--app-topbar-offset)]");
