@@ -336,15 +336,15 @@ export function FinanceDetailPanel({
                   </colgroup>
                   <thead className="sticky top-0 z-10 bg-muted/50">
                     <tr className="text-xs font-semibold text-muted-foreground">
-                      <th className="px-3 py-3 text-center">{locale === "zh" ? "到期日" : "Echeance"}</th>
-                      <th className="px-3 py-3 text-center">{locale === "zh" ? "楼栋" : "Bâtiment"}</th>
-                      <th className="px-3 py-3 text-center">{locale === "zh" ? "房号" : "Chambre"}</th>
-                      <th className="px-3 py-3 text-center">{locale === "zh" ? "客户" : "Client"}</th>
-                      <th className="px-3 py-3 text-center">{locale === "zh" ? "业务" : "Type"}</th>
-                      <th className="px-3 py-3 text-center">{locale === "zh" ? "应收" : "Du"}</th>
-                      <th className="px-3 py-3 text-center">{locale === "zh" ? "已收" : "Encaisse"}</th>
-                      <th className="px-3 py-3 text-center">{locale === "zh" ? "未收" : "Impaye"}</th>
-                      <th className="px-3 py-3 text-center">{locale === "zh" ? "状态" : "Statut"}</th>
+                      <th className="px-3 py-3 text-left">{locale === "zh" ? "到期日" : "Echeance"}</th>
+                      <th className="px-3 py-3 text-left">{locale === "zh" ? "楼栋" : "Bâtiment"}</th>
+                      <th className="px-3 py-3 text-left">{locale === "zh" ? "房号" : "Chambre"}</th>
+                      <th className="px-3 py-3 text-left">{locale === "zh" ? "客户" : "Client"}</th>
+                      <th className="px-3 py-3 text-left">{locale === "zh" ? "业务" : "Type"}</th>
+                      <th className="px-3 py-3 text-left">{locale === "zh" ? "应收" : "Du"}</th>
+                      <th className="px-3 py-3 text-left">{locale === "zh" ? "已收" : "Encaisse"}</th>
+                      <th className="px-3 py-3 text-left">{locale === "zh" ? "未收" : "Impaye"}</th>
+                      <th className="px-3 py-3 text-left">{locale === "zh" ? "状态" : "Statut"}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
