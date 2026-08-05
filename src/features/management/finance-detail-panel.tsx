@@ -335,16 +335,16 @@ export function FinanceDetailPanel({
                     <col className="w-[7%]" />
                   </colgroup>
                   <thead className="sticky top-0 z-10 bg-muted/50">
-                    <tr className="text-left text-xs font-semibold text-muted-foreground">
-                      <th className="px-3 py-3">{locale === "zh" ? "到期日" : "Echeance"}</th>
-                      <th className="px-3 py-3">{locale === "zh" ? "楼栋" : "Bâtiment"}</th>
-                      <th className="px-3 py-3">{locale === "zh" ? "房号" : "Chambre"}</th>
-                      <th className="px-3 py-3">{locale === "zh" ? "客户" : "Client"}</th>
-                      <th className="px-3 py-3">{locale === "zh" ? "业务" : "Type"}</th>
-                      <th className="px-3 py-3 text-right">{locale === "zh" ? "应收" : "Du"}</th>
-                      <th className="px-3 py-3 text-right">{locale === "zh" ? "已收" : "Encaisse"}</th>
-                      <th className="px-3 py-3 text-right">{locale === "zh" ? "未收" : "Impaye"}</th>
-                      <th className="px-3 py-3">{locale === "zh" ? "状态" : "Statut"}</th>
+                    <tr className="text-xs font-semibold text-muted-foreground">
+                      <th className="px-3 py-3 text-center">{locale === "zh" ? "到期日" : "Echeance"}</th>
+                      <th className="px-3 py-3 text-center">{locale === "zh" ? "楼栋" : "Bâtiment"}</th>
+                      <th className="px-3 py-3 text-center">{locale === "zh" ? "房号" : "Chambre"}</th>
+                      <th className="px-3 py-3 text-center">{locale === "zh" ? "客户" : "Client"}</th>
+                      <th className="px-3 py-3 text-center">{locale === "zh" ? "业务" : "Type"}</th>
+                      <th className="px-3 py-3 text-center">{locale === "zh" ? "应收" : "Du"}</th>
+                      <th className="px-3 py-3 text-center">{locale === "zh" ? "已收" : "Encaisse"}</th>
+                      <th className="px-3 py-3 text-center">{locale === "zh" ? "未收" : "Impaye"}</th>
+                      <th className="px-3 py-3 text-center">{locale === "zh" ? "状态" : "Statut"}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
@@ -397,7 +397,7 @@ export function FinanceDetailPanel({
                             <td className={cn("px-3 py-2.5 text-right tabular-nums font-semibold", r.outstandingXof > 0 ? "text-accentRed-600" : "text-muted-foreground/60")}>
                               <span className="block truncate" title={formatXof(r.outstandingXof)}>{formatXof(r.outstandingXof)}</span>
                             </td>
-                            <td className="px-3 py-2.5">
+                            <td className="px-3 py-2.5 text-center">
                               <span className={cn("inline-flex min-w-[58px] items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold", STATUS_STYLES[r.status] ?? "bg-muted text-foreground/70")}>
                                 {getStatusLabel(r.status)}
                               </span>
