@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, ChevronDown } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
-import { dictionaries } from "@/lib/i18n";
+import { dictionaries, routeFor } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,13 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, auditLogs, 
   return (
     <RightDrawer open title={t.detail.title} subtitle={`${buildingName} · ${unit.unit_no}`} onClose={onClose}>
         <div className="space-y-5">
+          <Button asChild className="w-full">
+            <Link href={routeFor(locale, `/units/${unit.id}`)}>
+              {locale === "zh" ? "打开完整房间档案" : "Ouvrir le dossier complet"}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+
           <dl className="grid grid-cols-2 gap-x-5 gap-y-4 text-sm">
             {[
               [t.detail.building, buildingName],
