@@ -325,14 +325,14 @@ export function FinanceDetailPanel({
                 <table className="w-full table-fixed text-left text-[13px]">
                   <colgroup>
                     <col className="w-[13%]" />
-                    <col className="w-[13%]" />
+                    <col className="w-[12%]" />
                     <col className="w-[8%]" />
-                    <col className="w-[13%]" />
+                    <col className="w-[12%]" />
                     <col className="w-[10%]" />
                     <col className="w-[12%]" />
                     <col className="w-[12%]" />
                     <col className="w-[12%]" />
-                    <col className="w-[7%]" />
+                    <col className="w-[9%]" />
                   </colgroup>
                   <thead className="sticky top-0 z-10 bg-muted/50">
                     <tr className="text-xs font-semibold text-muted-foreground">
