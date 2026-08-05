@@ -256,7 +256,7 @@ export function FinanceDetailPanel({
                   ))}
                 </div>
               </div>
-              <div className="grid min-w-0 grid-cols-3 gap-2 text-sm xl:w-[400px]">
+              <div className="grid min-w-0 grid-cols-3 gap-2 text-sm xl:mt-6 xl:w-[400px]">
                 <div className="rounded-lg bg-muted/50 px-3 py-2">
                   <p className="text-xs text-muted-foreground">{locale === "zh" ? "本月指标" : "Mois courant"}</p>
                   <p className="mt-1 font-semibold tabular-nums">{formatXof(selectedMetric)}</p>
