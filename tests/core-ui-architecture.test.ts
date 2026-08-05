@@ -27,7 +27,8 @@ describe("core UI architecture", () => {
     expect(sale).toContain("<OperationalPage");
     expect(sale).toContain("<MetricGrid");
     expect(units).toContain("<OperationalPage");
-    expect(units).toContain("<RoomBoard");
+    expect(units).toContain("data-unit-asset-table");
+    expect(units).not.toContain("<RoomBoard");
     expect(dailyPanel).toContain("<RightDrawer");
   });
 
@@ -37,7 +38,7 @@ describe("core UI architecture", () => {
     expect(existsSync(resolve(root, "src/app/fr/daily-rentals/overview/page.tsx"))).toBe(false);
   });
 
-  it("shows real customer and lease expiry information on unit cards", () => {
+  it("shows real customer and lease expiry information in the unit asset ledger", () => {
     const units = read("src/features/units/unit-list.tsx");
     const partySummary = read("src/features/units/unit-party-summary.ts");
     expect(units).toContain("party?.dailyCustomerName");
@@ -45,6 +46,17 @@ describe("core UI architecture", () => {
     expect(units).toContain("party?.saleCustomerName");
     expect(units).toContain("party?.leaseEndDate");
     expect(partySummary).toContain('from("customers").select("id, name")');
+  });
+
+  it("keeps the room-status board on the homepage and a unified ledger on the units page", () => {
+    const management = read("src/app/management/management-section-clients.tsx");
+    const units = read("src/features/units/unit-list.tsx");
+
+    expect(management).toContain("<RoomBoard");
+    expect(units).toContain("data-unit-asset-table");
+    expect(units).toContain("<UnitDetailPanel");
+    expect(units).not.toContain("非住宿资产");
+    expect(units).not.toContain("<RoomCard");
   });
 
   it("keeps the normal page gutter below the topbar", () => {

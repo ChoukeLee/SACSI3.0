@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowRight, Building2, ChevronDown, ChevronUp, Home, Key } from "lucide-react";
+import { AlertTriangle, ArrowRight, Building2, Home, Key } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { cn, compareFloorLabels, formatXof, sortUnitsForBuilding } from "@/lib/utils";
@@ -10,14 +10,10 @@ import { statusDisplayLabel } from "@/lib/display-labels";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { FilterBar, MetricGrid, OperationalPage, SegmentedControl, StatTile } from "@/components/ui/operational";
-import { RoomCard } from "@/components/room-card";
-import type { RoomStatus } from "@/components/room-card";
-import { RoomBoard } from "@/components/room-board";
 import { getUnitOperationalLabel, isOwnerOccupiedUnit } from "@/lib/unit-display";
 import { UnitDetailPanel } from "./unit-detail-panel";
 import { UnitFilters } from "./unit-filters";
 import type { UnitRow, UnitBusinessFlagRow } from "@/types/database";
-import type { BusinessType } from "@/types/domain";
 import type { UnitPartySummary } from "./unit-party-summary";
 
 interface AuditLogEntry {
@@ -44,17 +40,6 @@ interface UnitListProps {
   canEdit: boolean;
 }
 
-const STATUS_DOT: Record<string, string> = {
-  sold: "bg-[#A0D0E8]",
-  leased: "bg-[#5E9BC5]",
-  daily_occupied: "bg-[#62B6F5]",
-  reserved: "bg-[#E8C840]",
-  cleaning_pending: "bg-[#5CC4B8]",
-  maintenance: "bg-[#F08090]",
-  locked: "bg-gray-400",
-  available: "bg-[#B88A48]",
-};
-
 const LS_KEY = "sacsi_active_building_id";
 
 export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], unitPartySummaries = {}, auditLogsMap, buildings, locale, canEdit }: UnitListProps) {
@@ -63,11 +48,10 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], un
   const statusLabels = dictionaries[locale].statuses;
   const [selectedFloor, setSelectedFloor] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
-  const [selectedKind, setSelectedKind] = useState("apartment");
+  const [selectedKind, setSelectedKind] = useState("all");
   const [selectedBusiness, setSelectedBusiness] = useState("all");
   const [detailUnitId, setDetailUnitId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [showNonApartments, setShowNonApartments] = useState(false);
 
   // Building switcher with localStorage persistence
   const [activeBuildingId, setActiveBuildingId] = useState<string | null>(null);
@@ -132,17 +116,10 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], un
 
   const detailUnit = detailUnitId ? buildingUnits.find((unit) => unit.id === detailUnitId) : null;
 
-  const apartmentFloorGroups = useMemo(() => {
-    const groups = new Map<string, UnitRow[]>();
-    for (const unit of filtered.filter((item) => item.kind === "apartment")) {
-      const label = unit.floor_label || (locale === "zh" ? "未分层" : "Sans étage");
-      if (!groups.has(label)) groups.set(label, []);
-      groups.get(label)!.push(unit);
-    }
-    return [...groups.entries()]
-      .sort(([a], [b]) => compareFloorLabels(a, b))
-      .map(([floor, rows]) => [floor, sortUnitsForBuilding(rows, activeBuilding?.code)] as const);
-  }, [activeBuilding?.code, filtered, locale]);
+  const sortedUnits = useMemo(
+    () => sortUnitsForBuilding(filtered, activeBuilding?.code),
+    [activeBuilding?.code, filtered],
+  );
 
   const assetBlocks = [
     { key: "apartments", label: locale === "zh" ? "住宿房源" : "Appartements", value: summary.apartments, dot: "bg-foreground", icon: Home },
@@ -160,7 +137,9 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], un
     <OperationalPage
       eyebrow={locale === "zh" ? "房源管理" : "Gestion des biens"}
       title={activeBuilding ? `${activeBuilding.display_name || activeBuilding.code}` : (locale === "zh" ? "房源" : "Biens")}
-      description={`${summary.apartments} ${locale === "zh" ? "套住宿房源 · 点击卡片查看和修改房态" : "appartements · cliquez pour consulter"}`}
+      description={locale === "zh"
+        ? `${buildingUnits.length} 项资产 · 筛选、查看并维护房源档案`
+        : `${buildingUnits.length} actifs · filtrer, consulter et maintenir les dossiers`}
     >
       {/* Building Switcher */}
       {buildings.length > 1 && (
@@ -209,110 +188,46 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], un
         />
       </FilterBar>
 
-      {apartmentFloorGroups.length === 0 ? (
+      {sortedUnits.length === 0 ? (
         <EmptyState
           icon={<Building2 className="h-10 w-10" />}
-          title={t.empty}
-          description={locale === "zh" ? "请先在设置中导入楼栋和房间" : "Importez d'abord l'immeuble dans Paramètres"}
+          title={buildingUnits.length === 0 ? t.empty : (locale === "zh" ? "没有符合筛选条件的房源" : "Aucun bien ne correspond aux filtres")}
+          description={buildingUnits.length === 0
+            ? (locale === "zh" ? "请先在设置中导入楼栋和房间" : "Importez d'abord l'immeuble dans Paramètres")
+            : (locale === "zh" ? "请调整楼层、房态、类型或业务筛选" : "Modifiez les filtres d'étage, de statut, de type ou d'activité")}
         />
       ) : (
-        <RoomBoard
-          header={<>
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-              <h2 className="text-sm font-semibold">{activeBuilding?.display_name || activeBuilding?.code}</h2>
-            </div>
-            <span className="text-xs font-medium text-muted-foreground">{apartmentFloorGroups.reduce((sum, [, rows]) => sum + rows.length, 0)} {locale === "zh" ? "套" : "lots"}</span>
-          </>}
-        >
-          {apartmentFloorGroups.map(([floor, rows], index) => (
-            <section key={floor} className={index > 0 ? "mt-5 border-t border-border/60 pt-5" : ""}>
-              <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-                <h3 className="font-semibold text-foreground">{floor}</h3>
-                <span className="tabular-nums">{rows.length}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-                {rows.map((unit) => {
-                  const flags = (businessFlagsMap[unit.id] ?? []).filter((flag) => flag.is_enabled);
-                  const dailyFlag = flags.find((flag) => flag.business_type === "daily_rental");
-                  const managedLease = unit.status === "sold" && managedLeaseUnitSet.has(unit.id);
-                  const party = unitPartySummaries[unit.id];
-                  const status: RoomStatus = managedLease
-                    ? "managed"
-                    : unit.status === "locked" ? "maintenance" : unit.status as RoomStatus;
-                  const customerName = unit.status === "daily_occupied" || unit.status === "reserved"
-                    ? party?.dailyCustomerName
-                    : unit.status === "leased" || managedLease
-                      ? party?.leaseCustomerName
-                      : unit.status === "sold" ? party?.saleCustomerName : undefined;
-                  const businessDateText = unit.status === "leased" || managedLease
-                    ? party?.leaseEndDate
-                      ? `${locale === "zh" ? "到期" : "Fin"} ${party.leaseEndConfirmed === false ? (locale === "zh" ? "未确认" : "non confirmée") : party.leaseEndDate}`
-                      : undefined
-                    : unit.status === "daily_occupied" || unit.status === "reserved" ? party?.dailyDateText : undefined;
-                  return (
-                    <RoomCard
-                      key={unit.id}
-                      roomNo={unit.unit_no}
-                      status={status}
-                      customerName={customerName || (managedLease ? (locale === "zh" ? "已售代管" : "Vendu géré") : getUnitOperationalLabel(unit, locale) ?? statusLabels[unit.status])}
-                      dateText={businessDateText || (dailyFlag?.default_price_xof != null
-                        ? `${flags.map((flag) => t.businessTypes[flag.business_type]).join(" / ")} · ${formatXof(dailyFlag.default_price_xof)}`
-                        : flags.map((flag) => t.businessTypes[flag.business_type]).join(" / ") || unit.floor_label)}
-                      onClick={() => setDetailUnitId(unit.id)}
-                      actions={[{ key: "detail", label: locale === "zh" ? "查看房源" : "Voir", icon: ArrowRight, onClick: () => setDetailUnitId(unit.id) }]}
-                    />
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-        </RoomBoard>
-      )}
-
-      {nonApartments.length > 0 && (
-        <div className="rounded-xl border border-border bg-card shadow-card">
-          <button
-            type="button"
-            onClick={() => setShowNonApartments((value) => !value)}
-            className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-accent/40"
-          >
-            <span className="text-sm font-semibold">
-              {locale === "zh" ? "非住宿资产" : "Actifs non résidentiels"} · {summary.nonApartment}
-            </span>
-            {showNonApartments ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-          </button>
-          {showNonApartments && (
-            <div className="table-shell border-t-0 rounded-t-none">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr>
-                      <th>{locale === "zh" ? "编号" : "N°"}</th>
-                      <th>{locale === "zh" ? "楼层" : "Étage"}</th>
-                      <th>{locale === "zh" ? "类型" : "Type"}</th>
-                      <th>{locale === "zh" ? "房态" : "Statut"}</th>
-                      <th>{locale === "zh" ? "支持业务" : "Activité"}</th>
-                      <th className="w-10" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortUnitsForBuilding(nonApartments, activeBuilding?.code).map((unit) => (
-                      <UnitTableRow
-                        key={unit.id}
-                        unit={unit}
-                        locale={locale}
-                        flags={businessFlagsMap[unit.id] ?? []}
-                        managedLease={managedLeaseUnitSet.has(unit.id)}
-                        onOpen={() => setDetailUnitId(unit.id)}
-                        compact
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+        <div data-unit-asset-table className="table-shell">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1120px]">
+              <thead>
+                <tr>
+                  <th>{locale === "zh" ? "房号" : "N°"}</th>
+                  <th>{locale === "zh" ? "楼层" : "Étage"}</th>
+                  <th>{locale === "zh" ? "类型" : "Type"}</th>
+                  <th>{locale === "zh" ? "房态" : "Statut"}</th>
+                  <th>{locale === "zh" ? "当前客户" : "Client actuel"}</th>
+                  <th>{locale === "zh" ? "业务日期" : "Date d'activité"}</th>
+                  <th>{locale === "zh" ? "支持业务 / 默认价" : "Activité / tarif"}</th>
+                  <th>{locale === "zh" ? "备注" : "Notes"}</th>
+                  <th className="w-10" />
+                </tr>
+              </thead>
+              <tbody>
+                {sortedUnits.map((unit) => (
+                  <UnitTableRow
+                    key={unit.id}
+                    unit={unit}
+                    locale={locale}
+                    flags={businessFlagsMap[unit.id] ?? []}
+                    managedLease={managedLeaseUnitSet.has(unit.id)}
+                    party={unitPartySummaries[unit.id]}
+                    onOpen={() => setDetailUnitId(unit.id)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -338,30 +253,44 @@ function UnitTableRow({
   locale,
   flags,
   managedLease,
+  party,
   onOpen,
-  compact = false,
 }: {
   unit: UnitRow;
   locale: Locale;
   flags: UnitBusinessFlagRow[];
   managedLease: boolean;
+  party?: UnitPartySummary;
   onOpen: () => void;
-  compact?: boolean;
 }) {
   const t = dictionaries[locale].units;
   const enabledFlags = flags.filter((flag) => flag.is_enabled);
   const dailyFlag = flags.find((flag) => flag.business_type === "daily_rental" && flag.is_enabled);
+  const isManagedLease = unit.status === "sold" && managedLease;
+  const customerName = unit.status === "daily_occupied" || unit.status === "reserved"
+    ? party?.dailyCustomerName
+    : unit.status === "leased" || isManagedLease
+      ? party?.leaseCustomerName
+      : unit.status === "sold" ? party?.saleCustomerName : undefined;
+  const businessDate = unit.status === "leased" || isManagedLease
+    ? party?.leaseEndDate
+      ? `${locale === "zh" ? "到期" : "Fin"} ${party.leaseEndConfirmed === false ? (locale === "zh" ? "未确认" : "non confirmée") : party.leaseEndDate}`
+      : "—"
+    : unit.status === "daily_occupied" || unit.status === "reserved" ? party?.dailyDateText ?? "—" : "—";
 
   return (
     <tr className="cursor-pointer" onClick={onOpen}>
       <td><span className="font-mono text-xs font-bold">{unit.unit_no}</span></td>
       <td className="text-sm">{unit.floor_label}</td>
       <td className="text-sm text-muted-foreground">{t.kinds[unit.kind]}</td>
-      <td><StatusPill unit={unit} locale={locale} managedLease={unit.status === "sold" && managedLease} /></td>
-      <td className="text-sm text-muted-foreground">{enabledFlags.map((flag) => t.businessTypes[flag.business_type]).join(" / ") || "-"}</td>
-      {!compact && (
-        <td className="table-cell-amount">{dailyFlag?.default_price_xof != null ? formatXof(dailyFlag.default_price_xof) : "-"}</td>
-      )}
+      <td><StatusPill unit={unit} locale={locale} managedLease={isManagedLease} /></td>
+      <td className="max-w-48 truncate text-sm font-medium" title={customerName}>{customerName || "—"}</td>
+      <td className="whitespace-nowrap text-sm text-muted-foreground">{businessDate}</td>
+      <td className="text-sm text-muted-foreground">
+        <div>{enabledFlags.map((flag) => t.businessTypes[flag.business_type]).join(" / ") || "—"}</div>
+        {dailyFlag?.default_price_xof != null && <div className="mt-0.5 text-xs tabular-nums">{formatXof(dailyFlag.default_price_xof)}</div>}
+      </td>
+      <td className="max-w-56 truncate text-sm text-muted-foreground" title={unit.notes ?? undefined}>{unit.notes || "—"}</td>
       <td className="table-cell-action">
         <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); onOpen(); }}>
           <ArrowRight className="h-3.5 w-3.5" />
