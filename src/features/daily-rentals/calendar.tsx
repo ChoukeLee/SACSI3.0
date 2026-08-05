@@ -550,7 +550,7 @@ export function DailyCalendar({
   }
 
   return (
-    <div data-daily-calendar-root className="relative isolate space-y-5">
+    <div data-daily-calendar-root className="isolate space-y-5">
       <section className="relative z-20 overflow-hidden rounded-xl border border-border bg-card shadow-card">
         <div className="flex flex-col gap-3 border-b border-border px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -871,13 +871,9 @@ export function DailyCalendar({
       {/* Finance detail panel */}
       {financeDetail && (
         <>
-          <div className="pointer-events-none fixed inset-0 z-overlay flex flex-col">
-            <div aria-hidden className="h-12 shrink-0" />
-            <div className="pointer-events-auto min-h-0 flex-1 bg-black/30 backdrop-blur-sm" onClick={() => setFinanceDetail(null)} />
-          </div>
-          <div className="pointer-events-none fixed inset-0 z-panel flex flex-col overflow-hidden md:left-[var(--sidebar-width)]" role="dialog">
-            <div aria-hidden className="h-12 shrink-0" />
-            <div className="pointer-events-auto min-h-0 flex-1 overflow-y-auto overflow-x-hidden border-l border-border bg-card shadow-panel">
+          <div className="absolute inset-0 z-overlay bg-black/30 backdrop-blur-sm" onClick={() => setFinanceDetail(null)} />
+          <div className="absolute inset-0 z-panel flex flex-col overflow-hidden border-l border-border bg-card shadow-panel" role="dialog">
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
               <div>
                 <h3 className="text-sm font-medium tracking-tight text-foreground">

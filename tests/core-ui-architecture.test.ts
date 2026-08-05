@@ -59,9 +59,10 @@ describe("core UI architecture", () => {
   it("keeps the daily finance detail flush below the topbar without moving the page", () => {
     const daily = read("src/features/daily-rentals/calendar.tsx");
 
-    expect(daily).toContain('className="pointer-events-none fixed inset-0 z-panel flex flex-col');
-    expect(daily).toContain('aria-hidden className="h-12 shrink-0"');
-    expect(daily).toContain('pointer-events-auto min-h-0 flex-1 overflow-y-auto');
+    expect(daily).toContain('data-daily-calendar-root className="isolate space-y-5"');
+    expect(daily).toContain('className="absolute inset-0 z-panel flex flex-col');
+    expect(daily).not.toContain('aria-hidden className="h-12 shrink-0"');
+    expect(daily).not.toContain('className="fixed inset-0 z-panel');
     expect(daily).not.toContain("top-[var(--app-topbar-offset)]");
   });
 });
