@@ -398,7 +398,7 @@ export function FinanceDetailPanel({
                               <span className="block truncate" title={formatXof(r.outstandingXof)}>{formatXof(r.outstandingXof)}</span>
                             </td>
                             <td className="px-3 py-2.5">
-                              <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-semibold", STATUS_STYLES[r.status] ?? "bg-muted text-foreground/70")}>
+                              <span className={cn("inline-flex min-w-[58px] items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold", STATUS_STYLES[r.status] ?? "bg-muted text-foreground/70")}>
                                 {getStatusLabel(r.status)}
                               </span>
                             </td>
