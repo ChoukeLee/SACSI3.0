@@ -46,4 +46,12 @@ describe("core UI architecture", () => {
     expect(units).toContain("party?.leaseEndDate");
     expect(partySummary).toContain('from("customers").select("id, name")');
   });
+
+  it("joins the topbar directly to the page surface without a global gutter", () => {
+    const shell = read("src/components/app-shell.tsx");
+    const mainTag = shell.match(/<main data-app-main className="([^"]+)"/);
+
+    expect(mainTag?.[1]).toContain("pt-0");
+    expect(mainTag?.[1]).not.toMatch(/(?:^|\s)(?:p|py|pt)-(?:4|5|6)(?:\s|$)/);
+  });
 });

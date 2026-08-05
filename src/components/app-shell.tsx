@@ -146,7 +146,7 @@ function AppShellInner({
             </div>
           </div>
         </header>
-        <main data-app-main className="relative isolate min-w-0 flex-1 overflow-x-hidden bg-background p-4 pb-20 sm:p-5 lg:p-6">
+        <main data-app-main className="relative isolate min-w-0 flex-1 overflow-x-hidden bg-background px-4 pb-20 pt-0 sm:px-5 lg:px-6">
           {isNavigating && (
             <div data-navigation-overlay className="pointer-events-auto absolute inset-0 z-overlay bg-background/40" />
           )}
