@@ -54,4 +54,17 @@ describe("core UI architecture", () => {
     expect(mainTag?.[1]).toContain("pt-0");
     expect(mainTag?.[1]).not.toMatch(/(?:^|\s)(?:p|py|pt)-(?:4|5|6)(?:\s|$)/);
   });
+
+  it("aligns every full-height panel to the measured topbar edge", () => {
+    const shell = read("src/components/app-shell.tsx");
+    const operational = read("src/components/ui/operational.tsx");
+    const daily = read("src/features/daily-rentals/calendar.tsx");
+
+    expect(shell).toContain("--app-topbar-offset");
+    expect(shell).toContain("getBoundingClientRect().height");
+    expect(operational).toContain("top-[var(--app-topbar-offset)]");
+    expect(daily).toContain("top-[var(--app-topbar-offset)]");
+    expect(operational).not.toMatch(/fixed[^"\n]*\btop-12\b/);
+    expect(daily).not.toMatch(/fixed[^"\n]*\btop-12\b/);
+  });
 });

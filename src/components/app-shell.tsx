@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -55,6 +55,28 @@ function AppShellInner({
   const labels = getDesktopNavLabels(locale);
   const roleLabel = userRole ? labels.roles[userRole] : "";
   const isDailyRoute = pathname === "/daily-rentals" || pathname === "/fr/daily-rentals";
+  const topbarRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const topbar = topbarRef.current;
+    if (!topbar) return;
+
+    const syncTopbarOffset = () => {
+      document.documentElement.style.setProperty(
+        "--app-topbar-offset",
+        `${topbar.getBoundingClientRect().height}px`,
+      );
+    };
+
+    syncTopbarOffset();
+    const observer = new ResizeObserver(syncTopbarOffset);
+    observer.observe(topbar);
+    window.addEventListener("resize", syncTopbarOffset);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", syncTopbarOffset);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -92,7 +114,7 @@ function AppShellInner({
       <AppSidebar locale={locale} userRole={userRole} />
       <SidebarInset>
         <NavigationLoadingBar />
-        <header className="sticky top-0 z-sticky flex h-12 shrink-0 items-center border-b border-border bg-card/95 shadow-xs backdrop-blur supports-[backdrop-filter]:bg-card/90">
+        <header ref={topbarRef} data-app-topbar className="sticky top-0 z-sticky flex h-12 shrink-0 items-center border-b border-border bg-card/95 shadow-xs backdrop-blur supports-[backdrop-filter]:bg-card/90">
           <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 px-4">
             <div className="flex min-w-0 items-center gap-2">
               <SidebarTrigger className="hidden lg:flex" />

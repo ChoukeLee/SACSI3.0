@@ -26,6 +26,7 @@
     --input: 36 8% 88%;
     --ring: 200 72% 48%;
     --radius: 0.625rem;
+    --app-topbar-offset: 3rem;
 
     --sidebar-background: 30 11% 96%;
     --sidebar-foreground: 30 8% 12%;
