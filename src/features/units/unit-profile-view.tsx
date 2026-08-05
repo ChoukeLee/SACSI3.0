@@ -6,7 +6,7 @@ import { ArrowLeft, BedDouble, Building2, FileText, Home, Landmark, ReceiptText,
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
 import { cn, formatXof } from "@/lib/utils";
-import { currencyDisplayLabel, financialBusinessLabel, statusDisplayLabel } from "@/lib/display-labels";
+import { currencyDisplayLabel, financialBusinessLabel, isFinancialExpenseSourceType, statusDisplayLabel } from "@/lib/display-labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -155,7 +155,10 @@ export function UnitProfileView({ data, locale }: { data: UnitProfileData; local
             <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead><tr>{[zh ? "到期日" : "Échéance", zh ? "业务" : "Activité", zh ? "说明" : "Libellé", zh ? "应收" : "Dû", zh ? "已收" : "Payé", zh ? "未结" : "Solde"].map((label) => <th key={label} className="px-4 py-3 text-left text-xs text-muted-foreground">{label}</th>)}</tr></thead><tbody className="divide-y">{data.receivables.filter((row) => row.status !== "cancelled").map((row) => { const balance = Math.max(0, Number(row.amount_xof) - Number(row.paid_amount_xof)); return <tr key={row.id} className={cn("hover:bg-muted/40", balance > 0 && (row.status === "overdue" || row.due_date < today) && "bg-red-50/40")}><td className="px-4 py-3">{row.due_date}</td><td className="px-4 py-3">{financialBusinessLabel(row.source_type, locale, row.category)}</td><td className="px-4 py-3 font-medium">{row.title}</td><td className="px-4 py-3 tabular-nums">{formatXof(Number(row.amount_xof))}</td><td className="px-4 py-3 tabular-nums text-emerald-700">{formatXof(Number(row.paid_amount_xof))}</td><td className={cn("px-4 py-3 tabular-nums font-medium", balance > 0 && "text-red-700")}>{formatXof(balance)}</td></tr>; })}</tbody></table></div>
           </RecordCard>
           <RecordCard title={zh ? "历史收款" : "Paiements"} icon={ReceiptText} empty={data.payments.length === 0} emptyText={zh ? "暂无收款记录" : "Aucun paiement"}>
-            <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-sm"><thead><tr>{[zh ? "日期" : "Date", zh ? "业务" : "Activité", zh ? "金额" : "Montant", zh ? "币种" : "Devise", zh ? "收据号" : "Reçu"].map((label) => <th key={label} className="px-4 py-3 text-left text-xs text-muted-foreground">{label}</th>)}</tr></thead><tbody className="divide-y">{data.payments.map((row) => <tr key={row.id} className="hover:bg-muted/40"><td className="px-4 py-3">{row.payment_date}</td><td className="px-4 py-3">{financialBusinessLabel(row.source_type, locale)}</td><td className="px-4 py-3 font-medium tabular-nums text-emerald-700">{formatXof(Number(row.amount) * Number(row.exchange_rate_to_xof || 1))}</td><td className="px-4 py-3">{currencyDisplayLabel(row.currency, locale)}</td><td className="px-4 py-3">{row.receipt_no ?? "-"}</td></tr>)}</tbody></table></div>
+            <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-sm"><thead><tr>{[zh ? "日期" : "Date", zh ? "业务" : "Activité", zh ? "金额" : "Montant", zh ? "币种" : "Devise", zh ? "收据号" : "Reçu"].map((label) => <th key={label} className="px-4 py-3 text-left text-xs text-muted-foreground">{label}</th>)}</tr></thead><tbody className="divide-y">{data.payments.map((row) => {
+              const isExpense = isFinancialExpenseSourceType(row.source_type);
+              return <tr key={row.id} className="hover:bg-muted/40"><td className="px-4 py-3">{row.payment_date}</td><td className={cn("px-4 py-3", isExpense && "font-medium text-red-700")}>{financialBusinessLabel(row.source_type, locale)}</td><td className={cn("px-4 py-3 font-medium tabular-nums", isExpense ? "text-red-700" : "text-emerald-700")}>{formatXof(Number(row.amount) * Number(row.exchange_rate_to_xof || 1))}</td><td className="px-4 py-3">{currencyDisplayLabel(row.currency, locale)}</td><td className="px-4 py-3">{row.receipt_no ?? "-"}</td></tr>;
+            })}</tbody></table></div>
           </RecordCard>
         </div>
       )}

@@ -121,6 +121,19 @@ export function financialBusinessLabel(sourceType: string | null | undefined, lo
   return locale === "zh" ? "其他业务" : "Autre opération";
 }
 
+const FINANCIAL_OUTFLOW_SOURCE_TYPES = new Set([
+  "deposit_refund",
+  "lease_deposit_refund",
+  "lease_rent_refund",
+  "sale_deposit_refund",
+]);
+
+/** Identifies payments that represent cash leaving the business. */
+export function isFinancialExpenseSourceType(sourceType: string | null | undefined) {
+  const normalized = String(sourceType ?? "").trim().toLowerCase();
+  return normalized.endsWith("_expense") || FINANCIAL_OUTFLOW_SOURCE_TYPES.has(normalized);
+}
+
 export function statusDisplayLabel(status: string | null | undefined, locale: Locale) {
   const labels = STATUS_LABELS[status ?? ""];
   if (labels) return pick(labels, locale);
