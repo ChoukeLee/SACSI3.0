@@ -150,6 +150,62 @@ async function syncContractReceivableStatuses(contractId: string) {
   }
 }
 
+async function ensureNextLeaseReceivable(contractId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: contract, error: contractError } = await supabase
+    .from("lease_contracts")
+    .select("id, unit_id, customer_id, status, monthly_rent_xof, paid_through_date, unit:units(unit_no, building_id)")
+    .eq("id", contractId)
+    .single();
+  if (contractError || !contract) return { success: false, error: contractError?.message ?? "Contract not found." };
+  if (contract.status !== "active" || !contract.paid_through_date) return { success: true };
+
+  const { data: openRows, error: openError } = await supabase
+    .from("receivables")
+    .select("id, amount_xof, paid_amount_xof")
+    .eq("source_type", "lease_contract")
+    .eq("source_id", contract.id)
+    .eq("category", "lease_rent")
+    .in("status", ["pending", "partial", "overdue"]);
+  if (openError) return { success: false, error: openError.message };
+  if ((openRows ?? []).some((row) => Number(row.amount_xof) > Number(row.paid_amount_xof))) return { success: true };
+
+  const due = new Date(`${contract.paid_through_date}T00:00:00Z`);
+  due.setUTCDate(due.getUTCDate() + 1);
+  const dueDate = due.toISOString().slice(0, 10);
+  const { data: duplicate, error: duplicateError } = await supabase
+    .from("receivables")
+    .select("id")
+    .eq("source_type", "lease_contract")
+    .eq("source_id", contract.id)
+    .eq("category", "lease_rent")
+    .eq("due_date", dueDate)
+    .neq("status", "cancelled")
+    .limit(1);
+  if (duplicateError) return { success: false, error: duplicateError.message };
+  if (duplicate && duplicate.length > 0) return { success: true };
+
+  const unit = Array.isArray(contract.unit) ? contract.unit[0] : contract.unit;
+  const amountXof = Number(contract.monthly_rent_xof);
+  const { error: insertError } = await supabase.from("receivables").insert({
+    building_id: unit?.building_id ?? null,
+    unit_id: contract.unit_id,
+    customer_id: contract.customer_id,
+    source_type: "lease_contract",
+    source_id: contract.id,
+    category: "lease_rent",
+    title: `${unit?.unit_no ?? "-"} 长租下一期租金`,
+    due_date: dueDate,
+    amount_xof: amountXof,
+    paid_amount_xof: 0,
+    status: computeStatus(amountXof, 0, dueDate),
+    currency: "XOF",
+    notes: `根据租金已缴至日期 ${contract.paid_through_date} 自动生成`,
+  });
+  if (insertError && insertError.code !== "23505") return { success: false, error: insertError.message };
+  return { success: true };
+}
+
 // ── Create contract ──
 
 export async function createLeaseContract(input: {
@@ -369,6 +425,11 @@ export async function recordLeaseFinancialEntry(input: {
       })
       .eq("id", contract.id);
     if (endDateError) return { success: false, error: "收款已保存，但合同到期日同步失败，请重试。" };
+
+    const nextReceivable = await ensureNextLeaseReceivable(contract.id);
+    if (!nextReceivable.success) {
+      return { success: false, error: `收款已保存，但下一期应收生成失败：${nextReceivable.error ?? "未知错误"}` };
+    }
   }
 
   revalidatePath("/leases");

@@ -31,7 +31,7 @@ import {
   LEASE_FINANCIAL_BUSINESS_TYPES,
   type LeaseFinancialBusinessType,
 } from "./lease-financial-entry-types";
-import { isOverdueReceivable, summarizeLeaseReceivables } from "./lease-receivable-summary";
+import { isOverdueReceivable, resolveLeaseOverdue, summarizeLeaseReceivables } from "./lease-receivable-summary";
 
 interface UnitBusinessFlag {
   business_type: "daily_rental" | "long_lease" | "sale";
@@ -245,9 +245,15 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       const related = receivables.filter((row) => row.source_type === "lease_contract" && row.source_id === contract.id && row.status !== "cancelled");
       const summary = summarizeLeaseReceivables(related, today);
       const coverageDue = contract.paid_through_date ? addDaysToIso(contract.paid_through_date, 1) : null;
-      const dueDate = summary.earliestOverdueDue ?? summary.earliestOutstandingDue ?? coverageDue;
+      const overdueResolution = resolveLeaseOverdue({
+        receivables: related,
+        today,
+        paidThroughDate: contract.paid_through_date ?? null,
+        monthlyRentXof: Number(contract.monthly_rent_xof),
+      });
+      const dueDate = overdueResolution?.dueDate ?? summary.earliestOutstandingDue ?? coverageDue;
       if (!dueDate) return [];
-      const isOverdue = summary.overdue > 0 || dueDate < today;
+      const isOverdue = overdueResolution !== null;
       const isUpcoming = !isOverdue && dueDate <= upcomingLimit;
       if (!isOverdue && !isUpcoming) return [];
       const building = buildingMap.get(unit.building_id);
@@ -258,12 +264,12 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
         buildingName: building?.display_name || building?.code || "-",
         dueDate,
         paidThrough: contract.paid_through_date,
-        amount: summary.overdue > 0
-          ? summary.overdue
+        amount: overdueResolution
+          ? overdueResolution.amount
           : summary.outstanding > 0
             ? summary.outstanding
             : Number(contract.monthly_rent_xof),
-        amountIsEstimated: summary.outstanding <= 0,
+        amountIsEstimated: overdueResolution?.source === "contract" || (!overdueResolution && summary.outstanding <= 0),
         days: diffIsoDays(today, dueDate),
         kind: isOverdue ? "overdue" as const : "upcoming" as const,
       }];
@@ -274,32 +280,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     };
   }, [buildings, customerMap, filteredByBuilding, receivables, unitMap]);
 
-  const actualOverdueRows = useMemo(() => {
-    const buildingById = new Map(buildings.map((building) => [building.id, building]));
-    return filteredByBuilding.flatMap((contract) => {
-      const unit = unitMap.get(contract.unit_id);
-      const customer = customerMap.get(contract.customer_id);
-      if (!unit) return [];
-
-      const related = receivables.filter((row) => row.source_type === "lease_contract" && row.source_id === contract.id);
-      const summary = summarizeLeaseReceivables(related, todayStr);
-      if (summary.overdue <= 0 || !summary.earliestOverdueDue) return [];
-
-      const building = buildingById.get(unit.building_id);
-      return [{
-        contract,
-        unit,
-        customer,
-        buildingName: building?.display_name || building?.code || "-",
-        dueDate: summary.earliestOverdueDue,
-        paidThrough: contract.paid_through_date,
-        amount: summary.overdue,
-        amountIsEstimated: false,
-        days: diffIsoDays(todayStr, summary.earliestOverdueDue),
-        kind: "overdue" as const,
-      }];
-    }).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-  }, [buildings, customerMap, filteredByBuilding, receivables, todayStr, unitMap]);
+  const actualOverdueRows = leaseAttention.overdue;
 
   const dashboardStats = useMemo(() => {
     const scopedContractIds = new Set(filteredByBuilding.map((c) => c.id));
@@ -669,7 +650,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                         </div>
                         <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5" />{locale === "zh" ? "应缴日" : "Échéance"} {row.dueDate}</span>
-                          <span className="text-right">{row.amountIsEstimated ? (locale === "zh" ? "预计月租" : "Loyer estimé") : (locale === "zh" ? "未结应收" : "Créance ouverte")}</span>
+                          <span className="text-right">{row.amountIsEstimated ? (locale === "zh" ? "按合同月租" : "Selon le loyer") : (locale === "zh" ? "未结应收" : "Créance ouverte")}</span>
                           <span>{locale === "zh" ? "已缴至" : "Payé au"} {row.paidThrough ?? (locale === "zh" ? "待补" : "À compléter")}</span>
                           <span className="flex items-center justify-end gap-1.5"><Phone className="h-3.5 w-3.5" />{row.customer?.phone || (locale === "zh" ? "电话待补" : "Téléphone à compléter")}</span>
                         </div>
@@ -805,7 +786,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5" />{locale === "zh" ? "应缴日" : "Échéance"} {row.dueDate}</span>
-                      <span className="text-right">{row.amountIsEstimated ? (locale === "zh" ? "预计月租" : "Loyer estimé") : (locale === "zh" ? "未结应收" : "Créance ouverte")}</span>
+                      <span className="text-right">{row.amountIsEstimated ? (locale === "zh" ? "按合同月租" : "Selon le loyer") : (locale === "zh" ? "未结应收" : "Créance ouverte")}</span>
                       <span>{locale === "zh" ? "已缴至" : "Payé au"} {row.paidThrough ?? (locale === "zh" ? "待补" : "À compléter")}</span>
                       <span className="flex items-center justify-end gap-1.5"><Phone className="h-3.5 w-3.5" />{row.customer?.phone || (locale === "zh" ? "电话待补" : "Téléphone à compléter")}</span>
                     </div>

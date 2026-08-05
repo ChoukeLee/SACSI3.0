@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ReceivableRow } from "@/types/database";
-import { summarizeLeaseReceivables } from "./lease-receivable-summary";
+import { resolveLeaseOverdue, summarizeLeaseReceivables } from "./lease-receivable-summary";
 
 function receivable(overrides: Partial<ReceivableRow>): ReceivableRow {
   return {
@@ -48,5 +48,42 @@ describe("summarizeLeaseReceivables", () => {
       earliestOutstandingDue: null,
       earliestOverdueDue: null,
     });
+  });
+});
+
+describe("resolveLeaseOverdue", () => {
+  it("uses the contract monthly rent when paid coverage expired without an open receivable", () => {
+    expect(resolveLeaseOverdue({
+      receivables: [],
+      today: "2026-08-05",
+      paidThroughDate: "2026-07-31",
+      monthlyRentXof: 650_000,
+    })).toEqual({
+      dueDate: "2026-08-01",
+      amount: 650_000,
+      source: "contract",
+    });
+  });
+
+  it("keeps the real outstanding receivable authoritative", () => {
+    expect(resolveLeaseOverdue({
+      receivables: [receivable({ amount_xof: 750_000, due_date: "2026-07-21", status: "overdue" })],
+      today: "2026-08-05",
+      paidThroughDate: "2026-07-20",
+      monthlyRentXof: 750_000,
+    })).toEqual({
+      dueDate: "2026-07-21",
+      amount: 750_000,
+      source: "receivable",
+    });
+  });
+
+  it("does not mark the first uncovered day overdue until it has passed", () => {
+    expect(resolveLeaseOverdue({
+      receivables: [],
+      today: "2026-08-01",
+      paidThroughDate: "2026-07-31",
+      monthlyRentXof: 650_000,
+    })).toBeNull();
   });
 });

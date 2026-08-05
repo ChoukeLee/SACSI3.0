@@ -7,6 +7,18 @@ export interface LeaseReceivableSummary {
   earliestOverdueDue: string | null;
 }
 
+export interface LeaseOverdueResolution {
+  dueDate: string;
+  amount: number;
+  source: "receivable" | "contract";
+}
+
+export function addOneIsoDay(date: string): string {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + 1);
+  return value.toISOString().slice(0, 10);
+}
+
 export function isOverdueReceivable(receivable: ReceivableRow, today: string): boolean {
   return receivable.status === "overdue" || receivable.due_date < today;
 }
@@ -40,4 +52,36 @@ export function summarizeLeaseReceivables(
   }
 
   return { outstanding, overdue, earliestOutstandingDue, earliestOverdueDue };
+}
+
+/**
+ * Resolve the amount currently overdue for an active lease.
+ * Open receivables are authoritative when present. When the receivable for the
+ * next rent period has not been materialized yet, paid_through_date remains the
+ * coverage source of truth and monthly_rent_xof is the exact next amount due.
+ */
+export function resolveLeaseOverdue(input: {
+  receivables: ReceivableRow[];
+  today: string;
+  paidThroughDate: string | null;
+  monthlyRentXof: number;
+}): LeaseOverdueResolution | null {
+  const summary = summarizeLeaseReceivables(input.receivables, input.today);
+  if (summary.overdue > 0 && summary.earliestOverdueDue) {
+    return {
+      dueDate: summary.earliestOverdueDue,
+      amount: summary.overdue,
+      source: "receivable",
+    };
+  }
+
+  if (!input.paidThroughDate) return null;
+  const coverageDue = addOneIsoDay(input.paidThroughDate);
+  if (coverageDue >= input.today) return null;
+
+  return {
+    dueDate: coverageDue,
+    amount: Math.max(0, input.monthlyRentXof),
+    source: "contract",
+  };
 }
