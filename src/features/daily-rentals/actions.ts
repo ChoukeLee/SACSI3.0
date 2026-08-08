@@ -23,6 +23,7 @@ import {
   insertLedgerEntry,
 } from "./daily-rental-finance";
 import { writeAuditLog } from "@/lib/audit";
+import { isDailyBookingAgentName } from "./daily-booking-agents";
 
 // ── Permission guards ──
 async function guardWrite() {
@@ -68,6 +69,22 @@ async function getDailyRentalUnit(
   if (error) return { success: false as const, error: error.message };
   if (!data) return { success: false as const, error: "dailyRentalNotEnabledForUnit" };
   return { success: true as const, unit: data };
+}
+
+async function validateDailyBookingAgent(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  customerId: string,
+) {
+  const { data, error } = await supabase
+    .from("customers")
+    .select("id, name, is_blacklisted")
+    .eq("id", customerId)
+    .maybeSingle();
+  if (error) return { success: false as const, error: error.message };
+  if (!data || !isDailyBookingAgentName(data.name) || data.is_blacklisted) {
+    return { success: false as const, error: "dailyBookingAgentRequired" };
+  }
+  return { success: true as const };
 }
 
 export interface DailyOperationSnapshot {
@@ -190,6 +207,8 @@ export async function createBooking(input: {
 }): Promise<DailyActionResult> {
   const user = await requireRole("admin");
   const supabase = await createClient();
+  const agentCheck = await validateDailyBookingAgent(supabase, input.customerId);
+  if (!agentCheck.success) return { success: false, error: agentCheck.error };
   const { data, error } = await supabase.rpc("daily_create_booking_rpc", {
     p_unit_id: input.unitId,
     p_customer_id: input.customerId,
@@ -222,6 +241,8 @@ export async function createBackfillBooking(input: {
 }): Promise<DailyActionResult> {
   await requireRole("admin");
   const supabase = await createClient();
+  const agentCheck = await validateDailyBookingAgent(supabase, input.customerId);
+  if (!agentCheck.success) return { success: false, error: agentCheck.error };
   const unitCheck = await getDailyRentalUnit(supabase, input.unitId);
   if (!unitCheck.success) return { success: false, error: unitCheck.error };
 

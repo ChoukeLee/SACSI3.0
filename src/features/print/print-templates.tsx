@@ -253,8 +253,8 @@ export interface DailyReceiptPrintData {
 
 export function printDailyReceipt(data: DailyReceiptPrintData, locale: "zh" | "fr") {
   const labels = locale === "zh"
-    ? { title: "日租收据", company: "科建地产", room: "房间", guest: "客人", checkIn: "入住日期", checkOut: "退房日期", nights: "晚数", nightlyPrice: "每晚价格", total: "总金额", prepaid: "预付金额", remaining: "待付余额" }
-    : { title: "Recu journalier", company: "Kejian Immobilier", room: "Chambre", guest: "Client", checkIn: "Arrivee", checkOut: "Depart", nights: "Nuits", nightlyPrice: "Prix/nuit", total: "Total", prepaid: "Avance", remaining: "Solde" };
+    ? { title: "日租收据", company: "科建地产", room: "房间", guest: "经办人", checkIn: "入住日期", checkOut: "退房日期", nights: "晚数", nightlyPrice: "每晚价格", total: "总金额", prepaid: "预付金额", remaining: "待付余额" }
+    : { title: "Recu journalier", company: "Kejian Immobilier", room: "Chambre", guest: "Responsable", checkIn: "Arrivee", checkOut: "Depart", nights: "Nuits", nightlyPrice: "Prix/nuit", total: "Total", prepaid: "Avance", remaining: "Solde" };
 
   const effectiveCheckOut = data.booking.check_out ?? data.booking.actual_check_out ?? new Date().toISOString().slice(0, 10);
   const nights = Math.ceil((new Date(effectiveCheckOut).getTime() - new Date(data.booking.check_in).getTime()) / (1000 * 60 * 60 * 24));

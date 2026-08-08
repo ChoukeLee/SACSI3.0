@@ -24,6 +24,7 @@ import {
 } from "./actions";
 import type { DailyOperationSnapshot } from "./actions";
 import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
+import { dailyBookingAgentSortValue, isDailyBookingAgentName } from "./daily-booking-agents";
 
 interface BookingPanelProps {
   booking: DailyBookingRow | null; unitId: string | null; defaultDate?: string;
@@ -127,10 +128,9 @@ export function BookingPanel({
     setNewNightlyPrice(String(selectedUnit.daily_rental_price_xof));
   }, [isNew, selectedUnit?.id, selectedUnit?.daily_rental_price_xof]);
   const dailySelectableCustomers = useMemo(
-    () => customers.filter((customer) =>
-      !customer.has_active_lease_contract &&
-      !customer.has_active_sale_contract
-    ),
+    () => customers
+      .filter((customer) => isDailyBookingAgentName(customer.name) && !customer.is_blacklisted)
+      .sort((left, right) => dailyBookingAgentSortValue(left.name) - dailyBookingAgentSortValue(right.name)),
     [customers],
   );
   const bookingPayments = useMemo(() => payments.filter(p => p.source_id === booking?.id), [payments, booking]);
@@ -1005,6 +1005,10 @@ function formatDailyRentalError(message: string | null | undefined, locale: Loca
     customerNotFound: {
       zh: "未找到该客户，请刷新后重新选择。",
       fr: "Client introuvable. Actualisez puis choisissez-le de nouveau.",
+    },
+    dailyBookingAgentRequired: {
+      zh: "请选择已配置的日租经办人。",
+      fr: "Veuillez choisir un responsable journalier configure.",
     },
     unitNotFound: {
       zh: "未找到该房间，请刷新日历后重试。",

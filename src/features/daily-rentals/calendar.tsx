@@ -930,7 +930,7 @@ export function DailyCalendar({
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "收款日期" : "Date"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "居住日期" : "Sejour"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
-                          <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
+                          <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "经办人" : "Responsable"}</th>
                           <th className="px-3 py-3 whitespace-nowrap text-center">{locale === "zh" ? "笔数" : "Nb"}</th>
                           <th className="px-3 py-3 whitespace-nowrap text-right">{locale === "zh" ? "已收合计" : "Total encaisse"}</th>
                         </tr>
@@ -972,7 +972,7 @@ export function DailyCalendar({
                       <thead className="sticky top-0 z-10 bg-muted/50">
                         <tr className="text-left text-xs font-semibold text-muted-foreground">
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
-                          <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
+                          <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "经办人" : "Responsable"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "入住备注" : "Note séjour"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "入住" : "Arrivee"}</th>
                           <th className="px-3 py-3 whitespace-nowrap text-right">{locale === "zh" ? "应收" : "Du"}</th>
@@ -1031,7 +1031,7 @@ export function DailyCalendar({
                       <thead className="sticky top-0 z-10 bg-muted/50">
                         <tr className="text-left text-xs font-semibold text-muted-foreground">
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "房号" : "Chambre"}</th>
-                          <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "客户" : "Client"}</th>
+                          <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "经办人" : "Responsable"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "入住备注" : "Note séjour"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "入住" : "Arrivee"}</th>
                           <th className="px-3 py-3 whitespace-nowrap">{locale === "zh" ? "退房" : "Depart"}</th>
