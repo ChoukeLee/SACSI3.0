@@ -43,6 +43,7 @@ interface CalendarProps {
   }[];
   locale: Locale;
   userRole?: string;
+  buildingLabel?: string;
 }
 
 type ViewMode = "day" | "week" | "month";
@@ -70,6 +71,7 @@ export function DailyCalendar({
   payments,
   locale,
   userRole,
+  buildingLabel,
 }: CalendarProps) {
   const copy = COPY[locale];
   const bookingLabels = BOOKING_STATUS_LABELS[locale];
@@ -494,7 +496,7 @@ export function DailyCalendar({
   }, [visibleDailyUnits, todayStateMap, locale]);
 
   const handleCopy = useCallback(async () => {
-    let text = `11# ${locale === "zh" ? "日租房态" : "Occupation journaliere"}\n`;
+    let text = `${buildingLabel ?? "11#公寓"} ${locale === "zh" ? "日租房态" : "Occupation journaliere"}\n`;
     for (const row of shareRows) {
       text += `\n${row.label}: ${row.count}\n`;
       text += `${row.units.join(", ")}\n`;
@@ -511,7 +513,7 @@ export function DailyCalendar({
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [shareRows, locale]);
+  }, [buildingLabel, shareRows, locale]);
 
   const panelBooking = selectedBookingId ? bookingById.get(selectedBookingId) ?? null : null;
 
@@ -554,7 +556,7 @@ export function DailyCalendar({
       <section className="relative z-20 overflow-hidden rounded-xl border border-border bg-card shadow-card">
         <div className="flex flex-col gap-3 border-b border-border px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="text-[15px] font-semibold tracking-tight">{locale === "zh" ? "日租概览" : "Apercu journalier"}</h3>
+            <h3 className="text-[15px] font-semibold tracking-tight">{buildingLabel ? `${buildingLabel} · ` : ""}{locale === "zh" ? "日租概览" : "Apercu journalier"}</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">{locale === "zh" ? "今日房态、群消息和日租收款" : "Occupation, message et paiements du jour"}</p>
           </div>
           <div className={TOOLBAR_SURFACE}>

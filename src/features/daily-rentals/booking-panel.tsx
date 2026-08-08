@@ -43,6 +43,8 @@ interface BookingPanelProps {
   readOnly?: boolean;
 }
 
+type DailyPricedUnit = UnitRow & { daily_rental_price_xof?: number | null };
+
 type AdvancedTask = "payment" | "discount" | "extend" | "fixedCheckout" | null;
 
 export function BookingPanel({
@@ -118,7 +120,11 @@ export function BookingPanel({
     setActionError("");
   }, [booking?.id]);
 
-  const selectedUnit = unitId ? units.find((u) => u.id === unitId) : null;
+  const selectedUnit = unitId ? units.find((u) => u.id === unitId) as DailyPricedUnit | null : null;
+  useEffect(() => {
+    if (!isNew || !selectedUnit?.daily_rental_price_xof) return;
+    setNewNightlyPrice(String(selectedUnit.daily_rental_price_xof));
+  }, [isNew, selectedUnit?.id, selectedUnit?.daily_rental_price_xof]);
   const dailySelectableCustomers = useMemo(
     () => customers.filter((customer) =>
       !customer.has_active_lease_contract &&
@@ -1002,8 +1008,12 @@ function formatDailyRentalError(message: string | null | undefined, locale: Loca
       fr: "Chambre introuvable. Actualisez le calendrier puis reessayez.",
     },
     dailyRentalOnlyAllowedInSacsi11: {
-      zh: "日租订单只能创建在11#公寓。",
-      fr: "Les reservations journalieres sont limitees au bâtiment 11.",
+      zh: "该房间尚未启用日租业务。",
+      fr: "La location journaliere n'est pas activee pour cette chambre.",
+    },
+    dailyRentalNotEnabledForUnit: {
+      zh: "该房间尚未启用日租业务。",
+      fr: "La location journaliere n'est pas activee pour cette chambre.",
     },
     requestIdRequired: {
       zh: "订单请求无效，请关闭侧栏后重新创建。",

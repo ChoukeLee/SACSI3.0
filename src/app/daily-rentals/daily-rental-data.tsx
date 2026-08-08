@@ -20,9 +20,9 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
   noStore();
   const supabase = await createClient();
 
-  const [buildingRes, dailyCustomerIdsRes, activeLeasesRes, activeSalesRes, cleaningRes, paymentsRes, bookingsRes] =
+  const [buildingsRes, dailyCustomerIdsRes, activeLeasesRes, activeSalesRes, cleaningRes, paymentsRes, bookingsRes] =
     await Promise.all([
-      supabase.from("buildings").select("id").eq("code", "SACSI11").single(),
+      supabase.from("buildings").select("id, code, display_name").in("code", ["SACSI11", "SACSI5"]).eq("is_active", true),
       supabase.from("daily_bookings").select("customer_id"),
       supabase.from("lease_contracts").select("customer_id").eq("status", "active"),
       supabase.from("sale_contracts").select("customer_id").eq("status", "active"),
@@ -71,19 +71,27 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
   if (!paymentsRes.error) payments = paymentsRes.data ?? [];
   if (!bookingsRes.error) bookings = (bookingsRes.data as unknown as DailyBookingRow[]) ?? [];
 
-  const buildingId = buildingRes.data?.id;
-  if (buildingId) {
+  const buildings = (buildingsRes.data ?? []).sort((left, right) => (
+    left.code === "SACSI11" ? -1 : right.code === "SACSI11" ? 1 : left.code.localeCompare(right.code)
+  ));
+  const buildingIds = buildings.map((building) => building.id);
+  if (buildingIds.length > 0) {
     const { data: unitsData, error: unitsErr } = await supabase
       .from("units")
-      .select("id, unit_no, floor_label, status, notes, unit_business_flags!inner(business_type, is_enabled)")
-      .eq("building_id", buildingId)
+      .select("id, building_id, unit_no, floor_label, status, notes, unit_business_flags!inner(business_type, is_enabled, default_price_xof)")
+      .in("building_id", buildingIds)
       .eq("unit_business_flags.business_type", "daily_rental")
       .eq("unit_business_flags.is_enabled", true)
-      .neq("unit_no", "503")
       .in("status", ["available", "reserved", "daily_occupied", "cleaning_pending", "maintenance"])
       .order("unit_no");
     if (!unitsErr) {
-      dailyUnits = sortUnits((unitsData as unknown as UnitRow[]) ?? []);
+      dailyUnits = sortUnits(((unitsData ?? []).map((unit) => {
+        const flags = Array.isArray(unit.unit_business_flags) ? unit.unit_business_flags : [unit.unit_business_flags];
+        return {
+          ...unit,
+          daily_rental_price_xof: flags.find((flag) => flag?.business_type === "daily_rental")?.default_price_xof ?? null,
+        };
+      }) as unknown as UnitRow[]));
       unitLookupUnits = dailyUnits;
       const visibleUnitIds = new Set(dailyUnits.map((unit) => unit.id));
       const bookingUnitIds = Array.from(new Set(bookings.map((booking) => booking.unit_id).filter(Boolean)));
@@ -92,8 +100,8 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
       if (missingBookingUnitIds.length > 0) {
         const { data: historyUnitsData, error: historyUnitsErr } = await supabase
           .from("units")
-          .select("id, unit_no, floor_label, status, notes")
-          .eq("building_id", buildingId)
+          .select("id, building_id, unit_no, floor_label, status, notes")
+          .in("building_id", buildingIds)
           .in("id", missingBookingUnitIds);
         if (!historyUnitsErr) historyUnits = (historyUnitsData as unknown as UnitRow[]) ?? [];
       }
@@ -111,6 +119,7 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
       cleaningTasks={cleaningTasks}
       locale={locale}
       userRole={userRole}
+      buildings={buildings}
     />
   );
 }

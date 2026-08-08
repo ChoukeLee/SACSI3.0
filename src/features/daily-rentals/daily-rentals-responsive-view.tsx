@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Locale } from "@/lib/i18n";
 import type { CustomerRow, DailyBookingRow, PaymentRow, UnitRow } from "@/types/database";
 import { DailyCalendar } from "./calendar";
 import type { CustomerSummary } from "./calendar";
 import { MobileDailyCards } from "@/features/mobile";
+import { SegmentedControl } from "@/components/ui/operational";
 
 interface DailyRentalsResponsiveViewProps {
   dailyUnits: UnitRow[];
@@ -16,6 +17,7 @@ interface DailyRentalsResponsiveViewProps {
   payments: { id: string; source_id: string; amount: number; payment_date: string }[];
   locale: Locale;
   userRole?: string;
+  buildings: { id: string; code: string; display_name: string }[];
 }
 
 export function DailyRentalsResponsiveView({
@@ -27,8 +29,12 @@ export function DailyRentalsResponsiveView({
   payments,
   locale,
   userRole,
+  buildings,
 }: DailyRentalsResponsiveViewProps) {
   const [isDesktop, setIsDesktop] = useState(true);
+  const [selectedBuildingId, setSelectedBuildingId] = useState(
+    () => buildings.find((building) => building.code === "SACSI11")?.id ?? buildings[0]?.id ?? "",
+  );
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1024px)");
@@ -38,29 +44,72 @@ export function DailyRentalsResponsiveView({
     return () => media.removeEventListener("change", syncViewport);
   }, []);
 
-  if (!isDesktop) {
-    return (
+  useEffect(() => {
+    if (!buildings.some((building) => building.id === selectedBuildingId)) {
+      setSelectedBuildingId(buildings[0]?.id ?? "");
+    }
+  }, [buildings, selectedBuildingId]);
+
+  const selectedBuilding = buildings.find((building) => building.id === selectedBuildingId) ?? buildings[0];
+  const scopedDailyUnits = useMemo(
+    () => dailyUnits.filter((unit) => unit.building_id === selectedBuildingId),
+    [dailyUnits, selectedBuildingId],
+  );
+  const scopedLookupUnits = useMemo(
+    () => (unitLookupUnits ?? dailyUnits).filter((unit) => unit.building_id === selectedBuildingId),
+    [dailyUnits, selectedBuildingId, unitLookupUnits],
+  );
+  const scopedUnitIds = useMemo(() => new Set(scopedLookupUnits.map((unit) => unit.id)), [scopedLookupUnits]);
+  const scopedBookings = useMemo(
+    () => bookings.filter((booking) => scopedUnitIds.has(booking.unit_id)),
+    [bookings, scopedUnitIds],
+  );
+  const scopedBookingIds = useMemo(() => new Set(scopedBookings.map((booking) => booking.id)), [scopedBookings]);
+  const scopedPayments = useMemo(
+    () => payments.filter((payment) => scopedBookingIds.has(payment.source_id)),
+    [payments, scopedBookingIds],
+  );
+  const scopedCleaningTasks = useMemo(
+    () => cleaningTasks.filter((task) => scopedUnitIds.has(task.unit_id)),
+    [cleaningTasks, scopedUnitIds],
+  );
+
+  const content = !isDesktop ? (
       <MobileDailyCards
-        dailyUnits={dailyUnits}
-        bookings={bookings}
+        dailyUnits={scopedDailyUnits}
+        bookings={scopedBookings}
         customers={customers as unknown as CustomerRow[]}
-        payments={payments as unknown as PaymentRow[]}
-        cleaningTasks={cleaningTasks}
+        payments={scopedPayments as unknown as PaymentRow[]}
+        cleaningTasks={scopedCleaningTasks}
         locale={locale}
       />
-    );
-  }
-
-  return (
+  ) : (
     <DailyCalendar
-      dailyUnits={dailyUnits}
-      unitLookupUnits={unitLookupUnits}
-      bookings={bookings}
+      dailyUnits={scopedDailyUnits}
+      unitLookupUnits={scopedLookupUnits}
+      bookings={scopedBookings}
       customers={customers}
-      cleaningTasks={cleaningTasks}
-      payments={payments}
+      cleaningTasks={scopedCleaningTasks}
+      payments={scopedPayments}
       locale={locale}
       userRole={userRole}
+      buildingLabel={selectedBuilding?.display_name}
     />
+  );
+
+  return (
+    <div className="space-y-4">
+      <SegmentedControl
+        value={selectedBuildingId}
+        onChange={setSelectedBuildingId}
+        ariaLabel={locale === "zh" ? "日租楼栋" : "Bâtiment location journalière"}
+        items={buildings.map((building) => ({
+          value: building.id,
+          label: building.display_name,
+          count: dailyUnits.filter((unit) => unit.building_id === building.id).length,
+        }))}
+      />
+      <div key={selectedBuildingId}>{content}</div>
+    </div>
   );
 }

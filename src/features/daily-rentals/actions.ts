@@ -60,15 +60,13 @@ async function getDailyRentalUnit(
 ) {
   const { data, error } = await supabase
     .from("units")
-    .select("id, building_id, unit_no, status, buildings!inner(code)")
+    .select("id, building_id, unit_no, status, unit_business_flags!inner(business_type, is_enabled)")
     .eq("id", unitId)
+    .eq("unit_business_flags.business_type", "daily_rental")
+    .eq("unit_business_flags.is_enabled", true)
     .maybeSingle();
   if (error) return { success: false as const, error: error.message };
-  if (!data) return { success: false as const, error: "unitNotFound" };
-  const building = Array.isArray(data.buildings) ? data.buildings[0] : data.buildings;
-  if (building?.code !== "SACSI11") {
-    return { success: false as const, error: "dailyRentalOnlyAllowedInSacsi11" };
-  }
+  if (!data) return { success: false as const, error: "dailyRentalNotEnabledForUnit" };
   return { success: true as const, unit: data };
 }
 
