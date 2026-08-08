@@ -20,10 +20,10 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
   noStore();
   const supabase = await createClient();
 
-  const [buildingsRes, dailyCustomerIdsRes, activeLeasesRes, activeSalesRes, cleaningRes, paymentsRes, bookingsRes] =
+  const [buildingsRes, customersRes, activeLeasesRes, activeSalesRes, cleaningRes, paymentsRes, bookingsRes] =
     await Promise.all([
       supabase.from("buildings").select("id, code, display_name").in("code", ["SACSI11", "SACSI5"]).eq("is_active", true),
-      supabase.from("daily_bookings").select("customer_id"),
+      supabase.from("customers").select("id, name, phone, is_blacklisted").order("name"),
       supabase.from("lease_contracts").select("customer_id").eq("status", "active"),
       supabase.from("sale_contracts").select("customer_id").eq("status", "active"),
       supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed"),
@@ -50,22 +50,14 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
   let cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[] = [];
   let payments: { id: string; source_id: string; amount: number; payment_date: string }[] = [];
 
-  if (!dailyCustomerIdsRes.error) {
-    const dailyCustomerIds = [...new Set((dailyCustomerIdsRes.data ?? []).map((row) => row.customer_id).filter(Boolean))];
-    if (dailyCustomerIds.length > 0) {
-      const { data: dailyCustomersData } = await supabase
-        .from("customers")
-        .select("id, name, phone, is_blacklisted")
-        .in("id", dailyCustomerIds)
-        .order("name");
-      const activeLeaseCustomerIds = new Set((activeLeasesRes.data ?? []).map((row) => row.customer_id).filter(Boolean));
-      const activeSaleCustomerIds = new Set((activeSalesRes.data ?? []).map((row) => row.customer_id).filter(Boolean));
-      customers = (dailyCustomersData ?? []).map((customer) => ({
-        ...(customer as unknown as CustomerSummary),
-        has_active_lease_contract: activeLeaseCustomerIds.has(customer.id),
-        has_active_sale_contract: activeSaleCustomerIds.has(customer.id),
-      }));
-    }
+  if (!customersRes.error) {
+    const activeLeaseCustomerIds = new Set((activeLeasesRes.data ?? []).map((row) => row.customer_id).filter(Boolean));
+    const activeSaleCustomerIds = new Set((activeSalesRes.data ?? []).map((row) => row.customer_id).filter(Boolean));
+    customers = (customersRes.data ?? []).map((customer) => ({
+      ...(customer as unknown as CustomerSummary),
+      has_active_lease_contract: activeLeaseCustomerIds.has(customer.id),
+      has_active_sale_contract: activeSaleCustomerIds.has(customer.id),
+    }));
   }
   if (!cleaningRes.error) cleaningTasks = cleaningRes.data ?? [];
   if (!paymentsRes.error) payments = paymentsRes.data ?? [];
@@ -78,7 +70,7 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
   if (buildingIds.length > 0) {
     const { data: unitsData, error: unitsErr } = await supabase
       .from("units")
-      .select("id, building_id, unit_no, floor_label, status, notes, unit_business_flags!inner(business_type, is_enabled, default_price_xof)")
+      .select("id, building_id, code, unit_no, floor_label, status, notes, unit_business_flags!inner(business_type, is_enabled, default_price_xof)")
       .in("building_id", buildingIds)
       .eq("unit_business_flags.business_type", "daily_rental")
       .eq("unit_business_flags.is_enabled", true)
@@ -92,7 +84,6 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
           daily_rental_price_xof: flags.find((flag) => flag?.business_type === "daily_rental")?.default_price_xof ?? null,
         };
       }) as unknown as UnitRow[]));
-      unitLookupUnits = dailyUnits;
       const visibleUnitIds = new Set(dailyUnits.map((unit) => unit.id));
       const bookingUnitIds = Array.from(new Set(bookings.map((booking) => booking.unit_id).filter(Boolean)));
       const missingBookingUnitIds = bookingUnitIds.filter((unitId) => !visibleUnitIds.has(unitId));
@@ -100,11 +91,18 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
       if (missingBookingUnitIds.length > 0) {
         const { data: historyUnitsData, error: historyUnitsErr } = await supabase
           .from("units")
-          .select("id, building_id, unit_no, floor_label, status, notes")
+          .select("id, building_id, code, unit_no, floor_label, status, notes")
           .in("building_id", buildingIds)
           .in("id", missingBookingUnitIds);
         if (!historyUnitsErr) historyUnits = (historyUnitsData as unknown as UnitRow[]) ?? [];
       }
+      const activeBookingUnitIds = new Set(
+        bookings
+          .filter((booking) => booking.status === "confirmed" || booking.status === "checked_in")
+          .map((booking) => booking.unit_id),
+      );
+      const activeExternalUnits = historyUnits.filter((unit) => activeBookingUnitIds.has(unit.id));
+      dailyUnits = sortUnits([...dailyUnits, ...activeExternalUnits]);
       unitLookupUnits = sortUnits([...dailyUnits, ...historyUnits]);
     }
   }

@@ -14,6 +14,7 @@ import { RightDrawer, controlClass } from "@/components/ui/operational";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import type { CustomerSummary } from "./calendar";
+import { unitBuildingLabel } from "@/lib/unit-building-label";
 import { printDailyReceipt } from "@/features/print";
 import { calculateBilling } from "./billing";
 import { getDailyLodgingBusinessType, getPrimaryDailyAction, type DailyLodgingBusinessType } from "./daily-rental-policy";
@@ -208,8 +209,10 @@ export function BookingPanel({
         setActionError(formatError(result.error ?? "unknownError"));
         return;
       }
+      // Apply the authoritative operation snapshot immediately for responsive UI,
+      // then refresh the server component tree to reconcile every related list.
       if (result?.data) onOperationSnapshot?.(result.data);
-      else refresh();
+      refresh();
       if (options.closeOnSuccess) onClose();
     } catch (operationError) {
       setActionError(formatError(operationError instanceof Error ? operationError.message : "unknownError"));
@@ -390,7 +393,7 @@ export function BookingPanel({
       <RightDrawer
         open
         title={isBackfill ? (locale === "zh" ? "历史补录" : "Backfill") : isNew ? t.booking.newBooking : t.booking.title}
-        subtitle={selectedUnit ? `11# · ${selectedUnit.unit_no} · ${selectedUnit.floor_label}` : undefined}
+        subtitle={selectedUnit ? `${unitBuildingLabel(selectedUnit)} · ${selectedUnit.unit_no} · ${selectedUnit.floor_label}` : undefined}
         onClose={() => { if (!saving) onClose(); }}
       >
         <div className="space-y-4">

@@ -18,6 +18,7 @@ import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
 import { buildBookingMap, buildDailyRoomStateMap, getDailyRoomStateForDate } from "./room-status";
 import { getPrimaryDailyAction } from "./daily-rental-policy";
 import { calculateBilling } from "./billing";
+import { qualifiedUnitNo } from "@/lib/unit-building-label";
 
 export interface CustomerSummary {
   id: string;
@@ -719,12 +720,12 @@ export function DailyCalendar({
                       style={{ height: ROW_HEIGHT, left: "auto", position: "relative" }}
                       role="rowheader"
                       data-daily-calendar-room-label
-                      title={`11#${unit.unit_no}`}
+                      title={qualifiedUnitNo(unit)}
                     >
                       <span className={cn("mr-2 h-7 w-1.5 rounded-full", roomTone.strip)} />
                       <div className="min-w-0">
                         <div className="truncate text-[13px] font-semibold leading-4 text-foreground">
-                          11#{unit.unit_no}
+                          {qualifiedUnitNo(unit)}
                         </div>
                       </div>
                     </div>,
