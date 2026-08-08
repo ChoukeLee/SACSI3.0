@@ -2,6 +2,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 
 export type UserRole = "admin" | "boss" | "finance" | "front_desk" | "rental_sales";
+export type AppLocale = "zh" | "fr";
 
 export interface CurrentUser {
   id: string;
@@ -27,6 +28,15 @@ export const configuredAccountSummaries = Object.entries(seedAccountProfiles).ma
 export function getSeedAccountProfile(email: string | undefined) {
   if (!email) return null;
   return seedAccountProfiles[email.toLowerCase()] ?? null;
+}
+
+export function homePathForRole(role: UserRole, locale: AppLocale = "zh") {
+  if (role === "front_desk") return "/fr/daily-rentals";
+
+  const prefix = locale === "fr" ? "/fr" : "";
+  if (role === "finance") return `${prefix}/finance`;
+  if (role === "rental_sales") return `${prefix}/leases`;
+  return `${prefix}/management`;
 }
 
 // ── Permission matrix ──

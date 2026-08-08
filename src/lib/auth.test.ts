@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canAccessPage, getSeedAccountProfile, hasPermission, type CurrentUser } from "./auth";
+import { canAccessPage, getSeedAccountProfile, hasPermission, homePathForRole, type CurrentUser } from "./auth";
 
 const rentalSalesUser: CurrentUser = {
   id: "test-user",
@@ -110,5 +110,22 @@ describe("front desk role", () => {
     expect(canAccessPage("front_desk", "leases")).toBe(true);
     expect(canAccessPage("front_desk", "sales")).toBe(false);
     expect(canAccessPage("front_desk", "customers")).toBe(false);
+  });
+});
+
+describe("role home routes", () => {
+  it("sends each role directly to an authorized Chinese landing page", () => {
+    expect(homePathForRole("admin")).toBe("/management");
+    expect(homePathForRole("boss")).toBe("/management");
+    expect(homePathForRole("finance")).toBe("/finance");
+    expect(homePathForRole("rental_sales")).toBe("/leases");
+    expect(homePathForRole("front_desk")).toBe("/fr/daily-rentals");
+  });
+
+  it("keeps French landing pages localized", () => {
+    expect(homePathForRole("admin", "fr")).toBe("/fr/management");
+    expect(homePathForRole("finance", "fr")).toBe("/fr/finance");
+    expect(homePathForRole("rental_sales", "fr")).toBe("/fr/leases");
+    expect(homePathForRole("front_desk", "fr")).toBe("/fr/daily-rentals");
   });
 });

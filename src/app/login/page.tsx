@@ -5,6 +5,7 @@ import { login } from "./actions";
 function loginErrorMessage(error: string | undefined) {
   if (!error) return "";
   if (error === "missing") return "请输入邮箱和密码。";
+  if (error === "account_not_configured") return "该账号尚未配置系统权限。";
   return decodeURIComponent(error);
 }
 

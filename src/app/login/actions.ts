@@ -1,7 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { getSeedAccountProfile } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
+import { getSeedAccountProfile, homePathForRole, type UserRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export async function login(formData: FormData) {
@@ -14,9 +15,6 @@ export async function login(formData: FormData) {
 
   const supabase = await createClient();
 
-  // Clear any existing role/session cookies before switching accounts.
-  await supabase.auth.signOut();
-
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
@@ -25,6 +23,7 @@ export async function login(formData: FormData) {
 
   const user = data.user;
   const seedProfile = getSeedAccountProfile(user?.email);
+  let role: UserRole | null = seedProfile?.role ?? null;
   if (user && seedProfile) {
     await supabase.from("user_profiles").upsert({
       id: user.id,
@@ -34,18 +33,19 @@ export async function login(formData: FormData) {
     });
   }
 
-  if (seedProfile?.role === "front_desk") {
-    redirect("/fr/daily-rentals");
-  }
-
   if (user && !seedProfile) {
     const { data: profile } = await supabase
       .from("user_profiles")
       .select("role")
       .eq("id", user.id)
       .single();
-    if (profile?.role === "front_desk") redirect("/fr/daily-rentals");
+    role = profile?.role as UserRole | null;
   }
 
-  redirect("/");
+  // Root layouts are preserved during App Router navigation. Invalidate the
+  // anonymous shell after the auth cookie changes, then skip the extra `/` hop.
+  revalidatePath("/", "layout");
+
+  if (!role) redirect("/login?error=account_not_configured");
+  redirect(homePathForRole(role));
 }

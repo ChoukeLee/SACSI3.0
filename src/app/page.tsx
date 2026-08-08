@@ -1,14 +1,11 @@
 ﻿import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, homePathForRole } from "@/lib/auth";
 
 
 export default async function HomePage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  if (user.role === "front_desk") redirect("/fr/daily-rentals");
-  if (user.role === "finance") redirect("/finance");
-
-  redirect("/management");
+  redirect(homePathForRole(user.role));
 }
 

@@ -16,6 +16,8 @@ export function AppShellWrapper({
   const pathname = usePathname();
   const locale = pathname.startsWith("/fr") ? "fr" : "zh";
 
+  if (pathname === "/login") return <>{children}</>;
+
   return (
     <AppShell locale={locale} userRole={userRole} userDisplayName={userDisplayName}>
       {children}

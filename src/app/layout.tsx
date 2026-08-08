@@ -30,6 +30,33 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               const theme = localStorage.getItem('sacsi-theme');
               if (theme === 'dark') document.documentElement.classList.add('dark');
             } catch (_) {}
+
+            // Retire stale PWA workers/caches left by older mobile releases.
+            // Those releases cached the root route and Next.js chunks, so a successful
+            // login could be followed by an obsolete anonymous page.
+            try {
+              if (!('serviceWorker' in navigator)) return;
+              const cleanupKey = 'sacsi-sw-cleanup-v3';
+              if (sessionStorage.getItem(cleanupKey)) return;
+              const wasControlled = Boolean(navigator.serviceWorker.controller);
+              Promise.all([
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                  return Promise.all(registrations.map(function(registration) {
+                    return registration.unregister();
+                  }));
+                }),
+                'caches' in window
+                  ? caches.keys().then(function(keys) {
+                      return Promise.all(keys
+                        .filter(function(key) { return key.indexOf('sacsi') === 0; })
+                        .map(function(key) { return caches.delete(key); }));
+                    })
+                  : Promise.resolve()
+              ]).then(function() {
+                sessionStorage.setItem(cleanupKey, '1');
+                if (wasControlled) window.location.reload();
+              }).catch(function() {});
+            } catch (_) {}
           })();
         `}} />
       </head>
