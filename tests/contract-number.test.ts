@@ -14,5 +14,9 @@ describe("contract number generation", () => {
       .toBe("WB-LEASE-SACSI3-STOREFRONT-L-20260301");
     expect(buildSaleContractNumber("SACSI5", "6F前楼", "2026-06-01"))
       .toBe("WB-SALE-SACSI5-6F-FRONT-20260601");
+    expect(buildSaleContractNumber("SACSI5", "8F前楼", "2026-07-28"))
+      .toBe("WB-SALE-SACSI5-8F-FRONT-20260728");
+    expect(buildSaleContractNumber("SACSI4", "顶楼", "2020-11-17"))
+      .toBe("WB-SALE-SACSI4-ROOFTOP-20201117");
   });
 });

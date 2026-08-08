@@ -6,6 +6,8 @@ const UNIT_REFERENCE_ALIASES: Record<string, string> = {
   "小车库": "GARAGE-SMALL",
   "车库1": "GARAGE01",
   "6F前楼": "6F-FRONT",
+  "8F前楼": "8F-FRONT",
+  "顶楼": "ROOFTOP",
 };
 
 function compactDate(date: string) {

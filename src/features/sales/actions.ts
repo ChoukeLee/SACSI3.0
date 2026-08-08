@@ -8,6 +8,11 @@ import type { SaleContractRow, SalePaymentScheduleRow } from "@/types/database";
 import type { ContractStatus } from "@/types/domain";
 import { buildSaleContractNumber } from "@/lib/contract-number";
 import {
+  appendSaleFinancialSequence,
+  buildSaleFinancialReferencePrefix,
+  getNextSaleFinancialSequence,
+} from "./sale-financial-reference";
+import {
   createReceivable, cancelReceivablesForSource,
 } from "@/features/finance/receivables";
 
@@ -30,12 +35,40 @@ export async function recordSalePaymentAtomic(input: {
     return { success: false, error: "Invalid payment request." };
   }
   const supabase = await createClient();
+  let receiptNo = input.receiptNo?.trim() || null;
+  if (!receiptNo) {
+    const { data: contract, error: contractError } = await supabase
+      .from("sale_contracts")
+      .select("id, unit:units(unit_no, building:buildings(code))")
+      .eq("id", input.contractId)
+      .single();
+    if (contractError || !contract) {
+      return { success: false, error: contractError?.message ?? "Contract not found." };
+    }
+    const unit = Array.isArray(contract?.unit) ? contract.unit[0] : contract?.unit;
+    const building = Array.isArray(unit?.building) ? unit.building[0] : unit?.building;
+    const prefix = buildSaleFinancialReferencePrefix(
+      building?.code ?? "SACSI",
+      unit?.unit_no ?? "UNIT",
+      input.paymentDate,
+    );
+    const { data: existingReferences, error: referenceError } = await supabase
+      .from("payments")
+      .select("receipt_no")
+      .eq("source_id", input.contractId)
+      .not("receipt_no", "is", null);
+    if (referenceError) return { success: false, error: referenceError.message };
+    receiptNo = appendSaleFinancialSequence(
+      prefix,
+      getNextSaleFinancialSequence((existingReferences ?? []).map((row) => row.receipt_no)),
+    );
+  }
   const { error } = await supabase.rpc("record_sale_payment_rpc", {
     p_contract_id: input.contractId,
     p_schedule_id: input.scheduleId,
     p_amount: input.amount,
     p_payment_date: input.paymentDate,
-    p_receipt_no: input.receiptNo ?? null,
+    p_receipt_no: receiptNo,
     p_request_id: input.requestId,
   });
   if (error) return { success: false, error: error.message };
