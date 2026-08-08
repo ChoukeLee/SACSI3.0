@@ -32,6 +32,13 @@ describe("core UI architecture", () => {
     expect(dailyPanel).toContain("<RightDrawer");
   });
 
+  it("mounts shared drawers at the document root so page gutters cannot offset them", () => {
+    const operational = read("src/components/ui/operational.tsx");
+    expect(operational).toContain("createPortal");
+    expect(operational).toContain("portalTarget");
+    expect(operational).toContain('top-12');
+  });
+
   it("has one active long-lease implementation and no independent occupancy page", () => {
     expect(existsSync(resolve(root, "src/features/leases/lease-ledger.tsx"))).toBe(false);
     expect(existsSync(resolve(root, "src/app/daily-rentals/overview/page.tsx"))).toBe(false);

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -147,7 +148,9 @@ export function RightDrawer({
   width?: "compact" | "standard" | "wide" | "table";
   className?: string;
 }) {
-  if (!open) return null;
+  const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
+  React.useEffect(() => setPortalTarget(document.body), []);
+  if (!open || !portalTarget) return null;
   const widthClass = {
     compact: "lg:max-w-[420px]",
     standard: "lg:max-w-[480px]",
@@ -155,7 +158,7 @@ export function RightDrawer({
     table: "lg:max-w-5xl",
   }[width];
 
-  return (
+  return createPortal(
     <>
       <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={onClose} />
       <aside
@@ -191,7 +194,8 @@ export function RightDrawer({
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 py-5">{children}</div>
         {footer && <div className="sticky bottom-0 border-t border-border bg-card/95 px-5 py-4 backdrop-blur">{footer}</div>}
       </aside>
-    </>
+    </>,
+    portalTarget,
   );
 }
 
