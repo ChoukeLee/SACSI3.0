@@ -19,7 +19,7 @@ import { printDailyReceipt } from "@/features/print";
 import { calculateBilling } from "./billing";
 import { getDailyLodgingBusinessType, getPrimaryDailyAction, type DailyLodgingBusinessType } from "./daily-rental-policy";
 import {
-  createBooking, createBackfillBooking, checkIn, checkOut, completeCleaning, extendStay, cancelBooking,
+  createBooking, createBackfillBooking, confirmBooking, checkIn, checkOut, completeCleaning, extendStay, cancelBooking,
   recordSupplementaryPayment, applyDiscount, reversePayment, setFixedCheckout,
 } from "./actions";
 import type { DailyOperationSnapshot } from "./actions";
@@ -236,6 +236,13 @@ export function BookingPanel({
         notes: newNotes || undefined,
         requestId,
       }),
+      { closeOnSuccess: true },
+    );
+  };
+
+  const handleConfirmBooking = async () => {
+    await runPanelAction(
+      () => confirmBooking(booking!.id),
       { closeOnSuccess: true },
     );
   };
@@ -593,6 +600,22 @@ export function BookingPanel({
                 )}
               </div>
               <div className="space-y-2">
+
+              {primaryAction?.action === "confirm" && (
+                <div className="space-y-2">
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
+                    <p className="text-xs font-semibold text-amber-700">
+                      {locale === "zh" ? "此预订仍处于待确认状态。确认后即可继续办理入住。" : "Cette reservation attend confirmation. Confirmez-la avant l'arrivee."}
+                    </p>
+                  </div>
+                  <Button variant="default" onClick={handleConfirmBooking} disabled={saving} className="w-full">
+                    {t.booking.confirmBooking}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleCancelBooking} disabled={saving} className="w-full justify-center text-accentRed-600 hover:bg-accentRed-50 hover:text-accentRed-700">
+                    <UserX className="h-3.5 w-3.5 mr-1" />{t.booking.cancelBooking}
+                  </Button>
+                </div>
+              )}
 
               {/* ── confirmed + cleaning blocked → primary = complete_cleaning ── */}
               {primaryAction?.action === "complete_cleaning" && booking.status === "confirmed" && (

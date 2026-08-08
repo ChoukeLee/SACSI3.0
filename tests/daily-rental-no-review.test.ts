@@ -23,9 +23,10 @@ describe("daily rental no-review flow", () => {
     expect(calendar).toMatch(/const canCreateBooking = userRole === "admin"/);
   });
 
-  it("does not render an order-confirmation action", () => {
-    expect(panel).not.toMatch(/handleConfirmBooking/);
-    expect(panel).not.toMatch(/confirmBooking\(/);
+  it("auto-confirms any pending row returned by the create RPC", () => {
+    expect(actions).toMatch(/snapshot\.booking\?\.status === "pending_review"/);
+    expect(actions).toMatch(/daily_confirm_booking_rpc/);
+    expect(panel).toMatch(/handleConfirmBooking/);
   });
 
   it("keeps occupancy information in the main calendar without a separate overview route", () => {

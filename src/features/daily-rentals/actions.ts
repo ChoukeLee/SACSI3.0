@@ -223,13 +223,23 @@ export async function createBooking(input: {
   });
   if (error) return { success: false, error: error.message };
 
+  let snapshot = data as DailyOperationSnapshot;
+  if (snapshot.booking?.status === "pending_review") {
+    const { data: confirmedSnapshot, error: confirmError } = await supabase.rpc("daily_confirm_booking_rpc", {
+      p_booking_id: snapshot.booking.id,
+      p_actor: actorPayload(user),
+    });
+    if (confirmError) return { success: false, error: confirmError.message };
+    snapshot = confirmedSnapshot as DailyOperationSnapshot;
+  }
+
   revalidatePath("/"); revalidatePath("/fr");
   revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
   revalidatePath("/management"); revalidatePath("/fr/management");
   revalidatePath("/finance"); revalidatePath("/fr/finance");
   
 
-  return { success: true, data: data as DailyOperationSnapshot };
+  return { success: true, data: snapshot };
 }
 
 // ── Backfill (admin only) ──
