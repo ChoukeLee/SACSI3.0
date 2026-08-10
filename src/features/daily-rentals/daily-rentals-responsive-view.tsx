@@ -1,12 +1,14 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import type { Locale } from "@/lib/i18n";
 import type { CustomerRow, DailyBookingRow, PaymentRow, UnitRow } from "@/types/database";
-import { DailyCalendar } from "./calendar";
 import type { CustomerSummary } from "./calendar";
-import { MobileDailyCards } from "@/features/mobile";
 import { SegmentedControl } from "@/components/ui/operational";
+
+const DailyCalendar = dynamic(() => import("./calendar").then((module) => module.DailyCalendar));
+const MobileDailyCards = dynamic(() => import("@/features/mobile/mobile-daily-cards").then((module) => module.MobileDailyCards));
 
 interface DailyRentalsResponsiveViewProps {
   dailyUnits: UnitRow[];
@@ -18,6 +20,7 @@ interface DailyRentalsResponsiveViewProps {
   locale: Locale;
   userRole?: string;
   buildings: { id: string; code: string; display_name: string }[];
+  initialIsDesktop: boolean;
 }
 
 export function DailyRentalsResponsiveView({
@@ -30,8 +33,9 @@ export function DailyRentalsResponsiveView({
   locale,
   userRole,
   buildings,
+  initialIsDesktop,
 }: DailyRentalsResponsiveViewProps) {
-  const [isDesktop, setIsDesktop] = useState(true);
+  const [isDesktop, setIsDesktop] = useState(initialIsDesktop);
   const [selectedBuildingId, setSelectedBuildingId] = useState(
     () => buildings.find((building) => building.code === "SACSI11")?.id ?? buildings[0]?.id ?? "",
   );

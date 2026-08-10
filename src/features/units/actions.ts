@@ -8,6 +8,40 @@ import type { UnitStatus } from "@/types/domain";
 
 const manualStatuses: UnitStatus[] = ["available", "maintenance", "locked"];
 
+export interface UnitAuditLogEntry {
+  id: string;
+  action: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export async function getUnitAuditLogs(unitId: string): Promise<UnitAuditLogEntry[]> {
+  const user = await getCurrentUser();
+  if (!user || !["admin", "finance", "boss", "rental_sales"].includes(user.role)) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("audit_logs")
+    .select("id, action, metadata, created_at")
+    .eq("entity_type", "unit")
+    .eq("entity_id", unitId)
+    .eq("action", "status_change")
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error("Failed to load unit audit logs:", error);
+    return [];
+  }
+
+  return (data ?? []).map((log) => ({
+    id: log.id,
+    action: log.action,
+    metadata: (log.metadata ?? {}) as Record<string, unknown>,
+    created_at: log.created_at,
+  }));
+}
+
 export async function updateUnitStatus(
   unitId: string,
   status: UnitStatus

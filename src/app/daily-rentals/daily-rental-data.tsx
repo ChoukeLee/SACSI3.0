@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { unstable_noStore as noStore } from "next/cache";
+import { headers } from "next/headers";
 import { sortUnits } from "@/lib/utils";
 import { DailyRentalsResponsiveView } from "@/features/daily-rentals/daily-rentals-responsive-view";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
@@ -18,6 +19,8 @@ interface DailyRentalDataProps {
  */
 export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps) {
   noStore();
+  const userAgent = (await headers()).get("user-agent") ?? "";
+  const initialIsDesktop = !/Android|iPhone|iPad|iPod|Mobile/i.test(userAgent);
   const supabase = await createClient();
 
   const [buildingsRes, customersRes, activeLeasesRes, activeSalesRes, cleaningRes, paymentsRes, bookingsRes, unitsRes] =
@@ -26,7 +29,7 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
       supabase.from("customers").select("id, name, phone, is_blacklisted").order("name"),
       supabase.from("lease_contracts").select("customer_id").eq("status", "active"),
       supabase.from("sale_contracts").select("customer_id").eq("status", "active"),
-      supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed"),
+      supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed").eq("is_completed", false),
       supabase
         .from("payments")
         .select("id, source_id, amount, payment_date")
@@ -116,6 +119,7 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
       locale={locale}
       userRole={userRole}
       buildings={buildings}
+      initialIsDesktop={initialIsDesktop}
     />
   );
 }

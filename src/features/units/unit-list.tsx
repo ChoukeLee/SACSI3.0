@@ -16,13 +16,6 @@ import { UnitFilters } from "./unit-filters";
 import type { UnitRow, UnitBusinessFlagRow } from "@/types/database";
 import type { UnitPartySummary } from "./unit-party-summary";
 
-interface AuditLogEntry {
-  id: string;
-  action: string;
-  metadata: Record<string, unknown>;
-  created_at: string;
-}
-
 interface BuildingInfo {
   id: string;
   code: string;
@@ -34,7 +27,6 @@ interface UnitListProps {
   businessFlagsMap: Record<string, UnitBusinessFlagRow[]>;
   managedLeaseUnitIds?: string[];
   unitPartySummaries?: Record<string, UnitPartySummary>;
-  auditLogsMap: Record<string, AuditLogEntry[]>;
   buildings: BuildingInfo[];
   locale: Locale;
   canEdit: boolean;
@@ -42,7 +34,7 @@ interface UnitListProps {
 
 const LS_KEY = "sacsi_active_building_id";
 
-export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], unitPartySummaries = {}, auditLogsMap, buildings, locale, canEdit }: UnitListProps) {
+export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], unitPartySummaries = {}, buildings, locale, canEdit }: UnitListProps) {
   const router = useRouter();
   const t = dictionaries[locale].units;
   const statusLabels = dictionaries[locale].statuses;
@@ -237,7 +229,6 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], un
           unit={detailUnit}
           buildingName={activeBuilding?.display_name ?? activeBuilding?.code ?? "-"}
           businessFlags={businessFlagsMap[detailUnit.id] ?? []}
-          auditLogs={auditLogsMap[detailUnit.id] ?? []}
           locale={locale}
           canEdit={canEdit}
           onClose={() => setDetailUnitId(null)}

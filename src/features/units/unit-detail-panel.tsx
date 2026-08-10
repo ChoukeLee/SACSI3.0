@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ChevronDown } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { RightDrawer } from "@/components/ui/operational";
 import type { UnitRow } from "@/types/database";
 import type { UnitStatus, BusinessType } from "@/types/domain";
-import { updateUnitStatus } from "./actions";
+import { getUnitAuditLogs, updateUnitStatus } from "./actions";
+import type { UnitAuditLogEntry } from "./actions";
 
 interface UnitBusinessFlag {
   business_type: BusinessType;
@@ -19,18 +20,10 @@ interface UnitBusinessFlag {
   default_price_xof: number | null;
 }
 
-interface AuditLogEntry {
-  id: string;
-  action: string;
-  metadata: Record<string, unknown>;
-  created_at: string;
-}
-
 interface UnitDetailPanelProps {
   unit: UnitRow;
   buildingName: string;
   businessFlags: UnitBusinessFlag[];
-  auditLogs: AuditLogEntry[];
   locale: Locale;
   onClose: () => void;
   onStatusChanged: () => void;
@@ -39,12 +32,25 @@ interface UnitDetailPanelProps {
 
 const manualStatuses: UnitStatus[] = ["available", "maintenance", "locked"];
 
-export function UnitDetailPanel({ unit, buildingName, businessFlags, auditLogs, locale, onClose, onStatusChanged, canEdit }: UnitDetailPanelProps) {
+export function UnitDetailPanel({ unit, buildingName, businessFlags, locale, onClose, onStatusChanged, canEdit }: UnitDetailPanelProps) {
   const t = dictionaries[locale].units;
   const statusLabels = dictionaries[locale].statuses;
   const [statusOpen, setStatusOpen] = useState(false);
   const [changing, setChanging] = useState(false);
   const [error, setError] = useState("");
+  const [auditLogs, setAuditLogs] = useState<UnitAuditLogEntry[]>([]);
+  const [auditLogsLoading, setAuditLogsLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setAuditLogsLoading(true);
+    getUnitAuditLogs(unit.id).then((logs) => {
+      if (!active) return;
+      setAuditLogs(logs);
+      setAuditLogsLoading(false);
+    });
+    return () => { active = false; };
+  }, [unit.id]);
 
   const handleStatusChange = async (newStatus: UnitStatus) => {
     setChanging(true);
@@ -143,7 +149,9 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, auditLogs, 
 
           <div>
             <h4 className="text-xs font-semibold text-muted-foreground">{t.detail.statusHistory}</h4>
-            {meaningfulAuditLogs.length === 0 ? (
+            {auditLogsLoading ? (
+              <p className="mt-1.5 text-xs text-muted-foreground">{locale === "zh" ? "正在读取状态记录…" : "Chargement de l’historique…"}</p>
+            ) : meaningfulAuditLogs.length === 0 ? (
               <p className="mt-1.5 text-xs text-muted-foreground">{t.detail.noStatusHistory}</p>
             ) : (
               <ul className="mt-2 space-y-1.5">
