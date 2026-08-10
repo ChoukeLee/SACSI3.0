@@ -14,9 +14,10 @@ describe("display labels", () => {
     expect(statusDisplayLabel("future_status", "zh")).toBe("未知状态");
   });
 
-  it("shows the local currency consistently as FCFA", () => {
-    expect(currencyDisplayLabel("XOF", "zh")).toBe("FCFA");
-    expect(currencyDisplayLabel("CNY", "zh")).toBe("人民币（CNY）");
+  it("shows ISO codes in currency fields", () => {
+    expect(currencyDisplayLabel("XOF", "zh")).toBe("XOF");
+    expect(currencyDisplayLabel("FCFA", "zh")).toBe("XOF");
+    expect(currencyDisplayLabel("CNY", "zh")).toBe("CNY");
+    expect(currencyDisplayLabel("USD", "fr")).toBe("USD");
   });
 });
-

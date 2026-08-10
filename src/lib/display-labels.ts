@@ -160,10 +160,8 @@ export function paymentPlanDisplayLabel(plan: string | null | undefined, locale:
 
 export function currencyDisplayLabel(currency: string | null | undefined, locale: Locale) {
   const code = String(currency ?? "").toUpperCase();
-  if (code === "XOF" || code === "FCFA") return "FCFA";
-  if (code === "CNY") return locale === "zh" ? "人民币（CNY）" : "Yuan (CNY)";
-  if (code === "USD") return locale === "zh" ? "美元（USD）" : "Dollar (USD)";
-  if (code === "EUR") return locale === "zh" ? "欧元（EUR）" : "Euro (EUR)";
+  if (code === "XOF" || code === "FCFA") return "XOF";
+  if (["CNY", "USD", "EUR"].includes(code)) return code;
   return locale === "zh" ? "其他币种" : "Autre devise";
 }
 

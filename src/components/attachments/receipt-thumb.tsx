@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { FileText, ImageUp, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { currencyDisplayLabel, financialBusinessLabel, statusDisplayLabel } from "@/lib/display-labels";
+import { financialBusinessLabel, statusDisplayLabel } from "@/lib/display-labels";
 
 interface AttachmentMeta {
   id: string;
@@ -67,7 +67,7 @@ export function ReceiptThumb({ attachment, locale }: Props) {
               <div className="space-y-1 text-[12px] text-muted-foreground">
                 {meta.receipt_no != null && <p>{zh ? "收据号" : "No"}: {String(meta.receipt_no)}</p>}
                 {meta.receipt_date != null && <p>{zh ? "日期" : "Date"}: {String(meta.receipt_date)}</p>}
-                {meta.amount_xof != null && <p>{zh ? "金额" : "Montant"}: {Number(meta.amount_xof).toLocaleString()} {currencyDisplayLabel("XOF", locale)}</p>}
+                {meta.amount_xof != null && <p>{zh ? "金额" : "Montant"}: {Number(meta.amount_xof).toLocaleString()} FCFA</p>}
                 {meta.business_type != null && <p>{zh ? "类型" : "Type"}: {financialBusinessLabel(String(meta.business_type), locale)}</p>}
               </div>
 

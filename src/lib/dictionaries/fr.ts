@@ -500,7 +500,7 @@
     finance: {
       title: "Flux financiers",
       description: "Journal unique pour revenus journaliers, loyers, cautions, ventes et autres flux. Rapports en FCFA.",
-      metrics: [["Devises", "FCFA/CNY", "Taux saisi manuellement"], ["Recu", "Champ requis", "Correspond au recu papier"], ["Comptabilite", "API reservee", "Export Excel/CSV d'abord"]],
+      metrics: [["Devises", "XOF/CNY", "Taux saisi manuellement"], ["Recu", "Champ requis", "Correspond au recu papier"], ["Comptabilite", "API reservee", "Export Excel/CSV d'abord"]],
       empty: "Aucune ecriture comptable.",
       directions: {
         income: "Revenu",
@@ -556,7 +556,7 @@
         category: "Categorie",
         amount: "Montant",
         currency: "Devise",
-        exchangeRate: "Taux (FCFA=1)",
+        exchangeRate: "Taux (XOF=1)",
         amountXof: "Equivalent FCFA",
         description: "Description",
         receiptNo: "N° recu",
