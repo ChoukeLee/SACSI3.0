@@ -553,6 +553,8 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 const dataFlags = getLeaseDataFlags(contract, customer);
                 const paidThrough = contract.paid_through_date;
                 const paidPeriodStartsBeforeCutoff = paidThrough ? contract.start_date <= paidThrough : false;
+                const hasOverdueRent = summary.overdue > 0;
+                const nextRentIsFuture = !hasOverdueRent && !!summary.nextDue && summary.nextDue >= todayStr;
                 return (
                   <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status={isManaged ? "managed" : "leased"}
                     onClick={() => openDetail(contract.id)}>
@@ -585,7 +587,14 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                     </div>
                     {/* Outstanding alert */}
                     {summary.outstanding > 0 && (
-                      <p className="text-[11px] text-amber-600 font-medium leading-tight">{locale==="zh"?"待收":"Dû"}: {formatXof(summary.outstanding)}</p>
+                      <p className={cn("text-[11px] font-medium leading-tight", hasOverdueRent ? "text-red-600" : "text-[#5D7186]")}>
+                        {hasOverdueRent
+                          ? (locale === "zh" ? "逾期未收" : "Impayé")
+                          : nextRentIsFuture
+                            ? (locale === "zh" ? "下期应收" : "Prochaine échéance")
+                            : (locale === "zh" ? "待收" : "Dû")}: {formatXof(summary.outstanding)}
+                        {nextRentIsFuture ? ` · ${summary.nextDue}` : ""}
+                      </p>
                     )}
                     {/* Action buttons */}
                     <div className="mt-auto flex justify-center gap-5 border-t border-[rgba(23,50,77,0.06)] pt-3">
