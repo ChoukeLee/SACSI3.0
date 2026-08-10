@@ -73,7 +73,6 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
                     <SidebarMenuButton asChild isActive={active} tooltip={labels.nav[item.key]} size="default">
                       <Link
                         href={routeFor(locale, item.href)}
-                        prefetch={false}
                         onClick={() => {
                           const target = routeFor(locale, item.href);
                           if (pathname !== target) startNavigation(target);

@@ -1,13 +1,9 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
-import { sortUnits } from "@/lib/utils";
 import { UnitLazyView } from "@/features/units/unit-lazy-view";
-import { getUnitPartySummaries } from "@/features/units/unit-party-summary";
-import type { UnitPartySummary } from "@/features/units/unit-party-summary";
+import { loadUnitPageData } from "@/features/units/unit-page-data";
 import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
-import type { UnitRow, UnitBusinessFlagRow } from "@/types/database";
 
 export default async function FrenchUnitsPage() {
   const user = await getCurrentUser();
@@ -22,84 +18,6 @@ export default async function FrenchUnitsPage() {
 }
 
 async function FrenchUnitsData({ canEdit }: { canEdit: boolean }) {
-  const supabase = await createClient();
-  const { data: allBuildings, error: bldErr } = await supabase
-    .from("buildings")
-    .select("id, code, display_name")
-    .eq("is_active", true)
-    .order("code");
-
-  if (bldErr) {
-    console.error("Failed to fetch buildings:", bldErr);
-    return <div>Failed to load buildings</div>;
-  }
-
-  const buildingIds = allBuildings?.map((b) => b.id) ?? [];
-  let units: UnitRow[] = [];
-  let flags: UnitBusinessFlagRow[] = [];
-  let managedLeaseUnitIds: string[] = [];
-  let unitPartySummaries: Record<string, UnitPartySummary> = {};
-
-  const [flagsRes] = await Promise.all([
-    supabase.from("unit_business_flags").select("unit_id, business_type, is_enabled, default_price_xof"),
-  ]);
-
-  if (!flagsRes.error) flags = flagsRes.data;
-
-  if (buildingIds.length > 0) {
-    const { data: unitsData, error: unitsErr } = await supabase
-      .from("units")
-      .select("id, building_id, code, unit_no, floor_label, kind, status, area_sqm, layout, furnishing, notes")
-      .in("building_id", buildingIds)
-      .order("unit_no");
-    if (!unitsErr) units = sortUnits(unitsData as unknown as UnitRow[]);
-
-    if (units.length > 0) {
-      const unitIds = units.map((unit) => unit.id);
-      const partyData = await getUnitPartySummaries(supabase, unitIds);
-      managedLeaseUnitIds = partyData.activeLeaseUnitIds;
-      unitPartySummaries = partyData.summaries;
-    }
-  }
-
-  const businessFlagsMap: Record<string, UnitBusinessFlagRow[]> = {};
-  const sacsi11Id = allBuildings?.find((building) => building.code === "SACSI11")?.id;
-  const sacsi11503Id = units.find((unit) => unit.building_id === sacsi11Id && unit.unit_no === "503")?.id;
-  for (const flag of flags) {
-    if (flag.unit_id === sacsi11503Id && flag.business_type === "daily_rental") continue;
-    if (!businessFlagsMap[flag.unit_id]) businessFlagsMap[flag.unit_id] = [];
-    businessFlagsMap[flag.unit_id].push(flag);
-  }
-  const sacsi7Storefront = units.find((unit) => unit.code === "SACSI7-STOREFRONT");
-  if (sacsi7Storefront && !businessFlagsMap[sacsi7Storefront.id]?.some((flag) => flag.business_type === "long_lease")) {
-    businessFlagsMap[sacsi7Storefront.id] = [...(businessFlagsMap[sacsi7Storefront.id] ?? []), { unit_id: sacsi7Storefront.id, business_type: "long_lease", is_enabled: true, default_price_xof: 1200000 }];
-  }
-
-  const auditLogsMap: Record<string, { id: string; action: string; metadata: Record<string, unknown>; created_at: string }[]> = {};
-  if (buildingIds.length > 0 && units.length > 0) {
-    const unitIds = units.map((u) => u.id);
-    const { data: logs } = await supabase
-      .from("audit_logs")
-      .select("id, action, entity_type, entity_id, metadata, created_at")
-      .eq("entity_type", "unit")
-      .eq("action", "status_change")
-      .in("entity_id", unitIds)
-      .order("created_at", { ascending: false })
-      .limit(200);
-
-    if (logs) {
-      for (const log of logs) {
-        if (!log.entity_id) continue;
-        if (!auditLogsMap[log.entity_id]) auditLogsMap[log.entity_id] = [];
-        auditLogsMap[log.entity_id].push({
-          id: log.id,
-          action: log.action,
-          metadata: log.metadata as Record<string, unknown>,
-          created_at: log.created_at,
-        });
-      }
-    }
-  }
-
-  return <UnitLazyView units={units} businessFlagsMap={businessFlagsMap} managedLeaseUnitIds={managedLeaseUnitIds} unitPartySummaries={unitPartySummaries} auditLogsMap={auditLogsMap} buildings={allBuildings ?? []} locale="fr" canEdit={canEdit} />;
+  const data = await loadUnitPageData();
+  return <UnitLazyView {...data} locale="fr" canEdit={canEdit} />;
 }
