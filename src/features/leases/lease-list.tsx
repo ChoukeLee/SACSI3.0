@@ -191,7 +191,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     return related.some((r) => {
       const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
       if (outstanding <= 0) return false;
-      const isOverdue = r.status === "overdue" || r.due_date < todayStr;
+      const isOverdue = r.status === "overdue" || r.due_date <= todayStr;
       if (kind === "overdue") return isOverdue;
       if (kind === "currentDue") return !isOverdue;
       return !isOverdue && r.due_date >= todayStr && r.due_date <= dueSoonEnd;
@@ -224,7 +224,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const getContractReceivableSummary = (contractId: string) => {
     const related = receivables.filter((r) => r.source_type === "lease_contract" && r.source_id === contractId && r.status !== "cancelled");
     const today = new Date().toISOString().slice(0, 10); let total = 0, paid = 0, overdue = 0; let nextDue: string | null = null;
-    for (const r of related) { const amount = Number(r.amount_xof); const paidAmount = Number(r.paid_amount_xof); const outstanding = Math.max(0, amount - paidAmount); total += amount; paid += paidAmount; if (outstanding > 0 && (r.status === "overdue" || r.due_date < today)) overdue += outstanding; if (outstanding > 0 && (!nextDue || r.due_date < nextDue)) nextDue = r.due_date; }
+    for (const r of related) { const amount = Number(r.amount_xof); const paidAmount = Number(r.paid_amount_xof); const outstanding = Math.max(0, amount - paidAmount); total += amount; paid += paidAmount; if (outstanding > 0 && (r.status === "overdue" || r.due_date <= today)) overdue += outstanding; if (outstanding > 0 && (!nextDue || r.due_date < nextDue)) nextDue = r.due_date; }
     return { total, paid, outstanding: Math.max(0, total - paid), overdue, nextDue, count: related.length };
   };
 
@@ -323,7 +323,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
           const outstanding = Math.max(0, amount - paidAmount);
           total += amount;
           paid += paidAmount;
-          if (outstanding > 0 && (r.status === "overdue" || r.due_date < todayStr)) overdue += outstanding;
+          if (outstanding > 0 && (r.status === "overdue" || r.due_date <= todayStr)) overdue += outstanding;
           if (outstanding > 0 && (!nextDue || r.due_date < nextDue)) nextDue = r.due_date;
         }
         return {
@@ -344,7 +344,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
         if (r.source_type !== "lease_contract" || r.status === "cancelled" || !r.source_id || !scopedContracts.has(r.source_id)) return false;
         const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
         if (outstanding <= 0) return false;
-        return r.status !== "overdue" && r.due_date >= todayStr;
+        return r.status !== "overdue" && r.due_date > todayStr;
       })
       .map((r) => {
         const contract = scopedContracts.get(r.source_id!)!;
@@ -364,7 +364,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const totalIncome = contractPayments.reduce((sum, payment) => isLeaseFinancialExpenseSourceType(payment.source_type) ? sum : sum + paymentAmountXof(payment), 0);
   const totalExpense = contractPayments.reduce((sum, payment) => isLeaseFinancialExpenseSourceType(payment.source_type) ? sum + paymentAmountXof(payment) : sum, 0);
   const netFinancial = totalIncome - totalExpense;
-  const receivableStats = useMemo(() => { let totalRec=0,totalPd=0,overdue=0; const today=new Date().toISOString().slice(0,10); for(const r of contractReceivables){totalRec+=Number(r.amount_xof);totalPd+=Number(r.paid_amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<today))overdue+=os;} return {totalReceivable:totalRec,totalPaid:totalPd,outstanding:totalRec-totalPd,overdue}; }, [contractReceivables]);
+  const receivableStats = useMemo(() => { let totalRec=0,totalPd=0,overdue=0; const today=new Date().toISOString().slice(0,10); for(const r of contractReceivables){totalRec+=Number(r.amount_xof);totalPd+=Number(r.paid_amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<=today))overdue+=os;} return {totalReceivable:totalRec,totalPaid:totalPd,outstanding:totalRec-totalPd,overdue}; }, [contractReceivables]);
   const contractRisk = useMemo(() => { if(!selected||selected.status!=="active"||!isContractEndConfirmed(selected))return {expiringSoon:false,daysLeft:0}; const today=new Date(); const diff=Math.floor((new Date(selected.expected_end_date).getTime()-today.getTime())/86400000); return {expiringSoon:diff<=30&&diff>=0,daysLeft:Math.max(0,diff)}; }, [selected]);
   const availableUnits = useMemo(() => units.filter((u) => u.kind === "apartment" && (u.status === "available" || isManagedLeaseUnit(u))), [units]);
   const selectedNewUnit = useMemo(() => units.find((unit) => unit.id === fUnitId), [fUnitId, units]);

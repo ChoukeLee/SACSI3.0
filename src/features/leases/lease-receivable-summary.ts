@@ -20,7 +20,7 @@ export function addOneIsoDay(date: string): string {
 }
 
 export function isOverdueReceivable(receivable: ReceivableRow, today: string): boolean {
-  return receivable.status === "overdue" || receivable.due_date < today;
+  return receivable.status === "overdue" || receivable.due_date <= today;
 }
 
 export function summarizeLeaseReceivables(
@@ -77,7 +77,7 @@ export function resolveLeaseOverdue(input: {
 
   if (!input.paidThroughDate) return null;
   const coverageDue = addOneIsoDay(input.paidThroughDate);
-  if (coverageDue >= input.today) return null;
+  if (coverageDue > input.today) return null;
 
   return {
     dueDate: coverageDue,

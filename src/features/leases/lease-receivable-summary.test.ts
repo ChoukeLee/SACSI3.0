@@ -78,12 +78,25 @@ describe("resolveLeaseOverdue", () => {
     });
   });
 
-  it("does not mark the first uncovered day overdue until it has passed", () => {
+  it("marks the first uncovered day overdue on its due date", () => {
     expect(resolveLeaseOverdue({
       receivables: [],
       today: "2026-08-01",
       paidThroughDate: "2026-07-31",
       monthlyRentXof: 650_000,
-    })).toBeNull();
+    })).toEqual({
+      dueDate: "2026-08-01",
+      amount: 650_000,
+      source: "contract",
+    });
+  });
+
+  it("counts an unpaid receivable as overdue on its due date", () => {
+    const summary = summarizeLeaseReceivables([
+      receivable({ amount_xof: 650_000, due_date: "2026-08-10", status: "pending" }),
+    ], "2026-08-10");
+
+    expect(summary.overdue).toBe(650_000);
+    expect(summary.earliestOverdueDue).toBe("2026-08-10");
   });
 });
