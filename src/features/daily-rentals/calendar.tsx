@@ -76,7 +76,7 @@ export function DailyCalendar({
 }: CalendarProps) {
   const copy = COPY[locale];
   const bookingLabels = BOOKING_STATUS_LABELS[locale];
-  const canCreateBooking = userRole === "admin";
+  const canCreateBooking = userRole === "admin" || userRole === "rental_sales";
   const canOperateDaily = userRole === "admin" || userRole === "front_desk" || userRole === "rental_sales";
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("day");

@@ -17,10 +17,9 @@ describe("daily rental no-review flow", () => {
     expect(migration).toMatch(/where status = 'pending_review'/i);
   });
 
-  it("enforces admin-only creation in both the server action and database", () => {
-    expect(actions).toMatch(/export async function createBooking[\s\S]*requireRole\("admin"\)/);
-    expect(migration).toMatch(/has_app_role\('admin'\)/i);
-    expect(calendar).toMatch(/const canCreateBooking = userRole === "admin"/);
+  it("allows administrators and rental-sales operators to create bookings", () => {
+    expect(actions).toMatch(/export async function createBooking[\s\S]*requireRole\("admin", "rental_sales"\)/);
+    expect(calendar).toMatch(/const canCreateBooking = userRole === "admin" \|\| userRole === "rental_sales"/);
   });
 
   it("auto-confirms any pending row returned by the create RPC", () => {

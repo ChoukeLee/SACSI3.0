@@ -20,7 +20,7 @@ import { createSaleContract, recordSalePaymentAtomic, addFlexibleInstallment, up
 import { buildSaleContractNumber } from "@/lib/contract-number";
 import { printSaleContract } from "@/features/print";
 
-interface SaleListProps { contracts: SaleContractRow[]; schedules: SalePaymentScheduleRow[]; units: UnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale; canCreate?: boolean; canRecordFinance?: boolean; canManage?: boolean }
+interface SaleListProps { contracts: SaleContractRow[]; schedules: SalePaymentScheduleRow[]; units: UnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale; canCreate?: boolean; canRecordFinance?: boolean; canManage?: boolean; canTerminate?: boolean }
 type PanelType = "new" | "detail" | "insight" | null;
 type SaleStatKey = "active" | "total" | "received" | "receivable" | "overdue" | "transfer";
 type SaleStatusFilter = "current" | "all" | "terminated" | "expired";
@@ -33,7 +33,7 @@ const paymentAmountXof = (payment: PaymentRow) => payment.currency === "XOF"
 const formatCny = (amount: number) =>
   `¥${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(amount)}`;
 
-export function SaleList({ contracts, schedules, units, customers, payments, receivables, buildings, locale, canCreate = true, canRecordFinance = true, canManage = true }: SaleListProps) {
+export function SaleList({ contracts, schedules, units, customers, payments, receivables, buildings, locale, canCreate = true, canRecordFinance = true, canManage = true, canTerminate = true }: SaleListProps) {
   const router = useRouter();
   const t = dictionaries[locale].sales;
   const [statFilter, setStatFilter] = useState<SaleStatKey | null>(null);
@@ -532,7 +532,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
             </div>
           </div>
 
-          {selected.status==="active"&&<div className="grid grid-cols-2 gap-2">{canRecordFinance&&<Button size="sm" onClick={()=>{setPayScheduleId(contractSchedules.find(s=>s.status!=="paid")?.id??"");setPayAmount(0);}}><DollarSign className="h-4 w-4"/>{locale==="zh"?"收款":"Paiement"}</Button>}{canManage&&<Button size="sm" variant="outline" onClick={()=>{setShowFlexForm(true);setFlexDueDate("");setFlexAmount(0);setError("");}}><CalendarPlus className="h-4 w-4"/>{locale==="zh"?"新增分期":"+Echeance"}</Button>}{canManage&&<Button size="sm" variant="outline" onClick={()=>{setTrDate(new Date().toISOString().slice(0,10));setTrStatus(selected.transfer_status);}}><TrendingUp className="h-4 w-4"/>{locale==="zh"?"过户":"Transfert"}</Button>}{canManage&&<Button size="sm" variant="ghost" onClick={handleTerminateSale}><AlertTriangle className="h-4 w-4"/>{locale==="zh"?"终止":"Resilier"}</Button>}</div>}
+          {selected.status==="active"&&<div className="grid grid-cols-2 gap-2">{canRecordFinance&&<Button size="sm" onClick={()=>{setPayScheduleId(contractSchedules.find(s=>s.status!=="paid")?.id??"");setPayAmount(0);}}><DollarSign className="h-4 w-4"/>{locale==="zh"?"收款":"Paiement"}</Button>}{canManage&&<Button size="sm" variant="outline" onClick={()=>{setShowFlexForm(true);setFlexDueDate("");setFlexAmount(0);setError("");}}><CalendarPlus className="h-4 w-4"/>{locale==="zh"?"新增分期":"+Echeance"}</Button>}{canManage&&<Button size="sm" variant="outline" onClick={()=>{setTrDate(new Date().toISOString().slice(0,10));setTrStatus(selected.transfer_status);}}><TrendingUp className="h-4 w-4"/>{locale==="zh"?"过户":"Transfert"}</Button>}{canTerminate&&<Button size="sm" variant="ghost" onClick={handleTerminateSale}><AlertTriangle className="h-4 w-4"/>{locale==="zh"?"终止":"Resilier"}</Button>}</div>}
 
           <div ref={financeSectionRef} className={cn("scroll-mt-20 border-t pt-4", detailSection === "finance" && "-mx-2 rounded-xl px-2 ring-2 ring-primary/20")}>
             <div className="mb-2 space-y-1">

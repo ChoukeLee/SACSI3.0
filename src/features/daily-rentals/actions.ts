@@ -205,7 +205,7 @@ export async function createBooking(input: {
   nightlyPriceXof: number; notes?: string; otaSource?: string;
   requestId: string;
 }): Promise<DailyActionResult> {
-  const user = await requireRole("admin");
+  const user = await requireRole("admin", "rental_sales");
   const supabase = await createClient();
   const agentCheck = await validateDailyBookingAgent(supabase, input.customerId);
   if (!agentCheck.success) return { success: false, error: agentCheck.error };

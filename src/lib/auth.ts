@@ -11,12 +11,12 @@ export interface CurrentUser {
   displayName: string;
 }
 
-const seedAccountProfiles: Record<string, { role: UserRole; displayName: string; databaseRole?: "front_desk" }> = {
+const seedAccountProfiles: Record<string, { role: UserRole; displayName: string }> = {
   "admin@sacsi.com": { role: "admin", displayName: "Chouke" },
   "boss@sacsi.com": { role: "boss", displayName: "GAO" },
   "finance@sacsi.com": { role: "finance", displayName: "李财务" },
   "front@sacsi.com": { role: "front_desk", displayName: "Niamké" },
-  "ying@sacsi.com": { role: "rental_sales", displayName: "Ying", databaseRole: "front_desk" },
+  "ying@sacsi.com": { role: "rental_sales", displayName: "Ying" },
 };
 
 export const configuredAccountSummaries = Object.entries(seedAccountProfiles).map(([email, profile]) => ({

@@ -25,5 +25,6 @@ export default async function SalesPage() {
 
 async function SalesData({ locale, role }: { locale: "zh" | "fr"; role: string }) {
   const data = await getSalePageData();
-  return <SaleLazyView {...data} locale={locale} canCreate={role === "admin"} canRecordFinance={role === "admin" || role === "finance"} canManage={role === "admin"} />;
+  const canOperateSales = role === "admin" || role === "rental_sales";
+  return <SaleLazyView {...data} locale={locale} canCreate={canOperateSales} canRecordFinance={role === "admin" || role === "finance"} canManage={canOperateSales} canTerminate={role === "admin"} />;
 }

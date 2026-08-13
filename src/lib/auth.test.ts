@@ -23,11 +23,10 @@ const bossUser: CurrentUser = {
 };
 
 describe("rental sales role", () => {
-  it("maps the Ying account to the application role and supported database role", () => {
+  it("maps the Ying account to the rental-sales role consistently", () => {
     expect(getSeedAccountProfile("YING@SACSI.COM")).toEqual({
       role: "rental_sales",
       displayName: "Ying",
-      databaseRole: "front_desk",
     });
   });
 
