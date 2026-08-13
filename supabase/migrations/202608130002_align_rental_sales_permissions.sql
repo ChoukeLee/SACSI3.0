@@ -22,8 +22,8 @@ begin
   if position('dailyCreatePermissionDenied' in v_definition) = 0 then
     v_patched := replace(
       v_definition,
-      E'begin\n  if p_request_id is null then',
-      E'begin\n  if not public.has_app_role(''admin'', ''rental_sales'') then\n    raise exception ''dailyCreatePermissionDenied'' using errcode = ''42501'';\n  end if;\n  if p_request_id is null then'
+      'if p_request_id is null then',
+      E'if not public.has_app_role(''admin'', ''rental_sales'') then\n    raise exception ''dailyCreatePermissionDenied'' using errcode = ''42501'';\n  end if;\n  if p_request_id is null then'
     );
     if v_patched = v_definition then
       raise exception 'Unable to patch daily_create_booking_rpc permission guard';
@@ -35,15 +35,17 @@ begin
     'public.create_sale_contract_rpc(uuid,uuid,text,date,numeric,text,integer,date,text,text,numeric,boolean,uuid)'::regprocedure
   ) into v_definition;
 
-  v_patched := replace(
-    v_definition,
-    'public.has_app_role(''admin'')',
-    'public.has_app_role(''admin'', ''rental_sales'')'
-  );
-  if v_patched = v_definition then
-    raise exception 'Unable to patch create_sale_contract_rpc permission guard';
+  if position('public.has_app_role(''admin'', ''rental_sales'')' in v_definition) = 0 then
+    v_patched := replace(
+      v_definition,
+      'public.has_app_role(''admin'')',
+      'public.has_app_role(''admin'', ''rental_sales'')'
+    );
+    if v_patched = v_definition then
+      raise exception 'Unable to patch create_sale_contract_rpc permission guard';
+    end if;
+    execute v_patched;
   end if;
-  execute v_patched;
 end
 $migration$;
 
