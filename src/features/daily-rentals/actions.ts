@@ -24,7 +24,6 @@ import {
 } from "./daily-rental-finance";
 import { writeAuditLog } from "@/lib/audit";
 import { isDailyBookingAgentName } from "./daily-booking-agents";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 // ── Permission guards ──
 async function guardWrite() {
@@ -38,15 +37,6 @@ function actorPayload(user: CurrentUser) {
     actor_email: user.email ?? null,
     actor_display_name: user.displayName,
   };
-}
-
-function createPrivilegedDailyClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceRoleKey) throw new Error("Supabase service configuration is missing.");
-  return createSupabaseClient(url, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
 }
 
 async function applyUnitStatus(
@@ -515,14 +505,21 @@ export async function extendStay(
 // ── Cancel ──
 export async function cancelBooking(bookingId: string): Promise<DailyActionResult> {
   const user = await guardWrite();
-  // The user is authorized above. Use the service client only for this RPC so
-  // legacy database cancellation triggers cannot incorrectly reject front desk
-  // and rental sales roles; actor metadata still records the real operator.
-  const supabase = createPrivilegedDailyClient();
-  const { data, error } = await supabase.rpc("daily_cancel_booking_rpc", {
-    p_booking_id: bookingId,
-    p_actor: actorPayload(user),
-  });
-  if (error) return { success: false, error: error.message };
-  return { success: true, data: data as DailyOperationSnapshot };
+  try {
+    // Keep the authenticated session so the database can enforce and audit the
+    // real operator role. The cancellation trigger is aligned with these roles
+    // by migration 202608130001_align_daily_cancel_operator_permissions.sql.
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("daily_cancel_booking_rpc", {
+      p_booking_id: bookingId,
+      p_actor: actorPayload(user),
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data as DailyOperationSnapshot };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "dailyCancelFailed",
+    };
+  }
 }
