@@ -203,6 +203,12 @@ function resolveCalendarCheckOut(
 ): string {
   const { todayStr } = opts;
 
+  // A completed stay must stop on the recorded departure date, not on the
+  // original reservation end date.
+  if (b.status === "checked_out" && b.actual_check_out) {
+    return b.actual_check_out;
+  }
+
   if (b.checkout_mode !== "open") {
     // Fixed: strictly bounded by check_out
     return b.check_out ?? b.check_in;

@@ -404,7 +404,7 @@ export function DailyCalendar({
         outstandingBookings.push(b);
       }
 
-      const settledDate = b.checkout_mode === "open" ? b.actual_check_out : b.check_out;
+      const settledDate = b.actual_check_out ?? b.check_out;
       if (b.status === "checked_out" && settledDate && settledDate.startsWith(currentMonth)) {
         monthSettled += final;
         settledBookings.push(b);
@@ -436,7 +436,7 @@ export function DailyCalendar({
       const customer = booking ? customerMap.get(booking.customer_id) ?? null : null;
       const key = booking ? `booking:${booking.id}` : `payment:${payment.id}`;
       const stayEnd = booking
-        ? ((booking.checkout_mode === "open" ? booking.actual_check_out : booking.check_out) ?? booking.check_out)
+        ? (booking.actual_check_out ?? booking.check_out)
         : null;
       const stayRange = booking ? `${booking.check_in} → ${stayEnd ?? (locale === "zh" ? "未退房" : "En cours")}` : "—";
       const existing = groups.get(key);
@@ -1045,8 +1045,8 @@ export function DailyCalendar({
                           <tr><td colSpan={8} className="px-3 py-10 text-center text-muted-foreground/70">{locale === "zh" ? "本月暂无结算" : "Aucun reglement ce mois"}</td></tr>
                         ) : (
                           [...financeStats.settledBookings].sort((a, b) => {
-                            const aD = (a.checkout_mode === "open" ? a.actual_check_out : a.check_out) ?? "";
-                            const bD = (b.checkout_mode === "open" ? b.actual_check_out : b.check_out) ?? "";
+                            const aD = (a.actual_check_out ?? a.check_out) ?? "";
+                            const bD = (b.actual_check_out ?? b.check_out) ?? "";
                             const dateCompare = bD.localeCompare(aD);
                             if (dateCompare !== 0) return dateCompare;
                             const aUnit = allUnitById.get(a.unit_id)?.unit_no ?? "";
@@ -1064,7 +1064,7 @@ export function DailyCalendar({
                                   <span className="block truncate" title={b.notes ?? undefined}>{b.notes || "—"}</span>
                                 </td>
                                 <td className="px-3 py-2.5 whitespace-nowrap text-foreground/70">{b.check_in}</td>
-                                <td className="px-3 py-2.5 whitespace-nowrap text-foreground/70">{b.checkout_mode === "open" ? b.actual_check_out : b.check_out}</td>
+                                <td className="px-3 py-2.5 whitespace-nowrap text-foreground/70">{b.actual_check_out ?? b.check_out}</td>
                                 <td className="px-3 py-2.5 whitespace-nowrap text-right tabular-nums text-foreground">{formatXof(billing.finalAmount)}</td>
                                 <td className="px-3 py-2.5 whitespace-nowrap text-right tabular-nums text-accentGreen-700">{formatXof(billing.paid)}</td>
                                 <td className={cn("px-3 py-2.5 whitespace-nowrap text-right tabular-nums font-semibold", billing.outstanding > 0 ? "text-rose-600" : "text-accentGreen-700")}>

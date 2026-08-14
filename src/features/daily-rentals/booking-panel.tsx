@@ -541,8 +541,8 @@ export function BookingPanel({
                   <p className="mt-0.5 font-semibold text-foreground">{booking.check_in}</p>
                 </div>
                 <div className="rounded-lg bg-muted px-3 py-2">
-                  <p className="text-xs text-muted-foreground">{booking.checkout_mode === "open" ? t.actualCheckOutDate : t.booking.checkOutDate}</p>
-                  <p className="mt-0.5 font-semibold text-foreground">{booking.checkout_mode === "open" ? (booking.actual_check_out ?? "—") : booking.check_out}</p>
+                  <p className="text-xs text-muted-foreground">{booking.status === "checked_out" || booking.checkout_mode === "open" ? t.actualCheckOutDate : t.booking.checkOutDate}</p>
+                  <p className="mt-0.5 font-semibold text-foreground">{booking.status === "checked_out" ? (booking.actual_check_out ?? booking.check_out ?? "—") : booking.checkout_mode === "open" ? (booking.actual_check_out ?? "—") : booking.check_out}</p>
                 </div>
               </div>
 

@@ -36,7 +36,11 @@ export function calculateBilling(
 
   // Determine effective check-out date
   let effectiveCheckOut: Date;
-  if (mode === "fixed" && booking.check_out) {
+  if (booking.status === "checked_out" && booking.actual_check_out) {
+    // Once a guest has left, the actual departure is authoritative even when
+    // the reservation originally had a fixed planned check-out date.
+    effectiveCheckOut = new Date(booking.actual_check_out);
+  } else if (mode === "fixed" && booking.check_out) {
     effectiveCheckOut = new Date(booking.check_out);
   } else if (mode === "open" && booking.actual_check_out) {
     effectiveCheckOut = new Date(booking.actual_check_out);
