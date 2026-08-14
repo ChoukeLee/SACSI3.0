@@ -1,4 +1,5 @@
 import type { ReceivableRow, BuildingRow, UnitRow, LedgerEntryRow } from "@/types/database";
+import { computeFinanceMetrics, isReceivableOverdue } from "./metrics";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -49,13 +50,6 @@ export interface ReceivableFilters {
 const todayStr = new Date().toISOString().slice(0, 10);
 const currentMonthPrefix = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
 
-function isOverdue(r: ReceivableRow): boolean {
-  if (r.status === "cancelled" || r.status === "paid") return false;
-  const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
-  if (outstanding <= 0) return false;
-  return r.status === "overdue" || r.due_date < todayStr;
-}
-
 function isCurrentMonth(dateStr: string): boolean {
   return dateStr.startsWith(currentMonthPrefix);
 }
@@ -80,29 +74,15 @@ export function calculateReceivableSummary(
   filters?: ReceivableFilters,
 ): ReceivableSummary {
   const filtered = applyFilters(receivables, filters);
-
-  let totalReceivable = 0;
-  let totalPaid = 0;
-  let overdue = 0;
-
-  for (const r of filtered) {
-    totalReceivable += Number(r.amount_xof);
-    totalPaid += Number(r.paid_amount_xof);
-    if (isOverdue(r)) {
-      overdue += Number(r.amount_xof) - Number(r.paid_amount_xof);
-    }
-  }
-
-  const outstanding = totalReceivable - totalPaid;
-  const collectionRate = totalReceivable > 0 ? totalPaid / totalReceivable : 0;
+  const metrics = computeFinanceMetrics(filtered);
 
   return {
-    totalReceivable,
-    totalPaid,
-    outstanding,
-    overdue,
-    count: filtered.length,
-    collectionRate,
+    totalReceivable: metrics.receivable,
+    totalPaid: metrics.collected,
+    outstanding: metrics.outstanding,
+    overdue: metrics.overdue,
+    count: metrics.count,
+    collectionRate: metrics.collectionRate,
   };
 }
 
@@ -124,7 +104,7 @@ export function calculateReceivableByBusinessType(
     g.totalReceivable += Number(r.amount_xof);
     g.totalPaid += Number(r.paid_amount_xof);
     g.count++;
-    if (isOverdue(r)) {
+    if (isReceivableOverdue(r)) {
       g.overdue += Number(r.amount_xof) - Number(r.paid_amount_xof);
     }
   }
@@ -193,7 +173,7 @@ export function calculateReceivableByBuilding(
     }
     s.totalReceivable += Number(r.amount_xof);
     s.totalPaid += Number(r.paid_amount_xof);
-    if (isOverdue(r)) {
+    if (isReceivableOverdue(r)) {
       s.overdue += Number(r.amount_xof) - Number(r.paid_amount_xof);
     }
   }
@@ -260,7 +240,7 @@ export function getOverdueReceivables(
   limit = 10,
 ): ReceivableRow[] {
   return receivables
-    .filter((r) => isOverdue(r))
+    .filter((r) => isReceivableOverdue(r))
     .sort((a, b) => {
       const aOut = Number(a.amount_xof) - Number(a.paid_amount_xof);
       const bOut = Number(b.amount_xof) - Number(b.paid_amount_xof);

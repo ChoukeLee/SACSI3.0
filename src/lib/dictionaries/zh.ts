@@ -1,4 +1,4 @@
-﻿export const zhDict = {
+export const zhDict = {
     meta: {
       title: "SACSI | 科建地产房屋管理系统",
       description: "11#公寓首期业务管理系统"
@@ -856,10 +856,10 @@
         depositLiability: "押金/负债流入",
       },
       cockpit: {
-        receivableThisMonth: "本月应收",
+        receivableThisMonth: "应收",
         paidThisMonth: "本月实收",
-        outstandingThisMonth: "本月未收",
-        overdueThisMonth: "本月逾期",
+        outstandingThisMonth: "未收",
+        overdueThisMonth: "逾期",
         incomeThisMonth: "本月收入",
         expenseThisMonth: "本月支出",
         netThisMonth: "本月净额",

@@ -1,0 +1,31 @@
+name: Daily Backup
+
+on:
+  schedule:
+    - cron: "15 2 * * *" # 02:15 UTC daily
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    name: Full DB Backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run full backup
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/backup-full.mjs
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-backup
+          path: outputs/backups/*.json
+          retention-days: 90

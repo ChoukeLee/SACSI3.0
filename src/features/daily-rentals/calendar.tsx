@@ -467,8 +467,8 @@ export function DailyCalendar({
 
   const financeCards = useMemo(() => [
     { key: "collected", label: locale === "zh" ? "本月已收" : "Encaisse", value: formatXof(financeStats.monthCollected), tone: "green" as const },
-    { key: "outstanding", label: locale === "zh" ? "当前欠款" : "Impaye", value: formatXof(financeStats.currentOutstanding), tone: "orange" as const },
-    { key: "settled", label: locale === "zh" ? "本月结算" : "Regle", value: formatXof(financeStats.monthSettled), tone: "dark" as const },
+    { key: "outstanding", label: locale === "zh" ? "当前未收" : "Impayé", value: formatXof(financeStats.currentOutstanding), tone: "orange" as const },
+    { key: "settled", label: locale === "zh" ? "本月退房结账额" : "Règlement du mois", value: formatXof(financeStats.monthSettled), tone: "dark" as const },
   ], [financeStats, locale]);
 
   const shareRows = useMemo(() => {
@@ -881,8 +881,8 @@ export function DailyCalendar({
               <div>
                 <h3 className="text-sm font-medium tracking-tight text-foreground">
                   {financeDetail === "collected" ? (locale === "zh" ? "本月已收明细" : "Paiements du mois") :
-                   financeDetail === "outstanding" ? (locale === "zh" ? "当前欠款明细" : "Soldes impayes") :
-                   (locale === "zh" ? "本月结算明细" : "Reglements du mois")}
+                   financeDetail === "outstanding" ? (locale === "zh" ? "当前未收明细" : "Soldes impayés") :
+                   (locale === "zh" ? "本月退房结账明细" : "Règlements du mois")}
                 </h3>
               </div>
               <button onClick={() => setFinanceDetail(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">

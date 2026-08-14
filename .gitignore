@@ -11,3 +11,8 @@ docs/design/
 
 .vercel
 supabase/.temp/
+
+# local tool artifacts (not project files)
+.codex-prod-*.log
+washing-guide.html
+11#洗衣机使用说明.png

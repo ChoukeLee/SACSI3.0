@@ -205,7 +205,7 @@ export function printSaleContract(data: SaleContractPrintData, locale: "zh" | "f
     ? {
         title: "出售合同摘要单", company: "科建地产", contractNo: "合同编号", unit: "房源",
         customer: "客户", signedDate: "签约日期", total: "合同总额", paid: "累计已收",
-        outstanding: "待回款", paymentPlan: "付款方式", transfer: "过户状态",
+        outstanding: "未收", paymentPlan: "付款方式", transfer: "过户状态",
         buyer: "买方", seller: "卖方",
       }
     : {

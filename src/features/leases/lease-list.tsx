@@ -302,8 +302,8 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       rent: active.reduce((sum, c) => sum + Number(c.monthly_rent_xof), 0),
       dueSoon: leaseAttention.upcoming.length,
       currentDue,
-      overdue: actualOverdueRows.reduce((sum, row) => sum + row.amount, 0),
-      overdueContracts: actualOverdueRows.length,
+      overdue: actualOverdueRows.filter((row) => !row.amountIsEstimated).reduce((sum, row) => sum + row.amount, 0),
+      overdueContracts: actualOverdueRows.filter((row) => !row.amountIsEstimated).length,
     };
   }, [actualOverdueRows, filteredByBuilding, leaseAttention.upcoming.length, receivables, todayStr]);
 
@@ -463,7 +463,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     { key: "rent", label: locale==="zh"?"月租规模":"Loyer/mois", value: formatXof(dashboardStats.rent), dot: "bg-accentBlue-500", hint: locale==="zh"?"点击查看产生月租的合同":"Voir les loyers actifs" },
     { key: "dueSoon", label: locale==="zh"?"15天内应缴":"15j à payer", value: String(dashboardStats.dueSoon), dot: dashboardStats.dueSoon > 0 ? "bg-accentAmber-500" : "bg-muted-foreground/40", hint: locale==="zh"?"点击查看近期收费名单":"Voir les échéances proches" },
     { key: "currentDue", label: locale==="zh"?"待收未逾期":"Dû non échu", value: formatXof(dashboardStats.currentDue), dot: "bg-accentPurple-500", hint: locale==="zh"?"点击查看未逾期待收":"Voir les montants non échus" },
-    { key: "overdue", label: locale==="zh"?"逾期金额":"Retard", value: formatXof(dashboardStats.overdue), dot: dashboardStats.overdue > 0 ? "bg-accentRed-500" : "bg-muted-foreground/40", hint: `${dashboardStats.overdueContracts}${locale==="zh"?"份 · 点击查看":" · voir"}` },
+    { key: "overdue", label: locale==="zh"?"逾期":"En retard", value: formatXof(dashboardStats.overdue), dot: dashboardStats.overdue > 0 ? "bg-accentRed-500" : "bg-muted-foreground/40", hint: `${dashboardStats.overdueContracts}${locale==="zh"?"份 · 点击查看":" · voir"}` },
   ];
 
   return (
@@ -617,7 +617,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
           rent: locale === "zh" ? "月租规模明细" : "Détail des loyers",
           dueSoon: locale === "zh" ? "15天内应缴" : "Échéances sous 15 jours",
           currentDue: locale === "zh" ? "待收未逾期" : "Montants non échus",
-          overdue: locale === "zh" ? "逾期金额明细" : "Détail des retards",
+          overdue: locale === "zh" ? "逾期明细" : "Détail des retards",
         };
         const activeRows = leaseInsightContracts.filter((row) => row.contract.status === "active");
         const rentRows = [...activeRows].sort((a, b) => Number(b.contract.monthly_rent_xof) - Number(a.contract.monthly_rent_xof));
@@ -649,7 +649,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                               <span className="text-sm font-semibold">{row.buildingName} · {row.unit.unit_no}</span>
                               <Badge variant={row.kind === "overdue" ? "destructive" : "warning"} className="h-5 px-2 text-[10px]">
                                 {row.kind === "overdue"
-                                  ? `${locale === "zh" ? "逾期" : "Retard"} ${Math.abs(row.days)}${locale === "zh" ? "天" : "j"}`
+                                  ? (row.amountIsEstimated ? (locale === "zh" ? "预估" : "Estimé") : `${locale === "zh" ? "逾期" : "Retard"} ${Math.abs(row.days)}${locale === "zh" ? "天" : "j"}`)
                                   : `${row.days}${locale === "zh" ? "天后应缴" : "j"}`}
                               </Badge>
                             </div>
@@ -659,7 +659,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                         </div>
                         <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5" />{locale === "zh" ? "应缴日" : "Échéance"} {row.dueDate}</span>
-                          <span className="text-right">{row.amountIsEstimated ? (locale === "zh" ? "按合同月租" : "Selon le loyer") : (locale === "zh" ? "未结应收" : "Créance ouverte")}</span>
+                          <span className="text-right">{row.amountIsEstimated ? (locale === "zh" ? "预估（按合同月租）" : "Estimé (selon loyer)") : (locale === "zh" ? "未结应收" : "Créance ouverte")}</span>
                           <span>{locale === "zh" ? "已缴至" : "Payé au"} {row.paidThrough ?? (locale === "zh" ? "待补" : "À compléter")}</span>
                           <span className="flex items-center justify-end gap-1.5"><Phone className="h-3.5 w-3.5" />{row.customer?.phone || (locale === "zh" ? "电话待补" : "Téléphone à compléter")}</span>
                         </div>
@@ -795,7 +795,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5" />{locale === "zh" ? "应缴日" : "Échéance"} {row.dueDate}</span>
-                      <span className="text-right">{row.amountIsEstimated ? (locale === "zh" ? "按合同月租" : "Selon le loyer") : (locale === "zh" ? "未结应收" : "Créance ouverte")}</span>
+                      <span className="text-right">{row.amountIsEstimated ? (locale === "zh" ? "预估（按合同月租）" : "Estimé (selon loyer)") : (locale === "zh" ? "未结应收" : "Créance ouverte")}</span>
                       <span>{locale === "zh" ? "已缴至" : "Payé au"} {row.paidThrough ?? (locale === "zh" ? "待补" : "À compléter")}</span>
                       <span className="flex items-center justify-end gap-1.5"><Phone className="h-3.5 w-3.5" />{row.customer?.phone || (locale === "zh" ? "电话待补" : "Téléphone à compléter")}</span>
                     </div>

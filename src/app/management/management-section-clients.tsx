@@ -200,17 +200,15 @@ export function FinanceSectionClient({
       : snapshot.items,
     [snapshot.items, selectedBuildingId],
   );
+  // 明细面板的月份选择器默认值（YYYY-MM）。
   const currentMonthKey = (snapshot.monthStart || snapshot.asOf || new Date().toISOString().slice(0, 10)).slice(0, 7);
-  const currentMonthItems = useMemo(
-    () => filteredItems.filter((item) => item.dueDate.startsWith(currentMonthKey)),
-    [filteredItems, currentMonthKey],
-  );
-  const stats = useMemo(() => summarizeFinanceItems(currentMonthItems), [currentMonthItems]);
+  // 口径：截至今日（As-of）—— 卡片展示全部非日租业务的历史存量（到期日早于本月底），而非仅本月到期。
+  const stats = useMemo(() => summarizeFinanceItems(filteredItems), [filteredItems]);
   const blocks = [
-    { key: "receivable", label: locale === "zh" ? "本月应收" : t.cockpit.receivableThisMonth, value: stats.totalReceivable, color: "accentBlue" as const, icon: TrendingUp },
-    { key: "collected", label: locale === "zh" ? "本月已收" : "Encaisse du mois", value: stats.totalPaid, color: "accentGreen" as const, icon: Banknote },
-    { key: "outstanding", label: locale === "zh" ? "本月未收" : t.cockpit.outstandingThisMonth, value: stats.outstanding, color: "accentAmber" as const, icon: WalletCards },
-    { key: "overdue", label: locale === "zh" ? "本月逾期" : t.cockpit.overdueThisMonth, value: stats.overdue, color: "accentRed" as const, icon: Clock3 },
+    { key: "receivable", label: locale === "zh" ? "应收" : "Dû", value: stats.totalReceivable, color: "accentBlue" as const, icon: TrendingUp },
+    { key: "collected", label: locale === "zh" ? "已收" : "Encaissé", value: stats.totalPaid, color: "accentGreen" as const, icon: Banknote },
+    { key: "outstanding", label: locale === "zh" ? "未收" : "Reste à encaisser", value: stats.outstanding, color: "accentAmber" as const, icon: WalletCards },
+    { key: "overdue", label: locale === "zh" ? "逾期" : "En retard", value: stats.overdue, color: "accentRed" as const, icon: Clock3 },
   ];
 
   return (
@@ -221,13 +219,13 @@ export function FinanceSectionClient({
             <h2 className="text-[15px] font-semibold tracking-tight">{locale === "zh" ? "财务概览" : "Vue financiere"}</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {locale === "zh"
-                ? `${selectedBuildingName ?? "全部楼栋"} · 长租、出售及历史应收 · 本月 ${stats.count} 笔 · 点击指标查看历史与环比`
-                : `${selectedBuildingName ?? "Tous les bâtiments"} · ${stats.count} échéances ce mois · Cliquez pour l'historique`}
+                ? `${selectedBuildingName ?? "全部楼栋"} · 长租、出售及历史应收 · 截至今日 ${stats.count} 笔 · 点击指标查看明细`
+                : `${selectedBuildingName ?? "Tous les bâtiments"} · ${stats.count} créances à ce jour · Cliquez pour le détail`}
             </p>
           </div>
           <div className="hidden text-right sm:block">
             <p className="text-lg font-semibold tabular-nums">{Math.round(stats.collectionRate * 100)}%</p>
-            <p className="text-[11px] text-muted-foreground">{locale === "zh" ? "本月回款率" : "Taux de recouvrement"}</p>
+            <p className="text-[11px] text-muted-foreground">{locale === "zh" ? "回款率" : "Taux de recouvrement"}</p>
           </div>
         </div>
         <MetricGrid columns={4}>

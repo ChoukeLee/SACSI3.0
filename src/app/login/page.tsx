@@ -6,6 +6,7 @@ function loginErrorMessage(error: string | undefined) {
   if (!error) return "";
   if (error === "missing") return "请输入邮箱和密码。";
   if (error === "account_not_configured") return "该账号尚未配置系统权限。";
+  if (error === "rate_limited") return "登录尝试过于频繁，请稍后再试。";
   return decodeURIComponent(error);
 }
 

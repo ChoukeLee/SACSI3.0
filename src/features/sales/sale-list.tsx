@@ -299,9 +299,9 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
   const statBlocks: Array<{ key: SaleStatKey; label: string; value: string; dot: string; hint: string }> = [
     { key: "active", label: locale==="zh"?"生效出售":"Ventes actives", value: String(dashboardStats.active), dot: "bg-accentGreen-500", hint: locale==="zh"?"打开生效出售侧栏":"Ouvrir les ventes actives" },
     { key: "total", label: locale==="zh"?"合同总额":"Total contrats", value: formatXof(dashboardStats.total), dot: "bg-accentBlue-500", hint: locale==="zh"?"打开合同总额明细":"Ouvrir le detail des contrats" },
-    { key: "received", label: locale==="zh"?"已回款":"Recu", value: formatXof(dashboardStats.received), dot: "bg-accentGreen-500", hint: locale==="zh"?"打开已回款明细":"Ouvrir les encaissements" },
-    { key: "receivable", label: locale==="zh"?"待回款":"A recevoir", value: formatXof(dashboardStats.outstanding), dot: "bg-accentAmber-500", hint: locale==="zh"?"打开待回款侧栏":"Ouvrir les montants a recevoir" },
-    { key: "overdue", label: locale==="zh"?"逾期回款":"Retard", value: formatXof(dashboardStats.overdue), dot: dashboardStats.overdue > 0 ? "bg-accentRed-500" : "bg-muted-foreground/40", hint: locale==="zh"?"打开逾期回款侧栏":"Ouvrir les retards" },
+    { key: "received", label: locale==="zh"?"已收":"Encaissé", value: formatXof(dashboardStats.received), dot: "bg-accentGreen-500", hint: locale==="zh"?"打开已收明细":"Ouvrir les encaissements" },
+    { key: "receivable", label: locale==="zh"?"未收":"Reste", value: formatXof(dashboardStats.outstanding), dot: "bg-accentAmber-500", hint: locale==="zh"?"打开未收侧栏":"Ouvrir les montants à recevoir" },
+    { key: "overdue", label: locale==="zh"?"逾期":"En retard", value: formatXof(dashboardStats.overdue), dot: dashboardStats.overdue > 0 ? "bg-accentRed-500" : "bg-muted-foreground/40", hint: locale==="zh"?"打开逾期侧栏":"Ouvrir les retards" },
     { key: "transfer", label: locale==="zh"?"已过户":"Transfert", value: String(dashboardStats.transferDone), dot: "bg-accentPurple-500", hint: locale==="zh"?"打开过户明细":"Ouvrir les transferts" },
   ];
 
@@ -401,9 +401,9 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
         const titleMap: Record<SaleStatKey, string> = {
           active: locale === "zh" ? "生效出售明细" : "Ventes actives",
           total: locale === "zh" ? "合同总额明细" : "Total des contrats",
-          received: locale === "zh" ? "已回款明细" : "Encaissements",
-          receivable: locale === "zh" ? "待回款明细" : "Montants a recevoir",
-          overdue: locale === "zh" ? "逾期回款明细" : "Retards de paiement",
+          received: locale === "zh" ? "已收明细" : "Encaissements",
+          receivable: locale === "zh" ? "未收明细" : "Montants à recevoir",
+          overdue: locale === "zh" ? "逾期明细" : "Retards de paiement",
           transfer: locale === "zh" ? "已过户明细" : "Transferts completes",
         };
         const activeRows = saleInsightContracts.filter((row) => row.contract.status === "active");
@@ -477,8 +477,8 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
                       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
                         <span>{locale === "zh" ? "签约" : "Signe"} {row.contract.signed_date}</span>
                         <span className="text-right">{locale === "zh" ? "总额" : "Total"} {formatXof(Number(row.contract.total_amount_xof))}</span>
-                        <span>{locale === "zh" ? "已回款" : "Recu"} {formatXof(row.summary.paid)}</span>
-                        <span className="text-right">{locale === "zh" ? "待回款" : "Reste"} {formatXof(row.summary.outstanding)}</span>
+                        <span>{locale === "zh" ? "已收" : "Encaissé"} {formatXof(row.summary.paid)}</span>
+                        <span className="text-right">{locale === "zh" ? "未收" : "Reste"} {formatXof(row.summary.outstanding)}</span>
                         {row.summary.nextDue && <span className="col-span-2">{locale === "zh" ? "最近应收" : "Prochaine echeance"} {row.summary.nextDue}</span>}
                       </div>
                       <Button size="sm" variant="outline" className="mt-3 w-full" onClick={() => openDetail(row.contract.id)}>
@@ -522,11 +522,11 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
                 {selectedCnyReceived>0&&<p className="mt-0.5 tabular-nums text-emerald-700">{locale==="zh"?"人民币实收 ":"Reçu en CNY "}{formatCny(selectedCnyReceived)}</p>}
               </div>
               <div className={cn("rounded-md border px-3 py-2",selectedOutstanding>0?"border-amber-200 bg-amber-50/50":"border-emerald-200 bg-emerald-50/50")}>
-                <p className="text-muted-foreground">{locale==="zh"?"待回款":"Reste à recevoir"}</p>
+                <p className="text-muted-foreground">{locale==="zh"?"未收":"Reste à recevoir"}</p>
                 <p className={cn("font-semibold tabular-nums",selectedOutstanding>0?"text-amber-700":"text-emerald-700")}>{formatXof(selectedOutstanding)}</p>
               </div>
               <div className={cn("rounded-md border px-3 py-2",totalOverdueRec>0?"border-red-200 bg-red-50/50":"border-emerald-200 bg-emerald-50/50")}>
-                <p className="text-muted-foreground">{locale==="zh"?"逾期回款":"Retard"}</p>
+                <p className="text-muted-foreground">{locale==="zh"?"逾期":"En retard"}</p>
                 <p className={cn("font-semibold tabular-nums",totalOverdueRec>0?"text-red-700":"text-emerald-700")}>{formatXof(totalOverdueRec)}</p>
               </div>
             </div>

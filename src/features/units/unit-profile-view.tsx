@@ -97,8 +97,8 @@ export function UnitProfileView({ data, locale }: { data: UnitProfileData; local
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Metric label={zh ? "累计应收" : "Total dû"} value={formatXof(finance.receivable)} tone="blue" />
             <Metric label={zh ? "累计已收" : "Total encaissé"} value={formatXof(finance.received)} tone="green" />
-            <Metric label={zh ? "未结金额" : "Solde ouvert"} value={formatXof(finance.outstanding)} tone={finance.outstanding > 0 ? "amber" : "green"} />
-            <Metric label={zh ? "逾期金额" : "En retard"} value={formatXof(finance.overdue)} tone={finance.overdue > 0 ? "red" : "green"} />
+            <Metric label={zh ? "未收" : "Solde ouvert"} value={formatXof(finance.outstanding)} tone={finance.outstanding > 0 ? "amber" : "green"} />
+            <Metric label={zh ? "逾期" : "En retard"} value={formatXof(finance.overdue)} tone={finance.overdue > 0 ? "red" : "green"} />
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
@@ -150,7 +150,7 @@ export function UnitProfileView({ data, locale }: { data: UnitProfileData; local
 
       {tab === "finance" && (
         <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label={zh ? "累计应收" : "Total dû"} value={formatXof(finance.receivable)} tone="blue" /><Metric label={zh ? "累计已收" : "Total encaissé"} value={formatXof(finance.received)} tone="green" /><Metric label={zh ? "未结金额" : "Solde ouvert"} value={formatXof(finance.outstanding)} tone="amber" /><Metric label={zh ? "逾期金额" : "En retard"} value={formatXof(finance.overdue)} tone={finance.overdue > 0 ? "red" : "green"} /></div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label={zh ? "累计应收" : "Total dû"} value={formatXof(finance.receivable)} tone="blue" /><Metric label={zh ? "累计已收" : "Total encaissé"} value={formatXof(finance.received)} tone="green" /><Metric label={zh ? "未收" : "Solde ouvert"} value={formatXof(finance.outstanding)} tone="amber" /><Metric label={zh ? "逾期" : "En retard"} value={formatXof(finance.overdue)} tone={finance.overdue > 0 ? "red" : "green"} /></div>
           <RecordCard title={zh ? "应收记录" : "Créances"} icon={FileText} empty={data.receivables.filter((row) => row.status !== "cancelled").length === 0} emptyText={zh ? "暂无应收记录" : "Aucune créance"}>
             <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead><tr>{[zh ? "到期日" : "Échéance", zh ? "业务" : "Activité", zh ? "说明" : "Libellé", zh ? "应收" : "Dû", zh ? "已收" : "Payé", zh ? "未结" : "Solde"].map((label) => <th key={label} className="px-4 py-3 text-left text-xs text-muted-foreground">{label}</th>)}</tr></thead><tbody className="divide-y">{data.receivables.filter((row) => row.status !== "cancelled").map((row) => { const balance = Math.max(0, Number(row.amount_xof) - Number(row.paid_amount_xof)); return <tr key={row.id} className={cn("hover:bg-muted/40", balance > 0 && (row.status === "overdue" || row.due_date < today) && "bg-red-50/40")}><td className="px-4 py-3">{row.due_date}</td><td className="px-4 py-3">{financialBusinessLabel(row.source_type, locale, row.category)}</td><td className="px-4 py-3 font-medium">{row.title}</td><td className="px-4 py-3 tabular-nums">{formatXof(Number(row.amount_xof))}</td><td className="px-4 py-3 tabular-nums text-emerald-700">{formatXof(Number(row.paid_amount_xof))}</td><td className={cn("px-4 py-3 tabular-nums font-medium", balance > 0 && "text-red-700")}>{formatXof(balance)}</td></tr>; })}</tbody></table></div>
           </RecordCard>
