@@ -204,9 +204,10 @@ function resolveCalendarCheckOut(
   const { todayStr } = opts;
 
   // A completed stay must stop on the recorded departure date, not on the
-  // original reservation end date.
+  // original reservation end date. Same-day historical records still need one
+  // visible cell; otherwise the calendar range becomes empty.
   if (b.status === "checked_out" && b.actual_check_out) {
-    return b.actual_check_out;
+    return b.actual_check_out <= b.check_in ? addDays(b.check_in, 1) : b.actual_check_out;
   }
 
   if (b.checkout_mode !== "open") {
@@ -230,13 +231,6 @@ function resolveCalendarCheckOut(
   // pending_review / confirmed : just the check_in day (one cell)
   if (b.status === "pending_review" || b.status === "confirmed") {
     return addDays(b.check_in, 1);
-  }
-
-  // checked_out with actual_check_out : recorded range including checkout day.
-  // Some open-ended historical records have check_in === actual_check_out;
-  // keep at least one visible cell so the calendar does not swallow them.
-  if (b.status === "checked_out" && b.actual_check_out) {
-    return addDays(b.actual_check_out, 1);
   }
 
   // checked_out without actual : just check_in (one cell, as historical record)
