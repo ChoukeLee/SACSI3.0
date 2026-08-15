@@ -385,6 +385,9 @@ export async function recordSupplementaryPayment(input: {
   const user = await guardWrite();
   if (input.amount <= 0) return { success: false, error: "Amount must be positive." };
   const supabase = await createClient();
+  // Open-ended stays accrue nightly. Persist today's current amount before the
+  // RPC checks whether the payment exceeds the outstanding balance.
+  await syncBookingFinance(supabase, input.bookingId);
   const { data, error } = await supabase.rpc("daily_record_payment_rpc", {
     p_booking_id: input.bookingId,
     p_amount: input.amount,

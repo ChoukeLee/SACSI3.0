@@ -73,7 +73,13 @@ export function computeBookingAmountState(
 ): DailyBookingAmountState {
   const effectiveCheckOut = resolveEffectiveCheckOut(booking, referenceDate);
   const nights = Math.max(1, dateDiffDays(booking.check_in, effectiveCheckOut));
-  const grossAmount = Number(booking.total_amount_xof);
+  const isRunningOpenStay =
+    (booking.checkout_mode ?? "fixed") === "open" &&
+    booking.status === "checked_in" &&
+    !booking.actual_check_out;
+  const grossAmount = isRunningOpenStay
+    ? Math.round(nights * Number(booking.nightly_price_xof))
+    : Number(booking.total_amount_xof);
   const discount = Number(booking.manual_discount_amount_xof ?? 0);
   const finalAmount = Math.max(0, grossAmount - discount);
 
@@ -188,6 +194,7 @@ export async function syncBookingAmounts(
   await supabase
     .from("daily_bookings")
     .update({
+      total_amount_xof: amountState.grossAmount,
       final_amount_xof: amountState.finalAmount,
     })
     .eq("id", bookingId);
