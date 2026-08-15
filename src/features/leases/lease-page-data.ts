@@ -34,7 +34,7 @@ const PAYMENT_FIELDS = [
 
 const RECEIVABLE_FIELDS = [
   "id", "source_type", "source_id", "category", "title", "due_date",
-  "amount_xof", "paid_amount_xof", "status", "currency", "notes",
+  "amount_xof", "paid_amount_xof", "status", "management_status", "currency", "notes",
 ].join(",");
 
 const UNIT_FIELDS = [

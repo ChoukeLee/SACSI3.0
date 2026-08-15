@@ -19,16 +19,13 @@ import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, Pay
 import { createSaleContract, recordSalePaymentAtomic, addFlexibleInstallment, updateTransferStatus, terminateSaleContract } from "./actions";
 import { buildSaleContractNumber } from "@/lib/contract-number";
 import { printSaleContract } from "@/features/print";
+import { isRefundPayment, paymentAmountXof } from "@/features/finance/metrics";
 
 interface SaleListProps { contracts: SaleContractRow[]; schedules: SalePaymentScheduleRow[]; units: UnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale; canCreate?: boolean; canRecordFinance?: boolean; canManage?: boolean; canTerminate?: boolean }
 type PanelType = "new" | "detail" | "insight" | null;
-type SaleStatKey = "active" | "total" | "received" | "receivable" | "overdue" | "transfer";
+type SaleStatKey = "active" | "total" | "received" | "receivable" | "due" | "overdue" | "transfer";
 type SaleStatusFilter = "current" | "all" | "terminated" | "expired";
 const SALE_RECEIPT_SOURCE_TYPES = new Set(["sale", "sale_contract", "property_fee", "parking_fee"]);
-
-const paymentAmountXof = (payment: PaymentRow) => payment.currency === "XOF"
-  ? Number(payment.amount)
-  : Math.round(Number(payment.amount) * Number(payment.exchange_rate_to_xof));
 
 const formatCny = (amount: number) =>
   `¥${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(amount)}`;
@@ -110,22 +107,23 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
     const active=filteredByBuilding.filter(c=>c.status==="active");
     const activeIds=new Set(active.map(c=>c.id));
     const paidByContract=new Map<string,number>();
-    const receivablePaidByContract=new Map<string,number>();
     let overdue=0;
+    let dueOutstanding=0;
     const today=new Date().toISOString().slice(0,10);
     for(const p of payments){
-      if(!p.source_id||!activeIds.has(p.source_id)||!SALE_RECEIPT_SOURCE_TYPES.has(p.source_type))continue;
-      paidByContract.set(p.source_id,(paidByContract.get(p.source_id)??0)+paymentAmountXof(p));
+      if(!p.source_id||!activeIds.has(p.source_id)||(!SALE_RECEIPT_SOURCE_TYPES.has(p.source_type)&&!isRefundPayment(p)))continue;
+      const amount = paymentAmountXof(p);
+      paidByContract.set(p.source_id,(paidByContract.get(p.source_id)??0)+(isRefundPayment(p)?-amount:amount));
     }
     for(const r of receivables){
-      if(r.source_type!=="sale_contract"||r.status==="cancelled"||!r.source_id||!buildingContractIds.has(r.source_id))continue;
-      receivablePaidByContract.set(r.source_id,(receivablePaidByContract.get(r.source_id)??0)+Number(r.paid_amount_xof));
+      if(r.source_type!=="sale_contract"||r.status==="cancelled"||r.management_status==="historical_pending"||r.management_status==="excluded"||!r.source_id||!buildingContractIds.has(r.source_id))continue;
       const os=Number(r.amount_xof)-Number(r.paid_amount_xof);
-      if(os>0&&(r.status==="overdue"||r.due_date<today))overdue+=os;
+      if(os>0&&r.due_date<=today)dueOutstanding+=os;
+      if(os>0&&r.due_date<today)overdue+=os;
     }
     const total=active.reduce((s,c)=>s+Number(c.total_amount_xof),0);
-    const received=active.reduce((sum,c)=>sum+Math.min(Number(c.total_amount_xof),Math.max(paidByContract.get(c.id)??0,receivablePaidByContract.get(c.id)??0)),0);
-    return {active:active.length,total,received,outstanding:Math.max(0,total-received),overdue,transferDone:active.filter(c=>c.transfer_status==="completed").length};
+    const received=active.reduce((sum,c)=>sum+Math.min(Number(c.total_amount_xof),Math.max(0,paidByContract.get(c.id)??0)),0);
+    return {active:active.length,total,received,outstanding:Math.max(0,total-received),dueOutstanding,overdue,transferDone:active.filter(c=>c.transfer_status==="completed").length};
   }, [filteredByBuilding,payments,receivables]);
 
   const saleInsightContracts = useMemo(() => {
@@ -134,30 +132,33 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
       .map((contract) => {
         const unit = unitMap.get(contract.unit_id);
         const customer = customerMap.get(contract.customer_id);
-        const related = receivables.filter((r) => r.source_type === "sale_contract" && r.source_id === contract.id && r.status !== "cancelled");
+        const related = receivables.filter((r) => r.source_type === "sale_contract" && r.source_id === contract.id && r.status !== "cancelled" && r.management_status !== "historical_pending" && r.management_status !== "excluded");
         let total = 0;
-        let paid = 0;
+        const paid = payments
+          .filter((payment) => payment.source_id === contract.id && (SALE_RECEIPT_SOURCE_TYPES.has(payment.source_type) || isRefundPayment(payment)))
+          .reduce((sum, payment) => sum + (isRefundPayment(payment) ? -paymentAmountXof(payment) : paymentAmountXof(payment)), 0);
         let overdue = 0;
+        let dueOutstanding = 0;
         let nextDue: string | null = null;
         for (const r of related) {
           const amount = Number(r.amount_xof);
           const paidAmount = Number(r.paid_amount_xof);
           const outstanding = Math.max(0, amount - paidAmount);
           total += amount;
-          paid += paidAmount;
-          if (outstanding > 0 && (r.status === "overdue" || r.due_date < today)) overdue += outstanding;
+          if (outstanding > 0 && r.due_date <= today) dueOutstanding += outstanding;
+          if (outstanding > 0 && r.due_date < today) overdue += outstanding;
           if (outstanding > 0 && (!nextDue || r.due_date < nextDue)) nextDue = r.due_date;
         }
         return {
           contract,
           unit,
           customer,
-          summary: { total, paid, outstanding: Math.max(0, total - paid), overdue, nextDue, count: related.length },
+          summary: { total, paid, outstanding: Math.max(0, Number(contract.total_amount_xof) - paid), dueOutstanding, overdue, nextDue, count: related.length },
         };
       })
       .filter((row) => row.unit)
       .sort((a, b) => (a.unit?.unit_no ?? "").localeCompare(b.unit?.unit_no ?? "", undefined, { numeric: true }));
-  }, [customerMap, filteredByBuilding, receivables, unitMap]);
+  }, [customerMap, filteredByBuilding, payments, receivables, unitMap]);
 
   const contractSchedules = useMemo(()=>selectedId?schedules.filter(s=>s.sale_contract_id===selectedId).sort((a,b)=>a.installment_no-b.installment_no):[], [schedules,selectedId]);
   const contractReceivables = useMemo(()=>selectedId?receivables.filter(r=>r.source_type==="sale_contract"&&r.source_id===selectedId&&r.status!=="cancelled"):[], [receivables,selectedId]);
@@ -300,7 +301,8 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
     { key: "active", label: locale==="zh"?"生效出售":"Ventes actives", value: String(dashboardStats.active), dot: "bg-accentGreen-500", hint: locale==="zh"?"打开生效出售侧栏":"Ouvrir les ventes actives" },
     { key: "total", label: locale==="zh"?"合同总额":"Total contrats", value: formatXof(dashboardStats.total), dot: "bg-accentBlue-500", hint: locale==="zh"?"打开合同总额明细":"Ouvrir le detail des contrats" },
     { key: "received", label: locale==="zh"?"已收":"Encaissé", value: formatXof(dashboardStats.received), dot: "bg-accentGreen-500", hint: locale==="zh"?"打开已收明细":"Ouvrir les encaissements" },
-    { key: "receivable", label: locale==="zh"?"未收":"Reste", value: formatXof(dashboardStats.outstanding), dot: "bg-accentAmber-500", hint: locale==="zh"?"打开未收侧栏":"Ouvrir les montants à recevoir" },
+    { key: "receivable", label: locale==="zh"?"合同剩余款":"Reste contrat", value: formatXof(dashboardStats.outstanding), dot: "bg-accentAmber-500", hint: locale==="zh"?"含未来分期":"Y compris échéances futures" },
+    { key: "due", label: locale==="zh"?"到期未收":"Dû impayé", value: formatXof(dashboardStats.dueOutstanding), dot: "bg-accentPurple-500", hint: locale==="zh"?"截至今日，不含历史待核":"À ce jour, historique exclu" },
     { key: "overdue", label: locale==="zh"?"逾期":"En retard", value: formatXof(dashboardStats.overdue), dot: dashboardStats.overdue > 0 ? "bg-accentRed-500" : "bg-muted-foreground/40", hint: locale==="zh"?"打开逾期侧栏":"Ouvrir les retards" },
     { key: "transfer", label: locale==="zh"?"已过户":"Transfert", value: String(dashboardStats.transferDone), dot: "bg-accentPurple-500", hint: locale==="zh"?"打开过户明细":"Ouvrir les transferts" },
   ];
@@ -321,7 +323,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
             label={b.label}
             value={b.value}
             caption={panel === "insight" && statFilter === b.key ? (locale === "zh" ? "明细已打开" : "Détail ouvert") : b.hint}
-            tone={b.key === "overdue" ? "red" : b.key === "receivable" ? "amber" : b.key === "transfer" ? "purple" : b.key === "active" || b.key === "received" ? "green" : "blue"}
+            tone={b.key === "overdue" ? "red" : b.key === "receivable" ? "amber" : b.key === "due" || b.key === "transfer" ? "purple" : b.key === "active" || b.key === "received" ? "green" : "blue"}
             onClick={() => openInsight(b.key)}
             active={panel === "insight" && statFilter === b.key}
           />
@@ -403,6 +405,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
           total: locale === "zh" ? "合同总额明细" : "Total des contrats",
           received: locale === "zh" ? "已收明细" : "Encaissements",
           receivable: locale === "zh" ? "未收明细" : "Montants à recevoir",
+          due: locale === "zh" ? "到期未收明细" : "Montants échus impayés",
           overdue: locale === "zh" ? "逾期明细" : "Retards de paiement",
           transfer: locale === "zh" ? "已过户明细" : "Transferts completes",
         };
@@ -415,6 +418,8 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
               ? saleInsightContracts.filter((row) => row.summary.paid > 0).sort((a, b) => b.summary.paid - a.summary.paid)
               : statFilter === "receivable"
                 ? saleInsightContracts.filter((row) => row.summary.outstanding > 0).sort((a, b) => (a.summary.nextDue ?? "9999-12-31").localeCompare(b.summary.nextDue ?? "9999-12-31"))
+                : statFilter === "due"
+                  ? saleInsightContracts.filter((row) => row.summary.dueOutstanding > 0).sort((a, b) => b.summary.dueOutstanding - a.summary.dueOutstanding)
                 : statFilter === "overdue"
                   ? saleInsightContracts.filter((row) => row.summary.overdue > 0).sort((a, b) => b.summary.overdue - a.summary.overdue)
                   : activeRows.filter((row) => row.contract.transfer_status === "completed");
@@ -423,12 +428,14 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
           : formatXof(insightRows.reduce((sum, row) => {
               if (statFilter === "total") return sum + Number(row.contract.total_amount_xof);
               if (statFilter === "received") return sum + row.summary.paid;
+              if (statFilter === "due") return sum + row.summary.dueOutstanding;
               if (statFilter === "overdue") return sum + row.summary.overdue;
               return sum + row.summary.outstanding;
             }, 0));
         const valueForRow = (row: typeof insightRows[number]) => {
           if (statFilter === "received") return row.summary.paid;
           if (statFilter === "overdue") return row.summary.overdue;
+          if (statFilter === "due") return row.summary.dueOutstanding;
           if (statFilter === "receivable") return row.summary.outstanding;
           return Number(row.contract.total_amount_xof);
         };

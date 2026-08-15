@@ -1,8 +1,9 @@
 ﻿import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { parseManagementFinanceSnapshot } from "@/features/management/finance-snapshot";
 import type { ManagementFinanceSnapshot } from "@/features/management/finance-snapshot";
 import { fetchAllPages } from "@/lib/supabase/fetch-all";
+import { addIsoDays, isOperatingExpensePayment, isRefundPayment, paymentAmountXof } from "@/features/finance/metrics";
+import type { PaymentRow } from "@/types/database";
 
 export const getBuildings = cache(async () => {
   const supabase = await createClient();
@@ -18,33 +19,45 @@ export const getUnits = cache(async () => {
 
 export const getManagementFinanceSnapshot = cache(async () => {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("management_finance_snapshot");
-  if (!error) return parseManagementFinanceSnapshot(data);
-
-  console.error("Failed to load management finance snapshot RPC; using table fallback:", error);
-  return getManagementFinanceSnapshotFallback();
-});
-
-async function getManagementFinanceSnapshotFallback(): Promise<ManagementFinanceSnapshot> {
-  const supabase = await createClient();
   const now = new Date();
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const monthStartText = monthStart.toISOString().slice(0, 10);
   const monthEndText = monthEnd.toISOString().slice(0, 10);
   const asOf = now.toISOString().slice(0, 10);
+  const upcomingEnd = addIsoDays(asOf, 15);
 
-  const [receivables, units, buildings, customers] = await Promise.all([
+  const [receivables, payments, historicalPendingRows, units, buildings, customers] = await Promise.all([
     fetchAllPages(
       (from, to) => supabase.from("receivables")
-        .select("id, due_date, source_type, category, title, amount_xof, paid_amount_xof, building_id, unit_id, customer_id, status")
+        .select("id, due_date, source_type, category, title, amount_xof, paid_amount_xof, building_id, unit_id, customer_id, status, management_status")
         .neq("source_type", "daily_booking")
         .neq("status", "cancelled")
-        .lt("due_date", monthEndText)
+        .eq("management_status", "managed")
+        .lte("due_date", upcomingEnd)
         .order("due_date", { ascending: false })
         .order("id")
         .range(from, to),
-      "management finance fallback receivables",
+      "management finance receivables",
+    ),
+    fetchAllPages(
+      (from, to) => supabase.from("payments")
+        .select("id, customer_id, unit_id, source_type, source_id, payment_date, amount, currency, exchange_rate_to_xof, receipt_no, notes, reversal_of_payment_id, created_at")
+        .neq("source_type", "daily_booking")
+        .gte("payment_date", monthStartText)
+        .lt("payment_date", monthEndText)
+        .order("payment_date", { ascending: false })
+        .order("id")
+        .range(from, to),
+      "management finance payments",
+    ),
+    fetchAllPages(
+      (from, to) => supabase.from("receivables")
+        .select("amount_xof, paid_amount_xof")
+        .eq("management_status", "historical_pending")
+        .neq("status", "cancelled")
+        .range(from, to),
+      "management historical pending",
     ),
     getUnits(),
     getBuildings(),
@@ -97,28 +110,54 @@ async function getManagementFinanceSnapshotFallback(): Promise<ManagementFinance
     return unitOrder !== 0 ? unitOrder : left.id.localeCompare(right.id);
   });
 
-  const totalReceivable = items.reduce((sum, item) => sum + item.amountXof, 0);
-  const totalPaid = items.reduce((sum, item) => sum + item.paidAmountXof, 0);
-  const outstanding = items.reduce((sum, item) => sum + item.outstandingXof, 0);
-  const overdue = items
-    .filter((item) => item.status === "overdue")
-    .reduce((sum, item) => sum + item.outstandingXof, 0);
+  const paymentItems = (payments as PaymentRow[])
+    .filter((payment) => !isOperatingExpensePayment(payment))
+    .map((payment) => {
+      const unit = payment.unit_id ? unitById.get(payment.unit_id) : undefined;
+      const buildingId = unit?.building_id ?? null;
+      const building = buildingId ? buildingById.get(buildingId) : undefined;
+      return {
+        id: payment.id,
+        paymentDate: payment.payment_date,
+        sourceType: payment.source_type,
+        amountXof: paymentAmountXof(payment),
+        isRefund: isRefundPayment(payment),
+        buildingId,
+        buildingCode: building?.code ?? null,
+        buildingName: building?.display_name ?? building?.code ?? null,
+        unitId: payment.unit_id,
+        unitNo: unit?.unit_no ?? null,
+        customerId: payment.customer_id,
+        customerName: payment.customer_id ? customerById.get(payment.customer_id)?.name ?? null : null,
+        receiptNo: payment.receipt_no,
+      };
+    });
+  const dueItems = items.filter((item) => item.dueDate <= asOf && item.outstandingXof > 0);
+  const upcomingItems = items.filter((item) => item.dueDate > asOf && item.outstandingXof > 0);
+  const historicalPending = historicalPendingRows.reduce(
+    (sum, row) => sum + Math.max(Number(row.amount_xof) - Number(row.paid_amount_xof), 0), 0,
+  );
 
   return {
     monthStart: monthStartText,
     monthEndExclusive: monthEndText,
     asOf,
     summary: {
-      totalReceivable,
-      totalPaid,
-      outstanding,
-      overdue,
-      count: items.length,
-      collectionRate: totalReceivable > 0 ? totalPaid / totalReceivable : 0,
+      totalReceivable: dueItems.reduce((sum, item) => sum + item.amountXof, 0),
+      totalPaid: dueItems.reduce((sum, item) => sum + item.paidAmountXof, 0),
+      monthCollected: paymentItems.reduce((sum, item) => sum + (item.isRefund ? -item.amountXof : item.amountXof), 0),
+      outstanding: dueItems.reduce((sum, item) => sum + item.outstandingXof, 0),
+      overdue: dueItems.filter((item) => item.dueDate < asOf).reduce((sum, item) => sum + item.outstandingXof, 0),
+      upcoming: upcomingItems.reduce((sum, item) => sum + item.outstandingXof, 0),
+      count: dueItems.length,
+      historicalPending,
+      historicalPendingCount: historicalPendingRows.filter((row) => Number(row.amount_xof) > Number(row.paid_amount_xof)).length,
+      collectionRate: 0,
     },
     items,
+    paymentItems,
   };
-}
+});
 
 export const getDailyBookings = cache(async () => {
   const supabase = await createClient();

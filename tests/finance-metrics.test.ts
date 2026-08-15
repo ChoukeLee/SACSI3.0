@@ -69,6 +69,18 @@ describe("computeFinanceMetrics", () => {
     expect(m.count).toBe(1);
     expect(m.receivable).toBe(100000);
   });
+
+  it("as-of scope excludes future receivables and historical pending balances", () => {
+    const rows = [
+      rec({ id: "due", amount_xof: 100000, due_date: "2026-08-14" }),
+      rec({ id: "future", amount_xof: 50000, due_date: "2026-08-15" }),
+      rec({ id: "history", amount_xof: 900000, due_date: "2025-01-01", management_status: "historical_pending" }),
+    ];
+    const m = computeFinanceMetrics(rows, { scope: "asOf", asOfDate: "2026-08-14" });
+    expect(m.receivable).toBe(100000);
+    expect(m.outstanding).toBe(100000);
+    expect(m.count).toBe(1);
+  });
 });
 
 describe("isReceivableOverdue", () => {

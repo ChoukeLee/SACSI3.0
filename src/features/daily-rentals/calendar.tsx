@@ -466,9 +466,9 @@ export function DailyCalendar({
   }, [bookingById, customerMap, allUnitById, unitById, financeStats.collectedPayments, locale]);
 
   const financeCards = useMemo(() => [
-    { key: "collected", label: locale === "zh" ? "本月已收" : "Encaisse", value: formatXof(financeStats.monthCollected), tone: "green" as const },
-    { key: "outstanding", label: locale === "zh" ? "当前未收" : "Impayé", value: formatXof(financeStats.currentOutstanding), tone: "orange" as const },
-    { key: "settled", label: locale === "zh" ? "本月退房结账额" : "Règlement du mois", value: formatXof(financeStats.monthSettled), tone: "dark" as const },
+    { key: "collected", label: locale === "zh" ? "本月已收" : "Encaisse", value: formatXof(financeStats.monthCollected), caption: locale === "zh" ? "按实际收款日期" : "Date de paiement", tone: "green" as const },
+    { key: "outstanding", label: locale === "zh" ? "在住订单未收" : "Impayé en séjour", value: formatXof(financeStats.currentOutstanding), caption: locale === "zh" ? "仅已入住及已退房未结清" : "Séjours ouverts", tone: "orange" as const },
+    { key: "settled", label: locale === "zh" ? "本月退房结账额" : "Règlement du mois", value: formatXof(financeStats.monthSettled), caption: locale === "zh" ? "按实际退房日期" : "Date de départ", tone: "dark" as const },
   ], [financeStats, locale]);
 
   const shareRows = useMemo(() => {
@@ -592,7 +592,7 @@ export function DailyCalendar({
         </div>
         <div className="grid gap-3 border-t border-border bg-card px-4 py-3 md:grid-cols-3">
           {financeCards.map((card) => (
-            <FinanceCard key={card.key} label={card.label} value={card.value} tone={card.tone} onClick={() => setFinanceDetail(card.key as "collected" | "outstanding" | "settled")} />
+            <FinanceCard key={card.key} label={card.label} value={card.value} caption={card.caption} tone={card.tone} onClick={() => setFinanceDetail(card.key as "collected" | "outstanding" | "settled")} />
           ))}
         </div>
       </section>
@@ -1346,7 +1346,7 @@ function ShareCard({ label, value, units, tone }: { label: string; value: number
   );
 }
 
-function FinanceCard({ label, value, tone, onClick }: { label: string; value: string; tone: "dark" | "orange" | "green"; onClick: () => void }) {
+function FinanceCard({ label, value, caption, tone, onClick }: { label: string; value: string; caption: string; tone: "dark" | "orange" | "green"; onClick: () => void }) {
   const tileTone = {
     dark: "neutral",
     orange: "amber",
@@ -1357,6 +1357,7 @@ function FinanceCard({ label, value, tone, onClick }: { label: string; value: st
     <StatTile
       label={label}
       value={value}
+      caption={caption}
       tone={tileTone}
       onClick={onClick}
       className="min-h-[84px]"

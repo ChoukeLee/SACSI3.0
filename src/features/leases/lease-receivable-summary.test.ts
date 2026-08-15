@@ -91,12 +91,12 @@ describe("resolveLeaseOverdue", () => {
     });
   });
 
-  it("counts an unpaid receivable as overdue on its due date", () => {
+  it("does not count an unpaid receivable as overdue until after its due date", () => {
     const summary = summarizeLeaseReceivables([
       receivable({ amount_xof: 650_000, due_date: "2026-08-10", status: "pending" }),
     ], "2026-08-10");
 
-    expect(summary.overdue).toBe(650_000);
-    expect(summary.earliestOverdueDue).toBe("2026-08-10");
+    expect(summary.overdue).toBe(0);
+    expect(summary.earliestOverdueDue).toBeNull();
   });
 });

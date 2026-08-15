@@ -53,6 +53,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
   const [statusFilter, setStatusFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [buildingFilter, setBuildingFilter] = useState("all");
+  const [managementFilter, setManagementFilter] = useState("managed");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -83,6 +84,8 @@ export function ReceivableList({ receivables, units, customers, buildings, local
   const filtered = useMemo(() => {
     const statusWeight: Record<string, number> = { overdue: 0, partial: 1, pending: 2, paid: 3, cancelled: 4 };
     return receivables.filter((r) => {
+      const managementStatus = r.management_status ?? "managed";
+      if (managementFilter !== "all" && managementStatus !== managementFilter) return false;
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
       if (sourceFilter !== "all" && r.source_type !== sourceFilter) return false;
       if (buildingFilter !== "all") {
@@ -105,7 +108,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
       if (unitCompare !== 0) return unitCompare;
       return Number(b.amount_xof) - Number(a.amount_xof);
     });
-  }, [receivables, statusFilter, sourceFilter, buildingFilter, dateFrom, dateTo, unitBuildingMap, unitMap]);
+  }, [receivables, statusFilter, sourceFilter, buildingFilter, managementFilter, dateFrom, dateTo, unitBuildingMap, unitMap]);
 
   const summary = useMemo(
     () => calculateReceivableSummary(filtered),
@@ -193,6 +196,19 @@ export function ReceivableList({ receivables, units, customers, buildings, local
           </div>
         }
       >
+        <FilterGroup label={locale === "zh" ? "管理口径" : "Périmètre"}>
+          <SegmentedControl
+            value={managementFilter}
+            onChange={setManagementFilter}
+            ariaLabel={locale === "zh" ? "管理口径" : "Périmètre"}
+            items={[
+              { value: "managed", label: locale === "zh" ? "当前管理" : "Courant" },
+              { value: "historical_pending", label: locale === "zh" ? "历史待核" : "Historique à vérifier" },
+              { value: "excluded", label: locale === "zh" ? "已排除" : "Exclu" },
+              { value: "all", label: locale === "zh" ? "全部档案" : "Tous" },
+            ]}
+          />
+        </FilterGroup>
         <FilterGroup label={t.filters.status}>
           <SegmentedControl
             value={statusFilter}

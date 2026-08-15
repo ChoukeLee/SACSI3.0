@@ -102,20 +102,25 @@ function stateCustomerName(s: UnitState, cmap: Map<string, string>, locale: Loca
 }
 
 function summarizeFinanceItems(items: ManagementFinanceSnapshot["items"]): ManagementFinanceSnapshot["summary"] {
-  const totalReceivable = items.reduce((sum, item) => sum + item.amountXof, 0);
-  const totalPaid = items.reduce((sum, item) => sum + item.paidAmountXof, 0);
-  const outstanding = items.reduce((sum, item) => sum + item.outstandingXof, 0);
-  const overdue = items
-    .filter((item) => item.status === "overdue")
+  const today = new Date().toISOString().slice(0, 10);
+  const due = items.filter((item) => item.dueDate <= today && item.outstandingXof > 0);
+  const upcoming = items.filter((item) => item.dueDate > today && item.outstandingXof > 0);
+  const outstanding = due.reduce((sum, item) => sum + item.outstandingXof, 0);
+  const overdue = due
+    .filter((item) => item.dueDate < today)
     .reduce((sum, item) => sum + item.outstandingXof, 0);
 
   return {
-    totalReceivable,
-    totalPaid,
+    totalReceivable: due.reduce((sum, item) => sum + item.amountXof, 0),
+    totalPaid: due.reduce((sum, item) => sum + item.paidAmountXof, 0),
+    monthCollected: 0,
     outstanding,
     overdue,
-    count: items.length,
-    collectionRate: totalReceivable > 0 ? totalPaid / totalReceivable : 0,
+    upcoming: upcoming.reduce((sum, item) => sum + item.outstandingXof, 0),
+    count: due.length,
+    historicalPending: 0,
+    historicalPendingCount: 0,
+    collectionRate: 0,
   };
 }
 
@@ -200,15 +205,24 @@ export function FinanceSectionClient({
       : snapshot.items,
     [snapshot.items, selectedBuildingId],
   );
-  // 明细面板的月份选择器默认值（YYYY-MM）。
-  const currentMonthKey = (snapshot.monthStart || snapshot.asOf || new Date().toISOString().slice(0, 10)).slice(0, 7);
-  // 口径：截至今日（As-of）—— 卡片展示全部非日租业务的历史存量（到期日早于本月底），而非仅本月到期。
-  const stats = useMemo(() => summarizeFinanceItems(filteredItems), [filteredItems]);
+  const filteredPayments = useMemo(
+    () => selectedBuildingId
+      ? snapshot.paymentItems.filter((item) => item.buildingId === selectedBuildingId)
+      : snapshot.paymentItems,
+    [snapshot.paymentItems, selectedBuildingId],
+  );
+  const stats = useMemo(() => {
+    const receivableStats = summarizeFinanceItems(filteredItems);
+    return {
+      ...receivableStats,
+      monthCollected: filteredPayments.reduce((sum, item) => sum + (item.isRefund ? -item.amountXof : item.amountXof), 0),
+    };
+  }, [filteredItems, filteredPayments]);
   const blocks = [
-    { key: "receivable", label: locale === "zh" ? "应收" : "Dû", value: stats.totalReceivable, color: "accentBlue" as const, icon: TrendingUp },
-    { key: "collected", label: locale === "zh" ? "已收" : "Encaissé", value: stats.totalPaid, color: "accentGreen" as const, icon: Banknote },
-    { key: "outstanding", label: locale === "zh" ? "未收" : "Reste à encaisser", value: stats.outstanding, color: "accentAmber" as const, icon: WalletCards },
+    { key: "collected", label: locale === "zh" ? "本月已收" : "Encaissé ce mois", value: stats.monthCollected, color: "accentGreen" as const, icon: Banknote },
+    { key: "outstanding", label: locale === "zh" ? "已确认未收" : "Dû confirmé", value: stats.outstanding, color: "accentAmber" as const, icon: WalletCards },
     { key: "overdue", label: locale === "zh" ? "逾期" : "En retard", value: stats.overdue, color: "accentRed" as const, icon: Clock3 },
+    { key: "upcoming", label: locale === "zh" ? "15天内应收" : "Dû sous 15j", value: stats.upcoming, color: "accentBlue" as const, icon: TrendingUp },
   ];
 
   return (
@@ -219,14 +233,14 @@ export function FinanceSectionClient({
             <h2 className="text-[15px] font-semibold tracking-tight">{locale === "zh" ? "财务概览" : "Vue financiere"}</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {locale === "zh"
-                ? `${selectedBuildingName ?? "全部楼栋"} · 长租、出售及历史应收 · 截至今日 ${stats.count} 笔 · 点击指标查看明细`
+                ? `${selectedBuildingName ?? "全部楼栋"} · 当前管理口径 · 不含历史待核 · 卡片与明细同口径`
                 : `${selectedBuildingName ?? "Tous les bâtiments"} · ${stats.count} créances à ce jour · Cliquez pour le détail`}
             </p>
           </div>
-          <div className="hidden text-right sm:block">
-            <p className="text-lg font-semibold tabular-nums">{Math.round(stats.collectionRate * 100)}%</p>
-            <p className="text-[11px] text-muted-foreground">{locale === "zh" ? "回款率" : "Taux de recouvrement"}</p>
-          </div>
+          {!selectedBuildingId && snapshot.summary.historicalPendingCount > 0 && <div className="hidden text-right sm:block">
+            <p className="text-sm font-semibold tabular-nums">{snapshot.summary.historicalPendingCount} {locale === "zh" ? "笔" : "lignes"}</p>
+            <p className="text-[11px] text-muted-foreground">{locale === "zh" ? "历史待核（未计入）" : "Historique à vérifier (exclu)"}</p>
+          </div>}
         </div>
         <MetricGrid columns={4}>
           {blocks.map(block => {
@@ -247,11 +261,11 @@ export function FinanceSectionClient({
       </div>
       {detail != null && (
         <FinanceDetailPanel
-          open={detail as "receivable" | "collected" | "outstanding" | "overdue"}
+          open={detail as "collected" | "outstanding" | "overdue" | "upcoming"}
           onClose={() => setDetail(null)}
           items={filteredItems}
+          paymentItems={filteredPayments}
           asOf={snapshot.asOf}
-          defaultMonth={currentMonthKey}
           locale={locale}
         />
       )}

@@ -1,11 +1,16 @@
-export type FinanceDetailType = "receivable" | "collected" | "outstanding" | "overdue";
+export type FinanceDetailType = "collected" | "outstanding" | "overdue" | "upcoming";
 
 export interface ManagementFinanceSummary {
+  /** Legacy aggregate fields retained for snapshot compatibility; dashboard does not use them. */
   totalReceivable: number;
   totalPaid: number;
+  monthCollected: number;
   outstanding: number;
   overdue: number;
+  upcoming: number;
   count: number;
+  historicalPending: number;
+  historicalPendingCount: number;
   collectionRate: number;
 }
 
@@ -28,12 +33,29 @@ export interface ManagementFinanceItem {
   customerName: string | null;
 }
 
+export interface ManagementPaymentItem {
+  id: string;
+  paymentDate: string;
+  sourceType: string;
+  amountXof: number;
+  isRefund: boolean;
+  buildingId: string | null;
+  buildingCode: string | null;
+  buildingName: string | null;
+  unitId: string | null;
+  unitNo: string | null;
+  customerId: string | null;
+  customerName: string | null;
+  receiptNo: string | null;
+}
+
 export interface ManagementFinanceSnapshot {
   monthStart: string;
   monthEndExclusive: string;
   asOf: string;
   summary: ManagementFinanceSummary;
   items: ManagementFinanceItem[];
+  paymentItems: ManagementPaymentItem[];
 }
 
 type RawSnapshot = {
@@ -64,9 +86,13 @@ export function parseManagementFinanceSnapshot(value: unknown): ManagementFinanc
     summary: {
       totalReceivable: asNumber(summary.total_receivable),
       totalPaid: asNumber(summary.total_paid),
+      monthCollected: asNumber(summary.month_collected ?? summary.total_paid),
       outstanding: asNumber(summary.outstanding),
       overdue: asNumber(summary.overdue),
+      upcoming: asNumber(summary.upcoming),
       count: asNumber(summary.count),
+      historicalPending: asNumber(summary.historical_pending),
+      historicalPendingCount: asNumber(summary.historical_pending_count),
       collectionRate: asNumber(summary.collection_rate),
     },
     items: items.map((item) => ({
@@ -89,5 +115,6 @@ export function parseManagementFinanceSnapshot(value: unknown): ManagementFinanc
       customerId: asNullableString(item.customer_id),
       customerName: asNullableString(item.customer_name),
     })),
+    paymentItems: [],
   };
 }

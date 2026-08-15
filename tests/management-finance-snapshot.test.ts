@@ -49,9 +49,13 @@ describe("management finance snapshot", () => {
     expect(snapshot.summary).toEqual({
       totalReceivable: 650,
       totalPaid: 650,
+      monthCollected: 650,
       outstanding: 0,
       overdue: 0,
+      upcoming: 0,
       count: 2,
+      historicalPending: 0,
+      historicalPendingCount: 0,
       collectionRate: 1,
     });
     expect(snapshot.items[0]).toMatchObject({

@@ -237,6 +237,7 @@ export type CleaningTaskUpdate = Partial<CleaningTaskInsert>;
 export type ReceivableSourceType = "daily_booking" | "lease_contract" | "sale_contract" | "manual";
 export type ReceivableCategory = "daily_rental" | "lease_rent" | "lease_deposit" | "sale_installment" | "sale_lump_sum" | "other";
 export type ReceivableStatus = "pending" | "partial" | "paid" | "overdue" | "cancelled";
+export type ReceivableManagementStatus = "managed" | "historical_pending" | "excluded";
 
 export interface ReceivableRow {
   id: string;
@@ -251,6 +252,7 @@ export interface ReceivableRow {
   amount_xof: number;
   paid_amount_xof: number;
   status: ReceivableStatus;
+  management_status?: ReceivableManagementStatus;
   currency: string;
   notes?: string | null;
   created_at: string;

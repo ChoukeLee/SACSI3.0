@@ -20,7 +20,7 @@ export function addOneIsoDay(date: string): string {
 }
 
 export function isOverdueReceivable(receivable: ReceivableRow, today: string): boolean {
-  return receivable.status === "overdue" || receivable.due_date <= today;
+  return receivable.due_date < today;
 }
 
 export function summarizeLeaseReceivables(
