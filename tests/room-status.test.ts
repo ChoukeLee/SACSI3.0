@@ -180,4 +180,20 @@ describe("buildBookingMap", () => {
     expect(roomMap?.get("2026-06-24")?.status).toBe("checked_in");
     expect(roomMap?.get("2026-06-25")?.status).toBe("checked_in");
   });
+
+  it("shows one-day open checked_out bookings on the actual checkout date", () => {
+    const map = buildBookingMap(
+      [booking({
+        check_in: "2026-07-28",
+        check_out: null,
+        checkout_mode: "open",
+        actual_check_out: "2026-07-28",
+        status: "checked_out",
+      })],
+      { todayStr: "2026-08-15", tomorrowStr: "2026-08-16" },
+    );
+
+    const roomMap = map.get("u1");
+    expect(roomMap?.get("2026-07-28")?.status).toBe("checked_out");
+  });
 });

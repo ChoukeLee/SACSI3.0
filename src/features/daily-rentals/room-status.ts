@@ -232,9 +232,11 @@ function resolveCalendarCheckOut(
     return addDays(b.check_in, 1);
   }
 
-  // checked_out with actual_check_out : recorded range
+  // checked_out with actual_check_out : recorded range including checkout day.
+  // Some open-ended historical records have check_in === actual_check_out;
+  // keep at least one visible cell so the calendar does not swallow them.
   if (b.status === "checked_out" && b.actual_check_out) {
-    return b.actual_check_out;
+    return addDays(b.actual_check_out, 1);
   }
 
   // checked_out without actual : just check_in (one cell, as historical record)
