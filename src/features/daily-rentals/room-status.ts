@@ -73,14 +73,6 @@ export function getDailyRoomStateForDate(params: {
     return { unit, status: isCO ? "checking_out_today" : "occupied", booking: bestBooking, isCheckoutDay: isCO };
   }
 
-  // 1b. Early check-in (unit status says occupied but booking may have earlier check_in)
-  if (unit.status === "daily_occupied") {
-    const checkedInB = unitBookings.find(b => b.status === "checked_in");
-    if (checkedInB) {
-      return { unit, status: "occupied", booking: checkedInB, isCheckoutDay: false };
-    }
-  }
-
   // 2. Cleaning pending — takes priority over future bookings
   const hasPendingCleaning = cleaningTasks.some(t => t.unit_id === unit.id && !t.is_completed);
   const pendingCleaningTask = cleaningTasks.find(t => t.unit_id === unit.id && !t.is_completed);

@@ -66,6 +66,22 @@ describe("getDailyRoomStateForDate", () => {
       });
       expect(result.status).toBe("occupied");
     });
+
+    it("fixed checked_in booking does not occupy future dates after checkout", () => {
+      const result = getDailyRoomStateForDate({
+        unit: unit({ status: "daily_occupied" }),
+        dateStr: "2026-08-19",
+        bookings: [booking({
+          check_in: "2026-08-15",
+          check_out: "2026-08-17",
+          checkout_mode: "fixed",
+          status: "checked_in",
+        })],
+        cleaningTasks: [],
+      });
+      expect(result.status).toBe("available");
+      expect(result.booking).toBeNull();
+    });
   });
 
   describe("reserved", () => {
