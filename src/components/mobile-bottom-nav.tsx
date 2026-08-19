@@ -40,7 +40,7 @@ export function MobileBottomNav({ locale, userRole }: { locale: Locale; userRole
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-sticky border-t border-border/60 bg-card/95 shadow-[0_-10px_30px_-24px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:hidden"
-      aria-label="移动端导航"
+      aria-label={locale === "zh" ? "移动端导航" : "Navigation mobile"}
       style={{ paddingBottom: "var(--safe-bottom)" }}
     >
       <div className="flex items-center justify-around px-1">

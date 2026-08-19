@@ -288,7 +288,7 @@ export function BookingPanel({
     const amt = toN(discountAmount);
     if (amt <= 0) return;
     await runPanelAction(
-      () => applyDiscount({ bookingId: booking!.id, amount: amt, reason: discountReason || "手动优惠" }),
+      () => applyDiscount({ bookingId: booking!.id, amount: amt, reason: discountReason || (locale === "zh" ? "手动优惠" : "Remise manuelle") }),
       { closeOnSuccess: true, clearAdvancedTask: true },
     );
     setDiscountAmount("");

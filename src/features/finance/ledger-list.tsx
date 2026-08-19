@@ -20,9 +20,16 @@ function normalizeDepositPeriod(value: string): string {
   return value.trim().replace(/^(\d+)\s*months?$/i, "$1个月");
 }
 
-function formatLedgerDescription(description: string | null | undefined): string {
+function formatLedgerDescription(description: string | null | undefined, locale: Locale): string {
   const raw = description?.trim();
   if (!raw) return "-";
+  if (locale === "fr") {
+    return raw
+      .replace(/\s+(booking|lease|receivable|sale|payment)=[0-9a-f-]{8,}/gi, "")
+      .replace(/\s+installment=(\d+)/gi, " install. $1")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
   const dailyPaid = raw.match(/^Daily rental paid room\s+(\S+)(?:\s+on\s+([\d-]+))?$/i);
   if (dailyPaid) return `日租收款 房间${dailyPaid[1]}${dailyPaid[2] ? ` ${dailyPaid[2]}` : ""}`;
   const dailyBalance = raw.match(/^Daily rental balance paid room\s+(\S+)$/i);
@@ -48,10 +55,10 @@ function formatLedgerDescription(description: string | null | undefined): string
     .trim();
 }
 
-function buildLedgerCsv(entries: LedgerEntryRow[]): string {
+function buildLedgerCsv(entries: LedgerEntryRow[], locale: Locale): string {
   const header = "Date,Direction,Category,Amount_XOF,Description";
   const rows = entries.map((e) =>
-    [e.entry_date, e.direction, e.category, e.amount_xof, `"${formatLedgerDescription(e.description).replace(/"/g, '""')}"`].join(",")
+    [e.entry_date, e.direction, e.category, e.amount_xof, `"${formatLedgerDescription(e.description, locale).replace(/"/g, '""')}"`].join(",")
   );
   return [header, ...rows].join("\n");
 }
@@ -191,7 +198,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments, ca
   };
 
   const handleExportCsv = async () => {
-    const csv = buildLedgerCsv(filtered);
+    const csv = buildLedgerCsv(filtered, locale);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -324,7 +331,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments, ca
                       <MoneyCell tone={e.direction === "expense" || e.direction === "liability_out" ? "expense" : "income"}>
                         {e.direction === "expense" || e.direction === "liability_out" ? "-" : ""}{formatXof(Number(e.amount_xof))}
                       </MoneyCell>
-                      <BusinessTd className="truncate text-muted-foreground">{formatLedgerDescription(e.description)}</BusinessTd>
+                      <BusinessTd className="truncate text-muted-foreground">{formatLedgerDescription(e.description, locale)}</BusinessTd>
                       {attachments && attachments.length > 0 && (
                         <BusinessTd align="center" className="px-2">
                           {e.payment_id && attachmentByPayment.has(e.payment_id) && (

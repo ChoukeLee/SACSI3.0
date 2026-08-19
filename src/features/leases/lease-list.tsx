@@ -828,7 +828,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
             <div><dt className="text-xs text-muted-foreground">{locale === "zh" ? "正式合同到期日" : t.form.expectedEndDate}</dt><dd>{isContractEndConfirmed(selected)?selected.expected_end_date:(locale==="zh"?"未确认":"Non confirmée")}</dd></div>
             <div><dt className="text-xs text-muted-foreground">{locale==="zh"?"缴租截至日":"Loyer payé au"}</dt><dd className={cn(selected.paid_through_date&&isPaidThroughOverdue(selected)?"font-medium text-red-600":"font-medium text-emerald-700")}>{selected.paid_through_date??(locale==="zh"?"待补":"À compléter")}</dd></div>
             {selected.actual_end_date&&<div><dt className="text-xs text-muted-foreground">{t.form.actualEndDate}</dt><dd>{selected.actual_end_date}</dd></div>}
-            <div><dt className="text-xs text-muted-foreground">{t.form.paymentCycle}</dt><dd>{t.paymentCycle[selected.payment_cycle as keyof typeof t.paymentCycle]} / {selected.payment_day}号</dd></div>
+            <div><dt className="text-xs text-muted-foreground">{t.form.paymentCycle}</dt><dd>{t.paymentCycle[selected.payment_cycle as keyof typeof t.paymentCycle]} / {selected.payment_day}{locale === "zh" ? "号" : ""}</dd></div>
             <div>
               <dt className="text-xs text-muted-foreground">{t.form.monthlyRent}</dt>
               <dd className="font-semibold">{formatXof(Number(selected.monthly_rent_xof))}</dd>
@@ -839,7 +839,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
               )}
             </div>
             <div><dt className="text-xs text-muted-foreground">{t.form.deposit}</dt><dd>{formatXof(Number(selected.deposit_amount_xof))} {selected.deposit_received?t.form.depositPaid:t.form.depositUnpaid}</dd></div>
-            {selected.rent_free_days>0&&<div><dt className="text-xs text-muted-foreground">{t.form.rentFreeDays}</dt><dd>{selected.rent_free_days}天</dd></div>}
+            {selected.rent_free_days>0&&<div><dt className="text-xs text-muted-foreground">{t.form.rentFreeDays}</dt><dd>{selected.rent_free_days}{locale === "zh" ? "天" : " jours"}</dd></div>}
             {selected.signer_name&&<div><dt className="text-xs text-muted-foreground">{t.form.signerName}</dt><dd>{selected.signer_name}</dd></div>}
           </dl>
           {canActivate&&selected.status==="draft"&&<Button className="w-full" variant="default" onClick={()=>handleActivate(selected.id)} disabled={saving}>{saving?"...":t.form.activateContract}</Button>}
@@ -962,7 +962,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                   selected.contract_no,
                   financeType,
                   financeDate,
-                )}-自动顺序`}
+                )}${locale === "zh" ? "-自动顺序" : "-auto"}`}
                 className={cn(inputClass, "bg-muted/50 text-xs text-muted-foreground")}
               />
             </div>

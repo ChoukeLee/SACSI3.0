@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import { DesktopOnly } from "@/features/mobile";
 import { AuditLogViewer } from "@/features/settings";
 import { enrichAuditLogsWithUnitNumbers, type AuditLogRow } from "@/features/settings/audit-log-enrichment";
@@ -15,14 +16,17 @@ export default async function FrenchAuditLogsPage() {
 
   const supabase = await createClient();
 
-  const query = supabase
-    .from("audit_logs")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(500);
+  const rows = await fetchAllPages(
+    (from, to) => supabase
+      .from("audit_logs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to),
+    "audit logs",
+  );
 
-  const { data } = await query;
-  const logs = await enrichAuditLogsWithUnitNumbers(supabase, (data ?? []) as unknown as AuditLogRow[]);
+  const logs = await enrichAuditLogsWithUnitNumbers(supabase, rows as unknown as AuditLogRow[]);
 
   return (
     <>
