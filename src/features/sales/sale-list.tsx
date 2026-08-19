@@ -6,6 +6,7 @@ import { Plus, DollarSign, FileText, CalendarPlus, TrendingUp, AlertTriangle, Ey
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
+import { paymentDisplay, formatMoney } from "@/lib/currency";
 import { contractStatusVariant as statusVariant } from "@/lib/status-styles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,9 +27,6 @@ type PanelType = "new" | "detail" | "insight" | null;
 type SaleStatKey = "active" | "total" | "received" | "receivable" | "due" | "overdue" | "transfer";
 type SaleStatusFilter = "current" | "all" | "terminated" | "expired";
 const SALE_RECEIPT_SOURCE_TYPES = new Set(["sale", "sale_contract", "property_fee", "parking_fee"]);
-
-const formatCny = (amount: number) =>
-  `¥${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(amount)}`;
 
 export function SaleList({ contracts, schedules, units, customers, payments, receivables, buildings, locale, canCreate = true, canRecordFinance = true, canManage = true, canTerminate = true }: SaleListProps) {
   const router = useRouter();
@@ -521,12 +519,12 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
               <div className="rounded-md border border-blue-200 bg-blue-50/50 px-3 py-2">
                 <p className="text-muted-foreground">{locale==="zh"?"合同总额":"Total contrat"}</p>
                 <p className="font-semibold tabular-nums text-blue-700">{formatXof(selectedContractTotal)}</p>
-                {selectedCnyContractTotal>0&&<p className="mt-0.5 tabular-nums text-blue-700">{locale==="zh"?"人民币合同额 ":"Montant CNY "}{formatCny(selectedCnyContractTotal)}</p>}
+                {selectedCnyContractTotal>0&&<p className="mt-0.5 tabular-nums text-blue-700">{locale==="zh"?"人民币合同额 ":"Montant CNY "}{formatMoney(selectedCnyContractTotal, "CNY", locale)}</p>}
               </div>
               <div className="rounded-md border border-emerald-200 bg-emerald-50/50 px-3 py-2">
                 <p className="text-muted-foreground">{locale==="zh"?"累计已收":"Total reçu"}</p>
                 <p className="font-semibold tabular-nums text-emerald-700">{formatXof(saleContractReceived)}</p>
-                {selectedCnyReceived>0&&<p className="mt-0.5 tabular-nums text-emerald-700">{locale==="zh"?"人民币实收 ":"Reçu en CNY "}{formatCny(selectedCnyReceived)}</p>}
+                {selectedCnyReceived>0&&<p className="mt-0.5 tabular-nums text-emerald-700">{locale==="zh"?"人民币实收 ":"Reçu en CNY "}{formatMoney(selectedCnyReceived, "CNY", locale)}</p>}
               </div>
               <div className={cn("rounded-md border px-3 py-2",selectedOutstanding>0?"border-amber-200 bg-amber-50/50":"border-emerald-200 bg-emerald-50/50")}>
                 <p className="text-muted-foreground">{locale==="zh"?"未收":"Reste à recevoir"}</p>
@@ -554,7 +552,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
               <p className="text-xs text-muted-foreground">{locale==="zh"?"暂无逐笔财务记录":"Aucune écriture détaillée"}</p>
             ):(
               <div className="space-y-1.5">
-                {contractPayments.map(payment=>{const isExpense=isSaleExpensePayment(payment);const isCny=payment.currency==="CNY";return(
+                {contractPayments.map(payment=>{const isExpense=isSaleExpensePayment(payment);const display=paymentDisplay(payment,locale);return(
                   <div key={payment.id} className={cn("rounded-lg border px-3 py-2.5 text-[13px]",isExpense?"border-red-100 bg-red-50/50":"border-emerald-100 bg-emerald-50/40")}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -565,8 +563,8 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
                         <p className="mt-1 truncate text-[11px] text-muted-foreground" title={payment.receipt_no??payment.notes??""}>{payment.receipt_no||payment.notes||(locale==="zh"?"无业务编号":"Sans référence")}</p>
                       </div>
                       <div className={cn("shrink-0 text-right tabular-nums",isExpense?"text-red-600":"text-emerald-700")}>
-                        <p className="font-semibold">{isExpense?"- ":""}{isCny?formatCny(Number(payment.amount)):formatXof(Number(payment.amount))}</p>
-                        {isCny&&<p className="mt-0.5 text-[11px] font-medium text-muted-foreground">{locale==="zh"?"折合 ":"Soit "}{formatXof(paymentAmountXof(payment))}</p>}
+                        <p className="font-semibold">{isExpense?"- ":""}{display.primary}</p>
+                        {display.secondary&&<p className="mt-0.5 text-[11px] font-medium text-muted-foreground">{locale==="zh"?"折合 ":"Soit "}{display.secondary}</p>}
                       </div>
                     </div>
                   </div>

@@ -6,6 +6,7 @@ import { ArrowLeft, BedDouble, Building2, FileText, Home, Landmark, ReceiptText,
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
 import { cn, formatXof } from "@/lib/utils";
+import { paymentDisplay } from "@/lib/currency";
 import { currencyDisplayLabel, financialBusinessLabel, isFinancialExpenseSourceType, statusDisplayLabel } from "@/lib/display-labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -157,7 +158,8 @@ export function UnitProfileView({ data, locale }: { data: UnitProfileData; local
           <RecordCard title={zh ? "历史收款" : "Paiements"} icon={ReceiptText} empty={data.payments.length === 0} emptyText={zh ? "暂无收款记录" : "Aucun paiement"}>
             <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-sm"><thead><tr>{[zh ? "日期" : "Date", zh ? "业务" : "Activité", zh ? "金额" : "Montant", zh ? "币种" : "Devise", zh ? "收据号" : "Reçu"].map((label) => <th key={label} className="px-4 py-3 text-left text-xs text-muted-foreground">{label}</th>)}</tr></thead><tbody className="divide-y">{data.payments.map((row) => {
               const isExpense = isFinancialExpenseSourceType(row.source_type);
-              return <tr key={row.id} className="hover:bg-muted/40"><td className="px-4 py-3">{row.payment_date}</td><td className={cn("px-4 py-3", isExpense && "font-medium text-red-700")}>{financialBusinessLabel(row.source_type, locale)}</td><td className={cn("px-4 py-3 font-medium tabular-nums", isExpense ? "text-red-700" : "text-emerald-700")}>{formatXof(Number(row.amount) * Number(row.exchange_rate_to_xof || 1))}</td><td className="px-4 py-3">{currencyDisplayLabel(row.currency, locale)}</td><td className="px-4 py-3">{row.receipt_no ?? "-"}</td></tr>;
+              const display = paymentDisplay(row, locale);
+              return <tr key={row.id} className="hover:bg-muted/40"><td className="px-4 py-3">{row.payment_date}</td><td className={cn("px-4 py-3", isExpense && "font-medium text-red-700")}>{financialBusinessLabel(row.source_type, locale)}</td><td className={cn("px-4 py-3 font-medium tabular-nums", isExpense ? "text-red-700" : "text-emerald-700")}>{display.primary}{display.secondary && <span className="block text-[11px] font-normal text-muted-foreground">{zh ? "折合 " : "Soit "}{display.secondary}</span>}</td><td className="px-4 py-3">{currencyDisplayLabel(row.currency, locale)}</td><td className="px-4 py-3">{row.receipt_no ?? "-"}</td></tr>;
             })}</tbody></table></div>
           </RecordCard>
         </div>

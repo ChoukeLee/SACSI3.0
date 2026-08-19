@@ -6,6 +6,7 @@ import { Plus, AlertTriangle, FileText, DollarSign, LogOut, Printer, Eye, Calend
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
+import { formatMoney } from "@/lib/currency";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,14 +87,6 @@ function paymentAmountXof(payment: PaymentRow) {
   return payment.currency === "XOF"
     ? Number(payment.amount)
     : Math.round(Number(payment.amount) * Number(payment.exchange_rate_to_xof));
-}
-
-function formatOriginalPaymentAmount(payment: PaymentRow) {
-  return `${payment.currency} ${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(Number(payment.amount))}`;
-}
-
-function formatOriginalMonthlyRent(currency: string, amount: number) {
-  return `${currency} ${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(amount)}`;
 }
 
 function getRecordedOriginalPayment(payment: PaymentRow) {
@@ -841,7 +834,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
               <dd className="font-semibold">{formatXof(Number(selected.monthly_rent_xof))}</dd>
               {selectedOriginalMonthlyRent && (
                 <dd className="mt-0.5 text-xs text-muted-foreground">
-                  {locale === "zh" ? "原币约 " : "Devise d'origine env. "}{formatOriginalMonthlyRent(selectedOriginalMonthlyRent.currency, selectedOriginalMonthlyRent.amount)}/{locale === "zh" ? "月" : "mois"}
+                  {locale === "zh" ? "原币约 " : "Devise d'origine env. "}{formatMoney(selectedOriginalMonthlyRent.amount, selectedOriginalMonthlyRent.currency, locale)}/{locale === "zh" ? "月" : "mois"}
                 </dd>
               )}
             </div>
@@ -898,7 +891,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                       </div>
                       <div className="shrink-0 text-right tabular-nums">
                         <p className={cn("font-semibold", isExpense ? "text-red-600" : "text-emerald-700")}>
-                          {isExpense ? "- " : ""}{recordedOriginal ? formatOriginalMonthlyRent(recordedOriginal.currency, recordedOriginal.amount) : payment.currency === "XOF" ? formatXof(Number(payment.amount)) : formatOriginalPaymentAmount(payment)}
+                          {isExpense ? "- " : ""}{recordedOriginal ? formatMoney(recordedOriginal.amount, recordedOriginal.currency, locale) : payment.currency === "XOF" ? formatXof(Number(payment.amount)) : formatMoney(Number(payment.amount), payment.currency, locale)}
                         </p>
                         {(payment.currency !== "XOF" || recordedOriginal) && <p className="mt-0.5 text-[11px] text-muted-foreground">{locale === "zh" ? "折合" : "Équiv."} {formatXof(paymentAmountXof(payment))}</p>}
                       </div>
