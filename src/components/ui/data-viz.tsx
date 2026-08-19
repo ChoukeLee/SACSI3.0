@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 // ── HSL Color Palette (modern, gradient-friendly) ──
 
-type ChartTone = "blue" | "green" | "amber" | "red" | "neutral" | "sold" | "leased" | "teal";
+export type ChartTone = "blue" | "green" | "amber" | "red" | "neutral" | "sold" | "leased" | "teal";
 
 const HSL: Record<ChartTone, { base: string; fill: string; glow: string }> = {
   blue:    { base: "hsl(210 90% 50%)", fill: "hsl(210 90% 50% / 0.12)", glow: "hsl(210 90% 55% / 0.25)" },
@@ -293,5 +293,220 @@ export function RadarChart({ axes, size = 180 }: { axes: { label: string; value:
         ))}
       </div>
     </div>
+  );
+}
+
+// ── GroupedBarChart ──
+
+export function GroupedBarChart({
+  groups,
+  height = 200,
+  animate = true,
+}: {
+  groups: { label: string; series: { label: string; value: number; tone?: ChartTone; color?: string }[] }[];
+  height?: number;
+  animate?: boolean;
+}) {
+  const seriesMeta = Array.from(new Set(groups.flatMap((g) => g.series.map((s) => s.label)))).map((label) => {
+    const sample = groups.flatMap((g) => g.series).find((s) => s.label === label);
+    return { label, tone: sample?.tone ?? "blue" as ChartTone, color: sample?.color };
+  });
+  const max = Math.max(1, ...groups.flatMap((g) => g.series.map((s) => s.value)));
+
+  const chartW = 720;
+  const chartH = height;
+  const padX = 44;
+  const padTop = 12;
+  const padBottom = 28;
+  const innerW = chartW - padX * 2;
+  const innerH = chartH - padTop - padBottom;
+  const groupGap = 28;
+  const barGap = 3;
+  const groupW = groups.length > 0 ? (innerW - groupGap * (groups.length - 1)) / groups.length : innerW;
+  const barW = Math.max(2, (groupW - barGap * (seriesMeta.length - 1)) / Math.max(1, seriesMeta.length));
+
+  return (
+    <div>
+      <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full">
+        {[0, 0.5, 1].map((f) => {
+          const y = padTop + innerH * (1 - f);
+          return <line key={f} x1={padX} y1={y} x2={chartW - padX} y2={y} stroke="hsl(220 14% 90%)" strokeWidth="1" />;
+        })}
+        {groups.map((g, gi) => {
+          const groupX = padX + gi * (groupW + groupGap);
+          return g.series.map((s, si) => {
+            const h = (Math.max(0, s.value) / max) * innerH;
+            const x = groupX + si * (barW + barGap);
+            const y = padTop + innerH - h;
+            const color = s.color ?? HSL[s.tone ?? "blue"].base;
+            return (
+              <motion.rect
+                key={gi + "-" + si}
+                x={x} y={animate ? padTop + innerH : y}
+                width={barW} height={animate ? 0 : Math.max(h, 1)} rx="2"
+                fill={color}
+                initial={animate ? { y: padTop + innerH, height: 0 } : undefined}
+                animate={{ y, height: Math.max(h, 1) }}
+                transition={{ duration: 0.5, delay: gi * 0.05 }}
+              />
+            );
+          });
+        })}
+        {groups.map((g, gi) => {
+          const groupX = padX + gi * (groupW + groupGap);
+          return (
+            <text key={gi} x={groupX + groupW / 2} y={chartH - 8} textAnchor="middle" fontSize="10" fill="hsl(220 8% 46%)">
+              {g.label}
+            </text>
+          );
+        })}
+      </svg>
+      <div className="mt-2 flex flex-wrap gap-3">
+        {seriesMeta.map((s) => (
+          <span key={s.label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color ?? HSL[s.tone].base }} />
+            {s.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── MultiLineChart ──
+
+export function MultiLineChart({
+  series,
+  xLabels,
+  height = 200,
+}: {
+  series: { label: string; values: number[]; tone?: ChartTone; color?: string }[];
+  xLabels: string[];
+  height?: number;
+}) {
+  const chartW = 720;
+  const chartH = height;
+  const padX = 44;
+  const padTop = 14;
+  const padBottom = 28;
+  const innerW = chartW - padX * 2;
+  const innerH = chartH - padTop - padBottom;
+
+  const allVals = series.flatMap((s) => s.values);
+  const max = Math.max(1, ...allVals);
+  const min = Math.min(0, ...allVals);
+  const range = Math.max(1, max - min);
+
+  const toPoint = (value: number, idx: number) => {
+    const x = xLabels.length <= 1 ? padX : padX + (idx / (xLabels.length - 1)) * innerW;
+    const y = padTop + innerH - ((value - min) / range) * innerH;
+    return { x, y };
+  };
+
+  return (
+    <div>
+      <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full">
+        {[0, 0.5, 1].map((f) => {
+          const y = padTop + innerH * (1 - f);
+          return <line key={f} x1={padX} y1={y} x2={chartW - padX} y2={y} stroke="hsl(220 14% 90%)" strokeWidth="1" />;
+        })}
+        {series.map((s, si) => {
+          const color = s.color ?? HSL[s.tone ?? "blue"].base;
+          const pts = s.values.map((v, i) => toPoint(v, i));
+          const path = pts.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(" ");
+          return (
+            <motion.path
+              key={si}
+              d={path}
+              fill="none"
+              stroke={color}
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 1.2, ease: "easeOut" }}
+            />
+          );
+        })}
+        {xLabels.map((lbl, i) => {
+          const p = toPoint(0, i);
+          return (
+            <text key={i} x={p.x} y={chartH - 8} textAnchor="middle" fontSize="10" fill="hsl(220 8% 46%)">
+              {lbl}
+            </text>
+          );
+        })}
+      </svg>
+      <div className="mt-2 flex flex-wrap gap-3">
+        {series.map((s) => (
+          <span key={s.label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color ?? HSL[s.tone ?? "blue"].base }} />
+            {s.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── CalendarHeatmap ──
+
+export function CalendarHeatmap({
+  rows,
+  columns,
+  cells,
+  legend,
+}: {
+  rows: { id: string; label: string }[];
+  columns: { id: string; label: string }[];
+  cells: Record<string, Record<string, ChartTone>>;
+  legend: { label: string; tone: ChartTone }[];
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="overflow-x-auto"
+    >
+      <div className="min-w-max">
+        <div className="flex">
+          <div className="w-16 shrink-0" />
+          {columns.map((c) => (
+            <div key={c.id} className="w-8 shrink-0 pb-1 text-center text-[10px] leading-tight text-muted-foreground">
+              {c.label}
+            </div>
+          ))}
+        </div>
+        {rows.map((r) => (
+          <div key={r.id} className="flex items-center">
+            <div className="w-16 shrink-0 truncate pr-1 text-right text-[10px] text-muted-foreground">{r.label}</div>
+            {columns.map((c) => {
+              const tone = cells[r.id]?.[c.id];
+              return (
+                <div key={c.id} className="p-0.5">
+                  <div
+                    className="h-6 w-6 rounded-sm"
+                    style={{ backgroundColor: tone ? HSL[tone].base : "hsl(220 14% 94%)" }}
+                    title={tone ? `${r.label} · ${c.label}` : undefined}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        ))}
+        {legend.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-3">
+            {legend.map((l) => (
+              <span key={l.label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: HSL[l.tone].base }} />
+                {l.label}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
 }
