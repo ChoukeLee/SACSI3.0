@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { ChevronDown, ChevronUp, Clock, User, Tag, FileText, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { downloadCsv } from "@/lib/csv";
 import { Badge } from "@/components/ui/badge";
 import { DateInput } from "@/components/ui/date-input";
 import { DEFAULT_BUSINESS_TABLE_PAGE_SIZE } from "@/components/ui/business-table";
@@ -98,8 +99,8 @@ const ENTITY_LABELS: Record<string, Record<string, string>> = {
 };
 
 const ROLE_LABELS: Record<string, Record<string, string>> = {
-  zh: { admin: "管理员", boss: "老板", finance: "财务", front_desk: "前台" },
-  fr: { admin: "Admin", boss: "Propriétaire", finance: "Comptable", front_desk: "Réception" },
+  zh: { admin: "管理员", boss: "老板", finance: "财务", front_desk: "前台", rental_sales: "租售" },
+  fr: { admin: "Admin", boss: "Propriétaire", finance: "Comptable", front_desk: "Réception", rental_sales: "Location vente" },
 };
 
 const EXTRA_ACTION_LABELS: Record<string, Record<string, string>> = {
@@ -296,14 +297,31 @@ export function AuditLogViewer({ logs, locale }: Props) {
     );
   };
 
+  const handleExport = () => {
+    const headers = [zh ? "时间" : "Date", zh ? "操作人" : "Acteur", zh ? "角色" : "Rôle", zh ? "操作" : "Action", zh ? "对象" : "Objet", zh ? "摘要" : "Résumé"];
+    const rows = filtered.map((l) => {
+      const role = actorRole(l);
+      return [formatTime(l.created_at), actorText(l), role ? (roleLabels[role] ?? role) : "", actionLabel(l.action), entityText(l), summaryText(l)];
+    });
+    downloadCsv("审计日志_" + new Date().toISOString().slice(0, 10) + ".csv", headers, rows);
+  };
+
   return (
     <div className="space-y-5">
       {/* Filters */}
       <FilterBar
         meta={
-          <span className="tabular-nums">
-            {filtered.length} / {logs.length} {zh ? "条" : "lignes"}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="tabular-nums">
+              {filtered.length} / {logs.length} {zh ? "条" : "lignes"}
+            </span>
+            <button
+              onClick={handleExport}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted"
+            >
+              {zh ? "导出 CSV" : "Exporter CSV"}
+            </button>
+          </div>
         }
       >
         <FilterGroup label={zh ? "日期" : "Date"}>
