@@ -210,3 +210,32 @@ export function aggregateOccupancyMonthly(
     };
   });
 }
+// ─────────────────────────────────────────────────────────────────────────────
+// 应收报表聚合
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { receivableOutstanding } from "@/features/finance/metrics";
+import type { ReceivableRow } from "@/types/database";
+
+/** 各楼栋「已确认」未收余额（按 management_status=managed 之外的历史待核不计入）。 */
+export function aggregateOutstandingByBuilding(
+  receivables: ReceivableRow[],
+  buildings: BuildingRow[],
+  units: UnitRow[],
+): { label: string; value: number }[] {
+  const unitBuilding = new Map(units.map((u) => [u.id, u.building_id]));
+  const buildingName = new Map(buildings.map((b) => [b.id, b.display_name || b.code]));
+  const map = new Map<string, number>();
+
+  for (const r of receivables) {
+    const outstanding = receivableOutstanding(r);
+    if (outstanding <= 0) continue;
+    const bid = r.building_id ?? (r.unit_id ? unitBuilding.get(r.unit_id) ?? null : null);
+    const name = bid ? buildingName.get(bid) ?? bid : "未分楼栋";
+    map.set(name, (map.get(name) ?? 0) + outstanding);
+  }
+
+  return [...map.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value);
+}

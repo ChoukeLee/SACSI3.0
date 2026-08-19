@@ -8,14 +8,17 @@ import {
   GroupedBarChart,
   MultiLineChart,
   CalendarHeatmap,
+  BarListChart,
   type ChartTone,
 } from "@/components/ui/data-viz";
 import { MetricGrid, SegmentedControl, StatTile } from "@/components/ui/operational";
 import { formatXof, sortUnits } from "@/lib/utils";
+import { computeFinanceMetrics, isManagedReceivable, receivableOutstanding } from "@/features/finance/metrics";
 import {
   aggregateByCategory,
   aggregateDailyCollectionsMonthly,
   aggregateOccupancyMonthly,
+  aggregateOutstandingByBuilding,
   aggregatePnlByBuilding,
   aggregatePnlMonthly,
   buildDailyOccupancy,
@@ -23,7 +26,8 @@ import {
   monthRange,
   type DailyCellStatus,
 } from "./report-aggregators";
-import type { LedgerEntryRow, BuildingRow, UnitRow, DailyBookingRow, PaymentRow } from "@/types/database";
+import type { LedgerEntryRow, BuildingRow, UnitRow, DailyBookingRow, PaymentRow, ReceivableRow, CustomerRow } from "@/types/database";
+import { downloadCsv } from "./export-csv";
 
 const CATEGORY_TONES = ["blue", "green", "teal", "amber", "sold", "leased", "red", "neutral"] as const;
 
@@ -45,6 +49,8 @@ export function ReportsView({
   dailyBookings,
   dailyPayments,
   dailyUnitIds,
+  receivables,
+  customers,
   locale,
 }: {
   entries: LedgerEntryRow[];
@@ -53,6 +59,8 @@ export function ReportsView({
   dailyBookings: DailyBookingRow[];
   dailyPayments: PaymentRow[];
   dailyUnitIds: string[];
+  receivables: ReceivableRow[];
+  customers: CustomerRow[];
   locale: "zh" | "fr";
 }) {
   const zh = locale === "zh";
@@ -65,7 +73,7 @@ export function ReportsView({
   }, [entries, dailyPayments, dailyBookings]);
 
   const [selectedMonth, setSelectedMonth] = useState(availableMonths[0] ?? "");
-  const [tab, setTab] = useState<"pnl" | "daily">("pnl");
+  const [tab, setTab] = useState<"pnl" | "daily" | "receivables">("pnl");
 
   const monthEntries = useMemo(
     () => entries.filter((e) => e.entry_date.startsWith(selectedMonth)),
@@ -126,6 +134,64 @@ export function ReportsView({
     return { days, toneCells };
   }, [selectedMonth, dailyBookings, dailyUnitIds, dailyUnits]);
 
+  // 应收报表
+  const managedReceivables = useMemo(() => receivables.filter((r) => isManagedReceivable(r)), [receivables]);
+  const historicalReceivables = useMemo(
+    () => receivables.filter((r) => r.management_status === "historical_pending"),
+    [receivables],
+  );
+  const receivableMetrics = useMemo(() => computeFinanceMetrics(managedReceivables), [managedReceivables]);
+  const historicalOutstanding = useMemo(
+    () => historicalReceivables.reduce((s, r) => s + receivableOutstanding(r), 0),
+    [historicalReceivables],
+  );
+  const outstandingByBuilding = useMemo(
+    () => aggregateOutstandingByBuilding(managedReceivables, buildings, units),
+    [managedReceivables, buildings, units],
+  );
+  const notOverdueOutstanding = Math.max(0, receivableMetrics.outstanding - receivableMetrics.overdue);
+  const topOutstanding = useMemo(
+    () => managedReceivables
+      .filter((r) => receivableOutstanding(r) > 0)
+      .sort((a, b) => receivableOutstanding(b) - receivableOutstanding(a))
+      .slice(0, 20),
+    [managedReceivables],
+  );
+  const buildingNameMap = useMemo(() => new Map(buildings.map((b) => [b.id, b.display_name || b.code])), [buildings]);
+  const unitNoMap = useMemo(() => new Map(units.map((u) => [u.id, u.unit_no])), [units]);
+  const customerNameMap = useMemo(() => new Map(customers.map((c) => [c.id, c.name])), [customers]);
+
+  const handleExport = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    if (tab === "pnl") {
+      const months = trend?.months ?? [];
+      const rows = months.map((m, i) => [m, trend?.income[i] ?? 0, trend?.expense[i] ?? 0, trend?.net[i] ?? 0]);
+      downloadCsv("收支报表_" + selectedMonth + ".csv", [zh ? "月份" : "Mois", zh ? "收入" : "Revenus", zh ? "支出" : "Dépenses", zh ? "净额" : "Net"], rows);
+    } else if (tab === "daily") {
+      const months = monthRange(selectedMonth, 12);
+      const occMap = new Map(occupancyTrend.map((o) => [o.month, o]));
+      const rows = dailyTrend.map((v, i) => {
+        const m = months[i];
+        const o = occMap.get(m);
+        return [m, v, o?.occupiedNights ?? 0, o ? Math.round(o.rate * 1000) / 10 : 0];
+      });
+      downloadCsv("日租报表_" + selectedMonth + ".csv", [zh ? "月份" : "Mois", zh ? "日租收款" : "Encaissé", zh ? "入住晚数" : "Nuits", zh ? "入住率%" : "Taux %"], rows);
+    } else {
+      const rows = managedReceivables
+        .filter((r) => receivableOutstanding(r) > 0)
+        .sort((a, b) => receivableOutstanding(b) - receivableOutstanding(a))
+        .map((r) => {
+          const buildingName = buildingNameMap.get(r.building_id ?? "") ?? "";
+          const unitNo = r.unit_id ? unitNoMap.get(r.unit_id) ?? "" : "";
+          const customerName = r.customer_id ? customerNameMap.get(r.customer_id) ?? "" : "";
+          const out = receivableOutstanding(r);
+          const status = r.due_date < today ? (zh ? "逾期" : "Retard") : (zh ? "待收" : "Dû");
+          return [buildingName, unitNo, customerName, r.due_date, Number(r.amount_xof), Number(r.paid_amount_xof), out, status];
+        });
+      downloadCsv("应收报表_" + selectedMonth + ".csv", [zh ? "楼栋" : "Bâtiment", zh ? "房号" : "Lot", zh ? "客户" : "Client", zh ? "到期日" : "Échéance", zh ? "应收" : "Dû", zh ? "已收" : "Encaissé", zh ? "未收" : "Solde", zh ? "状态" : "Statut"], rows);
+    }
+  };
+
   if (availableMonths.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">
@@ -142,20 +208,29 @@ export function ReportsView({
           items={[
             { value: "pnl" as const, label: zh ? "收支" : "P&L" },
             { value: "daily" as const, label: zh ? "日租" : "Location jour" },
+            { value: "receivables" as const, label: zh ? "应收" : "Créances" },
           ]}
           onChange={setTab}
           ariaLabel={zh ? "报表类型" : "Type de rapport"}
         />
-        <select
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          className="rounded-lg border border-border bg-card px-3 py-2 text-sm"
-          aria-label={zh ? "选择月份" : "Choisir le mois"}
-        >
-          {availableMonths.map((m) => (
-            <option key={m} value={m}>{m}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="rounded-lg border border-border bg-card px-3 py-2 text-sm"
+            aria-label={zh ? "选择月份" : "Choisir le mois"}
+          >
+            {availableMonths.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+          <button
+            onClick={handleExport}
+            className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-muted"
+          >
+            {zh ? "导出 CSV" : "Exporter CSV"}
+          </button>
+        </div>
       </div>
 
       {tab === "pnl" ? (
@@ -218,7 +293,7 @@ export function ReportsView({
             </DataVizCard>
           </div>
         </>
-      ) : (
+      ) : tab === "daily" ? (
         <>
           <MetricGrid columns={3}>
             <StatTile label={zh ? "本月日租收款" : "Encaissé (jour)"} value={formatXof(dailyCollected)} tone="green" icon={Banknote} />
@@ -262,6 +337,77 @@ export function ReportsView({
                   { label: zh ? "空闲" : "Libre", tone: "neutral" },
                 ]}
               />
+            </DataVizCard>
+          )}
+        </>
+      ) : (
+        <>
+          <MetricGrid columns={5}>
+            <StatTile label={zh ? "已确认应收" : "Dû confirmé"} value={formatXof(receivableMetrics.receivable)} tone="blue" />
+            <StatTile label={zh ? "已确认已收" : "Encaissé confirmé"} value={formatXof(receivableMetrics.collected)} tone="green" />
+            <StatTile label={zh ? "已确认未收" : "Solde confirmé"} value={formatXof(receivableMetrics.outstanding)} tone="amber" />
+            <StatTile label={zh ? "逾期" : "En retard"} value={formatXof(receivableMetrics.overdue)} tone="red" />
+            <StatTile label={zh ? "历史待核" : "Historique à vérifier"} value={formatXof(historicalOutstanding)} tone="neutral" />
+          </MetricGrid>
+
+          <div className="grid gap-5 lg:grid-cols-2">
+            <DataVizCard title={zh ? "各楼栋已确认未收" : "Solde confirmé par bâtiment"}>
+              {outstandingByBuilding.length > 0 ? (
+                <BarListChart items={outstandingByBuilding.map((b, i) => ({ label: b.label, value: b.value, tone: (i === 0 ? "red" : "blue") as ChartTone }))} />
+              ) : (
+                <p className="text-sm text-muted-foreground">{zh ? "暂无未收" : "Aucun solde"}</p>
+              )}
+            </DataVizCard>
+            <DataVizCard title={zh ? "未收构成" : "Répartition du solde"}>
+              <DonutChart
+                items={[
+                  { label: zh ? "逾期" : "En retard", value: receivableMetrics.overdue, tone: "red" as ChartTone },
+                  { label: zh ? "未逾期未收" : "Solde non échu", value: notOverdueOutstanding, tone: "amber" as ChartTone },
+                  { label: zh ? "历史待核" : "Historique", value: historicalOutstanding, tone: "neutral" as ChartTone },
+                ].filter((i) => i.value > 0)}
+                centerValue={formatXof(receivableMetrics.outstanding + historicalOutstanding)}
+                centerLabel={zh ? "未收合计" : "Solde total"}
+              />
+            </DataVizCard>
+          </div>
+
+          {topOutstanding.length > 0 && (
+            <DataVizCard title={zh ? "未收明细（按金额前 20）" : "Top 20 des soldes"}>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-muted-foreground">
+                      <th className="px-3 py-2">{zh ? "楼栋/房号" : "Bâtiment/Lot"}</th>
+                      <th className="px-3 py-2">{zh ? "客户" : "Client"}</th>
+                      <th className="px-3 py-2">{zh ? "到期日" : "Échéance"}</th>
+                      <th className="px-3 py-2 text-right">{zh ? "应收" : "Dû"}</th>
+                      <th className="px-3 py-2 text-right">{zh ? "已收" : "Encaissé"}</th>
+                      <th className="px-3 py-2 text-right">{zh ? "未收" : "Solde"}</th>
+                      <th className="px-3 py-2">{zh ? "状态" : "Statut"}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {topOutstanding.map((r) => {
+                      const out = receivableOutstanding(r);
+                      const buildingName = buildingNameMap.get(r.building_id ?? "") ?? "—";
+                      const unitNo = r.unit_id ? unitNoMap.get(r.unit_id) ?? "—" : "—";
+                      const customerName = r.customer_id ? customerNameMap.get(r.customer_id) ?? "—" : "—";
+                      const isOverdue = r.due_date < new Date().toISOString().slice(0, 10);
+                      return (
+                        <tr key={r.id}>
+                          <td className="px-3 py-2">{buildingName} · {unitNo}</td>
+                          <td className="px-3 py-2">{customerName}</td>
+                          <td className="px-3 py-2 tabular-nums">{r.due_date}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{formatXof(Number(r.amount_xof))}</td>
+                          <td className="px-3 py-2 text-right tabular-nums text-emerald-700">{formatXof(Number(r.paid_amount_xof))}</td>
+                          <td className="px-3 py-2 text-right font-medium tabular-nums text-red-700">{formatXof(out)}</td>
+                          <td className="px-3 py-2">{isOverdue ? (zh ? "逾期" : "Retard") : (zh ? "待收" : "Dû")}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </DataVizCard>
           )}
         </>

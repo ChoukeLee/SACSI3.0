@@ -10,8 +10,8 @@ interface NavigationGroup<TItem extends NavigationItem> {
 }
 
 const ROLE_KEYS: Partial<Record<UserRole, Set<string>>> = {
-  boss: new Set(["management", "units", "dailyRentals", "leases", "sales"]),
-  finance: new Set(["management", "units", "leases", "sales"]),
+  boss: new Set(["management", "units", "dailyRentals", "leases", "sales", "reports"]),
+  finance: new Set(["management", "units", "leases", "sales", "reports"]),
   front_desk: new Set(["dailyRentals", "leases"]),
   rental_sales: new Set(["management", "units", "dailyRentals", "leases", "sales"]),
 };

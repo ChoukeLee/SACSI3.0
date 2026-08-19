@@ -2,12 +2,12 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllPages } from "@/lib/supabase/fetch-all";
-import type { LedgerEntryRow, BuildingRow, UnitRow, DailyBookingRow, PaymentRow } from "@/types/database";
+import type { LedgerEntryRow, BuildingRow, UnitRow, DailyBookingRow, PaymentRow, ReceivableRow, CustomerRow } from "@/types/database";
 
 export async function loadReportData() {
   const supabase = await createClient();
 
-  const [entries, buildingsRes, unitsRes, dailyBookings, dailyPayments, dailyFlagsRes] = await Promise.all([
+  const [entries, buildingsRes, unitsRes, dailyBookings, dailyPayments, dailyFlagsRes, receivables, customersRes] = await Promise.all([
     fetchAllPages(
       (from, to) => supabase
         .from("ledger_entries")
@@ -41,6 +41,17 @@ export async function loadReportData() {
       .select("unit_id")
       .eq("business_type", "daily_rental")
       .eq("is_enabled", true),
+    fetchAllPages(
+      (from, to) => supabase
+        .from("receivables")
+        .select("id, building_id, unit_id, customer_id, source_type, source_id, category, title, due_date, amount_xof, paid_amount_xof, status, management_status")
+        .neq("status", "cancelled")
+        .order("due_date", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to),
+      "report receivables",
+    ),
+    supabase.from("customers").select("id, name").order("name"),
   ]);
 
   return {
@@ -50,5 +61,7 @@ export async function loadReportData() {
     dailyBookings: dailyBookings as DailyBookingRow[],
     dailyPayments: dailyPayments as PaymentRow[],
     dailyUnitIds: ((dailyFlagsRes.data ?? []) as { unit_id: string }[]).map((f) => f.unit_id),
+    receivables: receivables as ReceivableRow[],
+    customers: (customersRes.data ?? []) as CustomerRow[],
   };
 }

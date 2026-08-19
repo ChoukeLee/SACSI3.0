@@ -26,5 +26,5 @@ export default async function ReportsPage() {
 
 async function ReportsData({ locale }: { locale: "zh" | "fr" }) {
   const data = await loadReportData();
-  return <ReportsView entries={data.entries} buildings={data.buildings} units={data.units} dailyBookings={data.dailyBookings} dailyPayments={data.dailyPayments} dailyUnitIds={data.dailyUnitIds} locale={locale} />;
+  return <ReportsView entries={data.entries} buildings={data.buildings} units={data.units} dailyBookings={data.dailyBookings} dailyPayments={data.dailyPayments} dailyUnitIds={data.dailyUnitIds} receivables={data.receivables} customers={data.customers} locale={locale} />;
 }
