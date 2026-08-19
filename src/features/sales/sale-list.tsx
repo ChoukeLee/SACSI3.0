@@ -364,7 +364,7 @@ function SaleActionBtn({ icon: Icon, label, onClick }: { icon: typeof Eye; label
             </>}
           >
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-              {fc.map(contract=>{const unit=unitMap.get(contract.unit_id);const customer=customerMap.get(contract.customer_id);const s=getContractSummary(contract.id);const dataFlags=getSaleDataFlags(contract,customer);return(<RoomCard key={contract.id} roomNo={unit?.unit_no??"-"} status="sold" statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]} onClick={()=>openDetail(contract.id)}>
+              {fc.map(contract=>{const unit=unitMap.get(contract.unit_id);const customer=customerMap.get(contract.customer_id);const s=getContractSummary(contract.id);const dataFlags=getSaleDataFlags(contract,customer);return(<RoomCard key={contract.id} roomNo={unit?.unit_no??"-"} status="sold" statusLabel={t.contractStatus[contract.status as keyof typeof t.contractStatus]} locale={locale} onClick={()=>openDetail(contract.id)}>
                 {/* Name + status badge */}
                 <div className="flex min-h-[52px] items-start justify-between gap-1.5">
                   <p className="text-[13px] font-medium leading-tight truncate" title={customer?.name??""}>{customer?.name??"-"}</p>

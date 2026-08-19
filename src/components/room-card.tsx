@@ -55,13 +55,17 @@ interface Props {
   className?: string
   children?: React.ReactNode
   actions?: RoomCardAction[]
+  locale?: "zh" | "fr"
 }
 
-const DEFAULT_ACTIONS: RoomCardAction[] = [
-  { key: "detail", label: "详情", icon: Info },
-  { key: "finance", label: "财务", icon: ReceiptText },
-  { key: "enter", label: "进入", icon: ArrowRight },
-]
+function defaultActions(locale: "zh" | "fr"): RoomCardAction[] {
+  const zh = locale !== "fr"
+  return [
+    { key: "detail", label: zh ? "详情" : "Détail", icon: Info },
+    { key: "finance", label: zh ? "财务" : "Finance", icon: ReceiptText },
+    { key: "enter", label: zh ? "进入" : "Ouvrir", icon: ArrowRight },
+  ]
+}
 
 /* ── 30×30 action button ── */
 function ActionBtn({ action, btnBg }: { action: RoomCardAction; btnBg: string }) {
@@ -92,9 +96,9 @@ function ActionBtn({ action, btnBg }: { action: RoomCardAction; btnBg: string })
   return <button type="button" onClick={handleClick} className="contents">{inner}</button>
 }
 
-export function RoomCard({ roomNo, status, statusLabel, customerName, dateText, href, onClick, className, children, actions }: Props) {
+export function RoomCard({ roomNo, status, statusLabel, customerName, dateText, href, onClick, className, children, actions, locale }: Props) {
   const s = statusStyle[status] ?? statusStyle.available
-  const btns = (actions ?? DEFAULT_ACTIONS).slice(0, 3)
+  const btns = (actions ?? defaultActions(locale ?? "zh")).slice(0, 3)
 
   /* ── Detail variant (leases / sales) ── */
   if (children) {

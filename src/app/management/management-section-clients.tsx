@@ -459,6 +459,7 @@ export function UnitDataClient({
                                 key={s.unit.id}
                                 roomNo={s.unit.unit_no ?? "?"}
                                 status={s.status}
+                                locale={locale}
                                 statusLabel={companyOwnedOffice
                                   ? (locale === "zh" ? "公司自购 · 自用" : "Acheté · usage interne")
                                   : s.status === "ownerOccupied" ? (locale === "zh" ? "自用" : "Usage interne") : undefined}

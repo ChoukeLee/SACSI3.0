@@ -12,7 +12,8 @@ export const zhDict = {
         admin: "管理员",
         boss: "老板",
         finance: "财务",
-        front_desk: "前台"
+        front_desk: "前台",
+        rental_sales: "租售"
       },
       notifications: {
         title: "通知中心",

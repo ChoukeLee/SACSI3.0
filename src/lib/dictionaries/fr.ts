@@ -1,4 +1,4 @@
-﻿export const frDict = {
+export const frDict = {
     meta: {
       title: "SACSI | Gestion immobiliere Kejian",
       description: "Systeme pilote pour l'immeuble 11"
@@ -12,7 +12,8 @@
         admin: "Administrateur",
         boss: "Proprietaire",
         finance: "Comptable",
-        front_desk: "Reception"
+        front_desk: "Reception",
+        rental_sales: "Location vente"
       },
       notifications: {
         title: "Centre de notifications",

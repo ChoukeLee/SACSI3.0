@@ -544,7 +544,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 const hasOverdueRent = summary.overdue > 0;
                 const nextRentIsFuture = !hasOverdueRent && !!summary.nextDue && summary.nextDue >= todayStr;
                 return (
-                  <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status={isManaged ? "managed" : "leased"}
+                  <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status={isManaged ? "managed" : "leased"} locale={locale}
                     onClick={() => openDetail(contract.id)}>
                     {/* Customer and tags */}
                     <div className="flex min-h-[62px] flex-col justify-start gap-2">
