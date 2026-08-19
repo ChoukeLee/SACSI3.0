@@ -140,7 +140,7 @@ export function ReceivableList({ receivables, units, customers, buildings, local
       paid: t.statuses.paid,
       overdue: t.statuses.overdue,
       cancelled: t.statuses.cancelled,
-    });
+    }, locale);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

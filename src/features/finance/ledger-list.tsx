@@ -56,7 +56,9 @@ function formatLedgerDescription(description: string | null | undefined, locale:
 }
 
 function buildLedgerCsv(entries: LedgerEntryRow[], locale: Locale): string {
-  const header = "Date,Direction,Category,Amount_XOF,Description";
+  const header = locale === "zh"
+    ? "日期,收支,类别,金额_XOF,说明"
+    : "Date,Direction,Categorie,Montant_XOF,Description";
   const rows = entries.map((e) =>
     [e.entry_date, e.direction, e.category, e.amount_xof, `"${formatLedgerDescription(e.description, locale).replace(/"/g, '""')}"`].join(",")
   );

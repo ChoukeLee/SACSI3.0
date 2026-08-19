@@ -272,11 +272,16 @@ export function buildReceivableCsv(
   buildingMap: Map<string, string>,
   customerMap: Map<string, string>,
   labelMap: Record<string, string>,
+  locale?: "zh" | "fr",
 ): string {
-  const header = [
-    "DueDate", "Building", "Unit", "Customer", "SourceType", "Category",
-    "Title", "Amount_XOF", "Paid_XOF", "Outstanding_XOF", "Status", "OverdueDays",
-  ].join(",");
+  const header = locale === "zh"
+    ? ["到期日", "楼栋", "房号", "客户", "来源", "类别", "标题", "应收_XOF", "已收_XOF", "未收_XOF", "状态", "逾期天数"].join(",")
+    : locale === "fr"
+      ? ["Echeance", "Batiment", "Lot", "Client", "Source", "Categorie", "Titre", "Du_XOF", "Paye_XOF", "Reste_XOF", "Statut", "Jours retard"].join(",")
+      : [
+          "DueDate", "Building", "Unit", "Customer", "SourceType", "Category",
+          "Title", "Amount_XOF", "Paid_XOF", "Outstanding_XOF", "Status", "OverdueDays",
+        ].join(",");
 
   const rows = receivables.map((r) => {
     const os = Number(r.amount_xof) - Number(r.paid_amount_xof);
