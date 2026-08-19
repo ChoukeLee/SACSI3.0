@@ -61,7 +61,7 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, locale, onC
     if (result.success) {
       onStatusChanged();
     } else {
-      setError(result.error ?? "Failed to update status.");
+      setError(result.error ?? (locale === "zh" ? "修改房态失败。" : "Échec de la mise à jour du statut."));
     }
   };
 

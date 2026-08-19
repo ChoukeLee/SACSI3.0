@@ -115,7 +115,7 @@ export function DateInput({ value, onChangeValue, className, onBlur, min, max, d
               type="button"
               onClick={() => setViewMonth(addMonths(viewMonth, -1))}
               className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              aria-label="Previous month"
+              aria-label={locale === "zh" ? "上个月" : "Mois précédent"}
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -124,7 +124,7 @@ export function DateInput({ value, onChangeValue, className, onBlur, min, max, d
               type="button"
               onClick={() => setViewMonth(addMonths(viewMonth, 1))}
               className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              aria-label="Next month"
+              aria-label={locale === "zh" ? "下个月" : "Mois suivant"}
             >
               <ChevronRight className="h-4 w-4" />
             </button>

@@ -142,7 +142,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
         await checkOut(currentRoom.booking.id, {});
       } else if (currentAction.type === "payment" && currentRoom.booking && amount) {
         const amt = Math.round(Number(amount));
-        if (amt <= 0) return { success: false, error: "Invalid amount" };
+        if (amt <= 0) return { success: false, error: locale === "zh" ? "金额无效" : "Montant invalide" };
         await recordSupplementaryPayment({
           bookingId: currentRoom.booking.id,
           amount: amt,

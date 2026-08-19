@@ -423,7 +423,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       setPanel("detail");
       router.refresh();
     } else {
-      setError(result.error ?? "Failed");
+      setError(result.error ?? (locale === "zh" ? "操作失败。" : "Échec de l'opération."));
     }
   };
 

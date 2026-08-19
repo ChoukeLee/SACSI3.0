@@ -44,7 +44,7 @@ async function generateLeaseReceivables(
     .select("*, unit:units(id, unit_no, building_id)")
     .eq("id", contractId)
     .single();
-  if (!contract) return { success: false, count: 0, error: "Contract not found." };
+  if (!contract) return { success: false, count: 0, error: "未找到合同。" };
 
   const monthlyRent = Number(contract.monthly_rent_xof);
   const multiplier = CYCLE_MULTIPLIER[contract.payment_cycle] ?? 1;
@@ -53,7 +53,7 @@ async function generateLeaseReceivables(
   const endDate = new Date(contract.expected_end_date);
 
   if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-    return { success: false, count: 0, error: "Invalid contract dates." };
+    return { success: false, count: 0, error: "合同日期无效。" };
   }
 
   // Get existing receivables for this contract to avoid duplicates
@@ -157,7 +157,7 @@ async function ensureNextLeaseReceivable(contractId: string): Promise<{ success:
     .select("id, unit_id, customer_id, status, monthly_rent_xof, paid_through_date, unit:units(unit_no, building_id)")
     .eq("id", contractId)
     .single();
-  if (contractError || !contract) return { success: false, error: contractError?.message ?? "Contract not found." };
+  if (contractError || !contract) return { success: false, error: contractError?.message ?? "未找到合同。" };
   if (contract.status !== "active" || !contract.paid_through_date) return { success: true };
 
   const { data: openRows, error: openError } = await supabase
@@ -284,7 +284,7 @@ export async function createLeaseContract(input: {
 
   if (error) {
     if (error.code === "23505") {
-      return { success: false, error: "Contract number already exists." };
+      return { success: false, error: "合同编号已存在。" };
     }
     return { success: false, error: error.message };
   }
@@ -454,7 +454,7 @@ export async function activateContract(
     .eq("id", contractId)
     .eq("status", "draft")
     .single();
-  if (!contract) return { success: false, error: "Contract not found or not in draft status." };
+  if (!contract) return { success: false, error: "未找到草稿状态的合同。" };
 
   // Re-check no other active contract on this unit
   const { data: conflict } = await supabase
@@ -465,7 +465,7 @@ export async function activateContract(
     .neq("id", contractId)
     .limit(1);
   if (conflict && conflict.length > 0) {
-    return { success: false, error: "Unit already has an active lease." };
+    return { success: false, error: "该房源已有生效中的长租合同。" };
   }
 
   await supabase.from("lease_contracts").update({ status: "active" }).eq("id", contractId);
@@ -508,7 +508,7 @@ export async function terminateContract(
     .eq("id", contractId)
     .eq("status", "active")
     .single();
-  if (!contract) return { success: false, error: "Contract not found or not active." };
+  if (!contract) return { success: false, error: "未找到生效中的合同。" };
 
   await supabase
     .from("lease_contracts")
@@ -546,12 +546,12 @@ async function recordReceivablePayment(input: {
     .select("*")
     .eq("id", input.receivableId)
     .single();
-  if (!receivable) return { success: false, error: "Receivable not found." };
-  if (receivable.status === "cancelled") return { success: false, error: "Receivable is cancelled." };
-  if (receivable.status === "paid") return { success: false, error: "Receivable is already paid." };
+  if (!receivable) return { success: false, error: "未找到该应收。" };
+  if (receivable.status === "cancelled") return { success: false, error: "该应收已取消。" };
+  if (receivable.status === "paid") return { success: false, error: "该应收已付清。" };
 
   const outstanding = Number(receivable.amount_xof) - Number(receivable.paid_amount_xof);
-  if (outstanding <= 0) return { success: false, error: "Nothing outstanding." };
+  if (outstanding <= 0) return { success: false, error: "没有待收款项。" };
 
   const amount = outstanding;
 
@@ -631,7 +631,7 @@ export async function processMoveOut(input: {
     .eq("id", input.contractId)
     .in("status", ["active", "expired"])
     .single();
-  if (!contract) return { success: false, error: "Contract not found or cannot be settled." };
+  if (!contract) return { success: false, error: "未找到可结算的合同。" };
 
   const depositAmount = Number(contract.deposit_amount_xof);
   const deduction = input.depositDeductionXof;

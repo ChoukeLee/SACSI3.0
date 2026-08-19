@@ -225,7 +225,7 @@ export function SystemSettingsPanel({ settings, isAdmin, locale }: Props) {
       const result = await updateSystemSetting(field.key, nextValue);
       setPendingKey(null);
       if (!result.success) {
-        setError(result.error ?? "Failed");
+        setError(result.error ?? (zh ? "保存失败。" : "Échec de l'enregistrement."));
         return;
       }
       setSavedKey(field.key);

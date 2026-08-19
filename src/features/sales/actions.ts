@@ -32,7 +32,7 @@ export async function recordSalePaymentAtomic(input: {
 }): Promise<{ success: boolean; error?: string }> {
   await guardSaleFinance();
   if (!input.requestId || !input.paymentDate || input.amount <= 0) {
-    return { success: false, error: "Invalid payment request." };
+    return { success: false, error: "收款请求无效。" };
   }
   const supabase = await createClient();
   let receiptNo = input.receiptNo?.trim() || null;
@@ -43,7 +43,7 @@ export async function recordSalePaymentAtomic(input: {
       .eq("id", input.contractId)
       .single();
     if (contractError || !contract) {
-      return { success: false, error: contractError?.message ?? "Contract not found." };
+      return { success: false, error: contractError?.message ?? "未找到合同。" };
     }
     const unit = Array.isArray(contract?.unit) ? contract.unit[0] : contract?.unit;
     const building = Array.isArray(unit?.building) ? unit.building[0] : unit?.building;
@@ -102,7 +102,7 @@ export async function createSaleContract(input: {
     .select("unit_no, building:buildings(code)")
     .eq("id", input.unitId)
     .single();
-  if (unitError || !contractUnit) return { success: false, error: unitError?.message ?? "Unit not found." };
+  if (unitError || !contractUnit) return { success: false, error: unitError?.message ?? "未找到该房源。" };
   const contractBuilding = Array.isArray(contractUnit.building) ? contractUnit.building[0] : contractUnit.building;
   const generatedContractNo = buildSaleContractNumber(
     contractBuilding?.code ?? "SACSI",
@@ -224,7 +224,7 @@ export async function recordSalePayment(input: {
   receiptNo?: string;
 }): Promise<{ success: boolean; error?: string }> {
   await guardSaleFinance();
-  if (input.amount <= 0) return { success: false, error: "Amount must be positive." };
+  if (input.amount <= 0) return { success: false, error: "金额必须大于 0。" };
 
   const supabase = await createClient();
 
@@ -233,16 +233,16 @@ export async function recordSalePayment(input: {
     .select("id, sale_contract_id, installment_no, amount_xof, status, due_date")
     .eq("id", input.scheduleId)
     .single();
-  if (!schedule) return { success: false, error: "Installment not found." };
-  if (schedule.status === "paid") return { success: false, error: "This installment is already paid." };
-  if (schedule.status === "cancelled") return { success: false, error: "This installment is cancelled." };
+  if (!schedule) return { success: false, error: "未找到该分期。" };
+  if (schedule.status === "paid") return { success: false, error: "该分期已付清。" };
+  if (schedule.status === "cancelled") return { success: false, error: "该分期已取消。" };
 
   const { data: contract } = await supabase
     .from("sale_contracts")
     .select("id, unit_id, customer_id, payment_plan_type, contract_no, unit:units(unit_no)")
     .eq("id", input.contractId)
     .single();
-  if (!contract) return { success: false, error: "Contract not found." };
+  if (!contract) return { success: false, error: "未找到合同。" };
   const saleUnit = (contract as typeof contract & { unit?: { unit_no?: string } | null }).unit;
   const unitNo = saleUnit?.unit_no ?? "未设置";
 
@@ -253,14 +253,14 @@ export async function recordSalePayment(input: {
   // Validate against receivable unpaid amount
   if (receivable) {
     const unpaid = Number(receivable.amount_xof) - Number(receivable.paid_amount_xof);
-    if (unpaid <= 0) return { success: false, error: "This receivable is already fully paid." };
+    if (unpaid <= 0) return { success: false, error: "该应收已全部付清。" };
     if (input.amount > unpaid) {
-      return { success: false, error: `Amount exceeds outstanding (${unpaid}). Full payment required for each installment.` };
+      return { success: false, error: `金额超过未收余额（${unpaid}），每期需全额支付。` };
     }
   } else {
     // No receivable found — validate against schedule amount
     if (input.amount > Number(schedule.amount_xof)) {
-      return { success: false, error: "Amount exceeds schedule amount." };
+      return { success: false, error: "金额超过该期应缴金额。" };
     }
   }
 
@@ -441,7 +441,7 @@ export async function terminateSaleContract(
     .eq("id", contractId)
     .eq("status", "active")
     .single();
-  if (!contract) return { success: false, error: "Contract not found or not active." };
+  if (!contract) return { success: false, error: "未找到生效中的合同。" };
 
   // Cancel unpaid schedules
   await supabase

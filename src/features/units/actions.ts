@@ -64,11 +64,11 @@ export async function updateUnitStatus(
     .single();
 
   if (fetchError || !unit) {
-    return { success: false, error: "Unit not found." };
+    return { success: false, error: "未找到该房源。" };
   }
 
   if (unit.status === status) {
-    return { success: false, error: "Unit is already in this status." };
+    return { success: false, error: "房源已处于该状态。" };
   }
 
   const previousStatus = unit.status;

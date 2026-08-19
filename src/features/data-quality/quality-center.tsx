@@ -67,7 +67,7 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
     } catch (err: unknown) {
       setRepairErrorById((prev) => ({
         ...prev,
-        [issue.id]: err instanceof Error ? err.message : "Repair failed",
+        [issue.id]: err instanceof Error ? err.message : (zh ? "修复失败。" : "Échec de la réparation."),
       }));
     } finally {
       setRepairingId(null);

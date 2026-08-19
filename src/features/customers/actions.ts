@@ -39,7 +39,7 @@ export async function createCustomer(
   const supabase = await createClient();
 
   if (!input.name || input.name.trim().length < 2) {
-    return { success: false, error: "Name is required (min 2 characters)." };
+    return { success: false, error: "姓名至少需要 2 个字符。" };
   }
 
   const encrypted = input.document_no_plain
@@ -77,7 +77,7 @@ export async function updateCustomer(
 
   if (input.name !== undefined) {
     if (!input.name || input.name.trim().length < 2) {
-      return { success: false, error: "Name is required (min 2 characters)." };
+      return { success: false, error: "姓名至少需要 2 个字符。" };
     }
     update.name = input.name.trim();
   }

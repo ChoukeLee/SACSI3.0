@@ -221,7 +221,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       } else {
         setOptimisticCustomers(previousCustomers);
         setFormMode({ type: "add" });
-        setFormError(result.error ?? "Failed");
+        setFormError(result.error ?? (locale === "zh" ? "操作失败。" : "Échec de l'opération."));
       }
     } else if (formMode?.type === "edit") {
       const original = formMode.customer;
@@ -234,7 +234,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       } else {
         setOptimisticCustomers(previousCustomers);
         setFormMode({ type: "edit", customer: original });
-        setFormError(result.error ?? "Failed");
+        setFormError(result.error ?? (locale === "zh" ? "操作失败。" : "Échec de l'opération."));
       }
     }
     setSaving(false);

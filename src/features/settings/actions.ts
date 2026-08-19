@@ -12,13 +12,13 @@ export async function addBuilding(input: {
   elevatorCount: number;
 }): Promise<{ success: boolean; data?: BuildingRow; error?: string }> {
   await requireRole("admin");
-  if (!input.code.trim()) return { success: false, error: "Building code is required." };
+  if (!input.code.trim()) return { success: false, error: "请输入楼栋编号。" };
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("buildings").insert({ code: input.code.trim(), display_name: input.displayName.trim(), floors_above_ground: input.floorsAboveGround, elevator_count: input.elevatorCount })
     .select("*").single();
   if (error) {
-    if (error.code === "23505") return { success: false, error: "Building code already exists." };
+    if (error.code === "23505") return { success: false, error: "楼栋编号已存在。" };
     return { success: false, error: error.message };
   }
   await supabase.from("audit_logs").insert({ action: "create", entity_type: "building", entity_id: data.id, metadata: { code: input.code } });

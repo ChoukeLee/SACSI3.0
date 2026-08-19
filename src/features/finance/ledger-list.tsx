@@ -193,7 +193,7 @@ export function LedgerList({ entries, units, buildingId, locale, attachments, ca
       setEAmount(0); setEDesc(""); setEReceiptNo("");
     } else {
       setShowNewEntry(true);
-      setError(result.error ?? "Failed");
+      setError(result.error ?? (locale === "zh" ? "保存失败。" : "Échec de l'enregistrement."));
     }
   };
 

@@ -95,7 +95,7 @@ export function ReceiptUpload({ locale, onClose }: Props) {
       formData.append("locale", locale);
       const res = await fetch("/api/receipt/scan", { method: "POST", body: formData });
       const data = (await res.json()) as ScanResult;
-      if (!res.ok) { setError(data.error ?? "Scan failed"); return; }
+      if (!res.ok) { setError(data.error ?? (zh ? "扫描失败。" : "Échec du scan.")); return; }
       setResult(data);
       setEditRoom(data.draft.room_no ?? "");
       setEditAmount(data.draft.amount_xof?.toString() ?? "");

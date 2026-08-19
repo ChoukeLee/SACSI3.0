@@ -48,7 +48,7 @@ export function SettingsView({ buildings, companyInfo, locale }: SettingsViewPro
     const result = await addBuilding({ code: bCode.trim(), displayName: bName.trim() || bCode, floorsAboveGround: bFloors, elevatorCount: bElevators });
     setSaving(false);
     if (result.success) { setShowNewBuilding(false); setBCode(""); setBName(""); }
-    else setError(result.error ?? "Failed");
+    else setError(result.error ?? (locale === "zh" ? "操作失败。" : "Échec de l'opération."));
   };
 
   const handleToggleActive = async (id: string, active: boolean) => { await toggleBuildingActive(id, !active); };
@@ -177,7 +177,7 @@ export function SettingsView({ buildings, companyInfo, locale }: SettingsViewPro
               const result = await saveCompanyInfo({ name: cName, phone: cPhone, address: cAddress });
               setCSaving(false);
               if (result.success) { setCSaved(true); setTimeout(() => setCSaved(false), 2000); }
-              else setError(result.error ?? "Save failed");
+              else setError(result.error ?? (locale === "zh" ? "保存失败。" : "Échec de l'enregistrement."));
             }}
           >
             {cSaving ? (zh ? "保存中..." : "En cours...") : cSaved ? (zh ? "已保存 ✓" : "Sauvegardé ✓") : t.company.save}

@@ -148,7 +148,7 @@ export async function checkConflicts(
   const supabase = await createClient();
 
   const { data: unit } = await supabase.from("units").select("status").eq("id", unitId).single();
-  if (!unit) return { hasConflict: true, reason: "Unit not found." };
+  if (!unit) return { hasConflict: true, reason: "unitNotFound" };
   if (unit.status === "maintenance") return { hasConflict: true, reason: "unitMaintenance" };
   if (unit.status === "locked") return { hasConflict: true, reason: "unitLocked" };
   if (unit.status === "sold") return { hasConflict: true, reason: "saleConflict" };
@@ -383,7 +383,7 @@ export async function recordSupplementaryPayment(input: {
   requestId: string;
 }): Promise<DailyActionResult> {
   const user = await guardWrite();
-  if (input.amount <= 0) return { success: false, error: "Amount must be positive." };
+  if (input.amount <= 0) return { success: false, error: "金额必须大于 0。" };
   const supabase = await createClient();
   // Open-ended stays accrue nightly. Persist today's current amount before the
   // RPC checks whether the payment exceeds the outstanding balance.
@@ -491,7 +491,7 @@ export async function extendStay(
 ): Promise<DailyActionResult> {
   const user = await guardWrite();
   if (extraNights <= 0 || extraAmount < 0) {
-    return { success: false, error: "Invalid extension amount or nights." };
+    return { success: false, error: "续住金额或晚数无效。" };
   }
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("daily_extend_stay_rpc", {
