@@ -1445,7 +1445,7 @@ function resolveRangeStart(anchorDate: Date, viewMode: ViewMode): Date {
   const anchor = startOfDay(anchorDate);
   if (viewMode === "month") return new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   if (viewMode === "week") return startOfWeek(anchor);
-  return addDays(anchor, -1);
+  return anchor;
 }
 
 function resolveRangeEnd(anchorDate: Date, viewMode: ViewMode): Date {

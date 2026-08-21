@@ -5,7 +5,7 @@ export const COPY = {
   zh: {
     noRooms: "暂无日租房源",
     timeline: "预订时间轴",
-    subtitle: "默认显示今天附近日期；点击空白格新建预订，点击色条查看订单。",
+    subtitle: "默认从今天开始显示；点击空白格新建预订，点击色条查看订单。",
     allRooms: "全部房间",
     day: "天",
     week: "周",
@@ -26,7 +26,7 @@ export const COPY = {
   fr: {
     noRooms: "Aucune chambre journaliere",
     timeline: "Planning des reservations",
-    subtitle: "Affiche les dates autour d'aujourd'hui. Cliquez une case vide pour creer.",
+    subtitle: "Affiche les dates a partir d'aujourd'hui. Cliquez une case vide pour creer.",
     allRooms: "Toutes",
     day: "Jour",
     week: "Semaine",
