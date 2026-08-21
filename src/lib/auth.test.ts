@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { canAccessPage, getSeedAccountProfile, hasPermission, homePathForRole, type CurrentUser } from "./auth";
 
-const rentalSalesUser: CurrentUser = {
+const yingAdminUser: CurrentUser = {
   id: "test-user",
   email: "ying@sacsi.com",
-  role: "rental_sales",
+  role: "admin",
   displayName: "Ying",
 };
 
@@ -22,29 +22,28 @@ const bossUser: CurrentUser = {
   displayName: "GAO",
 };
 
-describe("rental sales role", () => {
-  it("maps the Ying account to the rental-sales role consistently", () => {
+describe("Ying administrator account", () => {
+  it("maps the Ying account to the administrator role consistently", () => {
     expect(getSeedAccountProfile("YING@SACSI.COM")).toEqual({
-      role: "rental_sales",
+      role: "admin",
       displayName: "Ying",
     });
   });
 
-  it("allows rental and sales work without finance access", () => {
-    expect(hasPermission(rentalSalesUser, "daily_rentals:write")).toBe(true);
-    expect(hasPermission(rentalSalesUser, "leases:write")).toBe(true);
-    expect(hasPermission(rentalSalesUser, "sales:write")).toBe(true);
-    expect(hasPermission(rentalSalesUser, "audit_logs:read")).toBe(false);
-    expect(hasPermission(rentalSalesUser, "finance:read")).toBe(false);
-    expect(hasPermission(rentalSalesUser, "settings:read")).toBe(false);
-  });
-
-  it("allows the business pages but rejects finance and settings", () => {
-    expect(canAccessPage("rental_sales", "daily-rentals")).toBe(true);
-    expect(canAccessPage("rental_sales", "leases")).toBe(true);
-    expect(canAccessPage("rental_sales", "sales")).toBe(true);
-    expect(canAccessPage("rental_sales", "finance")).toBe(false);
-    expect(canAccessPage("rental_sales", "settings")).toBe(false);
+  it("grants all administrator permissions and pages", () => {
+    for (const permission of [
+      "units:read", "units:write", "units:delete",
+      "customers:read", "customers:write", "customers:delete",
+      "daily_rentals:read", "daily_rentals:write", "daily_rentals:delete",
+      "leases:read", "leases:write", "leases:delete",
+      "sales:read", "sales:write", "sales:delete",
+      "finance:read", "finance:write", "finance:export",
+      "audit_logs:read",
+      "settings:read", "settings:write", "users:manage",
+    ]) expect(hasPermission(yingAdminUser, permission)).toBe(true);
+    for (const section of ["management", "finance", "settings", "daily-rentals", "leases", "sales", "customers", "audit-logs"]) {
+      expect(canAccessPage("admin", section)).toBe(true);
+    }
   });
 
   it("denies unknown route sections by default", () => {

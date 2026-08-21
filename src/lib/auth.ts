@@ -16,7 +16,7 @@ const seedAccountProfiles: Record<string, { role: UserRole; displayName: string 
   "boss@sacsi.com": { role: "boss", displayName: "GAO" },
   "finance@sacsi.com": { role: "finance", displayName: "李财务" },
   "front@sacsi.com": { role: "front_desk", displayName: "Niamké" },
-  "ying@sacsi.com": { role: "rental_sales", displayName: "Ying" },
+  "ying@sacsi.com": { role: "admin", displayName: "Ying" },
 };
 
 export const configuredAccountSummaries = Object.entries(seedAccountProfiles).map(([email, profile]) => ({
@@ -49,6 +49,7 @@ const rolePermissions: Record<UserRole, string[]> = {
     "leases:read", "leases:write", "leases:delete",
     "sales:read", "sales:write", "sales:delete",
     "finance:read", "finance:write", "finance:export",
+    "audit_logs:read",
     "settings:read", "settings:write",
     "users:manage",
   ],
