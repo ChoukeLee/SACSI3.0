@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createPrivilegedClient } from "@/lib/supabase/privileged";
 import { requireRole } from "@/lib/auth";
 import { computeStatus } from "@/lib/repositories/receivable-repo";
 import type { LeaseContractRow, ReceivableRow } from "@/types/database";
@@ -151,7 +152,7 @@ async function syncContractReceivableStatuses(contractId: string) {
 }
 
 async function ensureNextLeaseReceivable(contractId: string): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createClient();
+  const supabase = createPrivilegedClient();
   const { data: contract, error: contractError } = await supabase
     .from("lease_contracts")
     .select("id, unit_id, customer_id, status, monthly_rent_xof, paid_through_date, unit:units(unit_no, building_id)")
@@ -380,7 +381,7 @@ export async function recordLeaseFinancialEntry(input: {
     return { success: false, error: "租金收入必须填写已缴至日期。" };
   }
 
-  const supabase = await createClient();
+  const supabase = createPrivilegedClient();
   const { data: contract, error: contractError } = await supabase
     .from("lease_contracts")
     .select("id, unit_id, customer_id, contract_no, paid_through_date, deposit_amount_xof, unit:units(unit_no, building_id, building:buildings(code))")
@@ -539,7 +540,7 @@ async function recordReceivablePayment(input: {
 }): Promise<{ success: boolean; error?: string }> {
   await guardLeaseFinance();
 
-  const supabase = await createClient();
+  const supabase = createPrivilegedClient();
 
   const { data: receivable } = await supabase
     .from("receivables")
@@ -623,7 +624,7 @@ export async function processMoveOut(input: {
   notes?: string;
 }): Promise<{ success: boolean; error?: string }> {
   await guardLeaseFinance();
-  const supabase = await createClient();
+  const supabase = createPrivilegedClient();
 
   const { data: contract } = await supabase
     .from("lease_contracts")

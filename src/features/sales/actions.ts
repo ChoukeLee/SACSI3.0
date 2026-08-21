@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createPrivilegedClient } from "@/lib/supabase/privileged";
 import { requireRole } from "@/lib/auth";
 import { computeStatus } from "@/lib/repositories/receivable-repo";
 import type { SaleContractRow, SalePaymentScheduleRow } from "@/types/database";
@@ -34,7 +35,7 @@ export async function recordSalePaymentAtomic(input: {
   if (!input.requestId || !input.paymentDate || input.amount <= 0) {
     return { success: false, error: "收款请求无效。" };
   }
-  const supabase = await createClient();
+  const supabase = createPrivilegedClient();
   let receiptNo = input.receiptNo?.trim() || null;
   if (!receiptNo) {
     const { data: contract, error: contractError } = await supabase
@@ -226,7 +227,7 @@ export async function recordSalePayment(input: {
   await guardSaleFinance();
   if (input.amount <= 0) return { success: false, error: "金额必须大于 0。" };
 
-  const supabase = await createClient();
+  const supabase = createPrivilegedClient();
 
   const { data: schedule } = await supabase
     .from("sale_payment_schedule")

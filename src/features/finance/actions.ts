@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createPrivilegedClient } from "@/lib/supabase/privileged";
 import { requireRole } from "@/lib/auth";
 import { convertToXof } from "@/lib/currency";
 import type { LedgerEntryRow } from "@/types/database";
@@ -24,7 +25,7 @@ export async function addLedgerEntry(input: {
 }): Promise<{ success: boolean; data?: LedgerEntryRow; error?: string }> {
   await requireRole("admin", "finance");
 
-  const supabase = await createClient();
+  const supabase = createPrivilegedClient();
 
   const amountXof = convertToXof(input.amount, input.currency, input.exchangeRateToXof);
   const amountCny = input.currency === "CNY" ? input.amount : null;
