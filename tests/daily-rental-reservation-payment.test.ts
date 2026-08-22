@@ -73,4 +73,11 @@ describe("daily rental reservation payments", () => {
     expect(panel).toContain('border-b border-border pb-4');
     expect(panel).toContain('border-t border-border pt-3');
   });
+
+  it("keeps the booking drawer free of repeated status and checkout totals", () => {
+    expect(panel).not.toContain("getPrimaryActionLabel");
+    expect(panel).not.toContain("t.fixedBadge");
+    expect(panel).not.toContain("{t.booking.confirmCheckOut} — {formatXof(finalDue)}");
+    expect(panel).toContain('booking.checkout_mode === "open" && (');
+  });
 });

@@ -537,8 +537,7 @@ export function BookingPanel({
             <section className="border-b border-border pb-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">{selectedUnit?.unit_no ?? booking.unit_id.slice(0, 8)}</p>
-                  <p className="mt-1 truncate text-base font-semibold text-foreground">{bookingCustomer?.name ?? booking.customer_id.slice(0, 8)}</p>
+                  <p className="truncate text-base font-semibold text-foreground">{bookingCustomer?.name ?? booking.customer_id.slice(0, 8)}</p>
                   {bookingCustomer?.phone && <p className="mt-0.5 text-xs text-muted-foreground">{bookingCustomer.phone}</p>}
                 </div>
                 <Button size="icon" variant="ghost" onClick={() => printDailyReceipt({ booking, unit: selectedUnit ?? null, customer: null }, locale)} aria-label={dictionaries[locale].settings.print.print} className="h-8 w-8 shrink-0">
@@ -556,12 +555,9 @@ export function BookingPanel({
                 <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-semibold text-foreground/75">
                   {t.bookingStatus[booking.status as keyof typeof t.bookingStatus] ?? statusDisplayLabel(booking.status, locale)}
                 </span>
-                <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", booking.checkout_mode === "open" ? "border-accentAmber-200 bg-accentAmber-50 text-accentAmber-700" : "border-border bg-muted text-foreground/70")}>
-                  {booking.checkout_mode === "open" ? t.openEndedBadge : t.fixedBadge}
-                </span>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-lg bg-muted px-3 py-2">
                   <p className="text-xs text-muted-foreground">{t.booking.checkInDate}</p>
                   <p className="mt-0.5 font-semibold text-foreground">{booking.check_in}</p>
@@ -593,24 +589,18 @@ export function BookingPanel({
                     <p className="mt-0.5 font-medium tabular-nums text-foreground">{billing.nights}{locale === "zh" ? "晚" : " nuits"}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-muted-foreground">{t.billing.grossAmount}</p>
-                    <p className="mt-0.5 font-medium tabular-nums text-foreground">{formatXof(billing.grossAmount)}</p>
+                    <p className="text-muted-foreground">{t.billing.finalAmount}</p>
+                    <p className="mt-0.5 font-semibold tabular-nums text-foreground">{formatXof(billing.finalAmount)}</p>
                   </div>
                   {billing.discount > 0 && (
-                    <div className="col-span-3 flex justify-between border-t border-border pt-2 text-accentGreen-700">
-                      <span>{t.billing.discount}</span>
-                      <span className="font-medium tabular-nums">-{formatXof(billing.discount)}</span>
+                    <div className="col-span-3 flex items-center justify-between border-t border-border pt-2">
+                      <span className="text-muted-foreground">{t.billing.grossAmount} {formatXof(billing.grossAmount)}</span>
+                      <span className="font-medium tabular-nums text-accentGreen-700">{t.billing.discount} -{formatXof(billing.discount)}</span>
                     </div>
                   )}
-                  <div className="col-span-3 grid grid-cols-2 gap-3 border-t border-border pt-2">
-                    <div>
-                      <p className="text-muted-foreground">{t.billing.finalAmount}</p>
-                      <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{formatXof(billing.finalAmount)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-muted-foreground">{t.billing.paid}</p>
-                      <p className="mt-0.5 text-sm font-semibold tabular-nums text-accentGreen-700">{formatXof(totalPaid)}</p>
-                    </div>
+                  <div className="col-span-3 flex items-center justify-between border-t border-border pt-2 text-sm">
+                    <span className="text-muted-foreground">{t.billing.paid}</span>
+                    <span className="font-semibold tabular-nums text-accentGreen-700">{formatXof(totalPaid)}</span>
                   </div>
                 </div>
               )}
@@ -688,14 +678,7 @@ export function BookingPanel({
             )}
 
             {!readOnly && <section className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-foreground">{locale === "zh" ? "下一步操作" : "Action suivante"}</p>
-                {primaryAction && (
-                  <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                    {getPrimaryActionLabel(primaryAction.action, locale)}
-                  </span>
-                )}
-              </div>
+              <p className="text-sm font-semibold text-foreground">{locale === "zh" ? "下一步操作" : "Action suivante"}</p>
               <div className="space-y-2">
 
               {showAdvanceReservationPayment && (
@@ -802,13 +785,15 @@ export function BookingPanel({
                         <DateInput value={actualCheckOut} onChangeValue={setActualCheckOut} className={inputClass} />
                       </div>
                     )}
-                    <div className="flex items-center justify-between gap-3 text-sm">
-                      <span className="text-muted-foreground">{t.booking.calculatedTotal}</span>
-                      <span className="font-semibold tabular-nums text-foreground">{formatXof(finalDue)}</span>
-                    </div>
+                    {booking.checkout_mode === "open" && (
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="text-muted-foreground">{t.booking.calculatedTotal}</span>
+                        <span className="font-semibold tabular-nums text-foreground">{formatXof(finalDue)}</span>
+                      </div>
+                    )}
                   </div>
 
-                  <Button variant="default" onClick={handleCheckOut} disabled={saving} className="w-full"><Check className="h-4 w-4 mr-1" />{t.booking.confirmCheckOut} — {formatXof(finalDue)}</Button>
+                  <Button variant="default" onClick={handleCheckOut} disabled={saving} className="w-full"><Check className="h-4 w-4 mr-1" />{t.booking.confirmCheckOut}</Button>
 
                   {/* More actions: choose one task, then show one focused form */}
                   <div className="rounded-lg border border-border bg-card">
@@ -1078,21 +1063,6 @@ function getLodgingBusinessTypeClass(type: DailyLodgingBusinessType): string {
     return "border-border bg-muted text-muted-foreground";
   }
   return "border-accentAmber-200 bg-accentAmber-50 text-accentAmber-700";
-}
-
-function getPrimaryActionLabel(action: ReturnType<typeof getPrimaryDailyAction>["action"], locale: Locale): string {
-  const labels: Record<ReturnType<typeof getPrimaryDailyAction>["action"], Record<Locale, string>> = {
-    create_booking: { zh: "创建订单", fr: "Creer" },
-    confirm: { zh: "确认预订", fr: "Confirmer" },
-    check_in: { zh: "办理入住", fr: "Arrivee" },
-    check_out: { zh: "办理退房", fr: "Depart" },
-    collect_balance: { zh: "补录收款", fr: "Encaisser" },
-    complete_cleaning: { zh: "完成保洁", fr: "Menage" },
-    view_settlement: { zh: "查看结算", fr: "Solde" },
-    readonly: { zh: "只读", fr: "Lecture seule" },
-  };
-
-  return labels[action][locale];
 }
 
 function formatDailyRentalError(message: string | null | undefined, locale: Locale): string {
