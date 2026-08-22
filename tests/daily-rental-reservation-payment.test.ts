@@ -28,12 +28,15 @@ describe("daily rental reservation payments", () => {
   });
 
   it("keeps installment history visible outside advanced payment actions", () => {
-    expect(panel).toContain(localeLabel("收款记录"));
+    expect(panel).toContain("收款记录 ·");
     expect(panel).toContain("positiveBookingPayments.slice(0, 3)");
-    expect(panel.indexOf(localeLabel("收款记录"))).toBeLessThan(panel.indexOf("更多业务操作"));
+    expect(panel.indexOf("收款记录 ·")).toBeLessThan(panel.indexOf("更多业务操作"));
+  });
+
+  it("keeps daily payment forms limited to amount and payment date", () => {
+    expect(panel).not.toContain("suppReceiptNo");
+    expect(panel).not.toContain("收据号/备注");
+    expect(panel).toContain("费用与收款");
+    expect(panel).toContain("下一步操作");
   });
 });
-
-function localeLabel(label: string) {
-  return `locale === "zh" ? "${label}"`;
-}

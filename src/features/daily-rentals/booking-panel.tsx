@@ -89,7 +89,6 @@ export function BookingPanel({
   const [prepaidAmount, setPrepaidAmount] = useState("");
   const [suppAmount, setSuppAmount] = useState("");
   const [suppPaymentDate, setSuppPaymentDate] = useState(new Date().toISOString().slice(0, 10));
-  const [suppReceiptNo, setSuppReceiptNo] = useState("");
   const [actualCheckOut, setActualCheckOut] = useState(new Date().toISOString().slice(0, 10));
   const [discountAmount, setDiscountAmount] = useState("");
   const [discountReason, setDiscountReason] = useState("");
@@ -191,7 +190,6 @@ export function BookingPanel({
     if (booking?.status === "checked_out" && hasOutstandingBalance) {
       setSuppAmount(String(outstanding));
       setSuppPaymentDate(new Date().toISOString().slice(0, 10));
-      setSuppReceiptNo("");
     }
   }, [booking?.id, booking?.status, hasOutstandingBalance, outstanding]);
 
@@ -272,12 +270,10 @@ export function BookingPanel({
         bookingId: booking!.id,
         amount,
         paymentDate: suppPaymentDate || undefined,
-        receiptNo: suppReceiptNo || undefined,
         requestId: crypto.randomUUID(),
       }),
     );
     setPrepaidAmount("");
-    setSuppReceiptNo("");
   };
 
   const handleCheckOut = async () => {
@@ -300,7 +296,6 @@ export function BookingPanel({
         bookingId: booking!.id,
         amount: amt,
         paymentDate: suppPaymentDate || undefined,
-        receiptNo: suppReceiptNo || undefined,
         requestId: crypto.randomUUID(),
       }),
       { closeOnSuccess: true, clearAdvancedTask: true },
@@ -579,86 +574,100 @@ export function BookingPanel({
               </div>
             </section>
 
-            <div className="space-y-1.5 text-sm">
-              <div className="flex justify-between"><span className="text-foreground/70">{t.booking.nightlyPrice}</span><span>{formatXof(Number(booking.nightly_price_xof))}</span></div>
-              {billing && (
-                <>
-                  <div className="flex justify-between"><span className="text-foreground/70">{t.booking.nights}</span><span>{billing.nights}{locale === "zh" ? "晚" : " nuits"}</span></div>
-                  <div className="flex justify-between"><span className="text-foreground/70">{t.billing.grossAmount}</span><span>{formatXof(billing.grossAmount)}</span></div>
-                  {billing.discount > 0 && <div className="flex justify-between text-accentGreen-600"><span>{t.billing.discount}</span><span>-{formatXof(billing.discount)}</span></div>}
-                  <div className="flex justify-between border-t border-border pt-1 font-semibold"><span>{t.billing.finalAmount}</span><span>{formatXof(billing.finalAmount)}</span></div>
-                  <div className="flex justify-between"><span className="text-foreground/70">{t.billing.paid}</span><span>{formatXof(totalPaid)}</span></div>
-                  {hasOutstandingBalance && <div className="flex justify-between text-accentRed-600 font-semibold"><span>{t.billing.outstanding}</span><span>{formatXof(outstanding)}</span></div>}
-                </>
-              )}
-            </div>
+            <section className="border-y border-border py-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-foreground">{locale === "zh" ? "费用与收款" : "Frais et paiements"}</p>
+                <span className={cn("text-sm font-semibold tabular-nums", hasOutstandingBalance ? "text-accentRed-600" : "text-accentGreen-700")}>
+                  {hasOutstandingBalance ? formatXof(outstanding) : (locale === "zh" ? "已付清" : "Paye")}
+                </span>
+              </div>
 
-            {positiveBookingPayments.length > 0 && (
-              <section className="rounded-lg border border-border bg-card">
-                <div className="flex items-center justify-between gap-3 px-3 py-2.5">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <WalletCards className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground">{locale === "zh" ? "收款记录" : "Paiements"}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {locale === "zh"
-                          ? `${positiveBookingPayments.length}笔，共 ${formatXof(totalPaid)}`
-                          : `${positiveBookingPayments.length} paiement(s), ${formatXof(totalPaid)}`}
-                      </p>
+              {billing && (
+                <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2 text-xs">
+                  <div>
+                    <p className="text-muted-foreground">{t.booking.nightlyPrice}</p>
+                    <p className="mt-0.5 font-medium tabular-nums text-foreground">{formatXof(Number(booking.nightly_price_xof))}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">{t.booking.nights}</p>
+                    <p className="mt-0.5 font-medium tabular-nums text-foreground">{billing.nights}{locale === "zh" ? "晚" : " nuits"}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-muted-foreground">{t.billing.grossAmount}</p>
+                    <p className="mt-0.5 font-medium tabular-nums text-foreground">{formatXof(billing.grossAmount)}</p>
+                  </div>
+                  {billing.discount > 0 && (
+                    <div className="col-span-3 flex justify-between border-t border-border pt-2 text-accentGreen-700">
+                      <span>{t.billing.discount}</span>
+                      <span className="font-medium tabular-nums">-{formatXof(billing.discount)}</span>
+                    </div>
+                  )}
+                  <div className="col-span-3 grid grid-cols-2 gap-3 border-t border-border pt-2">
+                    <div>
+                      <p className="text-muted-foreground">{t.billing.finalAmount}</p>
+                      <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{formatXof(billing.finalAmount)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-muted-foreground">{t.billing.paid}</p>
+                      <p className="mt-0.5 text-sm font-semibold tabular-nums text-accentGreen-700">{formatXof(totalPaid)}</p>
                     </div>
                   </div>
-                  {positiveBookingPayments.length > 3 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllPayments((value) => !value)}
-                      className="shrink-0 text-xs font-medium text-foreground/70 transition-colors hover:text-foreground"
-                    >
-                      {showAllPayments
-                        ? (locale === "zh" ? "收起" : "Reduire")
-                        : (locale === "zh" ? "查看全部" : "Tout voir")}
-                    </button>
-                  )}
                 </div>
-                <ul className="divide-y divide-border border-t border-border">
-                  {(showAllPayments ? positiveBookingPayments : positiveBookingPayments.slice(0, 3)).map((payment, index) => {
-                    const isReversed = reversedPaymentIds.has(payment.id);
-                    return (
-                      <li key={payment.id} className="group flex items-center justify-between gap-3 px-3 py-2 text-xs">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
-                            {positiveBookingPayments.length - index}
-                          </span>
-                          <span className="whitespace-nowrap text-foreground/70">{payment.payment_date}</span>
-                          {isReversed && (
-                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                              {locale === "zh" ? "已冲销" : "Annule"}
+              )}
+
+              {positiveBookingPayments.length > 0 && (
+                <div className="mt-3 border-t border-border pt-2">
+                  <div className="flex items-center justify-between gap-3 py-1">
+                    <p className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <WalletCards className="h-3.5 w-3.5" />
+                      {locale === "zh" ? `收款记录 · ${positiveBookingPayments.length}笔` : `${positiveBookingPayments.length} paiement(s)`}
+                    </p>
+                    {positiveBookingPayments.length > 3 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllPayments((value) => !value)}
+                        className="text-xs font-medium text-foreground/70 transition-colors hover:text-foreground"
+                      >
+                        {showAllPayments
+                          ? (locale === "zh" ? "收起" : "Reduire")
+                          : (locale === "zh" ? "查看全部" : "Tout voir")}
+                      </button>
+                    )}
+                  </div>
+                  <ul className="divide-y divide-border/70">
+                    {(showAllPayments ? positiveBookingPayments : positiveBookingPayments.slice(0, 3)).map((payment) => {
+                      const isReversed = reversedPaymentIds.has(payment.id);
+                      return (
+                        <li key={payment.id} className="group flex min-h-9 items-center justify-between gap-3 text-xs">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="whitespace-nowrap tabular-nums text-foreground/70">{payment.payment_date}</span>
+                            {isReversed && <span className="text-muted-foreground">{locale === "zh" ? "已冲销" : "Annule"}</span>}
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <span className={cn("font-semibold tabular-nums", isReversed ? "text-muted-foreground line-through" : "text-accentGreen-700")}>
+                              {formatXof(Number(payment.amount))}
                             </span>
-                          )}
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          <span className={cn("font-semibold tabular-nums", isReversed ? "text-muted-foreground line-through" : "text-accentGreen-700")}>
-                            {formatXof(Number(payment.amount))}
-                          </span>
-                          {!readOnly && !isReversed && (
-                            <button
-                              type="button"
-                              className="rounded p-1 text-muted-foreground/60 transition-colors hover:bg-accentRed-50 hover:text-accentRed-600"
-                              onClick={() => {
-                                setDeleteTarget({ id: payment.id, amount: Number(payment.amount) });
-                                setReversalReason("");
-                              }}
-                              title={locale === "zh" ? "冲销此收款" : "Annuler ce paiement"}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            )}
+                            {!readOnly && !isReversed && (
+                              <button
+                                type="button"
+                                className="rounded p-1 text-muted-foreground/60 transition-colors hover:bg-accentRed-50 hover:text-accentRed-600"
+                                onClick={() => {
+                                  setDeleteTarget({ id: payment.id, amount: Number(payment.amount) });
+                                  setReversalReason("");
+                                }}
+                                title={locale === "zh" ? "冲销此收款" : "Annuler ce paiement"}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </section>
 
             {billing?.eligibleForMonthlyDiscount && hasOutstandingBalance && (
               <div className="rounded-lg border border-amber-200 bg-accentAmber-50 p-3 text-xs text-accentAmber-700">
@@ -678,14 +687,11 @@ export function BookingPanel({
               </div>
             )}
 
-            {!readOnly && <section className="space-y-3 rounded-xl border border-border bg-muted/35 p-3">
+            {!readOnly && <section className="space-y-3 pt-1">
               <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{locale === "zh" ? "当前操作" : "Action actuelle"}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{locale === "zh" ? "系统按住宿类型和订单状态给出下一步" : "Action proposee selon le sejour et le statut"}</p>
-                </div>
+                <p className="text-sm font-semibold text-foreground">{locale === "zh" ? "下一步操作" : "Action suivante"}</p>
                 {primaryAction && (
-                  <span className="shrink-0 rounded-full bg-card px-2.5 py-1 text-xs font-semibold text-muted-foreground ring-1 ring-border">
+                  <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
                     {getPrimaryActionLabel(primaryAction.action, locale)}
                   </span>
                 )}
@@ -693,25 +699,16 @@ export function BookingPanel({
               <div className="space-y-2">
 
               {(booking.status === "pending_review" || booking.status === "confirmed") && (
-                <div className="space-y-3 rounded-lg border border-border bg-card p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">
-                        {locale === "zh" ? "预订收款" : "Paiement de reservation"}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {hasOutstandingBalance
-                          ? (locale === "zh"
-                            ? "可以只登记收款，暂不办理入住；也可以填写金额后连同入住一起完成。"
-                            : "Enregistrez le paiement sans effectuer l'arrivee, ou encaissez au moment de l'arrivee.")
-                          : (locale === "zh" ? "预订款已登记，可直接继续办理入住。" : "Paiement enregistre. L'arrivee peut etre effectuee.")}
-                      </p>
-                    </div>
+                <div className="space-y-3 border-y border-border py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-foreground">
+                      {locale === "zh" ? "预订收款" : "Paiement de reservation"}
+                    </p>
                     <span className={cn(
                       "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums",
                       hasOutstandingBalance
-                        ? "bg-accentAmber-50 text-accentAmber-700 ring-1 ring-accentAmber-200"
-                        : "bg-accentGreen-50 text-accentGreen-700 ring-1 ring-accentGreen-200",
+                        ? "bg-accentAmber-50 text-accentAmber-700"
+                        : "bg-accentGreen-50 text-accentGreen-700",
                     )}>
                       {hasOutstandingBalance
                         ? `${locale === "zh" ? "待收" : "Solde"} ${formatXof(outstanding)}`
@@ -738,16 +735,6 @@ export function BookingPanel({
                           <label className={labelClass}>{locale === "zh" ? "收款日期" : "Date paiement"}</label>
                           <DateInput value={suppPaymentDate} onChangeValue={setSuppPaymentDate} className={inputClass} />
                         </div>
-                      </div>
-                      <div>
-                        <label className={labelClass}>{locale === "zh" ? "收据号/备注" : "Recu / note"}</label>
-                        <input
-                          type="text"
-                          value={suppReceiptNo}
-                          onChange={event => setSuppReceiptNo(event.target.value)}
-                          className={inputClass}
-                          placeholder={locale === "zh" ? "可选" : "Optionnel"}
-                        />
                       </div>
                       <Button
                         type="button"
@@ -808,16 +795,16 @@ export function BookingPanel({
               {primaryAction?.action === "check_out" && (
                 <div className="space-y-3">
                   {/* ── Checkout total + date ── */}
-                  <div className="rounded-lg border border-border bg-card p-3">
+                  <div className="space-y-2 border-y border-border py-3">
                     {booking.checkout_mode === "open" && (
-                      <div className="mb-2">
+                      <div>
                         <label className={labelClass}>{t.actualCheckOutDate}</label>
                         <DateInput value={actualCheckOut} onChangeValue={setActualCheckOut} className={inputClass} />
                       </div>
                     )}
-                    <label className={labelClass}>{t.booking.calculatedTotal}</label>
-                    <div className="mt-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm font-semibold tabular-nums text-foreground">
-                      {formatXof(finalDue)}
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="text-muted-foreground">{t.booking.calculatedTotal}</span>
+                      <span className="font-semibold tabular-nums text-foreground">{formatXof(finalDue)}</span>
                     </div>
                   </div>
 
@@ -851,7 +838,7 @@ export function BookingPanel({
                               <DollarSign className="h-4 w-4 shrink-0 text-muted-foreground" />
                               <span>
                                 <span className="block text-sm font-semibold">{locale === "zh" ? "补缴收款" : "Paiement"}</span>
-                                <span className="block text-xs text-muted-foreground">{locale === "zh" ? "登记追加收款与收据" : "Ajouter un paiement"}</span>
+                                <span className="block text-xs text-muted-foreground">{locale === "zh" ? "登记追加收款" : "Ajouter un paiement"}</span>
                               </span>
                             </button>
                             <button
@@ -917,9 +904,8 @@ export function BookingPanel({
                                   <input type="number" value={suppAmount} onChange={e => setSuppAmount(e.target.value)} className={inputClass} placeholder={t.booking.totalAmount} />
                                   <Button variant="secondary" size="sm" onClick={handleSuppPayment} disabled={saving || (parseInt(suppAmount,10)||0) <= 0} className="shrink-0"><DollarSign className="h-3 w-3" />{locale === "zh" ? "收" : "+"}</Button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div>
                                   <DateInput value={suppPaymentDate} onChangeValue={setSuppPaymentDate} className={inputClass} />
-                                  <input type="text" value={suppReceiptNo} onChange={e => setSuppReceiptNo(e.target.value)} className={inputClass} placeholder={locale === "zh" ? "收据号/备注" : "Recu / note"} />
                                 </div>
                               </div>
                             )}
@@ -982,10 +968,6 @@ export function BookingPanel({
                       <label className={labelClass}>{locale === "zh" ? "收款日期" : "Date paiement"}</label>
                       <DateInput value={suppPaymentDate} onChangeValue={setSuppPaymentDate} className={inputClass} />
                     </div>
-                  </div>
-                  <div>
-                    <label className={labelClass}>{locale === "zh" ? "收据号/备注" : "Recu / note"}</label>
-                    <input type="text" value={suppReceiptNo} onChange={e => setSuppReceiptNo(e.target.value)} className={inputClass} placeholder={locale === "zh" ? "可选" : "Optionnel"} />
                   </div>
                   <Button variant="default" onClick={handleSuppPayment} disabled={saving || (parseInt(suppAmount, 10) || 0) <= 0} className="w-full">
                     <DollarSign className="h-4 w-4" />
