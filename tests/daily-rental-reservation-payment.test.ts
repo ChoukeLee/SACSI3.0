@@ -52,6 +52,14 @@ describe("daily rental reservation payments", () => {
     expect(panel.indexOf("收款记录 ·")).toBeLessThan(panel.indexOf("更多业务操作"));
   });
 
+  it("loads payment reversal links so reversed receipts are not shown as valid", () => {
+    const loader = readFileSync(
+      resolve(root, "src/app/daily-rentals/daily-rental-data.tsx"),
+      "utf8",
+    );
+    expect(loader).toContain("payment_date, reversal_of_payment_id");
+  });
+
   it("keeps daily payment forms limited to amount and payment date", () => {
     expect(panel).not.toContain("suppReceiptNo");
     expect(panel).not.toContain("收据号/备注");

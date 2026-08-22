@@ -32,7 +32,7 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
       supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed").eq("is_completed", false),
       supabase
         .from("payments")
-        .select("id, source_id, amount, payment_date")
+        .select("id, source_id, amount, payment_date, reversal_of_payment_id")
         .eq("source_type", "daily_booking")
         .order("payment_date", { ascending: false })
         .limit(200),
@@ -58,7 +58,13 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
   let bookings: DailyBookingRow[] = [];
   let customers: CustomerSummary[] = [];
   let cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[] = [];
-  let payments: { id: string; source_id: string; amount: number; payment_date: string }[] = [];
+  let payments: {
+    id: string;
+    source_id: string;
+    amount: number;
+    payment_date: string;
+    reversal_of_payment_id: string | null;
+  }[] = [];
 
   if (!customersRes.error) {
     const activeLeaseCustomerIds = new Set((activeLeasesRes.data ?? []).map((row) => row.customer_id).filter(Boolean));

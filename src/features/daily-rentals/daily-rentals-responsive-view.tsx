@@ -16,7 +16,13 @@ interface DailyRentalsResponsiveViewProps {
   bookings: DailyBookingRow[];
   customers: CustomerSummary[];
   cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[];
-  payments: { id: string; source_id: string; amount: number; payment_date: string }[];
+  payments: {
+    id: string;
+    source_id: string;
+    amount: number;
+    payment_date: string;
+    reversal_of_payment_id: string | null;
+  }[];
   locale: Locale;
   userRole?: string;
   buildings: { id: string; code: string; display_name: string }[];
