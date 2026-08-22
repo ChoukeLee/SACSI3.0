@@ -527,7 +527,7 @@ export function BookingPanel({
 
           {/* Booking Detail */}
           {booking && !isBackfill && (<>
-            <section className="rounded-xl border border-border bg-card p-4 shadow-xs">
+            <section className="border-b border-border pb-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-muted-foreground">{selectedUnit?.unit_no ?? booking.unit_id.slice(0, 8)}</p>
@@ -565,16 +565,9 @@ export function BookingPanel({
                 </div>
               </div>
 
-              <div className={cn("mt-3 flex items-center justify-between rounded-lg border px-3 py-2 text-sm", hasOutstandingBalance ? "border-accentRed-200 bg-accentRed-50 text-accentRed-700" : "border-accentGreen-200 bg-accentGreen-50 text-accentGreen-700")}>
-                <span className="inline-flex items-center gap-1.5 font-semibold">
-                  <WalletCards className="h-4 w-4" />
-                  {hasOutstandingBalance ? t.billing.outstanding : t.billing.paid}
-                </span>
-                <span className="tabular-nums font-semibold">{hasOutstandingBalance ? formatXof(outstanding) : formatXof(totalPaid)}</span>
-              </div>
             </section>
 
-            <section className="border-y border-border py-3">
+            <section className="border-b border-border pb-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-foreground">{locale === "zh" ? "费用与收款" : "Frais et paiements"}</p>
                 <span className={cn("text-sm font-semibold tabular-nums", hasOutstandingBalance ? "text-accentRed-600" : "text-accentGreen-700")}>
@@ -687,7 +680,7 @@ export function BookingPanel({
               </div>
             )}
 
-            {!readOnly && <section className="space-y-3 pt-1">
+            {!readOnly && <section className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-foreground">{locale === "zh" ? "下一步操作" : "Action suivante"}</p>
                 {primaryAction && (
@@ -699,7 +692,7 @@ export function BookingPanel({
               <div className="space-y-2">
 
               {(booking.status === "pending_review" || booking.status === "confirmed") && (
-                <div className="space-y-3 border-y border-border py-3">
+                <div className="space-y-3 border-t border-border pt-3">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold text-foreground">
                       {locale === "zh" ? "预订收款" : "Paiement de reservation"}
@@ -795,7 +788,7 @@ export function BookingPanel({
               {primaryAction?.action === "check_out" && (
                 <div className="space-y-3">
                   {/* ── Checkout total + date ── */}
-                  <div className="space-y-2 border-y border-border py-3">
+                  <div className="space-y-2 border-t border-border pt-3">
                     {booking.checkout_mode === "open" && (
                       <div>
                         <label className={labelClass}>{t.actualCheckOutDate}</label>

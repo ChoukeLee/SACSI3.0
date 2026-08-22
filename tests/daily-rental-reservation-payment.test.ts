@@ -39,4 +39,11 @@ describe("daily rental reservation payments", () => {
     expect(panel).toContain("费用与收款");
     expect(panel).toContain("下一步操作");
   });
+
+  it("uses one vertical divider rhythm across booking, finance, and actions", () => {
+    expect(panel).not.toContain('rounded-xl border border-border bg-card p-4 shadow-xs');
+    expect(panel).not.toContain('border-y border-border py-3');
+    expect(panel).toContain('border-b border-border pb-4');
+    expect(panel).toContain('border-t border-border pt-3');
+  });
 });
