@@ -26,4 +26,14 @@ describe("daily rental reservation payments", () => {
     expect(panel).toMatch(/handleReservationPayment[\s\S]*recordSupplementaryPayment/);
     expect(panel).toMatch(/handleCheckIn[\s\S]*checkIn\(booking!\.id/);
   });
+
+  it("keeps installment history visible outside advanced payment actions", () => {
+    expect(panel).toContain(localeLabel("收款记录"));
+    expect(panel).toContain("positiveBookingPayments.slice(0, 3)");
+    expect(panel.indexOf(localeLabel("收款记录"))).toBeLessThan(panel.indexOf("更多业务操作"));
+  });
 });
+
+function localeLabel(label: string) {
+  return `locale === "zh" ? "${label}"`;
+}

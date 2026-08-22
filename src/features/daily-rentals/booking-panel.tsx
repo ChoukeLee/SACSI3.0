@@ -100,6 +100,7 @@ export function BookingPanel({
   const [reversalReason, setReversalReason] = useState("");
   const [showAdvancedActions, setShowAdvancedActions] = useState(false);
   const [activeAdvancedTask, setActiveAdvancedTask] = useState<AdvancedTask>(null);
+  const [showAllPayments, setShowAllPayments] = useState(false);
 
   // ── Backfill form state ──
   const [bfUnitId, setBfUnitId] = useState("");
@@ -119,6 +120,7 @@ export function BookingPanel({
   useEffect(() => {
     setShowAdvancedActions(false);
     setActiveAdvancedTask(null);
+    setShowAllPayments(false);
     setActionError("");
   }, [booking?.id]);
 
@@ -137,6 +139,12 @@ export function BookingPanel({
   const totalPaid = bookingPayments.reduce((s, p) => s + Number(p.amount), 0);
   const reversedPaymentIds = useMemo(
     () => new Set(bookingPayments.map((payment) => payment.reversal_of_payment_id).filter(Boolean)),
+    [bookingPayments],
+  );
+  const positiveBookingPayments = useMemo(
+    () => bookingPayments
+      .filter((payment) => Number(payment.amount) > 0)
+      .sort((left, right) => right.payment_date.localeCompare(left.payment_date)),
     [bookingPayments],
   );
 
@@ -585,6 +593,73 @@ export function BookingPanel({
               )}
             </div>
 
+            {positiveBookingPayments.length > 0 && (
+              <section className="rounded-lg border border-border bg-card">
+                <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <WalletCards className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground">{locale === "zh" ? "收款记录" : "Paiements"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {locale === "zh"
+                          ? `${positiveBookingPayments.length}笔，共 ${formatXof(totalPaid)}`
+                          : `${positiveBookingPayments.length} paiement(s), ${formatXof(totalPaid)}`}
+                      </p>
+                    </div>
+                  </div>
+                  {positiveBookingPayments.length > 3 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllPayments((value) => !value)}
+                      className="shrink-0 text-xs font-medium text-foreground/70 transition-colors hover:text-foreground"
+                    >
+                      {showAllPayments
+                        ? (locale === "zh" ? "收起" : "Reduire")
+                        : (locale === "zh" ? "查看全部" : "Tout voir")}
+                    </button>
+                  )}
+                </div>
+                <ul className="divide-y divide-border border-t border-border">
+                  {(showAllPayments ? positiveBookingPayments : positiveBookingPayments.slice(0, 3)).map((payment, index) => {
+                    const isReversed = reversedPaymentIds.has(payment.id);
+                    return (
+                      <li key={payment.id} className="group flex items-center justify-between gap-3 px-3 py-2 text-xs">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
+                            {positiveBookingPayments.length - index}
+                          </span>
+                          <span className="whitespace-nowrap text-foreground/70">{payment.payment_date}</span>
+                          {isReversed && (
+                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                              {locale === "zh" ? "已冲销" : "Annule"}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <span className={cn("font-semibold tabular-nums", isReversed ? "text-muted-foreground line-through" : "text-accentGreen-700")}>
+                            {formatXof(Number(payment.amount))}
+                          </span>
+                          {!readOnly && !isReversed && (
+                            <button
+                              type="button"
+                              className="rounded p-1 text-muted-foreground/60 transition-colors hover:bg-accentRed-50 hover:text-accentRed-600"
+                              onClick={() => {
+                                setDeleteTarget({ id: payment.id, amount: Number(payment.amount) });
+                                setReversalReason("");
+                              }}
+                              title={locale === "zh" ? "冲销此收款" : "Annuler ce paiement"}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
+
             {billing?.eligibleForMonthlyDiscount && hasOutstandingBalance && (
               <div className="rounded-lg border border-amber-200 bg-accentAmber-50 p-3 text-xs text-accentAmber-700">
                 <Percent className="inline h-3.5 w-3.5 mr-1" />
@@ -846,28 +921,6 @@ export function BookingPanel({
                                   <DateInput value={suppPaymentDate} onChangeValue={setSuppPaymentDate} className={inputClass} />
                                   <input type="text" value={suppReceiptNo} onChange={e => setSuppReceiptNo(e.target.value)} className={inputClass} placeholder={locale === "zh" ? "收据号/备注" : "Recu / note"} />
                                 </div>
-                                {bookingPayments.length > 0 && (
-                                  <ul className="mt-2 space-y-1 text-xs text-foreground/70">
-                                    {bookingPayments.filter((payment) => Number(payment.amount) > 0).map(p => (
-                                      <li key={p.id} className="flex items-center justify-between rounded-md bg-muted/50 px-2 py-1 group">
-                                        <span>{p.payment_date} <span className="font-semibold">{formatXof(Number(p.amount))}</span></span>
-                                        {reversedPaymentIds.has(p.id) ? (
-                                          <span className="text-[11px] text-muted-foreground">{locale === "zh" ? "已冲销" : "Annule"}</span>
-                                        ) : (
-                                          <button
-                                            type="button"
-                                            className="rounded p-0.5 text-muted-foreground/70 opacity-60 transition hover:bg-accentRed-50 hover:text-accentRed-600 group-hover:opacity-100"
-                                            onClick={() => {
-                                              setDeleteTarget({ id: p.id, amount: Number(p.amount) });
-                                              setReversalReason("");
-                                            }}
-                                            title={locale === "zh" ? "冲销此收款" : "Annuler ce paiement"}
-                                          ><Trash2 className="h-3 w-3" /></button>
-                                        )}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                )}
                               </div>
                             )}
 
