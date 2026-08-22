@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Check, UserX, Printer, DollarSign, Percent, Trash2, MoreHorizontal, WalletCards, CalendarClock } from "lucide-react";
+import { Check, UserX, Printer, DollarSign, Percent, Trash2, MoreHorizontal, WalletCards, CalendarClock, ChevronDown } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
@@ -100,7 +100,7 @@ export function BookingPanel({
   const [reversalReason, setReversalReason] = useState("");
   const [showAdvancedActions, setShowAdvancedActions] = useState(false);
   const [activeAdvancedTask, setActiveAdvancedTask] = useState<AdvancedTask>(null);
-  const [showAllPayments, setShowAllPayments] = useState(false);
+  const [showPaymentHistory, setShowPaymentHistory] = useState(false);
 
   // ── Backfill form state ──
   const [bfUnitId, setBfUnitId] = useState("");
@@ -120,7 +120,7 @@ export function BookingPanel({
   useEffect(() => {
     setShowAdvancedActions(false);
     setActiveAdvancedTask(null);
-    setShowAllPayments(false);
+    setShowPaymentHistory(false);
     setActionError("");
   }, [booking?.id]);
 
@@ -607,25 +607,25 @@ export function BookingPanel({
 
               {positiveBookingPayments.length > 0 && (
                 <div className="mt-3 border-t border-border pt-2">
-                  <div className="flex items-center justify-between gap-3 py-1">
+                  <button
+                    type="button"
+                    aria-expanded={showPaymentHistory}
+                    onClick={() => setShowPaymentHistory((value) => !value)}
+                    className="flex min-h-9 w-full items-center justify-between gap-3 rounded-lg px-1 text-left transition-colors hover:bg-muted/50"
+                  >
                     <p className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                       <WalletCards className="h-3.5 w-3.5" />
                       {locale === "zh" ? `收款记录 · ${positiveBookingPayments.length}笔` : `${positiveBookingPayments.length} paiement(s)`}
                     </p>
-                    {positiveBookingPayments.length > 3 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowAllPayments((value) => !value)}
-                        className="text-xs font-medium text-foreground/70 transition-colors hover:text-foreground"
-                      >
-                        {showAllPayments
-                          ? (locale === "zh" ? "收起" : "Reduire")
-                          : (locale === "zh" ? "查看全部" : "Tout voir")}
-                      </button>
-                    )}
-                  </div>
-                  <ul className="divide-y divide-border/70">
-                    {(showAllPayments ? positiveBookingPayments : positiveBookingPayments.slice(0, 3)).map((payment) => {
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-foreground/70">
+                      {showPaymentHistory
+                        ? (locale === "zh" ? "收起" : "Reduire")
+                        : (locale === "zh" ? "展开" : "Afficher")}
+                      <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showPaymentHistory && "rotate-180")} />
+                    </span>
+                  </button>
+                  {showPaymentHistory && <ul className="divide-y divide-border/70">
+                    {positiveBookingPayments.map((payment) => {
                       const isReversed = reversedPaymentIds.has(payment.id);
                       return (
                         <li key={payment.id} className="group flex min-h-9 items-center justify-between gap-3 text-xs">
@@ -654,7 +654,7 @@ export function BookingPanel({
                         </li>
                       );
                     })}
-                  </ul>
+                  </ul>}
                 </div>
               )}
             </section>
