@@ -25,6 +25,7 @@ import {
 import type { DailyOperationSnapshot } from "./actions";
 import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
 import { dailyBookingAgentSortValue, isDailyBookingAgentName } from "./daily-booking-agents";
+import { shouldShowAdvanceReservationPayment } from "./daily-rental-policy";
 
 interface BookingPanelProps {
   booking: DailyBookingRow | null; unitId: string | null; defaultDate?: string;
@@ -185,6 +186,12 @@ export function BookingPanel({
         hasOutstandingBalance,
       })
     : null;
+  const showAdvanceReservationPayment = booking
+    ? shouldShowAdvanceReservationPayment({
+        bookingStatus: booking.status as "pending_review" | "confirmed" | "checked_in" | "checked_out" | "cancelled",
+        checkIn: booking.check_in,
+      })
+    : false;
 
   useEffect(() => {
     if (booking?.status === "checked_out" && hasOutstandingBalance) {
@@ -691,7 +698,7 @@ export function BookingPanel({
               </div>
               <div className="space-y-2">
 
-              {(booking.status === "pending_review" || booking.status === "confirmed") && (
+              {showAdvanceReservationPayment && (
                 <div className="space-y-3 border-t border-border pt-3">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold text-foreground">

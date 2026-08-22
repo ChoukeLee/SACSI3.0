@@ -188,6 +188,15 @@ export function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+export function shouldShowAdvanceReservationPayment(input: {
+  bookingStatus?: DailyBookingStatus | null;
+  checkIn: string;
+  todayStr?: string;
+}) {
+  const isReservation = input.bookingStatus === "pending_review" || input.bookingStatus === "confirmed";
+  return isReservation && input.checkIn > (input.todayStr ?? todayIso());
+}
+
 export function allowCreateBooking(input: CreateBookingPolicyInput): PolicyResult {
   const checkIn = input.checkIn;
   const mode = input.checkoutMode ?? "fixed";

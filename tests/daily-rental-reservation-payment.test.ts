@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { shouldShowAdvanceReservationPayment } from "../src/features/daily-rentals/daily-rental-policy";
 
 const root = resolve(__dirname, "..");
 const migration = readFileSync(
@@ -21,10 +22,28 @@ describe("daily rental reservation payments", () => {
   });
 
   it("keeps pre-arrival payment separate from the primary check-in command", () => {
-    expect(panel).toContain('booking.status === "pending_review" || booking.status === "confirmed"');
+    expect(panel).toContain("showAdvanceReservationPayment");
     expect(panel).toContain("登记收款，暂不入住");
     expect(panel).toMatch(/handleReservationPayment[\s\S]*recordSupplementaryPayment/);
     expect(panel).toMatch(/handleCheckIn[\s\S]*checkIn\(booking!\.id/);
+  });
+
+  it("shows advance payment only for reservations arriving after today", () => {
+    expect(shouldShowAdvanceReservationPayment({
+      bookingStatus: "confirmed",
+      checkIn: "2026-08-23",
+      todayStr: "2026-08-22",
+    })).toBe(true);
+    expect(shouldShowAdvanceReservationPayment({
+      bookingStatus: "confirmed",
+      checkIn: "2026-08-22",
+      todayStr: "2026-08-22",
+    })).toBe(false);
+    expect(shouldShowAdvanceReservationPayment({
+      bookingStatus: "checked_in",
+      checkIn: "2026-08-23",
+      todayStr: "2026-08-22",
+    })).toBe(false);
   });
 
   it("keeps installment history visible outside advanced payment actions", () => {
