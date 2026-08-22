@@ -256,6 +256,22 @@ export function BookingPanel({
     );
   };
 
+  const handleReservationPayment = async () => {
+    const amount = toN(prepaidAmount);
+    if (amount <= 0 || amount > outstanding) return;
+    await runPanelAction(
+      () => recordSupplementaryPayment({
+        bookingId: booking!.id,
+        amount,
+        paymentDate: suppPaymentDate || undefined,
+        receiptNo: suppReceiptNo || undefined,
+        requestId: crypto.randomUUID(),
+      }),
+    );
+    setPrepaidAmount("");
+    setSuppReceiptNo("");
+  };
+
   const handleCheckOut = async () => {
     const disc = toN(discountAmount);
     await runPanelAction(
@@ -601,6 +617,78 @@ export function BookingPanel({
               </div>
               <div className="space-y-2">
 
+              {(booking.status === "pending_review" || booking.status === "confirmed") && (
+                <div className="space-y-3 rounded-lg border border-border bg-card p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        {locale === "zh" ? "预订收款" : "Paiement de reservation"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {hasOutstandingBalance
+                          ? (locale === "zh"
+                            ? "可以只登记收款，暂不办理入住；也可以填写金额后连同入住一起完成。"
+                            : "Enregistrez le paiement sans effectuer l'arrivee, ou encaissez au moment de l'arrivee.")
+                          : (locale === "zh" ? "预订款已登记，可直接继续办理入住。" : "Paiement enregistre. L'arrivee peut etre effectuee.")}
+                      </p>
+                    </div>
+                    <span className={cn(
+                      "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums",
+                      hasOutstandingBalance
+                        ? "bg-accentAmber-50 text-accentAmber-700 ring-1 ring-accentAmber-200"
+                        : "bg-accentGreen-50 text-accentGreen-700 ring-1 ring-accentGreen-200",
+                    )}>
+                      {hasOutstandingBalance
+                        ? `${locale === "zh" ? "待收" : "Solde"} ${formatXof(outstanding)}`
+                        : (locale === "zh" ? "已登记" : "Paye")}
+                    </span>
+                  </div>
+
+                  {hasOutstandingBalance && (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className={labelClass}>{locale === "zh" ? "本次收款" : "Montant"}</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={outstanding}
+                            value={prepaidAmount}
+                            onChange={event => setPrepaidAmount(event.target.value)}
+                            className={inputClass}
+                            placeholder={String(outstanding)}
+                          />
+                        </div>
+                        <div>
+                          <label className={labelClass}>{locale === "zh" ? "收款日期" : "Date paiement"}</label>
+                          <DateInput value={suppPaymentDate} onChangeValue={setSuppPaymentDate} className={inputClass} />
+                        </div>
+                      </div>
+                      <div>
+                        <label className={labelClass}>{locale === "zh" ? "收据号/备注" : "Recu / note"}</label>
+                        <input
+                          type="text"
+                          value={suppReceiptNo}
+                          onChange={event => setSuppReceiptNo(event.target.value)}
+                          className={inputClass}
+                          placeholder={locale === "zh" ? "可选" : "Optionnel"}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleReservationPayment}
+                        disabled={saving || toN(prepaidAmount) <= 0 || toN(prepaidAmount) > outstanding}
+                        className="w-full"
+                      >
+                        <DollarSign className="h-4 w-4" />
+                        {locale === "zh" ? "登记收款，暂不入住" : "Encaisser sans arrivee"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {primaryAction?.action === "confirm" && (
                 <div className="space-y-2">
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
@@ -636,7 +724,6 @@ export function BookingPanel({
               {/* ── confirmed (no cleaning block) → primary = check_in ── */}
               {primaryAction?.action === "check_in" && (
                 <div className="space-y-2">
-                  <div><label className={labelClass}>{t.booking.prepaidAmount}</label><input type="number" value={prepaidAmount} onChange={e => setPrepaidAmount(e.target.value)} className={inputClass} /><p className="mt-0.5 text-xs text-muted-foreground/70">{t.booking.prepaidWarning}</p></div>
                   <Button variant="default" onClick={handleCheckIn} disabled={saving} className="w-full">{t.booking.checkIn}</Button>
                   <Button variant="outline" size="sm" onClick={handleCancelBooking} disabled={saving} className="w-full justify-center text-accentRed-600 hover:bg-accentRed-50 hover:text-accentRed-700"><UserX className="h-3.5 w-3.5 mr-1" />{t.booking.cancelBooking}</Button>
                 </div>
