@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Check, UserX, Printer, DollarSign, Percent, Trash2, MoreHorizontal, WalletCards, CalendarClock, ChevronDown } from "lucide-react";
+import { Check, UserX, Printer, DollarSign, Percent, Trash2, MoreHorizontal, WalletCards, CalendarClock, ChevronDown, LogIn } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
@@ -722,11 +722,12 @@ export function BookingPanel({
                       <Button
                         type="button"
                         variant="outline"
+                        size="lg"
                         onClick={handleReservationPayment}
                         disabled={saving || toN(prepaidAmount) <= 0 || toN(prepaidAmount) > outstanding}
-                        className="w-full"
+                        className="w-full justify-center"
                       >
-                        <DollarSign className="h-4 w-4" />
+                        <DollarSign />
                         {locale === "zh" ? "登记收款，暂不入住" : "Encaisser sans arrivee"}
                       </Button>
                     </div>
@@ -741,11 +742,12 @@ export function BookingPanel({
                       {locale === "zh" ? "此预订仍处于待确认状态。确认后即可继续办理入住。" : "Cette reservation attend confirmation. Confirmez-la avant l'arrivee."}
                     </p>
                   </div>
-                  <Button variant="default" onClick={handleConfirmBooking} disabled={saving} className="w-full">
+                  <Button variant="default" size="lg" onClick={handleConfirmBooking} disabled={saving} className="w-full justify-center">
+                    <Check />
                     {t.booking.confirmBooking}
                   </Button>
-                  <Button variant="outline" size="sm" onClick={handleCancelBooking} disabled={saving} className="w-full justify-center text-accentRed-600 hover:bg-accentRed-50 hover:text-accentRed-700">
-                    <UserX className="h-3.5 w-3.5 mr-1" />{t.booking.cancelBooking}
+                  <Button variant="outline" size="lg" onClick={handleCancelBooking} disabled={saving} className="w-full justify-center border-accentRed-200 text-accentRed-600 hover:border-accentRed-300 hover:bg-accentRed-50 hover:text-accentRed-700">
+                    <UserX />{t.booking.cancelBooking}
                   </Button>
                 </div>
               )}
@@ -759,8 +761,8 @@ export function BookingPanel({
                     </p>
                   </div>
                   {effectiveCleaningTask && (
-                    <Button variant="default" size="sm" onClick={handleCompleteCleaning} disabled={saving} className="w-full">
-                      <Check className="h-3.5 w-3.5 mr-1" />{t.cleaning.markComplete}
+                    <Button variant="default" size="lg" onClick={handleCompleteCleaning} disabled={saving} className="w-full justify-center">
+                      <Check />{t.cleaning.markComplete}
                     </Button>
                   )}
                 </div>
@@ -769,8 +771,8 @@ export function BookingPanel({
               {/* ── confirmed (no cleaning block) → primary = check_in ── */}
               {primaryAction?.action === "check_in" && (
                 <div className="space-y-2">
-                  <Button variant="default" onClick={handleCheckIn} disabled={saving} className="w-full">{t.booking.checkIn}</Button>
-                  <Button variant="outline" size="sm" onClick={handleCancelBooking} disabled={saving} className="w-full justify-center text-accentRed-600 hover:bg-accentRed-50 hover:text-accentRed-700"><UserX className="h-3.5 w-3.5 mr-1" />{t.booking.cancelBooking}</Button>
+                  <Button variant="default" size="lg" onClick={handleCheckIn} disabled={saving} className="w-full justify-center"><LogIn />{t.booking.checkIn}</Button>
+                  <Button variant="outline" size="lg" onClick={handleCancelBooking} disabled={saving} className="w-full justify-center border-accentRed-200 text-accentRed-600 hover:border-accentRed-300 hover:bg-accentRed-50 hover:text-accentRed-700"><UserX />{t.booking.cancelBooking}</Button>
                 </div>
               )}
 
@@ -793,7 +795,7 @@ export function BookingPanel({
                     )}
                   </div>
 
-                  <Button variant="default" onClick={handleCheckOut} disabled={saving} className="w-full"><Check className="h-4 w-4 mr-1" />{t.booking.confirmCheckOut}</Button>
+                  <Button variant="default" size="lg" onClick={handleCheckOut} disabled={saving} className="w-full justify-center"><Check />{t.booking.confirmCheckOut}</Button>
 
                   {/* More actions: choose one task, then show one focused form */}
                   <div className="rounded-lg border border-border bg-card">
