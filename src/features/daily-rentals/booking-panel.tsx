@@ -725,10 +725,10 @@ export function BookingPanel({
                         size="lg"
                         onClick={handleReservationPayment}
                         disabled={saving || toN(prepaidAmount) <= 0 || toN(prepaidAmount) > outstanding}
-                        className="w-full justify-center"
+                        className="w-full justify-center font-semibold"
                       >
                         <DollarSign />
-                        {locale === "zh" ? "登记收款，暂不入住" : "Encaisser sans arrivee"}
+                        {locale === "zh" ? "登记收款" : "Encaisser"}
                       </Button>
                     </div>
                   )}
@@ -742,11 +742,11 @@ export function BookingPanel({
                       {locale === "zh" ? "此预订仍处于待确认状态。确认后即可继续办理入住。" : "Cette reservation attend confirmation. Confirmez-la avant l'arrivee."}
                     </p>
                   </div>
-                  <Button variant="default" size="lg" onClick={handleConfirmBooking} disabled={saving} className="w-full justify-center">
+                  <Button variant="default" size="lg" onClick={handleConfirmBooking} disabled={saving} className="w-full justify-center font-semibold">
                     <Check />
                     {t.booking.confirmBooking}
                   </Button>
-                  <Button variant="outline" size="lg" onClick={handleCancelBooking} disabled={saving} className="w-full justify-center border-accentRed-200 text-accentRed-600 hover:border-accentRed-300 hover:bg-accentRed-50 hover:text-accentRed-700">
+                  <Button variant="outline" size="lg" onClick={handleCancelBooking} disabled={saving} className="w-full justify-center border-accentRed-200 font-semibold text-accentRed-600 hover:border-accentRed-300 hover:bg-accentRed-50 hover:text-accentRed-700">
                     <UserX />{t.booking.cancelBooking}
                   </Button>
                 </div>
@@ -761,7 +761,7 @@ export function BookingPanel({
                     </p>
                   </div>
                   {effectiveCleaningTask && (
-                    <Button variant="default" size="lg" onClick={handleCompleteCleaning} disabled={saving} className="w-full justify-center">
+                    <Button variant="default" size="lg" onClick={handleCompleteCleaning} disabled={saving} className="w-full justify-center font-semibold">
                       <Check />{t.cleaning.markComplete}
                     </Button>
                   )}
@@ -771,8 +771,8 @@ export function BookingPanel({
               {/* ── confirmed (no cleaning block) → primary = check_in ── */}
               {primaryAction?.action === "check_in" && (
                 <div className="space-y-2">
-                  <Button variant="default" size="lg" onClick={handleCheckIn} disabled={saving} className="w-full justify-center"><LogIn />{t.booking.checkIn}</Button>
-                  <Button variant="outline" size="lg" onClick={handleCancelBooking} disabled={saving} className="w-full justify-center border-accentRed-200 text-accentRed-600 hover:border-accentRed-300 hover:bg-accentRed-50 hover:text-accentRed-700"><UserX />{t.booking.cancelBooking}</Button>
+                  <Button variant="default" size="lg" onClick={handleCheckIn} disabled={saving} className="w-full justify-center font-semibold"><LogIn />{t.booking.checkIn}</Button>
+                  <Button variant="outline" size="lg" onClick={handleCancelBooking} disabled={saving} className="w-full justify-center border-accentRed-200 font-semibold text-accentRed-600 hover:border-accentRed-300 hover:bg-accentRed-50 hover:text-accentRed-700"><UserX />{t.booking.cancelBooking}</Button>
                 </div>
               )}
 
@@ -795,7 +795,7 @@ export function BookingPanel({
                     )}
                   </div>
 
-                  <Button variant="default" size="lg" onClick={handleCheckOut} disabled={saving} className="w-full justify-center"><Check />{t.booking.confirmCheckOut}</Button>
+                  <Button variant="default" size="lg" onClick={handleCheckOut} disabled={saving} className="w-full justify-center font-semibold"><Check />{t.booking.confirmCheckOut}</Button>
 
                   {/* More actions: choose one task, then show one focused form */}
                   <div className="rounded-lg border border-border bg-card">
