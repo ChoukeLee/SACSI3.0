@@ -15,6 +15,7 @@ import type {
 export async function getSalePageData() {
   const supabase = await createClient();
   const [
+    projectsRes,
     buildingsRes,
     contractsRes,
     schedulesRes,
@@ -23,7 +24,8 @@ export async function getSalePageData() {
     paymentsRes,
     receivablesRes,
   ] = await Promise.all([
-    supabase.from("buildings").select("id, code, display_name").eq("is_active", true).order("code"),
+    supabase.from("projects").select("id").eq("is_active", true).eq("allows_sale", true),
+    supabase.from("buildings").select("id, project_id, code, display_name").eq("is_active", true).order("code"),
     supabase.from("sale_contracts").select("*").order("signed_date", { ascending: false }).limit(1000),
     supabase.from("sale_payment_schedule").select("*").order("installment_no").limit(5000),
     supabase.from("units").select("*").order("unit_no"),
@@ -47,9 +49,11 @@ export async function getSalePageData() {
     supabase.from("receivables").select("*").eq("source_type", "sale_contract").order("due_date").limit(5000),
   ]);
 
+  if (projectsRes.error) throw projectsRes.error;
   if (buildingsRes.error) throw buildingsRes.error;
 
-  const buildings = (buildingsRes.data ?? []) as BuildingRow[];
+  const sellableProjectIds = new Set((projectsRes.data ?? []).map((project) => project.id));
+  const buildings = ((buildingsRes.data ?? []) as BuildingRow[]).filter((building) => building.project_id && sellableProjectIds.has(building.project_id));
   const buildingIds = new Set(buildings.map((building) => building.id));
 
   return {

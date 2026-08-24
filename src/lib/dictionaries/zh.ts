@@ -84,7 +84,8 @@ export const zhDict = {
         apartment: "公寓",
         parking: "车位",
         storefront: "门面",
-        office: "办公"
+        office: "办公",
+        warehouse: "仓库"
       },
       businessTypes: {
         daily_rental: "日租",

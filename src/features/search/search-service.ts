@@ -8,7 +8,7 @@ import type { SearchResult, SearchResultType, SearchResults } from "./search-typ
 import type { UserRole } from "@/lib/auth";
 
 const MAX_PER_TYPE = 6;
-const UNIT_KIND_LABELS: Record<string, string> = { apartment: "公寓", parking: "车位", storefront: "门面", office: "办公室" };
+const UNIT_KIND_LABELS: Record<string, string> = { apartment: "公寓", parking: "车位", storefront: "门面", office: "办公室", warehouse: "仓库" };
 
 const PERMITTED_TYPES: Record<UserRole, SearchResultType[]> = {
   admin:       ["customer","unit","daily_booking","lease","sale","receivable","payment","document"],

@@ -39,7 +39,8 @@ const RECEIVABLE_FIELDS = [
 
 const UNIT_FIELDS = [
   "id", "building_id", "code", "unit_no", "floor_label", "kind", "status",
-  "area_sqm", "layout", "furnishing", "notes",
+  "area_sqm", "layout", "furnishing", "notes", "asset_subtype", "construction_status",
+  "location_grade", "zone_label", "occupancy_verified",
   "unit_business_flags(business_type,is_enabled,default_price_xof)",
 ].join(",");
 
@@ -86,6 +87,7 @@ export async function loadLeasePageData() {
 
   const buildings = buildingsRes.data ?? [];
   const activeBuildingIds = new Set(buildings.map((building) => building.id));
+  const contractUnitIds = new Set((contracts as unknown as Array<{ unit_id: string }>).map((contract) => contract.unit_id));
   const rawUnits = (unitsRes.data ?? []) as unknown as Array<UnitRow & {
     unit_business_flags?: Array<{ business_type: string; is_enabled: boolean; default_price_xof: number | null }>;
   }>;
@@ -97,10 +99,13 @@ export async function loadLeasePageData() {
         ...(unit.unit_business_flags ?? []),
         { business_type: "long_lease", is_enabled: true, default_price_xof: 1_200_000 },
       ],
-    } : unit)) as unknown as UnitRow[]);
+    } : unit)
+    .filter((unit) => contractUnitIds.has(unit.id) || (unit.unit_business_flags ?? []).some((flag) => flag.business_type === "long_lease" && flag.is_enabled))) as unknown as UnitRow[]);
+  const unitBuildingIds = new Set(units.map((unit) => unit.building_id));
+  const leaseBuildings = buildings.filter((building) => unitBuildingIds.has(building.id));
 
   return {
-    buildings,
+    buildings: leaseBuildings,
     contracts: contracts as unknown as LeaseContractRow[],
     units,
     customers: (customersRes.data ?? []) as unknown as CustomerRow[],

@@ -23,7 +23,7 @@ const statusOptions: (UnitStatus | "all")[] = [
   "leased", "sold", "maintenance", "locked",
 ];
 
-const kindOptions: (UnitKind | "all")[] = ["all", "apartment", "parking", "storefront", "office"];
+const kindOptions: (UnitKind | "all")[] = ["all", "apartment", "parking", "storefront", "office", "warehouse"];
 const businessOptions: (BusinessType | "all")[] = ["all", "daily_rental", "long_lease", "sale"];
 
 export function UnitFilters({

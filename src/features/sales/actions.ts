@@ -100,11 +100,15 @@ export async function createSaleContract(input: {
 
   const { data: contractUnit, error: unitError } = await supabase
     .from("units")
-    .select("unit_no, building:buildings(code)")
+    .select("unit_no, building:buildings(code, project:projects(allows_sale))")
     .eq("id", input.unitId)
     .single();
   if (unitError || !contractUnit) return { success: false, error: unitError?.message ?? "未找到该房源。" };
   const contractBuilding = Array.isArray(contractUnit.building) ? contractUnit.building[0] : contractUnit.building;
+  const contractProject = Array.isArray(contractBuilding?.project) ? contractBuilding.project[0] : contractBuilding?.project;
+  if (contractProject?.allows_sale === false) {
+    return { success: false, error: "该项目设置为只租不卖，不能创建出售合同。" };
+  }
   const generatedContractNo = buildSaleContractNumber(
     contractBuilding?.code ?? "SACSI",
     contractUnit.unit_no,

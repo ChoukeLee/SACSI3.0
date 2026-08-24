@@ -43,7 +43,7 @@ export async function UnitDataSection({
     getSaleContracts(), getCleaningTasks(), getCustomers(), getManagementFinanceSnapshot(),
   ]);
 
-  const units = sortUnits((unitsRaw ?? []) as UnitRow[]);
+  const units = sortUnits((unitsRaw ?? []) as unknown as UnitRow[]);
   const dailyBookings = (dailyBookingsRaw ?? []) as DailyBookingRow[];
   const leaseContracts = (leaseContractsRaw ?? []) as LeaseContractRow[];
   const saleContracts = (saleContractsRaw ?? []) as SaleContractRow[];

@@ -59,7 +59,7 @@ export async function updateUnitStatus(
 
   const { data: unit, error: fetchError } = await supabase
     .from("units")
-    .select("id, status")
+    .select("id, status, construction_status, occupancy_verified")
     .eq("id", unitId)
     .single();
 
@@ -73,9 +73,12 @@ export async function updateUnitStatus(
 
   const previousStatus = unit.status;
 
+  const readinessUpdate = status === "available"
+    ? { construction_status: "operational", occupancy_verified: true }
+    : {};
   const { error: updateError } = await supabase
     .from("units")
-    .update({ status, updated_at: new Date().toISOString() })
+    .update({ status, ...readinessUpdate, updated_at: new Date().toISOString() })
     .eq("id", unitId);
 
   if (updateError) {
@@ -90,6 +93,9 @@ export async function updateUnitStatus(
       previous_status: previousStatus,
       new_status: status,
       changed_manually: true,
+      ...(status === "available" && unit.occupancy_verified === false
+        ? { readiness_verified: true, previous_construction_status: unit.construction_status }
+        : {}),
     },
   });
 

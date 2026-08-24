@@ -1,14 +1,36 @@
-export type BuildingCode =
-  | "SACSI3"
-  | "SACSI4"
-  | "SACSI5"
-  | "SACSI6"
-  | "SACSI7"
-  | "SACSI11";
+// Building codes are data-driven. Keeping this open avoids a code release for
+// every new building imported under a project such as CIMAC.
+export type BuildingCode = string;
+
+export type ProjectCode = string;
+
+export type ProjectConstructionStatus =
+  | "planned"
+  | "under_construction"
+  | "inspection_pending"
+  | "fitout_pending"
+  | "partially_operational"
+  | "operational"
+  | "paused"
+  | "unverified";
+
+export type UnitConstructionStatus = Exclude<ProjectConstructionStatus, "partially_operational">;
+
+export type LocationGrade = "standard" | "central_avenue_prime";
+
+export type AssetSubtype =
+  | "standard"
+  | "apartment"
+  | "parking"
+  | "storefront"
+  | "office"
+  | "commercial_shop"
+  | "apartment_ground_floor_shop"
+  | "warehouse";
 
 export type BusinessType = "daily_rental" | "long_lease" | "sale";
 
-export type UnitKind = "apartment" | "parking" | "storefront" | "office";
+export type UnitKind = "apartment" | "parking" | "storefront" | "office" | "warehouse";
 
 export type UnitStatus =
   | "available"

@@ -3,18 +3,125 @@ import { createClient } from "@/lib/supabase/server";
 import type { ManagementFinanceSnapshot } from "@/features/management/finance-snapshot";
 import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import { addIsoDays, isOperatingExpensePayment, isRefundPayment, paymentAmountXof } from "@/features/finance/metrics";
-import type { PaymentRow } from "@/types/database";
+import type { PaymentRow, ProjectRow } from "@/types/database";
+
+export interface CimacBuildingOverview {
+  id: string;
+  code: string;
+  displayName: string;
+  shopCount: number;
+  primeCount: number;
+  standardCount: number;
+  unverifiedCount: number;
+  operationalCount: number;
+  leasedCount: number;
+  standardMonthlyRentXof: number;
+}
+
+export interface CimacOverview {
+  project: Pick<ProjectRow, "id" | "code" | "display_name" | "brand_name" | "construction_status" | "allows_sale">;
+  buildingCount: number;
+  shopCount: number;
+  primeCount: number;
+  standardCount: number;
+  unverifiedCount: number;
+  operationalCount: number;
+  leasedCount: number;
+  standardMonthlyRentXof: number;
+  buildings: CimacBuildingOverview[];
+}
+
+export const getProjects = cache(async () => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id, code, display_name, brand_name, project_kind, construction_status, allows_daily_rental, allows_long_lease, allows_sale, is_active, notes, created_at, updated_at")
+    .eq("is_active", true)
+    .order("code");
+  if (error) throw new Error(`Failed to load projects: ${error.message}`);
+  return (data ?? []) as ProjectRow[];
+});
 
 export const getBuildings = cache(async () => {
   const supabase = await createClient();
-  const { data } = await supabase.from("buildings").select("id, display_name, is_active, code").eq("is_active", true).order("code");
+  const { data } = await supabase.from("buildings").select("id, project_id, display_name, is_active, code, construction_status").eq("is_active", true).order("code");
   return data ?? [];
 });
 
 export const getUnits = cache(async () => {
   const supabase = await createClient();
-  const { data } = await supabase.from("units").select("id, unit_no, floor_label, kind, status, building_id, layout, notes").order("unit_no");
+  const { data } = await supabase.from("units").select("id, unit_no, floor_label, kind, status, building_id, layout, notes, construction_status, location_grade, zone_label, occupancy_verified, asset_subtype").order("unit_no");
   return data ?? [];
+});
+
+export const getCimacOverview = cache(async (): Promise<CimacOverview | null> => {
+  const supabase = await createClient();
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("id, code, display_name, brand_name, construction_status, allows_sale")
+    .eq("code", "CIMAC")
+    .maybeSingle();
+  if (projectError) throw new Error(`Failed to load CIMAC project: ${projectError.message}`);
+  if (!project) return null;
+
+  const { data: buildings, error: buildingError } = await supabase
+    .from("buildings")
+    .select("id, code, display_name")
+    .eq("project_id", project.id)
+    .eq("is_active", true)
+    .order("code");
+  if (buildingError) throw new Error(`Failed to load CIMAC buildings: ${buildingError.message}`);
+  const buildingRows = buildings ?? [];
+  const buildingIds = buildingRows.map((building) => building.id);
+
+  const { data: units, error: unitError } = buildingIds.length === 0
+    ? { data: [], error: null }
+    : await supabase
+      .from("units")
+      .select("id, building_id, status, construction_status, location_grade, occupancy_verified, unit_business_flags(business_type,is_enabled,default_price_xof)")
+      .in("building_id", buildingIds)
+      .eq("asset_subtype", "commercial_shop")
+      .order("unit_no");
+  if (unitError) throw new Error(`Failed to load CIMAC shops: ${unitError.message}`);
+
+  const unitRows = (units ?? []) as Array<{
+    id: string;
+    building_id: string;
+    status: string;
+    construction_status: string;
+    location_grade: string | null;
+    occupancy_verified: boolean;
+    unit_business_flags: Array<{ business_type: string; is_enabled: boolean; default_price_xof: number | null }>;
+  }>;
+  const rentFor = (unit: typeof unitRows[number]) => Number(unit.unit_business_flags?.find((flag) => flag.business_type === "long_lease" && flag.is_enabled)?.default_price_xof ?? 0);
+  const buildingSummaries = buildingRows.map((building) => {
+    const shops = unitRows.filter((unit) => unit.building_id === building.id);
+    return {
+      id: building.id,
+      code: building.code,
+      displayName: building.display_name,
+      shopCount: shops.length,
+      primeCount: shops.filter((unit) => unit.location_grade === "central_avenue_prime").length,
+      standardCount: shops.filter((unit) => unit.location_grade === "standard").length,
+      unverifiedCount: shops.filter((unit) => !unit.occupancy_verified || unit.construction_status === "unverified").length,
+      operationalCount: shops.filter((unit) => unit.construction_status === "operational").length,
+      leasedCount: shops.filter((unit) => unit.status === "leased" && unit.occupancy_verified).length,
+      standardMonthlyRentXof: shops.reduce((sum, unit) => sum + rentFor(unit), 0),
+    };
+  });
+
+  return {
+    project: project as CimacOverview["project"],
+    buildingCount: buildingSummaries.length,
+    shopCount: unitRows.length,
+    primeCount: unitRows.filter((unit) => unit.location_grade === "central_avenue_prime").length,
+    standardCount: unitRows.filter((unit) => unit.location_grade === "standard").length,
+    unverifiedCount: unitRows.filter((unit) => !unit.occupancy_verified || unit.construction_status === "unverified").length,
+    operationalCount: unitRows.filter((unit) => unit.construction_status === "operational").length,
+    leasedCount: unitRows.filter((unit) => unit.status === "leased" && unit.occupancy_verified).length,
+    standardMonthlyRentXof: unitRows.reduce((sum, unit) => sum + rentFor(unit), 0),
+    buildings: buildingSummaries,
+  };
 });
 
 export const getManagementFinanceSnapshot = cache(async () => {

@@ -354,7 +354,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const netFinancial = totalIncome - totalExpense;
   const receivableStats = useMemo(() => { let totalRec=0,totalPd=0,overdue=0; const today=new Date().toISOString().slice(0,10); for(const r of contractReceivables){totalRec+=Number(r.amount_xof);totalPd+=Number(r.paid_amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<=today))overdue+=os;} return {totalReceivable:totalRec,totalPaid:totalPd,outstanding:totalRec-totalPd,overdue}; }, [contractReceivables]);
   const contractRisk = useMemo(() => { if(!selected||selected.status!=="active"||!isContractEndConfirmed(selected))return {expiringSoon:false,daysLeft:0}; const today=new Date(); const diff=Math.floor((new Date(selected.expected_end_date).getTime()-today.getTime())/86400000); return {expiringSoon:diff<=30&&diff>=0,daysLeft:Math.max(0,diff)}; }, [selected]);
-  const availableUnits = useMemo(() => units.filter((u) => u.kind === "apartment" && (u.status === "available" || isManagedLeaseUnit(u))), [units]);
+  const availableUnits = useMemo(() => units.filter((u) => u.status === "available" || isManagedLeaseUnit(u)), [units]);
   const selectedNewUnit = useMemo(() => units.find((unit) => unit.id === fUnitId), [fUnitId, units]);
   const generatedLeaseContractNo = useMemo(() => {
     if (!selectedNewUnit || !fStartDate) return "";

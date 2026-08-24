@@ -1,12 +1,46 @@
 // Database row types mirroring the Supabase schema.
 // Hand-written initially; replace with `supabase gen types` when available.
 
-import type { BuildingCode, UnitKind, UnitStatus, ContractStatus, PaymentStatus, CurrencyCode, BusinessType } from "./domain";
+import type {
+  AssetSubtype,
+  BuildingCode,
+  BusinessType,
+  ContractStatus,
+  CurrencyCode,
+  LocationGrade,
+  PaymentStatus,
+  ProjectConstructionStatus,
+  UnitConstructionStatus,
+  UnitKind,
+  UnitStatus,
+} from "./domain";
+
+// ── Projects ──
+
+export interface ProjectRow {
+  id: string;
+  code: string;
+  display_name: string;
+  brand_name: string | null;
+  project_kind: string;
+  construction_status: ProjectConstructionStatus;
+  allows_daily_rental: boolean;
+  allows_long_lease: boolean;
+  allows_sale: boolean;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ProjectInsert = Omit<ProjectRow, "id" | "created_at" | "updated_at">;
+export type ProjectUpdate = Partial<ProjectInsert>;
 
 // ── Buildings ──
 
 export interface BuildingRow {
   id: string;
+  project_id?: string;
   code: BuildingCode;
   display_name: string;
   address: string | null;
@@ -17,6 +51,7 @@ export interface BuildingRow {
   elevator_count: number;
   is_active: boolean;
   business_paused: boolean;
+  construction_status?: ProjectConstructionStatus;
   created_at: string;
   updated_at: string;
 }
@@ -38,6 +73,11 @@ export interface UnitRow {
   layout: string | null;
   furnishing: "none" | "basic" | "full" | null;
   notes: string | null;
+  asset_subtype?: AssetSubtype;
+  construction_status?: UnitConstructionStatus;
+  location_grade?: LocationGrade | null;
+  zone_label?: string | null;
+  occupancy_verified?: boolean;
   created_at: string;
   updated_at: string;
 }

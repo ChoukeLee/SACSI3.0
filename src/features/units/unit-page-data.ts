@@ -7,8 +7,19 @@ import type { BuildingRow, UnitBusinessFlagRow, UnitRow } from "@/types/database
 
 type RelatedCustomer = { name: string } | Array<{ name: string }> | null;
 
+type CatalogBuilding = Pick<BuildingRow, "id" | "code" | "display_name"> & {
+  project_id: string;
+  project: { code: string; display_name: string } | Array<{ code: string; display_name: string }>;
+};
+
+type UnitListBuilding = Pick<BuildingRow, "id" | "code" | "display_name"> & {
+  project_id: string;
+  project_code: string;
+  project_name: string;
+};
+
 type CatalogUnit = UnitRow & {
-  building: Pick<BuildingRow, "id" | "code" | "display_name"> | Array<Pick<BuildingRow, "id" | "code" | "display_name">>;
+  building: CatalogBuilding | CatalogBuilding[];
   unit_business_flags: UnitBusinessFlagRow[];
   lease_contracts: Array<{
     customer_id: string;
@@ -48,7 +59,8 @@ export async function loadUnitPageData() {
     .from("units")
     .select(`
       id, building_id, code, unit_no, floor_label, kind, status, area_sqm, layout, furnishing, notes,
-      building:buildings!inner(id, code, display_name, is_active),
+      asset_subtype, construction_status, location_grade, zone_label, occupancy_verified,
+      building:buildings!inner(id, code, display_name, is_active, project_id, project:projects(code, display_name)),
       unit_business_flags(unit_id, business_type, is_enabled, default_price_xof),
       lease_contracts(unit_id, customer_id, expected_end_date, expected_end_confirmed, status, start_date, customer:customers(name)),
       sale_contracts(unit_id, customer_id, signed_date, status, customer:customers(name)),
@@ -63,7 +75,7 @@ export async function loadUnitPageData() {
   if (error) throw new Error(`Failed to load unit catalogue: ${error.message}`);
 
   const catalogUnits = (data ?? []) as unknown as CatalogUnit[];
-  const buildingById = new Map<string, Pick<BuildingRow, "id" | "code" | "display_name">>();
+  const buildingById = new Map<string, UnitListBuilding>();
   const businessFlagsMap: Record<string, UnitBusinessFlagRow[]> = {};
   const unitPartySummaries: Record<string, UnitPartySummary> = {};
   const managedLeaseUnitIds: string[] = [];
@@ -71,7 +83,17 @@ export async function loadUnitPageData() {
 
   for (const unit of catalogUnits) {
     const building = Array.isArray(unit.building) ? unit.building[0] : unit.building;
-    if (building) buildingById.set(building.id, building);
+    if (building) {
+      const project = Array.isArray(building.project) ? building.project[0] : building.project;
+      buildingById.set(building.id, {
+        id: building.id,
+        code: building.code,
+        display_name: building.display_name,
+        project_id: building.project_id,
+        project_code: project?.code ?? "SACSI",
+        project_name: project?.display_name ?? "SACSI 公寓项目",
+      });
+    }
 
     businessFlagsMap[unit.id] = (unit.unit_business_flags ?? []) as UnitBusinessFlagRow[];
 

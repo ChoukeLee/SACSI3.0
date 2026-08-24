@@ -10,12 +10,19 @@ export async function addBuilding(input: {
   displayName: string;
   floorsAboveGround: number;
   elevatorCount: number;
+  projectCode?: string;
 }): Promise<{ success: boolean; data?: BuildingRow; error?: string }> {
   await requireRole("admin");
   if (!input.code.trim()) return { success: false, error: "请输入楼栋编号。" };
   const supabase = await createClient();
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("code", input.projectCode?.trim() || "SACSI")
+    .single();
+  if (projectError || !project) return { success: false, error: "未找到所属项目。" };
   const { data, error } = await supabase
-    .from("buildings").insert({ code: input.code.trim(), display_name: input.displayName.trim(), floors_above_ground: input.floorsAboveGround, elevator_count: input.elevatorCount })
+    .from("buildings").insert({ project_id: project.id, code: input.code.trim(), display_name: input.displayName.trim(), floors_above_ground: input.floorsAboveGround, elevator_count: input.elevatorCount })
     .select("*").single();
   if (error) {
     if (error.code === "23505") return { success: false, error: "楼栋编号已存在。" };

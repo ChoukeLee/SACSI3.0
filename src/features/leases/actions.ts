@@ -229,10 +229,18 @@ export async function createLeaseContract(input: {
 
   const { data: contractUnit } = await supabase
     .from("units")
-    .select("unit_no, building:buildings(code)")
+    .select("unit_no, status, construction_status, occupancy_verified, building:buildings(code, project:projects(allows_long_lease))")
     .eq("id", input.unitId)
     .single();
   const contractBuilding = Array.isArray(contractUnit?.building) ? contractUnit.building[0] : contractUnit?.building;
+  const contractProject = Array.isArray(contractBuilding?.project) ? contractBuilding.project[0] : contractBuilding?.project;
+  if (!contractUnit) return { success: false, error: "未找到该房源。" };
+  if (contractProject?.allows_long_lease === false) {
+    return { success: false, error: "该项目未启用长期租赁。" };
+  }
+  if (contractUnit.construction_status !== "operational" || contractUnit.occupancy_verified === false || contractUnit.status === "locked") {
+    return { success: false, error: "请先在房源档案中确认该资产已可投入使用。" };
+  }
   const generatedContractNo = buildLeaseContractNumber(
     contractBuilding?.code ?? "SACSI",
     contractUnit?.unit_no ?? "UNIT",

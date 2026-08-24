@@ -84,7 +84,8 @@ export const frDict = {
         apartment: "Appartement",
         parking: "Parking",
         storefront: "Local commercial",
-        office: "Bureau"
+        office: "Bureau",
+        warehouse: "Entrepôt"
       },
       businessTypes: {
         daily_rental: "Jour",

@@ -67,6 +67,12 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, locale, onC
 
   const enabledBusinesses = businessFlags.filter((f) => f.is_enabled);
   const dailyFlag = enabledBusinesses.find((f) => f.business_type === "daily_rental");
+  const leaseFlag = enabledBusinesses.find((f) => f.business_type === "long_lease");
+  const constructionLabel = unit.construction_status === "operational"
+    ? (locale === "zh" ? "可投入使用" : "Opérationnel")
+    : unit.construction_status === "unverified"
+      ? (locale === "zh" ? "待核实" : "À vérifier")
+      : unit.construction_status ?? t.detail.notSet;
   const meaningfulAuditLogs = auditLogs.filter(
     (log) => log.metadata.previous_status !== log.metadata.new_status
   );
@@ -76,7 +82,7 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, locale, onC
         <div className="space-y-5">
           <Button asChild className="w-full">
             <Link href={routeFor(locale, `/units/${unit.id}`)}>
-              {locale === "zh" ? "打开完整房间档案" : "Ouvrir le dossier complet"}
+              {locale === "zh" ? "打开完整资产档案" : "Ouvrir le dossier complet"}
               <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
@@ -87,11 +93,17 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, locale, onC
               [t.detail.floor, unit.floor_label],
               [t.detail.kind, t.kinds[unit.kind]],
               [t.detail.status, null],
+              ...(unit.construction_status ? [[locale === "zh" ? "建设状态" : "État de construction", constructionLabel]] : []),
+              ...(unit.location_grade ? [[locale === "zh" ? "地段等级" : "Emplacement", unit.location_grade === "central_avenue_prime" ? (locale === "zh" ? "中央大道优质地段" : "Axe central premium") : (locale === "zh" ? "普通地段" : "Standard")]] : []),
+              ...(unit.zone_label ? [[locale === "zh" ? "位置分区" : "Zone", unit.zone_label]] : []),
               [t.detail.area, unit.area_sqm != null ? `${Number(unit.area_sqm).toFixed(2)} ${t.detail.areaUnit}` : t.detail.notSet],
               [t.detail.layout, unit.layout ?? t.detail.notSet],
               [t.detail.furnishing, unit.furnishing ? t.furnishing[unit.furnishing] : t.detail.notSet],
               ...(dailyFlag
                 ? [[t.detail.dailyPrice, dailyFlag.default_price_xof ? formatXof(Number(dailyFlag.default_price_xof)) : t.detail.notSet]]
+                : []),
+              ...(leaseFlag
+                ? [[locale === "zh" ? "标准月租" : "Loyer mensuel standard", leaseFlag.default_price_xof ? formatXof(Number(leaseFlag.default_price_xof)) : t.detail.notSet]]
                 : []),
             ].map(([label, value]) => (
               <div key={label as string}>
@@ -123,6 +135,13 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, locale, onC
 
           {canEdit && <div className="relative">
             <h4 className="text-xs font-semibold text-muted-foreground">{t.actions.changeStatus}</h4>
+            {(unit.occupancy_verified === false || unit.construction_status === "unverified") && (
+              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                {locale === "zh"
+                  ? "建设和租赁状态尚未核实。只有现场确认已可投入使用后，才能将其开放为可出租资产。"
+                  : "La construction et l’occupation ne sont pas vérifiées. Confirmez la mise en service avant d’ouvrir le bien à la location."}
+              </p>
+            )}
             <div className="mt-2">
               <button onClick={() => setStatusOpen(!statusOpen)} disabled={changing}
                 className="inline-flex h-9 items-center gap-1.5 rounded-md border bg-card px-3 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50">
@@ -138,7 +157,9 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, locale, onC
                       disabled={unit.status === s || changing}
                       className="block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-accent disabled:opacity-40"
                     >
-                      {statusLabels[s]}
+                      {s === "available" && (unit.occupancy_verified === false || unit.construction_status === "unverified")
+                        ? (locale === "zh" ? "确认可投入使用" : "Confirmer la mise en service")
+                        : statusLabels[s]}
                     </button>
                   ))}
                 </div>
