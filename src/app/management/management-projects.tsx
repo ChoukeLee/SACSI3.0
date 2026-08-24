@@ -22,7 +22,33 @@ export function ProjectPortfolioCards({
   const zh = locale === "zh";
   const sacsi = projects.find((project) => project.code === "SACSI");
   const sacsiBuildingCount = buildings.filter((building) => building.project_id === sacsi?.id).length;
-  const cardClass = "group relative overflow-hidden rounded-xl border bg-card p-4 text-left shadow-card outline-none transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-panel focus-visible:ring-2 focus-visible:ring-primary/30";
+  const portfolioCards = [
+    {
+      code: "SACSI",
+      icon: Building2,
+      title: zh ? "SACSI 公寓项目" : "Projet résidentiel SACSI",
+      badge: zh ? "综合经营" : "Multi-activité",
+      description: zh ? "公寓及配套资产" : "Appartements et actifs annexes",
+      metrics: [
+        { value: `${sacsiBuildingCount} ${zh ? "栋" : "bât."}`, label: zh ? "在管楼栋" : "Gérés" },
+        { value: zh ? "日租" : "Jour", label: zh ? "住宿业务" : "Hébergement" },
+        { value: zh ? "长租 · 出售" : "Bail · Vente", label: zh ? "资产经营" : "Exploitation" },
+      ],
+    },
+    {
+      code: "CIMAC",
+      icon: Store,
+      title: zh ? "科建建材城 CIMAC" : "CIMAC",
+      badge: zh ? "只租不卖" : "Location uniquement",
+      description: zh ? "综合建材商业园区 · 分期建设" : "Parc de matériaux · construction par phases",
+      metrics: [
+        { value: `${cimac?.buildingCount ?? 10} ${zh ? "栋" : "bât."}`, label: zh ? "商业楼栋" : "Bâtiments" },
+        { value: `${cimac?.shopCount ?? 186} ${zh ? "间" : "lots"}`, label: zh ? "商业区商铺" : "Commerces" },
+        { value: `${cimac?.primeCount ?? 50} ${zh ? "间" : "lots"}`, label: zh ? "优质地段" : "Premium", tone: "amber" },
+      ],
+    },
+  ];
+  const cardClass = "group flex min-h-[148px] flex-col rounded-xl border border-border bg-card p-4 text-left shadow-card outline-none transition-[border-color,background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-panel focus-visible:ring-2 focus-visible:ring-primary/30 motion-reduce:transform-none motion-reduce:transition-none sm:p-5";
 
   return (
     <section aria-labelledby="project-portfolio-title" className="space-y-3">
@@ -33,47 +59,42 @@ export function ProjectPortfolioCards({
         </div>
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
-        <Link
-          href={routeFor(locale, "/management?project=SACSI")}
-          className={cn(cardClass, selectedProjectCode === "SACSI" && "border-primary/45 ring-2 ring-primary/10")}
-          aria-current={selectedProjectCode === "SACSI" ? "page" : undefined}
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-primary" />
-                <h3 className="font-semibold">{zh ? "SACSI 公寓项目" : "Projet résidentiel SACSI"}</h3>
+        {portfolioCards.map((project) => {
+          const Icon = project.icon;
+          const isSelected = selectedProjectCode === project.code;
+          return (
+            <Link
+              key={project.code}
+              href={routeFor(locale, `/management?project=${project.code}`)}
+              className={cn(cardClass, isSelected && "border-primary/45 bg-primary/[0.025] ring-1 ring-primary/15")}
+              aria-current={isSelected ? "page" : undefined}
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/60 text-primary" aria-hidden="true">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-[15px] font-semibold leading-6">{project.title}</h3>
+                    <span className="whitespace-nowrap rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{project.badge}</span>
+                  </div>
+                  <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{project.description}</p>
+                </div>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors group-hover:bg-muted group-hover:text-foreground" aria-hidden="true">
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none" />
+                </span>
               </div>
-              <p className="mt-2 text-sm text-muted-foreground">{zh ? "公寓及配套资产 · 日租 / 长租 / 出售" : "Appartements et annexes · jour / bail / vente"}</p>
-              <p className="mt-3 text-sm font-medium tabular-nums">{sacsiBuildingCount} {zh ? "栋在管" : "bâtiments gérés"}</p>
-            </div>
-            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-          </div>
-        </Link>
-
-        <Link
-          href={routeFor(locale, "/management?project=CIMAC")}
-          className={cn(cardClass, "pt-5", selectedProjectCode === "CIMAC" && "border-primary/45 ring-2 ring-primary/10")}
-          aria-current={selectedProjectCode === "CIMAC" ? "page" : undefined}
-        >
-          <div className="absolute inset-x-0 top-0 h-1 bg-amber-500" aria-hidden="true" />
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <Store className="h-4 w-4 text-primary" />
-                <h3 className="font-semibold">{zh ? "科建建材城 CIMAC" : "CIMAC"}</h3>
-                <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{zh ? "只租不卖" : "Location uniquement"}</span>
+              <div className="mt-auto grid grid-cols-3 divide-x divide-border border-t border-border pt-3">
+                {project.metrics.map((metric) => (
+                  <div key={metric.label} className="min-w-0 px-3 first:pl-0 last:pr-0">
+                    <p className={cn("truncate text-sm font-semibold tabular-nums", metric.tone === "amber" && "text-amber-700")}>{metric.value}</p>
+                    <p className="mt-0.5 truncate text-[11px] leading-4 text-muted-foreground">{metric.label}</p>
+                  </div>
+                ))}
               </div>
-              <p className="mt-2 text-sm text-muted-foreground">{zh ? "综合建材商业园区 · 分期建设" : "Parc commercial de matériaux · construction par phases"}</p>
-              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium tabular-nums">
-                <span>{cimac?.buildingCount ?? 10} {zh ? "栋" : "bâtiments"}</span>
-                <span>{cimac?.shopCount ?? 186} {zh ? "间商铺" : "commerces"}</span>
-                <span className="text-amber-700">{cimac?.primeCount ?? 50} {zh ? "间优质地段" : "premium"}</span>
-              </div>
-            </div>
-            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-          </div>
-        </Link>
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
