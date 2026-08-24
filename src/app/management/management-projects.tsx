@@ -233,7 +233,10 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
                     const buildingSummary = (
                       <Link
                         href={routeFor(locale, `/units?project=CIMAC&building=${building.code}`)}
-                        className="group block p-3.5 outline-none transition-colors hover:bg-muted/45 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
+                        className={cn(
+                          "group block p-3.5 outline-none transition-colors hover:bg-muted/45 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30",
+                          row === "north" && "mt-auto border-t border-border",
+                        )}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -285,7 +288,7 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
                       </div>
                     );
                     return (
-                      <article key={building.id} className="self-start overflow-hidden rounded-xl border border-border bg-card shadow-card">
+                      <article key={building.id} className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card shadow-card">
                         {row === "north" ? <>{shopDetails}{buildingSummary}</> : <>{buildingSummary}{shopDetails}</>}
                       </article>
                     );
