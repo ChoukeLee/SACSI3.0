@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CIMAC_SITE_ROWS, orderCimacShopsForPlan } from "@/app/management/cimac-site-layout";
+import { CIMAC_SITE_ROWS, matchesCimacShopQuery, orderCimacShopsForPlan } from "@/app/management/cimac-site-layout";
 
 const shops = (numbers: number[]) => numbers.map((unitNo) => ({ unitNo: String(unitNo) }));
 
@@ -16,5 +16,16 @@ describe("CIMAC site-plan ordering", () => {
   it("places even-numbered shops left and odd-numbered shops right in two-column buildings", () => {
     expect(orderCimacShopsForPlan(2, shops([201, 202, 203, 204])).map((shop) => shop.unitNo)).toEqual(["204", "203", "202", "201"]);
     expect(orderCimacShopsForPlan(3, shops([301, 302, 303, 304])).map((shop) => shop.unitNo)).toEqual(["302", "301", "304", "303"]);
+  });
+
+  it("finds a shop by room, merchant, business, or building", () => {
+    const shop = { unitNo: "612", tenantName: "彭力松", mainBusiness: "家具" };
+    const building = { code: "CIMAC-B06", displayName: "第六栋" };
+
+    expect(matchesCimacShopQuery(shop, building, "612")).toBe(true);
+    expect(matchesCimacShopQuery(shop, building, "彭力")).toBe(true);
+    expect(matchesCimacShopQuery(shop, building, "家具")).toBe(true);
+    expect(matchesCimacShopQuery(shop, building, "b06")).toBe(true);
+    expect(matchesCimacShopQuery(shop, building, "服装")).toBe(false);
   });
 });

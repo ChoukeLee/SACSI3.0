@@ -17,3 +17,16 @@ export function orderCimacShopsForPlan<T extends { unitNo: string }>(buildingNum
     return (leftNo % 2) - (rightNo % 2);
   });
 }
+
+export function matchesCimacShopQuery(
+  shop: { unitNo: string; tenantName: string | null; mainBusiness: string | null },
+  building: { code: string; displayName: string },
+  query: string,
+): boolean {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (!normalizedQuery) return true;
+
+  return [shop.unitNo, shop.tenantName, shop.mainBusiness, building.code, building.displayName]
+    .filter(Boolean)
+    .some((value) => String(value).toLocaleLowerCase().includes(normalizedQuery));
+}
