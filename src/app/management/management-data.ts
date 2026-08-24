@@ -85,6 +85,7 @@ export const getCimacOverview = cache(async (): Promise<CimacOverview | null> =>
     .order("code");
   if (buildingError) throw new Error(`Failed to load CIMAC buildings: ${buildingError.message}`);
   const buildingRows = buildings ?? [];
+  const commercialBuildingRows = buildingRows.filter((building) => /^CIMAC-B(?:0[1-9]|10)$/.test(building.code));
   const buildingIds = buildingRows.map((building) => building.id);
 
   const { data: units, error: unitError } = buildingIds.length === 0
@@ -121,7 +122,7 @@ export const getCimacOverview = cache(async (): Promise<CimacOverview | null> =>
     const customer = lease.customers as { name: string } | Array<{ name: string }> | null;
     return [lease.unit_id, Array.isArray(customer) ? customer[0]?.name ?? null : customer?.name ?? null];
   }));
-  const buildingSummaries = buildingRows.map((building) => {
+  const buildingSummaries = commercialBuildingRows.map((building) => {
     const shops = unitRows.filter((unit) => unit.building_id === building.id);
     const shopNumbers = shops
       .map((unit) => unit.unit_no)

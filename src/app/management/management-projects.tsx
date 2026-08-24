@@ -41,7 +41,7 @@ export function ProjectPortfolioCards({
       icon: Store,
       title: zh ? "科建建材城 CIMAC" : "CIMAC",
       badge: zh ? "只租不卖" : "Location uniquement",
-      description: zh ? "综合建材商业园区 · 分期建设" : "Parc de matériaux · construction par phases",
+      description: zh ? "商铺与仓库已建成可交付 · 其余分期建设" : "Commerces et entrepôt livrables · autres phases en cours",
       metrics: [
         { value: `${cimac?.buildingCount ?? 10} ${zh ? "栋" : "bât."}`, label: zh ? "商业楼栋" : "Bâtiments" },
         { value: `${cimac?.shopCount ?? 186} ${zh ? "间" : "lots"}`, label: zh ? "商业区商铺" : "Commerces" },
@@ -140,7 +140,7 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
   };
   const assetCards = [
     { key: "shops", icon: Store, title: zh ? "商业区商铺" : "Commerces", value: `${overview.shopCount} ${zh ? "间" : "lots"}`, meta: zh ? "第一栋至第十栋 · 基础台账已建立" : "Bâtiments 1 à 10 · registre créé", ready: true },
-    { key: "warehouses", icon: Warehouse, title: zh ? "仓储区" : "Entrepôts", value: zh ? "约 20,000㎡" : "Env. 20 000 m²", meta: zh ? "等待仓库编号、面积和建设状态" : "Numéros, surfaces et état à fournir", ready: false },
+    { key: "warehouses", icon: Warehouse, title: zh ? "仓储区" : "Entrepôts", value: zh ? "513㎡ 已登记" : "513 m² enregistré", meta: zh ? "已建成可交付 · 仓库编号与月租待确认" : "Livrable · numéro et loyer à confirmer", ready: true },
     { key: "apartments", icon: Building2, title: zh ? "公寓" : "Appartements", value: `128 ${zh ? "间规划" : "prévus"}`, meta: zh ? "一室 / 两室 · 详细台账待导入" : "1 / 2 chambres · registre à importer", ready: false },
     { key: "ground-shops", icon: PackageOpen, title: zh ? "公寓底商" : "Commerces en pied d’immeuble", value: zh ? "待编号" : "À numéroter", meta: zh ? "与186间商业区商铺分开统计" : "Comptés séparément des 186 commerces", ready: false },
   ];
@@ -152,9 +152,9 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 id="cimac-scope-title" className="text-[15px] font-semibold">{zh ? "商业区当前口径" : "Périmètre commercial actuel"}</h2>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{zh ? "租赁状态未核实" : "Location non vérifiée"}</span>
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">{zh ? "商铺与仓库可交付" : "Commerces et entrepôt livrables"}</span>
             </div>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">{zh ? "已录入编号、面积、标准月租和地段；未录入手写姓名、勾选、合同及财务。" : "Numéros, surfaces, loyers standard et emplacement saisis. Noms manuscrits, contrats et finances exclus."}</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">{zh ? "商铺与仓库已建成；开业活动为付一年赠一年。项目开业日及正式合同起始日待确认，暂不生成到期日和应收计划。" : "Actifs commerciaux achevés. Offre: 12 mois payés + 12 mois offerts. Début du bail à confirmer avant tout échéancier."}</p>
           </div>
           <Link href={unitsHref} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
             {zh ? "查看商铺档案" : "Voir les commerces"}<ArrowRight className="h-4 w-4" />
@@ -164,7 +164,7 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
 
       <MetricGrid columns={4}>
         <StatTile icon={Store} label={zh ? "商业区商铺" : "Commerces"} value={overview.shopCount} caption={`${overview.buildingCount} ${zh ? "栋" : "bâtiments"}`} />
-        <StatTile icon={Construction} label={zh ? "建设 / 运营待核" : "État à vérifier"} value={overview.unverifiedCount} caption={zh ? "不计入空置率" : "Exclus du taux de vacance"} />
+        <StatTile icon={Construction} label={zh ? "待核建设状态" : "État à vérifier"} value={overview.unverifiedCount} caption={zh ? "商铺已开放交付" : "Commerces ouverts à la livraison"} />
         <StatTile icon={MapPin} tone="amber" label={zh ? "中央大道优质地段" : "Axe central premium"} value={overview.primeCount} caption={`${overview.standardCount} ${zh ? "间普通地段" : "emplacements standard"}`} />
         <StatTile icon={CircleDollarSign} tone="blue" label={zh ? "标准满租月租" : "Loyer mensuel théorique"} value={formatXof(overview.standardMonthlyRentXof)} caption={zh ? "价格表口径，非实际应收" : "Tarif catalogue, hors créances réelles"} />
       </MetricGrid>
@@ -173,7 +173,7 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <h2 id="cimac-assets-title" className="text-[15px] font-semibold">{zh ? "资产组成" : "Composition des actifs"}</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">{zh ? "未建设完成的资产与可出租资产分开管理" : "Les actifs en construction restent séparés des actifs louables"}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{zh ? "商铺、仓库已开放；公寓及公寓底商继续按建设进度管理" : "Commerces et entrepôt ouverts; logements suivis séparément"}</p>
           </div>
           <LockKeyhole className="h-4 w-4 text-muted-foreground" />
         </div>

@@ -8,6 +8,10 @@ const accessMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "202608240002_restrict_cimac_project_access.sql"),
   "utf8",
 );
+const openingMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "202608240004_open_cimac_shops_and_warehouse.sql"),
+  "utf8",
+);
 
 type Shop = { building: string; unitNo: number; areaSqm: number; monthlyRentXof: number; prime: boolean };
 
@@ -84,5 +88,24 @@ describe("CIMAC confirmed commercial inventory", () => {
     expect(accessMigration).toContain('"project account restricts buildings"');
     expect(accessMigration).toContain('"project account restricts units"');
     expect(accessMigration).toContain('"project account restricts leases"');
+  });
+
+  it("opens completed shops and the confirmed warehouse without inventing lease dates", () => {
+    expect(openingMigration).toContain("construction_status = 'operational'");
+    expect(openingMigration).toContain("occupancy_verified = true");
+    expect(openingMigration).toContain("'CIMAC-W01-WAREHOUSE-TBD'");
+    expect(openingMigration).toContain("513");
+    expect(openingMigration).toContain("付12个月租金赠12个月");
+    expect(openingMigration).not.toMatch(/insert into public\.lease_contracts/i);
+    expect(openingMigration).not.toMatch(/insert into public\.receivables/i);
+  });
+
+  it("keeps committed pre-opening shops reserved until the real opening date", () => {
+    const reservedBlock = openingMigration.match(/with committed_shop_numbers[\s\S]*?update public\.units/)?.[0] ?? "";
+    const numbers = [...reservedBlock.matchAll(/\('(\d+)'\)/g)].map((match) => match[1]);
+    expect(numbers).toHaveLength(49);
+    expect(new Set(numbers).size).toBe(49);
+    expect(openingMigration).toContain("'reserved'::public.unit_status");
+    expect(openingMigration).toContain("'available'::public.unit_status");
   });
 });
