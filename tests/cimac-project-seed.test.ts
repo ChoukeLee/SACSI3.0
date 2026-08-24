@@ -12,6 +12,10 @@ const openingMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "202608240004_open_cimac_shops_and_warehouse.sql"),
   "utf8",
 );
+const reservationMerchantMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "202608240005_import_cimac_reservation_merchants.sql"),
+  "utf8",
+);
 
 type Shop = { building: string; unitNo: number; areaSqm: number; monthlyRentXof: number; prime: boolean };
 
@@ -107,5 +111,17 @@ describe("CIMAC confirmed commercial inventory", () => {
     expect(new Set(numbers).size).toBe(49);
     expect(openingMigration).toContain("'reserved'::public.unit_status");
     expect(openingMigration).toContain("'available'::public.unit_status");
+  });
+
+  it("imports verified merchant details without fabricating missing records", () => {
+    const detailsBlock = reservationMerchantMigration.match(/with reservation_details[\s\S]*?update public\.units/)?.[0] ?? "";
+    const unitNumbers = [...detailsBlock.matchAll(/\('(\d+)',/g)].map((match) => match[1]);
+    expect(unitNumbers).toHaveLength(47);
+    expect(new Set(unitNumbers).size).toBe(47);
+    expect(reservationMerchantMigration).toContain("'刘均（罗玉新）'");
+    expect(reservationMerchantMigration).toContain("'五金、机电、全屋定制'");
+    expect(unitNumbers).not.toContain("303");
+    expect(unitNumbers).not.toContain("909");
+    expect(reservationMerchantMigration).not.toMatch(/insert into public\.lease_contracts/i);
   });
 });

@@ -78,6 +78,8 @@ export interface UnitRow {
   location_grade?: LocationGrade | null;
   zone_label?: string | null;
   occupancy_verified?: boolean;
+  reservation_holder_name?: string | null;
+  reservation_main_business?: string | null;
   created_at: string;
   updated_at: string;
 }

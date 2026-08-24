@@ -273,15 +273,10 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
                     );
                     const shopDetails = (
                       <div className="relative flex flex-1 flex-col bg-[#E9EEF3]">
-                        <div className="pointer-events-none sticky top-3 z-20 h-0 px-2" aria-hidden="true">
-                          <span className="inline-flex rounded-md border border-slate-200/90 bg-white/90 px-2 py-1 text-[10px] font-semibold text-slate-600 shadow-sm backdrop-blur-sm">
-                            {building.displayName}
-                          </span>
-                        </div>
                         <div className={cn("grid flex-1 auto-rows-fr gap-1.5 p-1.5 sm:gap-2 sm:p-2", twoColumnPlan ? "grid-cols-2" : "grid-cols-1")}>
                         {shops.map((shop) => {
-                          const hasActiveLease = Boolean(shop.tenantName);
-                          const shopState = hasActiveLease ? "leased" : shop.status === "reserved" ? "reserved" : "available";
+                          const hasMerchantDetails = Boolean(shop.tenantName);
+                          const shopState = shop.hasActiveLease ? "leased" : shop.status === "reserved" ? "reserved" : "available";
                           const stateLabel = shopState === "leased"
                             ? (zh ? "已租" : "Loué")
                             : shopState === "reserved"
@@ -314,10 +309,10 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
                                 <span className="font-semibold tabular-nums">{shopRentLabel(shop.standardMonthlyRentXof)}</span>
                               </div>
                               <div className="mt-2 border-t border-slate-200/90 pt-1.5 text-[10px] leading-4">
-                                {hasActiveLease ? (
+                                {hasMerchantDetails ? (
                                   <dl className="space-y-0.5">
-                                    <div className="flex min-w-0 gap-1"><dt className="shrink-0 text-[#4D6780]">{zh ? "租户" : "Loc."}</dt><dd className="min-w-0 truncate font-medium">{shop.tenantName}</dd></div>
-                                    <div className="flex min-w-0 gap-1"><dt className="shrink-0 text-[#4D6780]">{zh ? "主营" : "Activité"}</dt><dd className="min-w-0 truncate font-medium">{shop.mainBusiness ?? (zh ? "待补充" : "À compléter")}</dd></div>
+                                    <div className="flex min-w-0 gap-1"><dt className="shrink-0 text-[#4D6780]">{shopState === "reserved" ? (zh ? "商户" : "Client") : (zh ? "租户" : "Loc.")}</dt><dd className="min-w-0 break-words font-medium">{shop.tenantName}</dd></div>
+                                    <div className="flex min-w-0 gap-1"><dt className="shrink-0 text-[#4D6780]">{zh ? "主营" : "Activité"}</dt><dd className="min-w-0 break-words font-medium">{shop.mainBusiness ?? (zh ? "待补充" : "À compléter")}</dd></div>
                                   </dl>
                                 ) : (
                                   <div className="flex items-center justify-between gap-2 text-[#4D6780]">
@@ -348,7 +343,7 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
             </span>
           </aside>
         </div>
-        <p className="px-1 text-[11px] leading-5 text-muted-foreground">{zh ? "186间商铺均已建成可交付；可租与预留状态来自当前资产台账，租户及主营业务将随合同资料导入后显示。" : "Les 186 commerces sont livrables. Les statuts proviennent du registre actuel ; locataires et activités apparaîtront après import des contrats."}</p>
+        <p className="px-1 text-[11px] leading-5 text-muted-foreground">{zh ? "186间商铺均已建成可交付；已预留商铺直接显示已核实的商户与主营业务，缺失资料继续标记待补。" : "Les 186 commerces sont livrables. Les réservations affichent directement les clients et activités vérifiés ; les données manquantes restent signalées."}</p>
       </section>
     </div>
   );

@@ -30,6 +30,7 @@ export interface CimacShopOverview {
   isPrime: boolean;
   tenantName: string | null;
   mainBusiness: string | null;
+  hasActiveLease: boolean;
 }
 
 export interface CimacOverview {
@@ -93,7 +94,7 @@ export const getCimacOverview = cache(async (): Promise<CimacOverview | null> =>
     ? { data: [], error: null }
     : await supabase
       .from("units")
-      .select("id, unit_no, building_id, status, area_sqm, construction_status, location_grade, occupancy_verified, unit_business_flags(business_type,is_enabled,default_price_xof)")
+      .select("id, unit_no, building_id, status, area_sqm, construction_status, location_grade, occupancy_verified, reservation_holder_name, reservation_main_business, unit_business_flags(business_type,is_enabled,default_price_xof)")
       .in("building_id", buildingIds)
       .eq("asset_subtype", "commercial_shop")
       .order("unit_no");
@@ -108,6 +109,8 @@ export const getCimacOverview = cache(async (): Promise<CimacOverview | null> =>
     construction_status: string;
     location_grade: string | null;
     occupancy_verified: boolean;
+    reservation_holder_name: string | null;
+    reservation_main_business: string | null;
     unit_business_flags: Array<{ business_type: string; is_enabled: boolean; default_price_xof: number | null }>;
   }>;
   const rentFor = (unit: typeof unitRows[number]) => Number(unit.unit_business_flags?.find((flag) => flag.business_type === "long_lease" && flag.is_enabled)?.default_price_xof ?? 0);
@@ -148,8 +151,9 @@ export const getCimacOverview = cache(async (): Promise<CimacOverview | null> =>
         areaSqm: unit.area_sqm,
         standardMonthlyRentXof: rentFor(unit),
         isPrime: unit.location_grade === "central_avenue_prime",
-        tenantName: tenantByUnitId.get(unit.id) ?? null,
-        mainBusiness: null,
+        tenantName: tenantByUnitId.get(unit.id) ?? unit.reservation_holder_name ?? null,
+        mainBusiness: unit.reservation_main_business ?? null,
+        hasActiveLease: tenantByUnitId.has(unit.id),
       })),
     };
   });
