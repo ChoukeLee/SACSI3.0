@@ -57,6 +57,11 @@ export function CimacShopMap({ overview, locale }: { overview: CimacOverview; lo
     return zh ? "可租" : "Disponible";
   };
 
+  const compactRentLabel = (amount: number) => {
+    const value = new Intl.NumberFormat(zh ? "zh-CN" : "fr-FR", { maximumFractionDigits: 2 }).format(amount / 10_000);
+    return zh ? `${value}万/月` : `${value}万/mois`;
+  };
+
   const locateFirstMatch = () => {
     if (!normalizedQuery) return;
     const first = overview.buildings.flatMap((building) => building.shops.map((shop) => ({ building, shop })))
@@ -160,7 +165,7 @@ export function CimacShopMap({ overview, locale }: { overview: CimacOverview; lo
                                 type="button"
                                 onClick={() => setSelected({ building, shop })}
                                 className={cn(
-                                  "relative min-h-20 rounded-lg border p-2 text-left text-[#17324D] outline-none transition-[opacity,border-color,background-color,box-shadow] hover:z-10 hover:border-slate-400 hover:shadow-sm focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-primary/40",
+                                  "relative flex min-h-[116px] flex-col rounded-lg border p-2 text-left text-[#17324D] outline-none transition-[opacity,border-color,background-color,box-shadow] hover:z-10 hover:border-slate-400 hover:shadow-sm focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-primary/40",
                                   state === "leased" && "border-slate-300 bg-slate-200",
                                   state === "reserved" && "border-sky-200 bg-sky-50",
                                   state === "available" && "border-slate-200 bg-white",
@@ -170,7 +175,10 @@ export function CimacShopMap({ overview, locale }: { overview: CimacOverview; lo
                                 aria-label={`${building.displayName} ${shop.unitNo}，${stateLabel(shop)}`}
                               >
                                 <div className="flex items-start justify-between gap-2">
-                                  <span className="font-mono text-xs font-bold tabular-nums">{shop.unitNo}</span>
+                                  <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold tabular-nums">
+                                    {shop.unitNo}
+                                    {shop.isPrime && <span className="h-2 w-2 rounded-full bg-amber-500" title={zh ? "优质地段" : "Premium"} aria-label={zh ? "优质地段" : "Premium"} />}
+                                  </span>
                                   <span className={cn(
                                     "inline-flex items-center gap-1 text-xs font-semibold",
                                     state === "leased" && "text-slate-700",
@@ -181,9 +189,14 @@ export function CimacShopMap({ overview, locale }: { overview: CimacOverview; lo
                                     {stateLabel(shop)}
                                   </span>
                                 </div>
-                                <p className="mt-2 break-words text-xs font-semibold leading-4">{shop.tenantName ?? (state === "reserved" ? (zh ? "商户待补" : "Client à compléter") : (zh ? "开放招商" : "Ouvert à la location"))}</p>
-                                {shop.mainBusiness && <p className="mt-0.5 break-words text-xs leading-4 text-[#4D6780]">{shop.mainBusiness}</p>}
-                                {shop.isPrime && <span className="absolute bottom-2 right-2 h-2 w-2 rounded-full bg-amber-500" title={zh ? "优质地段" : "Premium"} aria-label={zh ? "优质地段" : "Premium"} />}
+                                <div className="mt-2 min-h-9">
+                                  <p className="break-words text-xs font-semibold leading-4">{shop.tenantName ?? (state === "reserved" ? (zh ? "商户待补" : "Client à compléter") : (zh ? "开放招商" : "Ouvert à la location"))}</p>
+                                  {shop.mainBusiness && <p className="mt-0.5 break-words text-xs leading-4 text-[#4D6780]">{shop.mainBusiness}</p>}
+                                </div>
+                                <div className="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 border-t border-slate-200/90 pt-2 text-xs tabular-nums">
+                                  <span className="whitespace-nowrap text-[#4D6780]">{shop.areaSqm == null ? (zh ? "面积待核" : "Surface à vérifier") : `${Number(shop.areaSqm).toLocaleString(zh ? "zh-CN" : "fr-FR")}㎡`}</span>
+                                  <span className="whitespace-nowrap font-semibold text-[#17324D]">{compactRentLabel(shop.standardMonthlyRentXof)}</span>
+                                </div>
                               </button>
                             );
                           })}
