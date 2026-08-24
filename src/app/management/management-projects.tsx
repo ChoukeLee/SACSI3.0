@@ -259,7 +259,7 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
                       </Link>
                     );
                     const shopDetails = (
-                      <div className={cn("grid", row === "south" && "border-t border-border", twoColumnPlan ? "grid-cols-2" : "grid-cols-1")}>
+                      <div className={cn("grid flex-1 auto-rows-fr", row === "south" && "border-t border-border", twoColumnPlan ? "grid-cols-2" : "grid-cols-1")}>
                         {shops.map((shop, shopIndex) => (
                           <Link
                             key={shop.id}
