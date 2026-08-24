@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Building2, CircleDollarSign, Construction, LockKeyhole, MapPin, PackageOpen, Store, Warehouse } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Building2, CircleDollarSign, Construction, LockKeyhole, MapPin, PackageOpen, Store, Warehouse } from "lucide-react";
 import { MetricGrid, StatTile } from "@/components/ui/operational";
 import { routeFor, type Locale } from "@/lib/i18n";
 import { cn, formatXof } from "@/lib/utils";
@@ -103,6 +103,37 @@ export function ProjectPortfolioCards({
 export function CimacProjectOverview({ overview, locale }: { overview: CimacOverview; locale: Locale }) {
   const zh = locale === "zh";
   const unitsHref = routeFor(locale, "/units?project=CIMAC");
+  const buildingNumber = (code: string) => Number(code.match(/\d+$/)?.[0] ?? 0);
+  const buildingsByNumber = new Map(overview.buildings.map((building) => [buildingNumber(building.code), building]));
+  const siteRows = {
+    north: [10, 8, 6, 4, 2],
+    south: [9, 7, 5, 3, 1],
+  };
+  const positionLabels: Record<number, string> = zh
+    ? {
+        10: "中心广场北侧",
+        8: "中心广场北侧",
+        6: "中心广场北侧",
+        4: "中央大道北侧",
+        2: "中央大道北侧 · 临主干道",
+        9: "中心广场南侧",
+        7: "中心广场南侧",
+        5: "中心广场南侧",
+        3: "中央大道南侧",
+        1: "中央大道南侧 · 临主干道",
+      }
+    : {
+        10: "Nord de la place centrale",
+        8: "Nord de la place centrale",
+        6: "Nord de la place centrale",
+        4: "Nord de l’avenue centrale",
+        2: "Nord de l’avenue · route principale",
+        9: "Sud de la place centrale",
+        7: "Sud de la place centrale",
+        5: "Sud de la place centrale",
+        3: "Sud de l’avenue centrale",
+        1: "Sud de l’avenue · route principale",
+      };
   const assetCards = [
     { key: "shops", icon: Store, title: zh ? "商业区商铺" : "Commerces", value: `${overview.shopCount} ${zh ? "间" : "lots"}`, meta: zh ? "第一栋至第十栋 · 基础台账已建立" : "Bâtiments 1 à 10 · registre créé", ready: true },
     { key: "warehouses", icon: Warehouse, title: zh ? "仓储区" : "Entrepôts", value: zh ? "约 20,000㎡" : "Env. 20 000 m²", meta: zh ? "等待仓库编号、面积和建设状态" : "Numéros, surfaces et état à fournir", ready: false },
@@ -161,36 +192,83 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
       </section>
 
       <section aria-labelledby="cimac-buildings-title" className="space-y-3">
-        <div className="px-1">
-          <h2 id="cimac-buildings-title" className="text-[15px] font-semibold">{zh ? "第一栋至第十栋" : "Bâtiments 1 à 10"}</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">{zh ? "楼栋租赁状态统一保留为待核实" : "État locatif conservé comme non vérifié"}</p>
+        <div className="flex flex-col gap-2 px-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 id="cimac-buildings-title" className="text-[15px] font-semibold">{zh ? "商贸城楼栋分布" : "Plan des bâtiments"}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{zh ? "按现场地图排列 · 上排偶数栋，下排奇数栋" : "Disposition du plan · numéros pairs au nord, impairs au sud"}</p>
+          </div>
+          <div className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+            {zh ? "页面右侧为科特迪瓦主干道" : "Route principale à droite"}
+          </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {overview.buildings.map((building) => (
-            <Link
-              key={building.id}
-              href={routeFor(locale, `/units?project=CIMAC&building=${building.code}`)}
-              className="group rounded-xl border border-border bg-card p-3.5 shadow-card outline-none transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-panel focus-visible:ring-2 focus-visible:ring-primary/30"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold">{building.displayName}</h3>
-                  <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{building.code}</p>
+
+        <div className="grid overflow-hidden rounded-xl border border-border bg-muted/25 shadow-card grid-cols-[minmax(0,1fr)_36px] sm:grid-cols-[minmax(0,1fr)_44px]">
+          <div className="min-w-0 p-3 sm:p-4">
+            {(["north", "south"] as const).map((row, rowIndex) => (
+              <div key={row}>
+                {rowIndex === 1 && (
+                  <div className="my-3 flex min-h-11 items-center gap-3 border-y border-sky-200 bg-sky-50 px-3 text-sky-900" aria-label={zh ? "中央大道，东西向内部道路" : "Avenue centrale, axe intérieur est-ouest"}>
+                    <ArrowLeftRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span className="text-xs font-semibold">{zh ? "中央大道" : "Avenue centrale"}</span>
+                    <span className="hidden text-[11px] text-sky-700 sm:inline">{zh ? "东西向内部道路" : "Axe intérieur est-ouest"}</span>
+                    <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.16em] text-sky-700">E ↔ W</span>
+                  </div>
+                )}
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                  {siteRows[row].map((number) => {
+                    const building = buildingsByNumber.get(number);
+                    if (!building) return null;
+                    const numberRange = building.firstShopNo && building.lastShopNo
+                      ? building.firstShopNo === building.lastShopNo
+                        ? building.firstShopNo
+                        : `${building.firstShopNo}–${building.lastShopNo}`
+                      : zh ? "待核实" : "À vérifier";
+                    return (
+                      <Link
+                        key={building.id}
+                        href={routeFor(locale, `/units?project=CIMAC&building=${building.code}`)}
+                        className="group flex min-h-[248px] flex-col rounded-xl border border-border bg-card p-3.5 shadow-card outline-none transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-panel focus-visible:ring-2 focus-visible:ring-primary/30 motion-reduce:transform-none motion-reduce:transition-none"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-sm font-semibold">{building.displayName}</h3>
+                            <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{building.code}</p>
+                          </div>
+                          <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none" aria-hidden="true" />
+                        </div>
+                        <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                          <div><p className="text-muted-foreground">{zh ? "商铺" : "Lots"}</p><p className="mt-0.5 font-semibold tabular-nums">{building.shopCount}</p></div>
+                          <div><p className="text-muted-foreground">{zh ? "优质地段" : "Premium"}</p><p className="mt-0.5 font-semibold tabular-nums text-amber-700">{building.primeCount}</p></div>
+                        </div>
+                        <div className="mt-3 border-t border-border pt-3">
+                          <p className="text-[11px] text-muted-foreground">{zh ? "标准满租月租" : "Loyer théorique"}</p>
+                          <p className="mt-0.5 text-sm font-semibold tabular-nums">{formatXof(building.standardMonthlyRentXof)}</p>
+                        </div>
+                        <div className="mt-auto space-y-2 border-t border-border pt-3 text-[11px]">
+                          <div className="flex items-start gap-1.5">
+                            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                            <span className="leading-4 text-muted-foreground">{positionLabels[number]}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-muted-foreground">{zh ? "商铺编号" : "Numéros"}</span>
+                            <span className="font-mono font-semibold tabular-nums text-foreground">{numberRange}</span>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
                 </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                <div><p className="text-muted-foreground">{zh ? "商铺" : "Lots"}</p><p className="mt-0.5 font-semibold tabular-nums">{building.shopCount}</p></div>
-                <div><p className="text-muted-foreground">{zh ? "优质地段" : "Premium"}</p><p className="mt-0.5 font-semibold tabular-nums text-amber-700">{building.primeCount}</p></div>
-              </div>
-              <div className="mt-3 border-t border-border pt-3">
-                <p className="text-[11px] text-muted-foreground">{zh ? "标准满租月租" : "Loyer théorique"}</p>
-                <p className="mt-0.5 text-sm font-semibold tabular-nums">{formatXof(building.standardMonthlyRentXof)}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">{building.unverifiedCount} {zh ? "间状态待核实" : "lots à vérifier"}</p>
-              </div>
-            </Link>
-          ))}
+            ))}
+          </div>
+          <aside className="flex items-center justify-center border-l border-slate-700 bg-slate-900 px-1 text-white" aria-label={zh ? "科特迪瓦主干道" : "Route principale de Côte d’Ivoire"}>
+            <span className="text-center text-[10px] font-semibold tracking-[0.12em] [writing-mode:vertical-rl] sm:text-[11px]">
+              {zh ? "科特迪瓦主干道" : "ROUTE PRINCIPALE"}
+            </span>
+          </aside>
         </div>
+        <p className="px-1 text-[11px] leading-5 text-muted-foreground">{zh ? "楼栋租赁与建设状态仍统一保留为待核实；位置与编号按已确认场地图及商铺台账展示。" : "Les états locatifs et de construction restent à vérifier ; positions et numéros suivent le plan et le registre confirmés."}</p>
       </section>
     </div>
   );

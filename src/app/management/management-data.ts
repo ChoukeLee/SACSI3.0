@@ -9,6 +9,8 @@ export interface CimacBuildingOverview {
   id: string;
   code: string;
   displayName: string;
+  firstShopNo: string | null;
+  lastShopNo: string | null;
   shopCount: number;
   primeCount: number;
   standardCount: number;
@@ -78,7 +80,7 @@ export const getCimacOverview = cache(async (): Promise<CimacOverview | null> =>
     ? { data: [], error: null }
     : await supabase
       .from("units")
-      .select("id, building_id, status, construction_status, location_grade, occupancy_verified, unit_business_flags(business_type,is_enabled,default_price_xof)")
+      .select("id, unit_no, building_id, status, construction_status, location_grade, occupancy_verified, unit_business_flags(business_type,is_enabled,default_price_xof)")
       .in("building_id", buildingIds)
       .eq("asset_subtype", "commercial_shop")
       .order("unit_no");
@@ -86,6 +88,7 @@ export const getCimacOverview = cache(async (): Promise<CimacOverview | null> =>
 
   const unitRows = (units ?? []) as Array<{
     id: string;
+    unit_no: string;
     building_id: string;
     status: string;
     construction_status: string;
@@ -96,10 +99,15 @@ export const getCimacOverview = cache(async (): Promise<CimacOverview | null> =>
   const rentFor = (unit: typeof unitRows[number]) => Number(unit.unit_business_flags?.find((flag) => flag.business_type === "long_lease" && flag.is_enabled)?.default_price_xof ?? 0);
   const buildingSummaries = buildingRows.map((building) => {
     const shops = unitRows.filter((unit) => unit.building_id === building.id);
+    const shopNumbers = shops
+      .map((unit) => unit.unit_no)
+      .sort((left, right) => Number(left) - Number(right) || left.localeCompare(right));
     return {
       id: building.id,
       code: building.code,
       displayName: building.display_name,
+      firstShopNo: shopNumbers[0] ?? null,
+      lastShopNo: shopNumbers.at(-1) ?? null,
       shopCount: shops.length,
       primeCount: shops.filter((unit) => unit.location_grade === "central_avenue_prime").length,
       standardCount: shops.filter((unit) => unit.location_grade === "standard").length,

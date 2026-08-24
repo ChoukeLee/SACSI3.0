@@ -38,8 +38,8 @@ describe("CIMAC confirmed commercial inventory", () => {
     expect(new Set(shops.map((shop) => shop.building)).size).toBe(10);
     expect(Object.fromEntries([...new Set(shops.map((shop) => shop.building))].map((building) => [building, shops.filter((shop) => shop.building === building).length]))).toEqual({
       "CIMAC-B01": 28,
-      "CIMAC-B02": 28,
-      "CIMAC-B03": 32,
+      "CIMAC-B02": 32,
+      "CIMAC-B03": 28,
       "CIMAC-B04": 32,
       "CIMAC-B05": 10,
       "CIMAC-B06": 12,
@@ -48,6 +48,13 @@ describe("CIMAC confirmed commercial inventory", () => {
       "CIMAC-B09": 10,
       "CIMAC-B10": 12,
     });
+  });
+
+  it("assigns the confirmed shop-number ranges to buildings 2 and 3", () => {
+    const b02 = shops.filter((shop) => shop.building === "CIMAC-B02").map((shop) => shop.unitNo);
+    const b03 = shops.filter((shop) => shop.building === "CIMAC-B03").map((shop) => shop.unitNo);
+    expect([Math.min(...b02), Math.max(...b02)]).toEqual([201, 232]);
+    expect([Math.min(...b03), Math.max(...b03)]).toEqual([301, 328]);
   });
 
   it("keeps the confirmed location and monthly-rent totals", () => {
