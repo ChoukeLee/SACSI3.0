@@ -38,6 +38,7 @@ export default async function ManagementPage({ searchParams }: { searchParams: P
       t={t}
       projectName={selectedProjectCode === "CIMAC" ? "科建建材城" : "SACSI 公寓项目"}
       description={selectedProjectCode === "CIMAC" ? "建设、资产和租赁准备情况 · 只租不卖" : "财务、房态和楼栋经营信息"}
+      managedBuildingCount={selectedProjectCode === "CIMAC" ? cimac?.buildingCount : undefined}
     >
       <ProjectPortfolioCards projects={projects} buildings={buildings} cimac={cimac} selectedProjectCode={selectedProjectCode} locale="zh" />
 

@@ -5,14 +5,15 @@ import type { BuildingRow } from "@/types/database";
 import { OperationalPage } from "@/components/ui/operational";
 
 export function ManagementPageShell({
-  buildings, locale, t, children, projectName, description,
+  buildings, locale, t, children, projectName, description, managedBuildingCount,
 }: {
   buildings: BuildingRow[]; locale: Locale; t: ManagementDict; children: React.ReactNode;
   projectName?: string;
   description?: string;
+  managedBuildingCount?: number;
 }) {
   const todayStr = new Date().toISOString().slice(0, 10);
-  const buildingCount = buildings.filter((building) => building.is_active).length;
+  const buildingCount = managedBuildingCount ?? buildings.filter((building) => building.is_active).length;
 
   return (
     <OperationalPage
