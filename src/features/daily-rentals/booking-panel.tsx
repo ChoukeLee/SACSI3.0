@@ -728,7 +728,7 @@ export function BookingPanel({
                         className="w-full justify-center font-semibold"
                       >
                         <DollarSign />
-                        {locale === "zh" ? "登记收款" : "Encaisser"}
+                        {locale === "zh" ? "登记收款，暂不入住" : "Encaisser sans arrivée"}
                       </Button>
                     </div>
                   )}
