@@ -5,6 +5,7 @@ import { routeFor, type Locale } from "@/lib/i18n";
 import { cn, formatXof } from "@/lib/utils";
 import type { BuildingRow, ProjectRow } from "@/types/database";
 import type { CimacOverview } from "./management-data";
+import { CIMAC_SITE_ROWS, orderCimacShopsForPlan } from "./cimac-site-layout";
 
 export function ProjectPortfolioCards({
   projects,
@@ -105,10 +106,6 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
   const unitsHref = routeFor(locale, "/units?project=CIMAC");
   const buildingNumber = (code: string) => Number(code.match(/\d+$/)?.[0] ?? 0);
   const buildingsByNumber = new Map(overview.buildings.map((building) => [buildingNumber(building.code), building]));
-  const siteRows = {
-    north: [10, 8, 6, 4, 2],
-    south: [9, 7, 5, 3, 1],
-  };
   const positionLabels: Record<number, string> = zh
     ? {
         10: "中心广场北侧",
@@ -134,6 +131,13 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
         3: "Sud de l’avenue centrale",
         1: "Sud de l’avenue · route principale",
       };
+  const orderedShops = (number: number) => {
+    return orderCimacShopsForPlan(number, buildingsByNumber.get(number)?.shops ?? []);
+  };
+  const shopRentLabel = (amount: number) => {
+    const value = new Intl.NumberFormat(zh ? "zh-CN" : "fr-FR", { maximumFractionDigits: 2 }).format(amount / 10_000);
+    return zh ? `${value}万/月` : `${value}万/mois`;
+  };
   const assetCards = [
     { key: "shops", icon: Store, title: zh ? "商业区商铺" : "Commerces", value: `${overview.shopCount} ${zh ? "间" : "lots"}`, meta: zh ? "第一栋至第十栋 · 基础台账已建立" : "Bâtiments 1 à 10 · registre créé", ready: true },
     { key: "warehouses", icon: Warehouse, title: zh ? "仓储区" : "Entrepôts", value: zh ? "约 20,000㎡" : "Env. 20 000 m²", meta: zh ? "等待仓库编号、面积和建设状态" : "Numéros, surfaces et état à fournir", ready: false },
@@ -195,7 +199,7 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
         <div className="flex flex-col gap-2 px-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 id="cimac-buildings-title" className="text-[15px] font-semibold">{zh ? "商贸城楼栋分布" : "Plan des bâtiments"}</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">{zh ? "按现场地图排列 · 上排偶数栋，下排奇数栋" : "Disposition du plan · numéros pairs au nord, impairs au sud"}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{zh ? "按现场地图排列 · 186间商铺全部平铺展示" : "Disposition du plan · 186 commerces affichés sans repli"}</p>
           </div>
           <div className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
@@ -216,7 +220,7 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
                   </div>
                 )}
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                  {siteRows[row].map((number) => {
+                  {CIMAC_SITE_ROWS[row].map((number) => {
                     const building = buildingsByNumber.get(number);
                     if (!building) return null;
                     const numberRange = building.firstShopNo && building.lastShopNo
@@ -224,38 +228,61 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
                         ? building.firstShopNo
                         : `${building.firstShopNo}–${building.lastShopNo}`
                       : zh ? "待核实" : "À vérifier";
+                    const shops = orderedShops(number);
+                    const twoColumnPlan = number <= 4;
                     return (
-                      <Link
-                        key={building.id}
-                        href={routeFor(locale, `/units?project=CIMAC&building=${building.code}`)}
-                        className="group flex min-h-[248px] flex-col rounded-xl border border-border bg-card p-3.5 shadow-card outline-none transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-panel focus-visible:ring-2 focus-visible:ring-primary/30 motion-reduce:transform-none motion-reduce:transition-none"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h3 className="text-sm font-semibold">{building.displayName}</h3>
-                            <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{building.code}</p>
+                      <article key={building.id} className="self-start overflow-hidden rounded-xl border border-border bg-card shadow-card">
+                        <Link
+                          href={routeFor(locale, `/units?project=CIMAC&building=${building.code}`)}
+                          className="group block p-3.5 outline-none transition-colors hover:bg-muted/45 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h3 className="text-sm font-semibold">{building.displayName}</h3>
+                              <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{building.code}</p>
+                            </div>
+                            <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none" aria-hidden="true" />
                           </div>
-                          <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none" aria-hidden="true" />
-                        </div>
-                        <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                          <div><p className="text-muted-foreground">{zh ? "商铺" : "Lots"}</p><p className="mt-0.5 font-semibold tabular-nums">{building.shopCount}</p></div>
-                          <div><p className="text-muted-foreground">{zh ? "优质地段" : "Premium"}</p><p className="mt-0.5 font-semibold tabular-nums text-amber-700">{building.primeCount}</p></div>
-                        </div>
-                        <div className="mt-3 border-t border-border pt-3">
-                          <p className="text-[11px] text-muted-foreground">{zh ? "标准满租月租" : "Loyer théorique"}</p>
-                          <p className="mt-0.5 text-sm font-semibold tabular-nums">{formatXof(building.standardMonthlyRentXof)}</p>
-                        </div>
-                        <div className="mt-auto space-y-2 border-t border-border pt-3 text-[11px]">
-                          <div className="flex items-start gap-1.5">
-                            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                            <span className="leading-4 text-muted-foreground">{positionLabels[number]}</span>
+                          <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-[11px]">
+                            <span><span className="text-muted-foreground">{zh ? "商铺" : "Lots"}</span> <strong className="tabular-nums">{building.shopCount}</strong></span>
+                            <span><span className="text-muted-foreground">{zh ? "优质" : "Premium"}</span> <strong className="tabular-nums text-amber-700">{building.primeCount}</strong></span>
+                            <span className="col-span-2 inline-flex items-start gap-1.5 text-muted-foreground">
+                              <MapPin className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />{positionLabels[number]}
+                            </span>
                           </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-muted-foreground">{zh ? "商铺编号" : "Numéros"}</span>
-                            <span className="font-mono font-semibold tabular-nums text-foreground">{numberRange}</span>
+                          <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-2 text-[10px]">
+                            <span className="text-muted-foreground">{zh ? "编号" : "Nos"} <span className="font-mono font-semibold text-foreground">{numberRange}</span></span>
+                            <span className="font-semibold tabular-nums">{formatXof(building.standardMonthlyRentXof)}</span>
                           </div>
+                        </Link>
+                        <div className={cn("grid border-t border-border", twoColumnPlan ? "grid-cols-2" : "grid-cols-1")}>
+                          {shops.map((shop, shopIndex) => (
+                            <Link
+                              key={shop.id}
+                              href={routeFor(locale, `/units/${shop.id}`)}
+                              className={cn(
+                                "group/shop flex min-h-[112px] flex-col border-b border-border p-2.5 outline-none transition-colors hover:bg-muted/50 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30",
+                                twoColumnPlan && shopIndex % 2 === 0 && "border-r",
+                                shop.isPrime && "bg-amber-50/80 hover:bg-amber-100/70",
+                              )}
+                              aria-label={`${building.displayName} ${shop.unitNo}`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <span className="font-mono text-sm font-bold tabular-nums">{shop.unitNo}</span>
+                                {shop.isPrime && <span className="rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">{zh ? "优质" : "Premium"}</span>}
+                              </div>
+                              <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-[10px]">
+                                <span className="text-muted-foreground">{shop.areaSqm == null ? (zh ? "面积待核" : "Surface à vérifier") : `${Number(shop.areaSqm).toLocaleString(zh ? "zh-CN" : "fr-FR")}㎡`}</span>
+                                <span className="font-semibold tabular-nums">{shopRentLabel(shop.standardMonthlyRentXof)}</span>
+                              </div>
+                              <dl className="mt-auto space-y-0.5 border-t border-border/70 pt-1.5 text-[10px] leading-4">
+                                <div className="flex min-w-0 gap-1"><dt className="shrink-0 text-muted-foreground">{zh ? "租户" : "Loc."}</dt><dd className="min-w-0 truncate font-medium">{shop.tenantName ?? (zh ? "待核实" : "À vérifier")}</dd></div>
+                                <div className="flex min-w-0 gap-1"><dt className="shrink-0 text-muted-foreground">{zh ? "主营" : "Activité"}</dt><dd className="min-w-0 truncate font-medium">{shop.mainBusiness ?? (zh ? "待补充" : "À compléter")}</dd></div>
+                              </dl>
+                            </Link>
+                          ))}
                         </div>
-                      </Link>
+                      </article>
                     );
                   })}
                 </div>

@@ -18,6 +18,17 @@ export interface CimacBuildingOverview {
   operationalCount: number;
   leasedCount: number;
   standardMonthlyRentXof: number;
+  shops: CimacShopOverview[];
+}
+
+export interface CimacShopOverview {
+  id: string;
+  unitNo: string;
+  areaSqm: number | null;
+  standardMonthlyRentXof: number;
+  isPrime: boolean;
+  tenantName: string | null;
+  mainBusiness: string | null;
 }
 
 export interface CimacOverview {
@@ -80,7 +91,7 @@ export const getCimacOverview = cache(async (): Promise<CimacOverview | null> =>
     ? { data: [], error: null }
     : await supabase
       .from("units")
-      .select("id, unit_no, building_id, status, construction_status, location_grade, occupancy_verified, unit_business_flags(business_type,is_enabled,default_price_xof)")
+      .select("id, unit_no, building_id, status, area_sqm, construction_status, location_grade, occupancy_verified, unit_business_flags(business_type,is_enabled,default_price_xof)")
       .in("building_id", buildingIds)
       .eq("asset_subtype", "commercial_shop")
       .order("unit_no");
@@ -91,12 +102,25 @@ export const getCimacOverview = cache(async (): Promise<CimacOverview | null> =>
     unit_no: string;
     building_id: string;
     status: string;
+    area_sqm: number | null;
     construction_status: string;
     location_grade: string | null;
     occupancy_verified: boolean;
     unit_business_flags: Array<{ business_type: string; is_enabled: boolean; default_price_xof: number | null }>;
   }>;
   const rentFor = (unit: typeof unitRows[number]) => Number(unit.unit_business_flags?.find((flag) => flag.business_type === "long_lease" && flag.is_enabled)?.default_price_xof ?? 0);
+  const { data: leases, error: leaseError } = buildingIds.length === 0
+    ? { data: [], error: null }
+    : await supabase
+      .from("lease_contracts")
+      .select("unit_id, customers(name), units!inner(building_id)")
+      .in("units.building_id", buildingIds)
+      .eq("status", "active");
+  if (leaseError) throw new Error(`Failed to load CIMAC tenants: ${leaseError.message}`);
+  const tenantByUnitId = new Map((leases ?? []).map((lease) => {
+    const customer = lease.customers as { name: string } | Array<{ name: string }> | null;
+    return [lease.unit_id, Array.isArray(customer) ? customer[0]?.name ?? null : customer?.name ?? null];
+  }));
   const buildingSummaries = buildingRows.map((building) => {
     const shops = unitRows.filter((unit) => unit.building_id === building.id);
     const shopNumbers = shops
@@ -115,6 +139,15 @@ export const getCimacOverview = cache(async (): Promise<CimacOverview | null> =>
       operationalCount: shops.filter((unit) => unit.construction_status === "operational").length,
       leasedCount: shops.filter((unit) => unit.status === "leased" && unit.occupancy_verified).length,
       standardMonthlyRentXof: shops.reduce((sum, unit) => sum + rentFor(unit), 0),
+      shops: shops.map((unit) => ({
+        id: unit.id,
+        unitNo: unit.unit_no,
+        areaSqm: unit.area_sqm,
+        standardMonthlyRentXof: rentFor(unit),
+        isPrime: unit.location_grade === "central_avenue_prime",
+        tenantName: tenantByUnitId.get(unit.id) ?? null,
+        mainBusiness: null,
+      })),
     };
   });
 
