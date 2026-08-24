@@ -206,27 +206,28 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
               <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
               {zh ? "页面右侧为科特迪瓦主干道" : "Route principale à droite"}
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-[10px] font-medium text-muted-foreground" aria-label={zh ? "商铺状态图例" : "Légende des commerces"}>
-              <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#6D879C]" aria-hidden="true" />{zh ? "有效租约" : "Bail actif"}</span>
-              <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#C7CED6]" aria-hidden="true" />{zh ? "状态待核" : "À vérifier"}</span>
-              <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#D39B0B]" aria-hidden="true" />{zh ? "优质地段" : "Premium"}</span>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] font-medium text-muted-foreground" aria-label={zh ? "商铺状态图例" : "Légende des commerces"}>
+              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px] border border-slate-300 bg-slate-200" aria-hidden="true" />{zh ? "已租" : "Loué"}</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px] border border-sky-300 bg-sky-100" aria-hidden="true" />{zh ? "已预留" : "Réservé"}</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px] border border-slate-200 bg-white" aria-hidden="true" />{zh ? "可租" : "Disponible"}</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-3 rounded-full bg-amber-500" aria-hidden="true" />{zh ? "优质地段" : "Premium"}</span>
             </div>
           </div>
         </div>
 
-        <div className="grid overflow-hidden rounded-xl border border-[rgba(23,50,77,0.10)] bg-[#F7F9FB] shadow-[0_8px_18px_rgba(25,58,92,0.06)] grid-cols-[minmax(0,1fr)_36px] sm:grid-cols-[minmax(0,1fr)_44px]">
-          <div className="min-w-0 p-3 sm:p-4">
+        <div className="grid overflow-hidden rounded-2xl border border-slate-200 bg-[#F5F7FA] shadow-[0_10px_28px_rgba(25,58,92,0.07)] grid-cols-[minmax(0,1fr)_36px] sm:grid-cols-[minmax(0,1fr)_44px]">
+          <div className="min-w-0 p-3 sm:p-5">
             {(["north", "south"] as const).map((row, rowIndex) => (
               <div key={row}>
                 {rowIndex === 1 && (
-                  <div className="my-3 flex min-h-11 items-center gap-3 border-y border-sky-200 bg-sky-50 px-3 text-sky-900" aria-label={zh ? "中央大道，东西向内部道路" : "Avenue centrale, axe intérieur est-ouest"}>
+                  <div className="my-4 flex min-h-12 items-center gap-3 rounded-lg border border-sky-200 bg-sky-50/90 px-4 text-sky-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]" aria-label={zh ? "中央大道，东西向内部道路" : "Avenue centrale, axe intérieur est-ouest"}>
                     <ArrowLeftRight className="h-4 w-4 shrink-0" aria-hidden="true" />
                     <span className="text-xs font-semibold">{zh ? "中央大道" : "Avenue centrale"}</span>
                     <span className="hidden text-[11px] text-sky-700 sm:inline">{zh ? "东西向内部道路" : "Axe intérieur est-ouest"}</span>
                     <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.16em] text-sky-700">E ↔ W</span>
                   </div>
                 )}
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <div className="grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-5">
                   {CIMAC_SITE_ROWS[row].map((number) => {
                     const building = buildingsByNumber.get(number);
                     if (!building) return null;
@@ -241,8 +242,8 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
                       <Link
                         href={routeFor(locale, `/units?project=CIMAC&building=${building.code}`)}
                         className={cn(
-                          "group block bg-white/90 p-3.5 outline-none transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30",
-                          row === "north" && "mt-auto border-t border-border",
+                          "group block bg-white p-3.5 outline-none transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30",
+                          row === "north" ? "mt-auto border-t border-slate-200" : "border-b border-slate-200",
                         )}
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -271,40 +272,68 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
                       </Link>
                     );
                     const shopDetails = (
-                      <div className={cn("grid flex-1 auto-rows-fr", row === "south" && "border-t border-border", twoColumnPlan ? "grid-cols-2" : "grid-cols-1")}>
-                        {shops.map((shop, shopIndex) => {
+                      <div className="relative flex flex-1 flex-col bg-[#E9EEF3]">
+                        <div className="pointer-events-none sticky top-3 z-20 h-0 px-2" aria-hidden="true">
+                          <span className="inline-flex rounded-md border border-slate-200/90 bg-white/90 px-2 py-1 text-[10px] font-semibold text-slate-600 shadow-sm backdrop-blur-sm">
+                            {building.displayName}
+                          </span>
+                        </div>
+                        <div className={cn("grid flex-1 auto-rows-fr gap-1.5 p-1.5 sm:gap-2 sm:p-2", twoColumnPlan ? "grid-cols-2" : "grid-cols-1")}>
+                        {shops.map((shop) => {
                           const hasActiveLease = Boolean(shop.tenantName);
+                          const shopState = hasActiveLease ? "leased" : shop.status === "reserved" ? "reserved" : "available";
+                          const stateLabel = shopState === "leased"
+                            ? (zh ? "已租" : "Loué")
+                            : shopState === "reserved"
+                              ? (zh ? "已预留" : "Réservé")
+                              : (zh ? "可租" : "Disponible");
                           return (
                             <Link
                               key={shop.id}
                               href={routeFor(locale, `/units/${shop.id}`)}
                               className={cn(
-                                "group/shop flex min-h-[112px] flex-col border-b border-[rgba(23,50,77,0.08)] p-2.5 text-[#17324D] outline-none transition-[background-color,box-shadow] focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40",
-                                hasActiveLease ? "bg-[#C9D3DE] hover:bg-[#BECAD6]" : "bg-[#F1F4F7] hover:bg-[#E8EDF2]",
-                                twoColumnPlan && shopIndex % 2 === 0 && "border-r border-r-[rgba(23,50,77,0.08)]",
-                                shop.isPrime && "shadow-[inset_3px_0_0_#D39B0B]",
+                                "group/shop relative flex min-h-[112px] flex-col overflow-hidden rounded-lg border p-2.5 text-[#17324D] shadow-[0_1px_2px_rgba(25,58,92,0.06)] outline-none transition-[border-color,background-color,box-shadow] hover:z-10 hover:shadow-[0_5px_14px_rgba(25,58,92,0.12)] focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-primary/40 motion-reduce:transition-none",
+                                shopState === "leased" && "border-slate-300 bg-slate-200 hover:border-slate-400 hover:bg-slate-100",
+                                shopState === "reserved" && "border-sky-200 bg-sky-50 hover:border-sky-300 hover:bg-sky-100/70",
+                                shopState === "available" && "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
+                                shop.isPrime && "before:absolute before:inset-x-4 before:top-0 before:h-0.5 before:rounded-b-full before:bg-amber-500",
                               )}
-                              aria-label={`${building.displayName} ${shop.unitNo}`}
+                              aria-label={`${building.displayName} ${shop.unitNo}，${stateLabel}`}
                             >
                               <div className="flex items-start justify-between gap-2">
-                                <span className="inline-flex min-w-[42px] items-center justify-center rounded-full bg-white px-2 py-1 font-mono text-xs font-bold tabular-nums shadow-[0_1px_2px_rgba(25,58,92,0.06)]">{shop.unitNo}</span>
-                                {shop.isPrime && <span className="rounded-full border border-[#E6BD55] bg-[#FFE8A6] px-1.5 py-0.5 text-[9px] font-semibold text-[#735F24]">{zh ? "优质" : "Premium"}</span>}
+                                <span className="inline-flex min-w-[42px] items-center justify-center rounded-md border border-slate-200/80 bg-white px-2 py-1 font-mono text-xs font-bold tabular-nums shadow-sm">{shop.unitNo}</span>
+                                <span className={cn(
+                                  "rounded-full border px-1.5 py-0.5 text-[9px] font-semibold",
+                                  shopState === "leased" && "border-slate-300 bg-slate-100 text-slate-700",
+                                  shopState === "reserved" && "border-sky-200 bg-sky-100 text-sky-800",
+                                  shopState === "available" && "border-emerald-200 bg-emerald-50 text-emerald-700",
+                                )}>{stateLabel}</span>
                               </div>
-                              <div className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-[10px]">
+                              <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-[11px]">
                                 <span className="text-[#4D6780]">{shop.areaSqm == null ? (zh ? "面积待核" : "Surface à vérifier") : `${Number(shop.areaSqm).toLocaleString(zh ? "zh-CN" : "fr-FR")}㎡`}</span>
                                 <span className="font-semibold tabular-nums">{shopRentLabel(shop.standardMonthlyRentXof)}</span>
                               </div>
-                              <dl className="mt-auto space-y-0.5 border-t border-[rgba(23,50,77,0.10)] pt-1.5 text-[10px] leading-4">
-                                <div className="flex min-w-0 gap-1"><dt className="shrink-0 text-[#4D6780]">{zh ? "租户" : "Loc."}</dt><dd className="min-w-0 truncate font-medium">{shop.tenantName ?? (zh ? "待核实" : "À vérifier")}</dd></div>
-                                <div className="flex min-w-0 gap-1"><dt className="shrink-0 text-[#4D6780]">{zh ? "主营" : "Activité"}</dt><dd className="min-w-0 truncate font-medium">{shop.mainBusiness ?? (zh ? "待补充" : "À compléter")}</dd></div>
-                              </dl>
+                              <div className="mt-2 border-t border-slate-200/90 pt-1.5 text-[10px] leading-4">
+                                {hasActiveLease ? (
+                                  <dl className="space-y-0.5">
+                                    <div className="flex min-w-0 gap-1"><dt className="shrink-0 text-[#4D6780]">{zh ? "租户" : "Loc."}</dt><dd className="min-w-0 truncate font-medium">{shop.tenantName}</dd></div>
+                                    <div className="flex min-w-0 gap-1"><dt className="shrink-0 text-[#4D6780]">{zh ? "主营" : "Activité"}</dt><dd className="min-w-0 truncate font-medium">{shop.mainBusiness ?? (zh ? "待补充" : "À compléter")}</dd></div>
+                                  </dl>
+                                ) : (
+                                  <div className="flex items-center justify-between gap-2 text-[#4D6780]">
+                                    <span>{shopState === "reserved" ? (zh ? "租户资料待导入" : "Locataire à importer") : (zh ? "开放招商" : "Ouvert à la location")}</span>
+                                    {shop.isPrime && <span className="shrink-0 font-semibold text-amber-700">{zh ? "优质" : "Premium"}</span>}
+                                  </div>
+                                )}
+                              </div>
                             </Link>
                           );
                         })}
+                        </div>
                       </div>
                     );
                     return (
-                      <article key={building.id} className="flex h-full flex-col overflow-hidden rounded-[10px] border border-[rgba(23,50,77,0.08)] bg-white shadow-[0_8px_18px_rgba(25,58,92,0.08)]">
+                      <article key={building.id} className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_8px_20px_rgba(25,58,92,0.08)] ring-1 ring-white/70">
                         {row === "north" ? <>{shopDetails}{buildingSummary}</> : <>{buildingSummary}{shopDetails}</>}
                       </article>
                     );
@@ -319,7 +348,7 @@ export function CimacProjectOverview({ overview, locale }: { overview: CimacOver
             </span>
           </aside>
         </div>
-        <p className="px-1 text-[11px] leading-5 text-muted-foreground">{zh ? "楼栋租赁与建设状态仍统一保留为待核实；位置与编号按已确认场地图及商铺台账展示。" : "Les états locatifs et de construction restent à vérifier ; positions et numéros suivent le plan et le registre confirmés."}</p>
+        <p className="px-1 text-[11px] leading-5 text-muted-foreground">{zh ? "186间商铺均已建成可交付；可租与预留状态来自当前资产台账，租户及主营业务将随合同资料导入后显示。" : "Les 186 commerces sont livrables. Les statuts proviennent du registre actuel ; locataires et activités apparaîtront après import des contrats."}</p>
       </section>
     </div>
   );

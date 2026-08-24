@@ -24,6 +24,7 @@ export interface CimacBuildingOverview {
 export interface CimacShopOverview {
   id: string;
   unitNo: string;
+  status: string;
   areaSqm: number | null;
   standardMonthlyRentXof: number;
   isPrime: boolean;
@@ -143,6 +144,7 @@ export const getCimacOverview = cache(async (): Promise<CimacOverview | null> =>
       shops: shops.map((unit) => ({
         id: unit.id,
         unitNo: unit.unit_no,
+        status: unit.status,
         areaSqm: unit.area_sqm,
         standardMonthlyRentXof: rentFor(unit),
         isPrime: unit.location_grade === "central_avenue_prime",
