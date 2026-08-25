@@ -49,7 +49,7 @@ export function ProjectPortfolioCards({
       ],
     },
   ];
-  const cardClass = "group flex min-h-[148px] flex-col rounded-xl border border-border bg-card p-4 text-left shadow-card outline-none transition-[border-color,background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-panel focus-visible:ring-2 focus-visible:ring-primary/30 motion-reduce:transform-none motion-reduce:transition-none sm:p-5";
+  const cardClass = "group flex min-h-[148px] touch-manipulation flex-col rounded-xl border border-border bg-card p-4 text-left shadow-card outline-none transition-[border-color,background-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-panel active:translate-y-0 active:scale-[0.995] active:border-primary/40 active:bg-primary/[0.03] active:ring-1 active:ring-primary/15 active:shadow-card focus-visible:ring-2 focus-visible:ring-primary/30 motion-reduce:transform-none motion-reduce:transition-none sm:p-5";
 
   return (
     <section aria-labelledby="project-portfolio-title" className="space-y-3">
@@ -62,13 +62,12 @@ export function ProjectPortfolioCards({
       <div className="grid gap-3 lg:grid-cols-2">
         {portfolioCards.map((project) => {
           const Icon = project.icon;
-          const isSelected = selectedProjectCode === project.code;
           return (
             <Link
               key={project.code}
               href={routeFor(locale, `/management?project=${project.code}`)}
-              className={cn(cardClass, isSelected && "border-primary/45 bg-primary/[0.025] ring-1 ring-primary/15")}
-              aria-current={isSelected ? "page" : undefined}
+              className={cardClass}
+              aria-current={selectedProjectCode === project.code ? "page" : undefined}
             >
               <div className="flex items-start gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/60 text-primary" aria-hidden="true">
