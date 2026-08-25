@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CIMAC_SITE_ROWS, matchesCimacShopQuery, orderCimacShopsForPlan } from "@/app/management/cimac-site-layout";
+import { CIMAC_SITE_GROUPS, CIMAC_SITE_ROWS, matchesCimacShopQuery, orderCimacShopsForPlan } from "@/app/management/cimac-site-layout";
 
 const shops = (numbers: number[]) => numbers.map((unitNo) => ({ unitNo: String(unitNo) }));
 
@@ -7,6 +7,11 @@ describe("CIMAC site-plan ordering", () => {
   it("keeps even buildings north of the avenue and odd buildings south", () => {
     expect(CIMAC_SITE_ROWS.north).toEqual([10, 8, 6, 4, 2]);
     expect(CIMAC_SITE_ROWS.south).toEqual([9, 7, 5, 3, 1]);
+  });
+
+  it("groups the physically joined buildings without merging their identities", () => {
+    expect(CIMAC_SITE_GROUPS.north).toEqual([[10], [8, 6], [4], [2]]);
+    expect(CIMAC_SITE_GROUPS.south).toEqual([[9], [7, 5], [3], [1]]);
   });
 
   it("runs northern single-column shops toward the central avenue", () => {

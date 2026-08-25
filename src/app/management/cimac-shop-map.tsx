@@ -7,7 +7,7 @@ import { RightDrawer, controlClass } from "@/components/ui/operational";
 import { routeFor, type Locale } from "@/lib/i18n";
 import { cn, formatXof } from "@/lib/utils";
 import type { CimacBuildingOverview, CimacOverview, CimacShopOverview } from "./management-data";
-import { CIMAC_SITE_ROWS, matchesCimacShopQuery, orderCimacShopsForPlan } from "./cimac-site-layout";
+import { CIMAC_SITE_GROUPS, matchesCimacShopQuery, orderCimacShopsForPlan } from "./cimac-site-layout";
 
 type SelectedShop = {
   building: CimacBuildingOverview;
@@ -124,7 +124,7 @@ export function CimacShopMap({ overview, locale }: { overview: CimacOverview; lo
 
       <div className="grid overflow-hidden rounded-xl border border-slate-200 bg-[#F5F7FA] grid-cols-[minmax(0,1fr)_36px] sm:grid-cols-[minmax(0,1fr)_44px]">
         <div className="min-w-0 overflow-x-auto p-3 sm:p-4">
-          <div className="min-w-[1040px]">
+          <div className="min-w-[1240px]">
             {(["north", "south"] as const).map((row, rowIndex) => (
               <div key={row}>
                 {rowIndex === 1 && (
@@ -134,74 +134,92 @@ export function CimacShopMap({ overview, locale }: { overview: CimacOverview; lo
                     <span className="ml-auto text-xs font-medium text-sky-700">E ↔ W</span>
                   </div>
                 )}
-                <div className="grid grid-cols-5 items-start gap-3">
-                  {CIMAC_SITE_ROWS[row].map((number) => {
-                    const building = buildingsByNumber.get(number);
-                    if (!building) return null;
-                    const shops = orderCimacShopsForPlan(number, building.shops);
-                    const numberRange = building.firstShopNo && building.lastShopNo
-                      ? building.firstShopNo === building.lastShopNo ? building.firstShopNo : `${building.firstShopNo}–${building.lastShopNo}`
-                      : zh ? "待核实" : "À vérifier";
+                <div className="grid grid-cols-[18fr_30fr_26fr_26fr] items-stretch gap-3">
+                  {CIMAC_SITE_GROUPS[row].map((group) => {
+                    const groupBuildings = group
+                      .map((number) => buildingsByNumber.get(number))
+                      .filter((building): building is CimacBuildingOverview => Boolean(building));
+                    if (groupBuildings.length === 0) return null;
+                    const groupLabel = groupBuildings.map((building) => building.displayName).join(zh ? "与" : " et ");
                     return (
-                      <article key={building.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-                        <div className="border-b border-slate-200 bg-white px-3 py-2.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <h3 className="text-sm font-semibold">{building.displayName}</h3>
-                            <span className="text-xs font-semibold tabular-nums text-muted-foreground">{building.shopCount}{zh ? "间" : " lots"}</span>
-                          </div>
-                          <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                            <span className="truncate">{positionLabels[locale][number]}</span>
-                            <span className="shrink-0 font-mono tabular-nums">{numberRange}</span>
-                          </div>
-                        </div>
-                        <div className={cn("grid gap-1.5 bg-slate-100 p-1.5", number <= 4 ? "grid-cols-2" : "grid-cols-1")}>
-                          {shops.map((shop) => {
-                            const state = shopState(shop);
-                            const matches = matchesCimacShopQuery(shop, building, normalizedQuery);
+                      <div
+                        key={group.join("-")}
+                        role="group"
+                        className="h-full overflow-hidden rounded-lg border border-slate-200 bg-white"
+                        aria-label={group.length > 1 ? `${groupLabel}${zh ? "联排建筑" : " · bâtiment mitoyen"}` : groupLabel}
+                      >
+                        <div className={cn("grid h-full", group.length > 1 ? "grid-cols-2 divide-x divide-slate-200" : "grid-cols-1")}>
+                          {group.map((number) => {
+                            const building = buildingsByNumber.get(number);
+                            if (!building) return null;
+                            const shops = orderCimacShopsForPlan(number, building.shops);
+                            const numberRange = building.firstShopNo && building.lastShopNo
+                              ? building.firstShopNo === building.lastShopNo ? building.firstShopNo : `${building.firstShopNo}–${building.lastShopNo}`
+                              : zh ? "待核实" : "À vérifier";
                             return (
-                              <button
-                                id={`cimac-shop-${shop.id}`}
-                                key={shop.id}
-                                type="button"
-                                onClick={() => setSelected({ building, shop })}
-                                className={cn(
-                                  "relative flex min-h-[116px] flex-col rounded-lg border p-2 text-left text-[#17324D] outline-none transition-[opacity,border-color,background-color,box-shadow] hover:z-10 hover:border-slate-400 hover:shadow-sm focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-primary/40",
-                                  state === "leased" && "border-slate-300 bg-slate-200",
-                                  state === "reserved" && "border-sky-200 bg-sky-50",
-                                  state === "available" && "border-slate-200 bg-white",
-                                  normalizedQuery && !matches && "opacity-30",
-                                  normalizedQuery && matches && "z-10 ring-2 ring-primary/50",
-                                )}
-                                aria-label={`${building.displayName} ${shop.unitNo}，${stateLabel(shop)}`}
-                              >
-                                <div className="flex items-start justify-between gap-2">
-                                  <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold tabular-nums">
-                                    {shop.unitNo}
-                                    {shop.isPrime && <span className="h-2 w-2 rounded-full bg-amber-500" title={zh ? "优质地段" : "Premium"} aria-label={zh ? "优质地段" : "Premium"} />}
-                                  </span>
-                                  <span className={cn(
-                                    "inline-flex items-center gap-1 text-xs font-semibold",
-                                    state === "leased" && "text-slate-700",
-                                    state === "reserved" && "text-sky-800",
-                                    state === "available" && "text-emerald-700",
-                                  )}>
-                                    <span className={cn("h-1.5 w-1.5 rounded-full", state === "leased" && "bg-slate-500", state === "reserved" && "bg-sky-500", state === "available" && "bg-emerald-500")} aria-hidden="true" />
-                                    {stateLabel(shop)}
-                                  </span>
+                              <article key={building.id} className="flex min-w-0 flex-col bg-white">
+                                <div className="border-b border-slate-200 bg-white px-3 py-2.5">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <h3 className="text-sm font-semibold">{building.displayName}</h3>
+                                    <span className="text-xs font-semibold tabular-nums text-muted-foreground">{building.shopCount}{zh ? "间" : " lots"}</span>
+                                  </div>
+                                  <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                    <span className="truncate">{positionLabels[locale][number]}</span>
+                                    <span className="shrink-0 font-mono tabular-nums">{numberRange}</span>
+                                  </div>
                                 </div>
-                                <div className="mt-2 min-h-9">
-                                  <p className="break-words text-xs font-semibold leading-4">{shop.tenantName ?? (state === "reserved" ? (zh ? "商户待补" : "Client à compléter") : (zh ? "开放招商" : "Ouvert à la location"))}</p>
-                                  {shop.mainBusiness && <p className="mt-0.5 break-words text-xs leading-4 text-[#4D6780]">{shop.mainBusiness}</p>}
+                                <div className={cn("grid flex-1 gap-1.5 bg-slate-100 p-1.5", number <= 4 ? "grid-cols-2" : "grid-cols-1")}>
+                                  {shops.map((shop) => {
+                                    const state = shopState(shop);
+                                    const matches = matchesCimacShopQuery(shop, building, normalizedQuery);
+                                    return (
+                                      <button
+                                        id={`cimac-shop-${shop.id}`}
+                                        key={shop.id}
+                                        type="button"
+                                        onClick={() => setSelected({ building, shop })}
+                                        className={cn(
+                                          "relative flex min-h-[116px] flex-col rounded-lg border p-2 text-left text-[#17324D] outline-none transition-[opacity,border-color,background-color,box-shadow] hover:z-10 hover:border-slate-400 hover:shadow-sm focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-primary/40",
+                                          state === "leased" && "border-slate-300 bg-slate-200",
+                                          state === "reserved" && "border-sky-200 bg-sky-50",
+                                          state === "available" && "border-slate-200 bg-white",
+                                          normalizedQuery && !matches && "opacity-30",
+                                          normalizedQuery && matches && "z-10 ring-2 ring-primary/50",
+                                        )}
+                                        aria-label={`${building.displayName} ${shop.unitNo}，${stateLabel(shop)}`}
+                                      >
+                                        <div className="flex items-start justify-between gap-2">
+                                          <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold tabular-nums">
+                                            {shop.unitNo}
+                                            {shop.isPrime && <span className="h-2 w-2 rounded-full bg-amber-500" title={zh ? "优质地段" : "Premium"} aria-label={zh ? "优质地段" : "Premium"} />}
+                                          </span>
+                                          <span className={cn(
+                                            "inline-flex items-center gap-1 text-xs font-semibold",
+                                            state === "leased" && "text-slate-700",
+                                            state === "reserved" && "text-sky-800",
+                                            state === "available" && "text-emerald-700",
+                                          )}>
+                                            <span className={cn("h-1.5 w-1.5 rounded-full", state === "leased" && "bg-slate-500", state === "reserved" && "bg-sky-500", state === "available" && "bg-emerald-500")} aria-hidden="true" />
+                                            {stateLabel(shop)}
+                                          </span>
+                                        </div>
+                                        <div className="mt-2 min-h-9">
+                                          <p className="break-words text-xs font-semibold leading-4">{shop.tenantName ?? (state === "reserved" ? (zh ? "商户待补" : "Client à compléter") : (zh ? "开放招商" : "Ouvert à la location"))}</p>
+                                          {shop.mainBusiness && <p className="mt-0.5 break-words text-xs leading-4 text-[#4D6780]">{shop.mainBusiness}</p>}
+                                        </div>
+                                        <div className="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 border-t border-slate-200/90 pt-2 text-xs tabular-nums">
+                                          <span className="whitespace-nowrap text-[#4D6780]">{shop.areaSqm == null ? (zh ? "面积待核" : "Surface à vérifier") : `${Number(shop.areaSqm).toLocaleString(zh ? "zh-CN" : "fr-FR")}㎡`}</span>
+                                          <span className="whitespace-nowrap font-semibold text-[#17324D]">{compactRentLabel(shop.standardMonthlyRentXof)}</span>
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
                                 </div>
-                                <div className="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 border-t border-slate-200/90 pt-2 text-xs tabular-nums">
-                                  <span className="whitespace-nowrap text-[#4D6780]">{shop.areaSqm == null ? (zh ? "面积待核" : "Surface à vérifier") : `${Number(shop.areaSqm).toLocaleString(zh ? "zh-CN" : "fr-FR")}㎡`}</span>
-                                  <span className="whitespace-nowrap font-semibold text-[#17324D]">{compactRentLabel(shop.standardMonthlyRentXof)}</span>
-                                </div>
-                              </button>
+                              </article>
                             );
                           })}
                         </div>
-                      </article>
+                      </div>
                     );
                   })}
                 </div>

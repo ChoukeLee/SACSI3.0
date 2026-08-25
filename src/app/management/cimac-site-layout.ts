@@ -3,6 +3,11 @@ export const CIMAC_SITE_ROWS = {
   south: [9, 7, 5, 3, 1],
 } as const;
 
+export const CIMAC_SITE_GROUPS = {
+  north: [[10], [8, 6], [4], [2]],
+  south: [[9], [7, 5], [3], [1]],
+} as const;
+
 export function orderCimacShopsForPlan<T extends { unitNo: string }>(buildingNumber: number, shops: T[]): T[] {
   const northSide = buildingNumber % 2 === 0;
   if (buildingNumber > 4) {
