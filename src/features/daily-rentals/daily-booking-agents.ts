@@ -3,7 +3,7 @@ export const DAILY_BOOKING_AGENT_NAMES = [
   "Niamke",
   "Esai",
   "黄姐",
-  "小颖",
+  "颖",
   "镇淮",
   "悦凯",
 ] as const;
