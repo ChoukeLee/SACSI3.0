@@ -58,7 +58,7 @@ export function computeRoomStates(
 }
 
 export function getOccupiedRooms(states: RoomState[]): RoomState[] {
-  return states.filter((s) => s.displayStatus === "occupied" || s.displayStatus === "checking_out_today");
+  return states.filter((s) => s.displayStatus === "occupied");
 }
 
 export function getTodayCheckouts(states: RoomState[]): RoomState[] {

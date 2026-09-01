@@ -92,7 +92,7 @@ function AppShellInner({
       <AppSidebar locale={locale} userRole={userRole} />
       <SidebarInset>
         <NavigationLoadingBar />
-        <header className="sticky top-0 z-sticky flex h-12 shrink-0 items-center border-b border-border bg-card/95 shadow-xs backdrop-blur supports-[backdrop-filter]:bg-card/90">
+        <header className="sticky top-0 z-sticky flex h-[calc(3rem+var(--safe-top))] shrink-0 items-center border-b border-border bg-card/95 pt-[var(--safe-top)] shadow-xs backdrop-blur supports-[backdrop-filter]:bg-card/90 lg:h-12 lg:pt-0">
           <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 px-4">
             <div className="flex min-w-0 items-center gap-2">
               <SidebarTrigger className="hidden lg:flex" />
@@ -146,7 +146,7 @@ function AppShellInner({
             </div>
           </div>
         </header>
-        <main data-app-main className="relative isolate min-w-0 flex-1 overflow-x-hidden bg-background p-4 pb-20 sm:p-5 lg:p-6">
+        <main data-app-main className="relative isolate min-w-0 flex-1 overflow-x-hidden bg-background p-4 pb-[calc(var(--mobile-nav-height)+var(--safe-bottom)+1rem)] sm:p-5 sm:pb-[calc(var(--mobile-nav-height)+var(--safe-bottom)+1.25rem)] lg:p-6">
           {isNavigating && (
             <div data-navigation-overlay className="pointer-events-auto absolute inset-0 z-overlay bg-background/40" />
           )}

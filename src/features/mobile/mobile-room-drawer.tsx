@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   X, Phone, Copy, Check, ChevronRight, CreditCard,
@@ -84,6 +85,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
   const [extendDate, setExtendDate] = useState("");
   const [phoneCopied, setPhoneCopied] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const { pendingLabel, runOptimisticOperation } = useOptimisticOperation({
     setBusy: setLoading,
     onRefresh: () => router.refresh(),
@@ -103,7 +105,20 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
     onClose();
   }, [resetState, onClose]);
 
-  if (!open || !room) return null;
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
+  if (!open || !room || !portalTarget) return null;
 
   const unitStatus = displayStatusToUnitStatus(room.displayStatus);
   const isOccupied = room.displayStatus === "occupied" || room.displayStatus === "checking_out_today";
@@ -178,15 +193,18 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
 
   const actionLabels = t.actions;
 
-  return (
+  return createPortal(
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 z-overlay" onClick={handleClose}>
+      <div data-mobile-modal="true" className="fixed inset-0 z-panel" onClick={handleClose}>
         <div className="absolute inset-0 bg-black/20" />
         {/* Bottom sheet */}
         <div
-          className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-xl bg-card shadow-panel animate-in slide-in-from-bottom-4 duration-normal"
+          className="absolute inset-x-0 bottom-0 flex max-h-[calc(100dvh-var(--safe-top)-0.5rem)] flex-col overflow-hidden rounded-t-xl bg-card shadow-panel animate-in slide-in-from-bottom-4 duration-normal"
           onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${room.unit.unit_no} ${dictionaries[locale].statuses[unitStatus]}`}
         >
           {/* Handle */}
           <div className="flex justify-center pt-3 pb-1">
@@ -203,14 +221,14 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
             </div>
             <button
               onClick={handleClose}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
               aria-label={actionLabels.cancel}
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          <div className="px-5 pb-6 space-y-4">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 pb-[calc(1.5rem+var(--safe-bottom))]">
             {/* Guest info */}
             {room.customer && (
               <div className="rounded-xl border border-border bg-muted/50 p-3.5 space-y-2">
@@ -223,7 +241,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
                 {room.customer.phone && (
                   <button
                     onClick={handleCopyPhone}
-                    className="flex items-center gap-2 text-sm text-accentBlue-600 active:opacity-70 min-h-[36px]"
+                    className="flex min-h-11 items-center gap-2 text-sm text-accentBlue-600 active:opacity-70"
                   >
                     <Phone className="h-3.5 w-3.5" />
                     {room.customer.phone}
@@ -314,6 +332,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
                     size="sm"
                     onClick={executeAction}
                     disabled={loading || !paymentAmount || Number(paymentAmount) <= 0}
+                    className="min-h-11"
                   >
                     {pendingLabel || actionLabels.save}
                   </Button>
@@ -345,6 +364,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
                     size="sm"
                     onClick={executeAction}
                     disabled={loading || !extendDate}
+                    className="min-h-11"
                   >
                     {pendingLabel || actionLabels.save}
                   </Button>
@@ -502,6 +522,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
         locale={locale}
         loading={loading}
       />
-    </>
+    </>,
+    portalTarget,
   );
 }

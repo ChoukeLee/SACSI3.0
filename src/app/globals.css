@@ -26,6 +26,11 @@
     --input: 36 8% 88%;
     --ring: 200 72% 48%;
     --radius: 0.625rem;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --mobile-nav-height: 52px;
 
     --sidebar-background: 30 11% 96%;
     --sidebar-foreground: 30 8% 12%;

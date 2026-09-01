@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { BedDouble, Building2, CalendarDays, RefreshCw } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import type { DailyBookingRow, UnitRow, CustomerRow, PaymentRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import { MobileStatsBar } from "./mobile-stats-bar";
@@ -19,8 +18,6 @@ import {
   getTodayCheckouts,
   getReservedRooms,
   getCleaningRooms,
-  getAvailableRooms,
-  getAllActiveRooms,
   type RoomState,
   type RoomDisplayStatus,
 } from "./room-state";
@@ -96,13 +93,12 @@ export function MobileTodayWorkspace({
   const todayCheckouts = useMemo(() => getTodayCheckouts(roomStates), [roomStates]);
   const reserved = useMemo(() => getReservedRooms(roomStates), [roomStates]);
   const cleaning = useMemo(() => getCleaningRooms(roomStates), [roomStates]);
-  const available = useMemo(() => getAvailableRooms(roomStates), [roomStates]);
 
   // Occupied tab includes both checked-in guests and pending reservations
   const occupiedCount = occupied.length + todayCheckouts.length + reserved.length;
   const checkingOutCount = todayCheckouts.length;
   const cleaningCount = cleaning.length;
-  const availableCount = available.length;
+  const allCount = roomStates.length;
 
   const [activeTab, setActiveTab] = useState<RoomDisplayStatus>("checking_out_today");
   const [selectedRoom, setSelectedRoom] = useState<RoomState | null>(null);
@@ -127,11 +123,11 @@ export function MobileTodayWorkspace({
       case "cleaning":
         return cleaning;
       case "available":
-        return [...todayCheckouts, ...occupied, ...reserved, ...cleaning, ...available];
+        return roomStates;
       default:
         return [];
     }
-  }, [activeTab, occupied, todayCheckouts, reserved, cleaning, available]);
+  }, [activeTab, occupied, todayCheckouts, reserved, cleaning, roomStates]);
 
   const handleCardPress = useCallback((room: RoomState) => {
     setSelectedRoom(room);
@@ -215,19 +211,13 @@ export function MobileTodayWorkspace({
           <button
             type="button"
             onClick={() => router.refresh()}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-sm active:bg-muted"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-sm active:bg-muted"
             aria-label={locale === "zh" ? "刷新" : "Actualiser"}
           >
             <RefreshCw className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="grid grid-cols-4 border-t border-border/70 bg-muted/35">
-          <SummaryCell label={t.stats.checkingOut} value={checkingOutCount} tone="amber" />
-          <SummaryCell label={t.stats.cleaning} value={cleaningCount} tone="teal" />
-          <SummaryCell label={t.stats.occupied} value={occupiedCount} tone="blue" />
-          <SummaryCell label={t.stats.available} value={availableCount} tone="green" />
-        </div>
       </section>
 
       {/* Stats bar (also serves as tab switcher) */}
@@ -235,7 +225,7 @@ export function MobileTodayWorkspace({
         occupiedCount={occupiedCount}
         checkingOutCount={checkingOutCount}
         cleaningCount={cleaningCount}
-        availableCount={availableCount}
+        allCount={allCount}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         locale={locale}
@@ -289,29 +279,6 @@ export function MobileTodayWorkspace({
         locale={locale}
         loading={actionLoading}
       />
-    </div>
-  );
-}
-
-function SummaryCell({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "amber" | "teal" | "blue" | "green";
-}) {
-  const color = {
-    amber: "text-accentAmber-700",
-    teal: "text-emerald-700",
-    blue: "text-accentBlue-700",
-    green: "text-accentGreen-700",
-  }[tone];
-  return (
-    <div className="min-w-0 border-r border-border/60 px-3 py-3 last:border-r-0">
-      <p className={cn("text-lg font-semibold leading-none tabular-nums", color)}>{value}</p>
-      <p className="mt-1 truncate text-xs font-medium text-muted-foreground">{label}</p>
     </div>
   );
 }

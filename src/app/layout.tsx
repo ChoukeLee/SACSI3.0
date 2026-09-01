@@ -14,7 +14,10 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, statusBarStyle: "default", title: "SACSI" },
 };
 
-export const viewport: Viewport = { themeColor: "#f7f5f2" };
+export const viewport: Viewport = {
+  themeColor: "#f7f5f2",
+  viewportFit: "cover",
+};
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();

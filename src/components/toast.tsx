@@ -50,7 +50,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast: addToast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-toast flex flex-col-reverse gap-2 pointer-events-none">
+      <div className="pointer-events-none fixed inset-x-3 bottom-[calc(var(--mobile-nav-height)+var(--safe-bottom)+0.75rem)] z-toast flex flex-col-reverse items-end gap-2 sm:inset-x-auto sm:right-4 lg:bottom-4">
         <AnimatePresence>
           {toasts.map((t) => {
             const Icon = icons[t.type];
@@ -61,7 +61,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -8, scale: 0.95 }}
                 className={cn(
-                  "pointer-events-auto flex items-center gap-2.5 rounded-xl border px-4 py-3 shadow-lg text-sm font-medium min-w-[280px] max-w-[400px]",
+                  "pointer-events-auto flex w-full max-w-[400px] items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg sm:min-w-[280px]",
                   styles[t.type],
                 )}
               >

@@ -171,7 +171,7 @@ export function MobileRoomCard({
                 variant="default"
                 size="sm"
                 onClick={() => onCheckOut(room)}
-                className="min-h-[38px] flex-1 justify-center rounded-lg"
+                className="min-h-11 flex-1 justify-center rounded-lg"
               >
                 {t.roomCard.checkOut}
               </Button>
@@ -181,7 +181,7 @@ export function MobileRoomCard({
                 variant="outline"
                 size="sm"
                 onClick={() => onCompleteCleaning(room)}
-                className="min-h-[38px] flex-1 justify-center rounded-lg"
+                className="min-h-11 flex-1 justify-center rounded-lg"
               >
                 <Check className="h-3.5 w-3.5" />
                 {t.roomCard.cleaningDone}

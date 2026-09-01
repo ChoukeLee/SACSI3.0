@@ -10,7 +10,7 @@ interface MobileStatsBarProps {
   occupiedCount: number;
   checkingOutCount: number;
   cleaningCount: number;
-  availableCount: number;
+  allCount: number;
   activeTab: RoomDisplayStatus;
   onTabChange: (tab: RoomDisplayStatus) => void;
   locale: Locale;
@@ -20,7 +20,7 @@ export function MobileStatsBar({
   occupiedCount,
   checkingOutCount,
   cleaningCount,
-  availableCount,
+  allCount,
   activeTab,
   onTabChange,
   locale,
@@ -31,7 +31,7 @@ export function MobileStatsBar({
     { key: "checking_out_today" as const, count: checkingOutCount, label: tabs.checkingOut, icon: DoorOpen, tone: "amber" },
     { key: "cleaning" as const, count: cleaningCount, label: tabs.cleaning, icon: Sparkles, tone: "teal" },
     { key: "occupied" as const, count: occupiedCount, label: tabs.occupied, icon: BedDouble, tone: "blue" },
-    { key: "available" as const, count: availableCount, label: tabs.all, icon: CheckCircle2, tone: "green" },
+    { key: "available" as const, count: allCount, label: tabs.all, icon: CheckCircle2, tone: "green" },
   ];
 
   return (

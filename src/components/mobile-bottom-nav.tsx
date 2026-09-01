@@ -43,7 +43,7 @@ export function MobileBottomNav({ locale, userRole }: { locale: Locale; userRole
       aria-label={locale === "zh" ? "移动端导航" : "Navigation mobile"}
       style={{ paddingBottom: "var(--safe-bottom)" }}
     >
-      <div className="flex items-center justify-around px-1">
+      <div className="flex min-h-[var(--mobile-nav-height)] items-center justify-around px-[max(0.25rem,var(--safe-left))]">
         {visibleTabs.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);

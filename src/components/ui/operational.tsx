@@ -160,10 +160,10 @@ export function RightDrawer({
 
   return createPortal(
     <>
-      <div className="fixed bottom-0 left-0 right-0 top-12 z-overlay bg-black/20 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed bottom-0 left-0 right-0 top-[calc(3rem+var(--safe-top))] z-overlay bg-black/20 backdrop-blur-sm lg:top-12" onClick={onClose} />
       <aside
         className={cn(
-          "fixed bottom-0 right-0 top-12 z-panel flex w-full max-w-full flex-col border-l border-border bg-card shadow-panel",
+          "fixed bottom-0 right-0 top-[calc(3rem+var(--safe-top))] z-panel flex w-full max-w-full flex-col border-l border-border bg-card shadow-panel lg:top-12",
           widthClass,
           className,
         )}
@@ -191,8 +191,8 @@ export function RightDrawer({
             </button>
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 py-5">{children}</div>
-        {footer && <div className="sticky bottom-0 border-t border-border bg-card/95 px-5 py-4 backdrop-blur">{footer}</div>}
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pb-[calc(1.25rem+var(--safe-bottom))] pt-5 lg:pb-5">{children}</div>
+        {footer && <div className="sticky bottom-0 border-t border-border bg-card/95 px-5 pb-[calc(1rem+var(--safe-bottom))] pt-4 backdrop-blur lg:pb-4">{footer}</div>}
       </aside>
     </>,
     portalTarget,
