@@ -6,6 +6,7 @@ export const DAILY_BOOKING_AGENT_NAMES = [
   "颖",
   "镇淮",
   "悦凯",
+  "孙敏",
 ] as const;
 
 const DAILY_BOOKING_AGENT_NAME_SET = new Set<string>(DAILY_BOOKING_AGENT_NAMES);
