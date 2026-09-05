@@ -1,6 +1,6 @@
 # SACSI AI 工作台第一阶段需求规格
 
-> 状态：阶段 A/B 已完成本地实现与验证；阶段 C 已接通 L1「完成保洁」人工确认→原子执行→复查闭环，并已把工作台询问/草稿/确认/执行全程写入 `ai_*` 证据链（本地验证通过），等待迁移审核和受控上线。工作台 UI、结果与自然语言输入解析均已支持 zh/fr 双语。
+> 状态：阶段 A/B 已完成本地实现与验证；阶段 C 已接通 L1「完成保洁」人工确认→原子执行→复查闭环，并已把工作台询问/草稿/确认/执行全程写入 `ai_*` 证据链（本地验证通过）。两条迁移（foundations、draft infrastructure）已受控上线并经只读冒烟核对；线上 `schema_migrations` 记账仅含 3 条历史（CIMAC 20260904 系列）与本两条，与仓库提交历史的基线差异待统一（见 22.4）。工作台 UI、结果与自然语言输入解析均已支持 zh/fr 双语。
 >
 > 更新时间：2026-09-05
 >
@@ -574,3 +574,8 @@ AI 不是业务 actor。真正 actor 始终是当前登录用户，并记录 `ch
 4. 用登录会话（finance/admin）调用一次长租收款，确认只更新 `paid_through_date`、不触碰 `expected_end_date`，且缺付款方式时报 `paymentMethodRequired`。
 5. 冒烟：以受限角色执行 `public.confirm_ai_proposed_action` 应被拒绝；`ai_action_events` 不允许 `authenticated` 直接 insert。
 6. 恢复网络后执行 `git fetch origin`，确认远端 main 未前进、无新的冲突迁移后，再安排应用代码部署（先迁移、后发版）。
+
+### 22.4 上线记录与遗留差异
+
+- 已执行：`20260905082337`（foundations）、`20260905083639`（draft infrastructure）经 Management API 受控应用并写入线上 `schema_migrations`（version 与文件名时间戳一致）。上线后只读冒烟通过：`daily_bookings.booking_agent_id` 已回填且 0 空、触发器在位；`payments.payment_method` + CHECK 在位（存量 2423 条为 null=未知，符合设计）；`sale_contracts.total_amount_confirmed` 在位；`ai_*` 四表/RLS/策略/私有 bucket/8 个业务触发器及 public/private 函数均在位；`ai_action_events` 未授予 authenticated INSERT。
+- 遗留差异：线上 `schema_migrations` 仅含 3 条历史记录（20260904 CIMAC 三件套，均为“已应用未提交”），早于它们的历史迁移未记账。日后若用 `supabase db push` 同步将把仓库全量历史当作未应用，存在重复执行风险。建议后续单独做一次基线对齐（例如对线上做 `supabase db pull` 生成一致基线，或在受控窗口重建记账），本两条迁移不受影响。
