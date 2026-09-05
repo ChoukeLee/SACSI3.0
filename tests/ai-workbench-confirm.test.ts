@@ -73,4 +73,13 @@ describe("AI workbench human-confirmed execution (L1)", () => {
     // The view renders an execution result distinct from a plain query result.
     expect(view).toContain("WorkbenchActionResultView");
   });
+
+  it("lets the operator discard a draft through the evidence ledger", () => {
+    expect(workbench).toContain("export async function discardWorkbenchProposal");
+    expect(workbench).toContain("rejectAiProposal(proposalId, Number(rawProposalVersion), reason)");
+    expect(workbench).not.toContain("createPrivilegedClient");
+    expect(view).toContain("discardWorkbenchProposal");
+    expect(view).toContain('name="proposal_id"');
+    expect(view).toContain("discardPending");
+  });
 });

@@ -11,6 +11,7 @@ import {
   confirmAiProposal,
   createAiJob,
   createAiProposal,
+  rejectAiProposal,
 } from "@/features/business-actions/ai-draft-service";
 import type { Locale } from "@/lib/i18n";
 import { parseWorkbenchAction } from "./action-parser";
@@ -71,7 +72,7 @@ function evidenceError(locale: Locale, phaseZh: string, phaseFr: string, error: 
   if (lower.includes("permissiondenied") || lower.includes("authenticationrequired")) {
     return tr(locale, "当前账号无权执行该操作。", "Votre profil n'a pas le droit d'exécuter cette opération.");
   }
-  if (lower.includes("notconfirmable") || lower.includes("notexecutable") || lower.includes("notfound")) {
+  if (lower.includes("notconfirmable") || lower.includes("notexecutable") || lower.includes("notrejectable") || lower.includes("notfound")) {
     return tr(locale, "操作草稿状态已变化或不存在，请重新提交查询。", "Le brouillon n'est plus valide ; relancez une question.");
   }
   if (lower.includes("requestid") || lower.includes("conflict") || lower.includes("duplicate")) {
@@ -302,6 +303,34 @@ export async function confirmWorkbenchAction(
     return { status: "success", result: outcome, error: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : tr(locale, "确认执行失败，请稍后重试。", "Échec de la confirmation, réessayez plus tard.");
+    return { status: "error", result: null, error: message };
+  }
+}
+
+/**
+ * Operator discards a draft before it is confirmed. The proposal is rejected
+ * through the evidence ledger (rejected event + reason), so no dangling
+ * "awaiting_confirmation" job is left behind. No business write happens.
+ */
+export async function discardWorkbenchProposal(
+  _previousState: WorkbenchActionState,
+  formData: FormData,
+): Promise<WorkbenchActionState> {
+  const proposalId = String(formData.get("proposal_id") ?? "").trim();
+  const rawProposalVersion = String(formData.get("proposal_version") ?? "").trim();
+  const locale = readLocale(formData);
+  if (!proposalId || !/^\d+$/.test(rawProposalVersion)) {
+    return { status: "error", result: null, error: tr(locale, "该草稿缺少 AI 会话记录，请重新提交查询。", "Ce brouillon n'a pas de trace IA ; relancez une question.") };
+  }
+  try {
+    await requireAuth();
+    const reason = tr(locale, "用户放弃该草稿", "Brouillon abandonné par l'opérateur");
+    await rejectAiProposal(proposalId, Number(rawProposalVersion), reason).catch((error: unknown) => {
+      throw new Error(evidenceError(locale, "放弃操作草稿失败", "Échec de l'abandon du brouillon", error));
+    });
+    return { status: "success", result: null, error: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : tr(locale, "放弃草稿失败，请稍后重试。", "Échec de l'abandon, réessayez plus tard.");
     return { status: "error", result: null, error: message };
   }
 }

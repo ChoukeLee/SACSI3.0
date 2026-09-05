@@ -5,7 +5,7 @@ import { ArrowUp, CheckCircle2, Clock3, Database, LockKeyhole, Search, ShieldChe
 import { OperationalPage, StatTile } from "@/components/ui/operational";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/lib/i18n";
-import { askWorkbench, confirmWorkbenchAction } from "./actions";
+import { askWorkbench, confirmWorkbenchAction, discardWorkbenchProposal } from "./actions";
 import { INITIAL_WORKBENCH_STATE, type WorkbenchActionResult, type WorkbenchDraftPreview, type WorkbenchResult, type WorkbenchTone } from "./types";
 
 // Suggestions stay functional for the parser in each locale.
@@ -58,6 +58,7 @@ const COPY: Record<Locale, Record<string, string>> = {
     confirmExecuting: "正在执行并复查…",
     confirm: "确认执行",
     discard: "放弃此草稿",
+    discardPending: "正在作废草稿…",
     resultKind: "执行结果",
     actionTarget: "操作对象",
     verifyTitle: "执行后复查（重新查询数据库）",
@@ -99,6 +100,7 @@ const COPY: Record<Locale, Record<string, string>> = {
     confirmExecuting: "Exécution et vérification…",
     confirm: "Confirmer et exécuter",
     discard: "Abandonner ce brouillon",
+    discardPending: "Abandon en cours…",
     resultKind: "Résultat",
     actionTarget: "Cible",
     verifyTitle: "Vérification après exécution (base relue)",
@@ -232,7 +234,11 @@ export function AiWorkbenchView({ locale = "zh" }: { locale?: Locale }) {
 
 function WorkbenchDraftFlow({ t, locale, draft }: { t: Record<string, string>; locale: Locale; draft: WorkbenchDraftPreview }) {
   const [state, formAction, pending] = useActionState(confirmWorkbenchAction, INITIAL_WORKBENCH_STATE);
+  const [discardState, discardFormAction, discardPending] = useActionState(discardWorkbenchProposal, INITIAL_WORKBENCH_STATE);
   const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    if (discardState.status === "success") setDismissed(true);
+  }, [discardState.status]);
   if (dismissed) return null;
   if (state.status === "success" && state.result?.kind === "action_result") {
     return <WorkbenchActionResultView t={t} result={state.result} />;
@@ -285,12 +291,20 @@ function WorkbenchDraftFlow({ t, locale, draft }: { t: Record<string, string>; l
             {pending ? <Clock3 className="h-4 w-4 animate-pulse" /> : <CheckCircle2 className="h-4 w-4" />}
             {pending ? t.confirmExecuting : t.confirm}
           </button>
+        </form>
+        {discardState.status === "error" && (
+          <p className="mt-4 rounded-lg border border-accentRed-100 bg-accentRed-50 p-3 text-xs leading-5 text-accentRed-700" role="alert">{discardState.error}</p>
+        )}
+        <form action={discardFormAction} className="mt-2.5">
+          <input type="hidden" name="locale" value={locale} />
+          <input type="hidden" name="proposal_id" value={draft.execution.proposalId ?? ""} />
+          <input type="hidden" name="proposal_version" value={String(draft.execution.proposalVersion ?? "")} />
           <button
-            type="button"
-            onClick={() => setDismissed(true)}
-            className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
+            type="submit"
+            disabled={discardPending}
+            className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {t.discard}
+            {discardPending ? t.discardPending : t.discard}
           </button>
         </form>
       </aside>
