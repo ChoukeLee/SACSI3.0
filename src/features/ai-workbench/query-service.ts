@@ -5,6 +5,7 @@ import { financialBusinessLabel, statusDisplayLabel } from "@/lib/display-labels
 import { addIsoDays, isReceivableOverdue, receivableOutstanding } from "@/features/finance/metrics";
 import { buildDailyRoomStateMap } from "@/features/daily-rentals/room-status";
 import { formatXof, sortUnits } from "@/lib/utils";
+import type { Locale } from "@/lib/i18n";
 import type { BuildingRow, CustomerRow, DailyBookingRow, ReceivableRow, UnitRow } from "@/types/database";
 import type { WorkbenchDomain, WorkbenchIntent, WorkbenchResult, WorkbenchTable } from "./types";
 
@@ -18,16 +19,24 @@ const SOURCE_TYPES: Record<Exclude<WorkbenchDomain, "all">, ReceivableRow["sourc
   sale: "sale_contract",
 };
 
-function domainLabel(domain: WorkbenchDomain) {
-  return { all: "全部业务", daily: "日租", lease: "长租", sale: "出售" }[domain];
+function tr(locale: Locale, zh: string, fr: string) {
+  return locale === "fr" ? fr : zh;
 }
 
-function buildingLabel(building: BuildingSummary | undefined) {
-  return building?.display_name || building?.code || "未归属楼栋";
+function domainLabel(locale: Locale, domain: WorkbenchDomain) {
+  return tr(
+    locale,
+    { all: "全部业务", daily: "日租", lease: "长租", sale: "出售" }[domain],
+    { all: "Tous les secteurs", daily: "Location journalière", lease: "Bail longue durée", sale: "Vente" }[domain],
+  );
 }
 
-function statusLabel(status: string) {
-  const roomStatuses: Record<string, string> = {
+function buildingLabel(locale: Locale, building: BuildingSummary | undefined) {
+  return building?.display_name || building?.code || tr(locale, "未归属楼栋", "Bâtiment non identifié");
+}
+
+function statusLabel(locale: Locale, status: string) {
+  const zhMap: Record<string, string> = {
     occupied: "占用",
     checking_out_today: "今日离店",
     reserved: "已预订",
@@ -36,11 +45,20 @@ function statusLabel(status: string) {
     maintenance: "维修",
     locked: "锁定",
   };
-  return roomStatuses[status] ?? statusDisplayLabel(status, "zh");
+  const frMap: Record<string, string> = {
+    occupied: "Occupée",
+    checking_out_today: "Départ aujourd'hui",
+    reserved: "Réservée",
+    cleaning: "À nettoyer",
+    available: "Disponible",
+    maintenance: "En maintenance",
+    locked: "Verrouillée",
+  };
+  return (locale === "fr" ? frMap[status] : zhMap[status]) ?? statusDisplayLabel(status, locale);
 }
 
-function generatedAtText(iso: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
+function generatedAtText(locale: Locale, iso: string) {
+  return new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "zh-CN", {
     timeZone: "Africa/Abidjan",
     year: "numeric",
     month: "2-digit",
@@ -51,38 +69,45 @@ function generatedAtText(iso: string) {
   }).format(new Date(iso));
 }
 
-function baseEvidence(intent: WorkbenchIntent, generatedAt: string) {
-  const sourceLabel = intent.source === "deepseek" ? "DeepSeek 意图分类 + 固定查询" : intent.source === "openai" ? "OpenAI 意图分类 + 固定查询" : "本地规则识别 + 固定查询";
+function baseEvidence(locale: Locale, intent: WorkbenchIntent, generatedAt: string) {
+  const sourceLabel =
+    intent.source === "deepseek"
+      ? tr(locale, "DeepSeek 意图分类 + 固定查询", "Classification DeepSeek + requête fixe")
+      : intent.source === "openai"
+        ? tr(locale, "OpenAI 意图分类 + 固定查询", "Classification OpenAI + requête fixe")
+        : tr(locale, "本地规则识别 + 固定查询", "Règles locales + requête fixe");
+  const abidjan = locale === "fr" ? " (Abidjan)" : "（阿比让）";
   return [
-    { label: "数据范围", value: domainLabel(intent.domain) },
-    { label: "统计时点", value: `${intent.asOfDate}（阿比让）` },
-    { label: "生成时间", value: `${generatedAtText(generatedAt)}（阿比让）` },
-    { label: "取数方式", value: "当前账号权限下的系统实时记录" },
-    { label: "问题识别", value: sourceLabel },
+    { label: tr(locale, "数据范围", "Périmètre"), value: domainLabel(locale, intent.domain) },
+    { label: tr(locale, "统计时点", "Date de référence"), value: `${intent.asOfDate}${abidjan}` },
+    { label: tr(locale, "生成时间", "Généré le"), value: `${generatedAtText(locale, generatedAt)}${abidjan}` },
+    { label: tr(locale, "取数方式", "Source des données"), value: tr(locale, "当前账号权限下的系统实时记录", "Enregistrements réels visibles par votre profil") },
+    { label: tr(locale, "问题识别", "Détection de la demande"), value: sourceLabel },
   ];
 }
 
-function toResult(input: Omit<WorkbenchResult, "kind" | "generatedAt" | "evidence"> & { evidence?: WorkbenchResult["evidence"] }): WorkbenchResult {
+function toResult(locale: Locale, input: Omit<WorkbenchResult, "kind" | "generatedAt" | "evidence"> & { evidence?: WorkbenchResult["evidence"] }): WorkbenchResult {
   const generatedAt = new Date().toISOString();
   return {
     ...input,
     kind: "query_result",
     generatedAt,
-    evidence: [...baseEvidence(input.intent, generatedAt), ...(input.evidence ?? [])],
+    evidence: [...baseEvidence(locale, input.intent, generatedAt), ...(input.evidence ?? [])],
   };
 }
 
-function receivableColumns(): WorkbenchTable["columns"] {
+function receivableColumns(locale: Locale): WorkbenchTable["columns"] {
+  const col = (key: string, zh: string, fr: string, align?: "left" | "right") => ({ key, label: tr(locale, zh, fr), align });
   return [
-    { key: "dueDate", label: "到期日" },
-    { key: "building", label: "楼栋" },
-    { key: "unit", label: "房号" },
-    { key: "customer", label: "客户" },
-    { key: "business", label: "业务" },
-    { key: "title", label: "应收项目" },
-    { key: "amount", label: "应收", align: "right" },
-    { key: "paid", label: "已收", align: "right" },
-    { key: "outstanding", label: "未收", align: "right" },
+    col("dueDate", "到期日", "Échéance"),
+    col("building", "楼栋", "Bâtiment"),
+    col("unit", "房号", "Chambre"),
+    col("customer", "客户", "Client"),
+    col("business", "业务", "Secteur"),
+    col("title", "应收项目", "Libellé"),
+    col("amount", "应收", "Dû", "right"),
+    col("paid", "已收", "Payé", "right"),
+    col("outstanding", "未收", "Reste dû", "right"),
   ];
 }
 
@@ -106,10 +131,6 @@ async function retainLiveBusinessSources(rows: ReceivableRow[]) {
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  if (dailyRes.error) throw new Error(`读取日租订单状态失败：${dailyRes.error.message}`);
-  if (leaseRes.error) throw new Error(`读取长租合同状态失败：${leaseRes.error.message}`);
-  if (saleRes.error) throw new Error(`读取出售合同状态失败：${saleRes.error.message}`);
-
   const liveDaily = new Set((dailyRes.data ?? []).filter((row) => row.status !== "cancelled").map((row) => row.id));
   const liveLease = new Set((leaseRes.data ?? []).filter((row) => row.status === "active").map((row) => row.id));
   const liveSale = new Set((saleRes.data ?? []).filter((row) => row.status === "active").map((row) => row.id));
@@ -123,7 +144,7 @@ async function retainLiveBusinessSources(rows: ReceivableRow[]) {
   });
 }
 
-async function queryReceivables(query: string, intent: WorkbenchIntent): Promise<WorkbenchResult> {
+async function queryReceivables(locale: Locale, query: string, intent: WorkbenchIntent): Promise<WorkbenchResult> {
   const supabase = await createClient();
   const sourceTypes = intent.domain === "all"
     ? Object.values(SOURCE_TYPES)
@@ -143,7 +164,7 @@ async function queryReceivables(query: string, intent: WorkbenchIntent): Promise
   if (intent.kind === "receivable_due_soon") dbQuery = dbQuery.gt("due_date", intent.asOfDate).lte("due_date", endDate);
 
   const { data, error } = await dbQuery;
-  if (error) throw new Error(`读取应收记录失败：${error.message}`);
+  if (error) throw new Error(tr(locale, `读取应收记录失败：${error.message}`, `Erreur de lecture des créances : ${error.message}`));
 
   let rows = ((data ?? []) as unknown as ReceivableRow[]).filter((row) => receivableOutstanding(row) > 0);
   if (intent.kind === "receivable_overdue") rows = rows.filter((row) => isReceivableOverdue(row, intent.asOfDate));
@@ -156,9 +177,9 @@ async function queryReceivables(query: string, intent: WorkbenchIntent): Promise
     customerIds.length ? supabase.from("customers").select("id, name").in("id", customerIds) : Promise.resolve({ data: [], error: null }),
     supabase.from("buildings").select("id, code, display_name").eq("is_active", true),
   ]);
-  if (unitsRes.error) throw new Error(`读取房源失败：${unitsRes.error.message}`);
-  if (customersRes.error) throw new Error(`读取客户失败：${customersRes.error.message}`);
-  if (buildingsRes.error) throw new Error(`读取楼栋失败：${buildingsRes.error.message}`);
+  if (unitsRes.error) throw new Error(tr(locale, `读取房源失败：${unitsRes.error.message}`, `Erreur de lecture des chambres : ${unitsRes.error.message}`));
+  if (customersRes.error) throw new Error(tr(locale, `读取客户失败：${customersRes.error.message}`, `Erreur de lecture des clients : ${customersRes.error.message}`));
+  if (buildingsRes.error) throw new Error(tr(locale, `读取楼栋失败：${buildingsRes.error.message}`, `Erreur de lecture des bâtiments : ${buildingsRes.error.message}`));
 
   const units = new Map(((unitsRes.data ?? []) as unknown as UnitSummary[]).map((row) => [row.id, row]));
   const customers = new Map(((customersRes.data ?? []) as unknown as CustomerSummary[]).map((row) => [row.id, row.name]));
@@ -176,51 +197,67 @@ async function queryReceivables(query: string, intent: WorkbenchIntent): Promise
     const building = buildings.get(row.building_id ?? unit?.building_id ?? "");
     return {
       dueDate: row.due_date,
-      building: buildingLabel(building),
+      building: buildingLabel(locale, building),
       unit: unit?.unit_no ?? "—",
       customer: customers.get(row.customer_id ?? "") ?? "—",
-      business: financialBusinessLabel(row.source_type, "zh", row.category),
+      business: financialBusinessLabel(row.source_type, locale, row.category),
       title: row.title,
       amount: formatXof(row.amount_xof),
       paid: formatXof(row.paid_amount_xof),
       outstanding: formatXof(receivableOutstanding(row)),
     };
   });
-  const kindLabel = intent.kind === "receivable_overdue" ? "逾期" : intent.kind === "receivable_due_soon" ? `${intent.days} 天内应缴` : "当前未收";
-  const scope = `${domainLabel(intent.domain)} · ${intent.buildingCode ? intent.buildingCode.replace("SACSI", "") + "#" : "全部在管楼栋"}`;
+  const kindLabel = intent.kind === "receivable_overdue"
+    ? tr(locale, "逾期", "en retard")
+    : intent.kind === "receivable_due_soon"
+      ? tr(locale, `${intent.days} 天内应缴`, `dû sous ${intent.days} j`)
+      : tr(locale, "当前未收", "reste à encaisser");
+  const scope = `${domainLabel(locale, intent.domain)} · ${intent.buildingCode ? intent.buildingCode.replace("SACSI", "") + "#" : tr(locale, "全部在管楼栋", "tous bâtiments gérés")}`;
 
-  return toResult({
+  return toResult(locale, {
     query,
     intent,
-    title: `${kindLabel}明细`,
-    answer: rows.length ? `${scope}共有 ${rows.length} 笔${kindLabel}，未收合计 ${formatXof(total)}。` : `${scope}没有符合口径的${kindLabel}记录。`,
+    title: tr(locale, `${kindLabel}明细`, `Détail ${kindLabel}`),
+    answer: rows.length
+      ? tr(locale, `${scope}共有 ${rows.length} 笔${kindLabel}，未收合计 ${formatXof(total)}。`, `${scope} : ${rows.length} ${kindLabel}, total restant ${formatXof(total)}.`)
+      : tr(locale, `${scope}没有符合口径的${kindLabel}记录。`, `${scope} : aucune créance ${kindLabel}.`),
     scope,
     metrics: [
-      { label: "笔数", value: String(rows.length), tone: rows.length ? "amber" : "green" },
-      { label: "未收合计", value: formatXof(total), tone: intent.kind === "receivable_overdue" && total > 0 ? "red" : total > 0 ? "amber" : "green" },
-      ...(intent.kind === "receivable_due_soon" ? [{ label: "截止日期", value: endDate, tone: "blue" as const }] : []),
+      { label: tr(locale, "笔数", "Nombre"), value: String(rows.length), tone: rows.length ? "amber" : "green" },
+      { label: tr(locale, "未收合计", "Total restant"), value: formatXof(total), tone: intent.kind === "receivable_overdue" && total > 0 ? "red" : total > 0 ? "amber" : "green" },
+      ...(intent.kind === "receivable_due_soon" ? [{ label: tr(locale, "截止日期", "Date limite"), value: endDate, tone: "blue" as const }] : []),
     ],
-    table: { columns: receivableColumns(), rows: rowData.slice(0, 100) },
+    table: { columns: receivableColumns(locale), rows: rowData.slice(0, 100) },
     evidence: [
-      { label: "财务口径", value: "仅统计已确认管理（managed）、未取消且未收余额大于 0 的应收" },
-      { label: "合同口径", value: "长租和出售仅保留生效合同；日租排除已取消订单" },
-      { label: "逾期定义", value: "到期日早于统计日；到期当天不算逾期" },
+      { label: tr(locale, "财务口径", "Périmètre financier"), value: tr(locale, "仅统计已确认管理（managed）、未取消且未收余额大于 0 的应收", "Créances gérées (managed), non annulées et avec solde restant > 0") },
+      { label: tr(locale, "合同口径", "Périmètre contractuel"), value: tr(locale, "长租和出售仅保留生效合同；日租排除已取消订单", "Baux et ventes actifs uniquement ; réservations annulées exclues") },
+      { label: tr(locale, "逾期定义", "Définition du retard"), value: tr(locale, "到期日早于统计日；到期当天不算逾期", "Échéance avant la date de référence ; le jour même n'est pas en retard") },
     ],
-    warnings: rows.length > 100 ? [`共 ${rows.length} 笔，表格仅展示前 100 笔。`] : [],
+    warnings: rows.length > 100 ? [tr(locale, `共 ${rows.length} 笔，表格仅展示前 100 笔。`, `${rows.length} créances ; 100 premières affichées.`)] : [],
     resultCount: rows.length,
   });
 }
 
-async function queryDailyStatus(query: string, intent: WorkbenchIntent): Promise<WorkbenchResult> {
+async function queryDailyStatus(locale: Locale, query: string, intent: WorkbenchIntent): Promise<WorkbenchResult> {
   const supabase = await createClient();
   let buildingQuery = supabase.from("buildings").select("id, code, display_name").eq("is_active", true);
   if (intent.buildingCode) buildingQuery = buildingQuery.eq("code", intent.buildingCode);
   const { data: buildingData, error: buildingError } = await buildingQuery;
-  if (buildingError) throw new Error(`读取楼栋失败：${buildingError.message}`);
+  if (buildingError) throw new Error(tr(locale, `读取楼栋失败：${buildingError.message}`, `Erreur de lecture des bâtiments : ${buildingError.message}`));
   const buildings = (buildingData ?? []) as unknown as BuildingSummary[];
   const buildingIds = buildings.map((row) => row.id);
   if (!buildingIds.length) {
-    return toResult({ query, intent, title: "日租房态", answer: "没有找到指定的在管楼栋。", scope: intent.buildingCode ?? "全部楼栋", metrics: [], table: null, warnings: ["请检查楼栋编号。"], resultCount: 0 });
+    return toResult(locale, {
+      query,
+      intent,
+      title: tr(locale, "日租房态", "État journalier"),
+      answer: tr(locale, "没有找到指定的在管楼栋。", "Aucun bâtiment géré trouvé pour ce code."),
+      scope: intent.buildingCode ?? tr(locale, "全部楼栋", "Tous bâtiments"),
+      metrics: [],
+      table: null,
+      warnings: [tr(locale, "请检查楼栋编号。", "Vérifiez le numéro du bâtiment.")],
+      resultCount: 0,
+    });
   }
 
   const [unitsRes, bookingsRes, cleaningRes] = await Promise.all([
@@ -239,16 +276,16 @@ async function queryDailyStatus(query: string, intent: WorkbenchIntent): Promise
       .limit(500),
     supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed").eq("is_completed", false),
   ]);
-  if (unitsRes.error) throw new Error(`读取日租房源失败：${unitsRes.error.message}`);
-  if (bookingsRes.error) throw new Error(`读取日租订单失败：${bookingsRes.error.message}`);
-  if (cleaningRes.error) throw new Error(`读取保洁状态失败：${cleaningRes.error.message}`);
+  if (unitsRes.error) throw new Error(tr(locale, `读取日租房源失败：${unitsRes.error.message}`, `Erreur de lecture des chambres journalières : ${unitsRes.error.message}`));
+  if (bookingsRes.error) throw new Error(tr(locale, `读取日租订单失败：${bookingsRes.error.message}`, `Erreur de lecture des réservations : ${bookingsRes.error.message}`));
+  if (cleaningRes.error) throw new Error(tr(locale, `读取保洁状态失败：${cleaningRes.error.message}`, `Erreur de lecture du ménage : ${cleaningRes.error.message}`));
 
   const units = sortUnits((unitsRes.data ?? []) as unknown as UnitRow[]);
   const unitIds = new Set(units.map((row) => row.id));
   const bookings = ((bookingsRes.data ?? []) as unknown as DailyBookingRow[]).filter((row) => unitIds.has(row.unit_id));
   const customerIds = [...new Set(bookings.map((row) => row.customer_id).filter(Boolean))];
   const customersRes = customerIds.length ? await supabase.from("customers").select("id, name").in("id", customerIds) : { data: [], error: null };
-  if (customersRes.error) throw new Error(`读取客户失败：${customersRes.error.message}`);
+  if (customersRes.error) throw new Error(tr(locale, `读取客户失败：${customersRes.error.message}`, `Erreur de lecture des clients : ${customersRes.error.message}`));
 
   const customerNames = new Map(((customersRes.data ?? []) as CustomerSummary[]).map((row) => [row.id, row.name]));
   const buildingMap = new Map(buildings.map((row) => [row.id, row]));
@@ -259,72 +296,87 @@ async function queryDailyStatus(query: string, intent: WorkbenchIntent): Promise
     cleaningTasks: cleaningRes.data ?? [],
   });
   const counts = { occupied: 0, checking_out_today: 0, reserved: 0, cleaning: 0, available: 0, maintenance: 0, locked: 0 };
+  const openWord = tr(locale, "未定", "ouverte");
   const rows = units.map((unit) => {
     const state = states.get(unit.id)!;
     counts[state.status] += 1;
     const booking = state.booking;
     return {
-      building: buildingLabel(buildingMap.get(unit.building_id)),
+      building: buildingLabel(locale, buildingMap.get(unit.building_id)),
       unit: unit.unit_no,
-      status: statusLabel(state.status),
+      status: statusLabel(locale, state.status),
       guest: customerNames.get(booking?.customer_id ?? "") || "—",
-      period: booking ? `${booking.check_in} 至 ${booking.checkout_mode === "open" && !booking.actual_check_out ? "未定" : booking.actual_check_out ?? booking.check_out ?? "未定"}` : "—",
+      period: booking ? `${booking.check_in} ${tr(locale, "至", "→")} ${booking.checkout_mode === "open" && !booking.actual_check_out ? openWord : booking.actual_check_out ?? booking.check_out ?? openWord}` : "—",
     };
   });
-  const scope = `日租 · ${intent.buildingCode ? intent.buildingCode.replace("SACSI", "") + "#" : buildings.map((row) => row.code.replace("SACSI", "") + "#").join("、")}`;
+  const buildingScope = intent.buildingCode
+    ? intent.buildingCode.replace("SACSI", "") + "#"
+    : buildings.map((row) => row.code.replace("SACSI", "") + "#").join(tr(locale, "、", ", "));
+  const scope = `${tr(locale, "日租", "Journalier")} · ${buildingScope}`;
 
-  return toResult({
+  return toResult(locale, {
     query,
     intent,
-    title: `${intent.asOfDate} 日租房态`,
-    answer: `${scope}共 ${units.length} 间：占用 ${counts.occupied + counts.checking_out_today} 间，预订 ${counts.reserved} 间，待保洁 ${counts.cleaning} 间，可安排入住 ${counts.available} 间。`,
+    title: `${intent.asOfDate} ${tr(locale, "日租房态", "état journalier")}`,
+    answer: tr(
+      locale,
+      `${scope}共 ${units.length} 间：占用 ${counts.occupied + counts.checking_out_today} 间，预订 ${counts.reserved} 间，待保洁 ${counts.cleaning} 间，可安排入住 ${counts.available} 间。`,
+      `${scope} : ${units.length} chambres — occupées ${counts.occupied + counts.checking_out_today}, réservées ${counts.reserved}, à nettoyer ${counts.cleaning}, disponibles ${counts.available}.`,
+    ),
     scope,
     metrics: [
-      { label: "占用", value: String(counts.occupied + counts.checking_out_today), tone: "blue" },
-      { label: "今日离店", value: String(counts.checking_out_today), tone: "amber" },
-      { label: "待保洁", value: String(counts.cleaning), tone: "teal" },
-      { label: "可安排入住", value: String(counts.available), tone: "green" },
+      { label: tr(locale, "占用", "Occupées"), value: String(counts.occupied + counts.checking_out_today), tone: "blue" },
+      { label: tr(locale, "今日离店", "Départs"), value: String(counts.checking_out_today), tone: "amber" },
+      { label: tr(locale, "待保洁", "À nettoyer"), value: String(counts.cleaning), tone: "teal" },
+      { label: tr(locale, "可安排入住", "Disponibles"), value: String(counts.available), tone: "green" },
     ],
     table: {
       columns: [
-        { key: "building", label: "楼栋" }, { key: "unit", label: "房号" }, { key: "status", label: "房态" },
-        { key: "guest", label: "登记联系人" }, { key: "period", label: "入住区间" },
+        { key: "building", label: tr(locale, "楼栋", "Bâtiment") }, { key: "unit", label: tr(locale, "房号", "Chambre") }, { key: "status", label: tr(locale, "房态", "État") },
+        { key: "guest", label: tr(locale, "登记联系人", "Contact") }, { key: "period", label: tr(locale, "入住区间", "Séjour") },
       ],
       rows,
     },
     evidence: [
-      { label: "房态口径", value: "日租启用房源；在住优先，其次待保洁、预订、维修/锁定、可安排入住" },
-      { label: "订单口径", value: "排除已取消订单；开放式入住在未办理离店前持续占用" },
+      { label: tr(locale, "房态口径", "Périmètre des états"), value: tr(locale, "日租启用房源；在住优先，其次待保洁、预订、维修/锁定、可安排入住", "Chambres actives en journalier ; occupée prioritaire, puis à nettoyer, réservée, maintenance/verrouillée, disponible") },
+      { label: tr(locale, "订单口径", "Périmètre des réservations"), value: tr(locale, "排除已取消订单；开放式入住在未办理离店前持续占用", "Réservations annulées exclues ; séjour ouvert reste occupé sans départ") },
     ],
     warnings: [],
     resultCount: units.length,
   });
 }
 
-async function queryUnitSnapshot(query: string, intent: WorkbenchIntent): Promise<WorkbenchResult> {
+async function queryUnitSnapshot(locale: Locale, query: string, intent: WorkbenchIntent): Promise<WorkbenchResult> {
   const supabase = await createClient();
   const [buildingsRes, unitsRes] = await Promise.all([
     supabase.from("buildings").select("id, code, display_name").eq("is_active", true),
     supabase.from("units").select("id, building_id, unit_no, floor_label, status, code").eq("unit_no", intent.unitNo!),
   ]);
-  if (buildingsRes.error) throw new Error(`读取楼栋失败：${buildingsRes.error.message}`);
-  if (unitsRes.error) throw new Error(`读取房源失败：${unitsRes.error.message}`);
+  if (buildingsRes.error) throw new Error(tr(locale, `读取楼栋失败：${buildingsRes.error.message}`, `Erreur de lecture des bâtiments : ${buildingsRes.error.message}`));
+  if (unitsRes.error) throw new Error(tr(locale, `读取房源失败：${unitsRes.error.message}`, `Erreur de lecture des chambres : ${unitsRes.error.message}`));
   const buildings = (buildingsRes.data ?? []) as unknown as BuildingSummary[];
   const buildingMap = new Map(buildings.map((row) => [row.id, row]));
   let matches = (unitsRes.data ?? []) as unknown as UnitSummary[];
   if (intent.buildingCode) matches = matches.filter((row) => buildingMap.get(row.building_id)?.code.toUpperCase() === intent.buildingCode);
 
   if (matches.length !== 1) {
-    const message = matches.length === 0 ? "没有找到对应房源。" : "该房号存在于多个楼栋，请在问题中补充楼栋编号。";
-    return toResult({
+    const message = matches.length === 0
+      ? tr(locale, "没有找到对应房源。", "Aucune chambre correspondante trouvée.")
+      : tr(locale, "该房号存在于多个楼栋，请在问题中补充楼栋编号。", "Ce numéro existe dans plusieurs bâtiments ; précisez le bâtiment.");
+    return toResult(locale, {
       query,
       intent,
-      title: "房源定位",
+      title: tr(locale, "房源定位", "Localisation de la chambre"),
       answer: message,
-      scope: intent.unitNo ?? "未识别房号",
+      scope: intent.unitNo ?? tr(locale, "未识别房号", "Numéro non reconnu"),
       metrics: [],
-      table: matches.length ? { columns: [{ key: "building", label: "楼栋" }, { key: "unit", label: "房号" }, { key: "status", label: "当前房态" }], rows: matches.map((row) => ({ building: buildingLabel(buildingMap.get(row.building_id)), unit: row.unit_no, status: statusLabel(row.status) })) } : null,
-      warnings: [matches.length ? "例如：查看 11#503 的合同和收款。" : "请检查楼栋和房号。"],
+      table: matches.length ? {
+        columns: [
+          { key: "building", label: tr(locale, "楼栋", "Bâtiment") }, { key: "unit", label: tr(locale, "房号", "Chambre") }, { key: "status", label: tr(locale, "当前房态", "État actuel") },
+        ],
+        rows: matches.map((row) => ({ building: buildingLabel(locale, buildingMap.get(row.building_id)), unit: row.unit_no, status: statusLabel(locale, row.status) })),
+      } : null,
+      warnings: [matches.length ? tr(locale, "例如：查看 11#503 的合同和收款。", "Ex. : contrat et paiements du 11#503.") : tr(locale, "请检查楼栋和房号。", "Vérifiez le bâtiment et le numéro.")],
       resultCount: matches.length,
     });
   }
@@ -336,15 +388,21 @@ async function queryUnitSnapshot(query: string, intent: WorkbenchIntent): Promis
     supabase.from("daily_bookings").select("id, customer_id, check_in, check_out, checkout_mode, actual_check_out, final_amount_xof, total_amount_xof, prepaid_amount_xof, status").eq("unit_id", unit.id).neq("status", "cancelled").order("check_in", { ascending: false }).limit(5),
     supabase.from("receivables").select("id, building_id, unit_id, customer_id, source_type, source_id, category, title, due_date, amount_xof, paid_amount_xof, status, management_status, currency, created_at, updated_at").eq("unit_id", unit.id).eq("management_status", "managed").neq("status", "cancelled").limit(500),
   ]);
-  for (const [label, result] of [["长租合同", leasesRes], ["出售合同", salesRes], ["日租订单", bookingsRes], ["应收", receivablesRes]] as const) {
-    if (result.error) throw new Error(`读取${label}失败：${result.error.message}`);
+  const checks: Array<{ error: { message: string } | null; labelZh: string; labelFr: string }> = [
+    { error: leasesRes.error, labelZh: "长租合同", labelFr: "baux" },
+    { error: salesRes.error, labelZh: "出售合同", labelFr: "ventes" },
+    { error: bookingsRes.error, labelZh: "日租订单", labelFr: "réservations" },
+    { error: receivablesRes.error, labelZh: "应收", labelFr: "créances" },
+  ];
+  for (const check of checks) {
+    if (check.error) throw new Error(tr(locale, `读取${check.labelZh}失败：${check.error.message}`, `Erreur de lecture des ${check.labelFr} : ${check.error.message}`));
   }
 
   const activeDaily = (bookingsRes.data ?? []).filter((row) => ["pending_review", "confirmed", "checked_in"].includes(row.status));
   const activeSources = [...(leasesRes.data ?? []), ...(salesRes.data ?? []), ...activeDaily];
   const customerIds = [...new Set(activeSources.map((row) => row.customer_id).filter(Boolean))];
   const customersRes = customerIds.length ? await supabase.from("customers").select("id, name").in("id", customerIds) : { data: [], error: null };
-  if (customersRes.error) throw new Error(`读取客户失败：${customersRes.error.message}`);
+  if (customersRes.error) throw new Error(tr(locale, `读取客户失败：${customersRes.error.message}`, `Erreur de lecture des clients : ${customersRes.error.message}`));
   const customers = new Map(((customersRes.data ?? []) as CustomerSummary[]).map((row) => [row.id, row.name]));
   const receivables = (receivablesRes.data ?? []) as unknown as ReceivableRow[];
 
@@ -356,18 +414,47 @@ async function queryUnitSnapshot(query: string, intent: WorkbenchIntent): Promis
       outstanding: related.reduce((sum, row) => sum + receivableOutstanding(row), 0),
     };
   };
+  const waitLabel = tr(locale, "待确认", "à confirmer");
+  const monthWord = tr(locale, "/月", "/mois");
   const rows: Array<Record<string, string>> = [];
   for (const contract of leasesRes.data ?? []) {
     const finance = financialFor("lease_contract", contract.id);
-    rows.push({ business: "长租", reference: contract.contract_no, customer: customers.get(contract.customer_id) ?? "—", status: "生效中", dates: `${contract.start_date ?? "—"} · 已缴至 ${contract.paid_through_date ?? "待确认"}`, contractAmount: formatXof(contract.monthly_rent_xof) + "/月", paid: formatXof(finance.paid), outstanding: formatXof(finance.outstanding) });
+    rows.push({
+      business: tr(locale, "长租", "Bail"),
+      reference: contract.contract_no,
+      customer: customers.get(contract.customer_id) ?? "—",
+      status: tr(locale, "生效中", "Actif"),
+      dates: `${contract.start_date ?? "—"} · ${tr(locale, "已缴至", "payé au")} ${contract.paid_through_date ?? waitLabel}`,
+      contractAmount: formatXof(contract.monthly_rent_xof) + monthWord,
+      paid: formatXof(finance.paid),
+      outstanding: formatXof(finance.outstanding),
+    });
   }
   for (const contract of salesRes.data ?? []) {
     const finance = financialFor("sale_contract", contract.id);
-    rows.push({ business: "出售", reference: contract.contract_no, customer: customers.get(contract.customer_id) ?? "—", status: `生效中 · 过户${statusLabel(contract.transfer_status)}`, dates: contract.signed_date, contractAmount: formatXof(contract.total_amount_xof), paid: formatXof(finance.paid), outstanding: formatXof(finance.outstanding) });
+    rows.push({
+      business: tr(locale, "出售", "Vente"),
+      reference: contract.contract_no,
+      customer: customers.get(contract.customer_id) ?? "—",
+      status: `${tr(locale, "生效中", "Actif")} · ${statusLabel(locale, contract.transfer_status)}`,
+      dates: contract.signed_date,
+      contractAmount: formatXof(contract.total_amount_xof),
+      paid: formatXof(finance.paid),
+      outstanding: formatXof(finance.outstanding),
+    });
   }
   for (const booking of activeDaily) {
     const finance = financialFor("daily_booking", booking.id);
-    rows.push({ business: "日租", reference: `订单 ${booking.id.slice(0, 8)}`, customer: customers.get(booking.customer_id) || "—", status: statusDisplayLabel(booking.status, "zh"), dates: `${booking.check_in} 至 ${booking.actual_check_out ?? booking.check_out ?? "未定"}`, contractAmount: formatXof(booking.final_amount_xof ?? booking.total_amount_xof), paid: formatXof(finance.paid || booking.prepaid_amount_xof), outstanding: formatXof(finance.outstanding) });
+    rows.push({
+      business: tr(locale, "日租", "Journalier"),
+      reference: `${tr(locale, "订单", "Résa")} ${booking.id.slice(0, 8)}`,
+      customer: customers.get(booking.customer_id) || "—",
+      status: statusDisplayLabel(booking.status, locale),
+      dates: `${booking.check_in} ${tr(locale, "至", "→")} ${booking.actual_check_out ?? booking.check_out ?? tr(locale, "未定", "ouverte")}`,
+      contractAmount: formatXof(booking.final_amount_xof ?? booking.total_amount_xof),
+      paid: formatXof(finance.paid || booking.prepaid_amount_xof),
+      outstanding: formatXof(finance.outstanding),
+    });
   }
 
   const totalOutstanding = receivables.reduce((sum, row) => sum + receivableOutstanding(row), 0);
@@ -375,49 +462,57 @@ async function queryUnitSnapshot(query: string, intent: WorkbenchIntent): Promis
   const building = buildingMap.get(unit.building_id);
   const label = `${building?.code.replace("SACSI", "") ?? "?"}#${unit.unit_no}`;
 
-  return toResult({
+  return toResult(locale, {
     query,
     intent,
-    title: `${label} 房源快照`,
-    answer: `${label}当前房态为“${statusLabel(unit.status)}”，共有 ${rows.length} 项生效或进行中的业务记录；已确认未收 ${formatXof(totalOutstanding)}，其中逾期 ${formatXof(overdue)}。`,
-    scope: `${buildingLabel(building)} · ${unit.unit_no}`,
+    title: `${label} ${tr(locale, "房源快照", "aperçu de la chambre")}`,
+    answer: tr(
+      locale,
+      `${label}当前房态为“${statusLabel(locale, unit.status)}”，共有 ${rows.length} 项生效或进行中的业务记录；已确认未收 ${formatXof(totalOutstanding)}，其中逾期 ${formatXof(overdue)}。`,
+      `${label} : état « ${statusLabel(locale, unit.status)} », ${rows.length} dossier(s) actif(s) ; reste dû confirmé ${formatXof(totalOutstanding)}, dont ${formatXof(overdue)} en retard.`,
+    ),
+    scope: `${buildingLabel(locale, building)} · ${unit.unit_no}`,
     metrics: [
-      { label: "当前房态", value: statusLabel(unit.status), tone: "blue" },
-      { label: "进行中业务", value: String(rows.length), tone: rows.length ? "purple" : "neutral" },
-      { label: "已确认未收", value: formatXof(totalOutstanding), tone: totalOutstanding ? "amber" : "green" },
-      { label: "逾期", value: formatXof(overdue), tone: overdue ? "red" : "green" },
+      { label: tr(locale, "当前房态", "État actuel"), value: statusLabel(locale, unit.status), tone: "blue" },
+      { label: tr(locale, "进行中业务", "Dossiers actifs"), value: String(rows.length), tone: rows.length ? "purple" : "neutral" },
+      { label: tr(locale, "已确认未收", "Reste dû"), value: formatXof(totalOutstanding), tone: totalOutstanding ? "amber" : "green" },
+      { label: tr(locale, "逾期", "En retard"), value: formatXof(overdue), tone: overdue ? "red" : "green" },
     ],
     table: {
       columns: [
-        { key: "business", label: "业务" }, { key: "reference", label: "编号" }, { key: "customer", label: "客户" },
-        { key: "status", label: "状态" }, { key: "dates", label: "关键日期" }, { key: "contractAmount", label: "约定金额", align: "right" },
-        { key: "paid", label: "已收", align: "right" }, { key: "outstanding", label: "未收", align: "right" },
+        { key: "business", label: tr(locale, "业务", "Secteur") }, { key: "reference", label: tr(locale, "编号", "Référence") }, { key: "customer", label: tr(locale, "客户", "Client") },
+        { key: "status", label: tr(locale, "状态", "Statut") }, { key: "dates", label: tr(locale, "关键日期", "Dates clés") }, { key: "contractAmount", label: tr(locale, "约定金额", "Montant prévu"), align: "right" },
+        { key: "paid", label: tr(locale, "已收", "Payé"), align: "right" }, { key: "outstanding", label: tr(locale, "未收", "Reste dû"), align: "right" },
       ],
       rows,
     },
     evidence: [
-      { label: "业务口径", value: "长租、出售仅展示生效合同；日租展示待确认、已确认或已入住订单" },
-      { label: "财务口径", value: "金额来自该房源已确认管理且未取消的应收记录，不用合同总价倒推历史欠款" },
+      { label: tr(locale, "业务口径", "Périmètre métier"), value: tr(locale, "长租、出售仅展示生效合同；日租展示待确认、已确认或已入住订单", "Baux et ventes actifs ; journalier : à confirmer, confirmé ou arrivé") },
+      { label: tr(locale, "财务口径", "Périmètre financier"), value: tr(locale, "金额来自该房源已确认管理且未取消的应收记录，不用合同总价倒推历史欠款", "Montants issus des créances gérées non annulées ; pas de reconstitution depuis le prix du contrat") },
     ],
-    warnings: receivables.some((row) => row.management_status === "historical_pending") ? ["该房源仍有历史待核应收，未计入金额。"] : [],
+    warnings: receivables.some((row) => row.management_status === "historical_pending") ? [tr(locale, "该房源仍有历史待核应收，未计入金额。", "Créances historiques à vérifier non incluses.")] : [],
     resultCount: rows.length,
   });
 }
 
-export async function executeWorkbenchQuery(query: string, intent: WorkbenchIntent): Promise<WorkbenchResult> {
-  if (intent.kind === "daily_status") return queryDailyStatus(query, intent);
-  if (["receivable_overdue", "receivable_outstanding", "receivable_due_soon"].includes(intent.kind)) return queryReceivables(query, intent);
-  if (intent.kind === "unit_snapshot" && intent.unitNo) return queryUnitSnapshot(query, intent);
+export async function executeWorkbenchQuery(query: string, intent: WorkbenchIntent, locale: Locale = "zh"): Promise<WorkbenchResult> {
+  if (intent.kind === "daily_status") return queryDailyStatus(locale, query, intent);
+  if (["receivable_overdue", "receivable_outstanding", "receivable_due_soon"].includes(intent.kind)) return queryReceivables(locale, query, intent);
+  if (intent.kind === "unit_snapshot" && intent.unitNo) return queryUnitSnapshot(locale, query, intent);
 
-  return toResult({
+  return toResult(locale, {
     query,
     intent,
-    title: "暂不支持这个问题",
-    answer: "当前工作台只回答可由系统固定口径验证的日租房态、未收/逾期/近期应缴，以及指定房源快照。",
-    scope: "受控查询范围",
+    title: tr(locale, "暂不支持这个问题", "Question non prise en charge"),
+    answer: tr(
+      locale,
+      "当前工作台只回答可由系统固定口径验证的日租房态、未收/逾期/近期应缴，以及指定房源快照。",
+      "Le poste répond uniquement aux questions vérifiables par les règles fixes : état journalier, créances (reste dû / retard / échéances proches) et aperçu d'une chambre.",
+    ),
+    scope: tr(locale, "受控查询范围", "Périmètre de requête contrôlé"),
     metrics: [],
     table: null,
-    warnings: ["可以尝试：今天日租房态、11#长租逾期、出售15天内应缴、查看11#503的合同和收款。"],
+    warnings: [tr(locale, "可以尝试：今天日租房态、11#长租逾期、出售15天内应缴、查看11#503的合同和收款。", "Exemples : état journalier du jour, retards bail 11#, échéances vente sous 15 j, contrat et paiements du 11#503.")],
     resultCount: 0,
   });
 }

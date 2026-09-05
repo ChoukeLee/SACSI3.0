@@ -6,5 +6,5 @@ export default async function AssistantPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!["admin", "boss", "finance", "rental_sales"].includes(user.role)) redirect("/");
-  return <AiWorkbenchView />;
+  return <AiWorkbenchView locale="zh" />;
 }
