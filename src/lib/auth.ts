@@ -165,6 +165,7 @@ const pageAccess: Record<string, UserRole[]> = {
   sales: ["admin", "finance", "boss", "rental_sales"],
   customers: ["admin", "finance", "boss", "rental_sales"],
   "audit-logs": ["admin", "boss"],
+  assistant: ["admin", "boss", "finance", "rental_sales"],
 };
 
 /**

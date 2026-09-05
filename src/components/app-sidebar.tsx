@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Building2, CalendarDays, FileSignature, LayoutDashboard } from "lucide-react";
+import { Building2, CalendarDays, FileSignature, LayoutDashboard, ScanSearch } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -13,7 +13,7 @@ import { usePrefetch } from "@/components/navigation-prefetch";
 import type { UserRole } from "@/lib/auth";
 import { navigationGroupsForRole } from "@/lib/navigation-access";
 
-type NavKey = "management" | "units" | "dailyRentals" | "leases" | "sales";
+type NavKey = "management" | "units" | "dailyRentals" | "leases" | "sales" | "assistant";
 
 interface NavItem { key: NavKey; href: string; icon: typeof LayoutDashboard; activeMatch?: string }
 interface NavGroup { key: string; labelKey: string; items: NavItem[]; roles: UserRole[] }
@@ -25,6 +25,7 @@ const groups: NavGroup[] = [
     { key: "leases", href: "/leases", icon: FileSignature },
     { key: "sales", href: "/sales", icon: Building2 },
     { key: "units", href: "/units", icon: Building2, activeMatch: "/units" },
+    { key: "assistant", href: "/assistant", icon: ScanSearch },
   ]},
 ];
 
