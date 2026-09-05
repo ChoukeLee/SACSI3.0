@@ -53,6 +53,14 @@ export interface WorkbenchResult {
   resultCount: number;
 }
 
+export interface WorkbenchCleaningExecution {
+  action: "complete_daily_cleaning";
+  taskId: string;
+  unitId: string;
+  buildingCode: string;
+  unitNo: string;
+}
+
 export interface WorkbenchDraftPreview {
   kind: "action_draft";
   action: "complete_daily_cleaning";
@@ -65,11 +73,25 @@ export interface WorkbenchDraftPreview {
   warnings: string[];
   generatedAt: string;
   confidence: number;
-  canConfirm: false;
+  canConfirm: true;
   confirmationNote: string;
+  /** Stable execution identity posted back on confirm; never trusted without re-check. */
+  execution: WorkbenchCleaningExecution;
 }
 
-export type WorkbenchResponse = WorkbenchResult | WorkbenchDraftPreview;
+export interface WorkbenchActionResult {
+  kind: "action_result";
+  action: "complete_daily_cleaning";
+  risk: "L1";
+  title: string;
+  summary: string;
+  executedAt: string;
+  target: WorkbenchEvidence[];
+  verification: WorkbenchEvidence[];
+  warnings: string[];
+}
+
+export type WorkbenchResponse = WorkbenchResult | WorkbenchDraftPreview | WorkbenchActionResult;
 
 export interface WorkbenchActionState {
   status: "idle" | "success" | "error";

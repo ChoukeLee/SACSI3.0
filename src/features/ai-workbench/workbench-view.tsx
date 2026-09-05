@@ -4,8 +4,8 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { ArrowUp, CheckCircle2, Clock3, Database, LockKeyhole, Search, ShieldCheck, Sparkles } from "lucide-react";
 import { OperationalPage, StatTile } from "@/components/ui/operational";
 import { cn } from "@/lib/utils";
-import { askWorkbench } from "./actions";
-import { INITIAL_WORKBENCH_STATE, type WorkbenchDraftPreview, type WorkbenchResult, type WorkbenchTone } from "./types";
+import { askWorkbench, confirmWorkbenchAction } from "./actions";
+import { INITIAL_WORKBENCH_STATE, type WorkbenchActionResult, type WorkbenchDraftPreview, type WorkbenchResult, type WorkbenchTone } from "./types";
 
 const suggestions = [
   "今天日租房态",
@@ -41,10 +41,10 @@ export function AiWorkbenchView() {
     <OperationalPage
       eyebrow="业务查询"
       title="AI 工作台"
-      description="用自然语言查询系统记录并生成受控操作草稿；当前阶段不会直接执行修改。"
+      description="用自然语言查询系统记录并生成受控操作草稿；L1 写操作必须人工确认后才会执行。"
       action={
         <span className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-accentGreen-100 bg-accentGreen-50 px-3 text-xs font-semibold text-accentGreen-700">
-          <LockKeyhole className="h-3.5 w-3.5" />查询 + 草稿预览
+          <LockKeyhole className="h-3.5 w-3.5" />查询 + L1 确认执行
         </span>
       }
       className="mx-auto max-w-[1500px]"
@@ -106,7 +106,7 @@ export function AiWorkbenchView() {
             <div className="mt-4 space-y-4">
               <Boundary icon={Database} title="系统实时记录" text="读取当前账号有权查看的数据，不使用模型记忆补数。" />
               <Boundary icon={ShieldCheck} title="固定业务口径" text="应收、未收、逾期和房态沿用系统统一计算规则。" />
-              <Boundary icon={LockKeyhole} title="先草稿、后确认" text="当前只开放完成保洁草稿预览，尚未连接执行按钮，不会修改数据。" />
+              <Boundary icon={LockKeyhole} title="先草稿、后确认" text="保洁完成草稿可按你的登录身份确认执行（日租统一原子 RPC），执行后自动复查；其余写操作尚未开放。" />
               <Boundary icon={Sparkles} title="最小化模型输入" text="仅在本地规则无法识别时发送问题文字；数据库记录和查询结果不会发送。" />
             </div>
           </aside>
@@ -122,13 +122,19 @@ export function AiWorkbenchView() {
           </section>
         )}
         {!pending && state.result?.kind === "query_result" && <WorkbenchResultView result={state.result} />}
-        {!pending && state.result?.kind === "action_draft" && <WorkbenchDraftView draft={state.result} />}
+        {!pending && state.result?.kind === "action_draft" && <WorkbenchDraftFlow key={state.result.execution.taskId} draft={state.result} />}
       </div>
     </OperationalPage>
   );
 }
 
-function WorkbenchDraftView({ draft }: { draft: WorkbenchDraftPreview }) {
+function WorkbenchDraftFlow({ draft }: { draft: WorkbenchDraftPreview }) {
+  const [state, formAction, pending] = useActionState(confirmWorkbenchAction, INITIAL_WORKBENCH_STATE);
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+  if (state.status === "success" && state.result?.kind === "action_result") {
+    return <WorkbenchActionResultView result={state.result} />;
+  }
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
       <section className="min-w-0 overflow-hidden rounded-xl border border-accentAmber-100 bg-card shadow-card">
@@ -157,7 +163,64 @@ function WorkbenchDraftView({ draft }: { draft: WorkbenchDraftPreview }) {
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">人工确认</p>
         <div className="mt-4 rounded-lg border border-accentAmber-100 bg-accentAmber-50 p-3 text-xs leading-5 text-accentAmber-700">{draft.confirmationNote}</div>
         {draft.warnings.map((warning) => <p key={warning} className="mt-3 text-xs leading-5 text-muted-foreground">{warning}</p>)}
-        <button type="button" disabled className="mt-5 inline-flex min-h-10 w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground opacity-45"><LockKeyhole className="h-4 w-4" />确认执行（暂未开放）</button>
+        {state.status === "error" && (
+          <p className="mt-4 rounded-lg border border-accentRed-100 bg-accentRed-50 p-3 text-xs leading-5 text-accentRed-700" role="alert">{state.error}</p>
+        )}
+        <form action={formAction} className="mt-5 space-y-2.5">
+          <input type="hidden" name="execution_action" value={draft.execution.action} />
+          <input type="hidden" name="task_id" value={draft.execution.taskId} />
+          <input type="hidden" name="unit_id" value={draft.execution.unitId} />
+          <input type="hidden" name="building_code" value={draft.execution.buildingCode} />
+          <input type="hidden" name="unit_no" value={draft.execution.unitNo} />
+          <button
+            type="submit"
+            disabled={pending}
+            className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            {pending ? <Clock3 className="h-4 w-4 animate-pulse" /> : <CheckCircle2 className="h-4 w-4" />}
+            {pending ? "正在执行并复查…" : "确认执行"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setDismissed(true)}
+            className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
+          >
+            放弃此草稿
+          </button>
+        </form>
+      </aside>
+    </div>
+  );
+}
+
+function WorkbenchActionResultView({ result }: { result: WorkbenchActionResult }) {
+  return (
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <section className="min-w-0 overflow-hidden rounded-xl border border-accentGreen-100 bg-card shadow-card">
+        <div className="border-b border-border px-5 py-5 sm:px-6" role="status" aria-atomic="true">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accentGreen-50 text-accentGreen-600"><CheckCircle2 className="h-4 w-4" /></span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2"><p className="text-xs font-medium text-muted-foreground">执行结果</p><span className="rounded-full border border-accentGreen-100 bg-accentGreen-50 px-2 py-0.5 text-[11px] font-semibold text-accentGreen-700">{result.risk}</span></div>
+              <h2 className="mt-1 text-lg font-semibold">{result.title}</h2>
+              <p className="mt-2 text-sm leading-7 text-foreground/85">{result.summary}</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-5 sm:p-6">
+          <EvidenceGroup title="操作对象" items={result.target} />
+          <div className="mt-5">
+            <p className="text-xs font-semibold text-muted-foreground">执行后复查（重新查询数据库）</p>
+            <dl className="mt-3 divide-y divide-border/70 rounded-lg border border-border px-3">
+              {result.verification.map((item) => <div key={`${item.label}-${item.value}`} className="flex items-start justify-between gap-4 py-3"><dt className="text-xs text-muted-foreground">{item.label}</dt><dd className="text-right text-xs font-medium leading-5">{item.value}</dd></div>)}
+            </dl>
+          </div>
+          {result.warnings.length > 0 && <div className="mt-4 rounded-lg border border-accentRed-100 bg-accentRed-50 p-3">{result.warnings.map((warning) => <p key={warning} className="text-xs leading-5 text-accentRed-700">{warning}</p>)}</div>}
+        </div>
+      </section>
+      <aside className="h-fit rounded-xl border border-border bg-card p-5 shadow-card">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">下一步</p>
+        <p className="mt-3 text-xs leading-5 text-muted-foreground">已执行的 L1 操作会写入真实操作人的审计记录。可直接在上方输入框继续查询或办理其他事项。</p>
       </aside>
     </div>
   );

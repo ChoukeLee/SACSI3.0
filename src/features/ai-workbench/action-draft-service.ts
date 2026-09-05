@@ -86,7 +86,14 @@ export async function buildCleaningCompletionDraft(intent: WorkbenchActionIntent
     warnings: ["这是 L1 可逆状态操作，正式执行前仍须人工确认。"],
     generatedAt,
     confidence: intent.confidence,
-    canConfirm: false,
-    confirmationNote: "当前为草稿预览阶段，尚未连接执行按钮，不会修改任何业务数据。",
+    canConfirm: true,
+    confirmationNote: "确认后将以你的登录身份执行该 L1 操作（走日租统一原子 RPC，确认前不修改任何数据），随后自动复查任务与房态。",
+    execution: {
+      action: "complete_daily_cleaning",
+      taskId: task.id,
+      unitId: unit.id,
+      buildingCode: intent.buildingCode,
+      unitNo: unit.unit_no,
+    },
   };
 }
