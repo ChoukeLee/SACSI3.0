@@ -32,7 +32,16 @@ export function detectWorkbenchLocation(query: string): { buildingCode: string |
   return { buildingCode, unitNo: null };
 }
 
-function detectKind(query: string, unitNo: string | null): WorkbenchQueryKind {
+function looksLikeMovementsList(query: string): boolean {
+  if (/可安排入住|可住|空房|available|disponib/i.test(query)) return false;
+  const movementTerm = /(?:入住|到店|抵达|退房|离店|离开|arriv|départ|check[\s-]?in|check[\s-]?out)/i;
+  const listTerm = /(?:今天|今日|名单|哪些|谁|有几个|有多少|明细|安排|liste|quels|qui|prévu|aujourd'hui|today|du\s+jour)/i;
+  return movementTerm.test(query) && listTerm.test(query);
+}
+
+function detectKind(query: string, unitNo: string | null, domain: WorkbenchDomain): WorkbenchQueryKind {
+  if (looksLikeMovementsList(query) && /入住|退房|到店|离店|arriv|départ|check[\s-]?in|check[\s-]?out/i.test(query)) return "daily_movements";
+  if (domain === "lease" && /到期|期满|快到期|将到期|expir/i.test(query) && !/应缴|缴款|收款|未收|欠/i.test(query)) return "lease_expiring";
   if (/房态|占用|在住|入住|离店|退房|保洁|可安排入住|空房|journalier|ménage|nettoyage|occup|disponib|aujourd'hui/i.test(query)) return "daily_status";
   if (/逾期|retard\b|retards\b|échu|echu|impayé|impayes/i.test(query)) return "receivable_overdue";
   if (/(?:\d{1,2}\s*天内|近期|即将).*(?:应缴|到期)|(?:应缴|到期).*(?:\d{1,2}\s*天内|近期|即将)/.test(query)) return "receivable_due_soon";
@@ -47,13 +56,13 @@ export function parseWorkbenchIntent(query: string, asOfDate: string): Workbench
   const normalized = query.trim().replaceAll("＃", "#");
   const domain = detectDomain(normalized);
   const { buildingCode, unitNo } = detectWorkbenchLocation(normalized);
-  const kind = detectKind(normalized, unitNo);
+  const kind = detectKind(normalized, unitNo, domain);
   const daysMatch = normalized.match(/(\d{1,2})\s*(?:天内|jours?|j\b)/i);
   const days = Math.min(90, Math.max(1, Number(daysMatch?.[1] ?? 15)));
 
   return {
     kind,
-    domain: kind === "daily_status" ? "daily" : domain,
+    domain: kind === "daily_status" || kind === "daily_movements" ? "daily" : domain,
     buildingCode,
     unitNo,
     customerName: null,

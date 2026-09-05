@@ -12,6 +12,8 @@ import { INITIAL_WORKBENCH_STATE, type WorkbenchActionResult, type WorkbenchDraf
 const SUGGESTIONS: Record<Locale, string[]> = {
   zh: [
     "今天日租房态",
+    "11#今天退房名单",
+    "长租30天内到期",
     "11#长租逾期明细",
     "出售15天内应缴",
     "查看11#503的合同和收款",
@@ -19,6 +21,8 @@ const SUGGESTIONS: Record<Locale, string[]> = {
   ],
   fr: [
     "état journalier aujourd'hui",
+    "départs du jour 11#",
+    "baux expirant sous 30 jours",
     "retards bail 11#",
     "échéances vente sous 15 jours",
     "contrat et paiements du 11#503",

@@ -68,4 +68,31 @@ describe("parseWorkbenchIntent", () => {
       source: "rules",
     });
   });
+
+  it.each([
+    ["11#今天退房名单", "daily_movements", "daily", "SACSI11", null],
+    ["5#今日到店客人", "daily_movements", "daily", "SACSI5", null],
+    ["départs du jour 11#", "daily_movements", "daily", "SACSI11", null],
+  ])("parses today arrivals/departures lists (zh/fr): %s", (query, kind, domain, buildingCode, unitNo) => {
+    expect(parseWorkbenchIntent(query, today)).toMatchObject({ kind, domain, buildingCode, unitNo });
+  });
+
+  it.each([
+    ["长租30天内到期", 30],
+    ["11#长租7天内到期名单", 7],
+    ["baux expirant sous 30 jours", 30],
+  ])("parses leases expiring within N days (zh/fr): %s", (query, days) => {
+    expect(parseWorkbenchIntent(query, today)).toMatchObject({
+      kind: "lease_expiring",
+      domain: "lease",
+      days,
+    });
+  });
+
+  it("does not mistake availability questions for arrivals", () => {
+    expect(parseWorkbenchIntent("今天5号楼有哪些房间可安排入住", today)).toMatchObject({
+      kind: "daily_status",
+      domain: "daily",
+    });
+  });
 });

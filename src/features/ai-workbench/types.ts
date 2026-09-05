@@ -2,6 +2,8 @@ export type WorkbenchDomain = "all" | "daily" | "lease" | "sale";
 
 export type WorkbenchQueryKind =
   | "daily_status"
+  | "daily_movements"
+  | "lease_expiring"
   | "receivable_overdue"
   | "receivable_outstanding"
   | "receivable_due_soon"

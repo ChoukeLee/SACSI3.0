@@ -495,24 +495,201 @@ async function queryUnitSnapshot(locale: Locale, query: string, intent: Workbenc
   });
 }
 
+async function queryDailyMovements(locale: Locale, query: string, intent: WorkbenchIntent): Promise<WorkbenchResult> {
+  const supabase = await createClient();
+  let buildingQuery = supabase.from("buildings").select("id, code, display_name").eq("is_active", true);
+  if (intent.buildingCode) buildingQuery = buildingQuery.eq("code", intent.buildingCode);
+  const { data: buildingData, error: buildingError } = await buildingQuery;
+  if (buildingError) throw new Error(tr(locale, `读取楼栋失败：${buildingError.message}`, `Erreur de lecture des bâtiments : ${buildingError.message}`));
+  const buildings = (buildingData ?? []) as unknown as BuildingSummary[];
+  const buildingIds = buildings.map((row) => row.id);
+  if (!buildingIds.length) {
+    return toResult(locale, {
+      query,
+      intent,
+      title: tr(locale, "今日入住退房", "Arrivées et départs du jour"),
+      answer: tr(locale, "没有找到指定的在管楼栋。", "Aucun bâtiment géré trouvé pour ce code."),
+      scope: intent.buildingCode ?? tr(locale, "全部楼栋", "Tous bâtiments"),
+      metrics: [],
+      table: null,
+      warnings: [tr(locale, "请检查楼栋编号。", "Vérifiez le numéro du bâtiment.")],
+      resultCount: 0,
+    });
+  }
+
+  const [unitsRes, bookingsRes] = await Promise.all([
+    supabase.from("units").select("id, building_id, unit_no").in("building_id", buildingIds).order("unit_no"),
+    supabase.from("daily_bookings")
+      .select("id, unit_id, customer_id, check_in, check_out, checkout_mode, actual_check_out, status")
+      .in("status", ["pending_review", "confirmed", "checked_in", "checked_out"])
+      .lte("check_in", intent.asOfDate)
+      .order("check_in", { ascending: false })
+      .limit(1000),
+  ]);
+  if (unitsRes.error) throw new Error(tr(locale, `读取房源失败：${unitsRes.error.message}`, `Erreur de lecture des chambres : ${unitsRes.error.message}`));
+  if (bookingsRes.error) throw new Error(tr(locale, `读取订单失败：${bookingsRes.error.message}`, `Erreur de lecture des réservations : ${bookingsRes.error.message}`));
+
+  const units = ((unitsRes.data ?? []) as Array<{ id: string; building_id: string; unit_no: string }>).filter((row) => row.building_id && buildingIds.includes(row.building_id));
+  const unitByNo = new Map(units.map((row) => [row.id, row]));
+  const unitIds = new Set(units.map((row) => row.id));
+  const bookings = ((bookingsRes.data ?? []) as unknown as DailyBookingRow[]).filter((row) => unitIds.has(row.unit_id));
+
+  const customerIds = [...new Set(bookings.map((row) => row.customer_id).filter(Boolean))];
+  const customersRes = customerIds.length ? await supabase.from("customers").select("id, name").in("id", customerIds) : { data: [], error: null };
+  if (customersRes.error) throw new Error(tr(locale, `读取客户失败：${customersRes.error.message}`, `Erreur de lecture des clients : ${customersRes.error.message}`));
+  const customerNames = new Map(((customersRes.data ?? []) as Array<{ id: string; name: string }>).map((row) => [row.id, row.name]));
+
+  const asOf = intent.asOfDate;
+  const arrivals = bookings.filter((row) => ["pending_review", "confirmed", "checked_in"].includes(row.status) && row.check_in === asOf);
+  const departures = bookings.filter((row) =>
+    (row.status === "checked_in" && (row.actual_check_out === asOf || (row.checkout_mode === "fixed" && row.check_out === asOf)))
+    || (row.status === "checked_out" && row.actual_check_out === asOf),
+  );
+
+  const rows = [
+    ...arrivals.map((row) => ({ group: tr(locale, "入住", "Arrivée"), room: unitByNo.get(row.unit_id)?.unit_no ?? "—", guest: customerNames.get(row.customer_id ?? "") ?? "—", detail: tr(locale, "今日到达 · 订单待办", "Arrivée du jour") })),
+    ...departures.map((row) => ({ group: row.status === "checked_out" ? tr(locale, "已退", "Parti") : tr(locale, "退房", "Départ"), room: unitByNo.get(row.unit_id)?.unit_no ?? "—", guest: customerNames.get(row.customer_id ?? "") ?? "—", detail: row.status === "checked_out" ? tr(locale, "已办理退房", "Départ enregistré") : tr(locale, "今日退房", "Départ du jour") })),
+  ];
+  const scope = `${tr(locale, "日租", "Journalier")} · ${intent.buildingCode ? intent.buildingCode.replace("SACSI", "") + "#" : tr(locale, "全部楼栋", "tous bâtiments")}`;
+
+  return toResult(locale, {
+    query,
+    intent,
+    title: `${asOf} ${tr(locale, "今日入住退房", "arrivées et départs du jour")}`,
+    answer: tr(
+      locale,
+      `${scope}：今天安排入住 ${arrivals.length} 位，退房 ${departures.length} 位。退房后请记得安排保洁并核对房间状态。`,
+      `${scope} : ${arrivals.length} arrivée(s) et ${departures.length} départ(s) aujourd'hui. Après un départ, pensez au ménage et à la vérification de la chambre.`,
+    ),
+    scope,
+    metrics: [
+      { label: tr(locale, "今日入住", "Arrivées"), value: String(arrivals.length), tone: arrivals.length ? "blue" : "green" },
+      { label: tr(locale, "今日退房", "Départs"), value: String(departures.length), tone: departures.length ? "amber" : "green" },
+      { label: tr(locale, "已办理退房", "Déjà partis"), value: String(departures.filter((row) => row.status === "checked_out").length), tone: "neutral" },
+    ],
+    table: {
+      columns: [
+        { key: "group", label: tr(locale, "类型", "Type") },
+        { key: "room", label: tr(locale, "房号", "Chambre") },
+        { key: "guest", label: tr(locale, "联系人", "Contact") },
+        { key: "detail", label: tr(locale, "说明", "Détail") },
+      ],
+      rows: rows.slice(0, 100),
+    },
+    evidence: [
+      { label: tr(locale, "入住口径", "Périmètre arrivées"), value: tr(locale, "订单今天到店且状态为待确认/已确认/已入住", "Réservations arrivant ce jour (à confirmer, confirmées ou arrivées)") },
+      { label: tr(locale, "退房口径", "Périmètre départs"), value: tr(locale, "在住订单今天退房；已退房订单按实际退房日计入", "Séjours partant ce jour ; départs déjà enregistrés selon la date réelle") },
+    ],
+    warnings: [],
+    resultCount: rows.length,
+  });
+}
+
+async function queryLeaseExpiring(locale: Locale, query: string, intent: WorkbenchIntent): Promise<WorkbenchResult> {
+  const supabase = await createClient();
+  const endDate = addIsoDays(intent.asOfDate, intent.days);
+  const [buildingsRes, leasesRes] = await Promise.all([
+    supabase.from("buildings").select("id, code, display_name").eq("is_active", true),
+    supabase.from("lease_contracts")
+      .select("id, unit_id, customer_id, contract_no, start_date, expected_end_date, monthly_rent_xof, status")
+      .eq("status", "active")
+      .gte("expected_end_date", intent.asOfDate)
+      .lte("expected_end_date", endDate)
+      .order("expected_end_date", { ascending: true })
+      .limit(300),
+  ]);
+  if (buildingsRes.error) throw new Error(tr(locale, `读取楼栋失败：${buildingsRes.error.message}`, `Erreur de lecture des bâtiments : ${buildingsRes.error.message}`));
+  if (leasesRes.error) throw new Error(tr(locale, `读取长租合同失败：${leasesRes.error.message}`, `Erreur de lecture des baux : ${leasesRes.error.message}`));
+
+  const buildings = (buildingsRes.data ?? []) as unknown as BuildingSummary[];
+  const buildingMap = new Map(buildings.map((row) => [row.id, row]));
+  let leases = (leasesRes.data ?? []) as Array<{ id: string; unit_id: string; customer_id: string; contract_no: string; start_date: string | null; expected_end_date: string; monthly_rent_xof: number; status: string }>;
+
+  const unitIds = [...new Set(leases.map((row) => row.unit_id).filter(Boolean))];
+  const unitsRes = unitIds.length ? await supabase.from("units").select("id, building_id, unit_no").in("id", unitIds) : { data: [], error: null };
+  if (unitsRes.error) throw new Error(tr(locale, `读取房源失败：${unitsRes.error.message}`, `Erreur de lecture des chambres : ${unitsRes.error.message}`));
+  const units = new Map(((unitsRes.data ?? []) as Array<{ id: string; building_id: string; unit_no: string }>).map((row) => [row.id, row]));
+  const customerIds = [...new Set(leases.map((row) => row.customer_id).filter(Boolean))];
+  const customersRes = customerIds.length ? await supabase.from("customers").select("id, name").in("id", customerIds) : { data: [], error: null };
+  if (customersRes.error) throw new Error(tr(locale, `读取客户失败：${customersRes.error.message}`, `Erreur de lecture des clients : ${customersRes.error.message}`));
+  const customerNames = new Map(((customersRes.data ?? []) as Array<{ id: string; name: string }>).map((row) => [row.id, row.name]));
+
+  if (intent.buildingCode) leases = leases.filter((row) => buildingMap.get(units.get(row.unit_id)?.building_id ?? "")?.code.toUpperCase() === intent.buildingCode);
+
+  const daysBetween = (iso: string) => Math.max(0, Math.floor((Date.parse(`${iso}T00:00:00Z`) - Date.parse(`${intent.asOfDate}T00:00:00Z`)) / 86_400_000));
+  const rows = leases.map((row) => {
+    const unit = units.get(row.unit_id);
+    const building = buildingMap.get(unit?.building_id ?? "");
+    return {
+      endDate: row.expected_end_date,
+      daysLeft: String(daysBetween(row.expected_end_date)),
+      building: buildingLabel(locale, building),
+      unit: unit?.unit_no ?? "—",
+      customer: customerNames.get(row.customer_id ?? "") ?? "—",
+      monthlyRent: formatXof(row.monthly_rent_xof),
+      contractNo: row.contract_no,
+    };
+  });
+  const scope = `${tr(locale, "长租", "Baux")} · ${intent.buildingCode ? intent.buildingCode.replace("SACSI", "") + "#" : tr(locale, "全部楼栋", "tous bâtiments")}`;
+  const nearest = rows[0] ? `${rows[0].endDate} ${rows[0].unit}(${rows[0].customer})` : null;
+
+  return toResult(locale, {
+    query,
+    intent,
+    title: tr(locale, `长租 ${intent.days} 天内到期`, `Baux expirant sous ${intent.days} j`),
+    answer: rows.length
+      ? tr(
+          locale,
+          `${scope}：接下来 ${intent.days} 天有 ${rows.length} 份生效合同到期（最早 ${nearest}）。建议提前联系确认续租或安排退租，避免空置。`,
+          `${scope} : ${rows.length} bail(s) actif(s) expirent sous ${intent.days} j (au plus tôt ${nearest}). Contactez le locataire pour confirmer la reconduction ou préparer le départ.`,
+        )
+      : tr(locale, `${scope}：未来 ${intent.days} 天没有到期合同。`, `${scope} : aucun bail n'expire sous ${intent.days} j.`),
+    scope,
+    metrics: [
+      { label: tr(locale, "到期合同", "Baux à échéance"), value: String(rows.length), tone: rows.length ? "amber" : "green" },
+      { label: tr(locale, "最早到期", "Échéance la plus proche"), value: rows[0]?.endDate ?? "—", tone: "blue" },
+    ],
+    table: rows.length ? {
+      columns: [
+        { key: "endDate", label: tr(locale, "到期日", "Échéance") },
+        { key: "daysLeft", label: tr(locale, "剩余", "Jours") },
+        { key: "building", label: tr(locale, "楼栋", "Bâtiment") },
+        { key: "unit", label: tr(locale, "房号", "Chambre") },
+        { key: "customer", label: tr(locale, "客户", "Client") },
+        { key: "monthlyRent", label: tr(locale, "月租", "Loyer/mois"), align: "right" },
+        { key: "contractNo", label: tr(locale, "合同号", "Contrat") },
+      ],
+      rows: rows.slice(0, 100),
+    } : null,
+    evidence: [
+      { label: tr(locale, "口径", "Périmètre"), value: tr(locale, "仅统计生效中的合同，到期日落在今天到 N 天之间（含今天）", "Baux actifs dont l'échéance tombe entre aujourd'hui et N jours (aujourd'hui inclus)") },
+      { label: tr(locale, "提醒", "Rappel"), value: tr(locale, "是否续租取决于人工跟进，本结果不替代催办流程", "La reconduction dépend du suivi humain ; ce résultat ne remplace pas le processus de relance") },
+    ],
+    warnings: rows.length > 100 ? [tr(locale, `共 ${rows.length} 份，表格仅展示前 100 份。`, `${rows.length} baux ; 100 premiers affichés.`)] : [],
+    resultCount: rows.length,
+  });
+}
+
 export async function executeWorkbenchQuery(query: string, intent: WorkbenchIntent, locale: Locale = "zh"): Promise<WorkbenchResult> {
   if (intent.kind === "daily_status") return queryDailyStatus(locale, query, intent);
+  if (intent.kind === "daily_movements") return queryDailyMovements(locale, query, intent);
+  if (intent.kind === "lease_expiring") return queryLeaseExpiring(locale, query, intent);
   if (["receivable_overdue", "receivable_outstanding", "receivable_due_soon"].includes(intent.kind)) return queryReceivables(locale, query, intent);
   if (intent.kind === "unit_snapshot" && intent.unitNo) return queryUnitSnapshot(locale, query, intent);
 
   return toResult(locale, {
     query,
     intent,
-    title: tr(locale, "暂不支持这个问题", "Question non prise en charge"),
+    title: tr(locale, "这题我暂时答不了", "Je ne peux pas encore répondre à ça"),
     answer: tr(
       locale,
-      "当前工作台只回答可由系统固定口径验证的日租房态、未收/逾期/近期应缴，以及指定房源快照。",
-      "Le poste répond uniquement aux questions vérifiables par les règles fixes : état journalier, créances (reste dû / retard / échéances proches) et aperçu d'une chambre.",
+      "我只做“能用系统固定口径验证”的查询，现在还不会答这一类。可以换一种问法，或直接点下方示例。查询只读、绝不改数据；想办理事项（例如“保洁已完成”）请说清房间和动作，我会先给你草稿。",
+      "Je réponds uniquement aux questions vérifiables par les règles fixes du système. Reformulez votre question ou utilisez un exemple ci-dessous. Les requêtes sont en lecture seule ; pour une opération (ex. ménage terminé), précisez la chambre et l'action : je proposerai un brouillon.",
     ),
     scope: tr(locale, "受控查询范围", "Périmètre de requête contrôlé"),
     metrics: [],
     table: null,
-    warnings: [tr(locale, "可以尝试：今天日租房态、11#长租逾期、出售15天内应缴、查看11#503的合同和收款。", "Exemples : état journalier du jour, retards bail 11#, échéances vente sous 15 j, contrat et paiements du 11#503.")],
+    warnings: [tr(locale, "可以试试：今天日租房态、11#今天退房名单、11#长租逾期、长租30天内到期、出售15天内应缴、查看11#503的合同和收款、11#906保洁已完成。", "Exemples : état journalier du jour, départs du jour 11#, retards bail 11#, baux expirant sous 30 j, échéances vente sous 15 j, contrat et paiements du 11#503, ménage terminé 11#906.")],
     resultCount: 0,
   });
 }
