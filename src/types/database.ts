@@ -126,7 +126,11 @@ export type CustomerUpdate = Partial<CustomerInsert>;
 export interface DailyBookingRow {
   id: string;
   unit_id: string;
+  /** Legacy compatibility identity; use booking_agent_id for new workflows. */
   customer_id: string;
+  booking_agent_id?: string;
+  guest_customer_id?: string | null;
+  guest_name?: string | null;
   check_in: string;
   check_out: string | null;
   checkout_mode: "fixed" | "open";
@@ -155,8 +159,8 @@ export interface LeaseContractRow {
   unit_id: string;
   customer_id: string;
   contract_no: string;
-  start_date: string;
-  expected_end_date: string;
+  start_date: string | null;
+  expected_end_date: string | null;
   expected_end_confirmed?: boolean;
   paid_through_date?: string | null;
   actual_end_date: string | null;
@@ -169,6 +173,15 @@ export interface LeaseContractRow {
   signer_name: string | null;
   attachment_url: string | null;
   status: ContractStatus;
+  agreement_group_no?: string | null;
+  signing_state?: "signed" | "unsigned" | "pending_confirmation";
+  signed_date?: string | null;
+  commencement_state?: "started" | "pending_project_opening" | "cancelled_before_start";
+  billable_months?: number | null;
+  free_months?: number;
+  term_months?: number | null;
+  deposit_months?: number | null;
+  source_reference?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -192,7 +205,8 @@ export interface SaleContractRow {
   agency_commission_amount_xof: number | null;
   agency_commission_paid: boolean;
   payment_plan_type: string;
-  total_amount_xof: number;
+  total_amount_xof: number | null;
+  total_amount_confirmed: boolean;
   attachment_url: string | null;
   status: ContractStatus;
   created_at: string;
@@ -230,6 +244,7 @@ export interface PaymentRow {
   currency: CurrencyCode;
   exchange_rate_to_xof: number;
   receipt_no: string | null;
+  payment_method?: "cash" | "check" | "bank_transfer" | "offset" | "other" | null;
   notes: string | null;
   request_id?: string | null;
   request_kind?: string | null;
@@ -325,3 +340,88 @@ export interface LeaseSettlementRow {
 
 export type LeaseSettlementInsert = Omit<LeaseSettlementRow, "id" | "created_at">;
 export type LeaseSettlementUpdate = Partial<LeaseSettlementInsert>;
+
+// ── AI draft infrastructure ──
+
+export type AiJobStatus = "input_received" | "analyzing" | "awaiting_confirmation" | "executing" | "completed" | "failed" | "cancelled";
+export type AiProposalStatus = "awaiting_clarification" | "proposed" | "confirmed" | "executing" | "executed" | "rejected" | "expired" | "failed";
+
+export interface AiJobRow {
+  id: string;
+  actor_id: string;
+  actor_role: string;
+  project_id: string | null;
+  request_id: string;
+  input_mode: "text" | "image" | "file" | "mixed";
+  locale: "zh" | "fr";
+  timezone: string;
+  status: AiJobStatus;
+  failure_code: string | null;
+  failure_message: string | null;
+  retention_until: string;
+  created_at: string;
+  updated_at: string;
+  finished_at: string | null;
+}
+
+export interface AiInputRow {
+  id: string;
+  job_id: string;
+  sequence_no: number;
+  input_type: "text" | "image" | "pdf" | "spreadsheet" | "csv";
+  raw_text: string | null;
+  storage_bucket: string | null;
+  storage_path: string | null;
+  original_filename: string | null;
+  mime_type: string | null;
+  file_size_bytes: number | null;
+  extracted_text: string | null;
+  extraction_result: Record<string, unknown>;
+  contains_sensitive_data: boolean;
+  retention_until: string;
+  redacted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AiProposedActionRow {
+  id: string;
+  job_id: string;
+  sequence_no: number;
+  action_name: string;
+  risk_level: "L1" | "L2" | "L3";
+  status: AiProposalStatus;
+  target: Record<string, unknown>;
+  action_input: Record<string, unknown>;
+  before_snapshot: Record<string, unknown>;
+  before_versions: Record<string, string>;
+  expected_effects: Array<Record<string, unknown>>;
+  warnings: string[];
+  confidence: number;
+  requires_clarification: boolean;
+  version: number;
+  expires_at: string;
+  confirmation_request_id: string | null;
+  confirmed_by: string | null;
+  confirmed_at: string | null;
+  rejected_by: string | null;
+  rejected_at: string | null;
+  rejection_reason: string | null;
+  execution_request_id: string | null;
+  execution_result: Record<string, unknown> | null;
+  execution_error: string | null;
+  executed_at: string | null;
+  verified: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AiActionEventRow {
+  id: number;
+  job_id: string;
+  proposed_action_id: string | null;
+  actor_id: string;
+  event_type: string;
+  event_payload: Record<string, unknown>;
+  created_at: string;
+}

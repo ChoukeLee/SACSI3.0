@@ -1,7 +1,8 @@
 /**
  * Receipt OCR abstraction layer.
  *
- * Supported providers: mock (default), openai-vision, qwen-vl-plus.
+ * Supported providers: mock (default), deepseek-vision-exp, openai-vision,
+ * qwen-vl-plus, and glm-4v.
  * Set OCR_PROVIDER and corresponding API key env var to enable.
  */
 
@@ -27,14 +28,32 @@ export interface OcrResult {
   structured?: OcrStructured | null;
 }
 
+type OcrProvider = "mock" | "deepseek-vision-exp" | "openai-vision" | "qwen-vl-plus" | "glm-4v";
+
+const OCR_PROVIDERS = new Set<OcrProvider>([
+  "mock",
+  "deepseek-vision-exp",
+  "openai-vision",
+  "qwen-vl-plus",
+  "glm-4v",
+]);
+
 export async function extractReceiptTextFromImage(
   fileBuffer: Buffer,
   fileName: string,
 ): Promise<OcrResult> {
-  const provider = process.env.OCR_PROVIDER ?? "mock";
+  const configuredProvider = process.env.OCR_PROVIDER ?? "mock";
+  const provider = OCR_PROVIDERS.has(configuredProvider as OcrProvider)
+    ? configuredProvider as OcrProvider
+    : null;
   const processedAt = new Date().toISOString();
 
   try {
+    if (!provider) throw new Error(`Unsupported OCR provider: ${configuredProvider}`);
+    if (provider === "deepseek-vision-exp") {
+      const result = await extractWithDeepSeekVision(fileBuffer, fileName);
+      return { ...result, provider, processedAt };
+    }
     if (provider === "openai-vision") {
       const result = await extractWithOpenAiVision(fileBuffer, fileName);
       return { ...result, provider, processedAt };
@@ -52,7 +71,7 @@ export async function extractReceiptTextFromImage(
       provider, processedAt, error: null,
     };
   } catch (err) {
-    return { rawText: "", provider, processedAt, error: err instanceof Error ? err.message : "OCR extraction failed" };
+    return { rawText: "", provider: provider ?? configuredProvider, processedAt, error: err instanceof Error ? err.message : "OCR extraction failed" };
   }
 }
 
@@ -77,12 +96,52 @@ const QWEN_VISION_PROMPT = [
   "规则: receipt_date≠period_start可不同; 万=×10000, 195万=1950000; 日期均YYYY-MM-DD; 不确定填null+warnings。",
 ].join("\n");
 
+// ── DeepSeek V4 Flash Vision (experimental) ─────────────────
+
+async function extractWithDeepSeekVision(
+  fileBuffer: Buffer,
+  fileName: string,
+): Promise<{ rawText: string; structured?: OcrStructured | null }> {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) throw new Error("DEEPSEEK_API_KEY not set.");
+
+  const mime = detectImageMime(fileName);
+  const dataUrl = `data:${mime};base64,${fileBuffer.toString("base64")}`;
+  const baseUrl = (process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com").replace(/\/$/, "");
+  const model = process.env.DEEPSEEK_VISION_MODEL ?? "deepseek-v4-flash-vision-exp";
+  const res = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    signal: AbortSignal.timeout(20_000),
+    body: JSON.stringify({
+      model,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: QWEN_VISION_PROMPT },
+          { type: "image_url", image_url: { url: dataUrl, detail: "original" } },
+        ],
+      }],
+      response_format: { type: "json_object" },
+      thinking: { type: "disabled" },
+      max_tokens: 1200,
+      stream: false,
+    }),
+  });
+  if (!res.ok) throw new Error(`DeepSeek Vision request failed (${res.status}).`);
+
+  const data = await res.json() as { choices?: Array<{ message?: { content?: string | null } }> };
+  const rawText = data.choices?.[0]?.message?.content?.trim() ?? "";
+  if (!rawText) throw new Error("DeepSeek Vision returned an empty response.");
+  return { rawText, structured: parseStructuredJson(rawText) };
+}
+
 async function extractWithQwenVision(
   fileBuffer: Buffer,
   fileName: string,
 ): Promise<{ rawText: string; structured?: OcrStructured | null }> {
   const apiKey = process.env.QWEN_API_KEY;
-  if (!apiKey) return { rawText: "QWEN_API_KEY not set." };
+  if (!apiKey) throw new Error("QWEN_API_KEY not set.");
 
   const baseUrl = (process.env.QWEN_BASE_URL ?? "https://dashscope.aliyuncs.com/compatible-mode/v1").replace(/\/$/, "");
   const model = process.env.QWEN_VISION_MODEL ?? "qwen-vl-plus";
@@ -98,7 +157,7 @@ async function extractWithQwenVision(
     }),
   });
 
-  if (!res.ok) { const errText = await res.text(); return { rawText: `Qwen error: ${res.status} — ${errText.slice(0, 200)}` }; }
+  if (!res.ok) throw new Error(`Qwen Vision request failed (${res.status}).`);
 
   const data = await res.json();
   const rawText = data?.choices?.[0]?.message?.content ?? "";
@@ -113,7 +172,7 @@ async function extractWithGlmVision(
   fileName: string,
 ): Promise<{ rawText: string; structured?: OcrStructured | null }> {
   const apiKey = process.env.GLM_API_KEY;
-  if (!apiKey) return { rawText: "GLM_API_KEY not set." };
+  if (!apiKey) throw new Error("GLM_API_KEY not set.");
 
   const baseUrl = (process.env.GLM_BASE_URL ?? "https://open.bigmodel.cn/api/paas/v4").replace(/\/$/, "");
   const model = process.env.GLM_VISION_MODEL ?? "glm-4v";
@@ -129,7 +188,7 @@ async function extractWithGlmVision(
     }),
   });
 
-  if (!res.ok) { const errText = await res.text(); return { rawText: `GLM error: ${res.status} — ${errText.slice(0, 200)}` }; }
+  if (!res.ok) throw new Error(`GLM Vision request failed (${res.status}).`);
 
   const data = await res.json();
   const rawText = data?.choices?.[0]?.message?.content ?? "";
@@ -144,7 +203,7 @@ async function extractWithOpenAiVision(
   fileName: string,
 ): Promise<{ rawText: string; structured?: OcrStructured | null }> {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return { rawText: "OPENAI_API_KEY not set." };
+  if (!apiKey) throw new Error("OPENAI_API_KEY not set.");
 
   const mime = detectMime(fileName);
   const dataUrl = `data:${mime};base64,${fileBuffer.toString("base64")}`;
@@ -157,7 +216,7 @@ async function extractWithOpenAiVision(
       max_tokens: 1000,
     }),
   });
-  if (!res.ok) { const errText = await res.text(); return { rawText: `OpenAI error: ${res.status} — ${errText.slice(0, 200)}` }; }
+  if (!res.ok) throw new Error(`OpenAI Vision request failed (${res.status}).`);
   const data = await res.json();
   return { rawText: data?.choices?.[0]?.message?.content ?? "" };
 }
@@ -199,7 +258,16 @@ function detectMime(fileName: string): string {
     case "png": return "image/png";
     case "jpg": case "jpeg": return "image/jpeg";
     case "webp": return "image/webp";
+    case "gif": return "image/gif";
     case "pdf": return "application/pdf";
     default: return "application/octet-stream";
   }
+}
+
+function detectImageMime(fileName: string): string {
+  const mime = detectMime(fileName);
+  if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(mime)) {
+    throw new Error("DeepSeek Vision only accepts PNG, JPEG, WebP, or GIF images.");
+  }
+  return mime;
 }
