@@ -152,7 +152,7 @@ async function syncContractReceivableStatuses(contractId: string) {
 }
 
 async function ensureNextLeaseReceivable(contractId: string): Promise<{ success: boolean; error?: string }> {
-  const supabase = createPrivilegedClient();
+  const supabase = await createClient();
   const { data: contract, error: contractError } = await supabase
     .from("lease_contracts")
     .select("id, unit_id, customer_id, status, monthly_rent_xof, paid_through_date, unit:units(unit_no, building_id)")
@@ -372,7 +372,7 @@ export async function recordLeaseFinancialEntry(input: {
   paymentDate: string;
   amountXof: number;
   paidThroughDate?: string;
-  paymentMethod?: "cash" | "check" | "bank_transfer" | "offset" | "other";
+  paymentMethod: "cash" | "check" | "bank_transfer" | "offset" | "other";
   notes?: string;
   requestId?: string;
 }): Promise<{ success: boolean; referenceNo?: string; error?: string }> {
@@ -383,13 +383,16 @@ export async function recordLeaseFinancialEntry(input: {
   if (!input.paymentDate || !Number.isFinite(input.amountXof) || input.amountXof <= 0) {
     return { success: false, error: "请填写有效的日期和金额。" };
   }
+  if (!input.paymentMethod) {
+    return { success: false, error: "请选择付款方式，系统不会自动默认为现金。" };
+  }
 
   const config = getLeaseFinancialConfig(input.businessType);
   if (config.requiresPaidThrough && !input.paidThroughDate) {
     return { success: false, error: "租金收入必须填写已缴至日期。" };
   }
 
-  const supabase = createPrivilegedClient();
+  const supabase = await createClient();
   const { data: contract, error: contractError } = await supabase
     .from("lease_contracts")
     .select("id, unit_id, customer_id, contract_no, paid_through_date, deposit_amount_xof, unit:units(unit_no, building_id, building:buildings(code))")
@@ -413,7 +416,7 @@ export async function recordLeaseFinancialEntry(input: {
     p_payment_date: input.paymentDate,
     p_amount_xof: input.amountXof,
     p_paid_through_date: input.paidThroughDate ?? null,
-    p_payment_method: input.paymentMethod ?? "cash",
+    p_payment_method: input.paymentMethod,
     p_notes: input.notes?.trim() || null,
     p_reference_prefix: referencePrefix,
     p_request_id: requestId,
@@ -423,18 +426,8 @@ export async function recordLeaseFinancialEntry(input: {
   if (!payload?.success || !payload.reference_no) return { success: false, error: "财务记录保存失败。" };
 
   if (config.requiresPaidThrough && input.paidThroughDate) {
-    const latestPaidThrough = !contract.paid_through_date || input.paidThroughDate > contract.paid_through_date
-      ? input.paidThroughDate
-      : contract.paid_through_date;
-    const { error: endDateError } = await supabase
-      .from("lease_contracts")
-      .update({
-        expected_end_date: latestPaidThrough,
-        expected_end_confirmed: true,
-      })
-      .eq("id", contract.id);
-    if (endDateError) return { success: false, error: "收款已保存，但合同到期日同步失败，请重试。" };
-
+    // The RPC updates paid_through_date atomically. The formal contract end
+    // date is a separate fact and must never be overwritten by a payment.
     const nextReceivable = await ensureNextLeaseReceivable(contract.id);
     if (!nextReceivable.success) {
       return { success: false, error: `收款已保存，但下一期应收生成失败：${nextReceivable.error ?? "未知错误"}` };
@@ -459,11 +452,14 @@ export async function activateContract(
 
   const { data: contract } = await supabase
     .from("lease_contracts")
-    .select("id, unit_id")
+    .select("id, unit_id, start_date, expected_end_date, commencement_state")
     .eq("id", contractId)
     .eq("status", "draft")
     .single();
   if (!contract) return { success: false, error: "未找到草稿状态的合同。" };
+  if (contract.commencement_state === "pending_project_opening" || !contract.start_date || !contract.expected_end_date) {
+    return { success: false, error: "项目开业日期尚未确认，请先补齐正式起租日和到期日。" };
+  }
 
   // Re-check no other active contract on this unit
   const { data: conflict } = await supabase
@@ -548,7 +544,7 @@ async function recordReceivablePayment(input: {
 }): Promise<{ success: boolean; error?: string }> {
   await guardLeaseFinance();
 
-  const supabase = createPrivilegedClient();
+  const supabase = await createClient();
 
   const { data: receivable } = await supabase
     .from("receivables")
@@ -632,6 +628,10 @@ export async function processMoveOut(input: {
   notes?: string;
 }): Promise<{ success: boolean; error?: string }> {
   await guardLeaseFinance();
+  // Compatibility boundary: this legacy settlement spans contracts, units,
+  // settlements and finance tables whose RLS roles do not fully overlap.
+  // Keep it behind the explicit role guard until it is replaced by one
+  // authenticated, atomic settlement RPC.
   const supabase = createPrivilegedClient();
 
   const { data: contract } = await supabase
