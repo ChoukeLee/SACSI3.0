@@ -68,6 +68,12 @@ export async function buildCleaningCompletionDraft(intent: WorkbenchActionIntent
 
   const generatedAt = new Date().toISOString();
   const place = `${building.display_name || building.code} ${unit.unit_no}`;
+  const expectedEffects = [
+    tr(locale, "当前保洁任务变更为已完成，并记录实际完成时间。", "La tâche passe à « terminée » avec son heure réelle."),
+    tr(locale, "数据库重新计算该房间房态；有后续预订时保留为已预订，否则恢复为可用。", "L'état de la chambre est recalculé : réservée si une réservation suit, sinon disponible."),
+    tr(locale, "写入真实操作人的审计记录。", "Écriture dans l'audit avec l'opérateur réel."),
+  ];
+  const warnings = [tr(locale, "这是 L1 可逆状态操作，正式执行前仍须人工确认。", "Opération d'état réversible de niveau L1 ; confirmation humaine requise avant exécution.")];
   return {
     kind: "action_draft",
     action: "complete_daily_cleaning",
@@ -84,19 +90,15 @@ export async function buildCleaningCompletionDraft(intent: WorkbenchActionIntent
       { label: tr(locale, "当前房态", "État actuel"), value: statusDisplayLabel(unit.status, locale) },
       { label: tr(locale, "核对时间", "Vérifié le"), value: `${generatedAtText(locale, generatedAt)}${locale === "fr" ? " (Abidjan)" : "（阿比让）"}` },
     ],
-    expectedEffects: [
-      tr(locale, "当前保洁任务变更为已完成，并记录实际完成时间。", "La tâche passe à « terminée » avec son heure réelle."),
-      tr(locale, "数据库重新计算该房间房态；有后续预订时保留为已预订，否则恢复为可用。", "L'état de la chambre est recalculé : réservée si une réservation suit, sinon disponible."),
-      tr(locale, "写入真实操作人的审计记录。", "Écriture dans l'audit avec l'opérateur réel."),
-    ],
-    warnings: [tr(locale, "这是 L1 可逆状态操作，正式执行前仍须人工确认。", "Opération d'état réversible de niveau L1 ; confirmation humaine requise avant exécution.")],
+    expectedEffects,
+    warnings,
     generatedAt,
     confidence: intent.confidence,
     canConfirm: true,
     confirmationNote: tr(
       locale,
-      "确认后将以你的登录身份执行该 L1 操作（走日租统一原子 RPC，确认前不修改任何数据），随后自动复查任务与房态。",
-      "Après confirmation, cette opération L1 sera exécutée avec votre session (RPC atomique journalier ; aucune modification avant confirmation), puis l'état sera revérifié.",
+      "确认后将以你的登录身份执行该 L1 操作（走日租统一原子 RPC，确认前不修改任何数据），随后自动复查任务与房态，全程写入 AI 会话证据链。",
+      "Après confirmation, cette opération L1 sera exécutée avec votre session (RPC atomique journalier ; aucune modification avant confirmation), puis l'état sera revérifié ; toute la session est tracée dans la chaîne de preuve IA.",
     ),
     execution: {
       action: "complete_daily_cleaning",
@@ -104,6 +106,22 @@ export async function buildCleaningCompletionDraft(intent: WorkbenchActionIntent
       unitId: unit.id,
       buildingCode: intent.buildingCode,
       unitNo: unit.unit_no,
+    },
+    machine: {
+      buildingId: building.id,
+      bookingId: task.daily_booking_id,
+      beforeSnapshot: {
+        buildingCode: intent.buildingCode,
+        unitNo: unit.unit_no,
+        unitStatus: unit.status,
+        cleaningTaskId: task.id,
+        cleaningTaskState: "pending",
+      },
+      expectedEffects: [
+        { entityType: "cleaning_task", entityId: task.id, operation: "update", summary: expectedEffects[0] },
+        { entityType: "unit", entityId: unit.id, operation: "update", summary: expectedEffects[1] },
+        { entityType: "audit_log", operation: "insert", summary: expectedEffects[2] },
+      ],
     },
   };
 }

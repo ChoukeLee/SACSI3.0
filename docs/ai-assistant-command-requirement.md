@@ -1,6 +1,6 @@
 # SACSI AI 工作台第一阶段需求规格
 
-> 状态：阶段 A/B 已完成本地实现与验证；阶段 C 已接通 L1「完成保洁」人工确认→原子执行→复查闭环（本地验证通过），等待迁移审核和受控上线。工作台 UI、结果与自然语言输入解析均已支持 zh/fr 双语（法语规则覆盖房态/逾期/应缴/房源快照/保洁完成等常用表达）。
+> 状态：阶段 A/B 已完成本地实现与验证；阶段 C 已接通 L1「完成保洁」人工确认→原子执行→复查闭环，并已把工作台询问/草稿/确认/执行全程写入 `ai_*` 证据链（本地验证通过），等待迁移审核和受控上线。工作台 UI、结果与自然语言输入解析均已支持 zh/fr 双语。
 >
 > 更新时间：2026-09-05
 >
@@ -564,7 +564,7 @@ AI 不是业务 actor。真正 actor 始终是当前登录用户，并记录 `ch
 - 授权矩阵与 `src/features/business-actions/registry.ts` 由 `tests/ai-draft-infrastructure.test.ts` 镜像校验（每个写动作名/风险级/角色入 SQL，读动作不入），防漂移。
 - 幂等与复查强制：`request_id` 唯一、advisory lock、成功必须 `verified=true`、失败必须带 error；乐观版本号 `proposalVersionChanged`。
 - 存储：私有 `ai-inputs` bucket（20MB、白名单 MIME）按 `owner_id` 与 `{uid}/…` 路径隔离；触发器自动写生命周期事件；输入 30 天/任务 365 天留存，`redact_expired_ai_input` 到期清敏感字段。
-- 已知事项：阶段 C 当前 L1「完成保洁」确认执行走日租原子 RPC 与审计表，尚未把每次询问/草稿写入 `ai_*` 证据链；`ai_*` 基础设施先行建好，证据链接入留待后续迭代，不影响本迁移上线。
+- 已知事项：阶段 C 的 L1「完成保洁」已在询问时写入 `ai_jobs/ai_inputs/ai_proposed_actions`，确认执行按 `confirm → claim → 原子 RPC → 复查 → complete(verified)` 走完整证据链并写事件；工作台其余写动作仍按注册表分阶段开放。
 
 ### 22.3 上线时/上线后核对（需要授权与在线环境）
 

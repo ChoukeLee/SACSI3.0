@@ -275,6 +275,8 @@ function WorkbenchDraftFlow({ t, locale, draft }: { t: Record<string, string>; l
           <input type="hidden" name="unit_id" value={draft.execution.unitId} />
           <input type="hidden" name="building_code" value={draft.execution.buildingCode} />
           <input type="hidden" name="unit_no" value={draft.execution.unitNo} />
+          <input type="hidden" name="proposal_id" value={draft.execution.proposalId ?? ""} />
+          <input type="hidden" name="proposal_version" value={String(draft.execution.proposalVersion ?? "")} />
           <button
             type="submit"
             disabled={pending}

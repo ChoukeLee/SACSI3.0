@@ -46,9 +46,24 @@ describe("AI workbench human-confirmed execution (L1)", () => {
     expect(draftService).toContain("execution: {");
     expect(draftService).toContain("taskId: task.id");
     expect(draftService).toContain("unitId: unit.id");
-    for (const field of ["execution_action", "task_id", "unit_id", "building_code", "unit_no"]) {
+    for (const field of ["execution_action", "task_id", "unit_id", "building_code", "unit_no", "proposal_id", "proposal_version"]) {
       expect(view).toContain(`name="${field}"`);
     }
+  });
+
+  it("persists every workbench draft into the ai_* evidence ledger", () => {
+    expect(workbench).toContain('from "@/features/business-actions/ai-draft-service"');
+    for (const helper of ["createAiJob", "addAiTextInput", "createAiProposal", "confirmAiProposal", "claimAiProposalExecution", "completeAiProposalExecution"]) {
+      expect(workbench).toContain(helper);
+    }
+    expect(workbench).toContain('input: { taskId: draft.execution.taskId }');
+    expect(workbench).toContain("draft.execution.proposalId = String(proposal.id);");
+    expect(types).toContain("jobId?: string;");
+    expect(types).toContain("proposalId?: string;");
+    expect(types).toContain("machine: WorkbenchCleaningMachine;");
+    // Confirmation follows the evidence lifecycle before the business write.
+    expect(workbench.indexOf("confirmAiProposal(proposalId, expectedVersion)")).toBeGreaterThan(-1);
+    expect(workbench.indexOf("completeCleaning(taskId)")).toBeGreaterThan(workbench.indexOf("claimAiProposalExecution(proposalId, confirmedVersion)"));
   });
 
   it("defines a verified action-result response for the executed effect", () => {

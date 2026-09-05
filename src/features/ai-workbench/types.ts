@@ -59,6 +59,24 @@ export interface WorkbenchCleaningExecution {
   unitId: string;
   buildingCode: string;
   unitNo: string;
+  /** ai_jobs + ai_proposed_actions evidence identity, filled after the draft is persisted. */
+  jobId?: string;
+  proposalId?: string;
+  proposalVersion?: number;
+}
+
+export interface WorkbenchCleaningMachineEffect {
+  entityType: string;
+  entityId?: string;
+  operation: "insert" | "update" | "cancel" | "reverse";
+  summary: string;
+}
+
+export interface WorkbenchCleaningMachine {
+  buildingId: string;
+  bookingId: string | null;
+  beforeSnapshot: Record<string, unknown>;
+  expectedEffects: WorkbenchCleaningMachineEffect[];
 }
 
 export interface WorkbenchDraftPreview {
@@ -77,6 +95,8 @@ export interface WorkbenchDraftPreview {
   confirmationNote: string;
   /** Stable execution identity posted back on confirm; never trusted without re-check. */
   execution: WorkbenchCleaningExecution;
+  /** Structured evidence facts for the ai_* proposal ledger (not rendered). */
+  machine: WorkbenchCleaningMachine;
 }
 
 export interface WorkbenchActionResult {
