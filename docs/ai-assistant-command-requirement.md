@@ -526,7 +526,7 @@ AI 不是业务 actor。真正 actor 始终是当前登录用户，并记录 `ch
 - `deepseek-v4-flash` 继续只负责文字问题的意图分类，不接受图片，也不接触查询结果或数据库记录。
 - `deepseek-v4-flash-vision-exp` 作为独立图片识别通道；不得把普通文字模型误当成多模态模型。
 - Qwen VL、GLM Vision 和 OpenAI Vision 适配器继续保留，后续用同一组匿名化收据样本比较字段准确率，而不是只凭供应商宣传选择。
-- 当前环境明确配置 `OCR_PROVIDER=deepseek-vision-exp`；视觉模型故障时返回错误并允许改用人工粘贴文字，不得生成伪识别结果。
+- 当前环境明确配置 `OCR_PROVIDER=deepseek-vision-exp`；未显式配置但存在 `DEEPSEEK_API_KEY` 时也默认启用该视觉通道。模型故障时返回错误并允许改用人工粘贴文字，不得生成伪识别结果。
 
 ### 21.2 凭证识别安全规则
 

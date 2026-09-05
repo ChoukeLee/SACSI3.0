@@ -53,8 +53,8 @@ describe.sequential("receipt OCR providers", () => {
     expect(body.messages[0].content.map((part: { type: string }) => part.type)).toEqual(["image_url", "text"]);
   });
 
-  it("uses the dedicated DeepSeek vision model without changing the text model", async () => {
-    process.env.OCR_PROVIDER = "deepseek-vision-exp";
+  it("defaults to the dedicated DeepSeek vision model when its key exists", async () => {
+    delete process.env.OCR_PROVIDER;
     process.env.DEEPSEEK_API_KEY = "test-only-key";
     process.env.DEEPSEEK_BASE_URL = "https://api.deepseek.com";
     process.env.DEEPSEEK_VISION_MODEL = "deepseek-v4-flash-vision-exp";

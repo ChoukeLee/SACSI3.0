@@ -42,7 +42,8 @@ export async function extractReceiptTextFromImage(
   fileBuffer: Buffer,
   fileName: string,
 ): Promise<OcrResult> {
-  const configuredProvider = process.env.OCR_PROVIDER ?? "mock";
+  const configuredProvider = process.env.OCR_PROVIDER
+    ?? (process.env.DEEPSEEK_API_KEY ? "deepseek-vision-exp" : "mock");
   const provider = OCR_PROVIDERS.has(configuredProvider as OcrProvider)
     ? configuredProvider as OcrProvider
     : null;
