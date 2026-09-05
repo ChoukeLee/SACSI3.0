@@ -11,6 +11,7 @@ import {
   confirmAiProposal,
   createAiJob,
   createAiProposal,
+  loadAiProposalExecutionContext,
   rejectAiProposal,
 } from "@/features/business-actions/ai-draft-service";
 import type { Locale } from "@/lib/i18n";
@@ -18,6 +19,7 @@ import { parseWorkbenchAction } from "./action-parser";
 import { buildCleaningCompletionDraft } from "./action-draft-service";
 import { parseWorkbenchIntent } from "./intent-parser";
 import { classifyWorkbenchIntentWithModel } from "./model-classifier";
+import { assertCleaningProposalBinding } from "./proposal-binding";
 import { executeWorkbenchQuery } from "./query-service";
 import type { WorkbenchActionState, WorkbenchActionResult, WorkbenchIntent } from "./types";
 
@@ -188,6 +190,25 @@ export async function confirmWorkbenchAction(
 
     const supabase = await createClient();
 
+    // Form fields are display conveniences, never execution authority. Bind
+    // every target back to the authenticated user's immutable AI proposal.
+    const proposal = await loadAiProposalExecutionContext(proposalId);
+    let proposalBuildingId: string;
+    try {
+      proposalBuildingId = assertCleaningProposalBinding(proposal, {
+        action,
+        taskId,
+        unitId,
+        expectedVersion,
+      }).buildingId;
+    } catch {
+      throw new Error(tr(
+        locale,
+        "草稿记录与本次确认目标不一致或状态已变化，请重新生成草稿。",
+        "Le brouillon ne correspond pas à la cible confirmée ou son état a changé ; régénérez-le.",
+      ));
+    }
+
     // Re-verify the targeted task still exists, belongs to the draft unit and is pending.
     const { data: task, error: taskError } = await supabase
       .from("cleaning_tasks")
@@ -200,11 +221,13 @@ export async function confirmWorkbenchAction(
 
     const { data: unit, error: unitError } = await supabase
       .from("units")
-      .select("id, unit_no, status")
+      .select("id, building_id, unit_no, status")
       .eq("id", unitId)
       .maybeSingle();
     if (unitError) throw new Error(tr(locale, `复查房态失败：${unitError.message}`, `Revérification de l'état impossible : ${unitError.message}`));
-    if (!unit || unit.unit_no !== unitNo) throw new Error(tr(locale, "房间信息与草稿不一致，请重新提交查询。", "La chambre ne correspond plus au brouillon ; relancez une question."));
+    if (!unit || unit.unit_no !== unitNo || unit.building_id !== proposalBuildingId) {
+      throw new Error(tr(locale, "房间及楼栋信息与草稿不一致，请重新提交查询。", "La chambre ou le bâtiment ne correspond plus au brouillon ; relancez une question."));
+    }
 
     const { data: pendingTasks, error: pendingError } = await supabase
       .from("cleaning_tasks")
@@ -230,7 +253,33 @@ export async function confirmWorkbenchAction(
       throw new Error(evidenceError(locale, "执行占用失败", "Échec de la réservation d'exécution", error));
     });
 
-    const result = await completeCleaning(taskId);
+    let result: Awaited<ReturnType<typeof completeCleaning>>;
+    try {
+      result = await completeCleaning(taskId);
+    } catch (executionError) {
+      const executionMessage = executionError instanceof Error ? executionError.message : "complete_daily_cleaning_failed";
+      // A thrown call is not assumed to have failed: first re-read the effect.
+      // This covers the case where PostgreSQL committed but the response was lost.
+      const { data: recoveredTask, error: recoveryError } = await supabase
+        .from("cleaning_tasks")
+        .select("id, unit_id, is_completed, completed_at")
+        .eq("id", taskId)
+        .maybeSingle();
+      if (!recoveryError && recoveredTask?.unit_id === unitId && recoveredTask.is_completed) {
+        result = { success: true, taskId, unitId };
+      } else {
+        await completeAiProposalExecution({
+          proposalId,
+          requestId: claimed.requestId,
+          success: false,
+          verified: false,
+          error: recoveryError ? "execution_outcome_unknown" : executionMessage,
+        }).catch(() => undefined);
+        throw new Error(recoveryError
+          ? tr(locale, "执行结果暂时无法确认，请勿重复操作并联系管理员复核。", "Résultat impossible à confirmer ; ne répétez pas l'opération et demandez une vérification.")
+          : executionMessage);
+      }
+    }
     if (!result.success) {
       await completeAiProposalExecution({
         proposalId,

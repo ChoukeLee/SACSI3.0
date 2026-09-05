@@ -122,6 +122,26 @@ export async function reserveAiFileInput(input: {
   return { inputId, storagePath, token: upload.token };
 }
 
+export async function completeAiInputExtraction(input: {
+  inputId: string;
+  extractedText: string;
+  extractionResult: Record<string, unknown>;
+  containsSensitiveData?: boolean;
+}) {
+  await requireAuth();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("complete_ai_input_extraction", {
+    p_input_id: input.inputId,
+    p_extracted_text: input.extractedText,
+    p_extraction_result: input.extractionResult,
+    p_contains_sensitive_data: input.containsSensitiveData ?? true,
+  });
+  if (error) throw new Error(error.message);
+  const result = data as RpcTransitionResult & { input_id?: string };
+  if (!result.success) throw new Error(result.error ?? "AI 输入识别结果保存失败。");
+  return result;
+}
+
 export async function createAiProposal(jobId: string, sequenceNo: number, draft: AiProposalDraft) {
   const user = await requireAuth();
   const { definition, expiresAt } = validateAiProposalDraft(draft);
@@ -160,12 +180,22 @@ async function getExecutableProposal(proposalId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("ai_proposed_actions")
-    .select("id, action_name, target, before_versions, status, version, expires_at")
+    .select("id, job_id, action_name, target, action_input, before_versions, status, version, expires_at, execution_request_id, updated_at")
     .eq("id", proposalId)
     .single();
   if (error || !data) throw new Error(error?.message ?? "未找到操作草稿。");
   requireBusinessActionRole(user.role, data.action_name);
   return { supabase, proposal: data };
+}
+
+/**
+ * Loads the immutable identity carried by a proposal through the caller's
+ * authenticated session. Server actions must bind every posted identifier to
+ * this record before they confirm or execute a business write.
+ */
+export async function loadAiProposalExecutionContext(proposalId: string) {
+  const { proposal } = await getExecutableProposal(proposalId);
+  return proposal;
 }
 
 export async function confirmAiProposal(proposalId: string, expectedVersion: number, requestId = randomUUID()) {

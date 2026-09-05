@@ -746,6 +746,48 @@ begin
 end;
 $$;
 
+create or replace function private.complete_ai_input_extraction(
+  p_input_id uuid,
+  p_extracted_text text,
+  p_extraction_result jsonb,
+  p_contains_sensitive_data boolean default true
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_input public.ai_inputs%rowtype;
+  v_actor_id uuid := (select auth.uid());
+begin
+  if v_actor_id is null then raise exception 'authenticationRequired' using errcode = '42501'; end if;
+  if jsonb_typeof(coalesce(p_extraction_result, '{}'::jsonb)) <> 'object' then
+    raise exception 'extractionResultMustBeObject';
+  end if;
+
+  select input.* into v_input
+  from public.ai_inputs input
+  join public.ai_jobs job on job.id = input.job_id
+  where input.id = p_input_id
+    and job.actor_id = v_actor_id
+    and input.redacted_at is null
+  for update of input;
+  if v_input.id is null then raise exception 'aiInputNotFound' using errcode = 'P0002'; end if;
+  if v_input.extracted_text is not null or v_input.extraction_result <> '{}'::jsonb then
+    raise exception 'aiInputExtractionAlreadyCompleted';
+  end if;
+
+  update public.ai_inputs
+  set extracted_text = nullif(p_extracted_text, ''),
+      extraction_result = coalesce(p_extraction_result, '{}'::jsonb),
+      contains_sensitive_data = coalesce(p_contains_sensitive_data, true),
+      updated_at = now()
+  where id = v_input.id;
+  return jsonb_build_object('success', true, 'input_id', v_input.id);
+end;
+$$;
+
 create or replace function public.confirm_ai_proposed_action(p_proposal_id uuid, p_expected_version integer, p_request_id uuid)
 returns jsonb language sql security invoker set search_path = ''
 as 'select private.confirm_ai_proposed_action($1, $2, $3)';
@@ -770,6 +812,11 @@ as 'select private.revise_ai_proposed_action($1, $2, $3, $4, $5, $6, $7, $8, $9)
 create or replace function public.reject_ai_proposed_action(p_proposal_id uuid, p_expected_version integer, p_reason text)
 returns jsonb language sql security invoker set search_path = ''
 as 'select private.reject_ai_proposed_action($1, $2, $3)';
+create or replace function public.complete_ai_input_extraction(
+  p_input_id uuid, p_extracted_text text, p_extraction_result jsonb, p_contains_sensitive_data boolean
+)
+returns jsonb language sql security invoker set search_path = ''
+as 'select private.complete_ai_input_extraction($1, $2, $3, $4)';
 
 revoke all on function private.append_ai_creation_event() from public, anon, authenticated;
 revoke all on function private.is_ai_action_authorized(text, text) from public, anon, authenticated;
@@ -779,12 +826,14 @@ revoke all on function private.complete_ai_action_execution(uuid, uuid, boolean,
 revoke all on function private.redact_expired_ai_input(uuid, text) from public, anon;
 revoke all on function private.revise_ai_proposed_action(uuid, integer, jsonb, jsonb, jsonb, jsonb, jsonb, boolean, timestamptz) from public, anon;
 revoke all on function private.reject_ai_proposed_action(uuid, integer, text) from public, anon;
+revoke all on function private.complete_ai_input_extraction(uuid, text, jsonb, boolean) from public, anon;
 grant execute on function private.confirm_ai_proposed_action(uuid, integer, uuid) to authenticated;
 grant execute on function private.claim_ai_action_execution(uuid, integer, uuid) to authenticated;
 grant execute on function private.complete_ai_action_execution(uuid, uuid, boolean, boolean, jsonb, text) to authenticated;
 grant execute on function private.redact_expired_ai_input(uuid, text) to authenticated;
 grant execute on function private.revise_ai_proposed_action(uuid, integer, jsonb, jsonb, jsonb, jsonb, jsonb, boolean, timestamptz) to authenticated;
 grant execute on function private.reject_ai_proposed_action(uuid, integer, text) to authenticated;
+grant execute on function private.complete_ai_input_extraction(uuid, text, jsonb, boolean) to authenticated;
 
 revoke all on function public.confirm_ai_proposed_action(uuid, integer, uuid) from public, anon;
 revoke all on function public.claim_ai_action_execution(uuid, integer, uuid) from public, anon;
@@ -792,11 +841,13 @@ revoke all on function public.complete_ai_action_execution(uuid, uuid, boolean, 
 revoke all on function public.redact_expired_ai_input(uuid, text) from public, anon;
 revoke all on function public.revise_ai_proposed_action(uuid, integer, jsonb, jsonb, jsonb, jsonb, jsonb, boolean, timestamptz) from public, anon;
 revoke all on function public.reject_ai_proposed_action(uuid, integer, text) from public, anon;
+revoke all on function public.complete_ai_input_extraction(uuid, text, jsonb, boolean) from public, anon;
 grant execute on function public.confirm_ai_proposed_action(uuid, integer, uuid) to authenticated;
 grant execute on function public.claim_ai_action_execution(uuid, integer, uuid) to authenticated;
 grant execute on function public.complete_ai_action_execution(uuid, uuid, boolean, boolean, jsonb, text) to authenticated;
 grant execute on function public.redact_expired_ai_input(uuid, text) to authenticated;
 grant execute on function public.revise_ai_proposed_action(uuid, integer, jsonb, jsonb, jsonb, jsonb, jsonb, boolean, timestamptz) to authenticated;
 grant execute on function public.reject_ai_proposed_action(uuid, integer, text) to authenticated;
+grant execute on function public.complete_ai_input_extraction(uuid, text, jsonb, boolean) to authenticated;
 
 commit;

@@ -7,6 +7,7 @@
  */
 
 export interface OcrStructured {
+  building_code?: string | null;
   receipt_no?: string | null;
   receipt_date?: string | null;
   room_no?: string | null;
@@ -18,7 +19,6 @@ export interface OcrStructured {
   payer_name?: string | null;
   warnings?: string[];
 }
-
 export interface OcrResult {
   rawText: string;
   provider: string;
@@ -67,7 +67,7 @@ export async function extractReceiptTextFromImage(
       return { ...result, provider, processedAt };
     }
     return {
-      rawText: ["=== RECEIPT (MOCK)", `File: ${fileName}`, `Size: ${fileBuffer.length} bytes`, "", "Set OCR_PROVIDER=qwen-vl-plus and QWEN_API_KEY to enable real OCR."].join("\n"),
+      rawText: ["=== RECEIPT (MOCK)", `File: ${fileName}`, `Size: ${fileBuffer.length} bytes`, "", "Configure a supported vision provider to enable real OCR."].join("\n"),
       provider, processedAt, error: null,
     };
   } catch (err) {
@@ -83,6 +83,7 @@ const QWEN_VISION_PROMPT = [
   '  "raw_text": "识别到的完整文字",',
   '  "receipt_no": "收据编号或null",',
   '  "receipt_date": "YYYY-MM-DD 收据抬头/右上角的收款或开票日期",',
+  '  "building_code": "楼栋编号如SACSI11或null",',
   '  "room_no": "纯数字房号如103、602或null",',
   '  "amount_text": "金额原文如195万或null",',
   '  "amount_xof": 1950000,',
@@ -104,17 +105,23 @@ async function extractWithDeepSeekVision(
 ): Promise<{ rawText: string; structured?: OcrStructured | null }> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("DEEPSEEK_API_KEY not set.");
-
-  const mime = detectImageMime(fileName);
+  const mime = detectSupportedImageMime(fileName);
   const dataUrl = `data:${mime};base64,${fileBuffer.toString("base64")}`;
   const baseUrl = (process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com").replace(/\/$/, "");
   const model = process.env.DEEPSEEK_VISION_MODEL ?? "deepseek-v4-flash-vision-exp";
+  if (model !== "deepseek-v4-flash-vision-exp") {
+    throw new Error("DEEPSEEK_VISION_MODEL must be deepseek-v4-flash-vision-exp.");
+  }
+
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(30_000),
     body: JSON.stringify({
       model,
+      temperature: 0,
+      response_format: { type: "json_object" },
+      max_tokens: 1200,
       messages: [{
         role: "user",
         content: [
@@ -122,18 +129,16 @@ async function extractWithDeepSeekVision(
           { type: "image_url", image_url: { url: dataUrl, detail: "original" } },
         ],
       }],
-      response_format: { type: "json_object" },
-      thinking: { type: "disabled" },
-      max_tokens: 1200,
-      stream: false,
     }),
   });
   if (!res.ok) throw new Error(`DeepSeek Vision request failed (${res.status}).`);
-
   const data = await res.json() as { choices?: Array<{ message?: { content?: string | null } }> };
-  const rawText = data.choices?.[0]?.message?.content?.trim() ?? "";
-  if (!rawText) throw new Error("DeepSeek Vision returned an empty response.");
-  return { rawText, structured: parseStructuredJson(rawText) };
+  const content = data.choices?.[0]?.message?.content?.trim() ?? "";
+  if (!content) throw new Error("DeepSeek Vision returned an empty response.");
+  const structured = parseStructuredJson(content);
+  if (!structured) throw new Error("DeepSeek Vision returned invalid structured JSON.");
+  const parsed = JSON.parse(content.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1] ?? content.match(/\{[\s\S]*\}/)?.[0] ?? "{}") as { raw_text?: unknown };
+  return { rawText: typeof parsed.raw_text === "string" ? parsed.raw_text : content, structured };
 }
 
 async function extractWithQwenVision(
@@ -230,6 +235,7 @@ function parseStructuredJson(text: string): OcrStructured | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     return {
+      building_code: parsed.building_code as string | null ?? null,
       receipt_no: parsed.receipt_no as string | null ?? null,
       receipt_date: normalizeDateStr(parsed.receipt_date as string),
       room_no: parsed.room_no as string | null ?? null,
@@ -264,10 +270,10 @@ function detectMime(fileName: string): string {
   }
 }
 
-function detectImageMime(fileName: string): string {
+function detectSupportedImageMime(fileName: string): string {
   const mime = detectMime(fileName);
-  if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(mime)) {
-    throw new Error("DeepSeek Vision only accepts PNG, JPEG, WebP, or GIF images.");
+  if (!["image/jpeg", "image/png", "image/webp"].includes(mime)) {
+    throw new Error("DeepSeek Vision only accepts JPEG, PNG, or WebP in this workflow.");
   }
   return mime;
 }

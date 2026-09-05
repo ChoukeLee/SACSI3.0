@@ -269,7 +269,7 @@ async function queryDailyStatus(locale: Locale, query: string, intent: Workbench
       .in("status", ["available", "reserved", "daily_occupied", "cleaning_pending", "maintenance", "locked"])
       .order("unit_no"),
     supabase.from("daily_bookings")
-      .select("id, unit_id, customer_id, check_in, check_out, checkout_mode, actual_check_out, nightly_price_xof, total_amount_xof, prepaid_amount_xof, billing_status, manual_discount_amount_xof, final_amount_xof, status, notes, created_at, updated_at")
+      .select("id, unit_id, customer_id, booking_agent_id, guest_customer_id, guest_name, check_in, check_out, checkout_mode, actual_check_out, nightly_price_xof, total_amount_xof, prepaid_amount_xof, billing_status, manual_discount_amount_xof, final_amount_xof, status, notes, created_at, updated_at")
       .in("status", ["pending_review", "confirmed", "checked_in"])
       .lte("check_in", intent.asOfDate)
       .order("check_in", { ascending: false })
@@ -283,7 +283,7 @@ async function queryDailyStatus(locale: Locale, query: string, intent: Workbench
   const units = sortUnits((unitsRes.data ?? []) as unknown as UnitRow[]);
   const unitIds = new Set(units.map((row) => row.id));
   const bookings = ((bookingsRes.data ?? []) as unknown as DailyBookingRow[]).filter((row) => unitIds.has(row.unit_id));
-  const customerIds = [...new Set(bookings.map((row) => row.customer_id).filter(Boolean))];
+  const customerIds = [...new Set(bookings.flatMap((row) => [row.guest_customer_id, row.customer_id]).filter((id): id is string => Boolean(id)))];
   const customersRes = customerIds.length ? await supabase.from("customers").select("id, name").in("id", customerIds) : { data: [], error: null };
   if (customersRes.error) throw new Error(tr(locale, `读取客户失败：${customersRes.error.message}`, `Erreur de lecture des clients : ${customersRes.error.message}`));
 
@@ -305,7 +305,10 @@ async function queryDailyStatus(locale: Locale, query: string, intent: Workbench
       building: buildingLabel(locale, buildingMap.get(unit.building_id)),
       unit: unit.unit_no,
       status: statusLabel(locale, state.status),
-      guest: customerNames.get(booking?.customer_id ?? "") || "—",
+      guest: booking?.guest_name?.trim()
+        || customerNames.get(booking?.guest_customer_id ?? "")
+        || customerNames.get(booking?.customer_id ?? "")
+        || "—",
       period: booking ? `${booking.check_in} ${tr(locale, "至", "→")} ${booking.checkout_mode === "open" && !booking.actual_check_out ? openWord : booking.actual_check_out ?? booking.check_out ?? openWord}` : "—",
     };
   });
@@ -333,7 +336,7 @@ async function queryDailyStatus(locale: Locale, query: string, intent: Workbench
     table: {
       columns: [
         { key: "building", label: tr(locale, "楼栋", "Bâtiment") }, { key: "unit", label: tr(locale, "房号", "Chambre") }, { key: "status", label: tr(locale, "房态", "État") },
-        { key: "guest", label: tr(locale, "登记联系人", "Contact") }, { key: "period", label: tr(locale, "入住区间", "Séjour") },
+        { key: "guest", label: tr(locale, "住客", "Client hébergé") }, { key: "period", label: tr(locale, "入住区间", "Séjour") },
       ],
       rows,
     },
@@ -385,7 +388,7 @@ async function queryUnitSnapshot(locale: Locale, query: string, intent: Workbenc
   const [leasesRes, salesRes, bookingsRes, receivablesRes] = await Promise.all([
     supabase.from("lease_contracts").select("id, customer_id, contract_no, start_date, expected_end_date, paid_through_date, monthly_rent_xof, status").eq("unit_id", unit.id).eq("status", "active").limit(5),
     supabase.from("sale_contracts").select("id, customer_id, contract_no, signed_date, transfer_status, total_amount_xof, status").eq("unit_id", unit.id).eq("status", "active").limit(5),
-    supabase.from("daily_bookings").select("id, customer_id, check_in, check_out, checkout_mode, actual_check_out, final_amount_xof, total_amount_xof, prepaid_amount_xof, status").eq("unit_id", unit.id).neq("status", "cancelled").order("check_in", { ascending: false }).limit(5),
+    supabase.from("daily_bookings").select("id, customer_id, booking_agent_id, guest_customer_id, guest_name, check_in, check_out, checkout_mode, actual_check_out, final_amount_xof, total_amount_xof, prepaid_amount_xof, status").eq("unit_id", unit.id).neq("status", "cancelled").order("check_in", { ascending: false }).limit(5),
     supabase.from("receivables").select("id, building_id, unit_id, customer_id, source_type, source_id, category, title, due_date, amount_xof, paid_amount_xof, status, management_status, currency, created_at, updated_at").eq("unit_id", unit.id).eq("management_status", "managed").neq("status", "cancelled").limit(500),
   ]);
   const checks: Array<{ error: { message: string } | null; labelZh: string; labelFr: string }> = [
@@ -400,7 +403,10 @@ async function queryUnitSnapshot(locale: Locale, query: string, intent: Workbenc
 
   const activeDaily = (bookingsRes.data ?? []).filter((row) => ["pending_review", "confirmed", "checked_in"].includes(row.status));
   const activeSources = [...(leasesRes.data ?? []), ...(salesRes.data ?? []), ...activeDaily];
-  const customerIds = [...new Set(activeSources.map((row) => row.customer_id).filter(Boolean))];
+  const customerIds = [...new Set([
+    ...activeSources.map((row) => row.customer_id),
+    ...activeDaily.map((row) => row.guest_customer_id),
+  ].filter((id): id is string => Boolean(id)))];
   const customersRes = customerIds.length ? await supabase.from("customers").select("id, name").in("id", customerIds) : { data: [], error: null };
   if (customersRes.error) throw new Error(tr(locale, `读取客户失败：${customersRes.error.message}`, `Erreur de lecture des clients : ${customersRes.error.message}`));
   const customers = new Map(((customersRes.data ?? []) as CustomerSummary[]).map((row) => [row.id, row.name]));
@@ -448,7 +454,10 @@ async function queryUnitSnapshot(locale: Locale, query: string, intent: Workbenc
     rows.push({
       business: tr(locale, "日租", "Journalier"),
       reference: `${tr(locale, "订单", "Résa")} ${booking.id.slice(0, 8)}`,
-      customer: customers.get(booking.customer_id) || "—",
+      customer: booking.guest_name?.trim()
+        || customers.get(booking.guest_customer_id ?? "")
+        || customers.get(booking.customer_id)
+        || "—",
       status: statusDisplayLabel(booking.status, locale),
       dates: `${booking.check_in} ${tr(locale, "至", "→")} ${booking.actual_check_out ?? booking.check_out ?? tr(locale, "未定", "ouverte")}`,
       contractAmount: formatXof(booking.final_amount_xof ?? booking.total_amount_xof),
@@ -520,7 +529,7 @@ async function queryDailyMovements(locale: Locale, query: string, intent: Workbe
   const [unitsRes, bookingsRes] = await Promise.all([
     supabase.from("units").select("id, building_id, unit_no").in("building_id", buildingIds).order("unit_no"),
     supabase.from("daily_bookings")
-      .select("id, unit_id, customer_id, check_in, check_out, checkout_mode, actual_check_out, status")
+      .select("id, unit_id, customer_id, booking_agent_id, guest_customer_id, guest_name, check_in, check_out, checkout_mode, actual_check_out, status")
       .in("status", ["pending_review", "confirmed", "checked_in", "checked_out"])
       .lte("check_in", intent.asOfDate)
       .order("check_in", { ascending: false })
@@ -534,7 +543,7 @@ async function queryDailyMovements(locale: Locale, query: string, intent: Workbe
   const unitIds = new Set(units.map((row) => row.id));
   const bookings = ((bookingsRes.data ?? []) as unknown as DailyBookingRow[]).filter((row) => unitIds.has(row.unit_id));
 
-  const customerIds = [...new Set(bookings.map((row) => row.customer_id).filter(Boolean))];
+  const customerIds = [...new Set(bookings.flatMap((row) => [row.guest_customer_id, row.customer_id]).filter((id): id is string => Boolean(id)))];
   const customersRes = customerIds.length ? await supabase.from("customers").select("id, name").in("id", customerIds) : { data: [], error: null };
   if (customersRes.error) throw new Error(tr(locale, `读取客户失败：${customersRes.error.message}`, `Erreur de lecture des clients : ${customersRes.error.message}`));
   const customerNames = new Map(((customersRes.data ?? []) as Array<{ id: string; name: string }>).map((row) => [row.id, row.name]));
@@ -547,8 +556,8 @@ async function queryDailyMovements(locale: Locale, query: string, intent: Workbe
   );
 
   const rows = [
-    ...arrivals.map((row) => ({ group: tr(locale, "入住", "Arrivée"), room: unitByNo.get(row.unit_id)?.unit_no ?? "—", guest: customerNames.get(row.customer_id ?? "") ?? "—", detail: tr(locale, "今日到达 · 订单待办", "Arrivée du jour") })),
-    ...departures.map((row) => ({ group: row.status === "checked_out" ? tr(locale, "已退", "Parti") : tr(locale, "退房", "Départ"), room: unitByNo.get(row.unit_id)?.unit_no ?? "—", guest: customerNames.get(row.customer_id ?? "") ?? "—", detail: row.status === "checked_out" ? tr(locale, "已办理退房", "Départ enregistré") : tr(locale, "今日退房", "Départ du jour") })),
+    ...arrivals.map((row) => ({ group: tr(locale, "入住", "Arrivée"), room: unitByNo.get(row.unit_id)?.unit_no ?? "—", guest: row.guest_name?.trim() || customerNames.get(row.guest_customer_id ?? "") || customerNames.get(row.customer_id ?? "") || "—", detail: tr(locale, "今日到达 · 订单待办", "Arrivée du jour") })),
+    ...departures.map((row) => ({ group: row.status === "checked_out" ? tr(locale, "已退", "Parti") : tr(locale, "退房", "Départ"), room: unitByNo.get(row.unit_id)?.unit_no ?? "—", guest: row.guest_name?.trim() || customerNames.get(row.guest_customer_id ?? "") || customerNames.get(row.customer_id ?? "") || "—", detail: row.status === "checked_out" ? tr(locale, "已办理退房", "Départ enregistré") : tr(locale, "今日退房", "Départ du jour") })),
   ];
   const scope = `${tr(locale, "日租", "Journalier")} · ${intent.buildingCode ? intent.buildingCode.replace("SACSI", "") + "#" : tr(locale, "全部楼栋", "tous bâtiments")}`;
 
@@ -591,11 +600,12 @@ async function queryLeaseExpiring(locale: Locale, query: string, intent: Workben
   const [buildingsRes, leasesRes] = await Promise.all([
     supabase.from("buildings").select("id, code, display_name").eq("is_active", true),
     supabase.from("lease_contracts")
-      .select("id, unit_id, customer_id, contract_no, start_date, expected_end_date, monthly_rent_xof, status")
+      .select("id, unit_id, customer_id, contract_no, start_date, paid_through_date, monthly_rent_xof, status")
       .eq("status", "active")
-      .gte("expected_end_date", intent.asOfDate)
-      .lte("expected_end_date", endDate)
-      .order("expected_end_date", { ascending: true })
+      .not("paid_through_date", "is", null)
+      .gte("paid_through_date", intent.asOfDate)
+      .lte("paid_through_date", endDate)
+      .order("paid_through_date", { ascending: true })
       .limit(300),
   ]);
   if (buildingsRes.error) throw new Error(tr(locale, `读取楼栋失败：${buildingsRes.error.message}`, `Erreur de lecture des bâtiments : ${buildingsRes.error.message}`));
@@ -603,7 +613,7 @@ async function queryLeaseExpiring(locale: Locale, query: string, intent: Workben
 
   const buildings = (buildingsRes.data ?? []) as unknown as BuildingSummary[];
   const buildingMap = new Map(buildings.map((row) => [row.id, row]));
-  let leases = (leasesRes.data ?? []) as Array<{ id: string; unit_id: string; customer_id: string; contract_no: string; start_date: string | null; expected_end_date: string; monthly_rent_xof: number; status: string }>;
+  let leases = (leasesRes.data ?? []) as Array<{ id: string; unit_id: string; customer_id: string; contract_no: string; start_date: string | null; paid_through_date: string; monthly_rent_xof: number; status: string }>;
 
   const unitIds = [...new Set(leases.map((row) => row.unit_id).filter(Boolean))];
   const unitsRes = unitIds.length ? await supabase.from("units").select("id, building_id, unit_no").in("id", unitIds) : { data: [], error: null };
@@ -621,8 +631,8 @@ async function queryLeaseExpiring(locale: Locale, query: string, intent: Workben
     const unit = units.get(row.unit_id);
     const building = buildingMap.get(unit?.building_id ?? "");
     return {
-      endDate: row.expected_end_date,
-      daysLeft: String(daysBetween(row.expected_end_date)),
+      endDate: row.paid_through_date,
+      daysLeft: String(daysBetween(row.paid_through_date)),
       building: buildingLabel(locale, building),
       unit: unit?.unit_no ?? "—",
       customer: customerNames.get(row.customer_id ?? "") ?? "—",
@@ -636,22 +646,22 @@ async function queryLeaseExpiring(locale: Locale, query: string, intent: Workben
   return toResult(locale, {
     query,
     intent,
-    title: tr(locale, `长租 ${intent.days} 天内到期`, `Baux expirant sous ${intent.days} j`),
+    title: tr(locale, `长租 ${intent.days} 天内缴租截至`, `Loyers couverts jusqu'à une date sous ${intent.days} j`),
     answer: rows.length
       ? tr(
           locale,
-          `${scope}：接下来 ${intent.days} 天有 ${rows.length} 份生效合同到期（最早 ${nearest}）。建议提前联系确认续租或安排退租，避免空置。`,
-          `${scope} : ${rows.length} bail(s) actif(s) expirent sous ${intent.days} j (au plus tôt ${nearest}). Contactez le locataire pour confirmer la reconduction ou préparer le départ.`,
+          `${scope}：接下来 ${intent.days} 天有 ${rows.length} 份生效合同到达当前缴租截至日（最早 ${nearest}）。建议提前核对下一期应收并联系客户。`,
+          `${scope} : ${rows.length} bail(s) actif(s) atteignent leur date de loyer payé sous ${intent.days} j (au plus tôt ${nearest}). Vérifiez la prochaine créance et contactez le client.`,
         )
-      : tr(locale, `${scope}：未来 ${intent.days} 天没有到期合同。`, `${scope} : aucun bail n'expire sous ${intent.days} j.`),
+      : tr(locale, `${scope}：未来 ${intent.days} 天没有到达缴租截至日的合同。`, `${scope} : aucun bail n'atteint sa date de loyer payé sous ${intent.days} j.`),
     scope,
     metrics: [
-      { label: tr(locale, "到期合同", "Baux à échéance"), value: String(rows.length), tone: rows.length ? "amber" : "green" },
-      { label: tr(locale, "最早到期", "Échéance la plus proche"), value: rows[0]?.endDate ?? "—", tone: "blue" },
+      { label: tr(locale, "缴租截至", "Loyers à échéance"), value: String(rows.length), tone: rows.length ? "amber" : "green" },
+      { label: tr(locale, "最近截至日", "Date la plus proche"), value: rows[0]?.endDate ?? "—", tone: "blue" },
     ],
     table: rows.length ? {
       columns: [
-        { key: "endDate", label: tr(locale, "到期日", "Échéance") },
+        { key: "endDate", label: tr(locale, "已缴至", "Payé au") },
         { key: "daysLeft", label: tr(locale, "剩余", "Jours") },
         { key: "building", label: tr(locale, "楼栋", "Bâtiment") },
         { key: "unit", label: tr(locale, "房号", "Chambre") },
@@ -662,8 +672,8 @@ async function queryLeaseExpiring(locale: Locale, query: string, intent: Workben
       rows: rows.slice(0, 100),
     } : null,
     evidence: [
-      { label: tr(locale, "口径", "Périmètre"), value: tr(locale, "仅统计生效中的合同，到期日落在今天到 N 天之间（含今天）", "Baux actifs dont l'échéance tombe entre aujourd'hui et N jours (aujourd'hui inclus)") },
-      { label: tr(locale, "提醒", "Rappel"), value: tr(locale, "是否续租取决于人工跟进，本结果不替代催办流程", "La reconduction dépend du suivi humain ; ce résultat ne remplace pas le processus de relance") },
+      { label: tr(locale, "口径", "Périmètre"), value: tr(locale, "仅统计生效合同，按最新缴租截至日计算；不使用正式合同结束日替代收费进度", "Baux actifs calculés selon la dernière date de loyer payé ; la fin formelle du contrat ne remplace pas l'avancement d'encaissement") },
+      { label: tr(locale, "提醒", "Rappel"), value: tr(locale, "下一期是否已经生成应收仍以应收明细为准", "La création de la prochaine créance reste vérifiée dans le détail des créances") },
     ],
     warnings: rows.length > 100 ? [tr(locale, `共 ${rows.length} 份，表格仅展示前 100 份。`, `${rows.length} baux ; 100 premiers affichés.`)] : [],
     resultCount: rows.length,
@@ -689,7 +699,7 @@ export async function executeWorkbenchQuery(query: string, intent: WorkbenchInte
     scope: tr(locale, "受控查询范围", "Périmètre de requête contrôlé"),
     metrics: [],
     table: null,
-    warnings: [tr(locale, "可以试试：今天日租房态、11#今天退房名单、11#长租逾期、长租30天内到期、出售15天内应缴、查看11#503的合同和收款、11#906保洁已完成。", "Exemples : état journalier du jour, départs du jour 11#, retards bail 11#, baux expirant sous 30 j, échéances vente sous 15 j, contrat et paiements du 11#503, ménage terminé 11#906.")],
+    warnings: [tr(locale, "可以试试：今天日租房态、11#今天退房名单、11#长租逾期、长租30天内缴租截至、出售15天内应缴、查看11#503的合同和收款、11#906保洁已完成。", "Exemples : état journalier du jour, départs du jour 11#, retards bail 11#, loyers payés arrivant à échéance sous 30 j, échéances vente sous 15 j, contrat et paiements du 11#503, ménage terminé 11#906.")],
     resultCount: 0,
   });
 }

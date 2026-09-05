@@ -375,7 +375,7 @@ export async function recordLeaseFinancialEntry(input: {
   paymentMethod: "cash" | "check" | "bank_transfer" | "offset" | "other";
   notes?: string;
   requestId?: string;
-}): Promise<{ success: boolean; referenceNo?: string; error?: string }> {
+}): Promise<{ success: boolean; referenceNo?: string; error?: string; warning?: string }> {
   await guardLeaseFinance();
   if (!LEASE_FINANCIAL_BUSINESS_TYPES.includes(input.businessType)) {
     return { success: false, error: "不支持的业务类型。" };
@@ -430,7 +430,11 @@ export async function recordLeaseFinancialEntry(input: {
     // date is a separate fact and must never be overwritten by a payment.
     const nextReceivable = await ensureNextLeaseReceivable(contract.id);
     if (!nextReceivable.success) {
-      return { success: false, error: `收款已保存，但下一期应收生成失败：${nextReceivable.error ?? "未知错误"}` };
+      return {
+        success: true,
+        referenceNo: payload.reference_no,
+        warning: `收款已保存，但下一期应收生成失败：${nextReceivable.error ?? "未知错误"}`,
+      };
     }
   }
 
@@ -440,6 +444,93 @@ export async function recordLeaseFinancialEntry(input: {
   revalidatePath("/fr/finance");
   revalidatePath("/units");
   return { success: true, referenceNo: payload.reference_no };
+}
+
+export async function recordCombinedLeasePayment(input: {
+  contractId: string;
+  paymentDate: string;
+  rentAmountXof: number;
+  propertyAmountXof: number;
+  paidThroughDate: string;
+  paymentMethod: "cash" | "check" | "bank_transfer" | "offset" | "other";
+  notes?: string;
+  rentRequestId: string;
+  propertyRequestId: string;
+}): Promise<{ success: boolean; referenceNos?: string[]; error?: string; warning?: string }> {
+  await guardLeaseFinance();
+  if (
+    !input.paymentDate
+    || !input.paidThroughDate
+    || !input.paymentMethod
+    || !Number.isFinite(input.rentAmountXof)
+    || !Number.isFinite(input.propertyAmountXof)
+    || input.rentAmountXof <= 0
+    || input.propertyAmountXof <= 0
+  ) {
+    return { success: false, error: "组合收款必须包含有效的租金、物业费、付款方式和已缴至日期。" };
+  }
+
+  const supabase = await createClient();
+  const { data: contract, error: contractError } = await supabase
+    .from("lease_contracts")
+    .select("id, contract_no, unit:units(unit_no, building:buildings(code))")
+    .eq("id", input.contractId)
+    .eq("status", "active")
+    .single();
+  if (contractError || !contract) return { success: false, error: "未找到对应生效长租合同。" };
+
+  const unit = Array.isArray(contract.unit) ? contract.unit[0] : contract.unit;
+  const building = Array.isArray(unit?.building) ? unit.building[0] : unit?.building;
+  const rentPrefix = buildLeaseFinancialReferencePrefix(
+    building?.code ?? "SACSI",
+    unit?.unit_no ?? "UNIT",
+    contract.contract_no,
+    "rent_income",
+    input.paymentDate,
+  );
+  const propertyPrefix = buildLeaseFinancialReferencePrefix(
+    building?.code ?? "SACSI",
+    unit?.unit_no ?? "UNIT",
+    contract.contract_no,
+    "property_fee_income",
+    input.paymentDate,
+  );
+
+  const { data, error } = await supabase.rpc("record_combined_lease_payment_rpc", {
+    p_contract_id: input.contractId,
+    p_payment_date: input.paymentDate,
+    p_rent_amount_xof: input.rentAmountXof,
+    p_property_amount_xof: input.propertyAmountXof,
+    p_paid_through_date: input.paidThroughDate,
+    p_payment_method: input.paymentMethod,
+    p_notes: input.notes?.trim() || null,
+    p_rent_reference_prefix: rentPrefix,
+    p_property_reference_prefix: propertyPrefix,
+    p_rent_request_id: input.rentRequestId,
+    p_property_request_id: input.propertyRequestId,
+  });
+  if (error) return { success: false, error: error.message };
+  const payload = data as {
+    success?: boolean;
+    rent?: { reference_no?: string };
+    property_fee?: { reference_no?: string };
+  } | null;
+  if (!payload?.success) return { success: false, error: "组合收款保存失败。" };
+
+  const nextReceivable = await ensureNextLeaseReceivable(input.contractId);
+  if (!nextReceivable.success) {
+    return {
+      success: true,
+      referenceNos: [payload.rent?.reference_no, payload.property_fee?.reference_no].filter((value): value is string => Boolean(value)),
+      warning: `收款已保存，但下一期应收生成失败：${nextReceivable.error ?? "未知错误"}`,
+    };
+  }
+
+  for (const path of ["/leases", "/fr/leases", "/finance", "/fr/finance", "/units", "/fr/units"]) revalidatePath(path);
+  return {
+    success: true,
+    referenceNos: [payload.rent?.reference_no, payload.property_fee?.reference_no].filter((value): value is string => Boolean(value)),
+  };
 }
 
 // ── Activate contract ──

@@ -163,6 +163,13 @@ begin
   from public.units
   where id = v_contract.unit_id;
 
+  -- Different idempotency keys may execute concurrently for the same
+  -- contract. Serialize reference-number allocation per contract/prefix so
+  -- two valid payments cannot receive the same visible receipt code.
+  perform pg_advisory_xact_lock(
+    hashtextextended(v_contract.id::text || ':' || p_reference_prefix, 0)
+  );
+
   select source_type, direction, category, label
   into v_source_type, v_direction, v_category, v_label
   from (values

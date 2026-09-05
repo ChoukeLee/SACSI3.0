@@ -1,6 +1,6 @@
 # SACSI AI 工作台第一阶段需求规格
 
-> 状态：阶段 A/B 已完成本地实现与验证；阶段 C 已接通 L1「完成保洁」人工确认→原子执行→复查闭环，并已把工作台询问/草稿/确认/执行全程写入 `ai_*` 证据链（本地验证通过）。两条迁移（foundations、draft infrastructure）已受控上线并经只读冒烟核对；线上 `schema_migrations` 记账仅含 3 条历史（CIMAC 20260904 系列）与本两条，与仓库提交历史的基线差异待统一（见 22.4）。工作台 UI、结果与自然语言输入解析均已支持 zh/fr 双语。
+> 状态：阶段 A/B 与财务 MVP 数据库增量已应用生产库；RLS、授权、登录态提取写入和事务回滚冒烟验证通过。L0 查询、L1「完成保洁」与“凭证候选提取 → 业务匹配 → 人工确认 → 入账复核”代码已完成本地测试和构建，应用代码尚未推送或发布。
 >
 > 更新时间：2026-09-05
 >
@@ -524,29 +524,32 @@ AI 不是业务 actor。真正 actor 始终是当前登录用户，并记录 `ch
 ### 21.1 供应商边界
 
 - `deepseek-v4-flash` 继续只负责文字问题的意图分类，不接受图片，也不接触查询结果或数据库记录。
-- DeepSeek 当前另有实验视觉模型 `deepseek-v4-flash-vision-exp`；系统把它定义为独立的 `deepseek-vision-exp` OCR 提供方，不因两者使用同一密钥而混用模型职责。
-- 现有 Qwen VL、GLM Vision 和 OpenAI Vision 适配器继续保留，后续用同一组匿名化收据样本比较字段准确率，而不是只凭供应商宣传选择。
-- 当前 `OCR_PROVIDER` 默认仍为 `mock`，DeepSeek 视觉能力没有在生产环境自动启用。
+- `deepseek-v4-flash-vision-exp` 作为独立图片识别通道；不得把普通文字模型误当成多模态模型。
+- Qwen VL、GLM Vision 和 OpenAI Vision 适配器继续保留，后续用同一组匿名化收据样本比较字段准确率，而不是只凭供应商宣传选择。
+- 当前环境明确配置 `OCR_PROVIDER=deepseek-vision-exp`；视觉模型故障时返回错误并允许改用人工粘贴文字，不得生成伪识别结果。
 
 ### 21.2 凭证识别安全规则
 
-- DeepSeek 视觉通道只接受 PNG、JPEG、WebP 和 GIF；PDF 在外发前直接拒绝，后续应先进行本地逐页渲染和文件安全检查。
+- 当前图片通道只接受 PNG、JPEG 和 WebP；PDF 在外发前直接拒绝，后续应先进行本地逐页渲染和文件安全检查。
 - 视觉响应必须解析为收据结构化字段；不确定字段保持为空并进入人工确认，不允许直接生成收款。
 - 缺少密钥、未知提供方、HTTP 错误和空响应统一返回明确错误，不得把错误消息伪装成 OCR 正文。
 - 图片识别只是“提取候选事实”，金额、币种、房号、日期和业务类型仍须与系统记录交叉核对并由人工确认。
 
-### 21.3 本地验证
+### 21.3 验证要求
 
-- 使用不含业务数据的测试图片调用 `deepseek-v4-flash-vision-exp`，API 返回 HTTP 200，确认当前密钥具备该模型访问能力。
-- 新增供应商边界测试，覆盖缺少密钥、结构化响应、PDF 拦截和未知提供方安全失败。
-- 视觉模型仍标记为实验能力；完成真实凭证基准测试之前不得替换人工录入或确认流程。
+- 2026-09-05 已使用不含客户与业务数据的本地公开图片完成真实 API 冒烟：`deepseek-v4-flash-vision-exp` 返回 HTTP 200 和有效结构化 JSON。
+- 视觉供应商必须使用不含真实客户信息的样本完成字段准确率评测后才能启用。
+- 供应商边界测试须覆盖缺少密钥、结构化响应、文件类型拦截和未知提供方安全失败。
+- 图片识别始终只是候选提取；不得替换人工复核和确认流程。
 
 ## 22. 迁移上线检查清单（预检结论）
 
-上线对象（按此顺序，均为已提交迁移，编号晚于 origin 现有最新 `202609020002`）：
+上线对象（按此顺序）：
 
 1. `supabase/migrations/20260905082337_ai_business_action_foundations.sql`
 2. `supabase/migrations/20260905083639_create_ai_draft_infrastructure.sql`
+3. `supabase/migrations/20260905152115_ai_financial_mvp.sql`
+4. `supabase/migrations/20260905161000_harden_ai_financial_execution.sql`
 
 静态预检结论：**可进入受控上线**，需满足下列运行时核对项。
 
@@ -566,16 +569,17 @@ AI 不是业务 actor。真正 actor 始终是当前登录用户，并记录 `ch
 - 存储：私有 `ai-inputs` bucket（20MB、白名单 MIME）按 `owner_id` 与 `{uid}/…` 路径隔离；触发器自动写生命周期事件；输入 30 天/任务 365 天留存，`redact_expired_ai_input` 到期清敏感字段。
 - 已知事项：阶段 C 的 L1「完成保洁」已在询问时写入 `ai_jobs/ai_inputs/ai_proposed_actions`，确认执行按 `confirm → claim → 原子 RPC → 复查 → complete(verified)` 走完整证据链并写事件；工作台其余写动作仍按注册表分阶段开放。
 
-### 22.3 上线时/上线后核对（需要授权与在线环境）
+### 22.3 已完成核对与发布前待办
 
-1. 上线前先核对线上 `supabase_migrations.schema_migrations` 与已提交迁移文件一致（仓库曾存在“已执行但未提交”的迁移，需确认无残留）。
-2. 按顺序应用两条迁移；建议维护窗口执行迁移一。
-3. 迁移后抽查：任一 `daily_bookings` 行 `booking_agent_id = customer_id`；`payments` 旧行 `payment_method is null` 且页面不显示为“现金”。
-4. 用登录会话（finance/admin）调用一次长租收款，确认只更新 `paid_through_date`、不触碰 `expected_end_date`，且缺付款方式时报 `paymentMethodRequired`。
-5. 冒烟：以受限角色执行 `public.confirm_ai_proposed_action` 应被拒绝；`ai_action_events` 不允许 `authenticated` 直接 insert。
-6. 恢复网络后执行 `git fetch origin`，确认远端 main 未前进、无新的冲突迁移后，再安排应用代码部署（先迁移、后发版）。
+1. 已核对生产迁移历史和实际对象；前两条迁移此前已被执行，后两条增量于 2026-09-05 受控执行并登记。
+2. 已验证四张 AI 表全部启用 RLS；`anon` 无读取/执行权限，`authenticated` 无草稿表直接 update 权限。
+3. 已用现有 finance/admin 登录身份在事务中创建临时任务、写入输入并调用一次性提取 RPC，读取结果后整体回滚，未留下测试业务数据。
+4. 已验证收款编码分配存在事务锁，组合租金/物业费写入由一个数据库事务完成。
+5. 待发布前：提交并推送应用代码，部署后再以匿名化非业务样本走一遍完整 UI；真实收款不得作为首次试验数据。
 
-### 22.4 上线记录与遗留差异
+### 22.4 当前线上核验记录与遗留差异
 
-- 已执行：`20260905082337`（foundations）、`20260905083639`（draft infrastructure）经 Management API 受控应用并写入线上 `schema_migrations`（version 与文件名时间戳一致）。上线后只读冒烟通过：`daily_bookings.booking_agent_id` 已回填且 0 空、触发器在位；`payments.payment_method` + CHECK 在位（存量 2423 条为 null=未知，符合设计）；`sale_contracts.total_amount_confirmed` 在位；`ai_*` 四表/RLS/策略/私有 bucket/8 个业务触发器及 public/private 函数均在位；`ai_action_events` 未授予 authenticated INSERT。
-- 遗留差异：线上 `schema_migrations` 仅含 3 条历史记录（20260904 CIMAC 三件套，均为“已应用未提交”），早于它们的历史迁移未记账。日后若用 `supabase db push` 同步将把仓库全量历史当作未应用，存在重复执行风险。建议后续单独做一次基线对齐（例如对线上做 `supabase db pull` 生成一致基线，或在受控窗口重建记账），本两条迁移不受影响。
+- 2026-09-05 二次核验确认：前两条 AI 迁移已在生产历史中，且对应列、表真实存在；早先“当前不存在”的记录已过时，不能继续引用。
+- 迁移前业务表备份仍保留：日租 277 条、出售合同 198 条、收款 2423 条，并保存结构快照与 SHA-256 校验依据。
+- 增量 `20260905152115` 与 `20260905161000` 已成功执行；结构复查确认组合收款 RPC、一次性提取 RPC 和收款编码并发锁均存在。
+- 早期仓库迁移历史仍不完整，继续禁止使用 `supabase db push --include-all`；以后只应用明确审核过的前向增量。

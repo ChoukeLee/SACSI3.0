@@ -1,260 +1,131 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Check, ImageUp, Loader2, Pencil, Sparkles, X } from "lucide-react";
+import { AlertTriangle, Check, ImageUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { formatXof } from "@/lib/utils";
 
-interface ReceiptDraft {
-  room_no: string | null;
-  receipt_no: string | null;
-  receipt_date: string | null;
-  amount_xof: number | null;
-  currency: string;
-  period_start: string | null;
-  period_end: string | null;
-  business_type: string | null;
-  payer_name: string | null;
-  notes: string | null;
-  confidence: "high" | "medium" | "low";
-  warnings: string[];
-}
+type PaymentMethod = "cash" | "check" | "bank_transfer" | "offset" | "other";
+interface ReceiptDraft { building_code: string | null; room_no: string | null; receipt_no: string | null; receipt_date: string | null; amount_xof: number | null; period_end: string | null; business_hint: "rent" | "property_fee" | null; payer_name: string | null; notes: string | null; confidence: "high" | "medium" | "low"; warnings: string[] }
+interface PreparedProposal { proposal: { id: string; version: number; action: string; expiresAt: string }; match: { building: string; roomNo: string; contractNo: string; currentPaidThrough: string | null }; plan: { kind: string; rentAmountXof: number; propertyAmountXof: number; confidence: string; warnings: string[] } }
+interface Props { locale: "zh" | "fr"; onClose: () => void }
 
-interface ScanResult {
-  success: boolean;
-  imagePath?: string | null;
-  ocrText: string;
-  ocrProvider: string;
-  ocrError?: string | null;
-  draft: ReceiptDraft;
-  status: string;
-  error?: string;
-}
-
-interface ConfirmResult {
-  success: boolean;
-  paymentId?: string;
-  attachmentId?: string | null;
-  duplicateWarning?: string | null;
-  duplicateOverridden?: boolean;
-  requiresOverride?: boolean;
-  matchedReceivableId?: string | null;
-  unmatchedReceivable?: boolean;
-  message?: string;
-  error?: string;
-}
-
-interface Props {
-  locale: "zh" | "fr";
-  onClose: () => void;
+async function readJson(response: Response) {
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || data.plan?.warnings?.join("；") || "请求失败，请稍后重试。");
+  return data;
 }
 
 export function ReceiptUpload({ locale, onClose }: Props) {
   const zh = locale === "zh";
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-
   const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const [result, setResult] = useState<ScanResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState(false);
-  const [confirmResult, setConfirmResult] = useState<ConfirmResult | null>(null);
-  const [overrideDuplicate, setOverrideDuplicate] = useState(false);
-
-  // Editable draft fields
-  const [editRoom, setEditRoom] = useState("");
-  const [editAmount, setEditAmount] = useState("");
-  const [editDate, setEditDate] = useState("");
-  const [editReceiptNo, setEditReceiptNo] = useState("");
-  const [editPeriodStart, setEditPeriodStart] = useState("");
-  const [editPeriodEnd, setEditPeriodEnd] = useState("");
-  const [editBusinessType, setEditBusinessType] = useState("");
-  const [editPayer, setEditPayer] = useState("");
-  const [editNotes, setEditNotes] = useState("");
   const [manualText, setManualText] = useState("");
-  const [showManualInput, setShowManualInput] = useState(false);
+  const [jobId, setJobId] = useState("");
+  const [prepared, setPrepared] = useState<PreparedProposal | null>(null);
+  const [busy, setBusy] = useState<"scan" | "prepare" | "confirm" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+  const [done, setDone] = useState<{ references: string[] } | null>(null);
+  const [form, setForm] = useState({ buildingCode: "", roomNo: "", amount: "", receiptDate: "", paidThroughDate: "", payerName: "", notes: "", paymentMethod: "" as PaymentMethod | "", businessHint: "" as "rent" | "property_fee" | "" });
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0] ?? null;
-    setFile(f);
-    if (f) { setPreviewUrl(URL.createObjectURL(f)); setResult(null); setError(null); setConfirmed(false); }
+  const setField = (key: keyof typeof form, value: string) => {
+    if (prepared) return;
+    setForm((current) => ({ ...current, [key]: value }));
   };
 
-  const handleScan = async () => {
-    if (!file && !manualText) { setError(zh ? "请选择收据图片或粘贴文字" : "Choisissez une image ou collez le texte"); return; }
-    setLoading(true); setError(null);
+  const scan = async () => {
+    if (!file && !manualText.trim()) { setError(zh ? "请选择图片或粘贴收款文字。" : "Ajoutez une image ou collez le texte du reçu."); return; }
+    setBusy("scan"); setError(null); setWarning(null); setPrepared(null);
     try {
-      const formData = new FormData();
-      if (file) formData.append("file", file);
-      if (manualText) formData.append("manual_text", manualText);
-      formData.append("locale", locale);
-      const res = await fetch("/api/receipt/scan", { method: "POST", body: formData });
-      const data = (await res.json()) as ScanResult;
-      if (!res.ok) { setError(data.error ?? (zh ? "扫描失败。" : "Échec du scan.")); return; }
-      setResult(data);
-      setEditRoom(data.draft.room_no ?? "");
-      setEditAmount(data.draft.amount_xof?.toString() ?? "");
-      setEditDate(data.draft.receipt_date ?? "");
-      setEditReceiptNo(data.draft.receipt_no ?? "");
-      setEditPeriodStart(data.draft.period_start ?? "");
-      setEditPeriodEnd(data.draft.period_end ?? "");
-      setEditBusinessType(data.draft.business_type ?? "");
-      setEditPayer(data.draft.payer_name ?? "");
-      setEditNotes(data.draft.notes ?? "");
-      setOverrideDuplicate(false);
-    } catch { setError(zh ? "扫描失败，请重试" : "Échec du scan"); }
-    finally { setLoading(false); }
+      const body = new FormData();
+      if (file) body.append("file", file);
+      if (manualText.trim()) body.append("manual_text", manualText.trim());
+      body.append("locale", locale);
+      const result = await readJson(await fetch("/api/receipt/scan", { method: "POST", body }));
+      const draft = result.draft as ReceiptDraft;
+      setJobId(String(result.jobId));
+      setForm((current) => ({ ...current, buildingCode: draft.building_code ?? "", roomNo: draft.room_no ?? "", amount: draft.amount_xof ? String(draft.amount_xof) : "", receiptDate: draft.receipt_date ?? "", paidThroughDate: draft.period_end ?? "", payerName: draft.payer_name ?? "", notes: draft.notes ?? "", businessHint: draft.business_hint ?? "" }));
+      const messages = [...(draft.warnings ?? [])];
+      if (result.ocrError) messages.push(String(result.ocrError));
+      setWarning(messages.length ? messages.join("；") : null);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "识别失败。"); }
+    finally { setBusy(null); }
   };
 
-  const handleConfirm = async (forceOverride = false) => {
-    if (!editRoom || !editDate || !editAmount) { setError(zh ? "房号、金额、日期为必填" : "Chambre, montant, date obligatoires"); return; }
-    setConfirming(true); setError(null);
+  const prepare = async () => {
+    if (!jobId) return;
+    setBusy("prepare"); setError(null); setWarning(null);
     try {
-      const res = await fetch("/api/receipt/confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          room_no: editRoom, receipt_no: editReceiptNo || null, receipt_date: editDate,
-          amount_xof: parseInt(editAmount, 10) || 0, currency: "XOF",
-          period_start: editPeriodStart || null, period_end: editPeriodEnd || null,
-          business_type: editBusinessType || null, payer_name: editPayer || null,
-          notes: editNotes || null, image_path: result?.imagePath ?? null,
-          ocr_text: result?.ocrText ?? null, ocr_provider: result?.ocrProvider ?? "manual",
-          overrideDuplicate: forceOverride,
-        }),
-      });
-      const data = (await res.json()) as ConfirmResult;
+      const result = await readJson(await fetch("/api/receipt/prepare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ job_id: jobId, building_code: form.buildingCode, room_no: form.roomNo, amount_xof: Number(form.amount), receipt_date: form.receiptDate, period_end: form.paidThroughDate || null, payer_name: form.payerName || null, payment_method: form.paymentMethod, business_hint: form.businessHint || null, notes: form.notes || null }) }));
+      setPrepared(result as PreparedProposal);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "匹配失败。"); }
+    finally { setBusy(null); }
+  };
 
-      if (!data.success && data.requiresOverride) {
-        setError(data.duplicateWarning ?? "检测到重复收据");
-        setOverrideDuplicate(true);
-        return;
-      }
-
-      if (!data.success || !res.ok) { setError(data.error ?? data.message ?? (zh ? "入账失败" : "Échec")); return; }
-
-      setConfirmed(true);
-      setConfirmResult(data);
+  const confirm = async () => {
+    if (!prepared) return;
+    setBusy("confirm"); setError(null);
+    try {
+      const result = await readJson(await fetch("/api/receipt/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ proposal_id: prepared.proposal.id, proposal_version: prepared.proposal.version }) }));
+      setDone({ references: result.referenceNos ?? [] });
+      setWarning(result.warning ?? null);
       router.refresh();
-    } catch { setError(zh ? "确认失败" : "Échec de la confirmation"); }
-    finally { setConfirming(false); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "入账失败。"); }
+    finally { setBusy(null); }
   };
 
-  const labelClass = "text-xs font-medium text-muted-foreground";
-  const inputClass = "w-full rounded-lg border border-border bg-white px-3 py-2 text-[13px]";
+  if (done) return <div className="flex min-h-72 flex-col items-center justify-center text-center">
+    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><Check className="h-6 w-6" /></span>
+    <h3 className="mt-4 text-base font-semibold">{zh ? "已入账并完成复核" : "Enregistré et vérifié"}</h3>
+    {done.references.length > 0 && <p className="mt-2 max-w-md text-xs text-muted-foreground">{done.references.join(" · ")}</p>}
+    {warning && <p className="mt-3 max-w-md text-sm text-amber-700">{warning}</p>}
+    <Button className="mt-6 min-h-11 px-8" onClick={onClose}>{zh ? "完成" : "Terminer"}</Button>
+  </div>;
 
-  return (
-    <div className="space-y-4">
-      {!confirmed && (
-        <>
-          <input ref={fileRef} type="file" accept="image/*,.pdf" onChange={handleFileSelect} className="hidden" />
-          <div onClick={() => fileRef.current?.click()} className={cn("cursor-pointer rounded-xl border-2 border-dashed p-6 text-center transition-colors", file ? "border-primary/30 bg-accent/30" : "border-border hover:border-primary/20 hover:bg-muted/30")}>
-            {previewUrl ? <img src={previewUrl} alt="receipt" className="mx-auto max-h-48 rounded-lg object-contain" /> : (
-              <div className="space-y-2">
-                <ImageUp className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                <p className="text-[13px] text-muted-foreground">{zh ? "点击上传收据图片" : "Cliquez pour télécharger"}</p>
-                <p className="text-[11px] text-muted-foreground/60">{zh ? "支持 JPG、PNG、PDF" : "JPG, PNG, PDF"}</p>
-              </div>
-            )}
-          </div>
+  return <div className="space-y-5">
+    <section aria-labelledby="receipt-source-title">
+      <h3 id="receipt-source-title" className="text-sm font-semibold">1. {zh ? "提供凭证" : "Ajouter le justificatif"}</h3>
+      <p className="mb-3 text-xs text-muted-foreground">{zh ? "图片只负责提取候选内容，不会直接入账。" : "L’image ne crée jamais une écriture automatiquement."}</p>
+      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={Boolean(prepared)} onChange={(event) => { setFile(event.target.files?.[0] ?? null); setJobId(""); setPrepared(null); }} />
+      <button type="button" disabled={Boolean(prepared)} onClick={() => fileRef.current?.click()} className="flex min-h-20 w-full items-center gap-3 rounded-lg border border-dashed px-4 text-left transition-colors hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-60">
+        <ImageUp className="h-5 w-5 shrink-0 text-muted-foreground" />
+        <span><span className="block text-sm font-medium">{file?.name ?? (zh ? "选择收据图片" : "Choisir une image")}</span><span className="block text-xs text-muted-foreground">JPEG / PNG / WebP，最大 10 MB</span></span>
+      </button>
+      <textarea value={manualText} disabled={Boolean(prepared)} onChange={(event) => { setManualText(event.target.value); setJobId(""); setPrepared(null); }} rows={3} placeholder={zh ? "也可直接粘贴收款文字（没有视觉模型时建议使用）" : "Ou collez le texte du reçu"} className="mt-3 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60" />
+      <Button className="mt-3 min-h-11 w-full sm:w-auto" onClick={scan} disabled={busy !== null || Boolean(prepared)}>{busy === "scan" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{zh ? "提取候选信息" : "Extraire les informations"}</Button>
+    </section>
 
-          <button type="button" onClick={() => setShowManualInput(!showManualInput)} className="text-[11px] text-muted-foreground underline">
-            {showManualInput ? (zh ? "收起" : "Masquer") : (zh ? "或手动粘贴收据文字" : "Ou collez le texte du reçu")}
-          </button>
-          {showManualInput && <textarea value={manualText} onChange={(e) => setManualText(e.target.value)} placeholder={zh ? "粘贴收据上的文字……" : "Collez le texte du reçu…"} rows={4} className={cn(inputClass, "resize-none overflow-y-auto")} />}
+    {jobId && <section className="border-t pt-5" aria-labelledby="receipt-review-title">
+      <h3 id="receipt-review-title" className="text-sm font-semibold">2. {zh ? "人工核对关键字段" : "Vérifier les champs"}</h3>
+      <p className="mt-1 text-xs text-muted-foreground">{zh ? "楼栋、房号、日期、金额和付款方式必须由你确认。" : "Confirmez l’immeuble, le logement, la date, le montant et le mode."}</p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <Field label={zh ? "楼栋编码 *" : "Code immeuble *"}><Input className="h-11" value={form.buildingCode} onChange={(e) => setField("buildingCode", e.target.value.toUpperCase())} placeholder="SACSI11" /></Field>
+        <Field label={zh ? "房号 *" : "Logement *"}><Input className="h-11" value={form.roomNo} onChange={(e) => setField("roomNo", e.target.value)} /></Field>
+        <Field label={zh ? "金额（XOF）*" : "Montant (XOF) *"}><Input className="h-11" type="number" min="1" value={form.amount} onChange={(e) => setField("amount", e.target.value)} /></Field>
+        <Field label={zh ? "付款日期 *" : "Date *"}><Input className="h-11" type="date" value={form.receiptDate} onChange={(e) => setField("receiptDate", e.target.value)} /></Field>
+        <Field label={zh ? "已缴至（含租金时必填）" : "Payé jusqu’au"}><Input className="h-11" type="date" value={form.paidThroughDate} onChange={(e) => setField("paidThroughDate", e.target.value)} /></Field>
+        <Field label={zh ? "付款方式 *" : "Mode de paiement *"}><select className="h-11 w-full rounded-md border bg-background px-3 text-sm" value={form.paymentMethod} onChange={(e) => setField("paymentMethod", e.target.value)}><option value="">{zh ? "请选择" : "Choisir"}</option><option value="cash">{zh ? "现金" : "Espèces"}</option><option value="bank_transfer">{zh ? "银行转账" : "Virement"}</option><option value="check">{zh ? "支票" : "Chèque"}</option><option value="offset">{zh ? "抵扣" : "Compensation"}</option><option value="other">{zh ? "其他" : "Autre"}</option></select></Field>
+        <Field label={zh ? "付款人" : "Payeur"}><Input className="h-11" value={form.payerName} onChange={(e) => setField("payerName", e.target.value)} /></Field>
+        <Field label={zh ? "业务提示（不作为证据）" : "Indication facultative"}><select className="h-11 w-full rounded-md border bg-background px-3 text-sm" value={form.businessHint} onChange={(e) => setField("businessHint", e.target.value)}><option value="">{zh ? "不指定" : "Non précisé"}</option><option value="rent">{zh ? "租金" : "Loyer"}</option><option value="property_fee">{zh ? "物业费" : "Charges"}</option></select></Field>
+        <Field label={zh ? "备注" : "Note"}><Input className="h-11" value={form.notes} onChange={(e) => setField("notes", e.target.value)} /></Field>
+      </div>
+      <Button className="mt-4 min-h-11 w-full sm:w-auto" onClick={prepare} disabled={busy !== null}>{busy === "prepare" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{zh ? "核对系统记录并生成草稿" : "Vérifier et préparer"}</Button>
+    </section>}
 
-          {!result && (
-            <Button onClick={handleScan} disabled={loading} variant="default" className="w-full">
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-              {loading ? (zh ? "识别中……" : "Analyse…") : (zh ? "识别收据" : "Analyser le reçu")}
-            </Button>
-          )}
+    {prepared && <section className="rounded-xl border bg-muted/20 p-4" aria-labelledby="receipt-confirm-title">
+      <div className="flex items-start justify-between gap-3"><div><h3 id="receipt-confirm-title" className="text-sm font-semibold">3. {zh ? "确认入账草稿" : "Confirmer le brouillon"}</h3><p className="mt-1 text-xs text-muted-foreground">{prepared.match.building} · {prepared.match.roomNo} · {prepared.match.contractNo}</p></div><span className="rounded-full border px-2 py-1 text-xs font-medium">{prepared.proposal.action === "record_combined_lease_payment" ? "L3" : "L2"}</span></div>
+      <dl className="mt-4 grid gap-3 rounded-lg bg-background p-3 sm:grid-cols-3"><Summary label={zh ? "总额" : "Total"} value={formatXof(Number(form.amount))} /><Summary label={zh ? "分配租金" : "Loyer"} value={formatXof(prepared.plan.rentAmountXof)} /><Summary label={zh ? "分配物业费" : "Charges"} value={formatXof(prepared.plan.propertyAmountXof)} /></dl>
+      <p className="mt-3 text-xs text-muted-foreground">{zh ? "确认后只执行上方不可变草稿；页面字段的后续变化不会改变本次执行内容。" : "La confirmation exécute uniquement ce brouillon immuable."}</p>
+      <Button className="mt-4 min-h-11 w-full" onClick={confirm} disabled={busy !== null}>{busy === "confirm" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{zh ? "确认并入账" : "Confirmer et enregistrer"}</Button>
+    </section>}
 
-          {error && !overrideDuplicate && <p className="text-[13px] text-red-600">{error}</p>}
-        </>
-      )}
-
-      {/* Duplicate override prompt */}
-      {overrideDuplicate && !confirmed && (
-        <div className="space-y-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-4 text-center">
-          <AlertTriangle className="mx-auto h-8 w-8 text-amber-600" />
-          <p className="text-sm font-semibold text-amber-800">{zh ? "检测到重复收据" : "Reçu en double détecté"}</p>
-          <p className="text-xs text-amber-700">{error}</p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="flex-1" onClick={() => { setOverrideDuplicate(false); setError(null); }}>
-              {zh ? "取消" : "Annuler"}
-            </Button>
-            <Button variant="default" size="sm" className="flex-1" onClick={() => handleConfirm(true)} disabled={confirming}>
-              {confirming ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
-              {zh ? "仍然确认入账" : "Confirmer quand même"}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Draft review */}
-      {result && !confirmed && !overrideDuplicate && (
-        <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-4">
-          <p className="text-xs font-semibold text-muted-foreground">{zh ? "OCR 识别结果" : "Résultat OCR"} ({result.ocrProvider})</p>
-          {result.ocrError && <p className="text-xs text-red-600">{result.ocrError}</p>}
-          <pre className="max-h-24 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-muted/20 p-2 text-xs text-muted-foreground">{result.ocrText}</pre>
-
-          <div className="space-y-3">
-            <p className="text-xs font-semibold">
-              {zh ? "AI 解析草稿" : "Brouillon"} — <span className={cn("ml-1", result.draft.confidence === "high" ? "text-green-600" : result.draft.confidence === "medium" ? "text-amber-600" : "text-red-600")}>
-                {result.draft.confidence === "high" ? "✓" : result.draft.confidence === "medium" ? "⚠" : "✗"}
-              </span>
-            </p>
-            {result.draft.warnings.map((w, i) => <p key={i} className="text-[11px] text-amber-600">⚠ {w}</p>)}
-
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelClass}>{zh ? "房号 *" : "Chambre *"}</label><Input value={editRoom} onChange={(e) => setEditRoom(e.target.value)} className={cn(inputClass, !result.draft.room_no && "border-amber-400 bg-amber-50")} /></div>
-              <div><label className={labelClass}>{zh ? "金额（FCFA）*" : "Montant (FCFA) *"}</label><Input type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className={cn(inputClass, !result.draft.amount_xof && "border-amber-400 bg-amber-50")} /></div>
-              <div><label className={labelClass}>{zh ? "收据日期 *" : "Date *"}</label><Input value={editDate} onChange={(e) => setEditDate(e.target.value)} className={cn(inputClass, !result.draft.receipt_date && "border-amber-400 bg-amber-50")} /></div>
-              <div><label className={labelClass}>{zh ? "收据号" : "No reçu"}</label><Input value={editReceiptNo} onChange={(e) => setEditReceiptNo(e.target.value)} className={inputClass} /></div>
-              <div><label className={labelClass}>{zh ? "周期开始" : "Début période"}</label><Input value={editPeriodStart} onChange={(e) => setEditPeriodStart(e.target.value)} className={inputClass} /></div>
-              <div><label className={labelClass}>{zh ? "周期结束" : "Fin période"}</label><Input value={editPeriodEnd} onChange={(e) => setEditPeriodEnd(e.target.value)} className={inputClass} /></div>
-              <div>
-                <label className={labelClass}>{zh ? "业务类型" : "Type"}</label>
-                <select value={editBusinessType} onChange={(e) => setEditBusinessType(e.target.value)} className={inputClass}>
-                  <option value="">{zh ? "自动识别" : "Auto"}</option>
-                  <option value="lease_rent">{zh ? "长租" : "Loyer"}</option>
-                  <option value="managed_lease_rent">{zh ? "代租" : "Gestion"}</option>
-                  <option value="daily_rental">{zh ? "日租" : "Journalier"}</option>
-                  <option value="sale">{zh ? "出售" : "Vente"}</option>
-                  <option value="other">{zh ? "其他" : "Autre"}</option>
-                </select>
-              </div>
-              <div><label className={labelClass}>{zh ? "付款人" : "Payeur"}</label><Input value={editPayer} onChange={(e) => setEditPayer(e.target.value)} className={inputClass} /></div>
-            </div>
-            <div><label className={labelClass}>{zh ? "备注" : "Notes"}</label><Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className={inputClass} /></div>
-          </div>
-
-          <Button onClick={() => handleConfirm(false)} disabled={confirming} variant="default" className="w-full">
-            {confirming ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-            {confirming ? "……" : (zh ? "确认入账" : "Confirmer l'écriture")}
-          </Button>
-        </div>
-      )}
-
-      {/* Confirmed */}
-      {confirmed && (
-        <div className={cn("space-y-3 rounded-xl border p-4 text-center", confirmResult?.unmatchedReceivable ? "border-amber-200 bg-amber-50" : "border-green-200 bg-green-50")}>
-          <Check className={cn("mx-auto h-8 w-8", confirmResult?.unmatchedReceivable ? "text-amber-600" : "text-green-600")} />
-          <p className={cn("text-sm font-semibold", confirmResult?.unmatchedReceivable ? "text-amber-800" : "text-green-800")}>
-            {confirmResult?.unmatchedReceivable ? (zh ? "收款已入账（未匹配应收款）" : "Paiement enregistré (créance non trouvée)") : (zh ? "收款已确认入账" : "Paiement enregistré")}
-          </p>
-          {confirmResult?.message && <p className="text-xs text-muted-foreground">{confirmResult.message}</p>}
-          {confirmResult?.duplicateWarning && <p className="text-xs text-amber-700">⚠ {confirmResult.duplicateWarning}</p>}
-          {confirmResult?.attachmentId && <p className="text-xs text-muted-foreground">{zh ? "附件已保存" : "Pièce jointe sauvegardée"}</p>}
-          <Button variant="outline" size="sm" onClick={onClose}>{zh ? "关闭" : "Fermer"}</Button>
-        </div>
-      )}
-    </div>
-  );
+    {(error || warning) && <div role="alert" className={`flex gap-2 rounded-lg border p-3 text-sm ${error ? "border-red-200 bg-red-50 text-red-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><p>{error ?? warning}</p></div>}
+  </div>;
 }
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="space-y-1.5"><span className="text-xs font-medium text-muted-foreground">{label}</span>{children}</label>; }
+function Summary({ label, value }: { label: string; value: string }) { return <div><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 text-sm font-semibold tabular-nums">{value}</dd></div>; }
