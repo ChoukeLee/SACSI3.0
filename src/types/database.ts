@@ -159,8 +159,8 @@ export interface LeaseContractRow {
   unit_id: string;
   customer_id: string;
   contract_no: string;
-  start_date: string | null;
-  expected_end_date: string | null;
+  start_date: string;
+  expected_end_date: string;
   expected_end_confirmed?: boolean;
   paid_through_date?: string | null;
   actual_end_date: string | null;
@@ -173,15 +173,6 @@ export interface LeaseContractRow {
   signer_name: string | null;
   attachment_url: string | null;
   status: ContractStatus;
-  agreement_group_no?: string | null;
-  signing_state?: "signed" | "unsigned" | "pending_confirmation";
-  signed_date?: string | null;
-  commencement_state?: "started" | "pending_project_opening" | "cancelled_before_start";
-  billable_months?: number | null;
-  free_months?: number;
-  term_months?: number | null;
-  deposit_months?: number | null;
-  source_reference?: string | null;
   created_at: string;
   updated_at: string;
 }

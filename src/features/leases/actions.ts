@@ -452,14 +452,11 @@ export async function activateContract(
 
   const { data: contract } = await supabase
     .from("lease_contracts")
-    .select("id, unit_id, start_date, expected_end_date, commencement_state")
+    .select("id, unit_id")
     .eq("id", contractId)
     .eq("status", "draft")
     .single();
   if (!contract) return { success: false, error: "未找到草稿状态的合同。" };
-  if (contract.commencement_state === "pending_project_opening" || !contract.start_date || !contract.expected_end_date) {
-    return { success: false, error: "项目开业日期尚未确认，请先补齐正式起租日和到期日。" };
-  }
 
   // Re-check no other active contract on this unit
   const { data: conflict } = await supabase
