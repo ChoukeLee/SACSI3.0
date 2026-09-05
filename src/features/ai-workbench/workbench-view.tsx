@@ -8,14 +8,23 @@ import type { Locale } from "@/lib/i18n";
 import { askWorkbench, confirmWorkbenchAction } from "./actions";
 import { INITIAL_WORKBENCH_STATE, type WorkbenchActionResult, type WorkbenchDraftPreview, type WorkbenchResult, type WorkbenchTone } from "./types";
 
-// Query input is parsed by Chinese rules in this phase; chips stay functional in Chinese.
-const suggestions = [
-  "今天日租房态",
-  "11#长租逾期明细",
-  "出售15天内应缴",
-  "查看11#503的合同和收款",
-  "11#906保洁已完成",
-];
+// Suggestions stay functional for the parser in each locale.
+const SUGGESTIONS: Record<Locale, string[]> = {
+  zh: [
+    "今天日租房态",
+    "11#长租逾期明细",
+    "出售15天内应缴",
+    "查看11#503的合同和收款",
+    "11#906保洁已完成",
+  ],
+  fr: [
+    "état journalier aujourd'hui",
+    "retards bail 11#",
+    "échéances vente sous 15 jours",
+    "contrat et paiements du 11#503",
+    "ménage terminé 11#906",
+  ],
+};
 
 const COPY: Record<Locale, Record<string, string>> = {
   zh: {
@@ -71,7 +80,7 @@ const COPY: Record<Locale, Record<string, string>> = {
     submitting: "Vérification en cours…",
     submit: "Envoyer",
     examples: "Exemples de requêtes",
-    examplesNote: "Saisie en chinois pour cette phase.",
+    examplesNote: "",
     boundaryTitle: "Limites du poste",
     boundaryLiveTitle: "Enregistrements réels",
     boundaryLiveText: "Lit uniquement les données visibles par votre profil ; jamais de mémoire du modèle.",
@@ -114,6 +123,7 @@ const toneBorder: Record<WorkbenchTone, string> = {
 
 export function AiWorkbenchView({ locale = "zh" }: { locale?: Locale }) {
   const t = COPY[locale];
+  const suggestions = SUGGESTIONS[locale];
   const [query, setQuery] = useState("");
   const [state, formAction, pending] = useActionState(askWorkbench, INITIAL_WORKBENCH_STATE);
   const resultRef = useRef<HTMLDivElement>(null);
