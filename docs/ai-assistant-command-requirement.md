@@ -540,3 +540,37 @@ AI 不是业务 actor。真正 actor 始终是当前登录用户，并记录 `ch
 - 使用不含业务数据的测试图片调用 `deepseek-v4-flash-vision-exp`，API 返回 HTTP 200，确认当前密钥具备该模型访问能力。
 - 新增供应商边界测试，覆盖缺少密钥、结构化响应、PDF 拦截和未知提供方安全失败。
 - 视觉模型仍标记为实验能力；完成真实凭证基准测试之前不得替换人工录入或确认流程。
+
+## 22. 迁移上线检查清单（预检结论）
+
+上线对象（按此顺序，均为已提交迁移，编号晚于 origin 现有最新 `202609020002`）：
+
+1. `supabase/migrations/20260905082337_ai_business_action_foundations.sql`
+2. `supabase/migrations/20260905083639_create_ai_draft_infrastructure.sql`
+
+静态预检结论：**可进入受控上线**，需满足下列运行时核对项。
+
+### 22.1 迁移一（foundations）检查点
+
+- 日租经办人拆分：`daily_bookings` 新增 `booking_agent_id/guest_customer_id/guest_name`，先回填 `booking_agent_id = customer_id` 再置 `not null`；触发器 `sync_daily_booking_agent_identity` 兜底新插入。需在低峰窗口执行（会全表更新一次并持锁）。
+- `sale_contracts`：`total_amount_xof` 改为可空并新增 `total_amount_confirmed not null default true`（既有行保持 `true`，语义不变）。
+- `payments.payment_method`：新增列 + CHECK（null=未知，绝不按现金展示），与页面/服务端“付款方式必填”规则配套。
+- 替换 `record_lease_financial_entry_rpc`：签名与旧版一致（9 参），`create or replace` 直接覆盖、无残留重载；守卫 `auth.uid()`+`has_app_role('admin','finance')`；幂等键 + `paid_through_date` 是唯一被收款更新的合同日期；授权保持 `authenticated, service_role`。
+- 前置依赖函数（`current_user_role`、`has_app_role`、`can_access_project`）已在 origin 迁移中定义，无缺失。
+
+### 22.2 迁移二（draft infrastructure）检查点
+
+- 四张证据表（`ai_jobs/ai_inputs/ai_proposed_actions/ai_action_events`）+ RLS + 最小授权：`authenticated` 仅 `select/insert`（事件表仅 `select`），写路径全部经 `private.`（security definer）+ `public.` invoker 包装函数，无直接表更新权限。
+- 授权矩阵与 `src/features/business-actions/registry.ts` 由 `tests/ai-draft-infrastructure.test.ts` 镜像校验（每个写动作名/风险级/角色入 SQL，读动作不入），防漂移。
+- 幂等与复查强制：`request_id` 唯一、advisory lock、成功必须 `verified=true`、失败必须带 error；乐观版本号 `proposalVersionChanged`。
+- 存储：私有 `ai-inputs` bucket（20MB、白名单 MIME）按 `owner_id` 与 `{uid}/…` 路径隔离；触发器自动写生命周期事件；输入 30 天/任务 365 天留存，`redact_expired_ai_input` 到期清敏感字段。
+- 已知事项：阶段 C 当前 L1「完成保洁」确认执行走日租原子 RPC 与审计表，尚未把每次询问/草稿写入 `ai_*` 证据链；`ai_*` 基础设施先行建好，证据链接入留待后续迭代，不影响本迁移上线。
+
+### 22.3 上线时/上线后核对（需要授权与在线环境）
+
+1. 上线前先核对线上 `supabase_migrations.schema_migrations` 与已提交迁移文件一致（仓库曾存在“已执行但未提交”的迁移，需确认无残留）。
+2. 按顺序应用两条迁移；建议维护窗口执行迁移一。
+3. 迁移后抽查：任一 `daily_bookings` 行 `booking_agent_id = customer_id`；`payments` 旧行 `payment_method is null` 且页面不显示为“现金”。
+4. 用登录会话（finance/admin）调用一次长租收款，确认只更新 `paid_through_date`、不触碰 `expected_end_date`，且缺付款方式时报 `paymentMethodRequired`。
+5. 冒烟：以受限角色执行 `public.confirm_ai_proposed_action` 应被拒绝；`ai_action_events` 不允许 `authenticated` 直接 insert。
+6. 恢复网络后执行 `git fetch origin`，确认远端 main 未前进、无新的冲突迁移后，再安排应用代码部署（先迁移、后发版）。
