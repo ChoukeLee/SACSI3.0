@@ -44,4 +44,15 @@ describe("planLeaseFinancialAllocation", () => {
       propertyOutstandingXof: 100_000,
     }).kind).toBe("needs_review");
   });
+
+  it("never overrides an explicit business hint with an automatic split", () => {
+    const result = planLeaseFinancialAllocation({
+      totalAmountXof: 400_000,
+      rentOutstandingXof: 350_000,
+      propertyOutstandingXof: 50_000,
+      hint: "property_fee",
+    });
+    expect(result.kind).toBe("needs_review");
+    expect(result.warnings[0]).toContain("明确指定的物业费");
+  });
 });

@@ -30,14 +30,23 @@ export function planLeaseFinancialAllocation(input: FinancialAllocationInput): F
     return { kind: "needs_review", rentAmountXof: 0, propertyAmountXof: 0, confidence: 0, warnings: ["付款金额无效。"] };
   }
 
-  if (rent > 0 && property > 0 && sameAmount(total, rent + property)) {
-    return { kind: "combined", rentAmountXof: rent, propertyAmountXof: property, confidence: 0.99, warnings: [] };
-  }
   if (input.hint === "rent" && rent > 0 && sameAmount(total, rent)) {
     return { kind: "rent", rentAmountXof: total, propertyAmountXof: 0, confidence: 0.99, warnings: [] };
   }
   if (input.hint === "property_fee" && property > 0 && sameAmount(total, property)) {
     return { kind: "property_fee", rentAmountXof: 0, propertyAmountXof: total, confidence: 0.99, warnings: [] };
+  }
+  if (input.hint) {
+    return {
+      kind: "needs_review",
+      rentAmountXof: 0,
+      propertyAmountXof: 0,
+      confidence: 0.35,
+      warnings: [`付款 ${total} XOF 与明确指定的${input.hint === "rent" ? "租金" : "物业费"}应收余额不一致，系统不会覆盖该指令或自动拆分。`],
+    };
+  }
+  if (rent > 0 && property > 0 && sameAmount(total, rent + property)) {
+    return { kind: "combined", rentAmountXof: rent, propertyAmountXof: property, confidence: 0.99, warnings: [] };
   }
   if (rent > 0 && sameAmount(total, rent) && !sameAmount(total, property)) {
     return { kind: "rent", rentAmountXof: total, propertyAmountXof: 0, confidence: 0.97, warnings: [] };

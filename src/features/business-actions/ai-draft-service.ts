@@ -182,7 +182,7 @@ async function getExecutableProposal(proposalId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("ai_proposed_actions")
-    .select("id, job_id, action_name, target, action_input, before_versions, status, version, expires_at, execution_request_id, updated_at")
+    .select("id, job_id, action_name, risk_level, target, action_input, before_snapshot, before_versions, expected_effects, warnings, confidence, requires_clarification, status, version, expires_at, execution_request_id, updated_at")
     .eq("id", proposalId)
     .single();
   if (error || !data) throw new Error(error?.message ?? "未找到操作草稿。");
@@ -233,6 +233,42 @@ export async function reviseAiProposal(proposalId: string, expectedVersion: numb
   });
   if (error) throw new Error(error.message);
   const result = data as RpcTransitionResult;
+  if (!result.success) throw new Error(result.error ?? "操作草稿修改失败。");
+  return result;
+}
+
+export async function reviseAiProposalV2(
+  proposalId: string,
+  expectedVersion: number,
+  draft: AiProposalDraft,
+  changedFields: string[],
+) {
+  const user = await requireAuth();
+  const { supabase, proposal } = await getExecutableProposal(proposalId);
+  const { definition, expiresAt } = validateAiProposalDraft(draft);
+  requireBusinessActionRole(user.role, draft.action);
+  const currentVersions = await loadBusinessTargetVersions(draft.target);
+  if (JSON.stringify(proposal.target) === JSON.stringify(draft.target)) {
+    assertTargetVersionsUnchanged(proposal.before_versions as TargetVersionMap, currentVersions);
+  }
+  const { data, error } = await supabase.rpc("revise_ai_proposed_action_v2", {
+    p_proposal_id: proposalId,
+    p_expected_version: expectedVersion,
+    p_action_name: draft.action,
+    p_risk_level: definition.risk,
+    p_target: draft.target,
+    p_action_input: draft.input,
+    p_before_snapshot: draft.beforeSnapshot,
+    p_before_versions: currentVersions,
+    p_expected_effects: draft.expectedEffects,
+    p_warnings: draft.warnings ?? [],
+    p_confidence: draft.confidence,
+    p_requires_clarification: draft.requiresClarification ?? false,
+    p_expires_at: expiresAt,
+    p_revision_summary: { changed_fields: [...new Set(changedFields)].sort() },
+  });
+  if (error) throw new Error(error.message);
+  const result = data as RpcTransitionResult & { action_name?: string; expires_at?: string };
   if (!result.success) throw new Error(result.error ?? "操作草稿修改失败。");
   return result;
 }

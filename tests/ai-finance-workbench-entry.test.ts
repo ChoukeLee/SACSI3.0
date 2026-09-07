@@ -29,8 +29,11 @@ describe("AI finance workbench entry", () => {
     expect(view).toContain("conversationId={conversationId}");
     expect(upload).toContain("/api/receipt/scan");
     expect(upload).toContain("/api/receipt/prepare");
+    expect(upload).toContain("/api/receipt/revise");
     expect(upload).toContain("/api/receipt/confirm");
     expect(upload).toContain('body.append("conversation_id", conversationId)');
+    expect(upload).toContain("proposal_version: prepared.proposal.version");
+    expect(upload).toContain("每次修改都会生成新版本并写入审计记录");
   });
 
   it("accepts selected, pasted and dropped images in the main composer", () => {
@@ -42,10 +45,18 @@ describe("AI finance workbench entry", () => {
   });
 
   it("keeps every receipt API behind the server-side finance permission", () => {
-    for (const route of ["scan", "prepare", "confirm"]) {
+    for (const route of ["scan", "prepare", "revise", "confirm"]) {
       const source = read(`src/app/api/receipt/${route}/route.ts`);
       expect(source).toContain("await getCurrentUser()");
       expect(source).toContain('hasPermission(user, "finance:write")');
+    }
+  });
+
+  it("binds prepare, revision and confirmation to the same conversation", () => {
+    expect(upload.match(/conversation_id: conversationId/g)?.length).toBeGreaterThanOrEqual(3);
+    for (const route of ["prepare", "revise", "confirm"]) {
+      const source = read(`src/app/api/receipt/${route}/route.ts`);
+      expect(source).toContain("conversation_id");
     }
   });
 

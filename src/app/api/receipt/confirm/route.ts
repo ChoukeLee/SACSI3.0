@@ -9,6 +9,7 @@ import {
   confirmAiProposal,
   loadAiProposalExecutionContext,
 } from "@/features/business-actions/ai-draft-service";
+import { appendConversationTurn } from "@/features/ai-workbench/conversation-service";
 
 const ALLOWED_ACTIONS = new Set(["record_lease_rent", "record_property_fee", "record_combined_lease_payment"]);
 type PaymentMethod = "cash" | "check" | "bank_transfer" | "offset" | "other";
@@ -26,12 +27,18 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as Record<string, unknown>;
     proposalId = String(body.proposal_id ?? "");
+    const conversationId = String(body.conversation_id ?? "");
     const version = Number(body.proposal_version);
-    if (!proposalId || !Number.isInteger(version)) return NextResponse.json({ error: "Invalid proposal identity" }, { status: 400 });
+    if (!proposalId || !conversationId || !Number.isInteger(version)) return NextResponse.json({ error: "Invalid proposal identity" }, { status: 400 });
 
     const proposal = await loadAiProposalExecutionContext(proposalId);
     if (!ALLOWED_ACTIONS.has(proposal.action_name) || proposal.status !== "proposed" || proposal.version !== version) {
       return NextResponse.json({ error: "Proposal is no longer confirmable" }, { status: 409 });
+    }
+    const sessionClient = await createClient();
+    const { data: ownedJob, error: jobError } = await sessionClient.from("ai_jobs").select("id, conversation_id").eq("id", proposal.job_id).single();
+    if (jobError || !ownedJob || ownedJob.conversation_id !== conversationId) {
+      return NextResponse.json({ error: "Proposal does not belong to this conversation" }, { status: 409 });
     }
     const target = proposal.target as Record<string, unknown>;
     const input = proposal.action_input as Record<string, unknown>;
@@ -107,6 +114,16 @@ export async function POST(request: NextRequest) {
       error: verified ? undefined : "post_execution_verification_failed",
     });
     if (!verified) return NextResponse.json({ error: "收款写入后复查未通过，请勿重复提交并联系管理员。" }, { status: 500 });
+
+    const snapshot = proposal.before_snapshot as Record<string, unknown>;
+    await appendConversationTurn({
+      conversationId,
+      kind: "action_result",
+      userText: `确认并执行凭证草稿 v${version}`,
+      assistantText: `已入账并复核成功，共 ${actualTotal} XOF。`,
+      jobId: String(proposal.job_id),
+      context: { buildingCode: stringValue(snapshot, "buildingCode"), unitNo: stringValue(snapshot, "roomNo"), domain: "lease", proposalId, proposalVersion: version, paymentIds: payments!.map((payment) => payment.id) },
+    });
 
     for (const path of ["/", "/fr", "/leases", "/fr/leases", "/finance", "/fr/finance", "/management", "/fr/management"]) revalidatePath(path);
     return NextResponse.json({

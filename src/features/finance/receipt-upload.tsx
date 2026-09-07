@@ -9,7 +9,7 @@ import { formatXof } from "@/lib/utils";
 
 type PaymentMethod = "cash" | "check" | "bank_transfer" | "offset" | "other";
 interface ReceiptDraft { building_code: string | null; room_no: string | null; receipt_no: string | null; receipt_date: string | null; amount_xof: number | null; period_end: string | null; business_hint: "rent" | "property_fee" | null; payer_name: string | null; notes: string | null; confidence: "high" | "medium" | "low"; warnings: string[] }
-interface PreparedProposal { proposal: { id: string; version: number; action: string; expiresAt: string }; match: { building: string; roomNo: string; contractNo: string; currentPaidThrough: string | null }; plan: { kind: string; rentAmountXof: number; propertyAmountXof: number; confidence: string; warnings: string[] } }
+interface PreparedProposal { proposal: { id: string; version: number; action: string; expiresAt: string }; match: { building: string; roomNo: string; contractNo: string; currentPaidThrough: string | null }; plan: { kind: string; rentAmountXof: number; propertyAmountXof: number; confidence: number; warnings: string[] }; fields?: { buildingCode: string; roomNo: string; amountXof: number; receiptDate: string; paidThroughDate: string | null; payerName: string | null; notes: string | null; paymentMethod: PaymentMethod; businessHint: "rent" | "property_fee" | null } }
 interface Props {
   locale: "zh" | "fr";
   conversationId: string;
@@ -33,10 +33,12 @@ export function ReceiptUpload({ locale, conversationId, onClose, initialFile = n
   const [manualText, setManualText] = useState(initialText);
   const [jobId, setJobId] = useState("");
   const [prepared, setPrepared] = useState<PreparedProposal | null>(null);
-  const [busy, setBusy] = useState<"scan" | "prepare" | "confirm" | null>(null);
+  const [busy, setBusy] = useState<"scan" | "prepare" | "revise" | "confirm" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [done, setDone] = useState<{ references: string[] } | null>(null);
+  const [revisionInstruction, setRevisionInstruction] = useState("");
+  const [revisionMessage, setRevisionMessage] = useState<string | null>(null);
   const autoScanStarted = useRef(false);
   const [form, setForm] = useState({ buildingCode: "", roomNo: "", amount: "", receiptDate: "", paidThroughDate: "", payerName: "", notes: "", paymentMethod: "" as PaymentMethod | "", businessHint: "" as "rent" | "property_fee" | "" });
 
@@ -77,9 +79,36 @@ export function ReceiptUpload({ locale, conversationId, onClose, initialFile = n
     if (!jobId) return;
     setBusy("prepare"); setError(null); setWarning(null);
     try {
-      const result = await readJson(await fetch("/api/receipt/prepare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ job_id: jobId, building_code: form.buildingCode, room_no: form.roomNo, amount_xof: Number(form.amount), receipt_date: form.receiptDate, period_end: form.paidThroughDate || null, payer_name: form.payerName || null, payment_method: form.paymentMethod, business_hint: form.businessHint || null, notes: form.notes || null }) }));
+      const result = await readJson(await fetch("/api/receipt/prepare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ job_id: jobId, conversation_id: conversationId, building_code: form.buildingCode, room_no: form.roomNo, amount_xof: Number(form.amount), receipt_date: form.receiptDate, period_end: form.paidThroughDate || null, payer_name: form.payerName || null, payment_method: form.paymentMethod, business_hint: form.businessHint || null, notes: form.notes || null }) }));
       setPrepared(result as PreparedProposal);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "匹配失败。"); }
+    finally { setBusy(null); }
+  };
+
+  const revise = async () => {
+    if (!prepared || revisionInstruction.trim().length < 2) return;
+    setBusy("revise"); setError(null); setRevisionMessage(null);
+    try {
+      const result = await readJson(await fetch("/api/receipt/revise", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proposal_id: prepared.proposal.id, proposal_version: prepared.proposal.version, conversation_id: conversationId, instruction: revisionInstruction.trim() }),
+      })) as PreparedProposal & { message?: string };
+      setPrepared(result);
+      if (result.fields) setForm({
+        buildingCode: result.fields.buildingCode,
+        roomNo: result.fields.roomNo,
+        amount: String(result.fields.amountXof),
+        receiptDate: result.fields.receiptDate,
+        paidThroughDate: result.fields.paidThroughDate ?? "",
+        payerName: result.fields.payerName ?? "",
+        notes: result.fields.notes ?? "",
+        paymentMethod: result.fields.paymentMethod,
+        businessHint: result.fields.businessHint ?? "",
+      });
+      setRevisionMessage(result.message ?? (zh ? "草稿已更新。" : "Brouillon mis à jour."));
+      setRevisionInstruction("");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "草稿修改失败。"); }
     finally { setBusy(null); }
   };
 
@@ -87,7 +116,7 @@ export function ReceiptUpload({ locale, conversationId, onClose, initialFile = n
     if (!prepared) return;
     setBusy("confirm"); setError(null);
     try {
-      const result = await readJson(await fetch("/api/receipt/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ proposal_id: prepared.proposal.id, proposal_version: prepared.proposal.version }) }));
+      const result = await readJson(await fetch("/api/receipt/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ proposal_id: prepared.proposal.id, proposal_version: prepared.proposal.version, conversation_id: conversationId }) }));
       setDone({ references: result.referenceNos ?? [] });
       setWarning(result.warning ?? null);
       router.refresh();
@@ -134,8 +163,17 @@ export function ReceiptUpload({ locale, conversationId, onClose, initialFile = n
     </section>}
 
     {prepared && <section className="rounded-xl border bg-muted/20 p-4" aria-labelledby="receipt-confirm-title">
-      <div className="flex items-start justify-between gap-3"><div><h3 id="receipt-confirm-title" className="text-sm font-semibold">3. {zh ? "确认入账草稿" : "Confirmer le brouillon"}</h3><p className="mt-1 text-xs text-muted-foreground">{prepared.match.building} · {prepared.match.roomNo} · {prepared.match.contractNo}</p></div><span className="rounded-full border px-2 py-1 text-xs font-medium">{prepared.proposal.action === "record_combined_lease_payment" ? "L3" : "L2"}</span></div>
+      <div className="flex items-start justify-between gap-3"><div><h3 id="receipt-confirm-title" className="text-sm font-semibold">3. {zh ? "确认入账草稿" : "Confirmer le brouillon"}</h3><p className="mt-1 text-xs text-muted-foreground">{prepared.match.building} · {prepared.match.roomNo} · {prepared.match.contractNo} · v{prepared.proposal.version}</p></div><span className="rounded-full border px-2 py-1 text-xs font-medium">{prepared.proposal.action === "record_combined_lease_payment" ? "L3" : "L2"}</span></div>
       <dl className="mt-4 grid gap-3 rounded-lg bg-background p-3 sm:grid-cols-3"><Summary label={zh ? "总额" : "Total"} value={formatXof(Number(form.amount))} /><Summary label={zh ? "分配租金" : "Loyer"} value={formatXof(prepared.plan.rentAmountXof)} /><Summary label={zh ? "分配物业费" : "Charges"} value={formatXof(prepared.plan.propertyAmountXof)} /></dl>
+      <div className="mt-4 rounded-lg border border-border bg-background p-3">
+        <label className="text-xs font-semibold" htmlFor="receipt-revision-instruction">{zh ? "用自然语言修改草稿" : "Modifier le brouillon en langage naturel"}</label>
+        <textarea id="receipt-revision-instruction" rows={2} maxLength={500} value={revisionInstruction} onChange={(event) => setRevisionInstruction(event.target.value)} placeholder={zh ? "例如：房号改成 503，金额改为 25 万，这笔是物业费" : "Ex. : logement 503, montant 250000 XOF, charges"} className="mt-2 w-full resize-none rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <p className="text-[11px] text-muted-foreground">{zh ? "每次修改都会生成新版本并写入审计记录。" : "Chaque modification crée une nouvelle version auditée."}</p>
+          <Button variant="outline" className="min-h-9 shrink-0" onClick={revise} disabled={busy !== null || revisionInstruction.trim().length < 2}>{busy === "revise" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{zh ? "更新草稿" : "Mettre à jour"}</Button>
+        </div>
+        {revisionMessage && <p className="mt-2 text-xs text-emerald-700">{revisionMessage}</p>}
+      </div>
       <p className="mt-3 text-xs text-muted-foreground">{zh ? "确认后只执行上方不可变草稿；页面字段的后续变化不会改变本次执行内容。" : "La confirmation exécute uniquement ce brouillon immuable."}</p>
       <Button className="mt-4 min-h-11 w-full" onClick={confirm} disabled={busy !== null}>{busy === "confirm" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{zh ? "确认并入账" : "Confirmer et enregistrer"}</Button>
     </section>}
