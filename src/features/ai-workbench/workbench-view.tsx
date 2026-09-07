@@ -6,6 +6,7 @@ import { OperationalPage, StatTile } from "@/components/ui/operational";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/lib/i18n";
 import { askWorkbench, confirmWorkbenchAction, discardWorkbenchProposal } from "./actions";
+import { ReceiptWorkbench } from "./receipt-workbench";
 import { INITIAL_WORKBENCH_STATE, type WorkbenchActionResult, type WorkbenchDraftPreview, type WorkbenchResult, type WorkbenchTone } from "./types";
 
 // Suggestions stay functional for the parser in each locale.
@@ -33,8 +34,8 @@ const SUGGESTIONS: Record<Locale, string[]> = {
 const COPY: Record<Locale, Record<string, string>> = {
   zh: {
     eyebrow: "业务查询",
-    description: "用自然语言查询系统记录并生成受控操作草稿；L1 写操作必须人工确认后才会执行。",
-    badge: "查询 + L1 确认执行",
+    description: "用自然语言查询系统记录，或从凭证生成受控财务草稿；所有写操作必须人工确认后才会执行。",
+    badge: "查询 + 受控执行",
     askTitle: "查询事实或描述要办理的事项",
     askHint: "写明业务、楼栋、房号、日期和动作，系统会先核对再给出结果或草稿。",
     askLabel: "要查询的问题",
@@ -50,7 +51,7 @@ const COPY: Record<Locale, Record<string, string>> = {
     boundaryRulesTitle: "固定业务口径",
     boundaryRulesText: "应收、未收、逾期和房态沿用系统统一计算规则。",
     boundaryConfirmTitle: "先草稿、后确认",
-    boundaryConfirmText: "保洁完成草稿可按你的登录身份确认执行（日租统一原子 RPC），执行后自动复查；其余写操作尚未开放。",
+    boundaryConfirmText: "保洁与财务凭证均先生成不可变草稿，按当前登录身份确认后调用原子 RPC，并自动复查结果。",
     boundaryModelTitle: "最小化模型输入",
     boundaryModelText: "仅在本地规则无法识别时发送问题文字；数据库记录和查询结果不会发送。",
     errorTitle: "查询未完成",
@@ -75,8 +76,8 @@ const COPY: Record<Locale, Record<string, string>> = {
   },
   fr: {
     eyebrow: "Consultation métier",
-    description: "Interrogez les enregistrements en langage naturel et générez des brouillons contrôlés ; toute écriture L1 exige une confirmation humaine avant exécution.",
-    badge: "Consultation + exécution L1",
+    description: "Interrogez les enregistrements ou créez un brouillon financier depuis un reçu ; toute écriture exige une confirmation humaine.",
+    badge: "Consultation + exécution contrôlée",
     askTitle: "Interrogez les faits ou décrivez l'opération",
     askHint: "Indiquez le secteur, le bâtiment, la chambre, la date et l'action ; le système vérifie avant de répondre ou de proposer un brouillon.",
     askLabel: "Votre question",
@@ -92,7 +93,7 @@ const COPY: Record<Locale, Record<string, string>> = {
     boundaryRulesTitle: "Règles métier fixes",
     boundaryRulesText: "Créances, reste dû, retards et états suivent les calculs unifiés du système.",
     boundaryConfirmTitle: "Brouillon puis confirmation",
-    boundaryConfirmText: "Le brouillon de ménage peut être confirmé avec votre session (RPC atomique journalier), puis vérifié ; les autres écritures ne sont pas ouvertes.",
+    boundaryConfirmText: "Le ménage et les reçus financiers créent un brouillon immuable, confirmé avec votre session, exécuté par RPC atomique puis vérifié.",
     boundaryModelTitle: "Entrée modèle minimale",
     boundaryModelText: "Seul le texte de la question est envoyé quand les règles locales échouent ; jamais les enregistrements ni les résultats.",
     errorTitle: "Requête non aboutie",
@@ -127,7 +128,7 @@ const toneBorder: Record<WorkbenchTone, string> = {
   teal: "border-l-[#5CC4B8]",
 };
 
-export function AiWorkbenchView({ locale = "zh" }: { locale?: Locale }) {
+export function AiWorkbenchView({ locale = "zh", canRecordFinance = false }: { locale?: Locale; canRecordFinance?: boolean }) {
   const t = COPY[locale];
   const suggestions = SUGGESTIONS[locale];
   const [query, setQuery] = useState("");
@@ -147,9 +148,12 @@ export function AiWorkbenchView({ locale = "zh" }: { locale?: Locale }) {
       title="AI Workbench"
       description={t.description}
       action={
-        <span className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-accentGreen-100 bg-accentGreen-50 px-3 text-xs font-semibold text-accentGreen-700">
-          <LockKeyhole className="h-3.5 w-3.5" />{t.badge}
-        </span>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {canRecordFinance && <ReceiptWorkbench locale={locale} />}
+          <span className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-accentGreen-100 bg-accentGreen-50 px-3 text-xs font-semibold text-accentGreen-700">
+            <LockKeyhole className="h-3.5 w-3.5" />{t.badge}
+          </span>
+        </div>
       }
       className="mx-auto max-w-[1500px]"
     >

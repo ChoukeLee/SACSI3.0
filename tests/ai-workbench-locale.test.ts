@@ -16,7 +16,8 @@ describe("AI workbench French result layer", () => {
   it("threads the locale from the page into the workbench query pipeline", () => {
     expect(zhPage).toContain('locale="zh"');
     expect(frPage).toContain('locale="fr"');
-    expect(view).toContain("export function AiWorkbenchView({ locale = \"zh\" }");
+    expect(view).toContain('locale = "zh"');
+    expect(view).toContain("canRecordFinance = false");
     expect(view).toContain('name="locale"');
     expect(actions).toContain("function readLocale(formData: FormData): Locale");
     expect(actions).toContain("executeWorkbenchQuery(query, intent, locale)");
