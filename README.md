@@ -1,46 +1,114 @@
-# SACIS 3.0 科建地产房屋管理系统
+# SACSI 3.0
 
-首期聚焦 `SACSI11 / 11#公寓`，但代码和数据库按多楼栋架构设计，后续可扩展到 3#/4#/5#/6#/7#。
+SACSI 3.0 是科建地产使用的单租户房地产经营系统。系统以 Supabase 作为业务数据库，覆盖房源、日租、长租、出售、客户、应收、收付款、总账、数据质量和审计，并正在演进为可通过传统页面与 AI 工作台共同操作的业务系统。
 
-## 技术框架
+当前生产部署由 GitHub `main` 分支自动发布到 Vercel。数据库结构通过 `supabase/migrations` 中按时间排序的迁移维护。
 
-- Frontend: Next.js App Router + TypeScript + Tailwind CSS
-- Backend/DB: Supabase PostgreSQL
-- Hosting: Vercel + Supabase
-- PWA、权限、深色模式后续按模块接入；中法双语骨架已建立
+## 产品范围
 
-## 本地启动
+- 多项目与多楼栋：SACSI 3/4/5/6/7/11，以及 CIMAC 商业项目。
+- 日租：预订、入住、续住、收款、退房、取消、保洁和房态。
+- 长租：合同、租金、物业费、押金、组合收款、应收和退租记录。
+- 出售：销售合同、付款计划、收款、退款及过户状态。
+- 经营数据：管理首页、财务流水、应收、报表、客户档案和数据质量。
+- 系统能力：Supabase Auth、角色权限、RLS、原子 RPC、幂等请求、审计日志、Sentry 和每日备份。
+- AI 工作台：自然语言查询、受控操作草稿、人工确认以及财务凭证识别基础设施。
+
+## 技术栈
+
+- Next.js 15 App Router、React 19、TypeScript
+- Tailwind CSS、Radix UI、Framer Motion
+- Supabase PostgreSQL、Auth、Storage、RLS、PostgREST/RPC
+- Vitest、GitHub Actions、Vercel、Sentry
+
+## 架构原则
+
+传统页面和 AI 工作台是两种平级入口，最终应进入同一套业务动作和数据库 RPC：
+
+```text
+传统页面 ─┐
+          ├─ Business Actions ─ 权限/业务校验 ─ 原子 RPC ─ Supabase
+AI 工作台 ┘
+```
+
+AI 不直接执行 SQL，也不拥有独立于当前登录用户的权限。所有写操作必须先形成不可变草稿，经人工确认后执行，并在执行后重新查询数据库验证结果。
+
+详细说明见 [系统架构](docs/ARCHITECTURE.md) 和 [AI 开发进度](docs/AI_PROGRESS.md)。
+
+## 本地运行
+
+要求 Node.js 24。
 
 ```bash
-npm install
+npm ci
+cp .env.example .env.local
 npm run dev
 ```
 
-复制 `.env.example` 为 `.env.local` 后填入 Supabase 项目配置。
+`.env.local` 至少需要：
 
-## 目录说明
+```text
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+```
 
-- `src/app`: 页面路由
-- `src/components`: 通用 UI 和应用壳
-- `src/features`: 各业务模块骨架
-- `src/lib`: Supabase、工具函数、配置
-- `src/lib/i18n.ts`: 中文/法语界面文案字典和语言路由工具
-- `src/types`: 业务类型定义
-- `supabase/migrations`: 数据库迁移与 11#初始化数据
-- `docs/claude_code_module_prompts.md`: 后续交给 Claude Code 的模块提示词
+`SUPABASE_SERVICE_ROLE_KEY` 只能在服务端使用，不能添加 `NEXT_PUBLIC_` 前缀，也不能提交到 Git。
 
-## 首期范围
+## 验证
 
-1. 11#房源档案和房态中心
-2. 客户档案
-3. 日租业务
-4. 长租业务
-5. 出售业务
-6. 财务流水
-7. 报表与提醒基础框架
+```bash
+npm run check:daily-rental-rules
+npm run typecheck
+npm test
+npm run build
+```
 
-## 双语路由
+提交前的完整检查使用：
 
-- 中文默认路径：`/`, `/units`, `/daily-rentals`
-- 法语路径：`/fr`, `/fr/units`, `/fr/daily-rentals`
-- 后续新增页面时，需要同步补充 `src/lib/i18n.ts` 内的 `zh` 和 `fr` 文案。
+```bash
+npm run validate
+npm test
+git diff --check
+```
+
+## 主要目录
+
+```text
+src/app                 页面、路由和 API
+src/components          应用外壳与通用 UI
+src/features            业务模块与 Server Actions
+src/features/ai-workbench
+                        AI 查询、草稿、确认与财务匹配
+src/features/business-actions
+                        业务动作目录和 AI 证据链服务
+src/lib/supabase        浏览器、服务端与特权客户端
+src/types               领域与数据库类型
+supabase/migrations     数据库迁移、RLS 和原子 RPC
+scripts                 仍在使用的备份、核对和运维脚本
+tests                   跨模块业务规则测试
+docs                    当前架构、业务规则和运维文档
+```
+
+## 角色
+
+- `admin`：全部业务与系统维护。
+- `boss`：经营与审计只读。
+- `finance`：财务登记及授权数据读取。
+- `front_desk`：法语日租操作、长租只读。
+- `rental_sales`：客户、日租、长租和出售业务。
+
+页面权限只是第一层保护；关键写入还必须经过服务端角色校验和数据库授权。
+
+## 部署与数据库变更
+
+- 推送 `main` 会触发 GitHub Actions 检查及 Vercel 生产部署。
+- 应用部署不会自动替代数据库迁移。新增迁移必须先备份、审阅 RLS/RPC 权限并在隔离环境验证。
+- `.env.local`、`.vercel`、构建产物和本地工具目录均不得提交。
+- 生产检查流程见 [PRODUCTION_CHECKLIST](docs/PRODUCTION_CHECKLIST.md)。
+
+## 当前 AI 状态
+
+已完成自然语言只读查询、L1 保洁草稿确认执行、AI 证据链，以及图片/文字凭证的长租租金和物业费候选提取与入账 API。凭证上传界面尚未接入当前 AI 工作台；Excel/PDF、语音、合同导入、经营洞察和后台自动化仍在后续范围。
+
+以 [AI_PROGRESS](docs/AI_PROGRESS.md) 为当前进度基准，早期设计讨论不作为已完成能力说明。

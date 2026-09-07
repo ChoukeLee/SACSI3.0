@@ -13,6 +13,8 @@ describe("core page performance architecture", () => {
     expect(source).toContain("lease_contracts(");
     expect(source).toContain("sale_contracts(");
     expect(source).toContain("daily_bookings(");
+    expect(source).toContain("customers!daily_bookings_guest_customer_id_fkey");
+    expect(source).toContain("customers!daily_bookings_customer_id_fkey");
     expect(source).not.toContain('.from("audit_logs")');
   });
 

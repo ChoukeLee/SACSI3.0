@@ -1,5 +1,6 @@
 .next
 node_modules
+.claude/
 .env
 .env.local
 .env.*.local
@@ -7,6 +8,7 @@ dist
 coverage
 *.tsbuildinfo
 outputs/
+work/
 docs/design/
 
 .vercel

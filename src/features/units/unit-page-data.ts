@@ -35,12 +35,15 @@ type CatalogUnit = UnitRow & {
   }>;
   daily_bookings: Array<{
     customer_id: string;
+    guest_customer_id: string | null;
+    guest_name: string | null;
     check_in: string;
     check_out: string | null;
     checkout_mode: string | null;
     actual_check_out: string | null;
     status: string;
-    customer: RelatedCustomer;
+    guest_customer: RelatedCustomer;
+    legacy_customer: RelatedCustomer;
   }>;
 };
 
@@ -64,7 +67,11 @@ export async function loadUnitPageData() {
       unit_business_flags(unit_id, business_type, is_enabled, default_price_xof),
       lease_contracts(unit_id, customer_id, expected_end_date, expected_end_confirmed, status, start_date, customer:customers(name)),
       sale_contracts(unit_id, customer_id, signed_date, status, customer:customers(name)),
-      daily_bookings(unit_id, customer_id, check_in, check_out, checkout_mode, actual_check_out, status, customer:customers(name))
+      daily_bookings(
+        unit_id, customer_id, guest_customer_id, guest_name, check_in, check_out, checkout_mode, actual_check_out, status,
+        guest_customer:customers!daily_bookings_guest_customer_id_fkey(name),
+        legacy_customer:customers!daily_bookings_customer_id_fkey(name)
+      )
     `)
     .eq("building.is_active", true)
     .eq("lease_contracts.status", "active")
@@ -115,7 +122,11 @@ export async function loadUnitPageData() {
       leaseEndDate: lease?.expected_end_date ?? undefined,
       leaseEndConfirmed: lease ? lease.expected_end_confirmed !== false : undefined,
       saleCustomerName: sale ? customerName(sale.customer) : undefined,
-      dailyCustomerName: booking ? customerName(booking.customer) : undefined,
+      dailyCustomerName: booking
+        ? booking.guest_name?.trim()
+          || customerName(booking.guest_customer)
+          || customerName(booking.legacy_customer)
+        : undefined,
       dailyDateText: booking
         ? `${booking.check_in} - ${booking.checkout_mode === "open" ? booking.actual_check_out ?? "未定" : booking.check_out ?? booking.check_in}`
         : undefined,

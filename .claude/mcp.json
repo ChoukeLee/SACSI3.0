@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "sacis-vision": {
-      "command": "node",
-      "args": ["scripts/vision-mcp.mjs"]
-    }
-  }
-}
