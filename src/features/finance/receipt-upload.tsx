@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Check, ImageUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,13 @@ import { formatXof } from "@/lib/utils";
 type PaymentMethod = "cash" | "check" | "bank_transfer" | "offset" | "other";
 interface ReceiptDraft { building_code: string | null; room_no: string | null; receipt_no: string | null; receipt_date: string | null; amount_xof: number | null; period_end: string | null; business_hint: "rent" | "property_fee" | null; payer_name: string | null; notes: string | null; confidence: "high" | "medium" | "low"; warnings: string[] }
 interface PreparedProposal { proposal: { id: string; version: number; action: string; expiresAt: string }; match: { building: string; roomNo: string; contractNo: string; currentPaidThrough: string | null }; plan: { kind: string; rentAmountXof: number; propertyAmountXof: number; confidence: string; warnings: string[] } }
-interface Props { locale: "zh" | "fr"; onClose: () => void }
+interface Props {
+  locale: "zh" | "fr";
+  onClose: () => void;
+  initialFile?: File | null;
+  initialText?: string;
+  autoScan?: boolean;
+}
 
 async function readJson(response: Response) {
   const data = await response.json().catch(() => ({}));
@@ -18,18 +24,19 @@ async function readJson(response: Response) {
   return data;
 }
 
-export function ReceiptUpload({ locale, onClose }: Props) {
+export function ReceiptUpload({ locale, onClose, initialFile = null, initialText = "", autoScan = false }: Props) {
   const zh = locale === "zh";
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [manualText, setManualText] = useState("");
+  const [file, setFile] = useState<File | null>(initialFile);
+  const [manualText, setManualText] = useState(initialText);
   const [jobId, setJobId] = useState("");
   const [prepared, setPrepared] = useState<PreparedProposal | null>(null);
   const [busy, setBusy] = useState<"scan" | "prepare" | "confirm" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [done, setDone] = useState<{ references: string[] } | null>(null);
+  const autoScanStarted = useRef(false);
   const [form, setForm] = useState({ buildingCode: "", roomNo: "", amount: "", receiptDate: "", paidThroughDate: "", payerName: "", notes: "", paymentMethod: "" as PaymentMethod | "", businessHint: "" as "rent" | "property_fee" | "" });
 
   const setField = (key: keyof typeof form, value: string) => {
@@ -55,6 +62,14 @@ export function ReceiptUpload({ locale, onClose }: Props) {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "识别失败。"); }
     finally { setBusy(null); }
   };
+
+  useEffect(() => {
+    if (!autoScan || autoScanStarted.current || (!initialFile && !initialText.trim())) return;
+    autoScanStarted.current = true;
+    void scan();
+    // Initial attachments are immutable for this mounted conversation turn.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoScan]);
 
   const prepare = async () => {
     if (!jobId) return;

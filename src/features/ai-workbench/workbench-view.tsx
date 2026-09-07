@@ -1,13 +1,22 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
-import { ArrowUp, CheckCircle2, Clock3, Database, LockKeyhole, Search, ShieldCheck, Sparkles } from "lucide-react";
+import { type ClipboardEvent, type DragEvent, type FormEvent, useActionState, useEffect, useRef, useState } from "react";
+import { ArrowUp, CheckCircle2, Clock3, Database, ImageIcon, LockKeyhole, Paperclip, Search, ShieldCheck, Sparkles, X } from "lucide-react";
 import { OperationalPage, StatTile } from "@/components/ui/operational";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/lib/i18n";
+import { ReceiptUpload } from "@/features/finance/receipt-upload";
 import { askWorkbench, confirmWorkbenchAction, discardWorkbenchProposal } from "./actions";
-import { ReceiptWorkbench } from "./receipt-workbench";
 import { INITIAL_WORKBENCH_STATE, type WorkbenchActionResult, type WorkbenchDraftPreview, type WorkbenchResult, type WorkbenchTone } from "./types";
+
+const ALLOWED_RECEIPT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
+
+interface ReceiptTurn {
+  id: number;
+  file: File;
+  prompt: string;
+}
 
 // Suggestions stay functional for the parser in each locale.
 const SUGGESTIONS: Record<Locale, string[]> = {
@@ -41,6 +50,15 @@ const COPY: Record<Locale, Record<string, string>> = {
     askLabel: "要查询的问题",
     placeholder: "例如：11#长租有哪些逾期？",
     xofNote: "金额统一以 XOF（西非法郎）展示",
+    attach: "添加凭证图片",
+    attachmentHint: "支持粘贴、拖入或选择 JPEG / PNG / WebP，最大 10 MB",
+    invalidImage: "仅支持 JPEG、PNG 或 WebP 图片。",
+    imageTooLarge: "图片不能超过 10 MB。",
+    removeImage: "移除图片",
+    receiptTurn: "财务凭证识别",
+    receiptPromptFallback: "请识别这张凭证并生成入账草稿。",
+    closeReceiptTurn: "关闭本次凭证处理",
+    receiptActive: "请先完成或关闭当前凭证处理，再添加新图片。",
     submitting: "正在核对记录",
     submit: "提交",
     examples: "常用查询",
@@ -83,6 +101,15 @@ const COPY: Record<Locale, Record<string, string>> = {
     askLabel: "Votre question",
     placeholder: "Ex. : 11#长租有哪些逾期 ?",
     xofNote: "Montants affichés en XOF (franc CFA)",
+    attach: "Ajouter une image",
+    attachmentHint: "Collez, déposez ou choisissez un JPEG / PNG / WebP de 10 Mo maximum",
+    invalidImage: "Seules les images JPEG, PNG et WebP sont acceptées.",
+    imageTooLarge: "L’image ne doit pas dépasser 10 Mo.",
+    removeImage: "Retirer l’image",
+    receiptTurn: "Analyse du justificatif",
+    receiptPromptFallback: "Analysez ce justificatif et préparez un brouillon comptable.",
+    closeReceiptTurn: "Fermer ce traitement",
+    receiptActive: "Terminez ou fermez le justificatif en cours avant d’ajouter une autre image.",
     submitting: "Vérification en cours…",
     submit: "Envoyer",
     examples: "Exemples de requêtes",
@@ -132,8 +159,24 @@ export function AiWorkbenchView({ locale = "zh", canRecordFinance = false }: { l
   const t = COPY[locale];
   const suggestions = SUGGESTIONS[locale];
   const [query, setQuery] = useState("");
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState("");
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [receiptTurn, setReceiptTurn] = useState<ReceiptTurn | null>(null);
   const [state, formAction, pending] = useActionState(askWorkbench, INITIAL_WORKBENCH_STATE);
   const resultRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!attachment) {
+      setAttachmentPreview("");
+      return;
+    }
+    const objectUrl = URL.createObjectURL(attachment);
+    setAttachmentPreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [attachment]);
 
   useEffect(() => {
     if (state.status !== "idle") {
@@ -142,24 +185,63 @@ export function AiWorkbenchView({ locale = "zh", canRecordFinance = false }: { l
     }
   }, [state]);
 
+  const acceptAttachment = (file: File) => {
+    if (!canRecordFinance) return;
+    if (receiptTurn) {
+      setAttachmentError(t.receiptActive);
+      return;
+    }
+    if (!ALLOWED_RECEIPT_TYPES.has(file.type)) {
+      setAttachmentError(t.invalidImage);
+      return;
+    }
+    if (file.size > MAX_RECEIPT_BYTES) {
+      setAttachmentError(t.imageTooLarge);
+      return;
+    }
+    setAttachment(file);
+    setAttachmentError(null);
+  };
+
+  const handlePaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const image = Array.from(event.clipboardData.files).find((file) => file.type.startsWith("image/"));
+    if (!image) return;
+    acceptAttachment(image);
+    if (!event.clipboardData.getData("text/plain")) event.preventDefault();
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDragging(false);
+    const image = Array.from(event.dataTransfer.files).find((file) => file.type.startsWith("image/"));
+    if (image) acceptAttachment(image);
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (!attachment) return;
+    event.preventDefault();
+    setReceiptTurn({ id: Date.now(), file: attachment, prompt: query.trim() });
+    setAttachment(null);
+    setAttachmentError(null);
+    setQuery("");
+    window.setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  };
+
   return (
     <OperationalPage
       eyebrow={t.eyebrow}
       title="AI Workbench"
       description={t.description}
       action={
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {canRecordFinance && <ReceiptWorkbench locale={locale} />}
-          <span className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-accentGreen-100 bg-accentGreen-50 px-3 text-xs font-semibold text-accentGreen-700">
-            <LockKeyhole className="h-3.5 w-3.5" />{t.badge}
-          </span>
-        </div>
+        <span className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-accentGreen-100 bg-accentGreen-50 px-3 text-xs font-semibold text-accentGreen-700">
+          <LockKeyhole className="h-3.5 w-3.5" />{t.badge}
+        </span>
       }
       className="mx-auto max-w-[1500px]"
     >
       <section className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
         <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">
-          <form action={formAction} className="p-5 sm:p-7">
+          <form action={formAction} onSubmit={handleSubmit} className="p-5 sm:p-7">
             <input type="hidden" name="locale" value={locale} />
             <div className="mb-4 flex items-center gap-3">
               <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -172,22 +254,64 @@ export function AiWorkbenchView({ locale = "zh", canRecordFinance = false }: { l
             </div>
 
             <label htmlFor="ai-workbench-query" className="sr-only">{t.askLabel}</label>
-            <div className="rounded-xl border border-border-strong bg-background/55 p-2 transition-shadow focus-within:border-ring focus-within:shadow-glow">
+            <div
+              className={cn("rounded-xl border border-border-strong bg-background/55 p-2 transition-all focus-within:border-ring focus-within:shadow-glow", dragging && "border-accentBlue-500 bg-accentBlue-50/45 shadow-glow")}
+              onDragEnter={(event) => { if (canRecordFinance) { event.preventDefault(); setDragging(true); } }}
+              onDragOver={(event) => { if (canRecordFinance) event.preventDefault(); }}
+              onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
+              onDrop={handleDrop}
+            >
               <textarea
                 id="ai-workbench-query"
                 name="query"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
+                onPaste={handlePaste}
                 rows={3}
                 maxLength={500}
                 placeholder={t.placeholder}
                 className="min-h-[92px] w-full resize-none bg-transparent px-2.5 py-2 text-base leading-7 text-foreground outline-none placeholder:text-muted-foreground/70 sm:text-[15px]"
               />
+              {attachment && (
+                <div className="mx-1 mb-2 flex items-center gap-3 rounded-lg border border-border bg-card p-2 shadow-xs">
+                  {attachmentPreview
+                    ? <img src={attachmentPreview} alt="" className="h-12 w-12 rounded-md border border-border object-cover" />
+                    : <span className="flex h-12 w-12 items-center justify-center rounded-md bg-muted"><ImageIcon className="h-5 w-5 text-muted-foreground" /></span>}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-semibold">{attachment.name}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">{(attachment.size / 1024 / 1024).toFixed(2)} MB</p>
+                  </div>
+                  <button type="button" onClick={() => setAttachment(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={t.removeImage}>
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+              {attachmentError && <p className="mx-2 mb-2 text-xs text-accentRed-700" role="alert">{attachmentError}</p>}
               <div className="flex items-center justify-between gap-3 border-t border-border/70 px-1 pt-2">
-                <span className="hidden text-[11px] text-muted-foreground sm:inline">{t.xofNote}</span>
+                <div className="flex min-w-0 items-center gap-2">
+                  {canRecordFinance && !receiptTurn && (
+                    <>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="sr-only"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (file) acceptAttachment(file);
+                          event.target.value = "";
+                        }}
+                      />
+                      <button type="button" onClick={() => fileInputRef.current?.click()} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label={t.attach} title={t.attachmentHint}>
+                        <Paperclip className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
+                  <span className="hidden truncate text-[11px] text-muted-foreground sm:inline">{attachment ? t.attachmentHint : t.xofNote}</span>
+                </div>
                 <button
                   type="submit"
-                  disabled={pending || query.trim().length < 2}
+                  disabled={pending || (!attachment && query.trim().length < 2)}
                   className="ml-auto inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   {pending ? <Clock3 className="h-4 w-4 animate-pulse" /> : <ArrowUp className="h-4 w-4" />}
@@ -226,6 +350,15 @@ export function AiWorkbenchView({ locale = "zh", canRecordFinance = false }: { l
       </section>
 
       <div ref={resultRef} className="scroll-mt-16">
+        {receiptTurn && (
+          <ReceiptConversation
+            key={receiptTurn.id}
+            locale={locale}
+            turn={receiptTurn}
+            t={t}
+            onClose={() => setReceiptTurn(null)}
+          />
+        )}
         {pending && <LoadingResult t={t} />}
         {!pending && state.status === "error" && (
           <section className="rounded-xl border border-accentRed-100 bg-accentRed-50 p-5 text-sm text-accentRed-700" role="status" aria-atomic="true">
@@ -237,6 +370,42 @@ export function AiWorkbenchView({ locale = "zh", canRecordFinance = false }: { l
         {!pending && state.result?.kind === "action_draft" && <WorkbenchDraftFlow key={state.result.execution.taskId} t={t} locale={locale} draft={state.result} />}
       </div>
     </OperationalPage>
+  );
+}
+
+function ReceiptConversation({ locale, turn, t, onClose }: { locale: Locale; turn: ReceiptTurn; t: Record<string, string>; onClose: () => void }) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-card" aria-labelledby={`receipt-turn-${turn.id}`}>
+      <div className="border-b border-border bg-muted/25 px-4 py-4 sm:px-6">
+        <div className="ml-auto max-w-xl rounded-2xl rounded-br-md bg-primary px-4 py-3 text-primary-foreground">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-foreground/12"><ImageIcon className="h-4 w-4" /></span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold">{turn.file.name}</p>
+              <p className="mt-1 text-xs leading-5 text-primary-foreground/75">{turn.prompt || t.receiptPromptFallback}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="p-4 sm:p-6">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accentGreen-50 text-accentGreen-700"><Sparkles className="h-4 w-4" /></span>
+            <h2 id={`receipt-turn-${turn.id}`} className="text-sm font-semibold">{t.receiptTurn}</h2>
+          </div>
+          <button type="button" onClick={onClose} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label={t.closeReceiptTurn}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <ReceiptUpload
+          locale={locale}
+          initialFile={turn.file}
+          initialText={turn.prompt}
+          autoScan
+          onClose={onClose}
+        />
+      </div>
+    </section>
   );
 }
 

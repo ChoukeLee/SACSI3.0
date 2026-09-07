@@ -55,7 +55,8 @@ export async function POST(request: NextRequest) {
       if (uploadError) throw new Error(`Receipt upload failed: ${uploadError.message}`);
 
       const ocr = await extractReceiptTextFromImage(bytes, file.name);
-      rawText = ocr.rawText;
+      if (manualText) await addAiTextInput(String(job.id), 2, manualText);
+      rawText = [ocr.rawText, manualText].filter(Boolean).join("\n\n");
       provider = ocr.provider;
       ocrError = ocr.error ?? null;
       structured = ocr.structured ?? null;
