@@ -9,6 +9,7 @@ describe("AI proposal revision v2", () => {
   const migration = read("supabase/migrations/20260907155658_add_ai_proposal_revision_v2.sql");
   const service = read("src/features/business-actions/ai-draft-service.ts");
   const route = read("src/app/api/receipt/revise/route.ts");
+  const model = read("src/features/ai-workbench/receipt-revision-model.ts");
 
   it("locks the owned proposal and enforces optimistic versioning", () => {
     expect(migration).toMatch(/job\.actor_id = v_actor_id[\s\S]+for update of proposal/i);
@@ -35,5 +36,15 @@ describe("AI proposal revision v2", () => {
     expect(route).toContain("proposal.version !== expectedVersion");
     expect(service).toContain('supabase.rpc("revise_ai_proposed_action_v2"');
     expect(service).toContain("loadBusinessTargetVersions(draft.target)");
+  });
+
+  it("uses a bounded structured model only after local parsing fails", () => {
+    expect(route.indexOf("parseReceiptRevisionInstruction(instruction)")).toBeLessThan(route.indexOf("await interpretReceiptRevisionWithModel"));
+    expect(route).toContain("interpreted.confidence < 0.75");
+    expect(model).toContain('input: instruction');
+    expect(model).toContain("additionalProperties: false");
+    expect(model).toContain('store: false');
+    expect(model).not.toContain("createClient");
+    expect(model).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
   });
 });
