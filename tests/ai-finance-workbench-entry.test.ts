@@ -60,6 +60,18 @@ describe("AI finance workbench entry", () => {
     }
   });
 
+  it("routes the main composer into the active receipt proposal", () => {
+    expect(view).toContain("resolveWorkbenchComposerRoute");
+    expect(view).toContain('route === "receipt_revision"');
+    expect(view).toContain("setExternalRevision");
+    expect(view).toContain("receiptRevisionMode");
+    expect(upload).toContain("externalRevision.instruction");
+    expect(upload).toContain("onRevisionTargetChange");
+    expect(upload).toContain("onExternalRevisionHandled");
+    expect(upload).toContain("onRevisionBusyChange");
+    expect(view).toContain("receiptFlowBusy");
+  });
+
   it("accepts only bounded image inputs before creating a financial draft", () => {
     expect(scan).toContain('new Set(["image/jpeg", "image/png", "image/webp"])');
     expect(scan).toContain("10 * 1024 * 1024");

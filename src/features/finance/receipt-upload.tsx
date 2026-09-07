@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Check, ImageUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,8 @@ import { formatXof } from "@/lib/utils";
 type PaymentMethod = "cash" | "check" | "bank_transfer" | "offset" | "other";
 interface ReceiptDraft { building_code: string | null; room_no: string | null; receipt_no: string | null; receipt_date: string | null; amount_xof: number | null; period_end: string | null; business_hint: "rent" | "property_fee" | null; payer_name: string | null; notes: string | null; confidence: "high" | "medium" | "low"; warnings: string[] }
 interface PreparedProposal { proposal: { id: string; version: number; action: string; expiresAt: string }; match: { building: string; roomNo: string; contractNo: string; currentPaidThrough: string | null }; plan: { kind: string; rentAmountXof: number; propertyAmountXof: number; confidence: number; warnings: string[] }; fields?: { buildingCode: string; roomNo: string; amountXof: number; receiptDate: string; paidThroughDate: string | null; payerName: string | null; notes: string | null; paymentMethod: PaymentMethod; businessHint: "rent" | "property_fee" | null } }
+export interface ReceiptRevisionTarget { proposalId: string; version: number }
+export interface ReceiptRevisionRequest { id: number; instruction: string }
 interface Props {
   locale: "zh" | "fr";
   conversationId: string;
@@ -17,6 +19,10 @@ interface Props {
   initialFile?: File | null;
   initialText?: string;
   autoScan?: boolean;
+  onRevisionTargetChange?: (target: ReceiptRevisionTarget | null) => void;
+  onRevisionBusyChange?: (busy: boolean) => void;
+  externalRevision?: ReceiptRevisionRequest | null;
+  onExternalRevisionHandled?: (id: number) => void;
 }
 
 async function readJson(response: Response) {
@@ -25,7 +31,7 @@ async function readJson(response: Response) {
   return data;
 }
 
-export function ReceiptUpload({ locale, conversationId, onClose, initialFile = null, initialText = "", autoScan = false }: Props) {
+export function ReceiptUpload({ locale, conversationId, onClose, initialFile = null, initialText = "", autoScan = false, onRevisionTargetChange, onRevisionBusyChange, externalRevision = null, onExternalRevisionHandled }: Props) {
   const zh = locale === "zh";
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -40,6 +46,7 @@ export function ReceiptUpload({ locale, conversationId, onClose, initialFile = n
   const [revisionInstruction, setRevisionInstruction] = useState("");
   const [revisionMessage, setRevisionMessage] = useState<string | null>(null);
   const autoScanStarted = useRef(false);
+  const lastExternalRevisionId = useRef(0);
   const [form, setForm] = useState({ buildingCode: "", roomNo: "", amount: "", receiptDate: "", paidThroughDate: "", payerName: "", notes: "", paymentMethod: "" as PaymentMethod | "", businessHint: "" as "rent" | "property_fee" | "" });
 
   const setField = (key: keyof typeof form, value: string) => {
@@ -85,14 +92,15 @@ export function ReceiptUpload({ locale, conversationId, onClose, initialFile = n
     finally { setBusy(null); }
   };
 
-  const revise = async () => {
-    if (!prepared || revisionInstruction.trim().length < 2) return;
+  const revise = useCallback(async (instructionOverride?: string) => {
+    const instruction = (instructionOverride ?? revisionInstruction).trim();
+    if (!prepared || instruction.length < 2) return;
     setBusy("revise"); setError(null); setRevisionMessage(null);
     try {
       const result = await readJson(await fetch("/api/receipt/revise", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ proposal_id: prepared.proposal.id, proposal_version: prepared.proposal.version, conversation_id: conversationId, instruction: revisionInstruction.trim() }),
+        body: JSON.stringify({ proposal_id: prepared.proposal.id, proposal_version: prepared.proposal.version, conversation_id: conversationId, instruction }),
       })) as PreparedProposal & { message?: string };
       setPrepared(result);
       if (result.fields) setForm({
@@ -110,7 +118,21 @@ export function ReceiptUpload({ locale, conversationId, onClose, initialFile = n
       setRevisionInstruction("");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "草稿修改失败。"); }
     finally { setBusy(null); }
-  };
+  }, [conversationId, prepared, revisionInstruction, zh]);
+
+  useEffect(() => {
+    onRevisionTargetChange?.(prepared && !done ? { proposalId: prepared.proposal.id, version: prepared.proposal.version } : null);
+  }, [done, onRevisionTargetChange, prepared]);
+
+  useEffect(() => {
+    onRevisionBusyChange?.(busy !== null);
+  }, [busy, onRevisionBusyChange]);
+
+  useEffect(() => {
+    if (!externalRevision || !prepared || externalRevision.id === lastExternalRevisionId.current) return;
+    lastExternalRevisionId.current = externalRevision.id;
+    void revise(externalRevision.instruction).finally(() => onExternalRevisionHandled?.(externalRevision.id));
+  }, [externalRevision, onExternalRevisionHandled, prepared, revise]);
 
   const confirm = async () => {
     if (!prepared) return;
@@ -170,7 +192,7 @@ export function ReceiptUpload({ locale, conversationId, onClose, initialFile = n
         <textarea id="receipt-revision-instruction" rows={2} maxLength={500} value={revisionInstruction} onChange={(event) => setRevisionInstruction(event.target.value)} placeholder={zh ? "例如：房号改成 503，金额改为 25 万，这笔是物业费" : "Ex. : logement 503, montant 250000 XOF, charges"} className="mt-2 w-full resize-none rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
         <div className="mt-2 flex items-center justify-between gap-3">
           <p className="text-[11px] text-muted-foreground">{zh ? "每次修改都会生成新版本并写入审计记录。" : "Chaque modification crée une nouvelle version auditée."}</p>
-          <Button variant="outline" className="min-h-9 shrink-0" onClick={revise} disabled={busy !== null || revisionInstruction.trim().length < 2}>{busy === "revise" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{zh ? "更新草稿" : "Mettre à jour"}</Button>
+          <Button variant="outline" className="min-h-9 shrink-0" onClick={() => void revise()} disabled={busy !== null || revisionInstruction.trim().length < 2}>{busy === "revise" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{zh ? "更新草稿" : "Mettre à jour"}</Button>
         </div>
         {revisionMessage && <p className="mt-2 text-xs text-emerald-700">{revisionMessage}</p>}
       </div>

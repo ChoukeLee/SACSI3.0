@@ -1,13 +1,14 @@
 "use client";
 
-import { type ClipboardEvent, type DragEvent, type FormEvent, useActionState, useEffect, useRef, useState } from "react";
+import { type ClipboardEvent, type DragEvent, type FormEvent, useActionState, useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, CheckCircle2, Clock3, Database, ImageIcon, LockKeyhole, Paperclip, Search, ShieldCheck, Sparkles, X } from "lucide-react";
 import { OperationalPage, StatTile } from "@/components/ui/operational";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/lib/i18n";
-import { ReceiptUpload } from "@/features/finance/receipt-upload";
+import { ReceiptUpload, type ReceiptRevisionRequest, type ReceiptRevisionTarget } from "@/features/finance/receipt-upload";
 import type { ConversationTurnSummary } from "./conversation-service";
 import { askWorkbench, confirmWorkbenchAction, discardWorkbenchProposal } from "./actions";
+import { resolveWorkbenchComposerRoute } from "./composer-routing";
 import { INITIAL_WORKBENCH_STATE, type WorkbenchActionResult, type WorkbenchDraftPreview, type WorkbenchResult, type WorkbenchTone } from "./types";
 
 const ALLOWED_RECEIPT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -41,6 +42,11 @@ const SUGGESTIONS: Record<Locale, string[]> = {
   ],
 };
 
+const REVISION_SUGGESTIONS: Record<Locale, string[]> = {
+  zh: ["金额改为 25 万", "这笔是物业费", "付款日期改为 2026-09-07", "付款方式改成银行转账"],
+  fr: ["montant 250000 XOF", "cette somme est pour les charges", "date 2026-09-07", "paiement par virement"],
+};
+
 const COPY: Record<Locale, Record<string, string>> = {
   zh: {
     eyebrow: "业务查询",
@@ -60,11 +66,15 @@ const COPY: Record<Locale, Record<string, string>> = {
     receiptPromptFallback: "请识别这张凭证并生成入账草稿。",
     closeReceiptTurn: "关闭本次凭证处理",
     receiptActive: "请先完成或关闭当前凭证处理，再添加新图片。",
+    receiptRevisionMode: "当前输入会修改凭证草稿",
+    receiptRevisionPlaceholder: "例如：金额不对，改成 25 万",
+    revising: "正在更新草稿",
     historyTitle: "最近对话",
     restoredHistory: "已从安全会话记录恢复",
     submitting: "正在核对记录",
     submit: "提交",
     examples: "常用查询",
+    revisionExamples: "草稿修改示例",
     examplesNote: "",
     boundaryTitle: "工作台边界",
     boundaryLiveTitle: "系统实时记录",
@@ -113,11 +123,15 @@ const COPY: Record<Locale, Record<string, string>> = {
     receiptPromptFallback: "Analysez ce justificatif et préparez un brouillon comptable.",
     closeReceiptTurn: "Fermer ce traitement",
     receiptActive: "Terminez ou fermez le justificatif en cours avant d’ajouter une autre image.",
+    receiptRevisionMode: "Le message modifiera le brouillon",
+    receiptRevisionPlaceholder: "Ex. : montant incorrect, mettre 250000 XOF",
+    revising: "Mise à jour…",
     historyTitle: "Conversation récente",
     restoredHistory: "Restaurée depuis l’historique sécurisé",
     submitting: "Vérification en cours…",
     submit: "Envoyer",
     examples: "Exemples de requêtes",
+    revisionExamples: "Exemples de modification",
     examplesNote: "",
     boundaryTitle: "Limites du poste",
     boundaryLiveTitle: "Enregistrements réels",
@@ -172,13 +186,16 @@ export function AiWorkbenchView({
   canRecordFinance?: boolean;
 }) {
   const t = COPY[locale];
-  const suggestions = SUGGESTIONS[locale];
   const [query, setQuery] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
   const [attachmentPreview, setAttachmentPreview] = useState("");
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [receiptTurn, setReceiptTurn] = useState<ReceiptTurn | null>(null);
+  const [receiptRevisionTarget, setReceiptRevisionTarget] = useState<ReceiptRevisionTarget | null>(null);
+  const [receiptFlowBusy, setReceiptFlowBusy] = useState(false);
+  const [externalRevision, setExternalRevision] = useState<ReceiptRevisionRequest | null>(null);
+  const suggestions = receiptRevisionTarget ? REVISION_SUGGESTIONS[locale] : SUGGESTIONS[locale];
   const [state, formAction, pending] = useActionState(askWorkbench, INITIAL_WORKBENCH_STATE);
   const resultRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -233,14 +250,33 @@ export function AiWorkbenchView({
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    if (!attachment) return;
-    event.preventDefault();
-    setReceiptTurn({ id: Date.now(), file: attachment, prompt: query.trim() });
-    setAttachment(null);
-    setAttachmentError(null);
-    setQuery("");
-    window.setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    const route = resolveWorkbenchComposerRoute({ hasAttachment: Boolean(attachment), hasEditableReceiptProposal: Boolean(receiptRevisionTarget) });
+    if (route === "receipt_attachment" && attachment) {
+      event.preventDefault();
+      setReceiptTurn({ id: Date.now(), file: attachment, prompt: query.trim() });
+      setAttachment(null);
+      setAttachmentError(null);
+      setQuery("");
+      window.setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+      return;
+    }
+    if (route === "receipt_revision" && receiptRevisionTarget && query.trim()) {
+      event.preventDefault();
+      setExternalRevision({ id: Date.now(), instruction: query.trim() });
+      setQuery("");
+      window.setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    }
   };
+
+  const handleRevisionTargetChange = useCallback((target: ReceiptRevisionTarget | null) => setReceiptRevisionTarget(target), []);
+  const handleRevisionBusyChange = useCallback((busy: boolean) => setReceiptFlowBusy(busy), []);
+  const handleExternalRevisionHandled = useCallback((id: number) => setExternalRevision((current) => current?.id === id ? null : current), []);
+  const closeReceiptTurn = useCallback(() => {
+    setReceiptTurn(null);
+    setReceiptRevisionTarget(null);
+    setReceiptFlowBusy(false);
+    setExternalRevision(null);
+  }, []);
 
   return (
     <OperationalPage
@@ -285,7 +321,7 @@ export function AiWorkbenchView({
                 onPaste={handlePaste}
                 rows={3}
                 maxLength={500}
-                placeholder={t.placeholder}
+                placeholder={receiptRevisionTarget ? `${t.receiptRevisionPlaceholder} · v${receiptRevisionTarget.version}` : t.placeholder}
                 className="min-h-[92px] w-full resize-none bg-transparent px-2.5 py-2 text-base leading-7 text-foreground outline-none placeholder:text-muted-foreground/70 sm:text-[15px]"
               />
               {attachment && (
@@ -303,6 +339,7 @@ export function AiWorkbenchView({
                 </div>
               )}
               {attachmentError && <p className="mx-2 mb-2 text-xs text-accentRed-700" role="alert">{attachmentError}</p>}
+              {receiptRevisionTarget && <p className="mx-2 mb-2 text-xs font-medium text-accentBlue-700">{t.receiptRevisionMode} v{receiptRevisionTarget.version}</p>}
               <div className="flex items-center justify-between gap-3 border-t border-border/70 px-1 pt-2">
                 <div className="flex min-w-0 items-center gap-2">
                   {canRecordFinance && !receiptTurn && (
@@ -327,17 +364,17 @@ export function AiWorkbenchView({
                 </div>
                 <button
                   type="submit"
-                  disabled={pending || (!attachment && query.trim().length < 2)}
+                  disabled={pending || receiptFlowBusy || Boolean(externalRevision) || (!attachment && query.trim().length < 2)}
                   className="ml-auto inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  {pending ? <Clock3 className="h-4 w-4 animate-pulse" /> : <ArrowUp className="h-4 w-4" />}
-                  {pending ? t.submitting : t.submit}
+                  {pending || externalRevision ? <Clock3 className="h-4 w-4 animate-pulse" /> : <ArrowUp className="h-4 w-4" />}
+                  {externalRevision ? t.revising : pending ? t.submitting : t.submit}
                 </button>
               </div>
             </div>
 
             <div className="mt-4">
-              <div className="flex flex-wrap gap-2" aria-label={t.examples}>
+              <div className="flex flex-wrap gap-2" aria-label={receiptRevisionTarget ? t.revisionExamples : t.examples}>
                 {suggestions.map((suggestion) => (
                   <button
                     key={suggestion}
@@ -374,7 +411,11 @@ export function AiWorkbenchView({
             turn={receiptTurn}
             t={t}
             conversationId={conversationId}
-            onClose={() => setReceiptTurn(null)}
+            onRevisionTargetChange={handleRevisionTargetChange}
+            onRevisionBusyChange={handleRevisionBusyChange}
+            externalRevision={externalRevision}
+            onExternalRevisionHandled={handleExternalRevisionHandled}
+            onClose={closeReceiptTurn}
           />
         )}
         {pending && <LoadingResult t={t} />}
@@ -410,7 +451,7 @@ function ConversationHistory({ turns, t }: { turns: ConversationTurnSummary[]; t
   );
 }
 
-function ReceiptConversation({ locale, turn, t, conversationId, onClose }: { locale: Locale; turn: ReceiptTurn; t: Record<string, string>; conversationId: string; onClose: () => void }) {
+function ReceiptConversation({ locale, turn, t, conversationId, onRevisionTargetChange, onRevisionBusyChange, externalRevision, onExternalRevisionHandled, onClose }: { locale: Locale; turn: ReceiptTurn; t: Record<string, string>; conversationId: string; onRevisionTargetChange: (target: ReceiptRevisionTarget | null) => void; onRevisionBusyChange: (busy: boolean) => void; externalRevision: ReceiptRevisionRequest | null; onExternalRevisionHandled: (id: number) => void; onClose: () => void }) {
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card shadow-card" aria-labelledby={`receipt-turn-${turn.id}`}>
       <div className="border-b border-border bg-muted/25 px-4 py-4 sm:px-6">
@@ -440,6 +481,10 @@ function ReceiptConversation({ locale, turn, t, conversationId, onClose }: { loc
           initialFile={turn.file}
           initialText={turn.prompt}
           autoScan
+          onRevisionTargetChange={onRevisionTargetChange}
+          onRevisionBusyChange={onRevisionBusyChange}
+          externalRevision={externalRevision}
+          onExternalRevisionHandled={onExternalRevisionHandled}
           onClose={onClose}
         />
       </div>
