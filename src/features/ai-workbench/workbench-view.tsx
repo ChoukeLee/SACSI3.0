@@ -6,6 +6,7 @@ import { OperationalPage, StatTile } from "@/components/ui/operational";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/lib/i18n";
 import { ReceiptUpload } from "@/features/finance/receipt-upload";
+import type { ConversationTurnSummary } from "./conversation-service";
 import { askWorkbench, confirmWorkbenchAction, discardWorkbenchProposal } from "./actions";
 import { INITIAL_WORKBENCH_STATE, type WorkbenchActionResult, type WorkbenchDraftPreview, type WorkbenchResult, type WorkbenchTone } from "./types";
 
@@ -59,6 +60,8 @@ const COPY: Record<Locale, Record<string, string>> = {
     receiptPromptFallback: "请识别这张凭证并生成入账草稿。",
     closeReceiptTurn: "关闭本次凭证处理",
     receiptActive: "请先完成或关闭当前凭证处理，再添加新图片。",
+    historyTitle: "最近对话",
+    restoredHistory: "已从安全会话记录恢复",
     submitting: "正在核对记录",
     submit: "提交",
     examples: "常用查询",
@@ -110,6 +113,8 @@ const COPY: Record<Locale, Record<string, string>> = {
     receiptPromptFallback: "Analysez ce justificatif et préparez un brouillon comptable.",
     closeReceiptTurn: "Fermer ce traitement",
     receiptActive: "Terminez ou fermez le justificatif en cours avant d’ajouter une autre image.",
+    historyTitle: "Conversation récente",
+    restoredHistory: "Restaurée depuis l’historique sécurisé",
     submitting: "Vérification en cours…",
     submit: "Envoyer",
     examples: "Exemples de requêtes",
@@ -155,7 +160,17 @@ const toneBorder: Record<WorkbenchTone, string> = {
   teal: "border-l-[#5CC4B8]",
 };
 
-export function AiWorkbenchView({ locale = "zh", canRecordFinance = false }: { locale?: Locale; canRecordFinance?: boolean }) {
+export function AiWorkbenchView({
+  locale = "zh",
+  conversationId,
+  initialHistory = [],
+  canRecordFinance = false,
+}: {
+  locale?: Locale;
+  conversationId: string;
+  initialHistory?: ConversationTurnSummary[];
+  canRecordFinance?: boolean;
+}) {
   const t = COPY[locale];
   const suggestions = SUGGESTIONS[locale];
   const [query, setQuery] = useState("");
@@ -243,6 +258,7 @@ export function AiWorkbenchView({ locale = "zh", canRecordFinance = false }: { l
         <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">
           <form action={formAction} onSubmit={handleSubmit} className="p-5 sm:p-7">
             <input type="hidden" name="locale" value={locale} />
+            <input type="hidden" name="conversation_id" value={conversationId} />
             <div className="mb-4 flex items-center gap-3">
               <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 <Sparkles className="h-[18px] w-[18px]" />
@@ -350,12 +366,14 @@ export function AiWorkbenchView({ locale = "zh", canRecordFinance = false }: { l
       </section>
 
       <div ref={resultRef} className="scroll-mt-16">
+        {initialHistory.length > 0 && <ConversationHistory turns={initialHistory} t={t} />}
         {receiptTurn && (
           <ReceiptConversation
             key={receiptTurn.id}
             locale={locale}
             turn={receiptTurn}
             t={t}
+            conversationId={conversationId}
             onClose={() => setReceiptTurn(null)}
           />
         )}
@@ -373,7 +391,26 @@ export function AiWorkbenchView({ locale = "zh", canRecordFinance = false }: { l
   );
 }
 
-function ReceiptConversation({ locale, turn, t, onClose }: { locale: Locale; turn: ReceiptTurn; t: Record<string, string>; onClose: () => void }) {
+function ConversationHistory({ turns, t }: { turns: ConversationTurnSummary[]; t: Record<string, string> }) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-card" aria-labelledby="conversation-history-title">
+      <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/25 px-4 py-3 sm:px-6">
+        <h2 id="conversation-history-title" className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t.historyTitle}</h2>
+        <span className="text-[11px] text-muted-foreground">{t.restoredHistory}</span>
+      </div>
+      <div className="max-h-[420px] space-y-4 overflow-y-auto p-4 sm:p-6">
+        {turns.map((turn) => (
+          <article key={turn.id} className="space-y-2">
+            <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-6 text-primary-foreground">{turn.userText}</div>
+            <div className="max-w-[90%] rounded-2xl rounded-bl-md border border-border bg-muted/35 px-4 py-2.5 text-sm leading-6 text-foreground/85">{turn.assistantText}</div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ReceiptConversation({ locale, turn, t, conversationId, onClose }: { locale: Locale; turn: ReceiptTurn; t: Record<string, string>; conversationId: string; onClose: () => void }) {
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card shadow-card" aria-labelledby={`receipt-turn-${turn.id}`}>
       <div className="border-b border-border bg-muted/25 px-4 py-4 sm:px-6">
@@ -399,6 +436,7 @@ function ReceiptConversation({ locale, turn, t, onClose }: { locale: Locale; tur
         </div>
         <ReceiptUpload
           locale={locale}
+          conversationId={conversationId}
           initialFile={turn.file}
           initialText={turn.prompt}
           autoScan

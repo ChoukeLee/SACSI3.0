@@ -12,6 +12,7 @@ interface ReceiptDraft { building_code: string | null; room_no: string | null; r
 interface PreparedProposal { proposal: { id: string; version: number; action: string; expiresAt: string }; match: { building: string; roomNo: string; contractNo: string; currentPaidThrough: string | null }; plan: { kind: string; rentAmountXof: number; propertyAmountXof: number; confidence: string; warnings: string[] } }
 interface Props {
   locale: "zh" | "fr";
+  conversationId: string;
   onClose: () => void;
   initialFile?: File | null;
   initialText?: string;
@@ -24,7 +25,7 @@ async function readJson(response: Response) {
   return data;
 }
 
-export function ReceiptUpload({ locale, onClose, initialFile = null, initialText = "", autoScan = false }: Props) {
+export function ReceiptUpload({ locale, conversationId, onClose, initialFile = null, initialText = "", autoScan = false }: Props) {
   const zh = locale === "zh";
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -52,6 +53,7 @@ export function ReceiptUpload({ locale, onClose, initialFile = null, initialText
       if (file) body.append("file", file);
       if (manualText.trim()) body.append("manual_text", manualText.trim());
       body.append("locale", locale);
+      body.append("conversation_id", conversationId);
       const result = await readJson(await fetch("/api/receipt/scan", { method: "POST", body }));
       const draft = result.draft as ReceiptDraft;
       setJobId(String(result.jobId));

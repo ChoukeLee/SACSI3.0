@@ -52,6 +52,7 @@ export async function loadBusinessTargetVersions(target: BusinessTarget): Promis
 
 export async function createAiJob(input: {
   projectId?: string;
+  conversationId?: string;
   requestId?: string;
   inputMode?: AiInputMode;
   locale?: "zh" | "fr";
@@ -65,6 +66,7 @@ export async function createAiJob(input: {
       actor_id: user.id,
       actor_role: user.role,
       project_id: input.projectId ?? null,
+      conversation_id: input.conversationId ?? null,
       request_id: requestId,
       input_mode: input.inputMode ?? "text",
       locale: input.locale ?? "zh",

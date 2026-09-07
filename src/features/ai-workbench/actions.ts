@@ -21,6 +21,8 @@ import { parseWorkbenchIntent } from "./intent-parser";
 import { classifyWorkbenchIntentWithModel } from "./model-classifier";
 import { assertCleaningProposalBinding } from "./proposal-binding";
 import { executeWorkbenchQuery } from "./query-service";
+import { enrichQueryWithConversationContext, intentContextSnapshot, type WorkbenchConversationContext } from "./conversation-context";
+import { appendConversationTurn, loadLatestConversationContext } from "./conversation-service";
 import type { WorkbenchActionState, WorkbenchActionResult, WorkbenchIntent } from "./types";
 
 function tr(locale: Locale, zh: string, fr: string) {
@@ -88,6 +90,7 @@ export async function askWorkbench(
   formData: FormData,
 ): Promise<WorkbenchActionState> {
   const query = String(formData.get("query") ?? "").trim();
+  const conversationId = String(formData.get("conversation_id") ?? "").trim();
   const locale = readLocale(formData);
   if (query.length < 2) return { status: "error", result: null, error: tr(locale, "请输入要查询的问题。", "Saisissez votre question.") };
   if (query.length > 500) return { status: "error", result: null, error: tr(locale, "问题请控制在 500 个字符以内。", "Question limitée à 500 caractères.") };
@@ -95,7 +98,12 @@ export async function askWorkbench(
   try {
     const user = await requireAuth();
     const asOfDate = todayInAbidjan();
-    const actionIntent = parseWorkbenchAction(query);
+    const previousTurn = conversationId ? await loadLatestConversationContext(conversationId) : null;
+    const contextualQuery = enrichQueryWithConversationContext(
+      query,
+      (previousTurn?.context ?? null) as WorkbenchConversationContext | null,
+    );
+    const actionIntent = parseWorkbenchAction(contextualQuery);
     if (actionIntent) {
       if (!hasPermission(user, "daily_rentals:write")) {
         return { status: "error", result: null, error: tr(locale, "当前账号没有修改日租业务的权限。", "Votre profil n'a pas le droit de modifier les opérations journalières.") };
@@ -104,7 +112,7 @@ export async function askWorkbench(
       try {
         // Persist the AI evidence ledger: job -> text input -> proposed action.
         // No business record is modified at this stage.
-        const job = await createAiJob({ locale, inputMode: "text" });
+        const job = await createAiJob({ locale, inputMode: "text", conversationId });
         const jobId = String(job.id);
         await addAiTextInput(jobId, 1, query);
         const proposal = await createAiProposal(jobId, 1, {
@@ -124,6 +132,20 @@ export async function askWorkbench(
         draft.execution.jobId = String(job.id);
         draft.execution.proposalId = String(proposal.id);
         draft.execution.proposalVersion = Number(proposal.version);
+        await appendConversationTurn({
+          conversationId,
+          kind: "action_draft",
+          userText: query,
+          assistantText: draft.summary,
+          jobId,
+          context: {
+            buildingCode: actionIntent.buildingCode,
+            unitNo: actionIntent.unitNo,
+            domain: "daily",
+            proposalId: String(proposal.id),
+            proposalVersion: Number(proposal.version),
+          },
+        });
         return { status: "success", result: draft, error: null };
       } catch (evidenceErrorValue) {
         return {
@@ -135,15 +157,22 @@ export async function askWorkbench(
         };
       }
     }
-    let intent = parseWorkbenchIntent(query, asOfDate);
+    let intent = parseWorkbenchIntent(contextualQuery, asOfDate);
     if (intent.kind === "unsupported" || intent.confidence < 0.75) {
-      const classified = await classifyWorkbenchIntentWithModel({ query, asOfDate, userId: user.id }).catch(() => null);
+      const classified = await classifyWorkbenchIntentWithModel({ query: contextualQuery, asOfDate, userId: user.id }).catch(() => null);
       if (classified && classified.confidence >= 0.65) intent = classified;
     }
     if (!canRunIntent(user, intent)) {
       return { status: "error", result: null, error: tr(locale, "当前账号没有查看这类业务数据的权限。", "Votre profil n'a pas le droit de consulter ces données.") };
     }
     const result = await executeWorkbenchQuery(query, intent, locale);
+    await appendConversationTurn({
+      conversationId,
+      kind: "query",
+      userText: query,
+      assistantText: result.answer,
+      context: intentContextSnapshot(intent),
+    });
     return { status: "success", result, error: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : tr(locale, "查询失败，请稍后重试。", "Échec de la requête, réessayez plus tard.");

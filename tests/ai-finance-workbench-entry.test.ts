@@ -26,9 +26,11 @@ describe("AI finance workbench entry", () => {
     expect(view).toContain("<ReceiptConversation");
     expect(view).toContain("<ReceiptUpload");
     expect(view).toContain("autoScan");
+    expect(view).toContain("conversationId={conversationId}");
     expect(upload).toContain("/api/receipt/scan");
     expect(upload).toContain("/api/receipt/prepare");
     expect(upload).toContain("/api/receipt/confirm");
+    expect(upload).toContain('body.append("conversation_id", conversationId)');
   });
 
   it("accepts selected, pasted and dropped images in the main composer", () => {
