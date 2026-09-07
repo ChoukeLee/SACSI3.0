@@ -439,11 +439,11 @@ function ConversationHistory({ turns, t }: { turns: ConversationTurnSummary[]; t
         <h2 id="conversation-history-title" className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t.historyTitle}</h2>
         <span className="text-[11px] text-muted-foreground">{t.restoredHistory}</span>
       </div>
-      <div className="max-h-[420px] space-y-4 overflow-y-auto p-4 sm:p-6">
+      <div className="mx-auto max-h-[420px] max-w-4xl space-y-4 overflow-y-auto p-4 sm:p-6">
         {turns.map((turn) => (
           <article key={turn.id} className="space-y-2">
-            <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-6 text-primary-foreground">{turn.userText}</div>
-            <div className="max-w-[90%] rounded-2xl rounded-bl-md border border-border bg-muted/35 px-4 py-2.5 text-sm leading-6 text-foreground/85">{turn.assistantText}</div>
+            <div className="ml-auto w-fit max-w-[82%] break-words rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-6 text-primary-foreground">{turn.userText}</div>
+            <div className="w-fit max-w-[92%] break-words rounded-2xl rounded-bl-md border border-border bg-muted/35 px-4 py-2.5 text-sm leading-6 text-foreground/85">{turn.assistantText}</div>
           </article>
         ))}
       </div>
