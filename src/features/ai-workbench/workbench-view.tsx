@@ -195,9 +195,11 @@ export function AiWorkbenchView({
   const [receiptRevisionTarget, setReceiptRevisionTarget] = useState<ReceiptRevisionTarget | null>(null);
   const [receiptFlowBusy, setReceiptFlowBusy] = useState(false);
   const [externalRevision, setExternalRevision] = useState<ReceiptRevisionRequest | null>(null);
+  const [liveUserText, setLiveUserText] = useState("");
   const suggestions = receiptRevisionTarget ? REVISION_SUGGESTIONS[locale] : SUGGESTIONS[locale];
   const [state, formAction, pending] = useActionState(askWorkbench, INITIAL_WORKBENCH_STATE);
   const resultRef = useRef<HTMLDivElement>(null);
+  const conversationViewportRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -213,9 +215,15 @@ export function AiWorkbenchView({
   useEffect(() => {
     if (state.status !== "idle") {
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      resultRef.current?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+      resultRef.current?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "end" });
+      setQuery((current) => current.trim() === liveUserText ? "" : current);
     }
   }, [state]);
+
+  useEffect(() => {
+    const viewport = conversationViewportRef.current;
+    if (viewport) viewport.scrollTop = viewport.scrollHeight;
+  }, [initialHistory.length]);
 
   const acceptAttachment = (file: File) => {
     if (!canRecordFinance) return;
@@ -257,15 +265,17 @@ export function AiWorkbenchView({
       setAttachment(null);
       setAttachmentError(null);
       setQuery("");
-      window.setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+      window.setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }), 0);
       return;
     }
     if (route === "receipt_revision" && receiptRevisionTarget && query.trim()) {
       event.preventDefault();
       setExternalRevision({ id: Date.now(), instruction: query.trim() });
       setQuery("");
-      window.setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+      window.setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }), 0);
+      return;
     }
+    setLiveUserText(query.trim());
   };
 
   const handleRevisionTargetChange = useCallback((target: ReceiptRevisionTarget | null) => setReceiptRevisionTarget(target), []);
@@ -288,26 +298,88 @@ export function AiWorkbenchView({
           <LockKeyhole className="h-3.5 w-3.5" />{t.badge}
         </span>
       }
-      className="mx-auto max-w-[1500px]"
+      className="mx-auto max-w-[1200px]"
     >
-      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
-        <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">
-          <form action={formAction} onSubmit={handleSubmit} className="p-5 sm:p-7">
-            <input type="hidden" name="locale" value={locale} />
-            <input type="hidden" name="conversation_id" value={conversationId} />
-            <div className="mb-4 flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Sparkles className="h-[18px] w-[18px]" />
-              </span>
-              <div>
-                <h2 className="text-[15px] font-semibold">{t.askTitle}</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">{t.askHint}</p>
+      <section className="overflow-visible rounded-2xl border border-border bg-card shadow-card">
+        <header className="relative flex items-center justify-between gap-4 border-b border-border px-4 py-3 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Sparkles className="h-[18px] w-[18px]" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="truncate text-sm font-semibold">{t.askTitle}</h2>
+              <p className="truncate text-xs text-muted-foreground">{initialHistory.length > 0 ? t.restoredHistory : t.askHint}</p>
+            </div>
+          </div>
+          <details className="group relative shrink-0">
+            <summary className="inline-flex h-9 cursor-pointer list-none items-center gap-2 rounded-lg border border-border bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground [&::-webkit-details-marker]:hidden">
+              <ShieldCheck className="h-4 w-4" /><span className="hidden sm:inline">{t.boundaryTitle}</span>
+            </summary>
+            <div className="absolute right-0 top-11 z-30 w-[min(88vw,36rem)] rounded-xl border border-border bg-card p-4 shadow-xl">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Boundary icon={Database} title={t.boundaryLiveTitle} text={t.boundaryLiveText} />
+                <Boundary icon={ShieldCheck} title={t.boundaryRulesTitle} text={t.boundaryRulesText} />
+                <Boundary icon={LockKeyhole} title={t.boundaryConfirmTitle} text={t.boundaryConfirmText} />
+                <Boundary icon={Sparkles} title={t.boundaryModelTitle} text={t.boundaryModelText} />
               </div>
             </div>
+          </details>
+        </header>
 
+        <div ref={conversationViewportRef} className="min-h-[340px] max-h-[min(58vh,680px)] overflow-y-auto bg-muted/10">
+          <div className="mx-auto max-w-4xl space-y-5 px-4 py-6 sm:px-6 sm:py-8">
+            {initialHistory.length > 0
+              ? <ConversationHistory turns={initialHistory} />
+              : (
+                <div className="mx-auto flex max-w-lg flex-col items-center py-12 text-center text-muted-foreground">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card"><Sparkles className="h-5 w-5" /></span>
+                  <p className="mt-4 text-sm leading-6">{t.askHint}</p>
+                </div>
+              )}
+            {liveUserText && (
+              <div className="ml-auto w-fit max-w-[82%] break-words rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-6 text-primary-foreground">{liveUserText}</div>
+            )}
+            {receiptTurn && (
+              <ReceiptConversation
+                key={receiptTurn.id}
+                locale={locale}
+                turn={receiptTurn}
+                t={t}
+                conversationId={conversationId}
+                onRevisionTargetChange={handleRevisionTargetChange}
+                onRevisionBusyChange={handleRevisionBusyChange}
+                externalRevision={externalRevision}
+                onExternalRevisionHandled={handleExternalRevisionHandled}
+                onClose={closeReceiptTurn}
+              />
+            )}
+            {pending && <LoadingResult t={t} />}
+            {!pending && state.status === "error" && (
+              <section className="rounded-xl border border-accentRed-100 bg-accentRed-50 p-5 text-sm text-accentRed-700" role="status" aria-atomic="true">
+                <p className="font-semibold">{t.errorTitle}</p>
+                <p className="mt-1 leading-6">{state.error}</p>
+              </section>
+            )}
+            {!pending && state.result?.kind === "query_result" && <WorkbenchResultView t={t} result={state.result} />}
+            {!pending && state.result?.kind === "action_draft" && <WorkbenchDraftFlow key={state.result.execution.taskId} t={t} locale={locale} draft={state.result} />}
+            <div ref={resultRef} aria-hidden="true" />
+          </div>
+        </div>
+
+        <form action={formAction} onSubmit={handleSubmit} className="border-t border-border bg-card px-4 py-4 sm:px-6">
+          <input type="hidden" name="locale" value={locale} />
+          <input type="hidden" name="conversation_id" value={conversationId} />
+          <div className="mx-auto max-w-4xl">
+            <div className="mb-3 flex gap-2 overflow-x-auto pb-1" aria-label={receiptRevisionTarget ? t.revisionExamples : t.examples}>
+              {suggestions.map((suggestion) => (
+                <button key={suggestion} type="button" onClick={() => setQuery(suggestion)} className="h-8 shrink-0 rounded-full border border-border bg-background px-3 text-[11px] font-medium text-muted-foreground transition-colors hover:border-border-strong hover:bg-muted hover:text-foreground">
+                  {suggestion}
+                </button>
+              ))}
+            </div>
             <label htmlFor="ai-workbench-query" className="sr-only">{t.askLabel}</label>
             <div
-              className={cn("rounded-xl border border-border-strong bg-background/55 p-2 transition-all focus-within:border-ring focus-within:shadow-glow", dragging && "border-accentBlue-500 bg-accentBlue-50/45 shadow-glow")}
+              className={cn("rounded-2xl border border-border-strong bg-background p-2 transition-all focus-within:border-ring focus-within:shadow-glow", dragging && "border-accentBlue-500 bg-accentBlue-50/45 shadow-glow")}
               onDragEnter={(event) => { if (canRecordFinance) { event.preventDefault(); setDragging(true); } }}
               onDragOver={(event) => { if (canRecordFinance) event.preventDefault(); }}
               onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
@@ -319,23 +391,18 @@ export function AiWorkbenchView({
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onPaste={handlePaste}
-                rows={3}
+                rows={2}
                 maxLength={500}
                 placeholder={receiptRevisionTarget ? `${t.receiptRevisionPlaceholder} · v${receiptRevisionTarget.version}` : t.placeholder}
-                className="min-h-[92px] w-full resize-none bg-transparent px-2.5 py-2 text-base leading-7 text-foreground outline-none placeholder:text-muted-foreground/70 sm:text-[15px]"
+                className="min-h-[64px] w-full resize-none bg-transparent px-2.5 py-2 text-base leading-7 text-foreground outline-none placeholder:text-muted-foreground/70 sm:text-[15px]"
               />
               {attachment && (
                 <div className="mx-1 mb-2 flex items-center gap-3 rounded-lg border border-border bg-card p-2 shadow-xs">
                   {attachmentPreview
                     ? <img src={attachmentPreview} alt="" className="h-12 w-12 rounded-md border border-border object-cover" />
                     : <span className="flex h-12 w-12 items-center justify-center rounded-md bg-muted"><ImageIcon className="h-5 w-5 text-muted-foreground" /></span>}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold">{attachment.name}</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">{(attachment.size / 1024 / 1024).toFixed(2)} MB</p>
-                  </div>
-                  <button type="button" onClick={() => setAttachment(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={t.removeImage}>
-                    <X className="h-4 w-4" />
-                  </button>
+                  <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{attachment.name}</p><p className="mt-1 text-[11px] text-muted-foreground">{(attachment.size / 1024 / 1024).toFixed(2)} MB</p></div>
+                  <button type="button" onClick={() => setAttachment(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={t.removeImage}><X className="h-4 w-4" /></button>
                 </div>
               )}
               {attachmentError && <p className="mx-2 mb-2 text-xs text-accentRed-700" role="alert">{attachmentError}</p>}
@@ -344,109 +411,33 @@ export function AiWorkbenchView({
                 <div className="flex min-w-0 items-center gap-2">
                   {canRecordFinance && !receiptTurn && (
                     <>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        className="sr-only"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          if (file) acceptAttachment(file);
-                          event.target.value = "";
-                        }}
-                      />
-                      <button type="button" onClick={() => fileInputRef.current?.click()} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label={t.attach} title={t.attachmentHint}>
-                        <Paperclip className="h-4 w-4" />
-                      </button>
+                      <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) acceptAttachment(file); event.target.value = ""; }} />
+                      <button type="button" onClick={() => fileInputRef.current?.click()} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label={t.attach} title={t.attachmentHint}><Paperclip className="h-4 w-4" /></button>
                     </>
                   )}
                   <span className="hidden truncate text-[11px] text-muted-foreground sm:inline">{attachment ? t.attachmentHint : t.xofNote}</span>
                 </div>
-                <button
-                  type="submit"
-                  disabled={pending || receiptFlowBusy || Boolean(externalRevision) || (!attachment && query.trim().length < 2)}
-                  className="ml-auto inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
-                >
+                <button type="submit" disabled={pending || receiptFlowBusy || Boolean(externalRevision) || (!attachment && query.trim().length < 2)} className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45" aria-label={externalRevision ? t.revising : pending ? t.submitting : t.submit}>
                   {pending || externalRevision ? <Clock3 className="h-4 w-4 animate-pulse" /> : <ArrowUp className="h-4 w-4" />}
-                  {externalRevision ? t.revising : pending ? t.submitting : t.submit}
                 </button>
               </div>
             </div>
-
-            <div className="mt-4">
-              <div className="flex flex-wrap gap-2" aria-label={receiptRevisionTarget ? t.revisionExamples : t.examples}>
-                {suggestions.map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onClick={() => setQuery(suggestion)}
-                    className="min-h-9 rounded-lg border border-border bg-card px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-border-strong hover:bg-muted hover:text-foreground"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-              {t.examplesNote && <p className="mt-2 text-[11px] text-muted-foreground">{t.examplesNote}</p>}
-            </div>
-          </form>
-
-          <aside className="border-t border-border bg-muted/35 p-5 lg:border-l lg:border-t-0" aria-label={t.boundaryTitle}>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t.boundaryTitle}</p>
-            <div className="mt-4 space-y-4">
-              <Boundary icon={Database} title={t.boundaryLiveTitle} text={t.boundaryLiveText} />
-              <Boundary icon={ShieldCheck} title={t.boundaryRulesTitle} text={t.boundaryRulesText} />
-              <Boundary icon={LockKeyhole} title={t.boundaryConfirmTitle} text={t.boundaryConfirmText} />
-              <Boundary icon={Sparkles} title={t.boundaryModelTitle} text={t.boundaryModelText} />
-            </div>
-          </aside>
-        </div>
+          </div>
+        </form>
       </section>
-
-      <div ref={resultRef} className="scroll-mt-16">
-        {initialHistory.length > 0 && <ConversationHistory turns={initialHistory} t={t} />}
-        {receiptTurn && (
-          <ReceiptConversation
-            key={receiptTurn.id}
-            locale={locale}
-            turn={receiptTurn}
-            t={t}
-            conversationId={conversationId}
-            onRevisionTargetChange={handleRevisionTargetChange}
-            onRevisionBusyChange={handleRevisionBusyChange}
-            externalRevision={externalRevision}
-            onExternalRevisionHandled={handleExternalRevisionHandled}
-            onClose={closeReceiptTurn}
-          />
-        )}
-        {pending && <LoadingResult t={t} />}
-        {!pending && state.status === "error" && (
-          <section className="rounded-xl border border-accentRed-100 bg-accentRed-50 p-5 text-sm text-accentRed-700" role="status" aria-atomic="true">
-            <p className="font-semibold">{t.errorTitle}</p>
-            <p className="mt-1 leading-6">{state.error}</p>
-          </section>
-        )}
-        {!pending && state.result?.kind === "query_result" && <WorkbenchResultView t={t} result={state.result} />}
-        {!pending && state.result?.kind === "action_draft" && <WorkbenchDraftFlow key={state.result.execution.taskId} t={t} locale={locale} draft={state.result} />}
-      </div>
     </OperationalPage>
   );
 }
 
-function ConversationHistory({ turns, t }: { turns: ConversationTurnSummary[]; t: Record<string, string> }) {
+function ConversationHistory({ turns }: { turns: ConversationTurnSummary[] }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-card" aria-labelledby="conversation-history-title">
-      <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/25 px-4 py-3 sm:px-6">
-        <h2 id="conversation-history-title" className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t.historyTitle}</h2>
-        <span className="text-[11px] text-muted-foreground">{t.restoredHistory}</span>
-      </div>
-      <div className="mx-auto max-h-[420px] max-w-4xl space-y-4 overflow-y-auto p-4 sm:p-6">
-        {turns.map((turn) => (
-          <article key={turn.id} className="space-y-2">
-            <div className="ml-auto w-fit max-w-[82%] break-words rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-6 text-primary-foreground">{turn.userText}</div>
-            <div className="w-fit max-w-[92%] break-words rounded-2xl rounded-bl-md border border-border bg-muted/35 px-4 py-2.5 text-sm leading-6 text-foreground/85">{turn.assistantText}</div>
-          </article>
-        ))}
-      </div>
+    <section className="space-y-4" aria-label="Conversation">
+      {turns.map((turn) => (
+        <article key={turn.id} className="space-y-2">
+          <div className="ml-auto w-fit max-w-[82%] break-words rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-6 text-primary-foreground">{turn.userText}</div>
+          <div className="w-fit max-w-[92%] break-words rounded-2xl rounded-bl-md border border-border bg-card px-4 py-2.5 text-sm leading-6 text-foreground/85">{turn.assistantText}</div>
+        </article>
+      ))}
     </section>
   );
 }
