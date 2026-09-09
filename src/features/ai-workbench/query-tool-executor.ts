@@ -41,7 +41,11 @@ export async function executeQueryPlanV2(input: {
     callId: item.callId,
     tool: item.tool,
     resolvedTime: item.resolvedTime,
-    result: await executeWorkbenchQuery(input.query, item.intent, input.locale),
+    result: await executeWorkbenchQuery(input.query, item.intent, input.locale, {
+      timeRange: item.resolvedTime,
+      customerName: input.plan.calls.find((call) => call.id === item.callId)?.arguments.customerName ?? null,
+      limit: input.plan.calls.find((call) => call.id === item.callId)?.arguments.limit ?? 100,
+    }),
   })));
   return { status: "success", results };
 }

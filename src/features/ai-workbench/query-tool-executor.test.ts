@@ -38,6 +38,9 @@ describe("query plan v2 executor", () => {
   it("runs no query when any call is incompatible", async () => {
     vi.mocked(hasPermission).mockReturnValue(true);
     const incompatible = receivableCall("bad");
+    incompatible.tool = "get_daily_status";
+    incompatible.arguments.domain = "daily";
+    incompatible.arguments.receivableState = null;
     incompatible.arguments.customerName = "Example Customer";
     const result = await executeQueryPlanV2({ query: "test", plan: plan([receivableCall("good"), incompatible]), asOfDate: "2026-09-09", locale: "zh", user });
     expect(result).toMatchObject({ status: "invalid_plan", failures: [{ callId: "bad", code: "unsupported_customer_filter" }] });

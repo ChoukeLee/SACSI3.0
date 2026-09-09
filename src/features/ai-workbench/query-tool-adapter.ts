@@ -43,9 +43,9 @@ function failure(call: QueryPlanCall, code: Extract<QueryPlanCompileResult, { ok
  * silently broadening them. It grants no execution authority by itself.
  */
 export function compileQueryPlanCall(call: QueryPlanCall, asOfDate: string, confidence: number): QueryPlanCompileResult {
-  const resolvedTime = resolveQueryPlanTime(call.arguments.time, asOfDate);
+  let resolvedTime = resolveQueryPlanTime(call.arguments.time, asOfDate);
   const permissions = requiredPermissionsForQueryTool(call);
-  if (call.arguments.customerName) {
+  if (call.arguments.customerName && (call.tool === "get_daily_status" || call.tool === "get_unit_snapshot")) {
     return failure(call, "unsupported_customer_filter", "The current read service cannot safely filter by customer name.");
   }
 
@@ -53,32 +53,47 @@ export function compileQueryPlanCall(call: QueryPlanCall, asOfDate: string, conf
   let executionDate = asOfDate;
   let days = 15;
 
-  if (call.tool === "get_daily_status" || call.tool === "list_daily_movements") {
+  if (call.tool === "get_daily_status") {
     const date = pointDate(resolvedTime, asOfDate);
-    if (!date) return failure(call, "unsupported_time_window", "The current daily service accepts one exact day, not a date range.");
+    if (!date) return failure(call, "unsupported_time_window", "The current room-status service accepts one exact day, not a date range.");
     executionDate = date;
     days = 1;
-    kind = call.tool === "get_daily_status" ? "daily_status" : "daily_movements";
+    kind = "daily_status";
+  } else if (call.tool === "list_daily_movements") {
+    if (!resolvedTime.startDate || !resolvedTime.endDate) {
+      executionDate = asOfDate;
+      days = 1;
+      resolvedTime = {
+        startDate: asOfDate,
+        endDate: asOfDate,
+        startInclusive: true,
+        endInclusive: true,
+        timezone: "Africa/Abidjan",
+      };
+    } else {
+      executionDate = resolvedTime.startDate;
+      days = Math.max(1, daysBetween(resolvedTime.startDate, resolvedTime.endDate));
+      if (days < 1 || days > 90) return failure(call, "time_window_too_large", "Daily movement windows support up to 90 days.");
+    }
+    kind = "daily_movements";
   } else if (call.tool === "get_unit_snapshot") {
     if (!call.arguments.unitNo) return failure(call, "missing_unit", "A unit snapshot requires an exact unit number.");
     if (!pointDate(resolvedTime, asOfDate)) return failure(call, "unsupported_time_window", "The current unit snapshot only represents current state.");
     kind = "unit_snapshot";
   } else if (call.tool === "list_lease_expirations") {
-    if (!resolvedTime.startDate || !resolvedTime.endDate || resolvedTime.startDate !== asOfDate) {
-      return failure(call, "unsupported_time_window", "The current lease service only supports a window starting at the reference date.");
-    }
-    days = daysBetween(asOfDate, resolvedTime.endDate);
-    if (days < 1 || days > 90) return failure(call, "time_window_too_large", "The current lease service supports windows from 1 to 90 days.");
+    if (!resolvedTime.startDate || !resolvedTime.endDate) return failure(call, "unsupported_time_window", "Lease expirations require a bounded date range.");
+    executionDate = resolvedTime.startDate;
+    days = Math.max(1, daysBetween(resolvedTime.startDate, resolvedTime.endDate));
+    if (days < 1 || days > 366) return failure(call, "time_window_too_large", "Lease expiration windows support up to 366 days.");
     kind = "lease_expiring";
   } else {
     const state = call.arguments.receivableState;
     kind = state === "overdue" ? "receivable_overdue" : state === "outstanding" ? "receivable_outstanding" : "receivable_due_soon";
     if (state === "due_in_window") {
-      if (!resolvedTime.startDate || !resolvedTime.endDate || resolvedTime.startDate !== asOfDate) {
-        return failure(call, "unsupported_time_window", "The current receivable service only supports a due window starting at the reference date.");
-      }
-      days = daysBetween(asOfDate, resolvedTime.endDate);
-      if (days < 1 || days > 90) return failure(call, "time_window_too_large", "The current receivable service supports windows from 1 to 90 days.");
+      if (!resolvedTime.startDate || !resolvedTime.endDate) return failure(call, "unsupported_time_window", "Due receivables require a bounded date range.");
+      executionDate = resolvedTime.startDate;
+      days = Math.max(1, daysBetween(resolvedTime.startDate, resolvedTime.endDate));
+      if (days < 1 || days > 366) return failure(call, "time_window_too_large", "Receivable due windows support up to 366 days.");
     } else {
       const date = pointDate(resolvedTime, asOfDate);
       if (!date) return failure(call, "unsupported_time_window", "Outstanding and overdue queries require one reference date.");

@@ -39,11 +39,22 @@ describe("query plan tool adapter", () => {
       { domain: "daily", receivableState: null, time: { kind: "absolute_date", value: null, startDate: "2026-09-12", endDate: null } },
     ), "2026-09-09", 0.9);
     expect(result).toMatchObject({ ok: true, intent: { kind: "daily_movements", asOfDate: "2026-09-12" }, permissions: ["daily_rentals:read"] });
+    expect(compileQueryPlanCall(call(
+      { tool: "list_daily_movements" },
+      { domain: "daily", receivableState: null, time: { kind: "unspecified", value: null, startDate: null, endDate: null } },
+    ), "2026-09-09", 0.9)).toMatchObject({
+      ok: true,
+      resolvedTime: { startDate: "2026-09-09", endDate: "2026-09-09", startInclusive: true, endInclusive: true },
+    });
   });
 
-  it("refuses to silently broaden unsupported calendar windows or customer filters", () => {
-    expect(compileQueryPlanCall(call({}, { time: { kind: "next_calendar_week", value: null, startDate: null, endDate: null } }), "2026-09-09", 0.9)).toMatchObject({ ok: false, code: "unsupported_time_window" });
-    expect(compileQueryPlanCall(call({}, { customerName: "Example Customer" }), "2026-09-09", 0.9)).toMatchObject({ ok: false, code: "unsupported_customer_filter" });
+  it("supports exact calendar windows and customer filters where the tool can honor them", () => {
+    expect(compileQueryPlanCall(call({ tool: "list_daily_movements" }, { domain: "daily", receivableState: null, time: { kind: "next_calendar_week", value: null, startDate: null, endDate: null } }), "2026-09-09", 0.9)).toMatchObject({
+      ok: true,
+      resolvedTime: { startDate: "2026-09-14", endDate: "2026-09-20" },
+    });
+    expect(compileQueryPlanCall(call({}, { customerName: "Example Customer" }), "2026-09-09", 0.9)).toMatchObject({ ok: true });
+    expect(compileQueryPlanCall(call({ tool: "get_daily_status" }, { domain: "daily", customerName: "Example Customer", receivableState: null, time: { kind: "today", value: null, startDate: null, endDate: null } }), "2026-09-09", 0.9)).toMatchObject({ ok: false, code: "unsupported_customer_filter" });
   });
 
   it("requires a unit and all currently exposed snapshot scopes", () => {
@@ -68,10 +79,10 @@ describe("query plan tool adapter", () => {
       provider: "deepseek",
     };
     expect(summarizeQueryPlanCompatibility(plan, "2026-09-09")).toEqual({
-      status: "incompatible",
+      status: "compatible",
       calls: [
         { callId: "call_1", tool: "list_receivables", status: "compatible" },
-        { callId: "movement", tool: "list_daily_movements", status: "incompatible", code: "unsupported_time_window" },
+        { callId: "movement", tool: "list_daily_movements", status: "compatible" },
       ],
     });
   });

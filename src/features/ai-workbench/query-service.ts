@@ -9,10 +9,18 @@ import type { Locale } from "@/lib/i18n";
 import type { BuildingRow, CustomerRow, DailyBookingRow, ReceivableRow, UnitRow } from "@/types/database";
 import type { WorkbenchDomain, WorkbenchIntent, WorkbenchResult, WorkbenchTable } from "./types";
 import { buildUnsupportedGuidance } from "./unsupported-guidance";
+import { dateIsWithinRange, matchesCustomerName, queryRangeLabel } from "./query-filters";
+import type { ResolvedTimeRange } from "./query-plan";
 
 type BuildingSummary = Pick<BuildingRow, "id" | "code" | "display_name">;
 type UnitSummary = Pick<UnitRow, "id" | "building_id" | "unit_no" | "floor_label" | "status" | "code">;
 type CustomerSummary = Pick<CustomerRow, "id" | "name">;
+
+export interface WorkbenchQueryExecutionOptions {
+  timeRange?: ResolvedTimeRange;
+  customerName?: string | null;
+  limit?: number;
+}
 
 const SOURCE_TYPES: Record<Exclude<WorkbenchDomain, "all">, ReceivableRow["source_type"]> = {
   daily: "daily_booking",
@@ -145,12 +153,15 @@ async function retainLiveBusinessSources(rows: ReceivableRow[]) {
   });
 }
 
-async function queryReceivables(locale: Locale, query: string, intent: WorkbenchIntent): Promise<WorkbenchResult> {
+async function queryReceivables(locale: Locale, query: string, intent: WorkbenchIntent, options: WorkbenchQueryExecutionOptions = {}): Promise<WorkbenchResult> {
   const supabase = await createClient();
   const sourceTypes = intent.domain === "all"
     ? Object.values(SOURCE_TYPES)
     : [SOURCE_TYPES[intent.domain]];
-  const endDate = addIsoDays(intent.asOfDate, intent.days);
+  const timeRange = options.timeRange;
+  const startDate = timeRange?.startDate ?? intent.asOfDate;
+  const endDate = timeRange?.endDate ?? addIsoDays(intent.asOfDate, intent.days);
+  const displayLimit = Math.max(1, Math.min(200, Math.trunc(options.limit ?? 100)));
 
   let dbQuery = supabase
     .from("receivables")
@@ -162,7 +173,10 @@ async function queryReceivables(locale: Locale, query: string, intent: Workbench
     .limit(2000);
 
   if (intent.kind === "receivable_overdue") dbQuery = dbQuery.lt("due_date", intent.asOfDate);
-  if (intent.kind === "receivable_due_soon") dbQuery = dbQuery.gt("due_date", intent.asOfDate).lte("due_date", endDate);
+  if (intent.kind === "receivable_due_soon") {
+    dbQuery = timeRange?.startInclusive ? dbQuery.gte("due_date", startDate) : dbQuery.gt("due_date", startDate);
+    dbQuery = timeRange?.endInclusive === false ? dbQuery.lt("due_date", endDate) : dbQuery.lte("due_date", endDate);
+  }
 
   const { data, error } = await dbQuery;
   if (error) throw new Error(tr(locale, `读取应收记录失败：${error.message}`, `Erreur de lecture des créances : ${error.message}`));
@@ -191,6 +205,7 @@ async function queryReceivables(locale: Locale, query: string, intent: Workbench
     rows = building ? rows.filter((row) => row.building_id === building.id || units.get(row.unit_id ?? "")?.building_id === building.id) : [];
   }
   if (intent.unitNo) rows = rows.filter((row) => units.get(row.unit_id ?? "")?.unit_no.toUpperCase() === intent.unitNo);
+  if (options.customerName) rows = rows.filter((row) => matchesCustomerName(customers.get(row.customer_id ?? ""), options.customerName));
 
   const total = rows.reduce((sum, row) => sum + receivableOutstanding(row), 0);
   const rowData = rows.map((row) => {
@@ -211,9 +226,11 @@ async function queryReceivables(locale: Locale, query: string, intent: Workbench
   const kindLabel = intent.kind === "receivable_overdue"
     ? tr(locale, "逾期", "en retard")
     : intent.kind === "receivable_due_soon"
-      ? tr(locale, `${intent.days} 天内应缴`, `dû sous ${intent.days} j`)
+      ? timeRange
+        ? tr(locale, `${queryRangeLabel(timeRange, locale)} 应缴`, `dû ${queryRangeLabel(timeRange, locale)}`)
+        : tr(locale, `${intent.days} 天内应缴`, `dû sous ${intent.days} j`)
       : tr(locale, "当前未收", "reste à encaisser");
-  const scope = `${domainLabel(locale, intent.domain)} · ${intent.buildingCode ? intent.buildingCode.replace("SACSI", "") + "#" : tr(locale, "全部在管楼栋", "tous bâtiments gérés")}`;
+  const scope = `${domainLabel(locale, intent.domain)} · ${intent.buildingCode ? intent.buildingCode.replace("SACSI", "") + "#" : tr(locale, "全部在管楼栋", "tous bâtiments gérés")}${options.customerName ? ` · ${tr(locale, "客户", "client")} ${options.customerName}` : ""}`;
 
   return toResult(locale, {
     query,
@@ -228,13 +245,13 @@ async function queryReceivables(locale: Locale, query: string, intent: Workbench
       { label: tr(locale, "未收合计", "Total restant"), value: formatXof(total), tone: intent.kind === "receivable_overdue" && total > 0 ? "red" : total > 0 ? "amber" : "green" },
       ...(intent.kind === "receivable_due_soon" ? [{ label: tr(locale, "截止日期", "Date limite"), value: endDate, tone: "blue" as const }] : []),
     ],
-    table: { columns: receivableColumns(locale), rows: rowData.slice(0, 100) },
+    table: { columns: receivableColumns(locale), rows: rowData.slice(0, displayLimit) },
     evidence: [
       { label: tr(locale, "财务口径", "Périmètre financier"), value: tr(locale, "仅统计已确认管理（managed）、未取消且未收余额大于 0 的应收", "Créances gérées (managed), non annulées et avec solde restant > 0") },
       { label: tr(locale, "合同口径", "Périmètre contractuel"), value: tr(locale, "长租和出售仅保留生效合同；日租排除已取消订单", "Baux et ventes actifs uniquement ; réservations annulées exclues") },
       { label: tr(locale, "逾期定义", "Définition du retard"), value: tr(locale, "到期日早于统计日；到期当天不算逾期", "Échéance avant la date de référence ; le jour même n'est pas en retard") },
     ],
-    warnings: rows.length > 100 ? [tr(locale, `共 ${rows.length} 笔，表格仅展示前 100 笔。`, `${rows.length} créances ; 100 premières affichées.`)] : [],
+    warnings: rows.length > displayLimit ? [tr(locale, `共 ${rows.length} 笔，表格仅展示前 ${displayLimit} 笔。`, `${rows.length} créances ; ${displayLimit} premières affichées.`)] : [],
     resultCount: rows.length,
   });
 }
@@ -505,8 +522,17 @@ async function queryUnitSnapshot(locale: Locale, query: string, intent: Workbenc
   });
 }
 
-async function queryDailyMovements(locale: Locale, query: string, intent: WorkbenchIntent): Promise<WorkbenchResult> {
+async function queryDailyMovements(locale: Locale, query: string, intent: WorkbenchIntent, options: WorkbenchQueryExecutionOptions = {}): Promise<WorkbenchResult> {
   const supabase = await createClient();
+  const timeRange = options.timeRange ?? {
+    startDate: intent.asOfDate,
+    endDate: intent.asOfDate,
+    startInclusive: true,
+    endInclusive: true,
+    timezone: "Africa/Abidjan" as const,
+  };
+  const displayLimit = Math.max(1, Math.min(200, Math.trunc(options.limit ?? 100)));
+  const isSingleDay = timeRange.startDate === timeRange.endDate;
   let buildingQuery = supabase.from("buildings").select("id, code, display_name").eq("is_active", true);
   if (intent.buildingCode) buildingQuery = buildingQuery.eq("code", intent.buildingCode);
   const { data: buildingData, error: buildingError } = await buildingQuery;
@@ -527,21 +553,21 @@ async function queryDailyMovements(locale: Locale, query: string, intent: Workbe
     });
   }
 
-  const [unitsRes, bookingsRes] = await Promise.all([
-    supabase.from("units").select("id, building_id, unit_no").in("building_id", buildingIds).order("unit_no"),
-    supabase.from("daily_bookings")
-      .select("id, unit_id, customer_id, booking_agent_id, guest_customer_id, guest_name, check_in, check_out, checkout_mode, actual_check_out, status")
-      .in("status", ["pending_review", "confirmed", "checked_in", "checked_out"])
-      .lte("check_in", intent.asOfDate)
-      .order("check_in", { ascending: false })
-      .limit(1000),
-  ]);
+  const unitsRes = await supabase.from("units").select("id, building_id, unit_no").in("building_id", buildingIds).order("unit_no");
   if (unitsRes.error) throw new Error(tr(locale, `读取房源失败：${unitsRes.error.message}`, `Erreur de lecture des chambres : ${unitsRes.error.message}`));
-  if (bookingsRes.error) throw new Error(tr(locale, `读取订单失败：${bookingsRes.error.message}`, `Erreur de lecture des réservations : ${bookingsRes.error.message}`));
-
   const units = ((unitsRes.data ?? []) as Array<{ id: string; building_id: string; unit_no: string }>).filter((row) => row.building_id && buildingIds.includes(row.building_id));
   const unitByNo = new Map(units.map((row) => [row.id, row]));
   const unitIds = new Set(units.map((row) => row.id));
+  const bookingsRes = units.length
+    ? await supabase.from("daily_bookings")
+        .select("id, unit_id, customer_id, booking_agent_id, guest_customer_id, guest_name, check_in, check_out, checkout_mode, actual_check_out, status")
+        .in("unit_id", [...unitIds])
+        .in("status", ["pending_review", "confirmed", "checked_in", "checked_out"])
+        .lte("check_in", timeRange.endDate ?? intent.asOfDate)
+        .order("check_in", { ascending: false })
+        .limit(5000)
+    : { data: [], error: null };
+  if (bookingsRes.error) throw new Error(tr(locale, `读取订单失败：${bookingsRes.error.message}`, `Erreur de lecture des réservations : ${bookingsRes.error.message}`));
   const bookings = ((bookingsRes.data ?? []) as unknown as DailyBookingRow[]).filter((row) => unitIds.has(row.unit_id));
 
   const customerIds = [...new Set(bookings.flatMap((row) => [row.guest_customer_id, row.customer_id]).filter((id): id is string => Boolean(id)))];
@@ -549,65 +575,79 @@ async function queryDailyMovements(locale: Locale, query: string, intent: Workbe
   if (customersRes.error) throw new Error(tr(locale, `读取客户失败：${customersRes.error.message}`, `Erreur de lecture des clients : ${customersRes.error.message}`));
   const customerNames = new Map(((customersRes.data ?? []) as Array<{ id: string; name: string }>).map((row) => [row.id, row.name]));
 
-  const asOf = intent.asOfDate;
-  const arrivals = bookings.filter((row) => ["pending_review", "confirmed", "checked_in"].includes(row.status) && row.check_in === asOf);
+  const guestName = (row: DailyBookingRow) => row.guest_name?.trim() || customerNames.get(row.guest_customer_id ?? "") || customerNames.get(row.customer_id ?? "") || "—";
+  const filteredBookings = options.customerName ? bookings.filter((row) => matchesCustomerName(guestName(row), options.customerName)) : bookings;
+  const arrivals = filteredBookings.filter((row) => ["pending_review", "confirmed", "checked_in"].includes(row.status) && dateIsWithinRange(row.check_in, timeRange));
   const departures = bookings.filter((row) =>
-    (row.status === "checked_in" && (row.actual_check_out === asOf || (row.checkout_mode === "fixed" && row.check_out === asOf)))
-    || (row.status === "checked_out" && row.actual_check_out === asOf),
+    matchesCustomerName(guestName(row), options.customerName)
+    && ((row.status === "checked_in" && (dateIsWithinRange(row.actual_check_out, timeRange) || (row.checkout_mode === "fixed" && dateIsWithinRange(row.check_out, timeRange))))
+      || (row.status === "checked_out" && dateIsWithinRange(row.actual_check_out, timeRange))),
   );
 
   const rows = [
-    ...arrivals.map((row) => ({ group: tr(locale, "入住", "Arrivée"), room: unitByNo.get(row.unit_id)?.unit_no ?? "—", guest: row.guest_name?.trim() || customerNames.get(row.guest_customer_id ?? "") || customerNames.get(row.customer_id ?? "") || "—", detail: tr(locale, "今日到达 · 订单待办", "Arrivée du jour") })),
-    ...departures.map((row) => ({ group: row.status === "checked_out" ? tr(locale, "已退", "Parti") : tr(locale, "退房", "Départ"), room: unitByNo.get(row.unit_id)?.unit_no ?? "—", guest: row.guest_name?.trim() || customerNames.get(row.guest_customer_id ?? "") || customerNames.get(row.customer_id ?? "") || "—", detail: row.status === "checked_out" ? tr(locale, "已办理退房", "Départ enregistré") : tr(locale, "今日退房", "Départ du jour") })),
-  ];
-  const scope = `${tr(locale, "日租", "Journalier")} · ${intent.buildingCode ? intent.buildingCode.replace("SACSI", "") + "#" : tr(locale, "全部楼栋", "tous bâtiments")}`;
+    ...arrivals.map((row) => ({ date: row.check_in, group: tr(locale, "入住", "Arrivée"), room: unitByNo.get(row.unit_id)?.unit_no ?? "—", guest: guestName(row), detail: tr(locale, "计划到达 · 订单待办", "Arrivée prévue") })),
+    ...departures.map((row) => ({ date: row.actual_check_out ?? row.check_out ?? "—", group: row.status === "checked_out" ? tr(locale, "已退", "Parti") : tr(locale, "退房", "Départ"), room: unitByNo.get(row.unit_id)?.unit_no ?? "—", guest: guestName(row), detail: row.status === "checked_out" ? tr(locale, "已办理退房", "Départ enregistré") : tr(locale, "计划退房", "Départ prévu") })),
+  ].sort((a, b) => a.date.localeCompare(b.date) || a.room.localeCompare(b.room));
+  const rangeText = queryRangeLabel(timeRange, locale);
+  const scope = `${tr(locale, "日租", "Journalier")} · ${intent.buildingCode ? intent.buildingCode.replace("SACSI", "") + "#" : tr(locale, "全部楼栋", "tous bâtiments")}${options.customerName ? ` · ${tr(locale, "客户", "client")} ${options.customerName}` : ""}`;
 
   return toResult(locale, {
     query,
     intent,
-    title: `${asOf} ${tr(locale, "今日入住退房", "arrivées et départs du jour")}`,
+    title: `${rangeText} ${tr(locale, "入住退房", "arrivées et départs")}`,
     answer: tr(
       locale,
-      `${scope}：今天安排入住 ${arrivals.length} 位，退房 ${departures.length} 位。退房后请记得安排保洁并核对房间状态。`,
-      `${scope} : ${arrivals.length} arrivée(s) et ${departures.length} départ(s) aujourd'hui. Après un départ, pensez au ménage et à la vérification de la chambre.`,
+      `${scope}：${isSingleDay ? "当天" : "所选期间"}安排入住 ${arrivals.length} 位，退房 ${departures.length} 位。退房后请记得安排保洁并核对房间状态。`,
+      `${scope} : ${arrivals.length} arrivée(s) et ${departures.length} départ(s) ${isSingleDay ? "ce jour" : "sur la période"}. Après un départ, pensez au ménage et à la vérification de la chambre.`,
     ),
     scope,
     metrics: [
-      { label: tr(locale, "今日入住", "Arrivées"), value: String(arrivals.length), tone: arrivals.length ? "blue" : "green" },
-      { label: tr(locale, "今日退房", "Départs"), value: String(departures.length), tone: departures.length ? "amber" : "green" },
+      { label: tr(locale, "入住", "Arrivées"), value: String(arrivals.length), tone: arrivals.length ? "blue" : "green" },
+      { label: tr(locale, "退房", "Départs"), value: String(departures.length), tone: departures.length ? "amber" : "green" },
       { label: tr(locale, "已办理退房", "Déjà partis"), value: String(departures.filter((row) => row.status === "checked_out").length), tone: "neutral" },
     ],
     table: {
       columns: [
+        { key: "date", label: tr(locale, "日期", "Date") },
         { key: "group", label: tr(locale, "类型", "Type") },
         { key: "room", label: tr(locale, "房号", "Chambre") },
         { key: "guest", label: tr(locale, "联系人", "Contact") },
         { key: "detail", label: tr(locale, "说明", "Détail") },
       ],
-      rows: rows.slice(0, 100),
+      rows: rows.slice(0, displayLimit),
     },
     evidence: [
-      { label: tr(locale, "入住口径", "Périmètre arrivées"), value: tr(locale, "订单今天到店且状态为待确认/已确认/已入住", "Réservations arrivant ce jour (à confirmer, confirmées ou arrivées)") },
-      { label: tr(locale, "退房口径", "Périmètre départs"), value: tr(locale, "在住订单今天退房；已退房订单按实际退房日计入", "Séjours partant ce jour ; départs déjà enregistrés selon la date réelle") },
+      { label: tr(locale, "日期范围", "Période"), value: `${rangeText} · Africa/Abidjan` },
+      { label: tr(locale, "入住口径", "Périmètre arrivées"), value: tr(locale, "订单在所选日期到店且状态为待确认/已确认/已入住", "Réservations arrivant sur la période (à confirmer, confirmées ou arrivées)") },
+      { label: tr(locale, "退房口径", "Périmètre départs"), value: tr(locale, "在住所选日期计划退房；已退房订单按实际退房日计入", "Séjours partant sur la période ; départs enregistrés selon la date réelle") },
     ],
-    warnings: [],
+    warnings: rows.length > displayLimit ? [tr(locale, `共 ${rows.length} 条，表格仅展示前 ${displayLimit} 条。`, `${rows.length} mouvements ; ${displayLimit} premiers affichés.`)] : [],
     resultCount: rows.length,
   });
 }
 
-async function queryLeaseExpiring(locale: Locale, query: string, intent: WorkbenchIntent): Promise<WorkbenchResult> {
+async function queryLeaseExpiring(locale: Locale, query: string, intent: WorkbenchIntent, options: WorkbenchQueryExecutionOptions = {}): Promise<WorkbenchResult> {
   const supabase = await createClient();
-  const endDate = addIsoDays(intent.asOfDate, intent.days);
+  const timeRange = options.timeRange ?? {
+    startDate: intent.asOfDate,
+    endDate: addIsoDays(intent.asOfDate, intent.days),
+    startInclusive: true,
+    endInclusive: true,
+    timezone: "Africa/Abidjan" as const,
+  };
+  const startDate = timeRange.startDate ?? intent.asOfDate;
+  const endDate = timeRange.endDate ?? addIsoDays(intent.asOfDate, intent.days);
+  const displayLimit = Math.max(1, Math.min(200, Math.trunc(options.limit ?? 100)));
+  let leaseQuery = supabase.from("lease_contracts")
+    .select("id, unit_id, customer_id, contract_no, start_date, paid_through_date, monthly_rent_xof, status")
+    .eq("status", "active")
+    .not("paid_through_date", "is", null);
+  leaseQuery = timeRange.startInclusive ? leaseQuery.gte("paid_through_date", startDate) : leaseQuery.gt("paid_through_date", startDate);
+  leaseQuery = timeRange.endInclusive ? leaseQuery.lte("paid_through_date", endDate) : leaseQuery.lt("paid_through_date", endDate);
+  leaseQuery = leaseQuery.order("paid_through_date", { ascending: true }).limit(1000);
   const [buildingsRes, leasesRes] = await Promise.all([
     supabase.from("buildings").select("id, code, display_name").eq("is_active", true),
-    supabase.from("lease_contracts")
-      .select("id, unit_id, customer_id, contract_no, start_date, paid_through_date, monthly_rent_xof, status")
-      .eq("status", "active")
-      .not("paid_through_date", "is", null)
-      .gte("paid_through_date", intent.asOfDate)
-      .lte("paid_through_date", endDate)
-      .order("paid_through_date", { ascending: true })
-      .limit(300),
+    leaseQuery,
   ]);
   if (buildingsRes.error) throw new Error(tr(locale, `读取楼栋失败：${buildingsRes.error.message}`, `Erreur de lecture des bâtiments : ${buildingsRes.error.message}`));
   if (leasesRes.error) throw new Error(tr(locale, `读取长租合同失败：${leasesRes.error.message}`, `Erreur de lecture des baux : ${leasesRes.error.message}`));
@@ -626,6 +666,7 @@ async function queryLeaseExpiring(locale: Locale, query: string, intent: Workben
   const customerNames = new Map(((customersRes.data ?? []) as Array<{ id: string; name: string }>).map((row) => [row.id, row.name]));
 
   if (intent.buildingCode) leases = leases.filter((row) => buildingMap.get(units.get(row.unit_id)?.building_id ?? "")?.code.toUpperCase() === intent.buildingCode);
+  if (options.customerName) leases = leases.filter((row) => matchesCustomerName(customerNames.get(row.customer_id), options.customerName));
 
   const daysBetween = (iso: string) => Math.max(0, Math.floor((Date.parse(`${iso}T00:00:00Z`) - Date.parse(`${intent.asOfDate}T00:00:00Z`)) / 86_400_000));
   const rows = leases.map((row) => {
@@ -641,20 +682,21 @@ async function queryLeaseExpiring(locale: Locale, query: string, intent: Workben
       contractNo: row.contract_no,
     };
   });
-  const scope = `${tr(locale, "长租", "Baux")} · ${intent.buildingCode ? intent.buildingCode.replace("SACSI", "") + "#" : tr(locale, "全部楼栋", "tous bâtiments")}`;
+  const rangeText = queryRangeLabel(timeRange, locale);
+  const scope = `${tr(locale, "长租", "Baux")} · ${intent.buildingCode ? intent.buildingCode.replace("SACSI", "") + "#" : tr(locale, "全部楼栋", "tous bâtiments")}${options.customerName ? ` · ${tr(locale, "客户", "client")} ${options.customerName}` : ""}`;
   const nearest = rows[0] ? `${rows[0].endDate} ${rows[0].unit}(${rows[0].customer})` : null;
 
   return toResult(locale, {
     query,
     intent,
-    title: tr(locale, `长租 ${intent.days} 天内缴租截至`, `Loyers couverts jusqu'à une date sous ${intent.days} j`),
+    title: tr(locale, `长租 ${rangeText} 缴租截至`, `Loyers couverts jusqu'à une date ${rangeText}`),
     answer: rows.length
       ? tr(
           locale,
-          `${scope}：接下来 ${intent.days} 天有 ${rows.length} 份生效合同到达当前缴租截至日（最早 ${nearest}）。建议提前核对下一期应收并联系客户。`,
-          `${scope} : ${rows.length} bail(s) actif(s) atteignent leur date de loyer payé sous ${intent.days} j (au plus tôt ${nearest}). Vérifiez la prochaine créance et contactez le client.`,
+          `${scope}：${rangeText} 有 ${rows.length} 份生效合同到达当前缴租截至日（最早 ${nearest}）。建议提前核对下一期应收并联系客户。`,
+          `${scope} : ${rows.length} bail(s) actif(s) atteignent leur date de loyer payé sur ${rangeText} (au plus tôt ${nearest}). Vérifiez la prochaine créance et contactez le client.`,
         )
-      : tr(locale, `${scope}：未来 ${intent.days} 天没有到达缴租截至日的合同。`, `${scope} : aucun bail n'atteint sa date de loyer payé sous ${intent.days} j.`),
+      : tr(locale, `${scope}：${rangeText} 没有到达缴租截至日的合同。`, `${scope} : aucun bail n'atteint sa date de loyer payé sur ${rangeText}.`),
     scope,
     metrics: [
       { label: tr(locale, "缴租截至", "Loyers à échéance"), value: String(rows.length), tone: rows.length ? "amber" : "green" },
@@ -670,22 +712,23 @@ async function queryLeaseExpiring(locale: Locale, query: string, intent: Workben
         { key: "monthlyRent", label: tr(locale, "月租", "Loyer/mois"), align: "right" },
         { key: "contractNo", label: tr(locale, "合同号", "Contrat") },
       ],
-      rows: rows.slice(0, 100),
+      rows: rows.slice(0, displayLimit),
     } : null,
     evidence: [
+      { label: tr(locale, "日期范围", "Période"), value: `${rangeText} · Africa/Abidjan` },
       { label: tr(locale, "口径", "Périmètre"), value: tr(locale, "仅统计生效合同，按最新缴租截至日计算；不使用正式合同结束日替代收费进度", "Baux actifs calculés selon la dernière date de loyer payé ; la fin formelle du contrat ne remplace pas l'avancement d'encaissement") },
       { label: tr(locale, "提醒", "Rappel"), value: tr(locale, "下一期是否已经生成应收仍以应收明细为准", "La création de la prochaine créance reste vérifiée dans le détail des créances") },
     ],
-    warnings: rows.length > 100 ? [tr(locale, `共 ${rows.length} 份，表格仅展示前 100 份。`, `${rows.length} baux ; 100 premiers affichés.`)] : [],
+    warnings: rows.length > displayLimit ? [tr(locale, `共 ${rows.length} 份，表格仅展示前 ${displayLimit} 份。`, `${rows.length} baux ; ${displayLimit} premiers affichés.`)] : [],
     resultCount: rows.length,
   });
 }
 
-export async function executeWorkbenchQuery(query: string, intent: WorkbenchIntent, locale: Locale = "zh"): Promise<WorkbenchResult> {
+export async function executeWorkbenchQuery(query: string, intent: WorkbenchIntent, locale: Locale = "zh", options: WorkbenchQueryExecutionOptions = {}): Promise<WorkbenchResult> {
   if (intent.kind === "daily_status") return queryDailyStatus(locale, query, intent);
-  if (intent.kind === "daily_movements") return queryDailyMovements(locale, query, intent);
-  if (intent.kind === "lease_expiring") return queryLeaseExpiring(locale, query, intent);
-  if (["receivable_overdue", "receivable_outstanding", "receivable_due_soon"].includes(intent.kind)) return queryReceivables(locale, query, intent);
+  if (intent.kind === "daily_movements") return queryDailyMovements(locale, query, intent, options);
+  if (intent.kind === "lease_expiring") return queryLeaseExpiring(locale, query, intent, options);
+  if (["receivable_overdue", "receivable_outstanding", "receivable_due_soon"].includes(intent.kind)) return queryReceivables(locale, query, intent, options);
   if (intent.kind === "unit_snapshot" && intent.unitNo) return queryUnitSnapshot(locale, query, intent);
 
   const guidance = buildUnsupportedGuidance(intent, locale);
