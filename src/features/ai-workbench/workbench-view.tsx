@@ -1,6 +1,6 @@
 "use client";
 
-import { type ClipboardEvent, type DragEvent, type FormEvent, useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent, useActionState, useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, CheckCircle2, Clock3, Database, ImageIcon, LockKeyhole, Paperclip, Search, ShieldCheck, Sparkles, X } from "lucide-react";
 import { OperationalPage, StatTile } from "@/components/ui/operational";
 import { cn } from "@/lib/utils";
@@ -9,7 +9,7 @@ import { ReceiptUpload, type ReceiptRevisionRequest, type ReceiptRevisionTarget 
 import type { ConversationTurnSummary } from "./conversation-service";
 import { askWorkbench, confirmWorkbenchAction, discardWorkbenchProposal } from "./actions";
 import { resolveWorkbenchComposerRoute } from "./composer-routing";
-import { INITIAL_WORKBENCH_STATE, type WorkbenchActionResult, type WorkbenchDraftPreview, type WorkbenchResult, type WorkbenchTone } from "./types";
+import { INITIAL_WORKBENCH_STATE, type WorkbenchActionResult, type WorkbenchDraftPreview, type WorkbenchResponse, type WorkbenchResult, type WorkbenchTone } from "./types";
 
 const ALLOWED_RECEIPT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
@@ -18,6 +18,13 @@ interface ReceiptTurn {
   id: number;
   file: File;
   prompt: string;
+}
+
+interface LiveConversationTurn {
+  id: number;
+  userText: string;
+  response: WorkbenchResponse | null;
+  error: string | null;
 }
 
 // Suggestions stay functional for the parser in each locale.
@@ -196,11 +203,14 @@ export function AiWorkbenchView({
   const [receiptFlowBusy, setReceiptFlowBusy] = useState(false);
   const [externalRevision, setExternalRevision] = useState<ReceiptRevisionRequest | null>(null);
   const [liveUserText, setLiveUserText] = useState("");
+  const [liveTurns, setLiveTurns] = useState<LiveConversationTurn[]>([]);
   const suggestions = receiptRevisionTarget ? REVISION_SUGGESTIONS[locale] : SUGGESTIONS[locale];
   const [state, formAction, pending] = useActionState(askWorkbench, INITIAL_WORKBENCH_STATE);
   const resultRef = useRef<HTMLDivElement>(null);
   const conversationViewportRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const liveTurnSequenceRef = useRef(0);
+  const activeSubmissionRef = useRef<{ id: number; userText: string } | null>(null);
 
   useEffect(() => {
     if (!attachment) {
@@ -213,17 +223,29 @@ export function AiWorkbenchView({
   }, [attachment]);
 
   useEffect(() => {
-    if (state.status !== "idle") {
-      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      resultRef.current?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "end" });
-      setQuery((current) => current.trim() === liveUserText ? "" : current);
-    }
+    const submission = activeSubmissionRef.current;
+    if (state.status === "idle" || !submission) return;
+    activeSubmissionRef.current = null;
+    setLiveTurns((current) => [...current, {
+      id: submission.id,
+      userText: submission.userText,
+      response: state.result,
+      error: state.error,
+    }]);
+    setLiveUserText("");
+    setQuery((current) => current.trim() === submission.userText ? "" : current);
   }, [state]);
 
   useEffect(() => {
     const viewport = conversationViewportRef.current;
     if (viewport) viewport.scrollTop = viewport.scrollHeight;
   }, [initialHistory.length]);
+
+  useEffect(() => {
+    if (!liveUserText && liveTurns.length === 0 && !receiptTurn) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    resultRef.current?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "end" });
+  }, [liveTurns.length, liveUserText, pending, receiptTurn]);
 
   const acceptAttachment = (file: File) => {
     if (!canRecordFinance) return;
@@ -257,6 +279,13 @@ export function AiWorkbenchView({
     if (image) acceptAttachment(image);
   };
 
+  const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    const cannotSubmit = pending || receiptFlowBusy || Boolean(externalRevision) || (!attachment && query.trim().length < 2);
+    if (!cannotSubmit) event.currentTarget.form?.requestSubmit();
+  };
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     const route = resolveWorkbenchComposerRoute({ hasAttachment: Boolean(attachment), hasEditableReceiptProposal: Boolean(receiptRevisionTarget) });
     if (route === "receipt_attachment" && attachment) {
@@ -275,7 +304,10 @@ export function AiWorkbenchView({
       window.setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }), 0);
       return;
     }
-    setLiveUserText(query.trim());
+    const userText = query.trim();
+    liveTurnSequenceRef.current += 1;
+    activeSubmissionRef.current = { id: liveTurnSequenceRef.current, userText };
+    setLiveUserText(userText);
   };
 
   const handleRevisionTargetChange = useCallback((target: ReceiptRevisionTarget | null) => setReceiptRevisionTarget(target), []);
@@ -328,14 +360,14 @@ export function AiWorkbenchView({
 
         <div ref={conversationViewportRef} className="min-h-[340px] max-h-[min(58vh,680px)] overflow-y-auto bg-muted/10">
           <div className="mx-auto max-w-4xl space-y-5 px-4 py-6 sm:px-6 sm:py-8">
-            {initialHistory.length > 0
-              ? <ConversationHistory turns={initialHistory} />
-              : (
+            {initialHistory.length > 0 && <ConversationHistory turns={initialHistory} />}
+            {initialHistory.length === 0 && liveTurns.length === 0 && !liveUserText && !receiptTurn && (
                 <div className="mx-auto flex max-w-lg flex-col items-center py-12 text-center text-muted-foreground">
                   <span className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card"><Sparkles className="h-5 w-5" /></span>
                   <p className="mt-4 text-sm leading-6">{t.askHint}</p>
                 </div>
-              )}
+            )}
+            {liveTurns.map((turn) => <LiveConversationTurnView key={turn.id} turn={turn} t={t} locale={locale} />)}
             {liveUserText && (
               <div className="ml-auto w-fit max-w-[82%] break-words rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-6 text-primary-foreground">{liveUserText}</div>
             )}
@@ -354,14 +386,6 @@ export function AiWorkbenchView({
               />
             )}
             {pending && <LoadingResult t={t} />}
-            {!pending && state.status === "error" && (
-              <section className="rounded-xl border border-accentRed-100 bg-accentRed-50 p-5 text-sm text-accentRed-700" role="status" aria-atomic="true">
-                <p className="font-semibold">{t.errorTitle}</p>
-                <p className="mt-1 leading-6">{state.error}</p>
-              </section>
-            )}
-            {!pending && state.result?.kind === "query_result" && <WorkbenchResultView t={t} result={state.result} />}
-            {!pending && state.result?.kind === "action_draft" && <WorkbenchDraftFlow key={state.result.execution.taskId} t={t} locale={locale} draft={state.result} />}
             <div ref={resultRef} aria-hidden="true" />
           </div>
         </div>
@@ -390,6 +414,7 @@ export function AiWorkbenchView({
                 name="query"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={handleComposerKeyDown}
                 onPaste={handlePaste}
                 rows={2}
                 maxLength={500}
@@ -439,6 +464,23 @@ function ConversationHistory({ turns }: { turns: ConversationTurnSummary[] }) {
         </article>
       ))}
     </section>
+  );
+}
+
+function LiveConversationTurnView({ turn, t, locale }: { turn: LiveConversationTurn; t: Record<string, string>; locale: Locale }) {
+  return (
+    <article className="space-y-3">
+      <div className="ml-auto w-fit max-w-[82%] break-words rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-6 text-primary-foreground">{turn.userText}</div>
+      {turn.error && (
+        <section className="rounded-xl border border-accentRed-100 bg-accentRed-50 p-5 text-sm text-accentRed-700" role="status" aria-atomic="true">
+          <p className="font-semibold">{t.errorTitle}</p>
+          <p className="mt-1 leading-6">{turn.error}</p>
+        </section>
+      )}
+      {turn.response?.kind === "query_result" && <WorkbenchResultView t={t} result={turn.response} />}
+      {turn.response?.kind === "action_draft" && <WorkbenchDraftFlow t={t} locale={locale} draft={turn.response} />}
+      {turn.response?.kind === "action_result" && <WorkbenchActionResultView t={t} result={turn.response} />}
+    </article>
   );
 }
 

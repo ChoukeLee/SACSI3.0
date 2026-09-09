@@ -20,4 +20,21 @@ describe("AI workbench conversation layout", () => {
     expect(view).toContain('<details className="group relative shrink-0">');
     expect(view).not.toContain('<aside className="border-t border-border bg-muted/35');
   });
+
+  it("keeps completed client-side turns instead of replacing the previous answer", () => {
+    expect(view).toContain("const [liveTurns, setLiveTurns] = useState<LiveConversationTurn[]>([])");
+    expect(view).toContain("setLiveTurns((current) => [...current");
+    expect(view).toContain("liveTurns.map((turn) => <LiveConversationTurnView");
+    expect(view).not.toContain('!pending && state.result?.kind === "query_result"');
+  });
+
+  it("hides the empty-state prompt as soon as a live conversation starts", () => {
+    expect(view).toContain("initialHistory.length === 0 && liveTurns.length === 0 && !liveUserText && !receiptTurn");
+  });
+
+  it("submits on Enter while preserving Shift+Enter and IME composition", () => {
+    expect(view).toContain('event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing');
+    expect(view).toContain("event.currentTarget.form?.requestSubmit()");
+    expect(view).toContain("onKeyDown={handleComposerKeyDown}");
+  });
 });
