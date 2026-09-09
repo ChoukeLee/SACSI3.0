@@ -23,6 +23,7 @@ import { assertCleaningProposalBinding } from "./proposal-binding";
 import { executeWorkbenchQuery } from "./query-service";
 import { planWorkbenchQueryV2 } from "./query-planner";
 import { summarizeShadowPlan } from "./query-plan";
+import { summarizeQueryPlanCompatibility } from "./query-tool-adapter";
 import { enrichQueryWithConversationContext, intentContextSnapshot, selectConversationContext, type WorkbenchConversationContext } from "./conversation-context";
 import { appendConversationTurn, loadConversationHistory } from "./conversation-service";
 import type { WorkbenchActionState, WorkbenchActionResult, WorkbenchIntent } from "./types";
@@ -190,6 +191,7 @@ export async function askWorkbench(
           ? {
               queryPlannerShadow: {
                 ...summarizeShadowPlan(shadowPlan),
+                compatibility: summarizeQueryPlanCompatibility(shadowPlan, asOfDate),
                 legacy: { kind: intent.kind, days: intent.days },
               },
             }
