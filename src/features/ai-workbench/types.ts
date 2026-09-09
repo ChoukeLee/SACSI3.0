@@ -1,14 +1,17 @@
-export type WorkbenchDomain = "all" | "daily" | "lease" | "sale";
+export const WORKBENCH_DOMAINS = ["all", "daily", "lease", "sale"] as const;
+export type WorkbenchDomain = (typeof WORKBENCH_DOMAINS)[number];
 
-export type WorkbenchQueryKind =
-  | "daily_status"
-  | "daily_movements"
-  | "lease_expiring"
-  | "receivable_overdue"
-  | "receivable_outstanding"
-  | "receivable_due_soon"
-  | "unit_snapshot"
-  | "unsupported";
+export const WORKBENCH_QUERY_KINDS = [
+  "daily_status",
+  "daily_movements",
+  "lease_expiring",
+  "receivable_overdue",
+  "receivable_outstanding",
+  "receivable_due_soon",
+  "unit_snapshot",
+  "unsupported",
+] as const;
+export type WorkbenchQueryKind = (typeof WORKBENCH_QUERY_KINDS)[number];
 
 export interface WorkbenchIntent {
   kind: WorkbenchQueryKind;

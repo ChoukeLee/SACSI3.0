@@ -1,25 +1,18 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import type { WorkbenchIntent } from "./types";
+import { WORKBENCH_DOMAINS, WORKBENCH_QUERY_KINDS, type WorkbenchIntent } from "./types";
 
 type ModelProvider = "deepseek" | "openai";
 
-const allowedKinds = new Set<WorkbenchIntent["kind"]>([
-  "daily_status",
-  "receivable_overdue",
-  "receivable_outstanding",
-  "receivable_due_soon",
-  "unit_snapshot",
-  "unsupported",
-]);
-const allowedDomains = new Set<WorkbenchIntent["domain"]>(["all", "daily", "lease", "sale"]);
+const allowedKinds = new Set<WorkbenchIntent["kind"]>(WORKBENCH_QUERY_KINDS);
+const allowedDomains = new Set<WorkbenchIntent["domain"]>(WORKBENCH_DOMAINS);
 
 const systemPrompt = [
-  "You classify Chinese property-management questions into a closed query catalog and output json only.",
+  "You classify Chinese or French property-management questions into a closed query catalog and output json only.",
   "Never answer the question and never generate SQL.",
-  "Allowed kinds: daily_status, receivable_overdue, receivable_outstanding, receivable_due_soon, unit_snapshot, unsupported.",
-  "Allowed domains: all, daily, lease, sale.",
+  `Allowed kinds: ${WORKBENCH_QUERY_KINDS.join(", ")}.`,
+  `Allowed domains: ${WORKBENCH_DOMAINS.join(", ")}.`,
   "buildingCode must be SACSI plus the building number, for example SACSI11. Return null when absent.",
   "unitNo is the exact room number or null. days defaults to 15 and must be between 1 and 90.",
   "JSON example: {\"kind\":\"unit_snapshot\",\"domain\":\"all\",\"buildingCode\":\"SACSI11\",\"unitNo\":\"503\",\"days\":15,\"confidence\":0.98}",
@@ -41,7 +34,7 @@ function normalizeIntent(payload: unknown, asOfDate: string, provider: ModelProv
 
   return {
     kind: parsed.kind,
-    domain: parsed.kind === "daily_status" ? "daily" : parsed.domain,
+    domain: parsed.kind === "daily_status" || parsed.kind === "daily_movements" ? "daily" : parsed.domain,
     buildingCode,
     unitNo,
     customerName: null,
