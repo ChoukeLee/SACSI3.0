@@ -37,7 +37,8 @@ describe("AI conversation infrastructure", () => {
 
   it("threads conversation identity through text and receipt requests", () => {
     expect(actions).toContain('formData.get("conversation_id")');
-    expect(actions).toContain("loadLatestConversationContext(conversationId)");
+    expect(actions).toContain("loadRecentConversationContexts(conversationId)");
+    expect(actions).toContain("selectConversationContext");
     expect(actions).toContain("enrichQueryWithConversationContext");
     expect(scan).toContain('form.get("conversation_id")');
     expect(scan).toContain("appendConversationTurn");

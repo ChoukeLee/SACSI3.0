@@ -101,7 +101,7 @@ export async function appendConversationTurn(input: {
   return data;
 }
 
-export async function loadLatestConversationContext(conversationId: string) {
-  const history = await loadConversationHistory(conversationId, 1);
-  return history[0] ?? null;
+export async function loadRecentConversationContexts(conversationId: string, limit = 6) {
+  const history = await loadConversationHistory(conversationId, Math.max(1, Math.min(8, Math.trunc(limit))));
+  return history.map((turn) => turn.context);
 }

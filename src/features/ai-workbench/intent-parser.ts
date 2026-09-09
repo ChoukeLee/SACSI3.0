@@ -46,7 +46,7 @@ function detectKind(query: string, unitNo: string | null, domain: WorkbenchDomai
   if (/逾期|retard\b|retards\b|échu|echu|impayé|impayes/i.test(query)) return "receivable_overdue";
   if (/(?:\d{1,2}\s*天内|近期|即将).*(?:应缴|到期)|(?:应缴|到期).*(?:\d{1,2}\s*天内|近期|即将)/.test(query)) return "receivable_due_soon";
   if (/(?:\d{1,2}\s*(?:jours?|j\b).{0,16}(?:échéance|echeance|payer|paiement|d[ûu]))|(?:échéances?|echeances?).{0,16}(?:\d{1,2}\s*(?:jours?|j\b))/.test(query)) return "receivable_due_soon";
-  if (/未收|欠款|欠费|应收余额|reste d[ûu]|impay|dette/i.test(query)) return "receivable_outstanding";
+  if (/未收|欠款|欠费|欠多少|还欠|应收余额|reste (?:d[ûu]|à payer)|solde.{0,12}(?:d[ûu]|payer)|impay|dette/i.test(query)) return "receivable_outstanding";
   if (unitNo && /合同|房间|房源|公寓|商铺|信息|情况|档案|客户|租客|业主|收款|contrat|paiement|paiements|client|locataire|infos?|situation/i.test(query)) return "unit_snapshot";
   if (unitNo) return "unit_snapshot";
   return "unsupported";

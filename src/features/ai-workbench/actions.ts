@@ -21,8 +21,8 @@ import { parseWorkbenchIntent } from "./intent-parser";
 import { classifyWorkbenchIntentWithModel } from "./model-classifier";
 import { assertCleaningProposalBinding } from "./proposal-binding";
 import { executeWorkbenchQuery } from "./query-service";
-import { enrichQueryWithConversationContext, intentContextSnapshot, type WorkbenchConversationContext } from "./conversation-context";
-import { appendConversationTurn, loadLatestConversationContext } from "./conversation-service";
+import { enrichQueryWithConversationContext, intentContextSnapshot, selectConversationContext, type WorkbenchConversationContext } from "./conversation-context";
+import { appendConversationTurn, loadRecentConversationContexts } from "./conversation-service";
 import type { WorkbenchActionState, WorkbenchActionResult, WorkbenchIntent } from "./types";
 
 function tr(locale: Locale, zh: string, fr: string) {
@@ -98,10 +98,11 @@ export async function askWorkbench(
   try {
     const user = await requireAuth();
     const asOfDate = todayInAbidjan();
-    const previousTurn = conversationId ? await loadLatestConversationContext(conversationId) : null;
+    const recentContexts = conversationId ? await loadRecentConversationContexts(conversationId) : [];
+    const conversationContext = selectConversationContext(recentContexts as WorkbenchConversationContext[]);
     const contextualQuery = enrichQueryWithConversationContext(
       query,
-      (previousTurn?.context ?? null) as WorkbenchConversationContext | null,
+      conversationContext,
     );
     const actionIntent = parseWorkbenchAction(contextualQuery);
     if (actionIntent) {
