@@ -21,8 +21,10 @@ import { parseWorkbenchIntent } from "./intent-parser";
 import { classifyWorkbenchIntentWithModel } from "./model-classifier";
 import { assertCleaningProposalBinding } from "./proposal-binding";
 import { executeWorkbenchQuery } from "./query-service";
+import { planWorkbenchQueryV2 } from "./query-planner";
+import { summarizeShadowPlan } from "./query-plan";
 import { enrichQueryWithConversationContext, intentContextSnapshot, selectConversationContext, type WorkbenchConversationContext } from "./conversation-context";
-import { appendConversationTurn, loadRecentConversationContexts } from "./conversation-service";
+import { appendConversationTurn, loadConversationHistory } from "./conversation-service";
 import type { WorkbenchActionState, WorkbenchActionResult, WorkbenchIntent } from "./types";
 
 function tr(locale: Locale, zh: string, fr: string) {
@@ -98,7 +100,8 @@ export async function askWorkbench(
   try {
     const user = await requireAuth();
     const asOfDate = todayInAbidjan();
-    const recentContexts = conversationId ? await loadRecentConversationContexts(conversationId) : [];
+    const recentHistory = conversationId ? await loadConversationHistory(conversationId, 6) : [];
+    const recentContexts = recentHistory.map((turn) => turn.context);
     const conversationContext = selectConversationContext(recentContexts as WorkbenchConversationContext[]);
     const contextualQuery = enrichQueryWithConversationContext(
       query,
@@ -166,13 +169,32 @@ export async function askWorkbench(
     if (!canRunIntent(user, intent)) {
       return { status: "error", result: null, error: tr(locale, "当前账号没有查看这类业务数据的权限。", "Votre profil n'a pas le droit de consulter ces données.") };
     }
-    const result = await executeWorkbenchQuery(query, intent, locale);
+    const shadowPlanPromise = planWorkbenchQueryV2({
+      query,
+      asOfDate,
+      locale,
+      history: recentHistory.map((turn) => ({ userText: turn.userText, context: turn.context })),
+    }).catch(() => null);
+    const [result, shadowPlan] = await Promise.all([
+      executeWorkbenchQuery(query, intent, locale),
+      shadowPlanPromise,
+    ]);
     await appendConversationTurn({
       conversationId,
       kind: "query",
       userText: query,
       assistantText: result.answer,
-      context: intentContextSnapshot(intent),
+      context: {
+        ...intentContextSnapshot(intent),
+        ...(process.env.AI_QUERY_PLANNER_SHADOW_ENABLED === "true"
+          ? {
+              queryPlannerShadow: {
+                ...summarizeShadowPlan(shadowPlan),
+                legacy: { kind: intent.kind, days: intent.days },
+              },
+            }
+          : {}),
+      },
     });
     return { status: "success", result, error: null };
   } catch (error) {
