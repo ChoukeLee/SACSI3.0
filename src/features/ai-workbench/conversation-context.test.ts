@@ -57,6 +57,36 @@ describe("AI conversation context", () => {
     });
   });
 
+  it.each(["然后呢？", "接着呢？", "这笔呢？", "刚才那个房间怎么样？"])("carries the recent object into a conversational continuation: %s", (query) => {
+    const enriched = enrichQueryWithConversationContext(query, {
+      buildingCode: "SACSI11",
+      unitNo: "1001",
+      domain: "daily",
+    });
+    expect(enriched).toContain("11#，房号 1001，日租");
+    expect(parseWorkbenchIntent(enriched, "2026-09-09")).toMatchObject({
+      kind: "unit_snapshot",
+      buildingCode: "SACSI11",
+      unitNo: "1001",
+      domain: "daily",
+    });
+  });
+
+  it("supports a French conversational continuation", () => {
+    const enriched = enrichQueryWithConversationContext("Et ensuite ?", {
+      buildingCode: "SACSI11",
+      unitNo: "503",
+      domain: "lease",
+    });
+    expect(enriched).toContain("11#，房号 503，长租");
+    expect(parseWorkbenchIntent(enriched, "2026-09-09")).toMatchObject({
+      kind: "unit_snapshot",
+      buildingCode: "SACSI11",
+      unitNo: "503",
+      domain: "lease",
+    });
+  });
+
   it("skips empty turns and selects the nearest meaningful context", () => {
     expect(selectConversationContext([
       { buildingCode: "SACSI11", unitNo: "503", domain: "lease" },
