@@ -8,6 +8,7 @@ import { formatXof, sortUnits } from "@/lib/utils";
 import type { Locale } from "@/lib/i18n";
 import type { BuildingRow, CustomerRow, DailyBookingRow, ReceivableRow, UnitRow } from "@/types/database";
 import type { WorkbenchDomain, WorkbenchIntent, WorkbenchResult, WorkbenchTable } from "./types";
+import { buildUnsupportedGuidance } from "./unsupported-guidance";
 
 type BuildingSummary = Pick<BuildingRow, "id" | "code" | "display_name">;
 type UnitSummary = Pick<UnitRow, "id" | "building_id" | "unit_no" | "floor_label" | "status" | "code">;
@@ -687,19 +688,16 @@ export async function executeWorkbenchQuery(query: string, intent: WorkbenchInte
   if (["receivable_overdue", "receivable_outstanding", "receivable_due_soon"].includes(intent.kind)) return queryReceivables(locale, query, intent);
   if (intent.kind === "unit_snapshot" && intent.unitNo) return queryUnitSnapshot(locale, query, intent);
 
+  const guidance = buildUnsupportedGuidance(intent, locale);
   return toResult(locale, {
     query,
     intent,
-    title: tr(locale, "这题我暂时答不了", "Je ne peux pas encore répondre à ça"),
-    answer: tr(
-      locale,
-      "我只做“能用系统固定口径验证”的查询，现在还不会答这一类。可以换一种问法，或直接点下方示例。查询只读、绝不改数据；想办理事项（例如“保洁已完成”）请说清房间和动作，我会先给你草稿。",
-      "Je réponds uniquement aux questions vérifiables par les règles fixes du système. Reformulez votre question ou utilisez un exemple ci-dessous. Les requêtes sont en lecture seule ; pour une opération (ex. ménage terminé), précisez la chambre et l'action : je proposerai un brouillon.",
-    ),
+    title: guidance.title,
+    answer: guidance.answer,
     scope: tr(locale, "受控查询范围", "Périmètre de requête contrôlé"),
     metrics: [],
     table: null,
-    warnings: [tr(locale, "可以试试：今天日租房态、11#今天退房名单、11#长租逾期、长租30天内缴租截至、出售15天内应缴、查看11#503的合同和收款、11#906保洁已完成。", "Exemples : état journalier du jour, départs du jour 11#, retards bail 11#, loyers payés arrivant à échéance sous 30 j, échéances vente sous 15 j, contrat et paiements du 11#503, ménage terminé 11#906.")],
+    warnings: [tr(locale, `可以试试：${guidance.suggestions.join("；")}。`, `Essayez : ${guidance.suggestions.join(" ; ")}.`)],
     resultCount: 0,
   });
 }
