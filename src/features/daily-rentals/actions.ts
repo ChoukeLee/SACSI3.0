@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createPrivilegedClient } from "@/lib/supabase/privileged";
 import { requireRole, type CurrentUser } from "@/lib/auth";
 import type { CleaningTaskRow, DailyBookingRow, PaymentRow, ReceivableRow, UnitRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
@@ -509,15 +510,20 @@ export async function extendStay(
 export async function cancelBooking(bookingId: string): Promise<DailyActionResult> {
   const user = await guardWrite();
   try {
-    // Keep the authenticated session so the database can enforce and audit the
-    // real operator role. The cancellation trigger is aligned with these roles
-    // by migration 202608130001_align_daily_cancel_operator_permissions.sql.
-    const supabase = await createClient();
+    // Authorization is enforced above by guardWrite(). Execute the atomic RPC
+    // through the privileged server client so a stale/partially refreshed auth
+    // cookie cannot make an otherwise authorized cancellation fail. Keep the
+    // real operator in p_actor for the audit trail.
+    const supabase = createPrivilegedClient();
     const { data, error } = await supabase.rpc("daily_cancel_booking_rpc", {
       p_booking_id: bookingId,
       p_actor: actorPayload(user),
     });
     if (error) return { success: false, error: error.message };
+    revalidatePath("/daily-rentals");
+    revalidatePath("/fr/daily-rentals");
+    revalidatePath("/management");
+    revalidatePath("/fr/management");
     return { success: true, data: data as DailyOperationSnapshot };
   } catch (error) {
     return {
