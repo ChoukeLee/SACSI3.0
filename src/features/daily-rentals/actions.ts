@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createPrivilegedClient } from "@/lib/supabase/privileged";
 import { requireRole, type CurrentUser } from "@/lib/auth";
 import type { CleaningTaskRow, DailyBookingRow, PaymentRow, ReceivableRow, UnitRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
@@ -510,11 +509,9 @@ export async function extendStay(
 export async function cancelBooking(bookingId: string): Promise<DailyActionResult> {
   const user = await guardWrite();
   try {
-    // Authorization is enforced above by guardWrite(). Execute the atomic RPC
-    // through the privileged server client so a stale/partially refreshed auth
-    // cookie cannot make an otherwise authorized cancellation fail. Keep the
-    // real operator in p_actor for the audit trail.
-    const supabase = createPrivilegedClient();
+    // Keep the user's authenticated session. The database RPC and cancellation
+    // trigger both use that identity for authorization and auditing.
+    const supabase = await createClient();
     const { data, error } = await supabase.rpc("daily_cancel_booking_rpc", {
       p_booking_id: bookingId,
       p_actor: actorPayload(user),
