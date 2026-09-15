@@ -15,7 +15,7 @@ import {
   targetVersionKey,
   validateAiProposalDraft,
 } from "./ai-draft-model";
-import { requireBusinessActionRole } from "./registry";
+import { canRoleUseBusinessAction, getBusinessActionDefinition } from "./registry";
 
 type RpcTransitionResult = {
   success: boolean;
@@ -34,6 +34,23 @@ const TARGET_TABLES = [
   ["saleContractId", "sale_contract", "sale_contracts"],
   ["customerId", "customer", "customers"],
 ] as const;
+
+async function requireAiBusinessActionAccess(
+  user: Awaited<ReturnType<typeof requireAuth>>,
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actionName: string,
+) {
+  const definition = getBusinessActionDefinition(actionName);
+  if (!definition) throw new Error(`Unknown business action: ${actionName}`);
+  if (canRoleUseBusinessAction(user.role, actionName)) return definition;
+
+  const { data, error } = await supabase.rpc("can_execute_operator_action", {
+    p_action_name: actionName,
+    p_risk_level: definition.risk,
+  });
+  if (error || data !== true) throw new Error(`Business action denied: ${actionName}`);
+  return definition;
+}
 
 export async function loadBusinessTargetVersions(target: BusinessTarget): Promise<TargetVersionMap> {
   const supabase = await createClient();
@@ -147,12 +164,12 @@ export async function completeAiInputExtraction(input: {
 export async function createAiProposal(jobId: string, sequenceNo: number, draft: AiProposalDraft) {
   const user = await requireAuth();
   const { definition, expiresAt } = validateAiProposalDraft(draft);
-  requireBusinessActionRole(user.role, draft.action);
+  const supabase = await createClient();
+  await requireAiBusinessActionAccess(user, supabase, draft.action);
   const currentVersions = await loadBusinessTargetVersions(draft.target);
   if (Object.keys(draft.beforeVersions).length > 0) {
     assertTargetVersionsUnchanged(draft.beforeVersions, currentVersions);
   }
-  const supabase = await createClient();
   const { data, error } = await supabase
     .from("ai_proposed_actions")
     .insert({
@@ -186,7 +203,7 @@ async function getExecutableProposal(proposalId: string) {
     .eq("id", proposalId)
     .single();
   if (error || !data) throw new Error(error?.message ?? "未找到操作草稿。");
-  requireBusinessActionRole(user.role, data.action_name);
+  await requireAiBusinessActionAccess(user, supabase, data.action_name);
   return { supabase, proposal: data };
 }
 
@@ -246,7 +263,7 @@ export async function reviseAiProposalV2(
   const user = await requireAuth();
   const { supabase, proposal } = await getExecutableProposal(proposalId);
   const { definition, expiresAt } = validateAiProposalDraft(draft);
-  requireBusinessActionRole(user.role, draft.action);
+  await requireAiBusinessActionAccess(user, supabase, draft.action);
   const currentVersions = await loadBusinessTargetVersions(draft.target);
   if (JSON.stringify(proposal.target) === JSON.stringify(draft.target)) {
     assertTargetVersionsUnchanged(proposal.before_versions as TargetVersionMap, currentVersions);
