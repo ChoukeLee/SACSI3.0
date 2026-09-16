@@ -1,4 +1,5 @@
 import { cache } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
 export type UserRole = "admin" | "boss" | "finance" | "front_desk" | "rental_sales";
@@ -28,6 +29,40 @@ export const configuredAccountSummaries = Object.entries(seedAccountProfiles).ma
 export function getSeedAccountProfile(email: string | undefined) {
   if (!email) return null;
   return seedAccountProfiles[email.toLowerCase()] ?? null;
+}
+
+export async function resolveVerifiedSupabaseUser(
+  supabase: SupabaseClient<any, "public", any>,
+  user: { id: string; email?: string | null },
+): Promise<CurrentUser | null> {
+  const email = user.email ?? undefined;
+  const seedProfile = getSeedAccountProfile(email);
+  if (seedProfile) {
+    return {
+      id: user.id,
+      email,
+      role: seedProfile.role,
+      displayName: seedProfile.displayName,
+    };
+  }
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role, display_name")
+    .eq("id", user.id)
+    .single();
+
+  const role = profile?.role as UserRole | undefined;
+  if (!role || !Object.prototype.hasOwnProperty.call(rolePermissions, role)) {
+    return null;
+  }
+
+  return {
+    id: user.id,
+    email,
+    role,
+    displayName: profile?.display_name ?? email ?? "User",
+  };
 }
 
 export function homePathForRole(role: UserRole, locale: AppLocale = "zh") {
@@ -96,35 +131,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) return null;
 
-  // PERF: seed accounts skip the user_profiles DB query — they're resolved in-memory
-  const seedProfile = getSeedAccountProfile(user.email);
-  if (seedProfile) {
-    return {
-      id: user.id,
-      email: user.email,
-      role: seedProfile.role,
-      displayName: seedProfile.displayName,
-    };
-  }
-
-  // Non-seed accounts: lookup role/display_name from user_profiles
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("role, display_name")
-    .eq("id", user.id)
-    .single();
-
-  const role = profile?.role as UserRole | undefined;
-  if (!role || !Object.prototype.hasOwnProperty.call(rolePermissions, role)) {
-    return null;
-  }
-
-  return {
-    id: user.id,
-    email: user.email,
-    role,
-    displayName: profile?.display_name ?? user.email ?? "User",
-  };
+  return resolveVerifiedSupabaseUser(supabase, user);
 });
 
 export function hasPermission(user: CurrentUser | null, permission: string): boolean {
