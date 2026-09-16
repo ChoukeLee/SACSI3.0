@@ -24,6 +24,9 @@ import { executeWorkbenchQuery } from "./query-service";
 import { planWorkbenchQueryV2 } from "./query-planner";
 import { summarizeShadowPlan } from "./query-plan";
 import { summarizeQueryPlanCompatibility } from "./query-tool-adapter";
+import { executeQueryPlanV2 } from "./query-tool-executor";
+import { selectQueryPlanRollout } from "./query-plan-rollout";
+import { synthesizeQueryPlanResult } from "./query-result-synthesizer";
 import { enrichQueryWithConversationContext, intentContextSnapshot, selectConversationContext, type WorkbenchConversationContext } from "./conversation-context";
 import { appendConversationTurn, loadConversationHistory } from "./conversation-service";
 import type { WorkbenchActionState, WorkbenchActionResult, WorkbenchIntent } from "./types";
@@ -162,6 +165,46 @@ export async function askWorkbench(
         };
       }
     }
+    const plannerPromise = planWorkbenchQueryV2({
+      query,
+      asOfDate,
+      locale,
+      history: recentHistory.map((turn) => ({ userText: turn.userText, context: turn.context })),
+    }).catch(() => null);
+    const singleToolRolloutEnabled = process.env.AI_QUERY_PLANNER_SINGLE_TOOL_ENABLED === "true";
+    const rolloutPlan = singleToolRolloutEnabled ? await plannerPromise : null;
+    const rollout = selectQueryPlanRollout({
+      enabled: singleToolRolloutEnabled,
+      plan: rolloutPlan,
+      asOfDate,
+    });
+
+    if (rollout.mode === "execute_v2") {
+      const execution = await executeQueryPlanV2({ query, plan: rollout.plan, asOfDate, locale, user });
+      if (execution.status === "permission_denied") {
+        return { status: "error", result: null, error: tr(locale, "当前账号没有查看这类业务数据的权限。", "Votre profil n'a pas le droit de consulter ces données.") };
+      }
+      if (execution.status === "success" && execution.results.length === 1) {
+        const executed = execution.results[0];
+        const result = await synthesizeQueryPlanResult({ locale, tool: executed.tool, result: executed.result });
+        await appendConversationTurn({
+          conversationId,
+          kind: "query",
+          userText: query,
+          assistantText: result.answer,
+          context: {
+            ...intentContextSnapshot(result.intent),
+            queryPlannerV2: {
+              ...summarizeShadowPlan(rollout.plan),
+              compatibility: summarizeQueryPlanCompatibility(rollout.plan, asOfDate),
+              route: "single_tool",
+            },
+          },
+        });
+        return { status: "success", result, error: null };
+      }
+    }
+
     let intent = parseWorkbenchIntent(contextualQuery, asOfDate);
     if (intent.kind === "unsupported" || intent.confidence < 0.75) {
       const classified = await classifyWorkbenchIntentWithModel({ query: contextualQuery, asOfDate, userId: user.id }).catch(() => null);
@@ -170,12 +213,7 @@ export async function askWorkbench(
     if (!canRunIntent(user, intent)) {
       return { status: "error", result: null, error: tr(locale, "当前账号没有查看这类业务数据的权限。", "Votre profil n'a pas le droit de consulter ces données.") };
     }
-    const shadowPlanPromise = planWorkbenchQueryV2({
-      query,
-      asOfDate,
-      locale,
-      history: recentHistory.map((turn) => ({ userText: turn.userText, context: turn.context })),
-    }).catch(() => null);
+    const shadowPlanPromise = singleToolRolloutEnabled ? Promise.resolve(rolloutPlan) : plannerPromise;
     const [result, shadowPlan] = await Promise.all([
       executeWorkbenchQuery(query, intent, locale),
       shadowPlanPromise,
@@ -187,12 +225,13 @@ export async function askWorkbench(
       assistantText: result.answer,
       context: {
         ...intentContextSnapshot(intent),
-        ...(process.env.AI_QUERY_PLANNER_SHADOW_ENABLED === "true"
+        ...(process.env.AI_QUERY_PLANNER_SHADOW_ENABLED === "true" || singleToolRolloutEnabled
           ? {
-              queryPlannerShadow: {
+              queryPlannerV2: {
                 ...summarizeShadowPlan(shadowPlan),
                 compatibility: summarizeQueryPlanCompatibility(shadowPlan, asOfDate),
                 legacy: { kind: intent.kind, days: intent.days },
+                route: rollout.mode === "legacy" ? rollout.reason : "legacy_fallback",
               },
             }
           : {}),

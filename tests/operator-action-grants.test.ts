@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { BUSINESS_ACTIONS } from "@/features/business-actions/registry";
 
 const migration = readFileSync(
-  join(process.cwd(), "supabase/migrations/20260914082817_add_operator_action_grants.sql"),
+  join(process.cwd(), "supabase/migrations/20260914133925_add_operator_action_grants.sql"),
   "utf8",
 );
 

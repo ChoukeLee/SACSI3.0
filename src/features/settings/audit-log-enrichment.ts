@@ -13,6 +13,7 @@ export interface AuditLogRow {
   before_data: Record<string, unknown> | null;
   after_data: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
+  resolved_booking_agent_name?: string | null;
 }
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -23,6 +24,21 @@ export async function enrichAuditLogsWithUnitNumbers(
 ) {
   const unitByEntity = new Map<string, string>();
   const actorById = await collectActorProfiles(supabase, logs);
+  const agentIds = [...new Set(logs.map((log) => log.metadata?.booking_agent_id)
+    .filter((id): id is string => typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(id)))];
+  const agentNames = new Map<string, string>();
+  // Bound URL size; a lookup failure must not erase the immutable audit record.
+  for (let i = 0; i < agentIds.length; i += 100) {
+    try {
+      const { data, error } = await supabase.from("customers").select("id, name").in("id", agentIds.slice(i, i + 100));
+      if (error) continue;
+      for (const agent of data ?? []) {
+        if (agent.id && agent.name) agentNames.set(String(agent.id), String(agent.name));
+      }
+    } catch {
+      // Display the recorded ID when supplementary directory access fails.
+    }
+  }
 
   await Promise.all([
     collectUnitIds(supabase, logs, unitByEntity, "daily_booking", "daily_bookings"),
@@ -71,6 +87,7 @@ export async function enrichAuditLogsWithUnitNumbers(
 
     return {
       ...log,
+      resolved_booking_agent_name: agentNames.get(String(log.metadata?.booking_agent_id ?? "")) ?? null,
       metadata: unitNo && !metadataString(log, "unit_no") ? { ...metadata, unit_no: unitNo } : metadata,
     };
   });

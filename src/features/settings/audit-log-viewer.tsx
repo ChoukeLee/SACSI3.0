@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { Fragment, useEffect, useState, useMemo } from "react";
 import { ChevronDown, ChevronUp, Clock, User, Tag, FileText, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { downloadCsv } from "@/lib/csv";
@@ -11,6 +11,8 @@ import { FilterBar, FilterGroup, SegmentedControl, controlClass } from "@/compon
 import { SearchInput } from "@/components/ui/search-input";
 import type { Locale } from "@/lib/i18n";
 import { auditActionLabel, auditEntityLabel } from "@/lib/audit-labels";
+import { AuditBusinessDetail } from "./audit-business-detail";
+import { auditActorKey, auditActorText, auditBusinessSummary, auditChannel, auditChannelLabel, auditExportCell, auditSearchText } from "./audit-business-summary";
 
 interface AuditLogRow {
   id: string;
@@ -25,6 +27,7 @@ interface AuditLogRow {
   before_data: Record<string, unknown> | null;
   after_data: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
+  resolved_booking_agent_name?: string | null;
 }
 
 interface Props {
@@ -138,6 +141,8 @@ export function AuditLogViewer({ logs, locale }: Props) {
   const [dateTo, setDateTo] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
   const [entityFilter, setEntityFilter] = useState("all");
+  const [actorFilter, setActorFilter] = useState("all");
+  const [channelFilter, setChannelFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -151,14 +156,19 @@ export function AuditLogViewer({ logs, locale }: Props) {
     [logs],
   );
 
+  const actors = useMemo(() => [...new Map(logs.map(log => [auditActorKey(log), auditActorText(log, locale)])).entries()]
+    .sort((a, b) => a[1].localeCompare(b[1])), [logs, locale]);
+
   const filtered = useMemo(() => {
     return logs.filter(l => {
       if (dateFrom && l.created_at.slice(0, 10) < dateFrom) return false;
       if (dateTo && l.created_at.slice(0, 10) > dateTo) return false;
       if (actionFilter !== "all" && l.action !== actionFilter) return false;
       if (entityFilter !== "all" && l.entity_type !== entityFilter) return false;
+      if (actorFilter !== "all" && auditActorKey(l) !== actorFilter) return false;
+      if (channelFilter !== "all" && auditChannel(l) !== channelFilter) return false;
       if (search.trim()) {
-        const q = search.toLowerCase();
+        const q = search.trim().toLowerCase();
         const haystack = [
           l.entity_label ?? "", l.entity_id ?? "", l.actor_email ?? "",
           metadataText(l, "entity_label"),
@@ -167,17 +177,18 @@ export function AuditLogViewer({ logs, locale }: Props) {
           metadataText(l, "actor_display_name"),
           actionLabel(l.action),
           auditEntityLabel(l.entity_type, locale),
+          auditSearchText(l, locale),
         ].join(" ").toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
     }).sort((a, b) => b.created_at.localeCompare(a.created_at));
-  }, [logs, dateFrom, dateTo, actionFilter, entityFilter, search, actionLabels, entityLabels, extraActionLabels]);
+  }, [logs, dateFrom, dateTo, actionFilter, entityFilter, actorFilter, channelFilter, search, locale, actionLabels, entityLabels, extraActionLabels]);
 
   useEffect(() => {
     setPage(1);
     setExpandedId(null);
-  }, [dateFrom, dateTo, actionFilter, entityFilter, search]);
+  }, [dateFrom, dateTo, actionFilter, entityFilter, actorFilter, channelFilter, search]);
 
   const pageSize = DEFAULT_BUSINESS_TABLE_PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -193,7 +204,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
 
   const formatTime = (iso: string) => {
     const d = new Date(iso);
-    return `${d.toLocaleDateString(locale === "zh" ? "zh-CN" : "fr-FR")} ${d.toLocaleTimeString(locale === "zh" ? "zh-CN" : "fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
+    return `${d.toLocaleDateString(locale === "zh" ? "zh-CN" : "fr-FR", { timeZone: "Africa/Abidjan" })} ${d.toLocaleTimeString(locale === "zh" ? "zh-CN" : "fr-FR", { timeZone: "Africa/Abidjan", hour: "2-digit", minute: "2-digit" })}`;
   };
 
   function normalizedKey(key: string) {
@@ -215,13 +226,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
   }
 
   function actorText(log: AuditLogRow) {
-    return (
-      metadataText(log, "actor_display_name") ||
-      log.actor_email ||
-      metadataText(log, "actor_email") ||
-      log.actor_id?.slice(0, 8) ||
-      "—"
-    );
+    return auditActorText(log, locale);
   }
 
   function actorRole(log: AuditLogRow) {
@@ -267,6 +272,8 @@ export function AuditLogViewer({ logs, locale }: Props) {
   }
 
   function summaryText(log: AuditLogRow) {
+    const business = auditBusinessSummary(log, locale);
+    if (business.summary) return business.summary;
     const unitNo = unitNoFromLog(log);
     if (unitNo) return roomText(unitNo);
     const label = cleanLabel(entityLabel(log));
@@ -284,12 +291,12 @@ export function AuditLogViewer({ logs, locale }: Props) {
           const aVal = after?.[k];
           const changed = JSON.stringify(bVal) !== JSON.stringify(aVal);
           return (
-            <div key={k} className={cn("flex gap-2", changed && "font-medium")}>
+            <div key={k} className={cn("flex flex-wrap gap-2 break-words [overflow-wrap:anywhere]", changed && "font-medium")}>
               <span className="text-muted-foreground min-w-[100px]">{k}</span>
               <span className={cn("text-muted-foreground line-through", !changed && "no-underline")}>
-                {bVal != null ? String(bVal) : "—"}
+                {bVal != null ? (typeof bVal === "object" ? JSON.stringify(bVal) : String(bVal)) : "—"}
               </span>
-              {changed && <span>→ <span className="text-primary font-semibold">{aVal != null ? String(aVal) : "—"}</span></span>}
+              {changed && <span>→ <span className="text-primary font-semibold">{aVal != null ? (typeof aVal === "object" ? JSON.stringify(aVal) : String(aVal)) : "—"}</span></span>}
             </div>
           );
         })}
@@ -298,10 +305,13 @@ export function AuditLogViewer({ logs, locale }: Props) {
   };
 
   const handleExport = () => {
-    const headers = [zh ? "时间" : "Date", zh ? "操作人" : "Acteur", zh ? "角色" : "Rôle", zh ? "操作" : "Action", zh ? "对象" : "Objet", zh ? "摘要" : "Résumé"];
+    const headers = [zh ? "时间（阿比让）" : "Date (Abidjan)", zh ? "操作人" : "Acteur", zh ? "角色" : "Rôle", zh ? "操作" : "Action", zh ? "对象" : "Objet", zh ? "摘要" : "Résumé",
+      zh ? "操作账号 ID" : "ID acteur", zh ? "业务经办人" : "Responsable", zh ? "渠道（记录值）" : "Canal déclaré", zh ? "请求编号" : "Requête", zh ? "原始指令" : "Instruction"];
     const rows = filtered.map((l) => {
       const role = actorRole(l);
-      return [formatTime(l.created_at), actorText(l), role ? (roleLabels[role] ?? role) : "", actionLabel(l.action), entityText(l), summaryText(l)];
+      const business = auditBusinessSummary(l, locale);
+      return [formatTime(l.created_at), actorText(l), role ? (roleLabels[role] ?? role) : "", actionLabel(l.action), entityText(l), summaryText(l),
+        business.actorId, business.agent, business.channel, business.requestId, business.instruction].map(auditExportCell);
     });
     downloadCsv("审计日志_" + new Date().toISOString().slice(0, 10) + ".csv", headers, rows);
   };
@@ -324,6 +334,18 @@ export function AuditLogViewer({ logs, locale }: Props) {
           </div>
         }
       >
+        <FilterGroup label={zh ? "录入账号" : "Compte de saisie"}>
+          <select aria-label={zh ? "录入账号筛选" : "Filtre compte"} value={actorFilter} onChange={e => setActorFilter(e.target.value)} className={cn(controlClass, "max-w-[260px]")}>
+            <option value="all">{zh ? "全部账号" : "Tous les comptes"}</option>
+            {actors.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+          </select>
+        </FilterGroup>
+        <FilterGroup label={zh ? "录入渠道" : "Canal"}>
+          <select aria-label={zh ? "录入渠道筛选" : "Filtre canal"} value={channelFilter} onChange={e => setChannelFilter(e.target.value)} className={controlClass}>
+            <option value="all">{zh ? "全部渠道" : "Tous les canaux"}</option>
+            {(["external_codex", "sacsi_web", "unknown"] as const).map(channel => <option key={channel} value={channel}>{auditChannelLabel(channel, locale)}</option>)}
+          </select>
+        </FilterGroup>
         <FilterGroup label={zh ? "日期" : "Date"}>
           <DateInput value={dateFrom} onChangeValue={setDateFrom} className={filterDate} />
           <span className="px-0.5 text-xs font-semibold text-muted-foreground">-</span>
@@ -354,7 +376,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
         <SearchInput
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder={zh ? "搜索房号/客户/合同..." : "Rechercher..."}
+          placeholder={zh ? "房号 / 账号 / 请求号 / 原始指令" : "Chambre / compte / requête / instruction"}
           className="w-full sm:w-[280px]"
         />
       </FilterBar>
@@ -385,14 +407,15 @@ export function AuditLogViewer({ logs, locale }: Props) {
                     <span className="inline-flex items-center gap-1"><Tag className="h-3 w-3" />{zh ? "对象" : "Objet"}</span>
                   </th>
                   <th className="px-4 py-2.5">{zh ? "摘要" : "Résumé"}</th>
-                  <th className="px-4 py-2.5 w-[40px]" />
+                  <th className="px-2 py-2.5 w-[48px]" />
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {pagedLogs.map(l => {
                   const expanded = expandedId === l.id;
                   return (
-                    <tr key={l.id} className={cn("group", expanded && "bg-accent/30")}>
+                    <Fragment key={l.id}>
+                    <tr className={cn("group", expanded && "bg-accent/30")}>
                       <td className="px-4 py-2.5">
                         <button
                           className="flex w-full items-center gap-2 text-left cursor-pointer"
@@ -404,8 +427,8 @@ export function AuditLogViewer({ logs, locale }: Props) {
                         </button>
                       </td>
                       <td className="px-4 py-2.5" onClick={() => setExpandedId(expanded ? null : l.id)}>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-medium">
+                        <div className="min-w-0 space-y-1">
+                          <span title={actorText(l)} className="block truncate font-medium">
                             {actorText(l)}
                           </span>
                           {actorRole(l) && (
@@ -419,6 +442,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
                         <Badge variant="secondary" className="text-xs">
                           {actionLabel(l.action)}
                         </Badge>
+                        <p className="mt-1 text-[11px] text-muted-foreground">{auditChannelLabel(auditChannel(l), locale)}</p>
                       </td>
                       <td className="px-4 py-2.5" onClick={() => setExpandedId(expanded ? null : l.id)}>
                         <span className="text-muted-foreground">
@@ -428,45 +452,53 @@ export function AuditLogViewer({ logs, locale }: Props) {
                       <td className="px-4 py-2.5 max-w-[300px] truncate text-muted-foreground" onClick={() => setExpandedId(expanded ? null : l.id)}>
                         {summaryText(l)}
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td className="px-2 py-2.5">
                         <button
                           onClick={() => setExpandedId(expanded ? null : l.id)}
+                          aria-expanded={expanded}
+                          aria-controls={`audit-detail-${l.id}`}
+                          aria-label={zh ? "查看业务操作详情" : "Voir le détail métier"}
                           className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                           {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                         </button>
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {/* Expanded detail */}
-            {pagedLogs.map(l => {
-              if (expandedId !== l.id) return null;
-              return (
-                <div key={`detail-${l.id}`} className="border-t bg-muted/30 px-6 py-3">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    {expanded && <tr><td colSpan={6} className="bg-muted/30 px-6 py-3">
+                <div id={`audit-detail-${l.id}`}>
+                  <AuditBusinessDetail log={l} locale={locale} />
+                  <details>
+                    <summary className="cursor-pointer text-xs text-muted-foreground">{zh ? "查看原始变更字段" : "Voir les champs bruts"}</summary>
+                  <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="font-semibold mb-1.5 flex items-center gap-1">
                         <Eye className="h-3 w-3" />{zh ? "变更前" : "Avant"}
                       </p>
                       <div className="rounded-md border bg-card p-2">
-                        {renderDiff(null, l.before_data ? l.before_data : l.metadata)}
+                        {renderDiff(null, l.before_data)}
                       </div>
                     </div>
                     <div>
                       <p className="font-semibold mb-1.5 flex items-center gap-1">
-                        <Eye className="h-3 w-3" />{zh ? "变更后 / 元数据" : "Après / Métadonnées"}
+                        <Eye className="h-3 w-3" />{zh ? "变更后" : "Après"}
                       </p>
                       <div className="rounded-md border bg-card p-2">
-                        {renderDiff(l.before_data, l.after_data ?? l.metadata)}
+                        {renderDiff(l.before_data, l.after_data)}
                       </div>
                     </div>
                   </div>
+                  <div className="mt-3 rounded-md border bg-card p-2">
+                    <p className="mb-2 text-xs font-semibold">{zh ? "原始元数据" : "Métadonnées brutes"}</p>
+                    {renderDiff(null, l.metadata)}
+                  </div>
+                  </details>
                 </div>
-              );
-            })}
+                    </td></tr>}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
           {totalPages > 1 && (
             <div className="flex items-center justify-between gap-3 border-t px-4 py-3 text-sm text-muted-foreground">

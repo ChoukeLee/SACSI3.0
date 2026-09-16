@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSeedAccountProfile, homePathForRole, type UserRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { confirmationReturnPath } from "@/lib/confirmation-return-path";
 
 const MAX_FAILURES_BY_EMAIL = 5;
 const MAX_FAILURES_BY_IP = 10;
@@ -20,9 +21,11 @@ async function clientIp(): Promise<string> {
 export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const returnPath = confirmationReturnPath(formData.get("returnPath"));
+  const loginErrorPath = (code: string) => `/login?error=${encodeURIComponent(code)}${returnPath ? `&redirect=${encodeURIComponent(returnPath)}` : ""}`;
 
   if (!email || !password) {
-    redirect("/login?error=missing");
+    redirect(loginErrorPath("missing"));
   }
 
   const supabase = await createClient();
@@ -30,6 +33,7 @@ export async function login(formData: FormData) {
   const ipKey = `ip:${await clientIp()}`;
 
   // Throttle credential stuffing before it reaches Supabase Auth.
+  let rateLimited = false;
   try {
     const [byEmail, byIp] = await Promise.all([
       supabase.rpc("login_failure_count", { p_key: emailKey, p_window_minutes: RATE_WINDOW_MINUTES }),
@@ -37,12 +41,12 @@ export async function login(formData: FormData) {
     ]);
     const emailFailures = typeof byEmail.data === "number" ? byEmail.data : 0;
     const ipFailures = typeof byIp.data === "number" ? byIp.data : 0;
-    if (emailFailures >= MAX_FAILURES_BY_EMAIL || ipFailures >= MAX_FAILURES_BY_IP) {
-      redirect("/login?error=rate_limited");
-    }
+    rateLimited = emailFailures >= MAX_FAILURES_BY_EMAIL || ipFailures >= MAX_FAILURES_BY_IP;
   } catch {
     // Rate-limit RPC not yet deployed — fail open; Supabase Auth still guards.
   }
+  // Next.js redirect throws. Keep it outside the RPC fallback catch.
+  if (rateLimited) redirect(loginErrorPath("rate_limited"));
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -56,7 +60,7 @@ export async function login(formData: FormData) {
   }
 
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+    redirect(loginErrorPath(error.message));
   }
 
   const user = data.user;
@@ -84,6 +88,6 @@ export async function login(formData: FormData) {
   // anonymous shell after the auth cookie changes, then skip the extra `/` hop.
   revalidatePath("/", "layout");
 
-  if (!role) redirect("/login?error=account_not_configured");
-  redirect(homePathForRole(role));
+  if (!role) redirect(loginErrorPath("account_not_configured"));
+  redirect(returnPath ?? homePathForRole(role));
 }

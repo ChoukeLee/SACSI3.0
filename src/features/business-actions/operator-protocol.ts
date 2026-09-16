@@ -1,5 +1,5 @@
 import type { CurrentUser } from "@/lib/auth";
-import { BUSINESS_ACTIONS, canRoleUseBusinessAction } from "./registry";
+import { BUSINESS_ACTIONS } from "./registry";
 import { decideOperatorExecution } from "./operator-execution-policy";
 
 export const SACSI_OPERATOR_PROTOCOL_VERSION = "1.0";
@@ -47,6 +47,22 @@ export interface DatabaseOperatorCapability {
   authorization_source: "role" | "explicit_grant" | "none";
 }
 
+export function isDatabaseOperatorCapabilityList(value: unknown): value is DatabaseOperatorCapability[] {
+  if (!Array.isArray(value)) return false;
+  const names = new Set<string>();
+  return value.every((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)
+      || typeof row.action_name !== "string" || !row.action_name.trim()
+      || typeof row.authorized !== "boolean"
+      || !["role", "explicit_grant", "none"].includes(row.authorization_source)
+      || (row.authorized && row.authorization_source === "none")
+      || (!row.authorized && row.authorization_source !== "none")
+      || names.has(row.action_name)) return false;
+    names.add(row.action_name);
+    return true;
+  });
+}
+
 function cleanRelease(value: string | undefined) {
   const trimmed = value?.trim();
   if (!trimmed) return "local-development";
@@ -87,7 +103,6 @@ export function buildOperatorProtocolManifest(input: {
     },
     actions: BUSINESS_ACTIONS.map((action) => {
       const databaseCapability = databaseCapabilities.get(action.name);
-      const roleAuthorized = canRoleUseBusinessAction(input.user.role, action.name);
       return {
         name: action.name,
         domain: action.domain,
@@ -95,8 +110,9 @@ export function buildOperatorProtocolManifest(input: {
         risk: action.risk,
         write: action.write,
         availability: IMPLEMENTED_OPERATOR_ACTIONS.has(action.name) ? "implemented" : "planned",
-        authorized: databaseCapability?.authorized ?? roleAuthorized,
-        authorizationSource: databaseCapability?.authorization_source ?? (roleAuthorized ? "role" : "none"),
+        // Page roles are descriptive, not a fallback for missing live grants.
+        authorized: databaseCapability?.authorized === true,
+        authorizationSource: databaseCapability?.authorization_source ?? "none",
         naturalLanguageDecision: decideOperatorExecution({
           actionName: action.name,
           inputSource: "natural_language",

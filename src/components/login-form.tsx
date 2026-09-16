@@ -32,7 +32,7 @@ const TEXT = {
   },
 };
 
-export function LoginForm({ errorCode }: { errorCode?: string }) {
+export function LoginForm({ errorCode, returnPath }: { errorCode?: string; returnPath?: string }) {
   const [lang, setLang] = useState<"zh" | "fr">("zh");
   const t = TEXT[lang];
   const errorText = errorCode
@@ -50,6 +50,7 @@ export function LoginForm({ errorCode }: { errorCode?: string }) {
         </div>
 
         <form action={login} className="space-y-4">
+          {returnPath && <input type="hidden" name="returnPath" value={returnPath} />}
           <div>
             <label className="mb-1 block text-xs font-semibold text-muted-foreground">{t.email}</label>
             <input type="email" name="email" placeholder="admin@sacsi.com" required className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20" />

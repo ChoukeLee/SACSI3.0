@@ -32,11 +32,23 @@ afterEach(() => {
 });
 
 describe("query planner v2 model boundary", () => {
-  it("is inert unless shadow mode is explicitly enabled", async () => {
+  it("is inert unless shadow or single-tool rollout is explicitly enabled", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     await expect(planWorkbenchQueryV2({ query: "月底长租应收", asOfDate: "2026-09-09", locale: "zh", history: [] })).resolves.toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("can be enabled for the guarded single-tool rollout without shadow mode", async () => {
+    vi.stubEnv("AI_QUERY_PLANNER_SINGLE_TOOL_ENABLED", "true");
+    vi.stubEnv("DEEPSEEK_API_KEY", "test-key");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: JSON.stringify(validPlan) } }],
+    }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(planWorkbenchQueryV2({ query: "月底长租应收", asOfDate: "2026-09-09", locale: "zh", history: [] }))
+      .resolves.toMatchObject({ version: 2, calls: [{ tool: "list_receivables" }] });
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it("sends date, timezone and minimized history and accepts a strict plan", async () => {

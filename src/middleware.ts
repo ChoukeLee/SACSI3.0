@@ -76,5 +76,6 @@ export const config = {
     "/finance/:path*",
     "/data-quality/:path*",
     "/settings/:path*",
+    "/operator/confirmations/:path*",
   ],
 };

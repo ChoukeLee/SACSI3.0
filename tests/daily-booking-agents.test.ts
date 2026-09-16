@@ -12,6 +12,7 @@ describe("daily booking agents", () => {
     ]);
     expect(DAILY_BOOKING_AGENT_NAMES.every(isDailyBookingAgentName)).toBe(true);
     expect(isDailyBookingAgentName("AI QI")).toBe(false);
+    expect(isDailyBookingAgentName("振勇")).toBe(false);
     expect(isDailyBookingAgentName("镇淮（佳龙）")).toBe(false);
   });
 

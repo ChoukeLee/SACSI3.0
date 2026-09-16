@@ -54,7 +54,9 @@ export async function planWorkbenchQueryV2(input: {
   locale: Locale;
   history: QueryPlannerConversationTurn[];
 }): Promise<QueryPlanV2 | null> {
-  if (process.env.AI_QUERY_PLANNER_SHADOW_ENABLED !== "true") return null;
+  const enabled = process.env.AI_QUERY_PLANNER_SHADOW_ENABLED === "true"
+    || process.env.AI_QUERY_PLANNER_SINGLE_TOOL_ENABLED === "true";
+  if (!enabled) return null;
   const provider = (process.env.AI_QUERY_PLANNER_PROVIDER || process.env.AI_QUERY_PROVIDER || "deepseek").toLowerCase();
   if (provider !== "deepseek" || !process.env.DEEPSEEK_API_KEY) return null;
   const baseUrl = (process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/$/, "");

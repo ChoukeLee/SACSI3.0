@@ -10,7 +10,9 @@ import { buildOperatorAssistanceReport } from "@/features/business-actions/opera
 import { decideOperatorExecution } from "@/features/business-actions/operator-execution-policy";
 import { getBusinessActionDefinition } from "@/features/business-actions/registry";
 import { authenticateOperatorRequest } from "@/features/business-actions/operator-request-auth";
+import { operatorAuthFailure } from "@/features/business-actions/operator-auth-failure";
 import { IMPLEMENTED_OPERATOR_ACTIONS } from "@/features/business-actions/operator-protocol";
+import { verifyOperatorPaymentEvidence } from "@/features/business-actions/operator-payment-verification";
 
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -31,6 +33,11 @@ function databaseErrorCode(message: string) {
     "dailyReadPermissionDenied",
     "dailyWritePermissionDenied",
     "invalidPaymentAmount",
+    "invalidPaymentDate",
+    "invalidReceiptNo",
+    "bookingFinanceInconsistent",
+    "paymentIntegrityCheckFailed",
+    "paymentAlreadyReversed",
     "paymentExceedsOutstanding",
     "requestIdConflict",
     "requestIdRequired",
@@ -44,10 +51,8 @@ export async function POST(request: Request) {
 
   const auth = await authenticateOperatorRequest(request);
   if (!auth.authenticated) {
-    return response({
-      code: auth.reason,
-      error: auth.reason === "account_not_configured" ? "Account not configured" : "Authentication required",
-    }, auth.reason === "account_not_configured" ? 403 : 401);
+    const failure = operatorAuthFailure(auth.reason);
+    return response(failure.body, failure.status);
   }
 
   let rawBody: string;
@@ -105,11 +110,15 @@ export async function POST(request: Request) {
     }, 501, auth.mode);
   }
 
-  const { data: authorized, error: authorizationError } = await auth.supabase.rpc("can_execute_operator_action", {
-    p_action_name: definition.name,
-    p_risk_level: definition.risk,
-  });
-  if (authorizationError) {
+  let authorized: unknown;
+  try {
+    const result = await auth.supabase.rpc("can_execute_operator_action", {
+      p_action_name: definition.name,
+      p_risk_level: definition.risk,
+    });
+    if (result.error) throw new Error("authorization unavailable");
+    authorized = result.data;
+  } catch {
     return response({ code: "authorization_unavailable", error: "Action authorization is unavailable" }, 503, auth.mode);
   }
   if (authorized !== true) {
@@ -166,6 +175,17 @@ export async function POST(request: Request) {
 
   const input = parseRecordDailyPaymentInput(actionRequest.input);
   if (!input.success) return response(input, 400, auth.mode);
+  // A missing/old migration must block BEFORE the first write, not after it.
+  try {
+    const version = await auth.supabase.rpc("operator_daily_payment_protocol_version");
+    if (version.error || version.data !== 2) {
+      return response({ code: "database_upgrade_required", requestId: actionRequest.requestId,
+        error: "Payment database release is not ready; no write was attempted." }, 503, auth.mode);
+    }
+  } catch {
+    return response({ code: "database_readiness_unavailable", requestId: actionRequest.requestId,
+      error: "Cannot verify payment database readiness; no write was attempted." }, 503, auth.mode);
+  }
   const actorEvidence = {
     channel: "external_codex",
     connector_version: actionRequest.connectorVersion,
@@ -173,34 +193,56 @@ export async function POST(request: Request) {
     input_source: actionRequest.inputSource,
     original_instruction: actionRequest.originalInstruction,
   };
-  const { data: snapshot, error: writeError } = await auth.supabase.rpc("daily_record_payment_rpc", {
-    p_booking_id: input.data.bookingId,
-    p_amount: input.data.amountXof,
-    p_payment_date: input.data.paymentDate,
-    p_receipt_no: input.data.receiptNo,
-    p_request_id: actionRequest.requestId,
-    p_actor: actorEvidence,
-  });
+  const unknownOutcome = () => response({ status: "execution_unknown", code: "payment_outcome_unknown",
+    requestId: actionRequest.requestId, retryPolicy: "recheck_same_request_id_only",
+    error: "The payment outcome is unknown. Recheck using the same requestId; never retry with a new requestId." }, 503, auth.mode);
+  let writeResult;
+  try {
+    writeResult = await auth.supabase.rpc("daily_record_payment_rpc", {
+      p_booking_id: input.data.bookingId,
+      p_amount: input.data.amountXof,
+      p_payment_date: input.data.paymentDate,
+      p_receipt_no: input.data.receiptNo,
+      p_request_id: actionRequest.requestId,
+      p_actor: actorEvidence,
+    });
+  } catch {
+    return unknownOutcome();
+  }
+  const { data: snapshot, error: writeError } = writeResult;
   if (writeError) {
     const code = databaseErrorCode(writeError.message);
+    if (code === "operator_action_failed") return unknownOutcome();
     const status = code.includes("PermissionDenied") ? 403 : code === "bookingNotFound" ? 404 : 409;
-    return response({ code, error: "Daily payment was not recorded", requestId: actionRequest.requestId }, status, auth.mode);
+    return response({ code, error: "This payment attempt was rejected. A previous attempt may already exist; retain the requestId.",
+      requestId: actionRequest.requestId, retryPolicy: "recheck_same_request_id_only" }, status, auth.mode);
   }
 
-  const { data: verification, error: verificationError } = await auth.supabase.rpc("verify_operator_daily_payment", {
-    p_booking_id: input.data.bookingId,
-    p_request_id: actionRequest.requestId,
+  let verification: unknown = null;
+  let verificationError = false;
+  try {
+    const result = await auth.supabase.rpc("verify_operator_daily_payment", {
+      p_booking_id: input.data.bookingId,
+      p_request_id: actionRequest.requestId,
+    });
+    verification = result.data;
+    verificationError = Boolean(result.error);
+  } catch {
+    verificationError = true;
+  }
+  const evidenceCheck = verifyOperatorPaymentEvidence(verification, {
+    ...input.data,
+    requestId: actionRequest.requestId,
+    actorId: auth.user.id,
   });
-  const verified = !verificationError
-    && typeof verification === "object"
-    && verification !== null
-    && (verification as { verified?: boolean }).verified === true;
-  if (!verified) {
+  if (verificationError || !evidenceCheck.verified) {
     return response({
       status: "verification_failed",
       code: "post_execution_verification_failed",
       error: "Payment RPC returned, but evidence verification did not pass. Do not retry with a new requestId.",
       requestId: actionRequest.requestId,
+      issues: verificationError ? ["verification_unavailable"] : evidenceCheck.issues,
+      retryPolicy: "recheck_same_request_id_only",
     }, 500, auth.mode);
   }
 
