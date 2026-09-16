@@ -18,6 +18,18 @@
 
 Vercel Production 已保存 `SACSI_OPERATOR_PREVIEW_SECRET`（随机生成，不写仓库）、`SACSI_OPERATOR_PUBLIC_ORIGIN=https://sacsi-3-0.vercel.app`、`SACSI_OPERATOR_CONFIRMATIONS_ENABLED=true`。须等新部署生效及正常账号核验通过，才算线上放行完成；本记录此处不预填部署/测试成功。
 
+## 线上放行结果（20:06 UTC）
+
+功能提交 `d05c93fc3092e31b138aa7d62cce27ee6a7db097` 已推送 main，Vercel 部署 `EeCQ12Zz9r55HNnasggDagnBnmCE` 为 Production / Ready，正式域名已切换。
+
+使用普通 admin 账号真实登录，对 `https://sacsi-3-0.vercel.app` 执行上述只读发布检查并通过：返回提交号正确、数据库协议 2、身份匹配、匿名 401、Bearer 确认 403、确认功能开关生效、真实日租查询和签名预览成功。未创建确认单、未入账，测试会话已单独退出。不是 service-role 代替员工验收。
+
+因此本次日租查询和单笔截图收款的服务端技术放行完成。员工电脑安装、本人确认真实凭证、黄姐独立账号及审计阅读反馈仍是第三阶段待办，不计为已通过。
+
+连接器 0.1.1 的已核验包位于 `work/SACSI-operator-0.1.1-candidate.zip`，SHA-256：`47e91660b1e1cb2d630181374ac4f953776085b2dbe9ad1a67f7cd6e698d3471`。此精确哈希的候选包现可用于受控员工试用；文件名保留以避免混淆版本。不要发送本地测试包或包含会话文件的目录。
+
+回归证据：749 项测试通过、1 项跳过，类型检查通过；发布前另跑只读预览路由 12 项测试通过，Vercel 生产构建通过。未新增付费服务。剩余历史安全提示见下文，不能把本次上线视为完整安全审计完成。
+
 ## 安全告警范围
 
 本轮修复了函数可变 search_path 告警，收紧物业规则策略，新增确认入口为 authenticated-only SECURITY INVOKER，匿名不可执行。未宣称全部安全告警清零。
