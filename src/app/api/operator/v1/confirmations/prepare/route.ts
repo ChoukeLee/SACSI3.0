@@ -45,6 +45,6 @@ export async function POST(request: Request) {
     const proof = issuePreviewProof({ actorId: auth.user.id, request: result.normalizedRequest, snapshot: snapshot.data, deployment }, secret);
     return reply({ status: "preview_requires_human_confirmation", executionAvailable: false,
       actor: { id: auth.user.id, displayName: auth.user.displayName }, preview: result.preview, ...proof,
-      notice: "This is a preview, not approval or a payment result. Human confirmation and atomic execution are not enabled." }, 200);
+      notice: "This is a read-only preview, not approval or a payment result. A separate same-account webpage confirmation is required before posting." }, 200);
   } catch { return reply({ code: "preview_unavailable" }, 503); }
 }

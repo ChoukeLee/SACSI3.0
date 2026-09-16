@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { localCredentials, localSql, safeFailure, root } from './lib/local-supabase-runtime.mjs';
 import { pathToFileURL } from 'node:url';
 import { buildLocalPaymentSchema } from './lib/local-payment-schema.mjs';
+import { VERSION } from '../operator-connector/core.mjs';
 
 // Interactive, isolated acceptance: browser actions are performed by the tester.
 // The displayed credentials are disposable LOCAL test credentials, never real ones.
@@ -55,7 +56,7 @@ async function main() {
     const manifest = await api('capabilities');
     assert.equal(manifest.identity.userId, userId);
     const request = { actionName:'record_daily_payment', inputSource:'excel_screenshot', scope:'business_data',
-      exceptionalBusinessCase:false, protocolVersion:'1.0', connectorVersion:'0.1.0', requestId:ids.request,
+      exceptionalBusinessCase:false, protocolVersion:'1.0', connectorVersion:VERSION, requestId:ids.request,
       originalInstruction:'仅本地合成测试：T01 收到现金 10000 西法',
       input:{bookingId:ids.booking,amountXof:10000,paymentDate:new Date().toISOString().slice(0,10),receiptNo:'LOCAL-BROWSER'} };
     const preview = await api('confirmations/prepare', request);
@@ -64,7 +65,7 @@ async function main() {
     assert.match(draft.confirmationPath, /^\/operator\/confirmations\/[a-f0-9-]{36}$/);
     if(process.argv[2]) {
       const packagePath=resolve(process.argv[2]);
-      assert.ok(packagePath.startsWith(join(root,'work','operator-0.1.0-local-')),'Use only the generated local acceptance package');
+      assert.ok(packagePath.startsWith(join(root,'work',`operator-${VERSION}-local-`)),'Use only the generated local acceptance package');
       const manifest=JSON.parse(readFileSync(join(packagePath,'manifest.json'),'utf8'));
       for(const [file,hash] of Object.entries(manifest.checksums)) assert.equal(createHash('sha256').update(readFileSync(join(packagePath,file))).digest('hex'),hash,'Package checksum mismatch');
       const profile=join(packagePath,`test-profile-${ids.request}`);
@@ -86,6 +87,26 @@ async function main() {
       const viaConnector=connector('execute',request);
       assert.equal(viaConnector.confirmationUrl,`http://127.0.0.1:3100${draft.confirmationPath}`);
       assert.equal(viaConnector.requestId,ids.request);
+      const messages=[
+        {jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'local-acceptance',version:'1'}}},
+        {jsonrpc:'2.0',method:'notifications/initialized'},
+        {jsonrpc:'2.0',id:2,method:'tools/list'},
+        {jsonrpc:'2.0',id:3,method:'tools/call',params:{name:'capabilities',arguments:{}}},
+        {jsonrpc:'2.0',id:4,method:'tools/call',params:{name:'query_daily_booking',arguments:{bookingId:ids.booking}}},
+        {jsonrpc:'2.0',id:5,method:'tools/call',params:{name:'prepare_daily_payment',arguments:{requestId:ids.request,originalInstruction:request.originalInstruction,...request.input}}},
+      ];
+      let mcp;
+      try { mcp=execFileSync(join(packagePath,'node.exe'),[join(packagePath,'mcp-server.mjs')],{
+        input:messages.map(m=>JSON.stringify(m)).join('\n')+'\n',encoding:'utf8',windowsHide:true,stdio:['pipe','pipe','pipe'],timeout:180000,
+        cwd:packagePath,env:{...process.env,LOCALAPPDATA:profile}}).trim().split('\n').map(line=>JSON.parse(line));
+      } catch { throw new Error('local_mcp_process_failed'); }
+      assert.equal(mcp.length,5);
+      for(const response of mcp) { assert.ok(!response.error);assert.ok(!response.result.isError,'MCP tool failed'); }
+      assert.equal(mcp[1].result.tools.length,4);
+      assert.equal(JSON.parse(mcp[2].result.content[0].text).identity.userId,userId);
+      assert.equal(JSON.parse(mcp[3].result.content[0].text).status,'completed');
+      assert.equal(JSON.parse(mcp[4].result.content[0].text).confirmationUrl,viaConnector.confirmationUrl);
+      console.log('PASS: real stdio MCP handshake, tool discovery, own-account query and same-request draft reuse; no payment executed');
       assert.equal(existsSync(join(directory,'operation.lock')),false);
       console.log('PASS: standalone package login, DPAPI encrypted session, real token refresh, original request/draft reuse, no repository dependency');
     }

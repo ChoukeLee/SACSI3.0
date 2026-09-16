@@ -1,6 +1,14 @@
-# SACSI 员工连接器 0.1.0
+# SACSI 员工连接器 0.1.1
 
-Windows 独立连接器：不依赖开发仓库、Git、npm 或员工自行连接数据库。交付包自带 Node 运行时，只保存公开的连接配置。当前构建脚本生成的是 **本地验收包**，不能交给员工当作线上系统使用。
+Windows 独立连接器：不依赖开发仓库、Git、npm 或员工自行连接数据库。交付包自带 Node 运行时，只保存公开的连接配置。支持本地验收包及生产候选包；候选包不代表服务端已放行。
+
+员工操作见 [试用说明](EMPLOYEE_GUIDE.md)。双击 `login.cmd` 登录、`check.cmd` 检查身份、`logout.cmd` 退出；`setup.cmd` 生成 Codex MCP 配置片段，不覆盖用户原配置。安装仍需管理员协助一次。
+
+## Codex MCP 接入
+
+本地 stdio MCP，协议 `2025-06-18`。工具：`capabilities`、`new_request_id`、`query_daily_booking`、`prepare_daily_payment`。没有登录密码工具、确认付款工具或 SQL 工具。不监听网络端口，不额外调用付费模型。模型自身的使用额度仍由员工的 Codex 账号承担。
+
+按 [OpenAI 官方 MCP 配置文档](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) 配置绝对路径的 `node.exe` 与 `mcp-server.mjs`。移动包后重新运行 setup 并更新配置。连接器和浏览器各自登录，网页确认必须与连接器同一账号。
 
 ## 使用
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 // @ts-expect-error Standalone Node distribution has no application TS dependency.
-import { OperatorClient, validateConfig, checkManifest } from '../operator-connector/core.mjs';
+import { OperatorClient, validateConfig, checkManifest, VERSION } from '../operator-connector/core.mjs';
 const config={formatVersion:1,localTest:true,appUrl:'http://127.0.0.1:3100',supabaseUrl:'http://127.0.0.1:54321',publishableKey:'sb_publishable_test'};
 const manifest={protocolVersion:'1.0',minimumConnectorVersion:'0.1.0',identity:{userId:'owner'},safeguards:{serviceRoleAllowed:false,arbitrarySqlAllowed:false,systemChangesAllowed:false,screenshotWritesRequireConfirmation:true},actions:[{name:'record_daily_payment',authorized:true,availability:'implemented',write:true}]};
 const request={requestId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',actionName:'record_daily_payment',scope:'business_data',exceptionalBusinessCase:false,inputSource:'excel_screenshot',originalInstruction:'test',input:{}};
@@ -23,7 +23,7 @@ describe('standalone employee connector',()=>{
     expect(transport).toHaveBeenCalledTimes(3);
     const body=JSON.parse(transport.mock.calls[2][1].body);
     expect(body.request.requestId).toBe(request.requestId);
-    expect(body.request.connectorVersion).toBe('0.1.0');
+    expect(body.request.connectorVersion).toBe(VERSION);
     for(const call of transport.mock.calls) expect(call[1].redirect).toBe('error');
   });
   it('never retries a write when the outcome is unknown',async()=>{
