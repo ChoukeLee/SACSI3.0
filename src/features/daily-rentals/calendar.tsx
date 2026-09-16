@@ -999,7 +999,21 @@ export function DailyCalendar({
                             const billing = calculateBilling(b, todayStr);
                             return (
                               <tr key={b.id} className="hover:bg-muted/50">
-                                <td className="px-3 py-2.5 whitespace-nowrap font-medium text-foreground">{u?.unit_no ?? "—"}</td>
+                                <td className="px-3 py-2.5 whitespace-nowrap font-medium text-foreground">
+                                  <button
+                                    type="button"
+                                    className="text-accentBlue-700 underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring"
+                                    aria-label={locale === "zh" ? `查看房间${u?.unit_no ?? "—"}未结订单` : `Voir le séjour impayé ${u?.unit_no ?? "—"}`}
+                                    onClick={() => {
+                                      setFinanceDetail(null);
+                                      setNewBookingUnitId(null);
+                                      setNewBookingDate(null);
+                                      setSelectedBookingId(b.id);
+                                    }}
+                                  >
+                                    {u?.unit_no ?? "—"}
+                                  </button>
+                                </td>
                                 <td className="px-3 py-2.5 whitespace-nowrap text-foreground/80">{c?.name ?? "—"}</td>
                                 <td className="overflow-hidden px-3 py-2.5 text-foreground/80">
                                   <span className="block truncate" title={b.notes ?? undefined}>{b.notes || "—"}</span>
