@@ -1,6 +1,7 @@
 export const DAILY_BOOKING_AGENT_NAMES = [
   "Chouke",
   "Niamke",
+  "Fulo",
   "Esai",
   "黄姐",
   "颖",

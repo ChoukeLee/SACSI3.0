@@ -49,7 +49,7 @@ interface BookingPanelProps {
 
 type DailyPricedUnit = UnitRow & { daily_rental_price_xof?: number | null };
 
-type AdvancedTask = "payment" | "discount" | "extend" | "fixedCheckout" | null;
+type AdvancedTask = "payment" | "discount" | "extend" | "fixedCheckout" | "correction" | null;
 
 export function BookingPanel({
   booking,
@@ -803,16 +803,6 @@ export function BookingPanel({
 
                   <Button variant="default" size="lg" onClick={handleCheckOut} disabled={saving} className="w-full justify-center font-semibold"><Check />{t.booking.confirmCheckOut}</Button>
 
-                  {canCorrectCheckin && !readOnly && bookingPayments.length === 0 && Number(booking.prepaid_amount_xof) === 0 && (
-                    <details className="rounded-lg border border-border p-3">
-                      <summary className="cursor-pointer text-sm">{locale === "zh" ? "管理员纠错：撤销误入住" : "Correction admin : annuler une arrivée erronée"}</summary>
-                      <p className="my-2 text-xs text-muted-foreground">{locale === "zh" ? "仅用于重复或误录入住。撤销未收应收，保留历史；不会办理退房或生成保洁任务。" : "Doublon ou erreur uniquement. Historique conservé, sans départ ni ménage."}</p>
-                      <Input aria-label="误入住撤销原因" value={correctionReason} onChange={e => setCorrectionReason(e.target.value)} disabled={saving} />
-                      <Button variant="outline" disabled={saving || correctionReason.trim().length < 5} onClick={() => setConfirmCorrection(true)}>{locale === "zh" ? "撤销误入住" : "Annuler l’arrivée erronée"}</Button>
-                      <ConfirmDialog open={confirmCorrection} locale={locale} title={locale === "zh" ? "确认撤销误入住" : "Confirmer la correction"} description={correctionReason} loading={saving} confirmLabel={locale === "zh" ? "确认撤销误入住" : "Confirmer"} onClose={() => setConfirmCorrection(false)} onConfirm={() => void runPanelAction(() => voidErroneousCheckin(booking.id, correctionReason), { closeOnSuccess: true })} />
-                    </details>
-                  )}
-
                   {/* More actions: choose one task, then show one focused form */}
                   <div className="rounded-lg border border-border bg-card">
                     <button
@@ -881,6 +871,19 @@ export function BookingPanel({
                                 </span>
                               </button>
                             )}
+                            {canCorrectCheckin && bookingPayments.length === 0 && Number(booking.prepaid_amount_xof) === 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setActiveAdvancedTask("correction")}
+                                className="flex min-h-14 items-center gap-3 rounded-lg border border-accentRed-200 bg-accentRed-50 px-3 py-2 text-left transition-colors hover:bg-accentRed-100"
+                              >
+                                <UserX className="h-4 w-4 shrink-0 text-accentRed-600" />
+                                <span>
+                                  <span className="block text-sm font-semibold text-accentRed-700">{locale === "zh" ? "撤销误入住" : "Annuler l’arrivée"}</span>
+                                  <span className="block text-xs text-accentRed-600">{locale === "zh" ? "管理员纠错" : "Correction administrateur"}</span>
+                                </span>
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <div className="space-y-3">
@@ -891,6 +894,7 @@ export function BookingPanel({
                                   {activeAdvancedTask === "discount" && (locale === "zh" ? "优惠调整" : "Remise")}
                                   {activeAdvancedTask === "extend" && t.booking.extendStay}
                                   {activeAdvancedTask === "fixedCheckout" && t.setFixedCheckout}
+                                  {activeAdvancedTask === "correction" && (locale === "zh" ? "管理员纠错：撤销误入住" : "Correction admin : annuler une arrivée erronée")}
                                 </p>
                                 <p className="mt-0.5 text-xs text-muted-foreground">
                                   {locale === "zh" ? "只处理当前选中的业务动作" : "Action ciblee uniquement"}
@@ -941,6 +945,42 @@ export function BookingPanel({
                                 {fixedCheckOutDate && fixedCheckOutNights > 0 && (
                                   <p className="text-xs text-foreground/70">{t.setFixedCheckoutNights.replace("{nights}", String(fixedCheckOutNights)).replace("{amount}", formatXof(fixedCheckOutNights * Number(booking.nightly_price_xof)))}</p>
                                 )}
+                              </div>
+                            )}
+
+                            {activeAdvancedTask === "correction" && canCorrectCheckin && bookingPayments.length === 0 && Number(booking.prepaid_amount_xof) === 0 && (
+                              <div className="space-y-3">
+                                <p className="text-xs text-muted-foreground">
+                                  {locale === "zh"
+                                    ? "仅用于重复或误录入住。撤销未收应收，保留历史；不会办理退房或生成保洁任务。"
+                                    : "Doublon ou erreur uniquement. Historique conservé, sans départ ni ménage."}
+                                </p>
+                                <Input
+                                  aria-label="误入住撤销原因"
+                                  value={correctionReason}
+                                  onChange={event => setCorrectionReason(event.target.value)}
+                                  disabled={saving}
+                                  placeholder={locale === "zh" ? "填写纠错原因（至少5个字）" : "Motif de correction"}
+                                />
+                                <Button
+                                  variant="outline"
+                                  className="w-full border-accentRed-200 text-accentRed-600 hover:bg-accentRed-50 hover:text-accentRed-700"
+                                  disabled={saving || correctionReason.trim().length < 5}
+                                  onClick={() => setConfirmCorrection(true)}
+                                >
+                                  <UserX className="h-4 w-4" />
+                                  {locale === "zh" ? "撤销误入住" : "Annuler l’arrivée erronée"}
+                                </Button>
+                                <ConfirmDialog
+                                  open={confirmCorrection}
+                                  locale={locale}
+                                  title={locale === "zh" ? "确认撤销误入住" : "Confirmer la correction"}
+                                  description={correctionReason}
+                                  loading={saving}
+                                  confirmLabel={locale === "zh" ? "确认撤销误入住" : "Confirmer"}
+                                  onClose={() => setConfirmCorrection(false)}
+                                  onConfirm={() => void runPanelAction(() => voidErroneousCheckin(booking.id, correctionReason), { closeOnSuccess: true })}
+                                />
                               </div>
                             )}
                           </div>
