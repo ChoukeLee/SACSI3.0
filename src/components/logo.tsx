@@ -118,11 +118,13 @@ export function Logo({ variant = "full", size = 32, className, label }: LogoProp
     return (
       <div className={cn("relative shrink-0", className)} style={{ width: size, height: size }}>
         <Image
-          src="/favicon.png"
+          src="/icon-512.png"
           alt="SACSI"
           fill
           sizes={`${size}px`}
           className="object-contain"
+          unoptimized
+          priority
         />
       </div>
     );
@@ -142,7 +144,7 @@ export function Logo({ variant = "full", size = 32, className, label }: LogoProp
         style={{ width: size * 0.65, height: size * 0.65 }}
       >
         <Image
-          src="/favicon.png"
+          src="/icon-512.png"
           alt="SACSI"
           width={size}
           height={size}
