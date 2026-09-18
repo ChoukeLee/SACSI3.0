@@ -20,7 +20,7 @@ import { calculateBilling } from "./billing";
 import { getDailyLodgingBusinessType, getPrimaryDailyAction, type DailyLodgingBusinessType } from "./daily-rental-policy";
 import {
   createBooking, createBackfillBooking, confirmBooking, checkIn, checkOut, completeCleaning, extendStay, cancelBooking,
-  recordSupplementaryPayment, applyDiscount, reversePayment, setFixedCheckout,
+  recordSupplementaryPayment, applyDiscount, reversePayment, setFixedCheckout, voidErroneousCheckin,
 } from "./actions";
 import type { DailyOperationSnapshot } from "./actions";
 import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
@@ -44,6 +44,7 @@ interface BookingPanelProps {
   onOperationSnapshot?: (snapshot: DailyOperationSnapshot) => void;
   backfillMode?: boolean;
   readOnly?: boolean;
+  canCorrectCheckin?: boolean;
 }
 
 type DailyPricedUnit = UnitRow & { daily_rental_price_xof?: number | null };
@@ -66,6 +67,7 @@ export function BookingPanel({
   onOperationSnapshot,
   backfillMode,
   readOnly = false,
+  canCorrectCheckin = false,
 }: BookingPanelProps) {
   const t = dictionaries[locale].dailyRentals;
   const router = useRouter();
@@ -101,6 +103,8 @@ export function BookingPanel({
   const [showAdvancedActions, setShowAdvancedActions] = useState(false);
   const [activeAdvancedTask, setActiveAdvancedTask] = useState<AdvancedTask>(null);
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
+  const [correctionReason, setCorrectionReason] = useState("");
+  const [confirmCorrection, setConfirmCorrection] = useState(false);
 
   // ── Backfill form state ──
   const [bfUnitId, setBfUnitId] = useState("");
@@ -122,6 +126,8 @@ export function BookingPanel({
     setActiveAdvancedTask(null);
     setShowPaymentHistory(false);
     setActionError("");
+    setCorrectionReason("");
+    setConfirmCorrection(false);
   }, [booking?.id]);
 
   const selectedUnit = unitId ? units.find((u) => u.id === unitId) as DailyPricedUnit | null : null;
@@ -796,6 +802,16 @@ export function BookingPanel({
                   </div>
 
                   <Button variant="default" size="lg" onClick={handleCheckOut} disabled={saving} className="w-full justify-center font-semibold"><Check />{t.booking.confirmCheckOut}</Button>
+
+                  {canCorrectCheckin && !readOnly && bookingPayments.length === 0 && Number(booking.prepaid_amount_xof) === 0 && (
+                    <details className="rounded-lg border border-border p-3">
+                      <summary className="cursor-pointer text-sm">{locale === "zh" ? "管理员纠错：撤销误入住" : "Correction admin : annuler une arrivée erronée"}</summary>
+                      <p className="my-2 text-xs text-muted-foreground">{locale === "zh" ? "仅用于重复或误录入住。撤销未收应收，保留历史；不会办理退房或生成保洁任务。" : "Doublon ou erreur uniquement. Historique conservé, sans départ ni ménage."}</p>
+                      <Input aria-label="误入住撤销原因" value={correctionReason} onChange={e => setCorrectionReason(e.target.value)} disabled={saving} />
+                      <Button variant="outline" disabled={saving || correctionReason.trim().length < 5} onClick={() => setConfirmCorrection(true)}>{locale === "zh" ? "撤销误入住" : "Annuler l’arrivée erronée"}</Button>
+                      <ConfirmDialog open={confirmCorrection} locale={locale} title={locale === "zh" ? "确认撤销误入住" : "Confirmer la correction"} description={correctionReason} loading={saving} confirmLabel={locale === "zh" ? "确认撤销误入住" : "Confirmer"} onClose={() => setConfirmCorrection(false)} onConfirm={() => void runPanelAction(() => voidErroneousCheckin(booking.id, correctionReason), { closeOnSuccess: true })} />
+                    </details>
+                  )}
 
                   {/* More actions: choose one task, then show one focused form */}
                   <div className="rounded-lg border border-border bg-card">

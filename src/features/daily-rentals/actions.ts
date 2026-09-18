@@ -506,6 +506,18 @@ export async function extendStay(
 }
 
 // ── Cancel ──
+export async function voidErroneousCheckin(bookingId: string, reason: string): Promise<DailyActionResult> {
+  await requireRole("admin");
+  if (reason.trim().length < 5) return { success: false, error: "请填写至少5个字的纠错原因。" };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("daily_void_erroneous_checkin_rpc", {
+    p_booking_id: bookingId, p_reason: reason.trim(),
+  });
+  if (error) return { success: false, error: error.message };
+  for (const path of ["/daily-rentals", "/fr/daily-rentals", "/management", "/fr/management"]) revalidatePath(path);
+  return { success: true, data: data as DailyOperationSnapshot };
+}
+
 export async function cancelBooking(bookingId: string): Promise<DailyActionResult> {
   const user = await guardWrite();
   try {

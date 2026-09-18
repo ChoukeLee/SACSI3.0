@@ -808,6 +808,7 @@ export function DailyCalendar({
           payments={visiblePayments}
           locale={locale}
           readOnly={!canOperateDaily}
+          canCorrectCheckin={userRole === "admin"}
           onClose={() => {
             setSelectedBookingId(null);
             setNewBookingUnitId(null);
