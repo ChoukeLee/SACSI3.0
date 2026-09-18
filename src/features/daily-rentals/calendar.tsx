@@ -223,6 +223,7 @@ export function DailyCalendar({
       rangeLabel: formatRangeLabel(days, localeStr, viewMode),
     };
   }, [anchorDate, localeStr, viewMode]);
+  const firstVisibleDateStr = visibleDays[0] ? toDateStr(visibleDays[0]) : null;
 
   const bookingMap = useMemo(
     () => buildBookingMap(bookings, { todayStr, tomorrowStr }),
@@ -757,6 +758,7 @@ export function DailyCalendar({
                           isToday={isToday}
                           isStart={!prevSame}
                           isEnd={!nextSame}
+                          showCheckedInLabel={!prevSame || (viewMode === "day" && dateStr === firstVisibleDateStr)}
                           locale={locale}
                           copy={copy}
                           bookingLabels={bookingLabels}
@@ -1114,6 +1116,7 @@ function TimelineCell({
   isToday,
   isStart,
   isEnd,
+  showCheckedInLabel,
   locale,
   copy,
   bookingLabels,
@@ -1133,6 +1136,7 @@ function TimelineCell({
   isToday: boolean;
   isStart: boolean;
   isEnd: boolean;
+  showCheckedInLabel: boolean;
   locale: Locale;
   copy: (typeof COPY)[Locale];
   bookingLabels: Record<string, string>;
@@ -1185,7 +1189,7 @@ function TimelineCell({
             if (event.key === "Enter") onOpenBooking(booking.id);
           }}
         >
-          {isStart && (
+          {showCheckedInLabel && (
             <span className="min-w-0">
               <span className="block truncate text-xs font-semibold leading-3">{name}</span>
               <span className="block truncate text-[8px] font-semibold opacity-85">
