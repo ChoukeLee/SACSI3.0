@@ -33,6 +33,7 @@ import {
   type LeaseFinancialBusinessType,
 } from "./lease-financial-entry-types";
 import { isOverdueReceivable, resolveLeaseOverdue, summarizeLeaseReceivables } from "./lease-receivable-summary";
+import { ALL_BUILDINGS, groupLeaseBuildings, resolveBuildingScope, type LeaseBuilding } from "./project-scope";
 
 interface UnitBusinessFlag {
   business_type: "daily_rental" | "long_lease" | "sale";
@@ -44,7 +45,7 @@ type LeaseUnitRow = UnitRow & {
   unit_business_flags?: UnitBusinessFlag[];
 };
 
-interface LeaseListProps { contracts: LeaseContractRow[]; units: LeaseUnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: { id: string; code: string; display_name: string }[]; locale: Locale; canCreate?: boolean; canRecordFinance?: boolean; canActivate?: boolean; canMoveOut?: boolean }
+interface LeaseListProps { contracts: LeaseContractRow[]; units: LeaseUnitRow[]; customers: CustomerRow[]; payments: PaymentRow[]; receivables: ReceivableRow[]; buildings: LeaseBuilding[]; locale: Locale; canCreate?: boolean; canRecordFinance?: boolean; canActivate?: boolean; canMoveOut?: boolean }
 type PanelType = "new" | "detail" | "financeEntry" | "moveout" | "attention" | "insight" | null;
 type AttentionTab = "overdue" | "upcoming";
 const paymentCycles = ["monthly", "quarterly", "semiannual", "annual"];
@@ -144,10 +145,36 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const financeRequestIdRef = useRef<string | null>(null);
   const financeSectionRef = useRef<HTMLDivElement | null>(null);
 
-  // Building switcher
-  const [activeBuildingId, setActiveBuildingId] = useState<string>(() => (
-    buildings.find((building) => building.code === "SACSI11")?.id ?? buildings[0]?.id ?? ""
-  ));
+  const projects = useMemo(() => groupLeaseBuildings(buildings), [buildings]);
+  const [scope, setScope] = useState(() => {
+    const initial = buildings.find((b) => b.code === "SACSI11");
+    const projectId = initial?.project_id ?? projects[0]?.id ?? "";
+    return { projectId, buildings: { [projectId]: initial?.id ?? ALL_BUILDINGS } as Record<string, string> };
+  });
+  const [scopeLoaded, setScopeLoaded] = useState(false);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("lease-project-scope") ?? "null");
+      if (saved && typeof saved.projectId === "string" && saved.buildings && typeof saved.buildings === "object" && !Array.isArray(saved.buildings)) {
+        setScope({ projectId: saved.projectId, buildings: Object.fromEntries(Object.entries(saved.buildings).filter(([, value]) => typeof value === "string")) as Record<string, string> });
+      }
+    } catch { /* Storage is optional. */ }
+    setScopeLoaded(true);
+  }, []);
+  useEffect(() => {
+    if (scopeLoaded) {
+      try { localStorage.setItem("lease-project-scope", JSON.stringify(scope)); } catch { /* Storage is optional. */ }
+    }
+  }, [scope, scopeLoaded]);
+  const project = projects.find((p) => p.id === scope.projectId) ?? projects[0];
+  const projectBuildings = project?.buildings ?? [];
+  const activeBuildingId = resolveBuildingScope(projectBuildings, scope.buildings[project?.id ?? ""]);
+  const scopeBuildingIds = new Set(projectBuildings.filter((b) => activeBuildingId === ALL_BUILDINGS || b.id === activeBuildingId).map((b) => b.id));
+  const projectLabel = (p: typeof project) => p?.code === "SACSI" ? (locale === "zh" ? "公寓项目" : "Résidences SACSI") : p?.code === "CIMAC" ? (locale === "zh" ? "科建建材城" : "CIMAC") : p?.name || (locale === "zh" ? "未归属项目" : "Projet non affecté");
+  const scopeLabel = `${projectLabel(project)} · ${activeBuildingId === ALL_BUILDINGS ? (locale === "zh" ? "全部楼栋合计" : "Tous les bâtiments") : projectBuildings.find((b) => b.id === activeBuildingId)?.display_name ?? ""}`;
+  const closeScopePanel = () => { setPanel(null); setSelectedId(null); setFUnitId(""); setError(""); };
+  const changeProject = (projectId: string) => { setScope((current) => ({ ...current, projectId })); closeScopePanel(); };
+  const changeBuilding = (id: string) => { if (project) setScope((current) => ({ ...current, buildings: { ...current.buildings, [project.id]: id } })); closeScopePanel(); };
 
   // Build unit -> building_id map
   const unitBuildingMap = useMemo(() => {
@@ -157,9 +184,9 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   }, [units]);
 
   const filteredByBuilding = useMemo(() => {
-    if (!activeBuildingId) return contracts;
-    return contracts.filter((c) => unitBuildingMap.get(c.unit_id) === activeBuildingId);
-  }, [contracts, activeBuildingId, unitBuildingMap]);
+    const ids = new Set(project?.buildings.filter((b) => activeBuildingId === ALL_BUILDINGS || b.id === activeBuildingId).map((b) => b.id));
+    return contracts.filter((c) => ids.has(unitBuildingMap.get(c.unit_id) ?? ""));
+  }, [contracts, project, activeBuildingId, unitBuildingMap]);
 
   const unitMap = useMemo(() => new Map(units.map((u) => [u.id, u])), [units]);
   const customerMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
@@ -201,18 +228,21 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
 
   const groupedContracts = useMemo(() => {
     const grouped = new Map<string, LeaseContractRow[]>();
-    for (const contract of filtered) { const unit = unitMap.get(contract.unit_id); const floor = normalizeFloorLabel(unit?.floor_label ?? null, unit?.unit_no ?? ""); if (!grouped.has(floor)) grouped.set(floor, []); grouped.get(floor)!.push(contract); }
+    for (const contract of filtered) { const unit = unitMap.get(contract.unit_id); const floor = normalizeFloorLabel(unit?.floor_label ?? null, unit?.unit_no ?? ""); const key = `${unit?.building_id ?? ""}|${floor}`; if (!grouped.has(key)) grouped.set(key, []); grouped.get(key)!.push(contract); }
     return Array.from(grouped.entries())
+      .sort(([a], [b]) => {
+        const [ab, af] = a.split("|"); const [bb, bf] = b.split("|");
+        return (buildingMap.get(ab)?.code ?? "").localeCompare(buildingMap.get(bb)?.code ?? "", undefined, { numeric: true }) || floorSortValue(af) - floorSortValue(bf);
+      })
       .map(([floor, floorContracts]) => [
-        floor,
+        activeBuildingId === ALL_BUILDINGS ? `${buildingMap.get(floor.split("|")[0])?.display_name ?? ""} · ${floor.split("|")[1]}` : floor.split("|")[1],
         [...floorContracts].sort((a, b) => {
           const aUnit = unitMap.get(a.unit_id)?.unit_no ?? "";
           const bUnit = unitMap.get(b.unit_id)?.unit_no ?? "";
           return aUnit.localeCompare(bUnit, undefined, { numeric: true });
         }),
-      ] as [string, LeaseContractRow[]])
-      .sort((a, b) => floorSortValue(a[0]) - floorSortValue(b[0]));
-  }, [filtered, unitMap]);
+      ] as [string, LeaseContractRow[]]);
+  }, [filtered, unitMap, buildingMap, activeBuildingId]);
 
   const getContractReceivableSummary = (contractId: string) => {
     const related = receivables.filter((r) => r.source_type === "lease_contract" && r.source_id === contractId && r.status !== "cancelled" && r.management_status !== "historical_pending" && r.management_status !== "excluded");
@@ -354,7 +384,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const netFinancial = totalIncome - totalExpense;
   const receivableStats = useMemo(() => { let totalRec=0,totalPd=0,overdue=0; const today=new Date().toISOString().slice(0,10); for(const r of contractReceivables){totalRec+=Number(r.amount_xof);totalPd+=Number(r.paid_amount_xof);const os=Number(r.amount_xof)-Number(r.paid_amount_xof);if(os>0&&(r.status==="overdue"||r.due_date<=today))overdue+=os;} return {totalReceivable:totalRec,totalPaid:totalPd,outstanding:totalRec-totalPd,overdue}; }, [contractReceivables]);
   const contractRisk = useMemo(() => { if(!selected||selected.status!=="active"||!isContractEndConfirmed(selected))return {expiringSoon:false,daysLeft:0}; const today=new Date(); const diff=Math.floor((new Date(selected.expected_end_date).getTime()-today.getTime())/86400000); return {expiringSoon:diff<=30&&diff>=0,daysLeft:Math.max(0,diff)}; }, [selected]);
-  const availableUnits = useMemo(() => units.filter((u) => u.status === "available" || isManagedLeaseUnit(u)), [units]);
+  const availableUnits = units.filter((u) => scopeBuildingIds.has(u.building_id) && (u.status === "available" || isManagedLeaseUnit(u)));
   const selectedNewUnit = useMemo(() => units.find((unit) => unit.id === fUnitId), [fUnitId, units]);
   const generatedLeaseContractNo = useMemo(() => {
     if (!selectedNewUnit || !fStartDate) return "";
@@ -458,9 +488,24 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     <OperationalPage
       eyebrow={locale === "zh" ? "租赁业务" : "Location"}
       title={locale === "zh" ? "长租合同" : "Contrats de location"}
-      description={`${filteredByBuilding.length} ${locale === "zh" ? "份合同 · 以实际收款和未结应收为准" : "contrats · encaissements réels"}`}
+      description={`${scopeLabel} · ${filteredByBuilding.length} ${locale === "zh" ? "份合同 · 以实际收款和未结应收为准" : "contrats · encaissements réels"}`}
       action={canCreate ? <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" />{t.form.newContract}</Button> : undefined}
     >
+
+      <section className="space-y-3 rounded-xl border bg-card p-3 sm:p-4" aria-label={locale === "zh" ? "项目与楼栋" : "Projet et bâtiment"}>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs font-semibold text-muted-foreground">{locale === "zh" ? "项目" : "Projet"}</span>
+          <SegmentedControl value={project?.id ?? ""} onChange={changeProject} ariaLabel={locale === "zh" ? "项目切换" : "Choix du projet"} items={projects.map((p) => ({ value: p.id, label: projectLabel(p) }))} />
+        </div>
+        <div className="flex min-w-0 items-center gap-3 border-t pt-3">
+          <span className="shrink-0 text-xs font-semibold text-muted-foreground">{locale === "zh" ? "楼栋" : "Bâtiment"}</span>
+          <select aria-label={locale === "zh" ? "选择楼栋" : "Choisir un bâtiment"} className={`${controlClass} min-w-0 flex-1 sm:hidden`} value={activeBuildingId} onChange={(e) => changeBuilding(e.target.value)}>
+            <option value={ALL_BUILDINGS}>{locale === "zh" ? "全部楼栋" : "Tous les bâtiments"}</option>
+            {projectBuildings.map((b) => <option key={b.id} value={b.id}>{b.display_name || b.code}</option>)}
+          </select>
+          <SegmentedControl value={activeBuildingId} onChange={changeBuilding} className="hidden min-w-0 sm:inline-flex" ariaLabel={locale === "zh" ? "楼栋切换" : "Choix du bâtiment"} items={[{ value: ALL_BUILDINGS, label: locale === "zh" ? "全部楼栋" : "Tous les bâtiments" }, ...projectBuildings.map((b) => ({ value: b.id, label: b.display_name || b.code }))]} />
+        </div>
+      </section>
 
       {/* ── Summary stats ── */}
       <MetricGrid columns={5}>
@@ -478,20 +523,6 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
           />
         ))}
       </MetricGrid>
-
-      {/* ── Building switcher ── */}
-      {buildings.length > 1 && (
-        <SegmentedControl
-          value={activeBuildingId}
-          onChange={setActiveBuildingId}
-          ariaLabel={locale === "zh" ? "楼栋切换" : "Selection du batiment"}
-          className="self-start"
-          items={buildings.map((b) => ({
-            value: b.id,
-            label: b.display_name || b.code,
-          }))}
-        />
-      )}
 
       {/* ── Filter bar + new contract ── */}
       <FilterBar
@@ -805,7 +836,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
             <label className={labelClass}>{locale === "zh" ? "合同编号（自动生成）" : "N° de contrat (automatique)"}</label>
             <input type="text" value={generatedLeaseContractNo} readOnly placeholder={locale === "zh" ? "选择房源和起租日期后生成" : "Choisissez le logement et la date"} className={cn(inputClass, "bg-muted/50 text-muted-foreground")} />
           </div>
-          <div><label className={labelClass}>{t.form.unit} *</label><select value={fUnitId} onChange={e=>setFUnitId(e.target.value)} className={inputClass}><option value="">{t.form.noUnit}</option>{availableUnits.map(u=><option key={u.id} value={u.id}>{u.unit_no} ({u.floor_label}){isManagedLeaseUnit(u) ? (locale === "zh" ? " · 已售代管" : " · Gestion") : ""}</option>)}</select></div>
+          <div><label className={labelClass}>{t.form.unit} *</label><select value={fUnitId} onChange={e=>setFUnitId(e.target.value)} className={inputClass}><option value="">{t.form.noUnit}</option>{availableUnits.map(u=><option key={u.id} value={u.id}>{buildingMap.get(u.building_id)?.display_name} · {u.unit_no} ({u.floor_label}){isManagedLeaseUnit(u) ? (locale === "zh" ? " · 已售代管" : " · Gestion") : ""}</option>)}</select></div>
           <div><label className={labelClass}>{t.form.customer} *</label><select value={fCustomerId} onChange={e=>setFCustomerId(e.target.value)} className={inputClass}><option value="">{t.form.noCustomer}</option>{customers.filter(cc=>!cc.is_blacklisted).map(cc=><option key={cc.id} value={cc.id}>{cc.name} {cc.phone?`(${cc.phone})`:""}</option>)}</select></div>
           <div className="grid grid-cols-2 gap-3"><div><label className={labelClass}>{t.form.startDate}</label><DateInput value={fStartDate} onChangeValue={setFStartDate} className={inputClass}/></div><div><label className={labelClass}>{t.form.expectedEndDate}</label><DateInput value={fEndDate} onChangeValue={setFEndDate} className={inputClass}/></div></div>
           <div className="grid grid-cols-3 gap-3"><div><label className={labelClass}>{t.form.paymentCycle}</label><select value={fCycle} onChange={e=>setFCycle(e.target.value)} className={inputClass}>{paymentCycles.map(pc=><option key={pc} value={pc}>{t.paymentCycle[pc as keyof typeof t.paymentCycle]}</option>)}</select></div><div><label className={labelClass}>{t.form.paymentDay}</label><input type="number" min={1} max={31} value={fPayDay} onChange={e=>setFPayDay(Number(e.target.value))} className={inputClass}/></div><div><label className={labelClass}>{t.form.monthlyRent}</label><input type="number" value={fRent} onChange={e=>setFRent(Number(e.target.value))} className={inputClass}/></div></div>

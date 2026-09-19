@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import { sortUnits } from "@/lib/utils";
 import type { CustomerRow, LeaseContractRow, PaymentRow, ReceivableRow, UnitRow } from "@/types/database";
+import type { LeaseBuilding } from "./project-scope";
 
 const LEASE_PAYMENT_TYPES = [
   "lease_rent",
@@ -50,7 +51,7 @@ export async function loadLeasePageData() {
   // None of these datasets depends on another. Starting them together removes
   // the former buildings-first round trip from every lease-page navigation.
   const [buildingsRes, contracts, unitsRes, customersRes, payments, receivables] = await Promise.all([
-    supabase.from("buildings").select("id, code, display_name").eq("is_active", true).order("code"),
+    supabase.from("buildings").select("id, code, display_name, project_id, project:projects(id, code, display_name)").eq("is_active", true).order("code"),
     fetchAllPages(
       (from, to) => supabase.from("lease_contracts")
         .select(CONTRACT_FIELDS)
@@ -85,7 +86,10 @@ export async function loadLeasePageData() {
   if (unitsRes.error) throw new Error(`Failed to load lease units: ${unitsRes.error.message}`);
   if (customersRes.error) throw new Error(`Failed to load lease customers: ${customersRes.error.message}`);
 
-  const buildings = buildingsRes.data ?? [];
+  const buildings: LeaseBuilding[] = (buildingsRes.data ?? []).map((building) => ({
+    ...building,
+    project: (Array.isArray(building.project) ? building.project[0] : building.project) ?? null,
+  }));
   const activeBuildingIds = new Set(buildings.map((building) => building.id));
   const contractUnitIds = new Set((contracts as unknown as Array<{ unit_id: string }>).map((contract) => contract.unit_id));
   const rawUnits = (unitsRes.data ?? []) as unknown as Array<UnitRow & {
