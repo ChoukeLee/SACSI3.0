@@ -43,9 +43,16 @@ describe("audit reader interactions", () => {
     expect(host.querySelector("details")?.open).toBe(false);
   });
   it("filters by authenticated account, not by booking agent", async () => {
-    await render(); await select("录入账号筛选", "other-actor");
+    await render(); await select("登录账号筛选", "other-actor");
     expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
     expect(host.querySelector("tbody")?.textContent).toContain("other@example.invalid");
+  });
+  it("uses compact select controls for large action and module catalogs", async () => {
+    await render();
+    expect(host.querySelector('select[aria-label="操作筛选"]')).not.toBeNull();
+    expect(host.querySelector('select[aria-label="模块筛选"]')).not.toBeNull();
+    expect(host.textContent).toContain("登录账号");
+    expect(host.textContent).toContain("不能自动证明实际操作人是小颖");
   });
   it("filters channels and closes stale detail", async () => {
     await render(); await click(host.querySelector('[aria-label="查看业务操作详情"]')!);

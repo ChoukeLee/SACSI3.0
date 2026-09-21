@@ -1,8 +1,10 @@
-# SACSI 员工连接器 0.1.1
+# SACSI 员工连接器 0.1.2
 
 Windows 独立连接器：不依赖开发仓库、Git、npm 或员工自行连接数据库。交付包自带 Node 运行时，只保存公开的连接配置。支持本地验收包及生产候选包；候选包不代表服务端已放行。
 
 员工操作见 [试用说明](EMPLOYEE_GUIDE.md)。双击 `login.cmd` 登录、`check.cmd` 检查身份、`logout.cmd` 退出；`setup.cmd` 生成 Codex MCP 配置片段，不覆盖用户原配置。安装仍需管理员协助一次。
+
+Codex 订阅账号与 SACSI 业务身份相互独立。员工可以在同一台电脑、同一个 Codex 客户端中工作，但执行 SACSI 业务前必须让连接器和网页登录实际操作人的 SACSI 账号；共用 Chouke 的 SACSI 账号只会留下 Chouke 的审计身份。
 
 ## Codex MCP 接入
 

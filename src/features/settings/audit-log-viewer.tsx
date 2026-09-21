@@ -7,7 +7,7 @@ import { downloadCsv } from "@/lib/csv";
 import { Badge } from "@/components/ui/badge";
 import { DateInput } from "@/components/ui/date-input";
 import { DEFAULT_BUSINESS_TABLE_PAGE_SIZE } from "@/components/ui/business-table";
-import { FilterBar, FilterGroup, SegmentedControl, controlClass } from "@/components/ui/operational";
+import { FilterBar, FilterGroup, controlClass } from "@/components/ui/operational";
 import { SearchInput } from "@/components/ui/search-input";
 import type { Locale } from "@/lib/i18n";
 import { auditActionLabel, auditEntityLabel } from "@/lib/audit-labels";
@@ -27,6 +27,7 @@ interface AuditLogRow {
   before_data: Record<string, unknown> | null;
   after_data: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
+  resolved_actor_display_name?: string | null;
   resolved_booking_agent_name?: string | null;
 }
 
@@ -220,6 +221,14 @@ export function AuditLogViewer({ logs, locale }: Props) {
     return auditActionLabel(key, locale);
   }
 
+  function filterLabel(kind: "action" | "entity", key: string) {
+    const label = kind === "action" ? actionLabel(key) : auditEntityLabel(key, locale);
+    const generic = kind === "action"
+      ? (zh ? "其他操作" : "Autre action")
+      : (zh ? "其他对象" : "Autre objet");
+    return label === generic ? `${label} · ${key}` : label;
+  }
+
   function metadataText(log: AuditLogRow, key: string) {
     const value = log.metadata?.[key];
     return value == null ? "" : String(value);
@@ -305,7 +314,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
   };
 
   const handleExport = () => {
-    const headers = [zh ? "时间（阿比让）" : "Date (Abidjan)", zh ? "操作人" : "Acteur", zh ? "角色" : "Rôle", zh ? "操作" : "Action", zh ? "对象" : "Objet", zh ? "摘要" : "Résumé",
+    const headers = [zh ? "时间（阿比让）" : "Date (Abidjan)", zh ? "登录账号（系统认证）" : "Compte connecté (authentifié)", zh ? "角色" : "Rôle", zh ? "操作" : "Action", zh ? "对象" : "Objet", zh ? "摘要" : "Résumé",
       zh ? "操作账号 ID" : "ID acteur", zh ? "业务经办人" : "Responsable", zh ? "渠道（记录值）" : "Canal déclaré", zh ? "请求编号" : "Requête", zh ? "原始指令" : "Instruction"];
     const rows = filtered.map((l) => {
       const role = actorRole(l);
@@ -318,6 +327,12 @@ export function AuditLogViewer({ logs, locale }: Props) {
 
   return (
     <div className="space-y-5">
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+        <p className="font-semibold">{zh ? "身份说明" : "Note sur l’identité"}</p>
+        <p>{zh
+          ? "这里的“登录账号”来自系统认证。若小颖使用 Chouke 的账号，日志只能显示 Chouke，不能自动证明实际操作人是小颖；业务经办人另行展示，不等于登录账号。"
+          : "Le compte connecté provient de l’authentification. Un compte partagé ne permet pas d’identifier automatiquement la personne devant l’ordinateur ; le responsable métier est affiché séparément."}</p>
+      </div>
       {/* Filters */}
       <FilterBar
         meta={
@@ -334,8 +349,8 @@ export function AuditLogViewer({ logs, locale }: Props) {
           </div>
         }
       >
-        <FilterGroup label={zh ? "录入账号" : "Compte de saisie"}>
-          <select aria-label={zh ? "录入账号筛选" : "Filtre compte"} value={actorFilter} onChange={e => setActorFilter(e.target.value)} className={cn(controlClass, "max-w-[260px]")}>
+        <FilterGroup label={zh ? "登录账号" : "Compte connecté"}>
+          <select aria-label={zh ? "登录账号筛选" : "Filtre compte"} value={actorFilter} onChange={e => setActorFilter(e.target.value)} className={cn(controlClass, "max-w-[260px]")}>
             <option value="all">{zh ? "全部账号" : "Tous les comptes"}</option>
             {actors.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
           </select>
@@ -352,26 +367,16 @@ export function AuditLogViewer({ logs, locale }: Props) {
           <DateInput value={dateTo} onChangeValue={setDateTo} className={filterDate} />
         </FilterGroup>
         <FilterGroup label={zh ? "操作" : "Action"}>
-          <SegmentedControl
-            value={actionFilter}
-            onChange={setActionFilter}
-            ariaLabel={zh ? "操作筛选" : "Filtre action"}
-            items={[
-              { value: "all", label: zh ? "全部" : "Tous" },
-              ...uniqueActions.map((value) => ({ value, label: actionLabel(value) })),
-            ]}
-          />
+          <select aria-label={zh ? "操作筛选" : "Filtre action"} value={actionFilter} onChange={e => setActionFilter(e.target.value)} className={cn(controlClass, "max-w-[260px]")}>
+            <option value="all">{zh ? "全部操作" : "Toutes les actions"}</option>
+            {uniqueActions.map(value => <option key={value} value={value}>{filterLabel("action", value)}</option>)}
+          </select>
         </FilterGroup>
         <FilterGroup label={zh ? "模块" : "Module"}>
-          <SegmentedControl
-            value={entityFilter}
-            onChange={setEntityFilter}
-            ariaLabel={zh ? "模块筛选" : "Filtre module"}
-            items={[
-              { value: "all", label: zh ? "全部" : "Tous" },
-              ...uniqueEntities.map((value) => ({ value, label: auditEntityLabel(value, locale) })),
-            ]}
-          />
+          <select aria-label={zh ? "模块筛选" : "Filtre module"} value={entityFilter} onChange={e => setEntityFilter(e.target.value)} className={cn(controlClass, "max-w-[220px]")}>
+            <option value="all">{zh ? "全部模块" : "Tous les modules"}</option>
+            {uniqueEntities.map(value => <option key={value} value={value}>{filterLabel("entity", value)}</option>)}
+          </select>
         </FilterGroup>
         <SearchInput
           value={search}
@@ -398,7 +403,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
                     <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{zh ? "时间" : "Date"}</span>
                   </th>
                   <th className="px-4 py-2.5 w-[210px]">
-                    <span className="inline-flex items-center gap-1"><User className="h-3 w-3" />{zh ? "操作人" : "Acteur"}</span>
+                    <span className="inline-flex items-center gap-1"><User className="h-3 w-3" />{zh ? "登录账号" : "Compte connecté"}</span>
                   </th>
                   <th className="px-4 py-2.5 w-[180px] text-center">
                     <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" />{zh ? "操作" : "Action"}</span>

@@ -10,8 +10,13 @@ export function auditActorKey(log: AuditLogRow) {
 }
 
 export function auditActorText(log: AuditLogRow, locale: Locale) {
-  // A name embedded in an instruction/metadata is not an authenticated actor.
-  return log.actor_email || log.actor_id || (locale === "zh" ? "未记录操作账号" : "Compte non enregistré");
+  // A name embedded in an instruction/metadata is not authentication evidence.
+  // A current profile name is supplementary and is only shown when the immutable
+  // audit row contains an authenticated account id/email.
+  const account = log.actor_email || log.actor_id;
+  if (!account) return locale === "zh" ? "未记录登录账号" : "Compte connecté non enregistré";
+  const name = auditText(log.resolved_actor_display_name);
+  return name ? `${name} · ${account}` : account;
 }
 
 export function auditChannel(log: AuditLogRow): "external_codex" | "sacsi_web" | "unknown" {

@@ -13,6 +13,7 @@ export interface AuditLogRow {
   before_data: Record<string, unknown> | null;
   after_data: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
+  resolved_actor_display_name?: string | null;
   resolved_booking_agent_name?: string | null;
 }
 
@@ -87,6 +88,7 @@ export async function enrichAuditLogsWithUnitNumbers(
 
     return {
       ...log,
+      resolved_actor_display_name: actor?.displayName ?? null,
       resolved_booking_agent_name: agentNames.get(String(log.metadata?.booking_agent_id ?? "")) ?? null,
       metadata: unitNo && !metadataString(log, "unit_no") ? { ...metadata, unit_no: unitNo } : metadata,
     };

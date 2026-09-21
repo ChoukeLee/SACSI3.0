@@ -10,6 +10,7 @@ export function auditFixture(overrides: Partial<AuditLogRow> = {}): AuditLogRow 
       booking_agent_id: "44444444-4444-4444-8444-444444444444", request_id: "request-example",
       payment_date: "2026-09-15", receipt_no: "TEST-RECEIPT", original_instruction: "登记测试房间收款两万西法",
       connector_version: "0.1.0", protocol_version: "1.0" },
+    resolved_actor_display_name: "测试录入员",
     resolved_booking_agent_name: "振咏", ...overrides,
   };
 }

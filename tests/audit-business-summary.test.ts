@@ -5,17 +5,17 @@ import { auditFixture } from "./fixtures/audit-display";
 describe("human-readable audit evidence", () => {
   it("keeps real entry account separate from the business agent", () => {
     const log = auditFixture();
-    expect(auditBusinessSummary(log, "zh")).toMatchObject({ actor: log.actor_email, agent: "振咏（当前名称）",
+    expect(auditBusinessSummary(log, "zh")).toMatchObject({ actor: `测试录入员 · ${log.actor_email}`, agent: "振咏（当前名称）",
       summary: "登记日租收款 20,000 XOF", beforePaid: "10,000 XOF", afterPaid: "30,000 XOF",
       source: "自然语言", requestId: "request-example" });
   });
   it("does not use a metadata actor to replace missing authentication evidence", () => {
     const log = auditFixture({ actor_id: null, actor_email: null, metadata: { actor_display_name: "Chucke", actor_email: "admin@sacsi.com" } });
-    expect(auditActorText(log, "zh")).toBe("未记录操作账号");
+    expect(auditActorText(log, "zh")).toBe("未记录登录账号");
     expect(auditActorKey(log)).toBe("unknown");
   });
   it("falls back to the recorded actor and agent IDs, not a guessed collector", () => {
-    const log = auditFixture({ actor_email: null, resolved_booking_agent_name: null });
+    const log = auditFixture({ actor_email: null, resolved_actor_display_name: null, resolved_booking_agent_name: null });
     expect(auditActorText(log, "zh")).toBe(log.actor_id);
     expect(auditBusinessSummary(log, "zh").agent).toBe(log.metadata?.booking_agent_id);
   });
@@ -37,7 +37,7 @@ describe("human-readable audit evidence", () => {
   });
   it("searches request IDs, instruction, agent and account", () => {
     const text = auditSearchText(auditFixture(), "zh");
-    for (const term of ["request-example", "振咏", "两万西法", "test-operator"]) expect(text).toContain(term);
+    for (const term of ["request-example", "振咏", "两万西法", "测试录入员", "test-operator"]) expect(text).toContain(term);
   });
   it.each(["=HYPERLINK(1)", "+SUM(1)", "-1+1", "@SUM(1)", "  =1", "\t=1", "\r=1", "\n=1"])("exports formula-like content as text: %j", value => {
     expect(auditExportCell(value)).toBe(`'${value.replace(/\r\n?/g, "\n")}`);

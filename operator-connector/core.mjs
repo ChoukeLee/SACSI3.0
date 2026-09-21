@@ -1,4 +1,4 @@
-export const VERSION = '0.1.1';
+export const VERSION = '0.1.2';
 export const PROTOCOL = '1.0';
 export function validateConfig(value) {
   if (value?.formatVersion !== 1) throw new Error('invalid_configuration');

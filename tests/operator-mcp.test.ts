@@ -16,7 +16,7 @@ async function start() {const x=make(), dispatch=dispatcher(x.client,x.store);aw
 describe('SACSI narrow MCP surface',()=>{
   it('shows understandable identity and does not equate connection with payment release',()=>{
     const text=humanResult('capabilities',{identity:{displayName:'Ying',role:'admin',userId:id},actions:[{name:'record_daily_payment',authorized:true,availability:'implemented'}]});
-    expect(text).toContain('Ying');expect(text).toContain('不代表服务器截图确认功能已发布');expect(humanError('login_required')).toContain('本人');
+    expect(text).toContain('Ying');expect(text).toContain('与 Codex 订阅账号无关');expect(text).toContain('不代表服务器截图确认功能已发布');expect(humanError('login_required')).toContain('本人');
     expect(humanError('outcome_unknown_keep_original_request_id')).toContain('不要重新编号');
   });
   it('only exposes four bounded tools, no login, confirm, SQL or arbitrary action',()=>{

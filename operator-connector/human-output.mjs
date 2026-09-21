@@ -6,6 +6,7 @@ export function humanResult(command,result) {
     return ['SACSI 连接成功',`当前身份：${identity.displayName??'未知'}（${identity.role??'未知'}）`,
       `账号标识：${identity.userId??'未知'}`,`日租查询：${allowed('query_daily_booking')?'有权限':'不可用'}`,
       `截图收款权限：${allowed('record_daily_payment')?'有权限，仍需网页确认':'不可用'}`,
+      '此处显示的是 SACSI 业务身份，与 Codex 订阅账号无关。共用电脑时，实际录入人必须切换为自己的 SACSI 账号。',
       '注意：连接成功不代表服务器截图确认功能已发布。请先由管理员完成上线核验。',
       '确认是本人身份后，可回到 Codex 对话。请勿共用他人账号。'].join('\n');
   }

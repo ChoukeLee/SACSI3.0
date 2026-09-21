@@ -17,4 +17,13 @@ describe("supplementary agent names", () => {
     expect(result[0].resolved_booking_agent_name).toBe(mode === "success" ? "振咏" : null);
     expect(from).toHaveBeenCalledWith("customers");
   });
+
+  it("uses the authenticated profile directory as a supplementary actor label", async () => {
+    const log = auditFixture({ resolved_actor_display_name: undefined });
+    const from = vi.fn((table: string) => ({ select: () => ({ in: async () => ({
+      data: table === "user_profiles" ? [{ id: log.actor_id, display_name: "Ying", role: "admin" }] : [], error: null,
+    }) }) }));
+    const [result] = await enrichAuditLogsWithUnitNumbers({ from } as unknown as Parameters<typeof enrichAuditLogsWithUnitNumbers>[0], [log]);
+    expect(result.resolved_actor_display_name).toBe("Ying");
+  });
 });

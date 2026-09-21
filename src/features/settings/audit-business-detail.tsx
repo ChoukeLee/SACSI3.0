@@ -6,7 +6,7 @@ export function AuditBusinessDetail({ log, locale }: { log: AuditLogRow; locale:
   const info = auditBusinessSummary(log, locale);
   const zh = locale === "zh";
   const fields = [
-    [zh ? "实际录入账号" : "Compte de saisie", info.actor],
+    [zh ? "登录账号（系统认证）" : "Compte connecté (authentifié)", info.actor],
     [zh ? "业务经办人" : "Responsable métier", info.agent],
     [zh ? "录入渠道（记录值）" : "Canal déclaré", info.channel],
     [zh ? "输入来源" : "Source", info.source],
@@ -30,7 +30,7 @@ export function AuditBusinessDetail({ log, locale }: { log: AuditLogRow; locale:
       <p className="mt-1 whitespace-pre-wrap break-words text-sm [overflow-wrap:anywhere]">{info.instruction || (zh ? "未记录" : "Non enregistré")}</p>
     </div>
     <p className="mt-3 text-xs text-muted-foreground">{zh
-      ? "录入账号、业务经办人和实际收款人不是同一概念；未记录实际收款人时不能推断。此处展示历史审计，不代表人工复核或当前账务复查已通过。"
+      ? "登录账号、业务经办人和实际收款人不是同一概念；多人共用同一账号时，系统只能证明该登录账号执行了操作，不能证明当时坐在电脑前的人。未记录实际收款人时不能推断。此处展示历史审计，不代表人工复核或当前账务复查已通过。"
       : "Le compte de saisie, le responsable et l’encaisseur sont distincts. Cet historique ne constitue pas une validation humaine ni un contrôle du solde actuel."}</p>
   </section>;
 }
