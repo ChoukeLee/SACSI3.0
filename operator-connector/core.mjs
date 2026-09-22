@@ -1,4 +1,4 @@
-export const VERSION = '0.2.0';
+export const VERSION = '0.3.0';
 export const PROTOCOL = '1.0';
 export function validateConfig(value) {
   if (value?.formatVersion !== 1) throw new Error('invalid_configuration');
@@ -68,6 +68,12 @@ export class OperatorClient {
     const manifest=checkManifest(await this.api('capabilities'));
     if(manifest.identity.userId!==(await this.store.load())?.userId) throw new Error('session_identity_changed');
     return manifest;
+  }
+  async dailyWorkflow(operation, body) {
+    if (!['search','plan'].includes(operation)) throw new Error('connector_action_not_supported');
+    const manifest = await this.capabilities();
+    if (manifest.dailyWorkflow?.version !== 1 || manifest.dailyWorkflow?.readOnlyPlanning !== true) throw new Error('daily_workflow_upgrade_required');
+    return this.api(`bookings/${operation}`,body);
   }
   async collection(operation, body) {
     const manifest = await this.capabilities();

@@ -26,7 +26,17 @@ describe('standalone employee connector',()=>{
     expect(()=>validateConfig({...config,publishableKey:jwt})).toThrow('public_key_required');
     expect(()=>validateConfig({...config,supabaseUrl:'http://127.0.0.1:5555'})).toThrow();
   });
-  it.each([{protocolVersion:'2.0'},{minimumConnectorVersion:'0.3.0'},{minimumConnectorVersion:'bad'},{safeguards:{}}])('fails closed on incompatible capability manifest %j',change=>{expect(()=>checkManifest({...manifest,...change})).toThrow();});
+  it.each([{protocolVersion:'2.0'},{minimumConnectorVersion:'99.0.0'},{minimumConnectorVersion:'bad'},{safeguards:{}}])('fails closed on incompatible capability manifest %j',change=>{expect(()=>checkManifest({...manifest,...change})).toThrow();});
+  it('blocks new planning tools on old servers before the request',async()=>{
+    const transport=vi.fn().mockResolvedValue(reply(manifest));
+    await expect(new OperatorClient(config,memoryStore(),transport).dailyWorkflow('search',{buildingCode:'TEST',unitNo:'1'})).rejects.toThrow('daily_workflow_upgrade_required');
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+  it('only sends read-only planning requests to the advertised endpoint',async()=>{
+    const transport=vi.fn().mockResolvedValueOnce(reply({...manifest,dailyWorkflow:{version:1,readOnlyPlanning:true,executionAvailable:false}})).mockResolvedValueOnce(reply({status:'proposal_only',executionAllowed:false}));
+    const result=await new OperatorClient(config,memoryStore(),transport).dailyWorkflow('plan',{bookingId:request.requestId});
+    expect(result.executionAllowed).toBe(false);expect(transport.mock.calls[1][0]).toBe(config.appUrl+'/api/operator/v1/bookings/plan');
+  });
   it('creates a same-origin confirmation link without calling approval or changing request ID',async()=>{
     const transport=vi.fn().mockResolvedValueOnce(reply(manifest)).mockResolvedValueOnce(reply({previewProof:'proof',preview:{amount:10}})).mockResolvedValueOnce(reply({status:'awaiting_account_confirmation',confirmationPath:'/operator/confirmations/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}));
     const output=await new OperatorClient(config,memoryStore(),transport).execute(request);
