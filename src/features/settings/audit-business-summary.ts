@@ -52,9 +52,10 @@ export function auditBusinessSummary(log: AuditLogRow, locale: Locale) {
     natural_language: "自然语言", manual_form: "手工表单", excel_screenshot: "Excel 截图", structured_batch: "批量清单",
   } : { natural_language: "Langage naturel", manual_form: "Formulaire", excel_screenshot: "Capture Excel", structured_batch: "Lot structuré" };
   const dailyPayment = log.entity_type === "daily_booking" && log.action === "supplementary_payment";
-  const paymentAmount = dailyPayment ? amount(meta.amount) : null;
+  const collectionPayment = log.action === "operator_collection_item";
+  const paymentAmount = dailyPayment || collectionPayment ? amount(meta.amount) : null;
   const summary = paymentAmount !== null
-    ? `${zh ? "登记日租收款" : "Paiement journalier enregistré"} ${auditMoney(paymentAmount, locale)}`
+    ? `${collectionPayment ? (zh ? "截图分账收款" : "Encaissement ventilé") : (zh ? "登记日租收款" : "Paiement journalier enregistré")} ${auditMoney(paymentAmount, locale)}`
     : "";
   return {
     actor: auditActorText(log, locale), actorId: log.actor_id || "",
@@ -63,8 +64,9 @@ export function auditBusinessSummary(log: AuditLogRow, locale: Locale) {
     agentId, summary,
     paymentAmount: paymentAmount === null ? "" : auditMoney(paymentAmount, locale),
     paymentDate: auditText(meta.payment_date), receiptNo: auditText(meta.receipt_no),
-    beforePaid: dailyPayment ? auditMoney(log.before_data?.prepaid_amount_xof, locale) : "",
-    afterPaid: dailyPayment ? auditMoney(log.after_data?.prepaid_amount_xof, locale) : "",
+    beforePaid: dailyPayment ? auditMoney(log.before_data?.prepaid_amount_xof, locale) : collectionPayment ? auditMoney(log.before_data?.paid_amount_xof, locale) : "",
+    afterPaid: dailyPayment ? auditMoney(log.after_data?.prepaid_amount_xof, locale) : collectionPayment ? auditMoney(log.after_data?.paid_amount_xof, locale) : "",
+    sourceText: auditText(meta.source_text), lineId: auditText(meta.line_id), childRequestId: auditText(meta.child_request_id),
     instruction: auditText(meta.original_instruction),
     source: inputSources[auditText(meta.input_source)] || (zh ? "未记录 / 未识别" : "Non enregistré / inconnu"),
     connectorVersion: auditText(meta.connector_version), protocolVersion: auditText(meta.protocol_version),

@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { parseEnv } from 'node:util';
 import { packageFiles } from './lib/operator-package.mjs';
 import { validateConfig,VERSION } from '../operator-connector/core.mjs';
+import { tools } from '../operator-connector/mcp-tools.mjs';
 try {
   const root=fileURLToPath(new URL('../',import.meta.url)),target=resolve(process.argv[2]??'');
   const work=join(root,'work'),rel=relative(work,target);
@@ -32,6 +33,6 @@ try {
   const output=execFileSync(join(target,'node.exe'),[join(target,'mcp-server.mjs')],{cwd:profile,env:{...process.env,LOCALAPPDATA:profile},
     input:messages.map(m=>JSON.stringify(m)).join('\n')+'\n',encoding:'utf8',windowsHide:true,stdio:['pipe','pipe','pipe'],timeout:15000});
   const results=output.trim().split('\n').map(line=>JSON.parse(line));
-  assert.equal(results.length,2);assert.equal(results[0].result.serverInfo.version,VERSION);assert.equal(results[1].result.tools.length,4);
+  assert.equal(results.length,2);assert.equal(results[0].result.serverInfo.version,VERSION);assert.deepEqual(results[1].result.tools.map(t=>t.name),tools.map(t=>t.name));
   console.log('PASS: complete checksums, public-only config, no private environment values, standalone MCP handshake from unrelated working directory; no production API called.');
 } catch {console.error('Package verification failed; no credentials printed.');process.exitCode=1;}

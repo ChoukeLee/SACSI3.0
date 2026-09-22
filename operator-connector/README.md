@@ -1,4 +1,4 @@
-# SACSI 员工连接器 0.1.2
+# SACSI 员工连接器 0.2.0
 
 Windows 独立连接器：不依赖开发仓库、Git、npm 或员工自行连接数据库。交付包自带 Node 运行时，只保存公开的连接配置。支持本地验收包及生产候选包；候选包不代表服务端已放行。
 
@@ -8,7 +8,7 @@ Codex 订阅账号与 SACSI 业务身份相互独立。员工可以在同一台�
 
 ## Codex MCP 接入
 
-本地 stdio MCP，协议 `2025-06-18`。工具：`capabilities`、`new_request_id`、`query_daily_booking`、`prepare_daily_payment`。没有登录密码工具、确认付款工具或 SQL 工具。不监听网络端口，不额外调用付费模型。模型自身的使用额度仍由员工的 Codex 账号承担。
+本地 stdio MCP，协议 `2025-06-18`。工具：`capabilities`、`new_request_id`、`query_daily_booking`、`prepare_daily_payment`、`query_collection_position`、`prepare_collection_batch`、`collection_status`。没有登录密码工具、确认付款工具或 SQL 工具。不监听网络端口，不额外调用付费模型。模型自身的使用额度仍由员工的 Codex 账号承担。
 
 按 [OpenAI 官方 MCP 配置文档](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) 配置绝对路径的 `node.exe` 与 `mcp-server.mjs`。移动包后重新运行 setup 并更新配置。连接器和浏览器各自登录，网页确认必须与连接器同一账号。
 
@@ -29,7 +29,11 @@ Codex 订阅账号与 SACSI 业务身份相互独立。员工可以在同一台�
 - 同一站点每次操作串行加锁，避免刷新令牌竞争。操作中断遗留锁会拒绝继续；管理员确认没有连接器进程后，才可删除该站点的 `operation.lock`。不会自动抢占未知操作。
 - 网络错误不自动重发写入。保留原请求号核查结果；不进行离线付款队列（后续阶段）。
 - 每次执行先检查服务器协议与实时授权；功能标为计划中/未授权时拒绝。服务器仍会再次检查权限。
-- 本版本交付范围为日租查询与单笔截图收款；长租/出售/批量不是本连接器已交付能力。
+- 0.2.0 新增多行截图、日租/长租/出售整批收款及组合分账。新服务端和数据库迁移未放行时，新工具返回 `collection_upgrade_required`，旧日租工具仍兼容。
+- 批次最多 30 行、100 个应收分项；整批一个原子事务。每行必须明确合同/订单、收款日期、收款方式、XOF 总额及应收分配。一个目标在一批中只能出现一次，重复行需先人工澄清或合并。
+- `query_collection_position` 可按合同或楼栋房号查证；长租可提供 `periodStart/periodEnd/totalXof` 获取月租金与物业费规则建议，提供 `selectedReceivableIds/totalXof` 获取未收余额分账建议。两类建议不能代替确认。
+- 只结算已有可支付应收；不自动新建应收、不推定汇率、免租或未开业规则。长租租金须明确 `paidThroughDate`，不能跳过未清账期。日租开放日期订单继续走原有人工流程。
+- `collection_status` 使用原请求号找回确认链接、核查结果；超时不能换号。修改或过期重做需原请求号与旧确认 ID，新旧确认单互斥。
 - DPAPI 防止令牌以明文存盘或随文件搬走；不能防御已控制同一 Windows 账号的恶意软件。
 
 ## 更新

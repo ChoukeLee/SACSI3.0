@@ -14,14 +14,19 @@ const make=()=>({client:{capabilities:vi.fn().mockResolvedValue({identity:{email
 const initialize={jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18',clientInfo:{name:'test',version:'1'},capabilities:{}}};
 async function start() {const x=make(), dispatch=dispatcher(x.client,x.store);await dispatch(initialize);await dispatch({jsonrpc:'2.0',method:'notifications/initialized'});return {...x,dispatch};}
 describe('SACSI narrow MCP surface',()=>{
+  it('rejects nested batch actor injection and never calls the client',async()=>{
+    const client={collection:vi.fn()},store={lock:vi.fn((f:()=>unknown)=>f())};
+    const args={requestId:id,originalInstruction:'test',totalXof:10,rows:[{lineId:'1',sourceText:'test',domain:'lease',targetId:id,totalXof:10,paymentDate:'2026-09-22',paymentMethod:'cash',allocations:[{receivableId:id,amountXof:10,actorId:id}]}]};
+    await expect(callTool('prepare_collection_batch',args,client,store)).rejects.toThrow('invalid_tool_arguments');expect(client.collection).not.toHaveBeenCalled();
+  });
   it('shows understandable identity and does not equate connection with payment release',()=>{
     const text=humanResult('capabilities',{identity:{displayName:'Ying',role:'admin',userId:id},actions:[{name:'record_daily_payment',authorized:true,availability:'implemented'}]});
     expect(text).toContain('Ying');expect(text).toContain('与 Codex 订阅账号无关');expect(text).toContain('不代表服务器截图确认功能已发布');expect(humanError('login_required')).toContain('本人');
     expect(humanError('outcome_unknown_keep_original_request_id')).toContain('不要重新编号');
   });
-  it('only exposes four bounded tools, no login, confirm, SQL or arbitrary action',()=>{
-    expect(tools.map((t:{name:string})=>t.name)).toEqual(['capabilities','new_request_id','query_daily_booking','prepare_daily_payment']);
-    expect(tools[3].annotations.readOnlyHint).toBe(false);
+  it('only exposes bounded tools, no login, confirm, SQL or arbitrary action',()=>{
+    expect(tools.map((t:{name:string})=>t.name)).toEqual(['collection_status','query_collection_position','prepare_collection_batch','capabilities','new_request_id','query_daily_booking','prepare_daily_payment']);
+    expect(tools.find((t:{name:string})=>t.name==='prepare_daily_payment').annotations.readOnlyHint).toBe(false);
   });
   it('retains stable request and predecessor, enforces screenshot scope',async()=>{
     const {client,store}=make();await callTool('prepare_daily_payment',{...payment,replacesConfirmationId:id},client,store);
@@ -50,7 +55,7 @@ describe('SACSI narrow MCP surface',()=>{
   });
   it('lists tools, calls capabilities, rejects unknown tools and methods',async()=>{
     const {dispatch}=await start();
-    expect((await dispatch({jsonrpc:'2.0',id:2,method:'tools/list'})).result.tools).toHaveLength(4);
+    expect((await dispatch({jsonrpc:'2.0',id:2,method:'tools/list'})).result.tools).toHaveLength(7);
     expect((await dispatch({jsonrpc:'2.0',id:3,method:'tools/call',params:{name:'capabilities'}})).result.content[0].text).toContain('test@example.invalid');
     expect((await dispatch({jsonrpc:'2.0',id:4,method:'tools/call',params:{name:'confirm_payment'}})).error.code).toBe(-32602);
     expect((await dispatch({jsonrpc:'2.0',id:5,method:'sql'})).error.code).toBe(-32601);

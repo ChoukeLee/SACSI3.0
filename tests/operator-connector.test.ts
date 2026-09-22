@@ -8,13 +8,25 @@ const session=()=>({accessToken:'access-secret',refreshToken:'refresh-secret',us
 function memoryStore() {let value: ReturnType<typeof session>|null=session();return {load:async()=>value,save:async(v: ReturnType<typeof session>)=>{value=v;},remove:async()=>{value=null;}};}
 const reply=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
 describe('standalone employee connector',()=>{
+  it('checks collection database availability before sending a batch',async()=>{
+    const transport=vi.fn().mockResolvedValue(reply(manifest));
+    await expect(new OperatorClient(config,memoryStore(),transport).collection('prepare',{requestId:request.requestId})).rejects.toThrow('collection_upgrade_required');
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+  it('collection tools only prepare same-origin links, retain the original id and never confirm',async()=>{
+    const transport=vi.fn().mockResolvedValueOnce(reply({...manifest,collectionWorkflow:{available:true,version:1}})).mockResolvedValueOnce(reply({previewProof:'proof',preview:[]})).mockResolvedValueOnce(reply({status:'awaiting_account_confirmation',confirmationPath:`/operator/collections/${request.requestId}`}));
+    const result=await new OperatorClient(config,memoryStore(),transport).collection('prepare',{requestId:request.requestId,replacesConfirmationId:request.requestId,rows:[],totalXof:1,originalInstruction:'Test'});
+    expect(result.requestId).toBe(request.requestId);expect(result.confirmationUrl).toBe(config.appUrl+'/operator/collections/'+request.requestId);
+    expect(transport.mock.calls.map(c=>c[0])).toEqual(['capabilities','collections/prepare','collections/drafts'].map(p=>config.appUrl+'/api/operator/v1/'+p));
+    expect(JSON.parse(transport.mock.calls[2][1].body).replacesConfirmationId).toBe(request.requestId);
+  });
   it.each(['http://evil.invalid','https://user:pass@example.com','https://example.com/path','https://example.com/?q=x'])('rejects unsafe app endpoint %s',appUrl=>{expect(()=>validateConfig({...config,localTest:false,appUrl})).toThrow();});
   it('rejects service keys and loopback configuration drift',()=>{
     const jwt=`x.${Buffer.from(JSON.stringify({role:'service_role'})).toString('base64url')}.x`;
     expect(()=>validateConfig({...config,publishableKey:jwt})).toThrow('public_key_required');
     expect(()=>validateConfig({...config,supabaseUrl:'http://127.0.0.1:5555'})).toThrow();
   });
-  it.each([{protocolVersion:'2.0'},{minimumConnectorVersion:'0.2.0'},{minimumConnectorVersion:'bad'},{safeguards:{}}])('fails closed on incompatible capability manifest %j',change=>{expect(()=>checkManifest({...manifest,...change})).toThrow();});
+  it.each([{protocolVersion:'2.0'},{minimumConnectorVersion:'0.3.0'},{minimumConnectorVersion:'bad'},{safeguards:{}}])('fails closed on incompatible capability manifest %j',change=>{expect(()=>checkManifest({...manifest,...change})).toThrow();});
   it('creates a same-origin confirmation link without calling approval or changing request ID',async()=>{
     const transport=vi.fn().mockResolvedValueOnce(reply(manifest)).mockResolvedValueOnce(reply({previewProof:'proof',preview:{amount:10}})).mockResolvedValueOnce(reply({status:'awaiting_account_confirmation',confirmationPath:'/operator/confirmations/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}));
     const output=await new OperatorClient(config,memoryStore(),transport).execute(request);

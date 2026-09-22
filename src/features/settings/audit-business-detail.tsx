@@ -15,6 +15,8 @@ export function AuditBusinessDetail({ log, locale }: { log: AuditLogRow; locale:
     [zh ? "收据号" : "Numéro de reçu", info.receiptNo],
     [zh ? "累计已收：变更前 → 后" : "Total reçu : avant → après", info.beforePaid ? `${info.beforePaid} → ${info.afterPaid}` : ""],
     [zh ? "请求编号" : "Identifiant de requête", info.requestId],
+    [zh ? "截图行号 / 分项请求号" : "Ligne / sous-requête", info.lineId ? `${info.lineId} / ${info.childRequestId}` : ""],
+    [zh ? "本行凭证原文" : "Texte de la ligne", info.sourceText],
     [zh ? "连接器 / 协议版本" : "Version connecteur / protocole", `${info.connectorVersion || "—"} / ${info.protocolVersion || "—"}`],
   ];
   return <section aria-label={zh ? "业务操作详情" : "Détail métier"} className="mb-4 rounded-lg border bg-card p-4">

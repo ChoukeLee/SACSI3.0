@@ -1,4 +1,4 @@
-export const VERSION = '0.1.2';
+export const VERSION = '0.2.0';
 export const PROTOCOL = '1.0';
 export function validateConfig(value) {
   if (value?.formatVersion !== 1) throw new Error('invalid_configuration');
@@ -68,6 +68,22 @@ export class OperatorClient {
     const manifest=checkManifest(await this.api('capabilities'));
     if(manifest.identity.userId!==(await this.store.load())?.userId) throw new Error('session_identity_changed');
     return manifest;
+  }
+  async collection(operation, body) {
+    const manifest = await this.capabilities();
+    if (manifest.collectionWorkflow?.available !== true || manifest.collectionWorkflow.version !== 1) throw new Error('collection_upgrade_required');
+    if (operation === 'status') return this.api(`collections/status?requestId=${encodeURIComponent(body.requestId)}`);
+    if (operation === 'query') return this.api('collections/query', body);
+    if (operation !== 'prepare') throw new Error('connector_action_not_supported');
+    const { replacesConfirmationId, ...request } = body;
+    const payload = { ...request, protocolVersion: PROTOCOL, connectorVersion: VERSION };
+    const preview = await this.api('collections/prepare', payload);
+    const draft = await this.api('collections/drafts', { request: payload, previewProof: preview.previewProof,
+      ...(replacesConfirmationId ? { replacesConfirmationId } : {}) });
+    if (!/^\/operator\/collections\/[0-9a-f-]{36}$/.test(draft.confirmationPath ?? '')) throw new Error('invalid_confirmation_link');
+    return { status: draft.status, requestId: request.requestId, preview: preview.preview,
+      confirmationUrl: this.config.appUrl + draft.confirmationPath,
+      notice: '请本人逐行核对分账后在网页确认。此工具没有执行收款；结果未知时保留原请求号。' };
   }
   async execute(request) {
     if (!request || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(request.requestId ?? '')) throw new Error('stable_request_uuid_required');

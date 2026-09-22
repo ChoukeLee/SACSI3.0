@@ -5,6 +5,7 @@ import {
 } from "@/features/business-actions/operator-protocol";
 import { authenticateOperatorRequest } from "@/features/business-actions/operator-request-auth";
 import { operatorAuthFailure } from "@/features/business-actions/operator-auth-failure";
+import { confirmationsEnabled } from "@/features/business-actions/operator-confirmation-http";
 
 export async function GET(request: Request) {
   const auth = await authenticateOperatorRequest(request);
@@ -36,7 +37,13 @@ export async function GET(request: Request) {
       ?? "local-development",
   });
 
-  return NextResponse.json(manifest, {
+  let collectionAvailable = false;
+  try {
+    const version = await auth.supabase.rpc("operator_collection_protocol_version");
+    collectionAvailable = confirmationsEnabled() && !version.error && version.data === 1;
+  } catch { /* Older databases have no collection workflow. */ }
+  return NextResponse.json({ ...manifest, collectionWorkflow: { available: collectionAvailable, version: 1,
+    domains: ["daily", "lease", "sale"], maximumRows: 30, maximumAllocations: 100, confirmationRequired: true } }, {
     headers: {
       "Cache-Control": "private, no-store",
       "X-SACSI-Auth-Mode": auth.mode,
