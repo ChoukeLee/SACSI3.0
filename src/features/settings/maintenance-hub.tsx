@@ -24,7 +24,7 @@ const roleLabels: Record<Locale, Record<UserRole, string>> = {
   zh: {
     admin: "管理员",
     boss: "只读管理",
-    finance: "财务",
+    finance: "财务总管",
     front_desk: "前台",
     rental_sales: "租售业务",
   },
@@ -41,7 +41,7 @@ const roleScopes: Record<Locale, Record<UserRole, string>> = {
   zh: {
     admin: "全部功能与系统维护",
     boss: "首页、房源、日租、长租、出售、客户、财务及审计日志（只读）",
-    finance: "客户与财务可登记；其他授权业务只读",
+    finance: "SACSI公寓与科建建材城财务可登记；其他授权业务只读",
     front_desk: "日租操作；长租只读",
     rental_sales: "客户、日租、长租及出售业务操作",
   },

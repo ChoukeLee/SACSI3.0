@@ -17,7 +17,7 @@ type AccountProjectScope = "all" | "sacsi_only";
 const seedAccountProfiles: Record<string, { role: UserRole; displayName: string; projectScope: AccountProjectScope }> = {
   "admin@sacsi.com": { role: "admin", displayName: "Chouke", projectScope: "all" },
   "boss@sacsi.com": { role: "boss", displayName: "GAO", projectScope: "all" },
-  "finance@sacsi.com": { role: "admin", displayName: "zhulin", projectScope: "sacsi_only" },
+  "finance@sacsi.com": { role: "finance", displayName: "zhulin", projectScope: "all" },
   "front@sacsi.com": { role: "front_desk", displayName: "Niamké", projectScope: "sacsi_only" },
   "ying@sacsi.com": { role: "admin", displayName: "Ying", projectScope: "sacsi_only" },
   "huang@sacsi.com": { role: "admin", displayName: "黄姐", projectScope: "sacsi_only" },

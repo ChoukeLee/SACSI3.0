@@ -51,17 +51,21 @@ describe("Ying administrator account", () => {
   });
 });
 
-describe("configured administrator accounts", () => {
-  it("promotes finance as zhulin and configures Huang Jie like Ying", () => {
+describe("configured account roles and project scopes", () => {
+  it("configures zhulin as the finance controller with CIMAC access", () => {
     expect(getSeedAccountProfile("FINANCE@SACSI.COM")).toEqual({
-      role: "admin",
+      role: "finance",
       displayName: "zhulin",
     });
+    expect(configuredAccountSummaries.find((account) => account.email === "finance@sacsi.com")?.projectScope).toBe("all");
+  });
+
+  it("keeps Huang Jie aligned with Ying and restricted to SACSI", () => {
     expect(getSeedAccountProfile("HUANG@SACSI.COM")).toEqual({
       role: "admin",
       displayName: "黄姐",
     });
-    for (const email of ["finance@sacsi.com", "ying@sacsi.com", "huang@sacsi.com"]) {
+    for (const email of ["ying@sacsi.com", "huang@sacsi.com"]) {
       expect(configuredAccountSummaries.find((account) => account.email === email)?.projectScope).toBe("sacsi_only");
     }
   });
