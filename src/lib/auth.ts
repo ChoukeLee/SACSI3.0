@@ -12,23 +12,28 @@ export interface CurrentUser {
   displayName: string;
 }
 
-const seedAccountProfiles: Record<string, { role: UserRole; displayName: string }> = {
-  "admin@sacsi.com": { role: "admin", displayName: "Chouke" },
-  "boss@sacsi.com": { role: "boss", displayName: "GAO" },
-  "finance@sacsi.com": { role: "finance", displayName: "李财务" },
-  "front@sacsi.com": { role: "front_desk", displayName: "Niamké" },
-  "ying@sacsi.com": { role: "admin", displayName: "Ying" },
+type AccountProjectScope = "all" | "sacsi_only";
+
+const seedAccountProfiles: Record<string, { role: UserRole; displayName: string; projectScope: AccountProjectScope }> = {
+  "admin@sacsi.com": { role: "admin", displayName: "Chouke", projectScope: "all" },
+  "boss@sacsi.com": { role: "boss", displayName: "GAO", projectScope: "all" },
+  "finance@sacsi.com": { role: "admin", displayName: "zhulin", projectScope: "sacsi_only" },
+  "front@sacsi.com": { role: "front_desk", displayName: "Niamké", projectScope: "sacsi_only" },
+  "ying@sacsi.com": { role: "admin", displayName: "Ying", projectScope: "sacsi_only" },
+  "huang@sacsi.com": { role: "admin", displayName: "黄姐", projectScope: "sacsi_only" },
 };
 
 export const configuredAccountSummaries = Object.entries(seedAccountProfiles).map(([email, profile]) => ({
   email,
   displayName: profile.displayName,
   role: profile.role,
+  projectScope: profile.projectScope,
 }));
 
 export function getSeedAccountProfile(email: string | undefined) {
   if (!email) return null;
-  return seedAccountProfiles[email.toLowerCase()] ?? null;
+  const profile = seedAccountProfiles[email.toLowerCase()];
+  return profile ? { role: profile.role, displayName: profile.displayName } : null;
 }
 
 export async function resolveVerifiedSupabaseUser(

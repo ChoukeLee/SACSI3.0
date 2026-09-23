@@ -11,6 +11,7 @@ interface AccountSummary {
   email: string;
   displayName: string;
   role: UserRole;
+  projectScope: "all" | "sacsi_only";
 }
 
 interface MaintenanceHubProps {
@@ -100,7 +101,12 @@ export function MaintenanceHub({ locale, accounts, buildings }: MaintenanceHubPr
                     <td className="px-4 py-2.5">
                       <Badge variant="secondary">{roleLabels[locale][account.role]}</Badge>
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{roleScopes[locale][account.role]}</td>
+                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                      {roleScopes[locale][account.role]}
+                      {account.projectScope === "sacsi_only"
+                        ? (zh ? "；仅限SACSI公寓，不含建材城" : " ; résidences SACSI uniquement, hors CIMAC")
+                        : ""}
+                    </td>
                   </tr>
                 ))}
               </tbody>

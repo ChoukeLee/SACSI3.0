@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canAccessPage, getSeedAccountProfile, hasPermission, homePathForRole, type CurrentUser } from "./auth";
+import { canAccessPage, configuredAccountSummaries, getSeedAccountProfile, hasPermission, homePathForRole, type CurrentUser } from "./auth";
 
 const yingAdminUser: CurrentUser = {
   id: "test-user",
@@ -48,6 +48,22 @@ describe("Ying administrator account", () => {
 
   it("denies unknown route sections by default", () => {
     expect(canAccessPage("admin", "not-a-real-section")).toBe(false);
+  });
+});
+
+describe("configured administrator accounts", () => {
+  it("promotes finance as zhulin and configures Huang Jie like Ying", () => {
+    expect(getSeedAccountProfile("FINANCE@SACSI.COM")).toEqual({
+      role: "admin",
+      displayName: "zhulin",
+    });
+    expect(getSeedAccountProfile("HUANG@SACSI.COM")).toEqual({
+      role: "admin",
+      displayName: "黄姐",
+    });
+    for (const email of ["finance@sacsi.com", "ying@sacsi.com", "huang@sacsi.com"]) {
+      expect(configuredAccountSummaries.find((account) => account.email === email)?.projectScope).toBe("sacsi_only");
+    }
   });
 });
 
