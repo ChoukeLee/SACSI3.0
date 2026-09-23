@@ -59,6 +59,14 @@ describe("AI draft infrastructure migration", () => {
   it("mirrors every registered write action at the database permission boundary", () => {
     const writes = BUSINESS_ACTIONS.filter((action) => action.write);
     for (const action of writes) {
+      if (action.name === 'refund_daily_payment') {
+        // The later catalog migration replaces the original static AI permission list.
+        const grants=readFileSync(join(process.cwd(),'supabase/migrations/20260914133925_add_operator_action_grants.sql'),'utf8');
+        expect(grants).toContain('private.current_operator_action_allowed(p_action_name, p_risk_level)');
+        const incremental=readFileSync(join(process.cwd(),'supabase/migrations/20260923135331_operator_booking_operations.sql'),'utf8');
+        expect(incremental).toContain("values('refund_daily_payment','daily_rental','L3',true,'登记实际日租退款',array['admin'])");
+        continue;
+      }
       expect(sql).toContain(`('${action.name}', '${action.risk}'`);
     }
     for (const action of BUSINESS_ACTIONS.filter((item) => !item.write)) {

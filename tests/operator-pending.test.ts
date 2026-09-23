@@ -29,6 +29,17 @@ it('only re-prepares after explicit recovery and a not_found response, retaining
 it('refuses unsupported future format and corrupted storage without replacing it',async()=>{await wrapped.pending('capture',{requestId:id,sourceText:'test'});const file=join(directory,'pending-v1',readdirSync(join(directory,'pending-v1'))[0]);writeFileSync(file,crypt(JSON.stringify({formatVersion:9}),'protect'));await expect(wrapped.pending('list')).rejects.toThrow('pending_format_upgrade_required');writeFileSync(file,'broken');await expect(wrapped.pending('list')).rejects.toThrow('pending_storage_unreadable');expect(readFileSync(file,'utf8')).toBe('broken');});
 it('storage failure blocks all preparation calls',async()=>{const bad=durableClient(client,{load:async()=>({...config,userId:owner})},{get:()=>{throw new Error('storage failed');}},config);await expect(bad.dailyWorkflow('prepare',{requestId:id})).rejects.toThrow('storage failed');expect(client.dailyWorkflow).not.toHaveBeenCalled();});
 it('permission revocation prevents recovery without dropping the local draft',async()=>{await wrapped.pending('capture',{requestId:id,sourceText:'test'});client.capabilities.mockRejectedValue(new Error('action_forbidden'));await expect(wrapped.pending('recover',{requestId:id})).rejects.toThrow('action_forbidden');expect(journal.get(owner,id).sourceText).toBe('test');});
+it('persists and recovers booking operations through their own endpoint without replaying completed writes',async()=>{
+ client.bookingOperation=vi.fn().mockRejectedValueOnce(new Error('outcome_unknown_keep_original_request_id'));
+ const request={requestId:id,operation:'refund',originalInstruction:'synthetic refund'};
+ await expect(wrapped.bookingOperation('prepare',request)).rejects.toThrow('outcome_unknown');
+ expect(journal.get(owner,id)).toMatchObject({kind:'booking_operation',state:'unknown',request});
+ client.bookingOperation.mockResolvedValue({status:'completed',verified:false,confirmationPath:`/operator/booking-operations/${id}`});
+ const found=await wrapped.pending('recover',{requestId:id});expect(found.verified).toBe(false);
+ expect(client.bookingOperation.mock.calls.map((c:any[])=>c[0])).toEqual(['prepare','status']);
+ expect(client.api).not.toHaveBeenCalled();expect(client.execute).not.toHaveBeenCalled();
+ await expect(wrapped.bookingOperation('prepare',request)).rejects.toThrow('pending_already_completed');
+});
 it.each(['payment','collection'])('recovers %s by original request without executing payments',async kind=>{
   const request={requestId:id,actionName:'record_daily_payment'},result={status:'awaiting_account_confirmation',confirmationUrl:`${config.appUrl}/operator/${kind==='payment'?'confirmations':'collections'}/${id}`};
   client.execute.mockResolvedValue(result);client.collection.mockResolvedValue(result);

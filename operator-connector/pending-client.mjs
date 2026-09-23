@@ -23,6 +23,7 @@ export function durableClient(client,store,journal,config){
     }
   }
   const wrapped=Object.create(client);
+  wrapped.bookingOperation=(op,body)=>op==='prepare'?prepare('booking_operation',body,()=>client.bookingOperation(op,body)):client.bookingOperation(op,body);
   wrapped.dailyWorkflow=(op,body)=>op==='prepare'?prepare('daily',body,()=>client.dailyWorkflow(op,body)):client.dailyWorkflow(op,body);
   wrapped.collection=(op,body)=>op==='prepare'?prepare('collection',body,()=>client.collection(op,body)):client.collection(op,body);
   wrapped.execute=body=>body.actionName==='record_daily_payment'?prepare('payment',body,()=>client.execute(body)):client.execute(body);
@@ -41,16 +42,16 @@ export function durableClient(client,store,journal,config){
     // Online authentication and permissions are checked before consulting server state.
     await client.capabilities();
     if(item.kind==='note')return {requestId:item.requestId,state:'needs_details',sourceText:item.sourceText,notice:'请补齐订单、金额、日期、方式后，沿用原请求号准备确认单。'};
-    const result=item.kind==='daily'?await client.dailyWorkflow('status',{requestId:item.requestId}):item.kind==='collection'?await client.collection('status',{requestId:item.requestId}):await client.api(`confirmations/status?requestId=${encodeURIComponent(item.requestId)}`);
+    const result=item.kind==='booking_operation'?await client.bookingOperation('status',{requestId:item.requestId}):item.kind==='daily'?await client.dailyWorkflow('status',{requestId:item.requestId}):item.kind==='collection'?await client.collection('status',{requestId:item.requestId}):await client.api(`confirmations/status?requestId=${encodeURIComponent(item.requestId)}`);
     if(result.status==='not_found'){
       // An explicit recovery call may only recreate an unexecuted proposal using its original id.
       if(item.state==='completed_history')throw new Error('pending_history_conflicts_with_server');
-      return item.kind==='daily'?wrapped.dailyWorkflow('prepare',item.request):item.kind==='collection'?wrapped.collection('prepare',item.request):wrapped.execute(item.request);
+      return item.kind==='booking_operation'?wrapped.bookingOperation('prepare',item.request):item.kind==='daily'?wrapped.dailyWorkflow('prepare',item.request):item.kind==='collection'?wrapped.collection('prepare',item.request):wrapped.execute(item.request);
     }
     if(!['pending','completed'].includes(result.status))throw new Error('pending_server_state_requires_review');
     let confirmationUrl=item.confirmationUrl;
     if(result.confirmationPath){
-      if(!/^\/operator\/(confirmations|collections|daily-workflows)\/[0-9a-f-]{36}$/i.test(result.confirmationPath))throw new Error('invalid_confirmation_link');
+      if(!/^\/operator\/(confirmations|collections|daily-workflows|booking-operations)\/[0-9a-f-]{36}$/i.test(result.confirmationPath))throw new Error('invalid_confirmation_link');
       confirmationUrl=config.appUrl+result.confirmationPath;
     }
     journal.put(owner,{...item,state:result.status==='completed'?'completed_history':'awaiting_confirmation',confirmationUrl,confirmationId:confirmationUrl?.split('/').at(-1)});

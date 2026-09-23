@@ -8,7 +8,7 @@ import {
 describe("daily booking agents", () => {
   it("allows only the confirmed handlers including Fulo", () => {
     expect(DAILY_BOOKING_AGENT_NAMES).toEqual([
-      "Chouke", "Niamke", "Fulo", "Esai", "黄姐", "颖", "镇淮", "悦凯", "孙敏", "李军", "振咏",
+      "Chouke", "Niamke", "Fulo", "Esai", "黄姐", "颖", "镇淮", "悦凯", "孙敏", "李军", "振咏", "5号前台",
     ]);
     expect(DAILY_BOOKING_AGENT_NAMES.every(isDailyBookingAgentName)).toBe(true);
     expect(isDailyBookingAgentName("AI QI")).toBe(false);

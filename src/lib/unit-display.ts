@@ -6,9 +6,15 @@ export function isOwnerOccupiedUnit(unit: Pick<UnitRow, "notes" | "status">): bo
   return unit.status === "locked" && OWNER_OCCUPIED_PATTERN.test(unit.notes ?? "");
 }
 
-export function getUnitOperationalLabel(unit: Pick<UnitRow, "notes" | "status">, locale: "zh" | "fr"): string | null {
+export function getUnitOperationalLabel(
+  unit: Pick<UnitRow, "notes" | "status" | "reservation_holder_name">,
+  locale: "zh" | "fr",
+): string | null {
   if (isOwnerOccupiedUnit(unit)) {
     return locale === "zh" ? "自用" : "Usage interne";
+  }
+  if (unit.status === "locked" && unit.reservation_holder_name?.trim()) {
+    return unit.reservation_holder_name.trim();
   }
   return null;
 }

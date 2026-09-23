@@ -1,4 +1,4 @@
-# SACSI 员工连接器 0.4.0（待发布）
+# SACSI 员工连接器 0.5.0（本地验收，待发布）
 
 Windows 独立连接器：不依赖开发仓库、Git、npm 或员工自行连接数据库。交付包自带 Node 运行时，只保存公开的连接配置。支持本地验收包及生产候选包；候选包不代表服务端已放行。
 
@@ -8,7 +8,20 @@ Codex 订阅账号与 SACSI 业务身份相互独立。员工可以在同一台�
 
 ## Codex MCP 接入
 
-本地 stdio MCP，协议 `2025-06-18`。原有查询、收款准备和组合业务工具继续保留；新增 `list_pending`、`capture_pending`、`read_pending`、`recover_pending`，共 15 个工具。没有登录密码工具、确认付款工具或 SQL 工具。不监听网络端口，不额外调用付费模型。模型自身的使用额度仍由员工的 Codex 账号承担。
+本地 stdio MCP，协议 `2025-06-18`。保留 0.4.0 的 15 个工具，新增 `query_booking_options`、`plan_booking_operation`、`prepare_booking_operation`、`booking_operation_status`，共 19 个工具。没有登录密码工具、确认付款工具或 SQL 工具。不监听网络端口，不额外调用付费模型。
+
+## 0.5.0 业务操作
+
+新建固定住期预订、仅入住不收款、取消无收款预订、修改住期/日价、转移未入住无收款预订、纠正已入住或有收款订单录错的房号、错误收款冲正、已退房实际退款、无收款误入住撤销。所有写操作先产生本人网页确认单，高风险页面另行核对原因与影响。
+
+- `create` 明确 `unitId`、`bookingAgentId`、`checkIn`、`checkOut`、`nightlyPriceXof`，客人姓名使用独立 `guestName`；不把经办人当实际登录身份。
+- `change_stay` 明确调整后入住日、退房日和日价，保留已有优惠；不能自动制造退款或隐藏欠款。
+- `transfer` 是未入住无收款预订换房；`correct_room` 是整单原房号录错的纠正，不是实际搬房。已完成退房或已有保洁历史转协助。
+- `reverse` 明确原收款 ID 和原因，是纠错，不是实际退钱。
+- `refund` 只记录已退房、XOF 订单的实际退款，明确金额、日期、方式、调整后最终应收和原因，不调用银行。超过已收减最终应收的部分拒绝。退款后普通旧页面不能直接整笔冲正原收款。
+- 所有操作保留原 `requestId`，待办种类为 `booking_operation`；已完成再次查询只报告历史状态，不能宣称复查了之后的全部账务。
+- 服务器必须返回 `bookingOperations.available=true`。候选包不代表线上启用；旧 0.4.0 不支持新业务待办，回退期间停止处理这种待办，保留密文并用 0.5.0 恢复。
+- 长租、物业费、出售收款继续使用 `query_collection_position` / `prepare_collection_batch`，不另造财务录入路径。
 
 按 [OpenAI 官方 MCP 配置文档](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) 配置绝对路径的 `node.exe` 与 `mcp-server.mjs`。移动包后重新运行 setup 并更新配置。连接器和浏览器各自登录，网页确认必须与连接器同一账号。
 

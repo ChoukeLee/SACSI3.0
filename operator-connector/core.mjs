@@ -1,4 +1,4 @@
-export const VERSION = '0.4.0';
+export const VERSION = '0.5.0';
 export const PROTOCOL = '1.0';
 export function validateConfig(value) {
   if (value?.formatVersion !== 1) throw new Error('invalid_configuration');
@@ -81,6 +81,18 @@ export class OperatorClient {
     const draft=await this.api('bookings/drafts',{request,previewProof:preview.previewProof,...(replacesConfirmationId?{replacesConfirmationId}:{})});
     if (!/^\/operator\/daily-workflows\/[0-9a-f-]{36}$/.test(draft.confirmationPath??'')) throw new Error('invalid_confirmation_link');
     return {status:draft.status,requestId:request.requestId,preview:preview.preview,confirmationUrl:this.config.appUrl+draft.confirmationPath,notice:'仅创建确认单，未执行业务。请本人核对完整影响并在网页确认；未知结果按原号查询，禁止拆成单独写操作。'};
+  }
+  async bookingOperation(operation, body) {
+    if(!['options','preview','prepare','status'].includes(operation))throw new Error('connector_action_not_supported');
+    const manifest=await this.capabilities();
+    if(manifest.bookingOperations?.available!==true||manifest.bookingOperations.version!==1)throw new Error('booking_operations_upgrade_required');
+    if(operation==='status')return this.api(`booking-operations/status?requestId=${encodeURIComponent(body.requestId)}`);
+    if(operation!=='prepare')return this.api(`booking-operations/${operation}`,body);
+    const {replacesConfirmationId,...request}=body;
+    const preview=await this.api('booking-operations/prepare',request);
+    const draft=await this.api('booking-operations/drafts',{request,previewProof:preview.previewProof,...(replacesConfirmationId?{replacesConfirmationId}:{})});
+    if(!/^\/operator\/booking-operations\/[0-9a-f-]{36}$/.test(draft.confirmationPath??''))throw new Error('invalid_confirmation_link');
+    return {status:draft.status,requestId:request.requestId,preview:preview.preview,confirmationUrl:this.config.appUrl+draft.confirmationPath,notice:'仅准备确认单，未执行业务。请本人核对影响后确认。实际退款不是冲正；超时按原请求号查回，不换号重录。'};
   }
   async collection(operation, body) {
     const manifest = await this.capabilities();

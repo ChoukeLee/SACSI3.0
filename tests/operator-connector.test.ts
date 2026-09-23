@@ -8,6 +8,18 @@ const session=()=>({accessToken:'access-secret',refreshToken:'refresh-secret',us
 function memoryStore() {let value: ReturnType<typeof session>|null=session();return {load:async()=>value,save:async(v: ReturnType<typeof session>)=>{value=v;},remove:async()=>{value=null;}};}
 const reply=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
 describe('standalone employee connector',()=>{
+  it('refuses new operations on an older server without sending a draft',async()=>{
+    const transport=vi.fn().mockResolvedValue(reply(manifest));
+    await expect(new OperatorClient(config,memoryStore(),transport).bookingOperation('prepare',{requestId:request.requestId})).rejects.toThrow('booking_operations_upgrade_required');
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+  it('prepares booking operations with stable identity, never invoking confirmation',async()=>{
+    const transport=vi.fn().mockResolvedValueOnce(reply({...manifest,bookingOperations:{available:true,version:1}})).mockResolvedValueOnce(reply({previewProof:'proof',preview:{}})).mockResolvedValueOnce(reply({status:'awaiting_account_confirmation',confirmationPath:`/operator/booking-operations/${request.requestId}`}));
+    const result=await new OperatorClient(config,memoryStore(),transport).bookingOperation('prepare',{requestId:request.requestId,operation:'refund',replacesConfirmationId:request.requestId});
+    expect(result.confirmationUrl).toBe(`${config.appUrl}/operator/booking-operations/${request.requestId}`);
+    expect(transport.mock.calls.map(c=>c[0])).toEqual(['capabilities','booking-operations/prepare','booking-operations/drafts'].map(p=>`${config.appUrl}/api/operator/v1/${p}`));
+    expect(JSON.parse(transport.mock.calls[2][1].body)).toMatchObject({request:{requestId:request.requestId,operation:'refund'},replacesConfirmationId:request.requestId});
+  });
   it('blocks workflow draft creation when the database execution protocol is unavailable',async()=>{
     const transport=vi.fn().mockResolvedValue(reply({...manifest,dailyWorkflow:{version:1,readOnlyPlanning:true,executionAvailable:false}}));
     await expect(new OperatorClient(config,memoryStore(),transport).dailyWorkflow('prepare',{requestId:request.requestId})).rejects.toThrow('daily_workflow_upgrade_required');

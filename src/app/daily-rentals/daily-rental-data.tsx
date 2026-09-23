@@ -32,7 +32,7 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
       supabase.from("cleaning_tasks").select("id, unit_id, daily_booking_id, is_completed").eq("is_completed", false),
       supabase
         .from("payments")
-        .select("id, source_id, amount, payment_date, reversal_of_payment_id")
+        .select("id, source_id, amount, payment_date, reversal_of_payment_id, request_kind")
         .eq("source_type", "daily_booking")
         .order("payment_date", { ascending: false })
         .limit(200),
@@ -46,10 +46,10 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
         .limit(300),
       supabase
         .from("units")
-        .select("id, building_id, code, unit_no, floor_label, status, notes, unit_business_flags!inner(business_type, is_enabled, default_price_xof)")
+        .select("id, building_id, code, unit_no, floor_label, status, notes, reservation_holder_name, unit_business_flags!inner(business_type, is_enabled, default_price_xof)")
         .eq("unit_business_flags.business_type", "daily_rental")
         .eq("unit_business_flags.is_enabled", true)
-        .in("status", ["available", "reserved", "daily_occupied", "cleaning_pending", "maintenance"])
+        .in("status", ["available", "reserved", "daily_occupied", "cleaning_pending", "maintenance", "locked"])
         .order("unit_no"),
     ]);
 
@@ -64,6 +64,7 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
     amount: number;
     payment_date: string;
     reversal_of_payment_id: string | null;
+    request_kind: string | null;
   }[] = [];
 
   if (!customersRes.error) {
@@ -99,7 +100,7 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
     if (missingBookingUnitIds.length > 0) {
       const { data: historyUnitsData, error: historyUnitsErr } = await supabase
         .from("units")
-        .select("id, building_id, code, unit_no, floor_label, status, notes")
+        .select("id, building_id, code, unit_no, floor_label, status, notes, reservation_holder_name")
         .in("building_id", buildingIds)
         .in("id", missingBookingUnitIds);
       if (!historyUnitsErr) historyUnits = (historyUnitsData as unknown as UnitRow[]) ?? [];

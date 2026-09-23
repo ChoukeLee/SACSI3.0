@@ -53,10 +53,18 @@ export function auditBusinessSummary(log: AuditLogRow, locale: Locale) {
   } : { natural_language: "Langage naturel", manual_form: "Formulaire", excel_screenshot: "Capture Excel", structured_batch: "Lot structuré" };
   const dailyPayment = log.entity_type === "daily_booking" && log.action === "supplementary_payment";
   const collectionPayment = log.action === "operator_collection_item";
-  const paymentAmount = dailyPayment || collectionPayment ? amount(meta.amount) : null;
-  const summary = paymentAmount !== null
+  const bookingPlan = meta.plan && typeof meta.plan === 'object' && !Array.isArray(meta.plan) ? meta.plan as Record<string,unknown> : {};
+  const operationMoney = ['operator_booking_reverse','operator_booking_refund'].includes(log.action);
+  const paymentAmount = dailyPayment || collectionPayment ? amount(meta.amount) : operationMoney ? amount(bookingPlan.amountXof) : null;
+  const bookingOperationNames: Record<string,string> = zh ? {
+    create:'新建日租预订',check_in:'办理入住（不收款）',cancel:'取消未入住预订',change_stay:'调整住期或房价',transfer:'转移未入住预订',correct_room:'纠正录错房号',reverse:'冲正错误收款（非实际退款）',refund:'登记实际退款',void_checkin:'撤销误入住',
+  } : {create:'Réservation',check_in:'Arrivée sans paiement',cancel:'Annulation',change_stay:'Dates ou tarif',transfer:'Transfert de réservation',correct_room:'Correction du logement',reverse:'Contrepassation (sans remboursement)',refund:'Remboursement réel',void_checkin:'Correction arrivée erronée'};
+  const bookingOperation = log.action.startsWith('operator_booking_') ? log.action.slice('operator_booking_'.length) : '';
+  const operationSummary = bookingOperationNames[bookingOperation]
+    ? `${bookingOperationNames[bookingOperation]}${paymentAmount !== null ? ` ${auditMoney(paymentAmount,locale)}` : ''}${bookingOperation==='correct_room' ? ` ${auditText(bookingPlan.unitCode)} → ${auditText(bookingPlan.targetUnitCode)}` : ''}` : '';
+  const summary = operationSummary || (paymentAmount !== null
     ? `${collectionPayment ? (zh ? "截图分账收款" : "Encaissement ventilé") : (zh ? "登记日租收款" : "Paiement journalier enregistré")} ${auditMoney(paymentAmount, locale)}`
-    : "";
+    : "");
   return {
     actor: auditActorText(log, locale), actorId: log.actor_id || "",
     channel: auditChannelLabel(auditChannel(log), locale), requestId,
@@ -64,8 +72,8 @@ export function auditBusinessSummary(log: AuditLogRow, locale: Locale) {
     agentId, summary,
     paymentAmount: paymentAmount === null ? "" : auditMoney(paymentAmount, locale),
     paymentDate: auditText(meta.payment_date), receiptNo: auditText(meta.receipt_no),
-    beforePaid: dailyPayment ? auditMoney(log.before_data?.prepaid_amount_xof, locale) : collectionPayment ? auditMoney(log.before_data?.paid_amount_xof, locale) : "",
-    afterPaid: dailyPayment ? auditMoney(log.after_data?.prepaid_amount_xof, locale) : collectionPayment ? auditMoney(log.after_data?.paid_amount_xof, locale) : "",
+    beforePaid: dailyPayment || bookingOperation ? auditMoney(log.before_data?.prepaid_amount_xof, locale) : collectionPayment ? auditMoney(log.before_data?.paid_amount_xof, locale) : "",
+    afterPaid: dailyPayment || bookingOperation ? auditMoney(log.after_data?.prepaid_amount_xof, locale) : collectionPayment ? auditMoney(log.after_data?.paid_amount_xof, locale) : "",
     sourceText: auditText(meta.source_text), lineId: auditText(meta.line_id), childRequestId: auditText(meta.child_request_id),
     instruction: auditText(meta.original_instruction),
     source: inputSources[auditText(meta.input_source)] || (zh ? "未记录 / 未识别" : "Non enregistré / inconnu"),

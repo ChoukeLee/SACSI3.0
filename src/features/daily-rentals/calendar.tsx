@@ -19,6 +19,7 @@ import { buildBookingMap, buildDailyRoomStateMap, getDailyRoomStateForDate } fro
 import { getPrimaryDailyAction } from "./daily-rental-policy";
 import { calculateBilling } from "./billing";
 import { qualifiedUnitNo } from "@/lib/unit-building-label";
+import { getUnitOperationalLabel } from "@/lib/unit-display";
 
 export interface CustomerSummary {
   id: string;
@@ -41,6 +42,7 @@ interface CalendarProps {
     amount: number;
     payment_date: string;
     reversal_of_payment_id?: string | null;
+    request_kind?: string | null;
   }[];
   locale: Locale;
   userRole?: string;
@@ -93,6 +95,7 @@ export function DailyCalendar({
     amount: number;
     payment_date: string;
     reversal_of_payment_id?: string | null;
+    request_kind?: string | null;
   }[]>([]);
   const [optimisticCleaningTasks, setOptimisticCleaningTasks] = useState<{ id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[]>([]);
   const [optimisticCompletedCleaningIds, setOptimisticCompletedCleaningIds] = useState<Set<string>>(() => new Set());
@@ -277,6 +280,7 @@ export function DailyCalendar({
             amount: Number(payment.amount),
             payment_date: payment.payment_date,
             reversal_of_payment_id: payment.reversal_of_payment_id ?? null,
+            request_kind: payment.request_kind ?? null,
           })),
           ...withoutBookingPayments.filter((payment) => !snapshotIds.has(payment.id)),
         ];
@@ -1153,7 +1157,7 @@ function TimelineCell({
 
   if (isMaintenance) {
     const statusLabel = unit.status === "locked"
-      ? (locale === "zh" ? "锁定" : "Bloque")
+      ? (getUnitOperationalLabel(unit, locale) || (locale === "zh" ? "锁定" : "Bloque"))
       : copy.maintenance;
     const statusTitle = unit.notes ? `${statusLabel} · ${unit.notes}` : statusLabel;
 

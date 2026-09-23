@@ -26,7 +26,7 @@ export function pendingStore(directory,site,crypt=protect) {
     list(actor){return load(actor).items.map(({requestId,kind,state,createdAt,updatedAt})=>({requestId,kind,state,createdAt,updatedAt}));},
     get(actor,id){const item=load(actor).items.find(x=>x.requestId===id);if(!item)throw new Error('pending_not_found');return structuredClone(item);},
     put(actor,item){
-      if(!/^[0-9a-f-]{36}$/i.test(item.requestId)||!['note','payment','collection','daily'].includes(item.kind))throw new Error('invalid_pending_request');
+      if(!/^[0-9a-f-]{36}$/i.test(item.requestId)||!['note','payment','collection','daily','booking_operation'].includes(item.kind))throw new Error('invalid_pending_request');
       const data=load(actor),index=data.items.findIndex(x=>x.requestId===item.requestId);
       if(index<0&&data.items.length>=500)throw new Error('pending_storage_full');
       const now=new Date().toISOString(),value={...item,createdAt:index<0?now:data.items[index].createdAt,updatedAt:now};

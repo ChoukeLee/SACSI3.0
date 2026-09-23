@@ -47,7 +47,19 @@ export async function GET(request: Request) {
     const version = await auth.supabase.rpc("daily_workflow_protocol_version");
     dailyExecutionAvailable = confirmationsEnabled() && !version.error && version.data === 1;
   } catch { /* Unpublished database workflow must remain unavailable. */ }
-  return NextResponse.json({ ...manifest, dailyWorkflow: { version: 1, readOnlyPlanning: true, executionAvailable: dailyExecutionAvailable }, collectionWorkflow: { available: collectionAvailable, version: 1,
+  let bookingOperationsAvailable = false;
+  try {
+    const version = await auth.supabase.rpc("booking_operations_protocol_version");
+    bookingOperationsAvailable = confirmationsEnabled() && !version.error && version.data === 1;
+  } catch { /* No published migration means no new write surface. */ }
+  const bookingOperationActions: Record<string,string[]> = {
+    create_daily_booking:['create'],check_in_daily_booking:['check_in'],cancel_no_show_booking:['cancel'],
+    transfer_daily_booking:['transfer','correct_room'],reverse_daily_payment:['reverse'],refund_daily_payment:['refund'],correct_daily_booking:['change_stay','void_checkin'],
+  };
+  const actions = manifest.actions.map(action => bookingOperationsAvailable && bookingOperationActions[action.name]
+    ? {...action,availability:'implemented',entryPoint:'booking_operations',supportedOperations:bookingOperationActions[action.name],confirmationRequired:true}
+    : action);
+  return NextResponse.json({ ...manifest, actions, bookingOperations: { available: bookingOperationsAvailable, version: 1, confirmationRequired: true, operations: Object.values(bookingOperationActions).flat() }, dailyWorkflow: { version: 1, readOnlyPlanning: true, executionAvailable: dailyExecutionAvailable }, collectionWorkflow: { available: collectionAvailable, version: 1,
     domains: ["daily", "lease", "sale"], maximumRows: 30, maximumAllocations: 100, confirmationRequired: true } }, {
     headers: {
       "Cache-Control": "private, no-store",

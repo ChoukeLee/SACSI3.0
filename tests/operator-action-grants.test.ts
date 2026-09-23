@@ -34,6 +34,11 @@ describe("operator action grants migration", () => {
 
   it("keeps the database catalog synchronized with every registered action", () => {
     for (const action of BUSINESS_ACTIONS) {
+      if (action.name === 'refund_daily_payment') {
+        const incremental = readFileSync('supabase/migrations/20260923135331_operator_booking_operations.sql','utf8');
+        expect(incremental).toContain("values('refund_daily_payment','daily_rental','L3',true,'登记实际日租退款',array['admin'])");
+        continue;
+      }
       expect(migration).toContain(`('${action.name}', '${action.domain}', '${action.risk}'`);
     }
   });

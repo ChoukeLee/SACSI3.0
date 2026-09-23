@@ -18,6 +18,7 @@ export const BUSINESS_ACTIONS = [
   { name: "cancel_no_show_booking", domain: "daily_rental", risk: "L3", write: true, allowedRoles: ["admin"], description: "取消未到店订单" },
   { name: "transfer_daily_booking", domain: "daily_rental", risk: "L3", write: true, allowedRoles: ["admin"], description: "转移日租订单与关联财务" },
   { name: "reverse_daily_payment", domain: "daily_rental", risk: "L3", write: true, allowedRoles: ["admin"], description: "反冲错误日租收款" },
+  { name: "refund_daily_payment", domain: "daily_rental", risk: "L3", write: true, allowedRoles: ["admin"], description: "登记实际日租退款（不是冲正）" },
   { name: "correct_daily_booking", domain: "daily_rental", risk: "L3", write: true, allowedRoles: ["admin"], description: "纠正日租业务记录" },
   { name: "apply_booking_credit", domain: "daily_rental", risk: "L3", write: true, allowedRoles: ["admin"], description: "转移日租可用余额" },
 

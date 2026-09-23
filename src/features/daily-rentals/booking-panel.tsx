@@ -37,6 +37,7 @@ interface BookingPanelProps {
     amount: number;
     payment_date: string;
     reversal_of_payment_id?: string | null;
+    request_kind?: string | null;
   }[];
   locale: Locale; onClose: () => void; onChanged: () => void;
   onBookingCreated?: (booking: DailyBookingRow) => void;
@@ -143,6 +144,7 @@ export function BookingPanel({
   );
   const bookingPayments = useMemo(() => payments.filter(p => p.source_id === booking?.id), [payments, booking]);
   const totalPaid = bookingPayments.reduce((s, p) => s + Number(p.amount), 0);
+  const actualRefunds = bookingPayments.filter(p => p.request_kind === 'daily_refund');
   const reversedPaymentIds = useMemo(
     () => new Set(bookingPayments.map((payment) => payment.reversal_of_payment_id).filter(Boolean)),
     [bookingPayments],
@@ -643,7 +645,7 @@ export function BookingPanel({
                             <span className={cn("font-semibold tabular-nums", isReversed ? "text-muted-foreground line-through" : "text-accentGreen-700")}>
                               {formatXof(Number(payment.amount))}
                             </span>
-                            {!readOnly && !isReversed && (
+                            {!readOnly && !isReversed && actualRefunds.length === 0 && (
                               <button
                                 type="button"
                                 className="rounded p-1 text-muted-foreground/60 transition-colors hover:bg-accentRed-50 hover:text-accentRed-600"
@@ -661,6 +663,11 @@ export function BookingPanel({
                       );
                     })}
                   </ul>}
+                  {actualRefunds.length > 0 && <div className="space-y-2 border-t pt-3 text-xs">
+                    <p>{locale === 'zh' ? '实际退款（不是错误收款冲正）' : 'Remboursements réels (hors contrepassations)'}</p>
+                    {actualRefunds.map(p => <p key={p.id} className="flex justify-between"><span>{p.payment_date}</span><span>{formatXof(Math.abs(Number(p.amount)))}</span></p>)}
+                    <p className="text-muted-foreground">{locale === 'zh' ? '此单已有实际退款，如需冲正原收款，请先联系管理员核对。' : 'Remboursement existant : consulter un administrateur avant toute contrepassation.'}</p>
+                  </div>}
                 </div>
               )}
             </section>

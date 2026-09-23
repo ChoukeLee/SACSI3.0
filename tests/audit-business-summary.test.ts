@@ -3,6 +3,15 @@ import { auditActorKey, auditActorText, auditBusinessSummary, auditChannel, audi
 import { auditFixture } from "./fixtures/audit-display";
 
 describe("human-readable audit evidence", () => {
+  it('distinguishes real refunds from reversal and includes the amount',()=>{
+    const refund=auditFixture({action:'operator_booking_refund',metadata:{plan:{amountXof:5000},channel:'external_codex'}});
+    expect(auditBusinessSummary(refund,'zh').summary).toBe('登记实际退款 5,000 XOF');
+    expect(auditBusinessSummary({...refund,action:'operator_booking_reverse'},'zh').summary).toBe('冲正错误收款（非实际退款） 5,000 XOF');
+  });
+  it('shows both room references in correction audit',()=>{
+    const log=auditFixture({action:'operator_booking_correct_room',metadata:{plan:{unitCode:'11-503',targetUnitCode:'11-504'}}});
+    expect(auditBusinessSummary(log,'zh').summary).toBe('纠正录错房号 11-503 → 11-504');
+  });
   it("keeps real entry account separate from the business agent", () => {
     const log = auditFixture();
     expect(auditBusinessSummary(log, "zh")).toMatchObject({ actor: `测试录入员 · ${log.actor_email}`, agent: "振咏（当前名称）",
