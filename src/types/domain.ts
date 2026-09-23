@@ -46,7 +46,7 @@ export type PaymentStatus = "pending" | "paid" | "overdue" | "cancelled";
 
 export type ContractStatus = "draft" | "active" | "terminated" | "expired";
 
-export type CurrencyCode = "XOF" | "CNY";
+export type CurrencyCode = "XOF" | "CNY" | "USD";
 
 export interface Building {
   id: string;

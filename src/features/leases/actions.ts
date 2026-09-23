@@ -6,7 +6,7 @@ import { createPrivilegedClient } from "@/lib/supabase/privileged";
 import { requireRole } from "@/lib/auth";
 import { computeStatus } from "@/lib/repositories/receivable-repo";
 import type { LeaseContractRow, ReceivableRow } from "@/types/database";
-import type { ContractStatus } from "@/types/domain";
+import type { ContractStatus, CurrencyCode } from "@/types/domain";
 import {
   createReceivable, cancelReceivablesForSource,
 } from "@/features/finance/receivables";
@@ -370,9 +370,12 @@ export async function recordLeaseFinancialEntry(input: {
   contractId: string;
   businessType: LeaseFinancialBusinessType;
   paymentDate: string;
-  amountXof: number;
+  amount: number;
+  currency: CurrencyCode;
+  exchangeRateToXof: number;
   paidThroughDate?: string;
   paymentMethod: "cash" | "check" | "bank_transfer" | "offset" | "other";
+  externalReceiptNo?: string;
   notes?: string;
   requestId?: string;
 }): Promise<{ success: boolean; referenceNo?: string; error?: string; warning?: string }> {
@@ -380,8 +383,15 @@ export async function recordLeaseFinancialEntry(input: {
   if (!LEASE_FINANCIAL_BUSINESS_TYPES.includes(input.businessType)) {
     return { success: false, error: "不支持的业务类型。" };
   }
-  if (!input.paymentDate || !Number.isFinite(input.amountXof) || input.amountXof <= 0) {
+  if (!input.paymentDate || !Number.isFinite(input.amount) || input.amount <= 0) {
     return { success: false, error: "请填写有效的日期和金额。" };
+  }
+  if (
+    !Number.isFinite(input.exchangeRateToXof)
+    || (input.currency === "XOF" && input.exchangeRateToXof !== 1)
+    || (input.currency !== "XOF" && input.exchangeRateToXof <= 0)
+  ) {
+    return { success: false, error: "请填写有效的历史汇率；XOF 汇率必须为1。" };
   }
   if (!input.paymentMethod) {
     return { success: false, error: "请选择付款方式，系统不会自动默认为现金。" };
@@ -395,30 +405,22 @@ export async function recordLeaseFinancialEntry(input: {
   const supabase = await createClient();
   const { data: contract, error: contractError } = await supabase
     .from("lease_contracts")
-    .select("id, unit_id, customer_id, contract_no, paid_through_date, deposit_amount_xof, unit:units(unit_no, building_id, building:buildings(code))")
+    .select("id, unit_id, customer_id, contract_no, paid_through_date, deposit_amount_xof")
     .eq("id", input.contractId)
     .single();
   if (contractError || !contract) return { success: false, error: "未找到对应长租合同。" };
-
-  const unit = Array.isArray(contract.unit) ? contract.unit[0] : contract.unit;
-  const building = Array.isArray(unit?.building) ? unit.building[0] : unit?.building;
-  const referencePrefix = buildLeaseFinancialReferencePrefix(
-    building?.code ?? "SACSI",
-    unit?.unit_no ?? "UNIT",
-    contract.contract_no,
-    input.businessType,
-    input.paymentDate,
-  );
   const requestId = input.requestId ?? crypto.randomUUID();
-  const { data, error } = await supabase.rpc("record_lease_financial_entry_rpc", {
+  const { data, error } = await supabase.rpc("record_lease_financial_entry_v2_rpc", {
     p_contract_id: contract.id,
     p_business_type: input.businessType,
     p_payment_date: input.paymentDate,
-    p_amount_xof: input.amountXof,
+    p_amount: input.amount,
+    p_currency: input.currency,
+    p_exchange_rate_to_xof: input.exchangeRateToXof,
     p_paid_through_date: input.paidThroughDate ?? null,
     p_payment_method: input.paymentMethod,
     p_notes: input.notes?.trim() || null,
-    p_reference_prefix: referencePrefix,
+    p_external_receipt_no: input.externalReceiptNo?.trim() || null,
     p_request_id: requestId,
   });
   if (error) return { success: false, error: error.message };

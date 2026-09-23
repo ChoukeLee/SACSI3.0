@@ -18,7 +18,7 @@ import { EmptyState } from "@/components/empty-state";
 import { FilterBar, MetricGrid, OperationalPage, RightDrawer, SegmentedControl, StatTile, controlClass } from "@/components/ui/operational";
 import type { RoomVisualStatus } from "@/lib/status-styles";
 import type { LeaseContractRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
-import type { ContractStatus } from "@/types/domain";
+import type { ContractStatus, CurrencyCode } from "@/types/domain";
 import { contractStatusVariant as statusVariant } from "@/lib/status-styles";
 import { printLeaseContract } from "@/features/print";
 import { createLeaseContract, activateContract, terminateContract, processMoveOut, recordLeaseFinancialEntry } from "./actions";
@@ -139,6 +139,9 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const [financeType, setFinanceType] = useState<LeaseFinancialBusinessType>("rent_income");
   const [financeDate, setFinanceDate] = useState(new Date().toISOString().slice(0, 10));
   const [financeAmountWan, setFinanceAmountWan] = useState(0);
+  const [financeCurrency, setFinanceCurrency] = useState<CurrencyCode>("XOF");
+  const [financeExchangeRate, setFinanceExchangeRate] = useState(1);
+  const [financeExternalReceiptNo, setFinanceExternalReceiptNo] = useState("");
   const [financePaidThrough, setFinancePaidThrough] = useState("");
   const [financeMethod, setFinanceMethod] = useState<"cash" | "check" | "bank_transfer" | "offset" | "other">("other");
   const [financeNotes, setFinanceNotes] = useState("");
@@ -192,31 +195,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const customerMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
   const buildingMap = useMemo(() => new Map(buildings.map((b) => [b.id, b])), [buildings]);
 
-  const receivablesByContract = useMemo(() => {
-    const m = new Map<string, ReceivableRow[]>();
-    for (const r of receivables) {
-      if (r.source_type !== "lease_contract" || r.status === "cancelled" || r.management_status === "historical_pending" || r.management_status === "excluded" || !r.source_id) continue;
-      const list = m.get(r.source_id) ?? [];
-      list.push(r);
-      m.set(r.source_id, list);
-    }
-    return m;
-  }, [receivables]);
-
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const dueSoonEnd = useMemo(() => addDaysToIso(todayStr, 15), [todayStr]);
-
-  const contractHasReceivable = (contractId: string, kind: "dueSoon" | "currentDue" | "overdue") => {
-    const related = receivablesByContract.get(contractId) ?? [];
-    return related.some((r) => {
-      const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
-      if (outstanding <= 0) return false;
-      const isOverdue = r.due_date < todayStr;
-      if (kind === "overdue") return isOverdue;
-      if (kind === "currentDue") return !isOverdue;
-      return !isOverdue && r.due_date >= todayStr && r.due_date <= dueSoonEnd;
-    });
-  };
 
   const filteredByStatus = useMemo(() => (
     statusFilter === "all"
@@ -273,6 +252,8 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
         today,
         paidThroughDate: contract.paid_through_date ?? null,
         monthlyRentXof: Number(contract.monthly_rent_xof),
+        contractStatus: contract.status,
+        actualEndDate: contract.actual_end_date,
       });
       const dueDate = overdueResolution?.dueDate ?? summary.earliestOutstandingDue ?? coverageDue;
       if (!dueDate) return [];
@@ -306,24 +287,17 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const actualOverdueRows = leaseAttention.overdue;
 
   const dashboardStats = useMemo(() => {
-    const scopedContractIds = new Set(filteredByBuilding.map((c) => c.id));
     const active = filteredByBuilding.filter((c) => c.status === "active");
-    let currentDue = 0;
-    for (const r of receivables) {
-      if (r.source_type !== "lease_contract" || r.status === "cancelled" || r.management_status === "historical_pending" || r.management_status === "excluded" || !r.source_id || !scopedContractIds.has(r.source_id)) continue;
-      const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
-      if (outstanding <= 0) continue;
-      if (r.due_date <= todayStr) currentDue += outstanding;
-    }
+    const currentDue = actualOverdueRows.reduce((sum, row) => sum + row.amount, 0);
     return {
       active: active.length,
       rent: active.reduce((sum, c) => sum + Number(c.monthly_rent_xof), 0),
-      dueSoon: leaseAttention.upcoming.filter((row) => !row.amountIsEstimated).length,
+      dueSoon: leaseAttention.upcoming.length,
       currentDue,
-      overdue: actualOverdueRows.filter((row) => !row.amountIsEstimated).reduce((sum, row) => sum + row.amount, 0),
-      overdueContracts: actualOverdueRows.filter((row) => !row.amountIsEstimated).length,
+      overdue: currentDue,
+      overdueContracts: actualOverdueRows.length,
     };
-  }, [actualOverdueRows, filteredByBuilding, leaseAttention.upcoming.length, receivables, todayStr]);
+  }, [actualOverdueRows, filteredByBuilding, leaseAttention.upcoming.length]);
 
   const leaseInsightContracts = useMemo(() => {
     return filteredByBuilding
@@ -355,27 +329,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       .sort((a, b) => (a.unit?.unit_no ?? "").localeCompare(b.unit?.unit_no ?? "", undefined, { numeric: true }));
   }, [customerMap, filteredByBuilding, receivables, todayStr, unitMap]);
 
-  const currentDueRows = useMemo(() => {
-    const scopedContracts = new Map(filteredByBuilding.map((contract) => [contract.id, contract]));
-    return receivables
-      .filter((r) => {
-        if (r.source_type !== "lease_contract" || r.status === "cancelled" || r.management_status === "historical_pending" || r.management_status === "excluded" || !r.source_id || !scopedContracts.has(r.source_id)) return false;
-        const outstanding = Number(r.amount_xof) - Number(r.paid_amount_xof);
-        if (outstanding <= 0) return false;
-        return r.due_date <= todayStr;
-      })
-      .map((r) => {
-        const contract = scopedContracts.get(r.source_id!)!;
-        return {
-          receivable: r,
-          contract,
-          unit: unitMap.get(contract.unit_id),
-          customer: customerMap.get(contract.customer_id),
-          outstanding: Math.max(0, Number(r.amount_xof) - Number(r.paid_amount_xof)),
-        };
-      })
-      .sort((a, b) => a.receivable.due_date.localeCompare(b.receivable.due_date));
-  }, [customerMap, filteredByBuilding, receivables, todayStr, unitMap]);
+  const currentDueRows = actualOverdueRows;
 
   const contractReceivables = useMemo(() => selectedId ? receivables.filter(r => r.source_type === "lease_contract" && r.source_id === selectedId && r.status !== "cancelled") : [], [receivables, selectedId]);
   const contractPayments = useMemo(() => selectedId ? payments.filter((p) => p.source_id === selectedId) : [], [payments, selectedId]);
@@ -441,15 +395,22 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       contractId: selectedId,
       businessType: financeType,
       paymentDate: financeDate,
-      amountXof: Math.round(financeAmountWan * 10000),
+      amount: financeCurrency === "XOF" ? Math.round(financeAmountWan * 10000) : financeAmountWan,
+      currency: financeCurrency,
+      exchangeRateToXof: financeCurrency === "XOF" ? 1 : financeExchangeRate,
       paidThroughDate: financePaidThrough || undefined,
       paymentMethod: financeMethod,
+      externalReceiptNo: financeExternalReceiptNo || undefined,
       notes: financeNotes || undefined,
       requestId,
     });
     setSaving(false);
     if (result.success) {
       financeRequestIdRef.current = null;
+      setFinanceAmountWan(0);
+      setFinanceCurrency("XOF");
+      setFinanceExchangeRate(1);
+      setFinanceExternalReceiptNo("");
       setPanel("detail");
       router.refresh();
     } else {
@@ -479,8 +440,8 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const statBlocks: Array<{ key: LeaseStatFilter; label: string; value: string; dot: string; hint: string }> = [
     { key: "active", label: locale==="zh"?"生效合同":"Actifs", value: String(dashboardStats.active), dot: "bg-accentGreen-500", hint: locale==="zh"?"点击查看生效合同":"Voir les contrats actifs" },
     { key: "rent", label: locale==="zh"?"月租规模":"Loyer/mois", value: formatXof(dashboardStats.rent), dot: "bg-accentBlue-500", hint: locale==="zh"?"点击查看产生月租的合同":"Voir les loyers actifs" },
-    { key: "dueSoon", label: locale==="zh"?"15天内应缴":"15j à payer", value: String(dashboardStats.dueSoon), dot: dashboardStats.dueSoon > 0 ? "bg-accentAmber-500" : "bg-muted-foreground/40", hint: locale==="zh"?"仅统计已生成应收":"Créances générées uniquement" },
-    { key: "currentDue", label: locale==="zh"?"已确认未收":"Dû confirmé", value: formatXof(dashboardStats.currentDue), dot: "bg-accentPurple-500", hint: locale==="zh"?"截至今日，不含历史待核":"À ce jour, historique exclu" },
+    { key: "dueSoon", label: locale==="zh"?"15天内应缴":"15j à payer", value: String(dashboardStats.dueSoon), dot: dashboardStats.dueSoon > 0 ? "bg-accentAmber-500" : "bg-muted-foreground/40", hint: locale==="zh"?"按合同缴费周期统计":"Selon le cycle du contrat" },
+    { key: "currentDue", label: locale==="zh"?"累计应收未收":"Dû cumulé", value: formatXof(dashboardStats.currentDue), dot: "bg-accentPurple-500", hint: locale==="zh"?"每开始一个租赁月累计一期":"Chaque période commencée est due" },
     { key: "overdue", label: locale==="zh"?"逾期":"En retard", value: formatXof(dashboardStats.overdue), dot: dashboardStats.overdue > 0 ? "bg-accentRed-500" : "bg-muted-foreground/40", hint: `${dashboardStats.overdueContracts}${locale==="zh"?"份 · 点击查看":" · voir"}` },
   ];
 
@@ -563,16 +524,25 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 const unit = unitMap.get(contract.unit_id);
                 const customer = customerMap.get(contract.customer_id);
                 const summary = getContractReceivableSummary(contract.id);
+                const relatedReceivables = receivables.filter((row) => row.source_type === "lease_contract" && row.source_id === contract.id && row.status !== "cancelled" && row.management_status !== "historical_pending" && row.management_status !== "excluded");
+                const accruedRent = contract.status === "active" ? resolveLeaseOverdue({
+                  receivables: relatedReceivables,
+                  today: todayStr,
+                  paidThroughDate: contract.paid_through_date ?? null,
+                  monthlyRentXof: Number(contract.monthly_rent_xof),
+                  contractStatus: contract.status,
+                  actualEndDate: contract.actual_end_date ?? null,
+                }) : null;
+                const displayedOutstanding = accruedRent?.amount ?? summary.outstanding;
                 const endConfirmed = isContractEndConfirmed(contract);
                 const daysLeft = endConfirmed ? Math.floor((new Date(contract.expected_end_date).getTime() - Date.now()) / 86400000) : null;
-                const isRisk = summary.overdue > 0 || (contract.status === "active" && daysLeft !== null && daysLeft >= 0 && daysLeft <= 30);
                 const isLongTerm = endConfirmed && contract.expected_end_date >= "2099-01-01";
                 const rent = Number(contract.monthly_rent_xof);
                 const isManaged = unit ? isManagedLeaseUnit(unit) : false;
                 const dataFlags = getLeaseDataFlags(contract, customer);
                 const paidThrough = contract.paid_through_date;
                 const paidPeriodStartsBeforeCutoff = paidThrough ? contract.start_date <= paidThrough : false;
-                const hasOverdueRent = summary.overdue > 0;
+                const hasOverdueRent = accruedRent !== null || summary.overdue > 0;
                 const nextRentIsFuture = !hasOverdueRent && !!summary.nextDue && summary.nextDue >= todayStr;
                 return (
                   <RoomCard key={contract.id} roomNo={unit?.unit_no ?? "-"} status={isManaged ? "managed" : "leased"} locale={locale}
@@ -605,13 +575,13 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                       )}
                     </div>
                     {/* Outstanding alert */}
-                    {summary.outstanding > 0 && (
+                    {displayedOutstanding > 0 && (
                       <p className={cn("text-[11px] font-medium leading-tight", hasOverdueRent ? "text-red-600" : "text-[#5D7186]")}>
                         {hasOverdueRent
                           ? (locale === "zh" ? "逾期未收" : "Impayé")
                           : nextRentIsFuture
                             ? (locale === "zh" ? "下期应收" : "Prochaine échéance")
-                            : (locale === "zh" ? "待收" : "Dû")}: {formatXof(summary.outstanding)}
+                            : (locale === "zh" ? "待收" : "Dû")}: {formatXof(displayedOutstanding)}
                         {nextRentIsFuture ? ` · ${summary.nextDue}` : ""}
                       </p>
                     )}
@@ -635,12 +605,12 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
           active: locale === "zh" ? "生效合同明细" : "Contrats actifs",
           rent: locale === "zh" ? "月租规模明细" : "Détail des loyers",
           dueSoon: locale === "zh" ? "15天内应缴" : "Échéances sous 15 jours",
-          currentDue: locale === "zh" ? "已确认未收" : "Montants confirmés dus",
+          currentDue: locale === "zh" ? "累计应收未收" : "Montants cumulés dus",
           overdue: locale === "zh" ? "逾期明细" : "Détail des retards",
         };
         const activeRows = leaseInsightContracts.filter((row) => row.contract.status === "active");
         const rentRows = [...activeRows].sort((a, b) => Number(b.contract.monthly_rent_xof) - Number(a.contract.monthly_rent_xof));
-        const noticeRows = statFilter === "dueSoon" ? leaseAttention.upcoming.filter((row) => !row.amountIsEstimated) : actualOverdueRows.filter((row) => !row.amountIsEstimated);
+        const noticeRows = statFilter === "dueSoon" ? leaseAttention.upcoming : actualOverdueRows;
 
         if (statFilter === "dueSoon" || statFilter === "overdue") {
           return (
@@ -668,7 +638,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                               <span className="text-sm font-semibold">{row.buildingName} · {row.unit.unit_no}</span>
                               <Badge variant={row.kind === "overdue" ? "destructive" : "warning"} className="h-5 px-2 text-[10px]">
                                 {row.kind === "overdue"
-                                  ? (row.amountIsEstimated ? (locale === "zh" ? "预估" : "Estimé") : `${locale === "zh" ? "逾期" : "Retard"} ${Math.abs(row.days)}${locale === "zh" ? "天" : "j"}`)
+                                  ? (row.amountIsEstimated ? (locale === "zh" ? "合同累计" : "Calcul contrat") : `${locale === "zh" ? "逾期" : "Retard"} ${Math.abs(row.days)}${locale === "zh" ? "天" : "j"}`)
                                   : `${row.days}${locale === "zh" ? "天后应缴" : "j"}`}
                               </Badge>
                             </div>
@@ -678,7 +648,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                         </div>
                         <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5" />{locale === "zh" ? "应缴日" : "Échéance"} {row.dueDate}</span>
-                          <span className="text-right">{row.amountIsEstimated ? (locale === "zh" ? "预估（按合同月租）" : "Estimé (selon loyer)") : (locale === "zh" ? "未结应收" : "Créance ouverte")}</span>
+                          <span className="text-right">{row.amountIsEstimated ? (locale === "zh" ? "按已缴至日期逐月累计" : "Cumul selon la date payée") : (locale === "zh" ? "未结应收" : "Créance ouverte")}</span>
                           <span>{locale === "zh" ? "已缴至" : "Payé au"} {row.paidThrough ?? (locale === "zh" ? "待补" : "À compléter")}</span>
                           <span className="flex items-center justify-end gap-1.5"><Phone className="h-3.5 w-3.5" />{row.customer?.phone || (locale === "zh" ? "电话待补" : "Téléphone à compléter")}</span>
                         </div>
@@ -699,21 +669,21 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
             <PanelShell onClose={() => setPanel(null)} title={titleMap[statFilter]} badge={<Badge variant="secondary">{currentDueRows.length}</Badge>}>
               <div className="space-y-4">
                 <div className="rounded-xl border border-purple-200 bg-purple-50/40 p-3">
-                  <p className="text-xs text-muted-foreground">{locale === "zh" ? "截至今日已确认未收合计" : "Total confirmé dû à ce jour"}</p>
-                  <p className="mt-1 text-xl font-semibold tabular-nums text-purple-700">{formatXof(currentDueRows.reduce((sum, row) => sum + row.outstanding, 0))}</p>
+                  <p className="text-xs text-muted-foreground">{locale === "zh" ? "截至今日累计应收未收合计" : "Total cumulé dû à ce jour"}</p>
+                  <p className="mt-1 text-xl font-semibold tabular-nums text-purple-700">{formatXof(currentDueRows.reduce((sum, row) => sum + row.amount, 0))}</p>
                 </div>
                 {currentDueRows.length === 0 ? (
-                  <EmptyState title={locale === "zh" ? "当前没有已确认未收款" : "Aucun montant confirmé dû"} />
+                  <EmptyState title={locale === "zh" ? "当前没有累计未收款" : "Aucun montant cumulé dû"} />
                 ) : (
                   <div className="space-y-2.5">
                     {currentDueRows.map((row) => (
-                      <div key={row.receivable.id} className="rounded-xl border border-border bg-card p-3.5">
+                      <div key={row.contract.id} className="rounded-xl border border-border bg-card p-3.5">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold">{row.unit?.unit_no ?? "-"} · {row.customer?.name ?? (locale === "zh" ? "客户待补" : "Client à compléter")}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">{locale === "zh" ? "应收日期" : "Échéance"} {row.receivable.due_date}</p>
+                            <p className="text-sm font-semibold">{row.buildingName} · {row.unit.unit_no} · {row.customer?.name ?? (locale === "zh" ? "客户待补" : "Client à compléter")}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{locale === "zh" ? "首个未覆盖日" : "Première échéance"} {row.dueDate}</p>
                           </div>
-                          <p className="shrink-0 text-sm font-semibold tabular-nums text-purple-700">{formatXof(row.outstanding)}</p>
+                          <p className="shrink-0 text-sm font-semibold tabular-nums text-purple-700">{formatXof(row.amount)}</p>
                         </div>
                         <Button size="sm" variant="outline" className="mt-3 w-full" onClick={() => openDetail(row.contract.id)}>
                           {locale === "zh" ? "查看合同并收款" : "Voir et encaisser"}<ChevronRight className="h-3.5 w-3.5" />
@@ -790,7 +760,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
               ]}
             />
             <p className="text-xs leading-relaxed text-muted-foreground">
-              {locale === "zh" ? "依据未结应收日期及租金已缴至日期汇总，便于安排人员联系收费。" : "Liste basée sur les créances ouvertes et la date de loyer payé au."}
+              {locale === "zh" ? "依据租金已缴至日期逐月累计；每开始一个租赁月即计入一期，并与现有应收、付款合并核对。" : "Cumul mensuel depuis la date payée, rapproché des créances et paiements existants."}
             </p>
             {(attentionTab === "overdue" ? leaseAttention.overdue : leaseAttention.upcoming).length === 0 ? (
               <EmptyState title={locale === "zh" ? "当前没有需要跟进的合同" : "Aucun contrat à suivre"} />
@@ -814,7 +784,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5" />{locale === "zh" ? "应缴日" : "Échéance"} {row.dueDate}</span>
-                      <span className="text-right">{row.amountIsEstimated ? (locale === "zh" ? "预估（按合同月租）" : "Estimé (selon loyer)") : (locale === "zh" ? "未结应收" : "Créance ouverte")}</span>
+                      <span className="text-right">{row.amountIsEstimated ? (locale === "zh" ? "按已缴至日期逐月累计" : "Cumul selon la date payée") : (locale === "zh" ? "未结应收" : "Créance ouverte")}</span>
                       <span>{locale === "zh" ? "已缴至" : "Payé au"} {row.paidThrough ?? (locale === "zh" ? "待补" : "À compléter")}</span>
                       <span className="flex items-center justify-end gap-1.5"><Phone className="h-3.5 w-3.5" />{row.customer?.phone || (locale === "zh" ? "电话待补" : "Téléphone à compléter")}</span>
                     </div>
@@ -962,10 +932,29 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 <DateInput value={financeDate} onChangeValue={setFinanceDate} className={inputClass} />
               </div>
               <div>
-                <label className={labelClass}>{locale === "zh" ? "金额（万 FCFA）" : "Montant (10k FCFA)"} *</label>
+                <label className={labelClass}>{financeCurrency === "XOF" ? (locale === "zh" ? "金额（万 FCFA）" : "Montant (10k FCFA)") : `${locale === "zh" ? "原币金额" : "Montant d'origine"} (${financeCurrency})`} *</label>
                 <input type="number" min={0} step="0.01" value={financeAmountWan || ""} onChange={(event) => setFinanceAmountWan(Number(event.target.value))} className={inputClass} />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>{locale === "zh" ? "原始币种" : "Devise d'origine"} *</label>
+                <select value={financeCurrency} onChange={(event) => { const currency = event.target.value as CurrencyCode; setFinanceCurrency(currency); setFinanceExchangeRate(currency === "XOF" ? 1 : 0); }} className={inputClass}>
+                  <option value="XOF">XOF / FCFA</option>
+                  <option value="CNY">CNY / RMB</option>
+                  <option value="USD">USD</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>{locale === "zh" ? `历史汇率（1 ${financeCurrency} = XOF）` : `Taux historique (1 ${financeCurrency} = XOF)`} *</label>
+                <input type="number" min={financeCurrency === "XOF" ? 1 : 0.000001} step="0.000001" value={financeCurrency === "XOF" ? 1 : financeExchangeRate || ""} disabled={financeCurrency === "XOF"} onChange={(event) => setFinanceExchangeRate(Number(event.target.value))} className={cn(inputClass, financeCurrency === "XOF" && "bg-muted/50")} />
+              </div>
+            </div>
+            {financeCurrency !== "XOF" && financeAmountWan > 0 && financeExchangeRate > 0 && (
+              <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                {locale === "zh" ? "折合入账" : "Équivalent comptable"}：{formatXof(financeAmountWan * financeExchangeRate)}
+              </p>
+            )}
             {getLeaseFinancialConfig(financeType).requiresPaidThrough && (
               <div>
                 <label className={labelClass}>{locale === "zh" ? "租金已缴至" : "Loyer payé au"} *</label>
@@ -996,6 +985,10 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
                 )}${locale === "zh" ? "-自动顺序" : "-auto"}`}
                 className={cn(inputClass, "bg-muted/50 text-xs text-muted-foreground")}
               />
+            </div>
+            <div>
+              <label className={labelClass}>{locale === "zh" ? "原始收据/银行凭证号（可选）" : "N° reçu / banque d'origine (facultatif)"}</label>
+              <input type="text" value={financeExternalReceiptNo} onChange={(event) => setFinanceExternalReceiptNo(event.target.value)} placeholder={locale === "zh" ? "仅作为凭证保存，不参与系统编号" : "Conservé comme justificatif uniquement"} className={inputClass} />
             </div>
             <div>
               <label className={labelClass}>{locale === "zh" ? "备注" : "Note"}</label>

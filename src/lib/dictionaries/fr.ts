@@ -502,7 +502,7 @@ export const frDict = {
     finance: {
       title: "Flux financiers",
       description: "Journal unique pour revenus journaliers, loyers, cautions, ventes et autres flux. Rapports en FCFA.",
-      metrics: [["Devises", "XOF/CNY", "Taux saisi manuellement"], ["Recu", "Champ requis", "Correspond au recu papier"], ["Comptabilite", "API reservee", "Export Excel/CSV d'abord"]],
+      metrics: [["Devises", "XOF/CNY/USD", "Taux historique par paiement"], ["Recu", "Champ requis", "Correspond au recu papier"], ["Comptabilite", "API reservee", "Export Excel/CSV d'abord"]],
       empty: "Aucune ecriture comptable.",
       directions: {
         income: "Revenu",

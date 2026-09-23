@@ -502,7 +502,7 @@ export const zhDict = {
     finance: {
       title: "财务流水",
       description: "统一记录日租收入、长租租金、押金、出售房款和其他收支；报表统一换算为万FCFA。",
-      metrics: [["币种", "XOF/CNY", "汇率手动录入"], ["收据编号", "必留字段", "匹配公司纸质收据"], ["会计接口", "预留接口", "当前先导出Excel/CSV"]],
+      metrics: [["币种", "XOF/CNY/USD", "按每笔历史汇率录入"], ["收据编号", "必留字段", "匹配公司纸质收据"], ["会计接口", "预留接口", "当前先导出Excel/CSV"]],
       empty: "暂无财务流水记录。",
       directions: {
         income: "收入",

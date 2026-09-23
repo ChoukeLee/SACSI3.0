@@ -235,6 +235,7 @@ export interface PaymentRow {
   currency: CurrencyCode;
   exchange_rate_to_xof: number;
   receipt_no: string | null;
+  external_receipt_no?: string | null;
   payment_method?: "cash" | "check" | "bank_transfer" | "offset" | "other" | null;
   notes: string | null;
   request_id?: string | null;

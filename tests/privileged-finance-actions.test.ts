@@ -21,7 +21,7 @@ describe("privileged finance actions", () => {
       leases.indexOf("export async function recordLeaseFinancialEntry"),
       leases.indexOf("export async function activateContract"),
     );
-    expect(leasePayment).toContain("record_lease_financial_entry_rpc");
+    expect(leasePayment).toContain("record_lease_financial_entry_v2_rpc");
     expect(leasePayment).toContain("await createClient()");
     expect(leasePayment).not.toContain("createPrivilegedClient");
     expect(read("src/features/sales/actions.ts")).not.toContain("createPrivilegedClient");

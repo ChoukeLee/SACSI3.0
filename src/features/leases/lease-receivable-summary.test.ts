@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ReceivableRow } from "@/types/database";
-import { resolveLeaseOverdue, summarizeLeaseReceivables } from "./lease-receivable-summary";
+import { countStartedLeasePeriods, resolveLeaseOverdue, summarizeLeaseReceivables } from "./lease-receivable-summary";
 
 function receivable(overrides: Partial<ReceivableRow>): ReceivableRow {
   return {
@@ -62,19 +62,21 @@ describe("resolveLeaseOverdue", () => {
       dueDate: "2026-08-01",
       amount: 650_000,
       source: "contract",
+      startedPeriods: 1,
     });
   });
 
-  it("keeps the real outstanding receivable authoritative", () => {
+  it("reconciles a materialized receivable without stopping later rent accrual", () => {
     expect(resolveLeaseOverdue({
-      receivables: [receivable({ amount_xof: 750_000, due_date: "2026-07-21", status: "overdue" })],
-      today: "2026-08-05",
-      paidThroughDate: "2026-07-20",
-      monthlyRentXof: 750_000,
+      receivables: [receivable({ amount_xof: 950_000, due_date: "2026-07-01", status: "overdue" })],
+      today: "2026-09-23",
+      paidThroughDate: "2026-06-30",
+      monthlyRentXof: 950_000,
     })).toEqual({
-      dueDate: "2026-07-21",
-      amount: 750_000,
-      source: "receivable",
+      dueDate: "2026-07-01",
+      amount: 2_850_000,
+      source: "contract",
+      startedPeriods: 3,
     });
   });
 
@@ -88,6 +90,51 @@ describe("resolveLeaseOverdue", () => {
       dueDate: "2026-08-01",
       amount: 650_000,
       source: "contract",
+      startedPeriods: 1,
+    });
+  });
+
+  it("subtracts a partial payment from the accrued period", () => {
+    expect(resolveLeaseOverdue({
+      receivables: [receivable({ amount_xof: 1_000_000, paid_amount_xof: 300_000, due_date: "2026-08-01" })],
+      today: "2026-08-20",
+      paidThroughDate: "2026-07-31",
+      monthlyRentXof: 1_000_000,
+    })).toEqual({
+      dueDate: "2026-08-01",
+      amount: 700_000,
+      source: "receivable",
+      startedPeriods: 1,
+    });
+  });
+
+  it("caps accrual at the actual end date of a terminated contract", () => {
+    expect(resolveLeaseOverdue({
+      receivables: [],
+      today: "2026-09-23",
+      paidThroughDate: "2026-06-30",
+      monthlyRentXof: 950_000,
+      contractStatus: "terminated",
+      actualEndDate: "2026-07-10",
+    })).toEqual({
+      dueDate: "2026-07-01",
+      amount: 950_000,
+      source: "contract",
+      startedPeriods: 1,
+    });
+  });
+
+  it("uses due receivables when paid-through coverage is missing", () => {
+    expect(resolveLeaseOverdue({
+      receivables: [receivable({ amount_xof: 800_000, paid_amount_xof: 200_000, due_date: "2026-09-23" })],
+      today: "2026-09-23",
+      paidThroughDate: null,
+      monthlyRentXof: 800_000,
+    })).toEqual({
+      dueDate: "2026-09-23",
+      amount: 600_000,
+      source: "receivable",
+      startedPeriods: 0,
     });
   });
 
@@ -98,5 +145,20 @@ describe("resolveLeaseOverdue", () => {
 
     expect(summary.overdue).toBe(0);
     expect(summary.earliestOverdueDue).toBeNull();
+  });
+});
+
+describe("countStartedLeasePeriods", () => {
+  it("counts each started calendar-anchored period and rounds the current period up", () => {
+    expect(countStartedLeasePeriods("2026-07-01", "2026-09-08")).toBe(3);
+    expect(countStartedLeasePeriods("2026-07-17", "2026-09-16")).toBe(2);
+    expect(countStartedLeasePeriods("2026-07-17", "2026-09-17")).toBe(3);
+  });
+
+  it("clamps month-end anchors without drifting", () => {
+    expect(countStartedLeasePeriods("2026-01-31", "2026-02-27")).toBe(1);
+    expect(countStartedLeasePeriods("2026-01-31", "2026-02-28")).toBe(2);
+    expect(countStartedLeasePeriods("2026-01-31", "2026-03-30")).toBe(2);
+    expect(countStartedLeasePeriods("2026-01-31", "2026-03-31")).toBe(3);
   });
 });
