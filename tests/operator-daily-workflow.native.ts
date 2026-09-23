@@ -23,8 +23,19 @@ beforeAll(async()=>{
   const grants=read('20260914133925_add_operator_action_grants.sql');
   await db.query(grants.slice(grants.indexOf('insert into private.operator_action_catalog ('),grants.indexOf('create or replace function private.current_operator_action_allowed(')));
   for(const name of ['20260915150854_harden_operator_daily_payment_integrity.sql','20260915162247_add_operator_payment_confirmations.sql','20260915222405_add_operator_confirmation_reprepare.sql','20260916170356_harden_receivable_timestamp_search_path.sql','20260916173232_restrict_property_fee_rule_access.sql','20260922171433_operator_batch_collections.sql','20260923080038_operator_daily_workflow.sql'])await db.query(read(name));
+  await db.query(read('20260923082259_operator_pending_recovery.sql'));
 },45000);
 afterAll(async()=>{await cluster?.close();});
+it('finds a single-payment draft by original id with owner and permission isolation',async()=>{
+  const f=await seed(),request={protocolVersion:'1.0',connectorVersion:'0.4.0',requestId:f.request.requestId,actionName:'record_daily_payment',scope:'business_data',exceptionalBusinessCase:false,inputSource:'excel_screenshot',originalInstruction:'Synthetic recovery',input:{bookingId:f.booking,amountXof:10000,paymentDate:f.request.paymentDate}};
+  const snapshot=(await db.query('select public.daily_booking_operation_snapshot($1,null) v',[f.booking])).rows[0].v;
+  const draft=(await db.query("select public.create_operator_payment_confirmation($1,$2,now()+interval '5 minutes') v",[JSON.stringify(request),JSON.stringify(snapshot)])).rows[0].v;
+  const find=async()=> (await db.query('select public.find_operator_payment_confirmation($1) v',[f.request.requestId])).rows[0].v;
+  expect(await find()).toMatchObject({id:draft.id,status:'pending',verified:false});
+  const other=await seed();expect(await find()).toEqual({status:'not_found'});expect(other.actor).not.toBe(f.actor);
+  await login(db,f.actor);await db.query('select public.confirm_operator_payment($1)',[draft.id]);expect(await find()).toMatchObject({status:'completed',verified:false});
+  await db.query('reset role');await db.query("update public.user_profiles set role='boss' where id=$1",[f.actor]);await login(db,f.actor);await expect(find()).rejects.toThrow('confirmationForbidden');
+});
 
 async function seed(operation='extend_and_collect'){
   const actor=randomUUID(),project=randomUUID(),building=randomUUID(),unit=randomUUID(),customer=randomUUID(),booking=randomUUID();

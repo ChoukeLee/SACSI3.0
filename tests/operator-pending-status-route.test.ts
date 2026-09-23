@@ -1,0 +1,11 @@
+import {beforeEach,it,expect,vi} from 'vitest';
+const mock=vi.hoisted(()=>({rpc:vi.fn(),auth:vi.fn()}));
+vi.mock('@/features/business-actions/operator-request-auth',()=>({authenticateOperatorRequest:mock.auth}));
+import {GET} from '@/app/api/operator/v1/confirmations/status/route';
+const id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const req=(requestId=id)=>new Request(`http://localhost/api/operator/v1/confirmations/status?requestId=${requestId}`);
+beforeEach(()=>{vi.resetAllMocks();mock.auth.mockResolvedValue({authenticated:true,supabase:{rpc:mock.rpc}});});
+it('looks up original request and returns only a same-origin confirmation path',async()=>{mock.rpc.mockResolvedValue({data:{id,requestId:id,status:'completed',verified:false},error:null});const response=await GET(req());expect(response.status).toBe(200);expect(response.headers.get('cache-control')).toBe('private, no-store');expect(await response.json()).toMatchObject({status:'completed',verified:false,confirmationPath:`/operator/confirmations/${id}`});expect(mock.rpc).toHaveBeenCalledExactlyOnceWith('find_operator_payment_confirmation',{p_request_id:id});});
+it('rejects missing authentication before touching database',async()=>{mock.auth.mockResolvedValue({authenticated:false,reason:'missing_or_invalid_session'});expect((await GET(req())).status).toBe(401);expect(mock.rpc).not.toHaveBeenCalled();});
+it('rejects invalid ids',async()=>{expect((await GET(req('bad'))).status).toBe(400);expect(mock.rpc).not.toHaveBeenCalled();});
+it('keeps permission errors and outages fail-closed without leaking diagnostics',async()=>{mock.rpc.mockResolvedValueOnce({data:null,error:{message:'confirmationForbidden'}});expect((await GET(req())).status).toBe(403);mock.rpc.mockRejectedValueOnce(new Error('secret'));const response=await GET(req());expect(response.status).toBe(503);expect(await response.text()).not.toContain('secret');});

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { VERSION, validateConfig } from '../../operator-connector/core.mjs';
-export const packageFiles=['core.mjs','session-store.mjs','SessionProtection.cs','cli.mjs','login-prompt.mjs','human-output.mjs','runtime.mjs','mcp-tools.mjs','mcp-server.mjs','setup.mjs','login.cmd','check.cmd','logout.cmd','setup.cmd','README.md','EMPLOYEE_GUIDE.md'];
+export const packageFiles=['core.mjs','session-store.mjs','pending-store.mjs','pending-client.mjs','verify-package.mjs','SessionProtection.cs','cli.mjs','login-prompt.mjs','human-output.mjs','runtime.mjs','mcp-tools.mjs','mcp-server.mjs','setup.mjs','login.cmd','check.cmd','logout.cmd','pending.cmd','capture.cmd','recover-lock.cmd','setup.cmd','README.md','EMPLOYEE_GUIDE.md'];
 export async function buildPackage(value,purpose) {
   if(process.platform!=='win32') throw new Error('windows_packaging_required');
   const config=validateConfig(value), root=fileURLToPath(new URL('../../',import.meta.url));
