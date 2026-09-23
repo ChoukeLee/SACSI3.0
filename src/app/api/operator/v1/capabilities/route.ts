@@ -42,7 +42,12 @@ export async function GET(request: Request) {
     const version = await auth.supabase.rpc("operator_collection_protocol_version");
     collectionAvailable = confirmationsEnabled() && !version.error && version.data === 1;
   } catch { /* Older databases have no collection workflow. */ }
-  return NextResponse.json({ ...manifest, dailyWorkflow: { version: 1, readOnlyPlanning: true, executionAvailable: false }, collectionWorkflow: { available: collectionAvailable, version: 1,
+  let dailyExecutionAvailable = false;
+  try {
+    const version = await auth.supabase.rpc("daily_workflow_protocol_version");
+    dailyExecutionAvailable = confirmationsEnabled() && !version.error && version.data === 1;
+  } catch { /* Unpublished database workflow must remain unavailable. */ }
+  return NextResponse.json({ ...manifest, dailyWorkflow: { version: 1, readOnlyPlanning: true, executionAvailable: dailyExecutionAvailable }, collectionWorkflow: { available: collectionAvailable, version: 1,
     domains: ["daily", "lease", "sale"], maximumRows: 30, maximumAllocations: 100, confirmationRequired: true } }, {
     headers: {
       "Cache-Control": "private, no-store",

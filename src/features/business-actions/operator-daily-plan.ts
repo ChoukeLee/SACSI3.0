@@ -72,7 +72,7 @@ export function buildDailyChangePlan(request: DailyChangeRequest, snapshot: unkn
   return { ...base, status: "proposal_only" as const, bookingId: b.id, unitCode: u.code, operation: request.operation,
     pricingBasis: { nightlyRateXof: rate, nightsBefore: nights(b.check_in, b.check_out), nightsAfter: nights(b.check_in, date), currency: "XOF" },
     changes: {
-      checkOut: { before: b.check_out, after: date },
+      checkOut: { before: b.check_out, after: request.operation === "extend_and_collect" ? date : b.check_out },
       actualCheckOut: { before: b.actual_check_out ?? null, after: request.operation === "checkout_and_collect" ? date : b.actual_check_out ?? null },
       bookingStatus: { before: b.status, after: request.operation === "checkout_and_collect" ? "checked_out" : "checked_in" },
       totalXof: { before: total, after: totalAfter }, paidXof: { before: paid, after: paidAfter },

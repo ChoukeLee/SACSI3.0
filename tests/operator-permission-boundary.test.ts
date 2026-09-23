@@ -67,12 +67,13 @@ describe("live operator permission boundary (synthetic authentication and RPC)",
   it("rechecks permissions after a previously allowed manifest", async () => {
     rpc.mockResolvedValueOnce({ data: [capability], error: null })
       .mockResolvedValueOnce({ data: 1, error: null })
+      .mockResolvedValueOnce({ data: 1, error: null })
       .mockResolvedValueOnce({ data: false, error: null });
     expect((await GET(getRequest())).status).toBe(200);
     const response = await POST(postRequest());
     expect(response.status).toBe(403);
     expect((await response.json()).code).toBe("action_forbidden");
-    expect(rpc.mock.calls.map(([name]) => name)).toEqual(["get_my_operator_capabilities", "operator_collection_protocol_version", "can_execute_operator_action"]);
+    expect(rpc.mock.calls.map(([name]) => name)).toEqual(["get_my_operator_capabilities", "operator_collection_protocol_version", "daily_workflow_protocol_version", "can_execute_operator_action"]);
   });
 
   it("stops with a safe retryable error if permission checking throws", async () => {

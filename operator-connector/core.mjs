@@ -70,10 +70,17 @@ export class OperatorClient {
     return manifest;
   }
   async dailyWorkflow(operation, body) {
-    if (!['search','plan'].includes(operation)) throw new Error('connector_action_not_supported');
+    if (!['search','plan','prepare','status'].includes(operation)) throw new Error('connector_action_not_supported');
     const manifest = await this.capabilities();
     if (manifest.dailyWorkflow?.version !== 1 || manifest.dailyWorkflow?.readOnlyPlanning !== true) throw new Error('daily_workflow_upgrade_required');
-    return this.api(`bookings/${operation}`,body);
+    if (['prepare','status'].includes(operation) && manifest.dailyWorkflow.executionAvailable !== true) throw new Error('daily_workflow_upgrade_required');
+    if (operation === 'status') return this.api(`bookings/status?requestId=${encodeURIComponent(body.requestId)}`);
+    if (operation !== 'prepare') return this.api(`bookings/${operation}`,body);
+    const {replacesConfirmationId,...request}=body;
+    const preview=await this.api('bookings/prepare',request);
+    const draft=await this.api('bookings/drafts',{request,previewProof:preview.previewProof,...(replacesConfirmationId?{replacesConfirmationId}:{})});
+    if (!/^\/operator\/daily-workflows\/[0-9a-f-]{36}$/.test(draft.confirmationPath??'')) throw new Error('invalid_confirmation_link');
+    return {status:draft.status,requestId:request.requestId,preview:preview.preview,confirmationUrl:this.config.appUrl+draft.confirmationPath,notice:'仅创建确认单，未执行业务。请本人核对完整影响并在网页确认；未知结果按原号查询，禁止拆成单独写操作。'};
   }
   async collection(operation, body) {
     const manifest = await this.capabilities();

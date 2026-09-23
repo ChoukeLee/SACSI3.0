@@ -2,11 +2,14 @@
 import assert from 'node:assert/strict';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {createClient} from '@supabase/supabase-js';
+import {createServerClient} from '@supabase/ssr';
 import {localCredentials,localSql,safeFailure} from './lib/local-supabase-runtime.mjs';
 
 async function main(){
   const status=localCredentials(),options={auth:{persistSession:false,autoRefreshToken:false}};
   const admin=createClient(status.API_URL,status.SERVICE_ROLE_KEY,options),client=createClient(status.API_URL,status.ANON_KEY,options);
+  const cookies=new Map();
+  const browser=createServerClient(status.API_URL,status.ANON_KEY,{cookies:{getAll:()=>[...cookies].map(([name,value])=>({name,value})),setAll:values=>values.forEach(({name,value})=>cookies.set(name,value))}});
   const ids=Object.fromEntries(['project','building','unit','customer','booking','future','receivable'].map(key=>[key,randomUUID()]));
   const email=`workflow-${randomUUID()}@example.invalid`,password=randomBytes(24).toString('base64url');
   let userId;
@@ -40,11 +43,35 @@ async function main(){
     assert.equal(checkout.status,'proposal_only');assert.equal(checkout.cleaningRequired,true);
     assert.equal(localSql(`select count(*) from public.payments where source_id='${ids.booking}';`),'0');
     assert.equal(localSql(`select status::text from public.daily_bookings where id='${ids.booking}';`),'checked_in');
-    console.log('PASS: real local Auth, RLS/PostgREST joins, current+future search, extension/checkout proposals, no business execution; productionWrites=0');
+    assert.equal((await browser.auth.signInWithPassword({email,password})).error,null);
+    for(const operation of ['extend_and_collect','checkout_and_collect']){
+      const request={...base,requestId:randomUUID(),operation,effectiveCheckOut:operation==='extend_and_collect'?tomorrow:today,amountXof:operation==='extend_and_collect'?10000:20000};
+      const preview=await post('prepare',request);
+      const draft=await post('drafts',{request,previewProof:preview.previewProof});
+      const id=draft.confirmationPath.split('/').at(-1);
+      const endpoint=`http://127.0.0.1:3100/api/operator/v1/bookings/confirmations/${id}`;
+      assert.equal((await fetch(endpoint,{method:'POST',headers:{Authorization:`Bearer ${signed.data.session.access_token}`,Origin:'http://127.0.0.1:3100'}})).status,403);
+      const page=await fetch(`http://127.0.0.1:3100${draft.confirmationPath}`,{headers:{Cookie:[...cookies].map(([k,v])=>`${k}=${v}`).join('; ')}});
+      assert.equal(page.status,200);assert.ok((await page.text()).includes('整件业务确认'));
+      for(let retry=0;retry<2;retry++){
+        const response=await fetch(endpoint,{method:'POST',headers:{Origin:'http://127.0.0.1:3100',Cookie:[...cookies].map(([k,v])=>`${k}=${v}`).join('; ')}});
+        const result=await response.json();assert.equal(response.status,200,`${operation}: ${result.code??'failed'}`);assert.equal(result.verified,true);
+      }
+      assert.equal(localSql(`select count(*) from public.payments where request_id='${request.requestId}';`),'1');
+    }
+    assert.equal(localSql(`select status::text||':'||prepaid_amount_xof::int from public.daily_bookings where id='${ids.booking}';`),'checked_out:30000');
+    assert.equal(localSql(`select count(*) from public.audit_logs where actor_id='${userId}' and actor_email='${email}' and action='operator_daily_workflow';`),'2');
+    console.log('PASS: real local Auth, search/plans, signed previews, web confirmation pages, bearer denied, cookie atomic extension/checkout+collection, retry idempotency, identity audit; productionWrites=0');
   }finally{
     const signedOut=await client.auth.signOut();assert.equal(signedOut.error,null);
+    await browser.auth.signOut();
     if(userId){
       localSql(`begin;
+        delete from private.operator_daily_workflows where actor_id='${userId}';
+        delete from public.ledger_entries where payment_id in (select id from public.payments where source_id='${ids.booking}');
+        delete from public.payments where source_id='${ids.booking}';
+        delete from public.cleaning_tasks where daily_booking_id='${ids.booking}';
+        delete from public.daily_operation_requests where booking_id='${ids.booking}';
         delete from public.receivables where unit_id='${ids.unit}';
         delete from public.daily_bookings where id in ('${ids.booking}','${ids.future}');
         delete from public.unit_business_flags where unit_id='${ids.unit}';

@@ -8,6 +8,18 @@ const session=()=>({accessToken:'access-secret',refreshToken:'refresh-secret',us
 function memoryStore() {let value: ReturnType<typeof session>|null=session();return {load:async()=>value,save:async(v: ReturnType<typeof session>)=>{value=v;},remove:async()=>{value=null;}};}
 const reply=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
 describe('standalone employee connector',()=>{
+  it('blocks workflow draft creation when the database execution protocol is unavailable',async()=>{
+    const transport=vi.fn().mockResolvedValue(reply({...manifest,dailyWorkflow:{version:1,readOnlyPlanning:true,executionAvailable:false}}));
+    await expect(new OperatorClient(config,memoryStore(),transport).dailyWorkflow('prepare',{requestId:request.requestId})).rejects.toThrow('daily_workflow_upgrade_required');
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+  it('prepares workflow through signed preview without confirming or replacing the request id',async()=>{
+    const transport=vi.fn().mockResolvedValueOnce(reply({...manifest,dailyWorkflow:{version:1,readOnlyPlanning:true,executionAvailable:true}})).mockResolvedValueOnce(reply({previewProof:'proof',preview:{}})).mockResolvedValueOnce(reply({status:'awaiting_account_confirmation',confirmationPath:`/operator/daily-workflows/${request.requestId}`}));
+    const result=await new OperatorClient(config,memoryStore(),transport).dailyWorkflow('prepare',{requestId:request.requestId,replacesConfirmationId:request.requestId});
+    expect(result.confirmationUrl).toBe(`${config.appUrl}/operator/daily-workflows/${request.requestId}`);
+    expect(transport.mock.calls.map(c=>c[0])).toEqual(['capabilities','bookings/prepare','bookings/drafts'].map(p=>`${config.appUrl}/api/operator/v1/${p}`));
+    expect(JSON.parse(transport.mock.calls[2][1].body)).toEqual({request:{requestId:request.requestId},previewProof:'proof',replacesConfirmationId:request.requestId});
+  });
   it('checks collection database availability before sending a batch',async()=>{
     const transport=vi.fn().mockResolvedValue(reply(manifest));
     await expect(new OperatorClient(config,memoryStore(),transport).collection('prepare',{requestId:request.requestId})).rejects.toThrow('collection_upgrade_required');
