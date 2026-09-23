@@ -17,7 +17,7 @@ import {
 } from "@/lib/sacsi5-unit-display";
 import type { Locale, ManagementDict } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
-import { floorSortValue, formatXof, cn, sortUnitsForBuilding } from "@/lib/utils";
+import { floorSortValue, formatXof, cn, isMezzanineFloorLabel, sortUnitsForBuilding } from "@/lib/utils";
 import type {
   BuildingRow, UnitRow, DailyBookingRow, LeaseContractRow,
   SaleContractRow, CustomerRow,
@@ -47,6 +47,7 @@ function firstNumber(v: string | null | undefined): number | null {
 function getUnitFloorValue(u: UnitRow): number | null {
   const rawFloor = String(u.floor_label ?? "").trim();
   if (/^(G|G层|G楼|GF|G\/F|GROUND|GROUND FLOOR|RDC|底层|地面层)$/i.test(rawFloor)) return -1;
+  if (isMezzanineFloorLabel(rawFloor)) return -0.5;
   const f = firstNumber(u.floor_label); if (f !== null) return f;
   const n = firstNumber(u.unit_no); if (n === null) return null;
   return n >= 100 ? Math.floor(n / 100) : n;
@@ -58,7 +59,11 @@ function groupStatesByFloor(states: UnitState[], locale: Locale, buildingCode?: 
     const key = floor === null ? "__unknown__" : String(floor);
     const label = floor === null
       ? (locale === "zh" ? "未分层" : "Sans étage")
-      : floor === -1 ? (locale === "zh" ? "G层" : "RDC") : (locale === "zh" ? `${floor}层` : `Étage ${floor}`);
+      : floor === -1
+        ? (locale === "zh" ? "G层" : "RDC")
+        : floor === -0.5
+          ? (locale === "zh" ? "夹层" : "Mezzanine")
+          : (locale === "zh" ? `${floor}层` : `Étage ${floor}`);
     if (!groups.has(key)) groups.set(key, { key, label, sortValue: floor === null ? Number.MAX_SAFE_INTEGER : floorSortValue(s.unit.floor_label), states: [] });
     groups.get(key)!.states.push(s);
   }

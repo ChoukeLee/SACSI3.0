@@ -21,6 +21,10 @@ function firstNumber(value: string | null | undefined): number | null {
   return match ? Number(match[0]) : null;
 }
 
+export function isMezzanineFloorLabel(value: string | null | undefined): boolean {
+  return /^(M|MF|M\/F|MEZZANINE|MEZZANINE FLOOR|夹层|夾層)$/i.test(String(value ?? "").trim());
+}
+
 export function compareUnitNo(a: string | null | undefined, b: string | null | undefined) {
   const aText = String(a ?? "");
   const bText = String(b ?? "");
@@ -61,6 +65,7 @@ export function normalizeFloorLabel(floorLabel: string | null, unitNo: string): 
   if (floorLabel && floorLabel.trim()) {
     const raw = floorLabel.trim();
     if (/^(G|G层|G楼|GF|G\/F|GROUND|GROUND FLOOR|RDC|底层|地面层)$/i.test(raw)) return "G";
+    if (isMezzanineFloorLabel(raw)) return "夹层";
     // Strip "楼" and "层", extract the floor number, append "F"
     const cleaned = raw.replace(/[楼层]/g, "").trim();
     const match = cleaned.match(/\d+/);
@@ -75,6 +80,7 @@ export function floorSortValue(label: string): number {
   const raw = String(label ?? "").trim();
   if (!raw) return 9999;
   if (/^(G|G层|G楼|GF|G\/F|GROUND|GROUND FLOOR|RDC|底层|地面层)$/i.test(raw)) return -1;
+  if (isMezzanineFloorLabel(raw)) return -0.5;
   const cleaned = raw.replace(/[楼层]/g, "").trim();
   const match = cleaned.match(/-?\d+/);
   return match ? Number.parseInt(match[0], 10) : 9999;

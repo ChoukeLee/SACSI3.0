@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sortUnitsForBuilding } from "./utils";
+import { floorSortValue, normalizeFloorLabel, sortUnitsForBuilding } from "./utils";
 
 const units = [
   { unit_no: "A101", floor_label: "A座1F" },
@@ -28,5 +28,13 @@ describe("sortUnitsForBuilding", () => {
       "B102",
       "B103",
     ]);
+  });
+});
+
+describe("mezzanine floor labels", () => {
+  it("keeps the mezzanine between G and 1F", () => {
+    expect(normalizeFloorLabel("夹层", "01")).toBe("夹层");
+    expect(floorSortValue("G")).toBeLessThan(floorSortValue("夹层"));
+    expect(floorSortValue("夹层")).toBeLessThan(floorSortValue("1F"));
   });
 });
