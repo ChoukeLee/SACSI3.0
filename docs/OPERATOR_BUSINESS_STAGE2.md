@@ -70,3 +70,12 @@
 - 本次只改程序结构和迁移元数据，不创建业务测试账目、不修改人员角色。
 - 安全扫描保留既有公开 definer 函数及密码泄露检测未启用告警；新增私有表无策略是刻意禁止客户端直读，新增公开入口为 invoker。未借发布扩大权限或宣称全库零告警。
 - 后续由 `scripts/check-production-booking-operations.mjs <包目录> <完整提交号>` 核验实际线上版本、九项能力、身份、恢复端点及拒绝匿名/Bearer 确认；该脚本不创建确认单、不写业务数据。
+
+### 发布完成核验
+
+- 功能提交 `03bd6ec52f8ec47d53834b41a64fa2d30a47a28b` 已推送 main，GitHub CI 成功，Vercel 部署成功；普通账号实际读取 serverRelease 与该提交完全一致。
+- 0.5.0 独立进程线上验收通过：Chouke、九类新操作、四个恢复入口、匿名拒绝、Bearer 确认拒绝、待办 0，businessWrites=0。首次探测时服务器尚为旧版本，故版本断言拒绝；部署成功后重跑通过。
+- 本机包安装到 `%LOCALAPPDATA%/SACSI/connector/0.5.0/operator-0.5.0-production-candidate-9zNW00`，只修改原有 sacsi_operator 配置的两个路径，没有重复添加服务、删除会话或覆盖旧包。
+- 配置备份：`%USERPROFILE%/.codex/config.toml.before-sacsi-0.5.0-20260923-1437.bak`；升级/回滚材料：`work/operator-release-FlfwcS`。
+- 当前已运行的 Codex 会话仍需重启后验证新工具加载；独立进程验收不冒充当前对话已重载。人员实操仍由本人账号完成。
+- 全库安全扫描的既有告警需单独复核：[公开 definer 函数](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable)、[已登录角色 definer 函数](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable)、[密码泄露保护](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)。没有将这些告警误报为本轮已修复。
