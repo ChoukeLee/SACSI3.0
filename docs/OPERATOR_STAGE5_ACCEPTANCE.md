@@ -1,5 +1,20 @@
 # 第五阶段：待办、离线恢复、兼容和发布回滚
 
+## 最新发布结项（2026-09-23）
+
+用户已明确授权推送并更换本机连接器；第五阶段生产技术放行完成。以下“本地交付/尚未执行”内容保留为发布前验收记录，以本节为最新状态。
+
+- 功能提交 `fdaff519d60d1b2478d9fbbede6b9d11ec4d0c2d` 已推送 main；[GitHub CI](https://github.com/ChoukeLee/SACSI3.0/actions/runs/35838800096) 成功，[Vercel 部署](https://vercel.com/choukelees-projects/sacsi-3-0/8Hu1qJwGbtr8x5cYLMQQpLrq86Rt) 成功，线上普通账号返回相同 `serverRelease`。
+- 线上迁移记录 `20260923084356/operator_daily_workflow`、`20260923084357/operator_pending_recovery`，分别对应仓库 `20260923080038_operator_daily_workflow.sql` 与 `20260923082259_operator_pending_recovery.sql`。不改名历史文件，不重写历史收款。
+- 新增 7 个 public RPC 全为 invoker、空 search_path，anon 无执行权；私有组合确认表 RLS 开启、authenticated 无直接 SELECT 权，核验时 0 行。
+- `check-production-stage5.mjs` 通过：已登录 Chouke 普通业务账号、组合能力已开放、批次能力兼容、三个原请求号查询入口、空查询、匿名准备拒绝、Bearer 确认拒绝；本机待办 0 条，生产业务写入 0。初版核验脚本误用批次确认 URL 得到 404，修正为现有 `/collections/[id]` 后完整重测通过，不把失败轮计为通过。
+- 安全 advisors 前后 WARN 数量保持 8 个匿名 definer、25 个 authenticated definer、1 个密码泄漏保护；新私有表无客户端 policy 是有意禁止直读的 INFO。没有宣称全库没有历史警告，旧收据类型缺陷仍单列。
+- 完整 0.4.0 包已安装到 `C:/Users/Chouke/AppData/Local/SACSI/connector/0.4.0/operator-0.4.0-production-candidate-ifAk2n`；文件名保留候选构建身份，正式放行的是经过验证的同一组字节。哈希复核与独立 MCP 握手通过，15 个工具。旧 0.2.0 目录、加密会话和待办保留。
+- Codex 全局配置仅修改 `sacsi_operator` 的 command/args，其他内容逐字一致。原配置备份 `C:/Users/Chouke/.codex/config.toml.before-sacsi-0.4.0-20260923-0846.bak`。当前已运行对话不冒充热更新：重启 Codex 后才能确认当前进程载入新工具。小颖/黄姐实操仍按用户决定延期。
+- 工作区既有房态/经办人显示改动及测试保持未提交，未混入本次发布。此前确认的构建与回归证据见下文；本次 GitHub 干净 checkout CI 另行通过。
+
+## 发布前开发记录
+
 日期：2026-09-23。交付范围为本地开发、技术验收和发布材料；沿用“不每轮推送”的决定，不修改生产业务、部署或员工安装。生产发布和员工实际使用不能用本地测试代替。
 
 ## 已实现的完整流程
