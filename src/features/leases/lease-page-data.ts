@@ -25,7 +25,7 @@ const CONTRACT_FIELDS = [
   "id", "unit_id", "customer_id", "contract_no", "start_date", "expected_end_date",
   "expected_end_confirmed", "paid_through_date", "actual_end_date", "payment_cycle", "payment_day",
   "monthly_rent_xof", "deposit_amount_xof", "deposit_received", "rent_free_days", "signer_name",
-  "attachment_url", "status",
+  "attachment_url", "status", "updated_at",
 ].join(",");
 
 const PAYMENT_FIELDS = [

@@ -61,4 +61,8 @@
 
 08:17 UTC 已应用 `atomic_lease_lifecycle`，生产记录版本为 `20260924081716`，对应本地文件 `20260923183205_atomic_lease_lifecycle.sql`；平台应用时间与文件创建时间不同，不应因此重复执行。迁移前后合同、收款、流水、应收、结算及房源 6 表的行数与完整内容指纹一致，没有批量改写业务记录。
 
-当前应用正在发布；最终部署及只读验收结果见本轮发布记录。真实员工使用验收仍由后续实际使用完成，不以管理员或自动化核验代替。
+首次应用提交 `e01ec93` 已通过 GitHub 两项 CI 工作及 Vercel 部署。最终联查另补齐合同列表的 `updated_at` 字段，并增加页面数据加载行为测试，保证激活、终止、退租获得精确版本号；不能仅凭数据库测试通过就忽略页面输入链路。最终放行还须对部署后的实际版本执行普通账号只读核验。
+
+生产安全扫描中原有匿名 definer 告警 8 项、认证 definer 告警从 26 项降至 24 项，泄露密码保护未启用告警仍在，均不冒充已清零。新增私有请求表启用 RLS 且禁止客户端直读直写；无策略为刻意拒绝直接访问的提示，不应为了消除提示而放开。新公开 RPC 为 invoker，仅 authenticated 可调用，内部继续检查业务角色与项目范围。检查口径见 [函数权限告警](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable) 与 [密码保护](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)。
+
+真实员工使用验收仍由后续实际使用完成，不以管理员或自动化核验代替。本次不更换 0.5.0 员工连接器；没有新增真实客户测试账务。
