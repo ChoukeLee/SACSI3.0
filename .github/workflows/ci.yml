@@ -28,3 +28,17 @@ jobs:
         run: npm run validate
       - name: Test
         run: npm test
+
+  database:
+    name: Native database regression and clean rebuild
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Fresh loopback-only cluster; no production credentials or Docker required.
+      - run: npm run test:operator-concurrency

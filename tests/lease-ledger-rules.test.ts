@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const root = resolve(__dirname, "..");
 const ledger = readFileSync(resolve(root, "src/features/leases/lease-list.tsx"), "utf8");
 const loader = readFileSync(resolve(root, "src/features/leases/lease-lazy-view.tsx"), "utf8");
-const actions = readFileSync(resolve(root, "src/features/leases/actions.ts"), "utf8");
+const actions = readFileSync(resolve(root, "src/features/leases/lease-payment-actions.ts"), "utf8");
 const migration = readFileSync(
   resolve(root, "supabase/migrations/20260923162712_standardize_financial_references_and_currency_rules.sql"),
   "utf8",

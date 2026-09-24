@@ -1,0 +1,88 @@
+{
+  "formatVersion": 1,
+  "scope": "Fresh local application schema only; no hosted Auth/Storage configuration or production rows",
+  "baseline": {
+    "file": "20260916.application-schema.json",
+    "sha256": "6816fa8930d606dcd9c4ac66f5370967ad5a5da60b716165594768627c795dff"
+  },
+  "catalog": {
+    "file": "20260914133925_add_operator_action_grants.sql",
+    "sha256": "522e0bcd59d1d14c98ba06275f7038df5ac99897e6201cfb48f95403d96737e0"
+  },
+  "overlays": [
+    {
+      "file": "20260915150854_harden_operator_daily_payment_integrity.sql",
+      "sha256": "cf8f2c3bc4eb7b03c33c5912e53223a9d8c5f15dd45432b956a2bc0226202137"
+    },
+    {
+      "file": "20260915162247_add_operator_payment_confirmations.sql",
+      "sha256": "78027571a97721ba6ca9e27cfdbc59f9e2867ce75cc56d25125be5e343d0ee4d"
+    },
+    {
+      "file": "20260915222405_add_operator_confirmation_reprepare.sql",
+      "sha256": "104500980d45d61ca15b69a3e78ce8ade6513d5e6da5772367908a3791dd94e2"
+    },
+    {
+      "file": "20260916170356_harden_receivable_timestamp_search_path.sql",
+      "sha256": "10a40ac1132943a74394a4c885857cf4468e0e0b0a16ff36eba30d5009cbfd5a"
+    },
+    {
+      "file": "20260916173232_restrict_property_fee_rule_access.sql",
+      "sha256": "2fc23d75ff64a73c439098e2db20ca7f705c4d861769cbe0bc888a616f321000"
+    },
+    {
+      "file": "20260918084208_add_admin_duplicate_checkin_correction.sql",
+      "sha256": "85623bae36f3f1265ffb5aee5c567c09661b2bd5bb692ee585f92998667f6fa0"
+    },
+    {
+      "file": "20260922171433_operator_batch_collections.sql",
+      "sha256": "7311d13a3518e0ec1f2575b896e7bf43ac00f5a544627dd0c596274205a1ff73"
+    },
+    {
+      "file": "20260923080038_operator_daily_workflow.sql",
+      "sha256": "09ebe452a686bc3bd6793efd4794ecf34a31fdf35f88812fce7e9940abfeac3b"
+    },
+    {
+      "file": "20260923082259_operator_pending_recovery.sql",
+      "sha256": "ce66172aef8e7e3ea6b97184a35d007e92da8bae7434d917be916c1eed02a3ad"
+    },
+    {
+      "file": "20260923095940_fix_receipt_currency_type.sql",
+      "sha256": "384afebeaae13fe01e6d453c4f8e78c9620804b3ff46ab0c3c35821dba69d3c9"
+    },
+    {
+      "file": "20260923135331_operator_booking_operations.sql",
+      "sha256": "f7af7c998633f8e1d576f76200b68abd8a67188fc1ed3f7c46b5a9b6abf0c173"
+    },
+    {
+      "file": "20260923161338_add_usd_currency_support.sql",
+      "sha256": "226cf219bba2db255d4bdf402e71328f9b5876d0d79267903cf084ded0802043"
+    },
+    {
+      "file": "20260923162712_standardize_financial_references_and_currency_rules.sql",
+      "sha256": "afd11de401b5bfe0781ff3f5f43b48885c20cdee8c3ad9f4d0d68a6d5ac44a70"
+    },
+    {
+      "file": "20260923163547_fix_financial_reference_match_and_cleanup.sql",
+      "sha256": "d529801e49e31df5ebd8c00c74fbc0a7136e0efa4a8b52c7d896d3339d09978e"
+    },
+    {
+      "file": "20260923164629_support_sold_unit_property_fee_references.sql",
+      "sha256": "85f4d04752041d59ff65ce22582b1efed412a90f65392960a7e04b4438bb2df9"
+    },
+    {
+      "file": "20260923183205_atomic_lease_lifecycle.sql",
+      "sha256": "6175332075339ec2e9c7b08e02dac66d0276a612206976cf76f6330d50a6dd37"
+    }
+  ],
+  "excluded": [
+    {
+      "file": "20260918170000_add_fulo_daily_booking_agent_and_reassign_1102.sql",
+      "reason": "Historical business agent and booking reassignment; not synthetic seed"
+    },
+    {
+      "file": "20260923183000_grant_finance_controller_cimac_access.sql",
+      "reason": "Real employee account and project grant; not schema or synthetic seed"
+    }
+  ]
+}

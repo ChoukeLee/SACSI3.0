@@ -101,7 +101,8 @@ git diff --check
 
 ## 备份与恢复
 
-- GitHub Actions 每日执行 `scripts/backup-full.mjs`，产物保存 90 天。
+- GitHub Actions 配置每日执行 `scripts/backup-full.mjs`、产物保留 90 天，但这是部分 REST JSON 导出，不能当作完整灾备；近期实际执行情况尚未核验。
+- 2026-09-23 本地真实快照恢复演练通过；异地副本、独立密钥保管、定时完整备份及整站云端切换尚未完成，见 [灾备验收](DISASTER_RECOVERY.md)。
 - Supabase 建议开启 PITR 作为主要恢复能力。
 - 大型迁移前额外执行按业务域备份脚本。
 - `.env.local`、数据库导出和凭证文件不得提交到 Git。

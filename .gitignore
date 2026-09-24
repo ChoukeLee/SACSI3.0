@@ -9,6 +9,7 @@ coverage
 *.tsbuildinfo
 outputs/
 work/
+/output/pdf/recovery-key/
 docs/design/
 
 .vercel

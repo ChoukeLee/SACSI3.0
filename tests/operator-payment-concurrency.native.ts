@@ -28,7 +28,7 @@ async function waitForBlock(waiter: number, blocker: number) {
   while (Date.now() < deadline) {
     const row = (await owner.query<{ blocked: boolean }>("select $2::int = any(pg_blocking_pids($1::int)) blocked", [waiter, blocker])).rows[0];
     if (row.blocked) return;
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    await new Promise((resolve) => { setTimeout(resolve, 25); });
   }
   throw new Error("Second backend did not demonstrably wait on the first backend");
 }

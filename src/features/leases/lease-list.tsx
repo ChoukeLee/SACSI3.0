@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { leaseRequestIdentity, clearLeaseRequestIdentity } from "./lease-request-identity";
 import { Plus, AlertTriangle, FileText, DollarSign, LogOut, Printer, Eye, CalendarClock, Phone, ChevronRight } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
@@ -146,6 +147,9 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
   const [financeMethod, setFinanceMethod] = useState<"cash" | "check" | "bank_transfer" | "offset" | "other">("other");
   const [financeNotes, setFinanceNotes] = useState("");
   const financeRequestIdRef = useRef<string | null>(null);
+  const lifecycleBusy = useRef(false);
+  const [moCollectedConfirmed,setMoCollectedConfirmed]=useState(false);
+  const [moMethod,setMoMethod]=useState<"cash"|"check"|"bank_transfer"|"offset"|"other"|"">("");
   const financeSectionRef = useRef<HTMLDivElement | null>(null);
 
   const projects = useMemo(() => groupLeaseBuildings(buildings), [buildings]);
@@ -360,7 +364,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     setError("");
     setPanel("financeEntry");
   };
-  const openMoveOut = (id: string) => { setSelectedId(id); setPanel("moveout"); setError(""); const os = receivableStats.outstanding; setMoUnpaid(os > 0 ? os : 0); setMoEndDate(new Date().toISOString().slice(0,10)); };
+  const openMoveOut = (id:string) => { setSelectedId(id); setPanel("moveout"); setError(""); setMoUnpaid(0); setMoDeduction(0); setMoRefund(0); setMoUtility(false); setMoCollectedConfirmed(false); setMoMethod(""); setMoEndDate(new Date().toISOString().slice(0,10)); };
 
   useEffect(() => {
     if (panel !== "detail" || detailSection !== "finance") return;
@@ -368,15 +372,38 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
     return () => window.cancelAnimationFrame(frame);
   }, [detailSection, panel, selectedId]);
 
-  const handleCreate = async () => { /* ... all existing validation logic kept ... */
-    if (!fUnitId || !fCustomerId || !fStartDate || !fEndDate) { setError(locale==="zh"?"请填写必填字段":"Champs obligatoires"); return; }
-    setSaving(true); setError("");
-    const result = await createLeaseContract({ unitId:fUnitId, customerId:fCustomerId, contractNo:generatedLeaseContractNo, startDate:fStartDate, expectedEndDate:fEndDate, paymentCycle:fCycle as never, paymentDay:fPayDay, monthlyRentXof:fRent, depositAmountXof:fDeposit, depositReceived:fDepositReceived, rentFreeDays:fFreeDays, signerName:fSigner||undefined, status:fStatus });
-    setSaving(false); if(result.success) { resetNewForm(); setPanel(null); router.refresh(); } else { setError(result.error??"Failed"); }
+  const runLifecycle = async (operation:string,target:string,payload:unknown,submit:(requestId:string)=>Promise<{success:boolean;error?:string;rejected?:boolean}>,done:()=>void) => {
+    if(lifecycleBusy.current)return;
+    lifecycleBusy.current=true;setSaving(true);setError("");
+    try {
+      const requestId=await leaseRequestIdentity(operation,target,payload);
+      const result=await submit(requestId);
+      if(result.success||result.rejected)clearLeaseRequestIdentity(operation,target);
+      if(result.success){done();router.refresh();}
+      else setError((result.error??"操作失败")+(result.rejected?"":"；结果可能未知，请保留原内容重试。操作号："+requestId));
+    } catch(error) {setError(error instanceof Error?error.message:"结果未知，请保留原内容重试。");}
+    finally {lifecycleBusy.current=false;setSaving(false);}
   };
-  const handleActivate = async (id: string) => { setSaving(true); setError(""); const result = await activateContract(id); setSaving(false); if(!result.success) setError(result.error??"Failed"); else router.refresh(); };
-  const handleTerminate = async (id: string) => { setSaving(true); setError(""); const result = await terminateContract(id); setSaving(false); if(!result.success) setError(result.error??"Failed"); else router.refresh(); };
-  const handleMoveOut = async () => { if(!selectedId)return;const currentId=selectedId;setSaving(true);setError("");const result=await processMoveOut({contractId:currentId,actualEndDate:moEndDate,unpaidRentXof:moUnpaid,utilityCleared:moUtility,depositDeductionXof:moDeduction,depositRefundXof:moRefund});setSaving(false);if(result.success){setPanel(null);router.refresh();}else setError(result.error??"Failed");};
+  const handleCreate = async () => {
+    if (!fUnitId || !fCustomerId || !fStartDate || !fEndDate) { setError(locale==="zh"?"请填写必填字段":"Champs obligatoires"); return; }
+    const payload={unitId:fUnitId,customerId:fCustomerId,contractNo:generatedLeaseContractNo,startDate:fStartDate,expectedEndDate:fEndDate,paymentCycle:fCycle,paymentDay:fPayDay,monthlyRentXof:fRent,depositAmountXof:fDeposit,depositReceived:fDepositReceived,rentFreeDays:fFreeDays,signerName:fSigner||undefined,status:fStatus};
+    await runLifecycle("create",fUnitId,payload,requestId=>createLeaseContract({...payload,requestId}),()=>{resetNewForm();setPanel(null);});
+  };
+  const handleActivate = async (id:string) => {
+    const contract=contracts.find(c=>c.id===id);if(!contract)return;
+    const payload={contractId:id,expectedUpdatedAt:contract.updated_at};
+    await runLifecycle("activate",id,payload,requestId=>activateContract(id,requestId,contract.updated_at),()=>{});
+  };
+  const handleTerminate = async (id:string) => {
+    const contract=contracts.find(c=>c.id===id);if(!contract)return;
+    const payload={contractId:id,expectedUpdatedAt:contract.updated_at};
+    await runLifecycle("terminate",id,payload,requestId=>terminateContract(id,requestId,contract.updated_at),()=>{});
+  };
+  const handleMoveOut = async () => {
+    if(!selected)return;
+    const payload={contractId:selected.id,expectedUpdatedAt:selected.updated_at,actualEndDate:moEndDate,unpaidRentXof:moUnpaid,utilityCleared:moUtility,depositDeductionXof:moDeduction,depositRefundXof:moRefund,rentCollectedConfirmed:moCollectedConfirmed,paymentMethod:moMethod||undefined};
+    await runLifecycle("move_out",selected.id,payload,requestId=>processMoveOut({...payload,requestId}),()=>setPanel(null));
+  };
   const handleFinanceEntry = async () => {
     if (!selectedId) return;
     if (financeAmountWan <= 0) {
@@ -811,7 +838,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
           <div className="grid grid-cols-2 gap-3"><div><label className={labelClass}>{t.form.startDate}</label><DateInput value={fStartDate} onChangeValue={setFStartDate} className={inputClass}/></div><div><label className={labelClass}>{t.form.expectedEndDate}</label><DateInput value={fEndDate} onChangeValue={setFEndDate} className={inputClass}/></div></div>
           <div className="grid grid-cols-3 gap-3"><div><label className={labelClass}>{t.form.paymentCycle}</label><select value={fCycle} onChange={e=>setFCycle(e.target.value)} className={inputClass}>{paymentCycles.map(pc=><option key={pc} value={pc}>{t.paymentCycle[pc as keyof typeof t.paymentCycle]}</option>)}</select></div><div><label className={labelClass}>{t.form.paymentDay}</label><input type="number" min={1} max={31} value={fPayDay} onChange={e=>setFPayDay(Number(e.target.value))} className={inputClass}/></div><div><label className={labelClass}>{t.form.monthlyRent}</label><input type="number" value={fRent} onChange={e=>setFRent(Number(e.target.value))} className={inputClass}/></div></div>
           <div className="grid grid-cols-2 gap-3"><div><label className={labelClass}>{t.form.deposit}</label><input type="number" value={fDeposit} onChange={e=>setFDeposit(Number(e.target.value))} className={inputClass}/></div><div><label className={labelClass}>{t.form.rentFreeDays}</label><input type="number" value={fFreeDays} onChange={e=>setFFreeDays(Number(e.target.value))} className={inputClass}/></div></div>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={fDepositReceived} onChange={e=>setFDepositReceived(e.target.checked)} className="h-4 w-4 rounded border"/>{t.form.depositReceived}</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={fDepositReceived} disabled={!canRecordFinance} onChange={e=>setFDepositReceived(e.target.checked)} className="h-4 w-4 rounded border"/>{t.form.depositReceived}{!canRecordFinance&&(locale==="zh"?"（请由财务账号登记实收）":" (à enregistrer par la finance)")}</label>
           <div><label className={labelClass}>{t.form.signerName}</label><input type="text" value={fSigner} onChange={e=>setFSigner(e.target.value)} className={inputClass}/></div>
           <div><label className={labelClass}>{t.form.statusLabel}</label><select value={fStatus} onChange={e=>setFStatus(e.target.value as ContractStatus)} className={inputClass}><option value="draft">{t.contractStatus.draft}</option><option value="active">{t.contractStatus.active}</option></select></div>
           {error&&<p className="text-sm text-red-600">{error}</p>}
@@ -1008,7 +1035,7 @@ export function LeaseList({ contracts, units, customers, payments, receivables, 
       )}
 
       {/* ── Move-out Panel ── */}
-      {panel==="moveout"&&selected&&(<PanelShell onClose={()=>setPanel(null)} title={t.settlement.moveOut}>{/* form kept identical to original */}{/*...*/}<div className="space-y-4"><div><label className={labelClass}>{t.form.actualEndDate}</label><DateInput value={moEndDate} onChangeValue={setMoEndDate} className={inputClass}/></div><div><label className={labelClass}>{locale==="zh"?"未付租金":"Loyer impaye"}</label><input type="number" value={moUnpaid} onChange={e=>setMoUnpaid(Number(e.target.value))} className={inputClass}/></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={moUtility} onChange={e=>setMoUtility(e.target.checked)}/>{locale==="zh"?"水电已结清":"Charges reglees"}</label><div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-muted-foreground">{locale==="zh"?"押金抵扣":"Retenue depot"}</label><input type="number" value={moDeduction} onChange={e=>setMoDeduction(Number(e.target.value))} className={inputClass}/></div><div><label className="text-xs text-muted-foreground">{locale==="zh"?"押金退还":"Remb. depot"}</label><input type="number" value={moRefund} onChange={e=>setMoRefund(Number(e.target.value))} className={inputClass}/></div></div>{error&&<p className="text-sm text-red-600">{error}</p>}<Button className="w-full" onClick={handleMoveOut} disabled={saving}>{saving?"...":locale==="zh"?"确认退租":"Confirmer"}</Button></div></PanelShell>)}
+      {panel==="moveout"&&selected&&(<PanelShell onClose={()=>setPanel(null)} title={t.settlement.moveOut}>{/* form kept identical to original */}{/*...*/}<div className="space-y-4"><div><label className={labelClass}>{t.form.actualEndDate}</label><DateInput value={moEndDate} onChangeValue={setMoEndDate} className={inputClass}/></div><div><label className={labelClass}>{locale==="zh"?"本次已实际补收租金（XOF）":"Loyer effectivement reçu (XOF)"}</label><input type="number" value={moUnpaid} onChange={e=>setMoUnpaid(Number(e.target.value))} className={inputClass}/></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={moUtility} onChange={e=>setMoUtility(e.target.checked)}/>{locale==="zh"?"水电已结清":"Charges reglees"}</label><div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-muted-foreground">{locale==="zh"?"押金扣除（非租金抵扣，XOF）":"Retenue hors loyer (XOF)"}</label><input type="number" value={moDeduction} onChange={e=>setMoDeduction(Number(e.target.value))} className={inputClass}/></div><div><label className="text-xs text-muted-foreground">{locale==="zh"?"本次实际退还押金（XOF）":"Dépôt effectivement remboursé (XOF)"}</label><input type="number" value={moRefund} onChange={e=>setMoRefund(Number(e.target.value))} className={inputClass}/></div></div><p className="text-xs text-muted-foreground">{locale==="zh"?"补收款只冲抵已有到期欠租；欠款不会自动记为已收。退还与扣除须等于核实后的剩余实收押金。":"Seuls les encaissements réels règlent les impayés existants. Le dépôt doit être vérifié."}</p><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={moCollectedConfirmed} onChange={e=>setMoCollectedConfirmed(e.target.checked)}/>{locale==="zh"?"我确认上述补收和退还均已实际发生":"Je confirme les encaissements et remboursements réels"}</label><div><label className={labelClass}>{locale==="zh"?"实际收退款方式（不同方式请分开登记后再结算）":"Mode de paiement réel"}</label><select className={inputClass} value={moMethod} onChange={e=>setMoMethod(e.target.value as typeof moMethod)}><option value="">{locale==="zh"?"请选择":"Choisir"}</option><option value="cash">{locale==="zh"?"现金":"Espèces"}</option><option value="check">{locale==="zh"?"支票":"Chèque"}</option><option value="bank_transfer">{locale==="zh"?"银行转账":"Virement"}</option><option value="offset">{locale==="zh"?"抵扣/转款":"Compensation"}</option><option value="other">{locale==="zh"?"其他":"Autre"}</option></select></div>{error&&<p className="text-sm text-red-600">{error}</p>}<Button className="w-full" onClick={handleMoveOut} disabled={saving}>{saving?"...":locale==="zh"?"确认退租":"Confirmer"}</Button></div></PanelShell>)}
     </OperationalPage>
   );
 }

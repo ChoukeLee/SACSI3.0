@@ -39,7 +39,7 @@ git diff --check
 
 CI 使用占位环境变量，不连接生产数据库。
 
-`.github/workflows/backup.yml` 每天 02:15 UTC 运行完整数据备份，备份产物保留 90 天。数据库应同时启用 Supabase PITR。
+`.github/workflows/backup.yml` 配置每天 02:15 UTC 运行历史部分 REST JSON 导出，产物配置保留 90 天；实际近期运行及保留情况尚未验证。它遗漏部分业务表、Auth 和 Storage 文件，不是完整灾备。2026-09-23 本地真实快照恢复演练已通过，但未替换此定时任务；范围及后续异地备份要求见 [灾备演练记录](DISASTER_RECOVERY.md)。Supabase PITR 是否启用、是否涉及费用需另行核实。
 
 ## Vercel
 

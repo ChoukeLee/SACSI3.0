@@ -1,5 +1,7 @@
 # 第二阶段技术验收（2026-09-16）
 
+> 历史验收记录，不代表当前发布状态。2026-09-23 起，当前结构重建请使用 `npm run test:db-rebuild`；下方全结构脚本需要 `--legacy-baseline`，只用于复现本文旧基线。最新工程证据见 [工程化验收](ENGINEERING_REFACTOR.md)。
+
 结论：**本地技术验收通过，可进入第三阶段员工试用准备；未发布线上，不代表员工已经试用通过。**
 
 ## 交付边界
@@ -36,10 +38,10 @@
 ## 可复现入口
 
 ```powershell
-node scripts/setup-local-full-schema.mjs
+node scripts/setup-local-full-schema.mjs --legacy-baseline
 # 仅在已验证隔离环境，且业务表/Auth 为空时执行：
-node scripts/setup-local-full-schema.mjs --apply
-node scripts/check-local-full-schema.mjs
+node scripts/setup-local-full-schema.mjs --legacy-baseline --apply
+node scripts/check-local-full-schema.mjs --legacy-baseline
 node scripts/check-local-payment-flow.mjs
 node scripts/start-local-operator-web.mjs
 # 另一个终端构建独立本地包，复制命令输出的路径：

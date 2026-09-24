@@ -19,7 +19,7 @@ async function unusedLoopbackPort() {
   const server = createServer();
   await new Promise<void>((ok, fail) => { server.once("error", fail); server.listen(0, "127.0.0.1", ok); });
   const port = (server.address() as AddressInfo).port;
-  await new Promise<void>((ok, fail) => server.close((error) => error ? fail(error) : ok()));
+  await new Promise<void>((ok, fail) => { server.close((error) => error ? fail(error) : ok()); });
   return port;
 }
 

@@ -7,7 +7,7 @@ let cluster:Awaited<ReturnType<typeof createNativePaymentPostgres>>;
 let owner:pg.Client,first:pg.Client,second:pg.Client;
 let firstPid:number,secondPid:number;
 async function begin(c:pg.Client){await c.query('begin');await c.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({sub:ids.actor,role:'authenticated',email:'test@invalid'})]);await c.query('set local role authenticated');}
-async function blocked(){for(let n=0;n<100;n++){if((await owner.query('select $2::int=any(pg_blocking_pids($1::int)) blocked',[secondPid,firstPid])).rows[0].blocked)return;await new Promise(r=>setTimeout(r,20));}throw new Error('Expected lock wait');}
+async function blocked(){for(let n=0;n<100;n++){if((await owner.query('select $2::int=any(pg_blocking_pids($1::int)) blocked',[secondPid,firstPid])).rows[0].blocked)return;await new Promise(r=>{setTimeout(r,20);});}throw new Error('Expected lock wait');}
 const settle=(p:Promise<pg.QueryResult>)=>p.then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
 beforeAll(async()=>{cluster=await createNativePaymentPostgres();owner=await cluster.connect();first=await cluster.connect();second=await cluster.connect();
   firstPid=(await first.query('select pg_backend_pid() id')).rows[0].id;secondPid=(await second.query('select pg_backend_pid() id')).rows[0].id;

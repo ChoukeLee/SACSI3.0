@@ -1,6 +1,6 @@
 # SACSI 3.0 系统架构
 
-更新时间：2026-09-07
+更新时间：2026-09-23（本地工程化整理；不表示已发布）
 
 ## 1. 产品边界
 
@@ -25,6 +25,8 @@ Next.js App Router
 ```
 
 读取通常使用当前登录会话的 Supabase 服务端客户端。需要跨多表原子写入的操作通过 Server Action 调用数据库 RPC；少数旧写入仍由通过角色守卫的服务端特权客户端执行，后续应逐步收敛到统一业务动作和 RPC。
+
+当前模块边界：日租 `calendar.tsx` 管理交互状态，`calendar-model.ts` 处理纯计算，`calendar-view-parts.tsx` / `calendar-finance-panel.tsx` 负责展示；订单提示在 `booking-presentation.ts`。长租 `actions.ts` 是兼容入口，合同、收款、退租分别在 `lease-*-actions.ts`；建约、激活、终止、结算及应收维护已收拢到认证 RPC 事务中，不再由服务端逐表写入（本地完成待发布，见 [长租事务化](LEASE_ATOMIC_TRANSACTIONS.md)）。预订操作的标签、动作对应关系和风险等级由 `booking-operation-contract.ts` 共享；它不是授权引擎，最终授权仍在服务端和数据库。
 
 ## 3. 核心路由
 
@@ -66,6 +68,8 @@ Next.js App Router
 
 ## 6. AI 接入
 
+主要录入方向是外部工具 + 独立员工连接器，内嵌工作台保留兼容。连接器通过 `/api/operator/v1/` 提供受控查询和草稿准备，员工通过本人网页登录确认；客户端不持有数据库管理员密钥。经办人、实际收款人和认证操作人是不同字段，不能以“经办人叫颖”推导审计身份。
+
 ```text
 文字/图片
   ↓
@@ -89,7 +93,11 @@ AI 只生成结构化建议，不直接写 SQL。AI 动作继承当前登录用�
 ## 7. 部署
 
 - GitHub `main` 是生产基线。
-- GitHub Actions 运行静态业务规则、类型检查、生产构建和测试。
+- GitHub Actions 配置运行 ESLint、渐进格式检查、静态业务规则、类型检查、生产构建和普通测试；新增独立原生 PostgreSQL 回归任务（当前本地未推送）。
 - Vercel 通过 GitHub 集成自动部署 `main`。
 - Supabase 迁移独立于 Vercel 部署；任何数据库修改都需单独备份、应用和核验。
 - Sentry 在配置 DSN 后采集浏览器、服务端和 Edge 错误。
+
+Docker 仅用于本机隔离 Supabase/Auth 集成环境，不在员工日常录入链路中。`npm run test:db-rebuild` 使用一次性原生 PostgreSQL 验证应用结构基线和审核增量，不需要 Docker，也不会读取 `.env.local`。它不是完整生产灾备恢复；Auth/Storage、密钥和业务数据需要另外的备份与恢复演练。
+
+本轮证据与已知债务见 [工程化验收](ENGINEERING_REFACTOR.md)，后续维护见 [发布与交接](ENGINEERING_HANDOFF.md)。

@@ -76,7 +76,7 @@ describe("core UI architecture", () => {
   });
 
   it("keeps the daily finance detail flush below the topbar without moving the page", () => {
-    const daily = read("src/features/daily-rentals/calendar.tsx");
+    const daily = read("src/features/daily-rentals/calendar.tsx") + read("src/features/daily-rentals/calendar-finance-panel.tsx");
 
     expect(daily).toContain('data-daily-calendar-root className="isolate space-y-5"');
     expect(daily).toContain('className="absolute inset-0 z-panel !mt-0 flex flex-col');

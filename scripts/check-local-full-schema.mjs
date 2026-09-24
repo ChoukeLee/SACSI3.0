@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { localSql, root, safeFailure } from './lib/local-supabase-runtime.mjs';
 try {
+  assert.ok(process.argv.includes('--legacy-baseline'), 'Historical 2026-09-16 comparison only. Use npm run test:db-rebuild for the current schema; explicit --legacy-baseline required for historical reproduction.');
   const baseline=JSON.parse(readFileSync(join(root,'supabase/baselines/20260916.application-schema.json'),'utf8'));
   const actual=JSON.parse(localSql(readFileSync(join(root,'scripts/sql/export-application-schema.sql'),'utf8')));
   const equal=(a,b,message)=>assert.deepEqual(JSON.parse(JSON.stringify(a).replaceAll('\\r\\n','\\n')),JSON.parse(JSON.stringify(b).replaceAll('\\r\\n','\\n')),message);

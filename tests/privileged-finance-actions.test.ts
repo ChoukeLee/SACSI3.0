@@ -7,7 +7,7 @@ const read = (path: string) => readFileSync(join(root, path), "utf8");
 
 describe("privileged finance actions", () => {
   it("keeps role guards on financial writes", () => {
-    const leases = read("src/features/leases/actions.ts");
+    const leases = read("src/features/leases/lease-payment-actions.ts");
     const sales = read("src/features/sales/actions.ts");
     const finance = read("src/features/finance/actions.ts");
     expect(leases).toContain("await guardLeaseFinance();");
@@ -16,11 +16,7 @@ describe("privileged finance actions", () => {
   });
 
   it("preserves the caller session for atomic lease and sale payments", () => {
-    const leases = read("src/features/leases/actions.ts");
-    const leasePayment = leases.slice(
-      leases.indexOf("export async function recordLeaseFinancialEntry"),
-      leases.indexOf("export async function activateContract"),
-    );
+    const leasePayment = read("src/features/leases/lease-payment-actions.ts");
     expect(leasePayment).toContain("record_lease_financial_entry_v2_rpc");
     expect(leasePayment).toContain("await createClient()");
     expect(leasePayment).not.toContain("createPrivilegedClient");
@@ -28,11 +24,13 @@ describe("privileged finance actions", () => {
     expect(read("src/features/finance/actions.ts")).toContain("const supabase = createPrivilegedClient();");
   });
 
-  it("keeps the legacy multi-table move-out privilege boundary explicitly guarded", () => {
-    const leases = read("src/features/leases/actions.ts");
+  it("moves settlement to one authenticated atomic RPC without a privileged client", () => {
+    const leases = read("src/features/leases/lease-moveout-actions.ts");
     const moveOut = leases.slice(leases.indexOf("export async function processMoveOut"));
-    expect(moveOut.indexOf("await guardLeaseFinance();")).toBeLessThan(moveOut.indexOf("createPrivilegedClient();"));
-    expect(moveOut).toContain("replaced by one");
-    expect(moveOut).toContain("atomic settlement RPC");
+    expect(moveOut).toContain("await guardLeaseFinance();");
+    expect(moveOut).toContain("lease_lifecycle_rpc");
+    expect(moveOut).toContain("await createClient()");
+    expect(moveOut).not.toContain("createPrivilegedClient");
+    expect(moveOut).not.toContain(".from(");
   });
 });

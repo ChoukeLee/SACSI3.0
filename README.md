@@ -15,7 +15,7 @@ SACSI 3.0 是科建地产使用的单租户房地产经营系统。系统以 Sup
 - 长租：合同、租金、物业费、押金、组合收款、应收和退租记录。
 - 出售：销售合同、付款计划、收款、退款及过户状态。
 - 经营数据：管理首页、财务流水、应收、报表、客户档案和数据质量。
-- 系统能力：Supabase Auth、角色权限、RLS、原子 RPC、幂等请求、审计日志、Sentry 和每日备份。
+- 系统能力：Supabase Auth、角色权限、RLS、原子 RPC、幂等请求、审计日志、Sentry 和历史部分数据定时导出（不等于完整灾备）。
 - AI 工作台：自然语言查询、持久化会话、有限上下文理解、受控操作草稿、人工确认，以及在统一输入框粘贴、拖入或选择图片凭证入账。
 
 ## 技术栈
@@ -73,8 +73,15 @@ npm run build
 ```bash
 npm run validate
 npm test
+npm run test:operator-concurrency
 git diff --check
 ```
+
+没有生产环境配置时，使用隔离 Supabase 环境执行 `node scripts/start-local-operator-web.mjs --build`；该脚本只复制白名单源码，不复制 `.env.local`。纯数据库重建检查可单独运行 `npm run test:db-rebuild`，仅创建临时本地集群。当前历史迁移不能全部重放；重建来源固定在 `supabase/baselines/rebuild-manifest.json`，任何变更需审核哈希与回归。ESLint 覆盖 src/tests，格式检查渐进覆盖本轮治理模块，不宣称历史代码已全部格式化。
+
+工程化范围和遗留风险见 [工程化验收](docs/ENGINEERING_REFACTOR.md)，开发、发布、恢复与人工验收步骤见 [维护交接](docs/ENGINEERING_HANDOFF.md)。
+
+2026-09-23 已完成真实快照的本地数据库/Auth/Storage 恢复演练；异地副本、定时完整备份和整站云端切换仍待落实，见 [灾备验收](docs/DISASTER_RECOVERY.md)。
 
 ## 主要目录
 

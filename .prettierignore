@@ -1,0 +1,8 @@
+node_modules/
+.next/
+work/
+output/
+outputs/
+tmp/
+supabase/baselines/*.json
+package-lock.json

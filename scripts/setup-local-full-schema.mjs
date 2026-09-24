@@ -7,6 +7,7 @@ import { buildLocalPaymentSchema, reviewedSlice } from './lib/local-payment-sche
 import { root, localSql, docker, project, safeFailure } from './lib/local-supabase-runtime.mjs';
 
 try {
+  assert.ok(process.argv.includes('--legacy-baseline'), 'Historical 2026-09-16 baseline only. Use npm run test:db-rebuild for the current schema; explicit --legacy-baseline required for historical reproduction.');
   const raw = readFileSync(join(root,'supabase/baselines/20260916.application-schema.json'),'utf8').replaceAll('\r\n','\n');
   const snapshot = JSON.parse(raw);
   const hash = createHash('sha256').update(raw).digest('hex');

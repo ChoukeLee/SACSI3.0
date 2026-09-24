@@ -1,31 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, afterAll, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
 import { createNativePaymentPostgres } from './helpers/native-payment-postgres';
-// @ts-expect-error Existing schema-only exporter is a Node module.
-import { applicationSchemaSql } from '../scripts/lib/application-schema.mjs';
+import { installApplicationRebuild } from './helpers/application-rebuild';
 
 let cluster:Awaited<ReturnType<typeof createNativePaymentPostgres>>;
 let db:Awaited<ReturnType<Awaited<ReturnType<typeof createNativePaymentPostgres>>['connect']>>;
-const read=(name:string)=>readFileSync(`supabase/migrations/${name}`,'utf8');
 beforeAll(async()=>{
   cluster=await createNativePaymentPostgres();db=await cluster.connect();
-  await db.query(`create role postgres superuser; create role anon; create role authenticated; create role service_role bypassrls;
-    create schema private; create schema extensions; create schema auth;
-    create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb,raw_app_meta_data jsonb);
-    create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb; $$;
-    create function auth.uid() returns uuid language sql stable as $$ select (auth.jwt()->>'sub')::uuid; $$;
-    create function auth.role() returns text language sql stable as $$ select auth.jwt()->>'role'; $$;
-    grant usage on schema auth to authenticated,anon,service_role;
-    begin;
-    ${applicationSchemaSql(JSON.parse(readFileSync('supabase/baselines/20260916.application-schema.json','utf8')))}
-    commit;`);
-  const grants=read('20260914133925_add_operator_action_grants.sql');
-  await db.query(grants.slice(grants.indexOf('insert into private.operator_action_catalog ('),grants.indexOf('create or replace function private.current_operator_action_allowed(')));
-  for(const name of ['20260915150854_harden_operator_daily_payment_integrity.sql','20260915162247_add_operator_payment_confirmations.sql','20260915222405_add_operator_confirmation_reprepare.sql','20260916170356_harden_receivable_timestamp_search_path.sql','20260916173232_restrict_property_fee_rule_access.sql','20260922171433_operator_batch_collections.sql','20260923080038_operator_daily_workflow.sql'])await db.query(read(name));
-  await db.query(read('20260923082259_operator_pending_recovery.sql'));
-  await db.query(read('20260918084208_add_admin_duplicate_checkin_correction.sql'));
-  await db.query(read('20260923135331_operator_booking_operations.sql'));
+  await installApplicationRebuild(db);
 },45000);
 afterAll(async()=>{await cluster?.close();});
 
