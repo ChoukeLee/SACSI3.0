@@ -73,6 +73,10 @@
     {
       "file": "20260923183205_atomic_lease_lifecycle.sql",
       "sha256": "6175332075339ec2e9c7b08e02dac66d0276a612206976cf76f6330d50a6dd37"
+    },
+    {
+      "file": "20260924083457_atomic_remaining_finance.sql",
+      "sha256": "29a544a89a119b526e3c1f5e98e04e9306481a327fe5ee3ea25cbaf8f5c6e33d"
     }
   ],
   "excluded": [

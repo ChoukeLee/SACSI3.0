@@ -26,7 +26,8 @@ describe("atomic contract payment rules", () => {
 
   it("uses a stable client request id and the atomic RPC", () => {
     expect(actions).toMatch(/rpc\("record_sale_payment_rpc"/);
-    expect(saleList).toMatch(/payRequestIdRef/);
+    expect(saleList).toMatch(/runOperation\("sale_payment"/);
+    expect(saleList).toMatch(/runFinanceRequest/);
     expect(saleList).toMatch(/crypto\.randomUUID\(\)/);
     expect(saleList).toMatch(/recordSalePaymentAtomic/);
   });

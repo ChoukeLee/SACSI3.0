@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
+import { submitFinanceOperation } from "@/features/finance/finance-operation-service";
 import { getSetting } from "@/lib/settings";
 import { createClient } from "@/lib/supabase/server";
 import type { UnitStatus } from "@/types/domain";
@@ -57,14 +58,7 @@ export async function runBusinessRepair(input: BusinessRepairInput): Promise<Bus
     const booking = await findLatestDailyBooking(unit.id);
     if (!booking) return { success: false, message: `房间 ${unitNo} 没有可同步的日租订单。` };
 
-    await syncBookingFinance(supabase, booking.id);
-    await writeAuditLog({
-      action: "business_repair_sync_daily_finance",
-      entityType: "daily_booking",
-      entityId: booking.id,
-      entityLabel: `房间 ${unitNo}`,
-      metadata: { unit_id: unit.id, unit_no: unitNo, note: input.note ?? null },
-    });
+    await syncBookingFinance(supabase, booking.id, { note: input.note });
     revalidateAll();
     return { success: true, message: `已同步房间 ${unitNo} 最近日租订单的应收、已收和结算状态。` };
   }
@@ -125,7 +119,7 @@ export async function runBusinessRepair(input: BusinessRepairInput): Promise<Bus
     const configuredStatus = await getSetting<UnitStatus>("undo_checkin_target_status", "reserved");
     const { data: booking, error } = await supabase
       .from("daily_bookings")
-      .select("id, unit_id, status, check_in, check_out")
+      .select("id, unit_id, status, check_in, check_out, updated_at")
       .eq("unit_id", unit.id)
       .eq("status", "checked_in")
       .order("check_in", { ascending: false })
@@ -135,20 +129,8 @@ export async function runBusinessRepair(input: BusinessRepairInput): Promise<Bus
     if (error) return { success: false, message: error.message };
     if (!booking) return { success: false, message: `房间 ${unitNo} 当前没有入住中的日租订单。` };
 
-    const beforeBooking = { status: booking.status };
-    await supabase.from("daily_bookings").update({ status: "confirmed" }).eq("id", booking.id);
-    await supabase.from("units").update({ status: configuredStatus }).eq("id", unit.id);
-    await syncBookingFinance(supabase, booking.id);
-
-    await writeAuditLog({
-      action: "business_repair_undo_check_in",
-      entityType: "daily_booking",
-      entityId: booking.id,
-      entityLabel: `房间 ${unitNo}`,
-      beforeData: beforeBooking,
-      afterData: { status: "confirmed", unit_status: configuredStatus },
-      metadata: { unit_id: unit.id, unit_no: unitNo, note: input.note ?? null },
-    });
+    const result = await submitFinanceOperation("daily_undo_checkin", { bookingId: booking.id, expectedUpdatedAt: booking.updated_at, targetStatus: configuredStatus, note: input.note }, crypto.randomUUID());
+    if (!result.success) return { success: false, message: result.error ?? "修复未确认，请核对原结果。" };
     revalidateAll();
     return { success: true, message: `已撤销房间 ${unitNo} 的误入住，订单回到已确认，房态改为${statusLabels[configuredStatus]}。` };
   }

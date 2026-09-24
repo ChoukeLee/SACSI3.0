@@ -17,6 +17,7 @@ import { RoomBoard } from "@/components/room-board";
 import { EmptyState } from "@/components/empty-state";
 import { FilterBar, MetricGrid, OperationalPage, RightDrawer, SegmentedControl, StatTile } from "@/components/ui/operational";
 import type { SaleContractRow, SalePaymentScheduleRow, UnitRow, CustomerRow, PaymentRow, ReceivableRow } from "@/types/database";
+import { runFinanceRequest } from "@/features/finance/finance-request";
 import { createSaleContract, recordSalePaymentAtomic, addFlexibleInstallment, updateTransferStatus, terminateSaleContract } from "./actions";
 import { buildSaleContractNumber } from "@/lib/contract-number";
 import { printSaleContract } from "@/features/print";
@@ -43,7 +44,6 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   const [fAgency, setFAgency] = useState(""); const [fAgent, setFAgent] = useState(""); const [fCommission, setFCommission] = useState(0); const [fCommissionPaid, setFCommissionPaid] = useState(false);
   const [payScheduleId, setPayScheduleId] = useState(""); const [payAmount, setPayAmount] = useState(0);
   const [payDate, setPayDate] = useState(new Date().toISOString().slice(0,10)); const [payReceiptNo, setPayReceiptNo] = useState("");
-  const payRequestIdRef = useRef<string | null>(null);
   const createRequestIdRef = useRef<string | null>(null);
   const [flexDueDate, setFlexDueDate] = useState(""); const [flexAmount, setFlexAmount] = useState(0);
   const [trStatus, setTrStatus] = useState("not_started"); const [trDate, setTrDate] = useState(""); const [trCertNo, setTrCertNo] = useState("");
@@ -224,10 +224,35 @@ export function SaleList({ contracts, schedules, units, customers, payments, rec
   }, [detailSection, panel, selectedId]);
 
   const handleCreate = async () => {if(!fUnitId||!fCustomerId||!fSignedDate||fTotalAmount<=0){setError(locale==="zh"?"请填写必填字段":"Champs obligatoires");return;}const requestId=createRequestIdRef.current??crypto.randomUUID();createRequestIdRef.current=requestId;setSaving(true);setError("");const r=await createSaleContract({unitId:fUnitId,customerId:fCustomerId,contractNo:generatedSaleContractNo,signedDate:fSignedDate,totalAmountXof:fTotalAmount,paymentPlanType:fPlanType,numInstallments:fPlanType==="fixed_installment"?fNumInstallments:undefined,agencyCompany:fAgency||undefined,agentName:fAgent||undefined,agencyCommissionXof:fCommission,agencyCommissionPaid:fCommissionPaid,requestId});setSaving(false);if(r.success){createRequestIdRef.current=null;setPanel(null);router.refresh();}else{setError(r.error??"Failed");}};
-  const handlePay = async () => {if(!payScheduleId||payAmount<=0){setError(locale==="zh"?"请选择分期并输入金额":"Champs obligatoires");return;}const currentScheduleId=payScheduleId;const requestId=payRequestIdRef.current??crypto.randomUUID();payRequestIdRef.current=requestId;setSaving(true);setError("");const r=await recordSalePaymentAtomic({contractId:selectedId!,scheduleId:currentScheduleId,amount:payAmount,paymentDate:payDate,receiptNo:payReceiptNo||undefined,requestId});setSaving(false);if(r.success){payRequestIdRef.current=null;setPayScheduleId("");setPayAmount(0);setPayReceiptNo("");router.refresh();}else setError(r.error??"Failed");};
-  const handleAddFlex = async () => {if(!flexDueDate||flexAmount<=0){setError(locale==="zh"?"请填写到期日和金额":"Champs obligatoires");return;}setSaving(true);setError("");setShowFlexForm(false);const r=await addFlexibleInstallment({contractId:selectedId!,installmentNo:contractSchedules.length+1,dueDate:flexDueDate,amountXof:flexAmount});setSaving(false);if(r.success){setFlexDueDate("");setFlexAmount(0);}else {setShowFlexForm(true);setError(r.error??"Failed");}};
-  const handleTransfer = async () => {if(!trDate){setError(locale==="zh"?"请选择过户日期":"Champs obligatoires");return;}const currentId=selectedId!;setSaving(true);setError("");setPanel(null);const r=await updateTransferStatus(currentId,trStatus,trDate,trCertNo||undefined);setSaving(false);if(!r.success){setSelectedId(currentId);setPanel("detail");setError(r.error??"Failed");}};
-  const handleTerminateSale = async () => {const currentId=selectedId!;setSaving(true);setError("");setPanel(null);const r=await terminateSaleContract(currentId,termReason||(locale==="zh"?"手动终止":"Manuel"));setSaving(false);if(!r.success){setSelectedId(currentId);setPanel("detail");setError(r.error??"Failed");}};
+  const handlePay = async () => {
+    if (!selectedId || !payScheduleId || payAmount <= 0) { setError(locale === "zh" ? "请选择分期并输入金额" : "Champs obligatoires"); return; }
+    const payload = { contractId: selectedId, scheduleId: payScheduleId, amount: payAmount, paymentDate: payDate, receiptNo: payReceiptNo || undefined };
+    await runOperation("sale_payment", payload, requestId => recordSalePaymentAtomic({ ...payload, requestId }), () => { setPayScheduleId(""); setPayAmount(0); setPayReceiptNo(""); });
+  };
+  const financeBusy = useRef(false);
+  const runOperation = async (operation:string,payload:unknown,submit:(requestId:string)=>Promise<{success:boolean;error?:string;rejected?:boolean}>,done:()=>void) => {
+    if(financeBusy.current || !selectedId)return;
+    financeBusy.current=true;setSaving(true);setError("");
+    try { const r=await runFinanceRequest(operation,selectedId,payload,submit);
+      if(r.success){done();router.refresh();}else setError(r.error??"操作失败");
+    } catch(e){setError(e instanceof Error?e.message:"结果未知，请核对原操作。");}
+    finally{financeBusy.current=false;setSaving(false);}
+  };
+  const handleAddFlex = async () => {
+    if(!selected || !flexDueDate || flexAmount<=0)return;
+    const payload={contractId:selected.id,installmentNo:Math.max(0,...contractSchedules.map(s=>s.installment_no))+1,dueDate:flexDueDate,amountXof:flexAmount,expectedUpdatedAt:selected.updated_at};
+    await runOperation("sale_installment",payload,requestId=>addFlexibleInstallment({...payload,requestId}),()=>{setShowFlexForm(false);setFlexDueDate("");setFlexAmount(0);});
+  };
+  const handleTransfer = async () => {
+    if(!selected || !trDate)return;
+    const payload={contractId:selected.id,status:trStatus,transferDate:trDate,titleCertificateNo:trCertNo||undefined,expectedUpdatedAt:selected.updated_at};
+    await runOperation("sale_transfer",payload,id=>updateTransferStatus(payload.contractId,payload.status,payload.transferDate,payload.titleCertificateNo,id,payload.expectedUpdatedAt),()=>setPanel(null));
+  };
+  const handleTerminateSale = async () => {
+    if(!selected)return;
+    const payload={contractId:selected.id,reason:termReason||(locale==="zh"?"手动终止":"Manuel"),expectedUpdatedAt:selected.updated_at};
+    await runOperation("sale_terminate",payload,id=>terminateSaleContract(payload.contractId,payload.reason,id,payload.expectedUpdatedAt),()=>setPanel(null));
+  };
 
   const inputClass="w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
   const labelClass="block text-xs font-semibold text-muted-foreground mb-1";

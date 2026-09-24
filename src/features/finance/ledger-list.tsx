@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Plus, X, Download } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
@@ -13,6 +13,7 @@ import { DataVizCard, MiniLineChart } from "@/components/ui/data-viz";
 import { FilterBar, FilterGroup, MetricGrid, SegmentedControl, StatTile, controlClass } from "@/components/ui/operational";
 import type { LedgerEntryRow } from "@/types/database";
 import { addLedgerEntry } from "./actions";
+import { runFinanceRequest } from "./finance-request";
 import { ReceiptThumb } from "@/components/attachments/receipt-thumb";
 import { SearchInput } from "@/components/ui/search-input";
 
@@ -180,16 +181,21 @@ export function LedgerList({ entries, units, buildingId, locale, attachments, ca
     return [...buckets.entries()].map(([month, value]) => ({ month, value }));
   }, [filtered]);
 
+  const manualBusy = useRef(false);
   const handleSave = async () => {
+    if (manualBusy.current) return;
+    manualBusy.current = true;
+    try {
     setSaving(true); setError("");
     setShowNewEntry(false);
-    const result = await addLedgerEntry({
+    const payload = {
       buildingId: buildingId ?? undefined,
       unitId: eUnitId || undefined,
       entryDate: eDate, direction: eDir, category: eCat,
-      amount: eAmount, currency: "XOF", exchangeRateToXof: 1,
+      amount: eAmount, currency: "XOF" as const, exchangeRateToXof: 1,
       description: eDesc || undefined, receiptNo: eReceiptNo || undefined,
-    });
+    };
+    const result = await runFinanceRequest("manual_entry", eUnitId || buildingId || "unallocated", payload, requestId => addLedgerEntry({...payload,requestId}));
     setSaving(false);
     if (result.success) {
       setEAmount(0); setEDesc(""); setEReceiptNo("");
@@ -197,6 +203,8 @@ export function LedgerList({ entries, units, buildingId, locale, attachments, ca
       setShowNewEntry(true);
       setError(result.error ?? (locale === "zh" ? "保存失败。" : "Échec de l'enregistrement."));
     }
+    } catch(error) { setShowNewEntry(true); setError(error instanceof Error ? error.message : "结果未知，请核对原操作。"); }
+    finally { manualBusy.current=false; setSaving(false); }
   };
 
   const handleExportCsv = async () => {

@@ -14,14 +14,8 @@ import {
   resolveUnitStatusAfterDailyChange,
   todayIso,
 } from "./daily-rental-policy";
-import {
-  createReceivable,
-  updateReceivableAmount,
-} from "@/features/finance/receivables";
-import {
-  syncBookingFinance,
-  insertLedgerEntry,
-} from "./daily-rental-finance";
+import { submitFinanceOperation } from "@/features/finance/finance-operation-service";
+
 import { writeAuditLog } from "@/lib/audit";
 import { isDailyBookingAgentName } from "./daily-booking-agents";
 
@@ -246,105 +240,18 @@ export async function createBooking(input: {
 
 export async function createBackfillBooking(input: {
   unitId: string; customerId: string; checkIn: string; checkOut: string;
-  nightlyPriceXof: number; prepaidAmountXof: number; reason: string;
-  notes?: string;
-}): Promise<DailyActionResult> {
+  nightlyPriceXof: number; prepaidAmountXof: number; reason: string; notes?: string; requestId: string;
+}) {
   await requireRole("admin");
   const supabase = await createClient();
   const agentCheck = await validateDailyBookingAgent(supabase, input.customerId);
-  if (!agentCheck.success) return { success: false, error: agentCheck.error };
+  if (!agentCheck.success) return { success: false, error: agentCheck.error, rejected: true };
   const unitCheck = await getDailyRentalUnit(supabase, input.unitId);
-  if (!unitCheck.success) return { success: false, error: unitCheck.error };
-
-  // Validate dates
-  if (!input.checkIn || !input.checkOut) return { success: false, error: "checkInRequired" };
-  if (input.checkOut <= input.checkIn) return { success: false, error: "invalidDateRange" };
-  if (input.checkIn >= todayIso()) return { success: false, error: "backfillMustBePastDate" };
-  if (input.checkOut > todayIso()) return { success: false, error: "backfillMustBeCompleted" };
-  if (input.nightlyPriceXof <= 0) return { success: false, error: "invalidPrice" };
-  if (input.prepaidAmountXof < 0) return { success: false, error: "invalidPrepaid" };
-
-  const nights = Math.max(1, Math.ceil(
-    (new Date(input.checkOut).getTime() - new Date(input.checkIn).getTime()) / (1000 * 60 * 60 * 24)
-  ));
-  const totalAmount = Math.round(input.nightlyPriceXof * nights);
-  const paidAmount = input.prepaidAmountXof;
-  const isSettled = paidAmount >= totalAmount;
-
-  // Insert as checked_out — no unit.status change, no cleaning task
-  const { data, error } = await supabase.from("daily_bookings").insert({
-    unit_id: input.unitId, customer_id: input.customerId,
-    check_in: input.checkIn,
-    check_out: input.checkOut,
-    checkout_mode: "fixed",
-    nightly_price_xof: input.nightlyPriceXof,
-    total_amount_xof: totalAmount,
-    final_amount_xof: totalAmount,
-    prepaid_amount_xof: paidAmount,
-    billing_status: isSettled ? "settled" : (paidAmount > 0 ? "partially_paid" : "need_top_up"),
-    status: "checked_out",
-    notes: `[历史补录] ${input.reason}${input.notes ? ` — ${input.notes}` : ""}`,
-  }).select("*").single();
-
-  if (error) return { success: false, error: error.message };
-
-  // Create receivable
-  await createReceivable({
-    building_id: unitCheck.unit.building_id ?? null,
-    unit_id: input.unitId,
-    customer_id: input.customerId,
-    source_type: "daily_booking",
-    source_id: data.id,
-    category: "daily_rental",
-    title: `日租(补录) ${data.check_in}–${input.checkOut}`,
-    due_date: input.checkIn,
-    amount_xof: totalAmount,
-    paid_amount_xof: paidAmount,
-    status: isSettled ? "paid" : (paidAmount > 0 ? "partial" : "pending"),
-    currency: "XOF",
-  });
-
-  // If money was received, record payment + ledger
-  if (paidAmount > 0) {
-    const { data: payment } = await supabase.from("payments").insert({
-      customer_id: input.customerId, unit_id: input.unitId,
-      source_type: "daily_booking", source_id: data.id,
-      payment_date: input.checkOut, amount: paidAmount, currency: "XOF", exchange_rate_to_xof: 1,
-    }).select("id").single();
-
-    if (payment) {
-      await insertLedgerEntry(supabase, {
-        bookingId: data.id, unitId: input.unitId, buildingId: unitCheck.unit.building_id ?? null,
-        paymentId: payment.id, amount: paidAmount, direction: "income",
-        entryDate: input.checkOut,
-        description: `日租历史补录 房间${unitCheck.unit.unit_no ?? "?"}`,
-      });
-    }
-  }
-
-  // Audit log
-  await writeAuditLog({
-    action: "daily_booking_backfill",
-    entityType: "daily_booking",
-    entityId: data.id,
-    metadata: {
-      reason: input.reason,
-      check_in: input.checkIn,
-      check_out: input.checkOut,
-      amount: totalAmount,
-      paid_amount: paidAmount,
-      unit_id: input.unitId,
-      customer_id: input.customerId,
-    },
-  });
-
-  // Revalidate all financial pages
-  revalidatePath("/"); revalidatePath("/fr");
-  revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
-  revalidatePath("/management"); revalidatePath("/fr/management");
-  revalidatePath("/finance"); revalidatePath("/fr/finance");
-
-  return { success: true, data: await getDailyOperationSnapshot(supabase, data.id, input.unitId) };
+  if (!unitCheck.success) return { success: false, error: unitCheck.error, rejected: true };
+  if (input.checkIn >= todayIso()) return { success: false, error: "backfillMustBePastDate", rejected: true };
+  const { requestId, ...payload } = input;
+  // Database writes the [历史补录] record, receivable, receipt, ledger and audit together; never changes units.status.
+  return submitFinanceOperation<DailyOperationSnapshot>("daily_backfill", payload, requestId);
 }
 
 // ── Confirm ──
@@ -385,9 +292,7 @@ export async function recordSupplementaryPayment(input: {
   const user = await guardWrite();
   if (input.amount <= 0) return { success: false, error: "金额必须大于 0。" };
   const supabase = await createClient();
-  // Open-ended stays accrue nightly. Persist today's current amount before the
-  // RPC checks whether the payment exceeds the outstanding balance.
-  await syncBookingFinance(supabase, input.bookingId);
+  // The database payment RPC accrues open stays inside the same transaction.
   const { data, error } = await supabase.rpc("daily_record_payment_rpc", {
     p_booking_id: input.bookingId,
     p_amount: input.amount,

@@ -18,11 +18,7 @@ export async function repairDailyRentalIssue(
   if (issueId.startsWith("dr_fin_amount_") || issueId.startsWith("dr_fin_prepaid_") || issueId.startsWith("dr_fin_rec_amt_") || issueId.startsWith("dr_fin_rec_paid_") || issueId.startsWith("dr_fin_billing_")) {
     const bookingId = entityId;
     try {
-      await syncBookingFinance(supabase, bookingId);
-      await supabase.from("audit_logs").insert({
-        action: "repair_finance", entity_type: "daily_booking", entity_id: bookingId,
-        metadata: { issue_id: issueId, repaired_at: new Date().toISOString() },
-      });
+      await syncBookingFinance(supabase, bookingId, { issueId });
       revalidate();
       return { success: true, message: `已同步财务数据` };
     } catch (e: unknown) {

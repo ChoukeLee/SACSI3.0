@@ -1,5 +1,6 @@
 "use client";
 
+import { runFinanceRequest } from "@/features/finance/finance-request";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Check, UserX, Printer, DollarSign, Percent, Trash2, MoreHorizontal, WalletCards, CalendarClock, ChevronDown, LogIn } from "lucide-react";
@@ -414,14 +415,15 @@ export function BookingPanel({
     setBfError("");
     await runPanelAction(
       async () => {
-        const result = await createBackfillBooking({
+        const payload = {
           unitId: bfUnitId, customerId: bfCustomerId,
           checkIn: bfCheckIn, checkOut: bfCheckOut,
           nightlyPriceXof: parseInt(bfNightlyPrice, 10) || 40000,
           prepaidAmountXof: parseInt(bfPaidAmount, 10) || 0,
           reason: bfReason,
           notes: bfNotes || undefined,
-        });
+        };
+        const result = await runFinanceRequest("daily_backfill",bfUnitId,payload,requestId=>createBackfillBooking({...payload,requestId}));
         if (result.success && result.data?.booking) onBookingCreated?.(result.data.booking);
         if (!result.success) setBfError(formatError(result.error));
         return result;

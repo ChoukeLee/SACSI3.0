@@ -1,14 +1,8 @@
 "use server";
-
-import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { createPrivilegedClient } from "@/lib/supabase/privileged";
 import { requireRole } from "@/lib/auth";
-import { convertToXof } from "@/lib/currency";
 import type { LedgerEntryRow } from "@/types/database";
 import type { CurrencyCode } from "@/types/domain";
-
-// ── Add ledger entry (manual) ──
+import { submitFinanceOperation } from "./finance-operation-service";
 
 export async function addLedgerEntry(input: {
   buildingId?: string;
@@ -22,52 +16,9 @@ export async function addLedgerEntry(input: {
   exchangeRateToXof: number;
   description?: string;
   receiptNo?: string;
-}): Promise<{ success: boolean; data?: LedgerEntryRow; error?: string }> {
+  requestId: string;
+}) {
   await requireRole("admin", "finance");
-
-  const supabase = createPrivilegedClient();
-
-  const amountXof = convertToXof(input.amount, input.currency, input.exchangeRateToXof);
-  const amountCny = input.currency === "CNY" ? input.amount : null;
-
-  const { data, error } = await supabase
-    .from("ledger_entries")
-    .insert({
-      building_id: input.buildingId ?? null,
-      unit_id: input.unitId ?? null,
-      payment_id: input.paymentId ?? null,
-      entry_date: input.entryDate,
-      direction: input.direction,
-      category: input.category,
-      amount_xof: amountXof,
-      amount_cny: amountCny,
-      description: input.description ?? null,
-    })
-    .select("*")
-    .single();
-
-  if (error) return { success: false, error: error.message };
-
-  if (input.receiptNo && (input.direction === "income" || input.direction === "liability_in")) {
-    await supabase.from("payments").insert({
-      source_type: "manual",
-      source_id: data.id,
-      payment_date: input.entryDate,
-      amount: input.amount,
-      currency: input.currency,
-      exchange_rate_to_xof: input.exchangeRateToXof,
-      receipt_no: input.receiptNo,
-    });
-  }
-
-  await supabase.from("audit_logs").insert({
-    action: "create",
-    entity_type: "ledger_entry",
-    entity_id: data.id,
-    metadata: { category: input.category, direction: input.direction, amount_xof: amountXof },
-  });
-
-  revalidatePath("/finance");
-  revalidatePath("/fr/finance");
-  return { success: true, data };
+  const { requestId, ...payload } = input;
+  return submitFinanceOperation<LedgerEntryRow>("manual_entry", payload, requestId);
 }

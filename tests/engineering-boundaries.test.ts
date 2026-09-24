@@ -46,3 +46,14 @@ it("runs database regression in CI and classifies new schema migrations", () => 
   );
   expect(recent.filter((name) => !classified.has(name))).toEqual([]);
 });
+it("keeps consolidated finance entry points free of direct multi-table writes", () => {
+  for (const file of [
+    "src/features/finance/actions.ts",
+    "src/features/finance/finance-operation-service.ts",
+    "src/features/sales/actions.ts",
+    "src/features/daily-rentals/daily-rental-finance.ts",
+  ]) {
+    expect(read(file)).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
+    expect(read(file)).not.toContain("createPrivilegedClient");
+  }
+});

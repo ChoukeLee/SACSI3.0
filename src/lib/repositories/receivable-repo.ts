@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ReceivableRow, ReceivableInsert, ReceivableUpdate } from "@/types/database";
+import type { ReceivableRow } from "@/types/database";
 
 export function createReceivableRepo(client: SupabaseClient) {
   const table = () => client.from("receivables");
@@ -42,75 +42,6 @@ export function createReceivableRepo(client: SupabaseClient) {
         .order("due_date");
       if (error) throw error;
       return data;
-    },
-
-    async create(input: ReceivableInsert): Promise<ReceivableRow> {
-      const { data, error } = await table().insert(input).select("*").single();
-      if (error) throw error;
-      return data;
-    },
-
-    async update(id: string, input: ReceivableUpdate): Promise<ReceivableRow> {
-      const { data, error } = await table().update(input).eq("id", id).select("*").single();
-      if (error) throw error;
-      return data;
-    },
-
-    /** Recompute paid_amount_xof from payments and sync status. */
-    async syncFromPayments(sourceType: string, sourceId: string): Promise<void> {
-      // Sum all payments linked to this source
-      const { data: payments } = await client
-        .from("payments")
-        .select("amount")
-        .eq("source_type", sourceType)
-        .eq("source_id", sourceId);
-
-      const totalPaid = (payments ?? []).reduce((s, p) => s + Number(p.amount), 0);
-
-      // Find all receivables for this source
-      const receivables = await this.getBySource(sourceType, sourceId);
-
-      if (receivables.length === 0) return;
-
-      // Distribute paid amount across receivables (simple: first receivable gets all, or prorated)
-      // For v1: if single receivable, update directly.
-      // If multiple (e.g. sale installments), distribute proportionally.
-      const activeReceivables = receivables.filter((r) => r.status !== "cancelled");
-      if (activeReceivables.length === 0) return;
-
-      if (activeReceivables.length === 1) {
-        const r = activeReceivables[0];
-        await this.updatePaidAmount(r.id, totalPaid);
-      } else {
-        // Proportional distribution
-        const totalAmount = activeReceivables.reduce((s, r) => s + Number(r.amount_xof), 0);
-        if (totalAmount <= 0) {
-          for (const r of activeReceivables) {
-            await this.updatePaidAmount(r.id, 0);
-          }
-          return;
-        }
-        let remaining = totalPaid;
-        for (let i = 0; i < activeReceivables.length; i++) {
-          const r = activeReceivables[i];
-          const share = i === activeReceivables.length - 1
-            ? remaining // last one gets the remainder
-            : Math.min(Number(r.amount_xof), Math.round(totalPaid * Number(r.amount_xof) / totalAmount));
-          await this.updatePaidAmount(r.id, share);
-          remaining -= share;
-        }
-      }
-    },
-
-    async updatePaidAmount(id: string, paidAmount: number): Promise<void> {
-      const r = await this.getById(id);
-      if (!r || r.status === "cancelled") return;
-
-      const newStatus = computeStatus(Number(r.amount_xof), paidAmount, r.due_date);
-      await table().update({
-        paid_amount_xof: paidAmount,
-        status: newStatus,
-      }).eq("id", id);
     },
 
     async getSummary(filters?: {

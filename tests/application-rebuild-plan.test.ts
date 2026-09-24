@@ -4,7 +4,7 @@ import { it, expect } from "vitest";
 import { applicationRebuildPlan } from "../scripts/lib/application-rebuild.mjs";
 it("pins every rebuild source and excludes real personnel configuration", () => {
   const { steps, manifest } = applicationRebuildPlan();
-  expect(steps).toHaveLength(18);
+  expect(steps).toHaveLength(19);
   expect(
     manifest.excluded.some((entry: { file: string }) => entry.file.includes("finance_controller")),
   ).toBe(true);

@@ -12,7 +12,7 @@ describe("privileged finance actions", () => {
     const finance = read("src/features/finance/actions.ts");
     expect(leases).toContain("await guardLeaseFinance();");
     expect(sales).toContain("await guardSaleFinance();");
-    expect(finance.indexOf('await requireRole("admin", "finance");')).toBeLessThan(finance.indexOf("createPrivilegedClient();"));
+    expect(finance.indexOf('await requireRole("admin", "finance");')).toBeLessThan(finance.indexOf('return submitFinanceOperation'));
   });
 
   it("preserves the caller session for atomic lease and sale payments", () => {
@@ -21,7 +21,7 @@ describe("privileged finance actions", () => {
     expect(leasePayment).toContain("await createClient()");
     expect(leasePayment).not.toContain("createPrivilegedClient");
     expect(read("src/features/sales/actions.ts")).not.toContain("createPrivilegedClient");
-    expect(read("src/features/finance/actions.ts")).toContain("const supabase = createPrivilegedClient();");
+    expect(read("src/features/finance/actions.ts")).not.toContain("createPrivilegedClient");
   });
 
   it("moves settlement to one authenticated atomic RPC without a privileged client", () => {
