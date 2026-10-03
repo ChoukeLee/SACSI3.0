@@ -53,6 +53,7 @@ export function getDailyLodgingBusinessType(input: DailyLodgingBusinessTypeInput
 }
 
 export interface GetPrimaryActionInput {
+  dailyRentalEnabled?: boolean;
   bookingStatus?: DailyBookingStatus | null;
   roomDisplayStatus?: DailyRoomDisplayStatus;
   hasOpenCleaningTask?: boolean;
@@ -70,7 +71,7 @@ export function getPrimaryDailyAction(input: GetPrimaryActionInput): {
   } = input;
 
   // Unit-level blocks: sold / leased / maintenance / locked.
-  if (unitStatus === "sold" || unitStatus === "maintenance" || unitStatus === "locked") {
+  if ((unitStatus === "sold" && input.dailyRentalEnabled !== true) || unitStatus === "maintenance" || unitStatus === "locked") {
     return { action: "readonly", allowed: false, reason: `unit_${unitStatus}` };
   }
   if (unitStatus === "leased") {
@@ -176,6 +177,7 @@ export interface DailyBookingActionState {
 }
 
 export interface CreateBookingPolicyInput {
+  dailyRentalEnabled?: boolean;
   checkIn: string;
   checkOut?: string;
   checkoutMode?: "fixed" | "open";
@@ -208,7 +210,7 @@ export function allowCreateBooking(input: CreateBookingPolicyInput): PolicyResul
   if (input.unitStatus) {
     if (input.unitStatus === "maintenance") return { allowed: false, reason: "unitMaintenance" };
     if (input.unitStatus === "locked") return { allowed: false, reason: "unitLocked" };
-    if (input.unitStatus === "sold") return { allowed: false, reason: "saleConflict" };
+    if (input.unitStatus === "sold" && input.dailyRentalEnabled !== true) return { allowed: false, reason: "saleConflict" };
     if (input.unitStatus === "leased") return { allowed: false, reason: "longLeaseConflict" };
   }
 
@@ -229,6 +231,7 @@ export function allowConfirmBooking(booking: Pick<DailyBookingRow, "status">): P
 }
 
 export interface CheckInPolicyInput {
+  dailyRentalEnabled?: boolean;
   booking: Pick<DailyBookingRow, "status" | "checkout_mode">;
   prepaidAmount: number;
   hasOpenCleaningTask?: boolean;
@@ -245,7 +248,7 @@ export function allowCheckIn(input: CheckInPolicyInput): PolicyResult {
   if (unitStatus) {
     if (unitStatus === "maintenance") return { allowed: false, reason: "unitMaintenance" };
     if (unitStatus === "locked") return { allowed: false, reason: "unitLocked" };
-    if (unitStatus === "sold") return { allowed: false, reason: "saleConflict" };
+    if (unitStatus === "sold" && input.dailyRentalEnabled !== true) return { allowed: false, reason: "saleConflict" };
     if (unitStatus === "leased") return { allowed: false, reason: "longLeaseConflict" };
   }
 

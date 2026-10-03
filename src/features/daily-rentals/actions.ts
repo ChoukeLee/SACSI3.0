@@ -145,7 +145,11 @@ export async function checkConflicts(
   if (!unit) return { hasConflict: true, reason: "unitNotFound" };
   if (unit.status === "maintenance") return { hasConflict: true, reason: "unitMaintenance" };
   if (unit.status === "locked") return { hasConflict: true, reason: "unitLocked" };
-  if (unit.status === "sold") return { hasConflict: true, reason: "saleConflict" };
+  const { data: dailyFlag, error: dailyFlagError } = await supabase
+    .from("unit_business_flags").select("is_enabled")
+    .eq("unit_id", unitId).eq("business_type", "daily_rental").maybeSingle();
+  const dailyRentalEnabled = !dailyFlagError && dailyFlag?.is_enabled === true;
+  if (unit.status === "sold" && !dailyRentalEnabled) return { hasConflict: true, reason: "saleConflict" };
   if (unit.status === "leased") return { hasConflict: true, reason: "longLeaseConflict" };
 
   // For open-ended bookings, effective checkOut is far future
@@ -184,7 +188,7 @@ export async function checkConflicts(
     .from("sale_contracts")
     .select("id").eq("unit_id", unitId).eq("status", "active")
     .limit(1);
-  if (activeSale && activeSale.length > 0) {
+  if (activeSale && activeSale.length > 0 && !dailyRentalEnabled) {
     return { hasConflict: true, reason: "saleConflict" };
   }
 

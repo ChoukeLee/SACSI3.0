@@ -77,6 +77,10 @@
     {
       "file": "20260924083457_atomic_remaining_finance.sql",
       "sha256": "29a544a89a119b526e3c1f5e98e04e9306481a327fe5ee3ea25cbaf8f5c6e33d"
+    },
+    {
+      "file": "20261003133800_sold_daily_rental_management.sql",
+      "sha256": "a220a44061a42b2d5400e7bdd153e2b7b9056eed5fc9cfe1a3eaff5ef50a0401"
     }
   ],
   "excluded": [

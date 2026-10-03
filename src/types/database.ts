@@ -62,6 +62,8 @@ export type BuildingUpdate = Partial<BuildingInsert>;
 // ── Units ──
 
 export interface UnitRow {
+  /** Read-model capability; never changes ownership or the stored sold status. */
+  daily_rental_enabled?: boolean;
   id: string;
   building_id: string;
   code: string;

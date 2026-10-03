@@ -765,6 +765,7 @@ export function DailyCalendar({
                             const action = getPrimaryDailyAction({
                               roomDisplayStatus: dateRoomState.status,
                               unitStatus: unit.status as UnitStatus,
+                              dailyRentalEnabled: unit.daily_rental_enabled === true,
                               hasOpenCleaningTask: hasCleaning,
                               isPastDate: dateStr < todayStr,
                             });

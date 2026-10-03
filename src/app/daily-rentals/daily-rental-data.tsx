@@ -49,7 +49,7 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
         .select("id, building_id, code, unit_no, floor_label, status, notes, reservation_holder_name, unit_business_flags!inner(business_type, is_enabled, default_price_xof)")
         .eq("unit_business_flags.business_type", "daily_rental")
         .eq("unit_business_flags.is_enabled", true)
-        .in("status", ["available", "reserved", "daily_occupied", "cleaning_pending", "maintenance", "locked"])
+        .in("status", ["available", "reserved", "daily_occupied", "cleaning_pending", "maintenance", "locked", "sold"])
         .order("unit_no"),
     ]);
 
@@ -90,6 +90,7 @@ export async function DailyRentalData({ userRole, locale }: DailyRentalDataProps
       const flags = Array.isArray(unit.unit_business_flags) ? unit.unit_business_flags : [unit.unit_business_flags];
       return {
         ...unit,
+        daily_rental_enabled: true,
         daily_rental_price_xof: flags.find((flag) => flag?.business_type === "daily_rental")?.default_price_xof ?? null,
       };
     }) as unknown as UnitRow[]));
