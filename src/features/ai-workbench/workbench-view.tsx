@@ -668,6 +668,10 @@ function LoadingResult({ t }: { t: Record<string, string> }) {
 }
 
 function WorkbenchResultView({ t, result }: { t: Record<string, string>; result: WorkbenchResult }) {
+  if (result.sections?.length) return <div className="space-y-5">
+    <p className="text-sm text-muted-foreground">{result.warnings.join(" ")}</p>
+    {result.sections.map((section,index)=><WorkbenchResultView key={index} t={t} result={section}/>)}
+  </div>;
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
       <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-card">

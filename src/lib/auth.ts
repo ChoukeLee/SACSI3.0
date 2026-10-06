@@ -12,53 +12,20 @@ export interface CurrentUser {
   displayName: string;
 }
 
-type AccountProjectScope = "all" | "sacsi_only";
-
-const seedAccountProfiles: Record<string, { role: UserRole; displayName: string; projectScope: AccountProjectScope }> = {
-  "admin@sacsi.com": { role: "admin", displayName: "Chouke", projectScope: "all" },
-  "boss@sacsi.com": { role: "boss", displayName: "GAO", projectScope: "all" },
-  "finance@sacsi.com": { role: "finance", displayName: "zhulin", projectScope: "all" },
-  "front@sacsi.com": { role: "front_desk", displayName: "Niamké", projectScope: "sacsi_only" },
-  "ying@sacsi.com": { role: "admin", displayName: "Ying", projectScope: "sacsi_only" },
-  "huang@sacsi.com": { role: "admin", displayName: "黄姐", projectScope: "sacsi_only" },
-};
-
-export const configuredAccountSummaries = Object.entries(seedAccountProfiles).map(([email, profile]) => ({
-  email,
-  displayName: profile.displayName,
-  role: profile.role,
-  projectScope: profile.projectScope,
-}));
-
-export function getSeedAccountProfile(email: string | undefined) {
-  if (!email) return null;
-  const profile = seedAccountProfiles[email.toLowerCase()];
-  return profile ? { role: profile.role, displayName: profile.displayName } : null;
-}
-
 export async function resolveVerifiedSupabaseUser(
   supabase: SupabaseClient<any, "public", any>,
   user: { id: string; email?: string | null },
 ): Promise<CurrentUser | null> {
   const email = user.email ?? undefined;
-  const seedProfile = getSeedAccountProfile(email);
-  if (seedProfile) {
-    return {
-      id: user.id,
-      email,
-      role: seedProfile.role,
-      displayName: seedProfile.displayName,
-    };
-  }
-
-  const { data: profile } = await supabase
+  // The verified identity is resolved only against its database profile.
+  const { data: profile, error } = await supabase
     .from("user_profiles")
     .select("role, display_name")
     .eq("id", user.id)
     .single();
 
   const role = profile?.role as UserRole | undefined;
-  if (!role || !Object.prototype.hasOwnProperty.call(rolePermissions, role)) {
+  if (error || !role || !Object.prototype.hasOwnProperty.call(rolePermissions, role)) {
     return null;
   }
 

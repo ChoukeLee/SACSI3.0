@@ -53,6 +53,7 @@ export function getDailyLodgingBusinessType(input: DailyLodgingBusinessTypeInput
 }
 
 export interface GetPrimaryActionInput {
+  operationalCondition?: "normal" | "maintenance" | "locked";
   dailyRentalEnabled?: boolean;
   bookingStatus?: DailyBookingStatus | null;
   roomDisplayStatus?: DailyRoomDisplayStatus;
@@ -71,6 +72,10 @@ export function getPrimaryDailyAction(input: GetPrimaryActionInput): {
   } = input;
 
   // Unit-level blocks: sold / leased / maintenance / locked.
+  if(input.operationalCondition && input.operationalCondition!=="normal" &&
+    (!bookingStatus || ["confirmed","pending_review","cancelled"].includes(bookingStatus))) {
+    return {action:"readonly",allowed:false,reason:`condition_${input.operationalCondition}`};
+  }
   if ((unitStatus === "sold" && input.dailyRentalEnabled !== true) || unitStatus === "maintenance" || unitStatus === "locked") {
     return { action: "readonly", allowed: false, reason: `unit_${unitStatus}` };
   }

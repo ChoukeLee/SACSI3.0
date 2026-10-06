@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { configuredAccountSummaries, getCurrentUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { MaintenanceHub } from "@/features/settings";
 import { DesktopOnly } from "@/features/mobile";
@@ -13,14 +13,19 @@ export default async function SettingsPage() {
   if (user.role !== "admin") redirect("/");
 
   const supabase = await createClient();
-  const { data: buildings } = await supabase.from("buildings").select("*").order("code");
+  const [buildingResult,accountResult]=await Promise.all([
+    supabase.from("buildings").select("*").order("code"),
+    supabase.rpc("account_access_summary_rpc"),
+  ]);
+  if(buildingResult.error || accountResult.error) throw new Error("AccountAccessUnavailable");
+  const buildings=buildingResult.data;
 
   return (
     <>
       <div className="lg:hidden"><DesktopOnly locale="zh" /></div>
       <div className="hidden lg:block">
         <MaintenanceHub
-          accounts={configuredAccountSummaries}
+          accounts={accountResult.data ?? []}
           buildings={(buildings as BuildingRow[]) ?? []}
           locale="zh"
         />

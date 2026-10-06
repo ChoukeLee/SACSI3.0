@@ -70,6 +70,12 @@ export function UnitProfileView({ data, locale }: { data: UnitProfileData; local
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-semibold tracking-tight">{unit.unit_no}</h1>
               <StatusBadge status={unit.status} label={dictionaries[locale].statuses[unit.status]} />
+              {data.position && <span className="text-sm text-muted-foreground">
+                {zh ? "权属" : "Propriété"}: {data.position.ownership === "sold" ? (zh ? "已售" : "Vendu") : (zh ? "未明确（不按空闲推定）" : "Non précisée")}
+                {" · "}{zh ? "入住" : "Occupation"}: {data.position.daily_occupied ? (zh ? "日租入住" : "Séjour") : data.position.lease_occupied ? (zh ? "长租" : "Bail") : (zh ? "无当前入住" : "Aucune")}
+                {" · "}{zh ? "保洁" : "Nettoyage"}: {data.position.cleaning_pending ? (zh ? "待保洁" : "En attente") : "—"}
+                {" · "}{zh ? "运行条件" : "Condition"}: {data.position.operational_condition}
+              </span>}
             </div>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1.5"><Building2 className="h-4 w-4" />{data.buildingName}</span>

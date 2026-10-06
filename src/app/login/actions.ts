@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getSeedAccountProfile, homePathForRole, type UserRole } from "@/lib/auth";
+import { resolveVerifiedSupabaseUser, homePathForRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { confirmationReturnPath } from "@/lib/confirmation-return-path";
 
@@ -64,25 +64,8 @@ export async function login(formData: FormData) {
   }
 
   const user = data.user;
-  const seedProfile = getSeedAccountProfile(user?.email);
-  let role: UserRole | null = seedProfile?.role ?? null;
-  if (user && seedProfile) {
-    await supabase.from("user_profiles").upsert({
-      id: user.id,
-      role: seedProfile.role,
-      display_name: seedProfile.displayName,
-      updated_at: new Date().toISOString(),
-    });
-  }
-
-  if (user && !seedProfile) {
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    role = profile?.role as UserRole | null;
-  }
+  const actor = user ? await resolveVerifiedSupabaseUser(supabase,user) : null;
+  const role = actor?.role ?? null;
 
   // Root layouts are preserved during App Router navigation. Invalidate the
   // anonymous shell after the auth cookie changes, then skip the extra `/` hop.

@@ -11,7 +11,8 @@ interface AccountSummary {
   email: string;
   displayName: string;
   role: UserRole;
-  projectScope: "all" | "sacsi_only";
+  projectScope: "all" | "sacsi_only" | "restricted";
+  projectNames?: string;
 }
 
 interface MaintenanceHubProps {
@@ -103,7 +104,7 @@ export function MaintenanceHub({ locale, accounts, buildings }: MaintenanceHubPr
                     </td>
                     <td className="px-4 py-2.5 text-xs text-muted-foreground">
                       {roleScopes[locale][account.role]}
-                      {account.projectScope === "sacsi_only"
+                      {account.projectNames !== undefined ? ` · ${account.projectNames}` : account.projectScope === "sacsi_only"
                         ? (zh ? "；仅限SACSI公寓，不含建材城" : " ; résidences SACSI uniquement, hors CIMAC")
                         : ""}
                     </td>

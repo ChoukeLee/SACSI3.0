@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import { sortUnits } from "@/lib/utils";
 import type {
   BuildingRow,
@@ -24,33 +25,21 @@ export async function getSalePageData() {
     paymentsRes,
     receivablesRes,
   ] = await Promise.all([
-    supabase.from("projects").select("id").eq("is_active", true).eq("allows_sale", true),
-    supabase.from("buildings").select("id, project_id, code, display_name").eq("is_active", true).order("code"),
-    supabase.from("sale_contracts").select("*").order("signed_date", { ascending: false }).limit(1000),
-    supabase.from("sale_payment_schedule").select("*").order("installment_no").limit(5000),
-    supabase.from("units").select("*").order("unit_no"),
-    supabase.from("customers").select("*").order("name"),
-    supabase
-      .from("payments")
-      .select("*")
-      .in("source_type", [
-        "sale",
-        "sale_contract",
-        "property_fee",
-        "parking_fee",
-        "sale_registration_fee",
-        "sale_agency_income",
-        "sale_agency_expense",
-        "sale_other_income",
-        "sale_other_expense",
-      ])
-      .order("payment_date", { ascending: false })
-      .limit(5000),
-    supabase.from("receivables").select("*").eq("source_type", "sale_contract").order("due_date").limit(5000),
+    all(() => supabase.from("projects").select("id").eq("is_active", true).eq("allows_sale", true), "projects"),
+    all(() => supabase.from("buildings").select("id, project_id, code, display_name").eq("is_active", true).order("code"), "buildings"),
+    all(() => supabase.from("sale_contracts").select("*").order("signed_date", { ascending: false }), "sale contracts"),
+    all(() => supabase.from("sale_payment_schedule").select("*").order("installment_no"), "sale schedules"),
+    all(() => supabase.from("units").select("*").order("unit_no"), "units"),
+    all(() => supabase.from("customers").select("*").order("name"), "customers"),
+    all(() => supabase.from("payments").select("*").in("source_type", [
+      "sale", "sale_contract", "property_fee", "parking_fee", "sale_registration_fee",
+      "sale_agency_income", "sale_agency_expense", "sale_other_income", "sale_other_expense",
+    ]).order("payment_date", { ascending: false }), "sale payments"),
+    all(() => supabase.from("receivables").select("*").eq("source_type", "sale_contract").order("due_date"), "sale receivables"),
   ]);
-
-  if (projectsRes.error) throw projectsRes.error;
-  if (buildingsRes.error) throw buildingsRes.error;
+  for (const result of [projectsRes, buildingsRes, contractsRes, schedulesRes, unitsRes, customersRes, paymentsRes, receivablesRes]) {
+    if (result.error) throw result.error;
+  }
 
   const sellableProjectIds = new Set((projectsRes.data ?? []).map((project) => project.id));
   const buildings = ((buildingsRes.data ?? []) as BuildingRow[]).filter((building) => building.project_id && sellableProjectIds.has(building.project_id));
@@ -65,4 +54,8 @@ export async function getSalePageData() {
     payments: (paymentsRes.error ? [] : paymentsRes.data ?? []) as PaymentRow[],
     receivables: (receivablesRes.error ? [] : receivablesRes.data ?? []) as ReceivableRow[],
   };
+}
+// Every query ends in a unique tie-breaker; any failed page rejects the whole report.
+async function all<T>(factory: () => { order(column: string): { range(from: number, to: number): PromiseLike<{ data: T[] | null; error: { message: string } | null }> } }, label: string) {
+  return { data: await fetchAllPages((from, to) => factory().order("id").range(from, to), label), error: null };
 }

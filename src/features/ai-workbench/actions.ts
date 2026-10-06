@@ -27,6 +27,7 @@ import { summarizeQueryPlanCompatibility } from "./query-tool-adapter";
 import { executeQueryPlanV2 } from "./query-tool-executor";
 import { selectQueryPlanRollout } from "./query-plan-rollout";
 import { synthesizeQueryPlanResult } from "./query-result-synthesizer";
+import { combineQueryResults } from "./multi-query-result";
 import { enrichQueryWithConversationContext, intentContextSnapshot, selectConversationContext, type WorkbenchConversationContext } from "./conversation-context";
 import { appendConversationTurn, loadConversationHistory } from "./conversation-service";
 import type { WorkbenchActionState, WorkbenchActionResult, WorkbenchIntent } from "./types";
@@ -172,32 +173,49 @@ export async function askWorkbench(
       history: recentHistory.map((turn) => ({ userText: turn.userText, context: turn.context })),
     }).catch(() => null);
     const singleToolRolloutEnabled = process.env.AI_QUERY_PLANNER_SINGLE_TOOL_ENABLED === "true";
-    const rolloutPlan = singleToolRolloutEnabled ? await plannerPromise : null;
+    const multiToolRolloutEnabled = process.env.AI_QUERY_PLANNER_MULTI_TOOL_ENABLED === "true";
+    const clarificationEnabled = process.env.AI_QUERY_PLANNER_CLARIFICATION_ENABLED === "true";
+    const plannerEnabled = singleToolRolloutEnabled || multiToolRolloutEnabled || clarificationEnabled;
+    const rolloutPlan = plannerEnabled ? await plannerPromise : null;
     const rollout = selectQueryPlanRollout({
-      enabled: singleToolRolloutEnabled,
+      enabled: plannerEnabled,
+      multiToolEnabled: multiToolRolloutEnabled,
+      clarificationEnabled,
       plan: rolloutPlan,
       asOfDate,
     });
+
+    if (rollout.mode === "clarify") {
+      const result = {
+        kind: "query_result" as const, query, title: tr(locale,"需要补充信息","Précision nécessaire"),
+        answer: rollout.question, scope: tr(locale,"尚未查询业务数据","Aucune donnée consultée"),
+        intent: {kind:"unsupported" as const,domain:"all" as const,buildingCode:null,unitNo:null,customerName:null,days:0,asOfDate,confidence:rollout.plan.confidence,source:"deepseek" as const},
+        metrics:[],table:null,evidence:[],warnings:[],generatedAt:new Date().toISOString(),resultCount:0,
+      };
+      await appendConversationTurn({conversationId,kind:"query",userText:query,assistantText:result.answer,
+        context:{queryPlannerV2:{...summarizeShadowPlan(rollout.plan),route:"clarification"}}});
+      return {status:"success",result,error:null};
+    }
 
     if (rollout.mode === "execute_v2") {
       const execution = await executeQueryPlanV2({ query, plan: rollout.plan, asOfDate, locale, user });
       if (execution.status === "permission_denied") {
         return { status: "error", result: null, error: tr(locale, "当前账号没有查看这类业务数据的权限。", "Votre profil n'a pas le droit de consulter ces données.") };
       }
-      if (execution.status === "success" && execution.results.length === 1) {
-        const executed = execution.results[0];
-        const result = await synthesizeQueryPlanResult({ locale, tool: executed.tool, result: executed.result });
+      if (execution.status === "success" && execution.results.length > 0) {
+        const sections = await Promise.all(execution.results.map(executed => synthesizeQueryPlanResult({ locale, tool: executed.tool, result: executed.result })));
+        const result = combineQueryResults(query, sections, locale);
         await appendConversationTurn({
           conversationId,
           kind: "query",
           userText: query,
           assistantText: result.answer,
           context: {
-            ...intentContextSnapshot(result.intent),
+            ...(sections.length === 1 ? intentContextSnapshot(result.intent) : {}),
             queryPlannerV2: {
               ...summarizeShadowPlan(rollout.plan),
               compatibility: summarizeQueryPlanCompatibility(rollout.plan, asOfDate),
-              route: "single_tool",
+              route: sections.length === 1 ? "single_tool" : "multi_tool",
             },
           },
         });
@@ -213,7 +231,7 @@ export async function askWorkbench(
     if (!canRunIntent(user, intent)) {
       return { status: "error", result: null, error: tr(locale, "当前账号没有查看这类业务数据的权限。", "Votre profil n'a pas le droit de consulter ces données.") };
     }
-    const shadowPlanPromise = singleToolRolloutEnabled ? Promise.resolve(rolloutPlan) : plannerPromise;
+    const shadowPlanPromise = plannerEnabled ? Promise.resolve(rolloutPlan) : plannerPromise;
     const [result, shadowPlan] = await Promise.all([
       executeWorkbenchQuery(query, intent, locale),
       shadowPlanPromise,
@@ -225,7 +243,7 @@ export async function askWorkbench(
       assistantText: result.answer,
       context: {
         ...intentContextSnapshot(intent),
-        ...(process.env.AI_QUERY_PLANNER_SHADOW_ENABLED === "true" || singleToolRolloutEnabled
+        ...(process.env.AI_QUERY_PLANNER_SHADOW_ENABLED === "true" || plannerEnabled
           ? {
               queryPlannerV2: {
                 ...summarizeShadowPlan(shadowPlan),

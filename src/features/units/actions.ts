@@ -44,67 +44,27 @@ export async function getUnitAuditLogs(unitId: string): Promise<UnitAuditLogEntr
 
 export async function updateUnitStatus(
   unitId: string,
-  status: UnitStatus
+  status: UnitStatus,
+  expectedUpdatedAt: string,
 ): Promise<{ success: boolean; error?: string }> {
   requirePermission(await getCurrentUser(), "units:write");
-
-  if (!manualStatuses.includes(status)) {
-    return {
-      success: false,
-      error: `Status "${status}" is driven by business modules and cannot be set manually.`,
-    };
-  }
-
+  if (!manualStatuses.includes(status)) return { success: false, error: "请使用对应业务流程修改入住、保洁或合同状态。" };
   const supabase = await createClient();
-
-  const { data: unit, error: fetchError } = await supabase
-    .from("units")
-    .select("id, status, construction_status, occupancy_verified")
-    .eq("id", unitId)
-    .single();
-
-  if (fetchError || !unit) {
-    return { success: false, error: "未找到该房源。" };
-  }
-
-  if (unit.status === status) {
-    return { success: false, error: "房源已处于该状态。" };
-  }
-
-  const previousStatus = unit.status;
-
-  const readinessUpdate = status === "available"
-    ? { construction_status: "operational", occupancy_verified: true }
-    : {};
-  const { error: updateError } = await supabase
-    .from("units")
-    .update({ status, ...readinessUpdate, updated_at: new Date().toISOString() })
-    .eq("id", unitId);
-
-  if (updateError) {
-    return { success: false, error: updateError.message };
-  }
-
-  const { error: auditError } = await supabase.from("audit_logs").insert({
-    action: "status_change",
-    entity_type: "unit",
-    entity_id: unitId,
-    metadata: {
-      previous_status: previousStatus,
-      new_status: status,
-      changed_manually: true,
-      ...(status === "available" && unit.occupancy_verified === false
-        ? { readiness_verified: true, previous_construction_status: unit.construction_status }
-        : {}),
-    },
+  const { error } = await supabase.rpc("set_unit_condition_rpc", {
+    p_unit_id: unitId,
+    p_condition: status === "available" ? "normal" : status,
+    p_expected_updated_at: expectedUpdatedAt,
   });
-
-  if (auditError) {
-    console.error("Failed to write audit log:", auditError);
+  if (error) {
+    const messages: Record<string,string> = {
+      unitRecordChanged: "房源已变化，请刷新后重试。",
+      occupiedUnitRequiresBusinessWorkflow: "正在入住或出租，请通过业务流程处理。",
+      unitReadinessRequiresVerification: "建设或入住条件尚未核验，解除维修不能直接证明可出租。",
+    };
+    return { success: false, error: messages[error.message] ?? "修改未完成，请核对权限与房源状态。" };
   }
-
-  revalidatePath("/units");
-  revalidatePath("/fr/units");
-
+  revalidatePath("/units"); revalidatePath("/fr/units");
+  revalidatePath("/daily-rentals"); revalidatePath("/fr/daily-rentals");
+  revalidatePath(`/units/${unitId}`); revalidatePath(`/fr/units/${unitId}`);
   return { success: true };
 }

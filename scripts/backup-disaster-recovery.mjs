@@ -5,11 +5,15 @@ import { promisify } from "node:util";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { randomBytes } from "node:crypto";
+import { archiveStorageObjects, verifyStorageInventory } from "./lib/dr-storage.mjs";
 import pg from "pg";
 import { digest, seal, unseal, tableDigests } from "./lib/dr-archive.mjs";
 
 const exec = promisify(execFile);
-const docker = "C:/Program Files/Docker/Docker/resources/bin/docker.exe";
+const docker =
+  process.platform === "win32"
+    ? "C:/Program Files/Docker/Docker/resources/bin/docker.exe"
+    : "docker";
 const image = "public.ecr.aws/supabase/postgres:17.6.1.167";
 const project = "afadqifyaoixkvxywxqb";
 const root = resolve(import.meta.dirname, "..");
@@ -17,25 +21,31 @@ const schemas = ["public", "private", "auth", "storage", "supabase_migrations"];
 let client;
 let phase = "prepare";
 try {
-  assert.equal(process.platform, "win32");
+  assert.ok(["win32", "linux"].includes(process.platform));
+  if (process.platform === "linux")
+    assert.match(
+      process.env.SACSI_DR_ENCRYPTION_KEY ?? "",
+      /^[0-9a-f]{64}$/i,
+      "Escrowed encryption key required",
+    );
   assert.ok(process.env.SACSI_DR_DB_PASSWORD, "Database password required in process environment");
   const parent = join(root, "outputs/disaster-recovery");
   await mkdir(parent, { recursive: true });
   const directory = await mkdtemp(join(parent, "backup-"));
-  const sid = (
-    await exec("whoami.exe", ["/user", "/fo", "csv", "/nh"], { windowsHide: true })
-  ).stdout.match(/S-1-5-[0-9-]+/)[0];
-  await exec("icacls.exe", [directory, "/inheritance:r", "/grant:r", `*${sid}:(OI)(CI)F`], {
-    windowsHide: true,
-  });
-  const keyParent = join(root, "work/disaster-recovery-keys");
-  await mkdir(keyParent, { recursive: true });
-  await exec("icacls.exe", [keyParent, "/inheritance:r", "/grant:r", `*${sid}:(OI)(CI)F`], {
-    windowsHide: true,
-  });
-  const keyPath = join(keyParent, directory.split(/[\\/]/).at(-1) + ".key");
-  const key = randomBytes(32);
-  await writeFile(keyPath, key, { flag: "wx" });
+  let keyPath = null;
+  let key;
+  if (process.env.SACSI_DR_ENCRYPTION_KEY) {
+    assert.match(process.env.SACSI_DR_ENCRYPTION_KEY, /^[0-9a-f]{64}$/i);
+    key = Buffer.from(process.env.SACSI_DR_ENCRYPTION_KEY, "hex");
+  } else {
+    key = randomBytes(32);
+    const keyParent = join(root, "work/disaster-recovery-keys");
+    await mkdir(keyParent, { recursive: true });
+    keyPath = join(keyParent, directory.split(/[\\\\/]/).at(-1) + ".key");
+    await protectDirectory(keyParent);
+    await writeFile(keyPath, key, { flag: "wx", mode: 0o600 });
+  }
+  await protectDirectory(directory);
   const response = await fetch(
     "https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt",
     { signal: AbortSignal.timeout(15000) },
@@ -102,23 +112,12 @@ try {
       "select r.rolname as role, m.rolname as member, a.admin_option from pg_auth_members a join pg_roles r on r.oid=a.roleid join pg_roles m on m.oid=a.member order by 1,2",
     )
   ).rows;
-  // Empty production Storage is explicitly verified, not silently omitted.
-  const objects = (
-    await client.query(
-      "select bucket_id,name,updated_at from storage.objects order by bucket_id,name",
-    )
-  ).rows;
-  assert.equal(objects.length, 0, "Storage now contains objects: extend backup before proceeding");
-  manifest.storage = {
-    objects: 0,
-    bytes: 0,
-    checkedAt: new Date().toISOString(),
-    restorationNeedsSyntheticFileTest: true,
-  };
+  phase = "storage";
+  manifest.storage = await archiveStorageObjects({ client, directory, key, project });
   phase = "pg-dump";
   const env = { ...process.env };
   for (const k of Object.keys(env))
-    if (k.startsWith("PG") || k === "SACSI_DR_DB_PASSWORD") delete env[k];
+    if (k.startsWith("PG") || /^(SACSI_DR_|SUPABASE_SERVICE_ROLE_KEY)/.test(k)) delete env[k];
   env.PGPASSWORD = process.env.SACSI_DR_DB_PASSWORD;
   const args = [
     "run",
@@ -167,6 +166,9 @@ try {
   const encrypted = seal(dump, key);
   assert.equal(digest(unseal(encrypted, key)), manifest.dumpSha256);
   await writeFile(join(directory, "database.dump.aes"), encrypted, { flag: "wx" });
+  await client.query("ROLLBACK");
+  await client.query("BEGIN READ ONLY");
+  await verifyStorageInventory(client, manifest.storage);
   await client.query("ROLLBACK");
   manifest.complete = true; // Complete declared DB snapshot only, NOT full DR acceptance.
   manifest.finishedAt = new Date().toISOString();
@@ -218,4 +220,17 @@ try {
   process.exitCode = 1;
 } finally {
   if (client) await client.end().catch(() => {});
+}
+async function protectDirectory(directory) {
+  if (process.platform === "win32") {
+    const sid = (
+      await exec("whoami.exe", ["/user", "/fo", "csv", "/nh"], { windowsHide: true })
+    ).stdout.match(/S-1-5-[0-9-]+/)[0];
+    await exec("icacls.exe", [directory, "/inheritance:r", "/grant:r", `*${sid}:(OI)(CI)F`], {
+      windowsHide: true,
+    });
+  } else {
+    const { chmod } = await import("node:fs/promises");
+    await chmod(directory, 0o700);
+  }
 }

@@ -56,12 +56,14 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, locale, onC
     setChanging(true);
     setError("");
     setStatusOpen(false);
-    const result = await updateUnitStatus(unit.id, newStatus);
-    setChanging(false);
-    if (result.success) {
-      onStatusChanged();
-    } else {
-      setError(result.error ?? (locale === "zh" ? "修改房态失败。" : "Échec de la mise à jour du statut."));
+    try {
+      const result = await updateUnitStatus(unit.id, newStatus, unit.updated_at);
+      if (result.success) onStatusChanged();
+      else setError(result.error ?? (locale === "zh" ? "修改房态失败。" : "Échec de la mise à jour du statut."));
+    } catch {
+      setError(locale === "zh" ? "操作未完成，请刷新核对房态后再试。" : "Opération non terminée. Actualisez et vérifiez le statut.");
+    } finally {
+      setChanging(false);
     }
   };
 
@@ -74,7 +76,7 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, locale, onC
       ? (locale === "zh" ? "待核实" : "À vérifier")
       : unit.construction_status ?? t.detail.notSet;
   const meaningfulAuditLogs = auditLogs.filter(
-    (log) => log.metadata.previous_status !== log.metadata.new_status
+    (log) => log.metadata.previous_status !== log.metadata.new_status || log.metadata.previous_condition !== log.metadata.new_condition
   );
 
   return (
@@ -93,6 +95,7 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, locale, onC
               [t.detail.floor, unit.floor_label],
               [t.detail.kind, t.kinds[unit.kind]],
               [t.detail.status, null],
+              [locale === "zh" ? "维修/封锁" : "État opérationnel", unit.operational_condition ?? "normal"],
               ...(unit.construction_status ? [[locale === "zh" ? "建设状态" : "État de construction", constructionLabel]] : []),
               ...(unit.location_grade ? [[locale === "zh" ? "地段等级" : "Emplacement", unit.location_grade === "central_avenue_prime" ? (locale === "zh" ? "中央大道优质地段" : "Axe central premium") : (locale === "zh" ? "普通地段" : "Standard")]] : []),
               ...(unit.zone_label ? [[locale === "zh" ? "位置分区" : "Zone", unit.zone_label]] : []),
@@ -154,12 +157,10 @@ export function UnitDetailPanel({ unit, buildingName, businessFlags, locale, onC
                     <button
                       key={s}
                       onClick={() => handleStatusChange(s)}
-                      disabled={unit.status === s || changing}
+                      disabled={(unit.operational_condition ?? (unit.status === "maintenance" || unit.status === "locked" ? unit.status : "normal")) === (s === "available" ? "normal" : s) || changing}
                       className="block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-accent disabled:opacity-40"
                     >
-                      {s === "available" && (unit.occupancy_verified === false || unit.construction_status === "unverified")
-                        ? (locale === "zh" ? "确认可投入使用" : "Confirmer la mise en service")
-                        : statusLabels[s]}
+                      {s === "available" ? (locale === "zh" ? "解除维修/封锁" : "Lever le blocage") : statusLabels[s]}
                     </button>
                   ))}
                 </div>

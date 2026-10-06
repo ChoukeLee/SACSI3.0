@@ -81,6 +81,22 @@
     {
       "file": "20261003133800_sold_daily_rental_management.sql",
       "sha256": "a220a44061a42b2d5400e7bdd153e2b7b9056eed5fc9cfe1a3eaff5ef50a0401"
+    },
+    {
+      "file": "20261006082906_operational_architecture.sql",
+      "sha256": "ec8dc2be21692811337c2b836b117c181a4414e118a45e347b86f067d1a11c9b"
+    },
+    {
+      "file": "20261006083908_unit_operational_dimensions.sql",
+      "sha256": "04236a8c73ed69baf2501205e1a5e04b9260608e16245cf56a341e3a07d2835f"
+    },
+    {
+      "file": "20261006084039_explicit_sale_receivable_links.sql",
+      "sha256": "c80304897151a1ceeace10daec948560dc8753624233348bab7a8f28b2f766af"
+    },
+    {
+      "file": "20261006084655_operator_task_inbox.sql",
+      "sha256": "811cf09729d093351ef51e8d2fae3356d09ddee9aa6b908ad6d71d95c31557b6"
     }
   ],
   "excluded": [

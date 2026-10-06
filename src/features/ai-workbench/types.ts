@@ -44,6 +44,8 @@ export interface WorkbenchEvidence {
 }
 
 export interface WorkbenchResult {
+  /** Independent read results, never added together as overlapping totals. */
+  sections?: WorkbenchResult[];
   kind: "query_result";
   query: string;
   intent: WorkbenchIntent;

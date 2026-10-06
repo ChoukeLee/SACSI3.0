@@ -704,7 +704,7 @@ export function DailyCalendar({
                   const unitBM = bookingMap.get(unit.id);
                   const hasCleaning = unitCleaningMap.has(unit.id);
                   const cleaningTaskId = unitCleaningMap.get(unit.id);
-                  const isMaintenance = !MAINTENANCE_STATUSES.has(unit.status);
+                  const isMaintenance = !MAINTENANCE_STATUSES.has(unit.status) || (unit.operational_condition !== undefined && unit.operational_condition !== "normal");
                   const roomTone = getRoomTone(unit, hasCleaning, isMaintenance);
                   return [
                     <div
@@ -765,6 +765,7 @@ export function DailyCalendar({
                             const action = getPrimaryDailyAction({
                               roomDisplayStatus: dateRoomState.status,
                               unitStatus: unit.status as UnitStatus,
+                              operationalCondition: unit.operational_condition,
                               dailyRentalEnabled: unit.daily_rental_enabled === true,
                               hasOpenCleaningTask: hasCleaning,
                               isPastDate: dateStr < todayStr,

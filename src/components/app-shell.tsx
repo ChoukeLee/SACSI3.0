@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
+import { LogOut, Settings, ShieldCheck, UserRound, ListChecks } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import type { UserRole } from "@/lib/auth";
@@ -99,6 +99,9 @@ function AppShellInner({
             </div>
             <div />
             <div className="ml-auto flex h-9 items-center gap-1 rounded-lg border border-border bg-muted/55 p-0.5 shadow-xs">
+              <Link href="/operator" prefetch={false} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground" aria-label={locale === "zh" ? "我的业务待办" : "Mes tâches"}>
+                <ListChecks className="h-4 w-4" /><span className="hidden sm:inline">{locale === "zh" ? "我的待办" : "Mes tâches"}</span>
+              </Link>
               {userRole !== "front_desk" && (
                 <Link
                   href={routeFor(otherLocale, pathname)}

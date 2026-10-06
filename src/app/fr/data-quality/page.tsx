@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { sortUnits } from "@/lib/utils";
 import { DesktopOnly } from "@/features/mobile";
@@ -35,17 +36,17 @@ export default async function FrenchDataQualityPage() {
     { data: cleaningTasks }, { data: ledgerEntries }, { data: auditLogs },
     databaseIssues,
   ] = await Promise.all([
-    supabase.from("units").select("*").order("unit_no").limit(500),
-    supabase.from("customers").select("*").order("name").limit(500),
-    supabase.from("daily_bookings").select("*").order("check_in", { ascending: false }).limit(500),
-    supabase.from("lease_contracts").select("*").order("start_date", { ascending: false }).limit(300),
-    supabase.from("sale_contracts").select("*").order("signed_date", { ascending: false }).limit(200),
-    supabase.from("sale_payment_schedule").select("*").order("installment_no").limit(1000),
-    supabase.from("receivables").select("*").neq("status", "cancelled").order("due_date", { ascending: false }).limit(1000),
-    supabase.from("payments").select("*").order("payment_date", { ascending: false }).limit(1000),
-    supabase.from("cleaning_tasks").select("*").limit(500),
-    supabase.from("ledger_entries").select("*").order("entry_date", { ascending: false }).limit(1000),
-    supabase.from("audit_logs").select("*").in("entity_type", ["daily_booking", "unit"]).order("created_at", { ascending: false }).limit(500),
+    complete(() => supabase.from("units").select("*", { count: "exact" }).order("unit_no").order("id"), "units"),
+    complete(() => supabase.from("customers").select("*", { count: "exact" }).order("name").order("id"), "customers"),
+    complete(() => supabase.from("daily_bookings").select("*", { count: "exact" }).order("check_in", { ascending: false }).order("id"), "daily_bookings"),
+    complete(() => supabase.from("lease_contracts").select("*", { count: "exact" }).order("start_date", { ascending: false }).order("id"), "lease_contracts"),
+    complete(() => supabase.from("sale_contracts").select("*", { count: "exact" }).order("signed_date", { ascending: false }).order("id"), "sale_contracts"),
+    complete(() => supabase.from("sale_payment_schedule").select("*", { count: "exact" }).order("installment_no").order("id"), "sale_payment_schedule"),
+    complete(() => supabase.from("receivables").select("*", { count: "exact" }).neq("status", "cancelled").order("due_date", { ascending: false }).order("id"), "receivables"),
+    complete(() => supabase.from("payments").select("*", { count: "exact" }).order("payment_date", { ascending: false }).order("id"), "payments"),
+    complete(() => supabase.from("cleaning_tasks").select("*", { count: "exact" }).order("id"), "cleaning_tasks"),
+    complete(() => supabase.from("ledger_entries").select("*", { count: "exact" }).order("entry_date", { ascending: false }).order("id"), "ledger_entries"),
+    complete(() => supabase.from("audit_logs").select("*", { count: "exact" }).in("entity_type", ["daily_booking", "unit"]).order("created_at", { ascending: false }).order("id"), "audit_logs"),
     fetchDatabaseQualityIssues("fr"),
   ]);
 
@@ -84,4 +85,7 @@ export default async function FrenchDataQualityPage() {
       </div>
     </>
   );
+}
+async function complete<T>(factory: () => { range(from:number,to:number): PromiseLike<{data:T[]|null;error:{message:string}|null;count?:number|null}> }, label:string) {
+  return {data:await fetchAllPages((from,to)=>factory().range(from,to),label)};
 }

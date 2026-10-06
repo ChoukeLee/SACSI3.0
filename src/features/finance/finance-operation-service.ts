@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { captureOperationFailure } from "@/lib/operation-monitoring";
 
 const errors: Record<string, string> = {
   financePermissionDenied: "当前账号无权执行此操作。",
@@ -27,7 +28,10 @@ export async function submitFinanceOperation<T = unknown>(
     p_input: input,
     p_request_id: requestId,
   });
-  if (error)
+  if (error) {
+    if (!/^(P0001|42501|22[0-9A-Z]{3}|23[0-9A-Z]{3})$/.test(error.code ?? "")) {
+      captureOperationFailure({ operation, requestId, code: error.code });
+    }
     return {
       success: false,
       error: errors[error.message] ?? error.message,
@@ -35,6 +39,7 @@ export async function submitFinanceOperation<T = unknown>(
         error.message !== "requestIdConflict" &&
         /^(P0001|42501|22[0-9A-Z]{3}|23[0-9A-Z]{3}|40001|40P01)$/.test(error.code ?? ""),
     };
+  }
   if (!data?.success)
     return { success: false, error: "结果未知，请保留原操作编号重试。", rejected: false };
   for (const path of [

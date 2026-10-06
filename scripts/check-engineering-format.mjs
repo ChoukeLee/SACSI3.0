@@ -4,6 +4,20 @@ import * as prettier from 'prettier';
 // A reviewed, explicit adoption scope. Legacy files are added when refactored;
 // this avoids burying meaningful business changes under a repository-wide reflow.
 const files = [
+  'src/features/finance/finance-read.ts',
+  'src/features/finance/finance-workspace.tsx',
+  'src/features/finance/manual-entry-form.tsx',
+  'src/app/api/finance/export/route.ts',
+  'src/app/operator/page.tsx',
+  'src/features/ai-workbench/multi-query-result.ts',
+  'src/lib/monitoring-privacy.ts',
+  'src/lib/operation-monitoring.ts',
+  'scripts/lib/dr-storage.mjs',
+  'tests/architecture-read.test.ts',
+  'tests/multi-query-result.test.ts',
+  'tests/dr-storage.test.ts',
+  'tests/monitoring-privacy.test.ts',
+  'tests/operational-architecture.native.ts',
   'src/lib/business-request-identity.ts',
   'src/features/finance/actions.ts',
   'src/features/finance/finance-operation-service.ts',

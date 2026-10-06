@@ -62,6 +62,7 @@ export type BuildingUpdate = Partial<BuildingInsert>;
 // ── Units ──
 
 export interface UnitRow {
+  operational_condition?: "normal" | "maintenance" | "locked";
   /** Read-model capability; never changes ownership or the stored sold status. */
   daily_rental_enabled?: boolean;
   id: string;
@@ -212,6 +213,7 @@ export type SaleContractUpdate = Partial<SaleContractInsert>;
 // ── Sale Payment Schedule ──
 
 export interface SalePaymentScheduleRow {
+  receivable_id?: string | null;
   id: string;
   sale_contract_id: string;
   installment_no: number;

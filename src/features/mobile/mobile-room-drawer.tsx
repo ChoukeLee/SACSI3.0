@@ -169,11 +169,11 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
           onCleaningCompleted?.({ taskId: result.taskId, unitId: result.unitId, unitStatus: result.unitStatus });
         }
       } else if (currentAction.type === "maintenance") {
-        await updateUnitStatus(currentRoom.unit.id, "maintenance");
+        return updateUnitStatus(currentRoom.unit.id, "maintenance", currentRoom.unit.updated_at);
       } else if (currentAction.type === "lock") {
-        await updateUnitStatus(currentRoom.unit.id, "locked");
+        return updateUnitStatus(currentRoom.unit.id, "locked", currentRoom.unit.updated_at);
       } else if (currentAction.type === "markAvailable") {
-        await updateUnitStatus(currentRoom.unit.id, "available");
+        return updateUnitStatus(currentRoom.unit.id, "available", currentRoom.unit.updated_at);
       } else if (currentAction.type === "extendStay" && currentRoom.booking && checkoutDate) {
         const currentCheckOut = currentRoom.booking.check_out ?? new Date().toISOString().slice(0, 10);
         const newDate = new Date(checkoutDate);

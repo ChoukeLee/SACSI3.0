@@ -1,10 +1,10 @@
 import { beforeEach, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ rpc: vi.fn(), signIn: vi.fn(), redirect: vi.fn((path: string) => { throw new Error(`REDIRECT:${path}`); }) }));
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), signIn: vi.fn(), resolve:vi.fn(), redirect: vi.fn((path: string) => { throw new Error(`REDIRECT:${path}`); }) }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/lib/auth", () => ({ getSeedAccountProfile: () => null, homePathForRole: () => "/" }));
+vi.mock("@/lib/auth", () => ({ resolveVerifiedSupabaseUser: mocks.resolve, homePathForRole: () => "/" }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ rpc: mocks.rpc, auth: { signInWithPassword: mocks.signIn } }) }));
 import { login } from "@/app/login/actions";
 
@@ -21,4 +21,12 @@ it("retains Auth fallback if the optional rate RPC is unavailable", async () => 
   mocks.rpc.mockRejectedValue(new Error("unavailable"));
   await expect(login(form())).rejects.toThrow("REDIRECT:/login?error=invalid_credentials");
   expect(mocks.signIn).toHaveBeenCalledOnce();
+});
+
+it("successful login uses the stored account profile without rewriting it",async()=>{
+  mocks.rpc.mockResolvedValue({data:0});
+  mocks.signIn.mockResolvedValue({data:{user:{id:"ying-id",email:"ying@sacsi.com"}},error:null});
+  mocks.resolve.mockResolvedValue({id:"ying-id",role:"front_desk",displayName:"Ying"});
+  await expect(login(form())).rejects.toThrow("REDIRECT:/");
+  expect(mocks.resolve).toHaveBeenCalledWith(expect.anything(),{id:"ying-id",email:"ying@sacsi.com"});
 });

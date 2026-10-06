@@ -112,7 +112,9 @@ it("rechecks current role and project access before replaying completed finance 
   await login(f.actor);
   await expect(rpc("manual_entry", input, id)).rejects.toThrow("financePermissionDenied");
   await owner("update user_profiles set role='admin' where id=$1", [f.actor]);
-  await db.query("update projects set code='CIMAC' where id=$1", [f.project]);
+  await db.query("update projects set code='CIMAC',access_mode='restricted' where id=$1", [
+    f.project,
+  ]);
   await login(f.actor);
   try {
     await expect(rpc("manual_entry", input, id)).rejects.toThrow("financeAccessDenied");

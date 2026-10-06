@@ -22,7 +22,12 @@ export function backupInput(path) {
   const directory = resolve(path);
   assert.equal(dirname(directory), join(root, "outputs/disaster-recovery"));
   assert.match(basename(directory), /^backup-[A-Za-z0-9]+$/);
-  const key = readFileSync(join(root, "work/disaster-recovery-keys", basename(directory) + ".key"));
+  let key;
+  if (process.env.SACSI_DR_ENCRYPTION_KEY) {
+    assert.match(process.env.SACSI_DR_ENCRYPTION_KEY, /^[0-9a-f]{64}$/i);
+    key = Buffer.from(process.env.SACSI_DR_ENCRYPTION_KEY, "hex");
+  } else
+    key = readFileSync(join(root, "work/disaster-recovery-keys", basename(directory) + ".key"));
   const manifest = JSON.parse(unseal(readFileSync(join(directory, "manifest.json.aes")), key));
   assert.equal(manifest.project, "afadqifyaoixkvxywxqb");
   assert.equal(manifest.complete, true);

@@ -47,7 +47,11 @@ export function getUnitTimelineStatus(
   unitCleaningMap: Map<string, string>,
   todayStr?: string,
 ): Exclude<RoomFilter, "all"> {
-  if (!MAINTENANCE_STATUSES.has(unit.status)) return "maintenance";
+  if (
+    !MAINTENANCE_STATUSES.has(unit.status) ||
+    (unit.operational_condition !== undefined && unit.operational_condition !== "normal")
+  )
+    return "maintenance";
   if (unitCleaningMap.has(unit.id) || unit.status === "cleaning_pending") return "cleaning";
 
   const unitBookings = bookingMap.get(unit.id);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canAccessPage, configuredAccountSummaries, getSeedAccountProfile, hasPermission, homePathForRole, type CurrentUser } from "./auth";
+import { canAccessPage, hasPermission, homePathForRole, type CurrentUser } from "./auth";
 
 const yingAdminUser: CurrentUser = {
   id: "test-user",
@@ -23,13 +23,6 @@ const bossUser: CurrentUser = {
 };
 
 describe("Ying administrator account", () => {
-  it("maps the Ying account to the administrator role consistently", () => {
-    expect(getSeedAccountProfile("YING@SACSI.COM")).toEqual({
-      role: "admin",
-      displayName: "Ying",
-    });
-  });
-
   it("grants all administrator permissions and pages", () => {
     for (const permission of [
       "units:read", "units:write", "units:delete",
@@ -51,34 +44,7 @@ describe("Ying administrator account", () => {
   });
 });
 
-describe("configured account roles and project scopes", () => {
-  it("configures zhulin as the finance controller with CIMAC access", () => {
-    expect(getSeedAccountProfile("FINANCE@SACSI.COM")).toEqual({
-      role: "finance",
-      displayName: "zhulin",
-    });
-    expect(configuredAccountSummaries.find((account) => account.email === "finance@sacsi.com")?.projectScope).toBe("all");
-  });
-
-  it("keeps Huang Jie aligned with Ying and restricted to SACSI", () => {
-    expect(getSeedAccountProfile("HUANG@SACSI.COM")).toEqual({
-      role: "admin",
-      displayName: "黄姐",
-    });
-    for (const email of ["ying@sacsi.com", "huang@sacsi.com"]) {
-      expect(configuredAccountSummaries.find((account) => account.email === email)?.projectScope).toBe("sacsi_only");
-    }
-  });
-});
-
 describe("boss role", () => {
-  it("uses the standardized display name", () => {
-    expect(getSeedAccountProfile("BOSS@SACSI.COM")).toEqual({
-      role: "boss",
-      displayName: "GAO",
-    });
-  });
-
   it("has full business read access without mutation or settings access", () => {
     for (const permission of [
       "units:read",

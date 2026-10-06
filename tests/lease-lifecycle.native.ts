@@ -459,13 +459,13 @@ it("checks actor, current role and project scope even on a previously successful
   await expect(rpc("create", input, id)).rejects.toThrow("leasePermissionDenied");
   await owner("update user_profiles set role='admin' where id=$1", [f.actor]);
   await db.query(
-    "update projects set code='CIMAC' where id=(select b.project_id from buildings b join units u on u.building_id=b.id where u.id=$1)",
+    "update projects set code='CIMAC', access_mode='restricted' where id=(select b.project_id from buildings b join units u on u.building_id=b.id where u.id=$1)",
     [f.unit],
   );
   await login(f.actor);
   await expect(rpc("create", input, id)).rejects.toThrow("leaseAccessDenied");
   // Prevent the synthetic CIMAC code from colliding with later fixtures.
-  await owner("update projects set code=id::text where code='CIMAC'");
+  await owner("update projects set code=id::text, access_mode='open' where code='CIMAC'");
   expect(other.actor).not.toBe(f.actor);
 });
 it("requires finance role for settlement and admin for administrative termination", async () => {
