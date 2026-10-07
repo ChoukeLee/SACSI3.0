@@ -7,6 +7,7 @@ export function AuditBusinessDetail({ log, locale }: { log: AuditLogRow; locale:
   const zh = locale === "zh";
   const fields = [
     [zh ? "登录账号（系统认证）" : "Compte connecté (authentifié)", info.actor],
+    [zh ? "身份记录状态" : "État de l’identité enregistrée", info.identityStatus],
     [zh ? "业务经办人" : "Responsable métier", info.agent],
     [zh ? "录入渠道（记录值）" : "Canal déclaré", info.channel],
     [zh ? "输入来源" : "Source", info.source],

@@ -12,7 +12,7 @@ import { SearchInput } from "@/components/ui/search-input";
 import type { Locale } from "@/lib/i18n";
 import { auditActionLabel, auditEntityLabel } from "@/lib/audit-labels";
 import { AuditBusinessDetail } from "./audit-business-detail";
-import { auditActorKey, auditActorText, auditBusinessSummary, auditChannel, auditChannelLabel, auditExportCell, auditSearchText } from "./audit-business-summary";
+import { auditActorKey, auditActorText, auditBusinessSummary, auditChannel, auditChannelLabel, auditExportCell, auditIdentityLabel, auditIdentityStatus, auditSearchText } from "./audit-business-summary";
 
 interface AuditLogRow {
   id: string;
@@ -144,6 +144,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
   const [entityFilter, setEntityFilter] = useState("all");
   const [actorFilter, setActorFilter] = useState("all");
   const [channelFilter, setChannelFilter] = useState("all");
+  const [identityFilter, setIdentityFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -168,6 +169,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
       if (entityFilter !== "all" && l.entity_type !== entityFilter) return false;
       if (actorFilter !== "all" && auditActorKey(l) !== actorFilter) return false;
       if (channelFilter !== "all" && auditChannel(l) !== channelFilter) return false;
+      if (identityFilter !== "all" && auditIdentityStatus(l) !== identityFilter) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         const haystack = [
@@ -184,12 +186,12 @@ export function AuditLogViewer({ logs, locale }: Props) {
       }
       return true;
     }).sort((a, b) => b.created_at.localeCompare(a.created_at));
-  }, [logs, dateFrom, dateTo, actionFilter, entityFilter, actorFilter, channelFilter, search, locale, actionLabels, entityLabels, extraActionLabels]);
+  }, [logs, dateFrom, dateTo, actionFilter, entityFilter, actorFilter, channelFilter, identityFilter, search, locale, actionLabels, entityLabels, extraActionLabels]);
 
   useEffect(() => {
     setPage(1);
     setExpandedId(null);
-  }, [dateFrom, dateTo, actionFilter, entityFilter, actorFilter, channelFilter, search]);
+  }, [dateFrom, dateTo, actionFilter, entityFilter, actorFilter, channelFilter, identityFilter, search]);
 
   const pageSize = DEFAULT_BUSINESS_TABLE_PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -239,6 +241,7 @@ export function AuditLogViewer({ logs, locale }: Props) {
   }
 
   function actorRole(log: AuditLogRow) {
+    if (auditIdentityStatus(log) !== "account_recorded") return "";
     return log.actor_role || metadataText(log, "actor_role");
   }
 
@@ -315,12 +318,12 @@ export function AuditLogViewer({ logs, locale }: Props) {
 
   const handleExport = () => {
     const headers = [zh ? "时间（阿比让）" : "Date (Abidjan)", zh ? "登录账号（系统认证）" : "Compte connecté (authentifié)", zh ? "角色" : "Rôle", zh ? "操作" : "Action", zh ? "对象" : "Objet", zh ? "摘要" : "Résumé",
-      zh ? "操作账号 ID" : "ID acteur", zh ? "业务经办人" : "Responsable", zh ? "渠道（记录值）" : "Canal déclaré", zh ? "请求编号" : "Requête", zh ? "原始指令" : "Instruction"];
+      zh ? "操作账号 ID" : "ID acteur", zh ? "业务经办人" : "Responsable", zh ? "渠道（记录值）" : "Canal déclaré", zh ? "请求编号" : "Requête", zh ? "身份记录状态" : "État de l’identité enregistrée", zh ? "原始指令" : "Instruction"];
     const rows = filtered.map((l) => {
       const role = actorRole(l);
       const business = auditBusinessSummary(l, locale);
       return [formatTime(l.created_at), actorText(l), role ? (roleLabels[role] ?? role) : "", actionLabel(l.action), entityText(l), summaryText(l),
-        business.actorId, business.agent, business.channel, business.requestId, business.instruction].map(auditExportCell);
+        business.actorId, business.agent, business.channel, business.requestId, business.identityStatus, business.instruction].map(auditExportCell);
     });
     downloadCsv("审计日志_" + new Date().toISOString().slice(0, 10) + ".csv", headers, rows);
   };
@@ -332,6 +335,9 @@ export function AuditLogViewer({ logs, locale }: Props) {
         <p>{zh
           ? "这里的“登录账号”来自系统认证。若小颖使用 Chouke 的账号，日志只能显示 Chouke，不能自动证明实际操作人是小颖；业务经办人另行展示，不等于登录账号。"
           : "Le compte connecté provient de l’authentification. Un compte partagé ne permet pas d’identifier automatiquement la personne devant l’ordinateur ; le responsable métier est affiché séparément."}</p>
+        <p>{zh
+          ? "维护渠道标签仅展示历史记录值，不证明当时的实际操作人或授权已核实。缺少登录账号的旧记录不会自动补填；可通过身份记录筛选单独查看。"
+          : "Le canal de maintenance est une valeur historique, pas une preuve de l’identité ni d’autorisation vérifiée. Les comptes manquants ne sont pas déduits ; utilisez le filtre d’identité."}</p>
       </div>
       {/* Filters */}
       <FilterBar
@@ -358,7 +364,13 @@ export function AuditLogViewer({ logs, locale }: Props) {
         <FilterGroup label={zh ? "录入渠道" : "Canal"}>
           <select aria-label={zh ? "录入渠道筛选" : "Filtre canal"} value={channelFilter} onChange={e => setChannelFilter(e.target.value)} className={controlClass}>
             <option value="all">{zh ? "全部渠道" : "Tous les canaux"}</option>
-            {(["external_codex", "sacsi_web", "unknown"] as const).map(channel => <option key={channel} value={channel}>{auditChannelLabel(channel, locale)}</option>)}
+            {(["external_codex", "sacsi_web", "explicit_user_authorized_maintenance", "unknown"] as const).map(channel => <option key={channel} value={channel}>{auditChannelLabel(channel, locale)}</option>)}
+          </select>
+        </FilterGroup>
+        <FilterGroup label={zh ? "身份记录" : "Identité enregistrée"}>
+          <select aria-label={zh ? "身份记录筛选" : "Filtre identité"} value={identityFilter} onChange={e => setIdentityFilter(e.target.value)} className={controlClass}>
+            <option value="all">{zh ? "全部身份记录" : "Toutes les identités"}</option>
+            {(["account_recorded", "maintenance_without_account", "missing_account"] as const).map(status => <option key={status} value={status}>{auditIdentityLabel(status, locale)}</option>)}
           </select>
         </FilterGroup>
         <FilterGroup label={zh ? "日期" : "Date"}>

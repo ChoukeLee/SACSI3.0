@@ -30,6 +30,33 @@ async function select(label: string, value: string) {
 }
 
 describe("audit reader interactions", () => {
+  it("separates maintenance without an account from other missing identities and exports the distinction", async () => {
+    await act(async () => root.render(<AuditLogViewer locale="zh" logs={[
+      auditFixture(),
+      auditFixture({ id: "maintenance", actor_id: null, actor_email: null, metadata: { channel: "explicit_user_authorized_maintenance" } }),
+      auditFixture({ id: "unknown", actor_id: null, actor_email: null, metadata: null }),
+    ]} />));
+    await click(host.querySelector('[aria-label="查看业务操作详情"]')!);
+    await select("身份记录筛选", "maintenance_without_account");
+    expect(host.querySelector('[aria-label="业务操作详情"]')).toBeNull();
+    expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
+    expect(host.querySelector("tbody")?.textContent).not.toContain("管理员");
+    await click(host.querySelector('[aria-label="查看业务操作详情"]')!);
+    expect(host.querySelector('[aria-label="业务操作详情"]')?.textContent).toContain("维护记录：无登录账号");
+    expect(host.querySelector('[aria-label="业务操作详情"]')?.textContent).toContain("授权维护（记录值）");
+    await click(button("导出 CSV"));
+    expect(download.mock.calls[0][1]).toContain("身份记录状态");
+    expect(download.mock.calls[0][2][0]).toContain("维护记录：无登录账号");
+    await select("身份记录筛选", "missing_account");
+    expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
+    await select("录入渠道筛选", "explicit_user_authorized_maintenance");
+    expect(host.querySelectorAll("tbody tr")).toHaveLength(0);
+  });
+  it("localizes the identity filter and maintenance option in French", async () => {
+    await act(async () => root.render(<AuditLogViewer locale="fr" logs={[auditFixture()]} />));
+    expect(host.querySelector('select[aria-label="Filtre identité"]')?.textContent).toContain("Compte non enregistré");
+    expect(host.querySelector('select[aria-label="Filtre canal"]')?.textContent).toContain("Maintenance autorisée (valeur enregistrée)");
+  });
   it("opens business details without requiring a review action", async () => {
     await render();
     const toggle = host.querySelector('[aria-label="查看业务操作详情"]')!;

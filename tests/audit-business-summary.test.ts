@@ -1,8 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { auditActorKey, auditActorText, auditBusinessSummary, auditChannel, auditExportCell, auditMoney, auditSearchText } from "@/features/settings/audit-business-summary";
+import { auditActorKey, auditActorText, auditBusinessSummary, auditChannel, auditChannelLabel, auditExportCell, auditIdentityLabel, auditIdentityStatus, auditMoney, auditSearchText } from "@/features/settings/audit-business-summary";
 import { auditFixture } from "./fixtures/audit-display";
 
 describe("human-readable audit evidence", () => {
+  it("labels recorded maintenance without inventing a logged-in operator", () => {
+    const log = auditFixture({ actor_id: null, actor_email: null, metadata: { channel: "explicit_user_authorized_maintenance", actor_display_name: "Ying" } });
+    expect(auditChannel(log)).toBe("explicit_user_authorized_maintenance");
+    expect(auditActorText(log, "zh")).toBe("未记录登录账号");
+    expect(auditIdentityStatus(log)).toBe("maintenance_without_account");
+    expect(auditChannelLabel(auditChannel(log), "zh")).toBe("授权维护（记录值）");
+    expect(auditIdentityLabel(auditIdentityStatus(log), "fr")).toBe("Maintenance : sans compte enregistré");
+  });
+  it("does not treat names, metadata accounts or an unknown channel as identity evidence", () => {
+    const log = auditFixture({ actor_id: null, actor_email: null, metadata: { actor_email: "admin@sacsi.com", actor_display_name: "Ying", channel: "service_role" } });
+    expect(auditIdentityStatus(log)).toBe("missing_account");
+    expect(auditIdentityStatus({ ...log, actor_id: "   ", actor_email: " " })).toBe("missing_account");
+    expect(auditActorKey({ ...log, actor_id: "   ", actor_email: " " })).toBe("unknown");
+    expect(auditActorText({ ...log, actor_id: "   ", actor_email: " " }, "zh")).toBe("未记录登录账号");
+    expect(auditIdentityStatus({ ...log, actor_email: "recorded@example.invalid" })).toBe("account_recorded");
+  });
+  it("keeps the recorded account when maintenance metadata is also present", () => {
+    const log = auditFixture({ metadata: { channel: "explicit_user_authorized_maintenance" } });
+    expect(auditIdentityStatus(log)).toBe("account_recorded");
+    expect(auditSearchText(log, "zh")).toContain("已记录登录账号");
+  });
   it('distinguishes real refunds from reversal and includes the amount',()=>{
     const refund=auditFixture({action:'operator_booking_refund',metadata:{plan:{amountXof:5000},channel:'external_codex'}});
     expect(auditBusinessSummary(refund,'zh').summary).toBe('登记实际退款 5,000 XOF');

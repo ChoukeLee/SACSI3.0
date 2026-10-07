@@ -6,28 +6,42 @@ export function auditText(value: unknown): string {
 }
 
 export function auditActorKey(log: AuditLogRow) {
-  return log.actor_id || log.actor_email || "unknown";
+  return auditText(log.actor_id) || auditText(log.actor_email) || "unknown";
 }
 
 export function auditActorText(log: AuditLogRow, locale: Locale) {
   // A name embedded in an instruction/metadata is not authentication evidence.
   // A current profile name is supplementary and is only shown when the immutable
   // audit row contains an authenticated account id/email.
-  const account = log.actor_email || log.actor_id;
+  const account = auditText(log.actor_email) || auditText(log.actor_id);
   if (!account) return locale === "zh" ? "未记录登录账号" : "Compte connecté non enregistré";
   const name = auditText(log.resolved_actor_display_name);
   return name ? `${name} · ${account}` : account;
 }
 
-export function auditChannel(log: AuditLogRow): "external_codex" | "sacsi_web" | "unknown" {
+export function auditChannel(log: AuditLogRow): "external_codex" | "sacsi_web" | "explicit_user_authorized_maintenance" | "unknown" {
   const channel = auditText(log.metadata?.channel);
-  return channel === "external_codex" || channel === "sacsi_web" ? channel : "unknown";
+  return channel === "external_codex" || channel === "sacsi_web" || channel === "explicit_user_authorized_maintenance" ? channel : "unknown";
 }
 
 export function auditChannelLabel(channel: ReturnType<typeof auditChannel>, locale: Locale) {
   if (channel === "external_codex") return locale === "zh" ? "外部 Codex" : "Codex externe";
   if (channel === "sacsi_web") return locale === "zh" ? "SACSI 网页" : "Site SACSI";
+  if (channel === "explicit_user_authorized_maintenance") return locale === "zh" ? "授权维护（记录值）" : "Maintenance autorisée (valeur enregistrée)";
   return locale === "zh" ? "未记录渠道" : "Canal non enregistré";
+}
+
+export function auditIdentityStatus(log: AuditLogRow): "account_recorded" | "maintenance_without_account" | "missing_account" {
+  // Classify recorded evidence, never infer the person or verify a maintenance
+  // authorization from metadata alone. Directory labels are not identity proof.
+  if (auditText(log.actor_id) || auditText(log.actor_email)) return "account_recorded";
+  return auditChannel(log) === "explicit_user_authorized_maintenance" ? "maintenance_without_account" : "missing_account";
+}
+
+export function auditIdentityLabel(status: ReturnType<typeof auditIdentityStatus>, locale: Locale) {
+  if (status === "account_recorded") return locale === "zh" ? "已记录登录账号" : "Compte enregistré";
+  if (status === "maintenance_without_account") return locale === "zh" ? "维护记录：无登录账号" : "Maintenance : sans compte enregistré";
+  return locale === "zh" ? "缺少登录账号" : "Compte non enregistré";
 }
 
 function amount(value: unknown): number | null {
@@ -67,6 +81,7 @@ export function auditBusinessSummary(log: AuditLogRow, locale: Locale) {
     : "");
   return {
     actor: auditActorText(log, locale), actorId: log.actor_id || "",
+    identityStatus: auditIdentityLabel(auditIdentityStatus(log), locale),
     channel: auditChannelLabel(auditChannel(log), locale), requestId,
     agent: agentName ? `${agentName}（${zh ? "当前名称" : "nom actuel"}）` : agentId || (zh ? "未记录" : "Non enregistré"),
     agentId, summary,
@@ -84,7 +99,7 @@ export function auditBusinessSummary(log: AuditLogRow, locale: Locale) {
 export function auditSearchText(log: AuditLogRow, locale: Locale) {
   const info = auditBusinessSummary(log, locale);
   return [info.actor, info.actorId, info.agent, info.agentId, info.channel, info.requestId,
-    info.receiptNo, info.instruction, info.summary].join(" ").toLowerCase();
+    info.receiptNo, info.instruction, info.summary, info.identityStatus].join(" ").toLowerCase();
 }
 
 /** Export text, never spreadsheet formulas. Applied to every audit export cell. */

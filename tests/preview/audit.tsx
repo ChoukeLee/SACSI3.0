@@ -11,5 +11,6 @@ createRoot(document.getElementById("root")!).render(<main style={{ padding: 24, 
     auditFixture(),
     auditFixture({ id: "web-example", actor_id: "other-user", actor_email: "backup@example.invalid", metadata: { channel: "sacsi_web", input_source: "manual_form", amount: 15000 } }),
     auditFixture({ id: "legacy-example", actor_id: null, actor_email: null, metadata: null, before_data: null, after_data: null }),
+    auditFixture({ id: "maintenance-example", actor_id: null, actor_email: null, metadata: { channel: "explicit_user_authorized_maintenance" }, before_data: null, after_data: null }),
   ]} />
 </main>);
