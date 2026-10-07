@@ -103,17 +103,21 @@ async function collectActorProfiles(
   const actorById = new Map<string, { displayName: string; role: string }>();
   if (actorIds.length === 0) return actorById;
 
-  const { data } = await supabase
-    .from("user_profiles")
-    .select("id, display_name, role")
-    .in("id", actorIds);
-
-  for (const actor of data ?? []) {
-    if (!actor.id) continue;
-    actorById.set(String(actor.id), {
-      displayName: String(actor.display_name ?? actor.id),
-      role: String(actor.role ?? ""),
-    });
+  for (let i = 0; i < actorIds.length; i += 100) {
+    try {
+      const { data, error } = await supabase.from("user_profiles")
+        .select("id, display_name, role").in("id", actorIds.slice(i, i + 100));
+      if (error) continue;
+      for (const actor of data ?? []) {
+        if (!actor.id) continue;
+        actorById.set(String(actor.id), {
+          displayName: String(actor.display_name ?? actor.id),
+          role: String(actor.role ?? ""),
+        });
+      }
+    } catch {
+      // Supplementary names are optional. Preserve recorded account evidence.
+    }
   }
 
   return actorById;

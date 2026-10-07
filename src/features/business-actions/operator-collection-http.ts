@@ -1,5 +1,6 @@
 import { authenticateOperatorRequest } from "./operator-request-auth";
 import { operatorAuthFailure } from "./operator-auth-failure";
+import { checkCollectionReceipts } from "./collection-duplicate-check";
 import { batchUuid, collectionPreview, collectionFeedback, parseCollectionRequest, suggestCollectionAllocation, suggestMonthlyLeaseSplit } from "./operator-batch";
 import { issuePreviewProof, validPreviewSecret, verifyPreviewProof } from "./operator-preview-proof";
 import { confirmationReply as reply, confirmationDeployment, confirmationsEnabled, confirmationBrowserOriginMatches } from "./operator-confirmation-http";
@@ -7,7 +8,7 @@ import { confirmationReply as reply, confirmationDeployment, confirmationsEnable
 export function collectionError(error: { message?: string }, unknownOutcome = false) {
   const code = error.message?.match(/\b(collection[A-Za-z]+|invalidCollection[A-Za-z]+|duplicateCollection[A-Za-z]+|invalid_batch_[a-z_]+|duplicate_batch_[a-z_]+|row_total_mismatch|batch_total_mismatch)\b/)?.[0];
   return reply({ code: code || (unknownOutcome ? "collection_outcome_unknown" : "collection_unavailable"),
-    message: collectionFeedback(code || "") }, code === "collectionForbidden" ? 403 : code ? 409 : 503);
+    message: collectionFeedback(code || "") }, code === "collectionForbidden" ? 403 : code === "collectionDuplicateCheckUnavailable" ? 503 : code ? 409 : 503);
 }
 export async function collectionPost(request: Request, operation: "query" | "prepare" | "drafts") {
   if (!confirmationsEnabled()) return reply({ code: "confirmations_not_enabled" }, 503);
@@ -41,6 +42,7 @@ export async function collectionPost(request: Request, operation: "query" | "pre
     if (!validPreviewSecret(secret)) return reply({ code: "preview_signing_unavailable" }, 503);
     const snapshot = await auth.supabase.rpc("preview_operator_collection", { p_request: input });
     if (snapshot.error) return collectionError(snapshot.error);
+    await checkCollectionReceipts(auth.supabase, input);
     const binding = { actorId: auth.user.id, request: input, snapshot: snapshot.data, deployment: confirmationDeployment() };
     if (operation === "prepare") return reply({ status: "preview_requires_human_confirmation", preview: collectionPreview(input, snapshot.data), ...issuePreviewProof(binding, secret) }, 200);
     if (body.replacesConfirmationId !== undefined && !batchUuid(body.replacesConfirmationId)) return reply({ code: "invalid_confirmation_id" }, 400);

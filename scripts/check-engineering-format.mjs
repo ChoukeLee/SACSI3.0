@@ -4,6 +4,9 @@ import * as prettier from 'prettier';
 // A reviewed, explicit adoption scope. Legacy files are added when refactored;
 // this avoids burying meaningful business changes under a repository-wide reflow.
 const files = [
+  'src/features/business-actions/collection-duplicate-check.ts',
+  'tests/collection-input-safety.test.ts',
+  'scripts/verify-external-dr-copy.mjs',
   'scripts/inspect-unpaid-sale-review.mjs',
   'scripts/prepare-dr-20261006.mjs',
   'scripts/check-architecture-upgrade.mjs',
@@ -75,7 +78,9 @@ for(const filepath of files){
   const source=await readFile(filepath,'utf8');
   const options={...await prettier.resolveConfig(filepath),filepath};
   if(process.argv.includes('--write')) await writeFile(filepath,await prettier.format(source,options));
-  else if(!await prettier.check(source,options)){ console.error(`Format required: ${filepath}`);invalid++; }
+  // Git may materialize CRLF on Windows. Formatting must govern syntax/layout,
+  // not fail a clean checkout solely because of core.autocrlf.
+  else if(!await prettier.check(source.replace(/\r\n/g,'\n'),options)){ console.error(`Format required: ${filepath}`);invalid++; }
 }
 if(invalid)process.exitCode=1;
 else console.log(`Formatting verified: ${files.length} governed files.`);

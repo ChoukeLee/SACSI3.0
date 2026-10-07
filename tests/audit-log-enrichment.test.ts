@@ -3,6 +3,17 @@ import { enrichAuditLogsWithUnitNumbers } from "@/features/settings/audit-log-en
 import { auditFixture } from "./fixtures/audit-display";
 
 describe("supplementary agent names", () => {
+  it.each(["error", "throw"])("keeps recorded actor evidence when profile lookup is %s", async mode => {
+    const log = auditFixture({ entity_id: null, metadata: null, resolved_actor_display_name: undefined });
+    const original = structuredClone(log);
+    const from = vi.fn(() => ({ select: () => ({ in: async () => {
+      if (mode === "throw") throw new Error("offline");
+      return { data: [{ id: log.actor_id, display_name: "Untrusted result", role: "admin" }], error: {} };
+    } }) }));
+    const [result] = await enrichAuditLogsWithUnitNumbers({ from } as unknown as Parameters<typeof enrichAuditLogsWithUnitNumbers>[0], [log]);
+    expect(log).toEqual(original);expect(result.actor_id).toBe(log.actor_id);expect(result.actor_email).toBe(log.actor_email);
+    expect(result.resolved_actor_display_name).toBeNull();
+  });
   it.each(["success", "error", "throw"])("preserves original evidence when directory lookup is %s", async mode => {
     const log = auditFixture({ actor_id: null, entity_id: null, resolved_booking_agent_name: undefined });
     const original = structuredClone(log);

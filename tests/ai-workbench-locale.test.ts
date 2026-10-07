@@ -9,12 +9,8 @@ describe("AI workbench French result layer", () => {
   const queryService = read("src/features/ai-workbench/query-service.ts");
   const actions = read("src/features/ai-workbench/actions.ts");
   const draftService = read("src/features/ai-workbench/action-draft-service.ts");
-  const view = read("src/features/ai-workbench/workbench-view.tsx");
 
   it("preserves locale support in the retained shared query pipeline", () => {
-    expect(view).toContain('locale = "zh"');
-    expect(view).toContain("canRecordFinance = false");
-    expect(view).toContain('name="locale"');
     expect(actions).toContain("function readLocale(formData: FormData): Locale");
     expect(actions).toContain("executeWorkbenchQuery(query, intent, locale)");
     expect(actions).toContain("buildCleaningCompletionDraft(actionIntent, locale)");
@@ -30,12 +26,4 @@ describe("AI workbench French result layer", () => {
     expect(actions).toContain('tr(locale, "保洁已完成并复查", "Ménage terminé et vérifié")');
   });
 
-  it("keeps the bilingual UI copy complete for both locales", () => {
-    for (const key of ["verifyTitle", "confirmExecuting", "boundaryConfirmText", "emptyRows", "evidenceTitle", "loadingTitle"]) {
-      expect(view).toContain(`${key}:`);
-    }
-    expect(view).toContain('"Confirmer et exécuter"');
-    expect(view).toContain('"Vérification après exécution (base relue)"');
-    expect(view).toContain('"Enregistrements réels"');
-  });
 });

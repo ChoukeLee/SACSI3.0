@@ -9,7 +9,6 @@ describe("AI workbench human-confirmed execution (L1)", () => {
   const workbench = read("src/features/ai-workbench/actions.ts");
   const draftService = read("src/features/ai-workbench/action-draft-service.ts");
   const types = read("src/features/ai-workbench/types.ts");
-  const view = read("src/features/ai-workbench/workbench-view.tsx");
   const dailyActions = read("src/features/daily-rentals/actions.ts");
 
   it("exposes a confirm action next to the query action", () => {
@@ -46,9 +45,6 @@ describe("AI workbench human-confirmed execution (L1)", () => {
     expect(draftService).toContain("execution: {");
     expect(draftService).toContain("taskId: task.id");
     expect(draftService).toContain("unitId: unit.id");
-    for (const field of ["execution_action", "task_id", "unit_id", "building_code", "unit_no", "proposal_id", "proposal_version"]) {
-      expect(view).toContain(`name="${field}"`);
-    }
   });
 
   it("persists every workbench draft into the ai_* evidence ledger", () => {
@@ -70,16 +66,11 @@ describe("AI workbench human-confirmed execution (L1)", () => {
     expect(types).toContain('kind: "action_result"');
     expect(types).toContain("verification: WorkbenchEvidence[]");
     expect(types).toContain("execution: WorkbenchCleaningExecution");
-    // The view renders an execution result distinct from a plain query result.
-    expect(view).toContain("WorkbenchActionResultView");
   });
 
   it("lets the operator discard a draft through the evidence ledger", () => {
     expect(workbench).toContain("export async function discardWorkbenchProposal");
     expect(workbench).toContain("rejectAiProposal(proposalId, Number(rawProposalVersion), reason)");
     expect(workbench).not.toContain("createPrivilegedClient");
-    expect(view).toContain("discardWorkbenchProposal");
-    expect(view).toContain('name="proposal_id"');
-    expect(view).toContain("discardPending");
   });
 });

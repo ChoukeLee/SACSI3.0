@@ -33,8 +33,9 @@ export function parseCollectionRequest(value: unknown): CollectionRequest {
       || !Array.isArray(row.allocations) || row.allocations.length < 1 || row.allocations.length > 36) throw new Error("invalid_batch_row");
     // One target per batch avoids ambiguous date updates and duplicate source rows.
     const target = `${row.domain}:${row.targetId.toLowerCase()}`;
-    if (lines.has(row.lineId) || targets.has(target)) throw new Error("duplicate_batch_target");
-    lines.add(row.lineId); targets.add(target);
+    const line = row.lineId.trim().normalize("NFC");
+    if (lines.has(line) || targets.has(target)) throw new Error("duplicate_batch_target");
+    lines.add(line); targets.add(target);
     for (const allocation of row.allocations) {
       if (!record(allocation) || !keys(allocation, ["receivableId", "amountXof"]) || !batchUuid(allocation.receivableId) || !money(allocation.amountXof)) throw new Error("invalid_batch_allocation");
       const id = allocation.receivableId.toLowerCase();
@@ -71,6 +72,10 @@ export function collectionFeedback(code: string) {
     collectionResultInvalid: "入账结果复查未通过，请保留原单联系维护者，不要重复收款。",
     confirmation_deployment_changed: "系统版本已更新，请沿用原请求号重新准备确认单。",
     preview_changed: "预览内容或账务已变化，请重新准备并核对。",
+    duplicateCollectionReceipt: "同一合同或订单已有相同收据号的收款记录，请查询原请求核对；不要换请求号重复录入。分次使用同一收据也需先核对已有分账。",
+    collectionDuplicateCheckUnavailable: "历史收据核对暂时不可用，未生成新确认单。请保留原请求号稍后再查，不要换号重录。",
+    duplicate_batch_target: "本批存在重复行号或重复合同/订单，请先核对或合并，不能直接重复入账。",
+    duplicate_batch_receivable: "同一应收在本批出现多次，请核对分账并合并。",
   };
   return messages[code] || "请保留原请求编号，核对账号、凭证与账务，必要时联系 Chucke 协助。";
 }
@@ -99,9 +104,21 @@ export function collectionPreview(request: CollectionRequest, snapshots: Collect
 /** Suggest only when selected outstanding items exactly reconcile. Never invent
  * a proportional split, a bill, or a missing unit/currency conversion. */
 export function suggestCollectionAllocation(totalXof: number, selected: CollectionSnapshot["receivables"]) {
-  const allocations = selected.map(r => ({ receivableId: r.id, amountXof: Number(r.amount_xof) - Number(r.paid_amount_xof) }));
+  const exactAmount = (v: unknown) => {
+    if (typeof v !== "number" && (typeof v !== "string" || !/^\d+(?:\.0+)?$/.test(v))) return null;
+    const n = Number(v);
+    return Number.isSafeInteger(n) && n >= 0 && n <= 999999999999 ? n : null;
+  };
+  const allocations = selected.map(r => {
+    const due = exactAmount(r.amount_xof), paid = exactAmount(r.paid_amount_xof);
+    const valid = due !== null && paid !== null && paid <= due && batchUuid(r.id)
+      && (r.currency === undefined || r.currency === "XOF")
+      && !["paid", "cancelled"].includes(String(r.status))
+      && !["historical_pending", "excluded"].includes(String(r.management_status));
+    return { receivableId: r.id, amountXof: valid ? due! - paid! : NaN };
+  });
   if (!money(totalXof) || !allocations.length || allocations.some(a => !money(a.amountXof))
-    || new Set(allocations.map(a => a.receivableId)).size !== allocations.length
+    || new Set(allocations.map(a => a.receivableId.toLowerCase())).size !== allocations.length
     || allocations.reduce((n, a) => n + a.amountXof, 0) !== totalXof) {
     return { status: "clarification_required" as const, question: "总额与所选应收余额不一致，请核对账期、已收款及各项分配金额。" };
   }

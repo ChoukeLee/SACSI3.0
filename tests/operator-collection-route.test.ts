@@ -45,3 +45,23 @@ it('recovers the original request without executing payments',async()=>{
   expect((await result.json()).confirmationPath).toBe(`/operator/collections/${id}`);expect(mock.rpc).toHaveBeenCalledExactlyOnceWith('find_operator_collection',{p_request_id:id});
 });
 it('rejects anonymous queries',async()=>{mock.auth.mockResolvedValue({authenticated:false,reason:'missing_or_invalid_session'});expect((await collectionPost(request({domain:'lease',targetId:id}),'query')).status).toBe(401);expect(mock.rpc).not.toHaveBeenCalled();});
+it('does not create a new draft when a posted receipt number already exists',async()=>{
+  const query={select:()=>query,in:()=>query,not:()=>query,order:()=>query,range:async()=>({data:[{source_id:id,receipt_no:'TEST'}],error:null,count:1})};
+  mock.auth.mockResolvedValue({authenticated:true,mode:'bearer',user:{id},supabase:{rpc:mock.rpc,from:()=>query}});
+  const q=structuredClone(input) as typeof input & {rows:Array<typeof input.rows[number]&{receiptNo?:string}>};q.rows[0].receiptNo='TEST';
+  const result=await collectionPost(request(q),'prepare');expect(result.status).toBe(409);expect((await result.json()).code).toBe('duplicateCollectionReceipt');
+  expect(mock.rpc.mock.calls.map(c=>c[0])).toEqual(['preview_operator_collection']);
+});
+it('rechecks receipt history between preview and draft and fails closed on an outage',async()=>{
+  let entries:Array<{source_id:string;receipt_no:string}>=[];
+  let unavailable=false;
+  const query={select:()=>query,in:()=>query,not:()=>query,order:()=>query,range:async()=>({data:entries,error:unavailable?{message:'secret diagnostics'}:null,count:entries.length})};
+  mock.auth.mockResolvedValue({authenticated:true,mode:'bearer',user:{id},supabase:{rpc:mock.rpc,from:()=>query}});
+  const q=structuredClone(input) as typeof input & {rows:Array<typeof input.rows[number]&{receiptNo?:string}>};q.rows[0].receiptNo='TEST';
+  const preview=await (await collectionPost(request(q),'prepare')).json();
+  entries=[{source_id:id,receipt_no:'TEST'}];
+  expect((await collectionPost(request({request:q,previewProof:preview.previewProof}),'drafts')).status).toBe(409);
+  unavailable=true;
+  const response=await collectionPost(request(q),'prepare');expect(response.status).toBe(503);expect(await response.text()).not.toContain('secret diagnostics');
+  expect(mock.rpc.mock.calls.some(c=>c[0]==='create_operator_collection')).toBe(false);
+});

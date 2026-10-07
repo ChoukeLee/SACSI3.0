@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -8,7 +8,6 @@ const read = (path: string) => readFileSync(join(root, path), "utf8");
 describe("AI finance workbench entry", () => {
   const zhPage = read("src/app/assistant/page.tsx");
   const frPage = read("src/app/fr/assistant/page.tsx");
-  const view = read("src/features/ai-workbench/workbench-view.tsx");
   const upload = read("src/features/finance/receipt-upload.tsx");
   const scan = read("src/app/api/receipt/scan/route.ts");
 
@@ -21,16 +20,10 @@ describe("AI finance workbench entry", () => {
     expect(read("src/components/app-sidebar.tsx")).not.toContain('href: "/assistant"');
     expect(read("src/components/app-shell.tsx")).toContain('href="/operator"');
     expect(read("src/app/operator/page.tsx")).toContain("getCurrentUser");
-    expect(view).toContain("if (!canRecordFinance) return");
-    expect(view).toContain("{canRecordFinance && !receiptTurn && (");
+    expect(existsSync(join(root,"src/features/ai-workbench/workbench-view.tsx"))).toBe(false);
   });
 
-  it("mounts the existing three-step receipt flow inside the conversation", () => {
-    expect(view).toContain('from "@/features/finance/receipt-upload"');
-    expect(view).toContain("<ReceiptConversation");
-    expect(view).toContain("<ReceiptUpload");
-    expect(view).toContain("autoScan");
-    expect(view).toContain("conversationId={conversationId}");
+  it("preserves the shared three-step receipt flow", () => {
     expect(upload).toContain("/api/receipt/scan");
     expect(upload).toContain("/api/receipt/prepare");
     expect(upload).toContain("/api/receipt/revise");
@@ -40,13 +33,6 @@ describe("AI finance workbench entry", () => {
     expect(upload).toContain("每次修改都会生成新版本并写入审计记录");
   });
 
-  it("accepts selected, pasted and dropped images in the main composer", () => {
-    expect(view).toContain('onPaste={handlePaste}');
-    expect(view).toContain('onDrop={handleDrop}');
-    expect(view).toContain('accept="image/jpeg,image/png,image/webp"');
-    expect(view).toContain("URL.createObjectURL(attachment)");
-    expect(view).toContain("URL.revokeObjectURL(objectUrl)");
-  });
 
   it("keeps every receipt API behind the server-side finance permission", () => {
     for (const route of ["scan", "prepare", "revise", "confirm"]) {
@@ -64,17 +50,6 @@ describe("AI finance workbench entry", () => {
     }
   });
 
-  it("routes the main composer into the active receipt proposal", () => {
-    expect(view).toContain("resolveWorkbenchComposerRoute");
-    expect(view).toContain('route === "receipt_revision"');
-    expect(view).toContain("setExternalRevision");
-    expect(view).toContain("receiptRevisionMode");
-    expect(upload).toContain("externalRevision.instruction");
-    expect(upload).toContain("onRevisionTargetChange");
-    expect(upload).toContain("onExternalRevisionHandled");
-    expect(upload).toContain("onRevisionBusyChange");
-    expect(view).toContain("receiptFlowBusy");
-  });
 
   it("accepts only bounded image inputs before creating a financial draft", () => {
     expect(scan).toContain('new Set(["image/jpeg", "image/png", "image/webp"])');
