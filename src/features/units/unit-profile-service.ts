@@ -41,11 +41,11 @@ export async function fetchUnitProfile(unitId: string): Promise<UnitProfileData 
   const [buildingResult, positionResult, dailyBookings, leaseContracts, saleContracts, receivables, payments] = await Promise.all([
     supabase.from("buildings").select("display_name, code").eq("id", unit.building_id).single(),
     supabase.from("unit_operational_position").select("*").eq("id",unitId).single(),
-    fetchAllPages<DailyBookingRow>((from,to)=>supabase.from("daily_bookings").select("*").eq("unit_id",unitId).order("check_in",{ascending:false}).order("id").range(from,to),"daily bookings"),
-    fetchAllPages<LeaseContractRow>((from,to)=>supabase.from("lease_contracts").select("*").eq("unit_id",unitId).order("start_date",{ascending:false}).order("id").range(from,to),"lease contracts"),
-    fetchAllPages<SaleContractRow>((from,to)=>supabase.from("sale_contracts").select("*").eq("unit_id",unitId).order("signed_date",{ascending:false}).order("id").range(from,to),"sale contracts"),
-    fetchAllPages<ReceivableRow>((from,to)=>supabase.from("receivables").select("*").eq("unit_id",unitId).order("due_date",{ascending:false}).order("id").range(from,to),"receivables"),
-    fetchAllPages<PaymentRow>((from,to)=>supabase.from("payments").select("*").eq("unit_id",unitId).order("payment_date",{ascending:false}).order("id").range(from,to),"payments"),
+    fetchAllPages<DailyBookingRow>((from,to)=>supabase.from("daily_bookings").select("*",{count:"exact"}).eq("unit_id",unitId).order("check_in",{ascending:false}).order("id").range(from,to),"daily bookings"),
+    fetchAllPages<LeaseContractRow>((from,to)=>supabase.from("lease_contracts").select("*",{count:"exact"}).eq("unit_id",unitId).order("start_date",{ascending:false}).order("id").range(from,to),"lease contracts"),
+    fetchAllPages<SaleContractRow>((from,to)=>supabase.from("sale_contracts").select("*",{count:"exact"}).eq("unit_id",unitId).order("signed_date",{ascending:false}).order("id").range(from,to),"sale contracts"),
+    fetchAllPages<ReceivableRow>((from,to)=>supabase.from("receivables").select("*",{count:"exact"}).eq("unit_id",unitId).order("due_date",{ascending:false}).order("id").range(from,to),"receivables"),
+    fetchAllPages<PaymentRow>((from,to)=>supabase.from("payments").select("*",{count:"exact"}).eq("unit_id",unitId).order("payment_date",{ascending:false}).order("id").range(from,to),"payments"),
   ]);
   if (buildingResult.error || positionResult.error) throw new Error("UnitProfileUnavailable");
   const customerIds = new Set<string>();
@@ -58,9 +58,8 @@ export async function fetchUnitProfile(unitId: string): Promise<UnitProfileData 
   // Avoid oversized URL filters; each batch remains ordered and fully paged.
   const ids=[...customerIds]; const customers: CustomerRow[]=[];
   for(let offset=0;offset<ids.length;offset+=100) customers.push(...await fetchAllPages<CustomerRow>(
-    (from,to)=>supabase.from("customers").select("*").in("id",ids.slice(offset,offset+100)).order("id").range(from,to),"customers"));
+    (from,to)=>supabase.from("customers").select("*",{count:"exact"}).in("id",ids.slice(offset,offset+100)).order("id").range(from,to),"customers"));
   return { unit: unit as UnitRow, position: positionResult.data as UnitPosition,
     buildingName: buildingResult.data?.display_name ?? buildingResult.data?.code ?? "-",
     dailyBookings,leaseContracts,saleContracts,receivables,payments,customers };
 }
-

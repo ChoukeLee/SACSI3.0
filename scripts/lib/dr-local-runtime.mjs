@@ -4,7 +4,11 @@ import { readFileSync } from "node:fs";
 import { resolve, join, basename, dirname } from "node:path";
 import { unseal, digest } from "./dr-archive.mjs";
 export const root = resolve(import.meta.dirname, "../..");
-export const project = "sacsi-dr-20260923";
+export const project = process.env.SACSI_DR_LOCAL_PROJECT ?? "sacsi-dr-20260923";
+assert.ok(
+  ["sacsi-dr-20260923", "sacsi-dr-20261006"].includes(project),
+  "Unreviewed restore target",
+);
 export const network = project;
 export const db = `supabase_db_${project}`;
 export const dockerBin = "C:/Program Files/Docker/Docker/resources/bin/docker.exe";

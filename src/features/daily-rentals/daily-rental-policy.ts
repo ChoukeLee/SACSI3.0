@@ -182,6 +182,7 @@ export interface DailyBookingActionState {
 }
 
 export interface CreateBookingPolicyInput {
+  operationalCondition?: "normal" | "maintenance" | "locked";
   dailyRentalEnabled?: boolean;
   checkIn: string;
   checkOut?: string;
@@ -210,6 +211,8 @@ export function allowCreateBooking(input: CreateBookingPolicyInput): PolicyResul
   const today = input.todayStr ?? todayIso();
 
   if (!checkIn) return { allowed: false, reason: "checkInRequired" };
+  if (input.operationalCondition === "maintenance") return { allowed: false, reason: "unitMaintenance" };
+  if (input.operationalCondition === "locked") return { allowed: false, reason: "unitLocked" };
 
   // Unit-level blocks.
   if (input.unitStatus) {
@@ -236,6 +239,7 @@ export function allowConfirmBooking(booking: Pick<DailyBookingRow, "status">): P
 }
 
 export interface CheckInPolicyInput {
+  operationalCondition?: "normal" | "maintenance" | "locked";
   dailyRentalEnabled?: boolean;
   booking: Pick<DailyBookingRow, "status" | "checkout_mode">;
   prepaidAmount: number;
@@ -248,6 +252,8 @@ export function allowCheckIn(input: CheckInPolicyInput): PolicyResult {
   const { booking, hasOpenCleaningTask, otherCheckedInCount, unitStatus } = input;
 
   if (booking.status !== "confirmed") return { allowed: false, reason: "bookingNotConfirmed" };
+  if (input.operationalCondition === "maintenance") return { allowed: false, reason: "unitMaintenance" };
+  if (input.operationalCondition === "locked") return { allowed: false, reason: "unitLocked" };
 
   // Unit-level blocks
   if (unitStatus) {

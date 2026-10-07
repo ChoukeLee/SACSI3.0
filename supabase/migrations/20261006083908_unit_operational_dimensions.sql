@@ -82,5 +82,15 @@ begin
   old_text:='if v_unit.status in (''maintenance'', ''locked'', ''leased'')';
   if strpos(definition,old_text)=0 then raise exception 'unitConditionMigrationDrift'; end if;
   execute replace(definition,old_text,old_text||' or v_unit.operational_condition<>''normal''');
+  signature:='private.lease_lifecycle(text,jsonb,uuid)';
+  definition:=pg_get_functiondef(signature::regprocedure);
+  old_text:='or u.status=''locked'' then raise exception ''leaseUnitNotOperational'';';
+  if strpos(definition,old_text)=0 then raise exception 'leaseUnitConditionMigrationDrift'; end if;
+  execute replace(definition,old_text,'or u.status in (''locked'',''maintenance'') or u.operational_condition<>''normal'' then raise exception ''leaseUnitNotOperational'';');
+  signature:='private.preview_booking_operation(jsonb)';
+  definition:=pg_get_functiondef(signature::regprocedure);
+  old_text:='if target.status in (''locked'',''maintenance'',''leased'')';
+  if strpos(definition,old_text)=0 then raise exception 'bookingOperationConditionMigrationDrift'; end if;
+  execute replace(definition,old_text,old_text||' or target.operational_condition<>''normal''');
 end; $migration$;
 commit;

@@ -194,6 +194,7 @@ export function BookingPanel({
         bookingStatus: booking.status as "pending_review" | "confirmed" | "checked_in" | "checked_out" | "cancelled",
         hasOpenCleaningTask: Boolean(effectiveCleaningTask),
         hasOutstandingBalance,
+        operationalCondition: selectedUnit?.operational_condition,
       })
     : null;
   const showAdvanceReservationPayment = booking

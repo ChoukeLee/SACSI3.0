@@ -8,7 +8,9 @@ describe("monitoring privacy", () => {
       type: undefined,
       user: { email: "private@example.com" },
       extra: { customer: "private" },
-      tags: { operation: "finance", request_id: "safe-id" },
+      contexts: { business: { customer: "private" } },
+      message: "private customer message",
+      tags: { operation: "finance", request_id: "safe-id", customer: "private" },
       request: {
         url: "https://example.com/api?token=secret#secret",
         data: "private",

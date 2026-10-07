@@ -4,6 +4,11 @@ import * as prettier from 'prettier';
 // A reviewed, explicit adoption scope. Legacy files are added when refactored;
 // this avoids burying meaningful business changes under a repository-wide reflow.
 const files = [
+  'scripts/inspect-unpaid-sale-review.mjs',
+  'scripts/prepare-dr-20261006.mjs',
+  'scripts/check-architecture-upgrade.mjs',
+  'scripts/inspect-sale-link-compatibility.mjs',
+  'scripts/copy-current-dr-to-external.mjs',
   'src/features/finance/finance-read.ts',
   'src/features/finance/finance-workspace.tsx',
   'src/features/finance/manual-entry-form.tsx',

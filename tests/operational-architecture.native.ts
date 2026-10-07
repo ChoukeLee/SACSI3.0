@@ -176,6 +176,235 @@ it("new sale installments and receipts have explicit foreign-key identities", as
   expect(allocation.amount_xof).toBe("50.00");
   expect(allocation.actor_id).toBe(actor);
   await db.query("reset role");
+  // A second same-date/same-amount receivable must not change the explicit association.
+  const duplicate = (
+    await db.query(
+      `insert into public.receivables(building_id,unit_id,customer_id,source_type,source_id,category,title,due_date,amount_xof)
+    select building_id,unit_id,customer_id,source_type,source_id,category,'Unlinked duplicate',due_date,amount_xof from receivables where id=$1 returning id`,
+      [linked.receivable_id],
+    )
+  ).rows[0].id;
+  await db.query("set role authenticated");
+  await db.query("select finance_operation_rpc('sale_payment',$1,$2)", [
+    { contractId: contract, scheduleId: schedule.id, amount: 10, paymentDate: "2026-10-06" },
+    randomUUID(),
+  ]);
+  const batch = {
+    requestId: randomUUID(),
+    protocolVersion: "1.0",
+    connectorVersion: "0.5.0",
+    originalInstruction: "Synthetic linked sale receipt",
+    totalXof: 20,
+    rows: [
+      {
+        lineId: "1",
+        sourceText: "Synthetic",
+        domain: "sale",
+        targetId: contract,
+        totalXof: 20,
+        paymentDate: "2026-10-06",
+        paymentMethod: "cash",
+        allocations: [{ receivableId: linked.receivable_id, amountXof: 20 }],
+      },
+    ],
+  };
+  const preview = (await db.query("select public.preview_operator_collection($1) result", [batch]))
+    .rows[0].result;
+  const draft = (
+    await db.query(
+      "select public.create_operator_collection($1,$2,now()+interval '5 minutes','test') result",
+      [JSON.stringify(batch), JSON.stringify(preview)],
+    )
+  ).rows[0].result;
+  expect(
+    (await db.query("select public.confirm_operator_collection($1) result", [draft.id])).rows[0]
+      .result.verified,
+  ).toBe(true);
+  expect(
+    (await db.query("select paid_amount_xof from receivables where id=$1", [linked.receivable_id]))
+      .rows[0].paid_amount_xof,
+  ).toBe("80.00");
+  expect(
+    (await db.query("select paid_amount_xof from receivables where id=$1", [duplicate])).rows[0]
+      .paid_amount_xof,
+  ).toBe("0.00");
+  await db.query("reset role");
+});
+it("lease creation rejects separately locked sold units", async () => {
+  const f = await asset("sold");
+  await db.query("update units set operational_condition='locked' where id=$1", [f.unit]);
+  await db.query("set role authenticated");
+  try {
+    await expect(
+      db.query("select private.lease_lifecycle('create',$1,$2)", [
+        { unitId: f.unit },
+        randomUUID(),
+      ]),
+    ).rejects.toThrow("leaseUnitNotOperational");
+  } finally {
+    await db.query("reset role");
+  }
+});
+it("aggregate sale components settle only when every approved component is paid", async () => {
+  await db.query("reset role");
+  const f = await asset("sold"),
+    contract = randomUUID(),
+    schedule = randomUUID();
+  await db.query(
+    "insert into sale_contracts(id,unit_id,customer_id,contract_no,signed_date,total_amount_xof,payment_plan_type,status) values($1,$2,$3,$4,'2020-01-01',110,'Legacy split settlement','active')",
+    [contract, f.unit, f.customer, contract],
+  );
+  await db.query(
+    "insert into sale_payment_schedule(id,sale_contract_id,installment_no,due_date,amount_xof,status) values($1,$2,1,'2020-01-01',110,'overdue')",
+    [schedule, contract],
+  );
+  const ids: string[] = [];
+  for (const [amount, paid, category] of [
+    [60, 60, "sale_lump_sum"],
+    [40, 0, "sale_lump_sum"],
+    [10, 10, "other"],
+  ] as const) {
+    const id = (
+      await db.query(
+        "insert into receivables(building_id,unit_id,customer_id,source_type,source_id,category,title,due_date,amount_xof,paid_amount_xof,status) values($1,$2,$3,'sale_contract',$4,$5,'Synthetic','2021-01-01',$6,$7,$8) returning id",
+        [
+          f.building,
+          f.unit,
+          f.customer,
+          contract,
+          category,
+          amount,
+          paid,
+          paid === amount ? "paid" : "overdue",
+        ],
+      )
+    ).rows[0].id;
+    ids.push(id);
+    await db.query(
+      "insert into sale_schedule_components(schedule_id,receivable_id,basis,request_id) values($1,$2,$3,$4)",
+      [
+        schedule,
+        id,
+        category === "other" ? "approved_contract_settlement_credit" : "principal",
+        randomUUID(),
+      ],
+    );
+  }
+  expect(
+    (await db.query("select private.sale_components_valid($1) valid", [schedule])).rows[0].valid,
+  ).toBe(true);
+  await db.query("set role authenticated");
+  try {
+    await expect(
+      db.query("select finance_operation_rpc('sale_payment',$1,$2)", [
+        { contractId: contract, scheduleId: schedule, amount: 20, paymentDate: "2026-10-07" },
+        randomUUID(),
+      ]),
+    ).rejects.toThrow("ambiguousSaleReceivable");
+    for (const expected of ["overdue", "paid"]) {
+      const batch = {
+        requestId: randomUUID(),
+        protocolVersion: "1.0",
+        connectorVersion: "0.5.0",
+        originalInstruction: "Synthetic split receipt",
+        totalXof: 20,
+        rows: [
+          {
+            lineId: "1",
+            sourceText: "Synthetic",
+            domain: "sale",
+            targetId: contract,
+            totalXof: 20,
+            paymentDate: "2026-10-07",
+            paymentMethod: "cash",
+            allocations: [{ receivableId: ids[1], amountXof: 20 }],
+          },
+        ],
+      };
+      const preview = (await db.query("select preview_operator_collection($1) result", [batch]))
+        .rows[0].result;
+      const draft = (
+        await db.query(
+          "select create_operator_collection($1,$2,now()+interval '5 minutes','test') result",
+          [JSON.stringify(batch), JSON.stringify(preview)],
+        )
+      ).rows[0].result;
+      expect(
+        (await db.query("select confirm_operator_collection($1) result", [draft.id])).rows[0].result
+          .verified,
+      ).toBe(true);
+      expect(
+        (await db.query("select status from sale_payment_schedule where id=$1", [schedule])).rows[0]
+          .status,
+      ).toBe(expected);
+    }
+    expect(
+      (await db.query("select paid_amount_xof from receivables where id=$1", [ids[2]])).rows[0]
+        .paid_amount_xof,
+    ).toBe("10.00");
+    await expect(
+      db.query(
+        "insert into sale_schedule_components(schedule_id,receivable_id,basis,request_id) values($1,$2,'principal',$3)",
+        [schedule, randomUUID(), randomUUID()],
+      ),
+    ).rejects.toThrow("permission denied");
+  } finally {
+    await db.query("reset role");
+  }
+});
+it("legacy sale notes use the existing unique principal receivable, not an invented plan", async () => {
+  await db.query("reset role");
+  const f = await asset("sold"),
+    contract = randomUUID(),
+    schedule = randomUUID();
+  await db.query(
+    "insert into sale_contracts(id,unit_id,customer_id,contract_no,signed_date,total_amount_xof,payment_plan_type,status) values($1,$2,$3,$4,'2020-01-01',100,'Legacy payment note','active')",
+    [contract, f.unit, f.customer, contract],
+  );
+  await db.query(
+    "insert into sale_payment_schedule(id,sale_contract_id,installment_no,due_date,amount_xof,status) values($1,$2,1,'2020-01-01',100,'overdue')",
+    [schedule, contract],
+  );
+  const insert = `insert into receivables(unit_id,customer_id,source_type,source_id,category,title,due_date,amount_xof) values($1,$2,'sale_contract',$3,$4,'Synthetic','2020-01-01',100) returning id`;
+  // A tax/other line is never a principal candidate even when date and amount match.
+  await db.query(insert, [f.unit, f.customer, contract, "other"]);
+  const receipt = (await db.query(insert, [f.unit, f.customer, contract, "sale_lump_sum"])).rows[0]
+    .id;
+  expect(
+    (await db.query("select receivable_id from sale_payment_schedule where id=$1", [schedule]))
+      .rows[0].receivable_id,
+  ).toBe(receipt);
+  await db.query("set role authenticated");
+  try {
+    await db.query("select finance_operation_rpc('sale_payment',$1,$2)", [
+      { contractId: contract, scheduleId: schedule, amount: 10, paymentDate: "2026-10-07" },
+      randomUUID(),
+    ]);
+    expect(
+      (await db.query("select paid_amount_xof from receivables where id=$1", [receipt])).rows[0]
+        .paid_amount_xof,
+    ).toBe("10.00");
+  } finally {
+    await db.query("reset role");
+  }
+  expect(
+    (await db.query("select payment_plan_type from sale_contracts where id=$1", [contract])).rows[0]
+      .payment_plan_type,
+  ).toBe("Legacy payment note");
+  expect(
+    (
+      await db.query(
+        "select private.sale_principal_category_matches('lump_sum','sale_installment') allowed",
+      )
+    ).rows[0].allowed,
+  ).toBe(false);
+  // Unrecognized plans with TWO principal candidates remain ambiguous, never auto-linked.
+  await db.query("update sale_payment_schedule set receivable_id=null where id=$1", [schedule]);
+  await db.query(insert, [f.unit, f.customer, contract, "sale_installment"]);
+  expect(
+    (await db.query("select receivable_id from sale_payment_schedule where id=$1", [schedule]))
+      .rows[0].receivable_id,
+  ).toBeNull();
 });
 it("inbox is actor-bound and rechecks project access", async () => {
   const f = await asset(),
@@ -201,7 +430,9 @@ it("inbox is actor-bound and rechecks project access", async () => {
   await db.query("update projects set access_mode='restricted' where id=$1", [f.project]);
   await db.query("set role authenticated");
   expect(
-    (await db.query("select public.operator_task_inbox() result")).rows[0].result.items,
+    (await db.query("select public.operator_task_inbox() result")).rows[0].result.items.filter(
+      (item: { id: string }) => item.id === id,
+    ),
   ).toHaveLength(0);
   await db.query("reset role");
 });

@@ -51,6 +51,24 @@ export async function FinanceWorkspace({
     count: number;
     issues: { code: string; entity_id: string }[];
   };
+  const issueLabels: Record<string, string> = zh
+    ? {
+        sale_schedule_unlinked: "出售计划与应收尚未关联（不代表实际欠款）",
+        sale_link_mismatch: "出售计划与应收关联不一致",
+        sale_component_mismatch: "出售组合计划与多条应收不一致（需核对）",
+        sale_schedule_status_disagreement: "出售计划与应收结清状态不一致（需核对，不自动改账）",
+        allocation_amount_mismatch: "收款分配金额不一致",
+        duplicate_payment_ledger: "收款存在重复流水",
+      }
+    : {
+        sale_schedule_unlinked: "Échéance sans lien avec une créance (ne prouve pas une dette)",
+        sale_link_mismatch: "Lien échéance/créance incohérent",
+        sale_component_mismatch: "Composantes de l'échéance incohérentes (à vérifier)",
+        sale_schedule_status_disagreement:
+          "Statuts de règlement incohérents (à vérifier, sans correction automatique)",
+        allocation_amount_mismatch: "Montant réparti incohérent",
+        duplicate_payment_ledger: "Écritures multiples pour un paiement",
+      };
   const href = (page: number) =>
     "?" + new URLSearchParams({ ...query.filters, kind: query.kind, page: String(page) });
   const exportHref =
@@ -274,7 +292,7 @@ export async function FinanceWorkspace({
         <ul className="mt-3 space-y-2 text-sm">
           {quality.issues.map((issue) => (
             <li key={issue.code + issue.entity_id}>
-              {issue.code} · {issue.entity_id}
+              {issueLabels[issue.code] ?? issue.code} · {issue.entity_id}
             </li>
           ))}
         </ul>

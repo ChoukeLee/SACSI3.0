@@ -88,11 +88,11 @@
     },
     {
       "file": "20261006083908_unit_operational_dimensions.sql",
-      "sha256": "04236a8c73ed69baf2501205e1a5e04b9260608e16245cf56a341e3a07d2835f"
+      "sha256": "4fd264659005addaf603d176864454082859db826c6b71ae6f4c5d9f2567b821"
     },
     {
       "file": "20261006084039_explicit_sale_receivable_links.sql",
-      "sha256": "c80304897151a1ceeace10daec948560dc8753624233348bab7a8f28b2f766af"
+      "sha256": "0ef602c53f4a1b5be1e723fcf0999170f3f242588d5617157f94bbf6a6913ce2"
     },
     {
       "file": "20261006084655_operator_task_inbox.sql",

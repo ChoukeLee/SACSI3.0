@@ -11,6 +11,13 @@ describe("sold units explicitly enabled for daily management", () => {
     }
   });
   it("does not bypass maintenance, locks, leases, cleaning, occupancy or dates", () => {
+    for (const operationalCondition of ["maintenance", "locked"] as const) {
+      const blocked = { unitStatus: "sold" as const, dailyRentalEnabled: true, operationalCondition };
+      expect(getPrimaryDailyAction(blocked).allowed).toBe(false);
+      expect(allowCreateBooking({ ...blocked, checkIn: "2026-10-06", checkOut: "2026-10-07", todayStr: "2026-10-06" }).allowed).toBe(false);
+      expect(allowCheckIn({ ...blocked, booking: { status: "confirmed", checkout_mode: "fixed" }, prepaidAmount: 0 }).allowed).toBe(false);
+      expect(getPrimaryDailyAction({ ...blocked, bookingStatus: "checked_in" }).action).toBe("check_out");
+    }
     for (const unitStatus of ["maintenance", "locked", "leased"] as const) {
       expect(getPrimaryDailyAction({ unitStatus, dailyRentalEnabled: true }).allowed).toBe(false);
     }

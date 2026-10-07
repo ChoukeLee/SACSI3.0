@@ -25,17 +25,17 @@ export async function getSalePageData() {
     paymentsRes,
     receivablesRes,
   ] = await Promise.all([
-    all(() => supabase.from("projects").select("id").eq("is_active", true).eq("allows_sale", true), "projects"),
-    all(() => supabase.from("buildings").select("id, project_id, code, display_name").eq("is_active", true).order("code"), "buildings"),
-    all(() => supabase.from("sale_contracts").select("*").order("signed_date", { ascending: false }), "sale contracts"),
-    all(() => supabase.from("sale_payment_schedule").select("*").order("installment_no"), "sale schedules"),
-    all(() => supabase.from("units").select("*").order("unit_no"), "units"),
-    all(() => supabase.from("customers").select("*").order("name"), "customers"),
-    all(() => supabase.from("payments").select("*").in("source_type", [
+    all(() => supabase.from("projects").select("id", {count:"exact"}).eq("is_active", true).eq("allows_sale", true), "projects"),
+    all(() => supabase.from("buildings").select("id, project_id, code, display_name", {count:"exact"}).eq("is_active", true).order("code"), "buildings"),
+    all(() => supabase.from("sale_contracts").select("*", {count:"exact"}).order("signed_date", { ascending: false }), "sale contracts"),
+    all(() => supabase.from("sale_payment_schedule").select("*", {count:"exact"}).order("installment_no"), "sale schedules"),
+    all(() => supabase.from("units").select("*", {count:"exact"}).order("unit_no"), "units"),
+    all(() => supabase.from("customers").select("*", {count:"exact"}).order("name"), "customers"),
+    all(() => supabase.from("payments").select("*", {count:"exact"}).in("source_type", [
       "sale", "sale_contract", "property_fee", "parking_fee", "sale_registration_fee",
       "sale_agency_income", "sale_agency_expense", "sale_other_income", "sale_other_expense",
     ]).order("payment_date", { ascending: false }), "sale payments"),
-    all(() => supabase.from("receivables").select("*").eq("source_type", "sale_contract").order("due_date"), "sale receivables"),
+    all(() => supabase.from("receivables").select("*", {count:"exact"}).eq("source_type", "sale_contract").order("due_date"), "sale receivables"),
   ]);
   for (const result of [projectsRes, buildingsRes, contractsRes, schedulesRes, unitsRes, customersRes, paymentsRes, receivablesRes]) {
     if (result.error) throw result.error;
