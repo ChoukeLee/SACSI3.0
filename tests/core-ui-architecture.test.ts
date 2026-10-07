@@ -6,6 +6,18 @@ const root = resolve(__dirname, "..");
 const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 
 describe("core UI architecture", () => {
+  it("uses an expandable icon-only brand when the desktop sidebar is collapsed", () => {
+    const sidebar = read("src/components/app-sidebar.tsx");
+    const shell = read("src/components/app-shell.tsx");
+    expect(sidebar).toContain('state === "collapsed" && !isMobile');
+    expect(sidebar).toContain('<Logo variant="icon" size={32} />');
+    expect(sidebar).toContain("onClick={toggleSidebar}");
+    expect(sidebar).toContain('"展开侧栏"');
+    expect(sidebar).toContain("relative overflow-hidden");
+    expect(shell).toContain('if (state === "collapsed") return null;');
+    expect(shell).toContain("<DesktopSidebarTrigger />");
+  });
+
   it("keeps the desktop navigation focused on the five daily work areas", () => {
     const sidebar = read("src/components/app-sidebar.tsx");
     for (const route of ["/management", "/daily-rentals", "/leases", "/sales", "/units"]) {

@@ -8,12 +8,18 @@ import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import type { UserRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
-import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger, SidebarInset, useSidebar } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { NavigationTransitionProvider, useNavigationTransition } from "@/components/navigation-transition-provider";
 import { getDesktopNavLabels } from "@/lib/nav-labels";
 import { cn } from "@/lib/utils";
+
+function DesktopSidebarTrigger() {
+  const { state } = useSidebar();
+  if (state === "collapsed") return null;
+  return <SidebarTrigger className="hidden lg:flex" />;
+}
 
 function NavigationLoadingBar() {
   const { isNavigating } = useNavigationTransition();
@@ -95,7 +101,7 @@ function AppShellInner({
         <header className="sticky top-0 z-sticky flex h-[calc(3rem+var(--safe-top))] shrink-0 items-center border-b border-border bg-card/95 pt-[var(--safe-top)] shadow-xs backdrop-blur supports-[backdrop-filter]:bg-card/90 lg:h-12 lg:pt-0">
           <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 px-4">
             <div className="flex min-w-0 items-center gap-2">
-              <SidebarTrigger className="hidden lg:flex" />
+              <DesktopSidebarTrigger />
             </div>
             <div />
             <div className="ml-auto flex h-9 items-center gap-1 rounded-lg border border-border bg-muted/55 p-0.5 shadow-xs">

@@ -12,6 +12,8 @@ import { useNavigationTransition } from "@/components/navigation-transition-prov
 import { usePrefetch } from "@/components/navigation-prefetch";
 import type { UserRole } from "@/lib/auth";
 import { navigationGroupsForRole } from "@/lib/navigation-access";
+import { useSidebar } from "@/components/ui/sidebar";
+import { Logo } from "@/components/logo";
 
 type NavKey = "management" | "units" | "dailyRentals" | "leases" | "sales";
 
@@ -30,6 +32,8 @@ const groups: NavGroup[] = [
 
 export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: UserRole }) {
   const pathname = usePathname();
+  const { state, isMobile, toggleSidebar } = useSidebar();
+  const collapsed = state === "collapsed" && !isMobile;
   const { pendingHref, startNavigation } = useNavigationTransition();
   const prefetch = usePrefetch();
   const labels = getDesktopNavLabels(locale);
@@ -43,7 +47,18 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar">
-      <SidebarHeader className="gap-0 border-b border-sidebar-border px-4 h-12 relative">
+      <SidebarHeader className="gap-0 border-b border-sidebar-border px-0 h-12 relative overflow-hidden">
+        {collapsed ? (
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={locale === "zh" ? "展开侧栏" : "Développer le menu"}
+            title={locale === "zh" ? "展开侧栏" : "Développer le menu"}
+            className="flex h-12 w-full items-center justify-center rounded-md transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring"
+          >
+            <Logo variant="icon" size={32} />
+          </button>
+        ) : (
         <div className="absolute top-0 left-4 flex items-center gap-3 h-full">
           <span className="relative h-7 w-[108px] shrink-0">
             <Image
@@ -57,6 +72,7 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
           </span>
           <span className="translate-y-[1px] text-[17px] font-semibold italic leading-none text-sidebar-foreground whitespace-nowrap">{labels.brand}</span>
         </div>
+        )}
       </SidebarHeader>
       <SidebarContent>
         {visible.map((group, gi) => (
