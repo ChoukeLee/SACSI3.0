@@ -10,10 +10,10 @@ interface NavigationGroup<TItem extends NavigationItem> {
 }
 
 const ROLE_KEYS: Partial<Record<UserRole, Set<string>>> = {
-  boss: new Set(["management", "units", "dailyRentals", "leases", "sales", "assistant"]),
-  finance: new Set(["management", "units", "leases", "sales", "assistant"]),
+  boss: new Set(["management", "units", "dailyRentals", "leases", "sales"]),
+  finance: new Set(["management", "units", "leases", "sales"]),
   front_desk: new Set(["dailyRentals", "leases"]),
-  rental_sales: new Set(["management", "units", "dailyRentals", "leases", "sales", "assistant"]),
+  rental_sales: new Set(["management", "units", "dailyRentals", "leases", "sales"]),
 };
 
 export function navigationGroupsForRole<TItem extends NavigationItem, TGroup extends NavigationGroup<TItem>>(

@@ -10,12 +10,8 @@ describe("AI workbench French result layer", () => {
   const actions = read("src/features/ai-workbench/actions.ts");
   const draftService = read("src/features/ai-workbench/action-draft-service.ts");
   const view = read("src/features/ai-workbench/workbench-view.tsx");
-  const zhPage = read("src/app/assistant/page.tsx");
-  const frPage = read("src/app/fr/assistant/page.tsx");
 
-  it("threads the locale from the page into the workbench query pipeline", () => {
-    expect(zhPage).toContain('locale="zh"');
-    expect(frPage).toContain('locale="fr"');
+  it("preserves locale support in the retained shared query pipeline", () => {
     expect(view).toContain('locale = "zh"');
     expect(view).toContain("canRecordFinance = false");
     expect(view).toContain('name="locale"');

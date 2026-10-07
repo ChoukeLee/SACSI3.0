@@ -12,11 +12,15 @@ describe("AI finance workbench entry", () => {
   const upload = read("src/features/finance/receipt-upload.tsx");
   const scan = read("src/app/api/receipt/scan/route.ts");
 
-  it("derives the visible finance entry from the authenticated permission", () => {
+  it("retires both embedded entries without opening or creating conversations", () => {
     for (const page of [zhPage, frPage]) {
-      expect(page).toContain('hasPermission(user, "finance:write")');
-      expect(page).toContain("canRecordFinance=");
+      expect(page).toContain('redirect("/operator")');
+      expect(page).not.toContain("AiWorkbenchView");
+      expect(page).not.toContain("getOrCreateActiveConversation");
     }
+    expect(read("src/components/app-sidebar.tsx")).not.toContain('href: "/assistant"');
+    expect(read("src/components/app-shell.tsx")).toContain('href="/operator"');
+    expect(read("src/app/operator/page.tsx")).toContain("getCurrentUser");
     expect(view).toContain("if (!canRecordFinance) return");
     expect(view).toContain("{canRecordFinance && !receiptTurn && (");
   });
