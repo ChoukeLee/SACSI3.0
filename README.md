@@ -4,6 +4,8 @@ SACSI 3.0 是科建地产使用的单租户房地产经营系统。系统以 Sup
 
 2026-10-15 整体更新已实现，兼容数据库结构及只读性能修复已应用，历史账务保持不变。本轮交付标记为 `release/product-renewal-20261015`，仅在最终提交 CI、生产 Ready 和线上核验通过后创建；具体范围与证据见 [整体更新与验收](docs/PRODUCT_RENEWAL.md)。自动技术验收不代替员工本人实操。GitHub `main` 是生产代码基线，但 push 成功不等于 Vercel 已部署，必须核对对应提交。
 
+后续的 [性能根因手术](docs/PERFORMANCE_SURGERY.md) 包括共用 RLS 语句内授权集合、日租窗口读取和真实导航等待。两项兼容迁移已于 2026-10-15 21:28 UTC 应用，业务内容摘要与账号可见范围保持不变。最终应用交付按 `release/performance-surgery-20261015` 定位；只有对应提交 CI、Vercel Ready 和线上只读验收全部通过后才创建该标记，不能把前次发布结果当作本次结果。
+
 历史迁移存在重复编号及仓库未记录的线上结构，不能在新库简单整批重放；当前重建使用已审核的结构快照及增量清单。历史背景见 [第二阶段技术验收](docs/OPERATOR_STAGE2_ACCEPTANCE.md)，现行流程见 [维护交接](docs/ENGINEERING_HANDOFF.md)。
 
 当前 AI 录入入口是外部工具配合受控业务接口；独立员工连接器位于 `operator-connector/`，员工不需要同步开发仓库。内嵌业务助手已从导航移除，旧 `/assistant` 和 `/fr/assistant` 链接转到 `/operator` 我的业务待办，不再创建或加载聊天会话。共享业务模块与历史记录保留，不删除连接器 API、确认页或审计。

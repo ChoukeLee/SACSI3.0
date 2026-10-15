@@ -124,7 +124,7 @@ export function OperatingDashboard({
             {amount(data.netCollected)}
             <small>XOF</small>
           </strong>
-          <Link href={cashHref}>
+          <Link href={cashHref} prefetch={false}>
             {zh
               ? `截至 ${data.asOf.slice(5)} · 查看收支与凭证`
               : `Au ${data.asOf} · écritures et justificatifs`}{" "}
@@ -140,7 +140,7 @@ export function OperatingDashboard({
             {amount(data.dueOutstanding)}
             <small>XOF</small>
           </strong>
-          <Link href={dueHref}>
+          <Link href={dueHref} prefetch={false}>
             {zh
               ? `未来15天另有 ${amount(data.upcoming)} XOF 到期`
               : `${amount(data.upcoming)} XOF dus sous 15 jours`}{" "}
@@ -167,7 +167,9 @@ export function OperatingDashboard({
         <section>
           <div className={styles.panelHead}>
             <h2>{zh ? "收款趋势" : "Évolution des encaissements"}</h2>
-            <Link href={cashHref}>{zh ? "财务工作区" : "Espace finance"} ↗</Link>
+            <Link href={cashHref} prefetch={false}>
+              {zh ? "财务工作区" : "Espace finance"} ↗
+            </Link>
           </div>
           <OperatingTrend snapshot={data} locale={locale} />
         </section>
@@ -184,7 +186,7 @@ export function OperatingDashboard({
             </h2>
           </div>
           {taskItems.map((task) => (
-            <Link key={task.title} href={task.href} className={styles.task}>
+            <Link key={task.title} href={task.href} prefetch={false} className={styles.task}>
               <span
                 className={styles.taskDot}
                 style={task.alert ? { backgroundColor: "#bc4b4b" } : undefined}
@@ -232,6 +234,7 @@ export function OperatingDashboard({
                   <td>
                     <Link
                       href={routeFor(locale, `${row.href}?project=${data.projectId}`)}
+                      prefetch={false}
                       aria-label={`${row.label} · ${zh ? "进入工作区" : "ouvrir"}`}
                     >
                       <ArrowUpRight size={16} />
@@ -246,7 +249,9 @@ export function OperatingDashboard({
       <section className={styles.detailTable}>
         <div className={styles.panelHead}>
           <h2>{zh ? "优先跟进的到期应收" : "Créances à traiter en priorité"}</h2>
-          <Link href={dueHref}>{zh ? "查看全部" : "Tout voir"} ↗</Link>
+          <Link href={dueHref} prefetch={false}>
+            {zh ? "查看全部" : "Tout voir"} ↗
+          </Link>
         </div>
         {!data.dueItems.length ? (
           <p className={styles.empty}>
@@ -279,7 +284,9 @@ export function OperatingDashboard({
                     <td>{row.date}</td>
                     <td className={styles.amount}>{amount(row.balance)}</td>
                     <td>
-                      <Link href={dueHref}>{zh ? "核对" : "Vérifier"} ↗</Link>
+                      <Link href={dueHref} prefetch={false}>
+                        {zh ? "核对" : "Vérifier"} ↗
+                      </Link>
                     </td>
                   </tr>
                 ))}
@@ -293,7 +300,7 @@ export function OperatingDashboard({
           {zh
             ? `${data.excludedCount} 笔本月收款未纳入净收款；${data.historicalPending} 条历史待核对应收未纳入余额。`
             : `${data.excludedCount} écritures exclues du net; ${data.historicalPending} créances historiques non confirmées hors solde.`}{" "}
-          <Link href={routeFor(locale, "/data-quality")}>
+          <Link href={routeFor(locale, "/data-quality")} prefetch={false}>
             {zh ? "查看核验说明" : "Voir les contrôles"} ↗
           </Link>
         </p>

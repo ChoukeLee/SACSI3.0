@@ -95,7 +95,7 @@ describe("core UI architecture", () => {
 
   it("keeps the normal page gutter below the topbar", () => {
     const shell = read("src/components/app-shell.tsx");
-    const mainTag = shell.match(/<main data-app-main className="([^"]+)"/);
+    const mainTag = shell.match(/<main\b[^>]*\bdata-app-main\b[^>]*\bclassName="([^"]+)"/);
 
     expect(mainTag?.[1]).toContain("p-4");
     expect(mainTag?.[1]).toContain("sm:p-5");

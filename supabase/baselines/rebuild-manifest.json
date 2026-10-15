@@ -133,6 +133,14 @@
     {
       "file": "20261015185946_optimize_quality_authorized_snapshot.sql",
       "sha256": "cf57427c7a53d46697e60d9a465492e9a3968f90b8dafcaad2aae47903493e30"
+    },
+    {
+      "file": "20261015212825_optimize_statement_authorization_sets.sql",
+      "sha256": "3c0a4e77ab8a222a4cbc4f8bb59bf9efcd0bc13a7b89452febc43c34a1ee4c57"
+    },
+    {
+      "file": "20261015212832_daily_calendar_window_reads.sql",
+      "sha256": "6f6a38ce0f0ef6371889b1f248121223803284135883b6de49c753fa7ec80950"
     }
   ],
   "excluded": [

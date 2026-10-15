@@ -27,7 +27,6 @@ import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { getDesktopNavLabels } from "@/lib/nav-labels";
 import { useNavigationTransition } from "@/components/navigation-transition-provider";
-import { usePrefetch } from "@/components/navigation-prefetch";
 import type { UserRole } from "@/lib/auth";
 import { navigationGroupsForRole } from "@/lib/navigation-access";
 import { useSidebar } from "@/components/ui/sidebar";
@@ -84,7 +83,6 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
   const { state, isMobile, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed" && !isMobile;
   const { pendingHref, startNavigation } = useNavigationTransition();
-  const prefetch = usePrefetch();
   const labels = getDesktopNavLabels(locale);
   const visible = navigationGroupsForRole(groups, userRole);
   const activeHref = pendingHref ?? pathname;
@@ -148,12 +146,14 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
                     >
                       <Link
                         href={routeFor(locale, item.href)}
-                        onClick={() => {
+                        prefetch={false}
+                        onNavigate={(event) => {
                           const target = routeFor(locale, item.href);
-                          if (pathname !== target) startNavigation(target);
+                          if (pathname !== target) {
+                            event.preventDefault();
+                            startNavigation(target);
+                          }
                         }}
-                        onMouseEnter={() => prefetch(routeFor(locale, item.href))}
-                        onFocus={() => prefetch(routeFor(locale, item.href))}
                       >
                         <Icon className="h-4 w-4" strokeWidth={active ? 2.5 : 1.75} />
                         <span className="text-[13px] font-medium">{labels.nav[item.key]}</span>

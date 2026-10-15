@@ -8,10 +8,7 @@ const migration = readFileSync(
   resolve(root, "supabase/migrations/202608220001_allow_daily_booking_prepayments.sql"),
   "utf8",
 );
-const panel = readFileSync(
-  resolve(root, "src/features/daily-rentals/booking-panel.tsx"),
-  "utf8",
-);
+const panel = readFileSync(resolve(root, "src/features/daily-rentals/booking-panel.tsx"), "utf8");
 
 describe("daily rental reservation payments", () => {
   it("allows payments before check-in without weakening cancellation rules", () => {
@@ -29,21 +26,27 @@ describe("daily rental reservation payments", () => {
   });
 
   it("shows advance payment only for reservations arriving after today", () => {
-    expect(shouldShowAdvanceReservationPayment({
-      bookingStatus: "confirmed",
-      checkIn: "2026-08-23",
-      todayStr: "2026-08-22",
-    })).toBe(true);
-    expect(shouldShowAdvanceReservationPayment({
-      bookingStatus: "confirmed",
-      checkIn: "2026-08-22",
-      todayStr: "2026-08-22",
-    })).toBe(false);
-    expect(shouldShowAdvanceReservationPayment({
-      bookingStatus: "checked_in",
-      checkIn: "2026-08-23",
-      todayStr: "2026-08-22",
-    })).toBe(false);
+    expect(
+      shouldShowAdvanceReservationPayment({
+        bookingStatus: "confirmed",
+        checkIn: "2026-08-23",
+        todayStr: "2026-08-22",
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowAdvanceReservationPayment({
+        bookingStatus: "confirmed",
+        checkIn: "2026-08-22",
+        todayStr: "2026-08-22",
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowAdvanceReservationPayment({
+        bookingStatus: "checked_in",
+        checkIn: "2026-08-23",
+        todayStr: "2026-08-22",
+      }),
+    ).toBe(false);
   });
 
   it("keeps installment history visible outside advanced payment actions", () => {
@@ -58,7 +61,19 @@ describe("daily rental reservation payments", () => {
       resolve(root, "src/app/daily-rentals/daily-rental-data.tsx"),
       "utf8",
     );
-    expect(loader).toContain("payment_date, reversal_of_payment_id");
+    expect(loader).toContain("payments={window.payments}");
+    const model = readFileSync(
+      resolve(root, "src/features/daily-rentals/calendar-window-model.ts"),
+      "utf8",
+    );
+    expect(model).toContain("reversal_of_payment_id");
+    expect(model).toContain("request_kind");
+    const windowRead = readFileSync(
+      resolve(root, "supabase/migrations/20261015212832_daily_calendar_window_reads.sql"),
+      "utf8",
+    );
+    expect(windowRead).toContain("jsonb_agg(to_jsonb(p)");
+    expect(windowRead).toContain("p.source_id=any(selected_ids)");
   });
 
   it("keeps daily payment forms limited to amount and payment date", () => {
@@ -69,10 +84,10 @@ describe("daily rental reservation payments", () => {
   });
 
   it("uses one vertical divider rhythm across booking, finance, and actions", () => {
-    expect(panel).not.toContain('rounded-xl border border-border bg-card p-4 shadow-xs');
-    expect(panel).not.toContain('border-y border-border py-3');
-    expect(panel).toContain('border-b border-border pb-4');
-    expect(panel).toContain('border-t border-border pt-3');
+    expect(panel).not.toContain("rounded-xl border border-border bg-card p-4 shadow-xs");
+    expect(panel).not.toContain("border-y border-border py-3");
+    expect(panel).toContain("border-b border-border pb-4");
+    expect(panel).toContain("border-t border-border pt-3");
   });
 
   it("keeps the booking drawer free of repeated status and checkout totals", () => {

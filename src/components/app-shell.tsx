@@ -11,7 +11,10 @@ import { createClient } from "@/lib/supabase/client";
 import { SidebarProvider, SidebarTrigger, SidebarInset, useSidebar } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
-import { NavigationTransitionProvider, useNavigationTransition } from "@/components/navigation-transition-provider";
+import {
+  NavigationTransitionProvider,
+  useNavigationTransition,
+} from "@/components/navigation-transition-provider";
 import { getDesktopNavLabels } from "@/lib/nav-labels";
 import { cn } from "@/lib/utils";
 import { LocaleContextLink } from "@/components/locale-context-link";
@@ -34,17 +37,19 @@ function NavigationLoadingBar() {
 }
 
 export function AppShell({
-  children, locale = "zh", userRole, userDisplayName,
+  children,
+  locale = "zh",
+  userRole,
+  userDisplayName,
 }: {
-  children: React.ReactNode; locale?: Locale; userRole?: UserRole; userDisplayName?: string;
+  children: React.ReactNode;
+  locale?: Locale;
+  userRole?: UserRole;
+  userDisplayName?: string;
 }) {
   return (
     <NavigationTransitionProvider>
-      <AppShellInner
-        locale={locale}
-        userRole={userRole}
-        userDisplayName={userDisplayName}
-      >
+      <AppShellInner locale={locale} userRole={userRole} userDisplayName={userDisplayName}>
         {children}
       </AppShellInner>
     </NavigationTransitionProvider>
@@ -52,9 +57,15 @@ export function AppShell({
 }
 
 function AppShellInner({
-  children, locale, userRole, userDisplayName,
+  children,
+  locale,
+  userRole,
+  userDisplayName,
 }: {
-  children: React.ReactNode; locale: Locale; userRole?: UserRole; userDisplayName?: string;
+  children: React.ReactNode;
+  locale: Locale;
+  userRole?: UserRole;
+  userDisplayName?: string;
 }) {
   const pathname = usePathname();
   const { isNavigating } = useNavigationTransition();
@@ -68,14 +79,8 @@ function AppShellInner({
     document.body.setAttribute("data-sacis-route", pathname);
     document.body.setAttribute("data-sacis-daily-route", isDailyRoute ? "true" : "false");
 
-    const frame = window.requestAnimationFrame(() => {
-      if (!isDailyRoute) {
-        document.querySelectorAll("[data-daily-rentals-page], [data-daily-calendar-root]").forEach(function(n) { n.remove(); });
-      } else {
-        document.querySelectorAll("[data-daily-rentals-page]:nth-child(n+2), [data-daily-calendar-root]:nth-child(n+2)").forEach(function(n) { n.remove(); });
-      }
-    });
-    return function() { window.cancelAnimationFrame(frame); };
+    // Route content belongs to React. Removing its nodes here can corrupt the
+    // tree while an interrupted/streamed navigation is reconciling it.
   }, [pathname, isDailyRoute]);
 
   useEffect(() => {
@@ -106,8 +111,16 @@ function AppShellInner({
             </div>
             <div />
             <div className="ml-auto flex h-9 items-center gap-1 rounded-lg border border-border bg-muted/55 p-0.5 shadow-xs">
-              <Link href="/operator" prefetch={false} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground" aria-label={locale === "zh" ? "我的业务待办" : "Mes tâches"}>
-                <ListChecks className="h-4 w-4" /><span className="hidden sm:inline">{locale === "zh" ? "我的待办" : "Mes tâches"}</span>
+              <Link
+                href="/operator"
+                prefetch={false}
+                className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground"
+                aria-label={locale === "zh" ? "我的业务待办" : "Mes tâches"}
+              >
+                <ListChecks className="h-4 w-4" />
+                <span className="hidden sm:inline">
+                  {locale === "zh" ? "我的待办" : "Mes tâches"}
+                </span>
               </Link>
               {userRole !== "front_desk" && (
                 <Suspense fallback={null}>
@@ -152,14 +165,21 @@ function AppShellInner({
             </div>
           </div>
         </header>
-        <main data-app-main className="relative isolate min-w-0 flex-1 overflow-x-hidden bg-background p-4 pb-[calc(var(--mobile-nav-height)+var(--safe-bottom)+1rem)] sm:p-5 sm:pb-[calc(var(--mobile-nav-height)+var(--safe-bottom)+1.25rem)] lg:p-6">
+        <main
+          data-app-main
+          className="relative isolate min-w-0 flex-1 overflow-x-hidden bg-background p-4 pb-[calc(var(--mobile-nav-height)+var(--safe-bottom)+1rem)] sm:p-5 sm:pb-[calc(var(--mobile-nav-height)+var(--safe-bottom)+1.25rem)] lg:p-6"
+        >
           {isNavigating && (
-            <div data-navigation-overlay className="pointer-events-auto absolute inset-0 z-overlay bg-background/40" />
+            <div
+              data-navigation-overlay
+              className="pointer-events-auto absolute inset-0 z-overlay bg-background/40"
+            />
           )}
           <div
             key={pathname}
             data-route-root={pathname}
             data-current-route-root
+            inert={isNavigating ? true : undefined}
             className={cn("min-w-0", isNavigating ? "pointer-events-none select-none" : "")}
           >
             {children}

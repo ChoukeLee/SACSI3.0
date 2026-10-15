@@ -7,7 +7,6 @@ import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { getMobileNavLabels } from "@/lib/nav-labels";
 import { useNavigationTransition } from "@/components/navigation-transition-provider";
-import { usePrefetch } from "@/components/navigation-prefetch";
 import { cn } from "@/lib/utils";
 
 const mobileTabs = [
@@ -21,7 +20,6 @@ const mobileTabs = [
 export function MobileBottomNav({ locale, userRole }: { locale: Locale; userRole?: string }) {
   const pathname = usePathname();
   const { pendingHref, startNavigation } = useNavigationTransition();
-  const prefetch = usePrefetch();
   const labels = getMobileNavLabels(locale);
   const activeHref = pendingHref ?? pathname;
 
@@ -31,9 +29,10 @@ export function MobileBottomNav({ locale, userRole }: { locale: Locale; userRole
     return activeHref === localized || activeHref.startsWith(localized);
   };
 
-  const visibleTabs = userRole === "front_desk"
-    ? mobileTabs.filter((item) => item.key === "daily" || item.key === "leases")
-    : mobileTabs;
+  const visibleTabs =
+    userRole === "front_desk"
+      ? mobileTabs.filter((item) => item.key === "daily" || item.key === "leases")
+      : mobileTabs;
 
   const resolveHref = (href: string) => routeFor(locale, href);
 
@@ -52,20 +51,20 @@ export function MobileBottomNav({ locale, userRole }: { locale: Locale; userRole
             <Link
               key={item.key}
               href={resolveHref(item.href)}
-              onClick={() => {
+              prefetch={false}
+              onNavigate={(event) => {
                 const target = resolveHref(item.href);
-                if (pathname !== target) startNavigation(target);
+                if (pathname !== target) {
+                  event.preventDefault();
+                  startNavigation(target);
+                }
               }}
-              onMouseEnter={() => prefetch(resolveHref(item.href))}
-              onFocus={() => prefetch(resolveHref(item.href))}
               className={cn(
                 "relative flex flex-col items-center justify-center gap-0.5 min-h-[52px] min-w-[72px] px-1",
                 "text-xs font-semibold select-none rounded-lg",
                 "transition-colors duration-fast",
                 "active:scale-95 active:bg-accent",
-                active
-                  ? "text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
+                active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
               aria-current={active ? "page" : undefined}
             >
@@ -75,7 +74,7 @@ export function MobileBottomNav({ locale, userRole }: { locale: Locale; userRole
               <Icon
                 className={cn(
                   "h-[22px] w-[22px] transition-colors duration-100",
-                  active ? "text-primary" : "text-muted-foreground"
+                  active ? "text-primary" : "text-muted-foreground",
                 )}
                 aria-hidden
                 strokeWidth={active ? 2.5 : 2}

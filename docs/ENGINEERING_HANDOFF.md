@@ -14,6 +14,8 @@
 
 ## 开发检查
 
+性能改造见 [性能根因手术](PERFORMANCE_SURGERY.md)。两项新迁移已在生产登记，旧发布标记不变；本轮应用交付以 `release/performance-surgery-20261015` 对应提交的 CI / Ready / 只读验收核对。父表权限策略有完整签名漂移门槛；改变父策略时必须复核子表继承与原 helper/写入语义，不可为让迁移通过而直接更新签名。
+
 1. `git status --short` 检查用户已有改动；不要提交 `.env*`、work/、output/、tmp/ 或员工会话。
 2. `npm ci` 安装锁定依赖。`npm run lint`、`npm run format:check`、`npm run check:daily-rental-rules`、`npm run typecheck`。
 3. `npm test` 跑普通回归；`npm run test:operator-concurrency` 跑一次性本地原生 PostgreSQL（含从零重建）。无需真实账号或云数据库连接。

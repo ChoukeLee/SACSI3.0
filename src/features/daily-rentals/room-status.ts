@@ -1,8 +1,5 @@
 import type { UnitRow, DailyBookingRow } from "@/types/database";
-import {
-  bookingOccupiesDate,
-  type DailyRoomDisplayStatus,
-} from "./daily-rental-policy";
+import { bookingOccupiesDate, type DailyRoomDisplayStatus } from "./daily-rental-policy";
 
 // Types.
 
@@ -22,13 +19,13 @@ const ACTIVE_PRIORITY: Record<string, number> = {
 };
 
 export const STATUS_COLORS: Record<DailyRoomDisplayStatus, string> = {
-  maintenance:        "bg-[#FFE2EA] text-[#17324D] border border-[#F5C0CC]",
-  locked:             "bg-muted text-muted-foreground border border-border",
-  occupied:           "bg-[#62B6F5]/10 text-[#1A6090] border border-[#62B6F5]/20",
+  maintenance: "bg-[#FFE2EA] text-[#17324D] border border-[#F5C0CC]",
+  locked: "bg-muted text-muted-foreground border border-border",
+  occupied: "bg-[#62B6F5]/10 text-[#1A6090] border border-[#62B6F5]/20",
   checking_out_today: "bg-amber-50 text-amber-700 border border-amber-200",
-  reserved:           "bg-[#FFF6D8] text-[#17324D] border border-[#E8D5A0]/60",
-  cleaning:           "bg-[#D9F7F0] text-[#17324D] border border-[#A8E8DB]",
-  available:          "",
+  reserved: "bg-[#FFF6D8] text-[#17324D] border border-[#E8D5A0]/60",
+  cleaning: "bg-[#D9F7F0] text-[#17324D] border border-[#A8E8DB]",
+  available: "",
 };
 
 // Core room-state calculation.
@@ -53,7 +50,7 @@ export function getDailyRoomStateForDate(params: {
 }): DailyRoomStateForDate {
   const { unit, dateStr, bookings, cleaningTasks } = params;
 
-  const unitBookings = bookings.filter(b => b.unit_id === unit.id && b.status !== "cancelled");
+  const unitBookings = bookings.filter((b) => b.unit_id === unit.id && b.status !== "cancelled");
 
   // ── Priority: checked_in > cleaning > confirmed/pending_review > checked_out > available ──
 
@@ -64,28 +61,41 @@ export function getDailyRoomStateForDate(params: {
   for (const b of unitBookings) {
     if (!coversDisplayDate(b, dateStr)) continue;
     const p = ACTIVE_PRIORITY[b.status] ?? 0;
-    if (p > bestPriority) { bestPriority = p; bestBooking = b; }
+    if (p > bestPriority) {
+      bestPriority = p;
+      bestBooking = b;
+    }
   }
 
   // 1a. Active checked_in guest — highest priority
   if (bestBooking && bestBooking.status === "checked_in") {
     const isCO = bestBooking.checkout_mode === "fixed" && bestBooking.check_out === dateStr;
-    return { unit, status: isCO ? "checking_out_today" : "occupied", booking: bestBooking, isCheckoutDay: isCO };
+    return {
+      unit,
+      status: isCO ? "checking_out_today" : "occupied",
+      booking: bestBooking,
+      isCheckoutDay: isCO,
+    };
   }
 
   // 2. Cleaning pending — takes priority over future bookings
-  const hasPendingCleaning = cleaningTasks.some(t => t.unit_id === unit.id && !t.is_completed);
-  const pendingCleaningTask = cleaningTasks.find(t => t.unit_id === unit.id && !t.is_completed);
+  const hasPendingCleaning = cleaningTasks.some((t) => t.unit_id === unit.id && !t.is_completed);
+  const pendingCleaningTask = cleaningTasks.find((t) => t.unit_id === unit.id && !t.is_completed);
   if (hasPendingCleaning || unit.status === "cleaning_pending") {
     // If a confirmed/pending_review booking exists for today, include it as context
     // so the calendar can show the guest name alongside the cleaning status.
-    const upcomingBooking = bestBooking && (bestBooking.status === "confirmed" || bestBooking.status === "pending_review")
-      ? bestBooking : null;
+    const upcomingBooking =
+      bestBooking && (bestBooking.status === "confirmed" || bestBooking.status === "pending_review")
+        ? bestBooking
+        : null;
     return { unit, status: "cleaning", booking: upcomingBooking, isCheckoutDay: false };
   }
 
   // 3. Confirmed/pending_review — only shown when no cleaning is pending
-  if (bestBooking && (bestBooking.status === "confirmed" || bestBooking.status === "pending_review")) {
+  if (
+    bestBooking &&
+    (bestBooking.status === "confirmed" || bestBooking.status === "pending_review")
+  ) {
     return { unit, status: "reserved", booking: bestBooking, isCheckoutDay: false };
   }
 
@@ -126,6 +136,8 @@ export function buildDailyRoomStateMap(params: {
 interface BuildBookingMapOptions {
   todayStr: string;
   tomorrowStr: string;
+  visibleFrom?: string;
+  visibleTo?: string;
 }
 
 /**
@@ -163,11 +175,15 @@ export function buildBookingMap(
     if (!map.has(b.unit_id)) map.set(b.unit_id, new Map());
 
     const checkOut: string = resolveCalendarCheckOut(b, options);
-    const start = toUtcDate(b.check_in);
+    const start = toUtcDate(
+      options.visibleFrom && options.visibleFrom > b.check_in ? options.visibleFrom : b.check_in,
+    );
     const end = toUtcDate(checkOut);
     if (b.checkout_mode === "fixed" && b.status !== "checked_out") {
       end.setUTCDate(end.getUTCDate() + 1);
     }
+    if (options.visibleTo && end > toUtcDate(options.visibleTo))
+      end.setTime(toUtcDate(options.visibleTo).getTime());
 
     const cursor = new Date(start);
     while (cursor < end) {
@@ -189,10 +205,7 @@ export function buildBookingMap(
  *   - checked_out + open + actual_check_out : full recorded range
  *   - checked_out + open + no actual      : check_in only (fallback)
  */
-function resolveCalendarCheckOut(
-  b: DailyBookingRow,
-  opts: BuildBookingMapOptions,
-): string {
+function resolveCalendarCheckOut(b: DailyBookingRow, opts: BuildBookingMapOptions): string {
   const { todayStr } = opts;
 
   // A completed stay must stop on the recorded departure date, not on the

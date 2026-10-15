@@ -79,6 +79,10 @@ interface CalendarProps {
   userRole?: string;
   buildingLabel?: string;
   financeSnapshot?: CalendarFinanceSnapshot;
+  onVisibleRangeChange?: (from: string, to: string) => void;
+  windowPending?: boolean;
+  windowError?: boolean;
+  onRetryWindow?: () => void;
 }
 
 const NAV_BTN =
@@ -103,8 +107,14 @@ export function DailyCalendar({
   userRole,
   buildingLabel,
   financeSnapshot,
+  onVisibleRangeChange,
+  windowPending = false,
+  windowError = false,
+  onRetryWindow,
 }: CalendarProps) {
   const copy = COPY[locale];
+  const windowUnavailable = windowPending || windowError;
+  const windowUnavailableRef = useRef(windowUnavailable);
   const bookingLabels = BOOKING_STATUS_LABELS[locale];
   const canCreateBooking = userRole === "admin" || userRole === "rental_sales";
   const canOperateDaily =
@@ -281,10 +291,15 @@ export function DailyCalendar({
     };
   }, [anchorDate, localeStr, viewMode]);
   const firstVisibleDateStr = visibleDays[0] ? toDateStr(visibleDays[0]) : null;
+  const visibleFrom = toDateStr(resolveRangeStart(anchorDate, viewMode));
+  const visibleTo = toDateStr(resolveRangeEnd(anchorDate, viewMode));
+  useEffect(() => {
+    onVisibleRangeChange?.(visibleFrom, visibleTo);
+  }, [onVisibleRangeChange, visibleFrom, visibleTo]);
 
   const bookingMap = useMemo(
-    () => buildBookingMap(bookings, { todayStr, tomorrowStr }),
-    [bookings, todayStr, tomorrowStr],
+    () => buildBookingMap(bookings, { todayStr, tomorrowStr, visibleFrom, visibleTo }),
+    [bookings, todayStr, tomorrowStr, visibleFrom, visibleTo],
   );
 
   const customerMap = useMemo(() => {
@@ -457,6 +472,13 @@ export function DailyCalendar({
   const [financeDetail, setFinanceDetail] = useState<
     "collected" | "outstanding" | "settled" | null
   >(null);
+  useEffect(() => {
+    windowUnavailableRef.current = windowUnavailable;
+    if (windowUnavailable) {
+      setFinanceDetail(null);
+      setCopied(false);
+    }
+  }, [windowUnavailable]);
 
   const financeStats = useMemo(() => {
     const position = dailyBookingFinancePosition(bookings, todayStr);
@@ -628,6 +650,7 @@ export function DailyCalendar({
   }, [visibleDailyUnits, todayStateMap, locale]);
 
   const handleCopy = useCallback(async () => {
+    if (windowUnavailable || windowUnavailableRef.current) return;
     let text = `${buildingLabel ?? "11#公寓"} ${locale === "zh" ? "日租房态" : "Occupation journaliere"}\n`;
     for (const row of shareRows) {
       text += `\n${row.label}: ${row.count}\n`;
@@ -636,6 +659,7 @@ export function DailyCalendar({
     try {
       await navigator.clipboard.writeText(text);
     } catch {
+      if (windowUnavailableRef.current) return;
       const ta = document.createElement("textarea");
       ta.value = text;
       document.body.appendChild(ta);
@@ -643,9 +667,13 @@ export function DailyCalendar({
       document.execCommand("copy");
       document.body.removeChild(ta);
     }
+    if (windowUnavailableRef.current) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [buildingLabel, shareRows, locale]);
+  }, [buildingLabel, shareRows, locale, windowUnavailable]);
+  const handlePrint = useCallback(() => {
+    if (!windowUnavailable) window.print();
+  }, [windowUnavailable]);
 
   const panelBooking = selectedBookingId ? (bookingById.get(selectedBookingId) ?? null) : null;
 
@@ -679,7 +707,7 @@ export function DailyCalendar({
     });
   }, []);
 
-  if (visibleDailyUnits.length === 0) {
+  if (visibleDailyUnits.length === 0 && !windowUnavailable) {
     return (
       <div
         data-daily-calendar-root
@@ -721,6 +749,7 @@ export function DailyCalendar({
               variant={copied ? "default" : "ghost"}
               size="sm"
               onClick={handleCopy}
+              disabled={windowUnavailable}
               className={cn(
                 TOOLBAR_ITEM,
                 copied &&
@@ -740,7 +769,8 @@ export function DailyCalendar({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => window.print()}
+              onClick={handlePrint}
+              disabled={windowUnavailable}
               className={cn(TOOLBAR_ITEM, "no-print")}
             >
               <Printer className="h-3.5 w-3.5" />
@@ -749,30 +779,57 @@ export function DailyCalendar({
           </div>
         </div>
         <div className="grid gap-3 bg-card px-4 py-3 md:grid-cols-2 xl:grid-cols-4">
-          {shareRows.map((row) => (
-            <ShareCard
-              key={row.key}
-              label={row.label}
-              value={row.count}
-              units={row.units}
-              tone={row.tone}
-            />
-          ))}
+          {windowUnavailable ? (
+            <div
+              role="status"
+              className="min-h-16 py-3 text-sm text-muted-foreground md:col-span-2 xl:col-span-4"
+            >
+              {windowError
+                ? locale === "zh"
+                  ? "今日房态暂不可核验。"
+                  : "L’occupation du jour ne peut pas être vérifiée."
+                : locale === "zh"
+                  ? "正在读取今日房态…"
+                  : "Actualisation de l’occupation…"}
+            </div>
+          ) : (
+            shareRows.map((row) => (
+              <ShareCard
+                key={row.key}
+                label={row.label}
+                value={row.count}
+                units={row.units}
+                tone={row.tone}
+              />
+            ))
+          )}
         </div>
         <div className="grid gap-3 border-t border-border bg-card px-4 py-3 md:grid-cols-3">
-          {financeCards.map((card) => (
-            <FinanceCard
-              key={card.key}
-              label={card.label}
-              value={card.value}
-              caption={card.caption}
-              tone={card.tone}
-              onClick={() => {
-                if (card.key !== "collected" || financeSnapshot?.cash)
-                  setFinanceDetail(card.key as "collected" | "outstanding" | "settled");
-              }}
-            />
-          ))}
+          {windowUnavailable ? (
+            <div
+              role="status"
+              className="min-h-16 py-3 text-sm text-muted-foreground md:col-span-3"
+            >
+              {locale === "zh"
+                ? "房态与财务待刷新，暂不可核验。"
+                : "Occupation et finances en attente d’actualisation ; vérification indisponible."}
+            </div>
+          ) : (
+            financeCards.map((card) => (
+              <FinanceCard
+                key={card.key}
+                label={card.label}
+                value={card.value}
+                caption={card.caption}
+                tone={card.tone}
+                onClick={() => {
+                  if (windowUnavailable) return;
+                  if (card.key !== "collected" || financeSnapshot?.cash)
+                    setFinanceDetail(card.key as "collected" | "outstanding" | "settled");
+                }}
+              />
+            ))
+          )}
         </div>
       </section>
 
@@ -789,64 +846,66 @@ export function DailyCalendar({
             </p>
           </div>
 
-          <div className={TOOLBAR_SURFACE}>
-            <FilterButton
-              active={roomFilter === "all"}
-              onClick={() => setRoomFilter("all")}
-              icon={<SlidersHorizontal className="h-4 w-4" />}
-              label={copy.allRooms}
-              count={filterCounts.all}
-            />
-            <FilterButton
-              active={roomFilter === "occupied"}
-              onClick={() => setRoomFilter("occupied")}
-              color="#62B6F5"
-              label={copy.occupied}
-              count={filterCounts.occupied}
-            />
-            <FilterButton
-              active={roomFilter === "checkingOutToday"}
-              onClick={() => setRoomFilter("checkingOutToday")}
-              color="#E8C840"
-              label={locale === "zh" ? "今日离店" : "Depart"}
-              count={filterCounts.checkingOutToday}
-            />
-            <FilterButton
-              active={roomFilter === "openEnded"}
-              onClick={() => setRoomFilter("openEnded")}
-              color="#62B6F5"
-              label={locale === "zh" ? "未定离店" : "Ouvert"}
-              count={filterCounts.openEnded}
-            />
-            <FilterButton
-              active={roomFilter === "reserved"}
-              onClick={() => setRoomFilter("reserved")}
-              color="#E8C840"
-              label={copy.reserved}
-              count={filterCounts.reserved}
-            />
-            <FilterButton
-              active={roomFilter === "cleaning"}
-              onClick={() => setRoomFilter("cleaning")}
-              color="#5CC4B8"
-              label={copy.cleaning}
-              count={filterCounts.cleaning}
-            />
-            <FilterButton
-              active={roomFilter === "available"}
-              onClick={() => setRoomFilter("available")}
-              color="#A0D0E8"
-              label={copy.available}
-              count={filterCounts.available}
-            />
-            <FilterButton
-              active={roomFilter === "maintenance"}
-              onClick={() => setRoomFilter("maintenance")}
-              color="#F08090"
-              label={copy.maintenance}
-              count={filterCounts.maintenance}
-            />
-          </div>
+          {!windowUnavailable && (
+            <div className={TOOLBAR_SURFACE}>
+              <FilterButton
+                active={roomFilter === "all"}
+                onClick={() => setRoomFilter("all")}
+                icon={<SlidersHorizontal className="h-4 w-4" />}
+                label={copy.allRooms}
+                count={filterCounts.all}
+              />
+              <FilterButton
+                active={roomFilter === "occupied"}
+                onClick={() => setRoomFilter("occupied")}
+                color="#62B6F5"
+                label={copy.occupied}
+                count={filterCounts.occupied}
+              />
+              <FilterButton
+                active={roomFilter === "checkingOutToday"}
+                onClick={() => setRoomFilter("checkingOutToday")}
+                color="#E8C840"
+                label={locale === "zh" ? "今日离店" : "Depart"}
+                count={filterCounts.checkingOutToday}
+              />
+              <FilterButton
+                active={roomFilter === "openEnded"}
+                onClick={() => setRoomFilter("openEnded")}
+                color="#62B6F5"
+                label={locale === "zh" ? "未定离店" : "Ouvert"}
+                count={filterCounts.openEnded}
+              />
+              <FilterButton
+                active={roomFilter === "reserved"}
+                onClick={() => setRoomFilter("reserved")}
+                color="#E8C840"
+                label={copy.reserved}
+                count={filterCounts.reserved}
+              />
+              <FilterButton
+                active={roomFilter === "cleaning"}
+                onClick={() => setRoomFilter("cleaning")}
+                color="#5CC4B8"
+                label={copy.cleaning}
+                count={filterCounts.cleaning}
+              />
+              <FilterButton
+                active={roomFilter === "available"}
+                onClick={() => setRoomFilter("available")}
+                color="#A0D0E8"
+                label={copy.available}
+                count={filterCounts.available}
+              />
+              <FilterButton
+                active={roomFilter === "maintenance"}
+                onClick={() => setRoomFilter("maintenance")}
+                color="#F08090"
+                label={copy.maintenance}
+                count={filterCounts.maintenance}
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-3 border-b border-border px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between">
@@ -883,163 +942,185 @@ export function DailyCalendar({
           data-daily-calendar-viewport
           className="min-h-[360px] overflow-hidden rounded-b-xl [contain:paint]"
         >
-          <div
-            className="relative grid min-w-[760px] w-full"
-            style={{
-              gridTemplateColumns: `${ROOM_COL_WIDTH}px repeat(${visibleDays.length}, minmax(132px, 1fr))`,
-            }}
-            data-daily-calendar-grid
-            role="grid"
-            aria-label={copy.timeline}
-          >
+          {windowPending || windowError ? (
             <div
-              className="z-30 flex items-center border-b border-r bg-card px-3 text-xs font-semibold text-muted-foreground"
-              style={{ height: 40, left: "auto", position: "relative" }}
-              data-daily-calendar-room-label
+              role={windowError ? "alert" : "status"}
+              className="p-6 text-sm text-muted-foreground"
             >
-              <span className="sr-only">{copy.room}</span>
+              {windowError
+                ? locale === "zh"
+                  ? "日历读取失败，当前窗口房态未知。"
+                  : "Calendrier indisponible ; état de la période inconnu."
+                : locale === "zh"
+                  ? "正在读取此日期范围…"
+                  : "Chargement de cette période…"}
+              {windowError && (
+                <button type="button" className="ml-3 underline" onClick={onRetryWindow}>
+                  {locale === "zh" ? "重试" : "Réessayer"}
+                </button>
+              )}
             </div>
-            {visibleDays.map((date) => {
-              const dateStr = toDateStr(date);
-              const isToday = dateStr === todayStr;
-              const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-              return (
-                <div
-                  key={dateStr}
-                  className={cn(
-                    "flex flex-col items-center justify-center border-b border-r border-border text-xs",
-                    isToday && "bg-accent text-accent-foreground",
-                    isWeekend && !isToday && "bg-muted/30 text-muted-foreground",
-                    !isToday && !isWeekend && "bg-card text-muted-foreground",
-                  )}
-                  style={{ height: 40 }}
-                  role="columnheader"
-                >
-                  <span className="text-xs font-medium leading-3">
-                    {date.toLocaleDateString(localeStr, { weekday: "short" })}
-                  </span>
-                  <span className="text-[15px] font-semibold leading-5 text-foreground">
-                    {date.getDate()}
-                  </span>
-                  {isToday && <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary" />}
-                </div>
-              );
-            })}
-
-            {unitsByFloor.length === 0 ? (
+          ) : (
+            <div
+              className="relative grid min-w-[760px] w-full"
+              style={{
+                gridTemplateColumns: `${ROOM_COL_WIDTH}px repeat(${visibleDays.length}, minmax(132px, 1fr))`,
+              }}
+              data-daily-calendar-grid
+              role="grid"
+              aria-label={copy.timeline}
+            >
               <div
-                className="flex h-24 items-center justify-center text-sm font-medium text-muted-foreground"
-                style={{ gridColumn: `span ${visibleDays.length + 1}` }}
+                className="z-30 flex items-center border-b border-r bg-card px-3 text-xs font-semibold text-muted-foreground"
+                style={{ height: 40, left: "auto", position: "relative" }}
+                data-daily-calendar-room-label
               >
-                {copy.emptyFilter}
+                <span className="sr-only">{copy.room}</span>
               </div>
-            ) : (
-              unitsByFloor.flatMap(([floor, units]) => [
-                <FloorRow
-                  key={`floor-${floor}`}
-                  floor={floor}
-                  count={units.length}
-                  daysCount={visibleDays.length}
-                  copy={copy}
-                />,
-                ...units.flatMap((unit) => {
-                  const unitBM = bookingMap.get(unit.id);
-                  const hasCleaning = unitCleaningMap.has(unit.id);
-                  const cleaningTaskId = unitCleaningMap.get(unit.id);
-                  const isMaintenance =
-                    !MAINTENANCE_STATUSES.has(unit.status) ||
-                    (unit.operational_condition !== undefined &&
-                      unit.operational_condition !== "normal");
-                  const roomTone = getRoomTone(unit, hasCleaning, isMaintenance);
-                  return [
-                    <div
-                      key={`${unit.id}-room`}
-                      className="z-10 flex items-center border-b border-r bg-card px-3"
-                      style={{ height: ROW_HEIGHT, left: "auto", position: "relative" }}
-                      role="rowheader"
-                      data-daily-calendar-room-label
-                      title={qualifiedUnitNo(unit)}
-                    >
-                      <span className={cn("mr-2 h-7 w-1.5 rounded-full", roomTone.strip)} />
-                      <div className="min-w-0">
-                        <div className="truncate text-[13px] font-semibold leading-4 text-foreground">
-                          {qualifiedUnitNo(unit)}
-                        </div>
-                      </div>
-                    </div>,
-                    ...visibleDays.map((date) => {
-                      const dateStr = toDateStr(date);
-                      const prevDateStr = toDateStr(addDays(date, -1));
-                      const nextDateStr = toDateStr(addDays(date, 1));
-                      const booking = unitBM?.get(dateStr) ?? null;
-                      const dateRoomState = getDailyRoomStateForDate({
-                        unit,
-                        dateStr,
-                        bookings,
-                        cleaningTasks: visibleCleaningTasks,
-                      });
-                      const prevSame = booking && unitBM?.get(prevDateStr)?.id === booking.id;
-                      const nextSame = booking && unitBM?.get(nextDateStr)?.id === booking.id;
-                      const isToday = dateStr === todayStr;
+              {visibleDays.map((date) => {
+                const dateStr = toDateStr(date);
+                const isToday = dateStr === todayStr;
+                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                return (
+                  <div
+                    key={dateStr}
+                    className={cn(
+                      "flex flex-col items-center justify-center border-b border-r border-border text-xs",
+                      isToday && "bg-accent text-accent-foreground",
+                      isWeekend && !isToday && "bg-muted/30 text-muted-foreground",
+                      !isToday && !isWeekend && "bg-card text-muted-foreground",
+                    )}
+                    style={{ height: 40 }}
+                    role="columnheader"
+                  >
+                    <span className="text-xs font-medium leading-3">
+                      {date.toLocaleDateString(localeStr, { weekday: "short" })}
+                    </span>
+                    <span className="text-[15px] font-semibold leading-5 text-foreground">
+                      {date.getDate()}
+                    </span>
+                    {isToday && <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary" />}
+                  </div>
+                );
+              })}
 
-                      return (
-                        <TimelineCell
-                          key={`${unit.id}-${dateStr}`}
-                          unit={unit}
-                          dateStr={dateStr}
-                          todayStr={todayStr}
-                          booking={booking}
-                          customer={booking ? (customerMap.get(booking.customer_id) ?? null) : null}
-                          hasCleaning={hasCleaning}
-                          isMaintenance={isMaintenance}
-                          isToday={isToday}
-                          isStart={!prevSame}
-                          isEnd={!nextSame}
-                          showCheckedInLabel={
-                            !prevSame || (viewMode === "day" && dateStr === firstVisibleDateStr)
-                          }
-                          locale={locale}
-                          copy={copy}
-                          bookingLabels={bookingLabels}
-                          canCreateBooking={canCreateBooking}
-                          canOperateDaily={canOperateDaily}
-                          onOpenBooking={(id) => {
-                            setSelectedBookingId(id);
-                            setNewBookingUnitId(null);
-                            setNewBookingDate(null);
-                          }}
-                          onNewBooking={() => {
-                            const action = getPrimaryDailyAction({
-                              roomDisplayStatus: dateRoomState.status,
-                              unitStatus: unit.status as UnitStatus,
-                              operationalCondition: unit.operational_condition,
-                              dailyRentalEnabled: unit.daily_rental_enabled === true,
-                              hasOpenCleaningTask: hasCleaning,
-                              isPastDate: dateStr < todayStr,
-                            });
-                            if (action.action === "create_booking" && action.allowed) {
-                              setNewBookingUnitId(unit.id);
-                              setNewBookingDate(dateStr);
-                              setSelectedBookingId(null);
+              {unitsByFloor.length === 0 ? (
+                <div
+                  className="flex h-24 items-center justify-center text-sm font-medium text-muted-foreground"
+                  style={{ gridColumn: `span ${visibleDays.length + 1}` }}
+                >
+                  {copy.emptyFilter}
+                </div>
+              ) : (
+                unitsByFloor.flatMap(([floor, units]) => [
+                  <FloorRow
+                    key={`floor-${floor}`}
+                    floor={floor}
+                    count={units.length}
+                    daysCount={visibleDays.length}
+                    copy={copy}
+                  />,
+                  ...units.flatMap((unit) => {
+                    const unitBM = bookingMap.get(unit.id);
+                    const hasCleaning = unitCleaningMap.has(unit.id);
+                    const cleaningTaskId = unitCleaningMap.get(unit.id);
+                    const isMaintenance =
+                      !MAINTENANCE_STATUSES.has(unit.status) ||
+                      (unit.operational_condition !== undefined &&
+                        unit.operational_condition !== "normal");
+                    const roomTone = getRoomTone(unit, hasCleaning, isMaintenance);
+                    return [
+                      <div
+                        key={`${unit.id}-room`}
+                        className="z-10 flex items-center border-b border-r bg-card px-3"
+                        style={{ height: ROW_HEIGHT, left: "auto", position: "relative" }}
+                        role="rowheader"
+                        data-daily-calendar-room-label
+                        title={qualifiedUnitNo(unit)}
+                      >
+                        <span className={cn("mr-2 h-7 w-1.5 rounded-full", roomTone.strip)} />
+                        <div className="min-w-0">
+                          <div className="truncate text-[13px] font-semibold leading-4 text-foreground">
+                            {qualifiedUnitNo(unit)}
+                          </div>
+                        </div>
+                      </div>,
+                      ...visibleDays.map((date) => {
+                        const dateStr = toDateStr(date);
+                        const prevDateStr = toDateStr(addDays(date, -1));
+                        const nextDateStr = toDateStr(addDays(date, 1));
+                        const booking = unitBM?.get(dateStr) ?? null;
+                        const dateRoomState = getDailyRoomStateForDate({
+                          unit,
+                          dateStr,
+                          bookings,
+                          cleaningTasks: visibleCleaningTasks,
+                        });
+                        const prevSame = booking && unitBM?.get(prevDateStr)?.id === booking.id;
+                        const nextSame = booking && unitBM?.get(nextDateStr)?.id === booking.id;
+                        const isToday = dateStr === todayStr;
+
+                        return (
+                          <TimelineCell
+                            key={`${unit.id}-${dateStr}`}
+                            unit={unit}
+                            dateStr={dateStr}
+                            todayStr={todayStr}
+                            booking={booking}
+                            customer={
+                              booking ? (customerMap.get(booking.customer_id) ?? null) : null
                             }
-                          }}
-                          onCompleteCleaning={() => {
-                            if (cleaningTaskId) {
-                              setCleaningTarget({ taskId: cleaningTaskId, unitNo: unit.unit_no });
+                            hasCleaning={hasCleaning}
+                            isMaintenance={isMaintenance}
+                            isToday={isToday}
+                            isStart={!prevSame}
+                            isEnd={!nextSame}
+                            showCheckedInLabel={
+                              !prevSame || (viewMode === "day" && dateStr === firstVisibleDateStr)
                             }
-                          }}
-                        />
-                      );
-                    }),
-                  ];
-                }),
-              ])
-            )}
-          </div>
+                            locale={locale}
+                            copy={copy}
+                            bookingLabels={bookingLabels}
+                            canCreateBooking={canCreateBooking}
+                            canOperateDaily={canOperateDaily}
+                            onOpenBooking={(id) => {
+                              setSelectedBookingId(id);
+                              setNewBookingUnitId(null);
+                              setNewBookingDate(null);
+                            }}
+                            onNewBooking={() => {
+                              const action = getPrimaryDailyAction({
+                                roomDisplayStatus: dateRoomState.status,
+                                unitStatus: unit.status as UnitStatus,
+                                operationalCondition: unit.operational_condition,
+                                dailyRentalEnabled: unit.daily_rental_enabled === true,
+                                hasOpenCleaningTask: hasCleaning,
+                                isPastDate: dateStr < todayStr,
+                              });
+                              if (action.action === "create_booking" && action.allowed) {
+                                setNewBookingUnitId(unit.id);
+                                setNewBookingDate(dateStr);
+                                setSelectedBookingId(null);
+                              }
+                            }}
+                            onCompleteCleaning={() => {
+                              if (cleaningTaskId) {
+                                setCleaningTarget({ taskId: cleaningTaskId, unitNo: unit.unit_no });
+                              }
+                            }}
+                          />
+                        );
+                      }),
+                    ];
+                  }),
+                ])
+              )}
+            </div>
+          )}
         </div>
       </section>
 
-      {(panelBooking || newBookingUnitId) && (
+      {!windowPending && !windowError && (panelBooking || newBookingUnitId) && (
         <BookingPanel
           key={tick}
           booking={panelBooking}
@@ -1079,10 +1160,10 @@ export function DailyCalendar({
       )}
 
       <ConfirmDialog
-        open={cleaningTarget !== null}
+        open={cleaningTarget !== null && !windowPending && !windowError}
         onClose={() => setCleaningTarget(null)}
         onConfirm={() => {
-          if (!cleaningTarget) return;
+          if (!cleaningTarget || windowPending || windowError) return;
           setCleaningLoading(true);
           completeCleaning(cleaningTarget.taskId)
             .then((result) => {
@@ -1123,7 +1204,7 @@ export function DailyCalendar({
         loading={cleaningLoading}
       />
 
-      {financeDetail && (
+      {!windowUnavailable && financeDetail && (
         <CalendarFinancePanel
           financeDetail={financeDetail}
           locale={locale}
@@ -1134,6 +1215,7 @@ export function DailyCalendar({
           customerMap={customerMap}
           onClose={() => setFinanceDetail(null)}
           onOpenBooking={(bookingId) => {
+            if (windowUnavailable) return;
             setFinanceDetail(null);
             setNewBookingUnitId(null);
             setNewBookingDate(null);

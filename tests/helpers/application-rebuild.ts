@@ -3,7 +3,17 @@ import type pg from "pg";
 import { applicationRebuildPlan } from "../../scripts/lib/application-rebuild.mjs";
 
 /** Native test cluster only. Hosted platform Auth is deliberately a minimal shim. */
-export async function installApplicationRebuild(db: pg.Client) {
+export async function installApplicationRebuild(
+  db: pg.Client,
+  options: { beforeMigration?: string } = {},
+) {
+  const { steps } = applicationRebuildPlan();
+  if (
+    options.beforeMigration &&
+    !steps.some((step: { name: string }) => step.name === options.beforeMigration)
+  ) {
+    throw new Error(`Unknown rebuild migration boundary: ${options.beforeMigration}`);
+  }
   const empty = await db.query(
     "select count(*)::int n from pg_tables where schemaname in ('public','private','auth')",
   );
@@ -16,9 +26,13 @@ export async function installApplicationRebuild(db: pg.Client) {
     create function auth.uid() returns uuid language sql stable as $$ select (auth.jwt()->>'sub')::uuid; $$;
     create function auth.role() returns text language sql stable as $$ select auth.jwt()->>'role'; $$;
     grant usage on schema auth to authenticated,anon,service_role;`);
-  const { steps } = applicationRebuildPlan();
   // Keep migration transaction boundaries: newly added enum values must commit
   // before later migrations use them. No single giant replay transaction.
-  for (const step of steps) await db.query(step.sql);
-  return steps.map((step: { name: string }) => step.name);
+  const applied: string[] = [];
+  for (const step of steps) {
+    if (step.name === options.beforeMigration) break;
+    await db.query(step.sql);
+    applied.push(step.name);
+  }
+  return applied;
 }

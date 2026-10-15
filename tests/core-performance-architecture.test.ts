@@ -38,6 +38,11 @@ describe("core page performance architecture", () => {
       /dynamic(?:<[^>]+>)?\(\s*\(\) =>\s*import\("@\/features\/mobile\/mobile-daily-cards"\)/,
     );
     expect(responsive).toContain("useState(initialIsDesktop)");
-    expect(loader).toContain('.eq("is_completed", false)');
+    expect(loader).toContain("readCalendarWindow");
+    const windowRead = read("supabase/migrations/20261015212832_daily_calendar_window_reads.sql");
+    expect(windowRead).toMatch(
+      /from public\.cleaning_tasks t where t\.unit_id=any\(unit_ids\) and not t\.is_completed/,
+    );
+    expect(windowRead).toContain("cleaning_booking_ids");
   });
 });

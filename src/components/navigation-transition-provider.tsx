@@ -1,7 +1,15 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useTransition,
+  useRef,
+} from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 interface NavTransitionContextType {
   pendingHref: string | null;
@@ -23,40 +31,48 @@ export function useNavigationTransition() {
 
 function normalizePath(path: string) {
   // Strip trailing slash + query/hash so /management/ and /management both match
-  return path.replace(/[/]+$/, "").replace(/[?#].*$/, "") || "/";
+  return path.replace(/[?#].*$/, "").replace(/[/]+$/, "") || "/";
 }
 
 export function NavigationTransitionProvider({ children }: { children: React.ReactNode }) {
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const pathname = usePathname();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const targetRef = useRef<string | null>(null);
 
-  const startNavigation = useCallback((href: string) => {
-    const normalized = normalizePath(href);
-    // Don't trigger loading overlay for same-page clicks
-    if (normalizePath(pathname) === normalized) return;
-    setPendingHref(normalized);
-  }, [pathname]);
+  const startNavigation = useCallback(
+    (href: string) => {
+      const normalized = normalizePath(href);
+      // Don't trigger loading overlay for same-page clicks
+      if (normalizePath(pathname) === normalized || targetRef.current === normalized) return;
+      targetRef.current = normalized;
+      setPendingHref(normalized);
+      startTransition(() => router.push(href));
+    },
+    [pathname, router],
+  );
 
   const clearNavigation = useCallback(() => {
+    targetRef.current = null;
     setPendingHref(null);
   }, []);
 
   useEffect(() => {
-    if (pendingHref != null && normalizePath(pathname) === pendingHref) {
+    if (!isPending || (pendingHref != null && normalizePath(pathname) === pendingHref)) {
+      targetRef.current = null;
       setPendingHref(null);
     }
-  }, [pathname, pendingHref]);
+  }, [pathname, pendingHref, isPending]);
 
-  useEffect(() => {
-    if (pendingHref == null) return;
-    const timeout = window.setTimeout(() => setPendingHref(null), 3000);
-    return () => window.clearTimeout(timeout);
-  }, [pendingHref]);
-
-  const isNavigating = pendingHref !== null;
+  // Pending follows the actual route transition, not a timer which exposes the
+  // old page as interactive while a slower server response is still in flight.
+  const isNavigating = isPending && pendingHref !== null;
 
   return (
-    <NavTransitionContext.Provider value={{ pendingHref, startNavigation, clearNavigation, isNavigating }}>
+    <NavTransitionContext.Provider
+      value={{ pendingHref, startNavigation, clearNavigation, isNavigating }}
+    >
       {children}
     </NavTransitionContext.Provider>
   );
