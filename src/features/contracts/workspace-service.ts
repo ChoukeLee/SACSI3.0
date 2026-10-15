@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 import {
   decodeWorkspace,
   parseWorkspaceQuery,
@@ -12,6 +13,11 @@ import {
 import { resolveContractProjectLink } from "./project-link";
 import type { LeaseBuilding } from "@/features/leases/project-scope";
 import { projectLeaseWorkspaceUnit } from "@/features/leases/lease-unit-projection";
+import {
+  defaultLeaseScope,
+  leaseScopeCookieName,
+  validatedLeaseScope,
+} from "./lease-scope-preference";
 export async function readWorkspace(
   client: Pick<SupabaseClient, "rpc">,
   kind: WorkspaceKind,
@@ -36,6 +42,7 @@ export async function initialWorkspace(
   kind: WorkspaceKind,
   locale: "zh" | "fr",
   requestedProject?: string,
+  viewerId?: string,
 ) {
   const client = await createClient();
   const { data, error } = await client
@@ -52,11 +59,21 @@ export async function initialWorkspace(
     .filter((b) => kind === "lease" || b.project?.allows_sale) as unknown as LeaseBuilding[];
   const projectId = resolveContractProjectLink(buildings, requestedProject);
   const first = buildings.find((b) => b.code === "SACSI11") ?? buildings[0];
+  const cookieName = kind === "lease" ? leaseScopeCookieName(viewerId) : undefined;
+  const stored = cookieName ? (await cookies()).get(cookieName) : undefined;
+  const preferred = validatedLeaseScope(buildings, stored?.value);
+  const leaseScope = preferred ?? defaultLeaseScope(buildings);
   const query = parseWorkspaceQuery({
-    projectId: projectId ?? (kind === "lease" ? (first?.project_id ?? "") : ""),
-    buildingId: projectId ? "" : (first?.id ?? ""),
+    projectId: projectId ?? (kind === "lease" ? leaseScope.projectId : ""),
+    buildingId: projectId ? "" : kind === "lease" ? leaseScope.buildingId : (first?.id ?? ""),
     locale,
   });
   const result = await readWorkspace(client, kind, query);
-  return { ...result, buildings };
+  return {
+    ...result,
+    buildings,
+    scopePreference: cookieName
+      ? { cookieName, serverResolved: !!stored || !!projectId }
+      : undefined,
+  };
 }

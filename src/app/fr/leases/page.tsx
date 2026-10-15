@@ -26,6 +26,7 @@ export default async function FrenchLeasesPage({
       <div className="hidden lg:block">
         <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
           <FrenchLeasesData
+            viewerId={user.id}
             initialProject={params.project}
             canCreate={user.role === "admin" || user.role === "rental_sales"}
             canRecordFinance={user.role === "admin" || user.role === "finance"}
@@ -39,21 +40,24 @@ export default async function FrenchLeasesPage({
 }
 
 async function FrenchLeasesData({
+  viewerId,
   initialProject,
   canCreate,
   canRecordFinance,
   canActivate,
   canMoveOut,
 }: {
+  viewerId: string;
   initialProject?: string;
   canCreate: boolean;
   canRecordFinance: boolean;
   canActivate: boolean;
   canMoveOut: boolean;
 }) {
-  const data = await loadLeaseWorkspace("fr", initialProject);
+  const data = await loadLeaseWorkspace("fr", initialProject, viewerId);
   return (
     <LeaseLazyView
+      key={viewerId}
       {...data}
       initialProject={initialProject}
       locale="fr"

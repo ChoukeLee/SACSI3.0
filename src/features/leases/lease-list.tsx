@@ -93,6 +93,14 @@ import { useContractWorkspace } from "@/features/contracts/use-workspace";
 import type { WorkspaceData } from "@/features/contracts/workspace-model";
 import { workspaceQueryKey } from "@/features/contracts/workspace-model";
 import { useContractPrinter } from "@/features/contracts/use-contract-printer";
+import {
+  defaultLeaseScope,
+  leaseScopeStorageKey,
+  LEASE_SCOPE_LEGACY_KEY,
+  LEASE_SCOPE_LEGACY_CLAIM_KEY,
+  serializeLeaseScope,
+  type LeaseScopePreference,
+} from "@/features/contracts/lease-scope-preference";
 
 interface UnitBusinessFlag {
   business_type: "daily_rental" | "long_lease" | "sale";
@@ -107,6 +115,7 @@ type LeaseUnitRow = UnitRow & {
 interface LeaseListProps {
   workspace?: WorkspaceData;
   initialProject?: string;
+  scopePreference?: LeaseScopePreference;
   contracts: LeaseContractRow[];
   units: LeaseUnitRow[];
   customers: CustomerRow[];
@@ -219,6 +228,7 @@ function getOriginalMonthlyRent(contract: LeaseContractRow, payments: PaymentRow
 export function LeaseList({
   workspace: initialWorkspace,
   initialProject,
+  scopePreference,
   contracts: initialContracts,
   units: initialUnits,
   customers: initialCustomers,
@@ -299,18 +309,37 @@ export function LeaseList({
 
   const projects = useMemo(() => groupLeaseBuildings(buildings), [buildings]);
   const requestedProjectId = resolveContractProjectLink(buildings, initialProject);
+  const scopeStorageKey = leaseScopeStorageKey(scopePreference?.cookieName);
   const [scope, setScope] = useState(() => {
-    const initial = buildings.find((b) => b.code === "SACSI11");
-    const projectId = requestedProjectId ?? initial?.project_id ?? projects[0]?.id ?? "";
+    const initial = defaultLeaseScope(buildings);
+    const serverScope = scopePreference && initialWorkspace ? initialWorkspace.query : undefined;
+    const projectId = requestedProjectId ?? serverScope?.projectId ?? initial.projectId;
     return {
       projectId,
       buildings: {
-        [projectId]: requestedProjectId ? ALL_BUILDINGS : (initial?.id ?? ALL_BUILDINGS),
+        [projectId]: requestedProjectId
+          ? ALL_BUILDINGS
+          : serverScope
+            ? serverScope.buildingId || ALL_BUILDINGS
+            : initial.buildingId || ALL_BUILDINGS,
       } as Record<string, string>,
     };
   });
   const [scopeLoaded, setScopeLoaded] = useState(false);
   useEffect(() => {
+    let canReadLegacy = false;
+    if (scopePreference?.cookieName) {
+      try {
+        let owner = localStorage.getItem(LEASE_SCOPE_LEGACY_CLAIM_KEY);
+        if (!owner && localStorage.getItem(LEASE_SCOPE_LEGACY_KEY)) {
+          owner = scopePreference.cookieName;
+          localStorage.setItem(LEASE_SCOPE_LEGACY_CLAIM_KEY, owner);
+        }
+        canReadLegacy = owner === scopePreference.cookieName;
+      } catch {
+        /* Do not import a shared legacy preference if ownership cannot be established. */
+      }
+    }
     if (requestedProjectId) {
       setScope((current) => ({
         ...current,
@@ -323,8 +352,14 @@ export function LeaseList({
       setScopeLoaded(true);
       return;
     }
+    const serverScope = scopePreference?.serverResolved ? initialWorkspace?.query : undefined;
+    let restored: { projectId: string; buildings: Record<string, string> } | undefined;
     try {
-      const saved = JSON.parse(localStorage.getItem("lease-project-scope") ?? "null");
+      let raw = localStorage.getItem(scopeStorageKey);
+      if (!raw && canReadLegacy) {
+        raw = localStorage.getItem(LEASE_SCOPE_LEGACY_KEY);
+      }
+      const saved = JSON.parse(raw ?? "null");
       if (
         saved &&
         typeof saved.projectId === "string" &&
@@ -332,33 +367,57 @@ export function LeaseList({
         typeof saved.buildings === "object" &&
         !Array.isArray(saved.buildings)
       ) {
-        setScope({
-          projectId: saved.projectId,
-          buildings: Object.fromEntries(
-            Object.entries(saved.buildings).filter(([, value]) => typeof value === "string"),
-          ) as Record<string, string>,
-        });
+        const remembered = Object.fromEntries(
+          Object.entries(saved.buildings).filter(([, value]) => typeof value === "string"),
+        ) as Record<string, string>;
+        restored = { projectId: saved.projectId, buildings: remembered };
       }
     } catch {
       /* Storage is optional. */
     }
+    if (serverScope) {
+      setScope((current) => ({
+        projectId: serverScope.projectId,
+        buildings: {
+          ...current.buildings,
+          ...restored?.buildings,
+          [serverScope.projectId]: serverScope.buildingId || ALL_BUILDINGS,
+        },
+      }));
+    } else if (restored) setScope(restored);
     setScopeLoaded(true);
-  }, [requestedProjectId]);
+  }, [
+    requestedProjectId,
+    scopeStorageKey,
+    scopePreference?.cookieName,
+    scopePreference?.serverResolved,
+    initialWorkspace?.query.projectId,
+    initialWorkspace?.query.buildingId,
+  ]);
   useEffect(() => {
     if (scopeLoaded) {
       try {
-        localStorage.setItem("lease-project-scope", JSON.stringify(scope));
+        localStorage.setItem(scopeStorageKey, JSON.stringify(scope));
       } catch {
         /* Storage is optional. */
       }
     }
-  }, [scope, scopeLoaded]);
+  }, [scope, scopeLoaded, scopeStorageKey]);
   const project = projects.find((p) => p.id === scope.projectId) ?? projects[0];
   const projectBuildings = project?.buildings ?? [];
   const activeBuildingId = resolveBuildingScope(
     projectBuildings,
     scope.buildings[project?.id ?? ""],
   );
+  useEffect(() => {
+    if (!scopeLoaded || !scopePreference?.cookieName || !project?.id || project.id === "unassigned")
+      return;
+    try {
+      document.cookie = `${scopePreference.cookieName}=${serializeLeaseScope(project.id, activeBuildingId)}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+    } catch {
+      /* A navigation preference is optional, never a prerequisite to business reads. */
+    }
+  }, [scopeLoaded, scopePreference?.cookieName, project?.id, activeBuildingId]);
   const scopeBuildingIds = new Set(
     projectBuildings
       .filter((b) => activeBuildingId === ALL_BUILDINGS || b.id === activeBuildingId)
@@ -387,7 +446,7 @@ export function LeaseList({
     setError("");
   };
   useEffect(() => {
-    if (!workspace.enabled) return;
+    if (!workspace.enabled || !scopeLoaded) return;
     workspace.change({
       projectId: project?.id === "unassigned" ? "" : (project?.id ?? ""),
       buildingId: activeBuildingId === ALL_BUILDINGS ? "" : activeBuildingId,
@@ -399,6 +458,7 @@ export function LeaseList({
   }, [
     workspace.enabled,
     workspace.change,
+    scopeLoaded,
     project?.id,
     activeBuildingId,
     statusFilter,
