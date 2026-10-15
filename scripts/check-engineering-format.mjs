@@ -192,6 +192,9 @@ const files = [
   'src/components/locale-context-link.tsx',
   'tests/locale-context-link.test.tsx',
   'tests/finance-project-read.native.ts',
+  'tests/quality-snapshot.native.ts',
+  'tests/reports-category-labels.test.tsx',
+  'src/components/ui/data-viz.tsx',
 ];
 let invalid=0;
 for(const filepath of files){

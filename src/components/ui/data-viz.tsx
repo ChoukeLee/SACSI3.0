@@ -10,23 +10,54 @@ import { cn } from "@/lib/utils";
 export type ChartTone = "blue" | "green" | "amber" | "red" | "neutral" | "sold" | "leased" | "teal";
 
 const HSL: Record<ChartTone, { base: string; fill: string; glow: string }> = {
-  blue:    { base: "hsl(210 90% 50%)", fill: "hsl(210 90% 50% / 0.12)", glow: "hsl(210 90% 55% / 0.25)" },
-  green:   { base: "hsl(150 55% 40%)", fill: "hsl(150 55% 40% / 0.12)", glow: "hsl(150 55% 45% / 0.25)" },
-  amber:   { base: "hsl(38 85% 45%)", fill: "hsl(38 85% 45% / 0.12)", glow: "hsl(38 85% 48% / 0.25)" },
-  red:     { base: "hsl(0 72% 51%)", fill: "hsl(0 72% 51% / 0.10)", glow: "hsl(0 72% 55% / 0.25)" },
-  neutral: { base: "hsl(220 8% 46%)", fill: "hsl(220 8% 46% / 0.10)", glow: "hsl(220 8% 50% / 0.20)" },
-  sold:    { base: "hsl(32 45% 45%)", fill: "hsl(32 45% 45% / 0.12)", glow: "hsl(32 45% 50% / 0.25)" },
-  leased:  { base: "hsl(200 40% 50%)", fill: "hsl(200 40% 50% / 0.12)", glow: "hsl(200 40% 55% / 0.25)" },
-  teal:    { base: "hsl(172 55% 42%)", fill: "hsl(172 55% 42% / 0.12)", glow: "hsl(172 55% 48% / 0.25)" },
+  blue: {
+    base: "hsl(210 90% 50%)",
+    fill: "hsl(210 90% 50% / 0.12)",
+    glow: "hsl(210 90% 55% / 0.25)",
+  },
+  green: {
+    base: "hsl(150 55% 40%)",
+    fill: "hsl(150 55% 40% / 0.12)",
+    glow: "hsl(150 55% 45% / 0.25)",
+  },
+  amber: {
+    base: "hsl(38 85% 45%)",
+    fill: "hsl(38 85% 45% / 0.12)",
+    glow: "hsl(38 85% 48% / 0.25)",
+  },
+  red: { base: "hsl(0 72% 51%)", fill: "hsl(0 72% 51% / 0.10)", glow: "hsl(0 72% 55% / 0.25)" },
+  neutral: {
+    base: "hsl(220 8% 46%)",
+    fill: "hsl(220 8% 46% / 0.10)",
+    glow: "hsl(220 8% 50% / 0.20)",
+  },
+  sold: { base: "hsl(32 45% 45%)", fill: "hsl(32 45% 45% / 0.12)", glow: "hsl(32 45% 50% / 0.25)" },
+  leased: {
+    base: "hsl(200 40% 50%)",
+    fill: "hsl(200 40% 50% / 0.12)",
+    glow: "hsl(200 40% 55% / 0.25)",
+  },
+  teal: {
+    base: "hsl(172 55% 42%)",
+    fill: "hsl(172 55% 42% / 0.12)",
+    glow: "hsl(172 55% 48% / 0.25)",
+  },
 };
 
 // ── DataVizCard ──
 
 export function DataVizCard({
-  title, description, metric, children, className,
+  title,
+  description,
+  metric,
+  children,
+  className,
 }: {
-  title: React.ReactNode; description?: React.ReactNode; metric?: React.ReactNode;
-  children: React.ReactNode; className?: string;
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  metric?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
 }) {
   return (
     <motion.section
@@ -57,10 +88,18 @@ export function DataVizCard({
 // ── DonutChart ──
 
 export function DonutChart({
-  items, size = 160, stroke = 16, centerValue, centerLabel, animate = true,
+  items,
+  size = 160,
+  stroke = 16,
+  centerValue,
+  centerLabel,
+  animate = true,
 }: {
-  items: { label: string; value: number; tone?: ChartTone; color?: string }[];
-  size?: number; stroke?: number; centerValue?: React.ReactNode; centerLabel?: React.ReactNode;
+  items: { id?: string; label: string; value: number; tone?: ChartTone; color?: string }[];
+  size?: number;
+  stroke?: number;
+  centerValue?: React.ReactNode;
+  centerLabel?: React.ReactNode;
   animate?: boolean;
 }) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
@@ -74,16 +113,26 @@ export function DonutChart({
       <div className="relative shrink-0" style={{ width: size, height: size }}>
         <svg viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
           {/* Background ring */}
-          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="hsl(220 14% 92%)" strokeWidth={stroke} />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="hsl(220 14% 92%)"
+            strokeWidth={stroke}
+          />
           {items.map((item, i) => {
             const value = total > 0 ? Math.max(0, item.value) / total : 0;
             const dash = value * circumference;
             const color = item.color ?? HSL[item.tone ?? "blue"].base;
             const seg = (
               <motion.circle
-                key={item.label}
-                cx={size / 2} cy={size / 2} r={radius}
-                fill="none" stroke={color}
+                key={item.id ?? item.label}
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                fill="none"
+                stroke={color}
                 strokeWidth={hoveredIdx === i ? stroke + 4 : stroke}
                 strokeDasharray={`${dash} ${circumference - dash}`}
                 strokeDashoffset={-offset}
@@ -103,7 +152,9 @@ export function DonutChart({
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
           <AnimatePresence mode="wait">
             <motion.div
-              key={hoveredIdx !== null ? items[hoveredIdx].label : "total"}
+              key={
+                hoveredIdx !== null ? (items[hoveredIdx].id ?? items[hoveredIdx].label) : "total"
+              }
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
@@ -118,8 +169,14 @@ export function DonutChart({
                 </>
               ) : (
                 <>
-                  {centerValue && <span className="text-lg font-bold tabular-nums">{centerValue}</span>}
-                  {centerLabel && <span className="mt-0.5 block text-[10px] font-medium text-muted-foreground">{centerLabel}</span>}
+                  {centerValue && (
+                    <span className="text-lg font-bold tabular-nums">{centerValue}</span>
+                  )}
+                  {centerLabel && (
+                    <span className="mt-0.5 block text-[10px] font-medium text-muted-foreground">
+                      {centerLabel}
+                    </span>
+                  )}
                 </>
               )}
             </motion.div>
@@ -132,13 +189,19 @@ export function DonutChart({
           const color = item.color ?? HSL[item.tone ?? "blue"].base;
           return (
             <div
-              key={item.label}
-              className={cn("flex items-center justify-between gap-3 rounded-md px-2 py-1 text-xs transition-colors cursor-pointer", hoveredIdx === i && "bg-muted/60")}
+              key={item.id ?? item.label}
+              className={cn(
+                "flex items-center justify-between gap-3 rounded-md px-2 py-1 text-xs transition-colors cursor-pointer",
+                hoveredIdx === i && "bg-muted/60",
+              )}
               onMouseEnter={() => setHoveredIdx(i)}
               onMouseLeave={() => setHoveredIdx(null)}
             >
               <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: color }}
+                />
                 <span className="truncate">{item.label}</span>
               </span>
               <span className="font-semibold tabular-nums text-foreground">{item.value}</span>
@@ -153,10 +216,13 @@ export function DonutChart({
 // ── BarListChart ──
 
 export function BarListChart({
-  items, maxValue, animate = true,
+  items,
+  maxValue,
+  animate = true,
 }: {
   items: { label: string; value: number; tone?: ChartTone; color?: string }[];
-  maxValue?: number; animate?: boolean;
+  maxValue?: number;
+  animate?: boolean;
 }) {
   const max = Math.max(maxValue ?? 0, ...items.map((i) => i.value), 1);
 
@@ -169,8 +235,12 @@ export function BarListChart({
         return (
           <div key={item.label} className="space-y-1.5">
             <div className="flex items-center justify-between gap-3 text-xs">
-              <span className="min-w-0 truncate font-medium text-muted-foreground">{item.label}</span>
-              <span className="shrink-0 font-semibold tabular-nums text-foreground">{item.value}</span>
+              <span className="min-w-0 truncate font-medium text-muted-foreground">
+                {item.label}
+              </span>
+              <span className="shrink-0 font-semibold tabular-nums text-foreground">
+                {item.value}
+              </span>
             </div>
             <div className="h-2.5 overflow-hidden rounded-full bg-muted/60">
               <motion.div
@@ -191,9 +261,15 @@ export function BarListChart({
 // ── MiniLineChart ──
 
 export function MiniLineChart({
-  values, tone = "blue", height = 120, label,
+  values,
+  tone = "blue",
+  height = 120,
+  label,
 }: {
-  values: number[]; tone?: ChartTone; height?: number; label?: React.ReactNode;
+  values: number[];
+  tone?: ChartTone;
+  height?: number;
+  label?: React.ReactNode;
 }) {
   const width = 320;
   const max = Math.max(...values, 1);
@@ -211,7 +287,11 @@ export function MiniLineChart({
 
   return (
     <div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-28 w-full overflow-visible" preserveAspectRatio="none">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-28 w-full overflow-visible"
+        preserveAspectRatio="none"
+      >
         <defs>
           <linearGradient id={`lineGrad-${tone}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={c.base} stopOpacity="0.25" />
@@ -233,13 +313,23 @@ export function MiniLineChart({
           transition={{ duration: 1.2, ease: "easeOut" }}
         />
         {/* Glow under line */}
-        <path d={linePath} fill="none" stroke={c.base} strokeWidth="6" strokeLinecap="round" opacity="0.12" />
+        <path
+          d={linePath}
+          fill="none"
+          stroke={c.base}
+          strokeWidth="6"
+          strokeLinecap="round"
+          opacity="0.12"
+        />
         {/* Endpoint */}
         {values.length > 0 && (
           <circle
             cx={parseFloat(points[points.length - 1]?.split(",")[0] ?? "0")}
             cy={parseFloat(points[points.length - 1]?.split(",")[1] ?? "0")}
-            r="5" fill="#fff" stroke={c.base} strokeWidth="2.5"
+            r="5"
+            fill="#fff"
+            stroke={c.base}
+            strokeWidth="2.5"
           />
         )}
       </svg>
@@ -250,24 +340,51 @@ export function MiniLineChart({
 
 // ── RadarChart (improved) ──
 
-export function RadarChart({ axes, size = 180 }: { axes: { label: string; value: number; tone?: ChartTone }[]; size?: number }) {
+export function RadarChart({
+  axes,
+  size = 180,
+}: {
+  axes: { label: string; value: number; tone?: ChartTone }[];
+  size?: number;
+}) {
   const center = size / 2;
   const radius = size * 0.36;
   const toPoint = (i: number, v: number) => {
     const angle = -Math.PI / 2 + (i / axes.length) * Math.PI * 2;
-    return [center + Math.cos(angle) * radius * Math.max(0, Math.min(1, v)), center + Math.sin(angle) * radius * Math.max(0, Math.min(1, v))];
+    return [
+      center + Math.cos(angle) * radius * Math.max(0, Math.min(1, v)),
+      center + Math.sin(angle) * radius * Math.max(0, Math.min(1, v)),
+    ];
   };
   const polygon = axes.map((a, i) => toPoint(i, a.value).join(",")).join(" ");
-  const grid = [0.33, 0.66, 1].map(l => axes.map((_, i) => toPoint(i, l).join(",")).join(" "));
+  const grid = [0.33, 0.66, 1].map((l) => axes.map((_, i) => toPoint(i, l).join(",")).join(" "));
 
   return (
     <div className="flex items-center gap-4">
       <svg viewBox={`0 0 ${size} ${size}`} className="h-44 w-44 shrink-0">
-        {grid.map((pts, i) => <polygon key={i} points={pts} fill="none" stroke="hsl(220 14% 90%)" strokeWidth="1" />)}
-        {axes.map((_, i) => { const [x, y] = toPoint(i, 1); return <line key={i} x1={center} y1={center} x2={x} y2={y} stroke="hsl(220 14% 92%)" strokeWidth="1" />; })}
+        {grid.map((pts, i) => (
+          <polygon key={i} points={pts} fill="none" stroke="hsl(220 14% 90%)" strokeWidth="1" />
+        ))}
+        {axes.map((_, i) => {
+          const [x, y] = toPoint(i, 1);
+          return (
+            <line
+              key={i}
+              x1={center}
+              y1={center}
+              x2={x}
+              y2={y}
+              stroke="hsl(220 14% 92%)"
+              strokeWidth="1"
+            />
+          );
+        })}
         <motion.polygon
-          points={polygon} fill={HSL.blue.fill} stroke={HSL.blue.base}
-          strokeWidth="2.5" strokeLinejoin="round"
+          points={polygon}
+          fill={HSL.blue.fill}
+          stroke={HSL.blue.base}
+          strokeWidth="2.5"
+          strokeLinejoin="round"
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5 }}
@@ -303,14 +420,19 @@ export function GroupedBarChart({
   height = 200,
   animate = true,
 }: {
-  groups: { label: string; series: { label: string; value: number; tone?: ChartTone; color?: string }[] }[];
+  groups: {
+    label: string;
+    series: { label: string; value: number; tone?: ChartTone; color?: string }[];
+  }[];
   height?: number;
   animate?: boolean;
 }) {
-  const seriesMeta = Array.from(new Set(groups.flatMap((g) => g.series.map((s) => s.label)))).map((label) => {
-    const sample = groups.flatMap((g) => g.series).find((s) => s.label === label);
-    return { label, tone: sample?.tone ?? "blue" as ChartTone, color: sample?.color };
-  });
+  const seriesMeta = Array.from(new Set(groups.flatMap((g) => g.series.map((s) => s.label)))).map(
+    (label) => {
+      const sample = groups.flatMap((g) => g.series).find((s) => s.label === label);
+      return { label, tone: sample?.tone ?? ("blue" as ChartTone), color: sample?.color };
+    },
+  );
   const max = Math.max(1, ...groups.flatMap((g) => g.series.map((s) => s.value)));
 
   const chartW = 720;
@@ -322,15 +444,29 @@ export function GroupedBarChart({
   const innerH = chartH - padTop - padBottom;
   const groupGap = 28;
   const barGap = 3;
-  const groupW = groups.length > 0 ? (innerW - groupGap * (groups.length - 1)) / groups.length : innerW;
-  const barW = Math.max(2, (groupW - barGap * (seriesMeta.length - 1)) / Math.max(1, seriesMeta.length));
+  const groupW =
+    groups.length > 0 ? (innerW - groupGap * (groups.length - 1)) / groups.length : innerW;
+  const barW = Math.max(
+    2,
+    (groupW - barGap * (seriesMeta.length - 1)) / Math.max(1, seriesMeta.length),
+  );
 
   return (
     <div>
       <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full">
         {[0, 0.5, 1].map((f) => {
           const y = padTop + innerH * (1 - f);
-          return <line key={f} x1={padX} y1={y} x2={chartW - padX} y2={y} stroke="hsl(220 14% 90%)" strokeWidth="1" />;
+          return (
+            <line
+              key={f}
+              x1={padX}
+              y1={y}
+              x2={chartW - padX}
+              y2={y}
+              stroke="hsl(220 14% 90%)"
+              strokeWidth="1"
+            />
+          );
         })}
         {groups.map((g, gi) => {
           const groupX = padX + gi * (groupW + groupGap);
@@ -342,8 +478,11 @@ export function GroupedBarChart({
             return (
               <motion.rect
                 key={gi + "-" + si}
-                x={x} y={animate ? padTop + innerH : y}
-                width={barW} height={animate ? 0 : Math.max(h, 1)} rx="2"
+                x={x}
+                y={animate ? padTop + innerH : y}
+                width={barW}
+                height={animate ? 0 : Math.max(h, 1)}
+                rx="2"
                 fill={color}
                 initial={animate ? { y: padTop + innerH, height: 0 } : undefined}
                 animate={{ y, height: Math.max(h, 1) }}
@@ -355,7 +494,14 @@ export function GroupedBarChart({
         {groups.map((g, gi) => {
           const groupX = padX + gi * (groupW + groupGap);
           return (
-            <text key={gi} x={groupX + groupW / 2} y={chartH - 8} textAnchor="middle" fontSize="10" fill="hsl(220 8% 46%)">
+            <text
+              key={gi}
+              x={groupX + groupW / 2}
+              y={chartH - 8}
+              textAnchor="middle"
+              fontSize="10"
+              fill="hsl(220 8% 46%)"
+            >
               {g.label}
             </text>
           );
@@ -364,7 +510,10 @@ export function GroupedBarChart({
       <div className="mt-2 flex flex-wrap gap-3">
         {seriesMeta.map((s) => (
           <span key={s.label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color ?? HSL[s.tone].base }} />
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: s.color ?? HSL[s.tone].base }}
+            />
             {s.label}
           </span>
         ))}
@@ -408,12 +557,24 @@ export function MultiLineChart({
       <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full">
         {[0, 0.5, 1].map((f) => {
           const y = padTop + innerH * (1 - f);
-          return <line key={f} x1={padX} y1={y} x2={chartW - padX} y2={y} stroke="hsl(220 14% 90%)" strokeWidth="1" />;
+          return (
+            <line
+              key={f}
+              x1={padX}
+              y1={y}
+              x2={chartW - padX}
+              y2={y}
+              stroke="hsl(220 14% 90%)"
+              strokeWidth="1"
+            />
+          );
         })}
         {series.map((s, si) => {
           const color = s.color ?? HSL[s.tone ?? "blue"].base;
           const pts = s.values.map((v, i) => toPoint(v, i));
-          const path = pts.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(" ");
+          const path = pts
+            .map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`))
+            .join(" ");
           return (
             <motion.path
               key={si}
@@ -432,7 +593,14 @@ export function MultiLineChart({
         {xLabels.map((lbl, i) => {
           const p = toPoint(0, i);
           return (
-            <text key={i} x={p.x} y={chartH - 8} textAnchor="middle" fontSize="10" fill="hsl(220 8% 46%)">
+            <text
+              key={i}
+              x={p.x}
+              y={chartH - 8}
+              textAnchor="middle"
+              fontSize="10"
+              fill="hsl(220 8% 46%)"
+            >
               {lbl}
             </text>
           );
@@ -441,7 +609,10 @@ export function MultiLineChart({
       <div className="mt-2 flex flex-wrap gap-3">
         {series.map((s) => (
           <span key={s.label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color ?? HSL[s.tone ?? "blue"].base }} />
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: s.color ?? HSL[s.tone ?? "blue"].base }}
+            />
             {s.label}
           </span>
         ))}
@@ -474,14 +645,19 @@ export function CalendarHeatmap({
         <div className="flex">
           <div className="w-16 shrink-0" />
           {columns.map((c) => (
-            <div key={c.id} className="w-8 shrink-0 pb-1 text-center text-[10px] leading-tight text-muted-foreground">
+            <div
+              key={c.id}
+              className="w-8 shrink-0 pb-1 text-center text-[10px] leading-tight text-muted-foreground"
+            >
               {c.label}
             </div>
           ))}
         </div>
         {rows.map((r) => (
           <div key={r.id} className="flex items-center">
-            <div className="w-16 shrink-0 truncate pr-1 text-right text-[10px] text-muted-foreground">{r.label}</div>
+            <div className="w-16 shrink-0 truncate pr-1 text-right text-[10px] text-muted-foreground">
+              {r.label}
+            </div>
             {columns.map((c) => {
               const tone = cells[r.id]?.[c.id];
               return (
@@ -499,8 +675,14 @@ export function CalendarHeatmap({
         {legend.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-3">
             {legend.map((l) => (
-              <span key={l.label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: HSL[l.tone].base }} />
+              <span
+                key={l.label}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground"
+              >
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: HSL[l.tone].base }}
+                />
                 {l.label}
               </span>
             ))}

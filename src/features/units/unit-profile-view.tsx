@@ -272,7 +272,7 @@ export function UnitProfileView({ data, locale }: { data: UnitProfileData; local
                   label={zh ? "长租" : "Bail"}
                   value={
                     activeLease
-                      ? `${activeLease.contract_no} · ${zh ? "已缴至" : "Payé au"} ${activeLease.paid_through_date ?? activeLease.expected_end_date}`
+                      ? `${activeLease.contract_no} · ${zh ? "已缴至" : "Payé au"} ${activeLease.paid_through_date ?? (zh ? "未记录" : "—")}`
                       : "-"
                   }
                 />
@@ -332,7 +332,7 @@ export function UnitProfileView({ data, locale }: { data: UnitProfileData; local
                     zh ? "客户" : "Client",
                     zh ? "经办人" : "Responsable",
                     zh ? "金额" : "Montant",
-                    zh ? "已收" : "Encaissé",
+                    zh ? "订单付款" : "Paiement de réservation",
                     zh ? "状态" : "Statut",
                     "",
                   ].map((label) => (
@@ -416,7 +416,7 @@ export function UnitProfileView({ data, locale }: { data: UnitProfileData; local
                       <td className="px-4 py-3">{customerName(row.customer_id)}</td>
                       <td className="px-4 py-3">{row.start_date}</td>
                       <td className="px-4 py-3">
-                        {row.paid_through_date ?? row.expected_end_date}
+                        {row.paid_through_date ?? (zh ? "未记录" : "—")}
                       </td>
                       <td className="px-4 py-3 tabular-nums">
                         {formatXof(Number(row.monthly_rent_xof))}
@@ -534,7 +534,7 @@ export function UnitProfileView({ data, locale }: { data: UnitProfileData; local
                       zh ? "业务" : "Activité",
                       zh ? "说明" : "Libellé",
                       zh ? "应收" : "Dû",
-                      zh ? "已收" : "Payé",
+                      zh ? "已核销" : "Imputé",
                       zh ? "未结" : "Solde",
                     ].map((label) => (
                       <th key={label} className="px-4 py-3 text-left text-xs text-muted-foreground">

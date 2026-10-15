@@ -132,7 +132,106 @@ function receivables() {
     },
   ];
 }
+function unitProfile(overrides: Partial<UnitProfileData> = {}): UnitProfileData {
+  return {
+    unit: { id: "unit", unit_no: "101", kind: "apartment", floor_label: "1" },
+    buildingName: "Building",
+    dailyBookings: [],
+    leaseContracts: [],
+    saleContracts: [],
+    receivables: [],
+    payments: [],
+    customers: [],
+    auditLogs: [],
+    ...overrides,
+  } as UnitProfileData;
+}
 describe("profile identities, balances and history", () => {
+  it.each(["zh", "fr"] as const)(
+    "never substitutes a confirmed contract end for an unknown paid-through date (%s)",
+    async (locale) => {
+      const data = unitProfile({
+        leaseContracts: [
+          {
+            id: "lease",
+            contract_no: "L-UNKNOWN",
+            status: "active",
+            start_date: "2026-01-01",
+            paid_through_date: null,
+            expected_end_date: "2032-12-31",
+            expected_end_confirmed: true,
+            monthly_rent_xof: 100000,
+          },
+        ] as UnitProfileData["leaseContracts"],
+      });
+      await act(async () => root.render(<UnitProfileView data={data} locale={locale} />));
+      const unknown = locale === "zh" ? "未记录" : "—";
+      expect(host.textContent).toContain(`${locale === "zh" ? "已缴至" : "Payé au"} ${unknown}`);
+      expect(host.textContent).not.toContain("2032-12-31");
+      await click(locale === "zh" ? "长租 / 出售" : "Bail / Vente");
+      expect(host.querySelectorAll("tbody tr td")[3]?.textContent).toBe(unknown);
+      expect(host.textContent).not.toContain("2032-12-31");
+    },
+  );
+  it.each(["zh", "fr"] as const)(
+    "labels receivable allocation separately from cash in both profiles (%s)",
+    async (locale) => {
+      await act(async () =>
+        root.render(
+          <UnitProfileView
+            data={unitProfile({ receivables: receivables() as UnitProfileData["receivables"] })}
+            locale={locale}
+          />,
+        ),
+      );
+      await click(locale === "zh" ? "财务记录" : "Finance");
+      const allocation = locale === "zh" ? "已核销" : "Imputé";
+      expect([...host.querySelectorAll("th")].map((cell) => cell.textContent)).toContain(
+        allocation,
+      );
+      expect([...host.querySelectorAll("th")].map((cell) => cell.textContent)).not.toContain(
+        locale === "zh" ? "已收" : "Payé",
+      );
+      const customer = {
+        customer: { id: "customer", name: "Customer", is_blacklisted: false },
+        units: [],
+        dailyBookings: [],
+        agentBookings: [],
+        unresolvedBookings: [],
+        leaseContracts: [],
+        saleContracts: [],
+        receivables: receivables(),
+        payments: [],
+        auditLogs: [],
+        attachments: [],
+      } as unknown as CustomerProfileData;
+      await act(async () =>
+        root.render(<CustomerProfileView data={customer} locale={locale} userRole="admin" />),
+      );
+      await click(locale === "zh" ? "财务" : "Finance");
+      expect([...host.querySelectorAll("th")].map((cell) => cell.textContent)).toContain(
+        allocation,
+      );
+      expect(host.textContent).not.toContain("已收指应收核销额");
+    },
+  );
+  it("calls daily prepaid balances order payments, not period cash receipts", async () => {
+    const data = unitProfile({
+      dailyBookings: [
+        {
+          id: "booking",
+          check_in: "2026-01-01",
+          status: "checked_out",
+          total_amount_xof: 10000,
+          prepaid_amount_xof: 4000,
+        },
+      ] as UnitProfileData["dailyBookings"],
+    });
+    await act(async () => root.render(<UnitProfileView data={data} locale="zh" />));
+    await click("日租");
+    expect([...host.querySelectorAll("th")].map((cell) => cell.textContent)).toContain("订单付款");
+    expect([...host.querySelectorAll("th")].map((cell) => cell.textContent)).not.toContain("已收");
+  });
   it("never displays the booking agent as current guest, uses managed finance and reaches all daily rows", async () => {
     const data = {
       unit: {

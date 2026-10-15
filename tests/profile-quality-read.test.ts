@@ -17,6 +17,32 @@ function database(
 ) {
   const pages: { table: string; from: number }[] = [];
   session.client = {
+    async rpc(name: string, input: { p_source: string }) {
+      if (name !== "database_quality_read_rpc") throw new Error("Unexpected test RPC");
+      const sourceTables: Record<string, string> = {
+        findings: "system_data_quality_findings",
+        units: "units",
+        customers: "customers",
+        dailyBookings: "daily_bookings",
+        leaseContracts: "lease_contracts",
+        saleContracts: "sale_contracts",
+        saleSchedules: "sale_payment_schedule",
+        receivables: "receivables",
+        payments: "payments",
+        cleaningTasks: "cleaning_tasks",
+        ledgerEntries: "ledger_entries",
+        auditLogs: "audit_logs",
+      };
+      const table = sourceTables[input.p_source];
+      const rows = tables[table] ?? [];
+      return {
+        data: { rows, total: rows.length },
+        error:
+          failedTable === table
+            ? { code: "57014", message: "sensitive database details must never be logged" }
+            : null,
+      };
+    },
     from(table: string) {
       let rows = [...(tables[table] ?? [])];
       let sourceRead = false;
@@ -369,7 +395,7 @@ describe("complete authorized property profiles", () => {
 });
 
 describe("quality read completeness", () => {
-  it("paginates findings past 1000 with a stable issue-key tie breaker", async () => {
+  it("reads the complete findings past 1000 in one snapshot without count/page rescans", async () => {
     const pages = database({
       system_data_quality_findings: Array.from({ length: 1051 }, (_, index) => ({
         issue_key: `finding-${index}`,
@@ -383,7 +409,7 @@ describe("quality read completeness", () => {
     const issues = await fetchDatabaseQualityIssues("zh");
     expect(issues).toHaveLength(1051);
     expect(new Set(issues.map((issue) => issue.id)).size).toBe(1051);
-    expect(pages.some((page) => page.from >= 1000)).toBe(true);
+    expect(pages).toEqual([]);
   });
 
   it("marks the entire scan unknown when any source fails, never healthy with zero issues", async () => {
@@ -391,6 +417,75 @@ describe("quality read completeness", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(fetchDatabaseQualityIssues("zh")).rejects.toThrow("database quality findings");
     expect(await loadQualityPage("zh", "admin")).toEqual({ status: "unavailable" });
+    expect(console.error).toHaveBeenCalledWith("QualitySourceUnavailable", {
+      source: "findings",
+      code: "57014",
+    });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("sensitive database");
+  });
+
+  it("rejects truncated or malformed finding payloads instead of declaring a complete scan", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    for (const data of [
+      null,
+      { rows: [], total: 1 },
+      { rows: [{}], total: 1 },
+      {
+        rows: [
+          { issue_key: "unsupported", entity_type: "unit", severity: "critical", category: "unit" },
+        ],
+        total: 1,
+      },
+    ]) {
+      session.client = { rpc: async () => ({ data, error: null }) };
+      await expect(fetchDatabaseQualityIssues("zh")).rejects.toThrow("database quality findings");
+    }
+  });
+
+  it("completes findings alone then bounds the complete raw-source reads to two concurrent requests", async () => {
+    let active = 0,
+      peak = 0,
+      findingsComplete = false;
+    const calls: string[] = [];
+    session.client = {
+      rpc: async (_name: string, input: { p_source: string }) => {
+        calls.push(input.p_source);
+        if (input.p_source !== "findings") expect(findingsComplete).toBe(true);
+        active++;
+        peak = Math.max(peak, active);
+        await new Promise((resolve) => {
+          setTimeout(resolve, 1);
+        });
+        active--;
+        if (input.p_source === "findings") findingsComplete = true;
+        return { data: { rows: [], total: 0 }, error: null };
+      },
+    };
+    expect((await loadQualityPage("zh", "admin")).status).toBe("complete");
+    expect(calls[0]).toBe("findings");
+    expect(calls).toHaveLength(12);
+    expect(new Set(calls).size).toBe(12);
+    expect(peak).toBe(2);
+  });
+
+  it("marks any timed-out, malformed or truncated raw source as an unavailable whole scan", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    for (const bad of [
+      { data: null, error: { code: "57014", message: "private payment details" } },
+      { data: { rows: [{}], total: 1 }, error: null },
+      { data: { rows: [], total: 1 }, error: null },
+    ]) {
+      session.client = {
+        rpc: async (_name: string, input: { p_source: string }) =>
+          input.p_source === "payments" ? bad : { data: { rows: [], total: 0 }, error: null },
+      };
+      expect(await loadQualityPage("zh", "admin")).toEqual({ status: "unavailable" });
+    }
+    expect(console.error).toHaveBeenCalledWith("QualitySourceUnavailable", {
+      source: "payments",
+      code: "57014",
+    });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("private payment");
   });
 });
 

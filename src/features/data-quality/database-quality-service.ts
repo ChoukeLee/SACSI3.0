@@ -1,10 +1,14 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import type { Locale } from "@/lib/i18n";
 import { statusDisplayLabel } from "@/lib/display-labels";
 import type { QualityCategory, QualityIssue, QualitySeverity } from "./quality-types";
+import type { DataSnapshot } from "./quality-service";
+import type { AuditSnapshot } from "@/features/daily-rentals/daily-rental-audit";
+
+export type QualitySources = DataSnapshot &
+  Pick<AuditSnapshot, "cleaningTasks" | "ledgerEntries" | "auditLogs">;
 
 type FindingRow = {
   issue_key: string;
@@ -60,15 +64,15 @@ function textFor(row: FindingRow, locale: Locale) {
     return {
       title: zh ? "逾期应收状态未同步" : "Créance échue non synchronisée",
       description: zh
-        ? `应收 ${amount}，已收 ${paid}，到期日已过。`
-        : `Créance ${amount}, encaissé ${paid}, échéance dépassée.`,
+        ? `应收 ${amount}，已核销 ${paid}，到期日已过。`
+        : `Créance ${amount}, imputé ${paid}, échéance dépassée.`,
       action: zh ? "同步为逾期状态。" : "Passer le statut à en retard.",
     };
   }
   if (row.issue_key.startsWith("receivable_overpaid:")) {
     return {
-      title: zh ? "实收大于应收" : "Encaissement supérieur à la créance",
-      description: zh ? `应收 ${amount}，已收 ${paid}。` : `Créance ${amount}, encaissé ${paid}.`,
+      title: zh ? "核销金额大于应收" : "Montant imputé supérieur à la créance",
+      description: zh ? `应收 ${amount}，已核销 ${paid}。` : `Créance ${amount}, imputé ${paid}.`,
       action: zh
         ? "核实是否重复收款；否则登记退款或客户余额。"
         : "Vérifier un doublon, sinon enregistrer un remboursement ou un avoir.",
@@ -140,23 +144,73 @@ export function mapDatabaseFinding(row: FindingRow, locale: Locale): QualityIssu
   };
 }
 
-export async function fetchDatabaseQualityIssues(locale: Locale): Promise<QualityIssue[]> {
+async function readQualitySnapshot(source = "findings") {
   const supabase = await createClient();
-  const rows = await fetchAllPages<FindingRow>(
-    (from, to) =>
-      supabase
-        .from("system_data_quality_findings")
-        .select("*", { count: "exact" })
-        .order("severity")
-        .order("building_code")
-        .order("unit_no")
-        .order("issue_key")
-        .range(from, to),
-    "database quality findings",
-  );
-  return rows.map((row) => mapDatabaseFinding(row, locale));
+  const { data, error } = await supabase.rpc("database_quality_read_rpc", { p_source: source });
+  if (error) {
+    console.error("QualitySourceUnavailable", {
+      source,
+      code: /^[A-Z0-9_]{1,40}$/.test(error.code ?? "") ? error.code : "UNKNOWN",
+    });
+    throw new Error("Failed to fetch database quality findings");
+  }
+  const snapshot = data as { rows?: unknown; total?: unknown } | null;
+  if (
+    !snapshot ||
+    !Array.isArray(snapshot.rows) ||
+    !Number.isSafeInteger(snapshot.total) ||
+    snapshot.total !== snapshot.rows.length ||
+    !snapshot.rows.every(
+      (row) =>
+        row &&
+        typeof row === "object" &&
+        (source === "findings"
+          ? typeof row.issue_key === "string" &&
+            typeof row.entity_type === "string" &&
+            ["low", "medium", "high"].includes(row.severity) &&
+            Object.hasOwn(hrefByCategory, row.category)
+          : typeof row.id === "string"),
+    )
+  ) {
+    console.error("QualitySourceUnavailable", { source, code: "INVALID_RESULT" });
+    throw new Error("Incomplete database quality findings");
+  }
+  return snapshot.rows as Record<string, unknown>[];
 }
 
+export async function fetchDatabaseQualityIssues(locale: Locale): Promise<QualityIssue[]> {
+  return ((await readQualitySnapshot()) as FindingRow[]).map((row) =>
+    mapDatabaseFinding(row, locale),
+  );
+}
+
+export async function fetchDatabaseQualitySnapshot(locale: Locale) {
+  // Findings are the expensive multi-table scan. Complete it alone before the
+  // remaining independent sources; never multiply its cost with page/count reads.
+  const databaseIssues = await fetchDatabaseQualityIssues(locale);
+  const keys: (keyof QualitySources)[] = [
+    "units",
+    "customers",
+    "dailyBookings",
+    "leaseContracts",
+    "saleContracts",
+    "saleSchedules",
+    "receivables",
+    "payments",
+    "cleaningTasks",
+    "ledgerEntries",
+    "auditLogs",
+  ];
+  const sources: Partial<Record<keyof QualitySources, Record<string, unknown>[]>> = {};
+  for (let index = 0; index < keys.length; index += 2) {
+    const batch = keys.slice(index, index + 2);
+    const rows = await Promise.all(
+      batch.map(async (key) => [key, await readQualitySnapshot(key)] as const),
+    );
+    for (const [key, values] of rows) sources[key] = values;
+  }
+  return { sources: sources as unknown as QualitySources, databaseIssues };
+}
 const supersededPrefixes = [
   "unit_avail_leased_",
   "unit_avail_daily_",

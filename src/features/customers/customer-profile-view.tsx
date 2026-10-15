@@ -290,8 +290,8 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
 
       <p className="text-xs leading-relaxed text-muted-foreground">
         {locale === "zh"
-          ? "当前账号权限内的完整历史；应收指标仅含纳管应收，已收指应收核销额，并非期间现金流。住客、经办人分别列示；历史身份不明的不推定为住客。"
-          : "Historique complet dans vos droits. Les indicateurs concernent les créances suivies et leur règlement, pas le flux de trésorerie. Clients et responsables restent distincts."}
+          ? "当前账号权限内的完整历史；应收指标仅含纳管应收，已核销不等于期间现金流。住客、经办人分别列示；历史身份不明的不推定为住客。"
+          : "Historique complet dans vos droits. Les indicateurs concernent les créances suivies et leurs imputations, pas le flux de trésorerie. Clients et responsables restent distincts."}
       </p>
       {/* ── Tab Content ── */}
       {tab === "overview" && (
@@ -970,7 +970,7 @@ function labels(locale: Locale) {
       print: "Imprimer",
       date: "Date",
       amount: "Montant",
-      paid: "Payé",
+      paid: "Imputé",
       status: "Statut",
       role: "Chambre",
       contractNo: "Contrat",
@@ -1076,7 +1076,7 @@ function labels(locale: Locale) {
     print: "\u6253\u5370",
     date: "\u65e5\u671f",
     amount: "\u91d1\u989d",
-    paid: "\u5df2\u6536",
+    paid: "已核销",
     status: "\u72b6\u6001",
     role: "\u623f\u53f7",
     contractNo: "\u5408\u540c\u53f7",

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/data-viz";
 import { MetricGrid, SegmentedControl, StatTile } from "@/components/ui/operational";
 import { formatXof, sortUnits } from "@/lib/utils";
+import { financialBusinessLabel } from "@/lib/display-labels";
 import {
   computeFinanceMetrics,
   isManagedReceivable,
@@ -411,7 +412,8 @@ export function ReportsView({
               {incomeByCategory.length > 0 ? (
                 <DonutChart
                   items={incomeByCategory.map((c, i) => ({
-                    label: c.label,
+                    id: c.label,
+                    label: financialBusinessLabel(c.label, locale),
                     value: c.value,
                     tone: toneForIndex(i),
                   }))}
@@ -428,7 +430,8 @@ export function ReportsView({
               {expenseByCategory.length > 0 ? (
                 <DonutChart
                   items={expenseByCategory.map((c, i) => ({
-                    label: c.label,
+                    id: c.label,
+                    label: financialBusinessLabel(c.label, locale),
                     value: c.value,
                     tone: toneForIndex(i),
                   }))}

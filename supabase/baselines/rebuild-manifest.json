@@ -129,6 +129,10 @@
     {
       "file": "20261015183529_optimize_finance_authorized_project_reads.sql",
       "sha256": "86b66709d0aa9da9ee6b8f8954da9a786f5d5523a18e060454c683c542f6f647"
+    },
+    {
+      "file": "20261015185946_optimize_quality_authorized_snapshot.sql",
+      "sha256": "cf57427c7a53d46697e60d9a465492e9a3968f90b8dafcaad2aae47903493e30"
     }
   ],
   "excluded": [
