@@ -9,15 +9,26 @@ import { PageHeader } from "@/components/page-header";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function FrenchFinancePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function FrenchFinancePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!["admin", "boss", "finance"].includes(user.role)) redirect("/");
   return (
     <div className="space-y-5">
-      <PageHeader title="Finance" description="Ecritures, creances et rapprochement des recus" />
+      <PageHeader
+        title="Finance"
+        description="Flux, imputations et dépôts distincts ; montants d’origine conservés, totaux en XOF."
+      />
       <Suspense fallback={<OperationalPageSkeleton kind="table" rows={8} />}>
-        <FinanceWorkspace params={await searchParams} locale="fr" canWrite={user.role === "admin" || user.role === "finance"} />
+        <FinanceWorkspace
+          params={await searchParams}
+          locale="fr"
+          canWrite={user.role === "admin" || user.role === "finance"}
+        />
       </Suspense>
     </div>
   );

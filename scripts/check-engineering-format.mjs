@@ -186,6 +186,12 @@ const files = [
   'tests/engineering-boundaries.test.ts',
   'tests/application-rebuild-plan.test.ts',
   'tests/calendar-finance-panel.test.tsx',
+  'tests/management-section-failures.test.tsx',
+  'tests/receipt-project-scope.native.ts',
+  'src/app/fr/finance/page.tsx',
+  'src/components/locale-context-link.tsx',
+  'tests/locale-context-link.test.tsx',
+  'tests/finance-project-read.native.ts',
 ];
 let invalid=0;
 for(const filepath of files){

@@ -113,6 +113,22 @@
     {
       "file": "20261015181251_finance_project_scope.sql",
       "sha256": "7c0ef7346eb4082cf6079b476b6671ca0d60a3da4b15ace5979485069f7f529c"
+    },
+    {
+      "file": "20261015182502_optimize_management_daily_receipt_scope.sql",
+      "sha256": "8b9631bc4887ce11d01b04a96664b17d38b4dc640188a100e8f8fac8e37dd580"
+    },
+    {
+      "file": "20261015182503_optimize_management_authorized_read_fences.sql",
+      "sha256": "1d2c49de2ad12d737ecaf908b6dfa531a1224b5e10a7b5bf49bfc98d1c618d90"
+    },
+    {
+      "file": "20261015182936_scope_management_source_reads.sql",
+      "sha256": "2504af278c1d573e7074a01d2782e5276b377b0c419f1a795c9f311cab029a33"
+    },
+    {
+      "file": "20261015183529_optimize_finance_authorized_project_reads.sql",
+      "sha256": "86b66709d0aa9da9ee6b8f8954da9a786f5d5523a18e060454c683c542f6f647"
     }
   ],
   "excluded": [

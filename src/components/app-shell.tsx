@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { LogOut, Settings, ShieldCheck, UserRound, ListChecks } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
@@ -14,6 +14,7 @@ import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { NavigationTransitionProvider, useNavigationTransition } from "@/components/navigation-transition-provider";
 import { getDesktopNavLabels } from "@/lib/nav-labels";
 import { cn } from "@/lib/utils";
+import { LocaleContextLink } from "@/components/locale-context-link";
 
 function DesktopSidebarTrigger() {
   const { state } = useSidebar();
@@ -109,13 +110,9 @@ function AppShellInner({
                 <ListChecks className="h-4 w-4" /><span className="hidden sm:inline">{locale === "zh" ? "我的待办" : "Mes tâches"}</span>
               </Link>
               {userRole !== "front_desk" && (
-                <Link
-                  href={routeFor(otherLocale, pathname)}
-                  prefetch={false}
-                  className="inline-flex h-8 items-center rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
-                >
-                  {labels.shell.langLabel}
-                </Link>
+                <Suspense fallback={null}>
+                  <LocaleContextLink locale={otherLocale} label={labels.shell.langLabel} />
+                </Suspense>
               )}
               {userRole === "admin" && (
                 <Link

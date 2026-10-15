@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { routeFor, type Locale } from "@/lib/i18n";
 import { getCimacOverview, getProjects } from "@/app/management/management-data";
@@ -93,22 +93,94 @@ export async function ManagementPageContent({
     </main>
   );
 }
-async function DashboardSection(props: {
+export async function DashboardSection(props: {
   projectId: string;
   allowsSale: boolean;
   allowsDaily: boolean;
   locale: Locale;
   financeMode: boolean;
 }) {
-  const snapshot = await getOperatingSnapshot(props.projectId);
+  let snapshot: Awaited<ReturnType<typeof getOperatingSnapshot>>;
+  try {
+    snapshot = await getOperatingSnapshot(props.projectId);
+  } catch (error) {
+    // Preserve Next.js redirects/auth/static-render interruptions. Only this
+    // section's unavailable data becomes a local unknown state.
+    unstable_rethrow(error);
+    return (
+      <ManagementSectionUnavailable
+        locale={props.locale}
+        kind="operating"
+        projectId={props.projectId}
+      />
+    );
+  }
   return <OperatingDashboard snapshot={snapshot} {...props} />;
 }
-async function CimacSection({ locale }: { locale: Locale }) {
-  const overview = await getCimacOverview();
-  if (!overview) return null;
+export async function CimacSection({ locale }: { locale: Locale }) {
+  let overview: Awaited<ReturnType<typeof getCimacOverview>>;
+  try {
+    overview = await getCimacOverview();
+  } catch (error) {
+    unstable_rethrow(error);
+    return <ManagementSectionUnavailable locale={locale} kind="cimac" />;
+  }
+  if (!overview) return <ManagementSectionUnavailable locale={locale} kind="cimac" />;
   return (
     <div className="mt-6">
       <CimacProjectOverview overview={overview} locale={locale} />
     </div>
+  );
+}
+
+function ManagementSectionUnavailable({
+  locale,
+  kind,
+  projectId,
+}: {
+  locale: Locale;
+  kind: "operating" | "cimac";
+  projectId?: string;
+}) {
+  const zh = locale === "zh";
+  const title =
+    kind === "operating"
+      ? zh
+        ? "经营汇总暂不可用"
+        : "Synthèse temporairement indisponible"
+      : zh
+        ? "CIMAC 资产库存暂不可用"
+        : "Inventaire CIMAC temporairement indisponible";
+  const href =
+    kind === "operating"
+      ? `/finance?${new URLSearchParams({ projectId: projectId ?? "" })}`
+      : "/units?project=CIMAC";
+  return (
+    <section className={`${styles.surface} mt-6`} role="status" aria-label={title}>
+      <h2 className="text-base font-semibold">{title}</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {zh
+          ? "数据状态：未知。暂时无法读取此部分数据，因此不展示金额、数量或业务判断。其他工作区仍可使用。"
+          : "État des données : inconnu. Cette section ne peut pas être chargée ; aucun montant, nombre ou diagnostic n’est affiché. Les autres espaces restent accessibles."}
+      </p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {zh
+          ? "请稍后刷新重试，或先进入对应工作区核对。"
+          : "Actualisez la page plus tard ou consultez l’espace correspondant."}
+      </p>
+      <Link
+        className="mt-3 inline-block text-sm text-blue-700 underline-offset-4 hover:underline dark:text-blue-300"
+        href={routeFor(locale, href)}
+      >
+        {kind === "operating"
+          ? zh
+            ? "打开财务工作区"
+            : "Ouvrir l’espace finance"
+          : zh
+            ? "打开 CIMAC 资产档案"
+            : "Ouvrir les actifs CIMAC"}{" "}
+        ↗
+      </Link>
+    </section>
   );
 }

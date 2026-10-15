@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { createNativePaymentPostgres } from "./helpers/native-payment-postgres";
 import { installApplicationRebuild } from "./helpers/application-rebuild";
@@ -88,6 +90,48 @@ it("aggregates beyond all UI page limits, separates cash/deposit/offset/allocati
   expect(
     result.businessNet.lease + result.businessNet.sale + result.businessNet.asset + result.dailyNet,
   ).toBe(result.netCollected);
+});
+
+it("keeps authorized outputs identical to the published classifier while fencing RLS sources once", async () => {
+  const reference = readFileSync(
+    resolve("supabase/migrations/20261015181240_management_operating_snapshot.sql"),
+    "utf8",
+  ).replaceAll("management_operating_snapshot_rpc", "management_operating_snapshot_reference_rpc");
+  await db.query(reference);
+  const definition = (
+    await db.query(
+      "select pg_get_functiondef(oid) definition,prosecdef,provolatile from pg_proc where oid='public.management_operating_snapshot_rpc(uuid)'::regprocedure",
+    )
+  ).rows[0];
+  expect(definition.prosecdef).toBe(false);
+  expect(definition.provolatile).toBe("s");
+  for (const name of [
+    "raw_buildings",
+    "raw_units",
+    "raw_payments",
+    "raw_receivables",
+    "raw_leases",
+    "raw_sales",
+    "raw_ledger",
+    "raw_daily",
+  ])
+    expect(definition.definition).toContain(`${name} as materialized`);
+  await db.query("set role authenticated");
+  try {
+    // Both STABLE calls run under one statement timestamp and authenticated RLS.
+    const result = (
+      await db.query(
+        "select public.management_operating_snapshot_rpc($1) actual,public.management_operating_snapshot_reference_rpc($1) expected",
+        [project],
+      )
+    ).rows[0];
+    expect(result.actual).toEqual(result.expected);
+    await expect(
+      db.query("select public.management_operating_snapshot_rpc($1)", [otherProject]),
+    ).rejects.toThrow("managementPermissionDenied");
+  } finally {
+    await db.query("reset role");
+  }
 });
 it("finance project filtering applies to summary/detail/export and preserves zero separate authorized project", async () => {
   await db.query(
@@ -331,4 +375,52 @@ it("keeps unmatched or inconsistent scoped manual receipts visible as excluded, 
   expect(result.excludedCount).toBe(2);
   expect(result.trend[11]).toMatchObject({ net: 0, count: 0, excluded: 2 });
   expect(result.businessNet).toEqual({ lease: 0, sale: 0, asset: 0 });
+});
+
+it("scopes root scans without changing explicit receivable-building precedence or ended-contract fallback", async () => {
+  const f = await isolatedProject(),
+    other = await isolatedProject(),
+    contract = await lease(f.unit);
+  await db.query("update lease_contracts set status='terminated' where id=$1", [contract]);
+  await receipt(null, "lease_rent", contract, 211);
+  for (const [buildingId, unitId, amount, paid, management, status] of [
+    [f.building, other.unit, 100, 10, "managed", "partial"],
+    [other.building, f.unit, 900, 0, "managed", "pending"],
+    [null, f.unit, 70, 20, "managed", "partial"],
+    [f.building, f.unit, 40, 40, "historical_pending", "paid"],
+    [f.building, f.unit, 40, 50, "managed", "paid"],
+    [f.building, f.unit, 80, 0, "managed", "cancelled"],
+  ])
+    await db.query(
+      "insert into receivables(building_id,unit_id,source_type,category,title,due_date,amount_xof,paid_amount_xof,management_status,status) values($1,$2,'manual','other','Scope reference',current_date,$3,$4,$5,$6)",
+      [buildingId, unitId, amount, paid, management, status],
+    );
+  const manual = await receipt(f.unit, "manual", null, 60),
+    ledger = randomUUID();
+  await db.query(
+    "insert into ledger_entries(id,building_id,payment_id,entry_date,direction,category,amount_xof) values($1,$2,$3,current_date,'liability_in','other',60)",
+    [ledger, other.building, manual],
+  );
+  await db.query("update payments set source_id=$1 where id=$2", [ledger, manual]);
+  await db.query("set role authenticated");
+  try {
+    for (const id of [f.project, other.project]) {
+      const result = (
+        await db.query(
+          "select public.management_operating_snapshot_rpc($1) actual,public.management_operating_snapshot_reference_rpc($1) expected",
+          [id],
+        )
+      ).rows[0];
+      expect(result.actual).toEqual(result.expected);
+      if (id === f.project) {
+        expect(result.actual.netCollected).toBe(211);
+        expect(result.actual.dueOutstanding).toBe(140);
+        expect(result.actual.historicalPending).toBe(0);
+        expect(result.actual.leaseCount).toBe(0);
+        expect(result.actual.excludedCount).toBe(0);
+      }
+    }
+  } finally {
+    await db.query("reset role");
+  }
 });
