@@ -23,7 +23,7 @@ interface NavGroup { key: string; labelKey: string; items: NavItem[]; roles: Use
 const groups: NavGroup[] = [
   { key: "core", labelKey: "core", roles: ["admin", "boss", "finance", "front_desk", "rental_sales"], items: [
     { key: "management", href: "/management", icon: LayoutDashboard },
-    { key: "dailyRentals", href: "/daily-rentals", icon: CalendarDays },
+    { key: "dailyRentals", href: "/daily-rentals", icon: CalendarDays, activeMatch: "/daily-rentals" },
     { key: "leases", href: "/leases", icon: FileSignature },
     { key: "sales", href: "/sales", icon: Building2 },
     { key: "units", href: "/units", icon: Building2, activeMatch: "/units" },

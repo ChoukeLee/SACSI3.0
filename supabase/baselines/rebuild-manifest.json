@@ -97,6 +97,10 @@
     {
       "file": "20261006084655_operator_task_inbox.sql",
       "sha256": "811cf09729d093351ef51e8d2fae3356d09ddee9aa6b908ad6d71d95c31557b6"
+    },
+    {
+      "file": "20261015154715_daily_receipts_analysis.sql",
+      "sha256": "200cecf3a463c4fb04317b41a3392fa85720fc15ff43dd514edb4762d9e53e28"
     }
   ],
   "excluded": [

@@ -125,6 +125,16 @@ export async function FinanceWorkspace({
   const cls = "rounded-md border bg-background p-2 text-sm";
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <Link
+          href={`${zh ? "" : "/fr"}/daily-rentals/receipts`}
+          className="text-sm font-medium underline underline-offset-4"
+        >
+          {zh
+            ? "日租历史收款与增长分析"
+            : "Historique et évolution des encaissements courts séjours"}
+        </Link>
+      </div>
       <form className="flex flex-wrap items-end gap-3" method="get">
         <label>
           {zh ? "账表" : "Vue"}
