@@ -246,6 +246,12 @@ export interface PaymentRow {
   request_kind?: string | null;
   reversal_of_payment_id?: string | null;
   reversal_reason?: string | null;
+  actual_collector?: string | null;
+  collector_basis?: string | null;
+  recorded_by?: string | null;
+  context_version?: number;
+  context_confirmed_by?: string | null;
+  context_confirmed_at?: string | null;
   created_at: string;
 }
 
@@ -288,7 +294,8 @@ export type CleaningTaskUpdate = Partial<CleaningTaskInsert>;
 // ── Receivables ──
 
 export type ReceivableSourceType = "daily_booking" | "lease_contract" | "sale_contract" | "manual";
-export type ReceivableCategory = "daily_rental" | "lease_rent" | "lease_deposit" | "sale_installment" | "sale_lump_sum" | "other";
+export type ReceivableCategory =
+  "daily_rental" | "lease_rent" | "lease_deposit" | "sale_installment" | "sale_lump_sum" | "other";
 export type ReceivableStatus = "pending" | "partial" | "paid" | "overdue" | "cancelled";
 export type ReceivableManagementStatus = "managed" | "historical_pending" | "excluded";
 
@@ -306,6 +313,10 @@ export interface ReceivableRow {
   paid_amount_xof: number;
   status: ReceivableStatus;
   management_status?: ReceivableManagementStatus;
+  service_period_start?: string | null;
+  service_period_end?: string | null;
+  service_period_source?: string | null;
+  service_period_confirmed_by?: string | null;
   currency: string;
   notes?: string | null;
   created_at: string;
@@ -339,8 +350,23 @@ export type LeaseSettlementUpdate = Partial<LeaseSettlementInsert>;
 
 // ── AI draft infrastructure ──
 
-export type AiJobStatus = "input_received" | "analyzing" | "awaiting_confirmation" | "executing" | "completed" | "failed" | "cancelled";
-export type AiProposalStatus = "awaiting_clarification" | "proposed" | "confirmed" | "executing" | "executed" | "rejected" | "expired" | "failed";
+export type AiJobStatus =
+  | "input_received"
+  | "analyzing"
+  | "awaiting_confirmation"
+  | "executing"
+  | "completed"
+  | "failed"
+  | "cancelled";
+export type AiProposalStatus =
+  | "awaiting_clarification"
+  | "proposed"
+  | "confirmed"
+  | "executing"
+  | "executed"
+  | "rejected"
+  | "expired"
+  | "failed";
 
 export interface AiJobRow {
   id: string;

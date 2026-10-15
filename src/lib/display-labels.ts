@@ -84,8 +84,8 @@ const STATUS_LABELS: Record<string, Labels> = {
 const DIRECTION_LABELS: Record<string, Labels> = {
   income: { zh: "收入", fr: "Revenu" },
   expense: { zh: "支出", fr: "Dépense" },
-  liability_in: { zh: "押金收取", fr: "Dépôt reçu" },
-  liability_out: { zh: "押金退还", fr: "Dépôt rendu" },
+  liability_in: { zh: "负债流入", fr: "Entrée de passif" },
+  liability_out: { zh: "负债流出", fr: "Sortie de passif" },
 };
 
 const CYCLE_LABELS: Record<string, Labels> = {
@@ -114,8 +114,12 @@ function pick(labels: Labels, locale: Locale) {
   return locale === "zh" ? labels.zh : labels.fr;
 }
 
-export function financialBusinessLabel(sourceType: string | null | undefined, locale: Locale, category?: string | null) {
-  const key = category && BUSINESS_LABELS[category] ? category : sourceType ?? "";
+export function financialBusinessLabel(
+  sourceType: string | null | undefined,
+  locale: Locale,
+  category?: string | null,
+) {
+  const key = category && BUSINESS_LABELS[category] ? category : (sourceType ?? "");
   const labels = BUSINESS_LABELS[key];
   if (labels) return pick(labels, locale);
   return locale === "zh" ? "其他业务" : "Autre opération";
@@ -130,7 +134,9 @@ const FINANCIAL_OUTFLOW_SOURCE_TYPES = new Set([
 
 /** Identifies payments that represent cash leaving the business. */
 export function isFinancialExpenseSourceType(sourceType: string | null | undefined) {
-  const normalized = String(sourceType ?? "").trim().toLowerCase();
+  const normalized = String(sourceType ?? "")
+    .trim()
+    .toLowerCase();
   return normalized.endsWith("_expense") || FINANCIAL_OUTFLOW_SOURCE_TYPES.has(normalized);
 }
 

@@ -1,9 +1,9 @@
 import type { PaymentRow, ReceivableRow } from "@/types/database";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 财务口径唯一计算引擎（见 docs/finance-metrics-spec.md）。
-// 应收 / 已收 / 未收 / 逾期 / 回款率 只允许由本模块产出。
-// 已收 = Σ(receivables.paid_amount_xof)，该值已与付款净额（含负向冲销）对齐。
+// 应收管理计算引擎（见 docs/finance-metrics-spec.md）。
+// 计算应收 / 当前已核销 / 未收 / 逾期，遵守 managed 管理边界。
+// collected 是应收当前已核销余额，不是按收款日期统计的现金。
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type MetricScope = "period" | "asOf" | "cumulative";
@@ -11,7 +11,7 @@ export type MetricScope = "period" | "asOf" | "cumulative";
 export interface FinanceMetrics {
   /** 应收：应收取总额（含已收+未收） */
   receivable: number;
-  /** 已收：实际收到的净额 */
+  /** 应收当前已核销余额；不是按收款日期统计的现金。兼容字段名。 */
   collected: number;
   /** 未收：应收 − 已收（≥0） */
   outstanding: number;
@@ -35,7 +35,10 @@ export function receivableOutstanding(receivable: ReceivableRow): number {
  * 唯一逾期定义：未收余额 > 0，且（状态为 overdue 或到期日已过）。
  * 到期日当天不算逾期（「已过到期日」才逾期）。
  */
-export function isReceivableOverdue(receivable: ReceivableRow, asOfDate: string = todayIso()): boolean {
+export function isReceivableOverdue(
+  receivable: ReceivableRow,
+  asOfDate: string = todayIso(),
+): boolean {
   if (receivable.status === "cancelled" || receivable.status === "paid") return false;
   if (receivableOutstanding(receivable) <= 0) return false;
   return receivable.due_date < asOfDate;
@@ -58,7 +61,9 @@ export function computeFinanceMetrics(
 ): FinanceMetrics {
   const asOfDate = options.asOfDate ?? todayIso();
 
-  let rows = receivables.filter((receivable) => receivable.status !== "cancelled" && isManagedReceivable(receivable));
+  let rows = receivables.filter(
+    (receivable) => receivable.status !== "cancelled" && isManagedReceivable(receivable),
+  );
   if (options.scope === "period" && options.period) {
     rows = rows.filter((receivable) => receivable.due_date.startsWith(options.period!));
   } else if (options.scope === "asOf") {
@@ -91,17 +96,28 @@ export function addIsoDays(dateText: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-export function upcomingReceivables(receivables: ReceivableRow[], asOfDate = todayIso(), days = 15): ReceivableRow[] {
+export function upcomingReceivables(
+  receivables: ReceivableRow[],
+  asOfDate = todayIso(),
+  days = 15,
+): ReceivableRow[] {
   const end = addIsoDays(asOfDate, days);
-  return receivables.filter((row) => row.status !== "cancelled"
-    && isManagedReceivable(row)
-    && receivableOutstanding(row) > 0
-    && row.due_date > asOfDate
-    && row.due_date <= end);
+  return receivables.filter(
+    (row) =>
+      row.status !== "cancelled" &&
+      isManagedReceivable(row) &&
+      receivableOutstanding(row) > 0 &&
+      row.due_date > asOfDate &&
+      row.due_date <= end,
+  );
 }
 
 const REFUND_TYPES = new Set(["lease_deposit_refund", "lease_rent_refund"]);
-const EXPENSE_TYPES = new Set(["lease_agency_expense", "lease_other_expense", "sale_agency_expense"]);
+const EXPENSE_TYPES = new Set([
+  "lease_agency_expense",
+  "lease_other_expense",
+  "sale_agency_expense",
+]);
 
 export function paymentAmountXof(payment: PaymentRow): number {
   return Number(payment.amount) * (Number(payment.exchange_rate_to_xof) || 1);
@@ -109,13 +125,18 @@ export function paymentAmountXof(payment: PaymentRow): number {
 
 export function isRefundPayment(payment: PaymentRow): boolean {
   const text = `${payment.notes ?? ""} ${payment.receipt_no ?? ""}`.toLowerCase();
-  return REFUND_TYPES.has(payment.source_type)
-    || (payment.source_type === "sale_other_expense" && (text.includes("退款") || text.includes("refund") || text.includes("depref")));
+  return (
+    REFUND_TYPES.has(payment.source_type) ||
+    (payment.source_type === "sale_other_expense" &&
+      (text.includes("退款") || text.includes("refund") || text.includes("depref")))
+  );
 }
 
 export function isOperatingExpensePayment(payment: PaymentRow): boolean {
-  return !isRefundPayment(payment)
-    && (EXPENSE_TYPES.has(payment.source_type) || payment.source_type.endsWith("_expense"));
+  return (
+    !isRefundPayment(payment) &&
+    (EXPENSE_TYPES.has(payment.source_type) || payment.source_type.endsWith("_expense"))
+  );
 }
 
 export function netCollectedFromPayments(payments: PaymentRow[]): number {

@@ -7,7 +7,10 @@ const ledger = readFileSync(resolve(root, "src/features/leases/lease-list.tsx"),
 const loader = readFileSync(resolve(root, "src/features/leases/lease-lazy-view.tsx"), "utf8");
 const actions = readFileSync(resolve(root, "src/features/leases/lease-payment-actions.ts"), "utf8");
 const migration = readFileSync(
-  resolve(root, "supabase/migrations/20260923162712_standardize_financial_references_and_currency_rules.sql"),
+  resolve(
+    root,
+    "supabase/migrations/20260923162712_standardize_financial_references_and_currency_rules.sql",
+  ),
   "utf8",
 );
 
@@ -20,7 +23,7 @@ describe("lease ledger rules", () => {
   });
 
   it("uses explicit UI capabilities for creation and finance writes", () => {
-    expect(ledger).toMatch(/action=\{canCreate \?/);
+    expect(ledger).toMatch(/action=\{\s*canCreate\s*\?/);
     expect(ledger).toMatch(/canRecordFinance/);
     expect(ledger).toMatch(/requestId/);
     expect(ledger).toMatch(/crypto\.randomUUID\(\)/);

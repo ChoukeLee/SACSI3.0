@@ -6,6 +6,13 @@ import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import { formatXof } from "@/lib/utils";
 import { parseFinanceRead, type FinanceReadResult } from "./finance-read";
 import { ManualEntryForm } from "./manual-entry-form";
+import { PaymentContextPanel } from "./payment-context-panel";
+import {
+  directionDisplayLabel,
+  financialBusinessLabel,
+  statusDisplayLabel,
+  knownFinancialBusinessCodes,
+} from "@/lib/display-labels";
 
 export async function FinanceWorkspace({
   params,
@@ -18,7 +25,7 @@ export async function FinanceWorkspace({
 }) {
   const query = parseFinanceRead(params);
   const supabase = await createClient();
-  const [report, buildings, units, reconciliation] = await Promise.all([
+  const [report, buildings, units, reconciliation, projectsResult] = await Promise.all([
     supabase.rpc("finance_read_rpc", {
       p_kind: query.kind,
       p_filters: query.filters,
@@ -42,8 +49,16 @@ export async function FinanceWorkspace({
         )
       : Promise.resolve([]),
     supabase.rpc("finance_reconciliation_rpc"),
+    supabase.from("projects").select("id,code,display_name").eq("is_active", true).order("code"),
   ]);
-  if (report.error || !report.data || reconciliation.error || !reconciliation.data)
+  if (
+    report.error ||
+    !report.data ||
+    reconciliation.error ||
+    !reconciliation.data ||
+    projectsResult.error ||
+    !projectsResult.data
+  )
     throw new Error("FinanceReadUnavailable");
   const result = report.data as FinanceReadResult;
   const zh = locale === "zh";
@@ -83,7 +98,7 @@ export async function FinanceWorkspace({
         ]
       : [
           ["receivable", zh ? "应收" : "Dû"],
-          ["paid", zh ? "已收" : "Reçu"],
+          ["paid", zh ? "应收已核销" : "Créances imputées"],
           ["outstanding", zh ? "未收" : "Solde"],
           ["overdue", zh ? "逾期" : "En retard"],
         ];
@@ -116,15 +131,27 @@ export async function FinanceWorkspace({
         direction: "收支",
         category: "类别",
         amount_xof: "金额 XOF",
-        paid_amount_xof: "已收 XOF",
+        paid_amount_xof: "已核销 XOF",
         description: "说明",
         title: "事项",
         status: "状态",
       }
-    : {};
+    : {
+        entry_date: "Date",
+        due_date: "Échéance",
+        building_label: "Bâtiment",
+        unit_label: "Lot",
+        direction: "Flux",
+        category: "Catégorie",
+        amount_xof: "Montant XOF",
+        paid_amount_xof: "Imputé XOF",
+        description: "Description",
+        title: "Objet",
+        status: "Statut",
+      };
   const cls = "rounded-md border bg-background p-2 text-sm";
   return (
-    <div className="space-y-4">
+    <div className="space-y-5 rounded-xl border border-border bg-card p-4 sm:p-6">
       <div className="flex justify-end">
         <Link
           href={`${zh ? "" : "/fr"}/daily-rentals/receipts`}
@@ -136,6 +163,21 @@ export async function FinanceWorkspace({
         </Link>
       </div>
       <form className="flex flex-wrap items-end gap-3" method="get">
+        <label className="text-sm text-muted-foreground">
+          {zh ? "项目" : "Projet"}
+          <select
+            name="projectId"
+            defaultValue={query.filters.projectId ?? ""}
+            className={`${cls} block`}
+          >
+            <option value="">{zh ? "全部授权项目" : "Tous les projets autorisés"}</option>
+            {projectsResult.data.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.code}
+              </option>
+            ))}
+          </select>
+        </label>
         <label>
           {zh ? "账表" : "Vue"}
           <select name="kind" defaultValue={query.kind} className={`${cls} block`}>
@@ -195,16 +237,24 @@ export async function FinanceWorkspace({
             >
               <option value="">{zh ? "所有收支" : "Toutes directions"}</option>
               {["income", "expense", "liability_in", "liability_out"].map((v) => (
-                <option key={v}>{v}</option>
+                <option key={v} value={v}>
+                  {directionDisplayLabel(v, locale)}
+                </option>
               ))}
             </select>
-            <input
+            <select
               aria-label={zh ? "类别" : "Catégorie"}
               name="category"
               defaultValue={query.filters.category}
-              placeholder={zh ? "类别" : "Catégorie"}
               className={cls}
-            />
+            >
+              <option value="">{zh ? "全部类别" : "Toutes catégories"}</option>
+              {knownFinancialBusinessCodes.map((code) => (
+                <option key={code} value={code}>
+                  {financialBusinessLabel(code, locale)}
+                </option>
+              ))}
+            </select>
           </>
         ) : (
           <>
@@ -216,7 +266,9 @@ export async function FinanceWorkspace({
             >
               <option value="">{zh ? "所有状态" : "Tous statuts"}</option>
               {["pending", "partial", "paid", "overdue", "cancelled"].map((v) => (
-                <option key={v}>{v}</option>
+                <option key={v} value={v}>
+                  {statusDisplayLabel(v, locale)}
+                </option>
               ))}
             </select>
             <select
@@ -232,6 +284,15 @@ export async function FinanceWorkspace({
               <option value="excluded">{zh ? "已排除" : "Exclues"}</option>
               <option value="all">{zh ? "全部" : "Toutes"}</option>
             </select>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="outstandingOnly"
+                value="true"
+                defaultChecked={query.filters.outstandingOnly === "true"}
+              />
+              {zh ? "仅未结清" : "Non soldées uniquement"}
+            </label>
           </>
         )}
         <button className="rounded-md bg-primary p-2 text-primary-foreground">
@@ -250,30 +311,71 @@ export async function FinanceWorkspace({
         ))}
       </div>
       <p className="text-sm text-muted-foreground">
-        {zh
-          ? "合计按全部筛选范围中的有效管理记录计算（取消、历史待核对及排除项不计），明细每页 50 条。"
-          : "Totaux des écritures et créances gérées valides ; 50 lignes par page."}{" "}
+        {query.kind === "ledger"
+          ? zh
+            ? "合计与流水明细使用相同筛选范围；现金、押金、费用及冲正仍按各自类别区分，明细每页 50 条。"
+            : "Totaux et écritures partagent les mêmes filtres ; encaissements, dépôts, frais et annulations restent distincts. 50 lignes par page."
+          : zh
+            ? "合计按全部筛选范围中的有效管理应收计算（取消、历史待核对及排除项不计），明细每页 50 条。"
+            : "Totaux des créances gérées valides dans les filtres sélectionnés ; 50 lignes par page."}{" "}
         {result.total} {zh ? "条" : "lignes"}
       </p>
-      <div className="overflow-x-auto rounded-xl border">
+      <div className="table-shell overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr>
               {columns.map((key) => (
-                <th key={key} className="p-3 text-left">
+                <th
+                  key={key}
+                  scope="col"
+                  className={key.endsWith("amount_xof") ? "p-3 text-right" : "p-3 text-left"}
+                >
                   {labels[key] || key}
                 </th>
               ))}
+              {query.kind === "ledger" && (
+                <th scope="col">{zh ? "付款事实与账期" : "Faits du paiement"}</th>
+              )}
             </tr>
           </thead>
           <tbody>
             {result.rows.map((row) => (
               <tr key={String(row.id)} className="border-t">
                 {columns.map((key) => (
-                  <td key={key} className="p-3">
-                    {key.endsWith("amount_xof") ? formatXof(Number(row[key])) : (row[key] ?? "—")}
+                  <td
+                    key={key}
+                    className={
+                      key.endsWith("amount_xof")
+                        ? "p-3 text-right tabular-nums whitespace-nowrap"
+                        : "p-3"
+                    }
+                  >
+                    {key.endsWith("amount_xof")
+                      ? formatXof(Number(row[key]))
+                      : key === "direction"
+                        ? directionDisplayLabel(String(row[key]), locale)
+                        : key === "category"
+                          ? financialBusinessLabel(String(row[key]), locale)
+                          : key === "status"
+                            ? statusDisplayLabel(String(row[key]), locale)
+                            : (row[key] ?? "—")}
                   </td>
                 ))}
+                {query.kind === "ledger" && (
+                  <td className="p-3">
+                    {typeof row.payment_id === "string" ? (
+                      <PaymentContextPanel
+                        paymentId={row.payment_id}
+                        locale={locale}
+                        canWrite={canWrite}
+                      />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        {zh ? "独立流水，无关联付款" : "Écriture sans paiement lié"}
+                      </span>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

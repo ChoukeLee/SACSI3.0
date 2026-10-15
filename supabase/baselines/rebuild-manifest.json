@@ -101,6 +101,18 @@
     {
       "file": "20261015154715_daily_receipts_analysis.sql",
       "sha256": "200cecf3a463c4fb04317b41a3392fa85720fc15ff43dd514edb4762d9e53e28"
+    },
+    {
+      "file": "20261015181240_management_operating_snapshot.sql",
+      "sha256": "53628e055d80e52faed58b0e03217ff671877d4c72edf89c675deaea3eba8516"
+    },
+    {
+      "file": "20261015181250_payment_context_facts_and_allocations.sql",
+      "sha256": "9d8a6da943377dcf9ab50b3241571c2fa3778eeb3525eca27609e53d8ebf393d"
+    },
+    {
+      "file": "20261015181251_finance_project_scope.sql",
+      "sha256": "7c0ef7346eb4082cf6079b476b6671ca0d60a3da4b15ace5979485069f7f529c"
     }
   ],
   "excluded": [

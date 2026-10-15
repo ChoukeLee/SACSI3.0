@@ -5,7 +5,10 @@ import { describe, expect, it } from "vitest";
 const root = process.cwd();
 const actions = readFileSync(join(root, "src/features/sales/actions.ts"), "utf8");
 const view = readFileSync(join(root, "src/features/sales/sale-list.tsx"), "utf8");
-const migration = readFileSync(join(root, "supabase/migrations/202607290004_atomic_sale_contract_create.sql"), "utf8");
+const migration = readFileSync(
+  join(root, "supabase/migrations/202607290004_atomic_sale_contract_create.sql"),
+  "utf8",
+);
 
 describe("sale ledger accuracy rules", () => {
   it("creates sale contracts through one database transaction", () => {
@@ -14,7 +17,7 @@ describe("sale ledger accuracy rules", () => {
   });
 
   it("uses client-stable idempotency ids for contract creation", () => {
-    expect(view).toContain("createRequestIdRef.current??crypto.randomUUID()");
+    expect(view).toMatch(/createRequestIdRef\.current\s*\?\?\s*crypto\.randomUUID\(\)/);
     expect(migration).toContain("sale_contracts_request_id_unique");
   });
 

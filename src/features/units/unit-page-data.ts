@@ -1,9 +1,11 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import { sortUnits } from "@/lib/utils";
 import type { UnitPartySummary } from "@/features/units/unit-party-summary";
 import type { BuildingRow, UnitBusinessFlagRow, UnitRow } from "@/types/database";
+import type { UnitPosition } from "./operational-position";
 
 type RelatedCustomer = { name: string } | Array<{ name: string }> | null;
 
@@ -43,7 +45,6 @@ type CatalogUnit = UnitRow & {
     actual_check_out: string | null;
     status: string;
     guest_customer: RelatedCustomer;
-    legacy_customer: RelatedCustomer;
   }>;
 };
 
@@ -58,10 +59,15 @@ const customerName = (customer: RelatedCustomer) => {
  */
 export async function loadUnitPageData() {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("units")
-    .select(`
+  const [catalogUnits, positions] = await Promise.all([
+    fetchAllPages<CatalogUnit>(
+      (from, to) =>
+        supabase
+          .from("units")
+          .select(
+            `
       id, building_id, code, unit_no, floor_label, kind, status, area_sqm, layout, furnishing, notes,
+      operational_condition, reservation_holder_name, created_at, updated_at,
       asset_subtype, construction_status, location_grade, zone_label, occupancy_verified,
       building:buildings!inner(id, code, display_name, is_active, project_id, project:projects(code, display_name)),
       unit_business_flags(unit_id, business_type, is_enabled, default_price_xof),
@@ -69,19 +75,33 @@ export async function loadUnitPageData() {
       sale_contracts(unit_id, customer_id, signed_date, status, customer:customers(name)),
       daily_bookings(
         unit_id, customer_id, guest_customer_id, guest_name, check_in, check_out, checkout_mode, actual_check_out, status,
-        guest_customer:customers!daily_bookings_guest_customer_id_fkey(name),
-        legacy_customer:customers!daily_bookings_customer_id_fkey(name)
+        guest_customer:customers!daily_bookings_guest_customer_id_fkey(name)
       )
-    `)
-    .eq("building.is_active", true)
-    .eq("lease_contracts.status", "active")
-    .eq("sale_contracts.status", "active")
-    .in("daily_bookings.status", ["confirmed", "checked_in"])
-    .order("unit_no");
-
-  if (error) throw new Error(`Failed to load unit catalogue: ${error.message}`);
-
-  const catalogUnits = (data ?? []) as unknown as CatalogUnit[];
+    `,
+            { count: "exact" },
+          )
+          .eq("building.is_active", true)
+          .eq("lease_contracts.status", "active")
+          .eq("sale_contracts.status", "active")
+          .in("daily_bookings.status", ["confirmed", "checked_in"])
+          .order("unit_no")
+          .order("id")
+          .range(from, to),
+      "unit catalogue",
+    ),
+    fetchAllPages<UnitPosition & { id: string }>(
+      (from, to) =>
+        supabase
+          .from("unit_operational_position")
+          .select(
+            "id,ownership,operational_condition,daily_occupied,lease_occupied,cleaning_pending,daily_enabled,lease_enabled",
+            { count: "exact" },
+          )
+          .order("id")
+          .range(from, to),
+      "unit operational dimensions",
+    ),
+  ]);
   const buildingById = new Map<string, UnitListBuilding>();
   const businessFlagsMap: Record<string, UnitBusinessFlagRow[]> = {};
   const unitPartySummaries: Record<string, UnitPartySummary> = {};
@@ -104,10 +124,12 @@ export async function loadUnitPageData() {
 
     businessFlagsMap[unit.id] = (unit.unit_business_flags ?? []) as UnitBusinessFlagRow[];
 
-    const lease = [...(unit.lease_contracts ?? [])]
-      .sort((left, right) => right.start_date.localeCompare(left.start_date))[0];
-    const sale = [...(unit.sale_contracts ?? [])]
-      .sort((left, right) => right.signed_date.localeCompare(left.signed_date))[0];
+    const lease = [...(unit.lease_contracts ?? [])].sort((left, right) =>
+      right.start_date.localeCompare(left.start_date),
+    )[0];
+    const sale = [...(unit.sale_contracts ?? [])].sort((left, right) =>
+      right.signed_date.localeCompare(left.signed_date),
+    )[0];
     const booking = [...(unit.daily_bookings ?? [])].sort((left, right) => {
       if (left.status === "checked_in" && right.status !== "checked_in") return -1;
       if (right.status === "checked_in" && left.status !== "checked_in") return 1;
@@ -123,36 +145,34 @@ export async function loadUnitPageData() {
       leaseEndConfirmed: lease ? lease.expected_end_confirmed !== false : undefined,
       saleCustomerName: sale ? customerName(sale.customer) : undefined,
       dailyCustomerName: booking
-        ? booking.guest_name?.trim()
-          || customerName(booking.guest_customer)
-          || customerName(booking.legacy_customer)
+        ? customerName(booking.guest_customer) || booking.guest_name?.trim()
         : undefined,
+      dailyStatus: booking?.status,
       dailyDateText: booking
-        ? `${booking.check_in} - ${booking.checkout_mode === "open" ? booking.actual_check_out ?? "未定" : booking.check_out ?? booking.check_in}`
+        ? `${booking.check_in} - ${booking.checkout_mode === "open" ? (booking.actual_check_out ?? "未定") : (booking.check_out ?? booking.check_in)}`
         : undefined,
     };
   }
 
-  const buildings = Array.from(buildingById.values()).sort((left, right) => left.code.localeCompare(right.code));
-  const units = sortUnits(catalogUnits.map(({ building: _building, unit_business_flags: _flags, lease_contracts: _leases, sale_contracts: _sales, daily_bookings: _bookings, ...unit }) => unit as UnitRow));
-
-  const sacsi11Id = buildings.find((building) => building.code === "SACSI11")?.id;
-  const sacsi11503Id = units.find((unit) => unit.building_id === sacsi11Id && unit.unit_no === "503")?.id;
-  if (sacsi11503Id) {
-    businessFlagsMap[sacsi11503Id] = (businessFlagsMap[sacsi11503Id] ?? [])
-      .filter((flag) => flag.business_type !== "daily_rental");
-  }
-
-  const sacsi7Storefront = units.find((unit) => unit.code === "SACSI7-STOREFRONT");
-  if (sacsi7Storefront && !businessFlagsMap[sacsi7Storefront.id]?.some((flag) => flag.business_type === "long_lease")) {
-    businessFlagsMap[sacsi7Storefront.id] = [
-      ...(businessFlagsMap[sacsi7Storefront.id] ?? []),
-      { unit_id: sacsi7Storefront.id, business_type: "long_lease", is_enabled: true, default_price_xof: 1_200_000 },
-    ];
-  }
+  const buildings = Array.from(buildingById.values()).sort((left, right) =>
+    left.code.localeCompare(right.code),
+  );
+  const units = sortUnits(
+    catalogUnits.map(
+      ({
+        building: _building,
+        unit_business_flags: _flags,
+        lease_contracts: _leases,
+        sale_contracts: _sales,
+        daily_bookings: _bookings,
+        ...unit
+      }) => unit as UnitRow,
+    ),
+  );
 
   return {
     units,
+    positionsMap: Object.fromEntries(positions.map((position) => [position.id, position])),
     businessFlagsMap,
     managedLeaseUnitIds: Array.from(new Set(managedLeaseUnitIds)),
     unitPartySummaries,

@@ -1,0 +1,330 @@
+.page {
+  --blue: #355cdb;
+  --soft: #edf2ff;
+  min-width: 0;
+  color: hsl(var(--foreground));
+  font-size: 14px;
+  line-height: 1.6;
+}
+:global(.dark) .page {
+  --blue: #a6bdff;
+  --soft: #26324b;
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+  margin: 2px 0 24px;
+}
+.eyebrow {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 6px;
+}
+.header h1 {
+  font-size: 26px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+}
+.header p {
+  margin-top: 7px;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+}
+.context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.context a {
+  padding: 7px 12px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  border-radius: 6px;
+  font-size: 13px;
+}
+.context a[aria-current="page"] {
+  background: var(--soft);
+  color: var(--blue);
+  border-color: var(--blue);
+}
+.context span {
+  margin-left: auto;
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+.surface {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  padding: 28px 30px;
+}
+.metrics {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 24px;
+  padding-bottom: 26px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.metric {
+  min-width: 0;
+}
+.metric + .metric {
+  padding-left: 22px;
+  border-left: 1px solid hsl(var(--border));
+}
+.metricLabel {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+}
+.metricValue {
+  display: block;
+  margin: 9px 0 8px;
+  font-size: clamp(24px, 2.3vw, 34px);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.metricValue small {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+  font-weight: 400;
+  letter-spacing: normal;
+  margin-left: 7px;
+}
+.metric a {
+  color: var(--blue);
+  font-size: 12px;
+}
+.note {
+  margin-top: 12px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  line-height: 1.7;
+}
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr);
+  gap: 36px;
+  margin: 26px 0;
+}
+.panelHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 15px;
+}
+.panelHead h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.panelHead a {
+  color: var(--blue);
+  font-size: 12px;
+}
+.chartUnit {
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+.chart {
+  width: 100%;
+  display: block;
+  overflow: visible;
+}
+.chart line {
+  stroke: hsl(var(--border));
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+.chart text {
+  fill: hsl(var(--muted-foreground));
+  font:
+    11px "Microsoft YaHei",
+    system-ui,
+    sans-serif;
+}
+.bar {
+  fill: #b8c8f6;
+}
+.currentBar {
+  fill: var(--blue);
+}
+.chartDetails {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.chartDetails summary {
+  cursor: pointer;
+}
+.months {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 20px;
+  padding-top: 10px;
+}
+.months a {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--blue);
+}
+.months strong {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.task {
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 15px 0;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.taskDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--blue);
+  margin-top: 8px;
+}
+.task small {
+  display: block;
+  color: hsl(var(--muted-foreground));
+  margin-top: 4px;
+  font-size: 12px;
+}
+.task strong {
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.overview {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.tableWrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.overview th {
+  color: hsl(var(--muted-foreground));
+  font-weight: 400;
+  font-size: 12px;
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid hsl(var(--border));
+  white-space: nowrap;
+}
+.overview td {
+  padding: 16px 12px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.overview th:first-child,
+.overview td:first-child {
+  padding-left: 0;
+}
+.overview th:last-child,
+.overview td:last-child {
+  padding-right: 0;
+  text-align: right;
+}
+.overview a {
+  color: var(--blue);
+  white-space: nowrap;
+}
+.overview strong {
+  font-weight: 500;
+}
+.amount {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right !important;
+}
+.empty {
+  padding: 20px 0;
+  font-size: 13px;
+  color: hsl(var(--muted-foreground));
+}
+.notice {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: var(--soft);
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.notice a {
+  color: var(--blue);
+}
+.detailTable {
+  margin-top: 28px;
+  padding-top: 23px;
+  border-top: 1px solid hsl(var(--border));
+}
+@media (max-width: 1100px) {
+  .surface {
+    padding: 24px;
+  }
+  .grid {
+    gap: 24px;
+    grid-template-columns: minmax(0, 1.4fr) minmax(240px, 1fr);
+  }
+}
+@media (max-width: 800px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .metricValue {
+    font-size: 25px;
+  }
+  .metrics {
+    gap: 16px;
+  }
+  .metric + .metric {
+    padding-left: 16px;
+  }
+}
+@media (max-width: 600px) {
+  .surface {
+    padding: 20px 16px;
+  }
+  .header {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .header h1 {
+    font-size: 23px;
+  }
+  .context span {
+    width: 100%;
+    margin-left: 0;
+  }
+  .metrics {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .metric + .metric {
+    padding: 18px 0 0;
+    border-left: 0;
+    border-top: 1px solid hsl(var(--border));
+  }
+  .metricValue {
+    font-size: 30px;
+  }
+  .months {
+    grid-template-columns: 1fr;
+  }
+}

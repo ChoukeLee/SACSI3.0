@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { formatMoney, paymentDisplay, convertToXof, convertFromXof } from "@/lib/currency";
 
 describe("formatMoney", () => {
-  it("formats XOF via formatXof (万 FCFA)", () => {
-    expect(formatMoney(40000, "XOF")).toBe("4.00万 FCFA");
-    expect(formatMoney(40000, "FCFA")).toBe("4.00万 FCFA");
+  it("formats full XOF without ten-thousand-unit ambiguity", () => {
+    expect(formatMoney(40000, "XOF")).toBe("40,000 XOF");
+    expect(formatMoney(40000, "FCFA")).toBe("40,000 XOF");
   });
   it("formats CNY with ¥ symbol", () => {
     expect(formatMoney(1234.56, "CNY")).toBe("¥1,234.56");
@@ -18,13 +18,21 @@ describe("formatMoney", () => {
 describe("paymentDisplay", () => {
   it("XOF payment has only primary", () => {
     const d = paymentDisplay({ amount: 40000, currency: "XOF", exchange_rate_to_xof: 1 });
-    expect(d.primary).toBe("4.00万 FCFA");
+    expect(d.primary).toBe("40,000 XOF");
     expect(d.secondary).toBeNull();
   });
   it("CNY payment has primary + XOF equivalent", () => {
     const d = paymentDisplay({ amount: 1000, currency: "CNY", exchange_rate_to_xof: 600 });
     expect(d.primary).toBe("¥1,000");
-    expect(d.secondary).toBe("60.00万 FCFA");
+    expect(d.secondary).toBe("600,000 XOF");
+  });
+  it("preserves fractional historical conversions and does not invent a missing exchange rate", () => {
+    expect(
+      paymentDisplay({ amount: 2, currency: "CNY", exchange_rate_to_xof: 90.7 }).secondary,
+    ).toBe("181.4 XOF");
+    expect(paymentDisplay({ amount: 2, currency: "CNY", exchange_rate_to_xof: 0 }).secondary).toBe(
+      "历史汇率未核验",
+    );
   });
 });
 

@@ -18,14 +18,22 @@ describe("core UI architecture", () => {
     expect(shell).toContain("<DesktopSidebarTrigger />");
   });
 
-  it("keeps the desktop navigation focused on the five daily work areas", () => {
+  it("exposes operating workspaces in company order without putting maintenance in primary navigation", () => {
     const sidebar = read("src/components/app-sidebar.tsx");
-    for (const route of ["/management", "/daily-rentals", "/leases", "/sales", "/units"]) {
+    for (const route of [
+      "/management",
+      "/leases",
+      "/sales",
+      "/finance",
+      "/units",
+      "/daily-rentals",
+      "/customers",
+      "/reports",
+    ]) {
       expect(sidebar).toContain(`href: "${route}"`);
     }
     expect(sidebar).not.toContain('href: "/data-quality"');
-    expect(sidebar).not.toContain('href: "/customers"');
-    expect(sidebar).not.toContain('href: "/finance"');
+    expect(sidebar.indexOf('key: "leases"')).toBeLessThan(sidebar.indexOf('key: "dailyRentals"'));
   });
 
   it("uses shared page, metric and drawer components across core business pages", () => {
@@ -46,9 +54,10 @@ describe("core UI architecture", () => {
 
   it("mounts shared drawers at the document root so page gutters cannot offset them", () => {
     const operational = read("src/components/ui/operational.tsx");
-    expect(operational).toContain("createPortal");
-    expect(operational).toContain("portalTarget");
-    expect(operational).toContain('top-12');
+    expect(operational).toContain("<Dialog.Portal>");
+    expect(operational).toContain("<Dialog.Content");
+    expect(operational).toContain("onCloseAutoFocus");
+    expect(operational).toContain("top-12");
   });
 
   it("has one active long-lease implementation and no independent occupancy page", () => {
@@ -64,14 +73,20 @@ describe("core UI architecture", () => {
     expect(units).toContain("party?.leaseCustomerName");
     expect(units).toContain("party?.saleCustomerName");
     expect(units).toContain("party?.leaseEndDate");
-    expect(partySummary).toContain('from("customers").select("id, name")');
+    expect(partySummary).not.toContain('from("customers")');
+    expect(read("src/features/units/unit-page-data.ts")).toContain(
+      "customers!daily_bookings_guest_customer_id_fkey",
+    );
   });
 
-  it("keeps the room-status board on the homepage and a unified ledger on the units page", () => {
-    const management = read("src/app/management/management-section-clients.tsx");
+  it("uses the same operating homepage for both locales, with daily below core business", () => {
+    const management = read("src/features/management/operating-dashboard.tsx");
     const units = read("src/features/units/unit-list.tsx");
 
-    expect(management).toContain("<RoomBoard");
+    expect(read("src/app/management/page.tsx")).toContain("ManagementPageContent");
+    expect(read("src/app/fr/management/page.tsx")).toContain("ManagementPageContent");
+    expect(management).not.toContain("入住率");
+    expect(management.indexOf('key: "lease"')).toBeLessThan(management.indexOf('key: "daily"'));
     expect(units).toContain("data-unit-asset-table");
     expect(units).toContain("<UnitDetailPanel");
     expect(units).not.toContain("非住宿资产");
@@ -88,7 +103,9 @@ describe("core UI architecture", () => {
   });
 
   it("keeps the daily finance detail flush below the topbar without moving the page", () => {
-    const daily = read("src/features/daily-rentals/calendar.tsx") + read("src/features/daily-rentals/calendar-finance-panel.tsx");
+    const daily =
+      read("src/features/daily-rentals/calendar.tsx") +
+      read("src/features/daily-rentals/calendar-finance-panel.tsx");
 
     expect(daily).toContain('data-daily-calendar-root className="isolate space-y-5"');
     expect(daily).toContain('className="absolute inset-0 z-panel !mt-0 flex flex-col');

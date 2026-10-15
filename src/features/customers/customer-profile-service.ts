@@ -1,64 +1,320 @@
+import "server-only";
+
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import { sortUnits } from "@/lib/utils";
 import type {
-  CustomerRow, DailyBookingRow, LeaseContractRow, SaleContractRow,
-  ReceivableRow, PaymentRow, UnitRow
+  CustomerRow,
+  DailyBookingRow,
+  LeaseContractRow,
+  SaleContractRow,
+  ReceivableRow,
+  PaymentRow,
+  UnitRow,
 } from "@/types/database";
+
+export interface ProfileAuditRow {
+  id: string;
+  created_at: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  metadata: Record<string, unknown> | null;
+  actor_id: string | null;
+  actor_email: string | null;
+}
+
+export interface ProfileAttachmentRow {
+  id: string;
+  storage_path: string;
+  file_type: string;
+  ocr_text: string | null;
+  metadata: Record<string, unknown> | null;
+  paper_archive_status: string;
+  uploaded_at: string;
+}
 
 export interface CustomerProfileData {
   customer: CustomerRow;
   units: UnitRow[];
+  /** Only bookings with an explicit guest relationship. */
   dailyBookings: DailyBookingRow[];
+  agentBookings: DailyBookingRow[];
+  unresolvedBookings: DailyBookingRow[];
   leaseContracts: LeaseContractRow[];
   saleContracts: SaleContractRow[];
   receivables: ReceivableRow[];
   payments: PaymentRow[];
-  auditLogs: { id: string; created_at: string; action: string; entity_type: string; entity_id: string | null; metadata: Record<string, unknown> | null }[];
-  attachments: { id: string; storage_path: string; file_type: string; ocr_text: string | null; metadata: Record<string, unknown> | null; paper_archive_status: string; uploaded_at: string }[];
+  auditLogs: ProfileAuditRow[];
+  attachments: ProfileAttachmentRow[];
 }
 
-export async function fetchCustomerProfile(customerId: string): Promise<CustomerProfileData | null> {
-  const supabase = await createClient();
+function newestFirst<T extends { id: string }>(rows: T[], date: (row: T) => string): T[] {
+  return [...new Map(rows.map((row) => [row.id, row])).values()].sort(
+    (a, b) => date(b).localeCompare(date(a)) || a.id.localeCompare(b.id),
+  );
+}
 
-  const { data: customer } = await supabase.from("customers").select("*").eq("id", customerId).single();
+export async function fetchCustomerProfile(
+  customerId: string,
+): Promise<CustomerProfileData | null> {
+  const supabase = await createClient();
+  const { data: customer, error } = await supabase
+    .from("customers")
+    .select("*")
+    .eq("id", customerId)
+    .maybeSingle();
+  if (error) throw new Error("CustomerProfileUnavailable");
   if (!customer) return null;
 
   const [
-    { data: dailyBookings },
-    { data: leaseContracts },
-    { data: saleContracts },
-    { data: receivables },
-    { data: payments },
-    { data: auditLogs },
-    { data: units },
-    { data: attachments },
+    dailyBookings,
+    agentBookings,
+    unresolvedBookings,
+    leaseContracts,
+    saleContracts,
+    receivables,
+    payments,
+    directAttachments,
   ] = await Promise.all([
-    supabase.from("daily_bookings").select("*").eq("customer_id", customerId).order("check_in", { ascending: false }).limit(100),
-    supabase.from("lease_contracts").select("*").eq("customer_id", customerId).order("start_date", { ascending: false }).limit(50),
-    supabase.from("sale_contracts").select("*").eq("customer_id", customerId).order("signed_date", { ascending: false }).limit(50),
-    supabase.from("receivables").select("*").eq("customer_id", customerId).order("due_date", { ascending: false }).limit(200),
-    supabase.from("payments").select("*").eq("customer_id", customerId).order("payment_date", { ascending: false }).limit(200),
-    supabase.from("audit_logs").select("id, created_at, action, entity_type, entity_id, metadata").eq("entity_id", customerId).order("created_at", { ascending: false }).limit(100),
-    supabase.from("units").select("*").order("unit_no"),
-    supabase.from("attachments").select("id, storage_path, file_type, ocr_text, metadata, paper_archive_status, uploaded_at").eq("customer_id", customerId).order("uploaded_at", { ascending: false }).limit(20),
+    fetchAllPages<DailyBookingRow>(
+      (from, to) =>
+        supabase
+          .from("daily_bookings")
+          .select("*", { count: "exact" })
+          .eq("guest_customer_id", customerId)
+          .order("check_in", { ascending: false })
+          .order("id")
+          .range(from, to),
+      "customer guest bookings",
+    ),
+    fetchAllPages<DailyBookingRow>(
+      (from, to) =>
+        supabase
+          .from("daily_bookings")
+          .select("*", { count: "exact" })
+          .eq("booking_agent_id", customerId)
+          .order("check_in", { ascending: false })
+          .order("id")
+          .range(from, to),
+      "customer agent bookings",
+    ),
+    fetchAllPages<DailyBookingRow>(
+      (from, to) =>
+        supabase
+          .from("daily_bookings")
+          .select("*", { count: "exact" })
+          .eq("customer_id", customerId)
+          .is("guest_customer_id", null)
+          .is("booking_agent_id", null)
+          .order("check_in", { ascending: false })
+          .order("id")
+          .range(from, to),
+      "customer unresolved legacy bookings",
+    ),
+    fetchAllPages<LeaseContractRow>(
+      (from, to) =>
+        supabase
+          .from("lease_contracts")
+          .select("*", { count: "exact" })
+          .eq("customer_id", customerId)
+          .order("start_date", { ascending: false })
+          .order("id")
+          .range(from, to),
+      "customer lease contracts",
+    ),
+    fetchAllPages<SaleContractRow>(
+      (from, to) =>
+        supabase
+          .from("sale_contracts")
+          .select("*", { count: "exact" })
+          .eq("customer_id", customerId)
+          .order("signed_date", { ascending: false })
+          .order("id")
+          .range(from, to),
+      "customer sale contracts",
+    ),
+    fetchAllPages<ReceivableRow>(
+      (from, to) =>
+        supabase
+          .from("receivables")
+          .select("*", { count: "exact" })
+          .eq("customer_id", customerId)
+          .order("due_date", { ascending: false })
+          .order("id")
+          .range(from, to),
+      "customer receivables",
+    ),
+    fetchAllPages<PaymentRow>(
+      (from, to) =>
+        supabase
+          .from("payments")
+          .select("*", { count: "exact" })
+          .eq("customer_id", customerId)
+          .order("payment_date", { ascending: false })
+          .order("id")
+          .range(from, to),
+      "customer payments",
+    ),
+    fetchAllPages<ProfileAttachmentRow>(
+      (from, to) =>
+        supabase
+          .from("attachments")
+          .select(
+            "id, storage_path, file_type, ocr_text, metadata, paper_archive_status, uploaded_at",
+            { count: "exact" },
+          )
+          .eq("customer_id", customerId)
+          .order("uploaded_at", { ascending: false })
+          .order("id")
+          .range(from, to),
+      "customer attachments",
+    ),
   ]);
 
-  // Get all units that appear in this customer's bookings/contracts
-  const unitIds = new Set<string>();
-  for (const b of (dailyBookings ?? [])) unitIds.add(b.unit_id);
-  for (const l of (leaseContracts ?? [])) l.unit_id && unitIds.add(l.unit_id);
-  for (const s of (saleContracts ?? [])) s.unit_id && unitIds.add(s.unit_id);
-  const relevantUnits = sortUnits((units ?? []).filter(u => unitIds.has(u.id)));
+  const businessIds = [
+    ...new Set([...dailyBookings, ...leaseContracts, ...saleContracts].map((row) => row.id)),
+  ];
+  for (let offset = 0; offset < businessIds.length; offset += 100) {
+    const ids = businessIds.slice(offset, offset + 100);
+    const [relatedReceivables, relatedPayments] = await Promise.all([
+      fetchAllPages<ReceivableRow>(
+        (from, to) =>
+          supabase
+            .from("receivables")
+            .select("*", { count: "exact" })
+            .in("source_id", ids)
+            .order("due_date", { ascending: false })
+            .order("id")
+            .range(from, to),
+        "customer contract receivables",
+      ),
+      fetchAllPages<PaymentRow>(
+        (from, to) =>
+          supabase
+            .from("payments")
+            .select("*", { count: "exact" })
+            .in("source_id", ids)
+            .order("payment_date", { ascending: false })
+            .order("id")
+            .range(from, to),
+        "customer contract payments",
+      ),
+    ]);
+    receivables.push(...relatedReceivables);
+    payments.push(...relatedPayments);
+  }
+  // The old customer_id on daily financial rows can identify the booking agent.
+  // Keep that relationship in the agent tab, not the guest's financial balance.
+  const agentOnlyIds = new Set(
+    agentBookings.filter((row) => row.guest_customer_id !== customerId).map((row) => row.id),
+  );
+  const guestFinancial = (row: { source_type: string; source_id: string | null }) =>
+    !(row.source_type === "daily_booking" && row.source_id && agentOnlyIds.has(row.source_id));
+  const customerReceivables = newestFirst(
+    receivables.filter(guestFinancial),
+    (row) => row.due_date,
+  );
+  const customerPayments = newestFirst(payments.filter(guestFinancial), (row) => row.payment_date);
+
+  const unitIds = [
+    ...new Set(
+      [
+        ...dailyBookings,
+        ...agentBookings,
+        ...unresolvedBookings,
+        ...leaseContracts,
+        ...saleContracts,
+      ]
+        .map((row) => row.unit_id)
+        .filter(Boolean),
+    ),
+  ];
+  const entities = [
+    ...new Set([
+      customerId,
+      ...dailyBookings.map((row) => row.id),
+      ...agentBookings.map((row) => row.id),
+      ...unresolvedBookings.map((row) => row.id),
+      ...leaseContracts.map((row) => row.id),
+      ...saleContracts.map((row) => row.id),
+      ...receivables.map((row) => row.id),
+      ...payments.map((row) => row.id),
+    ]),
+  ];
+  const units: UnitRow[] = [];
+  const auditLogs: ProfileAuditRow[] = [];
+  const attachments: ProfileAttachmentRow[] = [...directAttachments];
+  // Bounded filters avoid oversized PostgREST URLs; every batch remains paged.
+  await Promise.all([
+    (async () => {
+      for (let offset = 0; offset < unitIds.length; offset += 100)
+        units.push(
+          ...(await fetchAllPages<UnitRow>(
+            (from, to) =>
+              supabase
+                .from("units")
+                .select("*", { count: "exact" })
+                .in("id", unitIds.slice(offset, offset + 100))
+                .order("id")
+                .range(from, to),
+            "customer units",
+          )),
+        );
+    })(),
+    (async () => {
+      for (let offset = 0; offset < entities.length; offset += 100)
+        auditLogs.push(
+          ...(await fetchAllPages<ProfileAuditRow>(
+            (from, to) =>
+              supabase
+                .from("audit_logs")
+                .select(
+                  "id, created_at, action, entity_type, entity_id, metadata, actor_id, actor_email",
+                  {
+                    count: "exact",
+                  },
+                )
+                .in("entity_id", entities.slice(offset, offset + 100))
+                .order("created_at", { ascending: false })
+                .order("id")
+                .range(from, to),
+            "customer related audit",
+          )),
+        );
+    })(),
+    (async () => {
+      for (let offset = 0; offset < entities.length; offset += 100)
+        attachments.push(
+          ...(await fetchAllPages<ProfileAttachmentRow>(
+            (from, to) =>
+              supabase
+                .from("attachments")
+                .select(
+                  "id, storage_path, file_type, ocr_text, metadata, paper_archive_status, uploaded_at",
+                  { count: "exact" },
+                )
+                .in("linked_id", entities.slice(offset, offset + 100))
+                .order("uploaded_at", { ascending: false })
+                .order("id")
+                .range(from, to),
+            "customer related attachments",
+          )),
+        );
+    })(),
+  ]);
 
   return {
     customer: customer as CustomerRow,
-    units: relevantUnits as UnitRow[],
-    dailyBookings: (dailyBookings ?? []) as DailyBookingRow[],
-    leaseContracts: (leaseContracts ?? []) as LeaseContractRow[],
-    saleContracts: (saleContracts ?? []) as SaleContractRow[],
-    receivables: (receivables ?? []) as ReceivableRow[],
-    payments: (payments ?? []) as PaymentRow[],
-    auditLogs: (auditLogs ?? []) as { id: string; created_at: string; action: string; entity_type: string; entity_id: string | null; metadata: Record<string, unknown> | null }[],
-    attachments: (attachments ?? []) as { id: string; storage_path: string; file_type: string; ocr_text: string | null; metadata: Record<string, unknown> | null; paper_archive_status: string; uploaded_at: string }[],
+    units: sortUnits(units),
+    dailyBookings,
+    agentBookings,
+    unresolvedBookings,
+    leaseContracts,
+    saleContracts,
+    receivables: customerReceivables,
+    payments: customerPayments,
+    auditLogs: newestFirst(auditLogs, (row) => row.created_at),
+    attachments: newestFirst(attachments, (row) => row.uploaded_at),
   };
 }

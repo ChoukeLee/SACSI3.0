@@ -14,7 +14,8 @@ describe("core page performance architecture", () => {
     expect(source).toContain("sale_contracts(");
     expect(source).toContain("daily_bookings(");
     expect(source).toContain("customers!daily_bookings_guest_customer_id_fkey");
-    expect(source).toContain("customers!daily_bookings_customer_id_fkey");
+    expect(source).toContain("guest_name");
+    expect(source).not.toContain("legacy_customer:customers!daily_bookings_customer_id_fkey");
     expect(source).not.toContain('.from("audit_logs")');
   });
 
@@ -25,15 +26,17 @@ describe("core page performance architecture", () => {
 
     expect(list).not.toContain("auditLogsMap");
     expect(panel).toContain("getUnitAuditLogs(unit.id)");
-    expect(actions).toContain('export async function getUnitAuditLogs');
+    expect(actions).toContain("export async function getUnitAuditLogs");
   });
 
   it("splits desktop and mobile daily-rental interfaces", () => {
     const responsive = read("src/features/daily-rentals/daily-rentals-responsive-view.tsx");
     const loader = read("src/app/daily-rentals/daily-rental-data.tsx");
 
-    expect(responsive).toContain('dynamic(() => import("./calendar")');
-    expect(responsive).toContain('dynamic(() => import("@/features/mobile/mobile-daily-cards")');
+    expect(responsive).toMatch(/dynamic\(\s*\(\) => import\("\.\/calendar"\)/);
+    expect(responsive).toMatch(
+      /dynamic(?:<[^>]+>)?\(\s*\(\) =>\s*import\("@\/features\/mobile\/mobile-daily-cards"\)/,
+    );
     expect(responsive).toContain("useState(initialIsDesktop)");
     expect(loader).toContain('.eq("is_completed", false)');
   });

@@ -2,10 +2,37 @@
 import { CalendarFinancePanel } from "./calendar-finance-panel";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { TimelineCell, FloorRow, ShareCard, FinanceCard, FilterButton } from "./calendar-view-parts";
-import { ROOM_COL_WIDTH, ROW_HEIGHT, MAINTENANCE_STATUSES, getRoomTone, getUnitTimelineStatus, resolveRangeStart, resolveRangeEnd, formatRangeLabel, startOfDay, addDays, toDateStr, serverMatchesPatch } from "./calendar-model";
+import {
+  TimelineCell,
+  FloorRow,
+  ShareCard,
+  FinanceCard,
+  FilterButton,
+} from "./calendar-view-parts";
+import {
+  ROOM_COL_WIDTH,
+  ROW_HEIGHT,
+  MAINTENANCE_STATUSES,
+  getRoomTone,
+  getUnitTimelineStatus,
+  resolveRangeStart,
+  resolveRangeEnd,
+  formatRangeLabel,
+  startOfDay,
+  addDays,
+  toDateStr,
+  serverMatchesPatch,
+} from "./calendar-model";
 import type { ViewMode, RoomFilter } from "./calendar-model";
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Printer, SlidersHorizontal } from "lucide-react";
+import {
+  CalendarDays,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Printer,
+  SlidersHorizontal,
+} from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { cn, formatXof, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
 import { COPY, BOOKING_STATUS_LABELS } from "./calendar-constants";
@@ -19,8 +46,11 @@ import type { DailyOperationSnapshot } from "./actions";
 import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
 import { buildBookingMap, buildDailyRoomStateMap, getDailyRoomStateForDate } from "./room-status";
 import { getPrimaryDailyAction } from "./daily-rental-policy";
-import { calculateBilling } from "./billing";
 import { qualifiedUnitNo } from "@/lib/unit-building-label";
+import {
+  dailyBookingFinancePosition,
+  type CalendarFinanceSnapshot,
+} from "./calendar-finance-model";
 
 import type { CustomerSummary } from "./customer-summary";
 export type { CustomerSummary } from "./customer-summary";
@@ -30,7 +60,12 @@ interface CalendarProps {
   unitLookupUnits?: UnitRow[];
   bookings: DailyBookingRow[];
   customers: CustomerSummary[];
-  cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[];
+  cleaningTasks: {
+    id: string;
+    unit_id: string;
+    daily_booking_id: string | null;
+    is_completed: boolean;
+  }[];
   payments: {
     id: string;
     source_id: string;
@@ -38,20 +73,24 @@ interface CalendarProps {
     payment_date: string;
     reversal_of_payment_id?: string | null;
     request_kind?: string | null;
+    unit_id?: string | null;
   }[];
   locale: Locale;
   userRole?: string;
   buildingLabel?: string;
+  financeSnapshot?: CalendarFinanceSnapshot;
 }
-
 
 const NAV_BTN =
   "inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-xs transition-colors hover:bg-white hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
-const TOOLBAR_SURFACE = "flex flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/45 p-1 shadow-xs";
+const TOOLBAR_SURFACE =
+  "flex flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/45 p-1 shadow-xs";
 const TOOLBAR_ITEM =
   "inline-flex h-8 items-center gap-2 rounded-md border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:bg-white hover:text-foreground";
-const TOOLBAR_META = cn(TOOLBAR_ITEM, "text-[13px] font-medium text-foreground tabular-nums hover:bg-card hover:text-foreground");
-
+const TOOLBAR_META = cn(
+  TOOLBAR_ITEM,
+  "text-[13px] font-medium text-foreground tabular-nums hover:bg-card hover:text-foreground",
+);
 
 export function DailyCalendar({
   dailyUnits,
@@ -63,11 +102,13 @@ export function DailyCalendar({
   locale,
   userRole,
   buildingLabel,
+  financeSnapshot,
 }: CalendarProps) {
   const copy = COPY[locale];
   const bookingLabels = BOOKING_STATUS_LABELS[locale];
   const canCreateBooking = userRole === "admin" || userRole === "rental_sales";
-  const canOperateDaily = userRole === "admin" || userRole === "front_desk" || userRole === "rental_sales";
+  const canOperateDaily =
+    userRole === "admin" || userRole === "front_desk" || userRole === "rental_sales";
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [roomFilter, setRoomFilter] = useState<RoomFilter>("all");
@@ -76,19 +117,32 @@ export function DailyCalendar({
   const [newBookingDate, setNewBookingDate] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [optimisticBookings, setOptimisticBookings] = useState<DailyBookingRow[]>([]);
-  const [optimisticBookingPatches, setOptimisticBookingPatches] = useState<Map<string, Partial<DailyBookingRow>>>(() => new Map());
-  const [optimisticPayments, setOptimisticPayments] = useState<{
-    id: string;
-    source_id: string;
-    amount: number;
-    payment_date: string;
-    reversal_of_payment_id?: string | null;
-    request_kind?: string | null;
-  }[]>([]);
-  const [optimisticCleaningTasks, setOptimisticCleaningTasks] = useState<{ id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[]>([]);
-  const [optimisticCompletedCleaningIds, setOptimisticCompletedCleaningIds] = useState<Set<string>>(() => new Set());
-  const [optimisticUnitStatuses, setOptimisticUnitStatuses] = useState<Map<string, UnitStatus>>(() => new Map());
-  const [cleaningTarget, setCleaningTarget] = useState<{ taskId: string; unitNo: string } | null>(null);
+  const [optimisticBookingPatches, setOptimisticBookingPatches] = useState<
+    Map<string, Partial<DailyBookingRow>>
+  >(() => new Map());
+  const [optimisticPayments, setOptimisticPayments] = useState<
+    {
+      id: string;
+      source_id: string;
+      unit_id?: string | null;
+      amount: number;
+      payment_date: string;
+      reversal_of_payment_id?: string | null;
+      request_kind?: string | null;
+    }[]
+  >([]);
+  const [optimisticCleaningTasks, setOptimisticCleaningTasks] = useState<
+    { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[]
+  >([]);
+  const [optimisticCompletedCleaningIds, setOptimisticCompletedCleaningIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [optimisticUnitStatuses, setOptimisticUnitStatuses] = useState<Map<string, UnitStatus>>(
+    () => new Map(),
+  );
+  const [cleaningTarget, setCleaningTarget] = useState<{ taskId: string; unitNo: string } | null>(
+    null,
+  );
   const [cleaningLoading, setCleaningLoading] = useState(false);
   const calendarViewportRef = useRef<HTMLDivElement | null>(null);
 
@@ -114,12 +168,14 @@ export function DailyCalendar({
 
   const visibleCleaningTasks = useMemo(() => {
     const serverTaskIds = new Set(cleaningTasks.map((task) => task.id));
-    const pendingOptimisticTasks = optimisticCleaningTasks.filter((task) => !serverTaskIds.has(task.id));
+    const pendingOptimisticTasks = optimisticCleaningTasks.filter(
+      (task) => !serverTaskIds.has(task.id),
+    );
     const mergedTasks = [...pendingOptimisticTasks, ...cleaningTasks];
     if (optimisticCompletedCleaningIds.size === 0) return mergedTasks;
-    return mergedTasks.map((task) => (
-      optimisticCompletedCleaningIds.has(task.id) ? { ...task, is_completed: true } : task
-    ));
+    return mergedTasks.map((task) =>
+      optimisticCompletedCleaningIds.has(task.id) ? { ...task, is_completed: true } : task,
+    );
   }, [cleaningTasks, optimisticCleaningTasks, optimisticCompletedCleaningIds]);
 
   const visiblePayments = useMemo(() => {
@@ -133,12 +189,16 @@ export function DailyCalendar({
   useEffect(() => {
     setOptimisticBookings((prev) => {
       if (prev.length === 0) return prev;
-      const next = prev.filter((optimisticBooking) => !serverBookings.some((booking) => (
-        booking.unit_id === optimisticBooking.unit_id &&
-        booking.customer_id === optimisticBooking.customer_id &&
-        booking.check_in === optimisticBooking.check_in &&
-        (booking.check_out ?? null) === (optimisticBooking.check_out ?? null)
-      )));
+      const next = prev.filter(
+        (optimisticBooking) =>
+          !serverBookings.some(
+            (booking) =>
+              booking.unit_id === optimisticBooking.unit_id &&
+              booking.customer_id === optimisticBooking.customer_id &&
+              booking.check_in === optimisticBooking.check_in &&
+              (booking.check_out ?? null) === (optimisticBooking.check_out ?? null),
+          ),
+      );
       return next.length === prev.length ? prev : next;
     });
     setOptimisticBookingPatches((prev) => {
@@ -165,8 +225,14 @@ export function DailyCalendar({
     });
     setOptimisticCleaningTasks((prev) => {
       if (prev.length === 0) return prev;
-      const serverOpenTaskKeys = new Set(cleaningTasks.filter((task) => !task.is_completed).map((task) => `${task.unit_id}:${task.daily_booking_id ?? ""}`));
-      const next = prev.filter((task) => !serverOpenTaskKeys.has(`${task.unit_id}:${task.daily_booking_id ?? ""}`));
+      const serverOpenTaskKeys = new Set(
+        cleaningTasks
+          .filter((task) => !task.is_completed)
+          .map((task) => `${task.unit_id}:${task.daily_booking_id ?? ""}`),
+      );
+      const next = prev.filter(
+        (task) => !serverOpenTaskKeys.has(`${task.unit_id}:${task.daily_booking_id ?? ""}`),
+      );
       return next.length === prev.length ? prev : next;
     });
     setOptimisticCompletedCleaningIds((prev) => {
@@ -236,65 +302,72 @@ export function DailyCalendar({
     setOptimisticUnitStatuses(new Map());
   }, []);
 
-  const applyOperationSnapshot = useCallback((snapshot: DailyOperationSnapshot) => {
-    if (snapshot.booking) {
-      const booking = snapshot.booking;
-      setOptimisticBookings((prev) => {
-        const withoutBooking = prev.filter((item) => item.id !== booking.id);
-        const existsOnServer = serverBookings.some((item) => item.id === booking.id);
-        return existsOnServer || booking.status === "cancelled" ? withoutBooking : [booking, ...withoutBooking];
-      });
-      setOptimisticBookingPatches((prev) => {
-        const next = new Map(prev);
-        next.set(booking.id, booking);
-        return next;
-      });
-    }
-    if (snapshot.unit) {
-      setOptimisticUnitStatuses((prev) => {
-        const next = new Map(prev);
-        next.set(snapshot.unit!.id, snapshot.unit!.status);
-        return next;
-      });
-    }
-    if (snapshot.booking) {
-      setOptimisticPayments((prev) => {
-        const snapshotIds = new Set(snapshot.payments.map((payment) => payment.id));
-        const withoutBookingPayments = prev.filter((payment) => payment.source_id !== snapshot.booking!.id);
-        return [
-          ...snapshot.payments.map((payment) => ({
-            id: payment.id,
-            source_id: payment.source_id ?? "",
-            amount: Number(payment.amount),
-            payment_date: payment.payment_date,
-            reversal_of_payment_id: payment.reversal_of_payment_id ?? null,
-            request_kind: payment.request_kind ?? null,
+  const applyOperationSnapshot = useCallback(
+    (snapshot: DailyOperationSnapshot) => {
+      if (snapshot.booking) {
+        const booking = snapshot.booking;
+        setOptimisticBookings((prev) => {
+          const withoutBooking = prev.filter((item) => item.id !== booking.id);
+          const existsOnServer = serverBookings.some((item) => item.id === booking.id);
+          return existsOnServer || booking.status === "cancelled"
+            ? withoutBooking
+            : [booking, ...withoutBooking];
+        });
+        setOptimisticBookingPatches((prev) => {
+          const next = new Map(prev);
+          next.set(booking.id, booking);
+          return next;
+        });
+      }
+      if (snapshot.unit) {
+        setOptimisticUnitStatuses((prev) => {
+          const next = new Map(prev);
+          next.set(snapshot.unit!.id, snapshot.unit!.status);
+          return next;
+        });
+      }
+      if (snapshot.booking) {
+        setOptimisticPayments((prev) => {
+          const snapshotIds = new Set(snapshot.payments.map((payment) => payment.id));
+          const withoutBookingPayments = prev.filter(
+            (payment) => payment.source_id !== snapshot.booking!.id,
+          );
+          return [
+            ...snapshot.payments.map((payment) => ({
+              id: payment.id,
+              source_id: payment.source_id ?? "",
+              amount: Number(payment.amount),
+              payment_date: payment.payment_date,
+              reversal_of_payment_id: payment.reversal_of_payment_id ?? null,
+              request_kind: payment.request_kind ?? null,
+            })),
+            ...withoutBookingPayments.filter((payment) => !snapshotIds.has(payment.id)),
+          ];
+        });
+      }
+      if (snapshot.unit) {
+        const openTasks = snapshot.cleaningTasks.filter((task) => !task.is_completed);
+        setOptimisticCleaningTasks((prev) => [
+          ...openTasks.map((task) => ({
+            id: task.id,
+            unit_id: task.unit_id,
+            daily_booking_id: task.daily_booking_id,
+            is_completed: task.is_completed,
           })),
-          ...withoutBookingPayments.filter((payment) => !snapshotIds.has(payment.id)),
-        ];
-      });
-    }
-    if (snapshot.unit) {
-      const openTasks = snapshot.cleaningTasks.filter((task) => !task.is_completed);
-      setOptimisticCleaningTasks((prev) => [
-        ...openTasks.map((task) => ({
-          id: task.id,
-          unit_id: task.unit_id,
-          daily_booking_id: task.daily_booking_id,
-          is_completed: task.is_completed,
-        })),
-        ...prev.filter((task) => task.unit_id !== snapshot.unit!.id),
-      ]);
-      setOptimisticCompletedCleaningIds((prev) => {
-        const next = new Set(prev);
-        for (const task of snapshot.cleaningTasks) {
-          if (task.is_completed) next.add(task.id);
-          else next.delete(task.id);
-        }
-        return next;
-      });
-    }
-  }, [serverBookings]);
+          ...prev.filter((task) => task.unit_id !== snapshot.unit!.id),
+        ]);
+        setOptimisticCompletedCleaningIds((prev) => {
+          const next = new Set(prev);
+          for (const task of snapshot.cleaningTasks) {
+            if (task.is_completed) next.add(task.id);
+            else next.delete(task.id);
+          }
+          return next;
+        });
+      }
+    },
+    [serverBookings],
+  );
 
   const bookingById = useMemo(() => {
     const map = new Map<string, DailyBookingRow>();
@@ -324,7 +397,13 @@ export function DailyCalendar({
   }, [visibleCleaningTasks]);
 
   const todayStateMap = useMemo(
-    () => buildDailyRoomStateMap({ dailyUnits: visibleDailyUnits, dateStr: todayStr, bookings, cleaningTasks: visibleCleaningTasks }),
+    () =>
+      buildDailyRoomStateMap({
+        dailyUnits: visibleDailyUnits,
+        dateStr: todayStr,
+        bookings,
+        cleaningTasks: visibleCleaningTasks,
+      }),
     [visibleDailyUnits, todayStr, bookings, visibleCleaningTasks],
   );
 
@@ -349,8 +428,15 @@ export function DailyCalendar({
   const filteredUnits = useMemo(() => {
     return visibleDailyUnits.filter((unit) => {
       if (roomFilter === "all") return true;
-      const status = getUnitTimelineStatus(unit, visibleDays, bookingMap, unitCleaningMap, todayStr);
-      if (roomFilter === "occupied") return status === "occupied" || status === "checkingOutToday" || status === "openEnded";
+      const status = getUnitTimelineStatus(
+        unit,
+        visibleDays,
+        bookingMap,
+        unitCleaningMap,
+        todayStr,
+      );
+      if (roomFilter === "occupied")
+        return status === "occupied" || status === "checkingOutToday" || status === "openEnded";
       return status === roomFilter;
     });
   }, [bookingMap, visibleDailyUnits, roomFilter, unitCleaningMap, visibleDays, todayStr]);
@@ -362,76 +448,70 @@ export function DailyCalendar({
       if (!grouped.has(floor)) grouped.set(floor, []);
       grouped.get(floor)!.push(unit);
     }
-    return Array.from(grouped.entries()).sort((a, b) => floorSortValue(a[0]) - floorSortValue(b[0]));
+    return Array.from(grouped.entries()).sort(
+      (a, b) => floorSortValue(a[0]) - floorSortValue(b[0]),
+    );
   }, [filteredUnits]);
 
   const [copied, setCopied] = useState(false);
-  const [financeDetail, setFinanceDetail] = useState<"collected" | "outstanding" | "settled" | null>(null);
+  const [financeDetail, setFinanceDetail] = useState<
+    "collected" | "outstanding" | "settled" | null
+  >(null);
 
   const financeStats = useMemo(() => {
-    const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-
-    let monthCollected = 0;
-    let currentOutstanding = 0;
-    let monthSettled = 0;
-    const collectedPayments: typeof payments = [];
-    const outstandingBookings: DailyBookingRow[] = [];
-    const settledBookings: DailyBookingRow[] = [];
-
-    for (const p of visiblePayments) {
-      if (p.payment_date.startsWith(currentMonth)) {
-        monthCollected += Number(p.amount);
-        collectedPayments.push(p);
-      }
-    }
-
-    for (const b of bookings) {
-      if (b.status === "cancelled") continue;
-      const billing = calculateBilling(b, todayStr);
-      const final = billing.finalAmount;
-      const outstanding = billing.outstanding;
-
-      if (outstanding > 0 && (b.status === "checked_in" || b.status === "checked_out")) {
-        currentOutstanding += outstanding;
-        outstandingBookings.push(b);
-      }
-
-      const settledDate = b.actual_check_out ?? b.check_out;
-      if (b.status === "checked_out" && settledDate && settledDate.startsWith(currentMonth)) {
-        monthSettled += final;
-        settledBookings.push(b);
-      }
-    }
-
+    const position = dailyBookingFinancePosition(bookings, todayStr);
+    const includedIds = new Set(financeSnapshot?.includedPaymentIds ?? []);
+    const collectedPayments = visiblePayments.filter((payment) => includedIds.has(payment.id));
     return {
-      monthCollected, currentOutstanding, monthSettled,
-      collectedPayments, outstandingBookings, settledBookings,
+      ...position,
+      // The complete server cash snapshot is authoritative. Unsaved optimistic
+      // payment rows never silently enter a verified cash-receipt figure.
+      monthCollected: financeSnapshot?.cash?.net ?? 0,
+      currentOutstanding:
+        optimisticBookings.length || optimisticBookingPatches.size
+          ? position.currentOutstanding
+          : (financeSnapshot?.currentOutstanding ?? position.currentOutstanding),
+      monthSettled:
+        optimisticBookings.length || optimisticBookingPatches.size
+          ? position.monthSettled
+          : (financeSnapshot?.monthSettled ?? position.monthSettled),
+      collectedPayments,
     };
-  }, [bookings, visiblePayments, todayStr]);
+  }, [
+    bookings,
+    visiblePayments,
+    todayStr,
+    financeSnapshot,
+    optimisticBookings.length,
+    optimisticBookingPatches.size,
+  ]);
 
   const collectedPaymentGroups = useMemo(() => {
-    const groups = new Map<string, {
-      id: string;
-      paymentDates: string[];
-      amount: number;
-      count: number;
-      booking: DailyBookingRow | null;
-      unit: UnitRow | null;
-      customer: CustomerSummary | null;
-      stayRange: string;
-      sortDate: string;
-    }>();
+    const groups = new Map<
+      string,
+      {
+        id: string;
+        paymentDates: string[];
+        amount: number;
+        count: number;
+        booking: DailyBookingRow | null;
+        unit: UnitRow | null;
+        customer: CustomerSummary | null;
+        stayRange: string;
+        sortDate: string;
+      }
+    >();
 
     for (const payment of financeStats.collectedPayments) {
-      const booking = payment.source_id ? bookingById.get(payment.source_id) ?? null : null;
-      const unit = booking ? allUnitById.get(booking.unit_id) ?? unitById.get(booking.unit_id) ?? null : null;
-      const customer = booking ? customerMap.get(booking.customer_id) ?? null : null;
+      const booking = payment.source_id ? (bookingById.get(payment.source_id) ?? null) : null;
+      const unitId = booking?.unit_id ?? payment.unit_id;
+      const unit = unitId ? (allUnitById.get(unitId) ?? unitById.get(unitId) ?? null) : null;
+      const customer = booking ? (customerMap.get(booking.customer_id) ?? null) : null;
       const key = booking ? `booking:${booking.id}` : `payment:${payment.id}`;
-      const stayEnd = booking
-        ? (booking.actual_check_out ?? booking.check_out)
-        : null;
-      const stayRange = booking ? `${booking.check_in} → ${stayEnd ?? (locale === "zh" ? "未退房" : "En cours")}` : "—";
+      const stayEnd = booking ? (booking.actual_check_out ?? booking.check_out) : null;
+      const stayRange = booking
+        ? `${booking.check_in} → ${stayEnd ?? (locale === "zh" ? "未退房" : "En cours")}`
+        : "—";
       const existing = groups.get(key);
 
       if (existing) {
@@ -458,16 +538,50 @@ export function DailyCalendar({
     return Array.from(groups.values()).sort((a, b) => b.sortDate.localeCompare(a.sortDate));
   }, [bookingById, customerMap, allUnitById, unitById, financeStats.collectedPayments, locale]);
 
-  const financeCards = useMemo(() => [
-    { key: "collected", label: locale === "zh" ? "本月已收" : "Encaisse", value: formatXof(financeStats.monthCollected), caption: locale === "zh" ? "按实际收款日期" : "Date de paiement", tone: "green" as const },
-    { key: "outstanding", label: locale === "zh" ? "在住订单未收" : "Impayé en séjour", value: formatXof(financeStats.currentOutstanding), caption: locale === "zh" ? "仅已入住及已退房未结清" : "Séjours ouverts", tone: "orange" as const },
-    { key: "settled", label: locale === "zh" ? "本月退房结账额" : "Règlement du mois", value: formatXof(financeStats.monthSettled), caption: locale === "zh" ? "按实际退房日期" : "Date de départ", tone: "dark" as const },
-  ], [financeStats, locale]);
+  const financeCards = useMemo(
+    () => [
+      {
+        key: "collected",
+        label: locale === "zh" ? "本月净收款" : "Encaissement net",
+        value: financeSnapshot?.cash ? formatXof(financeStats.monthCollected) : "—",
+        caption: financeSnapshot?.cash
+          ? locale === "zh"
+            ? `已核验口径 · ${financeSnapshot.cash.excludedCount} 笔未计入`
+            : `Contrôlé · ${financeSnapshot.cash.excludedCount} exclus`
+          : ["admin", "finance", "boss"].includes(userRole ?? "")
+            ? locale === "zh"
+              ? "收款汇总暂不可用"
+              : "Synthèse indisponible"
+            : locale === "zh"
+              ? "仅财务权限提供汇总"
+              : "Synthèse réservée à la finance",
+        tone: "green" as const,
+      },
+      {
+        key: "outstanding",
+        label: locale === "zh" ? "在住订单未收" : "Impayé en séjour",
+        value: formatXof(financeStats.currentOutstanding),
+        caption: locale === "zh" ? "仅已入住及已退房未结清" : "Séjours ouverts",
+        tone: "orange" as const,
+      },
+      {
+        key: "settled",
+        label: locale === "zh" ? "本月退房结账额" : "Règlement du mois",
+        value: formatXof(financeStats.monthSettled),
+        caption: locale === "zh" ? "按实际退房日期" : "Date de départ",
+        tone: "dark" as const,
+      },
+    ],
+    [financeStats, locale, financeSnapshot, userRole],
+  );
 
   const shareRows = useMemo(() => {
     const occupied = visibleDailyUnits.filter((u) => {
       const s = todayStateMap.get(u.id);
-      return s && (s.status === "occupied" || s.status === "checking_out_today" || s.status === "reserved");
+      return (
+        s &&
+        (s.status === "occupied" || s.status === "checking_out_today" || s.status === "reserved")
+      );
     });
     const checkingOut = visibleDailyUnits.filter((u) => {
       const s = todayStateMap.get(u.id);
@@ -482,10 +596,34 @@ export function DailyCalendar({
       return s?.status === "available";
     });
     return [
-      { key: "occupied", label: locale === "zh" ? "占用" : "Occupe", count: occupied.length, units: occupied.map((u) => u.unit_no), tone: "dark" as const },
-      { key: "checkout", label: locale === "zh" ? "今日离店" : "Depart", count: checkingOut.length, units: checkingOut.map((u) => u.unit_no), tone: "orange" as const },
-      { key: "cleaning", label: locale === "zh" ? "待保洁" : "Menage", count: cleaning.length, units: cleaning.map((u) => u.unit_no), tone: "teal" as const },
-      { key: "available", label: locale === "zh" ? "可安排入住" : "Disponible", count: available.length, units: available.map((u) => u.unit_no), tone: "green" as const },
+      {
+        key: "occupied",
+        label: locale === "zh" ? "占用" : "Occupe",
+        count: occupied.length,
+        units: occupied.map((u) => u.unit_no),
+        tone: "dark" as const,
+      },
+      {
+        key: "checkout",
+        label: locale === "zh" ? "今日离店" : "Depart",
+        count: checkingOut.length,
+        units: checkingOut.map((u) => u.unit_no),
+        tone: "orange" as const,
+      },
+      {
+        key: "cleaning",
+        label: locale === "zh" ? "待保洁" : "Menage",
+        count: cleaning.length,
+        units: cleaning.map((u) => u.unit_no),
+        tone: "teal" as const,
+      },
+      {
+        key: "available",
+        label: locale === "zh" ? "可安排入住" : "Disponible",
+        count: available.length,
+        units: available.map((u) => u.unit_no),
+        tone: "green" as const,
+      },
     ];
   }, [visibleDailyUnits, todayStateMap, locale]);
 
@@ -509,7 +647,7 @@ export function DailyCalendar({
     setTimeout(() => setCopied(false), 2000);
   }, [buildingLabel, shareRows, locale]);
 
-  const panelBooking = selectedBookingId ? bookingById.get(selectedBookingId) ?? null : null;
+  const panelBooking = selectedBookingId ? (bookingById.get(selectedBookingId) ?? null) : null;
 
   useEffect(() => {
     const viewport = calendarViewportRef.current;
@@ -518,12 +656,16 @@ export function DailyCalendar({
     viewport.scrollLeft = 0;
   }, [rangeLabel, roomFilter, viewMode]);
 
-  const moveRange = useCallback((direction: -1 | 1) => {
-    setAnchorDate((prev) => {
-      if (viewMode === "month") return new Date(prev.getFullYear(), prev.getMonth() + direction, 1);
-      return addDays(prev, direction * 7);
-    });
-  }, [viewMode]);
+  const moveRange = useCallback(
+    (direction: -1 | 1) => {
+      setAnchorDate((prev) => {
+        if (viewMode === "month")
+          return new Date(prev.getFullYear(), prev.getMonth() + direction, 1);
+        return addDays(prev, direction * 7);
+      });
+    },
+    [viewMode],
+  );
 
   const goToToday = useCallback(() => {
     setAnchorDate(new Date());
@@ -539,7 +681,10 @@ export function DailyCalendar({
 
   if (visibleDailyUnits.length === 0) {
     return (
-      <div data-daily-calendar-root className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card py-12 text-center shadow-card">
+      <div
+        data-daily-calendar-root
+        className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card py-12 text-center shadow-card"
+      >
         <p className="text-sm text-muted-foreground">{copy.noRooms}</p>
       </div>
     );
@@ -550,14 +695,27 @@ export function DailyCalendar({
       <section className="relative z-20 overflow-hidden rounded-xl border border-border bg-card shadow-card">
         <div className="flex flex-col gap-3 border-b border-border px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="text-[15px] font-semibold tracking-tight">{buildingLabel ? `${buildingLabel} · ` : ""}{locale === "zh" ? "日租概览" : "Apercu journalier"}</h3>
-            <p className="mt-0.5 text-xs text-muted-foreground">{locale === "zh" ? "今日房态、群消息和日租收款" : "Occupation, message et paiements du jour"}</p>
+            <h3 className="text-[15px] font-semibold tracking-tight">
+              {buildingLabel ? `${buildingLabel} · ` : ""}
+              {locale === "zh" ? "日租概览" : "Apercu journalier"}
+            </h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {locale === "zh"
+                ? "今日房态、群消息和日租收款"
+                : "Occupation, message et paiements du jour"}
+            </p>
           </div>
           <div className={TOOLBAR_SURFACE}>
             <div className={TOOLBAR_META}>
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              <span>{new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN")}</span>
-              <span className="text-xs font-medium text-muted-foreground">{new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", { weekday: "long" })}</span>
+              <span>
+                {new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN")}
+              </span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {new Date(todayStr).toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", {
+                  weekday: "long",
+                })}
+              </span>
             </div>
             <Button
               variant={copied ? "default" : "ghost"}
@@ -565,14 +723,26 @@ export function DailyCalendar({
               onClick={handleCopy}
               className={cn(
                 TOOLBAR_ITEM,
-                copied && "border-primary bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+                copied &&
+                  "border-primary bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
               )}
               aria-live="polite"
             >
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? (locale === "zh" ? "已复制" : "Copie") : (locale === "zh" ? "复制群消息" : "Copier")}
+              {copied
+                ? locale === "zh"
+                  ? "已复制"
+                  : "Copie"
+                : locale === "zh"
+                  ? "复制群消息"
+                  : "Copier"}
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => window.print()} className={cn(TOOLBAR_ITEM, "no-print")}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => window.print()}
+              className={cn(TOOLBAR_ITEM, "no-print")}
+            >
               <Printer className="h-3.5 w-3.5" />
               {locale === "zh" ? "打印" : "Imprimer"}
             </Button>
@@ -580,12 +750,28 @@ export function DailyCalendar({
         </div>
         <div className="grid gap-3 bg-card px-4 py-3 md:grid-cols-2 xl:grid-cols-4">
           {shareRows.map((row) => (
-            <ShareCard key={row.key} label={row.label} value={row.count} units={row.units} tone={row.tone} />
+            <ShareCard
+              key={row.key}
+              label={row.label}
+              value={row.count}
+              units={row.units}
+              tone={row.tone}
+            />
           ))}
         </div>
         <div className="grid gap-3 border-t border-border bg-card px-4 py-3 md:grid-cols-3">
           {financeCards.map((card) => (
-            <FinanceCard key={card.key} label={card.label} value={card.value} caption={card.caption} tone={card.tone} onClick={() => setFinanceDetail(card.key as "collected" | "outstanding" | "settled")} />
+            <FinanceCard
+              key={card.key}
+              label={card.label}
+              value={card.value}
+              caption={card.caption}
+              tone={card.tone}
+              onClick={() => {
+                if (card.key !== "collected" || financeSnapshot?.cash)
+                  setFinanceDetail(card.key as "collected" | "outstanding" | "settled");
+              }}
+            />
           ))}
         </div>
       </section>
@@ -597,9 +783,9 @@ export function DailyCalendar({
             <p className="mt-0.5 text-xs text-muted-foreground">
               {canCreateBooking
                 ? copy.subtitle
-                : (locale === "zh"
-                    ? "点击订单或房态办理入住、退房和完成保洁。"
-                    : "Ouvrez une réservation pour l'arrivée, le départ ou le ménage.")}
+                : locale === "zh"
+                  ? "点击订单或房态办理入住、退房和完成保洁。"
+                  : "Ouvrez une réservation pour l'arrivée, le départ ou le ménage."}
             </p>
           </div>
 
@@ -611,13 +797,55 @@ export function DailyCalendar({
               label={copy.allRooms}
               count={filterCounts.all}
             />
-            <FilterButton active={roomFilter === "occupied"} onClick={() => setRoomFilter("occupied")} color="#62B6F5" label={copy.occupied} count={filterCounts.occupied} />
-            <FilterButton active={roomFilter === "checkingOutToday"} onClick={() => setRoomFilter("checkingOutToday")} color="#E8C840" label={locale === "zh" ? "今日离店" : "Depart"} count={filterCounts.checkingOutToday} />
-            <FilterButton active={roomFilter === "openEnded"} onClick={() => setRoomFilter("openEnded")} color="#62B6F5" label={locale === "zh" ? "未定离店" : "Ouvert"} count={filterCounts.openEnded} />
-            <FilterButton active={roomFilter === "reserved"} onClick={() => setRoomFilter("reserved")} color="#E8C840" label={copy.reserved} count={filterCounts.reserved} />
-            <FilterButton active={roomFilter === "cleaning"} onClick={() => setRoomFilter("cleaning")} color="#5CC4B8" label={copy.cleaning} count={filterCounts.cleaning} />
-            <FilterButton active={roomFilter === "available"} onClick={() => setRoomFilter("available")} color="#A0D0E8" label={copy.available} count={filterCounts.available} />
-            <FilterButton active={roomFilter === "maintenance"} onClick={() => setRoomFilter("maintenance")} color="#F08090" label={copy.maintenance} count={filterCounts.maintenance} />
+            <FilterButton
+              active={roomFilter === "occupied"}
+              onClick={() => setRoomFilter("occupied")}
+              color="#62B6F5"
+              label={copy.occupied}
+              count={filterCounts.occupied}
+            />
+            <FilterButton
+              active={roomFilter === "checkingOutToday"}
+              onClick={() => setRoomFilter("checkingOutToday")}
+              color="#E8C840"
+              label={locale === "zh" ? "今日离店" : "Depart"}
+              count={filterCounts.checkingOutToday}
+            />
+            <FilterButton
+              active={roomFilter === "openEnded"}
+              onClick={() => setRoomFilter("openEnded")}
+              color="#62B6F5"
+              label={locale === "zh" ? "未定离店" : "Ouvert"}
+              count={filterCounts.openEnded}
+            />
+            <FilterButton
+              active={roomFilter === "reserved"}
+              onClick={() => setRoomFilter("reserved")}
+              color="#E8C840"
+              label={copy.reserved}
+              count={filterCounts.reserved}
+            />
+            <FilterButton
+              active={roomFilter === "cleaning"}
+              onClick={() => setRoomFilter("cleaning")}
+              color="#5CC4B8"
+              label={copy.cleaning}
+              count={filterCounts.cleaning}
+            />
+            <FilterButton
+              active={roomFilter === "available"}
+              onClick={() => setRoomFilter("available")}
+              color="#A0D0E8"
+              label={copy.available}
+              count={filterCounts.available}
+            />
+            <FilterButton
+              active={roomFilter === "maintenance"}
+              onClick={() => setRoomFilter("maintenance")}
+              color="#F08090"
+              label={copy.maintenance}
+              count={filterCounts.maintenance}
+            />
           </div>
         </div>
 
@@ -644,7 +872,9 @@ export function DailyCalendar({
             <button onClick={() => moveRange(1)} className={NAV_BTN} aria-label="next range">
               <ChevronRight className="h-4 w-4" />
             </button>
-            <Button onClick={goToToday} size="sm" variant="ghost" className={TOOLBAR_ITEM}>{copy.today}</Button>
+            <Button onClick={goToToday} size="sm" variant="ghost" className={TOOLBAR_ITEM}>
+              {copy.today}
+            </Button>
           </div>
         </div>
 
@@ -655,7 +885,9 @@ export function DailyCalendar({
         >
           <div
             className="relative grid min-w-[760px] w-full"
-            style={{ gridTemplateColumns: `${ROOM_COL_WIDTH}px repeat(${visibleDays.length}, minmax(132px, 1fr))` }}
+            style={{
+              gridTemplateColumns: `${ROOM_COL_WIDTH}px repeat(${visibleDays.length}, minmax(132px, 1fr))`,
+            }}
             data-daily-calendar-grid
             role="grid"
             aria-label={copy.timeline}
@@ -683,8 +915,12 @@ export function DailyCalendar({
                   style={{ height: 40 }}
                   role="columnheader"
                 >
-                  <span className="text-xs font-medium leading-3">{date.toLocaleDateString(localeStr, { weekday: "short" })}</span>
-                  <span className="text-[15px] font-semibold leading-5 text-foreground">{date.getDate()}</span>
+                  <span className="text-xs font-medium leading-3">
+                    {date.toLocaleDateString(localeStr, { weekday: "short" })}
+                  </span>
+                  <span className="text-[15px] font-semibold leading-5 text-foreground">
+                    {date.getDate()}
+                  </span>
                   {isToday && <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary" />}
                 </div>
               );
@@ -699,12 +935,21 @@ export function DailyCalendar({
               </div>
             ) : (
               unitsByFloor.flatMap(([floor, units]) => [
-                <FloorRow key={`floor-${floor}`} floor={floor} count={units.length} daysCount={visibleDays.length} copy={copy} />,
+                <FloorRow
+                  key={`floor-${floor}`}
+                  floor={floor}
+                  count={units.length}
+                  daysCount={visibleDays.length}
+                  copy={copy}
+                />,
                 ...units.flatMap((unit) => {
                   const unitBM = bookingMap.get(unit.id);
                   const hasCleaning = unitCleaningMap.has(unit.id);
                   const cleaningTaskId = unitCleaningMap.get(unit.id);
-                  const isMaintenance = !MAINTENANCE_STATUSES.has(unit.status) || (unit.operational_condition !== undefined && unit.operational_condition !== "normal");
+                  const isMaintenance =
+                    !MAINTENANCE_STATUSES.has(unit.status) ||
+                    (unit.operational_condition !== undefined &&
+                      unit.operational_condition !== "normal");
                   const roomTone = getRoomTone(unit, hasCleaning, isMaintenance);
                   return [
                     <div
@@ -744,13 +989,15 @@ export function DailyCalendar({
                           dateStr={dateStr}
                           todayStr={todayStr}
                           booking={booking}
-                          customer={booking ? customerMap.get(booking.customer_id) ?? null : null}
+                          customer={booking ? (customerMap.get(booking.customer_id) ?? null) : null}
                           hasCleaning={hasCleaning}
                           isMaintenance={isMaintenance}
                           isToday={isToday}
                           isStart={!prevSame}
                           isEnd={!nextSame}
-                          showCheckedInLabel={!prevSame || (viewMode === "day" && dateStr === firstVisibleDateStr)}
+                          showCheckedInLabel={
+                            !prevSame || (viewMode === "day" && dateStr === firstVisibleDateStr)
+                          }
                           locale={locale}
                           copy={copy}
                           bookingLabels={bookingLabels}
@@ -811,7 +1058,9 @@ export function DailyCalendar({
             setNewBookingDate(null);
             clearOptimisticState();
           }}
-          onChanged={() => { setTick((t) => t + 1); }}
+          onChanged={() => {
+            setTick((t) => t + 1);
+          }}
           onBookingCreated={(booking) => setOptimisticBookings((prev) => [booking, ...prev])}
           onCleaningTaskCompleted={(taskId, targetUnitId, status) => {
             setOptimisticCompletedCleaningIds((prev) => {
@@ -835,50 +1084,62 @@ export function DailyCalendar({
         onConfirm={() => {
           if (!cleaningTarget) return;
           setCleaningLoading(true);
-          completeCleaning(cleaningTarget.taskId).then((result) => {
-            if (result.success && result.data) {
-              applyOperationSnapshot(result.data);
-            }
-            if (result.success && result.taskId && result.unitId && result.unitStatus) {
-              setOptimisticCompletedCleaningIds((prev) => {
-                const next = new Set(prev);
-                next.add(result.taskId!);
-                return next;
-              });
-              setOptimisticUnitStatuses((prev) => {
-                const next = new Map(prev);
-                next.set(result.unitId!, result.unitStatus!);
-                return next;
-              });
-            }
-            setCleaningLoading(false);
-            setCleaningTarget(null);
-            setTick((t) => t + 1);
-          }).catch((error) => {
-            console.error("Cleaning completion failed:", error);
-            setCleaningLoading(false);
-          });
+          completeCleaning(cleaningTarget.taskId)
+            .then((result) => {
+              if (result.success && result.data) {
+                applyOperationSnapshot(result.data);
+              }
+              if (result.success && result.taskId && result.unitId && result.unitStatus) {
+                setOptimisticCompletedCleaningIds((prev) => {
+                  const next = new Set(prev);
+                  next.add(result.taskId!);
+                  return next;
+                });
+                setOptimisticUnitStatuses((prev) => {
+                  const next = new Map(prev);
+                  next.set(result.unitId!, result.unitStatus!);
+                  return next;
+                });
+              }
+              setCleaningLoading(false);
+              setCleaningTarget(null);
+              setTick((t) => t + 1);
+            })
+            .catch((error) => {
+              console.error("Cleaning completion failed:", error);
+              setCleaningLoading(false);
+            });
         }}
         title={locale === "zh" ? "完成保洁" : "Menage termine"}
-        description={cleaningTarget
-          ? (locale === "zh" ? `确认 ${cleaningTarget.unitNo} 保洁已完成？` : `Confirmer le menage de ${cleaningTarget.unitNo} ?`)
-          : ""}
+        description={
+          cleaningTarget
+            ? locale === "zh"
+              ? `确认 ${cleaningTarget.unitNo} 保洁已完成？`
+              : `Confirmer le menage de ${cleaningTarget.unitNo} ?`
+            : ""
+        }
         confirmLabel={locale === "zh" ? "完成保洁" : "Terminer"}
         locale={locale}
         loading={cleaningLoading}
       />
 
       {financeDetail && (
-        <CalendarFinancePanel financeDetail={financeDetail} locale={locale} todayStr={todayStr}
-          financeStats={financeStats} collectedPaymentGroups={collectedPaymentGroups}
-          allUnitById={allUnitById} customerMap={customerMap}
+        <CalendarFinancePanel
+          financeDetail={financeDetail}
+          locale={locale}
+          todayStr={todayStr}
+          financeStats={financeStats}
+          collectedPaymentGroups={collectedPaymentGroups}
+          allUnitById={allUnitById}
+          customerMap={customerMap}
           onClose={() => setFinanceDetail(null)}
           onOpenBooking={(bookingId) => {
             setFinanceDetail(null);
             setNewBookingUnitId(null);
             setNewBookingDate(null);
             setSelectedBookingId(bookingId);
-          }} />
+          }}
+        />
       )}
     </div>
   );

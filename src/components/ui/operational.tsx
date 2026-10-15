@@ -1,5 +1,5 @@
 import * as React from "react";
-import { createPortal } from "react-dom";
+import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -47,13 +47,16 @@ export function StatTile({
       className={cn(
         "group flex flex-col rounded-xl border border-border bg-card p-3.5 text-left text-card-foreground shadow-card transition-shadow duration-200",
         caption ? "min-h-[100px]" : "min-h-[84px]",
-        onClick && "cursor-pointer hover:shadow-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
+        onClick &&
+          "cursor-pointer hover:shadow-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
         active && "border-foreground/25 ring-2 ring-foreground/10",
         className,
       )}
     >
       <span className="flex min-w-0 items-center justify-between gap-3 pb-2">
-        <span className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">{label}</span>
+        <span className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">
+          {label}
+        </span>
         <span className="flex h-4 w-4 shrink-0 items-center justify-center">
           {Icon ? (
             <Icon className={cn("h-4 w-4", t.icon)} strokeWidth={1.8} />
@@ -62,8 +65,14 @@ export function StatTile({
           )}
         </span>
       </span>
-      <span className="block text-lg font-semibold leading-none tabular-nums text-foreground">{value}</span>
-      {caption && <span className="mt-2 block min-h-5 text-xs leading-relaxed text-muted-foreground">{caption}</span>}
+      <span className="block text-lg font-semibold leading-none tabular-nums text-foreground">
+        {value}
+      </span>
+      {caption && (
+        <span className="mt-2 block min-h-5 text-xs leading-relaxed text-muted-foreground">
+          {caption}
+        </span>
+      )}
     </Comp>
   );
 }
@@ -85,12 +94,18 @@ export function OperationalPage({
 }) {
   return (
     <div className={cn("flex flex-col gap-6", className)}>
-      <section className="rounded-xl border border-border bg-card px-5 py-4 shadow-card">
+      <section className="px-1 py-1">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             {eyebrow && <p className="text-xs font-medium text-muted-foreground">{eyebrow}</p>}
-            <h1 className="mt-1 text-[22px] font-semibold leading-tight tracking-normal text-foreground">{title}</h1>
-            {description && <p className="mt-1 max-w-3xl text-[13px] leading-5 text-muted-foreground">{description}</p>}
+            <h1 className="mt-1 text-[22px] font-semibold leading-tight tracking-normal text-foreground">
+              {title}
+            </h1>
+            {description && (
+              <p className="mt-1 max-w-3xl text-[13px] leading-5 text-muted-foreground">
+                {description}
+              </p>
+            )}
           </div>
           {action && <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div>}
         </div>
@@ -148,9 +163,7 @@ export function RightDrawer({
   width?: "compact" | "standard" | "wide" | "table";
   className?: string;
 }) {
-  const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
-  React.useEffect(() => setPortalTarget(document.body), []);
-  if (!open || !portalTarget) return null;
+  const previousFocus = React.useRef<HTMLElement | null>(null);
   const widthClass = {
     compact: "lg:max-w-[420px]",
     standard: "lg:max-w-[480px]",
@@ -158,44 +171,66 @@ export function RightDrawer({
     table: "lg:max-w-5xl",
   }[width];
 
-  return createPortal(
-    <>
-      <div className="fixed bottom-0 left-0 right-0 top-[calc(3rem+var(--safe-top))] z-overlay bg-black/20 backdrop-blur-sm lg:top-12" onClick={onClose} />
-      <aside
-        className={cn(
-          "fixed bottom-0 right-0 top-[calc(3rem+var(--safe-top))] z-panel flex w-full max-w-full flex-col border-l border-border bg-card shadow-panel lg:top-12",
-          widthClass,
-          className,
-        )}
-        role="dialog"
-        aria-modal="true"
-        aria-label={typeof title === "string" ? title : undefined}
-      >
-        <div className="sticky top-0 z-10 flex min-h-16 items-start justify-between gap-4 border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2">
-              <h2 className="truncate text-[15px] font-semibold leading-6 text-foreground">{title}</h2>
-              {badge}
+  return (
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" />
+        <Dialog.Content
+          className={cn(
+            "fixed bottom-0 right-0 top-[calc(3rem+var(--safe-top))] z-panel flex w-full max-w-full flex-col border-l border-border bg-card shadow-panel lg:top-12",
+            widthClass,
+            className,
+          )}
+          onOpenAutoFocus={() => {
+            if (document.activeElement instanceof HTMLElement)
+              previousFocus.current = document.activeElement;
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            previousFocus.current?.focus();
+          }}
+          aria-describedby={undefined}
+        >
+          <div className="sticky top-0 z-10 flex min-h-16 items-start justify-between gap-4 border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-2">
+                <Dialog.Title className="text-[15px] font-semibold leading-6 text-foreground">
+                  {title}
+                </Dialog.Title>
+                {badge}
+              </div>
+              {subtitle && (
+                <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{subtitle}</p>
+              )}
             </div>
-            {subtitle && <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{subtitle}</p>}
+            <div className="flex shrink-0 items-center gap-1">
+              {actions}
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            {actions}
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </button>
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pb-[calc(1.25rem+var(--safe-bottom))] pt-5 lg:pb-5">
+            {children}
           </div>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pb-[calc(1.25rem+var(--safe-bottom))] pt-5 lg:pb-5">{children}</div>
-        {footer && <div className="sticky bottom-0 border-t border-border bg-card/95 px-5 pb-[calc(1rem+var(--safe-bottom))] pt-4 backdrop-blur lg:pb-4">{footer}</div>}
-      </aside>
-    </>,
-    portalTarget,
+          {footer && (
+            <div className="sticky bottom-0 border-t border-border bg-card/95 px-5 pb-[calc(1rem+var(--safe-bottom))] pt-4 backdrop-blur lg:pb-4">
+              {footer}
+            </div>
+          )}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
@@ -209,9 +244,18 @@ export function FilterBar({
   className?: string;
 }) {
   return (
-    <div className={cn("flex max-w-full flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-card sm:flex-row sm:items-center sm:justify-between", className)}>
+    <div
+      className={cn(
+        "flex max-w-full flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-card sm:flex-row sm:items-center sm:justify-between",
+        className,
+      )}
+    >
       <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>
-      {meta && <div className="shrink-0 text-xs font-medium text-muted-foreground tabular-nums">{meta}</div>}
+      {meta && (
+        <div className="shrink-0 text-xs font-medium text-muted-foreground tabular-nums">
+          {meta}
+        </div>
+      )}
     </div>
   );
 }
@@ -245,7 +289,13 @@ export function SegmentedControl<T extends string>({
   className?: string;
 }) {
   return (
-    <nav className={cn("inline-flex max-w-full gap-1 overflow-x-auto rounded-lg border border-border bg-muted/70 p-1 shadow-xs", className)} aria-label={ariaLabel}>
+    <nav
+      className={cn(
+        "inline-flex max-w-full gap-1 overflow-x-auto rounded-lg border border-border bg-muted/70 p-1 shadow-xs",
+        className,
+      )}
+      aria-label={ariaLabel}
+    >
       {items.map((item) => (
         <button
           key={item.value}

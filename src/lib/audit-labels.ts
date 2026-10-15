@@ -1,7 +1,10 @@
 import type { Locale } from "@/lib/i18n";
 
 export function normalizeAuditKey(key: unknown) {
-  return String(key ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  return String(key ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
 }
 
 const zhActionLabels: Record<string, string> = {
@@ -21,6 +24,7 @@ const zhActionLabels: Record<string, string> = {
   record_payment: "登记收款",
   supplementary_payment: "补缴房费",
   confirm_operator_payment: "确认截图收款",
+  confirm_payment_context: "确认付款事实与账期",
   reprepare_operator_payment: "重新准备收款确认单",
   payment_reversed: "撤销收款",
   payment_deleted: "删除收款",
@@ -74,6 +78,7 @@ const frActionLabels: Record<string, string> = {
   record_payment: "Enregistrer paiement",
   supplementary_payment: "Paiement complementaire",
   confirm_operator_payment: "Confirmer paiement sur capture",
+  confirm_payment_context: "Confirmer les faits et périodes du paiement",
   reprepare_operator_payment: "Repréparer la confirmation du paiement",
   payment_reversed: "Paiement annule",
   payment_deleted: "Paiement supprime",
@@ -122,6 +127,7 @@ const zhEntityLabels: Record<string, string> = {
   unit: "房源",
   customer: "客户",
   payment: "收款",
+  payment_context: "付款事实与账期",
   receivable: "应收账款",
   ledger_entry: "财务流水",
   user: "用户",
@@ -140,6 +146,7 @@ const frEntityLabels: Record<string, string> = {
   unit: "Logement",
   customer: "Client",
   payment: "Paiement",
+  payment_context: "Faits et périodes du paiement",
   receivable: "Creance",
   ledger_entry: "Ecriture",
   user: "Utilisateur",

@@ -2,17 +2,18 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, ArrowRight, Building2, Home, Key, MapPin } from "lucide-react";
+import { ArrowDownUp, ArrowRight, Building2 } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { cn, compareFloorLabels, formatXof, sortUnitsForBuilding } from "@/lib/utils";
-import { statusDisplayLabel } from "@/lib/display-labels";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
-import { FilterBar, MetricGrid, OperationalPage, SegmentedControl, StatTile } from "@/components/ui/operational";
-import { getUnitOperationalLabel, isOwnerOccupiedUnit } from "@/lib/unit-display";
+import { SearchInput } from "@/components/ui/search-input";
+import { FilterBar, OperationalPage, SegmentedControl } from "@/components/ui/operational";
+import { HistoryPagination, useHistoryPage } from "@/features/profiles/history-pagination";
 import { UnitDetailPanel } from "./unit-detail-panel";
 import { UnitFilters } from "./unit-filters";
+import { conditionLabel, matchesUnitPosition, type UnitPosition } from "./operational-position";
 import type { UnitRow, UnitBusinessFlagRow } from "@/types/database";
 import type { UnitPartySummary } from "./unit-party-summary";
 
@@ -28,6 +29,7 @@ interface BuildingInfo {
 interface UnitListProps {
   units: UnitRow[];
   businessFlagsMap: Record<string, UnitBusinessFlagRow[]>;
+  positionsMap?: Record<string, UnitPosition>;
   managedLeaseUnitIds?: string[];
   unitPartySummaries?: Record<string, UnitPartySummary>;
   buildings: BuildingInfo[];
@@ -37,194 +39,221 @@ interface UnitListProps {
 
 const LS_KEY = "sacsi_active_building_id";
 
-export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], unitPartySummaries = {}, buildings, locale, canEdit }: UnitListProps) {
+export function UnitList({
+  units,
+  businessFlagsMap,
+  positionsMap = {},
+  unitPartySummaries = {},
+  buildings,
+  locale,
+  canEdit,
+}: UnitListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const t = dictionaries[locale].units;
-  const statusLabels = dictionaries[locale].statuses;
+  const zh = locale === "zh";
   const [selectedFloor, setSelectedFloor] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedKind, setSelectedKind] = useState("all");
   const [selectedBusiness, setSelectedBusiness] = useState("all");
+  const [search, setSearch] = useState("");
+  const [descending, setDescending] = useState(false);
   const [detailUnitId, setDetailUnitId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-
-  // Building switcher with localStorage persistence
   const [activeBuildingId, setActiveBuildingId] = useState<string | null>(null);
+  const requestedBuilding = searchParams.get("building");
+  const requestedProject = searchParams.get("project");
 
   useEffect(() => {
-    const requestedBuilding = searchParams.get("building");
-    const requestedProject = searchParams.get("project")?.toUpperCase();
     const deepLinkedBuilding = requestedBuilding
       ? buildings.find((building) => building.code === requestedBuilding)
       : requestedProject
-        ? buildings.find((building) => building.project_code === requestedProject)
+        ? buildings.find(
+            (building) =>
+              building.project_id === requestedProject ||
+              building.project_code.toUpperCase() === requestedProject.toUpperCase(),
+          )
         : undefined;
-    if (deepLinkedBuilding) {
-      setActiveBuildingId(deepLinkedBuilding.id);
-      localStorage.setItem(LS_KEY, deepLinkedBuilding.id);
+    if ((requestedBuilding || requestedProject) && !deepLinkedBuilding) {
+      setActiveBuildingId(null);
       return;
     }
-    const saved = localStorage.getItem(LS_KEY);
-    if (saved && buildings.some((b) => b.id === saved)) {
-      setActiveBuildingId(saved);
-    } else if (buildings.length > 0) {
-      // Default to first building (SACSI7 if available)
-      const defaultBld = buildings.find((b) => b.code === "SACSI7") ?? buildings[0];
-      setActiveBuildingId(defaultBld.id);
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(LS_KEY);
+    } catch {
+      /* Persistence is optional. */
     }
-  }, [buildings]);
+    const next =
+      deepLinkedBuilding ??
+      buildings.find((building) => building.id === saved) ??
+      buildings.find((building) => building.code === "SACSI7") ??
+      buildings[0];
+    if (next) setActiveBuildingId(next.id);
+  }, [buildings, requestedBuilding, requestedProject]);
 
   const handleBuildingChange = (id: string) => {
     setActiveBuildingId(id);
-    localStorage.setItem(LS_KEY, id);
+    setSelectedFloor("all");
+    setSelectedStatus("all");
+    setSelectedKind("all");
+    setSelectedBusiness("all");
+    setSearch("");
+    setDetailUnitId(null);
+    try {
+      localStorage.setItem(LS_KEY, id);
+    } catch {
+      /* Persistence is optional. */
+    }
   };
-
   const projects = useMemo(() => {
     const seen = new Map<string, { id: string; code: string; name: string }>();
-    for (const building of buildings) {
-      if (!seen.has(building.project_id)) {
+    for (const building of buildings)
+      if (!seen.has(building.project_id))
         seen.set(building.project_id, {
           id: building.project_id,
           code: building.project_code,
           name: building.project_name,
         });
-      }
-    }
-    return Array.from(seen.values()).sort((left, right) => left.code.localeCompare(right.code));
-  }, [buildings, searchParams]);
-
-  // Filter units by active building
-  const buildingUnits = useMemo(() => {
-    if (!activeBuildingId) return [];
-    return units.filter((u) => u.building_id === activeBuildingId);
-  }, [units, activeBuildingId]);
-
-  const activeBuilding = buildings.find((b) => b.id === activeBuildingId);
+    return [...seen.values()].sort((a, b) => a.code.localeCompare(b.code));
+  }, [buildings]);
+  const activeBuilding = buildings.find((building) => building.id === activeBuildingId);
   const activeProjectId = activeBuilding?.project_id ?? projects[0]?.id ?? "";
-  const activeProjectBuildings = useMemo(
-    () => buildings.filter((building) => building.project_id === activeProjectId),
-    [activeProjectId, buildings],
+  const activeProjectBuildings = buildings.filter(
+    (building) => building.project_id === activeProjectId,
   );
-  const handleProjectChange = (projectId: string) => {
-    const candidates = buildings.filter((building) => building.project_id === projectId);
-    const next = candidates.find((building) => building.code === "SACSI7") ?? candidates[0];
-    if (next) handleBuildingChange(next.id);
-  };
-
-  const floors = useMemo(() => {
-    const set = new Set(buildingUnits.map((unit) => unit.floor_label));
-    return Array.from(set).sort(compareFloorLabels);
-  }, [buildingUnits]);
-
-  const filtered = useMemo(() => {
-    return buildingUnits.filter((unit) => {
-      if (selectedFloor !== "all" && unit.floor_label !== selectedFloor) return false;
-      if (selectedStatus !== "all" && unit.status !== selectedStatus) return false;
-      if (selectedKind !== "all" && unit.kind !== selectedKind) return false;
-      if (selectedBusiness !== "all") {
-        const flags = businessFlagsMap[unit.id] ?? [];
-        return flags.some((flag) => flag.business_type === selectedBusiness && flag.is_enabled);
-      }
-      return true;
-    });
-  }, [buildingUnits, selectedFloor, selectedStatus, selectedKind, selectedBusiness, businessFlagsMap]);
-
-  const apartments = useMemo(() => buildingUnits.filter((unit) => unit.kind === "apartment"), [buildingUnits]);
-  const nonApartments = useMemo(() => buildingUnits.filter((unit) => unit.kind !== "apartment"), [buildingUnits]);
-  const managedLeaseUnitSet = useMemo(() => new Set(managedLeaseUnitIds), [managedLeaseUnitIds]);
-
-  const summary = useMemo(() => ({
-    apartments: apartments.length,
-    available: apartments.filter((unit) => unit.status === "available").length,
-    daily: apartments.filter((unit) => unit.status === "daily_occupied" || unit.status === "reserved").length,
-    leased: apartments.filter((unit) => unit.status === "leased").length,
-    managed: apartments.filter((unit) => unit.status === "sold" && managedLeaseUnitSet.has(unit.id)).length,
-    sold: apartments.filter((unit) => unit.status === "sold").length,
-    ownerOccupied: apartments.filter(isOwnerOccupiedUnit).length,
-    maintenance: apartments.filter((unit) => (unit.status === "maintenance" || unit.status === "locked" || unit.status === "cleaning_pending") && !isOwnerOccupiedUnit(unit)).length,
-    nonApartment: nonApartments.length,
-    unverified: buildingUnits.filter((unit) => unit.occupancy_verified === false || unit.construction_status === "unverified").length,
-    prime: buildingUnits.filter((unit) => unit.location_grade === "central_avenue_prime").length,
-    standard: buildingUnits.filter((unit) => unit.location_grade === "standard").length,
-  }), [apartments, buildingUnits, nonApartments, managedLeaseUnitSet]);
-
-  const detailUnit = detailUnitId ? buildingUnits.find((unit) => unit.id === detailUnitId) : null;
-
-  const sortedUnits = useMemo(
-    () => sortUnitsForBuilding(filtered, activeBuilding?.code),
-    [activeBuilding?.code, filtered],
+  const buildingUnits = useMemo(
+    () => units.filter((unit) => unit.building_id === activeBuildingId),
+    [units, activeBuildingId],
   );
-
+  const floors = useMemo(
+    () => [...new Set(buildingUnits.map((unit) => unit.floor_label))].sort(compareFloorLabels),
+    [buildingUnits],
+  );
+  const filtered = useMemo(
+    () =>
+      buildingUnits.filter((unit) => {
+        if (selectedFloor !== "all" && unit.floor_label !== selectedFloor) return false;
+        if (
+          !matchesUnitPosition(
+            unit,
+            positionsMap[unit.id],
+            selectedStatus,
+            unitPartySummaries[unit.id]?.dailyStatus,
+          )
+        )
+          return false;
+        if (selectedKind !== "all" && unit.kind !== selectedKind) return false;
+        if (
+          selectedBusiness !== "all" &&
+          !(businessFlagsMap[unit.id] ?? []).some(
+            (flag) => flag.business_type === selectedBusiness && flag.is_enabled,
+          )
+        )
+          return false;
+        const party = unitPartySummaries[unit.id];
+        return (
+          !search.trim() ||
+          [
+            unit.unit_no,
+            unit.code,
+            unit.layout,
+            unit.notes,
+            party?.dailyCustomerName,
+            party?.leaseCustomerName,
+            party?.saleCustomerName,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLocaleLowerCase()
+            .includes(search.trim().toLocaleLowerCase())
+        );
+      }),
+    [
+      buildingUnits,
+      positionsMap,
+      selectedFloor,
+      selectedStatus,
+      selectedKind,
+      selectedBusiness,
+      businessFlagsMap,
+      unitPartySummaries,
+      search,
+    ],
+  );
+  const sortedUnits = useMemo(() => {
+    const sorted = sortUnitsForBuilding(filtered, activeBuilding?.code);
+    return descending ? [...sorted].reverse() : sorted;
+  }, [filtered, activeBuilding?.code, descending]);
+  const history = useHistoryPage(sortedUnits);
+  const detailUnit = buildingUnits.find((unit) => unit.id === detailUnitId);
   const isCimac = activeBuilding?.project_code === "CIMAC";
-  const assetBlocks = isCimac ? [
-    { key: "shops", label: locale === "zh" ? "商业区商铺" : "Commerces", value: buildingUnits.length, dot: "bg-foreground", icon: Building2 },
-    { key: "unverified", label: locale === "zh" ? "状态待核实" : "À vérifier", value: summary.unverified, dot: "bg-muted-foreground", icon: AlertTriangle },
-    { key: "prime", label: locale === "zh" ? "优质地段" : "Emplacement premium", value: summary.prime, dot: "bg-[#D97706]", icon: MapPin },
-    { key: "standard", label: locale === "zh" ? "普通地段" : "Emplacement standard", value: summary.standard, dot: "bg-[#94A3B8]", icon: undefined },
-  ] : [
-    { key: "apartments", label: locale === "zh" ? "住宿房源" : "Appartements", value: summary.apartments, dot: "bg-foreground", icon: Home },
-    { key: "available", label: statusLabels.available, value: summary.available, dot: "bg-[#B88A48]", icon: undefined },
-    { key: "daily", label: locale === "zh" ? "日租/预订" : "Jour", value: summary.daily, dot: "bg-[#5090C0]", icon: undefined },
-    { key: "leased", label: statusLabels.leased, value: summary.leased, dot: "bg-[#5E9BC5]", icon: undefined },
-    { key: "managed", label: locale === "zh" ? "代管出租" : "Gestion locative", value: summary.managed, dot: "bg-[#36A78F]", icon: undefined },
-    { key: "sold", label: statusLabels.sold, value: summary.sold, dot: "bg-[#A0D0E8]", icon: undefined },
-    { key: "ownerOccupied", label: locale === "zh" ? "自用" : "Usage interne", value: summary.ownerOccupied, dot: "bg-[#8F8D89]", icon: undefined },
-    { key: "maintenance", label: locale === "zh" ? "维护中" : "Maintenance", value: summary.maintenance, dot: "bg-[#F0A080]", icon: AlertTriangle },
-    { key: "nonApartment", label: locale === "zh" ? "非住宿" : "Autres", value: summary.nonApartment, dot: "bg-muted-foreground", icon: Key },
-  ];
+  const unverified = buildingUnits.filter(
+    (unit) =>
+      unit.occupancy_verified === false ||
+      unit.construction_status === "unverified" ||
+      !positionsMap[unit.id],
+  ).length;
+  const missingConfiguration = buildingUnits.filter(
+    (unit) => !businessFlagsMap[unit.id]?.length,
+  ).length;
 
   return (
     <OperationalPage
-      eyebrow={locale === "zh" ? "房源管理" : "Gestion des biens"}
-      title={activeBuilding ? `${activeBuilding.display_name || activeBuilding.code}` : (locale === "zh" ? "房源" : "Biens")}
-      description={locale === "zh"
-        ? `${buildingUnits.length} 项资产 · 筛选、查看并维护房源档案`
-        : `${buildingUnits.length} actifs · filtrer, consulter et maintenir les dossiers`}
+      eyebrow={zh ? "资产主档案" : "Référentiel des actifs"}
+      title={activeBuilding?.display_name || activeBuilding?.code || (zh ? "房源" : "Biens")}
+      description={
+        zh
+          ? "以资产为中心，分别查看权属、占用、运行条件与业务配置。"
+          : "Propriété, occupation, état opérationnel et activités, sans les confondre."
+      }
     >
       {projects.length > 1 && (
         <SegmentedControl
           value={activeProjectId}
-          onChange={handleProjectChange}
-          ariaLabel={locale === "zh" ? "项目切换" : "Sélection du projet"}
+          onChange={(id) => {
+            const candidates = buildings.filter((building) => building.project_id === id);
+            const next = candidates.find((building) => building.code === "SACSI7") ?? candidates[0];
+            if (next) handleBuildingChange(next.id);
+          }}
+          ariaLabel={zh ? "项目切换" : "Sélection du projet"}
           className="self-start"
           items={projects.map((project) => ({ value: project.id, label: project.name }))}
         />
       )}
-
-      {/* Building Switcher */}
       {activeProjectBuildings.length > 1 && (
         <SegmentedControl
           value={activeBuildingId ?? ""}
           onChange={handleBuildingChange}
-          ariaLabel={locale === "zh" ? "楼栋切换" : "Selection du batiment"}
+          ariaLabel={zh ? "楼栋切换" : "Sélection du bâtiment"}
           className="self-start"
-          items={activeProjectBuildings.map((b) => ({
-            value: b.id,
-            label: b.display_name || b.code,
+          items={activeProjectBuildings.map((building) => ({
+            value: building.id,
+            label: building.display_name || building.code,
           }))}
         />
       )}
 
-      <MetricGrid columns={4}>
-        {assetBlocks.filter((block) => isCimac || ["apartments", "available", "leased", "maintenance"].includes(block.key)).map((block) => {
-          const Icon = block.icon;
-          const tone = block.key === "available" ? "sold" : block.key === "leased" ? "leased" : block.key === "maintenance" ? "red" : block.key === "prime" ? "amber" : "neutral";
-          return (
-            <StatTile
-              key={block.key}
-              label={block.label}
-              value={block.value}
-              tone={tone}
-              icon={Icon}
-            />
-          );
-        })}
-      </MetricGrid>
-
-      <FilterBar
-        meta={`${filtered.length} / ${buildingUnits.length} ${locale === "fr" ? "lots" : "套房源"}`}
-      >
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-y py-3 text-sm">
+        <span>
+          <span className="font-semibold tabular-nums">{buildingUnits.length}</span>{" "}
+          {zh ? "项资产" : "actifs"}
+        </span>
+        <span className={cn(unverified > 0 && "text-amber-700")}>
+          <span className="font-semibold tabular-nums">{unverified}</span>{" "}
+          {zh ? "项状态待核实" : "états à vérifier"}
+        </span>
+        <span className={cn(missingConfiguration > 0 && "text-amber-700")}>
+          <span className="font-semibold tabular-nums">{missingConfiguration}</span>{" "}
+          {zh ? "项业务配置待核对" : "configurations à vérifier"}
+        </span>
+      </div>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        {zh
+          ? "维度可同时成立：已售资产仍可能长租或待保洁；无当前占用不代表已具备出租条件。价格仅显示数据库配置，不替未配置资产补默认价。"
+          : "Les dimensions peuvent coexister : un actif vendu peut être loué ou à nettoyer. L’absence d’occupation ne prouve pas qu’il est prêt à louer. Aucun tarif n’est inventé."}
+      </p>
+      <FilterBar meta={`${filtered.length} / ${buildingUnits.length} ${zh ? "项资产" : "actifs"}`}>
         <UnitFilters
           locale={locale}
           selectedFloor={selectedFloor}
@@ -237,41 +266,65 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], un
           onKindChange={setSelectedKind}
           onBusinessChange={setSelectedBusiness}
         />
+        <SearchInput
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder={zh ? "房号、客户或备注" : "N°, client ou notes"}
+          aria-label={zh ? "搜索资产" : "Rechercher un actif"}
+          className="w-full sm:w-56"
+        />
       </FilterBar>
-
-      {sortedUnits.length === 0 ? (
+      {!sortedUnits.length ? (
         <EmptyState
           icon={<Building2 className="h-10 w-10" />}
-          title={buildingUnits.length === 0 ? t.empty : (locale === "zh" ? "没有符合筛选条件的房源" : "Aucun bien ne correspond aux filtres")}
-          description={buildingUnits.length === 0
-            ? (locale === "zh" ? "请先在设置中导入楼栋和房间" : "Importez d'abord l'immeuble dans Paramètres")
-            : (locale === "zh" ? "请调整楼层、房态、类型或业务筛选" : "Modifiez les filtres d'étage, de statut, de type ou d'activité")}
+          title={
+            !buildingUnits.length
+              ? t.empty
+              : zh
+                ? "没有符合筛选条件的资产"
+                : "Aucun actif pour ces filtres"
+          }
+          description={
+            zh
+              ? "请确认楼栋与筛选条件；不表示整个项目没有资产。"
+              : "Vérifiez le bâtiment et les filtres. Le projet peut contenir d’autres actifs."
+          }
         />
       ) : (
         <div data-unit-asset-table className="table-shell">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1120px]">
+            <table className="w-full min-w-[1220px]">
               <thead>
                 <tr>
-                  <th>{locale === "zh" ? "房号" : "N°"}</th>
-                  <th>{locale === "zh" ? "楼层" : "Étage"}</th>
-                  <th>{locale === "zh" ? "类型" : "Type"}</th>
-                  <th>{locale === "zh" ? "房态" : "Statut"}</th>
-                  <th>{locale === "zh" ? "当前客户" : "Client actuel"}</th>
-                  <th>{locale === "zh" ? "业务日期" : "Date d'activité"}</th>
-                  <th>{locale === "zh" ? "支持业务 / 默认价" : "Activité / tarif"}</th>
-                  <th>{isCimac ? (locale === "zh" ? "地段 / 位置" : "Emplacement") : (locale === "zh" ? "备注" : "Notes")}</th>
-                  <th className="w-10" />
+                  <th aria-sort={descending ? "descending" : "ascending"}>
+                    <button
+                      className="inline-flex items-center gap-1"
+                      onClick={() => setDescending((value) => !value)}
+                      aria-label={zh ? "按房号排序" : "Trier par numéro"}
+                    >
+                      {zh ? "房号 / 类型" : "N° / Type"}
+                      <ArrowDownUp className="h-3 w-3" />
+                    </button>
+                  </th>
+                  <th>{zh ? "权属" : "Propriété"}</th>
+                  <th>{zh ? "业务占用 / 客户" : "Occupation / Client"}</th>
+                  <th>{zh ? "运行条件 / 保洁" : "État / Nettoyage"}</th>
+                  <th>{zh ? "业务日期" : "Dates"}</th>
+                  <th>{zh ? "数据库业务配置 / 默认价" : "Activités / tarifs configurés"}</th>
+                  <th>{isCimac ? (zh ? "地段 / 位置" : "Emplacement") : zh ? "备注" : "Notes"}</th>
+                  <th className="w-10">
+                    <span className="sr-only">{zh ? "操作" : "Actions"}</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {sortedUnits.map((unit) => (
+                {history.rows.map((unit) => (
                   <UnitTableRow
                     key={unit.id}
                     unit={unit}
                     locale={locale}
+                    position={positionsMap[unit.id]}
                     flags={businessFlagsMap[unit.id] ?? []}
-                    managedLease={managedLeaseUnitSet.has(unit.id)}
                     party={unitPartySummaries[unit.id]}
                     onOpen={() => setDetailUnitId(unit.id)}
                   />
@@ -279,19 +332,23 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], un
               </tbody>
             </table>
           </div>
+          <HistoryPagination {...history.pagination} locale={locale} kind="records" />
         </div>
       )}
-
       {detailUnit && (
         <UnitDetailPanel
           key={`${detailUnit.id}-${refreshKey}`}
           unit={detailUnit}
-          buildingName={activeBuilding?.display_name ?? activeBuilding?.code ?? "-"}
+          position={positionsMap[detailUnit.id]}
+          buildingName={activeBuilding?.display_name ?? activeBuilding?.code ?? "—"}
           businessFlags={businessFlagsMap[detailUnit.id] ?? []}
           locale={locale}
           canEdit={canEdit}
           onClose={() => setDetailUnitId(null)}
-          onStatusChanged={() => { setRefreshKey((key) => key + 1); router.refresh(); }}
+          onStatusChanged={() => {
+            setRefreshKey((key) => key + 1);
+            router.refresh();
+          }}
         />
       )}
     </OperationalPage>
@@ -301,86 +358,183 @@ export function UnitList({ units, businessFlagsMap, managedLeaseUnitIds = [], un
 function UnitTableRow({
   unit,
   locale,
+  position,
   flags,
-  managedLease,
   party,
   onOpen,
 }: {
   unit: UnitRow;
   locale: Locale;
+  position?: UnitPosition;
   flags: UnitBusinessFlagRow[];
-  managedLease: boolean;
   party?: UnitPartySummary;
   onOpen: () => void;
 }) {
+  const zh = locale === "zh";
   const t = dictionaries[locale].units;
-  const enabledFlags = flags.filter((flag) => flag.is_enabled);
-  const priceFlag = enabledFlags.find((flag) => flag.business_type === "daily_rental")
-    ?? enabledFlags.find((flag) => flag.business_type === "long_lease");
-  const isManagedLease = unit.status === "sold" && managedLease;
-  const customerName = unit.status === "daily_occupied" || unit.status === "reserved"
-    ? party?.dailyCustomerName
-    : unit.status === "leased" || isManagedLease
-      ? party?.leaseCustomerName
-      : unit.status === "sold" ? party?.saleCustomerName : undefined;
-  const businessDate = unit.status === "leased" || isManagedLease
-    ? party?.leaseEndDate
-      ? `${locale === "zh" ? "到期" : "Fin"} ${party.leaseEndConfirmed === false ? (locale === "zh" ? "未确认" : "non confirmée") : party.leaseEndDate}`
-      : "—"
-    : unit.status === "daily_occupied" || unit.status === "reserved" ? party?.dailyDateText ?? "—" : "—";
-
+  const enabled = flags.filter((flag) => flag.is_enabled);
   return (
     <tr className="cursor-pointer" onClick={onOpen}>
-      <td><span className="font-mono text-xs font-bold">{unit.unit_no}</span></td>
-      <td className="text-sm">{unit.floor_label}</td>
-      <td className="text-sm text-muted-foreground">{t.kinds[unit.kind]}</td>
-      <td><StatusPill unit={unit} locale={locale} managedLease={isManagedLease} /></td>
-      <td className="max-w-48 truncate text-sm font-medium" title={customerName}>{customerName || "—"}</td>
-      <td className="whitespace-nowrap text-sm text-muted-foreground">{businessDate}</td>
+      <td>
+        <span className="font-mono text-sm font-semibold">{unit.unit_no}</span>
+        <span className="mt-1 block text-xs text-muted-foreground">
+          {unit.floor_label} · {t.kinds[unit.kind]}
+        </span>
+      </td>
+      <td className="text-sm">
+        {position?.ownership === "sold"
+          ? zh
+            ? "已售"
+            : "Vendu"
+          : zh
+            ? "权属未明确"
+            : "Propriété non précisée"}
+      </td>
+      <td className="text-sm">
+        <div className="space-y-1">
+          {position?.lease_occupied && (
+            <div>
+              <span className="font-medium">{zh ? "长租" : "Bail"}</span> ·{" "}
+              {party?.leaseCustomerName || (zh ? "客户待补" : "Client à compléter")}
+            </div>
+          )}
+          {position?.daily_occupied && (
+            <div>
+              <span className="font-medium">{zh ? "日租入住" : "Séjour"}</span> ·{" "}
+              {party?.dailyCustomerName || (zh ? "住客待补" : "Client à compléter")}
+            </div>
+          )}
+          {party?.dailyStatus === "confirmed" && (
+            <div className="text-amber-700">
+              {zh ? "日租预订（未入住）" : "Réservation (non arrivée)"} ·{" "}
+              {party.dailyCustomerName || "—"}
+            </div>
+          )}
+          {position &&
+            !position.daily_occupied &&
+            !position.lease_occupied &&
+            party?.dailyStatus !== "confirmed" && (
+              <span className="text-muted-foreground">
+                {zh ? "无当前占用" : "Aucune occupation actuelle"}
+              </span>
+            )}
+          {!position && (
+            <span className="text-amber-700">
+              {zh ? "占用维度待核实" : "Occupation à vérifier"}
+            </span>
+          )}
+          {position?.ownership === "sold" && party?.saleCustomerName && (
+            <span className="block text-xs text-muted-foreground">
+              {zh ? "购买客户" : "Acquéreur"} · {party.saleCustomerName}
+            </span>
+          )}
+        </div>
+      </td>
+      <td className="text-sm">
+        <span className={cn(position?.operational_condition !== "normal" && "text-amber-700")}>
+          {conditionLabel(position?.operational_condition, locale)}
+        </span>
+        <span className="mt-1 block text-xs text-muted-foreground">
+          {!position
+            ? zh
+              ? "保洁待核实"
+              : "Nettoyage à vérifier"
+            : position.cleaning_pending
+              ? zh
+                ? "待保洁"
+                : "À nettoyer"
+              : zh
+                ? "无待办保洁"
+                : "Aucun nettoyage en attente"}
+        </span>
+        {(unit.occupancy_verified === false || unit.construction_status === "unverified") && (
+          <span className="mt-1 block text-xs text-amber-700">
+            {zh ? "使用条件未核实" : "Mise en service à vérifier"}
+          </span>
+        )}
+      </td>
       <td className="text-sm text-muted-foreground">
-        <div>{enabledFlags.map((flag) => t.businessTypes[flag.business_type]).join(" / ") || "—"}</div>
-        {priceFlag?.default_price_xof != null && <div className="mt-0.5 text-xs tabular-nums">{formatXof(priceFlag.default_price_xof)}</div>}
+        <div className="space-y-1">
+          {position?.lease_occupied && (
+            <div>
+              {zh ? "合同到期" : "Fin de bail"} ·{" "}
+              {party?.leaseEndConfirmed === false
+                ? zh
+                  ? "未确认"
+                  : "Non confirmée"
+                : (party?.leaseEndDate ?? "—")}
+            </div>
+          )}
+          {(position?.daily_occupied || party?.dailyStatus === "confirmed") && (
+            <div>{party?.dailyDateText?.replace("未定", zh ? "未定" : "Ouvert") ?? "—"}</div>
+          )}
+          {!position?.lease_occupied &&
+            !position?.daily_occupied &&
+            party?.dailyStatus !== "confirmed" &&
+            "—"}
+        </div>
+      </td>
+      <td className="text-sm text-muted-foreground">
+        {!flags.length ? (
+          <span className="text-amber-700">
+            {zh ? "业务配置待核对" : "Configuration à vérifier"}
+          </span>
+        ) : !enabled.length ? (
+          zh ? (
+            "业务均未启用"
+          ) : (
+            "Aucune activité activée"
+          )
+        ) : (
+          <div className="space-y-1">
+            {enabled.map((flag) => (
+              <div key={flag.business_type}>
+                <span>{t.businessTypes[flag.business_type]}</span>
+                <span className="ml-2 tabular-nums">
+                  {flag.default_price_xof == null
+                    ? zh
+                      ? "未配置价格"
+                      : "Tarif non renseigné"
+                    : formatXof(flag.default_price_xof)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </td>
       <td className="max-w-56 text-sm text-muted-foreground">
         {unit.location_grade ? (
-          <div className="flex flex-col gap-0.5">
-            <span className={cn("font-medium", unit.location_grade === "central_avenue_prime" && "text-amber-700")}>{unit.location_grade === "central_avenue_prime" ? (locale === "zh" ? "中央大道优质地段" : "Axe central premium") : (locale === "zh" ? "普通地段" : "Standard")}</span>
-            <span className="text-xs">{unit.zone_label || "—"}</span>
+          <div>
+            <span>
+              {unit.location_grade === "central_avenue_prime"
+                ? zh
+                  ? "中央大道优质地段"
+                  : "Axe central premium"
+                : zh
+                  ? "普通地段"
+                  : "Standard"}
+            </span>
+            <span className="mt-1 block text-xs">{unit.zone_label || "—"}</span>
           </div>
-        ) : <span className="block truncate" title={unit.notes ?? undefined}>{unit.notes || "—"}</span>}
+        ) : (
+          <span className="line-clamp-2" title={unit.notes ?? undefined}>
+            {unit.notes || "—"}
+          </span>
+        )}
       </td>
       <td className="table-cell-action">
-        <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); onOpen(); }}>
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-label={zh ? `查看资产 ${unit.unit_no}` : `Voir l’actif ${unit.unit_no}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen();
+          }}
+        >
           <ArrowRight className="h-3.5 w-3.5" />
         </Button>
       </td>
     </tr>
-  );
-}
-
-function StatusPill({ unit, locale, managedLease = false }: { unit: UnitRow; locale: Locale; managedLease?: boolean }) {
-  const pendingVerification = unit.occupancy_verified === false || unit.construction_status === "unverified";
-  const displayStatus = isOwnerOccupiedUnit(unit) ? "ownerOccupied" : unit.status;
-  const label = pendingVerification
-    ? (locale === "zh" ? "待核实" : "À vérifier")
-    : managedLease
-    ? (locale === "zh" ? "已售代管" : "Vendu gere")
-    : getUnitOperationalLabel(unit, locale) ?? (dictionaries[locale].statuses as Record<string, string>)[unit.status] ?? statusDisplayLabel(unit.status, locale);
-  const styles: Record<string, string> = {
-    sold: "bg-[#EAF7FF] text-[#17324D] ring-[#C0DDF0]/60",
-    leased: "bg-[#DDECF7] text-[#17324D] ring-[#AFCBE1]/70",
-    daily_occupied: "bg-[#62B6F5]/10 text-[#1A6090] ring-[#62B6F5]/20",
-    reserved: "bg-[#FFF6D8] text-[#17324D] ring-[#E8D5A0]/60",
-    cleaning_pending: "bg-[#D9F7F0] text-[#17324D] ring-[#A8E8DB]/60",
-    available: "bg-[#EFE1CA] text-[#17324D] ring-[#D8BF98]/70",
-    maintenance: "bg-[#FFE2EA] text-[#17324D] ring-[#F5C0CC]/60",
-    locked: "bg-muted text-muted-foreground ring-border",
-    ownerOccupied: "bg-[#F1F0ED] text-[#17324D] ring-[#D2CFCA]/70",
-  };
-
-  return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset", pendingVerification ? "bg-muted text-muted-foreground ring-border" : styles[displayStatus] ?? "")}>
-      {label}
-    </span>
   );
 }

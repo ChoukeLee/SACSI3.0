@@ -25,6 +25,8 @@ export function parseFinanceRead(params: Record<string, string | string[] | unde
     "dateFrom",
     "dateTo",
     "buildingId",
+    "projectId",
+    "outstandingOnly",
     "direction",
     "category",
     "status",
@@ -36,6 +38,7 @@ export function parseFinanceRead(params: Record<string, string | string[] | unde
     if (value) filters[key] = value;
   }
   if (kind === "ledger") {
+    delete filters.outstandingOnly;
     delete filters.status;
     delete filters.management;
   } else {
@@ -58,6 +61,13 @@ export function parseFinanceRead(params: Record<string, string | string[] | unde
     !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(filters.buildingId)
   )
     throw new Error("Invalid building");
+  if (
+    filters.projectId &&
+    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(filters.projectId)
+  )
+    throw new Error("Invalid project");
+  if (filters.outstandingOnly && !["true", "false"].includes(filters.outstandingOnly))
+    throw new Error("Invalid outstanding filter");
   if (
     filters.direction &&
     !["income", "expense", "liability_in", "liability_out"].includes(filters.direction)

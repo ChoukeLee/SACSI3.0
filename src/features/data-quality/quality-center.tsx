@@ -3,7 +3,14 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, ShieldAlert, ChevronDown, ChevronUp, Wrench } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  ShieldAlert,
+  ChevronDown,
+  ChevronUp,
+  Wrench,
+} from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -11,23 +18,50 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { SearchInput } from "@/components/ui/search-input";
-import { FilterBar, FilterGroup, MetricGrid, SegmentedControl, StatTile } from "@/components/ui/operational";
+import {
+  FilterBar,
+  FilterGroup,
+  MetricGrid,
+  SegmentedControl,
+  StatTile,
+} from "@/components/ui/operational";
 import { repairDailyRentalIssue } from "@/features/daily-rentals/daily-rental-repair";
+import { HistoryPagination, useHistoryPage } from "@/features/profiles/history-pagination";
 import type { QualityIssue, QualityCategory, QualitySeverity } from "./quality-types";
 
 interface Props {
   issues: QualityIssue[];
   locale: Locale;
   userRole?: string;
+  loadError?: boolean;
+  checkedAt?: string;
 }
 
 const CATEGORY_LABELS: Record<Locale, Record<QualityCategory, string>> = {
-  zh: { unit: "房源", customer: "客户", daily_rental: "日租", lease: "长租", sale: "出售", finance: "财务", system: "系统" },
-  fr: { unit: "Logement", customer: "Client", daily_rental: "Jour", lease: "Location", sale: "Vente", finance: "Finance", system: "Système" },
+  zh: {
+    unit: "房源",
+    customer: "客户",
+    daily_rental: "日租",
+    lease: "长租",
+    sale: "出售",
+    finance: "财务",
+    system: "系统",
+  },
+  fr: {
+    unit: "Logement",
+    customer: "Client",
+    daily_rental: "Jour",
+    lease: "Location",
+    sale: "Vente",
+    finance: "Finance",
+    system: "Système",
+  },
 };
 
 const sevTone: Record<QualitySeverity, "red" | "amber" | "indigo"> = {
-  high: "red", medium: "amber", low: "indigo",
+  high: "red",
+  medium: "amber",
+  low: "indigo",
 };
 
 const sevLabels: Record<Locale, Record<QualitySeverity, string>> = {
@@ -35,7 +69,7 @@ const sevLabels: Record<Locale, Record<QualitySeverity, string>> = {
   fr: { high: "Élevé", medium: "Moyen", low: "Faible" },
 };
 
-export function QualityCenter({ issues, locale, userRole }: Props) {
+export function QualityCenter({ issues, locale, userRole, loadError = false, checkedAt }: Props) {
   const router = useRouter();
   const catLabels = CATEGORY_LABELS[locale];
 
@@ -67,7 +101,8 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
     } catch (err: unknown) {
       setRepairErrorById((prev) => ({
         ...prev,
-        [issue.id]: err instanceof Error ? err.message : (zh ? "修复失败。" : "Échec de la réparation."),
+        [issue.id]:
+          err instanceof Error ? err.message : zh ? "修复失败。" : "Échec de la réparation.",
       }));
     } finally {
       setRepairingId(null);
@@ -75,7 +110,7 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
   };
 
   const filtered = useMemo(() => {
-    return issues.filter(i => {
+    return issues.filter((i) => {
       if (severityFilter !== "all" && i.severity !== severityFilter) return false;
       if (categoryFilter !== "all" && i.category !== categoryFilter) return false;
       if (search.trim()) {
@@ -85,33 +120,107 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
       return true;
     });
   }, [issues, severityFilter, categoryFilter, search]);
+  const history = useHistoryPage(filtered);
 
-  const high = issues.filter(i => i.severity === "high").length;
-  const medium = issues.filter(i => i.severity === "medium").length;
-  const low = issues.filter(i => i.severity === "low").length;
-  const financeIssues = issues.filter(i => i.category === "finance").length;
-  const unitIssues = issues.filter(i => i.category === "unit").length;
+  const high = issues.filter((i) => i.severity === "high").length;
+  const medium = issues.filter((i) => i.severity === "medium").length;
+  const low = issues.filter((i) => i.severity === "low").length;
+  const financeIssues = issues.filter((i) => i.category === "finance").length;
+  const unitIssues = issues.filter((i) => i.category === "unit").length;
 
   const zh = locale === "zh";
 
+  if (loadError)
+    return (
+      <section role="alert" className="rounded-xl border border-amber-200 bg-amber-50/40 p-6">
+        <h2 className="text-base font-semibold">
+          {zh ? "数据质量检查未完成" : "Contrôle de qualité incomplet"}
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+          {zh
+            ? "至少一个数据来源读取失败，无法判断异常数量或数据健康状况。未执行任何自动修复；请重试或联系管理员。"
+            : "Une source n’a pas pu être lue. Le nombre d’anomalies et l’état des données sont inconnus. Aucune correction automatique n’a été effectuée."}
+        </p>
+        <Button variant="outline" size="sm" className="mt-4" onClick={() => router.refresh()}>
+          {zh ? "重新检查" : "Réessayer"}
+        </Button>
+      </section>
+    );
+
   return (
     <div className="space-y-5">
+      <p className="text-xs text-muted-foreground">
+        {zh
+          ? "检查范围：当前账号权限内的完整记录；未发现异常不等于完成全部人工业务验收。"
+          : "Périmètre : historique complet dans vos droits. L’absence d’anomalies ne remplace pas la validation métier."}
+        {checkedAt && ` · ${new Date(checkedAt).toLocaleString(zh ? "zh-CN" : "fr-FR")}`}
+      </p>
       {/* Summary */}
       <MetricGrid columns={6}>
-        {[{ key:"total", label:zh?"全部异常":"Total", value:String(issues.length), dot:"bg-accentBlue-500" },
-          { key:"high", label:zh?"高危":"Élevé", value:String(high), dot:"bg-accentRed-500" },
-          { key:"medium", label:zh?"中危":"Moyen", value:String(medium), dot:"bg-accentAmber-500" },
-          { key:"low", label:zh?"低危":"Faible", value:String(low), dot:"bg-accentBlue-500" },
-          { key:"finance", label:zh?"财务异常":"Finance", value:String(financeIssues), dot:"bg-accentRed-500" },
-          { key:"unit", label:zh?"房态异常":"Logement", value:String(unitIssues), dot:"bg-accentAmber-500" },
-        ].map(b => {
-          const tone = b.dot.includes("Red") ? "red" : b.dot.includes("Amber") ? "amber" : b.dot.includes("Green") ? "green" : "blue";
-          return <StatTile key={b.key} label={b.label} value={b.value} tone={tone as "red" | "amber" | "green" | "blue"} />;
+        {[
+          {
+            key: "total",
+            label: zh ? "全部异常" : "Total",
+            value: String(issues.length),
+            dot: "bg-accentBlue-500",
+          },
+          {
+            key: "high",
+            label: zh ? "高危" : "Élevé",
+            value: String(high),
+            dot: "bg-accentRed-500",
+          },
+          {
+            key: "medium",
+            label: zh ? "中危" : "Moyen",
+            value: String(medium),
+            dot: "bg-accentAmber-500",
+          },
+          {
+            key: "low",
+            label: zh ? "低危" : "Faible",
+            value: String(low),
+            dot: "bg-accentBlue-500",
+          },
+          {
+            key: "finance",
+            label: zh ? "财务异常" : "Finance",
+            value: String(financeIssues),
+            dot: "bg-accentRed-500",
+          },
+          {
+            key: "unit",
+            label: zh ? "房态异常" : "Logement",
+            value: String(unitIssues),
+            dot: "bg-accentAmber-500",
+          },
+        ].map((b) => {
+          const tone = b.dot.includes("Red")
+            ? "red"
+            : b.dot.includes("Amber")
+              ? "amber"
+              : b.dot.includes("Green")
+                ? "green"
+                : "blue";
+          return (
+            <StatTile
+              key={b.key}
+              label={b.label}
+              value={b.value}
+              tone={tone as "red" | "amber" | "green" | "blue"}
+            />
+          );
         })}
       </MetricGrid>
 
       {/* Filters */}
-      <FilterBar meta={<span className="tabular-nums">{filtered.length} {zh ? "条" : "lignes"}</span>}>
+      <FilterBar
+        meta={
+          <span className="tabular-nums">
+            {filtered.length} {zh ? "条" : "lignes"}
+          </span>
+        }
+      >
         <FilterGroup label={zh ? "级别" : "Severite"}>
           <SegmentedControl
             value={severityFilter}
@@ -132,7 +241,9 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
             ariaLabel={zh ? "类别筛选" : "Filtre categorie"}
             items={[
               { value: "all", label: zh ? "全部" : "Tous" },
-              ...(Object.entries(catLabels) as [QualityCategory, string][]).map(([value, label]) => ({ value, label })),
+              ...(Object.entries(catLabels) as [QualityCategory, string][]).map(
+                ([value, label]) => ({ value, label }),
+              ),
             ]}
           />
         </FilterGroup>
@@ -148,31 +259,70 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
       {filtered.length === 0 ? (
         <EmptyState
           icon={<ShieldAlert className="h-10 w-10" />}
-          title={zh ? "数据质量良好，未发现异常" : "Données saines, aucune anomalie"}
+          title={
+            issues.length === 0
+              ? zh
+                ? "本次检查未发现异常"
+                : "Aucune anomalie détectée lors de ce contrôle"
+              : zh
+                ? "当前筛选下没有异常"
+                : "Aucune anomalie pour ces filtres"
+          }
         />
       ) : (
         <div className="space-y-2">
-          {filtered.map(i => {
+          {history.rows.map((i) => {
             const expanded = expandedId === i.id;
             return (
               <div
                 key={i.id}
                 className={cn(
                   "overflow-hidden rounded-xl border bg-card shadow-sm",
-                  i.severity === "high" ? "border-l-[3px] border-l-rose-400" : i.severity === "medium" ? "border-l-[3px] border-l-amber-400" : "",
+                  i.severity === "high"
+                    ? "border-l-[3px] border-l-rose-400"
+                    : i.severity === "medium"
+                      ? "border-l-[3px] border-l-amber-400"
+                      : "",
                 )}
               >
-                <div
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-accent/50 transition-colors"
-                  onClick={() => setExpandedId(expanded ? null : i.id)}
-                >
-                  <AlertTriangle className={cn("h-5 w-5 shrink-0", i.severity === "high" ? "text-rose-500" : i.severity === "medium" ? "text-amber-500" : "text-cyan-500")} />
+                <div className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-accent/50 transition-colors">
+                  <AlertTriangle
+                    className={cn(
+                      "h-5 w-5 shrink-0",
+                      i.severity === "high"
+                        ? "text-rose-500"
+                        : i.severity === "medium"
+                          ? "text-amber-500"
+                          : "text-cyan-500",
+                    )}
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <Badge variant="secondary" className="text-[10px]">{catLabels[i.category]}</Badge>
-                      <Badge variant={sevTone[i.severity] === "red" ? "destructive" : sevTone[i.severity] === "amber" ? "warning" : "default"} className="text-[10px]">{sevLabels[locale][i.severity]}</Badge>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {catLabels[i.category]}
+                      </Badge>
+                      <Badge
+                        variant={
+                          sevTone[i.severity] === "red"
+                            ? "destructive"
+                            : sevTone[i.severity] === "amber"
+                              ? "warning"
+                              : "default"
+                        }
+                        className="text-[10px]"
+                      >
+                        {sevLabels[locale][i.severity]}
+                      </Badge>
                     </div>
-                    <p className="truncate text-sm font-semibold">{i.title}</p>
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      aria-controls={`quality-detail-${i.id}`}
+                      onClick={() => setExpandedId(expanded ? null : i.id)}
+                      className="block w-full text-left text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      {i.title}
+                    </button>
                     <p className="text-xs text-muted-foreground truncate">
                       {i.entityLabel}
                       <span className="ml-2 text-muted-foreground/70">{i.detectedAt}</span>
@@ -180,16 +330,26 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
                   </div>
                   <div className="shrink-0 flex items-center gap-2">
                     {i.href && (
-                      <Link href={routeFor(locale, i.href)} onClick={e => e.stopPropagation()}
-                        className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90">
+                      <Link
+                        href={routeFor(locale, i.href)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+                      >
                         {zh ? "查看" : "Voir"} <ArrowRight className="inline h-3 w-3 ml-0.5" />
                       </Link>
                     )}
-                    {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                    {expanded ? (
+                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    )}
                   </div>
                 </div>
                 {expanded && (
-                  <div className="border-t px-4 py-3 bg-muted/30 space-y-2 text-sm">
+                  <div
+                    id={`quality-detail-${i.id}`}
+                    className="border-t px-4 py-3 bg-muted/30 space-y-2 text-sm"
+                  >
                     <div>
                       <span className="font-semibold">{zh ? "描述" : "Description"}: </span>
                       <span className="text-muted-foreground">{i.description}</span>
@@ -201,7 +361,9 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
                     {i.relatedEntities.length > 0 && (
                       <div>
                         <span className="font-semibold">{zh ? "关联实体" : "Liés"}: </span>
-                        <span className="text-muted-foreground font-mono text-xs">{i.relatedEntities.map(e => e.slice(0, 8)).join(", ")}</span>
+                        <span className="text-muted-foreground font-mono text-xs">
+                          {i.relatedEntities.map((e) => e.slice(0, 8)).join(", ")}
+                        </span>
                       </div>
                     )}
                     {isAdmin && i.fixable && i.repairEntityId && (
@@ -227,7 +389,9 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
                       </div>
                     )}
                     {!isAdmin && i.fixable && (
-                      <p className="text-xs text-muted-foreground">{zh ? "仅管理员可修复" : "Admin requis pour réparer"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {zh ? "仅管理员可修复" : "Admin requis pour réparer"}
+                      </p>
                     )}
                   </div>
                 )}
@@ -236,6 +400,7 @@ export function QualityCenter({ issues, locale, userRole }: Props) {
           })}
         </div>
       )}
+      <HistoryPagination {...history.pagination} locale={locale} kind="records" />
     </div>
   );
 }

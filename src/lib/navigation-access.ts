@@ -10,21 +10,41 @@ interface NavigationGroup<TItem extends NavigationItem> {
 }
 
 const ROLE_KEYS: Partial<Record<UserRole, Set<string>>> = {
-  boss: new Set(["management", "units", "dailyRentals", "leases", "sales"]),
-  finance: new Set(["management", "units", "leases", "sales"]),
+  boss: new Set([
+    "management",
+    "units",
+    "dailyRentals",
+    "leases",
+    "sales",
+    "finance",
+    "customers",
+    "reports",
+  ]),
+  finance: new Set([
+    "management",
+    "units",
+    "dailyRentals",
+    "leases",
+    "sales",
+    "finance",
+    "customers",
+    "reports",
+  ]),
   front_desk: new Set(["dailyRentals", "leases"]),
-  rental_sales: new Set(["management", "units", "dailyRentals", "leases", "sales"]),
+  rental_sales: new Set(["units", "dailyRentals", "leases", "sales", "customers"]),
 };
 
-export function navigationGroupsForRole<TItem extends NavigationItem, TGroup extends NavigationGroup<TItem>>(
-  groups: TGroup[],
-  role?: UserRole,
-): TGroup[] {
+export function navigationGroupsForRole<
+  TItem extends NavigationItem,
+  TGroup extends NavigationGroup<TItem>,
+>(groups: TGroup[], role?: UserRole): TGroup[] {
   if (!role || role === "admin") return groups;
   const allowedKeys = ROLE_KEYS[role];
   if (!allowedKeys) return [];
-  return groups.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => allowedKeys.has(item.key)),
-  })).filter((group) => group.items.length > 0) as TGroup[];
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => allowedKeys.has(item.key)),
+    }))
+    .filter((group) => group.items.length > 0) as TGroup[];
 }

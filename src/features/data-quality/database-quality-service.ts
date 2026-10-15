@@ -1,7 +1,9 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import type { Locale } from "@/lib/i18n";
+import { statusDisplayLabel } from "@/lib/display-labels";
 import type { QualityCategory, QualityIssue, QualitySeverity } from "./quality-types";
 
 type FindingRow = {
@@ -31,9 +33,11 @@ const hrefByCategory: Record<QualityCategory, string> = {
 function textFor(row: FindingRow, locale: Locale) {
   const zh = locale === "zh";
   const detail = row.detail ?? {};
-  const current = String(detail.current_status ?? "-");
-  const expected = String(detail.expected_status ?? "-");
-  const amount = Number(detail.amount_xof ?? 0).toLocaleString();
+  const current = statusDisplayLabel(String(detail.current_status ?? "-"), locale);
+  const expected = statusDisplayLabel(String(detail.expected_status ?? "-"), locale);
+  const amount = Number(detail.amount_xof ?? detail.total_amount_xof ?? 0).toLocaleString(
+    locale === "zh" ? "zh-CN" : "fr-FR",
+  );
   const paid = Number(detail.paid_amount_xof ?? 0).toLocaleString();
 
   if (row.issue_key.startsWith("unit_status:")) {
@@ -42,15 +46,22 @@ function textFor(row: FindingRow, locale: Locale) {
       description: zh
         ? `当前房态 ${current}，按有效合同/订单推导应为 ${expected}。`
         : `Statut actuel ${current}, statut attendu ${expected} selon les contrats et réservations actifs.`,
-      action: expected === "available"
-        ? (zh ? "核对是否缺少历史合同；确认后再改为空闲。" : "Vérifier les contrats historiques avant de rendre le logement disponible.")
-        : (zh ? "以有效业务记录为准修正房态。" : "Aligner le statut sur les opérations actives."),
+      action:
+        detail.expected_status === "available"
+          ? zh
+            ? "核对是否缺少历史合同；确认后再改为空闲。"
+            : "Vérifier les contrats historiques avant de rendre le logement disponible."
+          : zh
+            ? "以有效业务记录为准修正房态。"
+            : "Aligner le statut sur les opérations actives.",
     };
   }
   if (row.issue_key.startsWith("receivable_status:")) {
     return {
       title: zh ? "逾期应收状态未同步" : "Créance échue non synchronisée",
-      description: zh ? `应收 ${amount}，已收 ${paid}，到期日已过。` : `Créance ${amount}, encaissé ${paid}, échéance dépassée.`,
+      description: zh
+        ? `应收 ${amount}，已收 ${paid}，到期日已过。`
+        : `Créance ${amount}, encaissé ${paid}, échéance dépassée.`,
       action: zh ? "同步为逾期状态。" : "Passer le statut à en retard.",
     };
   }
@@ -58,27 +69,51 @@ function textFor(row: FindingRow, locale: Locale) {
     return {
       title: zh ? "实收大于应收" : "Encaissement supérieur à la créance",
       description: zh ? `应收 ${amount}，已收 ${paid}。` : `Créance ${amount}, encaissé ${paid}.`,
-      action: zh ? "核实是否重复收款；否则登记退款或客户余额。" : "Vérifier un doublon, sinon enregistrer un remboursement ou un avoir.",
+      action: zh
+        ? "核实是否重复收款；否则登记退款或客户余额。"
+        : "Vérifier un doublon, sinon enregistrer un remboursement ou un avoir.",
     };
   }
   if (row.issue_key.startsWith("payment_missing_ledger:")) {
     return {
       title: zh ? "收款缺少总账记录" : "Paiement absent du grand livre",
-      description: zh ? "收款已存在，但没有对应总账分录。" : "Le paiement existe sans écriture correspondante.",
+      description: zh
+        ? "收款已存在，但没有对应总账分录。"
+        : "Le paiement existe sans écriture correspondante.",
       action: zh ? "补建对应总账分录。" : "Créer l’écriture de grand livre correspondante.",
     };
   }
   if (row.issue_key.startsWith("sale_missing_receivable:")) {
     return {
       title: zh ? "有效出售合同缺少应收" : "Vente active sans créance",
-      description: zh ? `合同总额 ${amount}，未找到有效应收记录。` : `Montant du contrat ${amount}, aucune créance active trouvée.`,
-      action: zh ? "先核实合同总额，再生成出售应收。" : "Vérifier le montant du contrat puis générer la créance.",
+      description: zh
+        ? `合同总额 ${amount}，未找到有效应收记录。`
+        : `Montant du contrat ${amount}, aucune créance active trouvée.`,
+      action: zh
+        ? "先核实合同总额，再生成出售应收。"
+        : "Vérifier le montant du contrat puis générer la créance.",
     };
   }
+  if (row.issue_key.startsWith("lease_sale_overlap:"))
+    return {
+      title: zh
+        ? "同一房源同时存在有效长租和出售"
+        : "Location et vente actives sur le même logement",
+      description: zh
+        ? "这可能是带租约出售或售后代管，也可能是合同状态未关闭。"
+        : "Il peut s’agir d’une vente avec locataire ou d’un ancien contrat non clôturé.",
+      action: zh
+        ? "确认业务模式，并明确标记为带租约出售/售后代管。"
+        : "Confirmer le modèle et le marquer explicitement.",
+    };
   return {
-    title: zh ? "同一房源同时存在有效长租和出售" : "Location et vente actives sur le même logement",
-    description: zh ? "这可能是带租约出售或售后代管，也可能是合同状态未关闭。" : "Il peut s’agir d’une vente avec locataire ou d’un ancien contrat non clôturé.",
-    action: zh ? "确认业务模式，并明确标记为带租约出售/售后代管。" : "Confirmer le modèle et le marquer explicitement.",
+    title: row.title || (zh ? "需要核查的数据异常" : "Anomalie à vérifier"),
+    description: zh
+      ? "检测到未归类的异常，需核对相关业务记录。"
+      : "Anomalie non classée. Vérifier les opérations liées.",
+    action: zh
+      ? "请管理员核查，不自动修改历史记录。"
+      : "Demander une vérification administrateur, sans modification automatique de l’historique.",
   };
 }
 
@@ -107,19 +142,19 @@ export function mapDatabaseFinding(row: FindingRow, locale: Locale): QualityIssu
 
 export async function fetchDatabaseQualityIssues(locale: Locale): Promise<QualityIssue[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("system_data_quality_findings")
-    .select("*")
-    .order("severity")
-    .order("building_code")
-    .order("unit_no")
-    .limit(1000);
-
-  if (error) {
-    console.error("Database quality findings error:", error);
-    return [];
-  }
-  return ((data ?? []) as FindingRow[]).map((row) => mapDatabaseFinding(row, locale));
+  const rows = await fetchAllPages<FindingRow>(
+    (from, to) =>
+      supabase
+        .from("system_data_quality_findings")
+        .select("*", { count: "exact" })
+        .order("severity")
+        .order("building_code")
+        .order("unit_no")
+        .order("issue_key")
+        .range(from, to),
+    "database quality findings",
+  );
+  return rows.map((row) => mapDatabaseFinding(row, locale));
 }
 
 const supersededPrefixes = [

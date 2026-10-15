@@ -44,7 +44,7 @@ export function aggregatePnlByBuilding(
   const map = new Map<string | null, { income: number; expense: number }>();
 
   for (const e of entries) {
-    const bid = e.building_id ?? (e.unit_id ? unitBuilding.get(e.unit_id) ?? null : null);
+    const bid = e.building_id ?? (e.unit_id ? (unitBuilding.get(e.unit_id) ?? null) : null);
     const g = map.get(bid) ?? { income: 0, expense: 0 };
     if (e.direction === "income") g.income += Number(e.amount_xof);
     else if (e.direction === "expense") g.expense += Number(e.amount_xof);
@@ -54,7 +54,7 @@ export function aggregatePnlByBuilding(
   return [...map.entries()]
     .map(([bid, g]) => ({
       buildingId: bid,
-      buildingName: bid ? buildingName.get(bid) ?? bid : "未分楼栋",
+      buildingName: bid ? (buildingName.get(bid) ?? bid) : "未分楼栋",
       income: g.income,
       expense: g.expense,
       net: g.income - g.expense,
@@ -67,7 +67,10 @@ export interface CategoryBreakdown {
   value: number;
 }
 
-export function aggregateByCategory(entries: LedgerEntryRow[], direction: "income" | "expense"): CategoryBreakdown[] {
+export function aggregateByCategory(
+  entries: LedgerEntryRow[],
+  direction: "income" | "expense",
+): CategoryBreakdown[] {
   const map = new Map<string, number>();
   for (const e of entries) {
     if (e.direction !== direction) continue;
@@ -94,16 +97,16 @@ export function monthRange(endMonth: string, count: number): string[] {
 // 日租报表聚合（收款按月 / 入住热力）
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { PaymentRow, DailyBookingRow } from "@/types/database";
+import type { DailyBookingRow } from "@/types/database";
+import type { ReceiptTrend } from "@/features/daily-rentals/receipt-analysis-types";
 
 /** 日租收款（按付款日分月，含负向冲销），返回与 months 对齐的每月净收款。 */
-export function aggregateDailyCollectionsMonthly(payments: PaymentRow[], months: string[]): number[] {
-  const sums = months.map(() => 0);
-  for (const p of payments) {
-    const idx = months.indexOf(p.payment_date.slice(0, 7));
-    if (idx >= 0) sums[idx] += Number(p.amount);
-  }
-  return sums;
+export function aggregateDailyCollectionsMonthly(
+  collections: ReceiptTrend[],
+  months: string[],
+): number[] {
+  const totals = new Map(collections.map((row) => [row.month, row.net]));
+  return months.map((month) => totals.get(month) ?? 0);
 }
 
 /** 生成某月（YYYY-MM）的全部日期（YYYY-MM-DD，升序）。 */
@@ -119,9 +122,14 @@ export function dayRangeOfMonth(month: string): string[] {
 
 export type DailyCellStatus = "occupied" | "reserved" | "cleaning" | "available";
 
-const STATUS_RANK: Record<DailyCellStatus, number> = { available: 0, cleaning: 1, reserved: 2, occupied: 3 };
+const STATUS_RANK: Record<DailyCellStatus, number> = {
+  available: 0,
+  cleaning: 1,
+  reserved: 2,
+  occupied: 3,
+};
 
-function statusForDay(bookings: DailyBookingRow[], day: string): DailyCellStatus {
+function statusForDay(bookings: DailyBookingRow[], day: string, today: string): DailyCellStatus {
   let best: DailyCellStatus = "available";
   for (const b of bookings) {
     if (b.status === "cancelled") continue;
@@ -131,7 +139,8 @@ function statusForDay(bookings: DailyBookingRow[], day: string): DailyCellStatus
     if (b.status === "checked_out" && b.actual_check_out === day) {
       status = "cleaning";
     } else if (end === null || day < end) {
-      if (b.status === "checked_in" || b.status === "checked_out") status = "occupied";
+      if (b.status === "checked_in" || b.status === "checked_out")
+        status = day < today ? "occupied" : "reserved";
       else if (b.status === "confirmed" || b.status === "pending_review") status = "reserved";
     }
     if (status && STATUS_RANK[status] > STATUS_RANK[best]) best = status;
@@ -147,6 +156,7 @@ export function buildDailyOccupancy(
   bookings: DailyBookingRow[],
   unitIds: string[],
   days: string[],
+  today = new Date().toISOString().slice(0, 10),
 ): Record<string, Record<string, DailyCellStatus>> {
   const byUnit = new Map<string, DailyBookingRow[]>();
   for (const b of bookings) {
@@ -159,54 +169,59 @@ export function buildDailyOccupancy(
   for (const unitId of unitIds) {
     const list = byUnit.get(unitId) ?? [];
     cells[unitId] = {};
-    for (const day of days) cells[unitId][day] = statusForDay(list, day);
+    for (const day of days) cells[unitId][day] = statusForDay(list, day, today);
   }
   return cells;
 }
-function daysBetween(a: string, b: string): number {
-  return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
-}
-
 export interface MonthlyOccupancy {
   month: string;
   occupiedNights: number;
-  sellableNights: number;
-  rate: number; // 0..1
+  reservedNights: number;
+  sellableNights: null;
+  rate: null;
 }
 
 /**
- * 日租入住率（按月）。
- * 可售晚数 = 当前日租房源数 × 当月天数（统一分母，跨月可比）。
- * 入住晚数 = 非取消订单落在该月内的晚数之和（开放式按实际退房日或月末截断）。
+ * Recorded actual room-nights, distinct from reservations. Historic sellable
+ * capacity is not recorded, so an occupancy percentage cannot be verified.
+ * Deduplicate overlapping rows for the same room/day and cap actuals at today.
  */
 export function aggregateOccupancyMonthly(
   bookings: DailyBookingRow[],
-  dailyRoomCount: number,
   months: string[],
+  today = new Date().toISOString().slice(0, 10),
 ): MonthlyOccupancy[] {
   return months.map((month) => {
     const [y, m] = month.split("-").map(Number);
     const mStart = month + "-01";
     const mEnd = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
-    const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
-
-    let occupiedNights = 0;
+    const occupied = new Set<string>();
+    const reserved = new Set<string>();
     for (const b of bookings) {
-      if (b.status === "cancelled") continue;
+      const isActual = b.status === "checked_in" || b.status === "checked_out";
+      const isReservation = b.status === "confirmed" || b.status === "pending_review";
+      if (!isActual && !isReservation) continue;
+      if (b.status === "checked_out" && !b.actual_check_out) continue;
       const start = b.check_in;
       const end = b.actual_check_out ?? b.check_out ?? null;
       const lo = start > mStart ? start : mStart;
-      const hi = end === null ? mEnd : end < mEnd ? end : mEnd;
-      const nights = daysBetween(lo, hi);
-      if (nights > 0) occupiedNights += nights;
+      const boundedEnd = end === null ? mEnd : end < mEnd ? end : mEnd;
+      const hi = isActual && boundedEnd > today ? today : boundedEnd;
+      for (
+        let day = lo;
+        day < hi;
+        day = new Date(Date.parse(`${day}T00:00:00Z`) + 86400000).toISOString().slice(0, 10)
+      ) {
+        (isActual ? occupied : reserved).add(`${b.unit_id}:${day}`);
+      }
     }
 
-    const sellableNights = dailyRoomCount * daysInMonth;
     return {
       month,
-      occupiedNights,
-      sellableNights,
-      rate: sellableNights > 0 ? occupiedNights / sellableNights : 0,
+      occupiedNights: occupied.size,
+      reservedNights: reserved.size,
+      sellableNights: null,
+      rate: null,
     };
   });
 }
@@ -230,8 +245,8 @@ export function aggregateOutstandingByBuilding(
   for (const r of receivables) {
     const outstanding = receivableOutstanding(r);
     if (outstanding <= 0) continue;
-    const bid = r.building_id ?? (r.unit_id ? unitBuilding.get(r.unit_id) ?? null : null);
-    const name = bid ? buildingName.get(bid) ?? bid : "未分楼栋";
+    const bid = r.building_id ?? (r.unit_id ? (unitBuilding.get(r.unit_id) ?? null) : null);
+    const name = bid ? (buildingName.get(bid) ?? bid) : "未分楼栋";
     map.set(name, (map.get(name) ?? 0) + outstanding);
   }
 

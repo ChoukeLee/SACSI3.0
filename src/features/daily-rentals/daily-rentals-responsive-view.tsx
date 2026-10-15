@@ -6,27 +6,37 @@ import type { Locale } from "@/lib/i18n";
 import type { CustomerRow, DailyBookingRow, PaymentRow, UnitRow } from "@/types/database";
 import type { CustomerSummary } from "./calendar";
 import { SegmentedControl } from "@/components/ui/operational";
+import type { CalendarFinanceSnapshot } from "./calendar-finance-model";
 
 const DailyCalendar = dynamic(() => import("./calendar").then((module) => module.DailyCalendar));
-const MobileDailyCards = dynamic(() => import("@/features/mobile/mobile-daily-cards").then((module) => module.MobileDailyCards));
+const MobileDailyCards = dynamic(() =>
+  import("@/features/mobile/mobile-daily-cards").then((module) => module.MobileDailyCards),
+);
 
 interface DailyRentalsResponsiveViewProps {
   dailyUnits: UnitRow[];
   unitLookupUnits?: UnitRow[];
   bookings: DailyBookingRow[];
   customers: CustomerSummary[];
-  cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[];
+  cleaningTasks: {
+    id: string;
+    unit_id: string;
+    daily_booking_id: string | null;
+    is_completed: boolean;
+  }[];
   payments: {
     id: string;
     source_id: string;
     amount: number;
     payment_date: string;
     reversal_of_payment_id: string | null;
+    unit_id?: string | null;
   }[];
   locale: Locale;
   userRole?: string;
   buildings: { id: string; code: string; display_name: string }[];
   initialIsDesktop: boolean;
+  financeSnapshots?: Record<string, CalendarFinanceSnapshot>;
 }
 
 export function DailyRentalsResponsiveView({
@@ -40,6 +50,7 @@ export function DailyRentalsResponsiveView({
   userRole,
   buildings,
   initialIsDesktop,
+  financeSnapshots,
 }: DailyRentalsResponsiveViewProps) {
   const [isDesktop, setIsDesktop] = useState(initialIsDesktop);
   const [selectedBuildingId, setSelectedBuildingId] = useState(
@@ -60,7 +71,8 @@ export function DailyRentalsResponsiveView({
     }
   }, [buildings, selectedBuildingId]);
 
-  const selectedBuilding = buildings.find((building) => building.id === selectedBuildingId) ?? buildings[0];
+  const selectedBuilding =
+    buildings.find((building) => building.id === selectedBuildingId) ?? buildings[0];
   const scopedDailyUnits = useMemo(
     () => dailyUnits.filter((unit) => unit.building_id === selectedBuildingId),
     [dailyUnits, selectedBuildingId],
@@ -69,15 +81,26 @@ export function DailyRentalsResponsiveView({
     () => (unitLookupUnits ?? dailyUnits).filter((unit) => unit.building_id === selectedBuildingId),
     [dailyUnits, selectedBuildingId, unitLookupUnits],
   );
-  const scopedUnitIds = useMemo(() => new Set(scopedLookupUnits.map((unit) => unit.id)), [scopedLookupUnits]);
+  const scopedUnitIds = useMemo(
+    () => new Set(scopedLookupUnits.map((unit) => unit.id)),
+    [scopedLookupUnits],
+  );
   const scopedBookings = useMemo(
     () => bookings.filter((booking) => scopedUnitIds.has(booking.unit_id)),
     [bookings, scopedUnitIds],
   );
-  const scopedBookingIds = useMemo(() => new Set(scopedBookings.map((booking) => booking.id)), [scopedBookings]);
+  const scopedBookingIds = useMemo(
+    () => new Set(scopedBookings.map((booking) => booking.id)),
+    [scopedBookings],
+  );
   const scopedPayments = useMemo(
-    () => payments.filter((payment) => scopedBookingIds.has(payment.source_id)),
-    [payments, scopedBookingIds],
+    () =>
+      payments.filter(
+        (payment) =>
+          scopedBookingIds.has(payment.source_id) ||
+          (payment.unit_id && scopedUnitIds.has(payment.unit_id)),
+      ),
+    [payments, scopedBookingIds, scopedUnitIds],
   );
   const scopedCleaningTasks = useMemo(
     () => cleaningTasks.filter((task) => scopedUnitIds.has(task.unit_id)),
@@ -85,14 +108,14 @@ export function DailyRentalsResponsiveView({
   );
 
   const content = !isDesktop ? (
-      <MobileDailyCards
-        dailyUnits={scopedDailyUnits}
-        bookings={scopedBookings}
-        customers={customers as unknown as CustomerRow[]}
-        payments={scopedPayments as unknown as PaymentRow[]}
-        cleaningTasks={scopedCleaningTasks}
-        locale={locale}
-      />
+    <MobileDailyCards
+      dailyUnits={scopedDailyUnits}
+      bookings={scopedBookings}
+      customers={customers as unknown as CustomerRow[]}
+      payments={scopedPayments as unknown as PaymentRow[]}
+      cleaningTasks={scopedCleaningTasks}
+      locale={locale}
+    />
   ) : (
     <DailyCalendar
       dailyUnits={scopedDailyUnits}
@@ -104,6 +127,7 @@ export function DailyRentalsResponsiveView({
       locale={locale}
       userRole={userRole}
       buildingLabel={selectedBuilding?.display_name}
+      financeSnapshot={financeSnapshots?.[selectedBuildingId]}
     />
   );
 

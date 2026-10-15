@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { addLedgerEntry } from "./actions";
 import { runFinanceRequest } from "./finance-request";
+import { directionDisplayLabel } from "@/lib/display-labels";
 
 export function ManualEntryForm({
   buildings,
@@ -106,7 +107,9 @@ export function ManualEntryForm({
           {zh ? "方向" : "Direction"}
           <select name="direction" className={`${input} w-full`} disabled={busy}>
             {["income", "expense", "liability_in", "liability_out"].map((v) => (
-              <option key={v}>{v}</option>
+              <option key={v} value={v}>
+                {directionDisplayLabel(v, zh ? "zh" : "fr")}
+              </option>
             ))}
           </select>
         </label>

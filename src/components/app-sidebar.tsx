@@ -3,8 +3,26 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Building2, CalendarDays, FileSignature, LayoutDashboard } from "lucide-react";
-import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import {
+  Building2,
+  CalendarDays,
+  FileSignature,
+  LayoutDashboard,
+  WalletCards,
+  UsersRound,
+  ChartNoAxesCombined,
+} from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { getDesktopNavLabels } from "@/lib/nav-labels";
@@ -15,19 +33,50 @@ import { navigationGroupsForRole } from "@/lib/navigation-access";
 import { useSidebar } from "@/components/ui/sidebar";
 import { Logo } from "@/components/logo";
 
-type NavKey = "management" | "units" | "dailyRentals" | "leases" | "sales";
+type NavKey =
+  | "management"
+  | "units"
+  | "dailyRentals"
+  | "leases"
+  | "sales"
+  | "finance"
+  | "customers"
+  | "reports";
 
-interface NavItem { key: NavKey; href: string; icon: typeof LayoutDashboard; activeMatch?: string }
-interface NavGroup { key: string; labelKey: string; items: NavItem[]; roles: UserRole[] }
+interface NavItem {
+  key: NavKey;
+  href: string;
+  icon: typeof LayoutDashboard;
+  activeMatch?: string;
+}
+interface NavGroup {
+  key: string;
+  labelKey: string;
+  items: NavItem[];
+  roles: UserRole[];
+}
 
 const groups: NavGroup[] = [
-  { key: "core", labelKey: "core", roles: ["admin", "boss", "finance", "front_desk", "rental_sales"], items: [
-    { key: "management", href: "/management", icon: LayoutDashboard },
-    { key: "dailyRentals", href: "/daily-rentals", icon: CalendarDays, activeMatch: "/daily-rentals" },
-    { key: "leases", href: "/leases", icon: FileSignature },
-    { key: "sales", href: "/sales", icon: Building2 },
-    { key: "units", href: "/units", icon: Building2, activeMatch: "/units" },
-  ]},
+  {
+    key: "core",
+    labelKey: "core",
+    roles: ["admin", "boss", "finance", "front_desk", "rental_sales"],
+    items: [
+      { key: "management", href: "/management", icon: LayoutDashboard },
+      { key: "leases", href: "/leases", icon: FileSignature },
+      { key: "sales", href: "/sales", icon: Building2 },
+      { key: "finance", href: "/finance", icon: WalletCards, activeMatch: "/finance" },
+      { key: "units", href: "/units", icon: Building2, activeMatch: "/units" },
+      {
+        key: "dailyRentals",
+        href: "/daily-rentals",
+        icon: CalendarDays,
+        activeMatch: "/daily-rentals",
+      },
+      { key: "customers", href: "/customers", icon: UsersRound, activeMatch: "/customers" },
+      { key: "reports", href: "/reports", icon: ChartNoAxesCombined },
+    ],
+  },
 ];
 
 export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: UserRole }) {
@@ -41,7 +90,9 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
   const activeHref = pendingHref ?? pathname;
 
   const isActive = (item: NavItem) => {
-    const target = item.activeMatch ? routeFor(locale, item.activeMatch) : routeFor(locale, item.href);
+    const target = item.activeMatch
+      ? routeFor(locale, item.activeMatch)
+      : routeFor(locale, item.href);
     return activeHref === target || (item.activeMatch ? activeHref.startsWith(target) : false);
   };
 
@@ -59,19 +110,21 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
             <Logo variant="icon" size={32} />
           </button>
         ) : (
-        <div className="absolute top-0 left-4 flex items-center gap-3 h-full">
-          <span className="relative h-7 w-[108px] shrink-0">
-            <Image
-              src="/logo.png"
-              alt="SACSI"
-              fill
-              sizes="108px"
-              className="object-contain"
-              priority
-            />
-          </span>
-          <span className="translate-y-[1px] text-[17px] font-semibold italic leading-none text-sidebar-foreground whitespace-nowrap">{labels.brand}</span>
-        </div>
+          <div className="absolute top-0 left-4 flex items-center gap-3 h-full">
+            <span className="relative h-7 w-[108px] shrink-0">
+              <Image
+                src="/logo.png"
+                alt="SACSI"
+                fill
+                sizes="108px"
+                className="object-contain"
+                priority
+              />
+            </span>
+            <span className="translate-y-[1px] text-[17px] font-semibold italic leading-none text-sidebar-foreground whitespace-nowrap">
+              {labels.brand}
+            </span>
+          </div>
         )}
       </SidebarHeader>
       <SidebarContent>
@@ -81,12 +134,18 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
               {labels.groups[group.key]}
             </SidebarGroupLabel>
             <SidebarMenu>
-              {group.items.map(item => {
+              {group.items.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item);
                 return (
                   <SidebarMenuItem key={item.key}>
-                    <SidebarMenuButton asChild isActive={active} tooltip={labels.nav[item.key]} size="default">
+                    <SidebarMenuButton
+                      asChild
+                      isActive={active}
+                      tooltip={labels.nav[item.key]}
+                      size="default"
+                      className="data-[active=true]:bg-blue-50 data-[active=true]:text-blue-700 data-[active=true]:shadow-none dark:data-[active=true]:bg-blue-950/40 dark:data-[active=true]:text-blue-200"
+                    >
                       <Link
                         href={routeFor(locale, item.href)}
                         onClick={() => {

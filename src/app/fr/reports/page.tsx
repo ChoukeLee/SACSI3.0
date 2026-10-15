@@ -16,7 +16,10 @@ export default async function ReportsPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Rapports" description="Revenus/dépenses mensuels, rentabilité par bâtiment" />
+      <PageHeader
+        title="Rapports d'exploitation"
+        description="Flux mensuels, flux par bâtiment et créances confirmées ; hors bénéfice comptable"
+      />
       <Suspense fallback={<OperationalPageSkeleton kind="table" rows={8} />}>
         <ReportsData locale="fr" />
       </Suspense>
@@ -26,5 +29,5 @@ export default async function ReportsPage() {
 
 async function ReportsData({ locale }: { locale: "zh" | "fr" }) {
   const data = await loadReportData();
-  return <ReportsView entries={data.entries} buildings={data.buildings} units={data.units} dailyBookings={data.dailyBookings} dailyPayments={data.dailyPayments} dailyUnitIds={data.dailyUnitIds} receivables={data.receivables} customers={data.customers} locale={locale} />;
+  return <ReportsView {...data} locale={locale} />;
 }

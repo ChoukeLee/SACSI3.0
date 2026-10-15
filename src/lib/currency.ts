@@ -1,6 +1,7 @@
 import type { CurrencyCode } from "@/types/domain";
 import type { PaymentRow } from "@/types/database";
 import { formatXof } from "@/lib/utils";
+import { historicalXofAmount } from "@/lib/financial-amount";
 
 export function convertToXof(amount: number, currency: CurrencyCode, rate: number): number {
   if (currency === "XOF") return amount;
@@ -16,7 +17,7 @@ const CURRENCY_SYMBOL: Record<string, string> = { CNY: "¥", USD: "$", EUR: "€
 
 /**
  * 按原币格式化金额。
- * XOF/FCFA 用 formatXof（万 FCFA）；CNY/USD/EUR 用货币符号；其它用代码后缀。
+ * XOF/FCFA 展示完整 XOF；原币保留最多两位小数。
  */
 export function formatMoney(
   amount: number,
@@ -24,8 +25,10 @@ export function formatMoney(
   locale: "zh" | "fr" = "zh",
 ): string {
   const code = String(currency ?? "XOF").toUpperCase();
-  if (code === "XOF" || code === "FCFA") return formatXof(amount);
-  const n = new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "fr-FR", { maximumFractionDigits: 2 }).format(Number(amount));
+  if (code === "XOF" || code === "FCFA") return formatXof(amount, locale);
+  const n = new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "fr-FR", {
+    maximumFractionDigits: 2,
+  }).format(Number(amount));
   const symbol = CURRENCY_SYMBOL[code];
   return symbol ? symbol + n : n + " " + code;
 }
@@ -39,9 +42,20 @@ export function paymentDisplay(
   locale: "zh" | "fr" = "zh",
 ): { primary: string; secondary: string | null } {
   const code = String(payment.currency ?? "XOF").toUpperCase();
-  const xof = Number(payment.amount) * (Number(payment.exchange_rate_to_xof) || 1);
+  const xof = historicalXofAmount(
+    Math.abs(Number(payment.amount)),
+    Number(payment.exchange_rate_to_xof),
+  );
   if (code === "XOF" || code === "FCFA") {
-    return { primary: formatXof(Number(payment.amount)), secondary: null };
+    return { primary: formatXof(Number(payment.amount), locale), secondary: null };
   }
-  return { primary: formatMoney(Number(payment.amount), code, locale), secondary: formatXof(xof) };
+  return {
+    primary: formatMoney(Number(payment.amount), code, locale),
+    secondary:
+      xof === null
+        ? locale === "zh"
+          ? "历史汇率未核验"
+          : "Taux historique non vérifié"
+        : formatXof(Number(payment.amount) < 0 ? -xof : xof, locale),
+  };
 }

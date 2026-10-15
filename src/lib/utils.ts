@@ -1,19 +1,13 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { formatXofExact } from "./financial-amount";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatXof(amount: number | string | null | undefined) {
-  const value = Number(amount ?? 0);
-  const safeValue = Number.isFinite(value) ? value : 0;
-  const valueInTenThousands = safeValue / 10000;
-
-  return `${new Intl.NumberFormat("zh-CN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(valueInTenThousands)}万 FCFA`;
+export function formatXof(amount: number | string | null | undefined, locale: "zh" | "fr" = "zh") {
+  return formatXofExact(amount, locale);
 }
 
 function firstNumber(value: string | null | undefined): number | null {
@@ -38,21 +32,31 @@ export function compareUnitNo(a: string | null | undefined, b: string | null | u
   return aText.localeCompare(bText, undefined, { numeric: true, sensitivity: "base" });
 }
 
-export function compareUnits<T extends { unit_no: string | null; floor_label?: string | null }>(a: T, b: T) {
+export function compareUnits<T extends { unit_no: string | null; floor_label?: string | null }>(
+  a: T,
+  b: T,
+) {
   const roomOrder = compareUnitNo(a.unit_no, b.unit_no);
   if (roomOrder !== 0) return roomOrder;
 
   const aFloor = firstNumber(a.floor_label);
   const bFloor = firstNumber(b.floor_label);
   if (aFloor !== null && bFloor !== null && aFloor !== bFloor) return aFloor - bFloor;
-  return String(a.floor_label ?? "").localeCompare(String(b.floor_label ?? ""), undefined, { numeric: true, sensitivity: "base" });
+  return String(a.floor_label ?? "").localeCompare(String(b.floor_label ?? ""), undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
 }
 
-export function sortUnits<T extends { unit_no: string | null; floor_label?: string | null }>(units: T[]): T[] {
+export function sortUnits<T extends { unit_no: string | null; floor_label?: string | null }>(
+  units: T[],
+): T[] {
   return [...units].sort(compareUnits);
 }
 
-export function sortUnitsForBuilding<T extends { unit_no: string | null; floor_label?: string | null }>(units: T[], buildingCode?: string | null): T[] {
+export function sortUnitsForBuilding<
+  T extends { unit_no: string | null; floor_label?: string | null },
+>(units: T[], buildingCode?: string | null): T[] {
   if (buildingCode !== "SACSI3") return sortUnits(units);
 
   return [...units].sort((a, b) => {
@@ -89,5 +93,8 @@ export function floorSortValue(label: string): number {
 export function compareFloorLabels(a: string | null | undefined, b: string | null | undefined) {
   const diff = floorSortValue(String(a ?? "")) - floorSortValue(String(b ?? ""));
   if (diff !== 0) return diff;
-  return String(a ?? "").localeCompare(String(b ?? ""), undefined, { numeric: true, sensitivity: "base" });
+  return String(a ?? "").localeCompare(String(b ?? ""), undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
 }
