@@ -42,7 +42,7 @@ export function matchesContractSearch(row: ContractTableRow, query: string): boo
 
 export function sortContractRows(rows: ContractTableRow[], sort: ContractSort): ContractTableRow[] {
   const compareText = (left: string, right: string) =>
-    left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+    left.localeCompare(right, "zh", { numeric: true, sensitivity: "base" });
   return [...rows].sort((left, right) => {
     let order = 0;
     if (sort.key === "amount" || sort.key === "balance") {

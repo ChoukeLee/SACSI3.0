@@ -6,7 +6,8 @@ export interface CalendarFinanceSnapshot {
   month: string;
   today: string;
   cash: ReceiptSummary | null;
-  includedPaymentIds: string[];
+  /** Legacy shape only; cash details are fetched separately with their classifier evidence. */
+  includedPaymentIds?: string[];
   currentOutstanding: number;
   monthSettled: number;
 }

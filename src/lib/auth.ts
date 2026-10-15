@@ -1,6 +1,7 @@
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { createRequestTiming } from "@/lib/performance";
 
 export type UserRole = "admin" | "boss" | "finance" | "front_desk" | "rental_sales";
 export type AppLocale = "zh" | "fr";
@@ -50,14 +51,27 @@ export function homePathForRole(role: UserRole, locale: AppLocale = "zh") {
 
 const rolePermissions: Record<UserRole, string[]> = {
   admin: [
-    "units:read", "units:write", "units:delete",
-    "customers:read", "customers:write", "customers:delete",
-    "daily_rentals:read", "daily_rentals:write", "daily_rentals:delete",
-    "leases:read", "leases:write", "leases:delete",
-    "sales:read", "sales:write", "sales:delete",
-    "finance:read", "finance:write", "finance:export",
+    "units:read",
+    "units:write",
+    "units:delete",
+    "customers:read",
+    "customers:write",
+    "customers:delete",
+    "daily_rentals:read",
+    "daily_rentals:write",
+    "daily_rentals:delete",
+    "leases:read",
+    "leases:write",
+    "leases:delete",
+    "sales:read",
+    "sales:write",
+    "sales:delete",
+    "finance:read",
+    "finance:write",
+    "finance:export",
     "audit_logs:read",
-    "settings:read", "settings:write",
+    "settings:read",
+    "settings:write",
     "users:manage",
   ],
   boss: [
@@ -66,44 +80,60 @@ const rolePermissions: Record<UserRole, string[]> = {
     "daily_rentals:read",
     "leases:read",
     "sales:read",
-    "finance:read", "finance:export",
+    "finance:read",
+    "finance:export",
     "audit_logs:read",
   ],
   finance: [
     "units:read",
-    "customers:read", "customers:write",
+    "customers:read",
+    "customers:write",
     "daily_rentals:read",
     "leases:read",
     "sales:read",
-    "finance:read", "finance:write", "finance:export",
+    "finance:read",
+    "finance:write",
+    "finance:export",
   ],
   front_desk: [
     "units:read",
     "customers:read",
-    "daily_rentals:read", "daily_rentals:write",
+    "daily_rentals:read",
+    "daily_rentals:write",
     "leases:read",
   ],
   rental_sales: [
     "units:read",
-    "customers:read", "customers:write",
-    "daily_rentals:read", "daily_rentals:write",
-    "leases:read", "leases:write",
-    "sales:read", "sales:write",
+    "customers:read",
+    "customers:write",
+    "daily_rentals:read",
+    "daily_rentals:write",
+    "leases:read",
+    "leases:write",
+    "sales:read",
+    "sales:write",
   ],
 };
 
 // ── Auth helpers ──
 
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
-  const supabase = await createClient();
+  const timing = createRequestTiming();
+  try {
+    const supabase = await timing.measure("auth_client", createClient);
 
-  // Server-side authorization must use a user verified by Supabase Auth.
-  // getSession() only reads the cookie payload and must not be trusted for
-  // permission decisions.
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) return null;
+    // This live Auth check remains authoritative after middleware's JWT prefilter.
+    // Never replace it with cookies/getSession/claims or request-supplied identity.
+    const {
+      data: { user },
+      error: userError,
+    } = await timing.measure("auth_user", () => supabase.auth.getUser());
+    if (userError || !user) return null;
 
-  return resolveVerifiedSupabaseUser(supabase, user);
+    return await timing.measure("auth_profile", () => resolveVerifiedSupabaseUser(supabase, user));
+  } finally {
+    timing.log("ssr_auth");
+  }
 });
 
 export function hasPermission(user: CurrentUser | null, permission: string): boolean {

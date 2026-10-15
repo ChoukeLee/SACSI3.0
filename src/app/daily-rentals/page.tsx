@@ -22,7 +22,7 @@ export default async function DailyRentalsPage() {
     <div data-daily-rentals-page>
       <DailyReceiptsNav locale="zh" active="calendar" userRole={user.role} />
       <Suspense fallback={<CalendarSkeleton locale="zh" />}>
-        <DailyRentalData userRole={user.role} locale="zh" />
+        <DailyRentalData userRole={user.role} viewerId={user.id} locale="zh" />
       </Suspense>
     </div>
   );

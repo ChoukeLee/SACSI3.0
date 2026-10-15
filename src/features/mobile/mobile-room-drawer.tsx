@@ -2,10 +2,20 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { notifyDailyDataChanged } from "@/features/daily-rentals/daily-read-invalidation";
 import { useRouter } from "next/navigation";
 import {
-  X, Phone, Copy, Check, ChevronRight, CreditCard,
-  Wrench, Lock, Unlock, CalendarPlus, DoorOpen,
+  X,
+  Phone,
+  Copy,
+  Check,
+  ChevronRight,
+  CreditCard,
+  Wrench,
+  Lock,
+  Unlock,
+  CalendarPlus,
+  DoorOpen,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
@@ -16,9 +26,17 @@ import { DateInput } from "@/components/ui/date-input";
 import { ConfirmDialog } from "./confirm-dialog";
 import type { RoomState } from "./room-state";
 import type { UnitStatus } from "@/types/domain";
-import { checkOut, recordSupplementaryPayment, completeCleaning, extendStay } from "@/features/daily-rentals/actions";
+import {
+  checkOut,
+  recordSupplementaryPayment,
+  completeCleaning,
+  extendStay,
+} from "@/features/daily-rentals/actions";
 import { updateUnitStatus } from "@/features/units/actions";
-import { type BackgroundOperationReporter, useOptimisticOperation } from "@/hooks/use-optimistic-operation";
+import {
+  type BackgroundOperationReporter,
+  useOptimisticOperation,
+} from "@/hooks/use-optimistic-operation";
 
 function displayStatusToUnitStatus(s: RoomState["displayStatus"]): UnitStatus {
   switch (s) {
@@ -36,7 +54,7 @@ function displayStatusToUnitStatus(s: RoomState["displayStatus"]): UnitStatus {
   }
 }
 
-type MobileActionLabels = typeof dictionaries[keyof typeof dictionaries]["mobile"]["actions"];
+type MobileActionLabels = (typeof dictionaries)[keyof typeof dictionaries]["mobile"]["actions"];
 
 function drawerActionLabel(action: Exclude<DrawerAction, null>, labels: MobileActionLabels) {
   switch (action.type) {
@@ -62,7 +80,11 @@ interface MobileRoomDrawerProps {
   open: boolean;
   onClose: () => void;
   locale: Locale;
-  onCleaningCompleted?: (result: { taskId: string; unitId: string; unitStatus: UnitStatus }) => void;
+  onCleaningCompleted?: (result: {
+    taskId: string;
+    unitId: string;
+    unitStatus: UnitStatus;
+  }) => void;
   onBackgroundOperation?: BackgroundOperationReporter;
 }
 
@@ -76,7 +98,14 @@ type DrawerAction =
   | { type: "extendStay" }
   | null;
 
-export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningCompleted, onBackgroundOperation }: MobileRoomDrawerProps) {
+export function MobileRoomDrawer({
+  room,
+  open,
+  onClose,
+  locale,
+  onCleaningCompleted,
+  onBackgroundOperation,
+}: MobileRoomDrawerProps) {
   const t = dictionaries[locale].mobile;
   const router = useRouter();
   const [action, setAction] = useState<DrawerAction>(null);
@@ -88,8 +117,15 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const { pendingLabel, runOptimisticOperation } = useOptimisticOperation({
     setBusy: setLoading,
-    onRefresh: () => router.refresh(),
-    reportBackgroundOperation: onBackgroundOperation,
+    onRefresh: () => {
+      notifyDailyDataChanged(room?.unit.building_id);
+      router.refresh();
+    },
+    onError: () => notifyDailyDataChanged(room?.unit.building_id),
+    reportBackgroundOperation: (label, state) => {
+      if (state === "failed") notifyDailyDataChanged(room?.unit.building_id);
+      onBackgroundOperation?.(label, state);
+    },
   });
 
   const resetState = useCallback(() => {
@@ -121,7 +157,8 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
   if (!open || !room || !portalTarget) return null;
 
   const unitStatus = displayStatusToUnitStatus(room.displayStatus);
-  const isOccupied = room.displayStatus === "occupied" || room.displayStatus === "checking_out_today";
+  const isOccupied =
+    room.displayStatus === "occupied" || room.displayStatus === "checking_out_today";
   const isCleaning = room.displayStatus === "cleaning";
   const isAvailable = room.displayStatus === "available";
 
@@ -152,43 +189,64 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
     const amount = paymentAmount;
     const checkoutDate = extendDate;
     const label = drawerActionLabel(currentAction, actionLabels);
-    await runOptimisticOperation(label, async () => {
-      if (currentAction.type === "checkout" && currentRoom.booking) {
-        await checkOut(currentRoom.booking.id, {});
-      } else if (currentAction.type === "payment" && currentRoom.booking && amount) {
-        const amt = Math.round(Number(amount));
-        if (amt <= 0) return { success: false, error: locale === "zh" ? "金额无效" : "Montant invalide" };
-        await recordSupplementaryPayment({
-          bookingId: currentRoom.booking.id,
-          amount: amt,
-          requestId: crypto.randomUUID(),
-        });
-      } else if (currentAction.type === "cleaning" && currentRoom.cleaningTask) {
-        const result = await completeCleaning(currentRoom.cleaningTask.id);
-        if (result.success && result.taskId && result.unitId && result.unitStatus) {
-          onCleaningCompleted?.({ taskId: result.taskId, unitId: result.unitId, unitStatus: result.unitStatus });
+    await runOptimisticOperation(
+      label,
+      async () => {
+        if (currentAction.type === "checkout" && currentRoom.booking) {
+          await checkOut(currentRoom.booking.id, {});
+        } else if (currentAction.type === "payment" && currentRoom.booking && amount) {
+          const amt = Math.round(Number(amount));
+          if (amt <= 0)
+            return { success: false, error: locale === "zh" ? "金额无效" : "Montant invalide" };
+          await recordSupplementaryPayment({
+            bookingId: currentRoom.booking.id,
+            amount: amt,
+            requestId: crypto.randomUUID(),
+          });
+        } else if (currentAction.type === "cleaning" && currentRoom.cleaningTask) {
+          const result = await completeCleaning(currentRoom.cleaningTask.id);
+          if (result.success && result.taskId && result.unitId && result.unitStatus) {
+            onCleaningCompleted?.({
+              taskId: result.taskId,
+              unitId: result.unitId,
+              unitStatus: result.unitStatus,
+            });
+          }
+        } else if (currentAction.type === "maintenance") {
+          return updateUnitStatus(currentRoom.unit.id, "maintenance", currentRoom.unit.updated_at);
+        } else if (currentAction.type === "lock") {
+          return updateUnitStatus(currentRoom.unit.id, "locked", currentRoom.unit.updated_at);
+        } else if (currentAction.type === "markAvailable") {
+          return updateUnitStatus(currentRoom.unit.id, "available", currentRoom.unit.updated_at);
+        } else if (currentAction.type === "extendStay" && currentRoom.booking && checkoutDate) {
+          const currentCheckOut =
+            currentRoom.booking.check_out ?? new Date().toISOString().slice(0, 10);
+          const newDate = new Date(checkoutDate);
+          const oldDate = new Date(currentCheckOut);
+          const extraNights = Math.max(
+            1,
+            Math.ceil((newDate.getTime() - oldDate.getTime()) / (1000 * 60 * 60 * 24)),
+          );
+          const extraAmount = Math.round(
+            extraNights * Number(currentRoom.booking.nightly_price_xof),
+          );
+          await extendStay(
+            currentRoom.booking.id,
+            checkoutDate,
+            extraNights,
+            extraAmount,
+            crypto.randomUUID(),
+          );
         }
-      } else if (currentAction.type === "maintenance") {
-        return updateUnitStatus(currentRoom.unit.id, "maintenance", currentRoom.unit.updated_at);
-      } else if (currentAction.type === "lock") {
-        return updateUnitStatus(currentRoom.unit.id, "locked", currentRoom.unit.updated_at);
-      } else if (currentAction.type === "markAvailable") {
-        return updateUnitStatus(currentRoom.unit.id, "available", currentRoom.unit.updated_at);
-      } else if (currentAction.type === "extendStay" && currentRoom.booking && checkoutDate) {
-        const currentCheckOut = currentRoom.booking.check_out ?? new Date().toISOString().slice(0, 10);
-        const newDate = new Date(checkoutDate);
-        const oldDate = new Date(currentCheckOut);
-        const extraNights = Math.max(1, Math.ceil((newDate.getTime() - oldDate.getTime()) / (1000 * 60 * 60 * 24)));
-        const extraAmount = Math.round(extraNights * Number(currentRoom.booking.nightly_price_xof));
-        await extendStay(currentRoom.booking.id, checkoutDate, extraNights, extraAmount, crypto.randomUUID());
-      }
-    }, {
-      background: true,
-      release: () => {
-        resetState();
-        onClose();
       },
-    });
+      {
+        background: true,
+        release: () => {
+          resetState();
+          onClose();
+        },
+      },
+    );
   };
 
   const actionLabels = t.actions;
@@ -233,9 +291,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
             {room.customer && (
               <div className="rounded-xl border border-border bg-muted/50 p-3.5 space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    {t.drawer.guest}
-                  </p>
+                  <p className="text-xs font-medium text-muted-foreground">{t.drawer.guest}</p>
                 </div>
                 <p className="text-sm font-semibold text-foreground">{room.customer.name}</p>
                 {room.customer.phone && (
@@ -268,7 +324,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
                     <p className="font-medium text-foreground">
                       {room.booking.checkout_mode === "open"
                         ? t.drawer.openEnded
-                        : room.booking.check_out ?? t.drawer.openEnded}
+                        : (room.booking.check_out ?? t.drawer.openEnded)}
                     </p>
                   </div>
                 </div>
@@ -280,7 +336,9 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
                     </div>
                     <div className="flex items-center justify-between text-xs mb-1.5">
                       <span className="text-muted-foreground/60">{t.drawer.paid}</span>
-                      <span className="font-semibold text-accentGreen-600">{formatXof(room.totalPaid)}</span>
+                      <span className="font-semibold text-accentGreen-600">
+                        {formatXof(room.totalPaid)}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between text-xs mb-1.5">
                       <span className="text-muted-foreground/60">{t.drawer.total}</span>
@@ -303,9 +361,7 @@ export function MobileRoomDrawer({ room, open, onClose, locale, onCleaningComple
 
             {/* Notes */}
             <div className="rounded-xl border border-border bg-card p-3.5 shadow-xs">
-              <p className="mb-1 text-xs font-medium text-muted-foreground">
-                {t.drawer.notes}
-              </p>
+              <p className="mb-1 text-xs font-medium text-muted-foreground">{t.drawer.notes}</p>
               <p className="text-xs text-foreground/70">
                 {room.unit.notes || room.booking?.notes || t.drawer.noNotes}
               </p>

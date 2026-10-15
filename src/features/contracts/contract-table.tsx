@@ -103,6 +103,7 @@ export function ContractTable({
   onOpen,
   onFinance,
   onPrint,
+  pagination,
 }: {
   rows: ContractTableRow[];
   locale: Locale;
@@ -111,15 +112,31 @@ export function ContractTable({
   onOpen: (id: string) => void;
   onFinance: (id: string) => void;
   onPrint: (id: string) => void;
+  pagination?: {
+    page: number;
+    total: number;
+    pageSize: number;
+    sort: ContractSort;
+    onPageChange: (page: number) => void;
+    onSortChange: (key: ContractSortKey, direction: "asc" | "desc") => void;
+  };
 }) {
   const zh = locale === "zh";
   const formatXof = (amount: number) => formatContractXof(amount, locale);
-  const [sort, setSort] = useState<ContractSort>({ key: "unit", direction: "asc" });
+  const [localSort, setSort] = useState<ContractSort>({ key: "unit", direction: "asc" });
+  const sort = pagination?.sort ?? localSort;
   const [requestedPage, setRequestedPage] = useState(1);
-  const ordered = useMemo(() => sortContractRows(rows, sort), [rows, sort]);
-  const pages = Math.max(1, Math.ceil(ordered.length / PAGE_SIZE));
-  const page = Math.min(requestedPage, pages);
-  const visible = ordered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const ordered = useMemo(
+    () => (pagination ? rows : sortContractRows(rows, sort)),
+    [rows, sort, pagination],
+  );
+  const total = pagination?.total ?? ordered.length;
+  const pageSize = pagination?.pageSize ?? PAGE_SIZE;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const page = pagination?.page ?? Math.min(requestedPage, pages);
+  const visible = pagination ? ordered : ordered.slice((page - 1) * pageSize, page * pageSize);
+  const changePage = (value: number) =>
+    pagination ? pagination.onPageChange(value) : setRequestedPage(value);
   const columns: { key: ContractSortKey; label: string; numeric?: boolean }[] = [
     { key: "unit", label: zh ? "房源 / 合同" : "Lot / contrat" },
     { key: "customer", label: zh ? "客户" : "Client" },
@@ -129,6 +146,10 @@ export function ContractTable({
     { key: "status", label: zh ? "状态" : "Statut" },
   ];
   function changeSort(key: ContractSortKey) {
+    if (pagination) {
+      pagination.onSortChange(key, sort.key === key && sort.direction === "asc" ? "desc" : "asc");
+      return;
+    }
     setSort((current) => ({
       key,
       direction: current.key === key && current.direction === "asc" ? "desc" : "asc",
@@ -293,8 +314,8 @@ export function ContractTable({
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-muted-foreground">
         <p aria-live="polite">
-          {ordered.length
-            ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, ordered.length)} / ${ordered.length}`
+          {total
+            ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} / ${total}`
             : "0"}{" "}
           {zh ? "份合同" : "contrats"}
         </p>
@@ -303,7 +324,7 @@ export function ContractTable({
             size="sm"
             variant="outline"
             disabled={page === 1}
-            onClick={() => setRequestedPage(page - 1)}
+            onClick={() => changePage(page - 1)}
           >
             {zh ? "上一页" : "Précédent"}
           </Button>
@@ -313,8 +334,8 @@ export function ContractTable({
           <Button
             size="sm"
             variant="outline"
-            disabled={page === pages}
-            onClick={() => setRequestedPage(page + 1)}
+            disabled={page >= pages}
+            onClick={() => changePage(page + 1)}
           >
             {zh ? "下一页" : "Suivant"}
           </Button>

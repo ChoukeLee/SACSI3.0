@@ -141,6 +141,14 @@
     {
       "file": "20261015212832_daily_calendar_window_reads.sql",
       "sha256": "6f6a38ce0f0ef6371889b1f248121223803284135883b6de49c753fa7ec80950"
+    },
+    {
+      "file": "20261015222540_contract_workspace_read_models.sql",
+      "sha256": "c97890bc3495a653249b9630bad2bc8cd44dae6507c0ba4f9667295046d7d99a"
+    },
+    {
+      "file": "20261015222541_daily_calendar_independent_context_reads.sql",
+      "sha256": "3e8643cd2b2cd73f461e0e7919766bb14f4f441120a16d535bf1eff0f0e4a388"
     }
   ],
   "excluded": [

@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { SaleLazyView } from "@/features/sales/sale-lazy-view";
-import { getSalePageData } from "@/features/sales/sale-page-data";
+import { loadSaleWorkspace } from "@/features/sales/sale-workspace-data";
 import { DesktopOnly } from "@/features/mobile";
 import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
 
@@ -38,7 +38,7 @@ async function FrenchSalesData({
   initialProject?: string;
   role: string;
 }) {
-  const data = await getSalePageData();
+  const data = await loadSaleWorkspace("fr", initialProject);
   const canOperateSales = role === "admin" || role === "rental_sales";
   return (
     <SaleLazyView

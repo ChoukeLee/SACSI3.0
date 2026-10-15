@@ -63,8 +63,13 @@ import {
   summarizeContractCash,
 } from "@/features/contracts/contract-cash-model";
 import { resolveContractProjectLink } from "@/features/contracts/project-link";
+import { useContractWorkspace } from "@/features/contracts/use-workspace";
+import type { WorkspaceData } from "@/features/contracts/workspace-model";
+import { workspaceQueryKey } from "@/features/contracts/workspace-model";
+import { useContractPrinter } from "@/features/contracts/use-contract-printer";
 
 interface SaleListProps {
+  workspace?: WorkspaceData;
   initialProject?: string;
   contracts: SaleContractRow[];
   schedules: SalePaymentScheduleRow[];
@@ -121,13 +126,14 @@ function SaleActionBtn({
 }
 
 export function SaleList({
+  workspace: initialWorkspace,
   initialProject,
-  contracts,
-  schedules,
-  units,
-  customers,
-  payments,
-  receivables,
+  contracts: initialContracts,
+  schedules: initialSchedules,
+  units: initialUnits,
+  customers: initialCustomers,
+  payments: initialPayments,
+  receivables: initialReceivables,
   buildings,
   locale,
   canCreate = true,
@@ -136,6 +142,13 @@ export function SaleList({
   canTerminate = true,
 }: SaleListProps) {
   const router = useRouter();
+  const workspace = useContractWorkspace(initialWorkspace);
+  const contracts = (workspace.data?.contracts ?? initialContracts) as SaleContractRow[];
+  const units = workspace.data?.units ?? initialUnits;
+  const customers = workspace.data?.customers ?? initialCustomers;
+  const payments = workspace.data?.payments ?? initialPayments;
+  const receivables = workspace.data?.receivables ?? initialReceivables;
+  const schedules = workspace.data?.schedules ?? initialSchedules;
   const t = dictionaries[locale].sales;
   const formatXof = (amount: number) => formatContractXof(amount, locale);
   const [statFilter, setStatFilter] = useState<SaleStatKey | null>(null);
@@ -143,10 +156,15 @@ export function SaleList({
   const [contractView, setContractView] = useState<"table" | "rooms">("table");
   const [search, setSearch] = useState("");
   const [panel, setPanel] = useState<PanelType>(null);
+  useEffect(() => {
+    if (workspace.enabled && contractView === "table" && panel !== "insight")
+      workspace.closeScope();
+  }, [workspace.enabled, workspace.closeScope, contractView, panel]);
   const [detailSection, setDetailSection] = useState<"overview" | "finance">("overview");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [writeConfirmed, setWriteConfirmed] = useState(false);
   const [fUnitId, setFUnitId] = useState("");
   const [fCustomerId, setFCustomerId] = useState("");
   const [fSignedDate, setFSignedDate] = useState(new Date().toISOString().slice(0, 10));
@@ -187,6 +205,13 @@ export function SaleList({
       ? ""
       : (buildings.find((building) => building.code === "SACSI11")?.id ?? buildings[0]?.id ?? ""),
   );
+  const printer = useContractPrinter(
+    workspace.query
+      ? workspaceQueryKey(workspace.query)
+      : `${requestedProjectId}/${activeBuildingId}`,
+    locale,
+    initialWorkspace,
+  );
   useEffect(() => {
     if (!requestedProjectId) return;
     setActiveBuildingId("");
@@ -194,6 +219,25 @@ export function SaleList({
     setSelectedId(null);
     setFUnitId("");
   }, [requestedProjectId]);
+  useEffect(() => {
+    if (workspace.enabled)
+      workspace.change({
+        projectId: requestedProjectId ?? "",
+        buildingId: activeBuildingId,
+        status: statusFilter,
+        search,
+        locale,
+        page: 1,
+      });
+  }, [
+    workspace.enabled,
+    workspace.change,
+    requestedProjectId,
+    activeBuildingId,
+    statusFilter,
+    search,
+    locale,
+  ]);
 
   const unitBuildingMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -218,68 +262,77 @@ export function SaleList({
   const customerMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
   const contractSummaryMap = useMemo(
     () =>
-      buildContractReceivableSummaries(
-        receivables,
-        "sale_contract",
-        new Date().toISOString().slice(0, 10),
-      ),
-    [receivables],
+      new Map([
+        ...Object.entries(workspace.data?.summaries ?? {}),
+        ...buildContractReceivableSummaries(
+          receivables,
+          "sale_contract",
+          new Date().toISOString().slice(0, 10),
+        ),
+      ]),
+    [receivables, workspace.data?.summaries],
   );
   const tableRows = useMemo<ContractTableRow[]>(
     () =>
-      filteredByBuilding.map((contract) => {
-        const unit = unitMap.get(contract.unit_id);
-        const customer = customerMap.get(contract.customer_id);
-        const summary = contractSummaryMap.get(contract.id) ?? EMPTY_CONTRACT_RECEIVABLE_SUMMARY;
-        const transferLabel =
-          locale === "zh"
-            ? { not_started: "未开始过户", in_progress: "过户办理中", completed: "过户完成" }
-            : {
-                not_started: "Transfert non commencé",
-                in_progress: "Transfert en cours",
-                completed: "Transfert terminé",
-              };
-        return {
-          id: contract.id,
-          contractNo: contract.contract_no,
-          building: buildings.find((row) => row.id === unit?.building_id)?.display_name ?? "—",
-          unit: unit?.unit_no ?? "—",
-          customer: customer?.name ?? (locale === "zh" ? "客户待补" : "Client à compléter"),
-          searchText: customer?.phone ?? "",
-          periodStart: contract.signed_date,
-          periodLabel: contract.signed_date,
-          periodDetail: contract.transfer_date
-            ? `${locale === "zh" ? "过户" : "Transfert"} ${contract.transfer_date}`
-            : undefined,
-          amountXof:
-            Number(contract.total_amount_xof) > 0 ? Number(contract.total_amount_xof) : null,
-          amountDetail:
-            contract.total_amount_confirmed === false
-              ? locale === "zh"
-                ? "合同总额待核实"
-                : "Total à confirmer"
-              : "XOF",
-          balanceXof: summary.count ? summary.outstanding : null,
-          balanceDetail: summary.count
-            ? summary.overdue > 0
-              ? `${locale === "zh" ? "逾期" : "Retard"} ${formatXof(summary.overdue)}`
-              : summary.nextDue
-                ? `${locale === "zh" ? "下次到期" : "Échéance"} ${summary.nextDue}`
-                : locale === "zh"
-                  ? "已建应收已结清"
-                  : "Créances soldées"
-            : locale === "zh"
-              ? "暂无已核应收"
-              : "Aucune créance vérifiée",
-          balanceOverdue: summary.overdue > 0,
-          status: contract.status,
-          statusLabel: t.contractStatus[contract.status as keyof typeof t.contractStatus],
-          secondaryLabel:
-            transferLabel[contract.transfer_status as keyof typeof transferLabel] ??
-            (locale === "zh" ? "过户状态待核实" : "Transfert à vérifier"),
-          needsReview: Boolean(getSaleDataFlags(contract, customer).needsData),
-        };
-      }),
+      filteredByBuilding
+        .filter(
+          (contract) =>
+            !workspace.enabled ||
+            workspace.pageData?.contracts.some((row) => row.id === contract.id),
+        )
+        .map((contract) => {
+          const unit = unitMap.get(contract.unit_id);
+          const customer = customerMap.get(contract.customer_id);
+          const summary = contractSummaryMap.get(contract.id) ?? EMPTY_CONTRACT_RECEIVABLE_SUMMARY;
+          const transferLabel =
+            locale === "zh"
+              ? { not_started: "未开始过户", in_progress: "过户办理中", completed: "过户完成" }
+              : {
+                  not_started: "Transfert non commencé",
+                  in_progress: "Transfert en cours",
+                  completed: "Transfert terminé",
+                };
+          return {
+            id: contract.id,
+            contractNo: contract.contract_no,
+            building: buildings.find((row) => row.id === unit?.building_id)?.display_name ?? "—",
+            unit: unit?.unit_no ?? "—",
+            customer: customer?.name ?? (locale === "zh" ? "客户待补" : "Client à compléter"),
+            searchText: customer?.phone ?? "",
+            periodStart: contract.signed_date,
+            periodLabel: contract.signed_date,
+            periodDetail: contract.transfer_date
+              ? `${locale === "zh" ? "过户" : "Transfert"} ${contract.transfer_date}`
+              : undefined,
+            amountXof:
+              Number(contract.total_amount_xof) > 0 ? Number(contract.total_amount_xof) : null,
+            amountDetail:
+              contract.total_amount_confirmed === false
+                ? locale === "zh"
+                  ? "合同总额待核实"
+                  : "Total à confirmer"
+                : "XOF",
+            balanceXof: summary.count ? summary.outstanding : null,
+            balanceDetail: summary.count
+              ? summary.overdue > 0
+                ? `${locale === "zh" ? "逾期" : "Retard"} ${formatXof(summary.overdue)}`
+                : summary.nextDue
+                  ? `${locale === "zh" ? "下次到期" : "Échéance"} ${summary.nextDue}`
+                  : locale === "zh"
+                    ? "已建应收已结清"
+                    : "Créances soldées"
+              : locale === "zh"
+                ? "暂无已核应收"
+                : "Aucune créance vérifiée",
+            balanceOverdue: summary.overdue > 0,
+            status: contract.status,
+            statusLabel: t.contractStatus[contract.status as keyof typeof t.contractStatus],
+            secondaryLabel:
+              transferLabel[contract.transfer_status as keyof typeof transferLabel] ??
+              (locale === "zh" ? "过户状态待核实" : "Transfert à vérifier"),
+            needsReview: Boolean(getSaleDataFlags(contract, customer).needsData),
+          };
+        }),
     [
       filteredByBuilding,
       unitMap,
@@ -288,16 +341,23 @@ export function SaleList({
       buildings,
       locale,
       t.contractStatus,
+      workspace.enabled,
+      workspace.pageData?.contracts,
     ],
   );
   const searchedTableRows = useMemo(
-    () => tableRows.filter((row) => matchesContractSearch(row, search)),
-    [tableRows, search],
+    () =>
+      workspace.enabled ? tableRows : tableRows.filter((row) => matchesContractSearch(row, search)),
+    [tableRows, search, workspace.enabled],
   );
   const visibleContracts = useMemo(() => {
+    if (workspace.enabled && contractView === "rooms")
+      return filteredByBuilding.filter((row) =>
+        workspace.scopeData?.contracts.some((c) => c.id === row.id),
+      );
     const ids = new Set(searchedTableRows.map((row) => row.id));
     return filteredByBuilding.filter((contract) => ids.has(contract.id));
-  }, [filteredByBuilding, searchedTableRows]);
+  }, [filteredByBuilding, searchedTableRows, workspace.enabled, workspace.scopeData, contractView]);
   const selectedNewUnit = useMemo(() => unitMap.get(fUnitId), [fUnitId, unitMap]);
   const generatedSaleContractNo = useMemo(() => {
     if (!selectedNewUnit || !fSignedDate) return "";
@@ -331,7 +391,12 @@ export function SaleList({
       .sort((a, b) => floorSortValue(a[0]) - floorSortValue(b[0]));
   }, [visibleContracts, unitMap, activeBuildingId, buildings]);
 
-  const selected = selectedId ? contracts.find((c) => c.id === selectedId) : null;
+  const selected =
+    selectedId &&
+    (!workspace.enabled ||
+      (!workspace.unavailable && workspace.detailData?.contracts[0]?.id === selectedId))
+      ? contracts.find((c) => c.id === selectedId)
+      : null;
   const selectedUnit = selected ? units.find((u) => u.id === selected.unit_id) : null;
   const selectedCustomer = selected ? customers.find((c) => c.id === selected.customer_id) : null;
   const selectedBuilding = selectedUnit
@@ -339,6 +404,7 @@ export function SaleList({
     : null;
 
   const dashboardStats = useMemo(() => {
+    if (workspace.enabled && workspace.pageData) return workspace.pageData.stats;
     const buildingContractIds = new Set(filteredByBuilding.map((c) => c.id));
     const active = filteredByBuilding.filter((c) => c.status === "active");
     const today = new Date().toISOString().slice(0, 10);
@@ -365,7 +431,7 @@ export function SaleList({
       unknownAll: filteredByBuilding.length > 0 && metrics.count === 0,
       transferDone: active.filter((c) => c.transfer_status === "completed").length,
     };
-  }, [filteredByBuilding, receivables, contractSummaryMap]);
+  }, [filteredByBuilding, receivables, contractSummaryMap, workspace.enabled, workspace.pageData]);
 
   const saleInsightContracts = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -377,10 +443,12 @@ export function SaleList({
           (r) => r.source_type === "sale_contract" && r.source_id === contract.id,
         );
         const summary = contractSummaryMap.get(contract.id) ?? EMPTY_CONTRACT_RECEIVABLE_SUMMARY;
-        const dueOutstanding = computeFinanceMetrics(related, {
-          scope: "asOf",
-          asOfDate: today,
-        }).outstanding;
+        const dueOutstanding = workspace.enabled
+          ? (workspace.data?.summaries[contract.id]?.dueOutstanding ?? 0)
+          : computeFinanceMetrics(related, {
+              scope: "asOf",
+              asOfDate: today,
+            }).outstanding;
         return {
           contract,
           unit,
@@ -392,7 +460,15 @@ export function SaleList({
       .sort((a, b) =>
         (a.unit?.unit_no ?? "").localeCompare(b.unit?.unit_no ?? "", undefined, { numeric: true }),
       );
-  }, [customerMap, filteredByBuilding, receivables, unitMap, contractSummaryMap]);
+  }, [
+    customerMap,
+    filteredByBuilding,
+    receivables,
+    unitMap,
+    contractSummaryMap,
+    workspace.enabled,
+    workspace.data?.summaries,
+  ]);
 
   const contractSchedules = useMemo(
     () =>
@@ -458,39 +534,78 @@ export function SaleList({
             : "pending";
   };
 
-  const openNew = () => {
+  const openNew = async () => {
+    if (workspace.enabled) {
+      try {
+        await workspace.ensure("context");
+      } catch {
+        return;
+      }
+    }
     setPanel("new");
     setSelectedId(null);
     setError("");
   };
-  const openDetail = (id: string, section: "overview" | "finance" = "overview") => {
+  const openDetail = async (id: string, section: "overview" | "finance" = "overview") => {
+    if (workspace.enabled) {
+      try {
+        await workspace.ensure("detail", id);
+      } catch {
+        return;
+      }
+    }
     setSelectedId(id);
     setDetailSection(section);
     setPanel("detail");
     setError("");
   };
-  const openInsight = (key: SaleStatKey) => {
+  const openInsight = async (key: SaleStatKey) => {
+    if (workspace.enabled) {
+      try {
+        await workspace.ensure("scope", undefined, true);
+      } catch {
+        return;
+      }
+    }
     setStatFilter(key);
     setPanel("insight");
     setSelectedId(null);
     setError("");
   };
 
-  const printContract = (contract: SaleContractRow) => {
-    const unit = unitMap.get(contract.unit_id) ?? null;
-    const customer = customerMap.get(contract.customer_id) ?? null;
-    const summary = contractSummaryMap.get(contract.id);
-    printSaleContract(
-      {
-        contract,
-        unit,
-        customer,
-        paidAmountXof: summary?.paid ?? null,
-        outstandingAmountXof: summary?.outstanding ?? null,
+  const printContract = (contract: SaleContractRow) =>
+    printer.print(
+      async () => {
+        if (workspace.enabled) {
+          const data = await workspace.ensure("detail", contract.id);
+          const fresh = data.contracts[0] as SaleContractRow;
+          return {
+            contract: fresh,
+            unit: data.units.find((row) => row.id === fresh.unit_id) ?? null,
+            customer: data.customers.find((row) => row.id === fresh.customer_id) ?? null,
+            summary: data.summaries[fresh.id],
+          };
+        }
+        return {
+          contract,
+          unit: unitMap.get(contract.unit_id) ?? null,
+          customer: customerMap.get(contract.customer_id) ?? null,
+          summary: contractSummaryMap.get(contract.id),
+        };
       },
-      locale,
+      (source, target) =>
+        printSaleContract(
+          {
+            contract: source.contract,
+            unit: source.unit,
+            customer: source.customer,
+            paidAmountXof: source.summary?.paid ?? null,
+            outstandingAmountXof: source.summary?.outstanding ?? null,
+          },
+          locale,
+          target,
+        ),
     );
-  };
 
   useEffect(() => {
     if (panel !== "detail" || detailSection !== "finance") return;
@@ -501,6 +616,7 @@ export function SaleList({
   }, [detailSection, panel, selectedId]);
 
   const handleCreate = async () => {
+    if (workspace.unavailable) return;
     if (!fUnitId || !fCustomerId || !fSignedDate || fTotalAmount <= 0) {
       setError(locale === "zh" ? "请填写必填字段" : "Champs obligatoires");
       return;
@@ -525,9 +641,11 @@ export function SaleList({
     });
     setSaving(false);
     if (r.success) {
+      setWriteConfirmed(true);
       createRequestIdRef.current = null;
       setPanel(null);
-      router.refresh();
+      if (workspace.enabled) await workspace.refresh();
+      else router.refresh();
     } else {
       setError(r.error ?? "Failed");
     }
@@ -564,15 +682,17 @@ export function SaleList({
     ) => Promise<{ success: boolean; error?: string; rejected?: boolean }>,
     done: () => void,
   ) => {
-    if (financeBusy.current || !selectedId) return;
+    if (financeBusy.current || !selectedId || workspace.unavailable) return;
     financeBusy.current = true;
     setSaving(true);
     setError("");
     try {
       const r = await runFinanceRequest(operation, selectedId, payload, submit);
       if (r.success) {
+        setWriteConfirmed(true);
         done();
-        router.refresh();
+        if (workspace.enabled) await workspace.refresh();
+        else router.refresh();
       } else setError(r.error ?? "操作失败");
     } catch (e) {
       setError(e instanceof Error ? e.message : "结果未知，请核对原操作。");
@@ -641,6 +761,16 @@ export function SaleList({
     );
   };
 
+  const changeView = async (value: "table" | "rooms") => {
+    if (workspace.enabled && value === "rooms") {
+      try {
+        await workspace.ensure("scope");
+      } catch {
+        return;
+      }
+    }
+    setContractView(value);
+  };
   const inputClass =
     "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
   const labelClass = "block text-xs font-semibold text-muted-foreground mb-1";
@@ -760,10 +890,10 @@ export function SaleList({
     <OperationalPage
       eyebrow={locale === "zh" ? "出售业务" : "Ventes"}
       title={locale === "zh" ? "出售合同" : "Contrats de vente"}
-      description={`${filteredByBuilding.length} ${locale === "zh" ? "份合同 · 汇总统一按 FCFA 结算" : "contrats · total en FCFA"}`}
+      description={`${workspace.enabled ? (workspace.unavailable ? "—" : workspace.pageData?.scopeCount) : filteredByBuilding.length} ${locale === "zh" ? "份合同 · 汇总统一按 FCFA 结算" : "contrats · total en FCFA"}`}
       action={
         canCreate ? (
-          <Button size="sm" onClick={openNew}>
+          <Button size="sm" disabled={workspace.unavailable} onClick={openNew}>
             <Plus className="h-4 w-4" />
             {t.form.newContract}
           </Button>
@@ -776,13 +906,17 @@ export function SaleList({
           <StatTile
             key={b.key}
             label={b.label}
-            value={b.value}
+            value={workspace.unavailable ? "—" : b.value}
             caption={
-              panel === "insight" && statFilter === b.key
+              workspace.unavailable
                 ? locale === "zh"
-                  ? "明细已打开"
-                  : "Détail ouvert"
-                : b.hint
+                  ? "读取中或暂不可核验"
+                  : "Lecture en cours ou indisponible"
+                : panel === "insight" && statFilter === b.key
+                  ? locale === "zh"
+                    ? "明细已打开"
+                    : "Détail ouvert"
+                  : b.hint
             }
             tone={
               b.key === "overdue"
@@ -802,7 +936,7 @@ export function SaleList({
       </MetricGrid>
 
       <FilterBar
-        meta={`${visibleContracts.length} / ${filteredByBuilding.length} ${locale === "zh" ? "份合同" : "contrats"}`}
+        meta={`${workspace.enabled ? (workspace.unavailable ? "—" : `${workspace.pageData?.total} / ${workspace.pageData?.scopeCount}`) : `${visibleContracts.length} / ${filteredByBuilding.length}`} ${locale === "zh" ? "份合同" : "contrats"}`}
       >
         {buildings.length > 1 && (
           <SegmentedControl
@@ -835,10 +969,46 @@ export function SaleList({
         query={search}
         onQueryChange={setSearch}
         view={contractView}
-        onViewChange={setContractView}
+        onViewChange={changeView}
       />
-      {contractView === "table" && (
+      {printer.error && (
+        <p role="alert" className="text-sm text-destructive">
+          {printer.error}
+        </p>
+      )}
+      {workspace.enabled && (
+        <p className="text-xs text-muted-foreground">
+          {locale === "zh"
+            ? "汇总范围：当前项目、楼栋及状态全部匹配合同，不随搜索或分页截断。"
+            : "Synthèse : tous les contrats du projet, bâtiment et statut ; indépendante de la recherche et des pages."}
+        </p>
+      )}
+      {workspace.unavailable && (
+        <div role="status" className="rounded-xl border bg-card p-5 text-sm">
+          {workspace.error && writeConfirmed && (
+            <p>
+              {locale === "zh"
+                ? "上一笔操作已确认成功，请勿重复提交。这里只需重试读取最新数据。"
+                : "La dernière opération est confirmée. Ne la soumettez pas de nouveau ; actualisez uniquement les données."}
+            </p>
+          )}
+          {workspace.error
+            ? locale === "zh"
+              ? "合同数据暂不可核验，未展示旧余额或办理动作。"
+              : "Données contractuelles indisponibles ; anciens soldes et actions masqués."
+            : locale === "zh"
+              ? "正在读取合同数据…"
+              : "Lecture des contrats…"}
+          {workspace.error && (
+            <Button variant="outline" size="sm" onClick={workspace.retry}>
+              {locale === "zh" ? "重试" : "Réessayer"}
+            </Button>
+          )}
+        </div>
+      )}
+      {!workspace.unavailable && contractView === "table" && (
         <ContractTable
+          pagination={workspace.pagination}
           rows={searchedTableRows}
           locale={locale}
           amountLabel={locale === "zh" ? "合同总额" : "Total du contrat"}
@@ -853,7 +1023,8 @@ export function SaleList({
       )}
 
       {/* ── Contract matrix (BusinessRoomCard) ── */}
-      {contractView === "rooms" &&
+      {!workspace.unavailable &&
+        contractView === "rooms" &&
         (groupedContracts.length === 0 ? (
           <EmptyState title={t.empty} />
         ) : (
@@ -971,7 +1142,8 @@ export function SaleList({
         ))}
 
       {/* ── KPI insight panel ── */}
-      {panel === "insight" &&
+      {!workspace.unavailable &&
+        panel === "insight" &&
         statFilter &&
         (() => {
           const titleMap: Record<SaleStatKey, string> = {
@@ -1163,7 +1335,7 @@ export function SaleList({
         })()}
 
       {/* ── New Contract Panel ── */}
-      {canCreate && panel === "new" && (
+      {!workspace.unavailable && canCreate && panel === "new" && (
         <SalePanelShell onClose={() => setPanel(null)} title={t.form.newContract}>
           <div className="space-y-4">
             <div>

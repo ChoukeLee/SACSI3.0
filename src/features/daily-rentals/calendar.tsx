@@ -1,5 +1,6 @@
 "use client";
 import { CalendarFinancePanel } from "./calendar-finance-panel";
+import dynamic from "next/dynamic";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
@@ -53,6 +54,10 @@ import {
 } from "./calendar-finance-model";
 
 import type { CustomerSummary } from "./customer-summary";
+import { notifyDailyDataChanged } from "./daily-read-invalidation";
+const CalendarCashDetail = dynamic(() =>
+  import("./calendar-cash-detail").then((module) => module.CalendarCashDetail),
+);
 export type { CustomerSummary } from "./customer-summary";
 
 interface CalendarProps {
@@ -79,6 +84,11 @@ interface CalendarProps {
   userRole?: string;
   buildingLabel?: string;
   financeSnapshot?: CalendarFinanceSnapshot;
+  buildingId?: string;
+  cashPending?: boolean;
+  cashRevision?: number;
+  cashAsOf?: string;
+  onRetryCash?: () => void;
   onVisibleRangeChange?: (from: string, to: string) => void;
   windowPending?: boolean;
   windowError?: boolean;
@@ -107,6 +117,11 @@ export function DailyCalendar({
   userRole,
   buildingLabel,
   financeSnapshot,
+  buildingId,
+  cashPending = false,
+  cashRevision = 0,
+  cashAsOf,
+  onRetryCash,
   onVisibleRangeChange,
   windowPending = false,
   windowError = false,
@@ -472,6 +487,10 @@ export function DailyCalendar({
   const [financeDetail, setFinanceDetail] = useState<
     "collected" | "outstanding" | "settled" | null
   >(null);
+  const onCashPermissionLost = useCallback(() => {
+    setFinanceDetail(null);
+    onRetryCash?.();
+  }, [onRetryCash]);
   useEffect(() => {
     windowUnavailableRef.current = windowUnavailable;
     if (windowUnavailable) {
@@ -482,8 +501,6 @@ export function DailyCalendar({
 
   const financeStats = useMemo(() => {
     const position = dailyBookingFinancePosition(bookings, todayStr);
-    const includedIds = new Set(financeSnapshot?.includedPaymentIds ?? []);
-    const collectedPayments = visiblePayments.filter((payment) => includedIds.has(payment.id));
     return {
       ...position,
       // The complete server cash snapshot is authoritative. Unsaved optimistic
@@ -497,68 +514,15 @@ export function DailyCalendar({
         optimisticBookings.length || optimisticBookingPatches.size
           ? position.monthSettled
           : (financeSnapshot?.monthSettled ?? position.monthSettled),
-      collectedPayments,
+      collectedPayments: [],
     };
   }, [
     bookings,
-    visiblePayments,
     todayStr,
     financeSnapshot,
     optimisticBookings.length,
     optimisticBookingPatches.size,
   ]);
-
-  const collectedPaymentGroups = useMemo(() => {
-    const groups = new Map<
-      string,
-      {
-        id: string;
-        paymentDates: string[];
-        amount: number;
-        count: number;
-        booking: DailyBookingRow | null;
-        unit: UnitRow | null;
-        customer: CustomerSummary | null;
-        stayRange: string;
-        sortDate: string;
-      }
-    >();
-
-    for (const payment of financeStats.collectedPayments) {
-      const booking = payment.source_id ? (bookingById.get(payment.source_id) ?? null) : null;
-      const unitId = booking?.unit_id ?? payment.unit_id;
-      const unit = unitId ? (allUnitById.get(unitId) ?? unitById.get(unitId) ?? null) : null;
-      const customer = booking ? (customerMap.get(booking.customer_id) ?? null) : null;
-      const key = booking ? `booking:${booking.id}` : `payment:${payment.id}`;
-      const stayEnd = booking ? (booking.actual_check_out ?? booking.check_out) : null;
-      const stayRange = booking
-        ? `${booking.check_in} → ${stayEnd ?? (locale === "zh" ? "未退房" : "En cours")}`
-        : "—";
-      const existing = groups.get(key);
-
-      if (existing) {
-        existing.paymentDates.push(payment.payment_date);
-        existing.amount += Number(payment.amount);
-        existing.count += 1;
-        if (payment.payment_date > existing.sortDate) existing.sortDate = payment.payment_date;
-        continue;
-      }
-
-      groups.set(key, {
-        id: key,
-        paymentDates: [payment.payment_date],
-        amount: Number(payment.amount),
-        count: 1,
-        booking,
-        unit,
-        customer,
-        stayRange,
-        sortDate: payment.payment_date,
-      });
-    }
-
-    return Array.from(groups.values()).sort((a, b) => b.sortDate.localeCompare(a.sortDate));
-  }, [bookingById, customerMap, allUnitById, unitById, financeStats.collectedPayments, locale]);
 
   const financeCards = useMemo(
     () => [
@@ -568,15 +532,19 @@ export function DailyCalendar({
         value: financeSnapshot?.cash ? formatXof(financeStats.monthCollected) : "—",
         caption: financeSnapshot?.cash
           ? locale === "zh"
-            ? `已核验口径 · ${financeSnapshot.cash.excludedCount} 笔未计入`
-            : `Contrôlé · ${financeSnapshot.cash.excludedCount} exclus`
-          : ["admin", "finance", "boss"].includes(userRole ?? "")
+            ? `已核验快照${cashAsOf ? ` · 截至 ${new Date(cashAsOf).toLocaleTimeString("zh-CN", { timeZone: "Africa/Abidjan", hour: "2-digit", minute: "2-digit" })}` : ""} · ${financeSnapshot.cash.excludedCount} 笔未计入`
+            : `Instantané contrôlé${cashAsOf ? ` · À ${new Date(cashAsOf).toLocaleTimeString("fr-FR", { timeZone: "Africa/Abidjan", hour: "2-digit", minute: "2-digit" })}` : ""} · ${financeSnapshot.cash.excludedCount} exclus`
+          : cashPending
             ? locale === "zh"
-              ? "收款汇总暂不可用"
-              : "Synthèse indisponible"
-            : locale === "zh"
-              ? "仅财务权限提供汇总"
-              : "Synthèse réservée à la finance",
+              ? "正在读取收款汇总…"
+              : "Chargement de la synthèse…"
+            : ["admin", "finance", "boss"].includes(userRole ?? "")
+              ? locale === "zh"
+                ? "收款汇总未知 · 点击重试"
+                : "Synthèse inconnue · Réessayer"
+              : locale === "zh"
+                ? "仅财务权限提供汇总"
+                : "Synthèse réservée à la finance",
         tone: "green" as const,
       },
       {
@@ -594,7 +562,7 @@ export function DailyCalendar({
         tone: "dark" as const,
       },
     ],
-    [financeStats, locale, financeSnapshot, userRole],
+    [financeStats, locale, financeSnapshot, userRole, cashPending, cashAsOf],
   );
 
   const shareRows = useMemo(() => {
@@ -826,6 +794,7 @@ export function DailyCalendar({
                   if (windowUnavailable) return;
                   if (card.key !== "collected" || financeSnapshot?.cash)
                     setFinanceDetail(card.key as "collected" | "outstanding" | "settled");
+                  else if (!cashPending) onRetryCash?.();
                 }}
               />
             ))
@@ -1184,6 +1153,7 @@ export function DailyCalendar({
               }
               setCleaningLoading(false);
               setCleaningTarget(null);
+              if (result.success) notifyDailyDataChanged();
               setTick((t) => t + 1);
             })
             .catch((error) => {
@@ -1204,13 +1174,23 @@ export function DailyCalendar({
         loading={cleaningLoading}
       />
 
-      {!windowUnavailable && financeDetail && (
+      {!windowUnavailable && financeDetail === "collected" && buildingId && (
+        <CalendarCashDetail
+          key={`${buildingId}:${cashRevision}`}
+          buildingId={buildingId}
+          today={todayStr}
+          locale={locale}
+          onClose={() => setFinanceDetail(null)}
+          onPermissionLost={onCashPermissionLost}
+        />
+      )}
+      {!windowUnavailable && financeDetail && financeDetail !== "collected" && (
         <CalendarFinancePanel
           financeDetail={financeDetail}
           locale={locale}
           todayStr={todayStr}
           financeStats={financeStats}
-          collectedPaymentGroups={collectedPaymentGroups}
+          collectedPaymentGroups={[]}
           allUnitById={allUnitById}
           customerMap={customerMap}
           onClose={() => setFinanceDetail(null)}

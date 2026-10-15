@@ -45,4 +45,33 @@ describe("core page performance architecture", () => {
     );
     expect(windowRead).toContain("cleaning_booking_ids");
   });
+  it("keeps default contract pages on bounded workspaces rather than all-history loaders", () => {
+    for (const path of [
+      "src/app/leases/page.tsx",
+      "src/app/fr/leases/page.tsx",
+      "src/app/sales/page.tsx",
+      "src/app/fr/sales/page.tsx",
+    ]) {
+      const source = read(path);
+      expect(source).toMatch(/load(?:Lease|Sale)Workspace/);
+      expect(source).not.toMatch(/loadLeasePageData|getSalePageData/);
+    }
+    expect(read("src/features/contracts/workspace-service.ts")).toContain(
+      '"contract_workspace_read_rpc"',
+    );
+  });
+  it("does not bundle month cash or the complete customer catalogue into a calendar window", () => {
+    const windowService = read("src/features/daily-rentals/calendar-window-service.ts");
+    expect(windowService).toContain('"daily_calendar_context_rpc"');
+    expect(windowService).not.toMatch(/daily_receipts_read_rpc|readReceiptAnalysis|fetchAllPages/);
+    const initial = read("src/app/daily-rentals/daily-rental-data.tsx");
+    expect(initial).not.toMatch(/fetchAllPages|\.from\("customers"\)|readCalendarCash/);
+    expect(read("src/features/daily-rentals/calendar-context-service.ts")).toContain(
+      '"daily_calendar_cash_summary_rpc"',
+    );
+  });
+  it("keeps a single app compute region aligned to the verified database region", () => {
+    const configuration = JSON.parse(read("vercel.json"));
+    expect(configuration.regions).toEqual(["dub1"]);
+  });
 });

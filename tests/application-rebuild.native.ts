@@ -46,6 +46,26 @@ it("does not grant anonymous execution or direct access to confirmation records"
     (select relrowsecurity from pg_class where oid='private.operator_booking_operations'::regclass) rls`);
   expect(result.rows[0]).toEqual({ anon: false, direct: false, rls: true });
 });
+it("rebuilds the bounded read models without new privileged functions or anonymous access", async () => {
+  for (const signature of [
+    "public.contract_workspace_read_rpc(text,jsonb,text,uuid)",
+    "public.daily_calendar_context_rpc(uuid,date,date)",
+    "public.daily_calendar_cash_summary_rpc(uuid)",
+    "public.daily_customer_candidates_rpc(uuid,text,integer,text[])",
+  ]) {
+    const result = await db.query(
+      `select p.prosecdef privileged, p.provolatile volatility,
+        has_function_privilege('anon',p.oid,'execute') anonymous,
+        has_function_privilege('service_role',p.oid,'execute') service,
+        has_function_privilege('authenticated',p.oid,'execute') authenticated
+       from pg_proc p where p.oid=to_regprocedure($1)`,
+      [signature],
+    );
+    expect(result.rows).toEqual([
+      { privileged: false, volatility: "s", anonymous: false, service: false, authenticated: true },
+    ]);
+  }
+});
 it("refuses to rebuild over an existing database", async () => {
   await expect(installApplicationRebuild(db)).rejects.toThrow("Fresh test database required");
 });

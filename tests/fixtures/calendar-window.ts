@@ -12,6 +12,8 @@ export function calendarWindowFixture(
     bookings: [],
     bookingCount: 0,
     payments: [],
+    customers: [],
+    customerCount: 0,
     paymentCount: 0,
     cleaningTasks: [],
     dailyUnits: [],

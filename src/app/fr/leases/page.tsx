@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { LeaseLazyView } from "@/features/leases/lease-lazy-view";
-import { loadLeasePageData } from "@/features/leases/lease-page-data";
+import { loadLeaseWorkspace } from "@/features/leases/lease-workspace-data";
 import { DesktopOnly } from "@/features/mobile";
 import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
 
@@ -51,7 +51,7 @@ async function FrenchLeasesData({
   canActivate: boolean;
   canMoveOut: boolean;
 }) {
-  const data = await loadLeasePageData();
+  const data = await loadLeaseWorkspace("fr", initialProject);
   return (
     <LeaseLazyView
       {...data}

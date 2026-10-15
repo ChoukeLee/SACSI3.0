@@ -8,8 +8,17 @@ const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 describe("contract card shortcuts", () => {
   it("keeps long-lease detail, finance and print actions distinct", () => {
     const source = read("src/features/leases/lease-list.tsx");
+    expect(source).toContain("onClick={() => openDetail(contract.id)}");
     expect(source).toContain('openDetail(contract.id, "finance")');
-    expect(source).toMatch(/icon=\{FileText\}[\s\S]{0,240}printLeaseContract/);
+    expect(source).toMatch(/icon=\{FileText\}[\s\S]{0,240}printById\(contract.id\)/);
+    const printHandler = source.slice(
+      source.indexOf("const printById ="),
+      source.indexOf("const statBlocks:"),
+    );
+    expect(printHandler).toContain('workspace.ensure("detail", id)');
+    expect(printHandler).toContain("printLeaseContract(");
+    expect(printHandler).toContain("source.contracts.find((row) => row.id === id)");
+    expect(printHandler).toContain("source.receivables.filter(");
     expect(source).toContain("financeSectionRef.current?.scrollIntoView");
   });
 

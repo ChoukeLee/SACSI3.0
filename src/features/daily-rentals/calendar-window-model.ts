@@ -1,5 +1,6 @@
 import type { DailyBookingRow, UnitRow } from "@/types/database";
 import type { CalendarFinanceSnapshot } from "./calendar-finance-model";
+import { decodeDailyCustomers, type CustomerSummary } from "./customer-summary";
 
 export interface CalendarWindowQuery {
   buildingId: string;
@@ -32,6 +33,8 @@ export interface CalendarWindowData extends CalendarWindowQuery {
   currentOutstanding: number;
   monthSettled: number;
   financeSnapshot?: CalendarFinanceSnapshot;
+  customers?: CustomerSummary[];
+  customerCount?: number;
 }
 export class CalendarWindowError extends Error {
   constructor(
@@ -105,5 +108,13 @@ export function decodeCalendarWindow(
     Object.values(row.buildingCounts).some((count) => !Number.isSafeInteger(count) || count < 0)
   )
     throw new CalendarWindowError();
+  if (row.customers !== undefined) {
+    try {
+      row.customers = decodeDailyCustomers(row.customers);
+    } catch {
+      throw new CalendarWindowError();
+    }
+    if (row.customerCount !== row.customers.length) throw new CalendarWindowError();
+  }
   return row;
 }

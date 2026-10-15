@@ -3,7 +3,19 @@
 import { runFinanceRequest } from "@/features/finance/finance-request";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Check, UserX, Printer, DollarSign, Percent, Trash2, MoreHorizontal, WalletCards, CalendarClock, ChevronDown, LogIn } from "lucide-react";
+import {
+  Check,
+  UserX,
+  Printer,
+  DollarSign,
+  Percent,
+  Trash2,
+  MoreHorizontal,
+  WalletCards,
+  CalendarClock,
+  ChevronDown,
+  LogIn,
+} from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatXof, cn } from "@/lib/utils";
@@ -15,24 +27,54 @@ import { RightDrawer, controlClass } from "@/components/ui/operational";
 import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import type { CustomerSummary } from "./customer-summary";
-import { addDays, getLodgingBusinessTypeLabel, getLodgingBusinessTypeClass, formatDailyRentalError } from "./booking-presentation";
+import {
+  addDays,
+  getLodgingBusinessTypeLabel,
+  getLodgingBusinessTypeClass,
+  formatDailyRentalError,
+} from "./booking-presentation";
 import { unitBuildingLabel } from "@/lib/unit-building-label";
 import { printDailyReceipt } from "@/features/print";
 import { calculateBilling } from "./billing";
-import { getDailyLodgingBusinessType, getPrimaryDailyAction, type DailyLodgingBusinessType } from "./daily-rental-policy";
 import {
-  createBooking, createBackfillBooking, confirmBooking, checkIn, checkOut, completeCleaning, extendStay, cancelBooking,
-  recordSupplementaryPayment, applyDiscount, reversePayment, setFixedCheckout, voidErroneousCheckin,
+  getDailyLodgingBusinessType,
+  getPrimaryDailyAction,
+  type DailyLodgingBusinessType,
+} from "./daily-rental-policy";
+import {
+  createBooking,
+  createBackfillBooking,
+  confirmBooking,
+  checkIn,
+  checkOut,
+  completeCleaning,
+  extendStay,
+  cancelBooking,
+  recordSupplementaryPayment,
+  applyDiscount,
+  reversePayment,
+  setFixedCheckout,
+  voidErroneousCheckin,
 } from "./actions";
 import type { DailyOperationSnapshot } from "./actions";
 import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
-import { dailyBookingAgentSortValue, isDailyBookingAgentName } from "./daily-booking-agents";
 import { shouldShowAdvanceReservationPayment } from "./daily-rental-policy";
+import { notifyDailyDataChanged } from "./daily-read-invalidation";
+import { DailyCustomerSelect } from "./daily-customer-select";
 
 interface BookingPanelProps {
-  booking: DailyBookingRow | null; unitId: string | null; defaultDate?: string;
-  units: UnitRow[]; customers: CustomerSummary[];
-  cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean; completed_at?: string | null }[];
+  booking: DailyBookingRow | null;
+  unitId: string | null;
+  defaultDate?: string;
+  units: UnitRow[];
+  customers: CustomerSummary[];
+  cleaningTasks: {
+    id: string;
+    unit_id: string;
+    daily_booking_id: string | null;
+    is_completed: boolean;
+    completed_at?: string | null;
+  }[];
   payments: {
     id: string;
     source_id: string;
@@ -41,7 +83,9 @@ interface BookingPanelProps {
     reversal_of_payment_id?: string | null;
     request_kind?: string | null;
   }[];
-  locale: Locale; onClose: () => void; onChanged: () => void;
+  locale: Locale;
+  onClose: () => void;
+  onChanged: () => void;
   onBookingCreated?: (booking: DailyBookingRow) => void;
   onCleaningTaskCompleted?: (taskId: string, unitId: string, status: UnitStatus) => void;
   onOperationSnapshot?: (snapshot: DailyOperationSnapshot) => void;
@@ -78,6 +122,7 @@ export function BookingPanel({
   const isBackfill = !!backfillMode;
 
   const refresh = () => {
+    notifyDailyDataChanged();
     router.refresh();
     onChanged();
   };
@@ -121,7 +166,12 @@ export function BookingPanel({
   const [bfError, setBfError] = useState("");
 
   useEffect(() => {
-    if (defaultDate) { setNewCheckIn(defaultDate); const nextDay = new Date(defaultDate); nextDay.setDate(nextDay.getDate() + 1); setNewCheckOut(nextDay.toISOString().slice(0, 10)); }
+    if (defaultDate) {
+      setNewCheckIn(defaultDate);
+      const nextDay = new Date(defaultDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      setNewCheckOut(nextDay.toISOString().slice(0, 10));
+    }
   }, [defaultDate]);
 
   useEffect(() => {
@@ -133,65 +183,83 @@ export function BookingPanel({
     setConfirmCorrection(false);
   }, [booking?.id]);
 
-  const selectedUnit = unitId ? units.find((u) => u.id === unitId) as DailyPricedUnit | null : null;
+  const selectedUnit = unitId
+    ? (units.find((u) => u.id === unitId) as DailyPricedUnit | null)
+    : null;
   useEffect(() => {
     if (!isNew || !selectedUnit?.daily_rental_price_xof) return;
     setNewNightlyPrice(String(selectedUnit.daily_rental_price_xof));
   }, [isNew, selectedUnit?.id, selectedUnit?.daily_rental_price_xof]);
-  const dailySelectableCustomers = useMemo(
-    () => customers
-      .filter((customer) => isDailyBookingAgentName(customer.name) && !customer.is_blacklisted)
-      .sort((left, right) => dailyBookingAgentSortValue(left.name) - dailyBookingAgentSortValue(right.name)),
-    [customers],
+  const bookingPayments = useMemo(
+    () => payments.filter((p) => p.source_id === booking?.id),
+    [payments, booking],
   );
-  const bookingPayments = useMemo(() => payments.filter(p => p.source_id === booking?.id), [payments, booking]);
   const totalPaid = bookingPayments.reduce((s, p) => s + Number(p.amount), 0);
-  const actualRefunds = bookingPayments.filter(p => p.request_kind === 'daily_refund');
+  const actualRefunds = bookingPayments.filter((p) => p.request_kind === "daily_refund");
   const reversedPaymentIds = useMemo(
     () => new Set(bookingPayments.map((payment) => payment.reversal_of_payment_id).filter(Boolean)),
     [bookingPayments],
   );
   const positiveBookingPayments = useMemo(
-    () => bookingPayments
-      .filter((payment) => Number(payment.amount) > 0)
-      .sort((left, right) => right.payment_date.localeCompare(left.payment_date)),
+    () =>
+      bookingPayments
+        .filter((payment) => Number(payment.amount) > 0)
+        .sort((left, right) => right.payment_date.localeCompare(left.payment_date)),
     [bookingPayments],
   );
 
   const newNights = useMemo(() => {
     if (!newCheckIn || !newCheckOut) return 0;
-    return Math.max(0, Math.ceil((new Date(newCheckOut).getTime() - new Date(newCheckIn).getTime()) / (1000 * 60 * 60 * 24)));
+    return Math.max(
+      0,
+      Math.ceil(
+        (new Date(newCheckOut).getTime() - new Date(newCheckIn).getTime()) / (1000 * 60 * 60 * 24),
+      ),
+    );
   }, [newCheckIn, newCheckOut]);
 
   const newTotal = newNights * (parseInt(newNightlyPrice, 10) || 0);
   const bookingCustomer = booking ? customers.find((c) => c.id === booking.customer_id) : null;
-  const relatedCleaningTask = booking ? cleaningTasks.find((t) => t.daily_booking_id === booking.id) : null;
+  const relatedCleaningTask = booking
+    ? cleaningTasks.find((t) => t.daily_booking_id === booking.id)
+    : null;
   // Unit-level cleaning: a cleaning task on the same unit from a different booking
   // (e.g. previous guest checked out → cleaning pending → this confirmed booking can't check in yet)
   const unitCleaningTask = booking
-    ? cleaningTasks.find((t) => t.unit_id === booking.unit_id && !t.is_completed && t.daily_booking_id !== booking.id) ?? null
+    ? (cleaningTasks.find(
+        (t) =>
+          t.unit_id === booking.unit_id && !t.is_completed && t.daily_booking_id !== booking.id,
+      ) ?? null)
     : null;
-  const effectiveCleaningTask = relatedCleaningTask && !relatedCleaningTask.is_completed
-    ? relatedCleaningTask
-    : unitCleaningTask;
+  const effectiveCleaningTask =
+    relatedCleaningTask && !relatedCleaningTask.is_completed
+      ? relatedCleaningTask
+      : unitCleaningTask;
   const billing = booking ? calculateBilling(booking) : null;
   const finalDue = billing?.finalAmount ?? 0;
   const rawOutstanding = finalDue - totalPaid;
   const outstanding = rawOutstanding <= 1 ? 0 : Math.max(0, rawOutstanding);
   const hasOutstandingBalance = outstanding > 0;
-  const lodgingBusinessType = booking && billing
-    ? getDailyLodgingBusinessType({
-        status: booking.status as "pending_review" | "confirmed" | "checked_in" | "checked_out" | "cancelled",
-        checkoutMode: booking.checkout_mode,
-        paidAmount: totalPaid,
-        finalAmount: billing.finalAmount,
-      })
+  const lodgingBusinessType =
+    booking && billing
+      ? getDailyLodgingBusinessType({
+          status: booking.status as
+            "pending_review" | "confirmed" | "checked_in" | "checked_out" | "cancelled",
+          checkoutMode: booking.checkout_mode,
+          paidAmount: totalPaid,
+          finalAmount: billing.finalAmount,
+        })
+      : null;
+  const lodgingBusinessLabel = lodgingBusinessType
+    ? getLodgingBusinessTypeLabel(lodgingBusinessType, locale)
     : null;
-  const lodgingBusinessLabel = lodgingBusinessType ? getLodgingBusinessTypeLabel(lodgingBusinessType, locale) : null;
-  const lodgingBusinessToneClass = lodgingBusinessType ? getLodgingBusinessTypeClass(lodgingBusinessType) : "";
+  const lodgingBusinessToneClass = lodgingBusinessType
+    ? getLodgingBusinessTypeClass(lodgingBusinessType)
+    : "";
   const primaryAction = booking
     ? getPrimaryDailyAction({
-        bookingStatus: booking.status as "pending_review" | "confirmed" | "checked_in" | "checked_out" | "cancelled",
+        bookingStatus: booking.status as
+          "pending_review" | "confirmed" | "checked_in" | "checked_out" | "cancelled",
         hasOpenCleaningTask: Boolean(effectiveCleaningTask),
         hasOutstandingBalance,
         operationalCondition: selectedUnit?.operational_condition,
@@ -199,7 +267,8 @@ export function BookingPanel({
     : null;
   const showAdvanceReservationPayment = booking
     ? shouldShowAdvanceReservationPayment({
-        bookingStatus: booking.status as "pending_review" | "confirmed" | "checked_in" | "checked_out" | "cancelled",
+        bookingStatus: booking.status as
+          "pending_review" | "confirmed" | "checked_in" | "checked_out" | "cancelled",
         checkIn: booking.check_in,
       })
     : false;
@@ -217,7 +286,11 @@ export function BookingPanel({
   const labelClass = "mb-1 block text-xs font-semibold text-muted-foreground";
   const formatError = (message?: string | null) => formatDailyRentalError(message, locale);
   const runPanelAction = async (
-    action: () => Promise<{ success: boolean; error?: string; data?: DailyOperationSnapshot } | void>,
+    action: () => Promise<{
+      success: boolean;
+      error?: string;
+      data?: DailyOperationSnapshot;
+    } | void>,
     options: {
       closeOnSuccess?: boolean;
       clearAdvancedTask?: boolean;
@@ -239,52 +312,59 @@ export function BookingPanel({
       refresh();
       if (options.closeOnSuccess) onClose();
     } catch (operationError) {
-      setActionError(formatError(operationError instanceof Error ? operationError.message : "unknownError"));
+      notifyDailyDataChanged();
+      setActionError(
+        formatError(operationError instanceof Error ? operationError.message : "unknownError"),
+      );
     } finally {
       setSaving(false);
     }
   };
 
   const handleCreate = async () => {
-    if (!newCustomerId) { setError(t.booking.noCustomer); return; }
-    if (newCheckoutMode === "fixed" && newNights <= 0) { setError(formatError("invalidDateRange")); return; }
+    if (!newCustomerId) {
+      setError(t.booking.noCustomer);
+      return;
+    }
+    if (newCheckoutMode === "fixed" && newNights <= 0) {
+      setError(formatError("invalidDateRange"));
+      return;
+    }
     setError("");
     const nightlyPrice = toN(newNightlyPrice) || 40000;
     const requestId = createRequestIdRef.current ?? crypto.randomUUID();
     createRequestIdRef.current = requestId;
     await runPanelAction(
-      async () => createBooking({
-        unitId: unitId!, customerId: newCustomerId, checkIn: newCheckIn,
-        checkOut: newCheckoutMode === "fixed" ? newCheckOut : undefined,
-        checkoutMode: newCheckoutMode, nightlyPriceXof: nightlyPrice,
-        notes: newNotes || undefined,
-        requestId,
-      }),
+      async () =>
+        createBooking({
+          unitId: unitId!,
+          customerId: newCustomerId,
+          checkIn: newCheckIn,
+          checkOut: newCheckoutMode === "fixed" ? newCheckOut : undefined,
+          checkoutMode: newCheckoutMode,
+          nightlyPriceXof: nightlyPrice,
+          notes: newNotes || undefined,
+          requestId,
+        }),
       { closeOnSuccess: true },
     );
   };
 
   const handleConfirmBooking = async () => {
-    await runPanelAction(
-      () => confirmBooking(booking!.id),
-      { closeOnSuccess: true },
-    );
+    await runPanelAction(() => confirmBooking(booking!.id), { closeOnSuccess: true });
   };
 
   const handleCheckIn = async () => {
     const prepay = toN(prepaidAmount);
     const requestId = prepay > 0 ? crypto.randomUUID() : undefined;
-    await runPanelAction(
-      () => checkIn(booking!.id, prepay, requestId),
-      { closeOnSuccess: true },
-    );
+    await runPanelAction(() => checkIn(booking!.id, prepay, requestId), { closeOnSuccess: true });
   };
 
   const handleReservationPayment = async () => {
     const amount = toN(prepaidAmount);
     if (amount <= 0 || amount > outstanding) return;
-    await runPanelAction(
-      () => recordSupplementaryPayment({
+    await runPanelAction(() =>
+      recordSupplementaryPayment({
         bookingId: booking!.id,
         amount,
         paymentDate: suppPaymentDate || undefined,
@@ -297,11 +377,12 @@ export function BookingPanel({
   const handleCheckOut = async () => {
     const disc = toN(discountAmount);
     await runPanelAction(
-      () => checkOut(booking!.id, {
-        actualCheckOut: booking?.checkout_mode === "open" ? actualCheckOut : undefined,
-        discountAmount: disc || undefined,
-        discountReason: discountReason || undefined,
-      }),
+      () =>
+        checkOut(booking!.id, {
+          actualCheckOut: booking?.checkout_mode === "open" ? actualCheckOut : undefined,
+          discountAmount: disc || undefined,
+          discountReason: discountReason || undefined,
+        }),
       { closeOnSuccess: true },
     );
   };
@@ -310,12 +391,13 @@ export function BookingPanel({
     const amt = toN(suppAmount);
     if (amt <= 0) return;
     await runPanelAction(
-      () => recordSupplementaryPayment({
-        bookingId: booking!.id,
-        amount: amt,
-        paymentDate: suppPaymentDate || undefined,
-        requestId: crypto.randomUUID(),
-      }),
+      () =>
+        recordSupplementaryPayment({
+          bookingId: booking!.id,
+          amount: amt,
+          paymentDate: suppPaymentDate || undefined,
+          requestId: crypto.randomUUID(),
+        }),
       { closeOnSuccess: true, clearAdvancedTask: true },
     );
     setSuppAmount("");
@@ -325,7 +407,12 @@ export function BookingPanel({
     const amt = toN(discountAmount);
     if (amt <= 0) return;
     await runPanelAction(
-      () => applyDiscount({ bookingId: booking!.id, amount: amt, reason: discountReason || (locale === "zh" ? "手动优惠" : "Remise manuelle") }),
+      () =>
+        applyDiscount({
+          bookingId: booking!.id,
+          amount: amt,
+          reason: discountReason || (locale === "zh" ? "手动优惠" : "Remise manuelle"),
+        }),
       { closeOnSuccess: true, clearAdvancedTask: true },
     );
     setDiscountAmount("");
@@ -344,23 +431,28 @@ export function BookingPanel({
 
   const fixedCheckOutNights = useMemo(() => {
     if (!booking || !fixedCheckOutDate) return 0;
-    return Math.max(0, Math.ceil((new Date(fixedCheckOutDate).getTime() - new Date(booking.check_in).getTime()) / (1000 * 60 * 60 * 24)));
+    return Math.max(
+      0,
+      Math.ceil(
+        (new Date(fixedCheckOutDate).getTime() - new Date(booking.check_in).getTime()) /
+          (1000 * 60 * 60 * 24),
+      ),
+    );
   }, [booking, fixedCheckOutDate]);
 
   const handleSetFixedCheckout = async () => {
-    if (!fixedCheckOutDate) { setActionError(formatError("checkOutRequired")); return; }
-    await runPanelAction(
-      () => setFixedCheckout(booking!.id, fixedCheckOutDate),
-      { closeOnSuccess: true },
-    );
+    if (!fixedCheckOutDate) {
+      setActionError(formatError("checkOutRequired"));
+      return;
+    }
+    await runPanelAction(() => setFixedCheckout(booking!.id, fixedCheckOutDate), {
+      closeOnSuccess: true,
+    });
   };
 
   // ── Backfill handler ──
   const handleCancelBooking = async () => {
-    await runPanelAction(
-      () => cancelBooking(booking!.id),
-      { closeOnSuccess: true },
-    );
+    await runPanelAction(() => cancelBooking(booking!.id), { closeOnSuccess: true });
   };
 
   const handleCompleteCleaning = async () => {
@@ -392,11 +484,14 @@ export function BookingPanel({
         return;
       }
       if (result.data) onOperationSnapshot?.(result.data);
-      else refresh();
+      refresh();
       setDeleteTarget(null);
       setReversalReason("");
     } catch (operationError) {
-      setActionError(formatError(operationError instanceof Error ? operationError.message : "unknownError"));
+      notifyDailyDataChanged();
+      setActionError(
+        formatError(operationError instanceof Error ? operationError.message : "unknownError"),
+      );
     } finally {
       setSaving(false);
     }
@@ -404,27 +499,48 @@ export function BookingPanel({
 
   const bfNights = useMemo(() => {
     if (!bfCheckIn || !bfCheckOut) return 0;
-    return Math.max(1, Math.ceil((new Date(bfCheckOut).getTime() - new Date(bfCheckIn).getTime()) / (1000 * 60 * 60 * 24)));
+    return Math.max(
+      1,
+      Math.ceil(
+        (new Date(bfCheckOut).getTime() - new Date(bfCheckIn).getTime()) / (1000 * 60 * 60 * 24),
+      ),
+    );
   }, [bfCheckIn, bfCheckOut]);
   const bfTotal = bfNights * (parseInt(bfNightlyPrice, 10) || 0);
 
   const handleBackfillCreate = async () => {
-    if (!bfUnitId) { setBfError(locale === "zh" ? "请选择房间。" : "Veuillez choisir une chambre."); return; }
-    if (!bfCustomerId) { setBfError(t.booking.noCustomer); return; }
-    if (!bfCheckIn || !bfCheckOut) { setBfError(formatError("invalidDateRange")); return; }
-    if (!bfReason) { setBfError(locale === "zh" ? "请填写补录原因。" : "Veuillez indiquer la raison du backfill."); return; }
+    if (!bfUnitId) {
+      setBfError(locale === "zh" ? "请选择房间。" : "Veuillez choisir une chambre.");
+      return;
+    }
+    if (!bfCustomerId) {
+      setBfError(t.booking.noCustomer);
+      return;
+    }
+    if (!bfCheckIn || !bfCheckOut) {
+      setBfError(formatError("invalidDateRange"));
+      return;
+    }
+    if (!bfReason) {
+      setBfError(locale === "zh" ? "请填写补录原因。" : "Veuillez indiquer la raison du backfill.");
+      return;
+    }
     setBfError("");
     await runPanelAction(
       async () => {
         const payload = {
-          unitId: bfUnitId, customerId: bfCustomerId,
-          checkIn: bfCheckIn, checkOut: bfCheckOut,
+          unitId: bfUnitId,
+          customerId: bfCustomerId,
+          checkIn: bfCheckIn,
+          checkOut: bfCheckOut,
           nightlyPriceXof: parseInt(bfNightlyPrice, 10) || 40000,
           prepaidAmountXof: parseInt(bfPaidAmount, 10) || 0,
           reason: bfReason,
           notes: bfNotes || undefined,
         };
-        const result = await runFinanceRequest("daily_backfill",bfUnitId,payload,requestId=>createBackfillBooking({...payload,requestId}));
+        const result = await runFinanceRequest("daily_backfill", bfUnitId, payload, (requestId) =>
+          createBackfillBooking({ ...payload, requestId }),
+        );
         if (result.success && result.data?.booking) onBookingCreated?.(result.data.booking);
         if (!result.success) setBfError(formatError(result.error));
         return result;
@@ -437,60 +553,129 @@ export function BookingPanel({
     <>
       <RightDrawer
         open
-        title={isBackfill ? (locale === "zh" ? "历史补录" : "Backfill") : isNew ? t.booking.newBooking : t.booking.title}
-        subtitle={selectedUnit ? `${unitBuildingLabel(selectedUnit)} · ${selectedUnit.unit_no} · ${selectedUnit.floor_label}` : undefined}
-        onClose={() => { if (!saving) onClose(); }}
+        title={
+          isBackfill
+            ? locale === "zh"
+              ? "历史补录"
+              : "Backfill"
+            : isNew
+              ? t.booking.newBooking
+              : t.booking.title
+        }
+        subtitle={
+          selectedUnit
+            ? `${unitBuildingLabel(selectedUnit)} · ${selectedUnit.unit_no} · ${selectedUnit.floor_label}`
+            : undefined
+        }
+        onClose={() => {
+          if (!saving) onClose();
+        }}
       >
         <div className="space-y-4">
           {/* New Booking */}
-          {isNew && (<>
-            <div>
-              <label className={labelClass}>{t.booking.customer}</label>
-              <select value={newCustomerId} onChange={e => setNewCustomerId(e.target.value)} className={inputClass}>
-                <option value="">{t.booking.noCustomer}</option>
-                {dailySelectableCustomers.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ""}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>{t.checkoutModeLabel}</label>
-              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t.checkoutModeLabel}>
-                {([
-                  { value: "fixed" as const, label: t.fixedCheckout },
-                  { value: "open" as const, label: t.openCheckout },
-                ]).map((item) => (
-                  <button
-                    key={item.value}
-                    type="button"
-                    onClick={() => setNewCheckoutMode(item.value)}
-                    className={cn(
-                      "h-9 rounded-lg border px-3 text-sm font-medium shadow-xs transition-colors",
-                      newCheckoutMode === item.value
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-card text-muted-foreground hover:bg-white hover:text-foreground",
-                    )}
-                    role="radio"
-                    aria-checked={newCheckoutMode === item.value}
-                  >
-                    {item.label}
-                  </button>
-                ))}
+          {isNew && (
+            <>
+              <div>
+                <label className={labelClass}>{t.booking.customer}</label>
+                <DailyCustomerSelect
+                  buildingId={selectedUnit?.building_id ?? null}
+                  value={newCustomerId}
+                  onChange={setNewCustomerId}
+                  locale={locale}
+                  placeholder={t.booking.noCustomer}
+                />
               </div>
-              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{t.checkoutModeHint}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelClass}>{t.booking.checkInDate}</label><DateInput value={newCheckIn} onChangeValue={setNewCheckIn} className={inputClass} min={new Date().toISOString().slice(0, 10)} /></div>
-              {newCheckoutMode === "fixed" && <div><label className={labelClass}>{t.booking.checkOutDate}</label><DateInput value={newCheckOut} onChangeValue={setNewCheckOut} className={inputClass} /></div>}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelClass}>{t.booking.nightlyPrice}</label><input type="number" value={newNightlyPrice} onChange={e => setNewNightlyPrice(e.target.value)} className={inputClass} /></div>
-              <div><label className={labelClass}>{t.booking.totalAmount}</label><p className="mt-2 text-sm font-semibold text-foreground">{newCheckoutMode === "fixed" ? `${newNights} ${t.booking.nights} = ${formatXof(newTotal)}` : `${t.booking.nights}×${newNightlyPrice.toLocaleString()} ${locale === "zh" ? "起" : "min"}`}</p></div>
-            </div>
-            <div><label className={labelClass}>{t.booking.notes}</label><textarea value={newNotes} onChange={e => setNewNotes(e.target.value)} rows={2} className={cn(inputClass, "resize-none overflow-hidden")} /></div>
-            {error && <p className="text-sm text-accentRed-600" role="alert">{error}</p>}
-            <Button onClick={handleCreate} disabled={saving} className="w-full" variant="default">
-              {saving ? "..." : t.booking.newBooking}
-            </Button>
-          </>)}
+              <div>
+                <label className={labelClass}>{t.checkoutModeLabel}</label>
+                <div
+                  className="grid grid-cols-2 gap-2"
+                  role="radiogroup"
+                  aria-label={t.checkoutModeLabel}
+                >
+                  {[
+                    { value: "fixed" as const, label: t.fixedCheckout },
+                    { value: "open" as const, label: t.openCheckout },
+                  ].map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setNewCheckoutMode(item.value)}
+                      className={cn(
+                        "h-9 rounded-lg border px-3 text-sm font-medium shadow-xs transition-colors",
+                        newCheckoutMode === item.value
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-card text-muted-foreground hover:bg-white hover:text-foreground",
+                      )}
+                      role="radio"
+                      aria-checked={newCheckoutMode === item.value}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                  {t.checkoutModeHint}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>{t.booking.checkInDate}</label>
+                  <DateInput
+                    value={newCheckIn}
+                    onChangeValue={setNewCheckIn}
+                    className={inputClass}
+                    min={new Date().toISOString().slice(0, 10)}
+                  />
+                </div>
+                {newCheckoutMode === "fixed" && (
+                  <div>
+                    <label className={labelClass}>{t.booking.checkOutDate}</label>
+                    <DateInput
+                      value={newCheckOut}
+                      onChangeValue={setNewCheckOut}
+                      className={inputClass}
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>{t.booking.nightlyPrice}</label>
+                  <input
+                    type="number"
+                    value={newNightlyPrice}
+                    onChange={(e) => setNewNightlyPrice(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>{t.booking.totalAmount}</label>
+                  <p className="mt-2 text-sm font-semibold text-foreground">
+                    {newCheckoutMode === "fixed"
+                      ? `${newNights} ${t.booking.nights} = ${formatXof(newTotal)}`
+                      : `${t.booking.nights}×${newNightlyPrice.toLocaleString()} ${locale === "zh" ? "起" : "min"}`}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <label className={labelClass}>{t.booking.notes}</label>
+                <textarea
+                  value={newNotes}
+                  onChange={(e) => setNewNotes(e.target.value)}
+                  rows={2}
+                  className={cn(inputClass, "resize-none overflow-hidden")}
+                />
+              </div>
+              {error && (
+                <p className="text-sm text-accentRed-600" role="alert">
+                  {error}
+                </p>
+              )}
+              <Button onClick={handleCreate} disabled={saving} className="w-full" variant="default">
+                {saving ? "..." : t.booking.newBooking}
+              </Button>
+            </>
+          )}
 
           {/* ── Backfill Form (admin only) ── */}
           {isBackfill && (
@@ -503,566 +688,1026 @@ export function BookingPanel({
 
               <div>
                 <label className={labelClass}>{locale === "zh" ? "房间" : "Chambre"}</label>
-                <select value={bfUnitId} onChange={e => setBfUnitId(e.target.value)} className={inputClass}>
+                <select
+                  value={bfUnitId}
+                  onChange={(e) => setBfUnitId(e.target.value)}
+                  className={inputClass}
+                >
                   <option value="">{locale === "zh" ? "选择房间" : "Choisir"}</option>
-                  {units.map(u => <option key={u.id} value={u.id}>{u.unit_no} ({u.floor_label})</option>)}
+                  {units.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.unit_no} ({u.floor_label})
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className={labelClass}>{t.booking.customer}</label>
-                <select value={bfCustomerId} onChange={e => setBfCustomerId(e.target.value)} className={inputClass}>
-                  <option value="">{t.booking.noCustomer}</option>
-                  {dailySelectableCustomers.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ""}</option>)}
-                </select>
+                <DailyCustomerSelect
+                  buildingId={units.find((unit) => unit.id === bfUnitId)?.building_id ?? null}
+                  value={bfCustomerId}
+                  onChange={setBfCustomerId}
+                  locale={locale}
+                  placeholder={t.booking.noCustomer}
+                />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={labelClass}>{t.booking.checkInDate}</label><DateInput value={bfCheckIn} onChangeValue={setBfCheckIn} className={inputClass} /></div>
-                <div><label className={labelClass}>{t.booking.checkOutDate}</label><DateInput value={bfCheckOut} onChangeValue={setBfCheckOut} className={inputClass} /></div>
+                <div>
+                  <label className={labelClass}>{t.booking.checkInDate}</label>
+                  <DateInput
+                    value={bfCheckIn}
+                    onChangeValue={setBfCheckIn}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>{t.booking.checkOutDate}</label>
+                  <DateInput
+                    value={bfCheckOut}
+                    onChangeValue={setBfCheckOut}
+                    className={inputClass}
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={labelClass}>{t.booking.nightlyPrice}</label><input type="number" value={bfNightlyPrice} onChange={e => setBfNightlyPrice(e.target.value)} className={inputClass} /></div>
-                <div><label className={labelClass}>{locale === "zh" ? "已收金额" : "Montant percu"}</label><input type="number" value={bfPaidAmount} onChange={e => setBfPaidAmount(e.target.value)} className={inputClass} /></div>
+                <div>
+                  <label className={labelClass}>{t.booking.nightlyPrice}</label>
+                  <input
+                    type="number"
+                    value={bfNightlyPrice}
+                    onChange={(e) => setBfNightlyPrice(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>
+                    {locale === "zh" ? "已收金额" : "Montant percu"}
+                  </label>
+                  <input
+                    type="number"
+                    value={bfPaidAmount}
+                    onChange={(e) => setBfPaidAmount(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
               </div>
               {bfCheckIn && bfCheckOut && (
                 <p className="text-xs text-muted-foreground">
-                  {bfNights} {locale === "zh" ? "晚 ×" : "nuits ×"} {parseInt(bfNightlyPrice, 10).toLocaleString()} = {formatXof(bfTotal)}{" "}
-                  {parseInt(bfPaidAmount, 10) > 0 && <span className="text-accentGreen-600">({locale === "zh" ? "已收" : "percu"} {formatXof(parseInt(bfPaidAmount, 10))})</span>}
+                  {bfNights} {locale === "zh" ? "晚 ×" : "nuits ×"}{" "}
+                  {parseInt(bfNightlyPrice, 10).toLocaleString()} = {formatXof(bfTotal)}{" "}
+                  {parseInt(bfPaidAmount, 10) > 0 && (
+                    <span className="text-accentGreen-600">
+                      ({locale === "zh" ? "已收" : "percu"} {formatXof(parseInt(bfPaidAmount, 10))})
+                    </span>
+                  )}
                 </p>
               )}
               <div>
                 <label className={labelClass}>{locale === "zh" ? "补录原因 *" : "Raison *"}</label>
-                <input type="text" value={bfReason} onChange={e => setBfReason(e.target.value)} className={inputClass} placeholder={locale === "zh" ? "如：补录2024年历史入住" : "ex: backfill sejour 2024"} />
+                <input
+                  type="text"
+                  value={bfReason}
+                  onChange={(e) => setBfReason(e.target.value)}
+                  className={inputClass}
+                  placeholder={
+                    locale === "zh" ? "如：补录2024年历史入住" : "ex: backfill sejour 2024"
+                  }
+                />
               </div>
               <div>
                 <label className={labelClass}>{t.booking.notes}</label>
-                <textarea value={bfNotes} onChange={e => setBfNotes(e.target.value)} rows={2} className={cn(inputClass, "resize-none overflow-hidden")} />
+                <textarea
+                  value={bfNotes}
+                  onChange={(e) => setBfNotes(e.target.value)}
+                  rows={2}
+                  className={cn(inputClass, "resize-none overflow-hidden")}
+                />
               </div>
-              {bfError && <p className="text-sm text-accentRed-600" role="alert">{bfError}</p>}
-              <Button onClick={handleBackfillCreate} disabled={saving} className="w-full" variant="default">
-                {saving ? "..." : (locale === "zh" ? "确认补录" : "Confirmer le backfill")}
+              {bfError && (
+                <p className="text-sm text-accentRed-600" role="alert">
+                  {bfError}
+                </p>
+              )}
+              <Button
+                onClick={handleBackfillCreate}
+                disabled={saving}
+                className="w-full"
+                variant="default"
+              >
+                {saving ? "..." : locale === "zh" ? "确认补录" : "Confirmer le backfill"}
               </Button>
             </div>
           )}
 
           {/* Booking Detail */}
-          {booking && !isBackfill && (<>
-            <section className="border-b border-border pb-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-base font-semibold text-foreground">{bookingCustomer?.name ?? booking.customer_id.slice(0, 8)}</p>
-                  {bookingCustomer?.phone && <p className="mt-0.5 text-xs text-muted-foreground">{bookingCustomer.phone}</p>}
-                </div>
-                <Button size="icon" variant="ghost" onClick={() => printDailyReceipt({ booking, unit: selectedUnit ?? null, customer: null }, locale)} aria-label={dictionaries[locale].settings.print.print} className="h-8 w-8 shrink-0">
-                  <Printer className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {lodgingBusinessLabel && (
-                  <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold", lodgingBusinessToneClass)}>
-                    <CalendarClock className="h-3.5 w-3.5" />
-                    {lodgingBusinessLabel}
-                  </span>
-                )}
-                <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-semibold text-foreground/75">
-                  {t.bookingStatus[booking.status as keyof typeof t.bookingStatus] ?? statusDisplayLabel(booking.status, locale)}
-                </span>
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-lg bg-muted px-3 py-2">
-                  <p className="text-xs text-muted-foreground">{t.booking.checkInDate}</p>
-                  <p className="mt-0.5 font-semibold text-foreground">{booking.check_in}</p>
-                </div>
-                <div className="rounded-lg bg-muted px-3 py-2">
-                  <p className="text-xs text-muted-foreground">{booking.status === "checked_out" || booking.checkout_mode === "open" ? t.actualCheckOutDate : t.booking.checkOutDate}</p>
-                  <p className="mt-0.5 font-semibold text-foreground">{booking.status === "checked_out" ? (booking.actual_check_out ?? booking.check_out ?? "—") : booking.checkout_mode === "open" ? (booking.actual_check_out ?? "—") : booking.check_out}</p>
-                </div>
-              </div>
-
-            </section>
-
-            <section className="border-b border-border pb-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-foreground">{locale === "zh" ? "费用与收款" : "Frais et paiements"}</p>
-                <span className={cn("text-sm font-semibold tabular-nums", hasOutstandingBalance ? "text-accentRed-600" : "text-accentGreen-700")}>
-                  {hasOutstandingBalance ? formatXof(outstanding) : (locale === "zh" ? "已付清" : "Paye")}
-                </span>
-              </div>
-
-              {billing && (
-                <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2 text-xs">
-                  <div>
-                    <p className="text-muted-foreground">{t.booking.nightlyPrice}</p>
-                    <p className="mt-0.5 font-medium tabular-nums text-foreground">{formatXof(Number(booking.nightly_price_xof))}</p>
+          {booking && !isBackfill && (
+            <>
+              <section className="border-b border-border pb-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-base font-semibold text-foreground">
+                      {bookingCustomer?.name ?? booking.customer_id.slice(0, 8)}
+                    </p>
+                    {bookingCustomer?.phone && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {bookingCustomer.phone}
+                      </p>
+                    )}
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">{t.booking.nights}</p>
-                    <p className="mt-0.5 font-medium tabular-nums text-foreground">{billing.nights}{locale === "zh" ? "晚" : " nuits"}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-muted-foreground">{t.billing.finalAmount}</p>
-                    <p className="mt-0.5 font-semibold tabular-nums text-foreground">{formatXof(billing.finalAmount)}</p>
-                  </div>
-                  {billing.discount > 0 && (
-                    <div className="col-span-3 flex items-center justify-between border-t border-border pt-2">
-                      <span className="text-muted-foreground">{t.billing.grossAmount} {formatXof(billing.grossAmount)}</span>
-                      <span className="font-medium tabular-nums text-accentGreen-700">{t.billing.discount} -{formatXof(billing.discount)}</span>
-                    </div>
-                  )}
-                  <div className="col-span-3 flex items-center justify-between border-t border-border pt-2 text-sm">
-                    <span className="text-muted-foreground">{t.billing.paid}</span>
-                    <span className="font-semibold tabular-nums text-accentGreen-700">{formatXof(totalPaid)}</span>
-                  </div>
-                </div>
-              )}
-
-              {positiveBookingPayments.length > 0 && (
-                <div className="mt-3 border-t border-border pt-2">
-                  <button
-                    type="button"
-                    aria-expanded={showPaymentHistory}
-                    onClick={() => setShowPaymentHistory((value) => !value)}
-                    className="flex min-h-9 w-full items-center justify-between gap-3 rounded-lg px-1 text-left transition-colors hover:bg-muted/50"
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() =>
+                      printDailyReceipt(
+                        { booking, unit: selectedUnit ?? null, customer: null },
+                        locale,
+                      )
+                    }
+                    aria-label={dictionaries[locale].settings.print.print}
+                    className="h-8 w-8 shrink-0"
                   >
-                    <p className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                      <WalletCards className="h-3.5 w-3.5" />
-                      {locale === "zh" ? `收款记录 · ${positiveBookingPayments.length}笔` : `${positiveBookingPayments.length} paiement(s)`}
-                    </p>
-                    <span className="inline-flex items-center gap-1 text-xs font-medium text-foreground/70">
-                      {showPaymentHistory
-                        ? (locale === "zh" ? "收起" : "Reduire")
-                        : (locale === "zh" ? "展开" : "Afficher")}
-                      <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showPaymentHistory && "rotate-180")} />
-                    </span>
-                  </button>
-                  {showPaymentHistory && <ul className="divide-y divide-border/70">
-                    {positiveBookingPayments.map((payment) => {
-                      const isReversed = reversedPaymentIds.has(payment.id);
-                      return (
-                        <li key={payment.id} className="group flex min-h-9 items-center justify-between gap-3 text-xs">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span className="whitespace-nowrap tabular-nums text-foreground/70">{payment.payment_date}</span>
-                            {isReversed && <span className="text-muted-foreground">{locale === "zh" ? "已冲销" : "Annule"}</span>}
-                          </div>
-                          <div className="flex shrink-0 items-center gap-1">
-                            <span className={cn("font-semibold tabular-nums", isReversed ? "text-muted-foreground line-through" : "text-accentGreen-700")}>
-                              {formatXof(Number(payment.amount))}
-                            </span>
-                            {!readOnly && !isReversed && actualRefunds.length === 0 && (
-                              <button
-                                type="button"
-                                className="rounded p-1 text-muted-foreground/60 transition-colors hover:bg-accentRed-50 hover:text-accentRed-600"
-                                onClick={() => {
-                                  setDeleteTarget({ id: payment.id, amount: Number(payment.amount) });
-                                  setReversalReason("");
-                                }}
-                                title={locale === "zh" ? "冲销此收款" : "Annuler ce paiement"}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>}
-                  {actualRefunds.length > 0 && <div className="space-y-2 border-t pt-3 text-xs">
-                    <p>{locale === 'zh' ? '实际退款（不是错误收款冲正）' : 'Remboursements réels (hors contrepassations)'}</p>
-                    {actualRefunds.map(p => <p key={p.id} className="flex justify-between"><span>{p.payment_date}</span><span>{formatXof(Math.abs(Number(p.amount)))}</span></p>)}
-                    <p className="text-muted-foreground">{locale === 'zh' ? '此单已有实际退款，如需冲正原收款，请先联系管理员核对。' : 'Remboursement existant : consulter un administrateur avant toute contrepassation.'}</p>
-                  </div>}
+                    <Printer className="h-4 w-4" />
+                  </Button>
                 </div>
-              )}
-            </section>
 
-            {billing?.eligibleForMonthlyDiscount && hasOutstandingBalance && (
-              <div className="rounded-lg border border-amber-200 bg-accentAmber-50 p-3 text-xs text-accentAmber-700">
-                <Percent className="inline h-3.5 w-3.5 mr-1" />
-                {t.monthlyDiscountHint.replace("{nights}", String(billing.nights)).replace("{gross}", formatXof(billing.grossAmount))}
-              </div>
-            )}
-
-            {booking.notes && <p className="text-xs text-muted-foreground">{locale === "zh" ? "备注" : "Note"}: {booking.notes}</p>}
-
-            {/* Cleaning task summary. Open cleaning actions are rendered by the primary action block below. */}
-            {effectiveCleaningTask && (effectiveCleaningTask.is_completed || primaryAction?.action !== "complete_cleaning") && (
-              <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-cyan-700">{t.cleaning.title}: {effectiveCleaningTask.is_completed ? t.cleaning.completed : t.cleaning.pending}</span>
-                </div>
-              </div>
-            )}
-
-            {!readOnly && <section className="space-y-3">
-              <p className="text-sm font-semibold text-foreground">{locale === "zh" ? "下一步操作" : "Action suivante"}</p>
-              <div className="space-y-2">
-
-              {showAdvanceReservationPayment && (
-                <div className="space-y-3 border-t border-border pt-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-foreground">
-                      {locale === "zh" ? "预订收款" : "Paiement de reservation"}
-                    </p>
-                    <span className={cn(
-                      "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums",
-                      hasOutstandingBalance
-                        ? "bg-accentAmber-50 text-accentAmber-700"
-                        : "bg-accentGreen-50 text-accentGreen-700",
-                    )}>
-                      {hasOutstandingBalance
-                        ? `${locale === "zh" ? "待收" : "Solde"} ${formatXof(outstanding)}`
-                        : (locale === "zh" ? "已登记" : "Paye")}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {lodgingBusinessLabel && (
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold",
+                        lodgingBusinessToneClass,
+                      )}
+                    >
+                      <CalendarClock className="h-3.5 w-3.5" />
+                      {lodgingBusinessLabel}
                     </span>
+                  )}
+                  <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-semibold text-foreground/75">
+                    {t.bookingStatus[booking.status as keyof typeof t.bookingStatus] ??
+                      statusDisplayLabel(booking.status, locale)}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-lg bg-muted px-3 py-2">
+                    <p className="text-xs text-muted-foreground">{t.booking.checkInDate}</p>
+                    <p className="mt-0.5 font-semibold text-foreground">{booking.check_in}</p>
                   </div>
+                  <div className="rounded-lg bg-muted px-3 py-2">
+                    <p className="text-xs text-muted-foreground">
+                      {booking.status === "checked_out" || booking.checkout_mode === "open"
+                        ? t.actualCheckOutDate
+                        : t.booking.checkOutDate}
+                    </p>
+                    <p className="mt-0.5 font-semibold text-foreground">
+                      {booking.status === "checked_out"
+                        ? (booking.actual_check_out ?? booking.check_out ?? "—")
+                        : booking.checkout_mode === "open"
+                          ? (booking.actual_check_out ?? "—")
+                          : booking.check_out}
+                    </p>
+                  </div>
+                </div>
+              </section>
 
-                  {hasOutstandingBalance && (
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className={labelClass}>{locale === "zh" ? "本次收款" : "Montant"}</label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={outstanding}
-                            value={prepaidAmount}
-                            onChange={event => setPrepaidAmount(event.target.value)}
-                            className={inputClass}
-                            placeholder={String(outstanding)}
-                          />
-                        </div>
-                        <div>
-                          <label className={labelClass}>{locale === "zh" ? "收款日期" : "Date paiement"}</label>
-                          <DateInput value={suppPaymentDate} onChangeValue={setSuppPaymentDate} className={inputClass} />
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="lg"
-                        onClick={handleReservationPayment}
-                        disabled={saving || toN(prepaidAmount) <= 0 || toN(prepaidAmount) > outstanding}
-                        className="w-full justify-center font-semibold"
-                      >
-                        <DollarSign />
-                        {locale === "zh" ? "登记收款，暂不入住" : "Encaisser sans arrivée"}
-                      </Button>
+              <section className="border-b border-border pb-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-foreground">
+                    {locale === "zh" ? "费用与收款" : "Frais et paiements"}
+                  </p>
+                  <span
+                    className={cn(
+                      "text-sm font-semibold tabular-nums",
+                      hasOutstandingBalance ? "text-accentRed-600" : "text-accentGreen-700",
+                    )}
+                  >
+                    {hasOutstandingBalance
+                      ? formatXof(outstanding)
+                      : locale === "zh"
+                        ? "已付清"
+                        : "Paye"}
+                  </span>
+                </div>
+
+                {billing && (
+                  <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2 text-xs">
+                    <div>
+                      <p className="text-muted-foreground">{t.booking.nightlyPrice}</p>
+                      <p className="mt-0.5 font-medium tabular-nums text-foreground">
+                        {formatXof(Number(booking.nightly_price_xof))}
+                      </p>
                     </div>
-                  )}
-                </div>
-              )}
-
-              {primaryAction?.action === "confirm" && (
-                <div className="space-y-2">
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
-                    <p className="text-xs font-semibold text-amber-700">
-                      {locale === "zh" ? "此预订仍处于待确认状态。确认后即可继续办理入住。" : "Cette reservation attend confirmation. Confirmez-la avant l'arrivee."}
-                    </p>
-                  </div>
-                  <Button variant="default" size="lg" onClick={handleConfirmBooking} disabled={saving} className="w-full justify-center font-semibold">
-                    <Check />
-                    {t.booking.confirmBooking}
-                  </Button>
-                  <Button variant="outline" size="lg" onClick={handleCancelBooking} disabled={saving} className="w-full justify-center border-accentRed-200 font-semibold text-accentRed-600 hover:border-accentRed-300 hover:bg-accentRed-50 hover:text-accentRed-700">
-                    <UserX />{t.booking.cancelBooking}
-                  </Button>
-                </div>
-              )}
-
-              {/* ── confirmed + cleaning blocked → primary = complete_cleaning ── */}
-              {primaryAction?.action === "complete_cleaning" && booking.status === "confirmed" && (
-                <div className="space-y-2">
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
-                    <p className="text-xs font-semibold text-amber-700">
-                      {locale === "zh" ? "此预订已确认，需先完成保洁后才能办理入住。" : "Reservation confirmee. Le menage doit etre termine avant l'arrivee."}
-                    </p>
-                  </div>
-                  {effectiveCleaningTask && (
-                    <Button variant="default" size="lg" onClick={handleCompleteCleaning} disabled={saving} className="w-full justify-center font-semibold">
-                      <Check />{t.cleaning.markComplete}
-                    </Button>
-                  )}
-                </div>
-              )}
-
-              {/* ── confirmed (no cleaning block) → primary = check_in ── */}
-              {primaryAction?.action === "check_in" && (
-                <div className="space-y-2">
-                  <Button variant="default" size="lg" onClick={handleCheckIn} disabled={saving} className="w-full justify-center font-semibold"><LogIn />{t.booking.checkIn}</Button>
-                  <Button variant="outline" size="lg" onClick={handleCancelBooking} disabled={saving} className="w-full justify-center border-accentRed-200 font-semibold text-accentRed-600 hover:border-accentRed-300 hover:bg-accentRed-50 hover:text-accentRed-700"><UserX />{t.booking.cancelBooking}</Button>
-                </div>
-              )}
-
-              {/* ── checked_in → primary = check_out ── */}
-              {primaryAction?.action === "check_out" && (
-                <div className="space-y-3">
-                  {/* ── Checkout total + date ── */}
-                  <div className="space-y-2 border-t border-border pt-3">
-                    {booking.checkout_mode === "open" && (
-                      <div>
-                        <label className={labelClass}>{t.actualCheckOutDate}</label>
-                        <DateInput value={actualCheckOut} onChangeValue={setActualCheckOut} className={inputClass} />
+                    <div>
+                      <p className="text-muted-foreground">{t.booking.nights}</p>
+                      <p className="mt-0.5 font-medium tabular-nums text-foreground">
+                        {billing.nights}
+                        {locale === "zh" ? "晚" : " nuits"}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-muted-foreground">{t.billing.finalAmount}</p>
+                      <p className="mt-0.5 font-semibold tabular-nums text-foreground">
+                        {formatXof(billing.finalAmount)}
+                      </p>
+                    </div>
+                    {billing.discount > 0 && (
+                      <div className="col-span-3 flex items-center justify-between border-t border-border pt-2">
+                        <span className="text-muted-foreground">
+                          {t.billing.grossAmount} {formatXof(billing.grossAmount)}
+                        </span>
+                        <span className="font-medium tabular-nums text-accentGreen-700">
+                          {t.billing.discount} -{formatXof(billing.discount)}
+                        </span>
                       </div>
                     )}
-                    {booking.checkout_mode === "open" && (
-                      <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="text-muted-foreground">{t.booking.calculatedTotal}</span>
-                        <span className="font-semibold tabular-nums text-foreground">{formatXof(finalDue)}</span>
-                      </div>
-                    )}
+                    <div className="col-span-3 flex items-center justify-between border-t border-border pt-2 text-sm">
+                      <span className="text-muted-foreground">{t.billing.paid}</span>
+                      <span className="font-semibold tabular-nums text-accentGreen-700">
+                        {formatXof(totalPaid)}
+                      </span>
+                    </div>
                   </div>
+                )}
 
-                  <Button variant="default" size="lg" onClick={handleCheckOut} disabled={saving} className="w-full justify-center font-semibold"><Check />{t.booking.confirmCheckOut}</Button>
-
-                  {/* More actions: choose one task, then show one focused form */}
-                  <div className="rounded-lg border border-border bg-card">
+                {positiveBookingPayments.length > 0 && (
+                  <div className="mt-3 border-t border-border pt-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        setShowAdvancedActions((value) => !value);
-                        setActiveAdvancedTask(null);
-                      }}
-                      className="flex h-10 w-full items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted/60"
+                      aria-expanded={showPaymentHistory}
+                      onClick={() => setShowPaymentHistory((value) => !value)}
+                      className="flex min-h-9 w-full items-center justify-between gap-3 rounded-lg px-1 text-left transition-colors hover:bg-muted/50"
                     >
-                      <MoreHorizontal className="h-4 w-4" />
-                      {showAdvancedActions
-                        ? (locale === "zh" ? "收起更多业务" : "Masquer")
-                        : (locale === "zh" ? "更多业务操作" : "Plus d'actions")}
+                      <p className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                        <WalletCards className="h-3.5 w-3.5" />
+                        {locale === "zh"
+                          ? `收款记录 · ${positiveBookingPayments.length}笔`
+                          : `${positiveBookingPayments.length} paiement(s)`}
+                      </p>
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-foreground/70">
+                        {showPaymentHistory
+                          ? locale === "zh"
+                            ? "收起"
+                            : "Reduire"
+                          : locale === "zh"
+                            ? "展开"
+                            : "Afficher"}
+                        <ChevronDown
+                          className={cn(
+                            "h-3.5 w-3.5 transition-transform",
+                            showPaymentHistory && "rotate-180",
+                          )}
+                        />
+                      </span>
                     </button>
-
-                    {showAdvancedActions && (
-                      <div className="border-t border-border p-3">
-                        {activeAdvancedTask === null ? (
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            <button
-                              type="button"
-                              onClick={() => setActiveAdvancedTask("payment")}
-                              className="flex min-h-14 items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/70"
+                    {showPaymentHistory && (
+                      <ul className="divide-y divide-border/70">
+                        {positiveBookingPayments.map((payment) => {
+                          const isReversed = reversedPaymentIds.has(payment.id);
+                          return (
+                            <li
+                              key={payment.id}
+                              className="group flex min-h-9 items-center justify-between gap-3 text-xs"
                             >
-                              <DollarSign className="h-4 w-4 shrink-0 text-muted-foreground" />
-                              <span>
-                                <span className="block text-sm font-semibold">{locale === "zh" ? "补缴收款" : "Paiement"}</span>
-                                <span className="block text-xs text-muted-foreground">{locale === "zh" ? "登记追加收款" : "Ajouter un paiement"}</span>
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setActiveAdvancedTask("discount")}
-                              className="flex min-h-14 items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/70"
-                            >
-                              <Percent className="h-4 w-4 shrink-0 text-muted-foreground" />
-                              <span>
-                                <span className="block text-sm font-semibold">{locale === "zh" ? "优惠调整" : "Remise"}</span>
-                                <span className="block text-xs text-muted-foreground">{locale === "zh" ? "记录手动优惠原因" : "Ajuster le montant"}</span>
-                              </span>
-                            </button>
-                            {booking.checkout_mode === "fixed" && (
-                              <button
-                                type="button"
-                                onClick={() => setActiveAdvancedTask("extend")}
-                                className="flex min-h-14 items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/70"
-                              >
-                                <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                <span>
-                                  <span className="block text-sm font-semibold">{t.booking.extendStay}</span>
-                                  <span className="block text-xs text-muted-foreground">{locale === "zh" ? "延长固定离店日期" : "Prolonger le sejour"}</span>
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span className="whitespace-nowrap tabular-nums text-foreground/70">
+                                  {payment.payment_date}
                                 </span>
-                              </button>
-                            )}
-                            {booking.checkout_mode === "open" && (
-                              <button
-                                type="button"
-                                onClick={() => setActiveAdvancedTask("fixedCheckout")}
-                                className="flex min-h-14 items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/70"
-                              >
-                                <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                <span>
-                                  <span className="block text-sm font-semibold">{t.setFixedCheckout}</span>
-                                  <span className="block text-xs text-muted-foreground">{locale === "zh" ? "把不固定离店改为固定日期" : "Fixer une date de depart"}</span>
-                                </span>
-                              </button>
-                            )}
-                            {canCorrectCheckin && bookingPayments.length === 0 && Number(booking.prepaid_amount_xof) === 0 && (
-                              <button
-                                type="button"
-                                onClick={() => setActiveAdvancedTask("correction")}
-                                className="flex min-h-14 items-center gap-3 rounded-lg border border-accentRed-200 bg-accentRed-50 px-3 py-2 text-left transition-colors hover:bg-accentRed-100"
-                              >
-                                <UserX className="h-4 w-4 shrink-0 text-accentRed-600" />
-                                <span>
-                                  <span className="block text-sm font-semibold text-accentRed-700">{locale === "zh" ? "撤销误入住" : "Annuler l’arrivée"}</span>
-                                  <span className="block text-xs text-accentRed-600">{locale === "zh" ? "管理员纠错" : "Correction administrateur"}</span>
-                                </span>
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-semibold text-foreground">
-                                  {activeAdvancedTask === "payment" && (locale === "zh" ? "补缴收款" : "Paiement")}
-                                  {activeAdvancedTask === "discount" && (locale === "zh" ? "优惠调整" : "Remise")}
-                                  {activeAdvancedTask === "extend" && t.booking.extendStay}
-                                  {activeAdvancedTask === "fixedCheckout" && t.setFixedCheckout}
-                                  {activeAdvancedTask === "correction" && (locale === "zh" ? "管理员纠错：撤销误入住" : "Correction admin : annuler une arrivée erronée")}
-                                </p>
-                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                  {locale === "zh" ? "只处理当前选中的业务动作" : "Action ciblee uniquement"}
-                                </p>
-                              </div>
-                              <Button type="button" variant="ghost" size="sm" onClick={() => setActiveAdvancedTask(null)}>
-                                {locale === "zh" ? "返回" : "Retour"}
-                              </Button>
-                            </div>
-
-                            {activeAdvancedTask === "payment" && (
-                              <div className="space-y-2">
-                                <div className="grid grid-cols-[1fr_auto] gap-2">
-                                  <input type="number" value={suppAmount} onChange={e => setSuppAmount(e.target.value)} className={inputClass} placeholder={t.booking.totalAmount} />
-                                  <Button variant="secondary" size="sm" onClick={handleSuppPayment} disabled={saving || (parseInt(suppAmount,10)||0) <= 0} className="shrink-0"><DollarSign className="h-3 w-3" />{locale === "zh" ? "收" : "+"}</Button>
-                                </div>
-                                <div>
-                                  <DateInput value={suppPaymentDate} onChangeValue={setSuppPaymentDate} className={inputClass} />
-                                </div>
-                              </div>
-                            )}
-
-                            {activeAdvancedTask === "discount" && (
-                              <div className="space-y-2">
-                                <div className="grid grid-cols-2 gap-2">
-                                  <input type="number" value={discountAmount} onChange={e => setDiscountAmount(e.target.value)} className={inputClass} placeholder={t.discountAmount} />
-                                  <input type="text" value={discountReason} onChange={e => setDiscountReason(e.target.value)} className={inputClass} placeholder={t.discountReason} />
-                                </div>
-                                <Button variant="secondary" size="sm" onClick={handleDiscount} disabled={saving || (parseInt(discountAmount,10)||0) <= 0} className="w-full"><Percent className="h-3 w-3 mr-1" />{t.applyDiscount}</Button>
-                              </div>
-                            )}
-
-                            {activeAdvancedTask === "extend" && booking.checkout_mode === "fixed" && (
-                              <div className="flex items-center gap-2">
-                                <input type="number" min={1} value={extendDays} onChange={e => setExtendDays(e.target.value)} className="h-9 w-16 rounded-lg border border-border px-2 text-sm shadow-sm transition-colors duration-fast hover:border-ring/30 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20" />
-                                <span className="flex-1 text-xs text-foreground/70">+{formatXof(Number(booking.nightly_price_xof) * (parseInt(extendDays,10)||1))}</span>
-                                <Button variant="secondary" size="sm" onClick={handleExtend} disabled={saving}>{t.booking.extendStay}</Button>
-                              </div>
-                            )}
-
-                            {activeAdvancedTask === "fixedCheckout" && booking.checkout_mode === "open" && (
-                              <div className="space-y-2">
-                                <p className="text-xs text-muted-foreground">{t.setFixedCheckoutDesc}</p>
-                                <div className="flex items-center gap-2">
-                                  <DateInput value={fixedCheckOutDate} onChangeValue={setFixedCheckOutDate} className={inputClass} min={booking.check_in} />
-                                  <Button variant="secondary" size="sm" onClick={handleSetFixedCheckout} disabled={saving || !fixedCheckOutDate} className="shrink-0">{t.setFixedCheckoutButton}</Button>
-                                </div>
-                                {fixedCheckOutDate && fixedCheckOutNights > 0 && (
-                                  <p className="text-xs text-foreground/70">{t.setFixedCheckoutNights.replace("{nights}", String(fixedCheckOutNights)).replace("{amount}", formatXof(fixedCheckOutNights * Number(booking.nightly_price_xof)))}</p>
+                                {isReversed && (
+                                  <span className="text-muted-foreground">
+                                    {locale === "zh" ? "已冲销" : "Annule"}
+                                  </span>
                                 )}
                               </div>
-                            )}
-
-                            {activeAdvancedTask === "correction" && canCorrectCheckin && bookingPayments.length === 0 && Number(booking.prepaid_amount_xof) === 0 && (
-                              <div className="space-y-3">
-                                <p className="text-xs text-muted-foreground">
-                                  {locale === "zh"
-                                    ? "仅用于重复或误录入住。撤销未收应收，保留历史；不会办理退房或生成保洁任务。"
-                                    : "Doublon ou erreur uniquement. Historique conservé, sans départ ni ménage."}
-                                </p>
-                                <Input
-                                  aria-label="误入住撤销原因"
-                                  value={correctionReason}
-                                  onChange={event => setCorrectionReason(event.target.value)}
-                                  disabled={saving}
-                                  placeholder={locale === "zh" ? "填写纠错原因（至少5个字）" : "Motif de correction"}
-                                />
-                                <Button
-                                  variant="outline"
-                                  className="w-full border-accentRed-200 text-accentRed-600 hover:bg-accentRed-50 hover:text-accentRed-700"
-                                  disabled={saving || correctionReason.trim().length < 5}
-                                  onClick={() => setConfirmCorrection(true)}
+                              <div className="flex shrink-0 items-center gap-1">
+                                <span
+                                  className={cn(
+                                    "font-semibold tabular-nums",
+                                    isReversed
+                                      ? "text-muted-foreground line-through"
+                                      : "text-accentGreen-700",
+                                  )}
                                 >
-                                  <UserX className="h-4 w-4" />
-                                  {locale === "zh" ? "撤销误入住" : "Annuler l’arrivée erronée"}
-                                </Button>
-                                <ConfirmDialog
-                                  open={confirmCorrection}
-                                  locale={locale}
-                                  title={locale === "zh" ? "确认撤销误入住" : "Confirmer la correction"}
-                                  description={correctionReason}
-                                  loading={saving}
-                                  confirmLabel={locale === "zh" ? "确认撤销误入住" : "Confirmer"}
-                                  onClose={() => setConfirmCorrection(false)}
-                                  onConfirm={() => void runPanelAction(() => voidErroneousCheckin(booking.id, correctionReason), { closeOnSuccess: true })}
+                                  {formatXof(Number(payment.amount))}
+                                </span>
+                                {!readOnly && !isReversed && actualRefunds.length === 0 && (
+                                  <button
+                                    type="button"
+                                    className="rounded p-1 text-muted-foreground/60 transition-colors hover:bg-accentRed-50 hover:text-accentRed-600"
+                                    onClick={() => {
+                                      setDeleteTarget({
+                                        id: payment.id,
+                                        amount: Number(payment.amount),
+                                      });
+                                      setReversalReason("");
+                                    }}
+                                    title={locale === "zh" ? "冲销此收款" : "Annuler ce paiement"}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                    {actualRefunds.length > 0 && (
+                      <div className="space-y-2 border-t pt-3 text-xs">
+                        <p>
+                          {locale === "zh"
+                            ? "实际退款（不是错误收款冲正）"
+                            : "Remboursements réels (hors contrepassations)"}
+                        </p>
+                        {actualRefunds.map((p) => (
+                          <p key={p.id} className="flex justify-between">
+                            <span>{p.payment_date}</span>
+                            <span>{formatXof(Math.abs(Number(p.amount)))}</span>
+                          </p>
+                        ))}
+                        <p className="text-muted-foreground">
+                          {locale === "zh"
+                            ? "此单已有实际退款，如需冲正原收款，请先联系管理员核对。"
+                            : "Remboursement existant : consulter un administrateur avant toute contrepassation."}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+
+              {billing?.eligibleForMonthlyDiscount && hasOutstandingBalance && (
+                <div className="rounded-lg border border-amber-200 bg-accentAmber-50 p-3 text-xs text-accentAmber-700">
+                  <Percent className="inline h-3.5 w-3.5 mr-1" />
+                  {t.monthlyDiscountHint
+                    .replace("{nights}", String(billing.nights))
+                    .replace("{gross}", formatXof(billing.grossAmount))}
+                </div>
+              )}
+
+              {booking.notes && (
+                <p className="text-xs text-muted-foreground">
+                  {locale === "zh" ? "备注" : "Note"}: {booking.notes}
+                </p>
+              )}
+
+              {/* Cleaning task summary. Open cleaning actions are rendered by the primary action block below. */}
+              {effectiveCleaningTask &&
+                (effectiveCleaningTask.is_completed ||
+                  primaryAction?.action !== "complete_cleaning") && (
+                  <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-cyan-700">
+                        {t.cleaning.title}:{" "}
+                        {effectiveCleaningTask.is_completed
+                          ? t.cleaning.completed
+                          : t.cleaning.pending}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+              {!readOnly && (
+                <section className="space-y-3">
+                  <p className="text-sm font-semibold text-foreground">
+                    {locale === "zh" ? "下一步操作" : "Action suivante"}
+                  </p>
+                  <div className="space-y-2">
+                    {showAdvanceReservationPayment && (
+                      <div className="space-y-3 border-t border-border pt-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-foreground">
+                            {locale === "zh" ? "预订收款" : "Paiement de reservation"}
+                          </p>
+                          <span
+                            className={cn(
+                              "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums",
+                              hasOutstandingBalance
+                                ? "bg-accentAmber-50 text-accentAmber-700"
+                                : "bg-accentGreen-50 text-accentGreen-700",
+                            )}
+                          >
+                            {hasOutstandingBalance
+                              ? `${locale === "zh" ? "待收" : "Solde"} ${formatXof(outstanding)}`
+                              : locale === "zh"
+                                ? "已登记"
+                                : "Paye"}
+                          </span>
+                        </div>
+
+                        {hasOutstandingBalance && (
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className={labelClass}>
+                                  {locale === "zh" ? "本次收款" : "Montant"}
+                                </label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={outstanding}
+                                  value={prepaidAmount}
+                                  onChange={(event) => setPrepaidAmount(event.target.value)}
+                                  className={inputClass}
+                                  placeholder={String(outstanding)}
                                 />
                               </div>
-                            )}
+                              <div>
+                                <label className={labelClass}>
+                                  {locale === "zh" ? "收款日期" : "Date paiement"}
+                                </label>
+                                <DateInput
+                                  value={suppPaymentDate}
+                                  onChangeValue={setSuppPaymentDate}
+                                  className={inputClass}
+                                />
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="lg"
+                              onClick={handleReservationPayment}
+                              disabled={
+                                saving ||
+                                toN(prepaidAmount) <= 0 ||
+                                toN(prepaidAmount) > outstanding
+                              }
+                              className="w-full justify-center font-semibold"
+                            >
+                              <DollarSign />
+                              {locale === "zh" ? "登记收款，暂不入住" : "Encaisser sans arrivée"}
+                            </Button>
                           </div>
                         )}
                       </div>
                     )}
-                  </div>
-                </div>
-              )}
 
-              {/* ── checked_out + unpaid → primary = collect_balance ── */}
-              {primaryAction?.action === "collect_balance" && (
-                <div className="space-y-3 rounded-lg border border-accentRed-200 bg-accentRed-50 p-3">
-                  <div>
-                    <p className="text-sm font-semibold text-accentRed-700">{locale === "zh" ? "补录离店未付款" : "Encaisser le solde"}</p>
-                    <p className="mt-0.5 text-xs text-accentRed-700/80">
-                      {locale === "zh"
-                        ? `当前仍欠 ${formatXof(outstanding)}，补录后会同步财务、流水和审计日志。`
-                        : `Solde restant ${formatXof(outstanding)}. Le paiement mettra a jour finance, ledger et audit.`}
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={labelClass}>{t.supplementaryPayment}</label>
-                      <input type="number" value={suppAmount} onChange={e => setSuppAmount(e.target.value)} className={inputClass} />
-                    </div>
-                    <div>
-                      <label className={labelClass}>{locale === "zh" ? "收款日期" : "Date paiement"}</label>
-                      <DateInput value={suppPaymentDate} onChangeValue={setSuppPaymentDate} className={inputClass} />
-                    </div>
-                  </div>
-                  <Button variant="default" onClick={handleSuppPayment} disabled={saving || (parseInt(suppAmount, 10) || 0) <= 0} className="w-full">
-                    <DollarSign className="h-4 w-4" />
-                    {locale === "zh" ? "确认补录收款" : "Confirmer le paiement"}
-                  </Button>
-                </div>
-              )}
+                    {primaryAction?.action === "confirm" && (
+                      <div className="space-y-2">
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
+                          <p className="text-xs font-semibold text-amber-700">
+                            {locale === "zh"
+                              ? "此预订仍处于待确认状态。确认后即可继续办理入住。"
+                              : "Cette reservation attend confirmation. Confirmez-la avant l'arrivee."}
+                          </p>
+                        </div>
+                        <Button
+                          variant="default"
+                          size="lg"
+                          onClick={handleConfirmBooking}
+                          disabled={saving}
+                          className="w-full justify-center font-semibold"
+                        >
+                          <Check />
+                          {t.booking.confirmBooking}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          onClick={handleCancelBooking}
+                          disabled={saving}
+                          className="w-full justify-center border-accentRed-200 font-semibold text-accentRed-600 hover:border-accentRed-300 hover:bg-accentRed-50 hover:text-accentRed-700"
+                        >
+                          <UserX />
+                          {t.booking.cancelBooking}
+                        </Button>
+                      </div>
+                    )}
 
-              {/* ── checked_out + cleaning pending → primary = complete_cleaning ── */}
-              {primaryAction?.action === "complete_cleaning" && booking.status === "checked_out" && (
-                <div className="space-y-2">
-                  <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-center">
-                    <p className="text-xs font-semibold text-cyan-700 mb-2">{t.cleaning.pending}</p>
-                    {effectiveCleaningTask && (
-                      <Button variant="default" size="sm" onClick={handleCompleteCleaning} disabled={saving}>
-                        <Check className="h-3.5 w-3.5 mr-1" />{t.cleaning.markComplete}
-                      </Button>
+                    {/* ── confirmed + cleaning blocked → primary = complete_cleaning ── */}
+                    {primaryAction?.action === "complete_cleaning" &&
+                      booking.status === "confirmed" && (
+                        <div className="space-y-2">
+                          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
+                            <p className="text-xs font-semibold text-amber-700">
+                              {locale === "zh"
+                                ? "此预订已确认，需先完成保洁后才能办理入住。"
+                                : "Reservation confirmee. Le menage doit etre termine avant l'arrivee."}
+                            </p>
+                          </div>
+                          {effectiveCleaningTask && (
+                            <Button
+                              variant="default"
+                              size="lg"
+                              onClick={handleCompleteCleaning}
+                              disabled={saving}
+                              className="w-full justify-center font-semibold"
+                            >
+                              <Check />
+                              {t.cleaning.markComplete}
+                            </Button>
+                          )}
+                        </div>
+                      )}
+
+                    {/* ── confirmed (no cleaning block) → primary = check_in ── */}
+                    {primaryAction?.action === "check_in" && (
+                      <div className="space-y-2">
+                        <Button
+                          variant="default"
+                          size="lg"
+                          onClick={handleCheckIn}
+                          disabled={saving}
+                          className="w-full justify-center font-semibold"
+                        >
+                          <LogIn />
+                          {t.booking.checkIn}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          onClick={handleCancelBooking}
+                          disabled={saving}
+                          className="w-full justify-center border-accentRed-200 font-semibold text-accentRed-600 hover:border-accentRed-300 hover:bg-accentRed-50 hover:text-accentRed-700"
+                        >
+                          <UserX />
+                          {t.booking.cancelBooking}
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* ── checked_in → primary = check_out ── */}
+                    {primaryAction?.action === "check_out" && (
+                      <div className="space-y-3">
+                        {/* ── Checkout total + date ── */}
+                        <div className="space-y-2 border-t border-border pt-3">
+                          {booking.checkout_mode === "open" && (
+                            <div>
+                              <label className={labelClass}>{t.actualCheckOutDate}</label>
+                              <DateInput
+                                value={actualCheckOut}
+                                onChangeValue={setActualCheckOut}
+                                className={inputClass}
+                              />
+                            </div>
+                          )}
+                          {booking.checkout_mode === "open" && (
+                            <div className="flex items-center justify-between gap-3 text-sm">
+                              <span className="text-muted-foreground">
+                                {t.booking.calculatedTotal}
+                              </span>
+                              <span className="font-semibold tabular-nums text-foreground">
+                                {formatXof(finalDue)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <Button
+                          variant="default"
+                          size="lg"
+                          onClick={handleCheckOut}
+                          disabled={saving}
+                          className="w-full justify-center font-semibold"
+                        >
+                          <Check />
+                          {t.booking.confirmCheckOut}
+                        </Button>
+
+                        {/* More actions: choose one task, then show one focused form */}
+                        <div className="rounded-lg border border-border bg-card">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowAdvancedActions((value) => !value);
+                              setActiveAdvancedTask(null);
+                            }}
+                            className="flex h-10 w-full items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted/60"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                            {showAdvancedActions
+                              ? locale === "zh"
+                                ? "收起更多业务"
+                                : "Masquer"
+                              : locale === "zh"
+                                ? "更多业务操作"
+                                : "Plus d'actions"}
+                          </button>
+
+                          {showAdvancedActions && (
+                            <div className="border-t border-border p-3">
+                              {activeAdvancedTask === null ? (
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveAdvancedTask("payment")}
+                                    className="flex min-h-14 items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/70"
+                                  >
+                                    <DollarSign className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span>
+                                      <span className="block text-sm font-semibold">
+                                        {locale === "zh" ? "补缴收款" : "Paiement"}
+                                      </span>
+                                      <span className="block text-xs text-muted-foreground">
+                                        {locale === "zh" ? "登记追加收款" : "Ajouter un paiement"}
+                                      </span>
+                                    </span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveAdvancedTask("discount")}
+                                    className="flex min-h-14 items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/70"
+                                  >
+                                    <Percent className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span>
+                                      <span className="block text-sm font-semibold">
+                                        {locale === "zh" ? "优惠调整" : "Remise"}
+                                      </span>
+                                      <span className="block text-xs text-muted-foreground">
+                                        {locale === "zh"
+                                          ? "记录手动优惠原因"
+                                          : "Ajuster le montant"}
+                                      </span>
+                                    </span>
+                                  </button>
+                                  {booking.checkout_mode === "fixed" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveAdvancedTask("extend")}
+                                      className="flex min-h-14 items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/70"
+                                    >
+                                      <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                      <span>
+                                        <span className="block text-sm font-semibold">
+                                          {t.booking.extendStay}
+                                        </span>
+                                        <span className="block text-xs text-muted-foreground">
+                                          {locale === "zh"
+                                            ? "延长固定离店日期"
+                                            : "Prolonger le sejour"}
+                                        </span>
+                                      </span>
+                                    </button>
+                                  )}
+                                  {booking.checkout_mode === "open" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveAdvancedTask("fixedCheckout")}
+                                      className="flex min-h-14 items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/70"
+                                    >
+                                      <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                      <span>
+                                        <span className="block text-sm font-semibold">
+                                          {t.setFixedCheckout}
+                                        </span>
+                                        <span className="block text-xs text-muted-foreground">
+                                          {locale === "zh"
+                                            ? "把不固定离店改为固定日期"
+                                            : "Fixer une date de depart"}
+                                        </span>
+                                      </span>
+                                    </button>
+                                  )}
+                                  {canCorrectCheckin &&
+                                    bookingPayments.length === 0 &&
+                                    Number(booking.prepaid_amount_xof) === 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setActiveAdvancedTask("correction")}
+                                        className="flex min-h-14 items-center gap-3 rounded-lg border border-accentRed-200 bg-accentRed-50 px-3 py-2 text-left transition-colors hover:bg-accentRed-100"
+                                      >
+                                        <UserX className="h-4 w-4 shrink-0 text-accentRed-600" />
+                                        <span>
+                                          <span className="block text-sm font-semibold text-accentRed-700">
+                                            {locale === "zh" ? "撤销误入住" : "Annuler l’arrivée"}
+                                          </span>
+                                          <span className="block text-xs text-accentRed-600">
+                                            {locale === "zh"
+                                              ? "管理员纠错"
+                                              : "Correction administrateur"}
+                                          </span>
+                                        </span>
+                                      </button>
+                                    )}
+                                </div>
+                              ) : (
+                                <div className="space-y-3">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm font-semibold text-foreground">
+                                        {activeAdvancedTask === "payment" &&
+                                          (locale === "zh" ? "补缴收款" : "Paiement")}
+                                        {activeAdvancedTask === "discount" &&
+                                          (locale === "zh" ? "优惠调整" : "Remise")}
+                                        {activeAdvancedTask === "extend" && t.booking.extendStay}
+                                        {activeAdvancedTask === "fixedCheckout" &&
+                                          t.setFixedCheckout}
+                                        {activeAdvancedTask === "correction" &&
+                                          (locale === "zh"
+                                            ? "管理员纠错：撤销误入住"
+                                            : "Correction admin : annuler une arrivée erronée")}
+                                      </p>
+                                      <p className="mt-0.5 text-xs text-muted-foreground">
+                                        {locale === "zh"
+                                          ? "只处理当前选中的业务动作"
+                                          : "Action ciblee uniquement"}
+                                      </p>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setActiveAdvancedTask(null)}
+                                    >
+                                      {locale === "zh" ? "返回" : "Retour"}
+                                    </Button>
+                                  </div>
+
+                                  {activeAdvancedTask === "payment" && (
+                                    <div className="space-y-2">
+                                      <div className="grid grid-cols-[1fr_auto] gap-2">
+                                        <input
+                                          type="number"
+                                          value={suppAmount}
+                                          onChange={(e) => setSuppAmount(e.target.value)}
+                                          className={inputClass}
+                                          placeholder={t.booking.totalAmount}
+                                        />
+                                        <Button
+                                          variant="secondary"
+                                          size="sm"
+                                          onClick={handleSuppPayment}
+                                          disabled={saving || (parseInt(suppAmount, 10) || 0) <= 0}
+                                          className="shrink-0"
+                                        >
+                                          <DollarSign className="h-3 w-3" />
+                                          {locale === "zh" ? "收" : "+"}
+                                        </Button>
+                                      </div>
+                                      <div>
+                                        <DateInput
+                                          value={suppPaymentDate}
+                                          onChangeValue={setSuppPaymentDate}
+                                          className={inputClass}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {activeAdvancedTask === "discount" && (
+                                    <div className="space-y-2">
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <input
+                                          type="number"
+                                          value={discountAmount}
+                                          onChange={(e) => setDiscountAmount(e.target.value)}
+                                          className={inputClass}
+                                          placeholder={t.discountAmount}
+                                        />
+                                        <input
+                                          type="text"
+                                          value={discountReason}
+                                          onChange={(e) => setDiscountReason(e.target.value)}
+                                          className={inputClass}
+                                          placeholder={t.discountReason}
+                                        />
+                                      </div>
+                                      <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={handleDiscount}
+                                        disabled={
+                                          saving || (parseInt(discountAmount, 10) || 0) <= 0
+                                        }
+                                        className="w-full"
+                                      >
+                                        <Percent className="h-3 w-3 mr-1" />
+                                        {t.applyDiscount}
+                                      </Button>
+                                    </div>
+                                  )}
+
+                                  {activeAdvancedTask === "extend" &&
+                                    booking.checkout_mode === "fixed" && (
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="number"
+                                          min={1}
+                                          value={extendDays}
+                                          onChange={(e) => setExtendDays(e.target.value)}
+                                          className="h-9 w-16 rounded-lg border border-border px-2 text-sm shadow-sm transition-colors duration-fast hover:border-ring/30 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
+                                        />
+                                        <span className="flex-1 text-xs text-foreground/70">
+                                          +
+                                          {formatXof(
+                                            Number(booking.nightly_price_xof) *
+                                              (parseInt(extendDays, 10) || 1),
+                                          )}
+                                        </span>
+                                        <Button
+                                          variant="secondary"
+                                          size="sm"
+                                          onClick={handleExtend}
+                                          disabled={saving}
+                                        >
+                                          {t.booking.extendStay}
+                                        </Button>
+                                      </div>
+                                    )}
+
+                                  {activeAdvancedTask === "fixedCheckout" &&
+                                    booking.checkout_mode === "open" && (
+                                      <div className="space-y-2">
+                                        <p className="text-xs text-muted-foreground">
+                                          {t.setFixedCheckoutDesc}
+                                        </p>
+                                        <div className="flex items-center gap-2">
+                                          <DateInput
+                                            value={fixedCheckOutDate}
+                                            onChangeValue={setFixedCheckOutDate}
+                                            className={inputClass}
+                                            min={booking.check_in}
+                                          />
+                                          <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={handleSetFixedCheckout}
+                                            disabled={saving || !fixedCheckOutDate}
+                                            className="shrink-0"
+                                          >
+                                            {t.setFixedCheckoutButton}
+                                          </Button>
+                                        </div>
+                                        {fixedCheckOutDate && fixedCheckOutNights > 0 && (
+                                          <p className="text-xs text-foreground/70">
+                                            {t.setFixedCheckoutNights
+                                              .replace("{nights}", String(fixedCheckOutNights))
+                                              .replace(
+                                                "{amount}",
+                                                formatXof(
+                                                  fixedCheckOutNights *
+                                                    Number(booking.nightly_price_xof),
+                                                ),
+                                              )}
+                                          </p>
+                                        )}
+                                      </div>
+                                    )}
+
+                                  {activeAdvancedTask === "correction" &&
+                                    canCorrectCheckin &&
+                                    bookingPayments.length === 0 &&
+                                    Number(booking.prepaid_amount_xof) === 0 && (
+                                      <div className="space-y-3">
+                                        <p className="text-xs text-muted-foreground">
+                                          {locale === "zh"
+                                            ? "仅用于重复或误录入住。撤销未收应收，保留历史；不会办理退房或生成保洁任务。"
+                                            : "Doublon ou erreur uniquement. Historique conservé, sans départ ni ménage."}
+                                        </p>
+                                        <Input
+                                          aria-label="误入住撤销原因"
+                                          value={correctionReason}
+                                          onChange={(event) =>
+                                            setCorrectionReason(event.target.value)
+                                          }
+                                          disabled={saving}
+                                          placeholder={
+                                            locale === "zh"
+                                              ? "填写纠错原因（至少5个字）"
+                                              : "Motif de correction"
+                                          }
+                                        />
+                                        <Button
+                                          variant="outline"
+                                          className="w-full border-accentRed-200 text-accentRed-600 hover:bg-accentRed-50 hover:text-accentRed-700"
+                                          disabled={saving || correctionReason.trim().length < 5}
+                                          onClick={() => setConfirmCorrection(true)}
+                                        >
+                                          <UserX className="h-4 w-4" />
+                                          {locale === "zh"
+                                            ? "撤销误入住"
+                                            : "Annuler l’arrivée erronée"}
+                                        </Button>
+                                        <ConfirmDialog
+                                          open={confirmCorrection}
+                                          locale={locale}
+                                          title={
+                                            locale === "zh"
+                                              ? "确认撤销误入住"
+                                              : "Confirmer la correction"
+                                          }
+                                          description={correctionReason}
+                                          loading={saving}
+                                          confirmLabel={
+                                            locale === "zh" ? "确认撤销误入住" : "Confirmer"
+                                          }
+                                          onClose={() => setConfirmCorrection(false)}
+                                          onConfirm={() =>
+                                            void runPanelAction(
+                                              () =>
+                                                voidErroneousCheckin(booking.id, correctionReason),
+                                              { closeOnSuccess: true },
+                                            )
+                                          }
+                                        />
+                                      </div>
+                                    )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── checked_out + unpaid → primary = collect_balance ── */}
+                    {primaryAction?.action === "collect_balance" && (
+                      <div className="space-y-3 rounded-lg border border-accentRed-200 bg-accentRed-50 p-3">
+                        <div>
+                          <p className="text-sm font-semibold text-accentRed-700">
+                            {locale === "zh" ? "补录离店未付款" : "Encaisser le solde"}
+                          </p>
+                          <p className="mt-0.5 text-xs text-accentRed-700/80">
+                            {locale === "zh"
+                              ? `当前仍欠 ${formatXof(outstanding)}，补录后会同步财务、流水和审计日志。`
+                              : `Solde restant ${formatXof(outstanding)}. Le paiement mettra a jour finance, ledger et audit.`}
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className={labelClass}>{t.supplementaryPayment}</label>
+                            <input
+                              type="number"
+                              value={suppAmount}
+                              onChange={(e) => setSuppAmount(e.target.value)}
+                              className={inputClass}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelClass}>
+                              {locale === "zh" ? "收款日期" : "Date paiement"}
+                            </label>
+                            <DateInput
+                              value={suppPaymentDate}
+                              onChangeValue={setSuppPaymentDate}
+                              className={inputClass}
+                            />
+                          </div>
+                        </div>
+                        <Button
+                          variant="default"
+                          onClick={handleSuppPayment}
+                          disabled={saving || (parseInt(suppAmount, 10) || 0) <= 0}
+                          className="w-full"
+                        >
+                          <DollarSign className="h-4 w-4" />
+                          {locale === "zh" ? "确认补录收款" : "Confirmer le paiement"}
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* ── checked_out + cleaning pending → primary = complete_cleaning ── */}
+                    {primaryAction?.action === "complete_cleaning" &&
+                      booking.status === "checked_out" && (
+                        <div className="space-y-2">
+                          <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-center">
+                            <p className="text-xs font-semibold text-cyan-700 mb-2">
+                              {t.cleaning.pending}
+                            </p>
+                            {effectiveCleaningTask && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={handleCompleteCleaning}
+                                disabled={saving}
+                              >
+                                <Check className="h-3.5 w-3.5 mr-1" />
+                                {t.cleaning.markComplete}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                    {/* ── checked_out without cleaning → view_settlement (read-only) ── */}
+                    {primaryAction?.action === "view_settlement" && (
+                      <div className="rounded-lg bg-muted/50 p-3 text-center text-sm text-foreground/70">
+                        {t.bookingStatus.checked_out}
+                      </div>
+                    )}
+
+                    {/* ── readonly (cancelled / blocked units / past dates) ── */}
+                    {primaryAction?.action === "readonly" && (
+                      <div className="rounded-lg bg-muted/50 p-3 text-center text-sm text-muted-foreground">
+                        {primaryAction.reason === "booking_cancelled"
+                          ? t.bookingStatus.cancelled
+                          : primaryAction.reason
+                            ? formatError(primaryAction.reason)
+                            : locale === "zh"
+                              ? "此房间当前不可操作"
+                              : "Aucune action disponible"}
+                      </div>
                     )}
                   </div>
-                </div>
+                </section>
               )}
-
-              {/* ── checked_out without cleaning → view_settlement (read-only) ── */}
-              {primaryAction?.action === "view_settlement" && (
-                <div className="rounded-lg bg-muted/50 p-3 text-center text-sm text-foreground/70">{t.bookingStatus.checked_out}</div>
+              {actionError && (
+                <p className="text-sm text-accentRed-600" role="alert">
+                  {actionError}
+                </p>
               )}
-
-              {/* ── readonly (cancelled / blocked units / past dates) ── */}
-              {primaryAction?.action === "readonly" && (
-                <div className="rounded-lg bg-muted/50 p-3 text-center text-sm text-muted-foreground">
-                  {primaryAction.reason === "booking_cancelled"
-                    ? t.bookingStatus.cancelled
-                    : primaryAction.reason
-                      ? formatError(primaryAction.reason)
-                      : (locale === "zh" ? "此房间当前不可操作" : "Aucune action disponible")}
-                </div>
-              )}
-              </div>
-            </section>}
-            {actionError && <p className="text-sm text-accentRed-600" role="alert">{actionError}</p>}
-          </>)}
+            </>
+          )}
         </div>
       </RightDrawer>
 
@@ -1075,23 +1720,29 @@ export function BookingPanel({
         }}
         onConfirm={() => void handleReversePayment()}
         title={locale === "zh" ? "冲销收款记录" : "Annuler le paiement"}
-        description={deleteTarget
-          ? (locale === "zh"
+        description={
+          deleteTarget
+            ? locale === "zh"
               ? `原收款 ${formatXof(deleteTarget.amount)} 将被保留，并新增等额冲销流水。`
-              : `Le paiement original de ${formatXof(deleteTarget.amount)} sera conserve avec une ecriture d'annulation.`)
-          : ""}
+              : `Le paiement original de ${formatXof(deleteTarget.amount)} sera conserve avec une ecriture d'annulation.`
+            : ""
+        }
         confirmLabel={locale === "zh" ? "确认冲销" : "Confirmer"}
         locale={locale}
         loading={saving}
         confirmDisabled={!reversalReason.trim()}
       >
         <div className="mb-4">
-          <label className={labelClass}>{locale === "zh" ? "冲销原因（必填）" : "Motif obligatoire"}</label>
+          <label className={labelClass}>
+            {locale === "zh" ? "冲销原因（必填）" : "Motif obligatoire"}
+          </label>
           <textarea
             value={reversalReason}
             onChange={(event) => setReversalReason(event.target.value)}
             className={cn(inputClass, "min-h-20 resize-y py-2")}
-            placeholder={locale === "zh" ? "例如：重复收款、金额录入错误" : "Ex. doublon ou montant incorrect"}
+            placeholder={
+              locale === "zh" ? "例如：重复收款、金额录入错误" : "Ex. doublon ou montant incorrect"
+            }
           />
         </div>
       </ConfirmDialog>

@@ -7,6 +7,9 @@ import type { CustomerRow, DailyBookingRow, PaymentRow, UnitRow } from "@/types/
 import type { CustomerSummary } from "./calendar";
 import { SegmentedControl } from "@/components/ui/operational";
 import type { CalendarFinanceSnapshot } from "./calendar-finance-model";
+import { businessDate } from "./receipt-analysis-query";
+import { decodeCalendarCash, type CalendarCashSummary } from "./calendar-context-model";
+import { DAILY_DATA_CHANGED } from "./daily-read-invalidation";
 import {
   decodeCalendarWindow,
   sameCalendarWindow,
@@ -71,6 +74,82 @@ export function DailyRentalsResponsiveView({
   const [pending, setPending] = useState(false);
   const [windowError, setWindowError] = useState(false);
   const [retry, setRetry] = useState(0);
+  const [cash, setCash] = useState<CalendarCashSummary>();
+  const [cashPending, setCashPending] = useState(false);
+  const [cashRevision, setCashRevision] = useState(0);
+  const cashGeneration = useRef(0);
+  const invalidateCash = useCallback(() => {
+    cashGeneration.current += 1;
+    setCash(undefined);
+    setCashRevision((value) => value + 1);
+  }, []);
+  const serverWindow = useRef(initialWindow);
+  const today = businessDate();
+  const canReadCash = ["admin", "finance", "boss"].includes(userRole ?? "");
+  useEffect(() => {
+    const invalidate = (event: Event) => {
+      const buildingId = (event as CustomEvent<{ buildingId?: string }>).detail?.buildingId;
+      if (buildingId && buildingId !== selectedBuildingId) return;
+      invalidateCash();
+      setRetry((value) => value + 1);
+    };
+    window.addEventListener(DAILY_DATA_CHANGED, invalidate);
+    const restore = () => {
+      if (document.visibilityState === "visible") invalidate(new Event(DAILY_DATA_CHANGED));
+    };
+    window.addEventListener("focus", restore);
+    document.addEventListener("visibilitychange", restore);
+    return () => {
+      window.removeEventListener(DAILY_DATA_CHANGED, invalidate);
+      window.removeEventListener("focus", restore);
+      document.removeEventListener("visibilitychange", restore);
+    };
+  }, [selectedBuildingId, invalidateCash]);
+  useEffect(() => {
+    // A new SSR payload means an explicit server refresh, not date navigation.
+    // Even receipt-only external edits may not change calendar booking rows.
+    if (serverWindow.current === initialWindow) return;
+    serverWindow.current = initialWindow;
+    invalidateCash();
+  }, [initialWindow, invalidateCash]);
+  useEffect(() => {
+    setCash(undefined);
+    if (!canReadCash || !selectedBuildingId) {
+      setCashPending(false);
+      return;
+    }
+    const controller = new AbortController();
+    const generation = cashGeneration.current;
+    let active = true;
+    setCashPending(true);
+    fetch(
+      `/api/daily-rentals/calendar/cash?${new URLSearchParams({ buildingId: selectedBuildingId })}`,
+      {
+        signal: controller.signal,
+        cache: "no-store",
+      },
+    )
+      .then(async (response) => {
+        if (!response.ok) throw new Error("CalendarCashUnavailable");
+        return decodeCalendarCash(await response.json(), selectedBuildingId, today);
+      })
+      .then((result) => {
+        if (active && generation === cashGeneration.current) {
+          setCash(result);
+          setCashPending(false);
+        }
+      })
+      .catch(() => {
+        if (active && generation === cashGeneration.current) {
+          setCash(undefined);
+          setCashPending(false);
+        }
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [selectedBuildingId, today, canReadCash, cashRevision]);
   const consumedInitial = useRef<CalendarWindowData | null>(null);
   const onVisibleRangeChange = useCallback((from: string, to: string) => {
     setRange((previous) =>
@@ -123,6 +202,13 @@ export function DailyRentalsResponsiveView({
   const bookings = currentWindow?.bookings ?? initialBookings;
   const cleaningTasks = currentWindow?.cleaningTasks ?? initialCleaningTasks;
   const payments = currentWindow?.payments ?? initialPayments;
+  const currentCustomers = currentWindow?.customers ?? customers;
+  const cashSnapshot =
+    cash?.buildingId === selectedBuildingId && cash.today === today ? cash : undefined;
+  const positionSnapshot = currentWindow?.financeSnapshot ?? financeSnapshots?.[selectedBuildingId];
+  const financeSnapshot = positionSnapshot
+    ? { ...positionSnapshot, cash: cashSnapshot?.cash ?? null }
+    : undefined;
   const windowPending = Boolean(
     initialWindow &&
     (pending ||
@@ -229,7 +315,7 @@ export function DailyRentalsResponsiveView({
       <MobileDailyCards
         dailyUnits={scopedDailyUnits}
         bookings={scopedBookings}
-        customers={customers as unknown as CustomerRow[]}
+        customers={currentCustomers as unknown as CustomerRow[]}
         payments={scopedPayments as unknown as PaymentRow[]}
         cleaningTasks={scopedCleaningTasks}
         locale={locale}
@@ -239,13 +325,18 @@ export function DailyRentalsResponsiveView({
         dailyUnits={scopedDailyUnits}
         unitLookupUnits={scopedLookupUnits}
         bookings={scopedBookings}
-        customers={customers}
+        customers={currentCustomers}
         cleaningTasks={scopedCleaningTasks}
         payments={scopedPayments}
         locale={locale}
         userRole={userRole}
         buildingLabel={selectedBuilding?.display_name}
-        financeSnapshot={currentWindow?.financeSnapshot ?? financeSnapshots?.[selectedBuildingId]}
+        financeSnapshot={financeSnapshot}
+        buildingId={selectedBuildingId}
+        cashPending={cashPending}
+        cashRevision={cashRevision}
+        cashAsOf={cashSnapshot?.generatedAt}
+        onRetryCash={invalidateCash}
         onVisibleRangeChange={initialWindow ? onVisibleRangeChange : undefined}
         windowPending={windowPending}
         windowError={windowError}
@@ -271,6 +362,16 @@ export function DailyRentalsResponsiveView({
             dailyUnits.filter((unit) => unit.building_id === building.id).length,
         }))}
       />
+      <button
+        type="button"
+        className="text-xs text-muted-foreground underline"
+        onClick={() => {
+          invalidateCash();
+          setRetry((value) => value + 1);
+        }}
+      >
+        {locale === "zh" ? "刷新房态与收款快照" : "Actualiser occupation et paiements"}
+      </button>
       <div key={selectedBuildingId}>{content}</div>
     </div>
   );

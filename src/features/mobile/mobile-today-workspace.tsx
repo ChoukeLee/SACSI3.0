@@ -22,14 +22,23 @@ import {
   type RoomDisplayStatus,
 } from "./room-state";
 import { checkOut, completeCleaning } from "@/features/daily-rentals/actions";
-import { useBackgroundOperationStatus, useOptimisticOperation } from "@/hooks/use-optimistic-operation";
+import {
+  useBackgroundOperationStatus,
+  useOptimisticOperation,
+} from "@/hooks/use-optimistic-operation";
+import { notifyDailyDataChanged } from "@/features/daily-rentals/daily-read-invalidation";
 
 interface MobileTodayWorkspaceProps {
   dailyUnits: UnitRow[];
   bookings: DailyBookingRow[];
   customers: CustomerRow[];
   payments: PaymentRow[];
-  cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[];
+  cleaningTasks: {
+    id: string;
+    unit_id: string;
+    daily_booking_id: string | null;
+    is_completed: boolean;
+  }[];
   locale: Locale;
   buildingName?: string;
 }
@@ -46,8 +55,12 @@ export function MobileTodayWorkspace({
   const t = dictionaries[locale].mobile;
   const router = useRouter();
   const todayStr = new Date().toISOString().slice(0, 10);
-  const [optimisticCompletedCleaningIds, setOptimisticCompletedCleaningIds] = useState<Set<string>>(() => new Set());
-  const [optimisticUnitStatuses, setOptimisticUnitStatuses] = useState<Map<string, UnitStatus>>(() => new Map());
+  const [optimisticCompletedCleaningIds, setOptimisticCompletedCleaningIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [optimisticUnitStatuses, setOptimisticUnitStatuses] = useState<Map<string, UnitStatus>>(
+    () => new Map(),
+  );
 
   const visibleDailyUnits = useMemo(() => {
     if (optimisticUnitStatuses.size === 0) return dailyUnits;
@@ -59,9 +72,9 @@ export function MobileTodayWorkspace({
 
   const visibleCleaningTasks = useMemo(() => {
     if (optimisticCompletedCleaningIds.size === 0) return cleaningTasks;
-    return cleaningTasks.map((task) => (
-      optimisticCompletedCleaningIds.has(task.id) ? { ...task, is_completed: true } : task
-    ));
+    return cleaningTasks.map((task) =>
+      optimisticCompletedCleaningIds.has(task.id) ? { ...task, is_completed: true } : task,
+    );
   }, [cleaningTasks, optimisticCompletedCleaningIds]);
 
   useEffect(() => {
@@ -85,7 +98,15 @@ export function MobileTodayWorkspace({
   }, [cleaningTasks, dailyUnits]);
 
   const roomStates = useMemo(
-    () => computeRoomStates(visibleDailyUnits, bookings, customers, visibleCleaningTasks, payments, todayStr),
+    () =>
+      computeRoomStates(
+        visibleDailyUnits,
+        bookings,
+        customers,
+        visibleCleaningTasks,
+        payments,
+        todayStr,
+      ),
     [visibleDailyUnits, bookings, customers, visibleCleaningTasks, payments, todayStr],
   );
 
@@ -106,11 +127,19 @@ export function MobileTodayWorkspace({
   const [checkoutTarget, setCheckoutTarget] = useState<RoomState | null>(null);
   const [cleaningTarget, setCleaningTarget] = useState<RoomState | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const { operation: backgroundOperation, reportOperation: reportBackgroundOperation } = useBackgroundOperationStatus();
+  const { operation: backgroundOperation, reportOperation: reportBackgroundOperation } =
+    useBackgroundOperationStatus();
   const { runOptimisticOperation } = useOptimisticOperation({
     setBusy: setActionLoading,
-    onRefresh: () => router.refresh(),
-    reportBackgroundOperation,
+    onRefresh: () => {
+      notifyDailyDataChanged(dailyUnits[0]?.building_id);
+      router.refresh();
+    },
+    onError: () => notifyDailyDataChanged(dailyUnits[0]?.building_id),
+    reportBackgroundOperation: (label, state) => {
+      if (state === "failed") notifyDailyDataChanged(dailyUnits[0]?.building_id);
+      reportBackgroundOperation(label, state);
+    },
   });
 
   const filteredRooms = useMemo(() => {
@@ -134,18 +163,21 @@ export function MobileTodayWorkspace({
     setDrawerOpen(true);
   }, []);
 
-  const applyCompletedCleaning = useCallback((result: { taskId: string; unitId: string; unitStatus: UnitStatus }) => {
-    setOptimisticCompletedCleaningIds((prev) => {
-      const next = new Set(prev);
-      next.add(result.taskId);
-      return next;
-    });
-    setOptimisticUnitStatuses((prev) => {
-      const next = new Map(prev);
-      next.set(result.unitId, result.unitStatus);
-      return next;
-    });
-  }, []);
+  const applyCompletedCleaning = useCallback(
+    (result: { taskId: string; unitId: string; unitStatus: UnitStatus }) => {
+      setOptimisticCompletedCleaningIds((prev) => {
+        const next = new Set(prev);
+        next.add(result.taskId);
+        return next;
+      });
+      setOptimisticUnitStatuses((prev) => {
+        const next = new Map(prev);
+        next.set(result.unitId, result.unitStatus);
+        return next;
+      });
+    },
+    [],
+  );
 
   const handleCloseDrawer = useCallback(() => {
     setDrawerOpen(false);
@@ -163,33 +195,46 @@ export function MobileTodayWorkspace({
   const executeCheckOut = useCallback(async () => {
     if (!checkoutTarget?.booking) return;
     const target = checkoutTarget;
-    await runOptimisticOperation(dictionaries[locale].mobile.actions.checkOut, async () => {
-      await checkOut(target.booking!.id, {});
-    }, {
-      background: true,
-      release: () => setCheckoutTarget(null),
-    });
+    await runOptimisticOperation(
+      dictionaries[locale].mobile.actions.checkOut,
+      async () => {
+        await checkOut(target.booking!.id, {});
+      },
+      {
+        background: true,
+        release: () => setCheckoutTarget(null),
+      },
+    );
   }, [checkoutTarget, locale, runOptimisticOperation]);
 
   const executeCleaning = useCallback(async () => {
     if (!cleaningTarget?.cleaningTask) return;
     const target = cleaningTarget;
-    await runOptimisticOperation(dictionaries[locale].mobile.actions.completeCleaning, async () => {
-      const result = await completeCleaning(target.cleaningTask!.id);
-      if (result.success && result.taskId && result.unitId && result.unitStatus) {
-        applyCompletedCleaning({ taskId: result.taskId, unitId: result.unitId, unitStatus: result.unitStatus });
-      }
-      return result;
-    }, {
-      background: true,
-      release: () => setCleaningTarget(null),
-    });
+    await runOptimisticOperation(
+      dictionaries[locale].mobile.actions.completeCleaning,
+      async () => {
+        const result = await completeCleaning(target.cleaningTask!.id);
+        if (result.success && result.taskId && result.unitId && result.unitStatus) {
+          applyCompletedCleaning({
+            taskId: result.taskId,
+            unitId: result.unitId,
+            unitStatus: result.unitStatus,
+          });
+        }
+        return result;
+      },
+      {
+        background: true,
+        release: () => setCleaningTarget(null),
+      },
+    );
   }, [applyCompletedCleaning, cleaningTarget, locale, runOptimisticOperation]);
 
-  const todayFormatted = new Date().toLocaleDateString(
-    locale === "fr" ? "fr-FR" : "zh-CN",
-    { weekday: "short", month: "short", day: "numeric" },
-  );
+  const todayFormatted = new Date().toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 
   return (
     <div className="space-y-4 pb-2">
@@ -200,9 +245,14 @@ export function MobileTodayWorkspace({
           <div className="min-w-0">
             <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <Building2 className="h-3.5 w-3.5" />
-              <span className="truncate">{buildingName}{locale === "zh" ? "公寓" : ""}</span>
+              <span className="truncate">
+                {buildingName}
+                {locale === "zh" ? "公寓" : ""}
+              </span>
             </div>
-            <h1 className="text-xl font-semibold leading-tight tracking-tight text-foreground">{t.today}</h1>
+            <h1 className="text-xl font-semibold leading-tight tracking-tight text-foreground">
+              {t.today}
+            </h1>
             <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <CalendarDays className="h-3.5 w-3.5" />
               <span>{todayFormatted}</span>
@@ -217,7 +267,6 @@ export function MobileTodayWorkspace({
             <RefreshCw className="h-4 w-4" />
           </button>
         </div>
-
       </section>
 
       {/* Stats bar (also serves as tab switcher) */}
@@ -283,13 +332,7 @@ export function MobileTodayWorkspace({
   );
 }
 
-function EmptyState({
-  activeTab,
-  locale,
-}: {
-  activeTab: RoomDisplayStatus;
-  locale: Locale;
-}) {
+function EmptyState({ activeTab, locale }: { activeTab: RoomDisplayStatus; locale: Locale }) {
   const empty = dictionaries[locale].mobile.empty;
   const message: Record<RoomDisplayStatus, string> = {
     occupied: empty.noOccupied,

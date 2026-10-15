@@ -65,7 +65,7 @@ async function render() {
         payments={[]}
         cleaningTasks={[]}
         locale="zh"
-        userRole="admin"
+        userRole="front_desk"
         buildings={[
           { id: calendarBuilding, code: "SACSI11", display_name: "11" },
           { id: calendarOtherBuilding, code: "SACSI5", display_name: "5" },

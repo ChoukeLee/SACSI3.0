@@ -12,13 +12,46 @@ import type {
   UnitRow,
 } from "@/types/database";
 
-function openPrintWindow(html: string) {
+/** Business records are text, never executable markup in a same-origin print window. */
+function escapePrintData<T>(value: T): T {
+  if (typeof value === "string")
+    return value
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;") as T;
+  if (Array.isArray(value)) return value.map(escapePrintData) as T;
+  if (value && typeof value === "object")
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, escapePrintData(item)]),
+    ) as T;
+  return value;
+}
+
+export function reservePrintWindow(locale: "zh" | "fr") {
   const w = window.open("", "_blank", "width=800,height=600");
+  if (!w) return null;
+  try {
+    w.opener = null;
+    w.document.write(
+      `<!doctype html><html><head><meta charset="utf-8"><title>${locale === "zh" ? "读取合同中" : "Lecture du contrat"}</title></head><body><p>${locale === "zh" ? "正在读取完整合同，请稍候。此时尚未展示账务金额。" : "Lecture du contrat complet. Aucun montant n’est encore affiché."}</p></body></html>`,
+    );
+    w.document.close();
+  } catch {
+    w.close();
+    return null;
+  }
+  return w;
+}
+function openPrintWindow(html: string, targetWindow?: Window) {
+  const w = targetWindow ?? window.open("", "_blank", "width=800,height=600");
   if (!w) return;
+  if (targetWindow) w.document.open();
+  w.onload = () => w.print();
   w.document.write(html);
   w.document.close();
   w.focus();
-  w.onload = () => w.print();
 }
 
 const a4Styles = `
@@ -53,7 +86,12 @@ export interface LeaseContractPrintData {
   receivables?: ReceivableRow[];
 }
 
-export function printLeaseContract(data: LeaseContractPrintData, locale: "zh" | "fr") {
+export function printLeaseContract(
+  data: LeaseContractPrintData,
+  locale: "zh" | "fr",
+  targetWindow?: Window,
+) {
+  data = escapePrintData(data);
   const labels =
     locale === "zh"
       ? {
@@ -173,8 +211,8 @@ export function printLeaseContract(data: LeaseContractPrintData, locale: "zh" | 
     <table>
       <tr><td class="label">${labels.unit}</td><td class="value">${data.unit?.unit_no ?? "-"} (${data.unit?.floor_label ?? ""})</td></tr>
       <tr><td class="label">${labels.customer}</td><td class="value">${data.customer?.name ?? "-"}</td></tr>
-      <tr><td class="label">${labels.startDate}</td><td class="value">${data.contract.start_date}</td></tr>
-      <tr><td class="label">${labels.endDate}</td><td class="value">${data.contract.expected_end_date}</td></tr>
+      <tr><td class="label">${labels.startDate}</td><td class="value">${data.contract.start_date ?? (locale === "zh" ? "待确认" : "À confirmer")}</td></tr>
+      <tr><td class="label">${labels.endDate}</td><td class="value">${data.contract.expected_end_date && data.contract.expected_end_confirmed !== false ? data.contract.expected_end_date : locale === "zh" ? "待确认" : "À confirmer"}</td></tr>
       <tr><td class="label">${labels.paymentCycle} / ${labels.paymentDay}</td><td class="value">${data.contract.payment_cycle} / ${data.contract.payment_day}${labels.paymentDaySuffix}</td></tr>
       <tr><td class="label">${labels.monthlyRent}</td><td class="value">${formatXof(Number(data.contract.monthly_rent_xof))}</td></tr>
       <tr><td class="label">${labels.deposit}</td><td class="value">${formatXof(Number(data.contract.deposit_amount_xof))} ${data.contract.deposit_received ? labels.depositPaid : labels.depositUnpaid}</td></tr>
@@ -200,7 +238,7 @@ export function printLeaseContract(data: LeaseContractPrintData, locale: "zh" | 
     </div>
     <div class="footer">${labels.company} - ${new Date().toLocaleDateString()}</div>
   </body></html>`;
-  openPrintWindow(html);
+  openPrintWindow(html, targetWindow);
 }
 
 export interface SaleContractPrintData {
@@ -211,7 +249,12 @@ export interface SaleContractPrintData {
   outstandingAmountXof?: number | null;
 }
 
-export function printSaleContract(data: SaleContractPrintData, locale: "zh" | "fr") {
+export function printSaleContract(
+  data: SaleContractPrintData,
+  locale: "zh" | "fr",
+  targetWindow?: Window,
+) {
+  data = escapePrintData(data);
   const labels =
     locale === "zh"
       ? {
@@ -284,7 +327,7 @@ export function printSaleContract(data: SaleContractPrintData, locale: "zh" | "f
     </div>
     <div class="footer">${labels.company} - ${new Date().toLocaleDateString()}</div>
   </body></html>`;
-  openPrintWindow(html);
+  openPrintWindow(html, targetWindow);
 }
 
 export interface DailyReceiptPrintData {
@@ -490,7 +533,7 @@ export function printMoveOutSettlement(data: MoveOutSettlementData, locale: "zh"
     '<tr><td class="label">' +
     labels.startDate +
     '</td><td class="value">' +
-    data.contract.start_date +
+    (data.contract.start_date ?? (locale === "zh" ? "待确认" : "À confirmer")) +
     "</td></tr>" +
     '<tr><td class="label">' +
     labels.actualEnd +

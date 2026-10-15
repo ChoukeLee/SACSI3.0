@@ -51,8 +51,12 @@ describe("daily rental reservation payments", () => {
 
   it("keeps installment history visible outside advanced payment actions", () => {
     expect(panel).toContain("收款记录 ·");
-    expect(panel).toContain("showPaymentHistory && <ul");
-    expect(panel).not.toContain("positiveBookingPayments.slice(0, 3)");
+    expect(panel).toMatch(/showPaymentHistory\s*&&\s*\(?\s*<ul\b/);
+    expect(panel).toMatch(/positiveBookingPayments\s*\.\s*map\s*\(/);
+    expect(panel).not.toMatch(/positiveBookingPayments\s*\.\s*slice\s*\(/);
+    expect(panel).toMatch(
+      /right\.payment_date\s*\.\s*localeCompare\s*\(\s*left\.payment_date\s*\)/,
+    );
     expect(panel.indexOf("收款记录 ·")).toBeLessThan(panel.indexOf("更多业务操作"));
   });
 
