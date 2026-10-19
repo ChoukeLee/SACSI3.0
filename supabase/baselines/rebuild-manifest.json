@@ -153,6 +153,10 @@
     {
       "file": "20261019140744_lease_rent_period_correction.sql",
       "sha256": "7f184c5b904b9272a8f50f73e164acc2752b64a50168393a61164408c0fa6a31"
+    },
+    {
+      "file": "20261019203420_reports_project_ledger_trend.sql",
+      "sha256": "0ec20084895321f731159e2be84c3c1d3dfe4618f57c3e7493447eccfea55064"
     }
   ],
   "excluded": [

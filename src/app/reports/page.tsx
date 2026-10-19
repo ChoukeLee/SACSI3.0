@@ -1,33 +1,34 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { PageHeader } from "@/components/page-header";
 import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
-import { ReportsView } from "@/features/reports";
+import { ReportsView } from "@/features/reports/reports-view";
 import { loadReportData } from "@/features/reports/report-data";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function ReportsPage() {
+type ReportParams = Record<string, string | string[] | undefined>;
+
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<ReportParams>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!["admin", "boss", "finance"].includes(user.role)) redirect("/");
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="经营报表"
-        description="月度经营收支、楼栋收支与已确认应收；不等同会计利润"
-      />
       <Suspense fallback={<OperationalPageSkeleton kind="table" rows={8} />}>
-        <ReportsData locale="zh" />
+        <ReportsData params={searchParams} />
       </Suspense>
     </div>
   );
 }
 
-async function ReportsData({ locale }: { locale: "zh" | "fr" }) {
-  const data = await loadReportData();
-  return <ReportsView {...data} locale={locale} />;
+async function ReportsData({ params }: { params: Promise<ReportParams> }) {
+  const data = await loadReportData(await params);
+  return <ReportsView data={data} locale="zh" />;
 }

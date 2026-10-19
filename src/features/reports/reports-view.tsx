@@ -1,653 +1,482 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Banknote, CalendarDays, Minus, TrendingUp } from "lucide-react";
+import { useState, type CSSProperties } from "react";
+import Link from "next/link";
+import Form from "next/form";
 import {
-  DataVizCard,
-  DonutChart,
-  GroupedBarChart,
-  MultiLineChart,
-  CalendarHeatmap,
-  BarListChart,
-  type ChartTone,
-} from "@/components/ui/data-viz";
-import { MetricGrid, SegmentedControl, StatTile } from "@/components/ui/operational";
-import { formatXof, sortUnits } from "@/lib/utils";
-import { financialBusinessLabel } from "@/lib/display-labels";
+  ArrowDownToLine,
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  FileSearch,
+  LockKeyhole,
+  Search,
+} from "lucide-react";
 import {
-  computeFinanceMetrics,
-  isManagedReceivable,
-  receivableOutstanding,
-} from "@/features/finance/metrics";
-import {
-  aggregateByCategory,
-  aggregateDailyCollectionsMonthly,
-  aggregateOccupancyMonthly,
-  aggregateOutstandingByBuilding,
-  aggregatePnlByBuilding,
-  aggregatePnlMonthly,
-  buildDailyOccupancy,
-  dayRangeOfMonth,
-  monthRange,
-  type DailyCellStatus,
-} from "./report-aggregators";
-import type {
-  LedgerEntryRow,
-  BuildingRow,
-  UnitRow,
-  DailyBookingRow,
-  ReceivableRow,
-  CustomerRow,
-} from "@/types/database";
-import type { ReceiptTrend } from "@/features/daily-rentals/receipt-analysis-types";
-import { downloadCsv } from "./export-csv";
+  directionDisplayLabel,
+  financialBusinessLabel,
+  statusDisplayLabel,
+} from "@/lib/display-labels";
+import { reportHref, type ReportQuery, type ReportWorkspaceData } from "./report-read";
+import { ReportInspector } from "./report-inspector";
+import styles from "./reports-view.module.css";
 
-const CATEGORY_TONES = [
-  "blue",
-  "green",
-  "teal",
-  "amber",
-  "sold",
-  "leased",
-  "red",
-  "neutral",
-] as const;
+type Locale = "zh" | "fr";
+type Row = ReportWorkspaceData["result"]["rows"][number];
 
-const STATUS_TONE: Record<DailyCellStatus, ChartTone> = {
-  occupied: "blue",
-  reserved: "amber",
-  cleaning: "teal",
-  available: "neutral",
-};
-
-function toneForIndex(i: number): (typeof CATEGORY_TONES)[number] {
-  return CATEGORY_TONES[i % CATEGORY_TONES.length];
+function money(value: number, locale: Locale) {
+  return new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "fr-FR", {
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
-export function ReportsView({
-  entries,
-  buildings,
-  units,
-  dailyBookings,
-  dailyCollections,
-  dailyUnitIds,
-  receivables,
-  customers,
-  locale,
-}: {
-  entries: LedgerEntryRow[];
-  buildings: BuildingRow[];
-  units: UnitRow[];
-  dailyBookings: DailyBookingRow[];
-  dailyCollections: ReceiptTrend[];
-  dailyUnitIds: string[];
-  receivables: ReceivableRow[];
-  customers: CustomerRow[];
-  locale: "zh" | "fr";
-}) {
+function numeric(value: Row[string]) {
+  if ((typeof value !== "number" && typeof value !== "string") || value === "")
+    throw new Error("Invalid report amount");
+  const number = Number(value);
+  if (!Number.isFinite(number)) throw new Error("Invalid report amount");
+  return number;
+}
+
+function rowText(row: Row, key: string) {
+  return typeof row[key] === "string" && row[key] ? String(row[key]) : "—";
+}
+
+function HiddenScope({ query, omit = [] }: { query: ReportQuery; omit?: string[] }) {
+  const params = new URL(reportHref(query), "https://reports.invalid").searchParams;
+  return (
+    <>
+      {Array.from(params.entries()).map(([key, value]) =>
+        key === "page" || omit.includes(key) ? null : (
+          <input key={key} type="hidden" name={key} value={value} />
+        ),
+      )}
+      <input type="hidden" name="page" value="1" />
+    </>
+  );
+}
+
+function MonthTrend({ data, locale }: { data: ReportWorkspaceData; locale: Locale }) {
   const zh = locale === "zh";
-
-  const availableMonths = useMemo(() => {
-    const set = new Set(entries.map((e) => e.entry_date.slice(0, 7)));
-    for (const row of dailyCollections) set.add(row.month);
-    for (const b of dailyBookings) set.add(b.check_in.slice(0, 7));
-    return [...set].sort().reverse();
-  }, [entries, dailyCollections, dailyBookings]);
-
-  const [selectedMonth, setSelectedMonth] = useState(availableMonths[0] ?? "");
-  const [tab, setTab] = useState<"pnl" | "daily" | "receivables">("pnl");
-
-  const monthEntries = useMemo(
-    () => entries.filter((e) => e.entry_date.startsWith(selectedMonth)),
-    [entries, selectedMonth],
-  );
-
-  const income = useMemo(
-    () =>
-      monthEntries
-        .filter((e) => e.direction === "income")
-        .reduce((s, e) => s + Number(e.amount_xof), 0),
-    [monthEntries],
-  );
-  const expense = useMemo(
-    () =>
-      monthEntries
-        .filter((e) => e.direction === "expense")
-        .reduce((s, e) => s + Number(e.amount_xof), 0),
-    [monthEntries],
-  );
-
-  const trend = useMemo(
-    () => (selectedMonth ? aggregatePnlMonthly(entries, monthRange(selectedMonth, 12)) : null),
-    [entries, selectedMonth],
-  );
-  const buildingPnl = useMemo(
-    () => aggregatePnlByBuilding(monthEntries, buildings, units),
-    [monthEntries, buildings, units],
-  );
-  const incomeByCategory = useMemo(
-    () => aggregateByCategory(monthEntries, "income"),
-    [monthEntries],
-  );
-  const expenseByCategory = useMemo(
-    () => aggregateByCategory(monthEntries, "expense"),
-    [monthEntries],
-  );
-
-  // 日租指标
-  const dailyCollected = useMemo(
-    () => dailyCollections.find((row) => row.month === selectedMonth)?.net ?? 0,
-    [dailyCollections, selectedMonth],
-  );
-  const dailyBookingCount = useMemo(
-    () =>
-      dailyBookings.filter(
-        (b) =>
-          b.check_in.startsWith(selectedMonth) &&
-          b.check_in <= new Date().toISOString().slice(0, 10) &&
-          (b.status === "checked_in" || b.status === "checked_out"),
-      ).length,
-    [dailyBookings, selectedMonth],
-  );
-  const dailyTrend = useMemo(
-    () =>
-      selectedMonth
-        ? aggregateDailyCollectionsMonthly(dailyCollections, monthRange(selectedMonth, 12))
-        : [],
-    [dailyCollections, selectedMonth],
-  );
-  const occupancyTrend = useMemo(
-    () =>
-      selectedMonth ? aggregateOccupancyMonthly(dailyBookings, monthRange(selectedMonth, 12)) : [],
-    [dailyBookings, selectedMonth],
-  );
-  const currentOccupiedNights =
-    occupancyTrend.find((o) => o.month === selectedMonth)?.occupiedNights ?? 0;
-  const dailyExcludedCount =
-    dailyCollections.find((row) => row.month === selectedMonth)?.excludedCount ?? 0;
-  const dailyUnits = useMemo(
-    () => sortUnits(units.filter((u) => dailyUnitIds.includes(u.id)) as UnitRow[]),
-    [units, dailyUnitIds],
-  );
-  const heatmap = useMemo(() => {
-    if (!selectedMonth) return null;
-    const days = dayRangeOfMonth(selectedMonth);
-    const occ = buildDailyOccupancy(dailyBookings, dailyUnitIds, days);
-    const toneCells: Record<string, Record<string, ChartTone>> = {};
-    for (const u of dailyUnits) {
-      toneCells[u.id] = {};
-      for (const d of days) toneCells[u.id][d] = STATUS_TONE[occ[u.id]?.[d] ?? "available"];
-    }
-    return { days, toneCells };
-  }, [selectedMonth, dailyBookings, dailyUnitIds, dailyUnits]);
-
-  // 应收报表
-  const managedReceivables = useMemo(
-    () => receivables.filter((r) => isManagedReceivable(r)),
-    [receivables],
-  );
-  const historicalReceivables = useMemo(
-    () => receivables.filter((r) => r.management_status === "historical_pending"),
-    [receivables],
-  );
-  const receivableMetrics = useMemo(
-    () => computeFinanceMetrics(managedReceivables),
-    [managedReceivables],
-  );
-  const historicalOutstanding = useMemo(
-    () => historicalReceivables.reduce((s, r) => s + receivableOutstanding(r), 0),
-    [historicalReceivables],
-  );
-  const outstandingByBuilding = useMemo(
-    () => aggregateOutstandingByBuilding(managedReceivables, buildings, units),
-    [managedReceivables, buildings, units],
-  );
-  const notOverdueOutstanding = Math.max(
-    0,
-    receivableMetrics.outstanding - receivableMetrics.overdue,
-  );
-  const topOutstanding = useMemo(
-    () =>
-      managedReceivables
-        .filter((r) => receivableOutstanding(r) > 0)
-        .sort((a, b) => receivableOutstanding(b) - receivableOutstanding(a))
-        .slice(0, 20),
-    [managedReceivables],
-  );
-  const buildingNameMap = useMemo(
-    () => new Map(buildings.map((b) => [b.id, b.display_name || b.code])),
-    [buildings],
-  );
-  const unitNoMap = useMemo(() => new Map(units.map((u) => [u.id, u.unit_no])), [units]);
-  const customerNameMap = useMemo(() => new Map(customers.map((c) => [c.id, c.name])), [customers]);
-
-  const handleExport = () => {
-    const today = new Date().toISOString().slice(0, 10);
-    if (tab === "pnl") {
-      const months = trend?.months ?? [];
-      const rows = months.map((m, i) => [
-        m,
-        trend?.income[i] ?? 0,
-        trend?.expense[i] ?? 0,
-        trend?.net[i] ?? 0,
-      ]);
-      downloadCsv(
-        "收支报表_" + selectedMonth + ".csv",
-        [
-          zh ? "月份" : "Mois",
-          zh ? "收入" : "Revenus",
-          zh ? "支出" : "Dépenses",
-          zh ? "净额" : "Net",
-        ],
-        rows,
-      );
-    } else if (tab === "daily") {
-      const months = monthRange(selectedMonth, 12);
-      const occMap = new Map(occupancyTrend.map((o) => [o.month, o]));
-      const rows = dailyTrend.map((v, i) => {
-        const m = months[i];
-        const o = occMap.get(m);
-        return [
-          m,
-          v,
-          o?.occupiedNights ?? 0,
-          o?.reservedNights ?? 0,
-          dailyCollections.find((row) => row.month === m)?.excludedCount ?? 0,
-        ];
-      });
-      downloadCsv(
-        "日租报表_" + selectedMonth + ".csv",
-        [
-          zh ? "月份" : "Mois",
-          zh ? "日租净收款XOF" : "Encaissement net XOF",
-          zh ? "实际入住房晚" : "Nuitées réelles",
-          zh ? "预订房晚" : "Nuitées réservées",
-          zh ? "未计入收款笔数" : "Paiements exclus",
-        ],
-        rows,
-      );
-    } else {
-      const rows = managedReceivables
-        .filter((r) => receivableOutstanding(r) > 0)
-        .sort((a, b) => receivableOutstanding(b) - receivableOutstanding(a))
-        .map((r) => {
-          const buildingName = buildingNameMap.get(r.building_id ?? "") ?? "";
-          const unitNo = r.unit_id ? (unitNoMap.get(r.unit_id) ?? "") : "";
-          const customerName = r.customer_id ? (customerNameMap.get(r.customer_id) ?? "") : "";
-          const out = receivableOutstanding(r);
-          const status = r.due_date < today ? (zh ? "逾期" : "Retard") : zh ? "待收" : "Dû";
-          return [
-            buildingName,
-            unitNo,
-            customerName,
-            r.due_date,
-            Number(r.amount_xof),
-            Number(r.paid_amount_xof),
-            out,
-            status,
-          ];
-        });
-      downloadCsv(
-        "应收报表_" + selectedMonth + ".csv",
-        [
-          zh ? "楼栋" : "Bâtiment",
-          zh ? "房号" : "Lot",
-          zh ? "客户" : "Client",
-          zh ? "到期日" : "Échéance",
-          zh ? "应收" : "Dû",
-          zh ? "已收" : "Encaissé",
-          zh ? "未收" : "Solde",
-          zh ? "状态" : "Statut",
-        ],
-        rows,
-      );
-    }
-  };
-
-  if (availableMonths.length === 0) {
-    return (
-      <div className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">
-        {zh
-          ? "暂无数据，登记收款后即可生成报表。"
-          : "Aucune donnée. Enregistrez un paiement pour générer des rapports."}
+  const positive = Math.max(0, ...data.trend.map((item) => item.net));
+  const negative = Math.max(0, ...data.trend.map((item) => -item.net));
+  const extent = Math.max(1, positive + negative);
+  const zeroPosition = (negative / extent) * 100;
+  return (
+    <section
+      className={styles.trend}
+      aria-label={zh ? "项目登记净额趋势" : "Tendance du solde inscrit"}
+    >
+      <div className={styles.trendCaption}>
+        <div>
+          <h2>{zh ? "近 12 个月 · 登记净额" : "12 mois · Solde inscrit"}</h2>
+          <p>
+            {zh
+              ? "项目全量账务，不随下方搜索或方向筛选变化"
+              : "Journal du projet ; indépendant de la recherche et du filtre de direction"}
+          </p>
+        </div>
+        <span className={styles.currency}>XOF</span>
       </div>
-    );
-  }
+      <div
+        className={styles.trendBars}
+        style={{ "--zero-position": `${zeroPosition}%` } as CSSProperties}
+      >
+        {data.trend.map((item) => {
+          const selected = item.month === data.query.month;
+          const label = `${item.month} · ${money(item.net, locale)} XOF`;
+          return (
+            <Link
+              key={item.month}
+              href={`${zh ? "" : "/fr"}${reportHref(data.query, { month: item.month, page: 1 })}`}
+              aria-label={label}
+              aria-current={selected ? "date" : undefined}
+              title={label}
+              className={`${styles.trendColumn} ${selected ? styles.trendCurrent : ""} ${item.net < 0 ? styles.trendNegative : ""}`}
+            >
+              <span
+                className={styles.trendBar}
+                style={
+                  {
+                    height: `${(Math.abs(item.net) / extent) * 100}%`,
+                    bottom: item.net >= 0 ? `${zeroPosition}%` : "auto",
+                    top: item.net < 0 ? `${100 - zeroPosition}%` : "auto",
+                  } as CSSProperties
+                }
+              />
+              <span className={styles.trendMonth}>{item.month.slice(5)}</span>
+            </Link>
+          );
+        })}
+      </div>
+      <div className={styles.trendRange}>
+        <span>{data.trend[0]?.month ?? "—"}</span>
+        <span>{data.trend.at(-1)?.month ?? "—"}</span>
+      </div>
+    </section>
+  );
+}
+
+export function ReportsView({ data, locale }: { data: ReportWorkspaceData; locale: Locale }) {
+  const zh = locale === "zh";
+  const text = (chinese: string, french: string) => (zh ? chinese : french);
+  const { query, result } = data;
+  const ledger = query.kind === "ledger";
+  const managed = query.management === "managed";
+  const project = data.projects.find((item) => item.id === query.projectId);
+  const cimac = project?.code.toUpperCase() === "CIMAC";
+  const prefix = zh ? "" : "/fr";
+  const href = (patch: Partial<ReportQuery>) => `${prefix}${reportHref(query, patch)}`;
+  const scope = JSON.stringify(query);
+  const [selection, setSelection] = useState<{ scope: string; id: string } | null>(null);
+  const selected =
+    (selection?.scope === scope
+      ? result.rows.find((row) => String(row.id) === selection.id)
+      : null) ??
+    result.rows[0] ??
+    null;
+  const pageCount = Math.max(1, Math.ceil(result.total / result.pageSize));
+  const first = result.rows.length ? (query.page - 1) * result.pageSize + 1 : 0;
+  const last = result.rows.length ? first + result.rows.length - 1 : 0;
+  const summary = result.summary;
+  const metrics = ledger
+    ? [
+        [text("登记净额", "Solde inscrit"), Number(summary.income) - Number(summary.expense)],
+        [text("登记收入", "Revenus inscrits"), Number(summary.income)],
+        [text("登记支出", "Dépenses inscrites"), Number(summary.expense)],
+      ]
+    : [
+        [text("管理应收未收", "Solde des créances gérées"), Number(summary.outstanding)],
+        [text("其中已逾期", "Dont en retard"), Number(summary.overdue)],
+        [text("应收已核销", "Créances imputées"), Number(summary.paid)],
+      ];
+  const exportHref = `${data.exportHref}${data.exportHref.includes("?") ? "&" : "?"}locale=${locale}`;
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <SegmentedControl
-          value={tab}
-          items={[
-            { value: "pnl" as const, label: zh ? "经营收支" : "Flux d'exploitation" },
-            { value: "daily" as const, label: zh ? "日租" : "Location jour" },
-            { value: "receivables" as const, label: zh ? "应收" : "Créances" },
-          ]}
-          onChange={setTab}
-          ariaLabel={zh ? "报表类型" : "Type de rapport"}
-        />
-        <div className="flex items-center gap-2">
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="rounded-lg border border-border bg-card px-3 py-2 text-sm"
-            aria-label={zh ? "选择月份" : "Choisir le mois"}
-          >
-            {availableMonths.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handleExport}
-            className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-muted"
-          >
-            {zh ? "导出 CSV" : "Exporter CSV"}
-          </button>
+    <div className={styles.root} data-reports-checking>
+      <header className={styles.header}>
+        <div>
+          <div className={styles.eyebrow}>
+            {text("财务分析 / 来源核查", "ANALYSE FINANCIÈRE / SOURCES")}
+          </div>
+          <h1>{text("财务核查台", "Contrôle financier")}</h1>
+          <p>
+            {text("看清账务，再回到每一笔来源。", "Du journal à la source de chaque écriture.")}
+          </p>
         </div>
+        <a className={styles.exportButton} href={exportHref}>
+          <ArrowDownToLine size={15} aria-hidden="true" />
+          {text("导出当前范围", "Exporter cette sélection")}
+        </a>
+      </header>
+
+      <div className={styles.scopeBar}>
+        <nav className={styles.projects} aria-label={text("核查项目", "Projet à contrôler")}>
+          {data.projects.map((item) => (
+            <Link
+              key={item.id}
+              href={href({ projectId: item.id, page: 1, search: "" })}
+              aria-current={query.projectId === item.id ? "page" : undefined}
+              className={query.projectId === item.id ? styles.projectActive : ""}
+              title={item.display_name}
+            >
+              <span className={styles.projectDot} />
+              {item.code}
+              <span className={styles.projectName}>
+                {item.display_name !== item.code ? item.display_name : ""}
+              </span>
+            </Link>
+          ))}
+        </nav>
+        {ledger ? (
+          <Form className={styles.monthForm} action={`${prefix}/reports`} key={`month-${scope}`}>
+            <HiddenScope query={query} omit={["month"]} />
+            <label className={styles.srOnly} htmlFor="report-month">
+              {text("核查月份", "Mois du journal")}
+            </label>
+            <input
+              id="report-month"
+              name="month"
+              type="month"
+              defaultValue={query.month}
+              required
+            />
+            <button type="submit">{text("查看", "Voir")}</button>
+          </Form>
+        ) : (
+          <span className={styles.snapshot}>
+            <span />
+            {text("当前快照", "Situation actuelle")} · {data.asOf}
+          </span>
+        )}
       </div>
 
-      {tab === "pnl" ? (
-        <>
-          <MetricGrid columns={3}>
-            <StatTile
-              label={zh ? "本月收入" : "Revenus du mois"}
-              value={formatXof(income)}
-              tone="green"
-              icon={Banknote}
-            />
-            <StatTile
-              label={zh ? "本月支出" : "Dépenses du mois"}
-              value={formatXof(expense)}
-              tone="red"
-              icon={Minus}
-            />
-            <StatTile
-              label={zh ? "本月经营收支净额" : "Solde des flux"}
-              caption={
-                zh
-                  ? "不等于会计利润，不含押金负债"
-                  : "Hors dépôts ; ce n'est pas un bénéfice comptable"
-              }
-              value={formatXof(income - expense)}
-              tone={income - expense >= 0 ? "green" : "red"}
-              icon={TrendingUp}
-            />
-          </MetricGrid>
+      <nav className={styles.tabs} aria-label={text("财务核查视图", "Vues de contrôle financier")}>
+        <Link
+          href={href({ kind: "ledger", page: 1, search: "" })}
+          aria-current={ledger ? "page" : undefined}
+        >
+          {text("账务核查", "Journal")}
+        </Link>
+        <Link
+          href={href({ kind: "receivables", page: 1, search: "" })}
+          aria-current={!ledger ? "page" : undefined}
+        >
+          {text("应收核查", "Créances")}
+        </Link>
+        {!cimac ? (
+          <Link className={styles.dailyLink} href={`${prefix}/daily-rentals/receipts`}>
+            {text("日租收款专题", "Encaissements courts séjours")}
+            <ArrowUpRight size={13} aria-hidden="true" />
+          </Link>
+        ) : null}
+      </nav>
 
-          {trend && (
-            <DataVizCard
-              title={zh ? "近 12 个月收支趋势" : "Tendance sur 12 mois"}
-              description={zh ? "收入 · 支出 · 净额" : "Revenus · Dépenses · Net"}
-            >
-              <MultiLineChart
-                xLabels={trend.months}
-                series={[
-                  { label: zh ? "收入" : "Revenus", values: trend.income, tone: "green" },
-                  { label: zh ? "支出" : "Dépenses", values: trend.expense, tone: "red" },
-                  { label: zh ? "净额" : "Net", values: trend.net, tone: "blue" },
-                ]}
-              />
-            </DataVizCard>
-          )}
-
-          {buildingPnl.length > 0 && (
-            <DataVizCard title={zh ? "本月各楼栋收支" : "Revenus/dépenses par bâtiment"}>
-              <GroupedBarChart
-                groups={buildingPnl.map((b) => ({
-                  label: b.buildingName,
-                  series: [
-                    { label: zh ? "收入" : "Revenus", value: b.income, tone: "green" },
-                    { label: zh ? "支出" : "Dépenses", value: b.expense, tone: "red" },
-                  ],
-                }))}
-              />
-            </DataVizCard>
-          )}
-
-          <div className="grid gap-5 lg:grid-cols-2">
-            <DataVizCard title={zh ? "本月收入构成" : "Répartition des revenus"}>
-              {incomeByCategory.length > 0 ? (
-                <DonutChart
-                  items={incomeByCategory.map((c, i) => ({
-                    id: c.label,
-                    label: financialBusinessLabel(c.label, locale),
-                    value: c.value,
-                    tone: toneForIndex(i),
-                  }))}
-                  centerValue={formatXof(income)}
-                  centerLabel={zh ? "收入" : "Revenus"}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  {zh ? "本月暂无收入" : "Aucun revenu ce mois"}
-                </p>
+      <div className={styles.content}>
+        {!ledger && !managed ? (
+          <div className={styles.pendingScope}>
+            <div>
+              <span className={styles.eyebrow}>{text("独立核查范围", "PÉRIMÈTRE SÉPARÉ")}</span>
+              <h2>
+                {query.management === "historical_pending"
+                  ? text("历史待核对", "Historique à vérifier")
+                  : text("已排除记录", "Écritures exclues")}
+              </h2>
+            </div>
+            <p>
+              {text(
+                "这些记录不计入管理应收、未收或逾期指标；请逐笔核对来源，不能将其视为新增欠款。",
+                "Ces écritures sont exclues des indicateurs de créances gérées. Vérifiez les sources ; elles ne constituent pas automatiquement de nouvelles dettes.",
               )}
-            </DataVizCard>
-            <DataVizCard title={zh ? "本月支出构成" : "Répartition des dépenses"}>
-              {expenseByCategory.length > 0 ? (
-                <DonutChart
-                  items={expenseByCategory.map((c, i) => ({
-                    id: c.label,
-                    label: financialBusinessLabel(c.label, locale),
-                    value: c.value,
-                    tone: toneForIndex(i),
-                  }))}
-                  centerValue={formatXof(expense)}
-                  centerLabel={zh ? "支出" : "Dépenses"}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  {zh ? "本月暂无支出" : "Aucune dépense ce mois"}
-                </p>
-              )}
-            </DataVizCard>
+            </p>
+            <strong>
+              {result.total}
+              <span>{text("条记录", "écritures")}</span>
+            </strong>
           </div>
-        </>
-      ) : tab === "daily" ? (
-        <>
-          <MetricGrid columns={3}>
-            <StatTile
-              label={zh ? "本月日租收款" : "Encaissé (jour)"}
-              value={formatXof(dailyCollected)}
-              tone="green"
-              icon={Banknote}
-            />
-            <StatTile
-              label={zh ? "本月实际入住订单" : "Séjours réellement commencés"}
-              value={String(dailyBookingCount)}
-              tone="blue"
-              icon={CalendarDays}
-            />
-            <StatTile
-              label={zh ? "本月实际入住房晚" : "Nuitées réelles"}
-              caption={
-                zh
-                  ? "房晚不是房间数；仅截至今日已发生的住宿"
-                  : "Nuitées, non chambres ; séjours déjà réalisés"
-              }
-              value={String(currentOccupiedNights)}
-              tone="teal"
-              icon={TrendingUp}
-            />
-          </MetricGrid>
+        ) : (
+          <div className={styles.metricRow}>
+            {metrics.map(([label, amount], index) => (
+              <div
+                key={String(label)}
+                className={`${styles.metric} ${index === 0 ? styles.primaryMetric : ""}`}
+              >
+                <span>{label}</span>
+                <strong className={Number(amount) < 0 ? styles.negative : ""}>
+                  {money(Number(amount), locale)}
+                  <small>XOF</small>
+                </strong>
+                {index === 0 ? (
+                  <p>
+                    {ledger
+                      ? text("登记收入 − 登记支出", "Revenus inscrits − dépenses inscrites")
+                      : text(
+                          "有效管理应收，不跨记录冲抵",
+                          "Créances gérées valides, sans compensation entre lignes",
+                        )}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
 
-          <p className="text-xs leading-5 text-muted-foreground" role="status">
-            {zh
-              ? `净收款沿用收款分析的币种、退款及冲正核验口径；${dailyExcludedCount} 笔未通过核验未计入。实际房晚仅计已记录的入住，已退房但缺少实际退房日的记录不推算。历史可售房源容量未核验，暂不展示入住率。`
-              : `Encaissement net selon les contrôles de devise, remboursement et annulation ; ${dailyExcludedCount} paiement(s) exclus. Nuitées documentées uniquement, sans déduire une date de départ manquante. Capacité historique non vérifiée : aucun taux d'occupation affiché.`}
+        <div className={styles.scopeNote}>
+          <LockKeyhole size={13} aria-hidden="true" />
+          <p>
+            {ledger
+              ? text(
+                  "这是账务登记口径，不等于实际现金流或会计利润。押金 / 负债不计入上述净额。",
+                  "Vue des écritures enregistrées, et non flux de trésorerie ni bénéfice comptable. Les passifs sont exclus du solde ci-dessus.",
+                )
+              : text(
+                  "应收显示当前状态，不是所选月份的月末余额；历史待核对和已排除记录另列。",
+                  "État actuel des créances, pas un solde de clôture mensuelle ; historique à vérifier et exclusions sont séparés.",
+                )}
           </p>
+          {ledger ? (
+            <span>
+              {text("负债流入", "Passifs entrants")} {money(Number(summary.liability_in), locale)} /{" "}
+              {text("流出", "sortants")} {money(Number(summary.liability_out), locale)} XOF
+            </span>
+          ) : null}
+        </div>
 
-          {dailyTrend.length > 0 && (
-            <DataVizCard
-              title={zh ? "近 12 个月日租收款" : "Encaissements journaliers sur 12 mois"}
-              description={zh ? "按实际付款日期" : "Par date de paiement"}
-            >
-              <GroupedBarChart
-                groups={dailyTrend.map((v, i) => ({
-                  label: monthRange(selectedMonth, 12)[i] ?? "",
-                  series: [{ label: zh ? "日租收款" : "Encaissé", value: v, tone: "green" }],
-                }))}
+        {ledger && data.trend.length ? <MonthTrend data={data} locale={locale} /> : null}
+
+        <section
+          className={styles.workspace}
+          aria-label={text("明细与来源", "Écritures et sources")}
+        >
+          <div className={styles.records}>
+            <div className={styles.recordsHeading}>
+              <div>
+                <h2>
+                  {ledger
+                    ? text("账务明细", "Écritures du journal")
+                    : text("应收明细", "Détail des créances")}
+                </h2>
+                <span>
+                  {result.total} {text("条匹配记录", "écritures correspondantes")}
+                </span>
+              </div>
+              <span className={styles.readonly}>
+                <LockKeyhole size={11} aria-hidden="true" />
+                {text("只读核查", "Lecture seule")}
+              </span>
+            </div>
+
+            <Form className={styles.filters} action={`${prefix}/reports`} key={`filter-${scope}`}>
+              <HiddenScope
+                query={query}
+                omit={["search", "direction", "management", "outstandingOnly"]}
               />
-            </DataVizCard>
-          )}
-
-          {occupancyTrend.length > 0 && (
-            <DataVizCard
-              title={zh ? "近 12 个月实际入住房晚" : "Nuitées réelles sur 12 mois"}
-              description={
-                zh
-                  ? "按已发生的住宿记录统计，不把预订当作实际入住"
-                  : "Séjours réalisés, sans compter les réservations comme occupation réelle"
-              }
-            >
-              <MultiLineChart
-                xLabels={occupancyTrend.map((o) => o.month)}
-                series={[
-                  {
-                    label: zh ? "实际房晚" : "Nuitées réelles",
-                    values: occupancyTrend.map((o) => o.occupiedNights),
-                    tone: "teal",
-                  },
-                ]}
-              />
-            </DataVizCard>
-          )}
-
-          {heatmap && dailyUnits.length > 0 && (
-            <DataVizCard
-              title={zh ? "本月入住热力" : "Occupation du mois"}
-              description={
-                zh ? "每行一个房间，每列一天" : "Une ligne par chambre, une colonne par jour"
-              }
-            >
-              <CalendarHeatmap
-                rows={dailyUnits.map((u) => ({ id: u.id, label: u.unit_no }))}
-                columns={heatmap.days.map((d) => ({ id: d, label: d.slice(8) }))}
-                cells={heatmap.toneCells}
-                legend={[
-                  { label: zh ? "入住" : "Occupé", tone: "blue" },
-                  { label: zh ? "预订" : "Réservé", tone: "amber" },
-                  { label: zh ? "退房清洁" : "Ménage", tone: "teal" },
-                  { label: zh ? "空闲" : "Libre", tone: "neutral" },
-                ]}
-              />
-            </DataVizCard>
-          )}
-        </>
-      ) : (
-        <>
-          <MetricGrid columns={5}>
-            <StatTile
-              label={zh ? "已确认应收" : "Dû confirmé"}
-              value={formatXof(receivableMetrics.receivable)}
-              tone="blue"
-            />
-            <StatTile
-              label={zh ? "已确认已收" : "Encaissé confirmé"}
-              value={formatXof(receivableMetrics.collected)}
-              tone="green"
-            />
-            <StatTile
-              label={zh ? "已确认未收" : "Solde confirmé"}
-              value={formatXof(receivableMetrics.outstanding)}
-              tone="amber"
-            />
-            <StatTile
-              label={zh ? "逾期" : "En retard"}
-              value={formatXof(receivableMetrics.overdue)}
-              tone="red"
-            />
-            <StatTile
-              label={zh ? "历史待核" : "Historique à vérifier"}
-              value={formatXof(historicalOutstanding)}
-              tone="neutral"
-            />
-          </MetricGrid>
-
-          <div className="grid gap-5 lg:grid-cols-2">
-            <DataVizCard title={zh ? "各楼栋已确认未收" : "Solde confirmé par bâtiment"}>
-              {outstandingByBuilding.length > 0 ? (
-                <BarListChart
-                  items={outstandingByBuilding.map((b, i) => ({
-                    label: b.label,
-                    value: b.value,
-                    tone: (i === 0 ? "red" : "blue") as ChartTone,
-                  }))}
+              <label className={styles.search}>
+                <Search size={15} aria-hidden="true" />
+                <span className={styles.srOnly}>
+                  {text("搜索房号或事项", "Rechercher un lot ou un objet")}
+                </span>
+                <input
+                  name="search"
+                  defaultValue={query.search}
+                  maxLength={150}
+                  placeholder={text("搜索房号或事项", "Rechercher un lot ou un objet")}
                 />
+              </label>
+              {ledger ? (
+                <select
+                  name="direction"
+                  defaultValue={query.direction}
+                  aria-label={text("账务方向", "Direction du journal")}
+                >
+                  <option value="">{text("全部方向", "Toutes directions")}</option>
+                  {["income", "expense", "liability_in", "liability_out"].map((direction) => (
+                    <option key={direction} value={direction}>
+                      {directionDisplayLabel(direction, locale)}
+                    </option>
+                  ))}
+                </select>
               ) : (
-                <p className="text-sm text-muted-foreground">{zh ? "暂无未收" : "Aucun solde"}</p>
+                <>
+                  <select
+                    name="management"
+                    defaultValue={query.management}
+                    aria-label={text("应收管理范围", "Périmètre des créances")}
+                  >
+                    <option value="managed">{text("系统管理", "Créances gérées")}</option>
+                    <option value="historical_pending">
+                      {text("历史待核对", "Historique à vérifier")}
+                    </option>
+                    <option value="excluded">{text("已排除", "Exclues")}</option>
+                  </select>
+                  <label className={styles.checkbox}>
+                    <input
+                      type="checkbox"
+                      name="outstandingOnly"
+                      value="true"
+                      defaultChecked={query.outstandingOnly}
+                    />
+                    {text("仅未结清", "Non soldées")}
+                  </label>
+                </>
               )}
-            </DataVizCard>
-            <DataVizCard title={zh ? "未收构成" : "Répartition du solde"}>
-              <DonutChart
-                items={[
-                  {
-                    label: zh ? "逾期" : "En retard",
-                    value: receivableMetrics.overdue,
-                    tone: "red" as ChartTone,
-                  },
-                  {
-                    label: zh ? "未逾期未收" : "Solde non échu",
-                    value: notOverdueOutstanding,
-                    tone: "amber" as ChartTone,
-                  },
-                  {
-                    label: zh ? "历史待核" : "Historique",
-                    value: historicalOutstanding,
-                    tone: "neutral" as ChartTone,
-                  },
-                ].filter((i) => i.value > 0)}
-                centerValue={formatXof(receivableMetrics.outstanding + historicalOutstanding)}
-                centerLabel={zh ? "未收合计" : "Solde total"}
-              />
-            </DataVizCard>
-          </div>
+              <button type="submit" className={styles.filterButton}>
+                {text("筛选", "Filtrer")}
+              </button>
+              {query.search || query.direction || query.outstandingOnly ? (
+                <Link
+                  className={styles.resetLink}
+                  href={href({ page: 1, search: "", direction: "", outstandingOnly: false })}
+                >
+                  {text("清除", "Effacer")}
+                </Link>
+              ) : null}
+            </Form>
 
-          {topOutstanding.length > 0 && (
-            <DataVizCard title={zh ? "未收明细（按金额前 20）" : "Top 20 des soldes"}>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-sm">
+            {result.rows.length ? (
+              <div
+                className={styles.tableScroll}
+                tabIndex={0}
+                role="region"
+                aria-label={text(
+                  "账务明细表，可横向滚动",
+                  "Tableau des écritures, défilement horizontal",
+                )}
+              >
+                <table className={styles.table}>
                   <thead>
-                    <tr className="text-left text-xs text-muted-foreground">
-                      <th className="px-3 py-2">{zh ? "楼栋/房号" : "Bâtiment/Lot"}</th>
-                      <th className="px-3 py-2">{zh ? "客户" : "Client"}</th>
-                      <th className="px-3 py-2">{zh ? "到期日" : "Échéance"}</th>
-                      <th className="px-3 py-2 text-right">{zh ? "应收" : "Dû"}</th>
-                      <th className="px-3 py-2 text-right">{zh ? "已收" : "Encaissé"}</th>
-                      <th className="px-3 py-2 text-right">{zh ? "未收" : "Solde"}</th>
-                      <th className="px-3 py-2">{zh ? "状态" : "Statut"}</th>
+                    <tr>
+                      <th scope="col">
+                        {ledger ? text("日期", "Date") : text("到期日", "Échéance")}
+                      </th>
+                      <th scope="col">{text("业务 / 事项", "Opération / objet")}</th>
+                      <th scope="col" className={styles.number}>
+                        {ledger
+                          ? text("登记金额 · XOF", "Inscrit · XOF")
+                          : text("未收 · XOF", "Solde · XOF")}
+                      </th>
+                      <th scope="col">
+                        <span className={styles.srOnly}>
+                          {text("核查来源", "Vérifier la source")}
+                        </span>
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
-                    {topOutstanding.map((r) => {
-                      const out = receivableOutstanding(r);
-                      const buildingName = buildingNameMap.get(r.building_id ?? "") ?? "—";
-                      const unitNo = r.unit_id ? (unitNoMap.get(r.unit_id) ?? "—") : "—";
-                      const customerName = r.customer_id
-                        ? (customerNameMap.get(r.customer_id) ?? "—")
-                        : "—";
-                      const isOverdue = r.due_date < new Date().toISOString().slice(0, 10);
+                  <tbody>
+                    {result.rows.map((row) => {
+                      const isSelected = selected?.id === row.id;
+                      const amount = ledger
+                        ? numeric(row.amount_xof)
+                        : Math.max(0, numeric(row.amount_xof) - numeric(row.paid_amount_xof));
+                      const business = financialBusinessLabel(
+                        String(row.source_type ?? row.category ?? ""),
+                        locale,
+                        String(row.category ?? ""),
+                      );
                       return (
-                        <tr key={r.id}>
-                          <td className="px-3 py-2">
-                            {buildingName} · {unitNo}
+                        <tr key={String(row.id)} className={isSelected ? styles.selectedRow : ""}>
+                          <td>
+                            <span className={styles.date}>
+                              {rowText(row, ledger ? "entry_date" : "due_date")}
+                            </span>
+                            <span className={styles.rowSecondary}>
+                              {ledger
+                                ? directionDisplayLabel(String(row.direction), locale)
+                                : statusDisplayLabel(String(row.status), locale)}
+                            </span>
                           </td>
-                          <td className="px-3 py-2">{customerName}</td>
-                          <td className="px-3 py-2 tabular-nums">{r.due_date}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">
-                            {formatXof(Number(r.amount_xof))}
+                          <td>
+                            <strong className={styles.rowTitle}>{business}</strong>
+                            <span className={styles.rowSecondary}>
+                              {[rowText(row, "building_label"), rowText(row, "unit_label")]
+                                .filter((value) => value !== "—")
+                                .join(" · ") || text("未关联房号", "Sans lot associé")}
+                            </span>
+                            <span className={styles.rowDescription}>
+                              {rowText(row, ledger ? "description" : "title")}
+                            </span>
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-emerald-700">
-                            {formatXof(Number(r.paid_amount_xof))}
+                          <td className={`${styles.number} ${amount < 0 ? styles.negative : ""}`}>
+                            <strong>
+                              {!ledger && row.status === "cancelled" ? "—" : money(amount, locale)}
+                            </strong>
+                            {!ledger ? (
+                              <span className={styles.rowSecondary}>
+                                {text("应收", "Dû")} {money(numeric(row.amount_xof), locale)}
+                              </span>
+                            ) : null}
                           </td>
-                          <td className="px-3 py-2 text-right font-medium tabular-nums text-red-700">
-                            {formatXof(out)}
-                          </td>
-                          <td className="px-3 py-2">
-                            {isOverdue ? (zh ? "逾期" : "Retard") : zh ? "待收" : "Dû"}
+                          <td className={styles.inspectCell}>
+                            <button
+                              type="button"
+                              className={styles.inspectButton}
+                              aria-label={`${text("核查", "Vérifier")} ${rowText(row, "unit_label")} ${rowText(row, ledger ? "entry_date" : "due_date")}`}
+                              aria-pressed={isSelected}
+                              onClick={() => setSelection({ scope, id: String(row.id) })}
+                            >
+                              {text("核查", "Vérifier")}
+                              <ChevronRight size={12} aria-hidden="true" />
+                            </button>
                           </td>
                         </tr>
                       );
@@ -655,10 +484,98 @@ export function ReportsView({
                   </tbody>
                 </table>
               </div>
-            </DataVizCard>
-          )}
-        </>
-      )}
+            ) : (
+              <div className={styles.empty}>
+                <FileSearch size={28} strokeWidth={1.3} aria-hidden="true" />
+                <h3>
+                  {result.total > 0
+                    ? text("当前页无记录", "Aucune écriture sur cette page")
+                    : text("没有匹配记录", "Aucune écriture correspondante")}
+                </h3>
+                <p>
+                  {result.total > 0
+                    ? text(
+                        "筛选范围内仍有记录，请返回第一页查看。",
+                        "Des écritures existent dans cette sélection. Revenez à la première page.",
+                      )
+                    : text(
+                        "试试调整搜索或筛选范围；无记录不代表已结清。",
+                        "Ajustez les filtres ; une liste vide ne prouve pas un règlement intégral.",
+                      )}
+                </p>
+                {result.total > 0 ? (
+                  <Link className={styles.financeLink} href={href({ page: 1 })}>
+                    {text("返回第一页", "Revenir à la première page")}
+                  </Link>
+                ) : null}
+              </div>
+            )}
+
+            <div className={styles.tableFooter}>
+              <span>
+                {first}–{last} / {result.total} · {text("每页", "Par page")} {result.pageSize}
+              </span>
+              <nav aria-label={text("明细分页", "Pagination des écritures")}>
+                {query.page > 1 ? (
+                  <Link
+                    href={href({ page: query.page - 1 })}
+                    aria-label={text("上一页", "Page précédente")}
+                  >
+                    <ChevronLeft size={15} aria-hidden="true" />
+                  </Link>
+                ) : (
+                  <span className={styles.disabledPage}>
+                    <ChevronLeft size={15} aria-hidden="true" />
+                  </span>
+                )}
+                <span>
+                  {query.page} / {pageCount}
+                </span>
+                {query.page < pageCount ? (
+                  <Link
+                    href={href({ page: query.page + 1 })}
+                    aria-label={text("下一页", "Page suivante")}
+                  >
+                    <ChevronRight size={15} aria-hidden="true" />
+                  </Link>
+                ) : (
+                  <span className={styles.disabledPage}>
+                    <ChevronRight size={15} aria-hidden="true" />
+                  </span>
+                )}
+              </nav>
+            </div>
+          </div>
+          <ReportInspector
+            key={`${scope}/${String(selected?.id ?? "empty")}`}
+            row={selected}
+            data={data}
+            locale={locale}
+          />
+        </section>
+
+        <details className={styles.notes}>
+          <summary>{text("统计口径与核查边界", "Périmètre et règles de contrôle")}</summary>
+          <p>
+            {text(
+              "合计与明细使用相同筛选范围，合计覆盖全部匹配记录，不仅是当前页。趋势单独展示所选项目的月度登记净额。导出包含完整筛选结果，不仅是当前页。",
+              "Les totaux couvrent toutes les écritures filtrées, pas seulement cette page. La tendance présente séparément le solde mensuel inscrit du projet. L’export couvre l’ensemble des résultats filtrés.",
+            )}
+          </p>
+          <p>
+            {text(
+              "登记收入和支出不自动识别真实现金、冲正或非现金结算；不能将登记净额当作现金净收入或利润。付款事实中的原币金额和已关联应收供逐笔核查，不自动补写或改账。",
+              "Le journal ne requalifie pas automatiquement trésorerie, annulations ou règlements non monétaires. Son solde n’est ni un flux net de trésorerie ni un bénéfice. Les faits de paiement servent uniquement à la vérification, sans correction automatique.",
+            )}
+          </p>
+          <p>
+            {text(
+              "当前应收只按有效系统管理记录计算；每条未收最低为零，不用其他记录的多收相抵。到期日不等于服务账期；没有明确来源时不推断实际收款人或账期。",
+              "Les créances sont calculées à partir des écritures gérées valides, sans compensation entre lignes. L’échéance ne remplace pas la période de service ; aucun encaisseur ni période n’est déduit sans source.",
+            )}
+          </p>
+        </details>
+      </div>
     </div>
   );
 }

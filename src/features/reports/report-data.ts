@@ -1,117 +1,156 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import { fetchAllPages } from "@/lib/supabase/fetch-all";
-import type {
-  LedgerEntryRow,
-  BuildingRow,
-  UnitRow,
-  DailyBookingRow,
-  ReceivableRow,
-  CustomerRow,
-} from "@/types/database";
-import { loadDailyReceiptMonths } from "./daily-receipt-report-service";
+import type { FinanceReadResult } from "@/features/finance/finance-read";
+import {
+  parseReportQuery,
+  reportExportHref,
+  reportFinanceFilters,
+  type ReportParams,
+  type ReportProject,
+  type ReportTrend,
+  type ReportWorkspaceData,
+} from "./report-read";
 
-export async function loadReportData() {
-  const supabase = await createClient();
+function money(value: unknown, nonnegative = false): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    Math.abs(value) <= Number.MAX_SAFE_INTEGER / 100 &&
+    (!nonnegative || value >= 0)
+  );
+}
 
-  const [
-    entries,
-    buildingsRes,
-    unitsRes,
-    dailyBookings,
-    dailyCollections,
-    dailyFlagsRes,
-    receivables,
-    customersRes,
-  ] = await Promise.all([
-    fetchAllPages(
-      (from, to) =>
-        supabase
-          .from("ledger_entries")
-          .select(
-            "id, building_id, unit_id, payment_id, entry_date, direction, category, amount_xof, amount_cny, description",
-          )
-          .order("entry_date", { ascending: false })
-          .order("id", { ascending: false })
-          .range(from, to),
-      "report ledger entries",
-    ),
-    fetchAllPages(
-      (from, to) =>
-        supabase
-          .from("buildings")
-          .select("id, code, display_name")
-          .eq("is_active", true)
-          .order("code")
-          .order("id")
-          .range(from, to),
-      "report buildings",
-    ).then((data) => ({ data, error: null })),
-    fetchAllPages(
-      (from, to) =>
-        supabase
-          .from("units")
-          .select("id, building_id, unit_no")
-          .order("unit_no")
-          .order("id")
-          .range(from, to),
-      "report units",
-    ).then((data) => ({ data, error: null })),
-    fetchAllPages(
-      (from, to) =>
-        supabase
-          .from("daily_bookings")
-          .select("id, unit_id, check_in, check_out, checkout_mode, actual_check_out, status")
-          .order("check_in", { ascending: false })
-          .order("id", { ascending: false })
-          .range(from, to),
-      "report daily bookings",
-    ),
-    loadDailyReceiptMonths(supabase),
-    fetchAllPages(
-      (from, to) =>
-        supabase
-          .from("unit_business_flags")
-          .select("unit_id")
-          .eq("business_type", "daily_rental")
-          .eq("is_enabled", true)
-          .order("unit_id")
-          .range(from, to),
-      "report daily units",
-    ).then((data) => ({ data, error: null })),
-    fetchAllPages(
-      (from, to) =>
-        supabase
-          .from("receivables")
-          .select(
-            "id, building_id, unit_id, customer_id, source_type, source_id, category, title, due_date, amount_xof, paid_amount_xof, status, management_status",
-          )
-          .neq("status", "cancelled")
-          .order("due_date", { ascending: false })
-          .order("id", { ascending: false })
-          .range(from, to),
-      "report receivables",
-    ),
-    fetchAllPages(
-      (from, to) =>
-        supabase.from("customers").select("id, name").order("name").order("id").range(from, to),
-      "report customers",
-    ).then((data) => ({ data, error: null })),
-  ]);
+function isoDate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
 
-  for (const result of [buildingsRes, unitsRes, dailyFlagsRes, customersRes]) {
-    if (result.error || !result.data) throw new Error("Report reference data unavailable");
+export function decodeReportResult(value: unknown): FinanceReadResult {
+  if (!value || typeof value !== "object") throw new Error("ReportReadUnavailable");
+  const result = value as FinanceReadResult;
+  if (
+    !["ledger", "receivables"].includes(result.kind) ||
+    !Number.isInteger(result.page) ||
+    result.page < 1 ||
+    result.pageSize !== 50 ||
+    !Number.isSafeInteger(result.total) ||
+    result.total < 0 ||
+    !Array.isArray(result.rows) ||
+    result.rows.length > result.total ||
+    !result.summary ||
+    typeof result.summary !== "object"
+  )
+    throw new Error("ReportReadUnavailable");
+  const keys =
+    result.kind === "ledger"
+      ? ["income", "expense", "liability_in", "liability_out"]
+      : ["receivable", "paid", "outstanding", "overdue"];
+  if (keys.some((key) => !money(result.summary[key], result.kind === "receivables")))
+    throw new Error("ReportReadUnavailable");
+  const seen = new Set<string>();
+  for (const row of result.rows) {
+    if (
+      !row ||
+      typeof row !== "object" ||
+      Array.isArray(row) ||
+      typeof row.id !== "string" ||
+      !row.id ||
+      seen.has(row.id) ||
+      typeof row.category !== "string" ||
+      !row.category ||
+      !money(row.amount_xof, result.kind === "receivables") ||
+      ["description", "title", "building_label", "unit_label"].some(
+        (key) => row[key] != null && typeof row[key] !== "string",
+      )
+    )
+      throw new Error("ReportReadUnavailable");
+    seen.add(row.id);
+    if (result.kind === "ledger") {
+      if (
+        !isoDate(row.entry_date) ||
+        !["income", "expense", "liability_in", "liability_out"].includes(String(row.direction)) ||
+        (row.amount_cny != null && !money(row.amount_cny))
+      )
+        throw new Error("ReportReadUnavailable");
+    } else if (
+      !isoDate(row.due_date) ||
+      !money(row.paid_amount_xof, true) ||
+      !["pending", "partial", "paid", "overdue", "cancelled"].includes(String(row.status)) ||
+      !["managed", "historical_pending", "excluded"].includes(String(row.management_status))
+    ) {
+      throw new Error("ReportReadUnavailable");
+    }
   }
+  return result;
+}
 
-  return {
-    entries: entries as LedgerEntryRow[],
-    buildings: (buildingsRes.data ?? []) as BuildingRow[],
-    units: (unitsRes.data ?? []) as UnitRow[],
-    dailyBookings: dailyBookings as DailyBookingRow[],
-    dailyCollections,
-    dailyUnitIds: ((dailyFlagsRes.data ?? []) as { unit_id: string }[]).map((f) => f.unit_id),
-    receivables: receivables as ReceivableRow[],
-    customers: (customersRes.data ?? []) as CustomerRow[],
-  };
+function decodeTrend(value: unknown, endMonth: string): ReportTrend[] {
+  if (!Array.isArray(value) || value.length !== 12) throw new Error("ReportTrendUnavailable");
+  const end = new Date(`${endMonth}-01T00:00:00Z`);
+  return value.map((row, index) => {
+    const date = new Date(end);
+    date.setUTCMonth(date.getUTCMonth() - 11 + index);
+    const expectedMonth = date.toISOString().slice(0, 7);
+    if (
+      !row ||
+      typeof row !== "object" ||
+      row.month !== expectedMonth ||
+      [row.income, row.expense, row.net].some((amount) => !money(amount)) ||
+      Math.abs(row.income - row.expense - row.net) >
+        Math.max(
+          0.000001,
+          Math.max(Math.abs(row.income), Math.abs(row.expense), Math.abs(row.net)) *
+            Number.EPSILON *
+            4,
+        )
+    )
+      throw new Error("ReportTrendUnavailable");
+    return { month: row.month, income: row.income, expense: row.expense, net: row.net };
+  });
+}
+
+export async function loadReportData(params: ReportParams = {}): Promise<ReportWorkspaceData> {
+  const asOf = new Date().toISOString().slice(0, 10);
+  parseReportQuery(params, asOf);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id,code,display_name")
+    .eq("is_active", true)
+    .order("code");
+  if (error || !data) throw new Error("ReportProjectsUnavailable");
+  const projects = data as ReportProject[];
+  if (!projects.length) throw new Error("ReportNoAuthorizedProjects");
+  const defaultProject =
+    projects.find((project) => project.code.toUpperCase() === "SACSI") ?? projects[0];
+  const query = parseReportQuery(params, asOf, defaultProject.id);
+  if (!projects.some((project) => project.id === query.projectId))
+    throw new Error("ReportProjectPermissionDenied");
+
+  const [read, trendRead] = await Promise.all([
+    supabase.rpc("finance_read_rpc", {
+      p_kind: query.kind,
+      p_filters: reportFinanceFilters(query),
+      p_page: query.page,
+    }),
+    query.kind === "ledger"
+      ? supabase.rpc("reports_trend_rpc", {
+          p_project_id: query.projectId,
+          p_end_month: `${query.month}-01`,
+        })
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (read.error || trendRead.error) throw new Error("ReportReadUnavailable");
+  const result = decodeReportResult(read.data);
+  const expectedRows = Math.min(50, Math.max(0, result.total - (query.page - 1) * 50));
+  if (
+    result.kind !== query.kind ||
+    result.page !== query.page ||
+    result.rows.length !== expectedRows
+  )
+    throw new Error("ReportReadScopeMismatch");
+  const trend = query.kind === "ledger" ? decodeTrend(trendRead.data, query.month) : [];
+  return { query, projects, result, trend, asOf, exportHref: reportExportHref(query) };
 }

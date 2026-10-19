@@ -12,7 +12,7 @@ function entry(
   index: number,
 ): LedgerEntryRow {
   return {
-    id: `${direction}-${category}-${index}`,
+    id: `10000000-0000-4000-8000-${String(index + (direction === "income" ? 100 : 200)).padStart(12, "0")}`,
     building_id: null,
     unit_id: null,
     payment_id: null,
@@ -28,19 +28,50 @@ function entry(
 function render(locale: "zh" | "fr", entries: LedgerEntryRow[]) {
   return renderToStaticMarkup(
     <ReportsView
-      entries={entries}
-      buildings={[]}
-      units={[]}
-      dailyBookings={[]}
-      dailyCollections={[]}
-      dailyUnitIds={[]}
-      receivables={[]}
-      customers={[]}
+      data={{
+        query: {
+          kind: "ledger",
+          projectId: "10000000-0000-4000-8000-000000000001",
+          month: "2026-10",
+          page: 1,
+          search: "",
+          direction: "",
+          management: "managed",
+          outstandingOnly: false,
+        },
+        projects: [
+          {
+            id: "10000000-0000-4000-8000-000000000001",
+            code: "SACSI",
+            display_name: "SACSI",
+          },
+        ],
+        result: {
+          kind: "ledger",
+          page: 1,
+          pageSize: 50,
+          total: entries.length,
+          summary: {
+            income: entries
+              .filter((row) => row.direction === "income")
+              .reduce((total, row) => total + Number(row.amount_xof), 0),
+            expense: entries
+              .filter((row) => row.direction === "expense")
+              .reduce((total, row) => total + Number(row.amount_xof), 0),
+            liability_in: 0,
+            liability_out: 0,
+          },
+          rows: entries.map((row) => ({ ...row })),
+        },
+        trend: [],
+        asOf: "2026-10-19",
+        exportHref: "/api/reports/export",
+      }}
       locale={locale}
     />,
   );
 }
-describe("reports category chart labels", () => {
+describe("reports checking table category labels", () => {
   it.each([
     ["zh", ["长租租金", "出售房款", "日租收入", "物业费"]],
     [
@@ -48,7 +79,7 @@ describe("reports category chart labels", () => {
       ["Loyer longue durée", "Paiement du bien", "Revenu journalier", "Charges de copropriété"],
     ],
   ] as const)(
-    "localizes income and expense legends in %s without changing aggregation keys or amounts",
+    "localizes income and expense rows in %s without changing aggregation keys or amounts",
     (locale, labels) => {
       const entries = [
         ...categories.map((category, index) => entry(category, "income", index)),
@@ -56,7 +87,7 @@ describe("reports category chart labels", () => {
       ];
       const before = structuredClone(entries);
       const html = render(locale, entries);
-      for (const label of labels) expect(html.split(label)).toHaveLength(3);
+      for (const label of labels) expect(html).toContain(label);
       for (const category of categories) expect(html).not.toContain(category);
       expect(entries).toEqual(before);
       expect(aggregateByCategory(entries, "income")).toEqual([
@@ -79,8 +110,8 @@ describe("reports category chart labels", () => {
     const zh = render("zh", entries);
     const fr = render("fr", entries);
     expect(aggregateByCategory(entries, "income")).toHaveLength(3);
-    expect(zh.split("出售房款")).toHaveLength(3);
-    expect(fr.split("Paiement du bien")).toHaveLength(3);
+    expect(zh).toContain("出售房款");
+    expect(fr).toContain("Paiement du bien");
     expect(zh).toContain("其他业务");
     expect(fr).toContain("Autre opération");
     expect(zh).not.toContain("legacy_private_code");
