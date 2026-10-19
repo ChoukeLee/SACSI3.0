@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
+import { safeWorkbenchReturnTo } from "@/lib/workbench-links";
 import { formatXof, cn } from "@/lib/utils";
 import { paymentDisplay } from "@/lib/currency";
 import {
@@ -44,9 +45,10 @@ interface Props {
   data: CustomerProfileData;
   locale: Locale;
   userRole: string;
+  returnTo?: string | null;
 }
 
-export function CustomerProfileView({ data, locale, userRole }: Props) {
+export function CustomerProfileView({ data, locale, userRole, returnTo }: Props) {
   void userRole;
   const { customer } = data;
   const [tab, setTab] = useState<Tab>("overview");
@@ -360,7 +362,7 @@ export function CustomerProfileView({ data, locale, userRole }: Props) {
           {L.finance} <ArrowRight className="h-3 w-3" />
         </Link>
         <Link
-          href={routeFor(locale, "/customers")}
+          href={safeWorkbenchReturnTo(returnTo) ?? routeFor(locale, "/customers")}
           className="hover:text-primary flex items-center gap-1"
         >
           {L.backToList} <ArrowRight className="h-3 w-3" />

@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { safeWorkbenchReturnTo } from "@/lib/workbench-links";
 import { LeaseRentPeriodCorrection } from "./lease-rent-period-correction";
 import { leaseRequestIdentity, clearLeaseRequestIdentity } from "./lease-request-identity";
 import {
@@ -117,6 +119,9 @@ type LeaseUnitRow = UnitRow & {
 interface LeaseListProps {
   workspace?: WorkspaceData;
   initialProject?: string;
+  initialBuilding?: string;
+  initialContract?: string;
+  returnTo?: string;
   scopePreference?: LeaseScopePreference;
   contracts: LeaseContractRow[];
   units: LeaseUnitRow[];
@@ -231,6 +236,9 @@ function getOriginalMonthlyRent(contract: LeaseContractRow, payments: PaymentRow
 export function LeaseList({
   workspace: initialWorkspace,
   initialProject,
+  initialBuilding,
+  initialContract,
+  returnTo,
   scopePreference,
   contracts: initialContracts,
   units: initialUnits,
@@ -278,6 +286,12 @@ export function LeaseList({
     contracts: LeaseContractRow[];
     version: number;
   } | null>(null);
+  const [linkedPreviewDismissed, setLinkedPreviewDismissed] = useState(false);
+  const safeReturnTo = safeWorkbenchReturnTo(returnTo);
+  useEffect(() => {
+    setLinkedPreviewDismissed(false);
+    setPreviewSelection(null);
+  }, [initialProject, initialBuilding, initialContract]);
   const previewVersion = useRef(0);
   const previewColumnRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
@@ -322,6 +336,12 @@ export function LeaseList({
 
   const projects = useMemo(() => groupLeaseBuildings(buildings), [buildings]);
   const requestedProjectId = resolveContractProjectLink(buildings, initialProject);
+  const requestedBuildingId = initialBuilding
+    ? buildings.find(
+        (b) =>
+          b.id === initialBuilding && (!requestedProjectId || b.project_id === requestedProjectId),
+      )?.id
+    : undefined;
   const scopeStorageKey = leaseScopeStorageKey(scopePreference?.cookieName);
   const [scope, setScope] = useState(() => {
     const initial = defaultLeaseScope(buildings);
@@ -331,7 +351,7 @@ export function LeaseList({
       projectId,
       buildings: {
         [projectId]: requestedProjectId
-          ? ALL_BUILDINGS
+          ? (requestedBuildingId ?? ALL_BUILDINGS)
           : serverScope
             ? serverScope.buildingId || ALL_BUILDINGS
             : initial.buildingId || ALL_BUILDINGS,
@@ -357,7 +377,10 @@ export function LeaseList({
       setScope((current) => ({
         ...current,
         projectId: requestedProjectId,
-        buildings: { ...current.buildings, [requestedProjectId]: ALL_BUILDINGS },
+        buildings: {
+          ...current.buildings,
+          [requestedProjectId]: requestedBuildingId ?? ALL_BUILDINGS,
+        },
       }));
       setPanel(null);
       setSelectedId(null);
@@ -401,6 +424,7 @@ export function LeaseList({
     setScopeLoaded(true);
   }, [
     requestedProjectId,
+    requestedBuildingId,
     scopeStorageKey,
     scopePreference?.cookieName,
     scopePreference?.serverResolved,
@@ -453,6 +477,7 @@ export function LeaseList({
     initialWorkspace,
   );
   const closeScopePanel = () => {
+    setLinkedPreviewDismissed(true);
     setPreviewSelection(null);
     setPanel(null);
     setSelectedId(null);
@@ -610,15 +635,28 @@ export function LeaseList({
     contractView,
     workspace.query ? workspaceQueryKey(workspace.query) : null,
   ]);
+  const linkedPreviewId =
+    !linkedPreviewDismissed &&
+    scopeLoaded &&
+    requestedProjectId === project?.id &&
+    workspace.query?.projectId === requestedProjectId &&
+    workspace.query.buildingId === (requestedBuildingId ?? "") &&
+    activeBuildingId === (requestedBuildingId ?? ALL_BUILDINGS) &&
+    statusFilter === "current" &&
+    !search &&
+    initialContract &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(initialContract)
+      ? initialContract
+      : null;
   const previewId =
-    !workspace.unavailable &&
-    panel === null &&
-    contractView === "table" &&
-    previewSelection?.scope === previewScope &&
-    previewSelection.page === workspace.pageData &&
-    previewSelection.contracts === initialContracts &&
-    searchedTableRows.some((row) => row.id === previewSelection.id)
-      ? previewSelection.id
+    !workspace.unavailable && panel === null && contractView === "table"
+      ? (linkedPreviewId ??
+        (previewSelection?.scope === previewScope &&
+        previewSelection.page === workspace.pageData &&
+        previewSelection.contracts === initialContracts &&
+        searchedTableRows.some((row) => row.id === previewSelection.id)
+          ? previewSelection.id
+          : null))
       : null;
   const preview = useLeaseWorkbenchPreview(workspace.query, previewId, previewSelection?.version);
   const previewContract = previewId
@@ -635,6 +673,7 @@ export function LeaseList({
   const previewPayments = workspace.enabled ? (preview.data?.payments ?? []) : payments;
   const previewReceivables = workspace.enabled ? (preview.data?.receivables ?? []) : receivables;
   const selectPreview = (id: string) => {
+    setLinkedPreviewDismissed(true);
     if (id === previewId && preview.error) preview.retry();
     setPreviewSelection({
       id,
@@ -1192,6 +1231,7 @@ export function LeaseList({
     setSelectedId(null);
   };
   const changeView = async (value: "table" | "rooms") => {
+    setLinkedPreviewDismissed(true);
     setPreviewSelection(null);
     if (workspace.enabled && value === "rooms") {
       try {
@@ -1310,6 +1350,7 @@ export function LeaseList({
         locale={locale}
         query={search}
         onQueryChange={(value) => {
+          setLinkedPreviewDismissed(true);
           setPreviewSelection(null);
           setSearch(value);
         }}
@@ -1320,6 +1361,7 @@ export function LeaseList({
         <SegmentedControl
           value={statusFilter}
           onChange={(value) => {
+            setLinkedPreviewDismissed(true);
             setPreviewSelection(null);
             setStatusFilter(value);
           }}
@@ -1369,6 +1411,14 @@ export function LeaseList({
         ) : undefined
       }
     >
+      {safeReturnTo && (
+        <Link
+          href={safeReturnTo}
+          className="mb-3 inline-flex text-sm text-blue-700 hover:underline"
+        >
+          {locale === "zh" ? "← 返回来源工作台" : "← Revenir à l'espace précédent"}
+        </Link>
+      )}
       <section
         className={styles.scopeRow}
         aria-label={locale === "zh" ? "项目与楼栋" : "Projet et bâtiment"}
@@ -1513,6 +1563,7 @@ export function LeaseList({
                   ? {
                       ...workspace.pagination,
                       onPageChange: (page) => {
+                        setLinkedPreviewDismissed(true);
                         setPreviewSelection(null);
                         workspace.pagination?.onPageChange(page);
                       },
@@ -1780,7 +1831,10 @@ export function LeaseList({
               onPrint={() => {
                 if (previewId) void printById(previewId);
               }}
-              onClose={() => setPreviewSelection(null)}
+              onClose={() => {
+                setLinkedPreviewDismissed(true);
+                setPreviewSelection(null);
+              }}
             />
             {previewId && preview.error && (
               <Button

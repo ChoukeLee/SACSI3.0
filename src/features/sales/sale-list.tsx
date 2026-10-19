@@ -2,15 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Plus,
-  DollarSign,
-  FileText,
-  CalendarPlus,
-  TrendingUp,
-  AlertTriangle,
-  Eye,
-} from "lucide-react";
+import { Plus, DollarSign, CalendarPlus, TrendingUp, AlertTriangle } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
@@ -20,17 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DateInput } from "@/components/ui/date-input";
-import { RoomCard } from "@/components/room-card";
-import { RoomBoard } from "@/components/room-board";
 import { EmptyState } from "@/components/empty-state";
-import {
-  FilterBar,
-  MetricGrid,
-  OperationalPage,
-  RightDrawer,
-  SegmentedControl,
-  StatTile,
-} from "@/components/ui/operational";
+import { OperationalPage, RightDrawer } from "@/components/ui/operational";
 import type {
   SaleContractRow,
   SalePaymentScheduleRow,
@@ -50,7 +33,6 @@ import {
 import { buildSaleContractNumber } from "@/lib/contract-number";
 import { printSaleContract } from "@/features/print";
 import { computeFinanceMetrics } from "@/features/finance/metrics";
-import { ContractListControls, ContractTable } from "@/features/contracts/contract-table";
 import {
   buildContractReceivableSummaries,
   formatContractXof,
@@ -67,17 +49,47 @@ import { useContractWorkspace } from "@/features/contracts/use-workspace";
 import type { WorkspaceData } from "@/features/contracts/workspace-model";
 import { workspaceQueryKey } from "@/features/contracts/workspace-model";
 import { useContractPrinter } from "@/features/contracts/use-contract-printer";
+import { safeWorkbenchReturnTo } from "@/lib/workbench-links";
+import { SaleWorkbenchTable } from "./sale-workbench-table";
+import { SaleWorkbenchRooms } from "./sale-workbench-rooms";
+import { SaleWorkbenchInspector } from "./sale-workbench-inspector";
+import { useSaleWorkbenchPreview } from "./use-sale-workbench-preview";
+import {
+  SALE_UUID,
+  salePrice,
+  saleWorkbenchHref,
+  saleWorkbenchStats,
+  saleScheduleState,
+} from "./sale-workbench-model";
+import styles from "./sale-workbench.module.css";
+import {
+  SaleWorkbenchScope,
+  SaleWorkbenchToolbar,
+  SaleWorkbenchSummary,
+  SaleNoSaleWorkspace,
+  type SaleStatKey,
+  type SaleStatusFilter,
+} from "./sale-workbench-chrome";
 
 interface SaleListProps {
   workspace?: WorkspaceData;
   initialProject?: string;
+  initialContract?: string;
+  returnTo?: string;
+  noSaleProject?: boolean;
   contracts: SaleContractRow[];
   schedules: SalePaymentScheduleRow[];
   units: UnitRow[];
   customers: CustomerRow[];
   payments: PaymentRow[];
   receivables: ReceivableRow[];
-  buildings: { id: string; code: string; display_name: string; project_id?: string | null }[];
+  buildings: {
+    id: string;
+    code: string;
+    display_name: string;
+    project_id?: string | null;
+    project?: { id: string; code: string; display_name: string; allows_sale?: boolean } | null;
+  }[];
   locale: Locale;
   canCreate?: boolean;
   canRecordFinance?: boolean;
@@ -85,49 +97,25 @@ interface SaleListProps {
   canTerminate?: boolean;
 }
 type PanelType = "new" | "detail" | "insight" | null;
-type SaleStatKey = "active" | "total" | "received" | "receivable" | "due" | "overdue" | "transfer";
-type SaleStatusFilter = "current" | "all" | "terminated" | "expired";
 const SALE_RECEIPT_SOURCE_TYPES = new Set(["sale", "sale_contract", "property_fee", "parking_fee"]);
 
 function getSaleDataFlags(contract: SaleContractRow, customer?: CustomerRow | null) {
   return {
     needsData:
       contract.payment_plan_type === "legacy_pending" ||
-      Number(contract.total_amount_xof) <= 0 ||
+      salePrice(contract) === null ||
       customer?.name.includes("资料待补") ||
       customer?.notes?.includes("legacy_placeholder=true"),
     needsNumberCleanup: contract.contract_no.startsWith("LEGACY-SALE-"),
   };
 }
 
-function SaleActionBtn({
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  icon: typeof Eye;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={(event) => {
-        event.stopPropagation();
-        onClick();
-      }}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground"
-      aria-label={label}
-      title={label}
-    >
-      <Icon className="h-[14px] w-[14px]" strokeWidth={1.5} />
-    </button>
-  );
-}
-
 export function SaleList({
   workspace: initialWorkspace,
   initialProject,
+  initialContract,
+  returnTo,
+  noSaleProject = false,
   contracts: initialContracts,
   schedules: initialSchedules,
   units: initialUnits,
@@ -152,9 +140,17 @@ export function SaleList({
   const t = dictionaries[locale].sales;
   const formatXof = (amount: number) => formatContractXof(amount, locale);
   const [statFilter, setStatFilter] = useState<SaleStatKey | null>(null);
-  const [statusFilter, setStatusFilter] = useState<SaleStatusFilter>("current");
+  const [statusFilter, setStatusFilter] = useState<SaleStatusFilter>(
+    (initialWorkspace?.query.status as SaleStatusFilter) ?? "current",
+  );
   const [contractView, setContractView] = useState<"table" | "rooms">("table");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialWorkspace?.query.search ?? "");
+  const [previewSelection, setPreviewSelection] = useState<{ id: string; scope: string } | null>(
+    () =>
+      initialContract && SALE_UUID.test(initialContract) && initialWorkspace
+        ? { id: initialContract, scope: workspaceQueryKey(initialWorkspace.query) }
+        : null,
+  );
   const [panel, setPanel] = useState<PanelType>(null);
   useEffect(() => {
     if (workspace.enabled && contractView === "table" && panel !== "insight")
@@ -201,10 +197,66 @@ export function SaleList({
 
   // Building switcher
   const [activeBuildingId, setActiveBuildingId] = useState<string>(() =>
-    requestedProjectId
-      ? ""
-      : (buildings.find((building) => building.code === "SACSI11")?.id ?? buildings[0]?.id ?? ""),
+    initialWorkspace
+      ? initialWorkspace.query.buildingId
+      : requestedProjectId
+        ? ""
+        : (buildings.find((building) => building.code === "SACSI11")?.id ?? buildings[0]?.id ?? ""),
   );
+  const currentQuery = workspace.query;
+  const currentScope = currentQuery
+    ? workspaceQueryKey(currentQuery)
+    : `${activeBuildingId}/${statusFilter}/${search}`;
+  const previewId =
+    previewSelection?.scope === currentScope && !workspace.unavailable ? previewSelection.id : null;
+  const previewVersion = useMemo(
+    () => ({ page: workspace.pageData, selection: previewSelection }),
+    [workspace.pageData, previewSelection],
+  );
+  const preview = useSaleWorkbenchPreview(
+    workspace.enabled && !workspace.unavailable ? currentQuery : undefined,
+    previewId,
+    previewVersion,
+  );
+  const currentHref = currentQuery
+    ? saleWorkbenchHref(currentQuery, previewId)
+    : `${locale === "fr" ? "/fr" : ""}/sales`;
+  const safeReturn = safeWorkbenchReturnTo(returnTo);
+  const previewColumnRef = useRef<HTMLDivElement | null>(null);
+  const revealPreview = () => {
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function" ||
+      typeof window.requestAnimationFrame !== "function" ||
+      !window.matchMedia("(max-width: 1199px)").matches
+    )
+      return;
+    window.requestAnimationFrame(() => {
+      const target = previewColumnRef.current;
+      if (!target) return;
+      target.focus({ preventScroll: true });
+      target.scrollIntoView?.({
+        block: "start",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      });
+    });
+  };
+  const selectPreview = (id: string) => {
+    setPreviewSelection({ id, scope: currentScope });
+    setPanel(null);
+    revealPreview();
+  };
+  const closePreview = () => setPreviewSelection(null);
+  useEffect(() => {
+    if (!currentQuery || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const back = safeWorkbenchReturnTo(params.get("returnTo"));
+    const href = new URL(saleWorkbenchHref(currentQuery, previewId), window.location.origin);
+    if (back) href.searchParams.set("returnTo", back);
+    const next = href.pathname + href.search;
+    if (window.location.pathname + window.location.search !== next)
+      window.history.replaceState(window.history.state, "", next);
+  }, [currentScope, previewId, currentQuery]);
   const printer = useContractPrinter(
     workspace.query
       ? workspaceQueryKey(workspace.query)
@@ -213,12 +265,11 @@ export function SaleList({
     initialWorkspace,
   );
   useEffect(() => {
-    if (!requestedProjectId) return;
-    setActiveBuildingId("");
+    if (!requestedProjectId || initialWorkspace) return;
     setPanel(null);
     setSelectedId(null);
     setFUnitId("");
-  }, [requestedProjectId]);
+  }, [requestedProjectId, initialWorkspace]);
   useEffect(() => {
     if (workspace.enabled)
       workspace.change({
@@ -227,7 +278,13 @@ export function SaleList({
         status: statusFilter,
         search,
         locale,
-        page: 1,
+        page:
+          workspace.query?.projectId === (requestedProjectId ?? "") &&
+          workspace.query?.buildingId === activeBuildingId &&
+          workspace.query?.status === statusFilter &&
+          workspace.query?.search === search
+            ? workspace.query.page
+            : 1,
       });
   }, [
     workspace.enabled,
@@ -304,8 +361,7 @@ export function SaleList({
             periodDetail: contract.transfer_date
               ? `${locale === "zh" ? "过户" : "Transfert"} ${contract.transfer_date}`
               : undefined,
-            amountXof:
-              Number(contract.total_amount_xof) > 0 ? Number(contract.total_amount_xof) : null,
+            amountXof: salePrice(contract),
             amountDetail:
               contract.total_amount_confirmed === false
                 ? locale === "zh"
@@ -504,9 +560,9 @@ export function SaleList({
   const saleFinancialIncome = saleCash.income;
   const saleFinancialExpense = saleCash.expense;
   const saleFinancialNet = saleCash.net;
-  const selectedContractTotal = Number(selected?.total_amount_xof ?? 0);
-  const saleContractReceived = selectedSummary?.paid ?? null;
-  const selectedOutstanding = selectedSummary?.outstanding ?? null;
+  const selectedContractTotal = selected ? salePrice(selected) : null;
+  const saleContractReceived = selectedSummary?.count ? selectedSummary.paid : null;
+  const selectedOutstanding = selectedSummary?.count ? selectedSummary.outstanding : null;
   const selectedCnyPayments = contractPayments.filter(
     (p) =>
       p.currency === "CNY" &&
@@ -515,23 +571,12 @@ export function SaleList({
   );
   const selectedCnyReceived = selectedCnyPayments.reduce((sum, p) => sum + Number(p.amount), 0);
 
-  const getContractSummary = (cid: string) =>
-    contractSummaryMap.get(cid) ?? EMPTY_CONTRACT_RECEIVABLE_SUMMARY;
-
   const getSchedStatus = (s: SalePaymentScheduleRow, rr: ReceivableRow[]) => {
-    const rec = rr.find(
-      (r) => r.due_date === s.due_date && Math.abs(Number(r.amount_xof) - Number(s.amount_xof)) < 1,
+    return saleScheduleState(
+      s,
+      rr,
+      workspace.detailData?.today ?? new Date().toISOString().slice(0, 10),
     );
-    if (!rec || rec.status === "cancelled") return s.status;
-    return rec.status === "paid"
-      ? "paid"
-      : Number(rec.paid_amount_xof) > 0 && Number(rec.paid_amount_xof) < Number(rec.amount_xof)
-        ? "partial"
-        : rec.status === "overdue"
-          ? "overdue"
-          : s.status === "paid"
-            ? "paid"
-            : "pending";
   };
 
   const openNew = async () => {
@@ -547,6 +592,13 @@ export function SaleList({
     setError("");
   };
   const openDetail = async (id: string, section: "overview" | "finance" = "overview") => {
+    setPanel(null);
+    setSelectedId(null);
+    setPayScheduleId("");
+    setPayAmount(0);
+    setShowFlexForm(false);
+    setTrDate("");
+    setError("");
     if (workspace.enabled) {
       try {
         await workspace.ensure("detail", id);
@@ -777,13 +829,21 @@ export function SaleList({
   const schedLabel = (s: string) => {
     const l: Record<string, string> =
       locale === "zh"
-        ? { pending: "待付", partial: "部分已付", paid: "已付", overdue: "逾期", cancelled: "取消" }
+        ? {
+            pending: "待付 / 未逾期",
+            partial: "部分核销 / 未逾期",
+            paid: "已核销",
+            overdue: "逾期",
+            cancelled: "取消",
+            unverified: "应收关联待核",
+          }
         : {
             pending: "En attente",
             partial: "Partiellement payé",
             paid: "Payé",
             overdue: "En retard",
             cancelled: "Annulé",
+            unverified: "Créance à vérifier",
           };
     return l[s] ?? (locale === "zh" ? "待核实" : "À vérifier");
   };
@@ -823,154 +883,101 @@ export function SaleList({
     [units, scopeBuildingIds, activeBuildingId],
   );
 
-  const statBlocks: Array<{
-    key: SaleStatKey;
-    label: string;
-    value: string;
-    dot: string;
-    hint: string;
-  }> = [
-    {
-      key: "active",
-      label: locale === "zh" ? "生效出售" : "Ventes actives",
-      value: String(dashboardStats.active),
-      dot: "bg-accentGreen-500",
-      hint: locale === "zh" ? "打开生效出售侧栏" : "Ouvrir les ventes actives",
-    },
-    {
-      key: "total",
-      label: locale === "zh" ? "合同总额" : "Total contrats",
-      value: formatXof(dashboardStats.total),
-      dot: "bg-accentBlue-500",
-      hint: locale === "zh" ? "打开合同总额明细" : "Ouvrir le detail des contrats",
-    },
-    {
-      key: "received",
-      label: locale === "zh" ? "应收已核销" : "Créances réglées",
-      value: dashboardStats.unknownAll ? "—" : formatXof(dashboardStats.received),
-      dot: "bg-accentGreen-500",
-      hint:
-        locale === "zh" ? "应收核销，不等于现金收入" : "Règlements affectés, pas flux de caisse",
-    },
-    {
-      key: "receivable",
-      label: locale === "zh" ? "已建应收未收" : "Créances restantes",
-      value: dashboardStats.unknownAll ? "—" : formatXof(dashboardStats.outstanding),
-      dot: "bg-accentAmber-500",
-      hint: dashboardStats.unknownContracts
-        ? `${dashboardStats.unknownContracts} ${locale === "zh" ? "份合同未建已核应收" : "contrats sans créance vérifiée"}`
-        : locale === "zh"
-          ? "含已建未来分期"
-          : "Dont échéances futures enregistrées",
-    },
-    {
-      key: "due",
-      label: locale === "zh" ? "到期未收" : "Dû impayé",
-      value: dashboardStats.unknownAll ? "—" : formatXof(dashboardStats.dueOutstanding),
-      dot: "bg-accentPurple-500",
-      hint: locale === "zh" ? "截至今日，不含历史待核" : "À ce jour, historique exclu",
-    },
-    {
-      key: "overdue",
-      label: locale === "zh" ? "逾期" : "En retard",
-      value: dashboardStats.unknownAll ? "—" : formatXof(dashboardStats.overdue),
-      dot: dashboardStats.overdue > 0 ? "bg-accentRed-500" : "bg-muted-foreground/40",
-      hint: locale === "zh" ? "打开逾期侧栏" : "Ouvrir les retards",
-    },
-    {
-      key: "transfer",
-      label: locale === "zh" ? "已过户" : "Transfert",
-      value: String(dashboardStats.transferDone),
-      dot: "bg-accentPurple-500",
-      hint: locale === "zh" ? "打开过户明细" : "Ouvrir les transferts",
-    },
-  ];
+  const statBlocks = saleWorkbenchStats(dashboardStats, locale);
+
+  const scopeToolbar = (
+    <SaleWorkbenchScope
+      locale={locale}
+      buildings={buildings}
+      projectId={requestedProjectId}
+      buildingId={activeBuildingId}
+      noSaleProject={noSaleProject}
+      returnTo={safeReturn}
+      onProject={(id) => {
+        setPanel(null);
+        closePreview();
+        router.push(`${locale === "fr" ? "/fr" : ""}/sales?project=${encodeURIComponent(id)}`);
+      }}
+      onBuilding={(id) => {
+        setPanel(null);
+        closePreview();
+        setActiveBuildingId(id);
+      }}
+    />
+  );
+  const tableToolbar = (
+    <SaleWorkbenchToolbar
+      locale={locale}
+      count={
+        workspace.enabled
+          ? `${workspace.pageData?.total ?? "—"} / ${workspace.pageData?.scopeCount ?? "—"}`
+          : `${visibleContracts.length} / ${filteredByBuilding.length}`
+      }
+      search={search}
+      view={contractView}
+      status={statusFilter}
+      onSearch={(value) => {
+        setPanel(null);
+        closePreview();
+        setSearch(value);
+      }}
+      onView={(value) => {
+        closePreview();
+        void changeView(value);
+      }}
+      onStatus={(value) => {
+        setPanel(null);
+        closePreview();
+        setStatusFilter(value);
+      }}
+    />
+  );
+  if (noSaleProject)
+    return (
+      <SaleNoSaleWorkspace locale={locale} projectId={requestedProjectId} scope={scopeToolbar} />
+    );
 
   return (
     <OperationalPage
-      eyebrow={locale === "zh" ? "出售业务" : "Ventes"}
-      title={locale === "zh" ? "出售合同" : "Contrats de vente"}
-      description={`${workspace.enabled ? (workspace.unavailable ? "—" : workspace.pageData?.scopeCount) : filteredByBuilding.length} ${locale === "zh" ? "份合同 · 汇总统一按 FCFA 结算" : "contrats · total en FCFA"}`}
+      className={styles.workbench}
+      eyebrow="SALES WORKSPACE"
+      title={locale === "zh" ? "出售履约台" : "Suivi des ventes"}
+      description={
+        locale === "zh"
+          ? "合同、分期与过户，沿同一笔业务查看。"
+          : "Contrats, échéances et transfert dans un même dossier."
+      }
       action={
         canCreate ? (
-          <Button size="sm" disabled={workspace.unavailable} onClick={openNew}>
+          <Button
+            size="sm"
+            className="bg-blue-600 text-white hover:bg-blue-700"
+            disabled={workspace.unavailable}
+            onClick={openNew}
+          >
             <Plus className="h-4 w-4" />
             {t.form.newContract}
           </Button>
         ) : undefined
       }
     >
-      {/* ── Summary stats ── */}
-      <MetricGrid columns={6}>
-        {statBlocks.map((b) => (
-          <StatTile
-            key={b.key}
-            label={b.label}
-            value={workspace.unavailable ? "—" : b.value}
-            caption={
-              workspace.unavailable
-                ? locale === "zh"
-                  ? "读取中或暂不可核验"
-                  : "Lecture en cours ou indisponible"
-                : panel === "insight" && statFilter === b.key
-                  ? locale === "zh"
-                    ? "明细已打开"
-                    : "Détail ouvert"
-                  : b.hint
-            }
-            tone={
-              b.key === "overdue"
-                ? "red"
-                : b.key === "receivable"
-                  ? "amber"
-                  : b.key === "due" || b.key === "transfer"
-                    ? "purple"
-                    : b.key === "active" || b.key === "received"
-                      ? "green"
-                      : "blue"
-            }
-            onClick={() => openInsight(b.key)}
-            active={panel === "insight" && statFilter === b.key}
-          />
-        ))}
-      </MetricGrid>
-
-      <FilterBar
-        meta={`${workspace.enabled ? (workspace.unavailable ? "—" : `${workspace.pageData?.total} / ${workspace.pageData?.scopeCount}`) : `${visibleContracts.length} / ${filteredByBuilding.length}`} ${locale === "zh" ? "份合同" : "contrats"}`}
-      >
-        {buildings.length > 1 && (
-          <SegmentedControl
-            value={activeBuildingId}
-            onChange={setActiveBuildingId}
-            ariaLabel={locale === "zh" ? "楼栋切换" : "Selection du batiment"}
-            items={[
-              { value: "", label: locale === "zh" ? "全部楼栋" : "Tous les bâtiments" },
-              ...buildings
-                .filter((building) => scopeBuildingIds.has(building.id))
-                .map((b) => ({ value: b.id, label: b.display_name || b.code })),
-            ]}
-          />
-        )}
-        <SegmentedControl
-          value={statusFilter}
-          onChange={(value) => setStatusFilter(value as SaleStatusFilter)}
-          ariaLabel={locale === "zh" ? "出售合同状态" : "Statut des contrats de vente"}
-          items={[
-            { value: "current", label: locale === "zh" ? "当前合同" : "En cours" },
-            { value: "all", label: locale === "zh" ? "全部" : "Tous" },
-            { value: "terminated", label: locale === "zh" ? "已终止" : "Résiliés" },
-            { value: "expired", label: locale === "zh" ? "已过期" : "Expirés" },
-          ]}
-        />
-      </FilterBar>
-
-      <ContractListControls
+      {scopeToolbar}
+      <SaleWorkbenchSummary
         locale={locale}
-        query={search}
-        onQueryChange={setSearch}
-        view={contractView}
-        onViewChange={changeView}
+        blocks={statBlocks}
+        unavailable={workspace.unavailable}
+        active={panel === "insight" ? statFilter : null}
+        onOpen={(key) => void openInsight(key)}
       />
+      {previewId ? (
+        <button
+          type="button"
+          className="self-start rounded-md border border-border bg-card px-3 py-2 text-xs text-blue-700 min-[1200px]:hidden dark:text-blue-300"
+          onClick={revealPreview}
+        >
+          {locale === "zh" ? "查看选中合同 ↓" : "Voir le contrat sélectionné ↓"}
+        </button>
+      ) : null}
       {printer.error && (
         <p role="alert" className="text-sm text-destructive">
           {printer.error}
@@ -1006,140 +1013,94 @@ export function SaleList({
           )}
         </div>
       )}
-      {!workspace.unavailable && contractView === "table" && (
-        <ContractTable
-          pagination={workspace.pagination}
-          rows={searchedTableRows}
-          locale={locale}
-          amountLabel={locale === "zh" ? "合同总额" : "Total du contrat"}
-          periodLabel={locale === "zh" ? "签约 / 过户日期" : "Signature / transfert"}
-          onOpen={openDetail}
-          onFinance={(id) => openDetail(id, "finance")}
-          onPrint={(id) => {
-            const contract = contracts.find((row) => row.id === id);
-            if (contract) printContract(contract);
-          }}
-        />
-      )}
-
-      {/* ── Contract matrix (BusinessRoomCard) ── */}
-      {!workspace.unavailable &&
-        contractView === "rooms" &&
-        (groupedContracts.length === 0 ? (
-          <EmptyState title={t.empty} />
-        ) : (
-          groupedContracts.map(([floor, fc]) => (
-            <RoomBoard
-              key={floor}
-              header={
-                <>
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-                    <h3 className="text-sm font-semibold">{floor}</h3>
-                  </div>
-                  <span className="text-[12px] font-medium text-[#5D7186]">
-                    {fc.length} {locale === "fr" ? "contrats" : "份合同"}
-                  </span>
-                </>
+      <div className={contractView === "table" ? styles.grid : undefined}>
+        <div className="min-w-0">
+          {!workspace.unavailable && contractView === "table" && (
+            <SaleWorkbenchTable
+              pagination={
+                workspace.pagination
+                  ? {
+                      ...workspace.pagination,
+                      onPageChange: (page) => {
+                        closePreview();
+                        setPanel(null);
+                        workspace.pagination?.onPageChange(page);
+                      },
+                      onSortChange: (key, direction) => {
+                        closePreview();
+                        setPanel(null);
+                        workspace.pagination?.onSortChange(key, direction);
+                      },
+                    }
+                  : undefined
               }
-            >
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-                {fc.map((contract) => {
-                  const unit = unitMap.get(contract.unit_id);
-                  const customer = customerMap.get(contract.customer_id);
-                  const s = getContractSummary(contract.id);
-                  const dataFlags = getSaleDataFlags(contract, customer);
-                  return (
-                    <RoomCard
-                      key={contract.id}
-                      roomNo={unit?.unit_no ?? "-"}
-                      status="sold"
-                      statusLabel={
-                        t.contractStatus[contract.status as keyof typeof t.contractStatus]
+              rows={searchedTableRows}
+              locale={locale}
+              selectedId={previewId}
+              onSelect={selectPreview}
+              onNavigate={closePreview}
+              toolbar={tableToolbar}
+            />
+          )}
+          {contractView === "rooms" ? (
+            <div className="mb-4 rounded-xl border bg-card">{tableToolbar}</div>
+          ) : null}
+
+          {!workspace.unavailable && contractView === "rooms" ? (
+            <SaleWorkbenchRooms
+              groups={groupedContracts}
+              units={unitMap}
+              customers={customerMap}
+              summaries={contractSummaryMap}
+              locale={locale}
+              onOpen={(id, section) => void openDetail(id, section)}
+              onPrint={printContract}
+            />
+          ) : null}
+        </div>
+        {contractView === "table" && !workspace.unavailable ? (
+          <div
+            className={styles.inspectorColumn}
+            ref={previewColumnRef}
+            data-selected={Boolean(previewId)}
+            tabIndex={-1}
+            role="region"
+            aria-label={locale === "zh" ? "选中出售合同详情" : "Détails de la vente sélectionnée"}
+          >
+            <SaleWorkbenchInspector
+              key={previewId ?? "empty"}
+              data={
+                workspace.enabled
+                  ? preview.data
+                  : previewId
+                    ? {
+                        contracts: contracts.filter((row) => row.id === previewId),
+                        units,
+                        customers,
+                        payments,
+                        receivables,
+                        schedules,
+                        summaries: Object.fromEntries(contractSummaryMap),
+                        buildings: buildings as WorkspaceData["buildings"],
+                        today: new Date().toISOString().slice(0, 10),
                       }
-                      locale={locale}
-                      onClick={() => openDetail(contract.id)}
-                    >
-                      {/* Name + status badge */}
-                      <div className="flex min-h-[52px] items-start justify-between gap-1.5">
-                        <p
-                          className="text-[13px] font-medium leading-tight truncate"
-                          title={customer?.name ?? ""}
-                        >
-                          {customer?.name ?? "-"}
-                        </p>
-                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
-                          {dataFlags.needsData && (
-                            <Badge variant="warning" className="text-[10px]">
-                              {locale === "zh" ? "资料待补" : "A compléter"}
-                            </Badge>
-                          )}
-                          {!dataFlags.needsData && dataFlags.needsNumberCleanup && (
-                            <Badge variant="info" className="text-[10px]">
-                              {locale === "zh" ? "编号待整理" : "N° à vérifier"}
-                            </Badge>
-                          )}
-                          <Badge variant={statusVariant[contract.status]} className="text-[10px]">
-                            {t.contractStatus[contract.status as keyof typeof t.contractStatus]}
-                          </Badge>
-                        </div>
-                      </div>
-                      {/* Compact info row */}
-                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#5D7186]">
-                        <span title={contract.contract_no} className="truncate max-w-[90px]">
-                          {contract.contract_no}
-                        </span>
-                        <span>·</span>
-                        <span className="tabular-nums">
-                          {Number(contract.total_amount_xof) > 0
-                            ? formatXof(Number(contract.total_amount_xof))
-                            : locale === "zh"
-                              ? "金额待补"
-                              : "Montant à compléter"}
-                        </span>
-                        {s.outstanding > 0 && (
-                          <span className="text-amber-600 font-medium">
-                            {formatXof(s.outstanding)} {locale === "zh" ? "待收" : "dû"}
-                          </span>
-                        )}
-                      </div>
-                      {/* Transfer status + action buttons */}
-                      <div className="mt-auto flex items-center justify-between gap-4 border-t border-[rgba(23,50,77,0.06)] pt-3">
-                        <span
-                          className={cn(
-                            "text-[11px]",
-                            contract.transfer_status === "completed"
-                              ? "text-emerald-600"
-                              : "text-[#5D7186]",
-                          )}
-                        >
-                          {transText(contract.transfer_status)}
-                        </span>
-                        <div className="flex justify-center gap-5">
-                          <SaleActionBtn
-                            icon={Eye}
-                            label={locale === "zh" ? "查看详情" : "Voir les détails"}
-                            onClick={() => openDetail(contract.id)}
-                          />
-                          <SaleActionBtn
-                            icon={DollarSign}
-                            label={locale === "zh" ? "查看财务" : "Voir les finances"}
-                            onClick={() => openDetail(contract.id, "finance")}
-                          />
-                          <SaleActionBtn
-                            icon={FileText}
-                            label={locale === "zh" ? "合同/打印" : "Contrat / imprimer"}
-                            onClick={() => printContract(contract)}
-                          />
-                        </div>
-                      </div>
-                    </RoomCard>
-                  );
-                })}
-              </div>
-            </RoomBoard>
-          ))
-        ))}
+                    : null
+              }
+              locale={locale}
+              loading={workspace.enabled && preview.loading}
+              error={workspace.enabled && preview.error}
+              selectedId={previewId}
+              returnTo={currentHref}
+              onClose={closePreview}
+              onRetry={preview.retry}
+              onOpen={(section) => {
+                if (previewId) void openDetail(previewId, section);
+              }}
+              onPrint={printContract}
+            />
+          </div>
+        ) : null}
+      </div>
 
       {/* ── KPI insight panel ── */}
       {!workspace.unavailable &&
@@ -1533,7 +1494,11 @@ export function SaleList({
                     {locale === "zh" ? "合同总额" : "Total contrat"}
                   </p>
                   <p className="font-semibold tabular-nums text-blue-700">
-                    {formatXof(selectedContractTotal)}
+                    {selectedContractTotal === null
+                      ? locale === "zh"
+                        ? "金额待核实"
+                        : "Montant à vérifier"
+                      : formatXof(selectedContractTotal)}
                   </p>
                 </div>
                 <div className="rounded-md border border-emerald-200 bg-emerald-50/50 px-3 py-2">
@@ -1583,7 +1548,7 @@ export function SaleList({
                       totalOverdueRec > 0 ? "text-red-700" : "text-emerald-700",
                     )}
                   >
-                    {selectedSummary ? formatXof(totalOverdueRec) : "—"}
+                    {selectedSummary?.count ? formatXof(totalOverdueRec) : "—"}
                   </p>
                 </div>
               </div>

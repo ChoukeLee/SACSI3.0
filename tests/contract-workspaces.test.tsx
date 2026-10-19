@@ -117,6 +117,15 @@ async function openCustomer() {
   await act(async () =>
     (host.querySelector("tbody td:nth-child(2) button") as HTMLButtonElement).click(),
   );
+  if (!document.querySelector('[role="dialog"]')) {
+    const openFull = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) =>
+        button.textContent?.includes("打开合同 / 办理") ||
+        button.textContent?.includes("Ouvrir le dossier / Gérer"),
+    );
+    expect(openFull).toBeTruthy();
+    await act(async () => openFull!.click());
+  }
   return document.querySelector('[role="dialog"]')!;
 }
 
@@ -140,8 +149,8 @@ it("sale default table keeps full identity and separates allocated receivables f
     ),
   );
   expect(host.querySelector("table")).toBeTruthy();
-  expect(summaryValue("应收已核销")).toContain("200,000 XOF");
-  expect(summaryValue("已建应收未收")).toContain("800,000 XOF");
+  expect(summaryValue("到期未收")).toContain("800,000 XOF");
+  expect(host.querySelector("tbody")?.textContent).toContain("应收未收 800,000 XOF");
   expect(host.textContent).toContain(sale.contract_no);
   const dialog = await openCustomer();
   expect(dialog.textContent).toContain("已录经营收款 1,200,000 XOF");
@@ -165,7 +174,7 @@ it("sale missing managed obligations remains unknown instead of treating cash or
       />,
     ),
   );
-  expect(summaryValue("Créances restantes")).toContain("—");
+  expect(summaryValue("Dû impayé")).toContain("—");
   expect(host.textContent).toContain("Aucune créance vérifiée");
   expect(host.textContent).not.toContain("万");
   const dialog = await openCustomer();

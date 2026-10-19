@@ -118,7 +118,10 @@ function detailFor(input: RequestInfo | URL, balance = 123456) {
   return data;
 }
 
-async function render(data = dataFor()) {
+async function render(
+  data = dataFor(),
+  linked: { initialContract?: string; returnTo?: string } = {},
+) {
   await act(async () =>
     root.render(
       <LeaseList
@@ -126,6 +129,7 @@ async function render(data = dataFor()) {
         contracts={data.contracts as LeaseContractRow[]}
         workspace={data}
         initialProject={data.query.projectId}
+        {...linked}
         locale="zh"
         canCreate={false}
         canRecordFinance={false}
@@ -204,6 +208,45 @@ it("keeps SSR idle, then fetches only the explicitly selected contract into a no
   expect(preview()?.textContent).toContain("123,456");
   expect(document.querySelector('[role="dialog"]')).toBeNull();
   expect(host.querySelectorAll("tbody tr")).toHaveLength(2);
+});
+
+it("opens an exact linked contract outside the visible list without loading every contract", async () => {
+  const linkedId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  await render(dataFor(), {
+    initialContract: linkedId,
+    returnTo: "/customers?project=" + workspaceProject + "&q=Synthetic&page=2",
+  });
+  await settle();
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(requestInfo(vi.mocked(fetch).mock.calls[0][0])).toMatchObject({
+    mode: "detail",
+    contractId: linkedId,
+    query: { projectId: workspaceProject, buildingId: "" },
+  });
+  await showFinance();
+  expect(preview()?.textContent).toContain("123,456");
+  expect(host.querySelectorAll("tbody tr")).toHaveLength(2);
+  expect(host.querySelector('a[href^="/customers?"]')?.getAttribute("href")).toContain("page=2");
+  await click(host.querySelector('button[aria-label="关闭预览"]'));
+  expect(preview()?.textContent).not.toContain("123,456");
+  await settle();
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it("drops a linked contract immediately when changing project and rejects an external return URL", async () => {
+  await render(dataFor(), {
+    initialContract: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    returnTo: "https://external.invalid/customers",
+  });
+  await settle();
+  await showFinance();
+  expect(preview()?.textContent).toContain("123,456");
+  expect(host.querySelector('a[href^="https://external.invalid"]')).toBeNull();
+  const nav = host.querySelector('nav[aria-label="项目切换"]');
+  await click(namedButton("科建建材城", nav!));
+  expect(preview()?.textContent).not.toContain("123,456");
+  await settle();
+  expect(preview()?.textContent).not.toContain("123,456");
 });
 
 it("preserves the customer's full contract dialog instead of changing it into the read-only preview", async () => {

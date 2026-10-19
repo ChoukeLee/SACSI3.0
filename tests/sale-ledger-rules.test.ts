@@ -32,6 +32,10 @@ describe("sale ledger accuracy rules", () => {
   it("does not hide historical contracts", () => {
     const zhPage = readFileSync(join(root, "src/app/sales/page.tsx"), "utf8");
     expect(zhPage).not.toContain('.eq("status", "active")');
-    expect(view).toContain('value: "terminated"');
+    const controls = readFileSync(
+      join(root, "src/features/sales/sale-workbench-chrome.tsx"),
+      "utf8",
+    );
+    expect(controls).toContain('value: "terminated"');
   });
 });

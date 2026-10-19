@@ -24,8 +24,12 @@ describe("contract card shortcuts", () => {
 
   it("keeps sale detail, finance and print actions distinct", () => {
     const source = read("src/features/sales/sale-list.tsx");
-    expect(source).toContain('openDetail(contract.id, "finance")');
-    expect(source).toMatch(/icon=\{FileText\}[\s\S]{0,180}printContract\(contract\)/);
+    const rooms = read("src/features/sales/sale-workbench-rooms.tsx");
+    expect(rooms).toContain('action: () => onOpen(contract.id, "finance")');
+    expect(rooms).toMatch(/icon: FileText[\s\S]{0,180}onPrint\(contract\)/);
+    expect(source).toContain("onOpen={(id, section) => void openDetail(id, section)}");
+    expect(source).toContain("onPrint={printContract}");
+    expect(source).toContain('workspace.ensure("detail", contract.id)');
     expect(source).toContain("financeSectionRef.current?.scrollIntoView");
     expect(read("src/features/print/index.ts")).toContain("printSaleContract");
   });

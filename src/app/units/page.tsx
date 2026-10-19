@@ -1,23 +1,29 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { UnitLazyView } from "@/features/units/unit-lazy-view";
-import { loadUnitPageData } from "@/features/units/unit-page-data";
-import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
+import {
+  UnitWorkbenchWorkspace,
+  UnitWorkbenchSkeleton,
+} from "@/features/units/unit-workbench-workspace";
+import type { UnitWorkbenchSearch } from "@/features/units/unit-workbench-model";
 
-export default async function UnitsPage() {
+export default async function UnitsPage({
+  searchParams,
+}: {
+  searchParams: Promise<UnitWorkbenchSearch>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!["admin", "finance", "boss", "rental_sales"].includes(user.role)) redirect("/");
 
   return (
-    <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
-      <UnitsData locale="zh" canEdit={user.role === "admin"} />
+    <Suspense fallback={<UnitWorkbenchSkeleton locale="zh" />}>
+      <UnitWorkbenchWorkspace
+        input={await searchParams}
+        locale="zh"
+        canEdit={user.role === "admin"}
+        viewerId={user.id}
+      />
     </Suspense>
   );
-}
-
-async function UnitsData({ locale, canEdit }: { locale: "zh" | "fr"; canEdit: boolean }) {
-  const data = await loadUnitPageData();
-  return <UnitLazyView {...data} locale={locale} canEdit={canEdit} />;
 }

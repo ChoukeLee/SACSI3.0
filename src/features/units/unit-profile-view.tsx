@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
+import { safeWorkbenchReturnTo } from "@/lib/workbench-links";
 import { cn, formatXof } from "@/lib/utils";
 import { paymentDisplay } from "@/lib/currency";
 import { ProfileAuditTimeline } from "@/features/profiles/audit-timeline";
@@ -42,7 +43,15 @@ import type { UnitProfileData } from "./unit-profile-service";
 type Tab = "overview" | "daily" | "contracts" | "finance" | "audit";
 type BadgeTone = React.ComponentProps<typeof Badge>["variant"];
 
-export function UnitProfileView({ data, locale }: { data: UnitProfileData; locale: Locale }) {
+export function UnitProfileView({
+  data,
+  locale,
+  returnTo,
+}: {
+  data: UnitProfileData;
+  locale: Locale;
+  returnTo?: string;
+}) {
   const [tab, setTab] = useState<Tab>("overview");
   const zh = locale === "zh";
   const unit = data.unit;
@@ -113,7 +122,7 @@ export function UnitProfileView({ data, locale }: { data: UnitProfileData; local
         <CardContent className="flex flex-col gap-5 p-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <Button asChild variant="ghost" size="sm" className="-ml-2 mb-3 text-muted-foreground">
-              <Link href={routeFor(locale, "/units")}>
+              <Link href={safeWorkbenchReturnTo(returnTo) ?? routeFor(locale, "/units")}>
                 <ArrowLeft className="h-4 w-4" />
                 {zh ? "返回房源" : "Retour aux lots"}
               </Link>

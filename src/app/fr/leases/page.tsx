@@ -9,10 +9,16 @@ import { OperationalPageSkeleton } from "@/components/operational-page-skeleton"
 export default async function FrenchLeasesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ project?: string | string[] }>;
+  searchParams: Promise<{
+    project?: string | string[];
+    building?: string | string[];
+    contract?: string | string[];
+    returnTo?: string | string[];
+  }>;
 }) {
   const params = await searchParams;
-  if (Array.isArray(params.project)) throw new Error("ContractProjectUnavailable");
+  if (Array.isArray(params.project) || Array.isArray(params.building))
+    throw new Error("ContractProjectUnavailable");
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!["admin", "front_desk", "finance", "boss", "rental_sales"].includes(user.role))
@@ -28,6 +34,9 @@ export default async function FrenchLeasesPage({
           <FrenchLeasesData
             viewerId={user.id}
             initialProject={params.project}
+            initialBuilding={typeof params.building === "string" ? params.building : undefined}
+            initialContract={typeof params.contract === "string" ? params.contract : undefined}
+            returnTo={typeof params.returnTo === "string" ? params.returnTo : undefined}
             canCreate={user.role === "admin" || user.role === "rental_sales"}
             canRecordFinance={user.role === "admin" || user.role === "finance"}
             canCorrectRentPeriod={user.role === "admin"}
@@ -43,6 +52,9 @@ export default async function FrenchLeasesPage({
 async function FrenchLeasesData({
   viewerId,
   initialProject,
+  initialBuilding,
+  initialContract,
+  returnTo,
   canCreate,
   canRecordFinance,
   canCorrectRentPeriod,
@@ -51,18 +63,24 @@ async function FrenchLeasesData({
 }: {
   viewerId: string;
   initialProject?: string;
+  initialBuilding?: string;
+  initialContract?: string;
+  returnTo?: string;
   canCreate: boolean;
   canRecordFinance: boolean;
   canCorrectRentPeriod: boolean;
   canActivate: boolean;
   canMoveOut: boolean;
 }) {
-  const data = await loadLeaseWorkspace("fr", initialProject, viewerId);
+  const data = await loadLeaseWorkspace("fr", initialProject, viewerId, initialBuilding);
   return (
     <LeaseLazyView
       key={viewerId}
       {...data}
       initialProject={initialProject}
+      initialBuilding={initialBuilding}
+      initialContract={initialContract}
+      returnTo={returnTo}
       locale="fr"
       canCreate={canCreate}
       canRecordFinance={canRecordFinance}

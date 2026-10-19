@@ -52,6 +52,7 @@ it("rebuilds the bounded read models without new privileged functions or anonymo
     "public.daily_calendar_context_rpc(uuid,date,date)",
     "public.daily_calendar_cash_summary_rpc(uuid)",
     "public.daily_customer_candidates_rpc(uuid,text,integer,text[])",
+    "public.customer_directory_read_rpc(jsonb,text,uuid,integer)",
   ]) {
     const result = await db.query(
       `select p.prosecdef privileged, p.provolatile volatility,

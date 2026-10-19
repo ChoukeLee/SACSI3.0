@@ -1,99 +1,24 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
-import { CustomerLazyView } from "@/features/customers/customer-lazy-view";
-import type { CustomerBuildingSummary } from "@/features/customers";
-import type { CustomerRow } from "@/types/database";
+import { canAccessPage, getCurrentUser, hasPermission } from "@/lib/auth";
 import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
+import { CustomerDirectoryWorkspace } from "@/features/customers/customer-directory-workspace";
 
-export default async function CustomersPage() {
+export default async function CustomersPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!["admin", "finance", "boss", "rental_sales"].includes(user.role)) redirect("/");
-
+  if (!canAccessPage(user.role, "customers")) redirect("/");
   return (
     <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
-      <CustomersData locale="zh" canEdit={user.role !== "boss"} />
+      <CustomerDirectoryWorkspace
+        searchParams={await searchParams}
+        locale="zh"
+        canEdit={hasPermission(user, "customers:write")}
+      />
     </Suspense>
-  );
-}
-
-async function CustomersData({ locale, canEdit }: { locale: "zh" | "fr"; canEdit: boolean }) {
-  const supabase = await createClient();
-
-  const [customersRes, unitsRes, leaseRes, saleRes, dailyRes] = await Promise.all([
-    supabase.from("customers").select("*").order("name"),
-    supabase.from("units").select("id, unit_no, buildings(id, code, display_name, project:projects(id, code, display_name))"),
-    supabase.from("lease_contracts").select("customer_id, unit_id, start_date").limit(2000),
-    supabase.from("sale_contracts").select("customer_id, unit_id, signed_date").limit(2000),
-    supabase.from("daily_bookings").select("customer_id, unit_id, check_in").limit(2000),
-  ]);
-
-  if (customersRes.error) console.error("Failed to fetch customers:", customersRes.error);
-  if (unitsRes.error) throw new Error("CustomerProjectScopeUnavailable");
-
-  const customerSegments = {
-    leaseCustomerIds: [...new Set((leaseRes.data ?? []).map((row) => row.customer_id).filter(Boolean))],
-    saleCustomerIds: [...new Set((saleRes.data ?? []).map((row) => row.customer_id).filter(Boolean))],
-    dailyCustomerIds: [...new Set((dailyRes.data ?? []).map((row) => row.customer_id).filter(Boolean))],
-  };
-
-  const unitMap = new Map<string, { unitNo: string; building: CustomerBuildingSummary | null }>();
-  const buildingMap = new Map<string, CustomerBuildingSummary>();
-  for (const u of (unitsRes.data ?? [])) {
-    const rawBuilding = Array.isArray(u.buildings) ? u.buildings[0] : u.buildings;
-    const rawProject = Array.isArray(rawBuilding?.project) ? rawBuilding.project[0] : rawBuilding?.project;
-    const building = rawBuilding
-      ? { id: rawBuilding.id, code: rawBuilding.code, label: rawBuilding.display_name || rawBuilding.code,
-          project: rawProject ? { id: rawProject.id, code: rawProject.code, label: rawProject.display_name || rawProject.code } : null }
-      : null;
-    if (building) buildingMap.set(building.id, building);
-    unitMap.set(u.id, { unitNo: u.unit_no, building });
-  }
-
-  const customerRooms: Record<string, string[]> = {};
-  const customerBuildings: Record<string, CustomerBuildingSummary[]> = {};
-  const customerProjectSegments: Record<string, typeof customerSegments> = {};
-  const addRoom = (customerId: string, unitId: string, segment: keyof typeof customerSegments) => {
-    const unit = unitMap.get(unitId);
-    if (!unit || !customerId) return;
-    if (!customerRooms[customerId]) customerRooms[customerId] = [];
-    if (!customerRooms[customerId].includes(unit.unitNo)) customerRooms[customerId].push(unit.unitNo);
-    if (unit.building) {
-      const projectId = unit.building.project?.id;
-      if (projectId) {
-        const scoped = customerProjectSegments[projectId] ??= { leaseCustomerIds: [], saleCustomerIds: [], dailyCustomerIds: [] };
-        if (!scoped[segment].includes(customerId)) scoped[segment].push(customerId);
-      }
-      if (!customerBuildings[customerId]) customerBuildings[customerId] = [];
-      if (!customerBuildings[customerId].some((building) => building.id === unit.building!.id)) customerBuildings[customerId].push(unit.building);
-    }
-  };
-  for (const r of (leaseRes.data ?? [])) addRoom(r.customer_id, r.unit_id, "leaseCustomerIds");
-  for (const r of (saleRes.data ?? [])) addRoom(r.customer_id, r.unit_id, "saleCustomerIds");
-  for (const r of (dailyRes.data ?? [])) addRoom(r.customer_id, r.unit_id, "dailyCustomerIds");
-
-  const customerLastActivity: Record<string, string> = {};
-  const setActivity = (customerId: string, date: string) => {
-    if (!customerId || !date) return;
-    if (!customerLastActivity[customerId] || date > customerLastActivity[customerId]) customerLastActivity[customerId] = date;
-  };
-  for (const r of (leaseRes.data ?? [])) setActivity(r.customer_id, r.start_date);
-  for (const r of (saleRes.data ?? [])) setActivity(r.customer_id, r.signed_date);
-  for (const r of (dailyRes.data ?? [])) setActivity(r.customer_id, r.check_in);
-
-  return (
-    <CustomerLazyView
-      customers={(customersRes.data as CustomerRow[]) ?? []}
-      customerSegments={customerSegments}
-      customerProjectSegments={customerProjectSegments}
-      customerRooms={customerRooms}
-      customerBuildings={customerBuildings}
-      buildingOptions={[...buildingMap.values()].sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }))}
-      customerLastActivity={customerLastActivity}
-      locale={locale}
-      canEdit={canEdit}
-    />
   );
 }

@@ -185,6 +185,17 @@ it("keeps the sale no-preference default on its actual initial building", async 
   });
   expect(mocks.rpc).toHaveBeenCalledTimes(1);
 });
+
+it("honors an exact linked lease building and refuses a building outside the linked project", async () => {
+  expect(
+    (await initialWorkspace("lease", "zh", workspaceProject, viewer, workspaceBuilding)).query,
+  ).toMatchObject({ projectId: workspaceProject, buildingId: workspaceBuilding });
+  mocks.rpc.mockClear();
+  await expect(
+    initialWorkspace("lease", "zh", cimacProject, viewer, workspaceBuilding),
+  ).rejects.toMatchObject({ status: 403 });
+  expect(mocks.rpc).not.toHaveBeenCalled();
+});
 it("never treats an unavailable project or failed authorized building read as a successful default scope", async () => {
   await expect(initialWorkspace("lease", "zh", "NO-ACCESS")).rejects.toThrow();
   expect(mocks.rpc).not.toHaveBeenCalled();

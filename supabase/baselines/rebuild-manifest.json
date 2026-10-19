@@ -157,6 +157,10 @@
     {
       "file": "20261019203420_reports_project_ledger_trend.sql",
       "sha256": "0ec20084895321f731159e2be84c3c1d3dfe4618f57c3e7493447eccfea55064"
+    },
+    {
+      "file": "20261019225507_customer_directory_read.sql",
+      "sha256": "6dcb26b9cd322ca7c372326f3731de4e65d807e6932ebcaecb3cf35a129a2019"
     }
   ],
   "excluded": [

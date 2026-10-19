@@ -36,10 +36,12 @@ describe("core UI architecture", () => {
     expect(sidebar.indexOf('key: "leases"')).toBeLessThan(sidebar.indexOf('key: "dailyRentals"'));
   });
 
-  it("keeps shared business shells while long leases use the selected table-and-preview workbench", () => {
+  it("uses table-and-inspector workbenches while preserving the shared business drawers", () => {
     const lease = read("src/features/leases/lease-list.tsx");
     const sale = read("src/features/sales/sale-list.tsx");
     const units = read("src/features/units/unit-list.tsx");
+    const assets = read("src/features/units/unit-workbench.tsx");
+    const customers = read("src/features/customers/customer-workbench.tsx");
     const dailyPanel = read("src/features/daily-rentals/booking-panel.tsx");
 
     expect(lease).toContain("<OperationalPage");
@@ -54,7 +56,18 @@ describe("core UI architecture", () => {
     expect(lease).toContain("onSelect={selectPreview}");
     expect(lease).toContain("onOpen={openDetail}");
     expect(sale).toContain("<OperationalPage");
-    expect(sale).toContain("<MetricGrid");
+    expect(sale).toContain("<SaleWorkbenchSummary");
+    expect(sale).toContain("<SaleWorkbenchTable");
+    expect(sale).toContain("<SaleWorkbenchInspector");
+    expect(sale).toContain("<RightDrawer");
+    expect(assets).toContain("<UnitWorkbenchInspector");
+    expect(assets).toContain("UnitConditionDrawer");
+    expect(assets).not.toContain("<RoomBoard");
+    expect(customers).toContain("<CustomerWorkbenchInspector");
+    for (const locale of ["", "fr/"]) {
+      expect(read(`src/app/${locale}units/page.tsx`)).toContain("UnitWorkbenchWorkspace");
+      expect(read(`src/app/${locale}customers/page.tsx`)).toContain("CustomerDirectoryWorkspace");
+    }
     expect(units).toContain("<OperationalPage");
     expect(units).toContain("data-unit-asset-table");
     expect(units).not.toContain("<RoomBoard");

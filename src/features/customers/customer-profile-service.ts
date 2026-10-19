@@ -3,6 +3,10 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import { sortUnits } from "@/lib/utils";
+import {
+  customerProfileFinancialRows,
+  unresolvedCustomerBookings,
+} from "./customer-profile-identity";
 import type {
   CustomerRow,
   DailyBookingRow,
@@ -70,7 +74,7 @@ export async function fetchCustomerProfile(
   const [
     dailyBookings,
     agentBookings,
-    unresolvedBookings,
+    legacyBookings,
     leaseContracts,
     saleContracts,
     receivables,
@@ -105,8 +109,6 @@ export async function fetchCustomerProfile(
           .from("daily_bookings")
           .select("*", { count: "exact" })
           .eq("customer_id", customerId)
-          .is("guest_customer_id", null)
-          .is("booking_agent_id", null)
           .order("check_in", { ascending: false })
           .order("id")
           .range(from, to),
@@ -171,6 +173,7 @@ export async function fetchCustomerProfile(
       "customer attachments",
     ),
   ]);
+  const unresolvedBookings = unresolvedCustomerBookings(customerId, legacyBookings);
 
   const businessIds = [
     ...new Set([...dailyBookings, ...leaseContracts, ...saleContracts].map((row) => row.id)),
@@ -204,18 +207,16 @@ export async function fetchCustomerProfile(
     receivables.push(...relatedReceivables);
     payments.push(...relatedPayments);
   }
-  // The old customer_id on daily financial rows can identify the booking agent.
-  // Keep that relationship in the agent tab, not the guest's financial balance.
-  const agentOnlyIds = new Set(
-    agentBookings.filter((row) => row.guest_customer_id !== customerId).map((row) => row.id),
-  );
-  const guestFinancial = (row: { source_type: string; source_id: string | null }) =>
-    !(row.source_type === "daily_booking" && row.source_id && agentOnlyIds.has(row.source_id));
+  // Only an explicit guest relationship establishes this customer's daily account.
+  // Agent and unresolved legacy relationships remain visible without attributing their debt.
   const customerReceivables = newestFirst(
-    receivables.filter(guestFinancial),
+    customerProfileFinancialRows(customerId, receivables, dailyBookings),
     (row) => row.due_date,
   );
-  const customerPayments = newestFirst(payments.filter(guestFinancial), (row) => row.payment_date);
+  const customerPayments = newestFirst(
+    customerProfileFinancialRows(customerId, payments, dailyBookings),
+    (row) => row.payment_date,
+  );
 
   const unitIds = [
     ...new Set(
