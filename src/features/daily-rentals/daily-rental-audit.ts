@@ -233,6 +233,7 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
   // 4b. receivable.paid vs payments
   const paymentsBySource = new Map<string, RawRow[]>();
   for (const p of payments) {
+    if (p.source_type !== "daily_booking") continue;
     const sid = p.source_id as string;
     if (!paymentsBySource.has(sid)) paymentsBySource.set(sid, []);
     paymentsBySource.get(sid)!.push(p);
@@ -244,7 +245,8 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
     const srcPayments = paymentsBySource.get(srcId) ?? [];
     const paymentSum = srcPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
     const recPaid = Number(r.paid_amount_xof) || 0;
-    if (Math.abs(recPaid - paymentSum) > 1) {
+    // XOF is stored as integers: even a one-franc mismatch must be reviewed.
+    if (recPaid !== paymentSum) {
       const unit = unitById.get(r.unit_id as string);
       const label = unit ? `${unit.unit_no ?? "?"}` : "?";
       issues.push(iss(
