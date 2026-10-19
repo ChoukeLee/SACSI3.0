@@ -30,6 +30,7 @@ export default async function FrenchLeasesPage({
             initialProject={params.project}
             canCreate={user.role === "admin" || user.role === "rental_sales"}
             canRecordFinance={user.role === "admin" || user.role === "finance"}
+            canCorrectRentPeriod={user.role === "admin"}
             canActivate={user.role === "admin" || user.role === "rental_sales"}
             canMoveOut={user.role === "admin" || user.role === "finance"}
           />
@@ -44,6 +45,7 @@ async function FrenchLeasesData({
   initialProject,
   canCreate,
   canRecordFinance,
+  canCorrectRentPeriod,
   canActivate,
   canMoveOut,
 }: {
@@ -51,6 +53,7 @@ async function FrenchLeasesData({
   initialProject?: string;
   canCreate: boolean;
   canRecordFinance: boolean;
+  canCorrectRentPeriod: boolean;
   canActivate: boolean;
   canMoveOut: boolean;
 }) {
@@ -63,6 +66,7 @@ async function FrenchLeasesData({
       locale="fr"
       canCreate={canCreate}
       canRecordFinance={canRecordFinance}
+      canCorrectRentPeriod={canCorrectRentPeriod}
       canActivate={canActivate}
       canMoveOut={canMoveOut}
     />

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { LeaseRentPeriodCorrection } from "./lease-rent-period-correction";
 import { leaseRequestIdentity, clearLeaseRequestIdentity } from "./lease-request-identity";
 import {
   Plus,
@@ -125,6 +126,7 @@ interface LeaseListProps {
   locale: Locale;
   canCreate?: boolean;
   canRecordFinance?: boolean;
+  canCorrectRentPeriod?: boolean;
   canActivate?: boolean;
   canMoveOut?: boolean;
 }
@@ -238,6 +240,7 @@ export function LeaseList({
   locale,
   canCreate = true,
   canRecordFinance = true,
+  canCorrectRentPeriod = false,
   canActivate = true,
   canMoveOut = true,
 }: LeaseListProps) {
@@ -2466,6 +2469,17 @@ export function LeaseList({
                     </p>
                   )}
                 </div>
+                {canCorrectRentPeriod && selected && (
+                  <LeaseRentPeriodCorrection
+                    key={selected.id}
+                    contractId={selected.id}
+                    locale={locale}
+                    onSaved={() => {
+                      if (workspace.enabled) void workspace.refresh();
+                      else router.refresh();
+                    }}
+                  />
+                )}
                 {canRecordFinance && (
                   <Button size="sm" variant="outline" onClick={openFinanceEntry}>
                     <Plus className="h-3.5 w-3.5" />

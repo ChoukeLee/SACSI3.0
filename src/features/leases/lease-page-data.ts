@@ -65,6 +65,8 @@ const PAYMENT_FIELDS = [
 ].join(",");
 
 const RECEIVABLE_FIELDS = [
+  "service_period_start",
+  "service_period_end",
   "id",
   "source_type",
   "source_id",

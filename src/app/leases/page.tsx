@@ -35,6 +35,7 @@ export default async function LeasesPage({
             locale="zh"
             canCreate={user.role === "admin" || user.role === "rental_sales"}
             canRecordFinance={user.role === "admin" || user.role === "finance"}
+            canCorrectRentPeriod={user.role === "admin"}
             canActivate={user.role === "admin" || user.role === "rental_sales"}
             canMoveOut={user.role === "admin" || user.role === "finance"}
           />
@@ -50,6 +51,7 @@ async function LeasesData({
   locale,
   canCreate,
   canRecordFinance,
+  canCorrectRentPeriod,
   canActivate,
   canMoveOut,
 }: {
@@ -58,6 +60,7 @@ async function LeasesData({
   locale: "zh" | "fr";
   canCreate: boolean;
   canRecordFinance: boolean;
+  canCorrectRentPeriod: boolean;
   canActivate: boolean;
   canMoveOut: boolean;
 }) {
@@ -70,6 +73,7 @@ async function LeasesData({
       locale={locale}
       canCreate={canCreate}
       canRecordFinance={canRecordFinance}
+      canCorrectRentPeriod={canCorrectRentPeriod}
       canActivate={canActivate}
       canMoveOut={canMoveOut}
     />

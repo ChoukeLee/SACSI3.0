@@ -95,14 +95,20 @@ export function resolveLeaseOverdue(input: {
   contractStatus?: string | null;
   actualEndDate?: string | null;
 }): LeaseOverdueResolution | null {
-  const throughDate = input.contractStatus === "terminated" && input.actualEndDate
-    ? [input.today, input.actualEndDate].sort()[0]
-    : input.today;
-  const rentReceivables = input.receivables.filter((row) => row.category === "lease_rent" && row.status !== "cancelled");
+  const throughDate =
+    input.contractStatus === "terminated" && input.actualEndDate
+      ? [input.today, input.actualEndDate].sort()[0]
+      : input.today;
+  const rentReceivables = input.receivables.filter(
+    (row) => row.category === "lease_rent" && row.status !== "cancelled",
+  );
 
   if (!input.paidThroughDate) {
     const dueRows = rentReceivables.filter((row) => row.due_date <= throughDate);
-    const amount = dueRows.reduce((sum, row) => sum + Math.max(0, Number(row.amount_xof) - Number(row.paid_amount_xof)), 0);
+    const amount = dueRows.reduce(
+      (sum, row) => sum + Math.max(0, Number(row.amount_xof) - Number(row.paid_amount_xof)),
+      0,
+    );
     if (amount <= 0) return null;
     return {
       dueDate: dueRows.map((row) => row.due_date).sort()[0],
@@ -119,12 +125,20 @@ export function resolveLeaseOverdue(input: {
   const dueRows = rentReceivables.filter((row) => row.due_date <= throughDate);
   const priorRows = dueRows.filter((row) => row.due_date < coverageDue);
   const coveredRows = dueRows.filter((row) => row.due_date >= coverageDue);
-  const priorOutstanding = priorRows.reduce((sum, row) => sum + Math.max(0, Number(row.amount_xof) - Number(row.paid_amount_xof)), 0);
-  const coveredOutstanding = coveredRows.reduce((sum, row) => sum + Math.max(0, Number(row.amount_xof) - Number(row.paid_amount_xof)), 0);
-  const coveredPaid = coveredRows.reduce((sum, row) => {
-    const amount = Math.max(0, Number(row.amount_xof));
-    return sum + Math.min(amount, Math.max(0, Number(row.paid_amount_xof)));
-  }, 0);
+  const priorOutstanding = priorRows.reduce(
+    (sum, row) => sum + Math.max(0, Number(row.amount_xof) - Number(row.paid_amount_xof)),
+    0,
+  );
+  const coveredOutstanding = coveredRows.reduce(
+    (sum, row) => sum + Math.max(0, Number(row.amount_xof) - Number(row.paid_amount_xof)),
+    0,
+  );
+  const coveredPaid = dueRows
+    .filter((row) => (row.service_period_end ?? row.due_date) >= coverageDue)
+    .reduce((sum, row) => {
+      const amount = Math.max(0, Number(row.amount_xof));
+      return sum + Math.min(amount, Math.max(0, Number(row.paid_amount_xof)));
+    }, 0);
   const accruedOutstanding = Math.max(0, startedPeriods * monthlyRent - coveredPaid);
   const amount = priorOutstanding + Math.max(coveredOutstanding, accruedOutstanding);
   if (amount <= 0) return null;

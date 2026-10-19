@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ReceivableRow } from "@/types/database";
-import { countStartedLeasePeriods, resolveLeaseOverdue, summarizeLeaseReceivables } from "./lease-receivable-summary";
+import {
+  countStartedLeasePeriods,
+  resolveLeaseOverdue,
+  summarizeLeaseReceivables,
+} from "./lease-receivable-summary";
 
 function receivable(overrides: Partial<ReceivableRow>): ReceivableRow {
   return {
@@ -26,10 +30,18 @@ function receivable(overrides: Partial<ReceivableRow>): ReceivableRow {
 
 describe("summarizeLeaseReceivables", () => {
   it("counts only the overdue portion when future balances also exist", () => {
-    const summary = summarizeLeaseReceivables([
-      receivable({ id: "overdue", amount_xof: 1_000_000, paid_amount_xof: 300_000, due_date: "2026-06-01" }),
-      receivable({ id: "future", amount_xof: 2_000_000, due_date: "2026-08-01" }),
-    ], "2026-07-28");
+    const summary = summarizeLeaseReceivables(
+      [
+        receivable({
+          id: "overdue",
+          amount_xof: 1_000_000,
+          paid_amount_xof: 300_000,
+          due_date: "2026-06-01",
+        }),
+        receivable({ id: "future", amount_xof: 2_000_000, due_date: "2026-08-01" }),
+      ],
+      "2026-07-28",
+    );
 
     expect(summary.outstanding).toBe(2_700_000);
     expect(summary.overdue).toBe(700_000);
@@ -37,10 +49,13 @@ describe("summarizeLeaseReceivables", () => {
   });
 
   it("excludes paid and cancelled receivables", () => {
-    const summary = summarizeLeaseReceivables([
-      receivable({ id: "paid", amount_xof: 500_000, paid_amount_xof: 500_000, status: "paid" }),
-      receivable({ id: "cancelled", amount_xof: 900_000, status: "cancelled" }),
-    ], "2026-07-28");
+    const summary = summarizeLeaseReceivables(
+      [
+        receivable({ id: "paid", amount_xof: 500_000, paid_amount_xof: 500_000, status: "paid" }),
+        receivable({ id: "cancelled", amount_xof: 900_000, status: "cancelled" }),
+      ],
+      "2026-07-28",
+    );
 
     expect(summary).toEqual({
       outstanding: 0,
@@ -52,13 +67,33 @@ describe("summarizeLeaseReceivables", () => {
 });
 
 describe("resolveLeaseOverdue", () => {
+  it("uses confirmed coverage rather than a late payment due date to avoid counting old paid rent twice", () => {
+    const result = resolveLeaseOverdue({
+      receivables: [
+        receivable({
+          due_date: "2026-07-27",
+          status: "paid",
+          amount_xof: 700000,
+          paid_amount_xof: 700000,
+          service_period_end: "2026-06-30",
+        }),
+      ],
+      today: "2026-10-19",
+      paidThroughDate: "2026-06-30",
+      monthlyRentXof: 700000,
+    });
+    expect(result?.amount).toBe(2800000);
+    expect(result?.startedPeriods).toBe(4);
+  });
   it("uses the contract monthly rent when paid coverage expired without an open receivable", () => {
-    expect(resolveLeaseOverdue({
-      receivables: [],
-      today: "2026-08-05",
-      paidThroughDate: "2026-07-31",
-      monthlyRentXof: 650_000,
-    })).toEqual({
+    expect(
+      resolveLeaseOverdue({
+        receivables: [],
+        today: "2026-08-05",
+        paidThroughDate: "2026-07-31",
+        monthlyRentXof: 650_000,
+      }),
+    ).toEqual({
       dueDate: "2026-08-01",
       amount: 650_000,
       source: "contract",
@@ -67,12 +102,16 @@ describe("resolveLeaseOverdue", () => {
   });
 
   it("reconciles a materialized receivable without stopping later rent accrual", () => {
-    expect(resolveLeaseOverdue({
-      receivables: [receivable({ amount_xof: 950_000, due_date: "2026-07-01", status: "overdue" })],
-      today: "2026-09-23",
-      paidThroughDate: "2026-06-30",
-      monthlyRentXof: 950_000,
-    })).toEqual({
+    expect(
+      resolveLeaseOverdue({
+        receivables: [
+          receivable({ amount_xof: 950_000, due_date: "2026-07-01", status: "overdue" }),
+        ],
+        today: "2026-09-23",
+        paidThroughDate: "2026-06-30",
+        monthlyRentXof: 950_000,
+      }),
+    ).toEqual({
       dueDate: "2026-07-01",
       amount: 2_850_000,
       source: "contract",
@@ -81,12 +120,14 @@ describe("resolveLeaseOverdue", () => {
   });
 
   it("marks the first uncovered day overdue on its due date", () => {
-    expect(resolveLeaseOverdue({
-      receivables: [],
-      today: "2026-08-01",
-      paidThroughDate: "2026-07-31",
-      monthlyRentXof: 650_000,
-    })).toEqual({
+    expect(
+      resolveLeaseOverdue({
+        receivables: [],
+        today: "2026-08-01",
+        paidThroughDate: "2026-07-31",
+        monthlyRentXof: 650_000,
+      }),
+    ).toEqual({
       dueDate: "2026-08-01",
       amount: 650_000,
       source: "contract",
@@ -95,12 +136,16 @@ describe("resolveLeaseOverdue", () => {
   });
 
   it("subtracts a partial payment from the accrued period", () => {
-    expect(resolveLeaseOverdue({
-      receivables: [receivable({ amount_xof: 1_000_000, paid_amount_xof: 300_000, due_date: "2026-08-01" })],
-      today: "2026-08-20",
-      paidThroughDate: "2026-07-31",
-      monthlyRentXof: 1_000_000,
-    })).toEqual({
+    expect(
+      resolveLeaseOverdue({
+        receivables: [
+          receivable({ amount_xof: 1_000_000, paid_amount_xof: 300_000, due_date: "2026-08-01" }),
+        ],
+        today: "2026-08-20",
+        paidThroughDate: "2026-07-31",
+        monthlyRentXof: 1_000_000,
+      }),
+    ).toEqual({
       dueDate: "2026-08-01",
       amount: 700_000,
       source: "receivable",
@@ -109,14 +154,16 @@ describe("resolveLeaseOverdue", () => {
   });
 
   it("caps accrual at the actual end date of a terminated contract", () => {
-    expect(resolveLeaseOverdue({
-      receivables: [],
-      today: "2026-09-23",
-      paidThroughDate: "2026-06-30",
-      monthlyRentXof: 950_000,
-      contractStatus: "terminated",
-      actualEndDate: "2026-07-10",
-    })).toEqual({
+    expect(
+      resolveLeaseOverdue({
+        receivables: [],
+        today: "2026-09-23",
+        paidThroughDate: "2026-06-30",
+        monthlyRentXof: 950_000,
+        contractStatus: "terminated",
+        actualEndDate: "2026-07-10",
+      }),
+    ).toEqual({
       dueDate: "2026-07-01",
       amount: 950_000,
       source: "contract",
@@ -125,12 +172,16 @@ describe("resolveLeaseOverdue", () => {
   });
 
   it("uses due receivables when paid-through coverage is missing", () => {
-    expect(resolveLeaseOverdue({
-      receivables: [receivable({ amount_xof: 800_000, paid_amount_xof: 200_000, due_date: "2026-09-23" })],
-      today: "2026-09-23",
-      paidThroughDate: null,
-      monthlyRentXof: 800_000,
-    })).toEqual({
+    expect(
+      resolveLeaseOverdue({
+        receivables: [
+          receivable({ amount_xof: 800_000, paid_amount_xof: 200_000, due_date: "2026-09-23" }),
+        ],
+        today: "2026-09-23",
+        paidThroughDate: null,
+        monthlyRentXof: 800_000,
+      }),
+    ).toEqual({
       dueDate: "2026-09-23",
       amount: 600_000,
       source: "receivable",
@@ -139,9 +190,10 @@ describe("resolveLeaseOverdue", () => {
   });
 
   it("does not count an unpaid receivable as overdue until after its due date", () => {
-    const summary = summarizeLeaseReceivables([
-      receivable({ amount_xof: 650_000, due_date: "2026-08-10", status: "pending" }),
-    ], "2026-08-10");
+    const summary = summarizeLeaseReceivables(
+      [receivable({ amount_xof: 650_000, due_date: "2026-08-10", status: "pending" })],
+      "2026-08-10",
+    );
 
     expect(summary.overdue).toBe(0);
     expect(summary.earliestOverdueDue).toBeNull();

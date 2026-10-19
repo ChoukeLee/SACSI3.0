@@ -149,6 +149,10 @@
     {
       "file": "20261015222541_daily_calendar_independent_context_reads.sql",
       "sha256": "3e8643cd2b2cd73f461e0e7919766bb14f4f441120a16d535bf1eff0f0e4a388"
+    },
+    {
+      "file": "20261019140744_lease_rent_period_correction.sql",
+      "sha256": "7f184c5b904b9272a8f50f73e164acc2752b64a50168393a61164408c0fa6a31"
     }
   ],
   "excluded": [

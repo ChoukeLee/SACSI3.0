@@ -3,6 +3,17 @@
 import * as contract from "./lease-contract-actions";
 import * as payment from "./lease-payment-actions";
 import * as moveout from "./lease-moveout-actions";
+import * as period from "./lease-rent-period-actions";
+export async function reviewLeaseRentPeriod(
+  ...args: Parameters<typeof period.reviewLeaseRentPeriod>
+) {
+  return period.reviewLeaseRentPeriod(...args);
+}
+export async function correctLeaseRentPeriod(
+  ...args: Parameters<typeof period.correctLeaseRentPeriod>
+) {
+  return period.correctLeaseRentPeriod(...args);
+}
 export async function createLeaseContract(
   ...args: Parameters<typeof contract.createLeaseContract>
 ) {
