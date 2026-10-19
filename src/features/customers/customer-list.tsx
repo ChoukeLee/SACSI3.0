@@ -19,15 +19,19 @@ export interface CustomerBuildingSummary {
   id: string;
   code: string;
   label: string;
+  project?: { id: string; code: string; label: string } | null;
+}
+
+interface CustomerSegments {
+  leaseCustomerIds: string[];
+  saleCustomerIds: string[];
+  dailyCustomerIds: string[];
 }
 
 interface CustomerListProps {
   customers: CustomerRow[];
-  customerSegments?: {
-    leaseCustomerIds: string[];
-    saleCustomerIds: string[];
-    dailyCustomerIds: string[];
-  };
+  customerSegments?: CustomerSegments;
+  customerProjectSegments?: Record<string, CustomerSegments>;
   customerRooms?: Record<string, string[]>;
   customerBuildings?: Record<string, CustomerBuildingSummary[]>;
   buildingOptions?: CustomerBuildingSummary[];
@@ -41,11 +45,12 @@ type FormMode = { type: "add" } | { type: "edit"; customer: CustomerRow } | null
 type CustomerSegment = "all" | "lease" | "sale" | "daily" | "blacklisted";
 type CustomerGroup = "lease" | "sale" | "daily" | "uncategorized" | "blacklisted";
 
-export function CustomerList({ customers, customerSegments, customerRooms, customerBuildings, buildingOptions, customerLastActivity, locale, showHeader = true, canEdit = true }: CustomerListProps) {
+export function CustomerList({ customers, customerSegments, customerProjectSegments, customerRooms, customerBuildings, buildingOptions, customerLastActivity, locale, showHeader = true, canEdit = true }: CustomerListProps) {
   const [optimisticCustomers, setOptimisticCustomers] = useState<CustomerRow[]>(customers);
   const [search, setSearch] = useState("");
   const [segment, setSegment] = useState<CustomerSegment>("all");
   const [buildingFilter, setBuildingFilter] = useState("__all__");
+  const [projectFilter, setProjectFilter] = useState("");
   const [formMode, setFormMode] = useState<FormMode>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -63,20 +68,55 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
     setOptimisticCustomers(customers);
   }, [customers]);
 
+  const projects = useMemo(() => {
+    const byId = new Map<string, NonNullable<CustomerBuildingSummary["project"]>>();
+    for (const building of buildingOptions ?? []) {
+      if (building.project) byId.set(building.project.id, building.project);
+    }
+    return [...byId.values()].sort((a, b) =>
+      Number(b.code === "SACSI") - Number(a.code === "SACSI") || a.code.localeCompare(b.code)
+    );
+  }, [buildingOptions]);
+  const hasUnassigned = optimisticCustomers.some((customer) =>
+    !(customerBuildings?.[customer.id] ?? []).some((building) => building.project)
+  );
+  const activeProject = projectFilter === "__unassigned__" && hasUnassigned
+    ? projectFilter
+    : projects.find((project) => project.id === projectFilter)?.id ?? projects[0]?.id ?? "";
+  const projectBuildings = useMemo(() => (buildingOptions ?? []).filter((building) =>
+    !activeProject || (activeProject === "__unassigned__" ? !building.project : building.project?.id === activeProject)
+  ), [buildingOptions, activeProject]);
+  const projectCustomers = useMemo(() => optimisticCustomers.filter((customer) => {
+    const buildings = customerBuildings?.[customer.id] ?? [];
+    if (!activeProject) return true;
+    if (activeProject === "__unassigned__") return !buildings.some((building) => building.project);
+    return buildings.some((building) => building.project?.id === activeProject);
+  }), [optimisticCustomers, customerBuildings, activeProject]);
+  const activeBuildingFilter = projectBuildings.some((building) => building.id === buildingFilter) ? buildingFilter : "__all__";
+  const changeProject = (id: string) => {
+    setProjectFilter(id);
+    setBuildingFilter("__all__");
+    setSelectedId(null);
+    setFormMode(null);
+  };
   const segmentSets = useMemo(() => {
-    const lease = new Set(customerSegments?.leaseCustomerIds ?? []);
-    const sale = new Set(customerSegments?.saleCustomerIds ?? []);
-    const daily = new Set(customerSegments?.dailyCustomerIds ?? []);
-    return { lease, sale, daily };
-  }, [customerSegments]);
+    const scoped = customerProjectSegments && activeProject
+      ? customerProjectSegments[activeProject]
+      : customerSegments;
+    return {
+      lease: new Set(scoped?.leaseCustomerIds ?? []),
+      sale: new Set(scoped?.saleCustomerIds ?? []),
+      daily: new Set(scoped?.dailyCustomerIds ?? []),
+    };
+  }, [customerSegments, customerProjectSegments, activeProject]);
 
   const stats = useMemo(() => ({
-    lease: optimisticCustomers.filter((c) => segmentSets.lease.has(c.id)).length,
-    sale: optimisticCustomers.filter((c) => segmentSets.sale.has(c.id)).length,
-    dailyOnly: optimisticCustomers.filter((c) => segmentSets.daily.has(c.id) && !segmentSets.lease.has(c.id) && !segmentSets.sale.has(c.id)).length,
-    blacklisted: optimisticCustomers.filter((c) => c.is_blacklisted).length,
-    all: optimisticCustomers.length,
-  }), [optimisticCustomers, segmentSets]);
+    lease: projectCustomers.filter((c) => segmentSets.lease.has(c.id)).length,
+    sale: projectCustomers.filter((c) => segmentSets.sale.has(c.id)).length,
+    dailyOnly: projectCustomers.filter((c) => segmentSets.daily.has(c.id) && !segmentSets.lease.has(c.id) && !segmentSets.sale.has(c.id)).length,
+    blacklisted: projectCustomers.filter((c) => c.is_blacklisted).length,
+    all: projectCustomers.length,
+  }), [projectCustomers, segmentSets]);
 
   const customerGroup = (c: CustomerRow): CustomerGroup => {
     if (c.is_blacklisted) return "blacklisted";
@@ -106,7 +146,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       uncategorized: 3,
       blacklisted: 4,
     };
-    return [...optimisticCustomers].sort((a, b) => {
+    return [...projectCustomers].sort((a, b) => {
       const aBuilding = primaryBuilding(a.id)?.label ?? "";
       const bBuilding = primaryBuilding(b.id)?.label ?? "";
       if (aBuilding !== bBuilding) return aBuilding.localeCompare(bBuilding);
@@ -123,7 +163,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       if (aAct !== bAct) return bAct.localeCompare(aAct);
       return a.name.localeCompare(b.name);
     });
-  }, [optimisticCustomers, segmentSets, customerRooms, customerBuildings, customerLastActivity]);
+  }, [projectCustomers, segmentSets, customerRooms, customerBuildings, customerLastActivity]);
 
   const filteredBase = useMemo(() => {
     const s = search.toLowerCase().trim();
@@ -146,11 +186,11 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
   }, [sorted, search, segment, segmentSets, customerRooms]);
 
   const filtered = useMemo(() => {
-    if (buildingFilter === "__all__") return filteredBase;
+    if (activeBuildingFilter === "__all__") return filteredBase;
     return filteredBase.filter((customer) =>
-      (customerBuildings?.[customer.id] ?? []).some((building) => building.id === buildingFilter)
+      (customerBuildings?.[customer.id] ?? []).some((building) => building.id === activeBuildingFilter)
     );
-  }, [filteredBase, customerBuildings, buildingFilter]);
+  }, [filteredBase, customerBuildings, activeBuildingFilter]);
 
   const selected = selectedId ? optimisticCustomers.find((c) => c.id === selectedId) : null;
   const selectedRooms = selected ? [...((customerRooms ?? {})[selected.id] ?? [])].sort(compareUnitNo) : [];
@@ -314,7 +354,7 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
 
   const buildingTabs = [
     { value: "__all__", label: t.allBuildings, count: filteredBase.length },
-    ...(buildingOptions ?? []).map((building) => ({
+    ...projectBuildings.map((building) => ({
       value: building.id,
       label: building.label,
       count: filteredBase.filter((customer) =>
@@ -323,9 +363,9 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
     })),
   ];
 
-  const activeBuildingGroups = buildingFilter === "__all__"
+  const activeBuildingGroups = activeBuildingFilter === "__all__"
     ? [
-        ...(buildingOptions ?? []).map((building) => ({
+        ...projectBuildings.map((building) => ({
           building,
           customers: filtered.filter((customer) =>
             (customerBuildings?.[customer.id] ?? []).some((item) => item.id === building.id)
@@ -338,9 +378,9 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       ]
     : [
         {
-          building: (buildingOptions ?? []).find((building) => building.id === buildingFilter) ?? null,
+          building: projectBuildings.find((building) => building.id === activeBuildingFilter) ?? null,
           customers: filtered.filter((customer) =>
-            (customerBuildings?.[customer.id] ?? []).some((item) => item.id === buildingFilter)
+            (customerBuildings?.[customer.id] ?? []).some((item) => item.id === activeBuildingFilter)
           ),
         },
       ];
@@ -365,7 +405,9 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
     const hasDaily = segmentSets.daily.has(c.id);
     const isStable = hasLease || hasSale;
     const rooms = [...((customerRooms ?? {})[c.id] ?? [])].sort(compareUnitNo);
-    const buildings = customerBuildings?.[c.id] ?? [];
+    const buildings = (customerBuildings?.[c.id] ?? []).filter((building) =>
+      !activeProject || (activeProject === "__unassigned__" ? !building.project : building.project?.id === activeProject)
+    );
 
     return (
       <button
@@ -439,6 +481,33 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
       />
       )}
 
+      {projects.length > 0 && (
+        <section className="space-y-3 rounded-xl border bg-card p-3 sm:p-4" aria-label={locale === "zh" ? "项目与楼栋" : "Projet et bâtiment"}>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs font-semibold text-muted-foreground">{locale === "zh" ? "项目" : "Projet"}</span>
+            <SegmentedControl value={activeProject} onChange={changeProject}
+              ariaLabel={locale === "zh" ? "项目切换" : "Choix du projet"}
+              items={[
+                ...projects.map((project) => ({ value: project.id, label: project.code === "SACSI" ? (locale === "zh" ? "公寓项目" : "Résidences SACSI") : project.code === "CIMAC" ? (locale === "zh" ? "科建建材城" : "CIMAC") : project.label })),
+                ...(hasUnassigned ? [{ value: "__unassigned__", label: locale === "zh" ? "未归属项目" : "Projet non affecté" }] : []),
+              ]} />
+          </div>
+          <div className="flex min-w-0 items-center gap-3 border-t pt-3">
+            <span className="shrink-0 text-xs font-semibold text-muted-foreground">{locale === "zh" ? "楼栋" : "Bâtiment"}</span>
+            <select aria-label={locale === "zh" ? "选择楼栋" : "Choisir un bâtiment"}
+              className={`${controlClass} min-w-0 flex-1 sm:hidden`} value={activeBuildingFilter}
+              onChange={(event) => { setBuildingFilter(event.target.value); setSelectedId(null); }}>
+              {buildingTabs.map((building) => <option key={building.value} value={building.value}>{building.label}</option>)}
+            </select>
+            <SegmentedControl value={activeBuildingFilter}
+              onChange={(id) => { setBuildingFilter(id); setSelectedId(null); }}
+              className="hidden min-w-0 sm:inline-flex"
+              ariaLabel={locale === "zh" ? "楼栋切换" : "Choix du bâtiment"}
+              items={buildingTabs.map(({ value, label }) => ({ value, label }))} />
+          </div>
+        </section>
+      )}
+
       <MetricGrid columns={5}>
         {statBlocks.map(b => (
           <StatTile key={b.key} label={b.label} value={b.value} tone={b.key === "blacklisted" ? "red" : b.key === "lease" ? "leased" : b.key === "sale" ? "sold" : b.key === "daily" ? "blue" : "neutral"} />
@@ -468,16 +537,16 @@ export function CustomerList({ customers, customerSegments, customerRooms, custo
               { value: "blacklisted", label: t.blacklistTab, count: stats.blacklisted },
             ]}
           />
-          {buildingTabs.length > 1 && (
+          {projects.length === 0 && buildingTabs.length > 1 && (
             <SegmentedControl
-              value={buildingFilter}
+              value={activeBuildingFilter}
               onChange={setBuildingFilter}
               ariaLabel={locale === "zh" ? "楼栋分类" : "Batiment"}
               items={buildingTabs}
             />
           )}
           <span className="pl-1 text-xs text-muted-foreground">
-            {t.filtered(filtered.length, customers.length)}
+            {t.filtered(filtered.length, projectCustomers.length)}
             <span className="ml-2 text-[10px] opacity-60">{t.stableFirst}</span>
           </span>
       </FilterBar>
