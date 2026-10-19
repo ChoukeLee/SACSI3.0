@@ -10,10 +10,12 @@ export function ManualEntryForm({
   buildings,
   units,
   zh,
+  expanded = false,
 }: {
   buildings: { id: string; display_name: string; code: string }[];
   units: { id: string; building_id: string; unit_no: string }[];
   zh: boolean;
+  expanded?: boolean;
 }) {
   const [building, setBuilding] = useState(buildings[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
@@ -59,7 +61,7 @@ export function ManualEntryForm({
   }
   const input = "rounded-md border bg-background p-2 text-sm";
   return (
-    <details className="rounded-xl border bg-card p-4">
+    <details open={expanded || undefined} className="rounded-xl border bg-card p-4">
       <summary className="cursor-pointer font-medium">
         {zh ? "手工记账（非业务收款请使用此处）" : "Écriture manuelle"}
       </summary>

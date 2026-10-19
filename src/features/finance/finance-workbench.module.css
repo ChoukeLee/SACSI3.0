@@ -1,0 +1,673 @@
+.workbench {
+  --finance-accent: #285dd5;
+  --finance-soft: #edf3ff;
+  display: grid;
+  gap: 18px;
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--background));
+  min-width: 0;
+}
+.workbench :global(.bg-card) {
+  background-color: hsl(var(--card));
+}
+.workbench :global(.text-foreground) {
+  color: hsl(var(--foreground));
+}
+.workbench :global(.text-muted-foreground) {
+  color: hsl(var(--muted-foreground));
+}
+.workbench :global([class*="bg-muted/"]) {
+  background-color: hsl(var(--muted) / 0.35);
+}
+:global(.dark) .workbench {
+  --finance-accent: #9dbbff;
+  --finance-soft: #263b5b;
+}
+.heading {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.heading h1 {
+  font-size: 25px;
+  line-height: 1.35;
+  font-weight: 650;
+  letter-spacing: -0.65px;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 1.7px;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 6px;
+}
+.subtitle {
+  margin-top: 7px;
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-top: 15px;
+}
+.primaryButton,
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-height: 35px;
+  font-size: 12px;
+  font-weight: 500;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+}
+.primaryButton {
+  background: #285dd5;
+  color: #fff;
+  border-color: #285dd5;
+}
+.secondaryButton:hover {
+  background: hsl(var(--muted) / 0.6);
+}
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.scopeForm {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px 13px;
+  min-width: 0;
+}
+.scopeForm label,
+.advancedFields label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  min-width: 0;
+}
+.scopeForm select,
+.scopeForm input,
+.toolbar select,
+.advancedFields select {
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 7px;
+  padding: 7px 10px;
+  min-height: 35px;
+  max-width: 100%;
+  font-size: 12px;
+}
+.scopeForm select {
+  max-width: 290px;
+}
+.scopeForm input[type="date"] {
+  min-width: 142px;
+}
+.scopeForm select:disabled,
+.scopeForm input:disabled {
+  opacity: 0.5;
+}
+.dateFields {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.dateFields > span {
+  color: hsl(var(--muted-foreground));
+  padding-bottom: 9px;
+}
+.tabs {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  border-bottom: 1px solid hsl(var(--border));
+  flex-wrap: wrap;
+}
+.tabs > a {
+  padding: 10px 0;
+  border-bottom: 2px solid transparent;
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+.tabs > a[aria-current="page"] {
+  border-color: var(--finance-accent);
+  color: var(--finance-accent);
+  font-weight: 500;
+}
+.tabs > .reportLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+}
+.summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--card));
+  overflow: hidden;
+}
+.stat {
+  padding: 17px 18px;
+  min-width: 0;
+}
+.stat + .stat {
+  border-left: 1px solid hsl(var(--border));
+}
+.stat > p {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+.statValue {
+  font-size: 23px;
+  line-height: 1.45;
+  letter-spacing: -0.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin: 7px 0 5px;
+  overflow-wrap: anywhere;
+}
+.statValue small {
+  font-size: 11px;
+  font-weight: 400;
+  color: hsl(var(--muted-foreground));
+  margin-left: 4px;
+  letter-spacing: 0;
+}
+.stat > span {
+  font-size: 11px;
+  line-height: 1.6;
+  color: hsl(var(--muted-foreground));
+}
+.appliedScope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 15px;
+  justify-content: space-between;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  margin-top: -5px;
+}
+.appliedScope > span:last-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 18px;
+  align-items: start;
+  min-width: 0;
+}
+.listPanel {
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--card));
+  min-width: 0;
+}
+.panelHeading {
+  padding: 17px 18px 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.panelHeading h2 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.panelHeading > span {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 0 18px 12px;
+}
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--muted-foreground));
+  border-radius: 8px;
+  padding: 0 10px;
+  min-height: 35px;
+  min-width: 140px;
+  flex: 1;
+}
+.search input {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font-size: 12px;
+  padding: 8px 0;
+}
+.search input::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+.advanced {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+.advanced summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 0;
+  cursor: pointer;
+}
+.advancedFields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 10px 0 3px;
+}
+.advancedFields label {
+  max-width: 100%;
+}
+.advancedFields .checkbox {
+  flex-direction: row;
+  align-items: center;
+  padding-bottom: 8px;
+}
+.dataNote {
+  padding: 0 18px 13px;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  line-height: 1.65;
+}
+.tableContainer {
+  container: finance-list / inline-size;
+}
+.table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.table th {
+  background: hsl(var(--muted) / 0.4);
+  border-block: 1px solid hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+  text-align: left;
+  padding: 11px 13px;
+  font-size: 11px;
+  font-weight: 400;
+}
+.table th:nth-child(1) {
+  width: 34%;
+}
+.table th:nth-child(2) {
+  width: 27%;
+}
+.table th:nth-child(3) {
+  width: 33%;
+}
+.table th:nth-child(4) {
+  width: 6%;
+}
+.table td {
+  padding: 17px 13px;
+  vertical-align: top;
+  border-bottom: 1px solid hsl(var(--border));
+  overflow-wrap: anywhere;
+}
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.table tbody tr:hover {
+  background: hsl(var(--muted) / 0.2);
+}
+.table tr[data-selected] td {
+  background: var(--finance-soft);
+}
+.table .amount {
+  text-align: right;
+}
+.rowLink {
+  color: var(--finance-accent);
+  text-align: left;
+  font-weight: 500;
+  font-size: 13px;
+}
+.rowLink:disabled {
+  cursor: progress;
+}
+.cellMain {
+  display: block;
+  font-weight: 500;
+}
+.cellSub {
+  display: block;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  margin-top: 5px;
+}
+.description {
+  display: block;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  margin-top: 5px;
+  line-height: 1.6;
+}
+.money {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  margin-top: 5px;
+}
+.cellSub > .badge {
+  display: table;
+}
+.danger {
+  background: hsl(var(--destructive) / 0.08);
+  color: hsl(var(--destructive));
+}
+.table .rowAction {
+  padding-left: 0;
+  padding-right: 7px;
+  text-align: right;
+}
+.iconButton {
+  display: inline-grid;
+  place-items: center;
+  min-height: 28px;
+  min-width: 26px;
+  border-radius: 6px;
+  color: hsl(var(--muted-foreground));
+}
+.iconButton:hover {
+  background: hsl(var(--muted));
+}
+.tableFooter {
+  border-top: 1px solid hsl(var(--border));
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  flex-wrap: wrap;
+}
+.tableFooter nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tableFooter nav button,
+.tableFooter nav a {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  min-height: 28px;
+}
+.tableFooter nav button:disabled {
+  opacity: 0.35;
+}
+.inspector {
+  min-width: 0;
+  scroll-margin-top: 75px;
+}
+.scopeNote {
+  font-size: 11px;
+  line-height: 1.75;
+  color: hsl(var(--muted-foreground));
+}
+.relatedLink {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  justify-self: start;
+}
+.relatedLink:hover {
+  color: var(--finance-accent);
+}
+.empty {
+  padding: 37px 18px;
+  color: hsl(var(--muted-foreground));
+  text-align: center;
+  font-size: 12px;
+}
+.exports {
+  display: grid;
+  gap: 15px;
+  padding: 18px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  border-radius: 12px;
+}
+.exports h2 {
+  font-size: 14px;
+  font-weight: 500;
+}
+.exports p {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  margin-block: 7px 12px;
+}
+.exports summary {
+  font-size: 12px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+.reconciliation {
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--card));
+}
+.reviewBanner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 18px;
+  background: var(--finance-soft);
+  border-radius: 12px 12px 0 0;
+}
+.reviewBanner svg {
+  flex-shrink: 0;
+  color: var(--finance-accent);
+}
+.reviewBanner h2 {
+  font-size: 14px;
+  font-weight: 500;
+}
+.reviewBanner p,
+.reviewError p {
+  margin-top: 6px;
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+.reviewError {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  padding: 22px;
+}
+.reviewError h3 {
+  font-weight: 500;
+  font-size: 14px;
+}
+.issueList li {
+  padding: 18px;
+  border-top: 1px solid hsl(var(--border));
+}
+.issueList h3 {
+  font-size: 13px;
+  font-weight: 500;
+}
+.issueList p {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  margin-top: 7px;
+}
+.issueId {
+  overflow-wrap: anywhere;
+  font-family: var(--font-geist-mono), monospace;
+}
+@container finance-list (max-width: 610px) {
+  .table th,
+  .table td {
+    padding-left: 11px;
+    padding-right: 11px;
+  }
+  .money {
+    white-space: normal;
+  }
+}
+@container finance-list (max-width: 430px) {
+  .table,
+  .table tbody {
+    display: block;
+  }
+  .table thead {
+    display: none;
+  }
+  .table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(90px, auto);
+    border-top: 1px solid hsl(var(--border));
+  }
+  .table td {
+    display: block;
+    border: 0;
+    padding: 11px 12px;
+  }
+  .table td:nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+    padding-top: 0;
+  }
+  .table td.amount {
+    grid-column: 2;
+    grid-row: 1;
+    max-width: 160px;
+  }
+  .table td.rowAction {
+    grid-column: 2;
+    grid-row: 2;
+    padding-top: 0;
+  }
+}
+@media (max-width: 1199px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .statValue {
+    font-size: 21px;
+  }
+  .headerActions {
+    padding-top: 0;
+  }
+}
+@media (max-width: 760px) {
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .stat {
+    padding: 14px;
+  }
+  .stat:nth-child(3) {
+    border-left: 0;
+  }
+  .stat:nth-child(n + 3) {
+    border-top: 1px solid hsl(var(--border));
+  }
+  .dateFields {
+    flex-wrap: wrap;
+  }
+  .tabs {
+    gap: 18px;
+  }
+  .tabs > .reportLink {
+    display: none;
+  }
+}
+@media (max-width: 480px) {
+  .heading h1 {
+    font-size: 23px;
+  }
+  .scopeForm {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .scopeForm > label:first-of-type {
+    grid-column: 1 / -1;
+  }
+  .dateFields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-column: 1 / -1;
+    gap: 10px;
+  }
+  .dateFields > span {
+    display: none;
+  }
+  .scopeForm input[type="date"] {
+    min-width: 0;
+    width: 100%;
+  }
+  .scopeForm select {
+    width: 100%;
+    max-width: none;
+  }
+  .toolbar,
+  .panelHeading {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .dataNote {
+    padding-inline: 12px;
+  }
+  .statValue {
+    font-size: 19px;
+  }
+  .scopeForm select,
+  .scopeForm input,
+  .toolbar input,
+  .toolbar select {
+    font-size: 16px;
+  }
+}
+@media (pointer: coarse) {
+  .workbench button,
+  .workbench select,
+  .workbench input,
+  .tabs a {
+    min-height: 44px;
+  }
+}

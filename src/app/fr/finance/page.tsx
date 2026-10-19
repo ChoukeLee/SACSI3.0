@@ -3,8 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 
 import { FinanceWorkspace } from "@/features/finance/finance-workspace";
-import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
-import { PageHeader } from "@/components/page-header";
+import { FinanceWorkbenchSkeleton } from "@/features/finance/finance-workbench-skeleton";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -19,11 +18,7 @@ export default async function FrenchFinancePage({
   if (!["admin", "boss", "finance"].includes(user.role)) redirect("/");
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Finance"
-        description="Flux, imputations et dépôts distincts ; montants d’origine conservés, totaux en XOF."
-      />
-      <Suspense fallback={<OperationalPageSkeleton kind="table" rows={8} />}>
+      <Suspense fallback={<FinanceWorkbenchSkeleton locale="fr" />}>
         <FinanceWorkspace
           params={await searchParams}
           locale="fr"
