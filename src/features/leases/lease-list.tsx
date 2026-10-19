@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { LeaseRentPeriodCorrection } from "./lease-rent-period-correction";
 import { leaseRequestIdentity, clearLeaseRequestIdentity } from "./lease-request-identity";
@@ -29,12 +29,9 @@ import { RoomBoard } from "@/components/room-board";
 import { RoomLegend } from "@/components/room-legend";
 import { EmptyState } from "@/components/empty-state";
 import {
-  FilterBar,
-  MetricGrid,
   OperationalPage,
   RightDrawer,
   SegmentedControl,
-  StatTile,
   controlClass,
 } from "@/components/ui/operational";
 import type { RoomVisualStatus } from "@/lib/status-styles";
@@ -76,7 +73,11 @@ import {
   resolveBuildingScope,
   type LeaseBuilding,
 } from "./project-scope";
-import { ContractListControls, ContractTable } from "@/features/contracts/contract-table";
+import { ContractListControls } from "@/features/contracts/contract-table";
+import { LeaseWorkbenchTable } from "./lease-workbench-table";
+import { LeaseWorkbenchInspector } from "./lease-workbench-inspector";
+import { useLeaseWorkbenchPreview } from "./use-lease-workbench-preview";
+import styles from "./lease-workbench.module.css";
 import {
   buildContractReceivableSummaries,
   formatContractXof,
@@ -270,6 +271,15 @@ export function LeaseList({
   const [detailSection, setDetailSection] = useState<"overview" | "finance">("overview");
   const [attentionTab, setAttentionTab] = useState<AttentionTab>("overdue");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [previewSelection, setPreviewSelection] = useState<{
+    id: string;
+    scope: string;
+    page: WorkspaceData | undefined;
+    contracts: LeaseContractRow[];
+    version: number;
+  } | null>(null);
+  const previewVersion = useRef(0);
+  const previewColumnRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [writeConfirmed, setWriteConfirmed] = useState(false);
@@ -443,6 +453,7 @@ export function LeaseList({
     initialWorkspace,
   );
   const closeScopePanel = () => {
+    setPreviewSelection(null);
     setPanel(null);
     setSelectedId(null);
     setFUnitId("");
@@ -591,6 +602,67 @@ export function LeaseList({
       workspace.enabled ? tableRows : tableRows.filter((row) => matchesContractSearch(row, search)),
     [tableRows, search, workspace.enabled],
   );
+  const previewScope = JSON.stringify([
+    project?.id,
+    activeBuildingId,
+    statusFilter,
+    search,
+    contractView,
+    workspace.query ? workspaceQueryKey(workspace.query) : null,
+  ]);
+  const previewId =
+    !workspace.unavailable &&
+    panel === null &&
+    contractView === "table" &&
+    previewSelection?.scope === previewScope &&
+    previewSelection.page === workspace.pageData &&
+    previewSelection.contracts === initialContracts &&
+    searchedTableRows.some((row) => row.id === previewSelection.id)
+      ? previewSelection.id
+      : null;
+  const preview = useLeaseWorkbenchPreview(workspace.query, previewId, previewSelection?.version);
+  const previewContract = previewId
+    ? workspace.enabled
+      ? ((preview.data?.contracts.find((row) => row.id === previewId) as
+          LeaseContractRow | undefined) ?? null)
+      : (contracts.find((row) => row.id === previewId) ?? null)
+    : null;
+  const previewUnits = workspace.enabled ? preview.data?.units : units;
+  const previewCustomers = workspace.enabled ? preview.data?.customers : customers;
+  const previewUnit = previewUnits?.find((row) => row.id === previewContract?.unit_id) ?? null;
+  const previewCustomer =
+    previewCustomers?.find((row) => row.id === previewContract?.customer_id) ?? null;
+  const previewPayments = workspace.enabled ? (preview.data?.payments ?? []) : payments;
+  const previewReceivables = workspace.enabled ? (preview.data?.receivables ?? []) : receivables;
+  const selectPreview = (id: string) => {
+    if (id === previewId && preview.error) preview.retry();
+    setPreviewSelection({
+      id,
+      scope: previewScope,
+      page: workspace.pageData,
+      contracts: initialContracts,
+      version: ++previewVersion.current,
+    });
+    if (
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 1279px)").matches
+    ) {
+      requestAnimationFrame(() => {
+        const target = previewColumnRef.current;
+        if (!target) return;
+        target.focus({ preventScroll: true });
+        target.scrollIntoView({
+          block: "start",
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "auto"
+            : "smooth",
+        });
+      });
+    }
+  };
+  const syncVisiblePreview = useCallback((ids: string[]) => {
+    setPreviewSelection((current) => (current && !ids.includes(current.id) ? null : current));
+  }, []);
   const filtered = useMemo(() => {
     if (workspace.enabled && contractView === "rooms")
       return filteredByStatus.filter((row) =>
@@ -870,6 +942,7 @@ export function LeaseList({
     setError("");
   };
   const openNew = async () => {
+    setPreviewSelection(null);
     if (workspace.enabled) {
       try {
         await workspace.ensure("context");
@@ -882,6 +955,7 @@ export function LeaseList({
     setSelectedId(null);
   };
   const openDetail = async (id: string, section: "overview" | "finance" = "overview") => {
+    setPreviewSelection(null);
     if (workspace.enabled) {
       try {
         await workspace.ensure("detail", id);
@@ -1103,6 +1177,7 @@ export function LeaseList({
   };
 
   const openInsight = async (key: LeaseStatFilter) => {
+    setPreviewSelection(null);
     if (workspace.enabled) {
       try {
         await workspace.ensure("scope", undefined, true);
@@ -1117,6 +1192,7 @@ export function LeaseList({
     setSelectedId(null);
   };
   const changeView = async (value: "table" | "rooms") => {
+    setPreviewSelection(null);
     if (workspace.enabled && value === "rooms") {
       try {
         await workspace.ensure("scope");
@@ -1209,122 +1285,44 @@ export function LeaseList({
     },
   ];
 
-  return (
-    <OperationalPage
-      eyebrow={locale === "zh" ? "租赁业务" : "Location"}
-      title={locale === "zh" ? "长租合同" : "Contrats de location"}
-      description={`${scopeLabel} · ${workspace.enabled ? (workspace.unavailable ? "—" : workspace.pageData?.scopeCount) : filteredByBuilding.length} ${locale === "zh" ? "份合同 · 以实际收款和未结应收为准" : "contrats · encaissements réels"}`}
-      action={
-        canCreate ? (
-          <Button size="sm" disabled={workspace.unavailable} onClick={openNew}>
-            <Plus className="h-4 w-4" />
-            {t.form.newContract}
-          </Button>
-        ) : undefined
-      }
-    >
-      <section
-        className="space-y-3 rounded-xl border bg-card p-3 sm:p-4"
-        aria-label={locale === "zh" ? "项目与楼栋" : "Projet et bâtiment"}
-      >
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-xs font-semibold text-muted-foreground">
-            {locale === "zh" ? "项目" : "Projet"}
-          </span>
-          <SegmentedControl
-            value={project?.id ?? ""}
-            onChange={changeProject}
-            ariaLabel={locale === "zh" ? "项目切换" : "Choix du projet"}
-            items={projects.map((p) => ({ value: p.id, label: projectLabel(p) }))}
-          />
-        </div>
-        <div className="flex min-w-0 items-center gap-3 border-t pt-3">
-          <span className="shrink-0 text-xs font-semibold text-muted-foreground">
-            {locale === "zh" ? "楼栋" : "Bâtiment"}
-          </span>
-          <select
-            aria-label={locale === "zh" ? "选择楼栋" : "Choisir un bâtiment"}
-            className={`${controlClass} min-w-0 flex-1 sm:hidden`}
-            value={activeBuildingId}
-            onChange={(e) => changeBuilding(e.target.value)}
-          >
-            <option value={ALL_BUILDINGS}>
-              {locale === "zh" ? "全部楼栋" : "Tous les bâtiments"}
-            </option>
-            {projectBuildings.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.display_name || b.code}
-              </option>
-            ))}
-          </select>
-          <SegmentedControl
-            value={activeBuildingId}
-            onChange={changeBuilding}
-            className="hidden min-w-0 sm:inline-flex"
-            ariaLabel={locale === "zh" ? "楼栋切换" : "Choix du bâtiment"}
-            items={[
-              { value: ALL_BUILDINGS, label: locale === "zh" ? "全部楼栋" : "Tous les bâtiments" },
-              ...projectBuildings.map((b) => ({ value: b.id, label: b.display_name || b.code })),
-            ]}
-          />
-        </div>
-      </section>
-
-      {/* ── Summary stats ── */}
-      <MetricGrid columns={5}>
-        {statBlocks.map((b) => (
-          <StatTile
-            key={b.key}
-            label={b.label}
-            value={workspace.unavailable ? "—" : b.value}
-            caption={
-              workspace.unavailable
-                ? locale === "zh"
-                  ? "读取中或暂不可核验"
-                  : "Lecture en cours ou indisponible"
-                : panel === "insight" && statFilter === b.key
-                  ? locale === "zh"
-                    ? "明细已打开"
-                    : "Détail ouvert"
-                  : b.hint
-            }
-            tone={
-              b.key === "overdue"
-                ? "red"
-                : b.key === "dueSoon"
-                  ? "amber"
-                  : b.key === "currentDue"
-                    ? "purple"
-                    : b.key === "active"
-                      ? "green"
-                      : "blue"
-            }
-            onClick={() => {
-              openInsight(b.key);
-            }}
-            active={panel === "insight" && statFilter === b.key}
-          />
-        ))}
-      </MetricGrid>
-
-      {/* ── Filter bar + new contract ── */}
-      <FilterBar
-        meta={
-          <div className="flex items-center gap-3">
-            <span>
-              {workspace.enabled
-                ? workspace.unavailable
-                  ? "—"
-                  : `${workspace.pageData?.total}/${workspace.pageData?.scopeCount}`
-                : `${filtered.length}/${filteredByBuilding.length}`}{" "}
-              {locale === "fr" ? "contrats" : "份合同"}
-            </span>
-          </div>
-        }
-      >
+  const listToolbar = (
+    <div className={styles.toolbar}>
+      <div className={styles.listHeading}>
+        <h2>
+          {contractView === "table"
+            ? locale === "zh"
+              ? "合同列表"
+              : "Liste des contrats"
+            : locale === "zh"
+              ? "楼层房源"
+              : "Lots par étage"}
+        </h2>
+        <span className={styles.listCount}>
+          {workspace.unavailable
+            ? "—"
+            : workspace.enabled
+              ? `${workspace.pageData?.total ?? 0} / ${workspace.pageData?.scopeCount ?? 0}`
+              : `${filtered.length} / ${filteredByBuilding.length}`}{" "}
+          {locale === "zh" ? "份合同" : "contrats"}
+        </span>
+      </div>
+      <ContractListControls
+        locale={locale}
+        query={search}
+        onQueryChange={(value) => {
+          setPreviewSelection(null);
+          setSearch(value);
+        }}
+        view={contractView}
+        onViewChange={changeView}
+      />
+      <div className={styles.statusRow}>
         <SegmentedControl
           value={statusFilter}
-          onChange={setStatusFilter}
+          onChange={(value) => {
+            setPreviewSelection(null);
+            setStatusFilter(value);
+          }}
           ariaLabel={locale === "zh" ? "合同状态筛选" : "Filtre statut contrat"}
           items={["current", "all", "draft", "active", "terminated", "expired"].map((value) => ({
             value,
@@ -1340,267 +1338,463 @@ export function LeaseList({
                   : t.contractStatus[value as keyof typeof t.contractStatus],
           }))}
         />
-      </FilterBar>
+        <span className={styles.scopeCaption}>
+          {locale === "zh" ? "金额统一以 XOF 展示" : "Montants en XOF"}
+        </span>
+      </div>
+    </div>
+  );
 
-      <ContractListControls
-        locale={locale}
-        query={search}
-        onQueryChange={setSearch}
-        view={contractView}
-        onViewChange={changeView}
-      />
+  return (
+    <OperationalPage
+      className={styles.workbench}
+      eyebrow="LEASE WORKSPACE"
+      title={locale === "zh" ? "长租工作台" : "Espace location"}
+      description={
+        locale === "zh"
+          ? "合同、应收与收款，在同一个工作区核对。"
+          : "Contrats, créances et encaissements réunis pour vérification."
+      }
+      action={
+        canCreate ? (
+          <Button
+            size="sm"
+            className="bg-blue-600 text-white hover:bg-blue-700"
+            disabled={workspace.unavailable}
+            onClick={openNew}
+          >
+            <Plus className="h-4 w-4" />
+            {t.form.newContract}
+          </Button>
+        ) : undefined
+      }
+    >
+      <section
+        className={styles.scopeRow}
+        aria-label={locale === "zh" ? "项目与楼栋" : "Projet et bâtiment"}
+      >
+        <div className={styles.scopeFields}>
+          <nav
+            className={styles.scopeProjects}
+            aria-label={locale === "zh" ? "项目切换" : "Choix du projet"}
+          >
+            {projects.map((p) => (
+              <button
+                type="button"
+                key={p.id}
+                aria-pressed={project?.id === p.id}
+                onClick={() => changeProject(p.id)}
+              >
+                {projectLabel(p)}
+              </button>
+            ))}
+          </nav>
+          <div className={styles.scopeBuildings}>
+            <span className={styles.scopeLabel}>{locale === "zh" ? "楼栋" : "Bâtiment"}</span>
+            <select
+              aria-label={locale === "zh" ? "选择楼栋" : "Choisir un bâtiment"}
+              className={`${controlClass} min-w-0 flex-1 sm:hidden`}
+              value={activeBuildingId}
+              onChange={(e) => changeBuilding(e.target.value)}
+            >
+              <option value={ALL_BUILDINGS}>
+                {locale === "zh" ? "全部楼栋" : "Tous les bâtiments"}
+              </option>
+              {projectBuildings.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.display_name || b.code}
+                </option>
+              ))}
+            </select>
+            <SegmentedControl
+              value={activeBuildingId}
+              onChange={changeBuilding}
+              className="hidden min-w-0 sm:inline-flex"
+              ariaLabel={locale === "zh" ? "楼栋切换" : "Choix du bâtiment"}
+              items={[
+                {
+                  value: ALL_BUILDINGS,
+                  label: locale === "zh" ? "全部楼栋" : "Tous les bâtiments",
+                },
+                ...projectBuildings.map((b) => ({ value: b.id, label: b.display_name || b.code })),
+              ]}
+            />
+          </div>
+        </div>
+        <p className={styles.scopeCaption}>{scopeLabel}</p>
+      </section>
+
+      {/* ── Summary stats ── */}
+      <section
+        className={styles.summaryStrip}
+        aria-label={locale === "zh" ? "项目与楼栋经营摘要" : "Synthèse du périmètre"}
+      >
+        {statBlocks.map((b) => (
+          <button
+            type="button"
+            key={b.key}
+            className={styles.summaryItem}
+            disabled={workspace.unavailable}
+            aria-pressed={panel === "insight" && statFilter === b.key}
+            onClick={() => {
+              void openInsight(b.key);
+            }}
+          >
+            <span className={styles.summaryLabel}>{b.label}</span>
+            <span className={styles.summaryValue}>
+              {workspace.unavailable ? "—" : b.value.replace(/\sXOF$/, "")}
+              {b.value.endsWith("XOF") && !workspace.unavailable && (
+                <span className={styles.summaryUnit}> XOF</span>
+              )}
+            </span>
+            <span className={styles.summaryHint}>
+              {workspace.unavailable
+                ? locale === "zh"
+                  ? "读取中或暂不可核验"
+                  : "Lecture en cours ou indisponible"
+                : panel === "insight" && statFilter === b.key
+                  ? locale === "zh"
+                    ? "明细已打开"
+                    : "Détail ouvert"
+                  : b.hint}
+            </span>
+          </button>
+        ))}
+      </section>
+
       {printer.error && (
         <p role="alert" className="text-sm text-destructive">
           {printer.error}
         </p>
       )}
-      {workspace.enabled && (
-        <p className="text-xs text-muted-foreground">
-          {locale === "zh"
-            ? "汇总范围：当前项目与楼栋全部合同，不随搜索、状态或分页截断。"
-            : "Synthèse : tous les contrats du projet et bâtiment, indépendante de la recherche, du statut et des pages."}
-        </p>
-      )}
-      {workspace.unavailable && (
-        <div role="status" className="rounded-xl border bg-card p-5 text-sm">
-          {workspace.error && writeConfirmed && (
-            <p>
+      <div className={cn(styles.workspaceGrid, contractView === "rooms" && styles.roomsWorkspace)}>
+        <section
+          className="min-w-0"
+          aria-label={locale === "zh" ? "合同查询区" : "Recherche de contrats"}
+        >
+          {(contractView === "rooms" || workspace.unavailable) && (
+            <div className={styles.roomsToolbar}>{listToolbar}</div>
+          )}
+          {workspace.enabled && (
+            <p className="sr-only">
               {locale === "zh"
-                ? "上一笔操作已确认成功，请勿重复提交。这里只需重试读取最新数据。"
-                : "La dernière opération est confirmée. Ne la soumettez pas de nouveau ; actualisez uniquement les données."}
+                ? "汇总范围：当前项目与楼栋全部合同，不随搜索、状态或分页截断。"
+                : "Synthèse : tous les contrats du projet et bâtiment, indépendante de la recherche, du statut et des pages."}
             </p>
           )}
-          {workspace.error
-            ? locale === "zh"
-              ? "合同数据暂不可核验，未展示旧余额或办理动作。"
-              : "Données contractuelles indisponibles ; anciens soldes et actions masqués."
-            : locale === "zh"
-              ? "正在读取合同数据…"
-              : "Lecture des contrats…"}
-          {workspace.error && (
-            <Button variant="outline" size="sm" onClick={workspace.retry}>
-              {locale === "zh" ? "重试" : "Réessayer"}
-            </Button>
+          {workspace.unavailable && (
+            <div role="status" className={styles.unavailable}>
+              {workspace.error && writeConfirmed && (
+                <p>
+                  {locale === "zh"
+                    ? "上一笔操作已确认成功，请勿重复提交。这里只需重试读取最新数据。"
+                    : "La dernière opération est confirmée. Ne la soumettez pas de nouveau ; actualisez uniquement les données."}
+                </p>
+              )}
+              {workspace.error
+                ? locale === "zh"
+                  ? "合同数据暂不可核验，未展示旧余额或办理动作。"
+                  : "Données contractuelles indisponibles ; anciens soldes et actions masqués."
+                : locale === "zh"
+                  ? "正在读取合同数据…"
+                  : "Lecture des contrats…"}
+              {workspace.error && (
+                <Button variant="outline" size="sm" onClick={workspace.retry}>
+                  {locale === "zh" ? "重试" : "Réessayer"}
+                </Button>
+              )}
+            </div>
           )}
-        </div>
-      )}
-      {!workspace.unavailable && contractView === "table" && (
-        <ContractTable
-          pagination={workspace.pagination}
-          rows={searchedTableRows}
-          locale={locale}
-          amountLabel={locale === "zh" ? "月租金" : "Loyer mensuel"}
-          periodLabel={locale === "zh" ? "合同期限 / 缴费" : "Période / paiement"}
-          onOpen={openDetail}
-          onFinance={(id) => openDetail(id, "finance")}
-          onPrint={printById}
-        />
-      )}
-
-      {/* ── Contract matrix (BusinessRoomCard) ── */}
-      {!workspace.unavailable &&
-        contractView === "rooms" &&
-        (groupedContracts.length === 0 ? (
-          <EmptyState title={t.empty} />
-        ) : (
-          groupedContracts.map(([floor, floorContracts]) => (
-            <RoomBoard
-              key={floor}
-              header={
-                <>
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-                    <h3 className="text-sm font-semibold">{floor}</h3>
-                  </div>
-                  <span className="text-[12px] font-medium text-[#5D7186]">
-                    {floorContracts.length} {locale === "fr" ? "contrats" : "份合同"}
-                  </span>
-                </>
+          {!workspace.unavailable && contractView === "table" && (
+            <LeaseWorkbenchTable
+              toolbar={listToolbar}
+              pagination={
+                workspace.pagination
+                  ? {
+                      ...workspace.pagination,
+                      onPageChange: (page) => {
+                        setPreviewSelection(null);
+                        workspace.pagination?.onPageChange(page);
+                      },
+                      onSortChange: (key, direction) => {
+                        setPreviewSelection(null);
+                        workspace.pagination?.onSortChange(key, direction);
+                      },
+                    }
+                  : undefined
               }
-            >
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-                {floorContracts.map((contract) => {
-                  const unit = unitMap.get(contract.unit_id);
-                  const customer = customerMap.get(contract.customer_id);
-                  const summary = getContractReceivableSummary(contract.id);
-                  const relatedReceivables = receivables.filter(
-                    (row) =>
-                      row.source_type === "lease_contract" &&
-                      row.source_id === contract.id &&
-                      row.status !== "cancelled" &&
-                      row.management_status !== "historical_pending" &&
-                      row.management_status !== "excluded",
-                  );
-                  const accruedRent = workspace.enabled
-                    ? (workspace.data?.accruals[contract.id] ?? null)
-                    : contract.status === "active"
-                      ? resolveLeaseOverdue({
-                          receivables: relatedReceivables,
-                          today: todayStr,
-                          paidThroughDate: contract.paid_through_date ?? null,
-                          monthlyRentXof: Number(contract.monthly_rent_xof),
-                          contractStatus: contract.status,
-                          actualEndDate: contract.actual_end_date ?? null,
-                        })
-                      : null;
-                  const displayedOutstanding = accruedRent?.amount ?? summary.outstanding;
-                  const endConfirmed = isContractEndConfirmed(contract);
-                  const daysLeft = endConfirmed
-                    ? Math.floor(
-                        (new Date(contract.expected_end_date).getTime() - Date.now()) / 86400000,
-                      )
-                    : null;
-                  const isLongTerm = endConfirmed && contract.expected_end_date >= "2099-01-01";
-                  const rent = Number(contract.monthly_rent_xof);
-                  const isManaged = unit ? isManagedLeaseUnit(unit) : false;
-                  const dataFlags = getLeaseDataFlags(contract, customer);
-                  const paidThrough = contract.paid_through_date;
-                  const paidPeriodStartsBeforeCutoff =
-                    paidThrough && contract.start_date ? contract.start_date <= paidThrough : false;
-                  const hasOverdueRent = accruedRent !== null || summary.overdue > 0;
-                  const nextRentIsFuture =
-                    !hasOverdueRent && !!summary.nextDue && summary.nextDue >= todayStr;
-                  return (
-                    <RoomCard
-                      key={contract.id}
-                      roomNo={unit?.unit_no ?? "-"}
-                      status={isManaged ? "managed" : "leased"}
-                      locale={locale}
-                      onClick={() => openDetail(contract.id)}
-                    >
-                      {/* Customer and tags */}
-                      <div className="flex min-h-[62px] flex-col justify-start gap-2">
-                        <p
-                          className="text-[13px] font-semibold leading-snug line-clamp-2 break-words"
-                          title={customer?.name ?? (locale === "zh" ? "无客户" : "Sans client")}
-                        >
-                          {customer?.name ?? "—"}
-                        </p>
-                        <div className="flex min-h-5 flex-wrap items-center gap-1.5">
-                          {isManaged && (
-                            <Badge
-                              variant="success"
-                              className="h-5 bg-white/70 px-2 text-[10px] text-[#217365]"
-                            >
-                              {locale === "zh" ? "代管" : "Gestion"}
-                            </Badge>
-                          )}
-                          {dataFlags.needsData && (
-                            <Badge variant="warning" className="h-5 px-2 text-[10px]">
-                              {locale === "zh" ? "资料待补" : "A compléter"}
-                            </Badge>
-                          )}
-                          <Badge
-                            variant={statusVariant[contract.status]}
-                            className="h-5 px-2 text-[10px]"
-                          >
-                            {t.contractStatus[contract.status as keyof typeof t.contractStatus]}
-                          </Badge>
-                        </div>
+              rows={searchedTableRows}
+              selectedId={previewId}
+              onSelect={selectPreview}
+              onVisibleIdsChange={syncVisiblePreview}
+              locale={locale}
+              amountLabel={locale === "zh" ? "月租金" : "Loyer mensuel"}
+              periodLabel={locale === "zh" ? "合同期限 / 缴费" : "Période / paiement"}
+              onOpen={openDetail}
+              onFinance={(id) => openDetail(id, "finance")}
+              onPrint={printById}
+            />
+          )}
+
+          {/* ── Contract matrix (BusinessRoomCard) ── */}
+          {!workspace.unavailable &&
+            contractView === "rooms" &&
+            (groupedContracts.length === 0 ? (
+              <EmptyState title={t.empty} />
+            ) : (
+              groupedContracts.map(([floor, floorContracts]) => (
+                <RoomBoard
+                  key={floor}
+                  header={
+                    <>
+                      <div className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+                        <h3 className="text-sm font-semibold">{floor}</h3>
                       </div>
-                      {/* Rent + expiry */}
-                      <div className="min-h-[50px] text-[11px] leading-relaxed text-[#5D7186]">
-                        <p className="tabular-nums">
-                          {rent > 0
-                            ? formatXof(rent)
-                            : locale === "zh"
-                              ? "租金未录入"
-                              : "Loyer non saisi"}
-                        </p>
-                        {paidThrough ? (
-                          <p
-                            className={cn(
-                              "tabular-nums font-medium",
-                              isPaidThroughOverdue(contract) ? "text-red-600" : "text-emerald-700",
-                            )}
-                          >
-                            {paidPeriodStartsBeforeCutoff ? (
-                              <>
-                                {locale === "zh" ? "缴费期" : "Période payée"} {contract.start_date}{" "}
-                                → {paidThrough}
-                              </>
-                            ) : (
-                              <>
-                                {locale === "zh" ? "已缴至" : "Payé au"} {paidThrough}
-                              </>
-                            )}
-                          </p>
-                        ) : (
-                          <p className="tabular-nums">
-                            {contract.start_date ?? (locale === "zh" ? "待确认" : "À confirmer")} →{" "}
-                            {!endConfirmed
-                              ? locale === "zh"
-                                ? "缴租截至日待补"
-                                : "Paiement à compléter"
-                              : isLongTerm
-                                ? locale === "zh"
-                                  ? "长期有效"
-                                  : "Long terme"
-                                : contract.expected_end_date}
-                            {endConfirmed &&
-                              !isLongTerm &&
-                              daysLeft !== null &&
-                              daysLeft >= 0 &&
-                              daysLeft <= 30 && (
-                                <span className="ml-1 text-amber-600 font-medium">
-                                  ({daysLeft}j)
-                                </span>
-                              )}
-                          </p>
-                        )}
-                      </div>
-                      {/* Outstanding alert */}
-                      {displayedOutstanding > 0 && (
-                        <p
-                          className={cn(
-                            "text-[11px] font-medium leading-tight",
-                            hasOverdueRent ? "text-red-600" : "text-[#5D7186]",
-                          )}
-                        >
-                          {hasOverdueRent
-                            ? accruedRent?.source === "contract"
-                              ? locale === "zh"
-                                ? "合同估算待核"
-                                : "Estimation à vérifier"
-                              : locale === "zh"
-                                ? "逾期未收"
-                                : "Impayé"
-                            : nextRentIsFuture
-                              ? locale === "zh"
-                                ? "下期应收"
-                                : "Prochaine échéance"
-                              : locale === "zh"
-                                ? "待收"
-                                : "Dû"}
-                          : {formatXof(displayedOutstanding)}
-                          {nextRentIsFuture ? ` · ${summary.nextDue}` : ""}
-                        </p>
-                      )}
-                      {/* Action buttons */}
-                      <div className="mt-auto flex justify-center gap-5 border-t border-[rgba(23,50,77,0.06)] pt-3">
-                        <ActionBtn
-                          icon={Eye}
-                          label={locale === "zh" ? "查看详情" : "Voir les détails"}
+                      <span className="text-[12px] font-medium text-[#5D7186]">
+                        {floorContracts.length} {locale === "fr" ? "contrats" : "份合同"}
+                      </span>
+                    </>
+                  }
+                >
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+                    {floorContracts.map((contract) => {
+                      const unit = unitMap.get(contract.unit_id);
+                      const customer = customerMap.get(contract.customer_id);
+                      const summary = getContractReceivableSummary(contract.id);
+                      const relatedReceivables = receivables.filter(
+                        (row) =>
+                          row.source_type === "lease_contract" &&
+                          row.source_id === contract.id &&
+                          row.status !== "cancelled" &&
+                          row.management_status !== "historical_pending" &&
+                          row.management_status !== "excluded",
+                      );
+                      const accruedRent = workspace.enabled
+                        ? (workspace.data?.accruals[contract.id] ?? null)
+                        : contract.status === "active"
+                          ? resolveLeaseOverdue({
+                              receivables: relatedReceivables,
+                              today: todayStr,
+                              paidThroughDate: contract.paid_through_date ?? null,
+                              monthlyRentXof: Number(contract.monthly_rent_xof),
+                              contractStatus: contract.status,
+                              actualEndDate: contract.actual_end_date ?? null,
+                            })
+                          : null;
+                      const displayedOutstanding = accruedRent?.amount ?? summary.outstanding;
+                      const endConfirmed = isContractEndConfirmed(contract);
+                      const daysLeft = endConfirmed
+                        ? Math.floor(
+                            (new Date(contract.expected_end_date).getTime() - Date.now()) /
+                              86400000,
+                          )
+                        : null;
+                      const isLongTerm = endConfirmed && contract.expected_end_date >= "2099-01-01";
+                      const rent = Number(contract.monthly_rent_xof);
+                      const isManaged = unit ? isManagedLeaseUnit(unit) : false;
+                      const dataFlags = getLeaseDataFlags(contract, customer);
+                      const paidThrough = contract.paid_through_date;
+                      const paidPeriodStartsBeforeCutoff =
+                        paidThrough && contract.start_date
+                          ? contract.start_date <= paidThrough
+                          : false;
+                      const hasOverdueRent = accruedRent !== null || summary.overdue > 0;
+                      const nextRentIsFuture =
+                        !hasOverdueRent && !!summary.nextDue && summary.nextDue >= todayStr;
+                      return (
+                        <RoomCard
+                          key={contract.id}
+                          roomNo={unit?.unit_no ?? "-"}
+                          status={isManaged ? "managed" : "leased"}
+                          locale={locale}
                           onClick={() => openDetail(contract.id)}
-                        />
-                        <ActionBtn
-                          icon={DollarSign}
-                          label={locale === "zh" ? "查看财务" : "Voir les finances"}
-                          onClick={() => openDetail(contract.id, "finance")}
-                        />
-                        <ActionBtn
-                          icon={FileText}
-                          label={locale === "zh" ? "合同/打印" : "Contrat / imprimer"}
-                          onClick={() => printById(contract.id)}
-                        />
-                      </div>
-                    </RoomCard>
-                  );
-                })}
-              </div>
-            </RoomBoard>
-          ))
-        ))}
+                        >
+                          {/* Customer and tags */}
+                          <div className="flex min-h-[62px] flex-col justify-start gap-2">
+                            <p
+                              className="text-[13px] font-semibold leading-snug line-clamp-2 break-words"
+                              title={customer?.name ?? (locale === "zh" ? "无客户" : "Sans client")}
+                            >
+                              {customer?.name ?? "—"}
+                            </p>
+                            <div className="flex min-h-5 flex-wrap items-center gap-1.5">
+                              {isManaged && (
+                                <Badge
+                                  variant="success"
+                                  className="h-5 bg-white/70 px-2 text-[10px] text-[#217365]"
+                                >
+                                  {locale === "zh" ? "代管" : "Gestion"}
+                                </Badge>
+                              )}
+                              {dataFlags.needsData && (
+                                <Badge variant="warning" className="h-5 px-2 text-[10px]">
+                                  {locale === "zh" ? "资料待补" : "A compléter"}
+                                </Badge>
+                              )}
+                              <Badge
+                                variant={statusVariant[contract.status]}
+                                className="h-5 px-2 text-[10px]"
+                              >
+                                {t.contractStatus[contract.status as keyof typeof t.contractStatus]}
+                              </Badge>
+                            </div>
+                          </div>
+                          {/* Rent + expiry */}
+                          <div className="min-h-[50px] text-[11px] leading-relaxed text-[#5D7186]">
+                            <p className="tabular-nums">
+                              {rent > 0
+                                ? formatXof(rent)
+                                : locale === "zh"
+                                  ? "租金未录入"
+                                  : "Loyer non saisi"}
+                            </p>
+                            {paidThrough ? (
+                              <p
+                                className={cn(
+                                  "tabular-nums font-medium",
+                                  isPaidThroughOverdue(contract)
+                                    ? "text-red-600"
+                                    : "text-emerald-700",
+                                )}
+                              >
+                                {paidPeriodStartsBeforeCutoff ? (
+                                  <>
+                                    {locale === "zh" ? "缴费期" : "Période payée"}{" "}
+                                    {contract.start_date} → {paidThrough}
+                                  </>
+                                ) : (
+                                  <>
+                                    {locale === "zh" ? "已缴至" : "Payé au"} {paidThrough}
+                                  </>
+                                )}
+                              </p>
+                            ) : (
+                              <p className="tabular-nums">
+                                {contract.start_date ??
+                                  (locale === "zh" ? "待确认" : "À confirmer")}{" "}
+                                →{" "}
+                                {!endConfirmed
+                                  ? locale === "zh"
+                                    ? "缴租截至日待补"
+                                    : "Paiement à compléter"
+                                  : isLongTerm
+                                    ? locale === "zh"
+                                      ? "长期有效"
+                                      : "Long terme"
+                                    : contract.expected_end_date}
+                                {endConfirmed &&
+                                  !isLongTerm &&
+                                  daysLeft !== null &&
+                                  daysLeft >= 0 &&
+                                  daysLeft <= 30 && (
+                                    <span className="ml-1 text-amber-600 font-medium">
+                                      ({daysLeft}j)
+                                    </span>
+                                  )}
+                              </p>
+                            )}
+                          </div>
+                          {/* Outstanding alert */}
+                          {displayedOutstanding > 0 && (
+                            <p
+                              className={cn(
+                                "text-[11px] font-medium leading-tight",
+                                hasOverdueRent ? "text-red-600" : "text-[#5D7186]",
+                              )}
+                            >
+                              {hasOverdueRent
+                                ? accruedRent?.source === "contract"
+                                  ? locale === "zh"
+                                    ? "合同估算待核"
+                                    : "Estimation à vérifier"
+                                  : locale === "zh"
+                                    ? "逾期未收"
+                                    : "Impayé"
+                                : nextRentIsFuture
+                                  ? locale === "zh"
+                                    ? "下期应收"
+                                    : "Prochaine échéance"
+                                  : locale === "zh"
+                                    ? "待收"
+                                    : "Dû"}
+                              : {formatXof(displayedOutstanding)}
+                              {nextRentIsFuture ? ` · ${summary.nextDue}` : ""}
+                            </p>
+                          )}
+                          {/* Action buttons */}
+                          <div className="mt-auto flex justify-center gap-5 border-t border-[rgba(23,50,77,0.06)] pt-3">
+                            <ActionBtn
+                              icon={Eye}
+                              label={locale === "zh" ? "查看详情" : "Voir les détails"}
+                              onClick={() => openDetail(contract.id)}
+                            />
+                            <ActionBtn
+                              icon={DollarSign}
+                              label={locale === "zh" ? "查看财务" : "Voir les finances"}
+                              onClick={() => openDetail(contract.id, "finance")}
+                            />
+                            <ActionBtn
+                              icon={FileText}
+                              label={locale === "zh" ? "合同/打印" : "Contrat / imprimer"}
+                              onClick={() => printById(contract.id)}
+                            />
+                          </div>
+                        </RoomCard>
+                      );
+                    })}
+                  </div>
+                </RoomBoard>
+              ))
+            ))}
+
+          <p className={styles.summaryExplanation}>
+            {locale === "zh"
+              ? "上方摘要覆盖当前项目与楼栋的全部合同，不随搜索、状态或分页截断。月租规模不是实收；15 天内跟进含缴费提醒，不等于合同到期。"
+              : "La synthèse couvre tous les contrats du périmètre, sans limitation de recherche, statut ou page. Le loyer mensuel n'est pas un encaissement ; les rappels de paiement ne sont pas des fins de bail."}
+          </p>
+        </section>
+        {contractView === "table" && (
+          <div className={styles.inspectorColumn} ref={previewColumnRef} tabIndex={-1}>
+            <LeaseWorkbenchInspector
+              contract={previewContract}
+              unit={previewUnit}
+              customer={previewCustomer}
+              buildingLabel={buildingMap.get(previewUnit?.building_id ?? "")?.display_name}
+              summary={
+                previewId
+                  ? workspace.enabled
+                    ? preview.data?.summaries[previewId]
+                    : contractSummaryMap.get(previewId)
+                  : null
+              }
+              payments={previewPayments}
+              receivables={previewReceivables}
+              locale={locale}
+              today={workspace.pageData?.today ?? todayStr}
+              loading={Boolean(previewId && preview.loading)}
+              error={Boolean(previewId && preview.error)}
+              onOpen={(section) => {
+                if (previewId) void openDetail(previewId, section ?? "overview");
+              }}
+              onPrint={() => {
+                if (previewId) void printById(previewId);
+              }}
+              onClose={() => setPreviewSelection(null)}
+            />
+            {previewId && preview.error && (
+              <Button
+                className={styles.previewRetry}
+                variant="outline"
+                size="sm"
+                onClick={preview.retry}
+              >
+                {locale === "zh" ? "重试预览" : "Réessayer l'aperçu"}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* ── KPI insight panel ── */}
       {!workspace.unavailable &&

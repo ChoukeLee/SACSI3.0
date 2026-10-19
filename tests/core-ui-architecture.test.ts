@@ -36,14 +36,23 @@ describe("core UI architecture", () => {
     expect(sidebar.indexOf('key: "leases"')).toBeLessThan(sidebar.indexOf('key: "dailyRentals"'));
   });
 
-  it("uses shared page, metric and drawer components across core business pages", () => {
+  it("keeps shared business shells while long leases use the selected table-and-preview workbench", () => {
     const lease = read("src/features/leases/lease-list.tsx");
     const sale = read("src/features/sales/sale-list.tsx");
     const units = read("src/features/units/unit-list.tsx");
     const dailyPanel = read("src/features/daily-rentals/booking-panel.tsx");
 
     expect(lease).toContain("<OperationalPage");
-    expect(lease).toContain("<MetricGrid");
+    expect(lease).toContain("<RightDrawer");
+    expect(lease).toContain("<LeaseWorkbenchTable");
+    expect(lease).toContain("<LeaseWorkbenchInspector");
+    expect(
+      /useLeaseWorkbenchPreview\(\s*workspace\.query,\s*previewId,\s*previewSelection\?\.version\s*\)/.test(
+        lease,
+      ),
+    ).toBe(true);
+    expect(lease).toContain("onSelect={selectPreview}");
+    expect(lease).toContain("onOpen={openDetail}");
     expect(sale).toContain("<OperationalPage");
     expect(sale).toContain("<MetricGrid");
     expect(units).toContain("<OperationalPage");
