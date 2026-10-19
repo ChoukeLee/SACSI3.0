@@ -7,6 +7,7 @@ import { formatXof } from "@/lib/utils";
 import { parseFinanceRead, type FinanceReadResult } from "./finance-read";
 import { ManualEntryForm } from "./manual-entry-form";
 import { PaymentContextPanel } from "./payment-context-panel";
+import { CimacExportActions } from "./cimac-export-actions";
 import {
   directionDisplayLabel,
   financialBusinessLabel,
@@ -302,6 +303,7 @@ export async function FinanceWorkspace({
           {zh ? "导出完整筛选结果" : "Exporter les résultats"}
         </a>
       </form>
+      <CimacExportActions kind={query.kind} filters={query.filters} locale={locale} />
       <div className="grid gap-3 sm:grid-cols-4">
         {summaries.map(([key, label]) => (
           <div key={key} className="rounded-xl border bg-card p-4">
