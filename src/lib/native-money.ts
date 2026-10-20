@@ -52,3 +52,8 @@ export function financeRowMoney(row: { currency?: unknown; amount_native?: unkno
   const native = row.amount_native != null;
   return { currency: native ? String(row.currency) : "XOF", amount: Number(row[paid ? (native ? "paid_amount_native" : "paid_amount_xof") : (native ? "amount_native" : "amount_xof")]) };
 }
+
+export function financeRowLabel(row: Parameters<typeof financeRowMoney>[0], locale: "zh" | "fr", paid = false) {
+  const value = financeRowMoney(row, paid);
+  return `${formatMoney(value.amount, value.currency, locale)}${value.currency === "XOF" ? "" : ` ${value.currency}`}`;
+}

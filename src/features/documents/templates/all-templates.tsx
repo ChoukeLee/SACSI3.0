@@ -1,6 +1,8 @@
 "use client";
 
 import { formatXof } from "@/lib/utils";
+import { leaseRentLabel } from "@/lib/native-money";
+import type { LeaseContractRow } from "@/types/database";
 import { paymentPlanDisplayLabel, statusDisplayLabel } from "@/lib/display-labels";
 import type { DocumentRecord, Locale } from "../types";
 
@@ -152,7 +154,7 @@ export function printLeaseContractDoc(data: DocumentRecord, locale: Locale) {
       [L.startDate, String(c.start_date ?? "-")],
       [L.endDate, String(c.expected_end_date ?? "-")],
       [L.paymentCycle, `${cycleLabels[String(c.payment_cycle ?? "")] ?? c.payment_cycle} / ${c.payment_day ?? "-"}号`],
-      [L.monthlyRent, formatXof(Number(c.monthly_rent_xof ?? 0))],
+      [L.monthlyRent, leaseRentLabel(c as unknown as LeaseContractRow, locale)],
       [L.deposit, `${formatXof(Number(c.deposit_amount_xof ?? 0))} ${c.deposit_received ? (locale === "zh" ? "✓已收" : "✓Recu") : (locale === "zh" ? "未收" : "Non recu")}`],
       [(locale === "zh" ? "合同状态" : "Statut"), statusBadge(data.status, L.statusLabels, locale)],
     ])}

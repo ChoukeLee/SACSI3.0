@@ -1,5 +1,6 @@
 "use client";
-import { leaseRentLabel } from "@/lib/native-money";
+import { leaseRentLabel, financeRowMoney, financeRowLabel } from "@/lib/native-money";
+import { formatMoney } from "@/lib/currency";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -553,7 +554,11 @@ export function UnitProfileView({
                 </thead>
                 <tbody className="divide-y">
                   {receivablePage.rows.map((row) => {
-                    const balance = receivableOutstanding(row);
+                    const value = financeRowMoney(row);
+                    const balance =
+                      row.amount_native != null
+                        ? Math.max(0, value.amount - financeRowMoney(row, true).amount)
+                        : receivableOutstanding(row);
                     return (
                       <tr
                         key={row.id}
@@ -576,11 +581,9 @@ export function UnitProfileView({
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 tabular-nums">
-                          {formatXof(Number(row.amount_xof))}
-                        </td>
+                        <td className="px-4 py-3 tabular-nums">{financeRowLabel(row, locale)}</td>
                         <td className="px-4 py-3 tabular-nums text-emerald-700">
-                          {formatXof(Number(row.paid_amount_xof))}
+                          {financeRowLabel(row, locale, true)}
                         </td>
                         <td
                           className={cn(
@@ -588,7 +591,8 @@ export function UnitProfileView({
                             balance > 0 && "text-red-700",
                           )}
                         >
-                          {formatXof(balance)}
+                          {formatMoney(balance, value.currency, locale)}{" "}
+                          {value.currency === "XOF" ? "" : value.currency}
                         </td>
                       </tr>
                     );

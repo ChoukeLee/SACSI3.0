@@ -40,7 +40,11 @@ export function isReceivableOverdue(
   asOfDate: string = todayIso(),
 ): boolean {
   if (receivable.status === "cancelled" || receivable.status === "paid") return false;
-  if (receivableOutstanding(receivable) <= 0) return false;
+  const balance =
+    receivable.amount_native != null
+      ? Number(receivable.amount_native) - Number(receivable.paid_amount_native)
+      : receivableOutstanding(receivable);
+  if (balance <= 0) return false;
   return receivable.due_date < asOfDate;
 }
 

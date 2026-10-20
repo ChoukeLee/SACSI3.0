@@ -1,5 +1,6 @@
 "use client";
-import { leaseRentLabel } from "@/lib/native-money";
+import { leaseRentLabel, financeRowMoney, financeRowLabel } from "@/lib/native-money";
+import { formatMoney } from "@/lib/currency";
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
@@ -554,7 +555,11 @@ function FinanceTab({
           </thead>
           <tbody className="divide-y">
             {receivablePage.rows.map((r) => {
-              const outstanding = receivableOutstanding(r);
+              const value = financeRowMoney(r);
+              const outstanding =
+                r.amount_native != null
+                  ? Math.max(0, value.amount - financeRowMoney(r, true).amount)
+                  : receivableOutstanding(r);
               return (
                 <tr
                   key={r.id}
@@ -568,10 +573,10 @@ function FinanceTab({
                     {financialBusinessLabel(r.source_type, locale, r.category)}
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums font-medium">
-                    {formatXof(Number(r.amount_xof))}
+                    {financeRowLabel(r, locale)}
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600 font-medium">
-                    {formatXof(Number(r.paid_amount_xof))}
+                    {financeRowLabel(r, locale, true)}
                   </td>
                   <td className="px-4 py-2.5">
                     <Badge
@@ -590,7 +595,7 @@ function FinanceTab({
                           ? "未纳管 · 不计指标"
                           : "Hors suivi · exclu des indicateurs"
                         : outstanding > 0
-                          ? formatXof(outstanding)
+                          ? `${formatMoney(outstanding, value.currency, locale)} ${value.currency}`
                           : L.settled}
                     </Badge>
                   </td>

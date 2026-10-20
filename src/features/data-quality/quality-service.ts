@@ -5,6 +5,7 @@ import type {
 import type { QualityIssue, QualityCategory, QualitySeverity, TodoRole } from "./quality-types";
 import { CATEGORY_ROLES } from "./quality-types";
 import { statusDisplayLabel } from "@/lib/display-labels";
+import { financeRowMoney, nativeLease } from "@/lib/native-money";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -255,7 +256,7 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
       `合同缺少到期日期 ${lc.contract_no}`, `合同 ${lc.contract_no} 缺少 expected_end_date`, "补充到期日期",
       "lease_contract", lc.id, label, [], "/leases",
     ));
-    if (!Number(lc.monthly_rent_xof) || Number(lc.monthly_rent_xof) <= 0) issues.push(issue(
+    if (!((nativeLease(lc) ? Number(lc.monthly_rent_amount) : Number(lc.monthly_rent_xof)) > 0)) issues.push(issue(
       `lease_missing_rent_${lc.id}`, "high", "lease",
       `合同缺少月租金 ${lc.contract_no}`, `合同 ${lc.contract_no} 月租为空或≤0`, "补充月租金",
       "lease_contract", lc.id, label, [], "/leases",
@@ -357,8 +358,8 @@ export function runQualityChecks(data: DataSnapshot, role?: TodoRole): QualityIs
   // ── Finance: amount anomalies ──
   for (const r of data.receivables) {
     if (r.status === "cancelled") continue;
-    const amount = Number(r.amount_xof);
-    const paid = Number(r.paid_amount_xof);
+    const amount = financeRowMoney(r).amount;
+    const paid = financeRowMoney(r, true).amount;
 
     if (amount <= 0) issues.push(issue(
       `rec_negative_${r.id}`, "high", "finance", `应收金额异常 ${r.title}`,

@@ -34,7 +34,8 @@ create function private.guard_native_lease_money() returns trigger
 language plpgsql security invoker set search_path='' as $$
 declare c public.lease_contracts%rowtype;
 begin
- if tg_table_name='payments' and new.source_type='lease_rent' then
+ if tg_table_name='payments' then
+  if new.source_type='lease_rent' then
   select * into c from public.lease_contracts where id=new.source_id;
   if c.rent_currency<>'XOF' and (not new.native_settlement or new.currency<>c.rent_currency) then
    raise exception 'nativeLeaseCurrencyRequired';
@@ -42,10 +43,13 @@ begin
   if new.native_settlement and (c.id is null or c.rent_currency<>new.currency) then
    raise exception 'nativeLeaseCurrencyMismatch';
   end if;
- elsif tg_table_name='receivables' and new.source_type='lease_contract' and new.category='lease_rent' then
+  end if;
+ elsif tg_table_name='receivables' then
+  if new.source_type='lease_contract' and new.category='lease_rent' then
   select * into c from public.lease_contracts where id=new.source_id;
   if c.rent_currency<>'XOF' and (new.currency<>c.rent_currency or new.amount_native is null) then
    raise exception 'nativeLeaseReceivableRequired';
+  end if;
   end if;
  end if;
  return new;
