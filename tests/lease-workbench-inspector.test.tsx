@@ -87,7 +87,6 @@ async function render(overrides: Partial<LeaseWorkbenchInspectorProps> = {}) {
     locale: "zh",
     today: "2026-10-19",
     buildingLabel: "测试楼栋",
-    onOpen: vi.fn(),
     onPrint: vi.fn(),
     ...overrides,
   };
@@ -107,7 +106,7 @@ function fact(name: string) {
     ?.nextElementSibling?.textContent;
 }
 
-describe("LeaseWorkbenchInspector read-only preview", () => {
+describe("LeaseWorkbenchInspector single contract dossier", () => {
   it("offers a separate exact-contract collection route only when a permitted caller supplies it", async () => {
     const href = "/leases/11111111-1111-4111-8111-111111111111/collect";
     await render({ collectionHref: href });
@@ -253,8 +252,9 @@ describe("LeaseWorkbenchInspector read-only preview", () => {
     expect(host.textContent).toContain("实收人: 已核实收人");
   });
 
-  it("keeps full-detail and print actions separate and supports keyboard tab navigation", async () => {
-    const props = await render();
+  it("keeps focused operations in the dossier and supports keyboard tab navigation", async () => {
+    const manage = vi.fn();
+    const props = await render({ actions: <button onClick={manage}>办理本合同</button> });
     const clickText = async (label: string) => {
       const button = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
         (item) => item.textContent === label,
@@ -262,8 +262,9 @@ describe("LeaseWorkbenchInspector read-only preview", () => {
       if (!button) throw new Error(`Missing action ${label}`);
       await act(async () => button.click());
     };
-    await clickText("打开合同详情 / 办理");
-    expect(props.onOpen).toHaveBeenLastCalledWith("overview");
+    expect(host.textContent).not.toContain("打开合同详情 / 办理");
+    await clickText("办理本合同");
+    expect(manage).toHaveBeenCalledTimes(1);
     const contractTab = host.querySelector<HTMLButtonElement>(
       '[role="tab"][aria-selected="true"]',
     )!;
@@ -272,8 +273,7 @@ describe("LeaseWorkbenchInspector read-only preview", () => {
     );
     expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("账务");
     expect(document.activeElement?.textContent).toBe("账务");
-    await clickText("打开完整财务记录");
-    expect(props.onOpen).toHaveBeenLastCalledWith("finance");
+    expect(host.textContent).not.toContain("打开完整财务记录");
     await clickText("合同 / 打印");
     expect(props.onPrint).toHaveBeenCalledTimes(1);
     await render({ contract: { ...contract, id: "lease-2", contract_no: "TEST-LEASE-002" } });
@@ -338,16 +338,77 @@ describe("LeaseWorkbenchInspector read-only preview", () => {
     }
   });
 
-  it("keeps follow-up suggestions French and read-only without changing the original action", async () => {
-    const props = await render({ locale: "fr" });
+  it("keeps follow-up suggestions French and read-only without another full-detail link", async () => {
+    await render({ locale: "fr" });
     const suggestion = host.querySelector('section[aria-label="Prochaine étape suggérée"]');
     expect(suggestion?.textContent).toContain("Confirmer la suite du bail");
     expect(suggestion?.querySelector("button")).toBeNull();
-    expect(props.onOpen).not.toHaveBeenCalled();
-    const open = [...host.querySelectorAll<HTMLButtonElement>("button")].find((button) =>
-      button.textContent?.includes("Ouvrir le dossier / Gérer"),
+    expect(host.textContent).not.toContain("Ouvrir le dossier / Gérer");
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("preserves the complete record history, original currency evidence and contract terms", async () => {
+    await render({
+      contract: { ...contract, rent_free_days: 15, signer_name: "Test signer", payment_day: 5 },
+      payments: Array.from({ length: 8 }, (_, index) =>
+        payment({
+          id: `history-${index}`,
+          receipt_no: `RECEIPT-${index}`,
+          notes:
+            index === 7
+              ? "original_currency=USD;original_amount=250;original_period_months=1"
+              : null,
+        }),
+      ),
+    });
+    expect(fact("免租天数")).toBe("15");
+    expect(fact("签约人")).toBe("Test signer");
+    expect(fact("约定付款日")).toContain("5");
+    await tab("记录");
+    expect(host.querySelectorAll("ol li")).toHaveLength(8);
+    expect(host.textContent).toContain("RECEIPT-7");
+    expect(host.textContent).toContain("$250");
+    expect(host.textContent).not.toContain("仅显示最近 6 笔");
+  });
+
+  it("opens the requested finance section without an intermediate dossier", async () => {
+    await render({ initialSection: "finance", financeTools: <button>更正租金账期</button> });
+    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("账务");
+    expect(host.querySelector('[aria-label="账务办理"]')?.textContent).toContain("更正租金账期");
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("does not mark native refunds, reversals or non-cash offsets as positive cash receipts", async () => {
+    await render({
+      payments: [
+        payment({
+          id: "native-refund",
+          source_type: "lease_rent_refund",
+          currency: "USD",
+          amount: 50,
+          native_settlement: true,
+        }),
+        payment({
+          id: "offset",
+          source_type: "lease_deposit_deduction",
+          payment_method: "offset",
+          amount: 200,
+        }),
+        payment({ id: "reversal", reversal_of_payment_id: "original", amount: 300 }),
+        payment({ id: "receipt", amount: 400 }),
+        payment({ id: "refund", source_type: "lease_rent_refund", amount: 500 }),
+      ],
+    });
+    await tab("记录");
+    const amounts = [...host.querySelectorAll("ol li")].map(
+      (item) => item.querySelector(":scope > p")?.textContent,
     );
-    await act(async () => open!.click());
-    expect(props.onOpen).toHaveBeenCalledWith("overview");
+    expect(amounts).toContain("$50 USD");
+    expect(amounts).toContain("200 XOF");
+    expect(amounts).toContain("300 XOF");
+    expect(amounts).toContain("+400 XOF");
+    expect(amounts).toContain("−500 XOF");
+    expect(host.textContent).toContain("原币结算");
+    expect(host.textContent).toContain("非现金抵扣");
   });
 });

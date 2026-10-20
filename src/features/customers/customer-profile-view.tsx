@@ -2,22 +2,23 @@
 import { leaseRentLabel, financeRowMoney, financeRowLabel } from "@/lib/native-money";
 import { formatMoney } from "@/lib/currency";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useId, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Phone,
   AlertTriangle,
   BedDouble,
   Home,
   CreditCard,
-  Receipt,
   Printer,
+  ArrowLeft,
   ArrowRight,
-  User,
+  Pencil,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
-import { safeWorkbenchReturnTo } from "@/lib/workbench-links";
+import { buildWorkbenchRecordHref, safeWorkbenchReturnTo } from "@/lib/workbench-links";
 import { formatXof, cn } from "@/lib/utils";
 import { paymentDisplay } from "@/lib/currency";
 import {
@@ -31,13 +32,14 @@ import { financialBusinessLabel, statusDisplayLabel } from "@/lib/display-labels
 import { ProfileAuditTimeline } from "@/features/profiles/audit-timeline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { printDocumentRecord } from "@/features/documents/templates/all-templates";
 import { ReceiptThumb } from "@/components/attachments/receipt-thumb";
-import { SegmentedControl } from "@/components/ui/operational";
 import type { DocumentRecord } from "@/features/documents/types";
 import type { CustomerProfileData } from "./customer-profile-service";
+import { CustomerWorkbenchForm } from "./customer-workbench-form";
+import workbench from "./customer-workbench.module.css";
+import styles from "./customer-profile-workspace.module.css";
 
 type Tab =
   "overview" | "daily" | "agent" | "unresolved" | "lease" | "sale" | "finance" | "docs" | "audit";
@@ -50,12 +52,21 @@ interface Props {
   returnTo?: string | null;
 }
 
-export function CustomerProfileView({ data, locale, userRole, returnTo }: Props) {
-  void userRole;
-  const { customer } = data;
-  const [tab, setTab] = useState<Tab>("overview");
+export function CustomerProfileView(props: Props) {
+  return <CustomerProfile key={props.data.customer.id} {...props} />;
+}
 
-  const L = labels(locale);
+function CustomerProfile({ data, locale, userRole, returnTo }: Props) {
+  const router = useRouter();
+  const { customer } = data;
+  const [requestedTab, setTab] = useState<Tab>("overview");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [refreshing, startRefresh] = useTransition();
+  const panelId = useId();
+  const canEdit = ["admin", "finance", "rental_sales"].includes(userRole);
+  const backHref = safeWorkbenchReturnTo(returnTo) ?? routeFor(locale, "/customers");
+
+  const L = useMemo(() => labels(locale), [locale]);
 
   const stats = useMemo(() => {
     const finance = computeFinanceMetrics(data.receivables);
@@ -188,188 +199,229 @@ export function CustomerProfileView({ data, locale, userRole, returnTo }: Props)
     { key: "docs", label: L.docs, count: documents.length },
     { key: "audit", label: L.audit, count: data.auditLogs.length },
   ];
+  const tab = tabs.some((item) => item.key === requestedTab) ? requestedTab : "overview";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
-      {/* ── Header ── */}
-      <Card>
-        <CardContent className="flex flex-col gap-5 p-6 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-xl font-semibold">{customer.name}</h1>
-              <CustomerStatusBadge status={customerStatus} labels={L} locale={locale} />
-              {customer.is_blacklisted && <AlertTriangle className="h-5 w-5 text-red-500" />}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
-              {customer.phone && (
-                <span className="inline-flex items-center gap-1.5">
-                  <Phone className="h-4 w-4" />
-                  {customer.phone}
-                </span>
-              )}
-              {customer.gender && (
-                <span>
-                  <span className="text-muted-foreground">{L.gender}:</span>{" "}
-                  {customer.gender === "male"
-                    ? L.male
-                    : customer.gender === "female"
-                      ? L.female
-                      : L.other}
-                </span>
-              )}
-              {customer.document_type && (
-                <span>
-                  <span className="text-muted-foreground">{L.docType}:</span>{" "}
-                  {customer.document_type === "id_card"
-                    ? L.idCard
-                    : customer.document_type === "passport"
-                      ? L.passport
-                      : customer.document_type === "drivers_license"
-                        ? L.driversLicense
-                        : customer.document_type}
-                </span>
-              )}
-              {customer.notes && <span className="text-muted-foreground">{customer.notes}</span>}
-            </div>
-            <div className="mt-4 flex gap-3 text-sm">
-              <span>
-                <span className="text-muted-foreground">{L.currentBusiness}:</span>{" "}
-                <strong>{businessSummary(stats, L)}</strong>
-              </span>
-            </div>
+    <div className={`${workbench.workbench} ${styles.workspace}`} aria-busy={refreshing}>
+      <Link prefetch={false} href={backHref} className={styles.back}>
+        <ArrowLeft size={13} aria-hidden="true" />
+        {L.backToList}
+      </Link>
+      <header className={workbench.heading}>
+        <div>
+          <p className={workbench.eyebrow}>CUSTOMER DOSSIER</p>
+          <div className={styles.title}>
+            <h1>{customer.name}</h1>
+            <CustomerStatusBadge status={customerStatus} labels={L} locale={locale} />
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm">
-              <Link href={routeFor(locale, "/daily-rentals")}>
-                <BedDouble className="h-4 w-4" />
-                {L.newBooking}
-              </Link>
-            </Button>
-            <Button asChild size="sm" variant="secondary">
-              <Link href={routeFor(locale, "/leases")}>
-                <Home className="h-4 w-4" />
-                {L.newLease}
-              </Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link href={routeFor(locale, "/sales")}>
-                <CreditCard className="h-4 w-4" />
-                {L.newSale}
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Blacklist info */}
-      {customer.is_blacklisted && (
-        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
-          <div>
-            <p className="font-semibold text-red-700">
-              {L.blacklisted}: {customer.blacklist_reason}
-            </p>
-            {customer.blacklist_date && (
-              <p className="text-red-500 text-xs mt-0.5">
-                {customer.blacklist_date} ·{" "}
+          <p className={workbench.subtitle}>
+            {locale === "zh"
+              ? "客户完整历史 · 合同、资金、单据与操作记录分别核对。"
+              : "Historique client · contrats, mouvements, documents et opérations distincts."}
+          </p>
+        </div>
+        {canEdit && (
+          <button
+            type="button"
+            className={workbench.secondary}
+            onClick={() => setEditingId(customer.id)}
+            disabled={refreshing}
+          >
+            <Pencil size={13} aria-hidden="true" />
+            {locale === "zh" ? "编辑资料" : "Modifier les coordonnées"}
+          </button>
+        )}
+      </header>
+      <div className={styles.layout}>
+        <aside className={styles.identity} aria-label={L.customerInfo}>
+          <section>
+            <h2>{L.customerInfo}</h2>
+            <dl className={styles.facts}>
+              <dt>
+                <Phone size={12} aria-hidden="true" /> {L.phone}
+              </dt>
+              <dd>{customer.phone || L.noData}</dd>
+              <dt>{L.gender}</dt>
+              <dd>
+                {customer.gender === "male"
+                  ? L.male
+                  : customer.gender === "female"
+                    ? L.female
+                    : customer.gender
+                      ? L.other
+                      : L.noData}
+              </dd>
+              <dt>{L.docType}</dt>
+              <dd>
+                {customer.document_type === "id_card"
+                  ? L.idCard
+                  : customer.document_type === "passport"
+                    ? L.passport
+                    : customer.document_type === "drivers_license"
+                      ? L.driversLicense
+                      : customer.document_type || L.noData}
+              </dd>
+              <dt>{L.notes}</dt>
+              <dd className={styles.notes}>{customer.notes || L.noData}</dd>
+            </dl>
+          </section>
+          {customer.is_blacklisted && (
+            <section className={workbench.risk}>
+              <h2>
+                <AlertTriangle size={13} aria-hidden="true" /> {L.blacklisted}
+              </h2>
+              <p>{customer.blacklist_reason || L.noData}</p>
+              <p>
+                {customer.blacklist_date || L.noData} ·{" "}
                 {customer.blacklist_permanent ? L.permanent : L.temporary}
               </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Tabs */}
-      <SegmentedControl
-        value={tab}
-        onChange={setTab}
-        ariaLabel={L.tabs}
-        className="self-start"
-        items={tabs.map((item) => ({
-          value: item.key,
-          label: item.label,
-          count: item.count,
-        }))}
-      />
-
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        {locale === "zh"
-          ? "当前账号权限内的完整历史；应收指标仅含纳管应收，已核销不等于期间现金流。住客、经办人分别列示；历史身份不明的不推定为住客。"
-          : "Historique complet dans vos droits. Les indicateurs concernent les créances suivies et leurs imputations, pas le flux de trésorerie. Clients et responsables restent distincts."}
-      </p>
-      {/* ── Tab Content ── */}
-      {tab === "overview" && (
-        <OverviewTab stats={stats} customer={customer} L={L} data={data} locale={locale} />
-      )}
-      {tab === "daily" && <DailyTab data={data} L={L} locale={locale} />}
-      {tab === "agent" && (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            {locale === "zh"
-              ? "以下是经办的订单，不代表本人入住或实际收款；不计入住客业务数与住客单据。"
-              : "Dossiers gérés, sans présumer un séjour personnel ni un encaissement par le responsable."}
-          </p>
-          <DailyTab data={{ ...data, dailyBookings: data.agentBookings }} L={L} locale={locale} />
-        </div>
-      )}
-      {tab === "unresolved" && (
-        <div className="space-y-3">
-          <p className="text-sm text-amber-700">
-            {locale === "zh"
-              ? "旧关联尚不能确认是住客还是经办人，暂不计入住客业务数和单据。"
-              : "L’ancien lien ne permet pas de distinguer client et responsable. Exclu des totaux de séjours et des documents client."}
-          </p>
-          <DailyTab
-            data={{ ...data, dailyBookings: data.unresolvedBookings }}
-            L={L}
-            locale={locale}
-          />
-        </div>
-      )}
-      {tab === "lease" && <LeaseTab data={data} L={L} locale={locale} />}
-      {tab === "sale" && <SaleTab data={data} L={L} locale={locale} />}
-      {tab === "finance" && <FinanceTab data={data} L={L} locale={locale} />}
-      {tab === "docs" && (
-        <TableTab
-          locale={locale}
-          columns={[L.docs, L.date, L.role, L.action]}
-          rows={documents.map((doc) => ({
-            cells: [
-              doc.title,
-              doc.date,
-              doc.unitNo,
-              <Button
-                key="p"
-                size="sm"
-                variant="ghost"
-                onClick={() => printDocumentRecord(doc, locale)}
+            </section>
+          )}
+          <section>
+            <h2>{L.currentBusiness}</h2>
+            <p>{businessSummary(stats, L)}</p>
+            <nav className={styles.businessLinks} aria-label={L.currentBusiness}>
+              <Link prefetch={false} href={routeFor(locale, "/daily-rentals")}>
+                <BedDouble size={13} aria-hidden="true" />
+                {L.newBooking}
+                <ArrowRight size={12} aria-hidden="true" />
+              </Link>
+              <Link prefetch={false} href={routeFor(locale, "/leases")}>
+                <Home size={13} aria-hidden="true" />
+                {L.newLease}
+                <ArrowRight size={12} aria-hidden="true" />
+              </Link>
+              <Link prefetch={false} href={routeFor(locale, "/sales")}>
+                <CreditCard size={13} aria-hidden="true" />
+                {L.newSale}
+                <ArrowRight size={12} aria-hidden="true" />
+              </Link>
+              <Link prefetch={false} href={routeFor(locale, "/finance")}>
+                <ArrowRight size={13} aria-hidden="true" />
+                {L.finance}
+              </Link>
+            </nav>
+          </section>
+        </aside>
+        <div className={styles.history}>
+          <div role="tablist" aria-label={L.tabs} className={styles.tabs}>
+            {tabs.map((item, index) => (
+              <button
+                type="button"
+                role="tab"
+                key={item.key}
+                id={`${panelId}-${item.key}`}
+                aria-selected={tab === item.key}
+                aria-controls={panelId}
+                tabIndex={tab === item.key ? 0 : -1}
+                onClick={() => setTab(item.key)}
+                onKeyDown={(event) => {
+                  const next =
+                    event.key === "ArrowRight"
+                      ? (index + 1) % tabs.length
+                      : event.key === "ArrowLeft"
+                        ? (index - 1 + tabs.length) % tabs.length
+                        : event.key === "Home"
+                          ? 0
+                          : event.key === "End"
+                            ? tabs.length - 1
+                            : null;
+                  if (next === null) return;
+                  event.preventDefault();
+                  setTab(tabs[next].key);
+                  document.getElementById(`${panelId}-${tabs[next].key}`)?.focus();
+                }}
               >
-                <Printer className="h-3.5 w-3.5" />
-                {L.print}
-              </Button>,
-            ],
-          }))}
-          empty={documents.length === 0}
-          emptyText={L.noData}
+                {item.label}
+                {item.count !== undefined && <span>{item.count}</span>}
+              </button>
+            ))}
+          </div>
+          <p className={styles.explainer}>
+            {locale === "zh"
+              ? "当前账号权限内的完整历史；应收指标仅含纳管应收，已核销不等于期间现金流。住客、经办人分别列示；历史身份不明的不推定为住客。"
+              : "Historique complet dans vos droits. Les indicateurs concernent les créances suivies et leurs imputations, pas le flux de trésorerie. Clients et responsables restent distincts."}
+          </p>
+          <section
+            id={panelId}
+            role="tabpanel"
+            aria-labelledby={`${panelId}-${tab}`}
+            className={styles.content}
+            tabIndex={0}
+          >
+            {tab === "overview" && <OverviewTab stats={stats} L={L} data={data} locale={locale} />}
+            {tab === "daily" && <DailyTab data={data} L={L} locale={locale} />}
+            {tab === "agent" && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  {locale === "zh"
+                    ? "以下是经办的订单，不代表本人入住或实际收款；不计入住客业务数与住客单据。"
+                    : "Dossiers gérés, sans présumer un séjour personnel ni un encaissement par le responsable."}
+                </p>
+                <DailyTab
+                  data={{ ...data, dailyBookings: data.agentBookings }}
+                  L={L}
+                  locale={locale}
+                />
+              </div>
+            )}
+            {tab === "unresolved" && (
+              <div className="space-y-3">
+                <p className="text-sm text-amber-700">
+                  {locale === "zh"
+                    ? "旧关联尚不能确认是住客还是经办人，暂不计入住客业务数和单据。"
+                    : "L’ancien lien ne permet pas de distinguer client et responsable. Exclu des totaux de séjours et des documents client."}
+                </p>
+                <DailyTab
+                  data={{ ...data, dailyBookings: data.unresolvedBookings }}
+                  L={L}
+                  locale={locale}
+                />
+              </div>
+            )}
+            {tab === "lease" && <LeaseTab data={data} L={L} locale={locale} />}
+            {tab === "sale" && <SaleTab data={data} L={L} locale={locale} />}
+            {tab === "finance" && <FinanceTab data={data} L={L} locale={locale} />}
+            {tab === "docs" && (
+              <TableTab
+                locale={locale}
+                columns={[L.docs, L.date, L.role, L.action]}
+                rows={documents.map((doc) => ({
+                  cells: [
+                    doc.title,
+                    doc.date,
+                    doc.unitNo,
+                    <Button
+                      key="p"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => printDocumentRecord(doc, locale)}
+                    >
+                      <Printer className="h-3.5 w-3.5" />
+                      {L.print}
+                    </Button>,
+                  ],
+                }))}
+                empty={documents.length === 0}
+                emptyText={L.noData}
+              />
+            )}
+            {tab === "audit" && <ProfileAuditTimeline logs={data.auditLogs} locale={locale} />}
+          </section>
+        </div>
+      </div>
+      {editingId === customer.id && canEdit && (
+        <CustomerWorkbenchForm
+          key={customer.id}
+          profile={{ ...customer, hasDocument: Boolean(customer.encrypted_document_no) }}
+          locale={locale}
+          onClose={() => setEditingId(null)}
+          onSaved={() => {
+            setEditingId(null);
+            startRefresh(() => router.refresh());
+          }}
         />
       )}
-      {tab === "audit" && <ProfileAuditTimeline logs={data.auditLogs} locale={locale} />}
-
-      {/* Quick links */}
-      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-        <Link
-          href={routeFor(locale, "/finance")}
-          className="hover:text-primary flex items-center gap-1"
-        >
-          {L.finance} <ArrowRight className="h-3 w-3" />
-        </Link>
-        <Link
-          href={safeWorkbenchReturnTo(returnTo) ?? routeFor(locale, "/customers")}
-          className="hover:text-primary flex items-center gap-1"
-        >
-          {L.backToList} <ArrowRight className="h-3 w-3" />
-        </Link>
-      </div>
     </div>
   );
 }
@@ -377,7 +429,6 @@ export function CustomerProfileView({ data, locale, userRole, returnTo }: Props)
 // ── Overview Tab ──
 function OverviewTab({
   stats,
-  customer,
   L,
   data,
   locale,
@@ -393,7 +444,6 @@ function OverviewTab({
     activeLease: number;
     activeSale: number;
   };
-  customer: CustomerProfileData["customer"];
   L: ReturnType<typeof labels>;
   data: CustomerProfileData;
   locale: Locale;
@@ -426,7 +476,7 @@ function OverviewTab({
         />
       </div>
 
-      <div className="grid gap-2 md:grid-cols-3">
+      <div className="grid gap-2 md:grid-cols-2">
         <InfoCard
           label={L.lastPayment}
           value={
@@ -443,67 +493,35 @@ function OverviewTab({
               : L.noData
           }
         />
-        <InfoCard label={L.currentBusiness} value={businessSummary(stats, L)} />
       </div>
 
       {/* Related units */}
       {data.units.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{L.relatedUnits}</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-1.5">
+        <section className={styles.section}>
+          <h2>{L.relatedUnits}</h2>
+          <div className="flex flex-wrap gap-1.5">
             {data.units.map((u) => (
-              <span key={u.id} className="rounded bg-muted px-2 py-0.5 text-xs font-mono">
+              <Link
+                key={u.id}
+                prefetch={false}
+                href={
+                  buildWorkbenchRecordHref({
+                    workspace: "units",
+                    id: u.id,
+                    building: u.building_id,
+                    locale,
+                    returnTo: routeFor(locale, `/customers/${data.customer.id}`),
+                  }) ?? routeFor(locale, "/units")
+                }
+                className={workbench.inlineLink}
+              >
                 {u.unit_no} ({L.kindLabels[u.kind] ?? u.kind})
-              </span>
+                <ArrowRight size={11} aria-hidden="true" />
+              </Link>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{L.customerInfo}</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
-          <span>
-            <span className="text-muted-foreground">{L.name}:</span> {customer.name}
-          </span>
-          {customer.gender && (
-            <span>
-              <span className="text-muted-foreground">{L.gender}:</span>{" "}
-              {customer.gender === "male"
-                ? L.male
-                : customer.gender === "female"
-                  ? L.female
-                  : L.other}
-            </span>
-          )}
-          {customer.phone && (
-            <span>
-              <span className="text-muted-foreground">{L.phone}:</span> {customer.phone}
-            </span>
-          )}
-          {customer.document_type && (
-            <span>
-              <span className="text-muted-foreground">{L.docType}:</span>{" "}
-              {customer.document_type === "id_card"
-                ? L.idCard
-                : customer.document_type === "passport"
-                  ? L.passport
-                  : customer.document_type === "drivers_license"
-                    ? L.driversLicense
-                    : customer.document_type}
-            </span>
-          )}
-          {customer.notes && (
-            <span className="sm:col-span-2">
-              <span className="text-muted-foreground">{L.notes}:</span> {customer.notes}
-            </span>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
@@ -723,7 +741,18 @@ function LeaseTab({
         <Badge key="s" variant={contractTone(lc.status)}>
           {L.contractStatusLabels[lc.status] ?? statusDisplayLabel(lc.status, locale)}
         </Badge>,
-        <TextLink key="v" href={routeFor(locale, "/leases")}>
+        <TextLink
+          key="v"
+          href={
+            buildWorkbenchRecordHref({
+              workspace: "leases",
+              id: lc.id,
+              building: unit?.building_id,
+              locale,
+              returnTo: routeFor(locale, `/customers/${data.customer.id}`),
+            }) ?? routeFor(locale, "/leases")
+          }
+        >
           {L.view}
         </TextLink>,
       ],
@@ -761,7 +790,18 @@ function SaleTab({
         <Badge key="s" variant={contractTone(sc.status)}>
           {L.contractStatusLabels[sc.status] ?? statusDisplayLabel(sc.status, locale)}
         </Badge>,
-        <TextLink key="v" href={routeFor(locale, "/sales")}>
+        <TextLink
+          key="v"
+          href={
+            buildWorkbenchRecordHref({
+              workspace: "sales",
+              id: sc.id,
+              building: unit?.building_id,
+              locale,
+              returnTo: routeFor(locale, `/customers/${data.customer.id}`),
+            }) ?? routeFor(locale, "/sales")
+          }
+        >
           {L.view}
         </TextLink>,
       ],
@@ -794,7 +834,7 @@ function TableTab({
   const history = useHistoryPage(rows);
   if (empty) return <EmptyState title={emptyText} />;
   return (
-    <Card>
+    <div className={styles.tableSection}>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-[13px]">
           <thead className="border-b bg-muted/60 text-xs font-medium text-muted-foreground">
@@ -820,7 +860,7 @@ function TableTab({
         </table>
       </div>
       <HistoryPagination {...history.pagination} locale={locale} />
-    </Card>
+    </div>
   );
 }
 
@@ -836,7 +876,7 @@ function TableSection({
   children: React.ReactNode;
 }) {
   return (
-    <Card>
+    <section className={styles.tableSection}>
       {title && (
         <div className="border-b bg-muted/60 px-4 py-2.5 text-xs font-medium text-muted-foreground">
           {title}
@@ -847,33 +887,27 @@ function TableSection({
       ) : (
         <div className="overflow-x-auto">{children}</div>
       )}
-    </Card>
+    </section>
   );
 }
 
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-h-[84px] rounded-xl border border-border bg-card p-3.5 text-card-foreground shadow-card transition-shadow duration-200">
-      <p className="truncate text-sm font-medium leading-tight tracking-tight text-foreground">
-        {label}
-      </p>
-      <p className="mt-2 text-lg font-semibold leading-snug tabular-nums text-foreground">
-        {value}
-      </p>
+    <div className={styles.info}>
+      <p className={styles.metricLabel}>{label}</p>
+      <p className={styles.infoValue}>{value}</p>
     </div>
   );
 }
 
 function StatBlock({ label, value, dot }: { label: string; value: string; dot: string }) {
   return (
-    <div className="flex min-h-[84px] flex-col rounded-xl border border-border bg-card p-3.5 text-card-foreground shadow-card transition-shadow duration-200">
+    <div className={styles.metric}>
       <div className="flex min-w-0 items-center justify-between gap-3 pb-2">
-        <p className="min-w-0 truncate text-sm font-medium leading-tight tracking-tight text-foreground">
-          {label}
-        </p>
+        <p className={styles.metricLabel}>{label}</p>
         <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", dot)} />
       </div>
-      <p className="text-lg font-semibold leading-none tabular-nums text-foreground">{value}</p>
+      <p className={styles.metricValue}>{value}</p>
     </div>
   );
 }

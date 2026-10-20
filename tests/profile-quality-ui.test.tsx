@@ -147,6 +147,30 @@ function unitProfile(overrides: Partial<UnitProfileData> = {}): UnitProfileData 
   } as UnitProfileData;
 }
 describe("profile identities, balances and history", () => {
+  it("resets the asset dossier tab when the target changes and retains a safe return destination", async () => {
+    await act(async () =>
+      root.render(
+        <UnitProfileView
+          data={unitProfile()}
+          locale="zh"
+          returnTo="/units?building=one&unit=unit"
+        />,
+      ),
+    );
+    expect([...host.querySelectorAll("a")].map((link) => link.getAttribute("href"))).toContain(
+      "/units?building=one&unit=unit",
+    );
+    await click("财务记录");
+    expect(host.querySelector('button[aria-current="page"]')?.textContent).toContain("财务记录");
+    const next = unitProfile();
+    next.unit = { ...next.unit, id: "unit-b", unit_no: "202" };
+    await act(async () =>
+      root.render(<UnitProfileView data={next} locale="zh" returnTo="https://evil.invalid" />),
+    );
+    expect(host.querySelector('button[aria-current="page"]')?.textContent).toBe("概览");
+    expect(host.querySelector('a[href="https://evil.invalid"]')).toBeNull();
+    expect(host.querySelectorAll("h1")).toHaveLength(1);
+  });
   it.each(["zh", "fr"] as const)(
     "never substitutes a confirmed contract end for an unknown paid-through date (%s)",
     async (locale) => {
@@ -263,8 +287,11 @@ describe("profile identities, balances and history", () => {
       auditLogs: [],
     } as unknown as UnitProfileData;
     await act(async () => root.render(<UnitProfileView data={data} locale="zh" />));
-    expect(host.textContent).toContain("当前客户：Real guest");
-    expect(host.textContent).not.toContain("当前客户：Agent");
+    const currentClient = [...host.querySelectorAll("p")].find(
+      (element) => element.textContent === "当前客户",
+    )?.parentElement;
+    expect(currentClient?.textContent).toContain("Real guest");
+    expect(currentClient?.textContent).not.toContain("Agent");
     expect(host.textContent).toContain("150,000 XOF");
     expect(host.textContent).not.toContain("900.00万 FCFA");
     await click("日租");

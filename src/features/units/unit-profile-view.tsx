@@ -12,11 +12,10 @@ import {
   Home,
   Landmark,
   ReceiptText,
-  User,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
-import { safeWorkbenchReturnTo } from "@/lib/workbench-links";
+import { buildWorkbenchRecordHref, safeWorkbenchReturnTo } from "@/lib/workbench-links";
 import { cn, formatXof } from "@/lib/utils";
 import { paymentDisplay } from "@/lib/currency";
 import { ProfileAuditTimeline } from "@/features/profiles/audit-timeline";
@@ -35,25 +34,26 @@ import {
 } from "@/lib/display-labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { conditionLabel } from "./operational-position";
-import { SegmentedControl } from "@/components/ui/operational";
 import type { ContractStatus, UnitKind } from "@/types/domain";
 import type { UnitProfileData } from "./unit-profile-service";
+import styles from "./unit-profile.module.css";
 
 type Tab = "overview" | "daily" | "contracts" | "finance" | "audit";
 type BadgeTone = React.ComponentProps<typeof Badge>["variant"];
 
-export function UnitProfileView({
-  data,
-  locale,
-  returnTo,
-}: {
+type UnitProfileProps = {
   data: UnitProfileData;
   locale: Locale;
   returnTo?: string;
-}) {
+};
+
+export function UnitProfileView(props: UnitProfileProps) {
+  return <UnitProfile key={props.data.unit.id} {...props} />;
+}
+
+function UnitProfile({ data, locale, returnTo }: UnitProfileProps) {
   const [tab, setTab] = useState<Tab>("overview");
   const zh = locale === "zh";
   const unit = data.unit;
@@ -119,298 +119,246 @@ export function UnitProfileView({
   ];
 
   return (
-    <div className="mx-auto max-w-[1440px] space-y-4 p-3 sm:p-5 lg:p-6">
-      <Card>
-        <CardContent className="flex flex-col gap-5 p-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <Button asChild variant="ghost" size="sm" className="-ml-2 mb-3 text-muted-foreground">
-              <Link href={safeWorkbenchReturnTo(returnTo) ?? routeFor(locale, "/units")}>
-                <ArrowLeft className="h-4 w-4" />
-                {zh ? "返回房源" : "Retour aux lots"}
-              </Link>
-            </Button>
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight">{unit.unit_no}</h1>
-              {data.position && (
-                <span className="text-sm text-muted-foreground">
-                  {zh ? "权属" : "Propriété"}:{" "}
-                  {data.position.ownership === "sold"
-                    ? zh
-                      ? "已售"
-                      : "Vendu"
-                    : zh
-                      ? "未明确（不按空闲推定）"
-                      : "Non précisée"}
-                  {" · "}
-                  {zh ? "入住" : "Occupation"}:{" "}
-                  {data.position.daily_occupied
-                    ? zh
-                      ? "日租入住"
-                      : "Séjour"
-                    : data.position.lease_occupied
-                      ? zh
-                        ? "长租"
-                        : "Bail"
-                      : zh
-                        ? "无当前入住"
-                        : "Aucune"}
-                  {" · "}
-                  {zh ? "保洁" : "Nettoyage"}:{" "}
-                  {data.position.cleaning_pending ? (zh ? "待保洁" : "En attente") : "—"}
-                  {" · "}
-                  {zh ? "运行条件" : "Condition"}:{" "}
-                  {conditionLabel(data.position.operational_condition, locale)}
-                </span>
-              )}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <Building2 className="h-4 w-4" />
-                {data.buildingName}
-              </span>
-              <span>
-                {zh ? "楼层" : "Étage"}：{unit.floor_label}
-              </span>
-              <span>
-                {zh ? "类型" : "Type"}：{unitKindLabel(unit.kind, locale)}
-              </span>
-              {unit.layout && (
-                <span>
-                  {zh ? "户型" : "Plan"}：{unit.layout}
-                </span>
-              )}
-              {unit.area_sqm != null && (
-                <span>
-                  {zh ? "面积" : "Surface"}：{Number(unit.area_sqm).toFixed(2)} m²
-                </span>
-              )}
-            </div>
-            <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-              <span className="inline-flex items-center gap-1.5">
-                <User className="h-4 w-4 text-muted-foreground" />
-                {zh ? "当前客户" : "Client actuel"}：<strong>{currentCustomerLabel}</strong>
-              </span>
-              <span>
-                {zh ? "当前业务" : "Activité"}：
-                <strong>
-                  {currentBusinessLabel({ activeBooking, activeLease, activeSale }, locale)}
-                </strong>
-              </span>
-            </div>
+    <div className={styles.profile} data-unit-profile>
+      <header className={styles.header}>
+        <div className="min-w-0">
+          <Button asChild variant="ghost" size="sm" className="-ml-2 mb-3 text-muted-foreground">
+            <Link href={safeWorkbenchReturnTo(returnTo) ?? routeFor(locale, "/units")}>
+              <ArrowLeft className="h-4 w-4" />
+              {zh ? "返回资产目录" : "Retour au répertoire"}
+            </Link>
+          </Button>
+          <p className={styles.eyebrow}>ASSET DOSSIER</p>
+          <h1>
+            {unit.unit_no}
+            <span>{zh ? "完整资产档案" : "Dossier complet"}</span>
+          </h1>
+          <div className={styles.subtitle}>
+            <span className="inline-flex items-center gap-1.5">
+              <Building2 className="h-4 w-4" />
+              {data.buildingName}
+            </span>
+            <span>
+              {zh
+                ? "关联业务、财务与完整历史，在同一处核对。"
+                : "Relations métier, finance et historique complet, au même endroit."}
+            </span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm" variant="outline">
-              <Link href={routeFor(locale, "/daily-rentals")}>
-                <BedDouble className="h-4 w-4" />
-                {zh ? "进入日租" : "Ouvrir jour"}
-              </Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link href={routeFor(locale, "/leases")}>
-                <Home className="h-4 w-4" />
-                {zh ? "进入长租" : "Ouvrir bail"}
-              </Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link href={routeFor(locale, "/sales")}>
-                <Landmark className="h-4 w-4" />
-                {zh ? "进入出售" : "Ouvrir vente"}
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link href={routeFor(locale, "/daily-rentals")}>
+              <BedDouble className="h-4 w-4" />
+              {zh ? "进入日租" : "Ouvrir jour"}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href={routeFor(locale, "/leases")}>
+              <Home className="h-4 w-4" />
+              {zh ? "进入长租" : "Ouvrir bail"}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href={routeFor(locale, "/sales")}>
+              <Landmark className="h-4 w-4" />
+              {zh ? "进入出售" : "Ouvrir vente"}
+            </Link>
+          </Button>
+        </div>
+      </header>
 
-      <SegmentedControl
-        value={tab}
-        onChange={setTab}
-        ariaLabel={zh ? "房间档案" : "Dossier du lot"}
-        items={tabs}
-        className="w-fit max-w-full"
-      />
+      <nav className={styles.tabs} aria-label={zh ? "房间档案" : "Dossier du lot"}>
+        {tabs.map((item) => (
+          <button
+            key={item.value}
+            type="button"
+            aria-current={tab === item.value ? "page" : undefined}
+            onClick={() => setTab(item.value)}
+            aria-controls={`unit-profile-${unit.id}-content`}
+          >
+            {item.label}
+            {"count" in item && <span>{item.count}</span>}
+          </button>
+        ))}
+      </nav>
       <p className="text-xs leading-relaxed text-muted-foreground">
         {zh
           ? "当前账号权限内的完整历史。应收指标仅含纳管应收；已核销不是期间现金流。预订不作实际入住，经办人不作住客。"
           : "Historique complet dans vos droits. Créances suivies uniquement ; leur règlement ne représente pas le flux de trésorerie. Une réservation n’est pas un séjour effectif ; le responsable n’est pas le client."}
       </p>
 
-      {tab === "overview" && (
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Metric
-              label={zh ? "纳管应收" : "Créances suivies"}
-              value={formatXof(finance.receivable)}
-              tone="blue"
-            />
-            <Metric
-              label={zh ? "应收已核销" : "Affecté aux créances"}
-              value={formatXof(finance.received)}
-              tone="green"
-            />
-            <Metric
-              label={zh ? "未收" : "Solde ouvert"}
-              value={formatXof(finance.outstanding)}
-              tone={finance.outstanding > 0 ? "amber" : "green"}
-            />
-            <Metric
-              label={zh ? "逾期" : "En retard"}
-              value={formatXof(finance.overdue)}
-              tone={finance.overdue > 0 ? "red" : "green"}
-            />
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>{zh ? "当前业务信息" : "Activité actuelle"}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <InfoRow label={zh ? "当前客户" : "Client actuel"} value={currentCustomerLabel} />
-                {activeBooking && (
+      <div id={`unit-profile-${unit.id}-content`} className={styles.content}>
+        {tab === "overview" && (
+          <div className="space-y-4">
+            <section
+              className={styles.dimensions}
+              aria-label={zh ? "资产独立状态" : "Dimensions de l’actif"}
+            >
+              <InfoRow
+                label={zh ? "权属 / 出售口径" : "Propriété / vente"}
+                value={
+                  !data.position
+                    ? zh
+                      ? "待核实"
+                      : "À vérifier"
+                    : data.position.ownership === "sold"
+                      ? zh
+                        ? "已售（业务口径）"
+                        : "Vendu (projection métier)"
+                      : zh
+                        ? "未明确（不按空闲推定）"
+                        : "Non précisée"
+                }
+              />
+              <InfoRow
+                label={zh ? "实际占用" : "Occupation réelle"}
+                value={
+                  !data.position
+                    ? zh
+                      ? "待核实"
+                      : "À vérifier"
+                    : [
+                        data.position.daily_occupied && (zh ? "日租入住" : "Séjour"),
+                        data.position.lease_occupied && (zh ? "长租" : "Bail"),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || (zh ? "无当前入住" : "Aucune occupation")
+                }
+              />
+              <InfoRow
+                label={zh ? "运行条件" : "État opérationnel"}
+                value={conditionLabel(data.position?.operational_condition, locale)}
+              />
+              <InfoRow
+                label={zh ? "保洁" : "Nettoyage"}
+                value={
+                  !data.position
+                    ? zh
+                      ? "待核实"
+                      : "À vérifier"
+                    : data.position.cleaning_pending
+                      ? zh
+                        ? "待保洁"
+                        : "En attente"
+                      : zh
+                        ? "无待办保洁"
+                        : "Aucun nettoyage en attente"
+                }
+              />
+            </section>
+            <p className={styles.note}>
+              {zh
+                ? "权属、实际占用与运行条件独立判断。“已售”是业务投影，不作为产权登记凭证；无占用不等于可出租。"
+                : "Propriété, occupation et état sont indépendants. « Vendu » n’est pas une preuve de titre ; sans occupation ne signifie pas prêt à louer."}
+            </p>
+            <div className={styles.metrics}>
+              <Metric
+                label={zh ? "纳管应收" : "Créances suivies"}
+                value={formatXof(finance.receivable)}
+                tone="blue"
+              />
+              <Metric
+                label={zh ? "应收已核销" : "Affecté aux créances"}
+                value={formatXof(finance.received)}
+                tone="green"
+              />
+              <Metric
+                label={zh ? "未收" : "Solde ouvert"}
+                value={formatXof(finance.outstanding)}
+                tone={finance.outstanding > 0 ? "amber" : "green"}
+              />
+              <Metric
+                label={zh ? "逾期" : "En retard"}
+                value={formatXof(finance.overdue)}
+                tone={finance.overdue > 0 ? "red" : "green"}
+              />
+            </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <section className={styles.section}>
+                <h2>{zh ? "当前业务信息" : "Activité actuelle"}</h2>
+                <div className="space-y-3 p-5 text-sm">
                   <InfoRow
-                    label={zh ? "经办人" : "Responsable"}
-                    value={customerName(activeBooking.booking_agent_id)}
+                    label={zh ? "当前业务" : "Activité"}
+                    value={currentBusinessLabel({ activeBooking, activeLease, activeSale }, locale)}
                   />
-                )}
-                <InfoRow
-                  label={zh ? "日租" : "Location jour"}
-                  value={
-                    activeBooking
-                      ? `${activeBooking.check_in} → ${activeBooking.check_out ?? (zh ? "未定" : "Ouvert")}`
-                      : "-"
-                  }
-                />
-                <InfoRow
-                  label={zh ? "长租" : "Bail"}
-                  value={
-                    activeLease
-                      ? `${activeLease.contract_no} · ${zh ? "已缴至" : "Payé au"} ${activeLease.paid_through_date ?? (zh ? "未记录" : "—")}`
-                      : "-"
-                  }
-                />
-                <InfoRow
-                  label={zh ? "出售" : "Vente"}
-                  value={
-                    activeSale
-                      ? `${activeSale.contract_no} · ${formatXof(Number(activeSale.total_amount_xof))}`
-                      : "-"
-                  }
-                />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>{zh ? "房间资料" : "Informations du lot"}</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-                <InfoRow label={zh ? "楼栋" : "Bâtiment"} value={data.buildingName} />
-                <InfoRow label={zh ? "楼层" : "Étage"} value={unit.floor_label} />
-                <InfoRow label={zh ? "类型" : "Type"} value={unitKindLabel(unit.kind, locale)} />
-                <InfoRow
-                  label={zh ? "家具" : "Meubles"}
-                  value={furnishingLabel(unit.furnishing, locale)}
-                />
-                <InfoRow label={zh ? "户型" : "Plan"} value={unit.layout ?? "-"} />
-                <InfoRow
-                  label={zh ? "面积" : "Surface"}
-                  value={unit.area_sqm != null ? `${Number(unit.area_sqm).toFixed(2)} m²` : "-"}
-                />
-                {unit.notes && (
-                  <div className="sm:col-span-2">
-                    <InfoRow label={zh ? "备注" : "Notes"} value={unit.notes} />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  <InfoRow label={zh ? "当前客户" : "Client actuel"} value={currentCustomerLabel} />
+                  {activeBooking && (
+                    <InfoRow
+                      label={zh ? "经办人" : "Responsable"}
+                      value={customerName(activeBooking.booking_agent_id)}
+                    />
+                  )}
+                  <InfoRow
+                    label={zh ? "日租" : "Location jour"}
+                    value={
+                      activeBooking
+                        ? `${activeBooking.check_in} → ${activeBooking.check_out ?? (zh ? "未定" : "Ouvert")}`
+                        : "-"
+                    }
+                  />
+                  <InfoRow
+                    label={zh ? "长租" : "Bail"}
+                    value={
+                      activeLease
+                        ? `${activeLease.contract_no} · ${zh ? "已缴至" : "Payé au"} ${activeLease.paid_through_date ?? (zh ? "未记录" : "—")}`
+                        : "-"
+                    }
+                  />
+                  <InfoRow
+                    label={zh ? "出售" : "Vente"}
+                    value={
+                      activeSale
+                        ? `${activeSale.contract_no} · ${formatXof(Number(activeSale.total_amount_xof))}`
+                        : "-"
+                    }
+                  />
+                </div>
+              </section>
+              <section className={styles.section}>
+                <h2>{zh ? "房间资料" : "Informations du lot"}</h2>
+                <div className="grid gap-x-6 gap-y-3 p-5 text-sm sm:grid-cols-2">
+                  <InfoRow label={zh ? "楼栋" : "Bâtiment"} value={data.buildingName} />
+                  <InfoRow label={zh ? "楼层" : "Étage"} value={unit.floor_label} />
+                  <InfoRow label={zh ? "类型" : "Type"} value={unitKindLabel(unit.kind, locale)} />
+                  <InfoRow
+                    label={zh ? "家具" : "Meubles"}
+                    value={furnishingLabel(unit.furnishing, locale)}
+                  />
+                  <InfoRow label={zh ? "户型" : "Plan"} value={unit.layout ?? "-"} />
+                  <InfoRow
+                    label={zh ? "面积" : "Surface"}
+                    value={unit.area_sqm != null ? `${Number(unit.area_sqm).toFixed(2)} m²` : "-"}
+                  />
+                  {unit.notes && (
+                    <div className="sm:col-span-2">
+                      <InfoRow label={zh ? "备注" : "Notes"} value={unit.notes} />
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {tab === "daily" && (
-        <RecordCard
-          title={zh ? "日租记录" : "Historique jour"}
-          footer={<HistoryPagination {...dailyPage.pagination} locale={locale} />}
-          icon={BedDouble}
-          empty={data.dailyBookings.length === 0}
-          emptyText={zh ? "这个房间暂无日租记录" : "Aucune location jour"}
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead>
-                <tr>
-                  {[
-                    zh ? "入住" : "Arrivée",
-                    zh ? "离店" : "Départ",
-                    zh ? "客户" : "Client",
-                    zh ? "经办人" : "Responsable",
-                    zh ? "金额" : "Montant",
-                    zh ? "订单付款" : "Paiement de réservation",
-                    zh ? "状态" : "Statut",
-                    "",
-                  ].map((label) => (
-                    <th key={label} className="px-4 py-3 text-left text-xs text-muted-foreground">
-                      {label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {dailyPage.rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-muted/40">
-                    <td className="px-4 py-3 tabular-nums">{row.check_in}</td>
-                    <td className="px-4 py-3 tabular-nums">
-                      {row.check_out ?? (zh ? "未定" : "Ouvert")}
-                    </td>
-                    <td className="px-4 py-3 font-medium">
-                      {row.guest_customer_id
-                        ? customerName(row.guest_customer_id)
-                        : (row.guest_name ?? (zh ? "住客身份待补" : "Client à compléter"))}
-                    </td>
-                    <td className="px-4 py-3">{customerName(row.booking_agent_id)}</td>
-                    <td className="px-4 py-3 tabular-nums">
-                      {formatXof(Number(row.total_amount_xof))}
-                    </td>
-                    <td className="px-4 py-3 tabular-nums text-emerald-700">
-                      {formatXof(Number(row.prepaid_amount_xof))}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={dailyTone(row.status)}>
-                        {statusDisplayLabel(row.status, locale)}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button asChild size="sm" variant="ghost">
-                        <Link href={routeFor(locale, "/daily-rentals")}>
-                          {zh ? "查看 / 修改" : "Voir / modifier"}
-                        </Link>
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </RecordCard>
-      )}
-
-      {tab === "contracts" && (
-        <div className="space-y-4">
+        {tab === "daily" && (
           <RecordCard
-            title={zh ? "长租合同" : "Baux"}
-            footer={<HistoryPagination {...leasePage.pagination} locale={locale} />}
-            icon={Home}
-            empty={data.leaseContracts.length === 0}
-            emptyText={zh ? "暂无长租合同" : "Aucun bail"}
+            title={zh ? "日租记录" : "Historique jour"}
+            footer={<HistoryPagination {...dailyPage.pagination} locale={locale} />}
+            icon={BedDouble}
+            empty={data.dailyBookings.length === 0}
+            emptyText={zh ? "这个房间暂无日租记录" : "Aucune location jour"}
           >
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr>
                     {[
-                      zh ? "合同号" : "Contrat",
+                      zh ? "入住" : "Arrivée",
+                      zh ? "离店" : "Départ",
                       zh ? "客户" : "Client",
-                      zh ? "开始" : "Début",
-                      zh ? "已缴至" : "Payé au",
-                      zh ? "月租" : "Loyer",
+                      zh ? "经办人" : "Responsable",
+                      zh ? "金额" : "Montant",
+                      zh ? "订单付款" : "Paiement de réservation",
                       zh ? "状态" : "Statut",
                       "",
                     ].map((label) => (
@@ -421,76 +369,33 @@ export function UnitProfileView({
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {leasePage.rows.map((row) => (
+                  {dailyPage.rows.map((row) => (
                     <tr key={row.id} className="hover:bg-muted/40">
-                      <td className="px-4 py-3 font-medium">{row.contract_no}</td>
-                      <td className="px-4 py-3">{customerName(row.customer_id)}</td>
-                      <td className="px-4 py-3">{row.start_date}</td>
-                      <td className="px-4 py-3">
-                        {row.paid_through_date ?? (zh ? "未记录" : "—")}
+                      <td className="px-4 py-3 tabular-nums">{row.check_in}</td>
+                      <td className="px-4 py-3 tabular-nums">
+                        {row.check_out ?? (zh ? "未定" : "Ouvert")}
                       </td>
-                      <td className="px-4 py-3 tabular-nums">{leaseRentLabel(row, locale)}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant={contractTone(row.status)}>
-                          {statusDisplayLabel(row.status, locale)}
-                        </Badge>
+                      <td className="px-4 py-3 font-medium">
+                        {row.guest_customer_id
+                          ? customerName(row.guest_customer_id)
+                          : (row.guest_name ?? (zh ? "住客身份待补" : "Client à compléter"))}
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <Button asChild size="sm" variant="ghost">
-                          <Link href={routeFor(locale, "/leases")}>
-                            {zh ? "进入长租" : "Ouvrir"}
-                          </Link>
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </RecordCard>
-          <RecordCard
-            title={zh ? "出售合同" : "Ventes"}
-            footer={<HistoryPagination {...salePage.pagination} locale={locale} />}
-            icon={Landmark}
-            empty={data.saleContracts.length === 0}
-            emptyText={zh ? "暂无出售合同" : "Aucune vente"}
-          >
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px] text-sm">
-                <thead>
-                  <tr>
-                    {[
-                      zh ? "合同号" : "Contrat",
-                      zh ? "客户" : "Client",
-                      zh ? "签约日期" : "Signature",
-                      zh ? "总价" : "Montant",
-                      zh ? "状态" : "Statut",
-                      "",
-                    ].map((label) => (
-                      <th key={label} className="px-4 py-3 text-left text-xs text-muted-foreground">
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {salePage.rows.map((row) => (
-                    <tr key={row.id} className="hover:bg-muted/40">
-                      <td className="px-4 py-3 font-medium">{row.contract_no}</td>
-                      <td className="px-4 py-3">{customerName(row.customer_id)}</td>
-                      <td className="px-4 py-3">{row.signed_date}</td>
+                      <td className="px-4 py-3">{customerName(row.booking_agent_id)}</td>
                       <td className="px-4 py-3 tabular-nums">
                         {formatXof(Number(row.total_amount_xof))}
                       </td>
+                      <td className="px-4 py-3 tabular-nums text-emerald-700">
+                        {formatXof(Number(row.prepaid_amount_xof))}
+                      </td>
                       <td className="px-4 py-3">
-                        <Badge variant={contractTone(row.status)}>
+                        <Badge variant={dailyTone(row.status)}>
                           {statusDisplayLabel(row.status, locale)}
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <Button asChild size="sm" variant="ghost">
-                          <Link href={routeFor(locale, "/sales")}>
-                            {zh ? "进入出售" : "Ouvrir"}
+                          <Link href={routeFor(locale, "/daily-rentals")}>
+                            {zh ? "查看 / 修改" : "Voir / modifier"}
                           </Link>
                         </Button>
                       </td>
@@ -500,167 +405,312 @@ export function UnitProfileView({
               </table>
             </div>
           </RecordCard>
-        </div>
-      )}
+        )}
 
-      {tab === "finance" && (
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Metric
-              label={zh ? "纳管应收" : "Créances suivies"}
-              value={formatXof(finance.receivable)}
-              tone="blue"
-            />
-            <Metric
-              label={zh ? "应收已核销" : "Affecté aux créances"}
-              value={formatXof(finance.received)}
-              tone="green"
-            />
-            <Metric
-              label={zh ? "未收" : "Solde ouvert"}
-              value={formatXof(finance.outstanding)}
-              tone="amber"
-            />
-            <Metric
-              label={zh ? "逾期" : "En retard"}
-              value={formatXof(finance.overdue)}
-              tone={finance.overdue > 0 ? "red" : "green"}
-            />
-          </div>
-          <RecordCard
-            title={zh ? "应收记录" : "Créances"}
-            footer={<HistoryPagination {...receivablePage.pagination} locale={locale} />}
-            icon={FileText}
-            empty={data.receivables.filter((row) => row.status !== "cancelled").length === 0}
-            emptyText={zh ? "暂无应收记录" : "Aucune créance"}
-          >
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm">
-                <thead>
-                  <tr>
-                    {[
-                      zh ? "到期日" : "Échéance",
-                      zh ? "业务" : "Activité",
-                      zh ? "说明" : "Libellé",
-                      zh ? "应收" : "Dû",
-                      zh ? "已核销" : "Imputé",
-                      zh ? "未结" : "Solde",
-                    ].map((label) => (
-                      <th key={label} className="px-4 py-3 text-left text-xs text-muted-foreground">
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {receivablePage.rows.map((row) => {
-                    const value = financeRowMoney(row);
-                    const balance =
-                      row.amount_native != null
-                        ? Math.max(0, value.amount - financeRowMoney(row, true).amount)
-                        : receivableOutstanding(row);
-                    return (
-                      <tr
-                        key={row.id}
-                        className={cn(
-                          "hover:bg-muted/40",
-                          isManagedReceivable(row) &&
-                            isReceivableOverdue(row, today) &&
-                            "bg-red-50/40",
-                        )}
-                      >
-                        <td className="px-4 py-3">{row.due_date}</td>
-                        <td className="px-4 py-3">
-                          {financialBusinessLabel(row.source_type, locale, row.category)}
-                        </td>
-                        <td className="px-4 py-3 font-medium">
-                          {row.title}
-                          {!isManagedReceivable(row) && (
-                            <span className="block text-xs font-normal text-muted-foreground">
-                              {zh ? "未纳管 · 不计指标" : "Hors suivi · exclu des indicateurs"}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 tabular-nums">{financeRowLabel(row, locale)}</td>
-                        <td className="px-4 py-3 tabular-nums text-emerald-700">
-                          {financeRowLabel(row, locale, true)}
-                        </td>
-                        <td
-                          className={cn(
-                            "px-4 py-3 tabular-nums font-medium",
-                            balance > 0 && "text-red-700",
-                          )}
+        {tab === "contracts" && (
+          <div className="space-y-4">
+            <RecordCard
+              title={zh ? "长租合同" : "Baux"}
+              footer={<HistoryPagination {...leasePage.pagination} locale={locale} />}
+              icon={Home}
+              empty={data.leaseContracts.length === 0}
+              emptyText={zh ? "暂无长租合同" : "Aucun bail"}
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead>
+                    <tr>
+                      {[
+                        zh ? "合同号" : "Contrat",
+                        zh ? "客户" : "Client",
+                        zh ? "开始" : "Début",
+                        zh ? "已缴至" : "Payé au",
+                        zh ? "月租" : "Loyer",
+                        zh ? "状态" : "Statut",
+                        "",
+                      ].map((label) => (
+                        <th
+                          key={label}
+                          className="px-4 py-3 text-left text-xs text-muted-foreground"
                         >
-                          {formatMoney(balance, value.currency, locale)}{" "}
-                          {value.currency === "XOF" ? "" : value.currency}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </RecordCard>
-          <RecordCard
-            title={zh ? "收付款与调整" : "Paiements et ajustements"}
-            footer={<HistoryPagination {...paymentPage.pagination} locale={locale} />}
-            icon={ReceiptText}
-            empty={data.payments.length === 0}
-            emptyText={zh ? "暂无收款记录" : "Aucun paiement"}
-          >
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[620px] text-sm">
-                <thead>
-                  <tr>
-                    {[
-                      zh ? "日期" : "Date",
-                      zh ? "业务" : "Activité",
-                      zh ? "金额" : "Montant",
-                      zh ? "币种" : "Devise",
-                      zh ? "收据号" : "Reçu",
-                    ].map((label) => (
-                      <th key={label} className="px-4 py-3 text-left text-xs text-muted-foreground">
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {paymentPage.rows.map((row) => {
-                    const isExpense = isFinancialExpenseSourceType(row.source_type);
-                    const display = paymentDisplay(row, locale);
-                    return (
+                          {label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {leasePage.rows.map((row) => (
                       <tr key={row.id} className="hover:bg-muted/40">
-                        <td className="px-4 py-3">{row.payment_date}</td>
-                        <td className={cn("px-4 py-3", isExpense && "font-medium text-red-700")}>
-                          {financialBusinessLabel(row.source_type, locale)}
+                        <td className="px-4 py-3 font-medium">{row.contract_no}</td>
+                        <td className="px-4 py-3">{customerName(row.customer_id)}</td>
+                        <td className="px-4 py-3">{row.start_date}</td>
+                        <td className="px-4 py-3">
+                          {row.paid_through_date ?? (zh ? "未记录" : "—")}
                         </td>
-                        <td
+                        <td className="px-4 py-3 tabular-nums">{leaseRentLabel(row, locale)}</td>
+                        <td className="px-4 py-3">
+                          <Badge variant={contractTone(row.status)}>
+                            {statusDisplayLabel(row.status, locale)}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Button asChild size="sm" variant="ghost">
+                            <Link
+                              href={
+                                buildWorkbenchRecordHref({
+                                  workspace: "leases",
+                                  id: row.id,
+                                  locale,
+                                  building: unit.building_id,
+                                  returnTo: routeFor(locale, `/units/${unit.id}`),
+                                }) ?? routeFor(locale, "/leases")
+                              }
+                            >
+                              {zh ? "进入长租" : "Ouvrir"}
+                            </Link>
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </RecordCard>
+            <RecordCard
+              title={zh ? "出售合同" : "Ventes"}
+              footer={<HistoryPagination {...salePage.pagination} locale={locale} />}
+              icon={Landmark}
+              empty={data.saleContracts.length === 0}
+              emptyText={zh ? "暂无出售合同" : "Aucune vente"}
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px] text-sm">
+                  <thead>
+                    <tr>
+                      {[
+                        zh ? "合同号" : "Contrat",
+                        zh ? "客户" : "Client",
+                        zh ? "签约日期" : "Signature",
+                        zh ? "总价" : "Montant",
+                        zh ? "状态" : "Statut",
+                        "",
+                      ].map((label) => (
+                        <th
+                          key={label}
+                          className="px-4 py-3 text-left text-xs text-muted-foreground"
+                        >
+                          {label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {salePage.rows.map((row) => (
+                      <tr key={row.id} className="hover:bg-muted/40">
+                        <td className="px-4 py-3 font-medium">{row.contract_no}</td>
+                        <td className="px-4 py-3">{customerName(row.customer_id)}</td>
+                        <td className="px-4 py-3">{row.signed_date}</td>
+                        <td className="px-4 py-3 tabular-nums">
+                          {formatXof(Number(row.total_amount_xof))}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge variant={contractTone(row.status)}>
+                            {statusDisplayLabel(row.status, locale)}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Button asChild size="sm" variant="ghost">
+                            <Link
+                              href={
+                                buildWorkbenchRecordHref({
+                                  workspace: "sales",
+                                  id: row.id,
+                                  locale,
+                                  building: unit.building_id,
+                                  returnTo: routeFor(locale, `/units/${unit.id}`),
+                                }) ?? routeFor(locale, "/sales")
+                              }
+                            >
+                              {zh ? "进入出售" : "Ouvrir"}
+                            </Link>
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </RecordCard>
+          </div>
+        )}
+
+        {tab === "finance" && (
+          <div className="space-y-4">
+            <div className={styles.metrics}>
+              <Metric
+                label={zh ? "纳管应收" : "Créances suivies"}
+                value={formatXof(finance.receivable)}
+                tone="blue"
+              />
+              <Metric
+                label={zh ? "应收已核销" : "Affecté aux créances"}
+                value={formatXof(finance.received)}
+                tone="green"
+              />
+              <Metric
+                label={zh ? "未收" : "Solde ouvert"}
+                value={formatXof(finance.outstanding)}
+                tone="amber"
+              />
+              <Metric
+                label={zh ? "逾期" : "En retard"}
+                value={formatXof(finance.overdue)}
+                tone={finance.overdue > 0 ? "red" : "green"}
+              />
+            </div>
+            <RecordCard
+              title={zh ? "应收记录" : "Créances"}
+              footer={<HistoryPagination {...receivablePage.pagination} locale={locale} />}
+              icon={FileText}
+              empty={data.receivables.filter((row) => row.status !== "cancelled").length === 0}
+              emptyText={zh ? "暂无应收记录" : "Aucune créance"}
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead>
+                    <tr>
+                      {[
+                        zh ? "到期日" : "Échéance",
+                        zh ? "业务" : "Activité",
+                        zh ? "说明" : "Libellé",
+                        zh ? "应收" : "Dû",
+                        zh ? "已核销" : "Imputé",
+                        zh ? "未结" : "Solde",
+                      ].map((label) => (
+                        <th
+                          key={label}
+                          className="px-4 py-3 text-left text-xs text-muted-foreground"
+                        >
+                          {label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {receivablePage.rows.map((row) => {
+                      const value = financeRowMoney(row);
+                      const balance =
+                        row.amount_native != null
+                          ? Math.max(0, value.amount - financeRowMoney(row, true).amount)
+                          : receivableOutstanding(row);
+                      return (
+                        <tr
+                          key={row.id}
                           className={cn(
-                            "px-4 py-3 font-medium tabular-nums",
-                            isExpense ? "text-red-700" : "text-emerald-700",
+                            "hover:bg-muted/40",
+                            isManagedReceivable(row) &&
+                              isReceivableOverdue(row, today) &&
+                              "bg-red-50/40",
                           )}
                         >
-                          {display.primary}
-                          {display.secondary && (
-                            <span className="block text-[11px] font-normal text-muted-foreground">
-                              {zh ? "折合 " : "Soit "}
-                              {display.secondary}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">{currencyDisplayLabel(row.currency, locale)}</td>
-                        <td className="px-4 py-3">{row.receipt_no ?? "-"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </RecordCard>
-        </div>
-      )}
-      {tab === "audit" && <ProfileAuditTimeline logs={data.auditLogs} locale={locale} />}
+                          <td className="px-4 py-3">{row.due_date}</td>
+                          <td className="px-4 py-3">
+                            {financialBusinessLabel(row.source_type, locale, row.category)}
+                          </td>
+                          <td className="px-4 py-3 font-medium">
+                            {row.title}
+                            {!isManagedReceivable(row) && (
+                              <span className="block text-xs font-normal text-muted-foreground">
+                                {zh ? "未纳管 · 不计指标" : "Hors suivi · exclu des indicateurs"}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 tabular-nums">{financeRowLabel(row, locale)}</td>
+                          <td className="px-4 py-3 tabular-nums text-emerald-700">
+                            {financeRowLabel(row, locale, true)}
+                          </td>
+                          <td
+                            className={cn(
+                              "px-4 py-3 tabular-nums font-medium",
+                              balance > 0 && "text-red-700",
+                            )}
+                          >
+                            {formatMoney(balance, value.currency, locale)}{" "}
+                            {value.currency === "XOF" ? "" : value.currency}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </RecordCard>
+            <RecordCard
+              title={zh ? "收付款与调整" : "Paiements et ajustements"}
+              footer={<HistoryPagination {...paymentPage.pagination} locale={locale} />}
+              icon={ReceiptText}
+              empty={data.payments.length === 0}
+              emptyText={zh ? "暂无收款记录" : "Aucun paiement"}
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[620px] text-sm">
+                  <thead>
+                    <tr>
+                      {[
+                        zh ? "日期" : "Date",
+                        zh ? "业务" : "Activité",
+                        zh ? "金额" : "Montant",
+                        zh ? "币种" : "Devise",
+                        zh ? "收据号" : "Reçu",
+                      ].map((label) => (
+                        <th
+                          key={label}
+                          className="px-4 py-3 text-left text-xs text-muted-foreground"
+                        >
+                          {label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {paymentPage.rows.map((row) => {
+                      const isExpense = isFinancialExpenseSourceType(row.source_type);
+                      const display = paymentDisplay(row, locale);
+                      return (
+                        <tr key={row.id} className="hover:bg-muted/40">
+                          <td className="px-4 py-3">{row.payment_date}</td>
+                          <td className={cn("px-4 py-3", isExpense && "font-medium text-red-700")}>
+                            {financialBusinessLabel(row.source_type, locale)}
+                          </td>
+                          <td
+                            className={cn(
+                              "px-4 py-3 font-medium tabular-nums",
+                              isExpense ? "text-red-700" : "text-emerald-700",
+                            )}
+                          >
+                            {display.primary}
+                            {display.secondary && (
+                              <span className="block text-[11px] font-normal text-muted-foreground">
+                                {zh ? "折合 " : "Soit "}
+                                {display.secondary}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {currencyDisplayLabel(row.currency, locale)}
+                          </td>
+                          <td className="px-4 py-3">{row.receipt_no ?? "-"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </RecordCard>
+          </div>
+        )}
+        {tab === "audit" && <ProfileAuditTimeline logs={data.auditLogs} locale={locale} />}
+      </div>
     </div>
   );
 }
@@ -681,7 +731,7 @@ function Metric({
     red: "bg-accentRed-500",
   };
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-card">
+    <div className={styles.metric}>
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-medium">{label}</p>
         <span className={cn("h-2.5 w-2.5 rounded-full", dots[tone])} />
@@ -716,12 +766,12 @@ function RecordCard({
   footer?: React.ReactNode;
 }) {
   return (
-    <Card>
-      <CardHeader className="flex-row items-center gap-2 space-y-0">
+    <section className={styles.section}>
+      <h2>
         <Icon className="h-4 w-4 text-muted-foreground" />
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
+        {title}
+      </h2>
+      <div>
         {empty ? (
           <div className="p-6">
             <EmptyState title={emptyText} />
@@ -729,9 +779,9 @@ function RecordCard({
         ) : (
           children
         )}
-      </CardContent>
+      </div>
       {!empty && footer}
-    </Card>
+    </section>
   );
 }
 

@@ -444,7 +444,16 @@ it.each(["zh", "fr"] as const)(
     await act(async () => details.click());
     await pause();
     expect(document.body.textContent).toContain(pending);
-    expect(document.body.textContent).toContain(locale === "zh" ? "未确认" : "Non confirmée");
+    const inspector = host.querySelector(
+      `[aria-label="${locale === "zh" ? "合同预览" : "Aperçu du contrat"}"]`,
+    )!;
+    for (const label of locale === "zh" ? ["起租日期", "预计到期"] : ["Début", "Fin prévue"]) {
+      const fact = [...inspector.querySelectorAll("dt")].find(
+        (element) => element.textContent === label,
+      )?.parentElement;
+      expect(fact?.querySelector("dd")?.textContent).toBe(pending);
+    }
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(document.body.textContent).not.toMatch(/null|undefined|NaN|1970-01-01/);
   },
 );

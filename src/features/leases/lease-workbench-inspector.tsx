@@ -1,8 +1,10 @@
 "use client";
 import Link from "next/link";
 import { leaseRentLabel } from "@/lib/native-money";
-import { paymentDisplay } from "@/lib/currency";
+import { formatMoney, paymentDisplay } from "@/lib/currency";
 import { NativeLeaseFinance } from "./native-lease-finance";
+import { getOriginalMonthlyRent, getRecordedOriginalPayment } from "./lease-display-model";
+import { getLeaseFinancialConfigBySourceType } from "./lease-financial-entry-types";
 
 import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowUpRight, Building2, CalendarDays, FileText, Printer, X } from "lucide-react";
@@ -41,7 +43,12 @@ export interface LeaseWorkbenchInspectorProps {
   loading?: boolean;
   /** A failed read must never leave a prior contract's data or actions available. */
   error?: boolean;
-  onOpen: (section?: "overview" | "finance") => void;
+  initialSection?: "overview" | "finance";
+  /** Permission-filtered, focused operations supplied by the business controller. */
+  actions?: ReactNode;
+  financeTools?: ReactNode;
+  operationError?: string;
+  busy?: boolean;
   onPrint: () => void;
   onClose?: () => void;
   /** Supplied only to roles permitted to collect, for this exact active contract. */
@@ -59,10 +66,14 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** A read-only companion to the existing contract drawer. No write action lives here. */
+/** The single contract detail surface; operations open only their relevant form. */
 export function LeaseWorkbenchInspector(props: LeaseWorkbenchInspectorProps) {
-  // Switching contracts also resets the local preview tab, without a sync effect.
-  return <InspectorContent key={props.contract?.id ?? "empty"} {...props} />;
+  return (
+    <InspectorContent
+      key={`${props.contract?.id ?? "empty"}/${props.initialSection ?? "overview"}`}
+      {...props}
+    />
+  );
 }
 
 function InspectorContent({
@@ -77,12 +88,18 @@ function InspectorContent({
   today,
   loading = false,
   error = false,
-  onOpen,
+  initialSection = "overview",
+  actions,
+  financeTools,
+  operationError,
+  busy = false,
   onPrint,
   onClose,
   collectionHref,
 }: LeaseWorkbenchInspectorProps) {
-  const [tab, setTab] = useState<InspectorTab>("contract");
+  const [tab, setTab] = useState<InspectorTab>(
+    initialSection === "finance" ? "finance" : "contract",
+  );
   const id = useId();
   const zh = locale === "zh";
   const text = (chinese: string, french: string) => (zh ? chinese : french);
@@ -141,8 +158,8 @@ function InspectorContent({
                     "Vérification de la location et des écritures avant affichage.",
                   )
                 : text(
-                    "点击列表中的房源，先看租期与账务；需要办理时再打开完整详情。",
-                    "Sélectionnez un lot pour consulter sa location et ses finances avant d’ouvrir le dossier complet.",
+                    "选择一份合同，在这里查看完整资料、核对账务并直接办理。",
+                    "Sélectionnez un contrat pour consulter son dossier, ses écritures et les opérations disponibles ici.",
                   )}
           </p>
         </div>
@@ -185,13 +202,13 @@ function InspectorContent({
   const cycle =
     cycleLabels[contract.payment_cycle as keyof typeof cycleLabels] ??
     text("待确认", "À confirmer");
-  const recentPayments = [...contractPayments]
-    .sort(
-      (left, right) =>
-        right.payment_date.localeCompare(left.payment_date) ||
-        right.created_at.localeCompare(left.created_at),
-    )
-    .slice(0, 6);
+  const originalMonthlyRent = getOriginalMonthlyRent(contract, contractPayments);
+  const orderedPayments = [...contractPayments].sort(
+    (left, right) =>
+      right.payment_date.localeCompare(left.payment_date) ||
+      (right.created_at ?? "").localeCompare(left.created_at ?? "") ||
+      right.id.localeCompare(left.id),
+  );
   const categories = dictionaries[locale].finance.categories;
   const noCash = text("暂无已核记录", "Aucune écriture vérifiée");
   const suggestion =
@@ -199,16 +216,16 @@ function InspectorContent({
       ? {
           title: text("核对逾期应收与实收", "Vérifier les impayés et les encaissements"),
           detail: text(
-            "先核实收款凭证与应收核销情况，再打开完整账务跟进。",
-            "Vérifiez les justificatifs et le rapprochement des créances avant de poursuivre dans le dossier complet.",
+            "在账务与记录页核实收款凭证及应收核销，再按实际情况办理。",
+            "Vérifiez les justificatifs et le rapprochement dans les onglets Finances et Écritures avant toute opération.",
           ),
         }
       : contract.status === "draft" || !contract.start_date || !endKnown
         ? {
             title: text("核实合同资料", "Vérifier les informations du contrat"),
             detail: text(
-              "先核对客户、合同日期与约定，再在原流程中办理。",
-              "Confirmez le client, les dates et les conditions avant toute opération dans le dossier complet.",
+              "先核对客户、合同日期与约定，再办理相应操作。",
+              "Confirmez le client, les dates et les conditions avant toute opération.",
             ),
           }
         : contract.status === "active" &&
@@ -224,8 +241,8 @@ function InspectorContent({
           : {
               title: text("查看合同与账务", "Consulter le contrat et les écritures"),
               detail: text(
-                "这里仅供核对；需要办理时，打开完整详情进入原流程。",
-                "Cet aperçu est en lecture seule. Ouvrez le dossier complet pour toute opération.",
+                "合同、账务和完整收支记录集中在这里；办理入口只显示当前身份有权执行的操作。",
+                "Contrat, finances et écritures complètes sont réunis ici. Seules les opérations autorisées sont proposées.",
               ),
             };
 
@@ -238,7 +255,7 @@ function InspectorContent({
       <div className="border-b border-blue-100/80 bg-blue-50/65 px-5 pb-4 pt-5 dark:border-blue-900/50 dark:bg-blue-950/25">
         <div className="mb-4 flex items-start justify-between gap-2">
           <span className="text-[11px] font-medium tracking-[0.1em] text-blue-600 dark:text-blue-300">
-            {text("合同速览", "APERÇU DU CONTRAT")}
+            {text("合同档案", "DOSSIER DU CONTRAT")}
           </span>
           {onClose ? (
             <Button
@@ -247,6 +264,7 @@ function InspectorContent({
               className="-mr-2 -mt-2 size-8"
               aria-label={text("关闭预览", "Fermer l’aperçu")}
               onClick={onClose}
+              disabled={busy}
             >
               <X aria-hidden="true" />
             </Button>
@@ -336,14 +354,39 @@ function InspectorContent({
               ) : null}
               <Fact label={text("月租金", "Loyer mensuel")}>
                 {leaseRentLabel(contract, locale)}
+                {originalMonthlyRent ? (
+                  <p className="mt-1 text-xs font-normal text-muted-foreground">
+                    {text("原币约 ", "Devise d’origine env. ")}
+                    {formatMoney(originalMonthlyRent.amount, originalMonthlyRent.currency, locale)}/
+                    {text("月", "mois")}
+                  </p>
+                ) : null}
               </Fact>
               <Fact label={text("支付周期", "Règlement")}>{cycle}</Fact>
+              <Fact label={text("约定付款日", "Jour de règlement")}>
+                {contract.payment_day
+                  ? `${contract.payment_day}${text(" 号", " du mois")}`
+                  : text("待确认", "À confirmer")}
+              </Fact>
               <Fact label={text("登记覆盖至", "Couverture enregistrée jusqu’au")}>
                 {contract.paid_through_date || text("未登记", "Non renseigné")}
               </Fact>
               <Fact label={text("约定押金", "Caution contractuelle")}>
                 {money(contract.deposit_amount_xof)}
               </Fact>
+              <Fact label={text("押金登记状态", "Indicateur de caution")}>
+                {contract.deposit_received
+                  ? text("标记已收，须核凭证", "Indiquée reçue, justificatif à vérifier")
+                  : text("未标记实收", "Réception non indiquée")}
+              </Fact>
+              {contract.rent_free_days > 0 ? (
+                <Fact label={text("免租天数", "Jours de franchise")}>
+                  {contract.rent_free_days}
+                </Fact>
+              ) : null}
+              {contract.signer_name ? (
+                <Fact label={text("签约人", "Signataire")}>{contract.signer_name}</Fact>
+              ) : null}
             </dl>
             <p className="mt-3 rounded-lg bg-muted/45 px-3 py-2.5 text-xs leading-5 text-muted-foreground">
               {text(
@@ -358,6 +401,14 @@ function InspectorContent({
           </p>
         ) : tab === "finance" ? (
           <>
+            {financeTools ? (
+              <div
+                className="mb-4 flex flex-wrap gap-2"
+                aria-label={text("账务办理", "Opérations financières")}
+              >
+                {financeTools}
+              </div>
+            ) : null}
             <div className="rounded-xl border border-border/75 bg-muted/20 p-3.5">
               <p className="text-xs text-muted-foreground">
                 {text("已核应收 · 当前未收", "Créances vérifiées · Solde actuel")}
@@ -399,6 +450,9 @@ function InspectorContent({
               </Fact>
               <Fact label={text("已录经营支出", "Décaissements enregistrés")}>
                 {hasExpense ? money(cash.expense) : noCash}
+              </Fact>
+              <Fact label={text("经营现金净额", "Flux de caisse net")}>
+                {hasIncome || hasExpense ? money(cash.net) : noCash}
               </Fact>
             </dl>
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
@@ -447,22 +501,35 @@ function InspectorContent({
           <>
             <p className="mb-3 text-xs leading-5 text-muted-foreground">
               {text(
-                "最近登记的财务记录，不等于完整操作审计；操作身份以审计日志为准。",
-                "Dernières écritures financières, pas un journal d’audit complet. L’identité de l’opérateur se vérifie dans l’audit.",
+                "本合同完整财务记录，不等于完整操作审计；操作身份以审计日志为准。",
+                "Toutes les écritures financières du contrat, pas un journal d’audit complet. L’identité de l’opérateur se vérifie dans l’audit.",
               )}
             </p>
-            {recentPayments.length === 0 ? (
+            {orderedPayments.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 {text("暂无财务记录", "Aucune écriture financière")}
               </p>
             ) : (
               <ol className="divide-y divide-border/60">
-                {recentPayments.map((payment) => {
+                {orderedPayments.map((payment) => {
                   const line = classifyContractCashPayment(payment);
-                  const label =
-                    categories[payment.source_type as keyof typeof categories] ??
-                    text("其他财务记录", "Autre écriture");
-                  const sign = line.kind === "expense" || line.kind === "deposit_out" ? "−" : "+";
+                  const original = getRecordedOriginalPayment(payment);
+                  const display = paymentDisplay(payment, locale);
+                  const config = getLeaseFinancialConfigBySourceType(payment.source_type);
+                  const label = config
+                    ? text(config.labelZh, config.labelFr)
+                    : payment.source_type === "lease_deposit_deduction"
+                      ? text("押金扣款", "Retenue sur dépôt")
+                      : payment.source_type === "lease_rent_refund"
+                        ? text("租金退款", "Remboursement de loyer")
+                        : (categories[payment.source_type as keyof typeof categories] ??
+                          text("其他财务记录", "Autre écriture"));
+                  const sign =
+                    line.kind === "expense" || line.kind === "deposit_out"
+                      ? "−"
+                      : line.kind === "income" || line.kind === "deposit_in"
+                        ? "+"
+                        : "";
                   return (
                     <li key={payment.id} className="py-3 first:pt-0">
                       <div className="flex items-start justify-between gap-3 text-xs">
@@ -472,14 +539,25 @@ function InspectorContent({
                         </span>
                       </div>
                       <p className="mt-1.5 text-sm font-semibold tabular-nums">
-                        {payment.native_settlement
-                          ? paymentDisplay(payment, locale).primary
-                          : line.kind === "excluded"
-                            ? line.reason === "non_cash_offset"
-                              ? text("非现金抵扣", "Compensation hors caisse")
-                              : text("待核对，不计入现金", "À vérifier, exclu du cash")
-                            : `${sign}${money(line.amountXof)}`}
+                        {sign}
+                        {original
+                          ? formatMoney(original.amount, original.currency, locale)
+                          : display.primary}
                       </p>
+                      {line.kind === "excluded" ? (
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          {payment.native_settlement
+                            ? display.secondary
+                            : line.reason === "non_cash_offset"
+                              ? text("非现金抵扣，不计入现金", "Compensation hors caisse")
+                              : text("待核对，不计入现金", "À vérifier, exclu du cash")}
+                        </p>
+                      ) : display.secondary || original ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {text("折合 ", "Équiv. ")}
+                          {money(line.amountXof)}
+                        </p>
+                      ) : null}
                       <p className="mt-1 break-words text-xs leading-5 text-muted-foreground">
                         {text("实收人", "Encaisseur")}:{" "}
                         {payment.actual_collector || text("待核对", "À vérifier")}
@@ -490,14 +568,12 @@ function InspectorContent({
                 })}
               </ol>
             )}
-            {contractPayments.length > recentPayments.length ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                {text(
-                  "仅显示最近 6 笔，其余见完整财务记录。",
-                  "Les 6 dernières écritures sont affichées. Consultez le dossier pour la suite.",
-                )}
-              </p>
-            ) : null}
+            <p className="mt-3 text-xs text-muted-foreground">
+              {text(
+                `共 ${orderedPayments.length} 笔财务记录`,
+                `${orderedPayments.length} écritures financières`,
+              )}
+            </p>
           </>
         )}
       </div>
@@ -506,6 +582,11 @@ function InspectorContent({
         {contract.status === "active" && collectionHref ? (
           <Link
             href={collectionHref}
+            aria-disabled={busy || undefined}
+            tabIndex={busy ? -1 : undefined}
+            onClick={(event) => {
+              if (busy) event.preventDefault();
+            }}
             className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
           >
             {text("登记实际收款", "Enregistrer un encaissement")}
@@ -519,23 +600,22 @@ function InspectorContent({
           <p className="mt-1.5 text-[13px] font-medium leading-5">{suggestion.title}</p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">{suggestion.detail}</p>
         </section>
-        <Button
-          type="button"
-          variant="outline"
-          className="min-h-10 w-full border-blue-200/80 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/50"
-          onClick={() => onOpen(tab === "contract" ? "overview" : "finance")}
-        >
-          {tab === "contract"
-            ? text("打开合同详情 / 办理", "Ouvrir le dossier / Gérer")
-            : text("打开完整财务记录", "Ouvrir les écritures complètes")}
-          <ArrowUpRight aria-hidden="true" />
-        </Button>
+        {operationError ? (
+          <p role="alert" className="text-xs text-red-700">
+            {operationError}
+          </p>
+        ) : null}
+        {actions ? (
+          <div className="grid gap-2" aria-label={text("合同办理", "Opérations du contrat")}>
+            {actions}
+          </div>
+        ) : null}
         <Button
           type="button"
           variant="ghost"
           className="min-h-10 w-full text-xs"
           onClick={onPrint}
-          disabled={loading}
+          disabled={loading || busy}
         >
           <Printer aria-hidden="true" />
           {text("合同 / 打印", "Contrat / Imprimer")}

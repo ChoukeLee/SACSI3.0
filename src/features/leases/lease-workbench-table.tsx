@@ -184,7 +184,9 @@ export function LeaseWorkbenchTable({
       {toolbar ? <div className="border-b border-border p-3">{toolbar}</div> : null}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2.5">
         <p className="text-xs leading-5 text-muted-foreground">
-          {zh ? "房号快速预览 · 客户查看完整合同" : "Lot : aperçu · Client : contrat complet"}
+          {zh
+            ? "点击房号或客户，在同一档案查看合同并办理"
+            : "Lot ou client : un dossier unique pour consulter et agir"}
         </p>
         <label className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
           <span>{zh ? "排序" : "Trier"}</span>
@@ -310,7 +312,8 @@ export function LeaseWorkbenchTable({
                 </p>
                 <div data-compact="balance" className="mt-1 leading-5">
                   <p className={cn(row.balanceOverdue && "text-red-600 dark:text-red-400")}>
-                    {zh ? "已建应收未收" : "Créances restantes"} {row.nativeBalanceLabel ?? formatAmount(row.balanceXof)}
+                    {zh ? "已建应收未收" : "Créances restantes"}{" "}
+                    {row.nativeBalanceLabel ?? formatAmount(row.balanceXof)}
                   </p>
                   {row.balanceDetail ? (
                     <p className="text-muted-foreground">{row.balanceDetail}</p>
@@ -328,7 +331,9 @@ export function LeaseWorkbenchTable({
                 ) : null}
               </td>
               <td data-col="amount" className="px-2.5 py-3 text-right leading-5 tabular-nums">
-                <p className="font-medium">{row.nativeAmountLabel ?? formatAmount(row.amountXof)}</p>
+                <p className="font-medium">
+                  {row.nativeAmountLabel ?? formatAmount(row.amountXof)}
+                </p>
                 {row.amountDetail ? (
                   <p className="mt-1 text-muted-foreground">{row.amountDetail}</p>
                 ) : null}

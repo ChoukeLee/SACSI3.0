@@ -14,6 +14,7 @@ vi.mock("@/features/leases/actions", () => ({
 vi.mock("@/features/print", () => ({ printLeaseContract: vi.fn(), printSaleContract: vi.fn() }));
 
 import { LeaseList } from "@/features/leases/lease-list";
+import { activateContract, recordLeaseFinancialEntry } from "@/features/leases/actions";
 import { parseWorkspaceQuery, type WorkspaceData } from "@/features/contracts/workspace-model";
 import type { LeaseContractRow } from "@/types/database";
 import {
@@ -121,6 +122,12 @@ function detailFor(input: RequestInfo | URL, balance = 123456) {
 async function render(
   data = dataFor(),
   linked: { initialContract?: string; returnTo?: string } = {},
+  permissions: Partial<{
+    canRecordFinance: boolean;
+    canActivate: boolean;
+    canMoveOut: boolean;
+    canCorrectRentPeriod: boolean;
+  }> = {},
 ) {
   await act(async () =>
     root.render(
@@ -135,6 +142,7 @@ async function render(
         canRecordFinance={false}
         canActivate={false}
         canMoveOut={false}
+        {...permissions}
       />,
     ),
   );
@@ -249,12 +257,212 @@ it("drops a linked contract immediately when changing project and rejects an ext
   expect(preview()?.textContent).not.toContain("123,456");
 });
 
-it("preserves the customer's full contract dialog instead of changing it into the read-only preview", async () => {
+it("opens the same complete dossier from the customer name without another detail dialog", async () => {
   await render();
   await click(host.querySelector("tbody td:nth-child(2) button"));
   await settle();
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Synthetic guest");
+  expect(preview()?.textContent).toContain("Synthetic guest");
+  expect(preview()?.textContent).toContain("约定付款日");
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
   expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it("opens focused deposit and move-out forms directly and returns to the same dossier", async () => {
+  await render(dataFor(), {}, { canRecordFinance: true, canMoveOut: true });
+  await click(previewButtons()[0]);
+  await settle();
+  const dossier = preview();
+  expect(dossier?.querySelector('a[href*="/collect"]')?.textContent).toContain("登记实际收款");
+  expect(dossier?.textContent).not.toContain("打开合同详情 / 办理");
+  await click(namedButton("押金 / 其他收支", dossier!));
+  await settle();
+  expect(fetch).toHaveBeenCalledTimes(2);
+  const depositForm = document.querySelector('[role="dialog"]')!;
+  expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+  expect(depositForm.textContent).toContain("新增长租财务记录");
+  expect(depositForm.textContent).toContain("SYNTHETIC-0");
+  expect(depositForm.textContent).toContain("业务类型");
+  expect(depositForm.textContent).not.toContain("风险概览");
+  await click(depositForm.querySelector('button[aria-label="Close"]'));
+  await settle();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(preview()?.textContent).toContain("SYNTHETIC-0");
+  const moveOut = [...preview()!.querySelectorAll("button")].find((button) =>
+    button.textContent?.includes("退租"),
+  );
+  await click(moveOut);
+  await settle();
+  const moveOutForm = document.querySelector('[role="dialog"]')!;
+  expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+  expect(moveOutForm.textContent).toContain("本次已实际补收租金");
+  expect(moveOutForm.textContent).toContain("本次实际退还押金");
+  expect(moveOutForm.textContent).not.toContain("打开完整财务记录");
+});
+
+it("hides all mutation controls for viewers while retaining the full contract and financial records", async () => {
+  await render();
+  await click(previewButtons()[0]);
+  await settle();
+  expect(preview()?.textContent).not.toContain("押金 / 其他收支");
+  expect(preview()?.querySelector('a[href*="/collect"]')).toBeNull();
+  expect(
+    [...preview()!.querySelectorAll("button")].some((button) =>
+      button.textContent?.includes("退租"),
+    ),
+  ).toBe(false);
+  await showFinance();
+  expect(preview()?.textContent).not.toContain("更正租金账期");
+  await click(namedButton("记录", preview()!));
+  expect(preview()?.textContent).toContain("本合同完整财务记录");
+});
+
+it("does not open an operation form if its exact-contract fresh read fails", async () => {
+  await render(dataFor(), {}, { canRecordFinance: true, canMoveOut: true });
+  await click(previewButtons()[0]);
+  await settle();
+  vi.mocked(fetch).mockResolvedValueOnce(new Response("", { status: 503 }));
+  await click(namedButton("押金 / 其他收支", preview()!));
+  await settle();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(host.textContent).toContain("合同数据暂不可核验");
+  expect(preview()?.textContent).not.toContain("押金 / 其他收支");
+});
+
+it("discards an in-flight operation read after changing the project", async () => {
+  await render(dataFor(), {}, { canRecordFinance: true });
+  await click(previewButtons()[0]);
+  await settle();
+  let complete!: (value: Response) => void;
+  vi.mocked(fetch).mockImplementationOnce(
+    () =>
+      new Promise<Response>((resolve) => {
+        complete = resolve;
+      }),
+  );
+  await click(namedButton("押金 / 其他收支", preview()!));
+  const pendingInput = vi.mocked(fetch).mock.calls.at(-1)![0];
+  const nav = host.querySelector('nav[aria-label="项目切换"]')!;
+  await click(namedButton("科建建材城", nav));
+  await settle();
+  await act(async () => complete(Response.json(detailFor(pendingInput))));
+  await settle();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(preview()?.textContent).not.toContain("SYNTHETIC-0");
+});
+
+it("requires the latest active status before opening a move-out form", async () => {
+  await render(dataFor(), {}, { canMoveOut: true });
+  await click(previewButtons()[0]);
+  await settle();
+  vi.mocked(fetch).mockImplementationOnce(async (input) => {
+    const value = detailFor(input);
+    value.contracts[0].status = "terminated";
+    return Response.json(value);
+  });
+  const moveOut = [...preview()!.querySelectorAll("button")].find((button) =>
+    button.textContent?.includes("退租"),
+  );
+  await click(moveOut);
+  await settle();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(host.textContent).toContain("合同状态已变化");
+});
+
+it.each([
+  ["finance", "select"],
+  ["finance", "close"],
+  ["moveout", "select"],
+  ["moveout", "close"],
+  ["activate", "select"],
+  ["activate", "close"],
+] as const)(
+  "cancels delayed %s preparation when the same-scope dossier is %s",
+  async (operation, navigation) => {
+    if (operation === "activate") {
+      vi.mocked(fetch).mockImplementationOnce(async (input) => {
+        const detail = detailFor(input);
+        detail.contracts[0].status = "draft";
+        return Response.json(detail);
+      });
+    }
+    await render(dataFor(), {}, { canRecordFinance: true, canMoveOut: true, canActivate: true });
+    await click(previewButtons()[0]);
+    await settle();
+    const action =
+      operation === "finance"
+        ? namedButton("押金 / 其他收支", preview()!)
+        : operation === "activate"
+          ? namedButton("激活合同", preview()!)
+          : [...preview()!.querySelectorAll("button")].find((button) =>
+              button.textContent?.includes("退租"),
+            );
+    const navigationButton =
+      navigation === "select"
+        ? previewButtons()[1]
+        : preview()!.querySelector('button[aria-label="关闭预览"]');
+    let complete!: (value: Response) => void;
+    let pendingInput!: RequestInfo | URL;
+    vi.mocked(fetch).mockImplementationOnce((input) => {
+      pendingInput = input;
+      return new Promise<Response>((resolve) => {
+        complete = resolve;
+      });
+    });
+    // These events may be queued before the fresh-read loading render commits.
+    await act(async () => {
+      (action as HTMLButtonElement).click();
+      (navigationButton as HTMLButtonElement).click();
+    });
+    expect(requestInfo(pendingInput).contractId).toBe(workspaceContract);
+    const delayed = detailFor(pendingInput);
+    if (operation === "activate") delayed.contracts[0].status = "draft";
+    await act(async () => complete(Response.json(delayed)));
+    await settle();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(activateContract).not.toHaveBeenCalled();
+    expect(recordLeaseFinancialEntry).not.toHaveBeenCalled();
+    if (navigation === "close") expect(preview()?.textContent).not.toContain("SYNTHETIC-0");
+    else {
+      expect(preview()?.textContent).not.toContain("新增长租财务记录");
+      expect(host.querySelectorAll('tbody tr[data-selected="true"]')).toHaveLength(1);
+      expect(requestInfo(vi.mocked(fetch).mock.calls.at(-1)![0]).contractId).toBe(
+        dataFor().contracts[1].id,
+      );
+    }
+  },
+);
+
+it("keeps the focused financial form open and prevents duplicate submits while a write is pending", async () => {
+  await render(dataFor(), {}, { canRecordFinance: true });
+  await click(previewButtons()[0]);
+  await settle();
+  await click(namedButton("押金 / 其他收支", preview()!));
+  await settle();
+  const form = document.querySelector('[role="dialog"]')!;
+  const amount = form.querySelector<HTMLInputElement>('input[type="number"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(amount, "1");
+    amount.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  let complete!: (value: { success: boolean; error: string }) => void;
+  vi.mocked(recordLeaseFinancialEntry).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve;
+      }),
+  );
+  const submit = namedButton("确认保存财务记录", form)!;
+  await act(async () => {
+    submit.click();
+    submit.click();
+  });
+  expect(recordLeaseFinancialEntry).toHaveBeenCalledTimes(1);
+  expect(form.querySelector("fieldset")?.disabled).toBe(true);
+  await click(form.querySelector('button[aria-label="Close"]'));
+  expect(document.querySelector('[role="dialog"]')).toBe(form);
+  await act(async () => complete({ success: false, error: "Synthetic rejection" }));
+  expect(form.querySelector("fieldset")?.disabled).toBe(false);
+  expect(form.textContent).toContain("Synthetic rejection");
 });
 
 it("does not reuse the preceding contract balance while the next selected preview is loading", async () => {

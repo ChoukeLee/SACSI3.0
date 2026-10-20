@@ -22,7 +22,7 @@ import { UnitFloorIndex, UnitWorkbenchRow } from "./unit-workbench-table";
 import styles from "./unit-workbench.module.css";
 
 const UnitConditionDrawer = dynamic(() =>
-  import("./unit-detail-panel").then((module) => module.UnitDetailPanel),
+  import("./unit-condition-editor").then((module) => module.UnitConditionEditor),
 );
 
 export function UnitWorkbench({
@@ -44,7 +44,8 @@ export function UnitWorkbench({
     record: data.selected,
   });
   const selected = selection.key === selectionKey ? selection.record : data.selected;
-  const [showCondition, setShowCondition] = useState(false);
+  const [conditionTarget, setConditionTarget] = useState<string | null>(null);
+  const selectedVersion = selected ? `${selected.unit.id}:${selected.unit.updated_at}` : null;
   const inspectorRef = useRef<HTMLDivElement>(null);
   const inspectorId = useId();
   const zh = locale === "zh";
@@ -84,7 +85,7 @@ export function UnitWorkbench({
   };
   const navigate = (patch: Partial<UnitWorkbenchQuery>) => {
     setSelection({ key: selectionKey, record: null });
-    setShowCondition(false);
+    setConditionTarget(null);
     startTransition(() =>
       router.push(unitWorkbenchHref(locale, query, { unit: "", page: 1, ...patch }), {
         scroll: false,
@@ -93,7 +94,7 @@ export function UnitWorkbench({
   };
   const select = (record: UnitWorkbenchRecord | null) => {
     setSelection({ key: selectionKey, record });
-    setShowCondition(false);
+    setConditionTarget(null);
     window.history.replaceState(
       null,
       "",
@@ -465,7 +466,7 @@ export function UnitWorkbench({
                       href={unitWorkbenchHref(locale, query, { page: query.page - 1, unit: "" })}
                       onClick={() => {
                         setSelection({ key: selectionKey, record: null });
-                        setShowCondition(false);
+                        setConditionTarget(null);
                       }}
                       prefetch={false}
                     >
@@ -478,7 +479,7 @@ export function UnitWorkbench({
                       href={unitWorkbenchHref(locale, query, { page: query.page + 1, unit: "" })}
                       onClick={() => {
                         setSelection({ key: selectionKey, record: null });
-                        setShowCondition(false);
+                        setConditionTarget(null);
                       }}
                       prefetch={false}
                     >
@@ -512,21 +513,21 @@ export function UnitWorkbench({
                 canEdit={canEdit}
                 returnTo={sourceHref}
                 onClose={() => select(null)}
-                onManage={() => setShowCondition(true)}
+                onManage={() => setConditionTarget(selectedVersion)}
               />
             </div>
           </div>
-          {selected && showCondition ? (
+          {selected && selectedVersion === conditionTarget && canEdit ? (
             <UnitConditionDrawer
+              key={`${selected.unit.id}:${selected.unit.updated_at}`}
               unit={selected.unit}
               position={selected.position ?? undefined}
               buildingName={building.display_name}
-              businessFlags={selected.flags}
               locale={locale}
               canEdit={canEdit}
-              onClose={() => setShowCondition(false)}
+              onClose={() => setConditionTarget(null)}
               onStatusChanged={() => {
-                setShowCondition(false);
+                setConditionTarget(null);
                 startTransition(() => router.refresh());
               }}
             />

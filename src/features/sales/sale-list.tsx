@@ -2,11 +2,10 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, DollarSign, CalendarPlus, TrendingUp, AlertTriangle } from "lucide-react";
+import { Plus } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
-import { formatMoney } from "@/lib/currency";
 import { contractStatusVariant as statusVariant } from "@/lib/status-styles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,10 +39,6 @@ import {
   matchesContractSearch,
   type ContractTableRow,
 } from "@/features/contracts/contract-list-model";
-import {
-  classifyContractCashPayment,
-  summarizeContractCash,
-} from "@/features/contracts/contract-cash-model";
 import { resolveContractProjectLink } from "@/features/contracts/project-link";
 import { useContractWorkspace } from "@/features/contracts/use-workspace";
 import type { WorkspaceData } from "@/features/contracts/workspace-model";
@@ -52,14 +47,13 @@ import { useContractPrinter } from "@/features/contracts/use-contract-printer";
 import { safeWorkbenchReturnTo } from "@/lib/workbench-links";
 import { SaleWorkbenchTable } from "./sale-workbench-table";
 import { SaleWorkbenchRooms } from "./sale-workbench-rooms";
-import { SaleWorkbenchInspector } from "./sale-workbench-inspector";
+import { SaleWorkbenchInspector, type SaleWorkbenchAction } from "./sale-workbench-inspector";
 import { useSaleWorkbenchPreview } from "./use-sale-workbench-preview";
 import {
   SALE_UUID,
   salePrice,
   saleWorkbenchHref,
   saleWorkbenchStats,
-  saleScheduleState,
 } from "./sale-workbench-model";
 import styles from "./sale-workbench.module.css";
 import {
@@ -96,8 +90,7 @@ interface SaleListProps {
   canManage?: boolean;
   canTerminate?: boolean;
 }
-type PanelType = "new" | "detail" | "insight" | null;
-const SALE_RECEIPT_SOURCE_TYPES = new Set(["sale", "sale_contract", "property_fee", "parking_fee"]);
+type PanelType = "new" | "insight" | SaleWorkbenchAction | null;
 
 function getSaleDataFlags(contract: SaleContractRow, customer?: CustomerRow | null) {
   return {
@@ -156,7 +149,9 @@ export function SaleList({
     if (workspace.enabled && contractView === "table" && panel !== "insight")
       workspace.closeScope();
   }, [workspace.enabled, workspace.closeScope, contractView, panel]);
-  const [detailSection, setDetailSection] = useState<"overview" | "finance">("overview");
+  const [previewTab, setPreviewTab] = useState<"overview" | "finance">("overview");
+  const actionRequestRef = useRef(0);
+  const actionSelectionRef = useRef("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -183,7 +178,6 @@ export function SaleList({
   const [trCertNo, setTrCertNo] = useState("");
   const [termReason, setTermReason] = useState("");
   const [showFlexForm, setShowFlexForm] = useState(false);
-  const financeSectionRef = useRef<HTMLDivElement | null>(null);
   const requestedProjectId = resolveContractProjectLink(buildings, initialProject);
   const scopeBuildingIds = useMemo(
     () =>
@@ -241,12 +235,22 @@ export function SaleList({
       });
     });
   };
-  const selectPreview = (id: string) => {
+  actionSelectionRef.current =
+    previewSelection?.scope === currentScope ? `${currentScope}/${previewSelection.id}` : "";
+  const selectPreview = (id: string, section: "overview" | "finance" = "overview") => {
+    actionRequestRef.current += 1;
     setPreviewSelection({ id, scope: currentScope });
+    setPreviewTab(section);
     setPanel(null);
+    setSelectedId(null);
     revealPreview();
   };
-  const closePreview = () => setPreviewSelection(null);
+  const closePreview = () => {
+    actionRequestRef.current += 1;
+    setPreviewSelection(null);
+    setPanel(null);
+    setSelectedId(null);
+  };
   useEffect(() => {
     if (!currentQuery || typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -548,37 +552,6 @@ export function SaleList({
         : [],
     [receivables, selectedId],
   );
-  const contractPayments = useMemo(
-    () => (selectedId ? payments.filter((p) => p.source_id === selectedId) : []),
-    [payments, selectedId],
-  );
-  const selectedSummary = selectedId ? contractSummaryMap.get(selectedId) : undefined;
-  const totalOverdueRec = selectedSummary?.overdue ?? 0;
-  const saleCash = useMemo(() => summarizeContractCash(contractPayments), [contractPayments]);
-  const isSaleExpensePayment = (payment: PaymentRow) =>
-    classifyContractCashPayment(payment).kind === "expense";
-  const saleFinancialIncome = saleCash.income;
-  const saleFinancialExpense = saleCash.expense;
-  const saleFinancialNet = saleCash.net;
-  const selectedContractTotal = selected ? salePrice(selected) : null;
-  const saleContractReceived = selectedSummary?.count ? selectedSummary.paid : null;
-  const selectedOutstanding = selectedSummary?.count ? selectedSummary.outstanding : null;
-  const selectedCnyPayments = contractPayments.filter(
-    (p) =>
-      p.currency === "CNY" &&
-      SALE_RECEIPT_SOURCE_TYPES.has(p.source_type) &&
-      classifyContractCashPayment(p).kind === "income",
-  );
-  const selectedCnyReceived = selectedCnyPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-
-  const getSchedStatus = (s: SalePaymentScheduleRow, rr: ReceivableRow[]) => {
-    return saleScheduleState(
-      s,
-      rr,
-      workspace.detailData?.today ?? new Date().toISOString().slice(0, 10),
-    );
-  };
-
   const openNew = async () => {
     if (workspace.enabled) {
       try {
@@ -591,25 +564,59 @@ export function SaleList({
     setSelectedId(null);
     setError("");
   };
-  const openDetail = async (id: string, section: "overview" | "finance" = "overview") => {
+  const openAction = async (id: string, action: SaleWorkbenchAction) => {
+    if (
+      financeBusy.current ||
+      saving ||
+      workspace.unavailable ||
+      (action === "payment" && !canRecordFinance) ||
+      (["installment", "transfer"].includes(action) && !canManage) ||
+      (action === "terminate" && !canTerminate)
+    )
+      return;
+    const request = ++actionRequestRef.current;
+    const identity = `${currentScope}/${id}`;
     setPanel(null);
     setSelectedId(null);
     setPayScheduleId("");
     setPayAmount(0);
+    setPayReceiptNo("");
     setShowFlexForm(false);
     setTrDate("");
+    setTermReason("");
     setError("");
+    let fresh: SaleContractRow | undefined;
+    let freshSchedules = schedules.filter((row) => row.sale_contract_id === id);
     if (workspace.enabled) {
       try {
-        await workspace.ensure("detail", id);
+        const detail = await workspace.ensure("detail", id);
+        fresh = detail.contracts.find((row) => row.id === id) as SaleContractRow | undefined;
+        freshSchedules = detail.schedules.filter((row) => row.sale_contract_id === id);
       } catch {
         return;
       }
-    }
+    } else fresh = contracts.find((row) => row.id === id);
+    // A scope change or another selection must never revive an old operation target.
+    if (
+      request !== actionRequestRef.current ||
+      actionSelectionRef.current !== identity ||
+      !fresh ||
+      fresh.status !== "active"
+    )
+      return;
     setSelectedId(id);
-    setDetailSection(section);
-    setPanel("detail");
-    setError("");
+    if (action === "payment") {
+      setPayScheduleId(freshSchedules.find((row) => row.status !== "paid")?.id ?? "");
+    } else if (action === "installment") {
+      setShowFlexForm(true);
+      setFlexDueDate("");
+      setFlexAmount(0);
+    } else if (action === "transfer") {
+      setTrStatus(fresh.transfer_status);
+      setTrDate(new Date().toISOString().slice(0, 10));
+      setTrCertNo(fresh.title_certificate_no ?? "");
+    }
+    setPanel(action);
   };
   const openInsight = async (key: SaleStatKey) => {
     if (workspace.enabled) {
@@ -659,14 +666,6 @@ export function SaleList({
         ),
     );
 
-  useEffect(() => {
-    if (panel !== "detail" || detailSection !== "finance") return;
-    const frame = window.requestAnimationFrame(() =>
-      financeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-    );
-    return () => window.cancelAnimationFrame(frame);
-  }, [detailSection, panel, selectedId]);
-
   const handleCreate = async () => {
     if (workspace.unavailable) return;
     if (!fUnitId || !fCustomerId || !fSignedDate || fTotalAmount <= 0) {
@@ -703,6 +702,7 @@ export function SaleList({
     }
   };
   const handlePay = async () => {
+    if (!canRecordFinance || !selected || selected.status !== "active") return;
     if (!selectedId || !payScheduleId || payAmount <= 0) {
       setError(locale === "zh" ? "请选择分期并输入金额" : "Champs obligatoires");
       return;
@@ -722,6 +722,7 @@ export function SaleList({
         setPayScheduleId("");
         setPayAmount(0);
         setPayReceiptNo("");
+        setPanel(null);
       },
     );
   };
@@ -754,7 +755,8 @@ export function SaleList({
     }
   };
   const handleAddFlex = async () => {
-    if (!selected || !flexDueDate || flexAmount <= 0) return;
+    if (!canManage || !selected || selected.status !== "active" || !flexDueDate || flexAmount <= 0)
+      return;
     const payload = {
       contractId: selected.id,
       installmentNo: Math.max(0, ...contractSchedules.map((s) => s.installment_no)) + 1,
@@ -770,11 +772,12 @@ export function SaleList({
         setShowFlexForm(false);
         setFlexDueDate("");
         setFlexAmount(0);
+        setPanel(null);
       },
     );
   };
   const handleTransfer = async () => {
-    if (!selected || !trDate) return;
+    if (!canManage || !selected || selected.status !== "active" || !trDate) return;
     const payload = {
       contractId: selected.id,
       status: trStatus,
@@ -798,7 +801,7 @@ export function SaleList({
     );
   };
   const handleTerminateSale = async () => {
-    if (!selected) return;
+    if (!canTerminate || !selected || selected.status !== "active") return;
     const payload = {
       contractId: selected.id,
       reason: termReason || (locale === "zh" ? "手动终止" : "Manuel"),
@@ -826,51 +829,11 @@ export function SaleList({
   const inputClass =
     "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
   const labelClass = "block text-xs font-semibold text-muted-foreground mb-1";
-  const schedLabel = (s: string) => {
-    const l: Record<string, string> =
-      locale === "zh"
-        ? {
-            pending: "待付 / 未逾期",
-            partial: "部分核销 / 未逾期",
-            paid: "已核销",
-            overdue: "逾期",
-            cancelled: "取消",
-            unverified: "应收关联待核",
-          }
-        : {
-            pending: "En attente",
-            partial: "Partiellement payé",
-            paid: "Payé",
-            overdue: "En retard",
-            cancelled: "Annulé",
-            unverified: "Créance à vérifier",
-          };
-    return l[s] ?? (locale === "zh" ? "待核实" : "À vérifier");
-  };
   const transText = (s: string) =>
     locale === "zh"
       ? ({ not_started: "未开始", in_progress: "办理中", completed: "已完成" }[s] ?? "待核实")
       : ({ not_started: "Non commencé", in_progress: "En cours", completed: "Terminé" }[s] ??
         "À vérifier");
-  const salePaymentKindLabel = (payment: PaymentRow) => {
-    const labels: Record<string, [string, string]> = {
-      sale: ["房款收款", "Paiement du bien"],
-      sale_contract: ["房款收款", "Paiement du bien"],
-      sale_other_income: ["其他经营收款", "Autre encaissement"],
-      sale_other_expense: ["其他经营支出", "Autre décaissement"],
-      sale_registration_fee: ["注册金收款", "Frais d'inscription"],
-      sale_agency_income: ["中介费收款", "Commission reçue"],
-      sale_agency_expense: ["中介费支出", "Commission versée"],
-      sale_refund: ["售款退款", "Remboursement du bien"],
-      parking_fee: ["车位款收款", "Paiement parking"],
-      property_fee: ["物业费收款", "Frais de copropriété"],
-    };
-    return (
-      labels[payment.source_type]?.[locale === "zh" ? 0 : 1] ??
-      (locale === "zh" ? "待核对财务记录" : "Écriture à vérifier")
-    );
-  };
-
   const sellableUnits = useMemo(
     () =>
       units.filter(
@@ -1013,7 +976,7 @@ export function SaleList({
           )}
         </div>
       )}
-      <div className={contractView === "table" ? styles.grid : undefined}>
+      <div className={styles.grid}>
         <div className="min-w-0">
           {!workspace.unavailable && contractView === "table" && (
             <SaleWorkbenchTable
@@ -1053,12 +1016,12 @@ export function SaleList({
               customers={customerMap}
               summaries={contractSummaryMap}
               locale={locale}
-              onOpen={(id, section) => void openDetail(id, section)}
+              onOpen={(id, section) => selectPreview(id, section)}
               onPrint={printContract}
             />
           ) : null}
         </div>
-        {contractView === "table" && !workspace.unavailable ? (
+        {!workspace.unavailable ? (
           <div
             className={styles.inspectorColumn}
             ref={previewColumnRef}
@@ -1068,7 +1031,7 @@ export function SaleList({
             aria-label={locale === "zh" ? "选中出售合同详情" : "Détails de la vente sélectionnée"}
           >
             <SaleWorkbenchInspector
-              key={previewId ?? "empty"}
+              key={`${previewId ?? "empty"}-${previewTab}`}
               data={
                 workspace.enabled
                   ? preview.data
@@ -1093,8 +1056,13 @@ export function SaleList({
               returnTo={currentHref}
               onClose={closePreview}
               onRetry={preview.retry}
-              onOpen={(section) => {
-                if (previewId) void openDetail(previewId, section);
+              initialTab={previewTab}
+              canRecordFinance={canRecordFinance}
+              canManage={canManage}
+              canTerminate={canTerminate}
+              busy={saving}
+              onAction={(action) => {
+                if (previewId) void openAction(previewId, action);
               }}
               onPrint={printContract}
             />
@@ -1282,7 +1250,7 @@ export function SaleList({
                           size="sm"
                           variant="outline"
                           className="mt-3 w-full"
-                          onClick={() => openDetail(row.contract.id)}
+                          onClick={() => selectPreview(row.contract.id)}
                         >
                           {locale === "zh" ? "查看合同" : "Voir le contrat"}
                         </Button>
@@ -1434,399 +1402,46 @@ export function SaleList({
         </SalePanelShell>
       )}
 
-      {/* ── Detail Panel ── */}
-      {panel === "detail" && selected && (
+      {/* The inspector is the only contract detail. Drawers contain one action only. */}
+      {selected && ["payment", "installment", "transfer", "terminate"].includes(panel ?? "") && (
         <SalePanelShell
-          onClose={() => setPanel(null)}
-          title={selected.contract_no}
-          badge={
-            <Badge variant={statusVariant[selected.status]}>
-              {t.contractStatus[selected.status as keyof typeof t.contractStatus]}
-            </Badge>
+          onClose={() => {
+            if (!saving) setPanel(null);
+          }}
+          title={
+            panel === "payment"
+              ? locale === "zh"
+                ? "登记出售收款"
+                : "Enregistrer un paiement"
+              : panel === "installment"
+                ? locale === "zh"
+                  ? "新增付款分期"
+                  : "Ajouter une échéance"
+                : panel === "transfer"
+                  ? locale === "zh"
+                    ? "更新过户进度"
+                    : "Mettre à jour le transfert"
+                  : locale === "zh"
+                    ? "确认终止出售合同"
+                    : "Confirmer la résiliation"
           }
         >
-          <div className="space-y-4">
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-              <div>
-                <dt className="text-xs text-muted-foreground">
-                  {locale === "zh" ? "楼栋 / 房号" : "Bâtiment / Lot"}
-                </dt>
-                <dd className="font-medium">
-                  {selectedBuilding?.display_name || selectedBuilding?.code || "-"} ·{" "}
-                  {selectedUnit?.unit_no ?? "-"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">{t.form.customer}</dt>
-                <dd className="font-medium">{selectedCustomer?.name ?? "-"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">{t.form.signedDate}</dt>
-                <dd>{selected.signed_date}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">{t.form.totalAmount}</dt>
-                <dd className="font-semibold">{formatXof(Number(selected.total_amount_xof))}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">
-                  {locale === "zh" ? "过户状态" : "Transfert"}
-                </dt>
-                <dd
-                  className={cn(
-                    "font-medium",
-                    selected.transfer_status === "completed" ? "text-emerald-600" : "",
-                  )}
-                >
-                  {transText(selected.transfer_status)}
-                </dd>
-              </div>
-            </dl>
-
-            <div className="border-t pt-4">
-              <h4 className="flex items-center gap-1.5 text-sm font-semibold">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-                {locale === "zh" ? "合同概览" : "Aperçu du contrat"}
-              </h4>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-md border border-blue-200 bg-blue-50/50 px-3 py-2">
-                  <p className="text-muted-foreground">
-                    {locale === "zh" ? "合同总额" : "Total contrat"}
-                  </p>
-                  <p className="font-semibold tabular-nums text-blue-700">
-                    {selectedContractTotal === null
-                      ? locale === "zh"
-                        ? "金额待核实"
-                        : "Montant à vérifier"
-                      : formatXof(selectedContractTotal)}
-                  </p>
-                </div>
-                <div className="rounded-md border border-emerald-200 bg-emerald-50/50 px-3 py-2">
-                  <p className="text-muted-foreground">
-                    {locale === "zh" ? "应收已核销" : "Créances réglées"}
-                  </p>
-                  <p className="font-semibold tabular-nums text-emerald-700">
-                    {saleContractReceived === null ? "—" : formatXof(saleContractReceived)}
-                  </p>
-                </div>
-                <div
-                  className={cn(
-                    "rounded-md border px-3 py-2",
-                    (selectedOutstanding ?? 0) > 0
-                      ? "border-amber-200 bg-amber-50/50"
-                      : "border-border bg-muted/25",
-                  )}
-                >
-                  <p className="text-muted-foreground">
-                    {locale === "zh" ? "已建应收未收" : "Créances restantes"}
-                  </p>
-                  <p
-                    className={cn(
-                      "font-semibold tabular-nums",
-                      (selectedOutstanding ?? 0) > 0 ? "text-amber-700" : "text-foreground",
-                    )}
-                  >
-                    {selectedOutstanding === null
-                      ? locale === "zh"
-                        ? "未建已核应收"
-                        : "Aucune créance vérifiée"
-                      : formatXof(selectedOutstanding)}
-                  </p>
-                </div>
-                <div
-                  className={cn(
-                    "rounded-md border px-3 py-2",
-                    totalOverdueRec > 0
-                      ? "border-red-200 bg-red-50/50"
-                      : "border-emerald-200 bg-emerald-50/50",
-                  )}
-                >
-                  <p className="text-muted-foreground">{locale === "zh" ? "逾期" : "En retard"}</p>
-                  <p
-                    className={cn(
-                      "font-semibold tabular-nums",
-                      totalOverdueRec > 0 ? "text-red-700" : "text-emerald-700",
-                    )}
-                  >
-                    {selectedSummary?.count ? formatXof(totalOverdueRec) : "—"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {selected.status === "active" && (
-              <div className="grid grid-cols-2 gap-2">
-                {canRecordFinance && (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setPayScheduleId(
-                        contractSchedules.find((s) => s.status !== "paid")?.id ?? "",
-                      );
-                      setPayAmount(0);
-                    }}
-                  >
-                    <DollarSign className="h-4 w-4" />
-                    {locale === "zh" ? "收款" : "Paiement"}
-                  </Button>
-                )}
-                {canManage && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setShowFlexForm(true);
-                      setFlexDueDate("");
-                      setFlexAmount(0);
-                      setError("");
-                    }}
-                  >
-                    <CalendarPlus className="h-4 w-4" />
-                    {locale === "zh" ? "新增分期" : "+Echeance"}
-                  </Button>
-                )}
-                {canManage && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setTrDate(new Date().toISOString().slice(0, 10));
-                      setTrStatus(selected.transfer_status);
-                    }}
-                  >
-                    <TrendingUp className="h-4 w-4" />
-                    {locale === "zh" ? "过户" : "Transfert"}
-                  </Button>
-                )}
-                {canTerminate && (
-                  <Button size="sm" variant="ghost" onClick={handleTerminateSale}>
-                    <AlertTriangle className="h-4 w-4" />
-                    {locale === "zh" ? "终止" : "Resilier"}
-                  </Button>
-                )}
-              </div>
-            )}
-
-            <div
-              ref={financeSectionRef}
-              className={cn(
-                "scroll-mt-20 border-t pt-4",
-                detailSection === "finance" && "-mx-2 rounded-xl px-2 ring-2 ring-primary/20",
-              )}
-            >
-              <div className="mb-2 space-y-1">
-                <h4 className="text-sm font-semibold">
-                  {locale === "zh" ? "财务记录" : "Écritures financières"}
-                </h4>
-                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium tabular-nums">
-                  <span className="text-emerald-700">
-                    {locale === "zh" ? "已录经营收款" : "Encaissements enregistrés"}{" "}
-                    {formatXof(saleFinancialIncome)}
-                  </span>
-                  <span className="text-red-600">
-                    {locale === "zh" ? "已录经营支出" : "Décaissements enregistrés"}{" "}
-                    {formatXof(saleFinancialExpense)}
-                  </span>
-                  <span className="text-slate-700">
-                    {locale === "zh" ? "经营现金净额" : "Flux de caisse net"}{" "}
-                    {formatXof(saleFinancialNet)}
-                  </span>
-                </div>
-                {selectedCnyReceived > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    {locale === "zh" ? "其中已录人民币收款 " : "Dont encaissements CNY "}
-                    {formatMoney(selectedCnyReceived, "CNY", locale)}
-                  </p>
-                )}
-                {(saleCash.excludedCount > 0 || saleCash.nonCashCount > 0) && (
-                  <p className="text-xs text-amber-700">
-                    {saleCash.excludedCount}{" "}
-                    {locale === "zh"
-                      ? "笔待核对记录未计入现金汇总"
-                      : "écritures à vérifier exclues du flux"}{" "}
-                    · {saleCash.nonCashCount}{" "}
-                    {locale === "zh" ? "笔非现金抵扣" : "compensations hors caisse"}
-                  </p>
-                )}
-                {selected.agency_commission_paid && (
-                  <p className="text-xs text-muted-foreground">
-                    {locale === "zh"
-                      ? "合同标注的佣金已付状态单独保留；未找到逐笔付款记录时，不代算现金支出。"
-                      : "Le statut de commission du contrat est conservé, mais ne remplace pas une écriture de caisse."}
-                  </p>
-                )}
-              </div>
-              {contractPayments.length === 0 && saleFinancialExpense <= 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  {locale === "zh" ? "暂无逐笔财务记录" : "Aucune écriture détaillée"}
-                </p>
-              ) : (
-                <div className="space-y-1.5">
-                  {contractPayments.map((payment) => {
-                    const cashLine = classifyContractCashPayment(payment);
-                    const isExpense = isSaleExpensePayment(payment);
-                    const display = {
-                      primary:
-                        payment.currency === "XOF"
-                          ? formatXof(Number(payment.amount))
-                          : formatMoney(Number(payment.amount), payment.currency, locale),
-                      secondary:
-                        payment.currency !== "XOF" && cashLine.amountXof !== null
-                          ? formatXof(cashLine.amountXof)
-                          : null,
-                    };
-                    return (
-                      <div
-                        key={payment.id}
-                        className={cn(
-                          "rounded-lg border px-3 py-2.5 text-[13px]",
-                          isExpense
-                            ? "border-red-100 bg-red-50/50"
-                            : "border-emerald-100 bg-emerald-50/40",
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={cn(
-                                  "font-semibold",
-                                  isExpense ? "text-red-700" : "text-emerald-800",
-                                )}
-                              >
-                                {salePaymentKindLabel(payment)}
-                              </span>
-                              <span className="text-xs tabular-nums text-muted-foreground">
-                                {payment.payment_date}
-                              </span>
-                            </div>
-                            <p
-                              className="mt-1 truncate text-[11px] text-muted-foreground"
-                              title={payment.receipt_no ?? payment.notes ?? ""}
-                            >
-                              {payment.receipt_no ||
-                                payment.notes ||
-                                (locale === "zh" ? "无业务编号" : "Sans référence")}
-                            </p>
-                            {cashLine.kind === "excluded" && (
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {locale === "zh"
-                                  ? "未计入现金汇总，保留原始记录"
-                                  : "Hors synthèse de caisse, écriture conservée"}
-                              </p>
-                            )}
-                          </div>
-                          <div
-                            className={cn(
-                              "shrink-0 text-right tabular-nums",
-                              isExpense ? "text-red-600" : "text-emerald-700",
-                            )}
-                          >
-                            <p className="font-semibold">
-                              {isExpense ? "- " : ""}
-                              {display.primary}
-                            </p>
-                            {cashLine.amountXof !== null && display.secondary && (
-                              <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">
-                                {locale === "zh" ? "折合 " : "Soit "}
-                                {display.secondary}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Paid contracts already have definitive entries in financial records. */}
-            {(selectedOutstanding === null || selectedOutstanding > 0) && (
-              <div className="border-t pt-4">
-                <h4 className="mb-2 text-sm font-semibold">
-                  {locale === "zh" ? "付款计划" : "Plan de paiement"}
-                </h4>
-                {contractSchedules.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    {locale === "zh" ? "暂无付款计划" : "Aucun plan"}
-                  </p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {contractSchedules.map((s) => {
-                      const stat = getSchedStatus(s, contractReceivables);
-                      const recPaid = contractReceivables.find(
-                        (r) =>
-                          r.due_date === s.due_date &&
-                          Math.abs(Number(r.amount_xof) - Number(s.amount_xof)) < 1,
-                      );
-                      const itemTitle =
-                        recPaid?.title
-                          ?.replace(new RegExp(`^${selectedUnit?.unit_no ?? ""}\\s*`), "")
-                          .trim() ||
-                        (selected?.payment_plan_type === "lump_sum"
-                          ? locale === "zh"
-                            ? "一次性付款"
-                            : "Paiement comptant"
-                          : locale === "zh"
-                            ? `第${s.installment_no}期`
-                            : `Échéance ${s.installment_no}`);
-                      return (
-                        <div
-                          key={s.id}
-                          className={cn(
-                            "rounded-lg border bg-card px-3 py-2.5 text-[13px]",
-                            stat === "overdue"
-                              ? "border-red-200"
-                              : stat === "paid"
-                                ? "border-emerald-200"
-                                : "border-amber-200",
-                          )}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-semibold">{itemTitle}</span>
-                                <Badge
-                                  variant={
-                                    stat === "paid"
-                                      ? "success"
-                                      : stat === "overdue"
-                                        ? "destructive"
-                                        : "warning"
-                                  }
-                                >
-                                  {schedLabel(stat)}
-                                </Badge>
-                              </div>
-                              <p className="mt-1 text-[11px] text-muted-foreground">
-                                {locale === "zh" ? "约定付款日" : "Date convenue"} {s.due_date}
-                                {recPaid && Number(recPaid.paid_amount_xof) > 0
-                                  ? ` · ${locale === "zh" ? "已收" : "Reçu"} ${formatXof(Number(recPaid.paid_amount_xof))}`
-                                  : ""}
-                              </p>
-                            </div>
-                            <span className="shrink-0 font-semibold tabular-nums">
-                              {formatXof(Number(s.amount_xof))}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
+          <div className="space-y-5">
+            <p className="border-b pb-4 text-sm text-muted-foreground">
+              {selected.contract_no} · {selectedBuilding?.display_name ?? "—"} ·{" "}
+              {selectedUnit?.unit_no ?? "—"} · {selectedCustomer?.name ?? "—"}
+            </p>
             {/* Pay form */}
-            {canRecordFinance && payScheduleId && (
-              <div className="space-y-2 rounded-md border bg-card p-3">
+            {canRecordFinance && panel === "payment" && (
+              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-xs text-muted-foreground">
+                    <label htmlFor="sale-action-schedule" className="text-xs text-muted-foreground">
                       {locale === "zh" ? "选择分期" : "Echeance"}
                     </label>
                     <select
+                      id="sale-action-schedule"
+                      disabled={saving}
                       value={payScheduleId}
                       onChange={(e) => {
                         setPayScheduleId(e.target.value);
@@ -1860,16 +1475,27 @@ export function SaleList({
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground">
+                    <label
+                      htmlFor="sale-action-payment-date"
+                      className="text-xs text-muted-foreground"
+                    >
                       {locale === "zh" ? "收款日期" : "Date"}
                     </label>
-                    <DateInput value={payDate} onChangeValue={setPayDate} className={inputClass} />
+                    <DateInput
+                      id="sale-action-payment-date"
+                      disabled={saving}
+                      value={payDate}
+                      onChangeValue={setPayDate}
+                      className={inputClass}
+                    />
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground">
+                    <label htmlFor="sale-action-amount" className="text-xs text-muted-foreground">
                       {locale === "zh" ? "金额" : "Montant"}
                     </label>
                     <input
+                      id="sale-action-amount"
+                      disabled={saving}
                       type="number"
                       value={payAmount}
                       onChange={(e) => setPayAmount(Number(e.target.value))}
@@ -1877,10 +1503,12 @@ export function SaleList({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground">
+                    <label htmlFor="sale-action-receipt" className="text-xs text-muted-foreground">
                       {locale === "zh" ? "收据号" : "Recu"}
                     </label>
                     <input
+                      id="sale-action-receipt"
+                      disabled={saving}
                       type="text"
                       value={payReceiptNo}
                       onChange={(e) => setPayReceiptNo(e.target.value)}
@@ -1890,14 +1518,27 @@ export function SaleList({
                 </div>
                 {error && <p className="text-xs text-red-600">{error}</p>}
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={handlePay} disabled={saving}>
+                  {!contractSchedules.some((schedule) => schedule.status !== "paid") ? (
+                    <p className="text-xs text-muted-foreground">
+                      {locale === "zh"
+                        ? "暂无可选分期，请先核对付款计划。"
+                        : "Aucune échéance disponible. Vérifiez le plan de paiement."}
+                    </p>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    onClick={handlePay}
+                    disabled={saving || !payScheduleId || payAmount <= 0}
+                  >
                     {saving ? "..." : locale === "zh" ? "确认收款" : "Encaisser"}
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
+                    disabled={saving}
                     onClick={() => {
                       setPayScheduleId("");
+                      setPanel(null);
                       setError("");
                     }}
                   >
@@ -1908,24 +1549,28 @@ export function SaleList({
             )}
 
             {/* Flex installment form */}
-            {canManage && showFlexForm && (
-              <div className="space-y-2 rounded-md border bg-card p-3">
+            {canManage && panel === "installment" && showFlexForm && (
+              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-xs text-muted-foreground">
+                    <label htmlFor="sale-action-due-date" className="text-xs text-muted-foreground">
                       {locale === "zh" ? "到期日" : "Echeance"}
                     </label>
                     <DateInput
+                      id="sale-action-due-date"
+                      disabled={saving}
                       value={flexDueDate}
                       onChangeValue={setFlexDueDate}
                       className={inputClass}
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground">
+                    <label htmlFor="sale-action-amount" className="text-xs text-muted-foreground">
                       {locale === "zh" ? "金额" : "Montant"}
                     </label>
                     <input
+                      id="sale-action-amount"
+                      disabled={saving}
                       type="number"
                       value={flexAmount}
                       onChange={(e) => setFlexAmount(Number(e.target.value))}
@@ -1935,14 +1580,20 @@ export function SaleList({
                 </div>
                 {error && <p className="text-xs text-red-600">{error}</p>}
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={handleAddFlex} disabled={saving}>
+                  <Button
+                    size="sm"
+                    onClick={handleAddFlex}
+                    disabled={saving || !flexDueDate || flexAmount <= 0}
+                  >
                     {saving ? "..." : locale === "zh" ? "新增" : "Ajouter"}
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
+                    disabled={saving}
                     onClick={() => {
                       setShowFlexForm(false);
+                      setPanel(null);
                       setFlexDueDate("");
                       setFlexAmount(0);
                       setError("");
@@ -1955,14 +1606,19 @@ export function SaleList({
             )}
 
             {/* Transfer form */}
-            {canManage && selected.status === "active" && trDate && (
-              <div className="space-y-2 rounded-md border bg-card p-3">
+            {canManage && panel === "transfer" && selected.status === "active" && (
+              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-xs text-muted-foreground">
+                    <label
+                      htmlFor="sale-action-transfer-status"
+                      className="text-xs text-muted-foreground"
+                    >
                       {locale === "zh" ? "过户状态" : "Transfert"}
                     </label>
                     <select
+                      id="sale-action-transfer-status"
+                      disabled={saving}
                       value={trStatus}
                       onChange={(e) => setTrStatus(e.target.value)}
                       className={inputClass}
@@ -1973,16 +1629,30 @@ export function SaleList({
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground">
+                    <label
+                      htmlFor="sale-action-transfer-date"
+                      className="text-xs text-muted-foreground"
+                    >
                       {locale === "zh" ? "过户日期" : "Date"}
                     </label>
-                    <DateInput value={trDate} onChangeValue={setTrDate} className={inputClass} />
+                    <DateInput
+                      id="sale-action-transfer-date"
+                      disabled={saving}
+                      value={trDate}
+                      onChangeValue={setTrDate}
+                      className={inputClass}
+                    />
                   </div>
                   <div className="col-span-2">
-                    <label className="text-xs text-muted-foreground">
+                    <label
+                      htmlFor="sale-action-certificate"
+                      className="text-xs text-muted-foreground"
+                    >
                       {locale === "zh" ? "产权证号" : "Titre"}
                     </label>
                     <input
+                      id="sale-action-certificate"
+                      disabled={saving}
                       type="text"
                       value={trCertNo}
                       onChange={(e) => setTrCertNo(e.target.value)}
@@ -1992,16 +1662,50 @@ export function SaleList({
                 </div>
                 {error && <p className="text-xs text-red-600">{error}</p>}
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={handleTransfer} disabled={saving}>
+                  <Button size="sm" onClick={handleTransfer} disabled={saving || !trDate}>
                     {saving ? "..." : locale === "zh" ? "保存" : "OK"}
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
+                    disabled={saving}
                     onClick={() => {
                       setTrDate("");
+                      setPanel(null);
                     }}
                   >
+                    {locale === "zh" ? "取消" : "Annuler"}
+                  </Button>
+                </div>
+              </div>
+            )}
+            {canTerminate && panel === "terminate" && selected.status === "active" && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {locale === "zh"
+                    ? "终止后保留历史合同与财务记录，不代表已退款或欠款已清。请核对后确认。"
+                    : "Les contrats et écritures restent conservés. La résiliation ne confirme ni un remboursement ni le règlement des dettes."}
+                </p>
+                <label className="block space-y-2 text-sm">
+                  <span>{locale === "zh" ? "终止原因" : "Motif"}</span>
+                  <textarea
+                    disabled={saving}
+                    className={inputClass}
+                    value={termReason}
+                    onChange={(event) => setTermReason(event.target.value)}
+                    rows={3}
+                  />
+                </label>
+                {error ? (
+                  <p role="alert" className="text-sm text-destructive">
+                    {error}
+                  </p>
+                ) : null}
+                <div className="flex gap-2">
+                  <Button variant="destructive" disabled={saving} onClick={handleTerminateSale}>
+                    {saving ? "…" : locale === "zh" ? "确认终止" : "Confirmer la résiliation"}
+                  </Button>
+                  <Button variant="outline" disabled={saving} onClick={() => setPanel(null)}>
                     {locale === "zh" ? "取消" : "Annuler"}
                   </Button>
                 </div>

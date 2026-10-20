@@ -356,6 +356,20 @@ describe("asset directory UI", () => {
       new URL(mocks.push.mock.calls[0][0], "https://example.invalid").searchParams.has("unit"),
     ).toBe(false);
   });
+  it("does not carry an open operation into a different server-selected asset or version", async () => {
+    await render(data(), true);
+    await selectFirst();
+    await click(button("核对 / 修改运行条件"));
+    expect(
+      host.querySelector("[data-condition-target]")?.getAttribute("data-condition-target"),
+    ).toBe(uuid(100));
+    const next = data();
+    next.selected = { ...row(1), unit: { ...row(1).unit, updated_at: "2026-10-20T12:00:00Z" } };
+    next.query.unit = next.selected.unit.id;
+    await render(next, true);
+    expect(host.querySelector('[aria-label="资产 102 的档案"]')).not.toBeNull();
+    expect(host.querySelector("[data-condition-target]")).toBeNull();
+  });
   it("binds selection to scope/result props and does not retain the previous asset on a new scope", async () => {
     await render();
     await selectFirst();

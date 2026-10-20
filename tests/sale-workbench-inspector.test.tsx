@@ -29,7 +29,7 @@ async function render(patch: Partial<ComponentProps<typeof SaleWorkbenchInspecto
     returnTo: "/sales?q=测试&page=2",
     onClose: vi.fn(),
     onRetry: vi.fn(),
-    onOpen: vi.fn(),
+    onAction: vi.fn(),
     onPrint: vi.fn(),
     ...patch,
   };
@@ -140,23 +140,61 @@ it("links only explicit customer/asset IDs and carries the sanitized return scop
   expect(asset.searchParams.get("unit")).toBe(saleFixture().units[0].id);
   expect(asset.searchParams.get("building")).toBe(saleFixture().buildings[0].id);
 });
-it("preserves the original full-detail and print callbacks and keyboard tabs", async () => {
-  const props = await render();
+it("opens focused actions directly and preserves print and keyboard tabs", async () => {
+  const props = await render({ canRecordFinance: true, canManage: true, canTerminate: true });
   const first = host.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]')!;
   await act(async () =>
     first.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })),
   );
   expect(host.querySelector('[aria-selected="true"]')?.textContent).toBe("付款事实");
-  const button = [...host.querySelectorAll<HTMLButtonElement>("button")].find((b) =>
-    b.textContent?.includes("打开合同 / 办理"),
-  )!;
-  await act(async () => button.click());
-  expect(props.onOpen).toHaveBeenCalledWith("finance");
-  const print = [...host.querySelectorAll<HTMLButtonElement>("button")].find((b) =>
-    b.textContent?.includes("合同 / 打印"),
-  )!;
-  await act(async () => print.click());
+  const find = (name: string) =>
+    [...host.querySelectorAll<HTMLButtonElement>("button")].find((b) =>
+      b.textContent?.includes(name),
+    )!;
+  for (const [label, action] of [
+    ["登记收款", "payment"],
+    ["新增分期", "installment"],
+    ["更新过户", "transfer"],
+    ["终止合同", "terminate"],
+  ]) {
+    await act(async () => find(label).click());
+    expect(props.onAction).toHaveBeenLastCalledWith(action);
+  }
+  expect(host.textContent).not.toContain("打开合同 / 办理");
+  await act(async () => find("合同 / 打印").click());
   expect(props.onPrint).toHaveBeenCalledTimes(1);
+});
+it("keeps operations hidden for viewers and inactive contracts", async () => {
+  await render();
+  expect(host.textContent).not.toContain("登记收款");
+  expect(host.textContent).not.toContain("新增分期");
+  const data = saleFixture(undefined, "detail", 1);
+  data.contracts[0].status = "terminated";
+  await render({ data, canRecordFinance: true, canManage: true, canTerminate: true });
+  expect(host.textContent).not.toContain("终止合同");
+  expect(host.textContent).toContain("合同 / 打印");
+});
+it("disables all mutation entry points while a business operation is pending", async () => {
+  await render({ canRecordFinance: true, canManage: true, canTerminate: true, busy: true });
+  const actions = host.querySelectorAll<HTMLButtonElement>('[aria-label="办理此合同"] button');
+  expect(actions).toHaveLength(4);
+  expect([...actions].every((button) => button.disabled)).toBe(true);
+});
+it("retains every payment and its full notes in the single detail", async () => {
+  const data = saleFixture(undefined, "detail", 1);
+  data.payments = Array.from({ length: 8 }, (_, index) =>
+    payment({
+      id: `payment-${index}`,
+      receipt_no: `receipt-${index}`,
+      notes: `完整备注-${index}`,
+    }),
+  );
+  await render({ data });
+  await tab("付款事实");
+  expect(host.querySelectorAll("article")).toHaveLength(8);
+  expect(host.textContent).toContain("receipt-7");
+  expect(host.textContent).toContain("完整备注-7");
+  expect(host.textContent).not.toContain("办理详情");
 });
 it("localizes the same read-only facts for French", async () => {
   await render({ locale: "fr" });

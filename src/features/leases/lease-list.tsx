@@ -22,9 +22,7 @@ import {
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
-import { formatMoney } from "@/lib/currency";
 import { nativeLease, leaseRentLabel } from "@/lib/native-money";
-import { NativeLeaseFinance } from "./native-lease-finance";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,8 +59,6 @@ import {
   buildLeaseContractNumber,
   buildLeaseFinancialReferencePrefix,
   getLeaseFinancialConfig,
-  getLeaseFinancialConfigBySourceType,
-  isLeaseFinancialExpenseSourceType,
   LEASE_FINANCIAL_BUSINESS_CONFIG,
   LEASE_FINANCIAL_BUSINESS_TYPES,
   type LeaseFinancialBusinessType,
@@ -91,10 +87,6 @@ import {
   matchesContractSearch,
   type ContractTableRow,
 } from "@/features/contracts/contract-list-model";
-import {
-  classifyContractCashPayment,
-  summarizeContractCash,
-} from "@/features/contracts/contract-cash-model";
 import { computeFinanceMetrics } from "@/features/finance/metrics";
 import { resolveContractProjectLink } from "@/features/contracts/project-link";
 import { useContractWorkspace } from "@/features/contracts/use-workspace";
@@ -140,7 +132,7 @@ interface LeaseListProps {
   canActivate?: boolean;
   canMoveOut?: boolean;
 }
-type PanelType = "new" | "detail" | "financeEntry" | "moveout" | "attention" | "insight" | null;
+type PanelType = "new" | "financeEntry" | "moveout" | "attention" | "insight" | null;
 type AttentionTab = "overdue" | "upcoming" | "coverage";
 const paymentCycles = ["monthly", "quarterly", "semiannual", "annual"];
 type LeaseStatFilter = "active" | "rent" | "dueSoon" | "currentDue" | "overdue";
@@ -183,49 +175,6 @@ function paymentAmountXof(payment: PaymentRow) {
   return payment.currency === "XOF"
     ? Number(payment.amount)
     : Math.round(Number(payment.amount) * Number(payment.exchange_rate_to_xof));
-}
-
-function getRecordedOriginalPayment(payment: PaymentRow) {
-  const metadata = payment.notes?.match(
-    /original_currency=([A-Z]{3});original_amount=([\d.]+);original_period_months=(\d+)/,
-  );
-  if (!metadata) return null;
-  const amount = Number(metadata[2]);
-  const periodMonths = Number(metadata[3]);
-  if (amount <= 0 || periodMonths <= 0) return null;
-  return { currency: metadata[1], amount, periodMonths };
-}
-
-function getOriginalMonthlyRent(contract: LeaseContractRow, payments: PaymentRow[]) {
-  if (nativeLease(contract)) return null;
-  const contractPayments = payments
-    .filter((payment) => payment.source_id === contract.id && payment.source_type === "lease_rent")
-    .sort((a, b) => b.payment_date.localeCompare(a.payment_date));
-  const originalCurrencyPayments = contractPayments.filter(
-    (payment) => payment.currency !== "XOF" && Number(payment.exchange_rate_to_xof) > 0,
-  );
-  const originalCurrency = originalCurrencyPayments[0]?.currency;
-  if (
-    originalCurrency &&
-    originalCurrencyPayments.every((payment) => payment.currency === originalCurrency)
-  ) {
-    return {
-      currency: originalCurrency,
-      amount:
-        Number(contract.monthly_rent_xof) /
-        Number(originalCurrencyPayments[0].exchange_rate_to_xof),
-    };
-  }
-
-  for (const payment of contractPayments) {
-    const recordedOriginal = getRecordedOriginalPayment(payment);
-    if (recordedOriginal)
-      return {
-        currency: recordedOriginal.currency,
-        amount: recordedOriginal.amount / recordedOriginal.periodMonths,
-      };
-  }
-  return null;
 }
 
 export function LeaseList({
@@ -280,8 +229,11 @@ export function LeaseList({
     page: WorkspaceData | undefined;
     contracts: LeaseContractRow[];
     version: number;
+    outsidePage?: boolean;
   } | null>(null);
   const [linkedPreviewDismissed, setLinkedPreviewDismissed] = useState(false);
+  const actionRequestRef = useRef(0);
+  const actionSelectionRef = useRef("");
   const safeReturnTo = safeWorkbenchReturnTo(returnTo);
   useEffect(() => {
     setLinkedPreviewDismissed(false);
@@ -323,11 +275,14 @@ export function LeaseList({
   const [financeNotes, setFinanceNotes] = useState("");
   const financeRequestIdRef = useRef<string | null>(null);
   const lifecycleBusy = useRef(false);
+  const financeBusy = useRef(false);
+  const writePending = () => lifecycleBusy.current || financeBusy.current;
+  const actionPermissionRef = useRef({ canRecordFinance, canActivate, canMoveOut });
+  actionPermissionRef.current = { canRecordFinance, canActivate, canMoveOut };
   const [moCollectedConfirmed, setMoCollectedConfirmed] = useState(false);
   const [moMethod, setMoMethod] = useState<
     "cash" | "check" | "bank_transfer" | "offset" | "other" | ""
   >("");
-  const financeSectionRef = useRef<HTMLDivElement | null>(null);
 
   const projects = useMemo(() => groupLeaseBuildings(buildings), [buildings]);
   const requestedProjectId = resolveContractProjectLink(buildings, initialProject);
@@ -500,10 +455,12 @@ export function LeaseList({
     locale,
   ]);
   const changeProject = (projectId: string) => {
+    if (writePending()) return;
     setScope((current) => ({ ...current, projectId }));
     closeScopePanel();
   };
   const changeBuilding = (id: string) => {
+    if (writePending()) return;
     if (project)
       setScope((current) => ({
         ...current,
@@ -631,7 +588,6 @@ export function LeaseList({
     activeBuildingId,
     statusFilter,
     search,
-    contractView,
     workspace.query ? workspaceQueryKey(workspace.query) : null,
   ]);
   const linkedPreviewId =
@@ -647,13 +603,26 @@ export function LeaseList({
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(initialContract)
       ? initialContract
       : null;
+  // Keep the selected identity through a fresh read's transient loading state.
+  // It must change immediately when the user closes or selects another dossier.
+  const operationTargetId =
+    contractView === "table" && panel === null
+      ? (linkedPreviewId ??
+        (previewSelection?.scope === previewScope &&
+        previewSelection.page === workspace.pageData &&
+        previewSelection.contracts === initialContracts
+          ? previewSelection.id
+          : null))
+      : null;
+  actionSelectionRef.current = operationTargetId ? `${previewScope}/${operationTargetId}` : "";
   const previewId =
     !workspace.unavailable && panel === null && contractView === "table"
       ? (linkedPreviewId ??
         (previewSelection?.scope === previewScope &&
         previewSelection.page === workspace.pageData &&
         previewSelection.contracts === initialContracts &&
-        searchedTableRows.some((row) => row.id === previewSelection.id)
+        (previewSelection.outsidePage ||
+          searchedTableRows.some((row) => row.id === previewSelection.id))
           ? previewSelection.id
           : null))
       : null;
@@ -671,8 +640,20 @@ export function LeaseList({
     previewCustomers?.find((row) => row.id === previewContract?.customer_id) ?? null;
   const previewPayments = workspace.enabled ? (preview.data?.payments ?? []) : payments;
   const previewReceivables = workspace.enabled ? (preview.data?.receivables ?? []) : receivables;
-  const selectPreview = (id: string) => {
+  const selectPreview = (
+    id: string,
+    section: "overview" | "finance" = "overview",
+    outsidePage = false,
+  ) => {
+    if (writePending()) return;
+    actionRequestRef.current += 1;
+    actionSelectionRef.current = `${previewScope}/${id}`;
     setLinkedPreviewDismissed(true);
+    setDetailSection(section);
+    setContractView("table");
+    setPanel(null);
+    setSelectedId(null);
+    setError("");
     if (id === previewId && preview.error) preview.retry();
     setPreviewSelection({
       id,
@@ -680,6 +661,7 @@ export function LeaseList({
       page: workspace.pageData,
       contracts: initialContracts,
       version: ++previewVersion.current,
+      outsidePage,
     });
     if (
       typeof window.matchMedia === "function" &&
@@ -699,8 +681,24 @@ export function LeaseList({
     }
   };
   const syncVisiblePreview = useCallback((ids: string[]) => {
-    setPreviewSelection((current) => (current && !ids.includes(current.id) ? null : current));
+    setPreviewSelection((current) =>
+      current && !current.outsidePage && !ids.includes(current.id) ? null : current,
+    );
   }, []);
+  const closePreview = () => {
+    if (writePending()) return;
+    actionRequestRef.current += 1;
+    actionSelectionRef.current = "";
+    setLinkedPreviewDismissed(true);
+    setPreviewSelection(null);
+    setSelectedId(null);
+  };
+  const closeOperation = () => {
+    if (writePending()) return;
+    actionRequestRef.current += 1;
+    setPanel(null);
+    setSelectedId(null);
+  };
   const filtered = useMemo(() => {
     if (workspace.enabled && contractView === "rooms")
       return filteredByStatus.filter((row) =>
@@ -758,7 +756,6 @@ export function LeaseList({
       : null;
   const selectedUnit = selected ? units.find((u) => u.id === selected.unit_id) : null;
   const selectedCustomer = selected ? customers.find((c) => c.id === selected.customer_id) : null;
-  const selectedOriginalMonthlyRent = selected ? getOriginalMonthlyRent(selected, payments) : null;
 
   const leaseAttention = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -884,46 +881,6 @@ export function LeaseList({
     }));
   const managedOverdueRows = leaseAttention.overdue.filter((row) => !row.amountIsEstimated);
 
-  const contractReceivables = useMemo(
-    () =>
-      selectedId
-        ? receivables.filter(
-            (r) =>
-              r.source_type === "lease_contract" &&
-              r.source_id === selectedId &&
-              r.status !== "cancelled" &&
-              (r.management_status ?? "managed") === "managed",
-          )
-        : [],
-    [receivables, selectedId],
-  );
-  const contractPayments = useMemo(
-    () => (selectedId ? payments.filter((p) => p.source_id === selectedId) : []),
-    [payments, selectedId],
-  );
-  const leaseCash = useMemo(() => summarizeContractCash(contractPayments), [contractPayments]);
-  const totalIncome = leaseCash.income;
-  const totalExpense = leaseCash.expense;
-  const netFinancial = leaseCash.net;
-  const receivableStats = useMemo(() => {
-    const metrics = computeFinanceMetrics(contractReceivables, { asOfDate: todayStr });
-    return {
-      totalReceivable: metrics.receivable,
-      totalPaid: metrics.collected,
-      outstanding: metrics.outstanding,
-      overdue: metrics.overdue,
-      known: metrics.count > 0,
-    };
-  }, [contractReceivables, todayStr]);
-  const contractRisk = useMemo(() => {
-    if (!selected || selected.status !== "active" || !isContractEndConfirmed(selected))
-      return { expiringSoon: false, daysLeft: 0 };
-    const today = new Date();
-    const diff = Math.floor(
-      (new Date(selected.expected_end_date).getTime() - today.getTime()) / 86400000,
-    );
-    return { expiringSoon: diff <= 30 && diff >= 0, daysLeft: Math.max(0, diff) };
-  }, [selected]);
   const availableUnits = units.filter(
     (u) =>
       scopeBuildingIds.has(u.building_id) &&
@@ -960,6 +917,8 @@ export function LeaseList({
     setError("");
   };
   const openNew = async () => {
+    if (writePending()) return;
+    actionRequestRef.current += 1;
     setPreviewSelection(null);
     if (workspace.enabled) {
       try {
@@ -972,21 +931,47 @@ export function LeaseList({
     setPanel("new");
     setSelectedId(null);
   };
-  const openDetail = async (id: string, section: "overview" | "finance" = "overview") => {
-    setPreviewSelection(null);
+  const openDetail = (id: string, section: "overview" | "finance" = "overview") => {
+    selectPreview(id, section, true);
+  };
+  const prepareOperation = async (
+    id: string,
+    permission: "canRecordFinance" | "canMoveOut" | "canActivate",
+  ) => {
+    const identity = `${previewScope}/${id}`;
+    if (
+      writePending() ||
+      saving ||
+      workspace.unavailable ||
+      preview.loading ||
+      preview.error ||
+      previewContract?.id !== id ||
+      actionSelectionRef.current !== identity ||
+      !actionPermissionRef.current[permission]
+    )
+      return;
+    const request = ++actionRequestRef.current;
+    const current = () =>
+      request === actionRequestRef.current &&
+      actionSelectionRef.current === identity &&
+      actionPermissionRef.current[permission] &&
+      !writePending();
+    let contract: LeaseContractRow | undefined;
     if (workspace.enabled) {
       try {
-        await workspace.ensure("detail", id);
+        const data = await workspace.ensure("detail", id);
+        contract = data.contracts.find((row) => row.id === id) as LeaseContractRow | undefined;
       } catch {
         return;
       }
-    }
+    } else contract = contracts.find((row) => row.id === id);
+    if (!contract || !current()) return;
     setSelectedId(id);
-    setDetailSection(section);
-    setPanel("detail");
-    setError("");
+    return { contract, current };
   };
-  const openFinanceEntry = () => {
+  const openFinanceEntry = async (id: string) => {
+    const prepared = await prepareOperation(id, "canRecordFinance");
+    if (!prepared?.current()) return;
     setFinanceType("deposit_income");
     setFinanceCurrency("XOF");
     setFinanceDate(new Date().toISOString().slice(0, 10));
@@ -1013,14 +998,18 @@ export function LeaseList({
       }),
     });
   const openMoveOut = async (id: string) => {
-    if (workspace.enabled) {
-      try {
-        await workspace.ensure("detail", id);
-      } catch {
-        return;
-      }
+    const prepared = await prepareOperation(id, "canMoveOut");
+    if (!prepared?.current()) return;
+    const { contract } = prepared;
+    if (contract.status !== "active") {
+      setError(
+        locale === "zh"
+          ? "合同状态已变化，请核对最新档案后办理。"
+          : "Le statut du contrat a changé. Vérifiez le dossier actualisé.",
+      );
+      preview.retry();
+      return;
     }
-    setSelectedId(id);
     setPanel("moveout");
     setError("");
     setMoUnpaid(0);
@@ -1032,14 +1021,6 @@ export function LeaseList({
     setMoEndDate(new Date().toISOString().slice(0, 10));
   };
 
-  useEffect(() => {
-    if (panel !== "detail" || detailSection !== "finance") return;
-    const frame = window.requestAnimationFrame(() =>
-      financeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-    );
-    return () => window.cancelAnimationFrame(frame);
-  }, [detailSection, panel, selectedId]);
-
   const runLifecycle = async (
     operation: string,
     target: string,
@@ -1049,7 +1030,7 @@ export function LeaseList({
     ) => Promise<{ success: boolean; error?: string; rejected?: boolean }>,
     done: () => void,
   ) => {
-    if (lifecycleBusy.current || workspace.unavailable) return;
+    if (writePending() || workspace.unavailable) return;
     lifecycleBusy.current = true;
     setSaving(true);
     setError("");
@@ -1075,6 +1056,7 @@ export function LeaseList({
     }
   };
   const handleCreate = async () => {
+    if (!canCreate) return;
     if (!fUnitId || !fCustomerId || !fStartDate || !fEndDate) {
       setError(locale === "zh" ? "请填写必填字段" : "Champs obligatoires");
       return;
@@ -1106,8 +1088,18 @@ export function LeaseList({
     );
   };
   const handleActivate = async (id: string) => {
-    const contract = contracts.find((c) => c.id === id);
-    if (!contract) return;
+    const prepared = await prepareOperation(id, "canActivate");
+    if (!prepared?.current()) return;
+    const { contract } = prepared;
+    if (contract.status !== "draft") {
+      setError(
+        locale === "zh"
+          ? "合同状态已变化，请核对最新档案后办理。"
+          : "Le statut du contrat a changé. Vérifiez le dossier actualisé.",
+      );
+      preview.retry();
+      return;
+    }
     const payload = { contractId: id, expectedUpdatedAt: contract.updated_at };
     await runLifecycle(
       "activate",
@@ -1130,7 +1122,7 @@ export function LeaseList({
     );
   };
   const handleMoveOut = async () => {
-    if (!selected) return;
+    if (!canMoveOut || !selected || selected.status !== "active") return;
     const payload = {
       contractId: selected.id,
       expectedUpdatedAt: selected.updated_at,
@@ -1151,8 +1143,8 @@ export function LeaseList({
     );
   };
   const handleFinanceEntry = async () => {
-    if (workspace.unavailable) return;
-    if (!selectedId) return;
+    if (!canRecordFinance || writePending() || workspace.unavailable || !selected || !selectedId)
+      return;
     if (financeAmountWan <= 0) {
       setError(locale === "zh" ? "请输入大于0的金额" : "Saisissez un montant supérieur à 0");
       return;
@@ -1161,41 +1153,52 @@ export function LeaseList({
       setError(locale === "zh" ? "租金收入必须填写已缴至日期" : "La date payée au est obligatoire");
       return;
     }
+    financeBusy.current = true;
     setSaving(true);
     setError("");
     const requestId = financeRequestIdRef.current ?? crypto.randomUUID();
     financeRequestIdRef.current = requestId;
-    const result = await recordLeaseFinancialEntry({
-      contractId: selectedId,
-      businessType: financeType,
-      paymentDate: financeDate,
-      amount: financeCurrency === "XOF" ? Math.round(financeAmountWan * 10000) : financeAmountWan,
-      currency: financeCurrency,
-      exchangeRateToXof:
-        selected && nativeLease(selected) && financeType === "rent_income"
-          ? null
-          : financeCurrency === "XOF"
-            ? 1
-            : financeExchangeRate,
-      paidThroughDate: financePaidThrough || undefined,
-      paymentMethod: financeMethod,
-      externalReceiptNo: financeExternalReceiptNo || undefined,
-      notes: financeNotes || undefined,
-      requestId,
-    });
-    setSaving(false);
-    if (result.success) {
-      setWriteConfirmed(true);
-      financeRequestIdRef.current = null;
-      setFinanceAmountWan(0);
-      setFinanceCurrency("XOF");
-      setFinanceExchangeRate(1);
-      setFinanceExternalReceiptNo("");
-      setPanel("detail");
-      if (workspace.enabled) await workspace.refresh();
-      else router.refresh();
-    } else {
-      setError(result.error ?? (locale === "zh" ? "操作失败。" : "Échec de l'opération."));
+    try {
+      const result = await recordLeaseFinancialEntry({
+        contractId: selectedId,
+        businessType: financeType,
+        paymentDate: financeDate,
+        amount: financeCurrency === "XOF" ? Math.round(financeAmountWan * 10000) : financeAmountWan,
+        currency: financeCurrency,
+        exchangeRateToXof:
+          selected && nativeLease(selected) && financeType === "rent_income"
+            ? null
+            : financeCurrency === "XOF"
+              ? 1
+              : financeExchangeRate,
+        paidThroughDate: financePaidThrough || undefined,
+        paymentMethod: financeMethod,
+        externalReceiptNo: financeExternalReceiptNo || undefined,
+        notes: financeNotes || undefined,
+        requestId,
+      });
+      if (result.success) {
+        setWriteConfirmed(true);
+        financeRequestIdRef.current = null;
+        setFinanceAmountWan(0);
+        setFinanceCurrency("XOF");
+        setFinanceExchangeRate(1);
+        setFinanceExternalReceiptNo("");
+        setPanel(null);
+        if (workspace.enabled) await workspace.refresh();
+        else router.refresh();
+      } else {
+        setError(result.error ?? (locale === "zh" ? "操作失败。" : "Échec de l'opération."));
+      }
+    } catch {
+      setError(
+        locale === "zh"
+          ? `结果未知，请保留本表单并使用原请求重试。操作号：${requestId}`
+          : `Résultat inconnu. Conservez ce formulaire pour réessayer la même demande : ${requestId}`,
+      );
+    } finally {
+      financeBusy.current = false;
+      setSaving(false);
     }
   };
 
@@ -1203,18 +1206,9 @@ export function LeaseList({
     "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
   const labelClass = "block text-xs font-semibold text-muted-foreground mb-1";
 
-  const paymentKindLabel = (sourceType: string) => {
-    const configured = getLeaseFinancialConfigBySourceType(sourceType);
-    if (configured) return locale === "zh" ? configured.labelZh : configured.labelFr;
-    if (sourceType === "lease_deposit_deduction")
-      return locale === "zh" ? "押金扣款" : "Retenue sur dépôt";
-    if (sourceType === "lease_rent_refund")
-      return locale === "zh" ? "租金退款" : "Remboursement de loyer";
-    if (sourceType === "lease_contract") return locale === "zh" ? "租金收入" : "Revenu de loyer";
-    return locale === "zh" ? "财务记录" : "Écriture financière";
-  };
-
   const openInsight = async (key: LeaseStatFilter) => {
+    if (writePending()) return;
+    actionRequestRef.current += 1;
     setPreviewSelection(null);
     if (workspace.enabled) {
       try {
@@ -1230,6 +1224,8 @@ export function LeaseList({
     setSelectedId(null);
   };
   const openCoverageReview = async () => {
+    if (writePending()) return;
+    actionRequestRef.current += 1;
     setPreviewSelection(null);
     if (workspace.enabled) {
       try {
@@ -1243,6 +1239,8 @@ export function LeaseList({
     setSelectedId(null);
   };
   const changeView = async (value: "table" | "rooms") => {
+    if (writePending()) return;
+    actionRequestRef.current += 1;
     setLinkedPreviewDismissed(true);
     setPreviewSelection(null);
     if (workspace.enabled && value === "rooms") {
@@ -1361,6 +1359,8 @@ export function LeaseList({
         locale={locale}
         query={search}
         onQueryChange={(value) => {
+          if (writePending()) return;
+          actionRequestRef.current += 1;
           setLinkedPreviewDismissed(true);
           setPreviewSelection(null);
           setSearch(value);
@@ -1372,6 +1372,8 @@ export function LeaseList({
         <SegmentedControl
           value={statusFilter}
           onChange={(value) => {
+            if (writePending()) return;
+            actionRequestRef.current += 1;
             setLinkedPreviewDismissed(true);
             setPreviewSelection(null);
             setStatusFilter(value);
@@ -1540,6 +1542,14 @@ export function LeaseList({
           {printer.error}
         </p>
       )}
+      {panel === null && error && !previewContract ? (
+        <p
+          role="alert"
+          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/25 dark:text-amber-300"
+        >
+          {error}
+        </p>
+      ) : null}
       <div className={cn(styles.workspaceGrid, contractView === "rooms" && styles.roomsWorkspace)}>
         <section
           className="min-w-0"
@@ -1586,11 +1596,15 @@ export function LeaseList({
                   ? {
                       ...workspace.pagination,
                       onPageChange: (page) => {
+                        if (writePending()) return;
+                        actionRequestRef.current += 1;
                         setLinkedPreviewDismissed(true);
                         setPreviewSelection(null);
                         workspace.pagination?.onPageChange(page);
                       },
                       onSortChange: (key, direction) => {
+                        if (writePending()) return;
+                        actionRequestRef.current += 1;
                         setPreviewSelection(null);
                         workspace.pagination?.onSortChange(key, direction);
                       },
@@ -1856,9 +1870,54 @@ export function LeaseList({
               today={workspace.pageData?.today ?? todayStr}
               loading={Boolean(previewId && preview.loading)}
               error={Boolean(previewId && preview.error)}
-              onOpen={(section) => {
-                if (previewId) void openDetail(previewId, section ?? "overview");
-              }}
+              initialSection={detailSection}
+              busy={saving}
+              operationError={error}
+              actions={
+                previewContract ? (
+                  <>
+                    {canRecordFinance ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => openFinanceEntry(previewContract.id)}
+                        disabled={saving}
+                      >
+                        <Plus aria-hidden="true" />
+                        {locale === "zh" ? "押金 / 其他收支" : "Dépôt / autres écritures"}
+                      </Button>
+                    ) : null}
+                    {canActivate && previewContract.status === "draft" ? (
+                      <Button onClick={() => handleActivate(previewContract.id)} disabled={saving}>
+                        {saving ? "..." : t.form.activateContract}
+                      </Button>
+                    ) : null}
+                    {canMoveOut && previewContract.status === "active" ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => openMoveOut(previewContract.id)}
+                        disabled={saving}
+                      >
+                        <LogOut aria-hidden="true" />
+                        {t.settlement.moveOut}
+                      </Button>
+                    ) : null}
+                  </>
+                ) : null
+              }
+              financeTools={
+                canCorrectRentPeriod && previewContract ? (
+                  <LeaseRentPeriodCorrection
+                    key={previewContract.id}
+                    contractId={previewContract.id}
+                    locale={locale}
+                    onSaved={() => {
+                      preview.retry();
+                      if (workspace.enabled) void workspace.refresh();
+                      else router.refresh();
+                    }}
+                  />
+                ) : null
+              }
               onPrint={() => {
                 if (previewId) void printById(previewId);
               }}
@@ -1867,10 +1926,7 @@ export function LeaseList({
                   ? collectionHrefFor(previewContract, previewUnit)
                   : undefined
               }
-              onClose={() => {
-                setLinkedPreviewDismissed(true);
-                setPreviewSelection(null);
-              }}
+              onClose={closePreview}
             />
             {previewId && preview.error && (
               <Button
@@ -2337,7 +2393,7 @@ export function LeaseList({
 
       {/* ── New Contract Panel ── */}
       {!workspace.unavailable && panel === "new" && (
-        <PanelShell onClose={() => setPanel(null)} title={t.form.newContract}>
+        <PanelShell onClose={closeOperation} title={t.form.newContract}>
           {/* form fields same as before, using shadcn tokens */}
           {/* kept compact */}
           <div className="space-y-4">
@@ -2498,432 +2554,13 @@ export function LeaseList({
         </PanelShell>
       )}
 
-      {/* ── Detail Panel ── */}
-      {panel === "detail" && selected && (
-        <PanelShell
-          onClose={() => setPanel(null)}
-          title={selected.contract_no}
-          badge={
-            <Badge variant={statusVariant[selected.status]}>
-              {t.contractStatus[selected.status as keyof typeof t.contractStatus]}
-            </Badge>
-          }
-          actions={
-            <button
-              onClick={() =>
-                printLeaseContract(
-                  {
-                    contract: selected,
-                    unit: selectedUnit ?? null,
-                    customer: selectedCustomer ?? null,
-                    receivables: contractReceivables,
-                  },
-                  locale,
-                )
-              }
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              title={dictionaries[locale].settings.print.print}
-            >
-              <Printer className="h-4 w-4" />
-            </button>
-          }
-        >
-          <div className="space-y-4">
-            <NativeLeaseFinance
-              contract={selected}
-              payments={contractPayments}
-              receivables={contractReceivables}
-              locale={locale}
-              today={todayStr}
-            />
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-              <div>
-                <dt className="text-xs text-muted-foreground">
-                  {locale === "zh" ? "楼栋 / 房号" : "Bâtiment / Lot"}
-                </dt>
-                <dd className="font-medium">
-                  {selectedUnit
-                    ? buildingMap.get(selectedUnit.building_id)?.display_name ||
-                      buildingMap.get(selectedUnit.building_id)?.code ||
-                      "-"
-                    : "-"}{" "}
-                  · {selectedUnit?.unit_no ?? "-"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">{t.form.customer}</dt>
-                <dd className="font-medium">{selectedCustomer?.name ?? "-"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">{t.form.startDate}</dt>
-                <dd>{selected.start_date ?? (locale === "zh" ? "待确认" : "À confirmer")}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">
-                  {locale === "zh" ? "正式合同到期日" : t.form.expectedEndDate}
-                </dt>
-                <dd>
-                  {isContractEndConfirmed(selected)
-                    ? selected.expected_end_date
-                    : locale === "zh"
-                      ? "未确认"
-                      : "Non confirmée"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">
-                  {locale === "zh" ? "登记覆盖至" : "Couverture enregistrée"}
-                </dt>
-                <dd
-                  className={cn(
-                    selected.paid_through_date && hasStaleRecordedCoverage(selected)
-                      ? "font-medium text-amber-700"
-                      : "font-medium text-emerald-700",
-                  )}
-                >
-                  {selected.paid_through_date ?? (locale === "zh" ? "待补" : "À compléter")}
-                  {hasStaleRecordedCoverage(selected) ? (
-                    <p className="mt-1 text-xs font-normal text-muted-foreground">
-                      {locale === "zh"
-                        ? "覆盖待确认，不等同于仍欠租；请核对已建账单及实际核销。"
-                        : "Couverture à vérifier, sans présumer une dette. Vérifiez les créances et leurs paiements."}
-                    </p>
-                  ) : null}
-                </dd>
-              </div>
-              {selected.actual_end_date && (
-                <div>
-                  <dt className="text-xs text-muted-foreground">{t.form.actualEndDate}</dt>
-                  <dd>{selected.actual_end_date}</dd>
-                </div>
-              )}
-              <div>
-                <dt className="text-xs text-muted-foreground">{t.form.paymentCycle}</dt>
-                <dd>
-                  {t.paymentCycle[selected.payment_cycle as keyof typeof t.paymentCycle]} /{" "}
-                  {selected.payment_day}
-                  {locale === "zh" ? "号" : ""}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">{t.form.monthlyRent}</dt>
-                <dd className="font-semibold">{leaseRentLabel(selected, locale)}</dd>
-                {selectedOriginalMonthlyRent && (
-                  <dd className="mt-0.5 text-xs text-muted-foreground">
-                    {locale === "zh" ? "原币约 " : "Devise d'origine env. "}
-                    {formatMoney(
-                      selectedOriginalMonthlyRent.amount,
-                      selectedOriginalMonthlyRent.currency,
-                      locale,
-                    )}
-                    /{locale === "zh" ? "月" : "mois"}
-                  </dd>
-                )}
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">{t.form.deposit}</dt>
-                <dd>
-                  {formatXof(Number(selected.deposit_amount_xof))}{" "}
-                  {selected.deposit_received ? t.form.depositPaid : t.form.depositUnpaid}
-                </dd>
-              </div>
-              {selected.rent_free_days > 0 && (
-                <div>
-                  <dt className="text-xs text-muted-foreground">{t.form.rentFreeDays}</dt>
-                  <dd>
-                    {selected.rent_free_days}
-                    {locale === "zh" ? "天" : " jours"}
-                  </dd>
-                </div>
-              )}
-              {selected.signer_name && (
-                <div>
-                  <dt className="text-xs text-muted-foreground">{t.form.signerName}</dt>
-                  <dd>{selected.signer_name}</dd>
-                </div>
-              )}
-            </dl>
-            {canActivate && selected.status === "draft" && (
-              <Button
-                className="w-full"
-                variant="default"
-                onClick={() => handleActivate(selected.id)}
-                disabled={saving}
-              >
-                {saving ? "..." : t.form.activateContract}
-              </Button>
-            )}
-            {canMoveOut && selected.status === "active" && (
-              <Button className="w-full" variant="outline" onClick={() => openMoveOut(selected.id)}>
-                <LogOut className="mr-1 inline h-4 w-4" />
-                {t.settlement.moveOut}
-              </Button>
-            )}
-            {/* Risk indicators */}
-            {selected.status === "active" && (
-              <div className="border-t pt-4">
-                <h4 className="flex items-center gap-1.5 text-sm font-semibold">
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-                  {locale === "zh" ? "风险概览" : "Apercu des risques"}
-                </h4>
-                <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                  <div
-                    className={cn(
-                      "rounded-md border px-3 py-2",
-                      receivableStats.outstanding > 0
-                        ? "border-amber-200 bg-amber-50"
-                        : "border-border bg-muted/25",
-                    )}
-                  >
-                    <p className="text-muted-foreground">
-                      {locale === "zh" ? "已建应收未收" : "Créances restantes"}
-                    </p>
-                    <p
-                      className={cn(
-                        "font-semibold tabular-nums",
-                        receivableStats.outstanding > 0 ? "text-amber-700" : "text-foreground",
-                      )}
-                    >
-                      {receivableStats.known
-                        ? formatXof(receivableStats.outstanding)
-                        : locale === "zh"
-                          ? "未建已核应收"
-                          : "Aucune créance vérifiée"}
-                    </p>
-                  </div>
-                  <div
-                    className={cn(
-                      "rounded-md border px-3 py-2",
-                      receivableStats.overdue > 0
-                        ? "border-red-200 bg-red-50"
-                        : "border-border bg-muted/25",
-                    )}
-                  >
-                    <p className="text-muted-foreground">{t.risk.overdueTotal}</p>
-                    <p
-                      className={cn(
-                        "font-semibold tabular-nums",
-                        receivableStats.overdue > 0 ? "text-red-700" : "text-foreground",
-                      )}
-                    >
-                      {receivableStats.known ? formatXof(receivableStats.overdue) : "—"}
-                    </p>
-                  </div>
-                  <div
-                    className={cn(
-                      "rounded-md border px-3 py-2",
-                      !selected.deposit_received
-                        ? "border-red-200 bg-red-50"
-                        : "border-emerald-200 bg-emerald-50",
-                    )}
-                  >
-                    <p className="text-muted-foreground">{t.risk.depositStatus}</p>
-                    <p
-                      className={cn(
-                        "text-xs font-semibold",
-                        selected.deposit_received ? "text-emerald-700" : "text-red-600",
-                      )}
-                    >
-                      {selected.deposit_received ? t.form.depositPaid : t.form.depositUnpaid}
-                    </p>
-                  </div>
-                  <div
-                    className={cn(
-                      "rounded-md border px-3 py-2",
-                      contractRisk.expiringSoon
-                        ? "border-amber-200 bg-amber-50"
-                        : "border-emerald-200 bg-emerald-50",
-                    )}
-                  >
-                    <p className="text-muted-foreground">{t.risk.expiringSoon}</p>
-                    <p
-                      className={cn(
-                        "text-xs font-semibold",
-                        contractRisk.expiringSoon ? "text-amber-700" : "text-emerald-700",
-                      )}
-                    >
-                      {contractRisk.expiringSoon
-                        ? `${contractRisk.daysLeft} ${locale === "zh" ? "天后到期" : "j restants"}`
-                        : locale === "zh"
-                          ? "否"
-                          : "Non"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Payment history */}
-            <div
-              ref={financeSectionRef}
-              className={cn(
-                "scroll-mt-20 border-t pt-4",
-                detailSection === "finance" && "-mx-2 rounded-xl px-2 ring-2 ring-primary/20",
-              )}
-            >
-              <div className="mb-2 flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <h4 className="text-sm font-semibold">
-                    {locale === "zh" ? "财务记录" : "Écritures financières"}
-                  </h4>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium tabular-nums">
-                    <span className="text-emerald-700">
-                      {locale === "zh" ? "已录经营收款" : "Encaissements enregistrés"}{" "}
-                      {formatXof(totalIncome)}
-                    </span>
-                    <span className="text-red-600">
-                      {locale === "zh" ? "已录经营支出" : "Décaissements enregistrés"}{" "}
-                      {formatXof(totalExpense)}
-                    </span>
-                    <span className="text-slate-700">
-                      {locale === "zh" ? "经营现金净额" : "Flux de caisse net"}{" "}
-                      {formatXof(netFinancial)}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {locale === "zh" ? "押金实收" : "Dépôts encaissés"}{" "}
-                    {formatXof(leaseCash.depositIn)} ·{" "}
-                    {locale === "zh" ? "押金实退" : "Dépôts remboursés"}{" "}
-                    {formatXof(leaseCash.depositOut)} ·{" "}
-                    {locale === "zh" ? "不计入经营收款" : "Hors encaissements d'exploitation"}
-                  </p>
-                  {(leaseCash.excludedCount > 0 || leaseCash.nonCashCount > 0) && (
-                    <p className="text-xs text-amber-700">
-                      {leaseCash.excludedCount}{" "}
-                      {locale === "zh"
-                        ? "笔待核对记录未计入现金汇总"
-                        : "écritures à vérifier exclues du flux"}{" "}
-                      · {leaseCash.nonCashCount}{" "}
-                      {locale === "zh" ? "笔非现金变动" : "mouvements hors caisse"}
-                    </p>
-                  )}
-                </div>
-                {canCorrectRentPeriod && selected && (
-                  <LeaseRentPeriodCorrection
-                    key={selected.id}
-                    contractId={selected.id}
-                    locale={locale}
-                    onSaved={() => {
-                      if (workspace.enabled) void workspace.refresh();
-                      else router.refresh();
-                    }}
-                  />
-                )}
-                {canRecordFinance && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    {selected.status === "active" && (
-                      <Link
-                        href={collectionHrefFor(selected, selectedUnit) ?? "#"}
-                        className="inline-flex min-h-9 items-center rounded-lg bg-blue-600 px-3 text-xs font-medium text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                      >
-                        {locale === "zh" ? "登记实际收款" : "Enregistrer un encaissement"}
-                      </Link>
-                    )}
-                    <Button size="sm" variant="outline" onClick={openFinanceEntry}>
-                      <Plus className="h-3.5 w-3.5" />
-                      {locale === "zh" ? "押金 / 其他收支" : "Dépôt / autres écritures"}
-                    </Button>
-                  </div>
-                )}
-              </div>
-              {contractPayments.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  {locale === "zh" ? "暂无财务记录" : "Aucune écriture financière"}
-                </p>
-              ) : (
-                <div className="space-y-1.5">
-                  {contractPayments.map((payment) => {
-                    const cashLine = classifyContractCashPayment(payment);
-                    const isExpense =
-                      cashLine.kind === "expense" || cashLine.kind === "deposit_out";
-                    const recordedOriginal = getRecordedOriginalPayment(payment);
-                    return (
-                      <div
-                        key={payment.id}
-                        className={cn(
-                          "rounded-lg border px-3 py-2.5 text-[13px]",
-                          cashLine.kind === "excluded"
-                            ? "border-border bg-muted/25"
-                            : isExpense
-                              ? "border-red-100 bg-red-50/50"
-                              : "border-emerald-100 bg-emerald-50/40",
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={cn(
-                                  "font-semibold",
-                                  isExpense ? "text-red-700" : "text-emerald-800",
-                                )}
-                              >
-                                {paymentKindLabel(payment.source_type)}
-                              </span>
-                              <span className="text-xs tabular-nums text-muted-foreground">
-                                {payment.payment_date}
-                              </span>
-                            </div>
-                            <p
-                              className="mt-1 truncate text-[11px] text-muted-foreground"
-                              title={payment.receipt_no ?? ""}
-                            >
-                              {payment.receipt_no || (locale === "zh" ? "无收据号" : "Sans reçu")}
-                            </p>
-                            {cashLine.kind === "excluded" && (
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {locale === "zh"
-                                  ? payment.native_settlement
-                                    ? "原币结算，不折算、不并入XOF汇总"
-                                    : "未计入现金汇总，保留原始记录"
-                                  : "Hors synthèse de caisse, écriture conservée"}
-                              </p>
-                            )}
-                          </div>
-                          <div className="shrink-0 text-right tabular-nums">
-                            <p
-                              className={cn(
-                                "font-semibold",
-                                isExpense ? "text-red-600" : "text-emerald-700",
-                              )}
-                            >
-                              {isExpense ? "- " : ""}
-                              {recordedOriginal
-                                ? formatMoney(
-                                    recordedOriginal.amount,
-                                    recordedOriginal.currency,
-                                    locale,
-                                  )
-                                : payment.currency === "XOF"
-                                  ? formatXof(Number(payment.amount))
-                                  : formatMoney(Number(payment.amount), payment.currency, locale)}
-                            </p>
-                            {cashLine.amountXof !== null &&
-                              (payment.currency !== "XOF" || recordedOriginal) && (
-                                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                                  {locale === "zh" ? "折合" : "Équiv."}{" "}
-                                  {formatXof(cashLine.amountXof)}
-                                </p>
-                              )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </PanelShell>
-      )}
-
       {canRecordFinance && panel === "financeEntry" && selected && (
         <PanelShell
-          onClose={() => setPanel("detail")}
+          onClose={closeOperation}
           title={locale === "zh" ? "新增长租财务记录" : "Nouvelle écriture financière"}
           badge={<Badge variant="secondary">{selectedUnit?.unit_no ?? "-"}</Badge>}
         >
-          <div className="space-y-4">
+          <fieldset disabled={saving} className="space-y-4">
             <div className="rounded-xl border bg-muted/35 p-3 text-sm">
               <p className="font-semibold">{selected.contract_no}</p>
               <p className="mt-1 text-xs text-muted-foreground">
@@ -3135,16 +2772,16 @@ export function LeaseList({
             <Button className="w-full" onClick={handleFinanceEntry} disabled={saving}>
               {saving ? "..." : locale === "zh" ? "确认保存财务记录" : "Enregistrer"}
             </Button>
-          </div>
+          </fieldset>
         </PanelShell>
       )}
 
       {/* ── Move-out Panel ── */}
       {panel === "moveout" && selected && (
-        <PanelShell onClose={() => setPanel(null)} title={t.settlement.moveOut}>
+        <PanelShell onClose={closeOperation} title={t.settlement.moveOut}>
           {/* form kept identical to original */}
           {/*...*/}
-          <div className="space-y-4">
+          <fieldset disabled={saving} className="space-y-4">
             <div>
               <label className={labelClass}>{t.form.actualEndDate}</label>
               <DateInput value={moEndDate} onChangeValue={setMoEndDate} className={inputClass} />
@@ -3232,7 +2869,7 @@ export function LeaseList({
             <Button className="w-full" onClick={handleMoveOut} disabled={saving}>
               {saving ? "..." : locale === "zh" ? "确认退租" : "Confirmer"}
             </Button>
-          </div>
+          </fieldset>
         </PanelShell>
       )}
     </OperationalPage>

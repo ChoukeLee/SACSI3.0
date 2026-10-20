@@ -339,7 +339,7 @@ export function CustomerWorkbenchInspector({
                 className={styles.secondary}
                 href={`${locale === "fr" ? "/fr" : ""}/customers/${c.id}?returnTo=${encodeURIComponent(returnTo)}`}
               >
-                {text("完整档案", "Dossier complet")}
+                {text("收款、单据与历史", "Paiements, documents et historique")}
                 <ArrowUpRight size={12} aria-hidden="true" />
               </Link>
             </div>

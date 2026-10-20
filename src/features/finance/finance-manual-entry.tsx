@@ -73,6 +73,7 @@ function ScopedManualEntry({ locale, projectId, buildingId }: Props) {
   const zh = locale === "zh";
   const text = (chinese: string, french: string) => (zh ? chinese : french);
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState(buildingId?.toLowerCase() ?? "");
   const [catalog, setCatalog] = useState<Building[]>([]);
   const [loaded, setLoaded] = useState<{ key: string; data: Options } | null>(null);
@@ -133,7 +134,9 @@ function ScopedManualEntry({ locale, projectId, buildingId }: Props) {
       </Button>
       <RightDrawer
         open={open}
-        onClose={close}
+        onClose={() => {
+          if (!saving) close();
+        }}
         title={text("手工记账", "Écriture manuelle")}
         subtitle={text(
           "仅登记非业务收支；业务收款请回到相应合同或订单办理。",
@@ -147,6 +150,7 @@ function ScopedManualEntry({ locale, projectId, buildingId }: Props) {
             <select
               className="w-full rounded-md border bg-background p-2"
               value={selectedBuilding}
+              disabled={saving}
               onChange={(event) => {
                 setSelectedBuilding(event.target.value);
                 setLoaded(null);
@@ -212,7 +216,10 @@ function ScopedManualEntry({ locale, projectId, buildingId }: Props) {
             buildings={data.buildings}
             units={data.units}
             zh={zh}
-            expanded
+            buildingId={scopedBuildingId}
+            showBuilding={!!buildingId}
+            onPendingChange={setSaving}
+            onSaved={close}
           />
         )}
       </RightDrawer>

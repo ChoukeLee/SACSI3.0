@@ -19,7 +19,9 @@ describe("contract card shortcuts", () => {
     expect(printHandler).toContain("printLeaseContract(");
     expect(printHandler).toContain("source.contracts.find((row) => row.id === id)");
     expect(printHandler).toContain("source.receivables.filter(");
-    expect(source).toContain("financeSectionRef.current?.scrollIntoView");
+    expect(source).toContain("<LeaseWorkbenchInspector");
+    expect(source).toContain("initialSection={detailSection}");
+    expect(source).not.toContain('panel === "detail"');
   });
 
   it("keeps sale detail, finance and print actions distinct", () => {
@@ -27,10 +29,12 @@ describe("contract card shortcuts", () => {
     const rooms = read("src/features/sales/sale-workbench-rooms.tsx");
     expect(rooms).toContain('action: () => onOpen(contract.id, "finance")');
     expect(rooms).toMatch(/icon: FileText[\s\S]{0,180}onPrint\(contract\)/);
-    expect(source).toContain("onOpen={(id, section) => void openDetail(id, section)}");
+    expect(source).toContain("onOpen={(id, section) => selectPreview(id, section)}");
     expect(source).toContain("onPrint={printContract}");
     expect(source).toContain('workspace.ensure("detail", contract.id)');
-    expect(source).toContain("financeSectionRef.current?.scrollIntoView");
+    expect(source).toContain("<SaleWorkbenchInspector");
+    expect(source).toContain("initialTab={previewTab}");
+    expect(source).not.toContain('panel === "detail"');
     expect(read("src/features/print/index.ts")).toContain("printSaleContract");
   });
 });

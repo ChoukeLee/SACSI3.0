@@ -2,9 +2,8 @@
 
 import { useId, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Printer, X } from "lucide-react";
+import { DollarSign, CalendarPlus, TrendingUp, AlertTriangle, Printer, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   formatContractXof,
   type ContractReceivableSummary,
@@ -19,7 +18,7 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatMoney } from "@/lib/currency";
 import type { SaleContractRow } from "@/types/database";
-import { salePrice, saleScheduleState } from "./sale-workbench-model";
+import { salePrice, saleScheduleReceivable, saleScheduleState } from "./sale-workbench-model";
 import styles from "./sale-workbench.module.css";
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -42,6 +41,8 @@ type SaleInspectorData = Pick<
   | "receivables"
 > & { summaries: Record<string, ContractReceivableSummary> };
 
+export type SaleWorkbenchAction = "payment" | "installment" | "transfer" | "terminate";
+
 export function SaleWorkbenchInspector({
   data,
   locale,
@@ -51,7 +52,12 @@ export function SaleWorkbenchInspector({
   returnTo,
   onClose,
   onRetry,
-  onOpen,
+  initialTab = "overview",
+  canRecordFinance = false,
+  canManage = false,
+  canTerminate = false,
+  busy = false,
+  onAction,
   onPrint,
 }: {
   data: SaleInspectorData | null;
@@ -62,11 +68,16 @@ export function SaleWorkbenchInspector({
   returnTo: string;
   onClose: () => void;
   onRetry: () => void;
-  onOpen: (section: "overview" | "finance") => void;
+  initialTab?: "overview" | "finance";
+  canRecordFinance?: boolean;
+  canManage?: boolean;
+  canTerminate?: boolean;
+  busy?: boolean;
+  onAction: (action: SaleWorkbenchAction) => void;
   onPrint: (contract: SaleContractRow) => void;
 }) {
   const id = useId();
-  const [tab, setTab] = useState<"overview" | "finance" | "profile">("overview");
+  const [tab, setTab] = useState<"overview" | "finance" | "profile">(initialTab);
   const text = (zh: string, fr: string) => (locale === "zh" ? zh : fr);
   if (!selectedId)
     return (
@@ -127,6 +138,26 @@ export function SaleWorkbenchInspector({
     price = salePrice(contract);
   const payments = data.payments.filter((row) => row.source_id === contract.id),
     cash = summarizeContractCash(payments);
+  const cnyReceived = payments
+    .filter(
+      (payment) =>
+        payment.currency === "CNY" &&
+        ["sale", "sale_contract", "property_fee", "parking_fee"].includes(payment.source_type) &&
+        classifyContractCashPayment(payment).kind === "income",
+    )
+    .reduce((sum, payment) => sum + Number(payment.amount), 0);
+  const paymentKindNames: Record<string, string> = {
+    sale: text("房款收款", "Paiement du bien"),
+    sale_contract: text("房款收款", "Paiement du bien"),
+    sale_other_income: text("其他经营收款", "Autre encaissement"),
+    sale_other_expense: text("其他经营支出", "Autre décaissement"),
+    sale_registration_fee: text("注册金收款", "Frais d'inscription"),
+    sale_agency_income: text("中介费收款", "Commission reçue"),
+    sale_agency_expense: text("中介费支出", "Commission versée"),
+    sale_refund: text("售款退款", "Remboursement du bien"),
+    parking_fee: text("车位款收款", "Paiement parking"),
+    property_fee: text("物业费收款", "Frais de copropriété"),
+  };
   const schedules = data.schedules
     .filter((row) => row.sale_contract_id === contract.id)
     .sort((a, b) => a.installment_no - b.installment_no);
@@ -277,6 +308,7 @@ export function SaleWorkbenchInspector({
             {schedules.length ? (
               schedules.map((schedule) => {
                 const state = saleScheduleState(schedule, recs, data.today);
+                const receivable = saleScheduleReceivable(schedule, recs);
                 return (
                   <div className={styles.schedule} key={schedule.id}>
                     <div className={styles.scheduleHead}>
@@ -294,6 +326,12 @@ export function SaleWorkbenchInspector({
                         {stateLabels[state]}
                       </span>
                     </p>
+                    {receivable?.title ? <p className={styles.sub}>{receivable.title}</p> : null}
+                    {receivable && Number(receivable.paid_amount_xof) > 0 ? (
+                      <p className={styles.sub}>
+                        {text("已核销", "Rapprochée")} · {money(Number(receivable.paid_amount_xof))}
+                      </p>
+                    ) : null}
                   </div>
                 );
               })
@@ -320,7 +358,28 @@ export function SaleWorkbenchInspector({
                   ? money(cash.expense)
                   : text("暂无已核记录", "Aucune écriture vérifiée")}
               </Fact>
+              <Fact label={text("经营现金净额", "Flux de caisse net")}>
+                {payments.some((p) =>
+                  ["income", "expense"].includes(classifyContractCashPayment(p).kind),
+                )
+                  ? money(cash.net)
+                  : text("暂无已核记录", "Aucune écriture vérifiée")}
+              </Fact>
             </dl>
+            {cnyReceived > 0 ? (
+              <p className={styles.sub}>
+                {text("其中已录人民币收款", "Dont encaissements CNY")}{" "}
+                {formatMoney(cnyReceived, "CNY", locale)}
+              </p>
+            ) : null}
+            {contract.agency_commission_paid ? (
+              <p className={styles.sub}>
+                {text(
+                  "合同佣金标注不代替逐笔现金支出。",
+                  "La mention de commission ne remplace pas une écriture de caisse.",
+                )}
+              </p>
+            ) : null}
             <p className={styles.callout}>
               {text(
                 "非现金抵扣不计作实收；实收人、合同经办和录入账号不能互相代替。",
@@ -339,7 +398,6 @@ export function SaleWorkbenchInspector({
                   b.payment_date.localeCompare(a.payment_date) ||
                   b.created_at.localeCompare(a.created_at),
               )
-              .slice(0, 6)
               .map((payment) => {
                 const classification = classifyContractCashPayment(payment);
                 return (
@@ -347,13 +405,18 @@ export function SaleWorkbenchInspector({
                     <div className={styles.scheduleHead}>
                       <span>{payment.payment_date}</span>
                       <strong>
+                        {classification.kind === "expense" ? "− " : ""}
                         {formatMoney(Number(payment.amount), payment.currency, locale)}
                       </strong>
                     </div>
+                    {payment.currency !== "XOF" && classification.amountXof !== null ? (
+                      <p className={styles.sub}>
+                        {text("折合", "Soit")} {money(classification.amountXof)}
+                      </p>
+                    ) : null}
                     <p className={styles.sub}>
-                      {dictionaries[locale].finance.categories[
-                        payment.source_type as keyof typeof dictionaries.zh.finance.categories
-                      ] ?? text("其他付款记录", "Autre écriture")}
+                      {paymentKindNames[payment.source_type] ??
+                        text("待核对财务记录", "Écriture à vérifier")}
                       {classification.kind === "excluded"
                         ? ` · ${text("不计入现金汇总", "Hors synthèse de caisse")}`
                         : ""}
@@ -368,6 +431,7 @@ export function SaleWorkbenchInspector({
                         ? text("已记录，见审计详情", "Enregistré, voir l’audit")
                         : text("待核对", "À vérifier")}
                     </p>
+                    {payment.notes ? <p className={styles.sub}>{payment.notes}</p> : null}
                     {payment.receipt_no ? (
                       <p className={styles.sub}>
                         {text("凭证", "Référence")}: {payment.receipt_no}
@@ -379,13 +443,6 @@ export function SaleWorkbenchInspector({
             {!payments.length ? (
               <p className="py-5 text-xs text-muted-foreground">
                 {text("暂无逐笔付款记录。", "Aucun paiement détaillé.")}
-              </p>
-            ) : payments.length > 6 ? (
-              <p className={styles.note}>
-                {text(
-                  "显示最近 6 笔，完整记录在办理详情中。",
-                  "Les 6 dernières écritures sont affichées. Dossier complet ci-dessous.",
-                )}
               </p>
             ) : null}
           </>
@@ -412,6 +469,14 @@ export function SaleWorkbenchInspector({
               <Fact label={text("中介经办", "Intermédiaire")}>
                 {contract.agent_name || text("未登记", "Non renseigné")}
               </Fact>
+              <Fact label={text("合同佣金", "Commission contractuelle")}>
+                {money(contract.agency_commission_amount_xof)}
+              </Fact>
+              <Fact label={text("合同佣金标注", "Mention de commission")}>
+                {contract.agency_commission_paid
+                  ? text("合同标注已付", "Mention payée")
+                  : text("未标注已付", "Non marquée payée")}
+              </Fact>
             </dl>
             <p className={styles.callout}>
               {text(
@@ -435,15 +500,55 @@ export function SaleWorkbenchInspector({
         </div>
       </div>
       <footer className={styles.detailActions}>
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          onClick={() => onOpen(tab === "finance" ? "finance" : "overview")}
-        >
-          {text("打开合同 / 办理", "Ouvrir le dossier / Gérer")}
-          <ArrowUpRight aria-hidden="true" />
-        </Button>
+        {contract.status === "active" ? (
+          <div
+            className={styles.operationActions}
+            aria-label={text("办理此合同", "Gérer ce contrat")}
+          >
+            {canRecordFinance ? (
+              <Button type="button" size="sm" disabled={busy} onClick={() => onAction("payment")}>
+                <DollarSign aria-hidden="true" />
+                {text("登记收款", "Enregistrer un paiement")}
+              </Button>
+            ) : null}
+            {canManage ? (
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => onAction("installment")}
+                >
+                  <CalendarPlus aria-hidden="true" />
+                  {text("新增分期", "Ajouter une échéance")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => onAction("transfer")}
+                >
+                  <TrendingUp aria-hidden="true" />
+                  {text("更新过户", "Mettre à jour le transfert")}
+                </Button>
+              </>
+            ) : null}
+            {canTerminate ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={busy}
+                onClick={() => onAction("terminate")}
+              >
+                <AlertTriangle aria-hidden="true" />
+                {text("终止合同", "Résilier le contrat")}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
         <Button
           type="button"
           variant="ghost"

@@ -12,6 +12,13 @@ vi.mock("@/features/sales/actions", () => ({
 }));
 vi.mock("@/features/print", () => ({ printSaleContract: vi.fn() }));
 import { SaleList } from "@/features/sales/sale-list";
+import {
+  terminateSaleContract,
+  recordSalePaymentAtomic,
+  addFlexibleInstallment,
+  updateTransferStatus,
+} from "@/features/sales/actions";
+import type { ComponentProps } from "react";
 import { saleFixture } from "./fixtures/sale-workbench";
 import {
   workspaceContract,
@@ -56,7 +63,13 @@ afterEach(async () => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
-async function render(data = saleFixture(), initialContract?: string) {
+async function render(
+  data = saleFixture(),
+  initialContract?: string,
+  capabilities: Partial<
+    Pick<ComponentProps<typeof SaleList>, "canRecordFinance" | "canManage" | "canTerminate">
+  > = {},
+) {
   await act(async () =>
     root.render(
       <SaleList
@@ -70,6 +83,7 @@ async function render(data = saleFixture(), initialContract?: string) {
         canRecordFinance={false}
         canManage={false}
         canTerminate={false}
+        {...capabilities}
       />,
     ),
   );
@@ -280,13 +294,210 @@ it("keeps row list available after isolated detail failure, without zero debt or
   expect(buttons()).toHaveLength(2);
   expect(document.querySelector('[role="dialog"]')).toBeNull();
 });
-it("retains the original read-only full contract drawer when explicitly opened", async () => {
+it("keeps the complete read-only contract in one inspector with no second detail drawer", async () => {
   await render();
   await click(buttons()[0]);
   await settle();
-  await click(named("打开合同 / 办理"));
+  await click(named("付款事实"));
+  expect(inspector()?.textContent).toContain("已录付款事实");
+  expect(host.textContent).not.toContain("打开合同 / 办理");
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
+it.each([
+  ["登记收款", "登记出售收款", "确认收款"],
+  ["新增分期", "新增付款分期", "新增"],
+  ["更新过户", "更新过户进度", "保存"],
+  ["终止合同", "确认终止出售合同", "确认终止"],
+])(
+  "opens only the focused %s form, preserving selection on cancel",
+  async (label, title, confirm) => {
+    await render(saleFixture(), undefined, {
+      canRecordFinance: true,
+      canManage: true,
+      canTerminate: true,
+    });
+    await click(buttons()[0]);
+    await settle();
+    await click(named(label));
+    await settle();
+    const dialogs = document.querySelectorAll('[role="dialog"]');
+    expect(dialogs).toHaveLength(1);
+    const dialog = dialogs[0];
+    expect(dialog.textContent).toContain(title);
+    expect(dialog.textContent).toContain("SYNTHETIC-SALE-0");
+    expect(dialog.textContent).not.toContain("合同概览");
+    expect(dialog.textContent).not.toContain("已录经营收款");
+    expect(dialog.textContent).toContain(confirm);
+    await click(named("取消", dialog));
+    await settle();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(inspector()?.textContent).toContain("SYNTHETIC-SALE-0");
+    expect(new URL(window.location.href).searchParams.get("contract")).toBe(workspaceContract);
+  },
+);
+it("requires explicit termination confirmation and keeps the existing audited mutation signature", async () => {
+  vi.mocked(terminateSaleContract).mockResolvedValue({
+    success: false,
+    error: "SYNTHETIC no write",
+    rejected: true,
+  });
+  await render(saleFixture(), undefined, { canTerminate: true });
+  await click(buttons()[0]);
   await settle();
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Synthetic guest");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("财务记录");
-  expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("确认收款");
+  await click(named("终止合同"));
+  await settle();
+  expect(terminateSaleContract).not.toHaveBeenCalled();
+  const dialog = document.querySelector('[role="dialog"]')!;
+  expect(dialog.textContent).toContain("不代表已退款或欠款已清");
+  const input = dialog.querySelector("textarea")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(
+      input,
+      "SYNTHETIC reason",
+    );
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await click(named("确认终止", dialog));
+  await settle();
+  expect(terminateSaleContract).toHaveBeenCalledWith(
+    workspaceContract,
+    "SYNTHETIC reason",
+    expect.any(String),
+    responseFor("/api/contracts/sale?mode=detail&contractId=" + workspaceContract).contracts[0]
+      .updated_at,
+  );
+  expect(dialog.textContent).toContain("SYNTHETIC no write");
+});
+async function changeInput(input: HTMLInputElement, value: string) {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+}
+it("preserves the existing installment mutation payload and optimistic concurrency", async () => {
+  vi.mocked(addFlexibleInstallment).mockResolvedValue({
+    success: false,
+    rejected: true,
+    error: "SYNTHETIC no write",
+  });
+  await render(saleFixture(), undefined, { canManage: true });
+  await click(buttons()[0]);
+  await settle();
+  await click(named("新增分期"));
+  await settle();
+  const dialog = document.querySelector('[role="dialog"]')!;
+  await click(dialog.querySelector("#sale-action-due-date"));
+  await click(named("今天", dialog));
+  await changeInput(dialog.querySelector("#sale-action-amount")!, "12345");
+  await click(named("新增", dialog));
+  expect(addFlexibleInstallment).toHaveBeenCalledWith({
+    contractId: workspaceContract,
+    installmentNo: 1,
+    dueDate: new Date().toISOString().slice(0, 10),
+    amountXof: 12345,
+    expectedUpdatedAt: saleFixture().contracts[0].updated_at,
+    requestId: expect.any(String),
+  });
+});
+it("preserves the existing transfer mutation signature", async () => {
+  vi.mocked(updateTransferStatus).mockResolvedValue({
+    success: false,
+    rejected: true,
+    error: "SYNTHETIC no write",
+  });
+  await render(saleFixture(), undefined, { canManage: true });
+  await click(buttons()[0]);
+  await settle();
+  await click(named("更新过户"));
+  await settle();
+  const dialog = document.querySelector('[role="dialog"]')!;
+  const status = dialog.querySelector<HTMLSelectElement>("#sale-action-transfer-status")!;
+  await act(async () => {
+    status.value = "completed";
+    status.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await click(dialog.querySelector("#sale-action-transfer-date"));
+  await click(named("今天", dialog));
+  await changeInput(dialog.querySelector("#sale-action-certificate")!, "SYNTHETIC-TITLE");
+  await click(named("保存", dialog));
+  expect(updateTransferStatus).toHaveBeenCalledWith(
+    workspaceContract,
+    "completed",
+    new Date().toISOString().slice(0, 10),
+    "SYNTHETIC-TITLE",
+    expect.any(String),
+    saleFixture().contracts[0].updated_at,
+  );
+});
+it("preserves the atomic receipt payload without creating an automatic amount", async () => {
+  vi.mocked(recordSalePaymentAtomic).mockResolvedValue({
+    success: false,
+    rejected: true,
+    error: "SYNTHETIC no write",
+  });
+  const scheduleId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  vi.mocked(fetch).mockImplementation(async (input) => {
+    const data = responseFor(input);
+    if (data.mode === "detail")
+      data.schedules = [
+        {
+          id: scheduleId,
+          sale_contract_id: workspaceContract,
+          installment_no: 1,
+          due_date: "2026-10-20",
+          amount_xof: 1000000,
+          status: "pending",
+          created_at: "2026-10-01T00:00:00Z",
+        },
+      ];
+    data.scheduleCount = data.schedules.length;
+    return Response.json(data);
+  });
+  await render(saleFixture(), undefined, { canRecordFinance: true });
+  await click(buttons()[0]);
+  await settle();
+  await click(named("登记收款"));
+  await settle();
+  const dialog = document.querySelector('[role="dialog"]')!;
+  expect((dialog.querySelector("#sale-action-amount") as HTMLInputElement).value).toBe("0");
+  expect((named("确认收款", dialog) as HTMLButtonElement).disabled).toBe(true);
+  await click(dialog.querySelector("#sale-action-payment-date"));
+  await click(named("今天", dialog));
+  await changeInput(dialog.querySelector("#sale-action-amount")!, "125000");
+  await changeInput(dialog.querySelector("#sale-action-receipt")!, "SYNTHETIC-RECEIPT");
+  await click(named("确认收款", dialog));
+  expect(recordSalePaymentAtomic).toHaveBeenCalledWith({
+    contractId: workspaceContract,
+    scheduleId,
+    amount: 125000,
+    paymentDate: new Date().toISOString().slice(0, 10),
+    receiptNo: "SYNTHETIC-RECEIPT",
+    requestId: expect.any(String),
+  });
+});
+it("does not revive a pending action after the workspace scope changes", async () => {
+  await render(saleFixture(), undefined, { canManage: true });
+  await click(buttons()[0]);
+  await settle();
+  let resolveAction!: (response: Response) => void;
+  vi.mocked(fetch).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveAction = resolve;
+      }),
+  );
+  await click(named("更新过户"));
+  await render(
+    saleFixture(parseWorkspaceQuery({ buildingId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" })),
+    undefined,
+    { canManage: true },
+  );
+  const input = vi
+    .mocked(fetch)
+    .mock.calls.findLast(([request]) => requestInfo(request).mode === "detail")![0];
+  await act(async () => resolveAction(Response.json(responseFor(input))));
+  await settle(260);
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(new URL(window.location.href).searchParams.get("contract")).toBeNull();
 });

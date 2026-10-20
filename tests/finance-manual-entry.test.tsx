@@ -130,7 +130,11 @@ describe("on-demand manual entry drawer", () => {
       `/api/finance/manual-options?projectId=${projectId}&buildingId=${buildingId}`,
     );
     expect(host.querySelector("form")).not.toBeNull();
-    expect(host.querySelector("details")?.open).toBe(true);
+    expect(host.querySelector("details")).toBeNull();
+    expect(host.querySelector("summary")).toBeNull();
+    expect(host.querySelectorAll("form")).toHaveLength(1);
+    expect([...host.querySelectorAll("select")].filter((select) => !select.name)).toHaveLength(1);
+    expect(host.querySelector("form")?.textContent).not.toContain("手工记账");
     expect(
       [...host.querySelectorAll('select[name="unitId"] option')].map(
         (option) => option.textContent,
@@ -148,11 +152,8 @@ describe("on-demand manual entry drawer", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toContain(`buildingId=${buildingId}`);
     expect(host.querySelector("form")).not.toBeNull();
-    expect(
-      [...host.querySelectorAll("form select:first-of-type option")].map(
-        (option) => option.textContent,
-      ),
-    ).toContain("示例楼栋");
+    expect(host.querySelector("form")?.textContent).toContain("示例楼栋");
+    expect([...host.querySelectorAll("select")].filter((select) => !select.name)).toHaveLength(0);
   });
 
   it("shows an independent retry state and never mounts a form after a failed read", async () => {

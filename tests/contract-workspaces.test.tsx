@@ -117,16 +117,20 @@ async function openCustomer() {
   await act(async () =>
     (host.querySelector("tbody td:nth-child(2) button") as HTMLButtonElement).click(),
   );
-  if (!document.querySelector('[role="dialog"]')) {
-    const openFull = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
-      (button) =>
-        button.textContent?.includes("打开合同 / 办理") ||
-        button.textContent?.includes("Ouvrir le dossier / Gérer"),
-    );
-    expect(openFull).toBeTruthy();
-    await act(async () => openFull!.click());
-  }
-  return document.querySelector('[role="dialog"]')!;
+  // A table selection opens the authoritative Inspector, not another full-detail dialog.
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  const inspector = host.querySelector(
+    '[aria-label="出售合同履约详情"], [aria-label="Détails du contrat de vente"], [aria-label="合同预览"]',
+  )!;
+  expect(inspector).not.toBeNull();
+  return inspector;
+}
+async function openFinance(inspector: Element) {
+  const finance = [...inspector.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
+    (button) => /^(账务|Finances|付款事实|Paiements)$/.test(button.textContent ?? ""),
+  );
+  expect(finance).toBeTruthy();
+  await act(async () => finance!.click());
 }
 
 it("sale default table keeps full identity and separates allocated receivables from recorded cash", async () => {
@@ -153,9 +157,10 @@ it("sale default table keeps full identity and separates allocated receivables f
   expect(host.querySelector("tbody")?.textContent).toContain("应收未收 800,000 XOF");
   expect(host.textContent).toContain(sale.contract_no);
   const dialog = await openCustomer();
-  expect(dialog.textContent).toContain("已录经营收款 1,200,000 XOF");
   expect(dialog.textContent).toContain("应收已核销200,000 XOF");
-  expect(dialog.textContent).not.toContain("300,000 XOF"); // Contract commission flags are not cash evidence.
+  await openFinance(dialog);
+  expect(dialog.textContent).toContain("经营收款1,200,000 XOF");
+  expect(dialog.querySelector('[role="tabpanel"]')?.textContent).not.toContain("300,000 XOF"); // Contract commission flags are not cash evidence.
 });
 
 it("sale missing managed obligations remains unknown instead of treating cash or contract total as allocation", async () => {
@@ -198,7 +203,8 @@ it("lease financial details keep refundable deposits outside operating income", 
     ),
   );
   const dialog = await openCustomer();
-  expect(dialog.textContent).toContain("已录经营收款 1,200,000 XOF");
-  expect(dialog.textContent).toContain("押金实收 3,000,000 XOF");
-  expect(dialog.textContent).not.toContain("已录经营收款 4,200,000 XOF");
+  await openFinance(dialog);
+  expect(dialog.textContent).toContain("已录经营收款1,200,000 XOF");
+  expect(dialog.textContent).toContain("已录押金实收3,000,000 XOF");
+  expect(dialog.textContent).not.toContain("已录经营收款4,200,000 XOF");
 });
