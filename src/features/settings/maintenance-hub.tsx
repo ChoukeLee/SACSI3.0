@@ -84,8 +84,17 @@ export function MaintenanceHub({ locale, accounts, buildings }: MaintenanceHubPr
               ? "当前仍存在同一账号多人共用的情况。系统权限按登录账号生效，操作追溯只能定位到账号，不能准确区分实际操作人。"
               : "Les droits suivent le compte connecté. Un compte partagé ne permet pas d'identifier précisément l'opérateur réel."}
           </p>
-          <div className="overflow-hidden rounded-lg border">
-            <table className="w-full text-left text-sm">
+          <div
+            className="overflow-x-auto rounded-lg border"
+            role="region"
+            aria-label={
+              zh
+                ? "账号与权限清单（可横向滚动）"
+                : "Liste des comptes et droits (défilement horizontal)"
+            }
+            tabIndex={0}
+          >
+            <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="border-b bg-muted/60 text-xs text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2.5">{zh ? "账号" : "Compte"}</th>
@@ -104,9 +113,13 @@ export function MaintenanceHub({ locale, accounts, buildings }: MaintenanceHubPr
                     </td>
                     <td className="px-4 py-2.5 text-xs text-muted-foreground">
                       {roleScopes[locale][account.role]}
-                      {account.projectNames !== undefined ? ` · ${account.projectNames}` : account.projectScope === "sacsi_only"
-                        ? (zh ? "；仅限SACSI公寓，不含建材城" : " ; résidences SACSI uniquement, hors CIMAC")
-                        : ""}
+                      {account.projectNames !== undefined
+                        ? ` · ${account.projectNames}`
+                        : account.projectScope === "sacsi_only"
+                          ? zh
+                            ? "；仅限SACSI公寓，不含建材城"
+                            : " ; résidences SACSI uniquement, hors CIMAC"
+                          : ""}
                     </td>
                   </tr>
                 ))}
@@ -126,17 +139,29 @@ export function MaintenanceHub({ locale, accounts, buildings }: MaintenanceHubPr
         <CardContent>
           <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {buildings.map((building) => (
-              <div key={building.id} className="flex items-center justify-between rounded-lg border px-3 py-2.5">
+              <div
+                key={building.id}
+                className="flex items-center justify-between rounded-lg border px-3 py-2.5"
+              >
                 <div>
                   <p className="font-semibold">{building.display_name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {building.code} · {building.floors_above_ground}{zh ? " 层" : " étages"}
+                    {building.code} · {building.floors_above_ground}
+                    {zh ? " 层" : " étages"}
                   </p>
                 </div>
-                <Badge variant={building.is_active && !building.business_paused ? "success" : "secondary"}>
+                <Badge
+                  variant={
+                    building.is_active && !building.business_paused ? "success" : "secondary"
+                  }
+                >
                   {building.is_active && !building.business_paused
-                    ? (zh ? "启用" : "Actif")
-                    : (zh ? "停用" : "Inactif")}
+                    ? zh
+                      ? "启用"
+                      : "Actif"
+                    : zh
+                      ? "停用"
+                      : "Inactif"}
                 </Badge>
               </div>
             ))}
@@ -159,7 +184,9 @@ export function MaintenanceHub({ locale, accounts, buildings }: MaintenanceHubPr
           </CardHeader>
           <CardContent>
             <p className="mb-4 text-sm text-muted-foreground">
-              {zh ? "核对订单、房态、应收和流水之间是否一致。" : "Contrôler les réservations, statuts, créances et écritures."}
+              {zh
+                ? "核对订单、房态、应收和流水之间是否一致。"
+                : "Contrôler les réservations, statuts, créances et écritures."}
             </p>
             <Button asChild>
               <Link href={routeFor(locale, "/data-quality")}>
@@ -178,7 +205,9 @@ export function MaintenanceHub({ locale, accounts, buildings }: MaintenanceHubPr
           </CardHeader>
           <CardContent>
             <p className="mb-4 text-sm text-muted-foreground">
-              {zh ? "查看关键业务变更及其登录账号。" : "Voir les changements métier et le compte connecté."}
+              {zh
+                ? "查看关键业务变更及其登录账号。"
+                : "Voir les changements métier et le compte connecté."}
             </p>
             <Button asChild>
               <Link href={routeFor(locale, "/settings/audit-logs")}>

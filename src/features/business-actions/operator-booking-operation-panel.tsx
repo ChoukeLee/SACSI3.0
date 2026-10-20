@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { operatorSourceMessage, type OperatorLocale } from "./operator-inbox-panel-labels";
 import { bookingOperationLabel, isHighRiskBookingOperation } from "./booking-operation-contract";
 const fields: Record<string, string> = {
   unitCode: "原房间",
@@ -24,6 +25,40 @@ const fields: Record<string, string> = {
   ledgerCount: "关联账本条数",
   reason: "变更原因",
 };
+const fieldsFr: Record<string, string> = {
+  unitCode: "Lot d’origine",
+  targetUnitCode: "Lot cible",
+  bookingAgent: "Responsable du dossier",
+  guestName: "Occupant",
+  checkInBefore: "Ancienne arrivée",
+  checkInAfter: "Nouvelle arrivée",
+  checkOutBefore: "Ancien départ",
+  checkOutAfter: "Nouveau départ",
+  priceBefore: "Ancien tarif journalier (XOF)",
+  priceAfter: "Nouveau tarif journalier (XOF)",
+  totalBefore: "Ancien montant dû (XOF)",
+  totalAfter: "Nouveau montant dû (XOF)",
+  paidBefore: "Ancien encaissement net (XOF)",
+  paidAfter: "Nouvel encaissement net (XOF)",
+  amountXof: "Remboursement ou extourne (XOF)",
+  paymentDate: "Date réelle de remboursement",
+  paymentMethod: "Moyen réel de remboursement",
+  paymentCount: "Paiements liés",
+  receivableCount: "Créances liées",
+  ledgerCount: "Écritures liées",
+  reason: "Motif de modification",
+};
+const operationsFr: Record<string, string> = {
+  create: "Créer une réservation",
+  check_in: "Enregistrer une arrivée (sans paiement)",
+  cancel: "Annuler une réservation non arrivée",
+  change_stay: "Modifier les dates ou le tarif",
+  correct_room: "Corriger le lot saisi par erreur",
+  transfer: "Transférer une réservation non arrivée",
+  reverse: "Extourner un paiement erroné",
+  refund: "Enregistrer un remboursement réel",
+  void_checkin: "Annuler une arrivée erronée",
+};
 export function BookingOperationPanel({
   id,
   plan,
@@ -32,6 +67,7 @@ export function BookingOperationPanel({
   originalInstruction,
   expiresAt,
   status,
+  locale = "zh",
 }: {
   id: string;
   plan: Record<string, unknown>;
@@ -40,15 +76,26 @@ export function BookingOperationPanel({
   originalInstruction: string;
   expiresAt: string;
   status: string;
+  locale?: OperatorLocale;
 }) {
-  const [state, setState] = useState(status),
+  const text = (zh: string, fr: string) => (locale === "zh" ? zh : fr);
+  const busy = useRef(false);
+  const [state, setState] = useState(
+      ["pending", "completed", "superseded"].includes(status) ? status : "blocked",
+    ),
     [checked, setChecked] = useState(false),
     [highRiskChecked, setHighRiskChecked] = useState(false),
     [message, setMessage] = useState("");
   const highRisk = isHighRiskBookingOperation(plan.operation);
   async function confirm() {
-    if (!checked || (highRisk && !highRiskChecked) || !["pending", "unknown"].includes(state))
+    if (
+      busy.current ||
+      !checked ||
+      (highRisk && !highRiskChecked) ||
+      !["pending", "unknown"].includes(state)
+    )
       return;
+    busy.current = true;
     setState("sending");
     try {
       const r = await fetch(`/api/operator/v1/booking-operations/confirmations/${id}`, {
@@ -58,44 +105,81 @@ export function BookingOperationPanel({
       const data = await r.json();
       if (r.ok && data.status === "completed" && data.verified === true) {
         setState("completed");
-        setMessage("业务已完成并通过本次执行核验。");
+        setMessage(
+          text("业务已完成并通过本次执行核验。", "Opération terminée et exécution vérifiée."),
+        );
         return;
       }
       if (r.ok && data.status === "completed_previously") {
         setState("completed");
-        setMessage("原单此前已完成，没有重复执行；未重新复核后续全部账务。");
+        setMessage(
+          text(
+            "原单此前已完成，没有重复执行；未重新复核后续全部账务。",
+            "Cette confirmation a déjà été exécutée, sans nouvelle exécution ; les écritures ultérieures n’ont pas toutes été revérifiées.",
+          ),
+        );
         return;
       }
       setState(r.status >= 500 ? "unknown" : "blocked");
-      setMessage(data.message || "结果未核实，请保留原请求号查询或联系 Chucke。");
+      setMessage(
+        data.message
+          ? operatorSourceMessage(data.message, locale)
+          : text(
+              "结果未核实，请保留原请求号查询或联系 Chucke。",
+              "Résultat non confirmé. Conservez l’identifiant pour vérification ou contactez Chucke.",
+            ),
+      );
     } catch {
       setState("unknown");
-      setMessage("网络中断，结果未知。请按原单重试，勿换号重录。");
+      setMessage(
+        text(
+          "网络中断，结果未知。请按原单重试，勿换号重录。",
+          "Connexion interrompue, résultat inconnu. Réessayez le même document sans changer d’identifiant.",
+        ),
+      );
+    } finally {
+      busy.current = false;
     }
   }
   return (
-    <section className="mx-auto max-w-3xl space-y-4 p-6">
-      <h1 className="text-xl font-semibold">{bookingOperationLabel(plan.operation)} · 本人确认</h1>
-      <p>实际操作账号：{actor}</p>
+    <section className="mx-auto max-w-3xl space-y-4 rounded-xl border bg-card p-4 sm:p-6">
+      <h1 className="text-xl font-semibold">
+        {locale === "zh"
+          ? bookingOperationLabel(plan.operation)
+          : operationsFr[String(plan.operation)] || "Opération à vérifier"}{" "}
+        · {text("本人确认", "Confirmation personnelle")}
+      </h1>
+      <p>
+        {text("实际操作账号", "Compte opérateur réel")}：{actor}
+      </p>
       <p className="whitespace-pre-wrap break-words rounded-lg border p-3">{originalInstruction}</p>
       <dl className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2">
         {Object.entries(fields)
           .filter(([key]) => plan[key] !== null && plan[key] !== undefined)
           .map(([key, label]) => (
             <div key={key}>
-              <dt className="text-sm text-muted-foreground">{label}</dt>
+              <dt className="text-sm text-muted-foreground">
+                {locale === "zh" ? label : fieldsFr[key]}
+              </dt>
               <dd className="break-words">{String(plan[key])}</dd>
             </div>
           ))}
       </dl>
-      <p>{String(plan.notice || "")}</p>
+      <p>{plan.notice ? operatorSourceMessage(String(plan.notice), locale) : ""}</p>
       <p className="break-all text-xs">
-        请求号：{requestId} · 有效至 {expiresAt}（UTC）
+        {text("请求号", "Opération")}：{requestId} · {text("有效至", "Valide jusqu’au")} {expiresAt}
+        （UTC）
       </p>
       {state === "completed" ? (
-        <p role="status">{message || "此单此前已完成，请勿重复执行。"}</p>
+        <p role="status">
+          {message ||
+            text(
+              "此单此前已完成，请勿重复执行。",
+              "Cette confirmation a déjà été exécutée. Ne l’exécutez pas à nouveau.",
+            )}
+        </p>
       ) : state === "superseded" ? (
-        <p role="alert">此单已被替换。</p>
+        <p role="alert">{text("此单已被替换。", "Cette confirmation a été remplacée.")}</p>
       ) : (
         <>
           <label className="flex gap-2">
@@ -104,7 +188,10 @@ export function BookingOperationPanel({
               checked={checked}
               onChange={(e) => setChecked(e.target.checked)}
             />
-            我已核对房间、客人、经办人、日期与金额。
+            {text(
+              "我已核对房间、客人、经办人、日期与金额。",
+              "J’ai vérifié le lot, l’occupant, le responsable, les dates et les montants.",
+            )}
           </label>
           {highRisk && (
             <label className="flex gap-2">
@@ -114,8 +201,14 @@ export function BookingOperationPanel({
                 onChange={(e) => setHighRiskChecked(e.target.checked)}
               />
               {plan.operation === "refund"
-                ? "我确认款项已经实际退给客户，日期、方式和金额正确。"
-                : "我确认变更原因及影响；冲正不是实际退钱。不确定时先联系 Chucke。"}
+                ? text(
+                    "我确认款项已经实际退给客户，日期、方式和金额正确。",
+                    "Je confirme le remboursement réel au client, avec la bonne date, le bon moyen et le bon montant.",
+                  )
+                : text(
+                    "我确认变更原因及影响；冲正不是实际退钱。不确定时先联系 Chucke。",
+                    "Je confirme le motif et les effets. Une extourne n’est pas un remboursement réel. En cas de doute, contactez d’abord Chucke.",
+                  )}
             </label>
           )}
           <button
@@ -126,10 +219,10 @@ export function BookingOperationPanel({
             }
           >
             {state === "sending"
-              ? "正在处理…"
+              ? text("正在处理…", "Traitement…")
               : state === "unknown"
-                ? "按原单重试"
-                : "确认执行业务"}
+                ? text("按原单重试", "Réessayer le même document")
+                : text("确认执行业务", "Confirmer l’exécution")}
           </button>
           {message && <p role="alert">{message}</p>}
         </>

@@ -10,7 +10,7 @@ import { useNavigationTransition } from "@/components/navigation-transition-prov
 import { cn } from "@/lib/utils";
 
 const mobileTabs = [
-  { key: "workbench" as const, href: "/", icon: Home },
+  { key: "workbench" as const, href: "/management", icon: Home },
   { key: "daily" as const, href: "/daily-rentals", icon: CalendarDays },
   { key: "leases" as const, href: "/leases", icon: FileSignature },
   { key: "sales" as const, href: "/sales", icon: Building2 },
@@ -25,14 +25,19 @@ export function MobileBottomNav({ locale, userRole }: { locale: Locale; userRole
 
   const isActive = (href: string) => {
     const localized = routeFor(locale, href);
-    if (href === "/") return activeHref === "/" || activeHref === "/fr";
-    return activeHref === localized || activeHref.startsWith(localized);
+    return activeHref === localized || activeHref.startsWith(`${localized}/`);
   };
 
   const visibleTabs =
     userRole === "front_desk"
       ? mobileTabs.filter((item) => item.key === "daily" || item.key === "leases")
-      : mobileTabs;
+      : userRole === "rental_sales"
+        ? mobileTabs.filter((item) => item.key !== "workbench")
+        : mobileTabs.map((item) =>
+            item.key === "workbench" && userRole === "finance"
+              ? { ...item, href: "/finance" }
+              : item,
+          );
 
   const resolveHref = (href: string) => routeFor(locale, href);
 
@@ -60,7 +65,7 @@ export function MobileBottomNav({ locale, userRole }: { locale: Locale; userRole
                 }
               }}
               className={cn(
-                "relative flex flex-col items-center justify-center gap-0.5 min-h-[52px] min-w-[72px] px-1",
+                "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 min-h-[52px] px-1",
                 "text-xs font-semibold select-none rounded-lg",
                 "transition-colors duration-fast",
                 "active:scale-95 active:bg-accent",

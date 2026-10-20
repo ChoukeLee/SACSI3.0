@@ -1,44 +1,28 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
-import { fetchAllPages } from "@/lib/supabase/fetch-all";
-import { DesktopOnly } from "@/features/mobile";
-import { AuditLogViewer } from "@/features/settings";
-import { enrichAuditLogsWithUnitNumbers, type AuditLogRow } from "@/features/settings/audit-log-enrichment";
+import { AuditWorkbenchPage } from "@/features/settings/audit-workbench-page";
+import { AuditWorkbenchSkeleton } from "@/features/settings/audit-workbench";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function FrenchAuditLogsPage() {
+export default async function FrenchAuditLogsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!["admin", "boss"].includes(user.role)) redirect("/");
 
-  const supabase = await createClient();
-
-  const rows = await fetchAllPages(
-    (from, to) => supabase
-      .from("audit_logs")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .range(from, to),
-    "audit logs",
-  );
-
-  const logs = await enrichAuditLogsWithUnitNumbers(supabase, rows as unknown as AuditLogRow[]);
-
   return (
-    <>
-      <div className="lg:hidden">
-        <DesktopOnly locale="fr" />
-      </div>
-      <div className="hidden lg:block">
-        <h1 className="mb-6 text-2xl font-semibold tracking-tight">Journal d'audit</h1>
-        <section className="mt-8">
-          <AuditLogViewer logs={logs} locale="fr" />
-        </section>
-      </div>
-    </>
+    <Suspense fallback={<AuditWorkbenchSkeleton locale="fr" />}>
+      <AuditWorkbenchPage
+        params={await searchParams}
+        locale="fr"
+        viewerKey={`${user.id}:${user.role}`}
+      />
+    </Suspense>
   );
 }

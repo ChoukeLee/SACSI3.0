@@ -19,10 +19,12 @@ import { getDesktopNavLabels } from "@/lib/nav-labels";
 import { cn } from "@/lib/utils";
 import { LocaleContextLink } from "@/components/locale-context-link";
 
-function DesktopSidebarTrigger() {
-  const { state } = useSidebar();
-  if (state === "collapsed") return null;
-  return <SidebarTrigger className="hidden lg:flex" />;
+function DesktopSidebarTrigger({ locale }: { locale: Locale }) {
+  const { state, isMobile } = useSidebar();
+  if (state === "collapsed" && !isMobile) return null;
+  return (
+    <SidebarTrigger aria-label={locale === "zh" ? "切换导航" : "Afficher ou masquer le menu"} />
+  );
 }
 
 function NavigationLoadingBar() {
@@ -78,10 +80,11 @@ function AppShellInner({
     if (typeof document === "undefined") return;
     document.body.setAttribute("data-sacis-route", pathname);
     document.body.setAttribute("data-sacis-daily-route", isDailyRoute ? "true" : "false");
+    document.documentElement.lang = locale === "fr" ? "fr" : "zh-CN";
 
     // Route content belongs to React. Removing its nodes here can corrupt the
     // tree while an interrupted/streamed navigation is reconciling it.
-  }, [pathname, isDailyRoute]);
+  }, [pathname, isDailyRoute, locale]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -107,12 +110,12 @@ function AppShellInner({
         <header className="sticky top-0 z-sticky flex h-[calc(3rem+var(--safe-top))] shrink-0 items-center border-b border-border bg-card/95 pt-[var(--safe-top)] shadow-xs backdrop-blur supports-[backdrop-filter]:bg-card/90 lg:h-12 lg:pt-0">
           <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 px-4">
             <div className="flex min-w-0 items-center gap-2">
-              <DesktopSidebarTrigger />
+              <DesktopSidebarTrigger locale={locale} />
             </div>
             <div />
             <div className="ml-auto flex h-9 items-center gap-1 rounded-lg border border-border bg-muted/55 p-0.5 shadow-xs">
               <Link
-                href="/operator"
+                href={routeFor(locale, "/operator")}
                 prefetch={false}
                 className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground"
                 aria-label={locale === "zh" ? "我的业务待办" : "Mes tâches"}

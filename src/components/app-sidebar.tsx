@@ -11,6 +11,7 @@ import {
   WalletCards,
   UsersRound,
   ChartNoAxesCombined,
+  X,
 } from "lucide-react";
 import {
   Sidebar,
@@ -31,6 +32,7 @@ import type { UserRole } from "@/lib/auth";
 import { navigationGroupsForRole } from "@/lib/navigation-access";
 import { useSidebar } from "@/components/ui/sidebar";
 import { Logo } from "@/components/logo";
+import { SheetTitle } from "@/components/ui/sheet";
 
 type NavKey =
   | "management"
@@ -80,7 +82,7 @@ const groups: NavGroup[] = [
 
 export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: UserRole }) {
   const pathname = usePathname();
-  const { state, isMobile, toggleSidebar } = useSidebar();
+  const { state, isMobile, toggleSidebar, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed" && !isMobile;
   const { pendingHref, startNavigation } = useNavigationTransition();
   const labels = getDesktopNavLabels(locale);
@@ -97,6 +99,21 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar">
       <SidebarHeader className="gap-0 border-b border-sidebar-border px-0 h-12 relative overflow-hidden">
+        {isMobile && (
+          <>
+            <SheetTitle className="sr-only">
+              {locale === "zh" ? "主导航菜单" : "Menu de navigation"}
+            </SheetTitle>
+            <button
+              type="button"
+              onClick={() => setOpenMobile(false)}
+              aria-label={locale === "zh" ? "关闭菜单" : "Fermer le menu"}
+              className="absolute right-0 top-0 z-10 flex h-12 w-12 items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </>
+        )}
         {collapsed ? (
           <button
             type="button"
@@ -148,6 +165,7 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
                         href={routeFor(locale, item.href)}
                         prefetch={false}
                         onNavigate={(event) => {
+                          if (isMobile) setOpenMobile(false);
                           const target = routeFor(locale, item.href);
                           if (pathname !== target) {
                             event.preventDefault();

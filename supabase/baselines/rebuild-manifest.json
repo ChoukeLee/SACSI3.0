@@ -173,6 +173,18 @@
     {
       "file": "20261020114358_restore_native_management_authorized_scope.sql",
       "sha256": "38b0bd16f0fa8be073a6f2cbb57478a749e14a199edbfb270a0b5c348ef4b851"
+    },
+    {
+      "file": "20261020122817_operator_inbox_paged_read.sql",
+      "sha256": "39c063edc38805a21203aac9e596566bceb583515650bc22651c6e8890ed836f"
+    },
+    {
+      "file": "20261020122819_audit_workbench_read.sql",
+      "sha256": "8ce8b137b11e9834f815c9e20d0f8394361d5c6ea3f5123e7af4ed38f12119a6"
+    },
+    {
+      "file": "20261020124527_audit_workbench_business_amount_projection.sql",
+      "sha256": "2e7e0856630159fd58f6b0c00fa3883f22a99e65f799a46993fde5188922e367"
     }
   ],
   "excluded": [

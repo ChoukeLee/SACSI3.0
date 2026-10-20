@@ -18,9 +18,11 @@ describe("AI finance workbench entry", () => {
       expect(page).not.toContain("getOrCreateActiveConversation");
     }
     expect(read("src/components/app-sidebar.tsx")).not.toContain('href: "/assistant"');
-    expect(read("src/components/app-shell.tsx")).toContain('href="/operator"');
-    expect(read("src/app/operator/page.tsx")).toContain("getCurrentUser");
-    expect(existsSync(join(root,"src/features/ai-workbench/workbench-view.tsx"))).toBe(false);
+    expect(read("src/components/app-shell.tsx")).toContain('href={routeFor(locale, "/operator")}');
+    expect(read("src/features/business-actions/operator-inbox-page.tsx")).toContain(
+      "getCurrentUser",
+    );
+    expect(existsSync(join(root, "src/features/ai-workbench/workbench-view.tsx"))).toBe(false);
   });
 
   it("preserves the shared three-step receipt flow", () => {
@@ -32,7 +34,6 @@ describe("AI finance workbench entry", () => {
     expect(upload).toContain("proposal_version: prepared.proposal.version");
     expect(upload).toContain("每次修改都会生成新版本并写入审计记录");
   });
-
 
   it("keeps every receipt API behind the server-side finance permission", () => {
     for (const route of ["scan", "prepare", "revise", "confirm"]) {
@@ -49,7 +50,6 @@ describe("AI finance workbench entry", () => {
       expect(source).toContain("conversation_id");
     }
   });
-
 
   it("accepts only bounded image inputs before creating a financial draft", () => {
     expect(scan).toContain('new Set(["image/jpeg", "image/png", "image/webp"])');

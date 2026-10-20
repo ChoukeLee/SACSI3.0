@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { LeaseLazyView } from "@/features/leases/lease-lazy-view";
 import { loadLeaseWorkspace } from "@/features/leases/lease-workspace-data";
-import { DesktopOnly } from "@/features/mobile";
 import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
 
 export default async function FrenchLeasesPage({
@@ -25,27 +24,20 @@ export default async function FrenchLeasesPage({
     redirect("/");
 
   return (
-    <>
-      <div className="lg:hidden">
-        <DesktopOnly locale="fr" />
-      </div>
-      <div className="hidden lg:block">
-        <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
-          <FrenchLeasesData
-            viewerId={user.id}
-            initialProject={params.project}
-            initialBuilding={typeof params.building === "string" ? params.building : undefined}
-            initialContract={typeof params.contract === "string" ? params.contract : undefined}
-            returnTo={typeof params.returnTo === "string" ? params.returnTo : undefined}
-            canCreate={user.role === "admin" || user.role === "rental_sales"}
-            canRecordFinance={user.role === "admin" || user.role === "finance"}
-            canCorrectRentPeriod={user.role === "admin"}
-            canActivate={user.role === "admin" || user.role === "rental_sales"}
-            canMoveOut={user.role === "admin" || user.role === "finance"}
-          />
-        </Suspense>
-      </div>
-    </>
+    <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
+      <FrenchLeasesData
+        viewerId={user.id}
+        initialProject={params.project}
+        initialBuilding={typeof params.building === "string" ? params.building : undefined}
+        initialContract={typeof params.contract === "string" ? params.contract : undefined}
+        returnTo={typeof params.returnTo === "string" ? params.returnTo : undefined}
+        canCreate={user.role === "admin" || user.role === "rental_sales"}
+        canRecordFinance={user.role === "admin" || user.role === "finance"}
+        canCorrectRentPeriod={user.role === "admin"}
+        canActivate={user.role === "admin" || user.role === "rental_sales"}
+        canMoveOut={user.role === "admin" || user.role === "finance"}
+      />
+    </Suspense>
   );
 }
 
