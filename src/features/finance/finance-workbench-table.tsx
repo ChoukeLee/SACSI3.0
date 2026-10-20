@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { formatXof } from "@/lib/utils";
+import { formatMoney } from "@/lib/currency";
+import { financeRowMoney } from "@/lib/native-money";
 import {
   directionDisplayLabel,
   financialBusinessLabel,
@@ -65,8 +66,8 @@ export function FinanceWorkbenchTable({
               <th>{text("业务对象", "Lot / activité")}</th>
               <th className={styles.amount}>
                 {ledger
-                  ? text("分录金额 XOF", "Écriture XOF")
-                  : text("未收 / 应收 XOF", "Restant / dû XOF")}
+                  ? text("分录金额 / 币种", "Écriture / devise")
+                  : text("未收 / 应收 / 币种", "Restant / dû / devise")}
               </th>
               <th className={styles.rowAction}>
                 <span className="sr-only">{text("详情", "Détail")}</span>
@@ -75,6 +76,9 @@ export function FinanceWorkbenchTable({
           </thead>
           <tbody>
             {result.rows.map((row) => {
+              const value = financeRowMoney(row);
+              const money = (amount: number) =>
+                `${formatMoney(amount, value.currency, locale)}${value.currency === "XOF" ? "" : ` ${value.currency}`}`;
               const balance = ledger ? null : financeManagedOutstanding(row);
               const overdue =
                 !ledger &&
@@ -125,16 +129,12 @@ export function FinanceWorkbenchTable({
                   </td>
                   <td className={styles.amount}>
                     <span className={styles.money}>
-                      {ledger
-                        ? formatXof(Number(row.amount_xof))
-                        : balance === null
-                          ? "—"
-                          : formatXof(balance)}
+                      {ledger ? money(value.amount) : balance === null ? "—" : money(balance)}
                     </span>
                     <span className={styles.cellSub}>
                       {ledger
                         ? directionDisplayLabel(String(row.direction), locale)
-                        : `${text("登记应收", "Dû enregistré")} ${formatXof(Number(row.amount_xof))}`}
+                        : `${text("登记应收", "Dû enregistré")} ${money(value.amount)}`}
                     </span>
                     {ledger && String(row.direction).startsWith("liability") && (
                       <span className={styles.badge}>
@@ -143,7 +143,7 @@ export function FinanceWorkbenchTable({
                     )}
                     {!ledger && (
                       <span className={styles.cellSub}>
-                        {text("已核销", "Imputé")} {formatXof(Number(row.paid_amount_xof))}
+                        {text("已核销", "Imputé")} {money(financeRowMoney(row, true).amount)}
                       </span>
                     )}
                   </td>

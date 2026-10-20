@@ -1,4 +1,5 @@
 import { parseFinanceRead, type FinanceKind, type FinanceReadResult } from "./finance-read";
+import { decodeNativeSummary, financeRowMoney } from "@/lib/native-money";
 
 export type FinanceWorkbenchQuery = ReturnType<typeof parseFinanceRead>;
 export type FinanceWorkbenchMode = FinanceKind | "reconciliation";
@@ -99,7 +100,15 @@ export function decodeFinanceWorkbenchRead(
       ...(kind === "receivables" ? { paid_amount_xof: financeNumber(row.paid_amount_xof) } : {}),
     } as FinanceReadResult["rows"][number];
   });
-  return { kind, page, pageSize: 50, total: Number(data.total), summary: numericSummary, rows };
+  return {
+    kind,
+    page,
+    pageSize: 50,
+    total: Number(data.total),
+    summary: numericSummary,
+    rows,
+    nativeSummary: decodeNativeSummary(data.nativeSummary),
+  };
 }
 export function decodeFinanceReconciliation(value: unknown): FinanceReconciliation {
   const row = object(value);
@@ -173,7 +182,7 @@ export function financeScopeIsValid(
 }
 export function financeManagedOutstanding(row: FinanceReadResult["rows"][number]): number | null {
   if (row.management_status !== "managed" || row.status === "cancelled") return null;
-  return Math.max(0, financeNumber(row.amount_xof) - financeNumber(row.paid_amount_xof));
+  return Math.max(0, financeRowMoney(row).amount - financeRowMoney(row, true).amount);
 }
 export const financeIssueLabels: Record<"zh" | "fr", Record<string, string>> = {
   zh: {

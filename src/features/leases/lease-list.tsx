@@ -22,6 +22,8 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
 import { formatMoney } from "@/lib/currency";
+import { nativeLease, leaseRentLabel } from "@/lib/native-money";
+import { NativeLeaseFinance } from "./native-lease-finance";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -163,7 +165,9 @@ function isManagedLeaseUnit(unit: LeaseUnitRow) {
 function getLeaseDataFlags(contract: LeaseContractRow, customer?: CustomerRow | null) {
   return {
     needsData:
-      Number(contract.monthly_rent_xof) <= 0 ||
+      (nativeLease(contract)
+        ? Number(contract.monthly_rent_amount) <= 0
+        : Number(contract.monthly_rent_xof) <= 0) ||
       Number(contract.deposit_amount_xof) <= 0 ||
       !contract.start_date ||
       !contract.expected_end_date ||
@@ -203,6 +207,7 @@ function getRecordedOriginalPayment(payment: PaymentRow) {
 }
 
 function getOriginalMonthlyRent(contract: LeaseContractRow, payments: PaymentRow[]) {
+  if (nativeLease(contract)) return null;
   const contractPayments = payments
     .filter((payment) => payment.source_id === contract.id && payment.source_type === "lease_rent")
     .sort((a, b) => b.payment_date.localeCompare(a.payment_date));
@@ -585,7 +590,11 @@ export function LeaseList({
               : undefined,
             amountXof:
               Number(contract.monthly_rent_xof) > 0 ? Number(contract.monthly_rent_xof) : null,
-            amountDetail: locale === "zh" ? "每月 · XOF" : "par mois · XOF",
+            nativeAmountLabel: nativeLease(contract) ? leaseRentLabel(contract, locale) : undefined,
+            nativeBalanceLabel: nativeLease(contract)
+              ? `${contract.rent_currency} · ${locale === "zh" ? "原币账务另列" : "voir le détail en devise"}`
+              : undefined,
+            amountDetail: `${locale === "zh" ? "每月" : "par mois"} · ${contract.rent_currency ?? "XOF"}`,
             balanceXof: summary.count ? summary.outstanding : null,
             balanceDetail: summary.count
               ? summary.overdue > 0
@@ -1009,6 +1018,7 @@ export function LeaseList({
   };
   const openFinanceEntry = () => {
     setFinanceType("rent_income");
+    setFinanceCurrency(selected?.rent_currency ?? "XOF");
     setFinanceDate(new Date().toISOString().slice(0, 10));
     setFinanceAmountWan(0);
     setFinancePaidThrough("");
@@ -1177,7 +1187,12 @@ export function LeaseList({
       paymentDate: financeDate,
       amount: financeCurrency === "XOF" ? Math.round(financeAmountWan * 10000) : financeAmountWan,
       currency: financeCurrency,
-      exchangeRateToXof: financeCurrency === "XOF" ? 1 : financeExchangeRate,
+      exchangeRateToXof:
+        selected && nativeLease(selected) && financeType === "rent_income"
+          ? null
+          : financeCurrency === "XOF"
+            ? 1
+            : financeExchangeRate,
       paidThroughDate: financePaidThrough || undefined,
       paymentMethod: financeMethod,
       externalReceiptNo: financeExternalReceiptNo || undefined,
@@ -2462,6 +2477,13 @@ export function LeaseList({
           }
         >
           <div className="space-y-4">
+            <NativeLeaseFinance
+              contract={selected}
+              payments={contractPayments}
+              receivables={contractReceivables}
+              locale={locale}
+              today={todayStr}
+            />
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
               <div>
                 <dt className="text-xs text-muted-foreground">
@@ -2526,7 +2548,7 @@ export function LeaseList({
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">{t.form.monthlyRent}</dt>
-                <dd className="font-semibold">{formatXof(Number(selected.monthly_rent_xof))}</dd>
+                <dd className="font-semibold">{leaseRentLabel(selected, locale)}</dd>
                 {selectedOriginalMonthlyRent && (
                   <dd className="mt-0.5 text-xs text-muted-foreground">
                     {locale === "zh" ? "原币约 " : "Devise d'origine env. "}
@@ -2782,7 +2804,9 @@ export function LeaseList({
                             {cashLine.kind === "excluded" && (
                               <p className="mt-1 text-xs text-muted-foreground">
                                 {locale === "zh"
-                                  ? "未计入现金汇总，保留原始记录"
+                                  ? payment.native_settlement
+                                    ? "原币结算，不折算、不并入XOF汇总"
+                                    : "未计入现金汇总，保留原始记录"
                                   : "Hors synthèse de caisse, écriture conservée"}
                               </p>
                             )}
@@ -2843,9 +2867,13 @@ export function LeaseList({
               </label>
               <select
                 value={financeType}
-                onChange={(event) =>
-                  setFinanceType(event.target.value as LeaseFinancialBusinessType)
-                }
+                onChange={(event) => {
+                  const type = event.target.value as LeaseFinancialBusinessType;
+                  setFinanceType(type);
+                  setFinanceCurrency(
+                    type === "rent_income" ? (selected.rent_currency ?? "XOF") : "XOF",
+                  );
+                }}
                 className={inputClass}
               >
                 {LEASE_FINANCIAL_BUSINESS_TYPES.map((type) => {
@@ -2893,6 +2921,7 @@ export function LeaseList({
                 </label>
                 <select
                   value={financeCurrency}
+                  disabled={nativeLease(selected) && financeType === "rent_income"}
                   onChange={(event) => {
                     const currency = event.target.value as CurrencyCode;
                     setFinanceCurrency(currency);
@@ -2907,28 +2936,38 @@ export function LeaseList({
               </div>
               <div>
                 <label className={labelClass}>
-                  {locale === "zh"
-                    ? `历史汇率（1 ${financeCurrency} = XOF）`
-                    : `Taux historique (1 ${financeCurrency} = XOF)`}{" "}
+                  {selected && nativeLease(selected) && financeType === "rent_income"
+                    ? locale === "zh"
+                      ? "原币结算，不折算XOF"
+                      : "Devise contractuelle, sans conversion XOF"
+                    : locale === "zh"
+                      ? `历史汇率（1 ${financeCurrency} = XOF）`
+                      : `Taux historique (1 ${financeCurrency} = XOF)`}{" "}
                   *
                 </label>
                 <input
                   type="number"
                   min={financeCurrency === "XOF" ? 1 : 0.000001}
                   step="0.000001"
-                  value={financeCurrency === "XOF" ? 1 : financeExchangeRate || ""}
-                  disabled={financeCurrency === "XOF"}
+                  value={nativeLease(selected) && financeType === "rent_income" ? "" : financeCurrency === "XOF" ? 1 : financeExchangeRate || ""}
+                  disabled={
+                    financeCurrency === "XOF" ||
+                    (nativeLease(selected) && financeType === "rent_income")
+                  }
                   onChange={(event) => setFinanceExchangeRate(Number(event.target.value))}
                   className={cn(inputClass, financeCurrency === "XOF" && "bg-muted/50")}
                 />
               </div>
             </div>
-            {financeCurrency !== "XOF" && financeAmountWan > 0 && financeExchangeRate > 0 && (
-              <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-                {locale === "zh" ? "折合入账" : "Équivalent comptable"}：
-                {formatXof(financeAmountWan * financeExchangeRate)}
-              </p>
-            )}
+            {!nativeLease(selected) &&
+              financeCurrency !== "XOF" &&
+              financeAmountWan > 0 &&
+              financeExchangeRate > 0 && (
+                <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                  {locale === "zh" ? "折合入账" : "Équivalent comptable"}：
+                  {formatXof(financeAmountWan * financeExchangeRate)}
+                </p>
+              )}
             {getLeaseFinancialConfig(financeType).requiresPaidThrough && (
               <div>
                 <label className={labelClass}>

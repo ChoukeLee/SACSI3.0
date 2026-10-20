@@ -1,4 +1,5 @@
 "use client";
+import { leaseRentLabel } from "@/lib/native-money";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -427,9 +428,7 @@ export function UnitProfileView({
                       <td className="px-4 py-3">
                         {row.paid_through_date ?? (zh ? "未记录" : "—")}
                       </td>
-                      <td className="px-4 py-3 tabular-nums">
-                        {formatXof(Number(row.monthly_rent_xof))}
-                      </td>
+                      <td className="px-4 py-3 tabular-nums">{leaseRentLabel(row, locale)}</td>
                       <td className="px-4 py-3">
                         <Badge variant={contractTone(row.status)}>
                           {statusDisplayLabel(row.status, locale)}

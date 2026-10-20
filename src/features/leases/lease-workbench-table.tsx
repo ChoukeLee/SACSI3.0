@@ -305,12 +305,12 @@ export function LeaseWorkbenchTable({
                   {row.periodDetail ? <p>{row.periodDetail}</p> : null}
                 </div>
                 <p data-compact="amount" className="mt-1 leading-5 text-muted-foreground">
-                  {amountLabel} {formatAmount(row.amountXof)}
+                  {amountLabel} {row.nativeAmountLabel ?? formatAmount(row.amountXof)}
                   {row.amountDetail ? ` · ${row.amountDetail}` : ""}
                 </p>
                 <div data-compact="balance" className="mt-1 leading-5">
                   <p className={cn(row.balanceOverdue && "text-red-600 dark:text-red-400")}>
-                    {zh ? "已建应收未收" : "Créances restantes"} {formatAmount(row.balanceXof)}
+                    {zh ? "已建应收未收" : "Créances restantes"} {row.nativeBalanceLabel ?? formatAmount(row.balanceXof)}
                   </p>
                   {row.balanceDetail ? (
                     <p className="text-muted-foreground">{row.balanceDetail}</p>
@@ -328,7 +328,7 @@ export function LeaseWorkbenchTable({
                 ) : null}
               </td>
               <td data-col="amount" className="px-2.5 py-3 text-right leading-5 tabular-nums">
-                <p className="font-medium">{formatAmount(row.amountXof)}</p>
+                <p className="font-medium">{row.nativeAmountLabel ?? formatAmount(row.amountXof)}</p>
                 {row.amountDetail ? (
                   <p className="mt-1 text-muted-foreground">{row.amountDetail}</p>
                 ) : null}
@@ -340,7 +340,7 @@ export function LeaseWorkbenchTable({
                     row.balanceOverdue && "text-red-600 dark:text-red-400",
                   )}
                 >
-                  {formatAmount(row.balanceXof)}
+                  {row.nativeBalanceLabel ?? formatAmount(row.balanceXof)}
                 </p>
                 {row.balanceDetail ? (
                   <p className="mt-1 text-muted-foreground">{row.balanceDetail}</p>

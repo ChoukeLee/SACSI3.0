@@ -1,5 +1,7 @@
+import { decodeNativeSummary, type NativeCurrencySummary } from "@/lib/native-money";
 /** The dashboard read model is separate from receivable allocation metrics. */
 export interface OperatingSnapshot {
+  nativeSummary?: NativeCurrencySummary[];
   projectId: string;
   asOf: string;
   monthStart: string;
@@ -125,6 +127,9 @@ export function decodeOperatingSnapshot(value: unknown): OperatingSnapshot {
   );
   return {
     ...result,
+    ...(raw.nativeSummary !== undefined
+      ? { nativeSummary: decodeNativeSummary(raw.nativeSummary) }
+      : {}),
     projectId: text(raw.projectId),
     asOf,
     monthStart,

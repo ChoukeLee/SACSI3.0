@@ -1,4 +1,7 @@
 "use client";
+import { leaseRentLabel } from "@/lib/native-money";
+import { paymentDisplay } from "@/lib/currency";
+import { NativeLeaseFinance } from "./native-lease-finance";
 
 import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowUpRight, Building2, CalendarDays, FileText, Printer, X } from "lucide-react";
@@ -301,6 +304,7 @@ function InspectorContent({
         aria-labelledby={`${id}-tab-${tab}`}
         className="min-h-72 px-5 py-4"
       >
+        <NativeLeaseFinance contract={contract} payments={contractPayments} receivables={contractReceivables} locale={locale} today={today} />
         {tab === "contract" ? (
           <>
             <div className="flex items-center gap-2 text-xs font-semibold">
@@ -321,9 +325,7 @@ function InspectorContent({
                 <Fact label={text("实际结束", "Fin réelle")}>{contract.actual_end_date}</Fact>
               ) : null}
               <Fact label={text("月租金", "Loyer mensuel")}>
-                {Number(contract.monthly_rent_xof) > 0
-                  ? money(contract.monthly_rent_xof)
-                  : text("待核对", "À vérifier")}
+                {leaseRentLabel(contract, locale)}
               </Fact>
               <Fact label={text("支付周期", "Règlement")}>{cycle}</Fact>
               <Fact label={text("租金缴至", "Loyer couvert jusqu’au")}>
@@ -460,7 +462,7 @@ function InspectorContent({
                         </span>
                       </div>
                       <p className="mt-1.5 text-sm font-semibold tabular-nums">
-                        {line.kind === "excluded"
+                        {payment.native_settlement ? paymentDisplay(payment, locale).primary : line.kind === "excluded"
                           ? line.reason === "non_cash_offset"
                             ? text("非现金抵扣", "Compensation hors caisse")
                             : text("待核对，不计入现金", "À vérifier, exclu du cash")

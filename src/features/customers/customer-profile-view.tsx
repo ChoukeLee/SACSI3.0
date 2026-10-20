@@ -1,4 +1,5 @@
 "use client";
+import { leaseRentLabel } from "@/lib/native-money";
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
@@ -712,7 +713,7 @@ function LeaseTab({
         lc.contract_no,
         lc.start_date + " → " + lc.expected_end_date,
         <span key="a" className="tabular-nums font-medium">
-          {formatXof(Number(lc.monthly_rent_xof))}
+          {leaseRentLabel(lc, locale)}
         </span>,
         <Badge key="s" variant={contractTone(lc.status)}>
           {L.contractStatusLabels[lc.status] ?? statusDisplayLabel(lc.status, locale)}

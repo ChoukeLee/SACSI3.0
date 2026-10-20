@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NativeCurrencySummaryPanel } from "@/components/native-currency-summary";
 import { ArrowUpRight, CalendarClock, CircleDollarSign, ClipboardList } from "lucide-react";
 import { routeFor, type Locale } from "@/lib/i18n";
 import type { OperatingSnapshot } from "./operating-snapshot";
@@ -114,6 +115,8 @@ export function OperatingDashboard({
   ];
   return (
     <section className={styles.surface} aria-label={zh ? "项目经营驾驶舱" : "Pilotage du projet"}>
+      <NativeCurrencySummaryPanel rows={data.nativeSummary} kind="ledger" locale={locale} />
+      <NativeCurrencySummaryPanel rows={data.nativeSummary} kind="receivables" locale={locale} />
       <div className={styles.metrics}>
         <div className={styles.metric}>
           <div className={styles.metricLabel}>

@@ -1,4 +1,5 @@
 import "server-only";
+import { decodeNativeSummary } from "@/lib/native-money";
 
 import { createClient } from "@/lib/supabase/server";
 import type { FinanceReadResult } from "@/features/finance/finance-read";
@@ -83,7 +84,12 @@ export function decodeReportResult(value: unknown): FinanceReadResult {
       throw new Error("ReportReadUnavailable");
     }
   }
-  return result;
+  return {
+    ...result,
+    ...(result.nativeSummary !== undefined
+      ? { nativeSummary: decodeNativeSummary(result.nativeSummary) }
+      : {}),
+  };
 }
 
 function decodeTrend(value: unknown, endMonth: string): ReportTrend[] {

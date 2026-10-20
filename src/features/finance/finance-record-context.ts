@@ -4,6 +4,9 @@ export interface FinanceRecordContext {
   kind: FinanceKind;
   id: string;
   amountXof: number;
+  nativeAmount?: number;
+  nativePaidAmount?: number;
+  currency?: string;
   date: string;
   category: string;
   direction: "income" | "expense" | "liability_in" | "liability_out" | null;
@@ -106,6 +109,15 @@ export function decodeFinanceRecordContext(value: unknown): FinanceRecordContext
     kind: row.kind,
     id: id(row.id),
     amountXof: number(row.amountXof),
+    ...(row.nativeAmount !== undefined
+      ? {
+          nativeAmount: number(row.nativeAmount),
+          currency: text(row.currency, 3),
+          ...(row.nativePaidAmount !== undefined
+            ? { nativePaidAmount: number(row.nativePaidAmount) }
+            : {}),
+        }
+      : {}),
     date: date(row.date),
     category: text(row.category, 100),
     direction,

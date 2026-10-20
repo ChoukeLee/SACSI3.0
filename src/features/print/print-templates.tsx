@@ -1,6 +1,9 @@
 "use client";
 
 import { formatXof } from "@/lib/utils";
+import { leaseRentLabel } from "@/lib/native-money";
+import { financeRowMoney } from "@/lib/native-money";
+import { formatMoney } from "@/lib/currency";
 import { paymentPlanDisplayLabel, statusDisplayLabel } from "@/lib/display-labels";
 import { formatXofExact } from "@/lib/financial-amount";
 import type {
@@ -175,6 +178,17 @@ export function printLeaseContract(
   const receivableTotal = receivables.reduce((sum, r) => sum + Number(r.amount_xof), 0);
   const receivablePaid = receivables.reduce((sum, r) => sum + Number(r.paid_amount_xof), 0);
   const receivableUnpaid = Math.max(0, receivableTotal - receivablePaid);
+  const nativeTotals = ["USD", "CNY"]
+    .flatMap((currency) => {
+      const rows = receivables.filter((r) => r.currency === currency && r.amount_native != null);
+      if (!rows.length) return [];
+      const total = rows.reduce((sum, r) => sum + Number(r.amount_native), 0);
+      const paid = rows.reduce((sum, r) => sum + Number(r.paid_amount_native), 0);
+      return [
+        `<p>${currency} (${locale === "zh" ? "原币单列，不并入XOF" : "devise séparée, hors XOF"}) · ${labels.total}: ${formatMoney(total, currency, locale)} · ${labels.paidTotal}: ${formatMoney(paid, currency, locale)} · ${labels.unpaidTotal}: ${formatMoney(Math.max(0, total - paid), currency, locale)}</p>`,
+      ];
+    })
+    .join("");
   const statusLabel = (status: string) =>
     ({
       paid: labels.paidStatus,
@@ -190,15 +204,18 @@ export function printLeaseContract(
     })[category] ?? labels.other;
   const receivableRows = receivables
     .map((r) => {
-      const amount = Number(r.amount_xof);
-      const paid = Number(r.paid_amount_xof);
+      const value = financeRowMoney(r);
+      const money = (n: number) =>
+        `${formatMoney(n, value.currency, locale)}${value.currency === "XOF" ? "" : " " + value.currency}`;
+      const amount = value.amount;
+      const paid = financeRowMoney(r, true).amount;
       const unpaid = Math.max(0, amount - paid);
       return `<tr>
       <td>${kindLabel(r.category)}</td>
       <td>${r.due_date}</td>
-      <td>${formatXof(amount)}</td>
-      <td>${formatXof(paid)}</td>
-      <td>${formatXof(unpaid)}</td>
+      <td>${money(amount)}</td>
+      <td>${money(paid)}</td>
+      <td>${money(unpaid)}</td>
       <td>${statusLabel(r.status)}</td>
     </tr>`;
     })
@@ -214,10 +231,10 @@ export function printLeaseContract(
       <tr><td class="label">${labels.startDate}</td><td class="value">${data.contract.start_date ?? (locale === "zh" ? "待确认" : "À confirmer")}</td></tr>
       <tr><td class="label">${labels.endDate}</td><td class="value">${data.contract.expected_end_date && data.contract.expected_end_confirmed !== false ? data.contract.expected_end_date : locale === "zh" ? "待确认" : "À confirmer"}</td></tr>
       <tr><td class="label">${labels.paymentCycle} / ${labels.paymentDay}</td><td class="value">${data.contract.payment_cycle} / ${data.contract.payment_day}${labels.paymentDaySuffix}</td></tr>
-      <tr><td class="label">${labels.monthlyRent}</td><td class="value">${formatXof(Number(data.contract.monthly_rent_xof))}</td></tr>
+      <tr><td class="label">${labels.monthlyRent}</td><td class="value">${leaseRentLabel(data.contract, locale)}</td></tr>
       <tr><td class="label">${labels.deposit}</td><td class="value">${formatXof(Number(data.contract.deposit_amount_xof))} ${data.contract.deposit_received ? labels.depositPaid : labels.depositUnpaid}</td></tr>
     </table>
-    <h2>${labels.summary}</h2>
+    <h2>${labels.summary}</h2>${nativeTotals}
     <div class="total-grid">
       <div class="total-box"><span class="label">${labels.total}</span><span class="value">${formatXof(receivableTotal)}</span></div>
       <div class="total-box"><span class="label">${labels.paidTotal}</span><span class="value">${formatXof(receivablePaid)}</span></div>

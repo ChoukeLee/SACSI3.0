@@ -1,3 +1,4 @@
+import type { NativeCurrencySummary } from "@/lib/native-money";
 export type FinanceKind = "ledger" | "receivables";
 export type FinanceFilters = Record<string, string>;
 export interface FinanceReadResult {
@@ -6,6 +7,7 @@ export interface FinanceReadResult {
   pageSize: number;
   total: number;
   summary: Record<string, number>;
+  nativeSummary?: NativeCurrencySummary[];
   rows: Array<Record<string, string | number | null>>;
 }
 
@@ -110,6 +112,8 @@ export function financeCsv(result: FinanceReadResult) {
           "status",
           "id",
         ];
+  columns.push("currency", "amount_native");
+  if (result.kind === "receivables") columns.push("paid_amount_native");
   const cell = (value: string | number | null | undefined) => {
     const text = String(value ?? "");
     const safe = typeof value === "string" && /^[\s]*[=+@-]/.test(text) ? `'${text}` : text;

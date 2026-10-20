@@ -12,7 +12,8 @@ export interface ContractCashLine {
     | "currency_rate_mismatch"
     | "unsupported_source"
     | "unverified_reversal"
-    | "invalid_payment_method";
+    | "invalid_payment_method"
+    | "native_currency";
 }
 
 const INCOME_TYPES = new Set([
@@ -40,6 +41,8 @@ const EXPENSE_TYPES = new Set([
 
 /** Contract cash projection only. No note guessing, FX defaults, or allocation inference. */
 export function classifyContractCashPayment(payment: PaymentRow): ContractCashLine {
+  if (payment.native_settlement)
+    return { kind: "excluded", amountXof: null, reason: "native_currency" };
   if (payment.payment_method === "offset")
     return { kind: "excluded", amountXof: null, reason: "non_cash_offset" };
   if (
@@ -59,7 +62,7 @@ export function classifyContractCashPayment(payment: PaymentRow): ContractCashLi
     return { kind: "excluded", amountXof: null, reason: "currency_rate_mismatch" };
   if (!["XOF", "CNY", "USD"].includes(payment.currency))
     return { kind: "excluded", amountXof: null, reason: "missing_historical_rate" };
-  const amountXof = historicalXofAmount(payment.amount, payment.exchange_rate_to_xof);
+  const amountXof = historicalXofAmount(payment.amount, rate);
   if (amountXof === null) return { kind: "excluded", amountXof: null, reason: "invalid_amount" };
   if (payment.source_type === "lease_deposit") return { kind: "deposit_in", amountXof };
   if (payment.source_type === "lease_deposit_refund") return { kind: "deposit_out", amountXof };
@@ -78,6 +81,7 @@ export function summarizeContractCash(payments: PaymentRow[]) {
     excludedCount = 0,
     nonCashCount = 0;
   for (const payment of payments) {
+    if (payment.native_settlement) continue; // Separately displayed in its contractual currency.
     const line = classifyContractCashPayment(payment);
     if (line.kind === "excluded") {
       if (line.reason === "non_cash_offset") nonCashCount++;

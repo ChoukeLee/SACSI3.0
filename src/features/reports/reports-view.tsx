@@ -1,4 +1,6 @@
 "use client";
+import { NativeCurrencySummaryPanel } from "@/components/native-currency-summary";
+import { financeRowMoney } from "@/lib/native-money";
 
 import { useState, type CSSProperties } from "react";
 import Link from "next/link";
@@ -28,14 +30,6 @@ function money(value: number, locale: Locale) {
   return new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "fr-FR", {
     maximumFractionDigits: 2,
   }).format(value);
-}
-
-function numeric(value: Row[string]) {
-  if ((typeof value !== "number" && typeof value !== "string") || value === "")
-    throw new Error("Invalid report amount");
-  const number = Number(value);
-  if (!Number.isFinite(number)) throw new Error("Invalid report amount");
-  return number;
 }
 
 function rowText(row: Row, key: string) {
@@ -281,6 +275,11 @@ export function ReportsView({ data, locale }: { data: ReportWorkspaceData; local
           </div>
         )}
 
+        <NativeCurrencySummaryPanel
+          rows={result.nativeSummary}
+          kind={data.query.kind}
+          locale={locale}
+        />
         <div className={styles.scopeNote}>
           <LockKeyhole size={13} aria-hidden="true" />
           <p>
@@ -412,8 +411,8 @@ export function ReportsView({ data, locale }: { data: ReportWorkspaceData; local
                       <th scope="col">{text("业务 / 事项", "Opération / objet")}</th>
                       <th scope="col" className={styles.number}>
                         {ledger
-                          ? text("登记金额 · XOF", "Inscrit · XOF")
-                          : text("未收 · XOF", "Solde · XOF")}
+                          ? text("登记金额 / 币种", "Inscrit / devise")
+                          : text("未收 / 币种", "Solde / devise")}
                       </th>
                       <th scope="col">
                         <span className={styles.srOnly}>
@@ -424,10 +423,11 @@ export function ReportsView({ data, locale }: { data: ReportWorkspaceData; local
                   </thead>
                   <tbody>
                     {result.rows.map((row) => {
+                      const value = financeRowMoney(row);
                       const isSelected = selected?.id === row.id;
                       const amount = ledger
-                        ? numeric(row.amount_xof)
-                        : Math.max(0, numeric(row.amount_xof) - numeric(row.paid_amount_xof));
+                        ? value.amount
+                        : Math.max(0, value.amount - financeRowMoney(row, true).amount);
                       const business = financialBusinessLabel(
                         String(row.source_type ?? row.category ?? ""),
                         locale,
@@ -460,9 +460,12 @@ export function ReportsView({ data, locale }: { data: ReportWorkspaceData; local
                             <strong>
                               {!ledger && row.status === "cancelled" ? "—" : money(amount, locale)}
                             </strong>
+                            {!ledger && row.status === "cancelled" ? null : (
+                              <span className={styles.rowSecondary}>{value.currency}</span>
+                            )}
                             {!ledger ? (
                               <span className={styles.rowSecondary}>
-                                {text("应收", "Dû")} {money(numeric(row.amount_xof), locale)}
+                                {text("应收", "Dû")} {money(value.amount, locale)} {value.currency}
                               </span>
                             ) : null}
                           </td>

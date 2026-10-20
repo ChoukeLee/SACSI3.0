@@ -25,6 +25,7 @@ import {
   type FinanceWorkbenchQuery,
 } from "./finance-workbench-model";
 import styles from "./finance-workbench.module.css";
+import { NativeCurrencySummaryPanel } from "@/components/native-currency-summary";
 
 export interface FinanceWorkbenchProps {
   scopeKey: string;
@@ -146,6 +147,7 @@ export function FinanceWorkbench({
 
   return (
     <div className={styles.workbench} aria-busy={pending}>
+      <NativeCurrencySummaryPanel rows={result?.nativeSummary} kind={query.kind} locale={locale} />
       <header className={styles.heading}>
         <div>
           <p className={styles.eyebrow}>FINANCE WORKSPACE</p>

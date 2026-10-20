@@ -170,6 +170,9 @@ export interface LeaseContractRow {
   payment_cycle: string;
   payment_day: number;
   monthly_rent_xof: number;
+  /** Native-currency rent is never stored in the XOF field. */
+  rent_currency?: CurrencyCode;
+  monthly_rent_amount?: number | null;
   deposit_amount_xof: number;
   deposit_received: boolean;
   rent_free_days: number;
@@ -237,7 +240,8 @@ export interface PaymentRow {
   payment_date: string;
   amount: number;
   currency: CurrencyCode;
-  exchange_rate_to_xof: number;
+  exchange_rate_to_xof: number | null;
+  native_settlement?: boolean;
   receipt_no: string | null;
   external_receipt_no?: string | null;
   payment_method?: "cash" | "check" | "bank_transfer" | "offset" | "other" | null;
@@ -269,6 +273,8 @@ export interface LedgerEntryRow {
   direction: "income" | "expense" | "liability_in" | "liability_out";
   category: string;
   amount_xof: number;
+  currency?: CurrencyCode;
+  amount_native?: number | null;
   amount_cny: number | null;
   description: string | null;
   created_at: string;
@@ -311,6 +317,8 @@ export interface ReceivableRow {
   due_date: string;
   amount_xof: number;
   paid_amount_xof: number;
+  amount_native?: number | null;
+  paid_amount_native?: number | null;
   status: ReceivableStatus;
   management_status?: ReceivableManagementStatus;
   service_period_start?: string | null;

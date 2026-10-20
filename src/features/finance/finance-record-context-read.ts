@@ -53,9 +53,9 @@ async function one(
 }
 
 const ledgerColumns =
-  "id,building_id,unit_id,payment_id,entry_date,direction,category,amount_xof,description";
+  "id,building_id,unit_id,payment_id,entry_date,direction,category,amount_xof,description,currency,amount_native";
 const receivableColumns =
-  "id,building_id,unit_id,customer_id,source_type,source_id,category,title,due_date,amount_xof,paid_amount_xof,status,management_status,service_period_start,service_period_end,service_period_source";
+  "id,building_id,unit_id,customer_id,source_type,source_id,category,title,due_date,amount_xof,paid_amount_xof,status,management_status,service_period_start,service_period_end,service_period_source,currency,amount_native,paid_amount_native";
 
 /** Bounded, selected-ID lookups using only the authenticated caller's RLS client. */
 export async function readFinanceRecordContext(
@@ -81,6 +81,15 @@ export async function readFinanceRecordContext(
     kind: query.kind,
     id: query.id,
     amountXof: numeric(row.amount_xof),
+    ...(row.amount_native != null
+      ? {
+          nativeAmount: numeric(row.amount_native),
+          currency: text(row.currency),
+          ...(query.kind === "receivables"
+            ? { nativePaidAmount: numeric(row.paid_amount_native) }
+            : {}),
+        }
+      : {}),
     date: text(query.kind === "ledger" ? row.entry_date : row.due_date),
     category: text(row.category),
     direction:

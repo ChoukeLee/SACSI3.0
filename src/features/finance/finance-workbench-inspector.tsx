@@ -161,8 +161,8 @@ function InspectorContent({
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xs font-medium text-slate-600 dark:text-slate-300">
             {kind === "ledger"
-              ? text("本条分录 · XOF", "Cette écriture · XOF")
-              : text("本条应收 · XOF", "Cette créance · XOF")}
+              ? `${text("本条分录", "Cette écriture")} · ${record.currency ?? "XOF"}`
+              : `${text("本条应收", "Cette créance")} · ${record.currency ?? "XOF"}`}
           </h2>
           {onClose ? (
             <button
@@ -176,7 +176,7 @@ function InspectorContent({
           ) : null}
         </div>
         <p className="mt-3 break-words text-[25px] font-semibold leading-tight tracking-tight tabular-nums">
-          {money(record.amountXof)}
+          {money(record.nativeAmount ?? record.amountXof, record.currency ?? "XOF")}
         </p>
         <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">
           {financialBusinessLabel(record.category, locale)}
@@ -203,7 +203,12 @@ function InspectorContent({
             {kind === "receivables" ? (
               <>
                 <Fact label={text("应收已核销", "Montant imputé")}>
-                  {record.paidAmountXof === null ? pending : money(record.paidAmountXof)}
+                  {record.paidAmountXof === null
+                    ? pending
+                    : money(
+                        record.nativePaidAmount ?? record.paidAmountXof,
+                        record.currency ?? "XOF",
+                      )}
                 </Fact>
                 <Fact label={text("登记状态", "Statut enregistré")}>
                   {record.status ? statusDisplayLabel(record.status, locale) : pending}

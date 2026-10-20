@@ -17,7 +17,7 @@ export async function recordLeaseFinancialEntry(input: {
   paymentDate: string;
   amount: number;
   currency: CurrencyCode;
-  exchangeRateToXof: number;
+  exchangeRateToXof: number | null;
   paidThroughDate?: string;
   paymentMethod: "cash" | "check" | "bank_transfer" | "offset" | "other";
   externalReceiptNo?: string;
@@ -31,13 +31,6 @@ export async function recordLeaseFinancialEntry(input: {
   if (!input.paymentDate || !Number.isFinite(input.amount) || input.amount <= 0) {
     return { success: false, error: "请填写有效的日期和金额。" };
   }
-  if (
-    !Number.isFinite(input.exchangeRateToXof) ||
-    (input.currency === "XOF" && input.exchangeRateToXof !== 1) ||
-    (input.currency !== "XOF" && input.exchangeRateToXof <= 0)
-  ) {
-    return { success: false, error: "请填写有效的历史汇率；XOF 汇率必须为1。" };
-  }
   if (!input.paymentMethod) {
     return { success: false, error: "请选择付款方式，系统不会自动默认为现金。" };
   }
@@ -50,24 +43,45 @@ export async function recordLeaseFinancialEntry(input: {
   const supabase = await createClient();
   const { data: contract, error: contractError } = await supabase
     .from("lease_contracts")
-    .select("id, unit_id, customer_id, contract_no, paid_through_date, deposit_amount_xof")
+    .select(
+      "id, unit_id, customer_id, contract_no, paid_through_date, deposit_amount_xof, rent_currency",
+    )
     .eq("id", input.contractId)
     .single();
   if (contractError || !contract) return { success: false, error: "未找到对应长租合同。" };
+  const nativeRent =
+    contract.rent_currency &&
+    contract.rent_currency !== "XOF" &&
+    input.businessType === "rent_income";
+  if (nativeRent) {
+    if (input.currency !== contract.rent_currency || input.exchangeRateToXof !== null)
+      return { success: false, error: "原币合同租金须按合同币种登记，不填折算汇率。" };
+  } else if (
+    input.exchangeRateToXof === null ||
+    !Number.isFinite(input.exchangeRateToXof) ||
+    (input.currency === "XOF" ? input.exchangeRateToXof !== 1 : input.exchangeRateToXof <= 0)
+  ) {
+    return { success: false, error: "请填写有效的历史汇率；XOF 汇率必须为1。" };
+  }
   const requestId = input.requestId ?? crypto.randomUUID();
-  const { data, error } = await supabase.rpc("record_lease_financial_entry_v2_rpc", {
+  const parameters = {
     p_contract_id: contract.id,
-    p_business_type: input.businessType,
     p_payment_date: input.paymentDate,
     p_amount: input.amount,
     p_currency: input.currency,
-    p_exchange_rate_to_xof: input.exchangeRateToXof,
     p_paid_through_date: input.paidThroughDate ?? null,
     p_payment_method: input.paymentMethod,
     p_notes: input.notes?.trim() || null,
     p_external_receipt_no: input.externalReceiptNo?.trim() || null,
     p_request_id: requestId,
-  });
+  };
+  const { data, error } = nativeRent
+    ? await supabase.rpc("record_native_lease_rent_rpc", parameters)
+    : await supabase.rpc("record_lease_financial_entry_v2_rpc", {
+        ...parameters,
+        p_business_type: input.businessType,
+        p_exchange_rate_to_xof: input.exchangeRateToXof,
+      });
   if (error) return { success: false, error: error.message };
   const payload = data as { success?: boolean; reference_no?: string } | null;
   if (!payload?.success || !payload.reference_no)

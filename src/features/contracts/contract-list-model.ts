@@ -13,6 +13,8 @@ export interface ContractTableRow {
   periodLabel: string;
   periodDetail?: string;
   amountXof: number | null;
+  nativeAmountLabel?: string;
+  nativeBalanceLabel?: string;
   amountDetail?: string;
   balanceXof: number | null;
   balanceDetail?: string;

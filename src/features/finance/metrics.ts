@@ -120,7 +120,9 @@ const EXPENSE_TYPES = new Set([
 ]);
 
 export function paymentAmountXof(payment: PaymentRow): number {
-  return Number(payment.amount) * (Number(payment.exchange_rate_to_xof) || 1);
+  if (payment.native_settlement) return 0;
+  const rate = Number(payment.exchange_rate_to_xof);
+  return Number.isFinite(rate) && rate > 0 ? Number(payment.amount) * rate : 0;
 }
 
 export function isRefundPayment(payment: PaymentRow): boolean {

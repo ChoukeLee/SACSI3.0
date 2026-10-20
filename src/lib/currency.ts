@@ -38,10 +38,16 @@ export function formatMoney(
  * 供长租/出售/房源等收款明细统一使用。
  */
 export function paymentDisplay(
-  payment: Pick<PaymentRow, "amount" | "currency" | "exchange_rate_to_xof">,
+  payment: Pick<PaymentRow, "amount" | "currency" | "exchange_rate_to_xof" | "native_settlement">,
   locale: "zh" | "fr" = "zh",
 ): { primary: string; secondary: string | null } {
   const code = String(payment.currency ?? "XOF").toUpperCase();
+  if (payment.native_settlement)
+    return {
+      primary: `${formatMoney(Number(payment.amount), code, locale)} ${code}`,
+      secondary:
+        locale === "zh" ? "原币结算 · 不折算 XOF" : "Règlement en devise · sans conversion XOF",
+    };
   const xof = historicalXofAmount(
     Math.abs(Number(payment.amount)),
     Number(payment.exchange_rate_to_xof),

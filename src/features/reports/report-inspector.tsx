@@ -1,4 +1,5 @@
 "use client";
+import { financeRowMoney } from "@/lib/native-money";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -180,7 +181,8 @@ export function ReportInspector({
   const unit = row?.unit_label;
   if (typeof unit === "string" && unit) financeParams.set("search", unit);
   const financeHref = `${zh ? "" : "/fr"}/finance?${financeParams.toString()}`;
-  const amount = row ? Number(row.amount_xof) : 0;
+  const value = row ? financeRowMoney(row) : { amount: 0, currency: "XOF" };
+  const amount = value.amount;
 
   return (
     <aside
@@ -202,7 +204,7 @@ export function ReportInspector({
           </div>
           <div className={styles.inspectAmount}>
             {formatNumber(amount, locale)}
-            <span>XOF</span>
+            <span>{value.currency}</span>
           </div>
           <p className={styles.inspectorNote}>
             {ledger
@@ -236,7 +238,9 @@ export function ReportInspector({
                 </div>
                 <div>
                   <dt>{text("应收已核销", "Montant imputé")}</dt>
-                  <dd>{formatNumber(Number(row.paid_amount_xof), locale)} XOF</dd>
+                  <dd>
+                    {formatNumber(financeRowMoney(row, true).amount, locale)} {value.currency}
+                  </dd>
                 </div>
               </>
             ) : null}

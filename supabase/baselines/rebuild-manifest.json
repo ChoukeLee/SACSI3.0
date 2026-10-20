@@ -161,6 +161,10 @@
     {
       "file": "20261019225507_customer_directory_read.sql",
       "sha256": "6dcb26b9cd322ca7c372326f3731de4e65d807e6932ebcaecb3cf35a129a2019"
+    },
+    {
+      "file": "20261020082645_native_currency_lease_settlement.sql",
+      "sha256": "096c03aada4b1c1929a75b037f102059d21ef30e33c32a6d8893c5e735a0c6bc"
     }
   ],
   "excluded": [

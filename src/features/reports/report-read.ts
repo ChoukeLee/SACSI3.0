@@ -156,8 +156,13 @@ export function reportCsv(result: FinanceReadResult, locale: "zh" | "fr" = "zh")
           "source_id",
           "id",
         ];
+  columns.push("currency", "amount_native");
+  if (result.kind === "receivables") columns.push("paid_amount_native");
   const labels: Record<string, string> = zh
     ? {
+        currency: "原币币种（独立结算）",
+        amount_native: "原币金额（不并入XOF）",
+        paid_amount_native: "原币已核销",
         entry_date: "登记日期",
         due_date: "到期日",
         building_label: "楼栋",
@@ -177,6 +182,9 @@ export function reportCsv(result: FinanceReadResult, locale: "zh" | "fr" = "zh")
         source_id: "来源 ID",
       }
     : {
+        currency: "Devise indépendante",
+        amount_native: "Montant en devise (hors XOF)",
+        paid_amount_native: "Imputé en devise",
         entry_date: "Date d’écriture",
         due_date: "Échéance",
         building_label: "Bâtiment",
