@@ -29,15 +29,16 @@ describe("core page performance architecture", () => {
     expect(actions).toContain("export async function getUnitAuditLogs");
   });
 
-  it("splits desktop and mobile daily-rental interfaces", () => {
-    const responsive = read("src/features/daily-rentals/daily-rentals-responsive-view.tsx");
+  it("shares one responsive daily workbench and loads operation forms only on demand", () => {
+    const workbench = read("src/features/daily-rentals/daily-workbench.tsx");
+    const operations = read("src/features/daily-rentals/daily-workbench-actions.tsx");
     const loader = read("src/app/daily-rentals/daily-rental-data.tsx");
 
-    expect(responsive).toMatch(/dynamic\(\s*\(\) => import\("\.\/calendar"\)/);
-    expect(responsive).toMatch(
-      /dynamic(?:<[^>]+>)?\(\s*\(\) =>\s*import\("@\/features\/mobile\/mobile-daily-cards"\)/,
-    );
-    expect(responsive).toContain("useState(initialIsDesktop)");
+    expect(loader).toContain("<DailyWorkbench");
+    expect(workbench).toContain('matchMedia("(max-width: 600px)")');
+    expect(workbench).not.toMatch(/import\("\.\/calendar"\)|calendar\/cash|CalendarFinancePanel/);
+    expect(operations).toMatch(/dynamic\(\(\) => import\("\.\/booking-panel"\)/);
+    expect(workbench).toContain("{action && data && (");
     expect(loader).toContain("readCalendarWindow");
     const windowRead = read("supabase/migrations/20261015212832_daily_calendar_window_reads.sql");
     expect(windowRead).toMatch(

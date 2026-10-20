@@ -65,7 +65,14 @@ describe("daily rental reservation payments", () => {
       resolve(root, "src/app/daily-rentals/daily-rental-data.tsx"),
       "utf8",
     );
-    expect(loader).toContain("payments={window.payments}");
+    // The workbench receives the complete verified window, including reversal
+    // evidence, rather than splitting the same payment rows into separate props.
+    expect(loader).toContain("initialWindow={window}");
+    const operations = readFileSync(
+      resolve(root, "src/features/daily-rentals/daily-workbench-actions.tsx"),
+      "utf8",
+    );
+    expect(operations).toContain("payments={context.payments}");
     const model = readFileSync(
       resolve(root, "src/features/daily-rentals/calendar-window-model.ts"),
       "utf8",

@@ -66,6 +66,7 @@ interface BookingPanelProps {
   booking: DailyBookingRow | null;
   unitId: string | null;
   defaultDate?: string;
+  defaultCheckOut?: string;
   units: UnitRow[];
   customers: CustomerSummary[];
   cleaningTasks: {
@@ -102,6 +103,7 @@ export function BookingPanel({
   booking,
   unitId,
   defaultDate,
+  defaultCheckOut,
   units,
   customers,
   cleaningTasks,
@@ -168,11 +170,15 @@ export function BookingPanel({
   useEffect(() => {
     if (defaultDate) {
       setNewCheckIn(defaultDate);
-      const nextDay = new Date(defaultDate);
-      nextDay.setDate(nextDay.getDate() + 1);
-      setNewCheckOut(nextDay.toISOString().slice(0, 10));
+      const nextDay = new Date(defaultDate + "T00:00:00Z");
+      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+      setNewCheckOut(
+        defaultCheckOut && defaultCheckOut > defaultDate
+          ? defaultCheckOut
+          : nextDay.toISOString().slice(0, 10),
+      );
     }
-  }, [defaultDate]);
+  }, [defaultDate, defaultCheckOut]);
 
   useEffect(() => {
     setShowAdvancedActions(false);
