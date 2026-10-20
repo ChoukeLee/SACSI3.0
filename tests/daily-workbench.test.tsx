@@ -399,6 +399,28 @@ it.each(["transport", "status", "incomplete"])(
   },
 );
 
+it("does not relabel a foreign-currency original amount as XOF in the order inspector", async () => {
+  const initial = fixture();
+  initial.payments = [
+    {
+      id: "foreign-payment",
+      source_id: "booking-arrival",
+      amount: 100,
+      currency: "CNY",
+      exchange_rate_to_xof: 90,
+      payment_date: today,
+      reversal_of_payment_id: null,
+      request_kind: null,
+    },
+  ];
+  initial.paymentCount = 1;
+  await render(initial);
+  expect(aside()?.textContent).toContain("含非 XOF 流水或缺少币种/汇率证据");
+  expect(aside()?.textContent).not.toContain("100 XOF");
+  expect(aside()?.textContent).not.toContain("订单已付记录与收款净额不一致");
+  expect(fetch).not.toHaveBeenCalled();
+});
+
 it("uses a three-day mobile planning window and keeps history as a separate searchable view", async () => {
   compact = true;
   await render();

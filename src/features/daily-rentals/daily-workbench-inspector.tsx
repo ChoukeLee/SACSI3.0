@@ -7,6 +7,7 @@ import { qualifiedUnitNo } from "@/lib/unit-building-label";
 import type { DailyBookingRow, UnitRow } from "@/types/database";
 import type { CalendarWindowData } from "./calendar-window-model";
 import { calculateBilling } from "./billing";
+import { dailyRecordedXofNet } from "./daily-workbench-payment-model";
 import {
   dailyDateLabel,
   dailyGuestLabel,
@@ -58,7 +59,7 @@ export function DailyWorkbenchInspector({
     ? data.customers?.find((c) => c.id === (booking.booking_agent_id ?? booking.customer_id))
     : null;
   const paymentRows = booking ? data.payments.filter((p) => p.source_id === booking.id) : [];
-  const netRecorded = paymentRows.reduce((total, p) => total + Number(p.amount), 0);
+  const netRecorded = dailyRecordedXofNet(paymentRows);
   const hasCleaning = data.cleaningTasks.some((t) => t.unit_id === unit.id && !t.is_completed);
   const occupied = data.bookings.some(
     (b) => b.unit_id === unit.id && b.status === "checked_in" && !b.actual_check_out,
@@ -181,7 +182,11 @@ export function DailyWorkbenchInspector({
           </div>
           <div className={styles.moneyRow}>
             <span>{text("已登记收款净额", "Encaissements nets saisis")}</span>
-            <strong>{formatXof(netRecorded, locale)}</strong>
+            <strong>
+              {netRecorded === null
+                ? text("待核对", "À rapprocher")
+                : formatXof(netRecorded, locale)}
+            </strong>
           </div>
           <div className={styles.moneyRow}>
             <span>{text("订单记录已付", "Payé selon le dossier")}</span>
@@ -191,7 +196,15 @@ export function DailyWorkbenchInspector({
             <span>{text("按订单记录待收", "Solde selon le dossier")}</span>
             <strong>{formatXof(billing.outstanding, locale)}</strong>
           </div>
-          {netRecorded !== billing.paid && (
+          {netRecorded === null && (
+            <p className={styles.notice}>
+              {text(
+                "含非 XOF 流水或缺少币种/汇率证据，收款净额待核对；不在此混币相加或猜汇率。",
+                "Devise autre que XOF ou preuve de taux manquante : montant net à rapprocher, sans addition de devises ni taux déduit.",
+              )}
+            </p>
+          )}
+          {netRecorded !== null && netRecorded !== billing.paid && (
             <p className={styles.notice}>
               {text(
                 "订单已付记录与收款净额不一致，请先核对，不据此认定客户欠款。",

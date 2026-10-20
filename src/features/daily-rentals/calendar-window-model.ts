@@ -16,6 +16,8 @@ export interface CalendarWindowData extends CalendarWindowQuery {
     source_id: string;
     unit_id?: string | null;
     amount: number;
+    currency?: string;
+    exchange_rate_to_xof?: number | null;
     payment_date: string;
     reversal_of_payment_id: string | null;
     request_kind: string | null;
