@@ -30,6 +30,8 @@ const allowedColumns: Record<string, readonly string[]> = {
     "direction",
     "category",
     "amount_xof",
+    "currency",
+    "amount_native",
     "description",
   ],
   receivables: [
@@ -44,6 +46,9 @@ const allowedColumns: Record<string, readonly string[]> = {
     "due_date",
     "amount_xof",
     "paid_amount_xof",
+    "currency",
+    "amount_native",
+    "paid_amount_native",
     "status",
     "management_status",
     "service_period_start",

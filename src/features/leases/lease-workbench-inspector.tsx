@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { leaseRentLabel } from "@/lib/native-money";
 import { paymentDisplay } from "@/lib/currency";
 import { NativeLeaseFinance } from "./native-lease-finance";
@@ -43,6 +44,8 @@ export interface LeaseWorkbenchInspectorProps {
   onOpen: (section?: "overview" | "finance") => void;
   onPrint: () => void;
   onClose?: () => void;
+  /** Supplied only to roles permitted to collect, for this exact active contract. */
+  collectionHref?: string | null;
 }
 
 type InspectorTab = "contract" | "finance" | "records";
@@ -77,6 +80,7 @@ function InspectorContent({
   onOpen,
   onPrint,
   onClose,
+  collectionHref,
 }: LeaseWorkbenchInspectorProps) {
   const [tab, setTab] = useState<InspectorTab>("contract");
   const id = useId();
@@ -304,7 +308,13 @@ function InspectorContent({
         aria-labelledby={`${id}-tab-${tab}`}
         className="min-h-72 px-5 py-4"
       >
-        <NativeLeaseFinance contract={contract} payments={contractPayments} receivables={contractReceivables} locale={locale} today={today} />
+        <NativeLeaseFinance
+          contract={contract}
+          payments={contractPayments}
+          receivables={contractReceivables}
+          locale={locale}
+          today={today}
+        />
         {tab === "contract" ? (
           <>
             <div className="flex items-center gap-2 text-xs font-semibold">
@@ -328,7 +338,7 @@ function InspectorContent({
                 {leaseRentLabel(contract, locale)}
               </Fact>
               <Fact label={text("支付周期", "Règlement")}>{cycle}</Fact>
-              <Fact label={text("租金缴至", "Loyer couvert jusqu’au")}>
+              <Fact label={text("登记覆盖至", "Couverture enregistrée jusqu’au")}>
                 {contract.paid_through_date || text("未登记", "Non renseigné")}
               </Fact>
               <Fact label={text("约定押金", "Caution contractuelle")}>
@@ -337,8 +347,8 @@ function InspectorContent({
             </dl>
             <p className="mt-3 rounded-lg bg-muted/45 px-3 py-2.5 text-xs leading-5 text-muted-foreground">
               {text(
-                "合同到期不等于已退租；约定押金不等于实收或可退金额。",
-                "La fin prévue ne confirme pas une sortie. La caution prévue n’est ni un encaissement ni un montant remboursable.",
+                "合同到期不等于已退租；约定押金不等于实收或可退金额。登记覆盖日不等于当前欠款；实收核销与覆盖确认分别核对。",
+                "La fin prévue ne confirme pas une sortie. La caution prévue n’est ni un encaissement ni un montant remboursable. La couverture enregistrée ne prouve pas un impayé actuel ; encaissement et couverture sont distincts.",
               )}
             </p>
           </>
@@ -462,11 +472,13 @@ function InspectorContent({
                         </span>
                       </div>
                       <p className="mt-1.5 text-sm font-semibold tabular-nums">
-                        {payment.native_settlement ? paymentDisplay(payment, locale).primary : line.kind === "excluded"
-                          ? line.reason === "non_cash_offset"
-                            ? text("非现金抵扣", "Compensation hors caisse")
-                            : text("待核对，不计入现金", "À vérifier, exclu du cash")
-                          : `${sign}${money(line.amountXof)}`}
+                        {payment.native_settlement
+                          ? paymentDisplay(payment, locale).primary
+                          : line.kind === "excluded"
+                            ? line.reason === "non_cash_offset"
+                              ? text("非现金抵扣", "Compensation hors caisse")
+                              : text("待核对，不计入现金", "À vérifier, exclu du cash")
+                            : `${sign}${money(line.amountXof)}`}
                       </p>
                       <p className="mt-1 break-words text-xs leading-5 text-muted-foreground">
                         {text("实收人", "Encaisseur")}:{" "}
@@ -491,6 +503,15 @@ function InspectorContent({
       </div>
 
       <div className="space-y-2 border-t bg-muted/15 p-4">
+        {contract.status === "active" && collectionHref ? (
+          <Link
+            href={collectionHref}
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          >
+            {text("登记实际收款", "Enregistrer un encaissement")}
+            <ArrowUpRight className="size-4" aria-hidden="true" />
+          </Link>
+        ) : null}
         <section aria-label={text("建议下一步", "Prochaine étape suggérée")} className="pb-2">
           <h3 className="text-[11px] font-medium text-muted-foreground">
             {text("建议下一步", "Prochaine étape suggérée")}

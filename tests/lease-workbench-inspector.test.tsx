@@ -108,6 +108,23 @@ function fact(name: string) {
 }
 
 describe("LeaseWorkbenchInspector read-only preview", () => {
+  it("offers a separate exact-contract collection route only when a permitted caller supplies it", async () => {
+    const href = "/leases/11111111-1111-4111-8111-111111111111/collect";
+    await render({ collectionHref: href });
+    const link = [...host.querySelectorAll("a")].find((item) =>
+      item.textContent?.includes("登记实际收款"),
+    );
+    expect(link?.getAttribute("href")).toBe(href);
+    await render({ collectionHref: undefined });
+    expect(host.querySelector(`a[href="${href}"]`)).toBeNull();
+    await render({ collectionHref: href, contract: { ...contract, status: "terminated" } });
+    expect(host.querySelector(`a[href="${href}"]`)).toBeNull();
+    await render({ collectionHref: href, loading: true });
+    expect(host.querySelector(`a[href="${href}"]`)).toBeNull();
+    await render({ collectionHref: href, error: true });
+    expect(host.querySelector(`a[href="${href}"]`)).toBeNull();
+  });
+
   it("keeps the empty preview useful without phantom amounts or business actions", async () => {
     await render({ contract: null });
     expect(host.querySelector('aside[aria-label="合同预览"]')).not.toBeNull();
@@ -144,6 +161,14 @@ describe("LeaseWorkbenchInspector read-only preview", () => {
       contract: { ...contract, expected_end_date: "2099-12-31", expected_end_confirmed: false },
     });
     expect(fact("预计到期")).toBe("待确认");
+  });
+
+  it("does not present an old coverage registration as proof of current arrears", async () => {
+    await render({
+      receivables: [receivable({ amount_xof: 100, paid_amount_xof: 100, status: "paid" })],
+    });
+    expect(fact("登记覆盖至")).toBe("2026-09-30");
+    expect(host.textContent).toContain("登记覆盖日不等于当前欠款");
   });
 
   it("separates managed receivable applications, operating cash, and deposit movements", async () => {

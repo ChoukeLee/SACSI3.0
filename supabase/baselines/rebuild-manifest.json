@@ -165,6 +165,14 @@
     {
       "file": "20261020082645_native_currency_lease_settlement.sql",
       "sha256": "00ed02667b135555964c47892fdc3a77c47738df169b83103209cf60863c819f"
+    },
+    {
+      "file": "20261020114344_lease_explicit_collection.sql",
+      "sha256": "e2bcacc68a7d77cb1535853c370766ee5c4ffdf6789d38316eaed3291f654d70"
+    },
+    {
+      "file": "20261020114358_restore_native_management_authorized_scope.sql",
+      "sha256": "38b0bd16f0fa8be073a6f2cbb57478a749e14a199edbfb270a0b5c348ef4b851"
     }
   ],
   "excluded": [

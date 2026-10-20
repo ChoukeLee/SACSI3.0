@@ -125,7 +125,7 @@ it("keeps authorized outputs identical to the published classifier while fencing
         [project],
       )
     ).rows[0];
-    expect(result.actual).toEqual(result.expected);
+    expect(result.actual).toEqual({ ...result.expected, nativeSummary: [] });
     await expect(
       db.query("select public.management_operating_snapshot_rpc($1)", [otherProject]),
     ).rejects.toThrow("managementPermissionDenied");
@@ -411,7 +411,7 @@ it("scopes root scans without changing explicit receivable-building precedence o
           [id],
         )
       ).rows[0];
-      expect(result.actual).toEqual(result.expected);
+      expect(result.actual).toEqual({ ...result.expected, nativeSummary: [] });
       if (id === f.project) {
         expect(result.actual.netCollected).toBe(211);
         expect(result.actual.dueOutstanding).toBe(140);

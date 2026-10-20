@@ -14,6 +14,71 @@ export interface LeaseOverdueResolution {
   startedPeriods: number;
 }
 
+export type LeaseAttentionResolution =
+  | { kind: "overdue"; dueDate: string; amount: number; days: number; amountIsEstimated: false }
+  | { kind: "upcoming"; dueDate: string; amount: number; days: number; amountIsEstimated: false }
+  | { kind: "coverage"; dueDate: string; amount: null; days: null; amountIsEstimated: false };
+
+/** Collection reminders use verified balances, never a stale coverage-date fallback. */
+export function resolveLeaseAttention(input: {
+  today: string;
+  paidThroughDate: string | null;
+  outstanding: number;
+  overdue: number;
+  nextDue: string | null;
+}): LeaseAttentionResolution | null {
+  const validDate = (date: string | null): date is string =>
+    !!date &&
+    /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+    Number.isFinite(Date.parse(date)) &&
+    new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) === date;
+  if (!validDate(input.today)) return null;
+  const days = validDate(input.nextDue)
+    ? Math.round(
+        (Date.parse(input.nextDue + "T00:00:00Z") - Date.parse(input.today + "T00:00:00Z")) /
+          86400000,
+      )
+    : null;
+  const known =
+    Number.isFinite(input.outstanding) &&
+    input.outstanding >= 0 &&
+    Number.isFinite(input.overdue) &&
+    input.overdue >= 0 &&
+    input.overdue <= input.outstanding;
+  if (known && input.outstanding > 0 && days !== null) {
+    if (input.overdue > 0 && days < 0)
+      return {
+        kind: "overdue",
+        dueDate: input.nextDue!,
+        amount: input.overdue,
+        days,
+        amountIsEstimated: false,
+      };
+    if (input.overdue === 0 && days >= 0 && days <= 15)
+      return {
+        kind: "upcoming",
+        dueDate: input.nextDue!,
+        amount: input.outstanding,
+        days,
+        amountIsEstimated: false,
+      };
+  }
+  if (
+    !known ||
+    !validDate(input.paidThroughDate) ||
+    input.paidThroughDate < input.today ||
+    (input.outstanding > 0 && (days === null || (days < 0 && input.overdue === 0)))
+  )
+    return {
+      kind: "coverage",
+      dueDate: input.paidThroughDate ?? input.today,
+      amount: null,
+      days: null,
+      amountIsEstimated: false,
+    };
+  return null;
+}
+
 export function addOneIsoDay(date: string): string {
   const value = new Date(`${date}T00:00:00Z`);
   value.setUTCDate(value.getUTCDate() + 1);

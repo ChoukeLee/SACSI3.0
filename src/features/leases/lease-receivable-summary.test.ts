@@ -3,6 +3,7 @@ import type { ReceivableRow } from "@/types/database";
 import {
   countStartedLeasePeriods,
   resolveLeaseOverdue,
+  resolveLeaseAttention,
   summarizeLeaseReceivables,
 } from "./lease-receivable-summary";
 
@@ -212,5 +213,77 @@ describe("countStartedLeasePeriods", () => {
     expect(countStartedLeasePeriods("2026-01-31", "2026-02-28")).toBe(2);
     expect(countStartedLeasePeriods("2026-01-31", "2026-03-30")).toBe(2);
     expect(countStartedLeasePeriods("2026-01-31", "2026-03-31")).toBe(3);
+  });
+});
+
+describe("verified collection attention versus unconfirmed coverage", () => {
+  const base = {
+    today: "2026-10-20",
+    paidThroughDate: "2026-09-30",
+    outstanding: 0,
+    overdue: 0,
+    nextDue: "2026-10-01",
+  };
+  it("does not invent another monthly payment after the current rent bill was fully settled", () => {
+    expect(resolveLeaseAttention(base)).toEqual({
+      kind: "coverage",
+      dueDate: "2026-09-30",
+      amount: null,
+      days: null,
+      amountIsEstimated: false,
+    });
+  });
+  it("reports only confirmed overdue balances, not future debt or contract monthly rent", () => {
+    expect(resolveLeaseAttention({ ...base, outstanding: 1100000, overdue: 100000 })).toEqual({
+      kind: "overdue",
+      dueDate: "2026-10-01",
+      amount: 100000,
+      days: -19,
+      amountIsEstimated: false,
+    });
+  });
+  it("never calls a past date an upcoming payable when no overdue debt exists", () => {
+    expect(resolveLeaseAttention({ ...base, outstanding: 100000 })).toMatchObject({
+      kind: "coverage",
+      amount: null,
+      days: null,
+    });
+  });
+  it("retains a real due-today and upcoming balance without an estimated rent fallback", () => {
+    expect(
+      resolveLeaseAttention({ ...base, outstanding: 100000, nextDue: "2026-10-20" }),
+    ).toMatchObject({ kind: "upcoming", amount: 100000, days: 0 });
+    expect(
+      resolveLeaseAttention({ ...base, outstanding: 100000, nextDue: "2026-11-04" }),
+    ).toMatchObject({ kind: "upcoming", amount: 100000, days: 15 });
+  });
+  it("does not convert a future bill outside the window into current collection demand", () => {
+    expect(
+      resolveLeaseAttention({
+        ...base,
+        paidThroughDate: "2026-10-31",
+        outstanding: 100000,
+        nextDue: "2026-11-05",
+      }),
+    ).toBeNull();
+  });
+  it("keeps missing or invalid balances/date as verification work, not zero debt or invented cash", () => {
+    expect(resolveLeaseAttention({ ...base, paidThroughDate: null, nextDue: null })).toMatchObject({
+      kind: "coverage",
+      amount: null,
+    });
+    expect(resolveLeaseAttention({ ...base, outstanding: NaN })).toMatchObject({
+      kind: "coverage",
+      amount: null,
+    });
+    expect(
+      resolveLeaseAttention({ ...base, outstanding: 100000, nextDue: "2026-02-30" }),
+    ).toMatchObject({ kind: "coverage", amount: null });
+    expect(resolveLeaseAttention({ ...base, today: "invalid" })).toBeNull();
+  });
+  it("does not flag current confirmed coverage and no balance as payable", () => {
+    expect(
+      resolveLeaseAttention({ ...base, paidThroughDate: "2026-10-31", nextDue: "2026-11-01" }),
+    ).toBeNull();
   });
 });

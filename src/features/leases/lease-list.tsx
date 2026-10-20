@@ -3,7 +3,8 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { safeWorkbenchReturnTo } from "@/lib/workbench-links";
+import { buildWorkbenchRecordHref, safeWorkbenchReturnTo } from "@/lib/workbench-links";
+import { buildLeaseCollectionHref } from "./lease-collection-links";
 import { LeaseRentPeriodCorrection } from "./lease-rent-period-correction";
 import { leaseRequestIdentity, clearLeaseRequestIdentity } from "./lease-request-identity";
 import {
@@ -68,6 +69,7 @@ import {
 } from "./lease-financial-entry-types";
 import {
   isOverdueReceivable,
+  resolveLeaseAttention,
   resolveLeaseOverdue,
   summarizeLeaseReceivables,
 } from "./lease-receivable-summary";
@@ -139,21 +141,9 @@ interface LeaseListProps {
   canMoveOut?: boolean;
 }
 type PanelType = "new" | "detail" | "financeEntry" | "moveout" | "attention" | "insight" | null;
-type AttentionTab = "overdue" | "upcoming";
+type AttentionTab = "overdue" | "upcoming" | "coverage";
 const paymentCycles = ["monthly", "quarterly", "semiannual", "annual"];
 type LeaseStatFilter = "active" | "rent" | "dueSoon" | "currentDue" | "overdue";
-
-function addDaysToIso(date: string, days: number) {
-  const value = new Date(`${date}T00:00:00Z`);
-  value.setUTCDate(value.getUTCDate() + days);
-  return value.toISOString().slice(0, 10);
-}
-
-function diffIsoDays(from: string, to: string) {
-  return Math.round(
-    (new Date(`${to}T00:00:00Z`).getTime() - new Date(`${from}T00:00:00Z`).getTime()) / 86400000,
-  );
-}
 
 function isManagedLeaseUnit(unit: LeaseUnitRow) {
   return (
@@ -182,7 +172,7 @@ function isContractEndConfirmed(contract: LeaseContractRow) {
   return !!contract.expected_end_date && contract.expected_end_confirmed !== false;
 }
 
-function isPaidThroughOverdue(contract: LeaseContractRow) {
+function hasStaleRecordedCoverage(contract: LeaseContractRow) {
   return (
     !!contract.paid_through_date &&
     contract.paid_through_date < new Date().toISOString().slice(0, 10)
@@ -772,7 +762,6 @@ export function LeaseList({
 
   const leaseAttention = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-    const upcomingLimit = addDaysToIso(today, 15);
     const buildingMap = new Map(buildings.map((building) => [building.id, building]));
     const rows = filteredByBuilding.flatMap((contract) => {
       if (contract.status !== "active") return [];
@@ -788,30 +777,17 @@ export function LeaseList({
           row.management_status !== "excluded",
       );
       const summary = summarizeLeaseReceivables(related, today);
-      const coverageDue = contract.paid_through_date
-        ? addDaysToIso(contract.paid_through_date, 1)
-        : null;
-      const overdueResolution = workspace.enabled
-        ? (workspace.data?.accruals[contract.id] ?? null)
-        : resolveLeaseOverdue({
-            receivables: related,
-            today,
-            paidThroughDate: contract.paid_through_date ?? null,
-            monthlyRentXof: Number(contract.monthly_rent_xof),
-            contractStatus: contract.status,
-            actualEndDate: contract.actual_end_date,
-          });
       const projected = workspace.data?.summaries[contract.id];
-      const dueDate =
-        overdueResolution?.dueDate ??
-        (workspace.enabled
-          ? workspace.data?.attentionDue[contract.id]
-          : summary.earliestOutstandingDue) ??
-        coverageDue;
-      if (!dueDate) return [];
-      const isOverdue = overdueResolution !== null;
-      const isUpcoming = !isOverdue && dueDate <= upcomingLimit;
-      if (!isOverdue && !isUpcoming) return [];
+      const attention = resolveLeaseAttention({
+        today,
+        paidThroughDate: contract.paid_through_date ?? null,
+        outstanding: projected?.outstanding ?? summary.outstanding,
+        overdue: projected?.overdue ?? summary.overdue,
+        nextDue: workspace.enabled
+          ? (workspace.data?.attentionDue[contract.id] ?? null)
+          : summary.earliestOutstandingDue,
+      });
+      if (!attention) return [];
       const building = buildingMap.get(unit.building_id);
       return [
         {
@@ -819,18 +795,8 @@ export function LeaseList({
           unit,
           customer,
           buildingName: building?.display_name || building?.code || "-",
-          dueDate,
+          ...attention,
           paidThrough: contract.paid_through_date,
-          amount: overdueResolution
-            ? overdueResolution.amount
-            : (projected?.outstanding ?? summary.outstanding) > 0
-              ? (projected?.outstanding ?? summary.outstanding)
-              : Number(contract.monthly_rent_xof),
-          amountIsEstimated:
-            overdueResolution?.source === "contract" ||
-            (!overdueResolution && (projected?.outstanding ?? summary.outstanding) <= 0),
-          days: diffIsoDays(today, dueDate),
-          kind: isOverdue ? ("overdue" as const) : ("upcoming" as const),
         },
       ];
     });
@@ -840,6 +806,9 @@ export function LeaseList({
         .sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
       upcoming: rows
         .filter((row) => row.kind === "upcoming")
+        .sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
+      coverage: rows
+        .filter((row) => row.kind === "coverage")
         .sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
     };
   }, [
@@ -851,6 +820,7 @@ export function LeaseList({
     workspace.enabled,
     workspace.data,
   ]);
+  const attentionRows = leaseAttention[attentionTab];
 
   const dashboardStats = useMemo(() => {
     if (workspace.enabled && workspace.pageData) return workspace.pageData.stats;
@@ -1017,17 +987,31 @@ export function LeaseList({
     setError("");
   };
   const openFinanceEntry = () => {
-    setFinanceType("rent_income");
-    setFinanceCurrency(selected?.rent_currency ?? "XOF");
+    setFinanceType("deposit_income");
+    setFinanceCurrency("XOF");
     setFinanceDate(new Date().toISOString().slice(0, 10));
     setFinanceAmountWan(0);
     setFinancePaidThrough("");
     setFinanceMethod("other");
     setFinanceNotes("");
+    setFinanceExternalReceiptNo("");
     financeRequestIdRef.current = null;
     setError("");
     setPanel("financeEntry");
   };
+  const collectionHrefFor = (contract: LeaseContractRow, unit?: UnitRow | null) =>
+    buildLeaseCollectionHref({
+      contractId: contract.id,
+      locale,
+      returnTo: buildWorkbenchRecordHref({
+        workspace: "leases",
+        id: contract.id,
+        locale,
+        project: unit ? buildingMap.get(unit.building_id)?.project_id : project?.id,
+        building: unit?.building_id,
+        returnTo: safeReturnTo,
+      }),
+    });
   const openMoveOut = async (id: string) => {
     if (workspace.enabled) {
       try {
@@ -1245,6 +1229,19 @@ export function LeaseList({
     setPanel("insight");
     setSelectedId(null);
   };
+  const openCoverageReview = async () => {
+    setPreviewSelection(null);
+    if (workspace.enabled) {
+      try {
+        await workspace.ensure("scope", undefined, true);
+      } catch {
+        return;
+      }
+    }
+    setAttentionTab("coverage");
+    setPanel("attention");
+    setSelectedId(null);
+  };
   const changeView = async (value: "table" | "rooms") => {
     setLinkedPreviewDismissed(true);
     setPreviewSelection(null);
@@ -1317,8 +1314,7 @@ export function LeaseList({
       label: locale === "zh" ? "15天内跟进" : "Suivi sous 15j",
       value: String(dashboardStats.dueSoon),
       dot: dashboardStats.dueSoon > 0 ? "bg-accentAmber-500" : "bg-muted-foreground/40",
-      hint:
-        locale === "zh" ? "含合同缴费提醒，非确认应收" : "Rappels contrat, pas créances confirmées",
+      hint: locale === "zh" ? "已建未结账单的到期跟进" : "Suivi des créances vérifiées ouvertes",
     },
     {
       key: "currentDue",
@@ -1395,9 +1391,21 @@ export function LeaseList({
                   : t.contractStatus[value as keyof typeof t.contractStatus],
           }))}
         />
-        <span className={styles.scopeCaption}>
-          {locale === "zh" ? "金额统一以 XOF 展示" : "Montants en XOF"}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={workspace.unavailable}
+            onClick={() => void openCoverageReview()}
+          >
+            <CalendarClock className="size-3.5" aria-hidden="true" />
+            {locale === "zh" ? "覆盖核对" : "Vérifier la couverture"}
+          </Button>
+          <span className={styles.scopeCaption}>
+            {locale === "zh" ? "金额统一以 XOF 展示" : "Montants en XOF"}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -1719,21 +1727,29 @@ export function LeaseList({
                               <p
                                 className={cn(
                                   "tabular-nums font-medium",
-                                  isPaidThroughOverdue(contract)
-                                    ? "text-red-600"
+                                  hasStaleRecordedCoverage(contract)
+                                    ? "text-amber-700"
                                     : "text-emerald-700",
                                 )}
                               >
                                 {paidPeriodStartsBeforeCutoff ? (
                                   <>
-                                    {locale === "zh" ? "缴费期" : "Période payée"}{" "}
+                                    {locale === "zh" ? "登记覆盖期" : "Période enregistrée"}{" "}
                                     {contract.start_date} → {paidThrough}
                                   </>
                                 ) : (
                                   <>
-                                    {locale === "zh" ? "已缴至" : "Payé au"} {paidThrough}
+                                    {locale === "zh" ? "登记覆盖至" : "Couverture enregistrée"}{" "}
+                                    {paidThrough}
                                   </>
                                 )}
+                                {hasStaleRecordedCoverage(contract) ? (
+                                  <span className="ml-1 font-normal">
+                                    {locale === "zh"
+                                      ? "· 覆盖待确认，非欠款判定"
+                                      : "· À vérifier, dette non présumée"}
+                                  </span>
+                                ) : null}
                               </p>
                             ) : (
                               <p className="tabular-nums">
@@ -1816,8 +1832,8 @@ export function LeaseList({
 
           <p className={styles.summaryExplanation}>
             {locale === "zh"
-              ? "上方摘要覆盖当前项目与楼栋的全部合同，不随搜索、状态或分页截断。月租规模不是实收；15 天内跟进含缴费提醒，不等于合同到期。"
-              : "La synthèse couvre tous les contrats du périmètre, sans limitation de recherche, statut ou page. Le loyer mensuel n'est pas un encaissement ; les rappels de paiement ne sont pas des fins de bail."}
+              ? "上方摘要覆盖当前项目与楼栋的全部合同，不随搜索、状态或分页截断。月租规模不是实收；15 天内跟进仅含明确未结账单，不等于合同到期。覆盖待确认另行核对，不推算为应缴。"
+              : "La synthèse couvre tous les contrats du périmètre, sans limitation de recherche, statut ou page. Le loyer mensuel n’est pas un encaissement ; le suivi sous 15 jours porte sur les créances ouvertes vérifiées, pas sur les fins de bail. La couverture à confirmer est vérifiée séparément, sans dette présumée."}
           </p>
         </section>
         {contractView === "table" && (
@@ -1846,6 +1862,11 @@ export function LeaseList({
               onPrint={() => {
                 if (previewId) void printById(previewId);
               }}
+              collectionHref={
+                canRecordFinance && previewContract?.status === "active"
+                  ? collectionHrefFor(previewContract, previewUnit)
+                  : undefined
+              }
               onClose={() => {
                 setLinkedPreviewDismissed(true);
                 setPreviewSelection(null);
@@ -1873,7 +1894,7 @@ export function LeaseList({
           const titleMap: Record<LeaseStatFilter, string> = {
             active: locale === "zh" ? "生效合同明细" : "Contrats actifs",
             rent: locale === "zh" ? "月租规模明细" : "Détail des loyers",
-            dueSoon: locale === "zh" ? "15天内应缴" : "Échéances sous 15 jours",
+            dueSoon: locale === "zh" ? "15天内到期跟进" : "Suivi des échéances sous 15 jours",
             currentDue: locale === "zh" ? "已建应收未收" : "Créances restantes",
             overdue: locale === "zh" ? "逾期明细" : "Détail des retards",
           };
@@ -1907,7 +1928,13 @@ export function LeaseList({
                     )}
                   >
                     <p className="text-xs text-muted-foreground">
-                      {locale === "zh" ? "合计金额" : "Total"}
+                      {statFilter === "dueSoon"
+                        ? locale === "zh"
+                          ? "相关合同未结总额（含未来期，不等于本期应缴）"
+                          : "Soldes totaux des contrats, échéances futures incluses — pas le montant de la prochaine échéance"
+                        : locale === "zh"
+                          ? "已核实逾期余额合计"
+                          : "Total des soldes échus vérifiés"}
                     </p>
                     <p
                       className={cn(
@@ -1973,16 +2000,16 @@ export function LeaseList({
                               {locale === "zh" ? "应缴日" : "Échéance"} {row.dueDate}
                             </span>
                             <span className="text-right">
-                              {row.amountIsEstimated
+                              {row.kind === "upcoming"
                                 ? locale === "zh"
-                                  ? "按已缴至日期逐月累计"
-                                  : "Cumul selon la date payée"
+                                  ? "本合同未结总额（含未来期）"
+                                  : "Solde total du contrat, échéances futures incluses"
                                 : locale === "zh"
-                                  ? "未结应收"
-                                  : "Créance ouverte"}
+                                  ? "已核实逾期余额"
+                                  : "Solde échu vérifié"}
                             </span>
                             <span>
-                              {locale === "zh" ? "已缴至" : "Payé au"}{" "}
+                              {locale === "zh" ? "登记覆盖至" : "Couverture enregistrée"}{" "}
                               {row.paidThrough ?? (locale === "zh" ? "待补" : "À compléter")}
                             </span>
                             <span className="flex items-center justify-end gap-1.5">
@@ -2166,9 +2193,7 @@ export function LeaseList({
           title={locale === "zh" ? "长租收费提醒" : "Rappels de loyer"}
           badge={
             <Badge variant={attentionTab === "overdue" ? "destructive" : "warning"}>
-              {attentionTab === "overdue"
-                ? leaseAttention.overdue.length
-                : leaseAttention.upcoming.length}
+              {attentionRows.length}
             </Badge>
           }
         >
@@ -2186,24 +2211,24 @@ export function LeaseList({
                   value: "upcoming",
                   label: `${locale === "zh" ? "15天内应缴" : "Sous 15 jours"} ${leaseAttention.upcoming.length}`,
                 },
+                {
+                  value: "coverage",
+                  label: `${locale === "zh" ? "覆盖待确认" : "Couverture à vérifier"} ${leaseAttention.coverage.length}`,
+                },
               ]}
             />
             <p className="text-xs leading-relaxed text-muted-foreground">
               {locale === "zh"
-                ? "合同估算仅用于提醒核对，不作为确认欠款或现金收入；确认余额只取已建立、已核实的应收记录。"
-                : "Les estimations servent au suivi, jamais à confirmer une dette ou un flux de caisse. Les soldes proviennent des créances vérifiées."}
+                ? "收费提醒只取已建、已核实应收的未收余额。登记覆盖日期过期或缺失，只列为覆盖待确认，不据此推算另一笔应缴款。"
+                : "Les rappels d’encaissement reposent uniquement sur les créances vérifiées ouvertes. Une couverture ancienne ou manquante doit être vérifiée, sans inventer un nouveau montant à payer."}
             </p>
-            {(attentionTab === "overdue" ? leaseAttention.overdue : leaseAttention.upcoming)
-              .length === 0 ? (
+            {attentionRows.length === 0 ? (
               <EmptyState
                 title={locale === "zh" ? "当前没有需要跟进的合同" : "Aucun contrat à suivre"}
               />
             ) : (
               <div className="space-y-2.5">
-                {(attentionTab === "overdue"
-                  ? leaseAttention.overdue
-                  : leaseAttention.upcoming
-                ).map((row) => (
+                {attentionRows.map((row) => (
                   <div
                     key={row.contract.id}
                     className={cn(
@@ -2223,9 +2248,13 @@ export function LeaseList({
                             variant={row.kind === "overdue" ? "destructive" : "warning"}
                             className="h-5 px-2 text-[10px]"
                           >
-                            {row.kind === "overdue"
-                              ? `${locale === "zh" ? "逾期" : "Retard"} ${Math.abs(row.days)}${locale === "zh" ? "天" : "j"}`
-                              : `${row.days}${locale === "zh" ? "天后应缴" : "j"}`}
+                            {row.kind === "coverage"
+                              ? locale === "zh"
+                                ? "覆盖待确认 · 非欠款判定"
+                                : "Couverture à vérifier · dette non présumée"
+                              : row.kind === "overdue"
+                                ? `${locale === "zh" ? "逾期" : "Retard"} ${Math.abs(row.days)}${locale === "zh" ? "天" : "j"}`
+                                : `${row.days}${locale === "zh" ? "天后应缴" : "j"}`}
                           </Badge>
                         </div>
                         <p className="mt-1 truncate text-[13px] font-medium text-foreground">
@@ -2239,25 +2268,42 @@ export function LeaseList({
                           row.kind === "overdue" ? "text-red-700" : "text-amber-700",
                         )}
                       >
-                        {formatXof(row.amount)}
+                        {row.amount === null
+                          ? locale === "zh"
+                            ? "金额不推算"
+                            : "Aucun montant présumé"
+                          : formatXof(row.amount)}
                       </p>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
                         <CalendarClock className="h-3.5 w-3.5" />
-                        {locale === "zh" ? "应缴日" : "Échéance"} {row.dueDate}
+                        {row.kind === "coverage"
+                          ? locale === "zh"
+                            ? "登记覆盖至"
+                            : "Couverture enregistrée"
+                          : locale === "zh"
+                            ? "应缴日"
+                            : "Échéance"}{" "}
+                        {row.kind === "coverage"
+                          ? row.paidThrough || (locale === "zh" ? "待确认" : "À vérifier")
+                          : row.dueDate}
                       </span>
                       <span className="text-right">
-                        {row.amountIsEstimated
+                        {row.kind === "coverage"
                           ? locale === "zh"
-                            ? "按已缴至日期逐月累计"
-                            : "Cumul selon la date payée"
-                          : locale === "zh"
-                            ? "未结应收"
-                            : "Créance ouverte"}
+                            ? "核对服务账期与收款关联"
+                            : "Vérifier les périodes et paiements"
+                          : row.kind === "upcoming"
+                            ? locale === "zh"
+                              ? "本合同未结总额（含未来期）"
+                              : "Solde total du contrat, échéances futures incluses"
+                            : locale === "zh"
+                              ? "已核实逾期余额"
+                              : "Solde échu vérifié"}
                       </span>
                       <span>
-                        {locale === "zh" ? "已缴至" : "Payé au"}{" "}
+                        {locale === "zh" ? "登记覆盖至" : "Couverture enregistrée"}{" "}
                         {row.paidThrough ?? (locale === "zh" ? "待补" : "À compléter")}
                       </span>
                       <span className="flex items-center justify-end gap-1.5">
@@ -2272,7 +2318,13 @@ export function LeaseList({
                       className="mt-3 w-full"
                       onClick={() => openDetail(row.contract.id)}
                     >
-                      {locale === "zh" ? "查看合同并收款" : "Voir et encaisser"}
+                      {row.kind === "coverage"
+                        ? locale === "zh"
+                          ? "查看合同并核对覆盖"
+                          : "Voir et vérifier la couverture"
+                        : locale === "zh"
+                          ? "查看合同并收款"
+                          : "Voir et encaisser"}
                       <ChevronRight className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -2520,16 +2572,23 @@ export function LeaseList({
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">
-                  {locale === "zh" ? "缴租截至日" : "Loyer payé au"}
+                  {locale === "zh" ? "登记覆盖至" : "Couverture enregistrée"}
                 </dt>
                 <dd
                   className={cn(
-                    selected.paid_through_date && isPaidThroughOverdue(selected)
-                      ? "font-medium text-red-600"
+                    selected.paid_through_date && hasStaleRecordedCoverage(selected)
+                      ? "font-medium text-amber-700"
                       : "font-medium text-emerald-700",
                   )}
                 >
                   {selected.paid_through_date ?? (locale === "zh" ? "待补" : "À compléter")}
+                  {hasStaleRecordedCoverage(selected) ? (
+                    <p className="mt-1 text-xs font-normal text-muted-foreground">
+                      {locale === "zh"
+                        ? "覆盖待确认，不等同于仍欠租；请核对已建账单及实际核销。"
+                        : "Couverture à vérifier, sans présumer une dette. Vérifiez les créances et leurs paiements."}
+                    </p>
+                  ) : null}
                 </dd>
               </div>
               {selected.actual_end_date && (
@@ -2751,10 +2810,20 @@ export function LeaseList({
                   />
                 )}
                 {canRecordFinance && (
-                  <Button size="sm" variant="outline" onClick={openFinanceEntry}>
-                    <Plus className="h-3.5 w-3.5" />
-                    {locale === "zh" ? "新增记录" : "Ajouter"}
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {selected.status === "active" && (
+                      <Link
+                        href={collectionHrefFor(selected, selectedUnit) ?? "#"}
+                        className="inline-flex min-h-9 items-center rounded-lg bg-blue-600 px-3 text-xs font-medium text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                      >
+                        {locale === "zh" ? "登记实际收款" : "Enregistrer un encaissement"}
+                      </Link>
+                    )}
+                    <Button size="sm" variant="outline" onClick={openFinanceEntry}>
+                      <Plus className="h-3.5 w-3.5" />
+                      {locale === "zh" ? "押金 / 其他收支" : "Dépôt / autres écritures"}
+                    </Button>
+                  </div>
                 )}
               </div>
               {contractPayments.length === 0 ? (
@@ -2876,7 +2945,9 @@ export function LeaseList({
                 }}
                 className={inputClass}
               >
-                {LEASE_FINANCIAL_BUSINESS_TYPES.map((type) => {
+                {LEASE_FINANCIAL_BUSINESS_TYPES.filter(
+                  (type) => type !== "rent_income" && type !== "property_fee_income",
+                ).map((type) => {
                   const config = LEASE_FINANCIAL_BUSINESS_CONFIG[type];
                   return (
                     <option key={type} value={type}>
@@ -3057,8 +3128,8 @@ export function LeaseList({
             </div>
             <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 text-xs leading-relaxed text-blue-800">
               {locale === "zh"
-                ? "租金收入会同步“已缴至日期”并优先冲抵未结应收；押金收入会同步合同押金状态；支出类不会计入收入。"
-                : "Le loyer met à jour la date payée et règle d'abord les créances ouvertes. Le dépôt met à jour le statut du contrat."}
+                ? "此入口仅处理押金及其他收支。租金和物业费请使用独立实际收款工作台，逐笔选择账单核销；不会按旧的先到期顺序自动分配。押金仍核对实收状态，支出不计入收入。"
+                : "Cette saisie concerne les dépôts et autres recettes ou dépenses. Pour les loyers et charges, utilisez l’atelier d’encaissement et choisissez les créances à rapprocher, sans affectation automatique par ancienneté. Les dépenses ne sont pas des revenus."}
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <Button className="w-full" onClick={handleFinanceEntry} disabled={saving}>

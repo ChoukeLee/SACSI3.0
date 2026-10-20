@@ -22,6 +22,7 @@ const zhActionLabels: Record<string, string> = {
   move_out: "退租",
   payment: "收款",
   record_payment: "登记收款",
+  record_lease_collection: "登记长租实际收款并核销",
   supplementary_payment: "补缴房费",
   confirm_operator_payment: "确认截图收款",
   confirm_payment_context: "确认付款事实与账期",
@@ -77,6 +78,7 @@ const frActionLabels: Record<string, string> = {
   move_out: "Sortie",
   payment: "Paiement",
   record_payment: "Enregistrer paiement",
+  record_lease_collection: "Enregistrer et affecter un encaissement locatif",
   supplementary_payment: "Paiement complementaire",
   confirm_operator_payment: "Confirmer paiement sur capture",
   confirm_payment_context: "Confirmer les faits et périodes du paiement",
@@ -125,6 +127,7 @@ export const AUDIT_ACTION_LABELS: Record<Locale, Record<string, string>> = {
 const zhEntityLabels: Record<string, string> = {
   daily_booking: "日租预订",
   lease_contract: "长租合同",
+  lease_collection: "长租实收核销",
   sale_contract: "出售合同",
   unit: "房源",
   customer: "客户",
@@ -144,6 +147,7 @@ const zhEntityLabels: Record<string, string> = {
 const frEntityLabels: Record<string, string> = {
   daily_booking: "Reservation",
   lease_contract: "Contrat location",
+  lease_collection: "Encaissement locatif affecté",
   sale_contract: "Contrat vente",
   unit: "Logement",
   customer: "Client",

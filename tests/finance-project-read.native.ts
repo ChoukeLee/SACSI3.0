@@ -145,7 +145,13 @@ async function compare(kind: string, filters: Record<string, unknown>, page = 1,
         [kind, filters, page, exported],
       )
     ).rows[0];
-    expect(result.actual).toEqual(result.expected);
+    // Native-currency support is additive. Keep the complete published XOF
+    // response comparison, including every row, field, total and export page.
+    // These fixtures contain no native contractual money, so its new dimension
+    // must explicitly be empty rather than being silently removed from checks.
+    const { nativeSummary, ...legacyActual } = result.actual;
+    expect(nativeSummary).toEqual([]);
+    expect(legacyActual).toEqual(result.expected);
     return result.actual;
   });
 }
