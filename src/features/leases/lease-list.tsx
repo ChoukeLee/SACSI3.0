@@ -2949,7 +2949,13 @@ export function LeaseList({
                   type="number"
                   min={financeCurrency === "XOF" ? 1 : 0.000001}
                   step="0.000001"
-                  value={nativeLease(selected) && financeType === "rent_income" ? "" : financeCurrency === "XOF" ? 1 : financeExchangeRate || ""}
+                  value={
+                    nativeLease(selected) && financeType === "rent_income"
+                      ? ""
+                      : financeCurrency === "XOF"
+                        ? 1
+                        : financeExchangeRate || ""
+                  }
                   disabled={
                     financeCurrency === "XOF" ||
                     (nativeLease(selected) && financeType === "rent_income")
