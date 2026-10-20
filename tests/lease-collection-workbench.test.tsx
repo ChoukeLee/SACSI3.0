@@ -186,6 +186,16 @@ async function fill(
 async function click(element: HTMLElement) {
   await act(async () => element.click());
 }
+async function waitForRecordedRequests(count: number) {
+  // Native Web Crypto completion is outside React's act queue. Observe the
+  // actual action boundary, not a fixed delay or the end of a click handler.
+  await act(async () => {
+    await vi.waitFor(() => expect(record).toHaveBeenCalledTimes(count), {
+      timeout: 2000,
+      interval: 10,
+    });
+  });
+}
 async function submit() {
   await act(async () => {
     host
@@ -388,15 +398,38 @@ describe("independent lease collection workbench", () => {
   });
 
   it("retains the identical request on an unknown result and prohibits edited retries", async () => {
+    const realDigest = webcrypto.subtle.digest.bind(webcrypto.subtle);
+    let releaseRetryDigest!: () => void;
+    const retryDigestGate = new Promise<void>((resolve) => {
+      releaseRetryDigest = resolve;
+    });
+    let digestCalls = 0;
+    vi.stubGlobal("crypto", {
+      randomUUID: webcrypto.randomUUID.bind(webcrypto),
+      subtle: {
+        async digest(...args: Parameters<typeof realDigest>) {
+          digestCalls += 1;
+          if (digestCalls === 2) await retryDigestGate;
+          return realDigest(...args);
+        },
+      },
+    });
     record.mockResolvedValueOnce({ success: false, rejected: false, error: "网络无法确认" });
     await render();
     await validDraft();
     await submit();
+    await waitForRecordedRequests(1);
     const first = record.mock.calls[0][0];
     expect(host.textContent).toContain("暂时无法确认是否已经入账");
     expect(host.querySelector<HTMLFieldSetElement>("fieldset")?.disabled).toBe(true);
     await fill(amountInput(), "1");
     await click(button("按原操作号核对 / 重试"));
+    // A completed act(click) does not imply the native SHA-256 has finished.
+    // Hold that boundary deliberately to reproduce slow CI worker scheduling.
+    expect(digestCalls).toBe(2);
+    expect(record).toHaveBeenCalledTimes(1);
+    releaseRetryDigest();
+    await waitForRecordedRequests(2);
     expect(record).toHaveBeenCalledTimes(2);
     expect(record.mock.calls[1][0]).toEqual(first);
     expect(host.textContent).toContain("已完成入账");
@@ -408,9 +441,11 @@ describe("independent lease collection workbench", () => {
     await render();
     await validDraft();
     await submit();
+    await waitForRecordedRequests(1);
     expect(host.textContent).toContain("结果未知，请勿另起一笔");
     const first = record.mock.calls[0][0];
     await click(button("按原操作号核对 / 重试"));
+    await waitForRecordedRequests(2);
     expect(record.mock.calls[1][0]).toEqual(first);
   });
 
