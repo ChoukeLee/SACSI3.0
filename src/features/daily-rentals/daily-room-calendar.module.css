@@ -1,0 +1,414 @@
+.calendar {
+  --room-row-height: 40px;
+  --event-row-height: 24px;
+  --room-column-width: 104px;
+  --calendar-blue: var(--daily-accent, #245cd3);
+  --calendar-blue-soft: var(--daily-accent-soft, #eef4ff);
+  --calendar-green: var(--daily-green, #23715c);
+  --calendar-green-soft: var(--daily-green-soft, #edf7f2);
+  --calendar-amber: var(--daily-amber, #92621d);
+  --calendar-amber-soft: var(--daily-amber-soft, #fff6e7);
+  min-width: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  background: hsl(var(--card));
+  overflow: hidden;
+}
+
+.toolbar,
+.location,
+.periodNav,
+.footer,
+.legend,
+.legend > span {
+  display: flex;
+  align-items: center;
+}
+.toolbar {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 12px;
+}
+.location {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.location h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+.select,
+.iconButton,
+.todayButton {
+  min-height: 30px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font-size: 12px;
+}
+.select {
+  max-width: 160px;
+  padding: 4px 7px;
+}
+.periodNav {
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.iconButton {
+  display: grid;
+  width: 30px;
+  place-items: center;
+}
+.todayButton {
+  padding: 4px 10px;
+}
+.dateRange {
+  margin: 0 4px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.scrollRegion {
+  max-width: 100%;
+  max-height: min(72vh, 840px);
+  overflow: auto;
+  overscroll-behavior-x: contain;
+  border-top: 1px solid hsl(var(--border));
+  scrollbar-gutter: stable;
+}
+.table {
+  width: 100%;
+  min-width: calc(var(--room-column-width) + var(--day-count) * 65px);
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  font-size: 12px;
+}
+.roomColumn {
+  width: var(--room-column-width);
+}
+.timeHead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: hsl(var(--muted));
+  border-bottom: 1px solid hsl(var(--border));
+}
+.roomHeading {
+  left: 0;
+  z-index: 7 !important;
+  padding: 7px 12px;
+  border-right: 1px solid hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+  text-align: left;
+  font-weight: 500;
+}
+.dayHeading {
+  height: 44px;
+  padding: 4px;
+  border-left: 1px solid hsl(var(--border));
+  text-align: center;
+}
+.dayHeading span {
+  display: inline;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 400;
+}
+.dayHeading strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+.timeHead .todayCell {
+  background: var(--calendar-blue-soft);
+  color: var(--calendar-blue);
+}
+.floorRow th {
+  height: 24px;
+  padding: 3px 12px;
+  background: hsl(var(--muted) / 0.65);
+  border-bottom: 1px solid hsl(var(--border));
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+.floorRow th > span {
+  position: sticky;
+  left: 12px;
+}
+.floorRow small {
+  margin-left: 10px;
+  font-size: 11px;
+  font-weight: 400;
+}
+.roomCell {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  padding: 0;
+  border-right: 1px solid hsl(var(--border));
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+}
+.roomButton {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  min-height: var(--room-row-height);
+  padding: 3px 11px;
+  border: 0;
+  background: transparent;
+  color: hsl(var(--foreground));
+  text-align: left;
+}
+.roomButton strong {
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+.roomButton span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  line-height: 1.2;
+}
+.trackCell {
+  padding: 0;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.track {
+  display: grid;
+  grid-template-columns: repeat(var(--day-count), minmax(0, 1fr));
+  align-items: center;
+  isolation: isolate;
+}
+.dateCell {
+  align-self: stretch;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-left: 1px solid hsl(var(--border));
+  padding: 0;
+  background: transparent;
+}
+.track > .todayCell {
+  background: color-mix(in srgb, var(--calendar-blue-soft) 48%, hsl(var(--card)));
+}
+.emptyDate span {
+  opacity: 0;
+  color: var(--calendar-blue);
+  font-size: 17px;
+}
+.emptyDate:hover,
+.emptyDate[aria-pressed="true"] {
+  background: var(--calendar-blue-soft);
+}
+.emptyDate:hover span,
+.emptyDate:focus-visible span,
+.emptyDate[aria-pressed="true"] span {
+  opacity: 1;
+}
+.bookingBand,
+.eventBand {
+  z-index: 1;
+  min-width: 0;
+  overflow: hidden;
+  margin: 0 3px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bookingBand {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 29px;
+  padding: 4px 7px;
+  font-size: 12px;
+}
+.bookingBand strong {
+  flex-shrink: 0;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  font-size: 11px;
+  font-weight: 600;
+}
+.bookingBand > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.inhouseBand {
+  background: var(--calendar-green-soft);
+  color: var(--calendar-green);
+}
+.reservedBand {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--calendar-blue) 40%, transparent);
+  background: var(--calendar-blue-soft);
+  color: var(--calendar-blue);
+}
+.completedBand {
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+}
+.bookingBand.conditionalBand {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent,
+    transparent 6px,
+    color-mix(in srgb, currentColor 6%, transparent) 6px,
+    color-mix(in srgb, currentColor 6%, transparent) 9px
+  );
+}
+.bookingBand[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.eventBand {
+  height: 20px;
+  margin-bottom: 3px;
+  padding: 1px 5px;
+  background: var(--calendar-amber-soft);
+  color: var(--calendar-amber);
+  font-size: 11px;
+}
+.selectedRoom .roomCell,
+.highlightedRoom .roomCell {
+  background: var(--calendar-blue-soft);
+}
+.highlightedRoom .roomButton {
+  box-shadow: inset 3px 0 var(--calendar-blue);
+}
+.footer {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 8px 12px;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+}
+.legend {
+  flex-wrap: wrap;
+  gap: 7px 12px;
+}
+.legend > span {
+  gap: 4px;
+}
+.legend i {
+  display: inline-block;
+  width: 11px;
+  height: 7px;
+  border-radius: 2px;
+}
+.greenSwatch {
+  background: var(--calendar-green-soft);
+  border: 1px solid color-mix(in srgb, var(--calendar-green) 35%, transparent);
+}
+.blueSwatch {
+  background: var(--calendar-blue-soft);
+  border: 1px dashed var(--calendar-blue);
+}
+.graySwatch {
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+}
+.amberSwatch {
+  background: var(--calendar-amber-soft);
+  border: 1px solid color-mix(in srgb, var(--calendar-amber) 35%, transparent);
+}
+.notice {
+  margin: 0;
+  padding: 0 12px 9px;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  line-height: 1.5;
+}
+.empty {
+  padding: 18px 12px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.calendar button:focus-visible,
+.calendar select:focus-visible,
+.scrollRegion:focus-visible {
+  outline: 2px solid var(--calendar-blue);
+  outline-offset: -2px;
+}
+
+@media (max-width: 640px) {
+  .calendar {
+    --room-column-width: 78px;
+    --room-row-height: 44px;
+  }
+  .toolbar {
+    padding: 8px;
+  }
+  .periodNav {
+    gap: 3px;
+  }
+  .location h2 {
+    font-size: 12px;
+  }
+  .select {
+    font-size: 16px;
+    max-width: 145px;
+  }
+  .roomButton {
+    padding-inline: 8px;
+  }
+  .bookingBand {
+    padding-inline: 5px;
+  }
+  .scrollRegion {
+    max-height: 68vh;
+  }
+}
+
+@media (pointer: coarse) {
+  .calendar {
+    --room-row-height: 50px;
+    --event-row-height: 44px;
+  }
+  .bookingBand {
+    height: 44px;
+  }
+  .eventBand {
+    height: 44px;
+    margin-bottom: 0;
+  }
+  .select,
+  .iconButton,
+  .todayButton {
+    min-height: 44px;
+  }
+  .iconButton {
+    width: 44px;
+  }
+}

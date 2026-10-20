@@ -1015,6 +1015,275 @@ button.stat:hover {
   padding: 16px 18px;
 }
 
+.compactPage {
+  gap: 10px;
+}
+
+.compactPage > section {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.compactHeader {
+  gap: 12px;
+}
+
+.compactHeaderCopy {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+  min-width: 0;
+}
+
+.compactHeader .eyebrow {
+  display: none;
+}
+
+.compactHeader .title {
+  font-size: 23px;
+  letter-spacing: -0.5px;
+}
+
+.compactHeader .subtitle {
+  margin-top: 0;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.compactHeader .headerActions {
+  gap: 6px;
+}
+
+.compactHeader .primaryButton,
+.compactHeader .button {
+  min-height: 34px;
+  padding: 6px 10px;
+}
+
+.todayStrip {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--card));
+}
+
+.todayStripItem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 1 1 auto;
+  gap: 8px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.todayStripItem:hover {
+  color: var(--daily-accent);
+  background: hsl(var(--muted) / 0.4);
+}
+
+.todayStripLabel {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.todayStripValue {
+  flex-shrink: 0;
+  color: hsl(var(--foreground));
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+.todayStripActive,
+.todayStripItem[aria-pressed="true"] {
+  color: var(--daily-accent);
+  background: var(--daily-accent-soft);
+}
+
+.todayStripActive .todayStripValue,
+.todayStripItem[aria-pressed="true"] .todayStripValue {
+  color: var(--daily-accent);
+}
+
+.compactPage .viewbar {
+  gap: 6px 12px;
+  align-items: center;
+}
+
+.controlBar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  min-width: 0;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.controlBar .viewbar {
+  flex: 1 1 360px;
+  border-bottom: 0;
+}
+
+.controlBar .toolbarCompact {
+  flex: 1 1 360px;
+  min-width: 0;
+}
+
+.compactPage .tabs {
+  gap: 0 18px;
+}
+
+.compactPage .tab {
+  min-height: 38px;
+  padding: 8px 0;
+  font-size: 12px;
+}
+
+.compactPage .archiveNav {
+  gap: 6px 12px;
+  padding-bottom: 0;
+}
+
+.compactPage .archiveNav a,
+.compactPage .archiveNav button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+}
+
+.toolbarCompact {
+  gap: 6px 12px;
+}
+
+.toolbarCompact .buildingSelect {
+  gap: 7px;
+}
+
+.toolbarCompact .buildingSelect select {
+  min-height: 32px;
+  padding-block: 5px;
+}
+
+.toolbarCompact .freshness {
+  gap: 6px;
+}
+
+.toolbarCompact .quietButton {
+  min-height: 32px;
+  padding-block: 5px;
+}
+
+.stageWide,
+.stageInspecting {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+}
+
+.stageWide,
+.workspace.stageWide {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.stageInspecting,
+.workspace.stageInspecting {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+}
+
+.stageWide > *,
+.stageInspecting > * {
+  min-width: 0;
+}
+
+.inspectorHost {
+  position: sticky;
+  top: 76px;
+  scroll-margin-top: 80px;
+}
+
+.inspectorHost .inspector {
+  position: static;
+}
+
+.compactPage .inspector {
+  padding: 15px;
+  border-radius: 10px;
+}
+
+.inspectorHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.inspectorHeader > div {
+  min-width: 0;
+}
+
+.inspectorHeader .inspectorTop {
+  margin-bottom: 0;
+}
+
+.inspectorClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  min-height: 32px;
+  padding: 6px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--card));
+  color: hsl(var(--muted-foreground));
+}
+
+.inspectorClose:hover {
+  color: hsl(var(--foreground));
+  background: hsl(var(--muted) / 0.5);
+}
+
+.compactPage .inspectorTop {
+  margin-bottom: 12px;
+}
+
+.compactPage .detailRoom {
+  font-size: 23px;
+}
+
+.compactPage .stay {
+  margin-bottom: 12px;
+  padding-block: 13px;
+}
+
+.compactPage .section {
+  margin-top: 12px;
+}
+
+.compactPage .footer {
+  gap: 5px 12px;
+}
+
 @media (max-width: 1199px) {
   .workspace {
     grid-template-columns: minmax(0, 1fr) 250px;
@@ -1027,6 +1296,21 @@ button.stat:hover {
 
   .taskSide {
     max-width: 120px;
+  }
+}
+
+@media (max-width: 1099px) {
+  .stageInspecting,
+  .workspace.stageInspecting {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stageInspecting .inspector {
+    position: static;
+  }
+
+  .inspectorHost {
+    position: static;
   }
 }
 
@@ -1182,6 +1466,56 @@ button.stat:hover {
   .historyToolbar {
     padding-inline: 13px;
   }
+
+  .workbench.compactPage {
+    gap: 10px;
+  }
+
+  .compactHeader {
+    gap: 8px 12px;
+  }
+
+  .compactHeader .title {
+    font-size: 22px;
+  }
+
+  .compactHeader .headerActions {
+    gap: 5px;
+  }
+
+  .todayStripItem {
+    flex: 1 1 50%;
+    width: 50%;
+    padding: 7px 10px;
+  }
+
+  .compactPage .tabs {
+    gap: 0 14px;
+  }
+
+  .compactPage .archiveNav {
+    width: auto;
+    padding-bottom: 0;
+  }
+
+  .toolbarCompact .buildingSelect {
+    flex: 1 1 180px;
+    width: auto;
+    max-width: 100%;
+  }
+
+  .toolbarCompact .freshness {
+    flex: 1 1 auto;
+    justify-content: flex-end;
+  }
+
+  .toolbarCompact .buildingSelect select {
+    max-width: 100%;
+  }
+
+  .compactPage .inspector {
+    padding: 13px;
+  }
 }
 
 @media (pointer: coarse) {
@@ -1206,6 +1540,22 @@ button.stat:hover {
   .workbench select {
     font-size: 16px;
   }
+
+  .compactPage .tab,
+  .compactHeader .primaryButton,
+  .compactHeader .button,
+  .toolbarCompact .buildingSelect select,
+  .toolbarCompact .quietButton,
+  .todayStripItem,
+  .inspectorClose,
+  .compactPage .archiveNav a,
+  .compactPage .archiveNav button {
+    min-height: 44px;
+  }
+
+  .inspectorClose {
+    width: 44px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1220,7 +1570,9 @@ button.stat:hover {
   .headerActions,
   .viewbar,
   .toolbar,
+  .todayStrip,
   .filters,
+  .inspectorClose,
   .detailAction,
   .detailFoot {
     display: none;

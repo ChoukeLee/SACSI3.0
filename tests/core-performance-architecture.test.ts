@@ -38,7 +38,7 @@ describe("core page performance architecture", () => {
     expect(workbench).toContain('matchMedia("(max-width: 600px)")');
     expect(workbench).not.toMatch(/import\("\.\/calendar"\)|calendar\/cash|CalendarFinancePanel/);
     expect(operations).toMatch(/dynamic\(\(\) => import\("\.\/booking-panel"\)/);
-    expect(workbench).toContain("{action && data && (");
+    expect(workbench).toMatch(/\{action\s*&&\s*data\s*&&/);
     expect(loader).toContain("readCalendarWindow");
     const windowRead = read("supabase/migrations/20261015212832_daily_calendar_window_reads.sql");
     expect(windowRead).toMatch(

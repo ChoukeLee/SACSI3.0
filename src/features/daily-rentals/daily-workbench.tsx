@@ -43,7 +43,7 @@ import { dailyWorkbenchShareText } from "./daily-workbench-share";
 import styles from "./daily-workbench.module.css";
 
 type WorkView = "today" | "availability" | "timeline" | "history";
-type Selection = { unitId: string; bookingId: string | null } | null;
+type Selection = { unitId: string; bookingId: string | null; date?: string } | null;
 type ActionTarget = {
   unit: UnitRow | null;
   booking: DailyBookingRow | null;
@@ -64,7 +64,7 @@ export function DailyWorkbench({
 }) {
   const text = (zh: string, fr: string) => (locale === "zh" ? zh : fr);
   const prefix = locale === "fr" ? "/fr" : "";
-  const [view, setView] = useState<WorkView>("today");
+  const [view, setView] = useState<WorkView>("timeline");
   const [buildingId, setBuildingId] = useState(initialWindow.buildingId);
   const [filter, setFilter] = useState<DailyTaskFilter>("priority");
   const [selection, setSelection] = useState<Selection>(null);
@@ -79,7 +79,10 @@ export function DailyWorkbench({
   });
   const [queryError, setQueryError] = useState("");
   const [timelineFrom, setTimelineFrom] = useState(initialWindow.today);
-  const [dayCount, setDayCount] = useState(7);
+  const [desktopDays, setDesktopDays] = useState<7 | 14>(7);
+  const [smallViewport, setSmallViewport] = useState(false);
+  const [calendarHighlight, setCalendarHighlight] = useState<DailyTaskFilter | null>(null);
+  const dayCount = smallViewport ? 3 : desktopDays;
   const [historyRange, setHistoryRange] = useState({
     from: initialWindow.today.slice(0, 7) + "-01",
     to: addDays(initialWindow.today, 1),
@@ -88,6 +91,7 @@ export function DailyWorkbench({
   const [historyTo, setHistoryTo] = useState(historyRange.to);
   const [historySearch, setHistorySearch] = useState("");
   const inspectorRef = useRef<HTMLDivElement>(null);
+  const selectionTrigger = useRef<HTMLElement | null>(null);
   const inspectorId = useId();
   const stageId = useId();
   const tabPrefix = useId();
@@ -132,7 +136,11 @@ export function DailyWorkbench({
   }, [data, businessDay, from, to]);
   useEffect(() => {
     const media = window.matchMedia("(max-width: 600px)");
-    const sync = () => setDayCount(media.matches ? 3 : 7);
+    const sync = () => {
+      setSmallViewport(media.matches);
+      setSelection(null);
+      setAction(null);
+    };
     sync();
     media.addEventListener("change", sync);
     return () => media.removeEventListener("change", sync);
@@ -142,6 +150,14 @@ export function DailyWorkbench({
     [data, today, filter],
   );
   const counts = useMemo(() => (data ? dailyWorkbenchCounts(data, today) : null), [data, today]);
+  const todaySummaryAvailable = !!data && data.from <= today && data.to > today;
+  const highlightedUnitIds = useMemo(
+    () =>
+      data && calendarHighlight && todaySummaryAvailable
+        ? [...new Set(buildDailyTasks(data, today, calendarHighlight).map((task) => task.unit.id))]
+        : undefined,
+    [data, calendarHighlight, today, todaySummaryAvailable],
+  );
   const rooms = useMemo(
     () =>
       data && view === "availability"
@@ -150,26 +166,29 @@ export function DailyWorkbench({
     [data, view, searchRange.from, searchRange.to, today],
   );
   const available = rooms.filter((room) => room.state !== "blocked");
-  const firstTask = tasks[0];
-  const effectiveSelection =
-    selection ??
-    (view === "today" && firstTask
-      ? { unitId: firstTask.unit.id, bookingId: firstTask.booking?.id ?? null }
-      : view === "availability" && available[0]
-        ? { unitId: available[0].unit.id, bookingId: null }
-        : null);
-  const selectedUnit =
-    data?.dailyUnits.find((unit) => unit.id === effectiveSelection?.unitId) ??
-    data?.unitLookupUnits.find((unit) => unit.id === effectiveSelection?.unitId) ??
+  const selectionUnit =
+    data?.dailyUnits.find((unit) => unit.id === selection?.unitId) ??
+    data?.unitLookupUnits.find((unit) => unit.id === selection?.unitId) ??
     null;
   const selectedBooking =
     data?.bookings.find(
-      (booking) =>
-        booking.id === effectiveSelection?.bookingId && booking.unit_id === selectedUnit?.id,
+      (booking) => booking.id === selection?.bookingId && booking.unit_id === selectionUnit?.id,
     ) ?? null;
+  // A missing or moved order must never become an empty-room creation context.
+  const effectiveSelection = selection?.bookingId && !selectedBooking ? null : selection;
+  const selectedUnit = effectiveSelection ? selectionUnit : null;
   const selectedRoomResult = rooms.find((room) => room.unit.id === selectedUnit?.id);
+  const selectionFrom =
+    view === "availability" ? searchRange.from : (effectiveSelection?.date ?? today);
+  const selectionTo = view === "availability" ? searchRange.to : addDays(selectionFrom, 1);
+  const calendarRoomReason =
+    data && selectedUnit && !selectedBooking && view === "timeline"
+      ? findDailyRooms(data, selectionFrom, selectionTo, today).find(
+          (room) => room.unit.id === selectedUnit.id,
+        )?.reason
+      : undefined;
   const revealInspector = () => {
-    if (window.matchMedia("(max-width: 899px)").matches) {
+    if (window.matchMedia("(max-width: 1099px)").matches) {
       requestAnimationFrame(() =>
         inspectorRef.current?.scrollIntoView({
           block: "start",
@@ -180,15 +199,32 @@ export function DailyWorkbench({
       );
     }
   };
-  const choose = (unitId: string, bookingId: string | null) => {
-    setSelection({ unitId, bookingId });
+  const choose = (unitId: string, bookingId: string | null, date?: string) => {
+    selectionTrigger.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setSelection({ unitId, bookingId, date });
     revealInspector();
+  };
+  const clearTarget = () => {
+    setSelection(null);
+    setAction(null);
+  };
+  const changeTimelineRange = (date: string) => {
+    setTimelineFrom(date);
+    clearTarget();
+  };
+  const closeInspector = () => {
+    setSelection(null);
+    requestAnimationFrame(() => {
+      if (selectionTrigger.current?.isConnected) selectionTrigger.current.focus();
+    });
   };
   const changeView = (next: WorkView) => {
     setView(next);
     setSelection(null);
     setAction(null);
     setQueryError("");
+    setCalendarHighlight(null);
   };
   const building = buildings.find((b) => b.id === buildingId);
   const filterNames: [DailyTaskFilter, string][] = [
@@ -229,8 +265,8 @@ export function DailyWorkbench({
     setAction({
       unit: selectedUnit,
       booking: selectedBooking,
-      date: view === "availability" ? searchRange.from : today,
-      checkOut: view === "availability" ? searchRange.to : undefined,
+      date: selectionFrom,
+      checkOut: !selectedBooking ? selectionTo : undefined,
     });
   };
   const submitRange = (event: React.FormEvent, mode: "availability" | "history") => {
@@ -257,11 +293,17 @@ export function DailyWorkbench({
   };
 
   return (
-    <div className={styles.workbench} data-daily-workbench>
-      <header className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>DAILY OPERATIONS</p>
-          <h1 className={styles.title}>{text("日租运营台", "Locations courtes")}</h1>
+    <div
+      className={cn(styles.workbench, styles.compactPage)}
+      data-daily-workbench
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !action && selection) closeInspector();
+      }}
+    >
+      <header className={cn(styles.header, styles.compactHeader)}>
+        <div className={styles.compactHeaderCopy}>
+          <p className={styles.eyebrow}>DAILY RENTALS</p>
+          <h1 className={styles.title}>{text("日租房态", "Locations courtes")}</h1>
           <p className={styles.subtitle}>
             {new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "fr-FR", {
               month: "long",
@@ -269,16 +311,16 @@ export function DailyWorkbench({
               weekday: "long",
               timeZone: "Africa/Abidjan",
             }).format(new Date(today + "T00:00:00Z"))}{" "}
-            · {text("先把今天安排好", "Organiser la journée")}
+            · {text("房态与住宿安排", "Occupation et séjours")}
           </p>
         </div>
         <div className={styles.headerActions}>
-          {view === "today" && (
+          {(view === "today" || view === "timeline") && (
             <>
               <button
                 type="button"
                 className={styles.button}
-                disabled={!data}
+                disabled={!data || !todaySummaryAvailable}
                 onClick={async () => {
                   if (!data) return;
                   try {
@@ -327,88 +369,108 @@ export function DailyWorkbench({
           )}
         </div>
       </header>
-      <div className={styles.viewbar}>
-        <div
-          className={styles.tabs}
-          role="tablist"
-          aria-label={text("日租工作视图", "Vues des locations courtes")}
-        >
-          {(
-            [
-              ["today", ListChecks, text("今日运营", "Aujourd'hui")],
-              ["availability", Search, text("查空房", "Disponibilités")],
-              ["timeline", Columns3, text("排房", "Planning")],
-            ] as const
-          ).map(([value, Icon, title]) => (
+      <div className={styles.controlBar}>
+        <div className={styles.viewbar}>
+          <div
+            className={styles.tabs}
+            role="tablist"
+            aria-label={text("日租工作视图", "Vues des locations courtes")}
+          >
+            {(
+              [
+                ["timeline", Columns3, text("房态日历", "Calendrier")],
+                ["today", ListChecks, text("今日事项", "Aujourd'hui")],
+                ["availability", Search, text("查空房", "Disponibilités")],
+              ] as const
+            ).map(([value, Icon, title]) => (
+              <button
+                type="button"
+                key={value}
+                role="tab"
+                id={`${tabPrefix}-${value}`}
+                aria-selected={view === value}
+                aria-controls={stageId}
+                className={cn(styles.tab, view === value && styles.activeTab)}
+                onClick={() => changeView(value)}
+              >
+                <Icon size={16} aria-hidden="true" />
+                {title}
+              </button>
+            ))}
+          </div>
+          <nav
+            className={styles.archiveNav}
+            aria-label={text("日租历史与分析", "Historique et analyse")}
+          >
             <button
               type="button"
-              key={value}
-              role="tab"
-              id={`${tabPrefix}-${value}`}
-              aria-selected={view === value}
-              aria-controls={stageId}
-              className={cn(styles.tab, view === value && styles.activeTab)}
-              onClick={() => changeView(value)}
+              aria-current={view === "history" ? "page" : undefined}
+              onClick={() => changeView("history")}
             >
-              <Icon size={16} aria-hidden="true" />
-              {title}
+              {text("历史订单", "Historique")}
             </button>
-          ))}
+            {["admin", "finance", "boss"].includes(userRole) && (
+              <Link href={`${prefix}/daily-rentals/receipts`}>
+                {text("收款分析 ↗", "Encaissements ↗")}
+              </Link>
+            )}
+          </nav>
         </div>
-        <nav
-          className={styles.archiveNav}
-          aria-label={text("日租历史与分析", "Historique et analyse")}
-        >
-          <button
-            type="button"
-            aria-current={view === "history" ? "page" : undefined}
-            onClick={() => changeView("history")}
-          >
-            {text("历史订单", "Historique")}
-          </button>
-          {["admin", "finance", "boss"].includes(userRole) && (
-            <Link href={`${prefix}/daily-rentals/receipts`}>
-              {text("收款分析 ↗", "Encaissements ↗")}
-            </Link>
+        <div className={cn(styles.toolbar, styles.toolbarCompact)}>
+          <label className={styles.buildingSelect}>
+            <span>{text("楼栋", "Bâtiment")}</span>
+            <select
+              value={buildingId}
+              onChange={(event) => {
+                setBuildingId(event.target.value);
+                setSelection(null);
+                setAction(null);
+                setCalendarHighlight(null);
+              }}
+            >
+              {buildings.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.display_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {view === "timeline" && !smallViewport && (
+            <label className={styles.buildingSelect}>
+              <span>{text("显示范围", "Période")}</span>
+              <select
+                aria-label={text("日历显示天数", "Nombre de jours affichés")}
+                value={desktopDays}
+                onChange={(event) => {
+                  setDesktopDays(event.target.value === "14" ? 14 : 7);
+                  setSelection(null);
+                  setAction(null);
+                }}
+              >
+                <option value="7">{text("7 天", "7 jours")}</option>
+                <option value="14">{text("14 天", "14 jours")}</option>
+              </select>
+            </label>
           )}
-        </nav>
-      </div>
-      <div className={styles.toolbar}>
-        <label className={styles.buildingSelect}>
-          <span>{text("楼栋", "Bâtiment")}</span>
-          <select
-            value={buildingId}
-            onChange={(event) => {
-              setBuildingId(event.target.value);
-              setSelection(null);
-              setAction(null);
-            }}
-          >
-            {buildings.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.display_name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className={styles.freshness}>
-          <span>
-            {asOf
-              ? `${text("更新于", "Actualisé à")} ${new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Abidjan" }).format(new Date(asOf))}`
-              : text("页面读取快照", "Lecture à l'ouverture")}
-          </span>
-          <button
-            type="button"
-            className={styles.quietButton}
-            onClick={() => {
-              setAction(null);
-              refresh();
-            }}
-            disabled={pending}
-          >
-            <RefreshCw size={14} aria-hidden="true" />
-            {text("刷新", "Actualiser")}
-          </button>
+          <div className={styles.freshness}>
+            <span>
+              {asOf
+                ? `${text("更新于", "Actualisé à")} ${new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Abidjan" }).format(new Date(asOf))}`
+                : text("页面读取快照", "Lecture à l'ouverture")}
+            </span>
+            <button
+              type="button"
+              className={styles.quietButton}
+              onClick={() => {
+                setAction(null);
+                refresh();
+              }}
+              disabled={pending}
+            >
+              <RefreshCw size={14} aria-hidden="true" />
+              {text("刷新", "Actualiser")}
+            </button>
+          </div>
         </div>
       </div>
       {view === "availability" && (
@@ -513,23 +575,52 @@ export function DailyWorkbench({
           }
           aria-labelledby={view === "history" ? undefined : `${tabPrefix}-${view}`}
         >
-          {view === "today" && counts && (
-            <div
-              className={styles.summary}
-              aria-label={text("当前楼栋运营汇总", "Résumé opérationnel du bâtiment")}
-            >
+          {(view === "today" || view === "timeline") && counts && todaySummaryAvailable && (
+            <div className={styles.todayStrip} aria-label={text("今日辅助事项", "Repères du jour")}>
               {[
-                [counts.arrivals, text("待入住 / 待核实", "Arrivées / à vérifier")],
-                [counts.inhouse, text("当前在住", "En séjour")],
-                [counts.departures, text("应退 / 待核实", "Départs / à vérifier")],
-                [counts.cleaning, text("待保洁", "Ménage")],
-              ].map(([value, label]) => (
-                <div className={styles.stat} key={label}>
-                  <strong className={styles.statValue}>{value}</strong>
-                  <span>{label}</span>
-                </div>
+                ["arrivals", counts.arrivals, text("入住待核", "Arrivées à vérifier")],
+                ["inhouse", counts.inhouse, text("当前在住", "En séjour")],
+                ["departures", counts.departures, text("离店待核", "Départs à vérifier")],
+                ["cleaning", counts.cleaning, text("待保洁", "Ménage")],
+              ].map(([kind, value, label]) => (
+                <button
+                  type="button"
+                  className={cn(
+                    styles.todayStripItem,
+                    (view === "timeline" ? calendarHighlight === kind : filter === kind) &&
+                      styles.todayStripActive,
+                  )}
+                  key={kind}
+                  aria-pressed={view === "timeline" ? calendarHighlight === kind : filter === kind}
+                  onClick={() => {
+                    clearTarget();
+                    if (view === "timeline") {
+                      setCalendarHighlight((current) =>
+                        current === kind ? null : (kind as DailyTaskFilter),
+                      );
+                    } else setFilter(kind as DailyTaskFilter);
+                  }}
+                >
+                  <span className={styles.todayStripLabel}>{label}</span>
+                  <strong className={styles.todayStripValue}>{value}</strong>
+                </button>
               ))}
             </div>
+          )}
+          {view === "timeline" && !todaySummaryAvailable && (
+            <p className={styles.inlineInfo}>
+              {text(
+                "当前日期窗口不含今天，未显示不完整的今日统计。",
+                "La période n'inclut pas aujourd'hui : les repères du jour ne sont pas affichés.",
+              )}
+              <button
+                type="button"
+                className={styles.quietButton}
+                onClick={() => changeTimelineRange(today)}
+              >
+                {text("返回今日房态", "Revenir à aujourd'hui")}
+              </button>
+            </p>
           )}
           {view === "availability" && (
             <p className={styles.resultSummary}>
@@ -545,7 +636,12 @@ export function DailyWorkbench({
               {text("间待交接 / 复核", "à remettre / revérifier")}
             </p>
           )}
-          <div className={styles.workspace}>
+          <div
+            className={cn(
+              styles.workspace,
+              selectedUnit ? styles.stageInspecting : styles.stageWide,
+            )}
+          >
             {view === "today" && (
               <section className={styles.board} aria-label={text("今日运营任务", "Tâches du jour")}>
                 <div className={styles.boardHeader}>
@@ -735,9 +831,13 @@ export function DailyWorkbench({
                 buildingLabel={building?.display_name ?? ""}
                 locale={locale}
                 selectedBookingId={selectedBooking?.id}
+                selectedUnitId={selectedUnit?.id}
+                selectedDate={effectiveSelection?.date}
+                highlightedUnitIds={highlightedUnitIds}
                 inspectorId={inspectorId}
                 onChoose={choose}
-                onRangeChange={setTimelineFrom}
+                onScopeChange={clearTarget}
+                onRangeChange={changeTimelineRange}
               />
             )}
             {view === "history" && (
@@ -795,20 +895,23 @@ export function DailyWorkbench({
                 )}
               </section>
             )}
-            <div id={inspectorId} ref={inspectorRef}>
-              <DailyWorkbenchInspector
-                data={data}
-                unit={selectedUnit}
-                booking={selectedBooking}
-                locale={locale}
-                today={today}
-                reason={view === "availability" ? selectedRoomResult?.reason : undefined}
-                from={view === "availability" ? searchRange.from : today}
-                to={view === "availability" ? searchRange.to : addDays(today, 1)}
-                userRole={userRole}
-                onOperate={operate}
-              />
-            </div>
+            {selectedUnit && (
+              <div id={inspectorId} ref={inspectorRef} className={styles.inspectorHost}>
+                <DailyWorkbenchInspector
+                  data={data}
+                  unit={selectedUnit}
+                  booking={selectedBooking}
+                  locale={locale}
+                  today={today}
+                  reason={view === "availability" ? selectedRoomResult?.reason : calendarRoomReason}
+                  from={selectionFrom}
+                  to={selectionTo}
+                  userRole={userRole}
+                  onOperate={operate}
+                  onClose={closeInspector}
+                />
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -823,24 +926,29 @@ export function DailyWorkbench({
           {today} · {text("阿比让时间", "Heure d'Abidjan")}
         </span>
       </footer>
-      {action && data && (
-        <DailyWorkbenchActions
-          unit={action.unit}
-          booking={action.booking}
-          date={action.date}
-          checkOut={action.checkOut}
-          open
-          onClose={() => setAction(null)}
-          onChanged={() => {
-            setAction(null);
-            setSelection(null);
-            refresh();
-          }}
-          locale={locale}
-          userRole={userRole}
-          buildingId={buildingId}
-        />
-      )}
+      {action &&
+        data &&
+        (!action.booking ||
+          data.bookings.some(
+            (booking) => booking.id === action.booking?.id && booking.unit_id === action.unit?.id,
+          )) && (
+          <DailyWorkbenchActions
+            unit={action.unit}
+            booking={action.booking}
+            date={action.date}
+            checkOut={action.checkOut}
+            open
+            onClose={() => setAction(null)}
+            onChanged={() => {
+              setAction(null);
+              setSelection(null);
+              refresh();
+            }}
+            locale={locale}
+            userRole={userRole}
+            buildingId={buildingId}
+          />
+        )}
     </div>
   );
 }

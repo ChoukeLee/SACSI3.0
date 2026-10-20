@@ -186,11 +186,16 @@ let host: HTMLDivElement;
 let root: Root;
 let scroll: ReturnType<typeof vi.fn>;
 let compact = false;
+let animationFrames: FrameRequestCallback[];
+let mediaChangeListeners: Map<string, Set<() => void>>;
 const originalScroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
+const originalClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
 
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   compact = false;
+  animationFrames = [];
+  mediaChangeListeners = new Map();
   scroll = vi.fn();
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
     value: scroll,
@@ -200,13 +205,24 @@ beforeEach(() => {
     "matchMedia",
     vi.fn((media: string) => ({
       media,
-      matches: compact && ["(max-width: 600px)", "(max-width: 899px)"].includes(media),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
+      get matches() {
+        return (
+          compact &&
+          ["(max-width: 600px)", "(max-width: 899px)", "(max-width: 1099px)"].includes(media)
+        );
+      },
+      addEventListener: vi.fn((event: string, listener: () => void) => {
+        if (event !== "change") return;
+        if (!mediaChangeListeners.has(media)) mediaChangeListeners.set(media, new Set());
+        mediaChangeListeners.get(media)!.add(listener);
+      }),
+      removeEventListener: vi.fn((event: string, listener: () => void) => {
+        if (event === "change") mediaChangeListeners.get(media)?.delete(listener);
+      }),
     })),
   );
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
-    callback(0);
+    animationFrames.push(callback);
     return 1;
   });
   vi.stubGlobal(
@@ -224,6 +240,8 @@ afterEach(async () => {
   if (originalScroll)
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", originalScroll);
   else Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+  if (originalClipboard) Object.defineProperty(navigator, "clipboard", originalClipboard);
+  else Reflect.deleteProperty(navigator, "clipboard");
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.clearAllMocks();
@@ -251,7 +269,7 @@ function button(label: string, within: ParentNode = host) {
 }
 
 function task(label: string, within: ParentNode = host) {
-  return [...within.querySelectorAll("button[aria-controls]")].find((node) =>
+  return [...within.querySelectorAll<HTMLButtonElement>("button[aria-controls]")].find((node) =>
     node.textContent?.includes(label),
   );
 }
@@ -259,6 +277,9 @@ function task(label: string, within: ParentNode = host) {
 async function click(node: Element | null | undefined) {
   expect(node).toBeTruthy();
   await act(async () => (node as HTMLButtonElement).click());
+  await act(async () => {
+    for (const callback of animationFrames.splice(0)) callback(0);
+  });
 }
 
 async function setValue(input: HTMLInputElement | HTMLSelectElement, value: string) {
@@ -277,11 +298,30 @@ async function submit(form: HTMLFormElement) {
   });
 }
 
+async function setCompact(next: boolean) {
+  await act(async () => {
+    compact = next;
+    for (const listeners of mediaChangeListeners.values()) {
+      for (const listener of listeners) listener();
+    }
+  });
+}
+
 function aside() {
   return host.querySelector('aside[aria-label="订单详情"]');
 }
 
-it("renders SSR and the initial today view without a browser fetch, receipt analysis or an action drawer", async () => {
+function timeline() {
+  return host.querySelector<HTMLElement>('section[aria-label="排房时间轴"]')!;
+}
+
+function labelledButton(label: string, within: ParentNode = host) {
+  return [...within.querySelectorAll("button")].find(
+    (node) => node.getAttribute("aria-label") === label,
+  );
+}
+
+it("renders SSR and the initial full-width room calendar without a browser fetch, receipt analysis or an action drawer", async () => {
   const html = renderToString(
     <DailyWorkbench
       initialWindow={fixture()}
@@ -290,13 +330,17 @@ it("renders SSR and the initial today view without a browser fetch, receipt anal
       userRole="front_desk"
     />,
   );
-  expect(html).toContain("日租运营台");
+  expect(html).toContain("日租房态");
   expect(html).toContain("待住示例甲");
   expect(fetch).not.toHaveBeenCalled();
   await render();
-  expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("今日运营");
-  expect(host.querySelector('section[aria-label="今日运营任务"]')).toBeTruthy();
-  expect(host.querySelector('[aria-label="当前楼栋运营汇总"]')?.textContent).toContain("待保洁");
+  expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("房态日历");
+  expect(timeline()).toBeTruthy();
+  expect(timeline().style.getPropertyValue("--day-count")).toBe("7");
+  expect(host.querySelector('section[aria-label="今日运营任务"]')).toBeNull();
+  expect(host.querySelector('[aria-label="今日辅助事项"]')?.textContent).toContain("待保洁");
+  expect(aside()).toBeNull();
+  expect(timeline().parentElement?.className).toContain("stageWide");
   expect(fetch).not.toHaveBeenCalled();
   expect(actionSpy).not.toHaveBeenCalled();
   expect(host.querySelector('[role="dialog"]')).toBeNull();
@@ -308,6 +352,7 @@ it("renders SSR and the initial today view without a browser fetch, receipt anal
 it("selects an in-house order without confusing guest and agent, then passes its stable identity to the action drawer", async () => {
   compact = true;
   await render();
+  await click(button("今日事项"));
   await click(button("在住"));
   await click(task("在住示例乙"));
   expect(aside()?.textContent).toContain("在住示例乙");
@@ -324,7 +369,7 @@ it("selects an in-house order without confusing guest and agent, then passes its
     }),
   );
   expect(host.querySelector('[role="dialog"]')?.textContent).toContain("在住示例乙");
-  expect(fetch).not.toHaveBeenCalled();
+  expect(fetch).toHaveBeenCalledTimes(2);
 });
 
 it("fetches the explicit availability window with no-store and never lists occupied rooms as empty", async () => {
@@ -342,6 +387,8 @@ it("fetches the explicit availability window with no-store and never lists occup
   expect(task("101", results)).toBeUndefined();
   expect(task("102", results)).toBeUndefined();
   expect(results.querySelector("summary")?.textContent).toBe("不可安排 · 2");
+  expect(aside()).toBeNull();
+  await click(task("103", results));
   expect(aside()?.textContent).toContain("103");
   const dates = host.querySelectorAll<HTMLInputElement>('input[type="date"]');
   await setValue(dates[0], "2026-10-23");
@@ -415,6 +462,7 @@ it("does not relabel a foreign-currency original amount as XOF in the order insp
   ];
   initial.paymentCount = 1;
   await render(initial);
+  await click(task("待住示例甲", timeline()));
   expect(aside()?.textContent).toContain("含非 XOF 流水或缺少币种/汇率证据");
   expect(aside()?.textContent).not.toContain("100 XOF");
   expect(aside()?.textContent).not.toContain("订单已付记录与收款净额不一致");
@@ -424,14 +472,14 @@ it("does not relabel a foreign-currency original amount as XOF in the order insp
 it("uses a three-day mobile planning window and keeps history as a separate searchable view", async () => {
   compact = true;
   await render();
-  await click(button("排房"));
-  const timeline = host.querySelector<HTMLElement>('section[aria-label="排房时间轴"]')!;
-  expect(timeline.style.getPropertyValue("--day-count")).toBe("3");
+  const planning = timeline();
+  expect(planning.style.getPropertyValue("--day-count")).toBe("3");
+  expect(host.querySelector('[aria-label="日历显示天数"]')).toBeNull();
   expect(requestedWindow(vi.mocked(fetch).mock.calls.at(-1)![0])).toMatchObject({
     from: today,
     to: "2026-10-23",
   });
-  await click(task("在住示例乙", timeline));
+  await click(task("在住示例乙", planning));
   expect(aside()?.textContent).toContain("在住示例乙");
   await click(host.querySelector('[aria-label="后一段日期"]'));
   expect(requestedWindow(vi.mocked(fetch).mock.calls.at(-1)![0])).toMatchObject({
@@ -455,6 +503,7 @@ it("uses a three-day mobile planning window and keeps history as a separate sear
 
 it("hides the previous building's selected facts and open action before its replacement read returns", async () => {
   await render();
+  await click(task("待住示例甲", timeline()));
   await click(button("查看保洁与订单", aside()!));
   expect(host.querySelector('[role="dialog"]')).toBeTruthy();
   let complete!: (value: Response) => void;
@@ -491,11 +540,14 @@ it("hides the previous building's selected facts and open action before its repl
   });
   expect(host.textContent).toContain("他楼住客丙");
   expect(host.textContent).not.toContain("待住示例甲");
+  expect(aside()).toBeNull();
+  await click(task("他楼住客丙", timeline()));
   expect(aside()?.textContent).toContain("201");
 });
 
 it("refreshes after a completed action and hides old balances while that refresh is pending", async () => {
   await render();
+  await click(task("待住示例甲", timeline()));
   await click(button("查看保洁与订单", aside()!));
   let complete!: (value: Response) => void;
   vi.mocked(fetch).mockImplementationOnce(
@@ -509,6 +561,8 @@ it("refreshes after a completed action and hides old balances while that refresh
   expect(host.querySelector('[role="status"]')?.textContent).toContain("正在读取");
   expect(host.textContent).not.toContain("40,000 XOF");
   await act(async () => complete(response(vi.mocked(fetch).mock.calls.at(-1)![0])));
+  expect(aside()).toBeNull();
+  await click(task("待住示例甲", timeline()));
   expect(aside()?.textContent).toContain("待住示例甲");
   expect(fetch).toHaveBeenCalledTimes(1);
 });
@@ -523,6 +577,7 @@ it.each([
   "keeps receipt, creation and read-only entrypoints scoped to the %s role",
   async (role, receipts, create, readOnly) => {
     await render(fixture(), role as string);
+    await click(task("待住示例甲", timeline()));
     expect(Boolean(host.querySelector('a[href="/daily-rentals/receipts"]'))).toBe(receipts);
     expect(Boolean(button("新建预订"))).toBe(create);
     expect(Boolean(button("查看订单与收据", aside()!))).toBe(readOnly);
@@ -535,9 +590,303 @@ it.each([
 it("preserves the French receipt route and translated navigation", async () => {
   await render(fixture(), "finance", "fr");
   expect(host.querySelector('a[href="/fr/daily-rentals/receipts"]')).toBeTruthy();
-  expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("Aujourd'hui");
+  expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("Calendrier");
   expect(host.textContent).toContain("Locations courtes");
 });
+
+it("keeps all rooms visible when a calendar auxiliary item highlights matching rooms", async () => {
+  await render();
+  const summary = host.querySelector('[aria-label="今日辅助事项"]')!;
+  const item = [...summary.querySelectorAll("button")].find((node) =>
+    node.textContent?.includes("入住待核"),
+  )!;
+  expect(summary.querySelectorAll("button")).toHaveLength(4);
+  expect(summary.textContent).toContain("当前在住");
+  expect(summary.textContent).toContain("离店待核");
+  await click(item);
+  expect(item.getAttribute("aria-pressed")).toBe("true");
+  expect(timeline().querySelectorAll("[data-unit-id]")).toHaveLength(3);
+  expect(timeline().querySelector('[data-unit-id="unit-101"]')?.className).toContain(
+    "highlightedRoom",
+  );
+  expect(timeline().querySelector('[data-unit-id="unit-103"]')?.className).not.toContain(
+    "highlightedRoom",
+  );
+  expect(aside()).toBeNull();
+  expect(actionSpy).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+  await click(item);
+  expect(item.getAttribute("aria-pressed")).toBe("false");
+  expect(timeline().querySelectorAll('[class*="highlightedRoom"]')).toHaveLength(0);
+  await click(button("今日事项"));
+  await click(
+    [...host.querySelectorAll('[aria-label="今日辅助事项"] button')].find((node) =>
+      node.textContent?.includes("当前在住"),
+    ),
+  );
+  expect(button("在住")?.getAttribute("aria-pressed")).toBe("true");
+  const board = host.querySelector('section[aria-label="今日运营任务"]')!;
+  expect(task("在住示例乙", board)).toBeTruthy();
+  expect(task("待住示例甲", board)).toBeUndefined();
+  expect(aside()).toBeNull();
+});
+
+it("changes seven to fourteen days and clears a stale inspector before the new window settles", async () => {
+  await render();
+  await click(task("待住示例甲", timeline()));
+  expect(aside()).toBeTruthy();
+  await setValue(host.querySelector<HTMLSelectElement>('[aria-label="日历显示天数"]')!, "14");
+  expect(requestedWindow(vi.mocked(fetch).mock.calls.at(-1)![0])).toEqual({
+    buildingId: calendarBuilding,
+    from: today,
+    to: "2026-11-03",
+  });
+  expect(timeline().style.getPropertyValue("--day-count")).toBe("14");
+  expect(aside()).toBeNull();
+  expect(timeline().parentElement?.className).toContain("stageWide");
+  await click(host.querySelector('[aria-label="后一段日期"]'));
+  expect(requestedWindow(vi.mocked(fetch).mock.calls.at(-1)![0])).toMatchObject({
+    from: "2026-11-03",
+    to: "2026-11-17",
+  });
+  expect(host.querySelector('[aria-label="今日辅助事项"]')).toBeNull();
+  expect(button("复制房态")?.disabled).toBe(true);
+  expect(button("打印")?.disabled).toBe(false);
+  await click(button("返回今日房态"));
+  expect(requestedWindow(vi.mocked(fetch).mock.calls.at(-1)![0])).toMatchObject({
+    from: today,
+    to: "2026-11-03",
+  });
+  expect(button("复制房态")?.disabled).toBe(false);
+});
+
+it.each(["7", "14"])(
+  "clears the selected order and open action when the %s-day desktop calendar changes to a three-day mobile window",
+  async (desktopDays) => {
+    await render(fixture(), "admin");
+    if (desktopDays === "14") {
+      await setValue(host.querySelector<HTMLSelectElement>('[aria-label="日历显示天数"]')!, "14");
+    }
+    await click(task("待住示例甲", timeline()));
+    await click(button("查看保洁与订单", aside()!));
+    expect(host.querySelector('[role="dialog"]')).toBeTruthy();
+    await setCompact(true);
+    expect(timeline().style.getPropertyValue("--day-count")).toBe("3");
+    expect(requestedWindow(vi.mocked(fetch).mock.calls.at(-1)![0])).toMatchObject({
+      from: today,
+      to: "2026-10-23",
+    });
+    expect(host.querySelector('[aria-label="日历显示天数"]')).toBeNull();
+    expect(aside()).toBeNull();
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    expect(timeline().parentElement?.className).toContain("stageWide");
+    await setCompact(false);
+    expect(timeline().style.getPropertyValue("--day-count")).toBe(desktopDays);
+    expect(aside()).toBeNull();
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+  },
+);
+
+it.each(["removed", "moved"])(
+  "does not turn a selected order into a vacant-room creation when the refreshed booking is %s",
+  async (change) => {
+    const initial = fixture({ cleaningTasks: [] });
+    await render(initial, "admin");
+    await click(task("待住示例甲", timeline()));
+    expect(button("办理预订与入住", aside()!)).toBeTruthy();
+    const bookings = initial.bookings.flatMap((record) => {
+      if (record.id !== "booking-arrival") return [record];
+      return change === "removed" ? [] : [{ ...record, unit_id: "unit-103" }];
+    });
+    vi.mocked(fetch).mockImplementation(async (input) =>
+      response(input, {
+        bookings,
+        bookingCount: bookings.length,
+        cleaningTasks: [],
+        payments: [],
+        paymentCount: 0,
+      }),
+    );
+    await click(button("刷新"));
+    expect(aside()).toBeNull();
+    expect(button("填写预订信息")).toBeUndefined();
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    expect(timeline().parentElement?.className).toContain("stageWide");
+    expect(actionSpy).not.toHaveBeenCalled();
+    if (change === "moved") {
+      const movedRow = timeline().querySelector('[data-unit-id="unit-103"]')!;
+      expect(task("待住示例甲", movedRow)).toBeTruthy();
+      await click(task("待住示例甲", movedRow));
+      expect(aside()?.textContent).toContain("11#103");
+      expect(button("办理预订与入住", aside()!)).toBeTruthy();
+    }
+  },
+);
+
+it("clears a future date and action context when returning to today's room calendar", async () => {
+  await render(fixture(), "admin");
+  await click(host.querySelector('[aria-label="后一段日期"]'));
+  await click(labelledButton("11#103 2026-10-28 查看日期与预订"));
+  await click(button("填写预订信息", aside()!));
+  expect(actionSpy).toHaveBeenLastCalledWith(
+    expect.objectContaining({ date: "2026-10-28", checkOut: "2026-10-29" }),
+  );
+  await click(button("关闭测试操作"));
+  expect(aside()).toBeTruthy();
+  await click(button("返回今日房态"));
+  expect(requestedWindow(vi.mocked(fetch).mock.calls.at(-1)![0])).toMatchObject({
+    from: today,
+    to: "2026-10-27",
+  });
+  expect(aside()).toBeNull();
+  expect(host.querySelector('[role="dialog"]')).toBeNull();
+  expect(timeline().parentElement?.className).toContain("stageWide");
+  await click(labelledButton("11#103 2026-10-22 查看日期与预订"));
+  await click(button("填写预订信息", aside()!));
+  expect(actionSpy).toHaveBeenLastCalledWith(
+    expect.objectContaining({ date: "2026-10-22", checkOut: "2026-10-23" }),
+  );
+});
+
+it("clears selected details and actions when changing the visible calendar floor", async () => {
+  const initial = fixture();
+  initial.dailyUnits = initial.dailyUnits.map((room) =>
+    room.id === "unit-103" ? { ...room, floor_label: "2F" } : room,
+  );
+  initial.unitLookupUnits = initial.dailyUnits;
+  await render(initial, "admin");
+  await click(task("待住示例甲", timeline()));
+  await click(button("查看保洁与订单", aside()!));
+  expect(host.querySelector('[role="dialog"]')).toBeTruthy();
+  const floor = timeline().querySelector<HTMLSelectElement>("select")!;
+  await setValue(floor, "2F");
+  expect(timeline().querySelectorAll("[data-unit-id]")).toHaveLength(1);
+  expect(timeline().querySelector('[data-unit-id="unit-103"]')).toBeTruthy();
+  expect(aside()).toBeNull();
+  expect(host.querySelector('[role="dialog"]')).toBeNull();
+  expect(timeline().parentElement?.className).toContain("stageWide");
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it("closes a selected inspector and restores the full-width calendar and originating focus", async () => {
+  await render();
+  const trigger = task("待住示例甲", timeline())!;
+  trigger.focus();
+  await click(trigger);
+  expect(aside()).toBeTruthy();
+  expect(timeline().parentElement?.className).toContain("stageInspecting");
+  await click(labelledButton("关闭详情"));
+  expect(aside()).toBeNull();
+  expect(timeline().parentElement?.className).toContain("stageWide");
+  expect(document.activeElement).toBe(trigger);
+  await click(trigger);
+  await act(async () => {
+    trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  });
+  await act(async () => {
+    for (const callback of animationFrames.splice(0)) callback(0);
+  });
+  expect(aside()).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+});
+
+it("selects a vacant calendar date without writing, then passes that exact room and one-night interval to the existing actions", async () => {
+  await render(fixture(), "admin");
+  await click(labelledButton("11#103 2026-10-22 查看日期与预订"));
+  expect(aside()?.textContent).toContain("尚未创建预订");
+  expect(aside()?.textContent).toContain("10/22");
+  expect(actionSpy).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+  await click(button("填写预订信息", aside()!));
+  expect(actionSpy).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      unit: expect.objectContaining({ id: "unit-103" }),
+      booking: null,
+      date: "2026-10-22",
+      checkOut: "2026-10-23",
+      buildingId: calendarBuilding,
+      userRole: "admin",
+    }),
+  );
+  expect(host.querySelector('[role="dialog"]')).toBeTruthy();
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it("passes the explicitly searched availability interval to the original booking actions", async () => {
+  await render(fixture(), "rental_sales");
+  await click(button("新建预订"));
+  const dates = host.querySelectorAll<HTMLInputElement>('input[type="date"]');
+  await setValue(dates[0], "2026-10-23");
+  await setValue(dates[1], "2026-10-26");
+  await submit(host.querySelector("form")!);
+  expect(aside()).toBeNull();
+  await click(task("103", host.querySelector('section[aria-label="空房查询结果"]')!));
+  await click(button("填写预订信息", aside()!));
+  expect(actionSpy).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      unit: expect.objectContaining({ id: "unit-103" }),
+      booking: null,
+      date: "2026-10-23",
+      checkOut: "2026-10-26",
+      userRole: "rental_sales",
+    }),
+  );
+});
+
+it.each(["front_desk", "finance", "boss"])(
+  "does not grant %s a creation action from a vacant calendar cell",
+  async (role) => {
+    await render(fixture(), role);
+    await click(labelledButton("11#103 2026-10-22 查看日期与预订"));
+    expect(aside()?.textContent).toContain("尚未创建预订");
+    expect(button("填写预订信息", aside()!)).toBeUndefined();
+    expect(actionSpy).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  },
+);
+
+it.each(["admin", "rental_sales", "front_desk", "finance", "boss"])(
+  "preserves the admin-only historical backfill entry for %s",
+  async (role) => {
+    await render(fixture(), role);
+    await click(button("历史订单"));
+    expect(Boolean(button("历史补录"))).toBe(role === "admin");
+    if (role === "admin") {
+      await click(button("历史补录"));
+      expect(actionSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({ unit: null, booking: null, date: today, userRole: "admin" }),
+      );
+    } else expect(actionSpy).not.toHaveBeenCalled();
+  },
+);
+
+it.each(["房态日历", "今日事项"])(
+  "preserves print and privacy-safe room-summary copy in the %s view",
+  async (view) => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    const print = vi.spyOn(window, "print").mockImplementation(() => {});
+    await render();
+    if (view === "今日事项") await click(button(view));
+    await click(button("复制房态"));
+    expect(writeText).toHaveBeenCalledTimes(1);
+    const copied = writeText.mock.calls[0][0] as string;
+    expect(copied).toContain("11 号楼 · 日租房态 · 2026-10-20");
+    expect(copied).not.toContain("待住示例甲");
+    expect(copied).not.toContain("在住示例乙");
+    expect(copied).not.toContain("经办示例");
+    expect(copied).not.toContain("40,000");
+    expect(copied).not.toContain("payment-arrival");
+    expect(host.querySelector('[role="status"]')?.textContent).toContain("房态摘要已复制");
+    await click(button("打印"));
+    expect(print).toHaveBeenCalledTimes(1);
+    expect(actionSpy).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  },
+);
 
 it("advances a refreshed business day without returning to the old SSR window and follows untouched date defaults", async () => {
   await render();
@@ -560,7 +909,7 @@ it("advances a refreshed business day without returning to the old SSR window an
     from: "2026-10-21",
     to: "2026-10-24",
   });
-  await click(button("今日运营"));
+  await click(button("今日事项"));
   expect(requestedWindow(vi.mocked(fetch).mock.calls.at(-1)![0])).toEqual({
     buildingId: calendarBuilding,
     from: "2026-10-21",
@@ -591,7 +940,7 @@ it.each([
     await setValue(dates[0], from);
     await setValue(dates[1], to);
     await submit(host.querySelector("form")!);
-    await click(button("今日运营"));
+    await click(button("今日事项"));
     vi.mocked(fetch).mockImplementation(async (input) => response(input, { today: "2026-10-21" }));
     await click(button("刷新"));
     expect(host.querySelector("footer")?.textContent).toContain("2026-10-21");

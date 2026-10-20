@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, CircleCheck, Clock3, Info } from "lucide-react";
+import { ArrowRight, CircleCheck, Clock3, Info, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { cn, formatXof } from "@/lib/utils";
 import { qualifiedUnitNo } from "@/lib/unit-building-label";
@@ -27,6 +27,7 @@ export function DailyWorkbenchInspector({
   to,
   userRole,
   onOperate,
+  onClose,
 }: {
   data: CalendarWindowData;
   unit: UnitRow | null;
@@ -38,6 +39,7 @@ export function DailyWorkbenchInspector({
   to: string;
   userRole?: string;
   onOperate: () => void;
+  onClose?: () => void;
 }) {
   const text = (zh: string, fr: string) => (locale === "zh" ? zh : fr);
   if (!unit)
@@ -79,9 +81,10 @@ export function DailyWorkbenchInspector({
               : "readinessUnverified");
   const canOperate =
     booking ||
-    ((hasCleaning ? ["admin", "rental_sales", "front_desk"] : ["admin", "rental_sales"]).includes(
-      userRole ?? "",
-    ) &&
+    ((hasCleaning || from >= today) &&
+      (hasCleaning ? ["admin", "rental_sales", "front_desk"] : ["admin", "rental_sales"]).includes(
+        userRole ?? "",
+      ) &&
       unit.daily_rental_enabled === true &&
       !["unitMaintenance", "unitLocked", "longLeaseConflict", "saleConflict"].includes(readiness));
   const action =
@@ -104,13 +107,23 @@ export function DailyWorkbenchInspector({
       aria-label={text("订单详情", "Détail du séjour")}
       aria-live="polite"
     >
-      <div className={styles.inspectorTop}>
+      <div className={cn(styles.inspectorTop, styles.inspectorHeader)}>
         <span>
           {booking
             ? text("订单详情", "Détail du séjour")
             : text("房间与预订", "Chambre et réservation")}
         </span>
         <span>{unit.layout ?? text("日租房间", "Location courte")}</span>
+        {onClose && (
+          <button
+            type="button"
+            className={styles.inspectorClose}
+            aria-label={text("关闭详情", "Fermer le détail")}
+            onClick={onClose}
+          >
+            <X size={15} aria-hidden="true" />
+          </button>
+        )}
       </div>
       <h2 className={styles.detailRoom}>{qualifiedUnitNo(unit)}</h2>
       <div className={styles.detailGuest}>

@@ -425,6 +425,18 @@ const files = [
   'tests/audit-business-action-labels.test.ts',
   'src/components/ui/sheet.tsx',
   'src/components/ui/sidebar.tsx',
+  'src/features/daily-rentals/daily-workbench.tsx',
+  'src/features/daily-rentals/calendar-skeleton.tsx',
+  'src/features/daily-rentals/daily-workbench-inspector.tsx',
+  'src/features/daily-rentals/daily-workbench-timeline.tsx',
+  'src/features/daily-rentals/daily-workbench.module.css',
+  'src/features/daily-rentals/daily-room-calendar-model.ts',
+  'src/features/daily-rentals/daily-room-calendar.module.css',
+  'tests/daily-calendar-loader.test.tsx',
+  'tests/daily-calendar-skeleton.test.tsx',
+  'tests/daily-workbench.test.tsx',
+  'tests/daily-workbench-timeline.test.tsx',
+  'tests/daily-room-calendar-model.test.ts',
 ];
 let invalid=0;
 for(const filepath of files){

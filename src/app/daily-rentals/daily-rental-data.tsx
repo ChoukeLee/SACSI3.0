@@ -37,7 +37,7 @@ export async function DailyRentalData({
     );
   const today = businessDate();
   const end = new Date(today + "T00:00:00Z");
-  end.setUTCDate(end.getUTCDate() + 8);
+  end.setUTCDate(end.getUTCDate() + 7);
   const window = await readCalendarWindow(
     supabase,
     { buildingId: buildings[0].id, from: today, to: end.toISOString().slice(0, 10) },
