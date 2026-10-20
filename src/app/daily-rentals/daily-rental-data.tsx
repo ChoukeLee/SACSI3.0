@@ -1,11 +1,12 @@
 import { unstable_noStore as noStore } from "next/cache";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import type { Locale } from "@/lib/i18n";
-import { DailyWorkbench } from "@/features/daily-rentals/daily-workbench";
+import { DailyRentalsResponsiveView } from "@/features/daily-rentals/daily-rentals-responsive-view";
 import { businessDate } from "@/features/daily-rentals/receipt-analysis-query";
 import { readCalendarWindow } from "@/features/daily-rentals/calendar-window-service";
 
-/** One caller-scoped operational window; forms and financial analysis load on demand. */
+/** Initial calendar window only. Full financial context is read independently. */
 export async function DailyRentalData({
   userRole,
   locale,
@@ -16,6 +17,7 @@ export async function DailyRentalData({
   viewerId?: string;
 }) {
   noStore();
+  const userAgent = (await headers()).get("user-agent") ?? "";
   const supabase = await createClient();
   const { data: buildingRows, error } = await supabase
     .from("buildings")
@@ -37,18 +39,26 @@ export async function DailyRentalData({
     );
   const today = businessDate();
   const end = new Date(today + "T00:00:00Z");
-  end.setUTCDate(end.getUTCDate() + 7);
+  end.setUTCDate(end.getUTCDate() + 8);
   const window = await readCalendarWindow(
     supabase,
     { buildingId: buildings[0].id, from: today, to: end.toISOString().slice(0, 10) },
     userRole,
   );
   return (
-    <DailyWorkbench
+    <DailyRentalsResponsiveView
       key={`${viewerId ?? "viewer"}:${userRole}`}
+      dailyUnits={window.dailyUnits}
+      unitLookupUnits={window.unitLookupUnits}
+      bookings={window.bookings}
+      customers={window.customers ?? []}
+      payments={window.payments}
+      cleaningTasks={window.cleaningTasks}
       locale={locale}
       userRole={userRole}
       buildings={buildings}
+      initialIsDesktop={!/Android|iPhone|iPad|iPod|Mobile/i.test(userAgent)}
+      financeSnapshots={{ [window.buildingId]: window.financeSnapshot! }}
       initialWindow={window}
     />
   );

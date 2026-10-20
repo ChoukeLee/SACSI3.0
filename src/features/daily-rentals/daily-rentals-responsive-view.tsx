@@ -319,6 +319,7 @@ export function DailyRentalsResponsiveView({
         payments={scopedPayments as unknown as PaymentRow[]}
         cleaningTasks={scopedCleaningTasks}
         locale={locale}
+        readOnly={!["admin", "front_desk", "rental_sales"].includes(userRole ?? "")}
       />
     ) : (
       <DailyCalendar

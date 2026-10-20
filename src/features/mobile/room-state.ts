@@ -1,9 +1,7 @@
 import type { UnitRow, DailyBookingRow, CustomerRow } from "@/types/database";
 import type { BillingResult } from "@/features/daily-rentals/billing";
 import { calculateBilling } from "@/features/daily-rentals/billing";
-import {
-  getDailyRoomStateForDate,
-} from "@/features/daily-rentals/room-status";
+import { getDailyRoomStateForDate } from "@/features/daily-rentals/room-status";
 import type { DailyRoomDisplayStatus } from "@/features/daily-rentals/daily-rental-policy";
 
 export type RoomDisplayStatus = DailyRoomDisplayStatus;
@@ -13,7 +11,12 @@ export interface RoomState {
   booking: DailyBookingRow | null;
   customer: CustomerRow | null;
   billing: BillingResult | null;
-  cleaningTask: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean } | null;
+  cleaningTask: {
+    id: string;
+    unit_id: string;
+    daily_booking_id: string | null;
+    is_completed: boolean;
+  } | null;
   displayStatus: RoomDisplayStatus;
   totalPaid: number;
 }
@@ -29,31 +32,45 @@ export function computeRoomStates(
   dailyUnits: UnitRow[],
   bookings: DailyBookingRow[],
   customers: CustomerRow[],
-  cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[],
+  cleaningTasks: {
+    id: string;
+    unit_id: string;
+    daily_booking_id: string | null;
+    is_completed: boolean;
+  }[],
   payments: { source_id: string | null; amount: number }[],
   todayStr: string,
 ): RoomState[] {
   return dailyUnits.map((unit) => {
-    const state = getDailyRoomStateForDate({ unit, dateStr: todayStr, bookings, cleaningTasks });
+    const state = getDailyRoomStateForDate({
+      unit,
+      dateStr: todayStr,
+      todayStr,
+      bookings,
+      cleaningTasks,
+    });
     const booking = state.booking;
 
-    const customer = booking
-      ? (customers.find((c) => c.id === booking.customer_id) ?? null)
-      : null;
+    const customer = booking ? (customers.find((c) => c.id === booking.customer_id) ?? null) : null;
 
-    const billing = booking && booking.status === "checked_in"
-      ? calculateBilling(booking, todayStr)
-      : null;
+    const billing =
+      booking && booking.status === "checked_in" ? calculateBilling(booking, todayStr) : null;
 
     const cleaningTask =
       cleaningTasks.find((t) => t.unit_id === unit.id && !t.is_completed) ?? null;
 
-    const unitPayments = booking
-      ? payments.filter((p) => p.source_id === booking.id)
-      : [];
+    const unitPayments = booking ? payments.filter((p) => p.source_id === booking.id) : [];
     const totalPaid = unitPayments.reduce((s, p) => s + Number(p.amount), 0);
 
-    return { unit, booking, customer, billing, cleaningTask, displayStatus: state.status, totalPaid };
+    return {
+      unit,
+      booking,
+      customer,
+      billing,
+      cleaningTask,
+      displayStatus: state.status,
+      totalPaid,
+    };
   });
 }
 
@@ -78,9 +95,7 @@ export function getAvailableRooms(states: RoomState[]): RoomState[] {
 }
 
 export function getOtherRooms(states: RoomState[]): RoomState[] {
-  return states.filter(
-    (s) => s.displayStatus === "maintenance" || s.displayStatus === "locked",
-  );
+  return states.filter((s) => s.displayStatus === "maintenance" || s.displayStatus === "locked");
 }
 
 /** All rooms with active bookings, pending reservations, or cleaning tasks */

@@ -29,22 +29,34 @@ describe("core page performance architecture", () => {
     expect(actions).toContain("export async function getUnitAuditLogs");
   });
 
-  it("shares one responsive daily workbench and loads operation forms only on demand", () => {
-    const workbench = read("src/features/daily-rentals/daily-workbench.tsx");
-    const operations = read("src/features/daily-rentals/daily-workbench-actions.tsx");
+  it("restores the original responsive calendar without restoring all-history initial reads", () => {
+    const responsive = read("src/features/daily-rentals/daily-rentals-responsive-view.tsx");
+    const calendar = read("src/features/daily-rentals/calendar.tsx");
     const loader = read("src/app/daily-rentals/daily-rental-data.tsx");
 
-    expect(loader).toContain("<DailyWorkbench");
-    expect(workbench).toContain('matchMedia("(max-width: 600px)")');
-    expect(workbench).not.toMatch(/import\("\.\/calendar"\)|calendar\/cash|CalendarFinancePanel/);
-    expect(operations).toMatch(/dynamic\(\(\) => import\("\.\/booking-panel"\)/);
-    expect(workbench).toMatch(/\{action\s*&&\s*data\s*&&/);
+    expect(loader).toContain("<DailyRentalsResponsiveView");
+    expect(loader).not.toContain("<DailyWorkbench");
+    expect(responsive).toContain('matchMedia("(min-width: 1024px)")');
+    expect(responsive).toMatch(/dynamic\(\(\) => import\("\.\/calendar"\)/);
+    expect(responsive).toContain('import("@/features/mobile/mobile-daily-cards")');
+    expect(calendar).toMatch(
+      /!windowPending\s*&&\s*!windowError\s*&&\s*\(panelBooking\s*\|\|\s*newBookingUnitId\)/,
+    );
     expect(loader).toContain("readCalendarWindow");
     const windowRead = read("supabase/migrations/20261015212832_daily_calendar_window_reads.sql");
     expect(windowRead).toMatch(
       /from public\.cleaning_tasks t where t\.unit_id=any\(unit_ids\) and not t\.is_completed/,
     );
     expect(windowRead).toContain("cleaning_booking_ids");
+  });
+  it("keeps the optional workbench operation forms on demand", () => {
+    const workbench = read("src/features/daily-rentals/daily-workbench.tsx");
+    const operations = read("src/features/daily-rentals/daily-workbench-actions.tsx");
+
+    expect(workbench).toContain('matchMedia("(max-width: 600px)")');
+    expect(workbench).not.toMatch(/import\("\.\/calendar"\)|calendar\/cash|CalendarFinancePanel/);
+    expect(operations).toMatch(/dynamic\(\(\) => import\("\.\/booking-panel"\)/);
+    expect(workbench).toMatch(/\{action\s*&&\s*data\s*&&/);
   });
   it("keeps default contract pages on bounded workspaces rather than all-history loaders", () => {
     for (const path of [

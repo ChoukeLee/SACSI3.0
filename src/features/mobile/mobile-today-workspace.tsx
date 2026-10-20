@@ -41,6 +41,7 @@ interface MobileTodayWorkspaceProps {
   }[];
   locale: Locale;
   buildingName?: string;
+  readOnly?: boolean;
 }
 
 export function MobileTodayWorkspace({
@@ -51,6 +52,7 @@ export function MobileTodayWorkspace({
   cleaningTasks,
   locale,
   buildingName = "SACSI11",
+  readOnly = false,
 }: MobileTodayWorkspaceProps) {
   const t = dictionaries[locale].mobile;
   const router = useRouter();
@@ -184,16 +186,22 @@ export function MobileTodayWorkspace({
     setSelectedRoom(null);
   }, []);
 
-  const handleCheckOut = useCallback((room: RoomState) => {
-    setCheckoutTarget(room);
-  }, []);
+  const handleCheckOut = useCallback(
+    (room: RoomState) => {
+      if (!readOnly) setCheckoutTarget(room);
+    },
+    [readOnly],
+  );
 
-  const handleCompleteCleaning = useCallback((room: RoomState) => {
-    setCleaningTarget(room);
-  }, []);
+  const handleCompleteCleaning = useCallback(
+    (room: RoomState) => {
+      if (!readOnly) setCleaningTarget(room);
+    },
+    [readOnly],
+  );
 
   const executeCheckOut = useCallback(async () => {
-    if (!checkoutTarget?.booking) return;
+    if (readOnly || !checkoutTarget?.booking) return;
     const target = checkoutTarget;
     await runOptimisticOperation(
       dictionaries[locale].mobile.actions.checkOut,
@@ -205,10 +213,10 @@ export function MobileTodayWorkspace({
         release: () => setCheckoutTarget(null),
       },
     );
-  }, [checkoutTarget, locale, runOptimisticOperation]);
+  }, [checkoutTarget, locale, readOnly, runOptimisticOperation]);
 
   const executeCleaning = useCallback(async () => {
-    if (!cleaningTarget?.cleaningTask) return;
+    if (readOnly || !cleaningTarget?.cleaningTask) return;
     const target = cleaningTarget;
     await runOptimisticOperation(
       dictionaries[locale].mobile.actions.completeCleaning,
@@ -228,7 +236,7 @@ export function MobileTodayWorkspace({
         release: () => setCleaningTarget(null),
       },
     );
-  }, [applyCompletedCleaning, cleaningTarget, locale, runOptimisticOperation]);
+  }, [applyCompletedCleaning, cleaningTarget, locale, readOnly, runOptimisticOperation]);
 
   const todayFormatted = new Date().toLocaleDateString(locale === "fr" ? "fr-FR" : "zh-CN", {
     weekday: "short",
@@ -289,8 +297,8 @@ export function MobileTodayWorkspace({
               room={room}
               locale={locale}
               onPress={handleCardPress}
-              onCheckOut={handleCheckOut}
-              onCompleteCleaning={handleCompleteCleaning}
+              onCheckOut={readOnly ? undefined : handleCheckOut}
+              onCompleteCleaning={readOnly ? undefined : handleCompleteCleaning}
             />
           ))}
         </div>
@@ -304,13 +312,14 @@ export function MobileTodayWorkspace({
         open={drawerOpen}
         onClose={handleCloseDrawer}
         locale={locale}
+        readOnly={readOnly}
         onCleaningCompleted={applyCompletedCleaning}
         onBackgroundOperation={reportBackgroundOperation}
       />
 
       {/* Checkout confirmation */}
       <ConfirmDialog
-        open={checkoutTarget !== null}
+        open={!readOnly && checkoutTarget !== null}
         onClose={() => setCheckoutTarget(null)}
         onConfirm={executeCheckOut}
         title={dictionaries[locale].mobile.actions.checkOutConfirm}
@@ -321,7 +330,7 @@ export function MobileTodayWorkspace({
 
       {/* Cleaning confirmation */}
       <ConfirmDialog
-        open={cleaningTarget !== null}
+        open={!readOnly && cleaningTarget !== null}
         onClose={() => setCleaningTarget(null)}
         onConfirm={executeCleaning}
         title={dictionaries[locale].mobile.actions.completeCleaning}

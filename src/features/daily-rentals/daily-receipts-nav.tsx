@@ -23,7 +23,7 @@ export function DailyReceiptsNav({
         aria-current={active === "calendar" ? "page" : undefined}
       >
         <CalendarDays size={16} aria-hidden="true" />
-        {locale === "fr" ? "Opérations" : "日租运营"}
+        {locale === "fr" ? "Calendrier" : "房态日历"}
       </Link>
       <Link
         href={`${prefix}/daily-rentals/receipts`}

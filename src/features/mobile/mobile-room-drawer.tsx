@@ -80,6 +80,7 @@ interface MobileRoomDrawerProps {
   open: boolean;
   onClose: () => void;
   locale: Locale;
+  readOnly?: boolean;
   onCleaningCompleted?: (result: {
     taskId: string;
     unitId: string;
@@ -103,6 +104,7 @@ export function MobileRoomDrawer({
   open,
   onClose,
   locale,
+  readOnly = false,
   onCleaningCompleted,
   onBackgroundOperation,
 }: MobileRoomDrawerProps) {
@@ -183,7 +185,7 @@ export function MobileRoomDrawer({
   };
 
   const executeAction = async () => {
-    if (!action || !room) return;
+    if (readOnly || !action || !room) return;
     const currentAction = action;
     const currentRoom = room;
     const amount = paymentAmount;
@@ -368,7 +370,7 @@ export function MobileRoomDrawer({
             </div>
 
             {/* Payment input (when payment action active) */}
-            {action?.type === "payment" && (
+            {!readOnly && action?.type === "payment" && (
               <div className="rounded-xl border border-accentBlue-200 bg-accentBlue-50 p-3.5">
                 <p className="mb-2 text-xs font-medium text-foreground">
                   {actionLabels.recordPaymentTitle}
@@ -397,7 +399,7 @@ export function MobileRoomDrawer({
             )}
 
             {/* Extend stay input (when extend action active) */}
-            {action?.type === "extendStay" && room.booking && (
+            {!readOnly && action?.type === "extendStay" && room.booking && (
               <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-3.5">
                 <p className="mb-2 text-xs font-medium text-foreground">
                   {actionLabels.extendStayDesc}
@@ -429,7 +431,7 @@ export function MobileRoomDrawer({
             )}
 
             {/* Primary actions */}
-            <div className="space-y-2">
+            <div className="space-y-2" hidden={readOnly}>
               {isOccupied && (
                 <>
                   <button
@@ -535,7 +537,7 @@ export function MobileRoomDrawer({
 
       {/* Confirmation dialogs */}
       <ConfirmDialog
-        open={action?.type === "checkout"}
+        open={!readOnly && action?.type === "checkout"}
         onClose={() => setAction(null)}
         onConfirm={executeAction}
         title={actionLabels.checkOutConfirm}
@@ -544,7 +546,7 @@ export function MobileRoomDrawer({
         loading={loading}
       />
       <ConfirmDialog
-        open={action?.type === "maintenance"}
+        open={!readOnly && action?.type === "maintenance"}
         onClose={() => setAction(null)}
         onConfirm={executeAction}
         title={actionLabels.maintenanceConfirm}
@@ -553,7 +555,7 @@ export function MobileRoomDrawer({
         loading={loading}
       />
       <ConfirmDialog
-        open={action?.type === "lock"}
+        open={!readOnly && action?.type === "lock"}
         onClose={() => setAction(null)}
         onConfirm={executeAction}
         title={actionLabels.lockConfirm}
@@ -562,7 +564,7 @@ export function MobileRoomDrawer({
         loading={loading}
       />
       <ConfirmDialog
-        open={action?.type === "markAvailable"}
+        open={!readOnly && action?.type === "markAvailable"}
         onClose={() => setAction(null)}
         onConfirm={executeAction}
         title={actionLabels.markAvailableConfirm}
@@ -571,7 +573,7 @@ export function MobileRoomDrawer({
         loading={loading}
       />
       <ConfirmDialog
-        open={action?.type === "cleaning"}
+        open={!readOnly && action?.type === "cleaning"}
         onClose={() => setAction(null)}
         onConfirm={executeAction}
         title={actionLabels.completeCleaning}

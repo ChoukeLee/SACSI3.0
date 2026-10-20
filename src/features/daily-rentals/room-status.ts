@@ -47,8 +47,10 @@ export function getDailyRoomStateForDate(params: {
   dateStr: string;
   bookings: DailyBookingRow[];
   cleaningTasks: { unit_id: string; is_completed: boolean }[];
+  /** Explicit snapshot date; omitted for historical callers without an as-of context. */
+  todayStr?: string;
 }): DailyRoomStateForDate {
-  const { unit, dateStr, bookings, cleaningTasks } = params;
+  const { unit, dateStr, bookings, cleaningTasks, todayStr } = params;
 
   const unitBookings = bookings.filter((b) => b.unit_id === unit.id && b.status !== "cancelled");
 
@@ -59,7 +61,7 @@ export function getDailyRoomStateForDate(params: {
   let bestPriority = -1;
 
   for (const b of unitBookings) {
-    if (!coversDisplayDate(b, dateStr)) continue;
+    if (!coversDisplayDate(b, dateStr, todayStr)) continue;
     const p = ACTIVE_PRIORITY[b.status] ?? 0;
     if (p > bestPriority) {
       bestPriority = p;
@@ -122,11 +124,15 @@ export function buildDailyRoomStateMap(params: {
   dateStr: string;
   bookings: DailyBookingRow[];
   cleaningTasks: { unit_id: string; is_completed: boolean }[];
+  todayStr?: string;
 }): Map<string, DailyRoomStateForDate> {
-  const { dailyUnits, dateStr, bookings, cleaningTasks } = params;
+  const { dailyUnits, dateStr, bookings, cleaningTasks, todayStr } = params;
   const map = new Map<string, DailyRoomStateForDate>();
   for (const unit of dailyUnits) {
-    map.set(unit.id, getDailyRoomStateForDate({ unit, dateStr, bookings, cleaningTasks }));
+    map.set(
+      unit.id,
+      getDailyRoomStateForDate({ unit, dateStr, bookings, cleaningTasks, todayStr }),
+    );
   }
   return map;
 }
@@ -179,7 +185,11 @@ export function buildBookingMap(
       options.visibleFrom && options.visibleFrom > b.check_in ? options.visibleFrom : b.check_in,
     );
     const end = toUtcDate(checkOut);
-    if (b.checkout_mode === "fixed" && b.status !== "checked_out") {
+    if (
+      b.checkout_mode === "fixed" &&
+      b.status !== "checked_out" &&
+      !hasUnresolvedFixedCheckout(b, todayStr)
+    ) {
       end.setUTCDate(end.getUTCDate() + 1);
     }
     if (options.visibleTo && end > toUtcDate(options.visibleTo))
@@ -214,6 +224,10 @@ function resolveCalendarCheckOut(b: DailyBookingRow, opts: BuildBookingMapOption
   if (b.status === "checked_out" && b.actual_check_out) {
     return b.actual_check_out <= b.check_in ? addDays(b.check_in, 1) : b.actual_check_out;
   }
+
+  // The planned departure cannot release a still-checked-in room. Keep the
+  // unresolved stay visible through this bounded read window until verified.
+  if (hasUnresolvedFixedCheckout(b, todayStr)) return opts.visibleTo ?? opts.tomorrowStr;
 
   if (b.checkout_mode !== "open") {
     // Fixed: strictly bounded by check_out
@@ -264,12 +278,25 @@ export function getBookingColorClass(booking: DailyBookingRow): string {
 // Helpers.
 
 /** Does this booking need to appear on the room-state display for this date? */
-function coversDisplayDate(b: DailyBookingRow, dateStr: string): boolean {
+function coversDisplayDate(b: DailyBookingRow, dateStr: string, todayStr?: string): boolean {
+  if (hasUnresolvedFixedCheckout(b, todayStr) && dateStr >= b.check_in) return true;
   if (bookingOccupiesDate(b, dateStr)) return true;
 
   // Fixed checked-in bookings should still appear on checkout day so the
   // front desk can see the "checking out today" state before cleaning.
   return b.status === "checked_in" && b.checkout_mode === "fixed" && b.check_out === dateStr;
+}
+
+/** Presentation only: unresolved current occupancy is not a confirmed future vacancy. */
+function hasUnresolvedFixedCheckout(b: DailyBookingRow, todayStr?: string): boolean {
+  return Boolean(
+    todayStr &&
+    b.status === "checked_in" &&
+    b.checkout_mode !== "open" &&
+    !b.actual_check_out &&
+    b.check_in <= todayStr &&
+    (!b.check_out || b.check_out <= todayStr),
+  );
 }
 
 function toUtcDate(s: string): Date {

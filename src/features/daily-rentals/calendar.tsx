@@ -431,6 +431,7 @@ export function DailyCalendar({
       buildDailyRoomStateMap({
         dailyUnits: visibleDailyUnits,
         dateStr: todayStr,
+        todayStr,
         bookings,
         cleaningTasks: visibleCleaningTasks,
       }),
@@ -1022,6 +1023,7 @@ export function DailyCalendar({
                         const dateRoomState = getDailyRoomStateForDate({
                           unit,
                           dateStr,
+                          todayStr,
                           bookings,
                           cleaningTasks: visibleCleaningTasks,
                         });

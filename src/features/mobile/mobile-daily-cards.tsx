@@ -9,8 +9,14 @@ interface MobileDailyCardsProps {
   bookings: DailyBookingRow[];
   customers: CustomerRow[];
   payments: PaymentRow[];
-  cleaningTasks: { id: string; unit_id: string; daily_booking_id: string | null; is_completed: boolean }[];
+  cleaningTasks: {
+    id: string;
+    unit_id: string;
+    daily_booking_id: string | null;
+    is_completed: boolean;
+  }[];
   locale: Locale;
+  readOnly?: boolean;
 }
 
 /**
@@ -26,6 +32,7 @@ export function MobileDailyCards(props: MobileDailyCardsProps) {
       payments={props.payments}
       cleaningTasks={props.cleaningTasks}
       locale={props.locale}
+      readOnly={props.readOnly ?? true}
     />
   );
 }
