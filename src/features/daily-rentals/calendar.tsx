@@ -45,7 +45,12 @@ import { BookingPanel } from "./booking-panel";
 import { completeCleaning } from "./actions";
 import type { DailyOperationSnapshot } from "./actions";
 import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
-import { buildBookingMap, buildDailyRoomStateMap, getDailyRoomStateForDate } from "./room-status";
+import {
+  buildBookingMap,
+  buildDailyRoomStateMap,
+  getDailyRoomStateForDate,
+  isFixedCheckoutReminder,
+} from "./room-status";
 import { getPrimaryDailyAction } from "./daily-rental-policy";
 import { qualifiedUnitNo } from "@/lib/unit-building-label";
 import {
@@ -1028,7 +1033,10 @@ export function DailyCalendar({
                           cleaningTasks: visibleCleaningTasks,
                         });
                         const prevSame = booking && unitBM?.get(prevDateStr)?.id === booking.id;
-                        const nextSame = booking && unitBM?.get(nextDateStr)?.id === booking.id;
+                        const nextSame =
+                          booking &&
+                          unitBM?.get(nextDateStr)?.id === booking.id &&
+                          !isFixedCheckoutReminder(booking, nextDateStr, todayStr);
                         const isToday = dateStr === todayStr;
 
                         return (

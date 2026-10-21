@@ -10,6 +10,7 @@ import type { UnitRow, DailyBookingRow } from "@/types/database";
 import type { CustomerSummary } from "./customer-summary";
 import type { COPY } from "./calendar-constants";
 import { ROW_HEIGHT, FLOOR_ROW_HEIGHT, getBookingTone } from "./calendar-model";
+import { isFixedCheckoutReminder } from "./room-status";
 
 export function TimelineCell({
   unit,
@@ -75,7 +76,18 @@ export function TimelineCell({
 
   // Checked-in guest — always takes priority
   if (booking && booking.status === "checked_in") {
-    const tone = getBookingTone(booking.status);
+    const isDepartureReminder = isFixedCheckoutReminder(booking, dateStr, todayStr);
+    const departureLabel =
+      locale === "zh"
+        ? booking.check_out === todayStr
+          ? "今日待退房"
+          : "退房待确认"
+        : booking.check_out === todayStr
+          ? "Départ prévu aujourd’hui"
+          : "Départ à confirmer";
+    const tone = isDepartureReminder
+      ? "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-300"
+      : getBookingTone(booking.status);
     const name = customer?.name ?? "?";
     const dateRange =
       booking.checkout_mode === "open"
@@ -88,8 +100,8 @@ export function TimelineCell({
           className={cn(
             "absolute top-1/2 flex h-8 -translate-y-1/2 items-center overflow-hidden px-2 text-left shadow-sm transition-all hover:-translate-y-[54%] hover:shadow-md focus-visible:ring-ring",
             tone,
-            isStart ? "left-1.5 rounded-l-xl" : "-left-px rounded-l-none",
-            isEnd ? "right-1.5 rounded-r-xl" : "-right-px rounded-r-none",
+            isStart || isDepartureReminder ? "left-1.5 rounded-l-xl" : "-left-px rounded-l-none",
+            isEnd || isDepartureReminder ? "right-1.5 rounded-r-xl" : "-right-px rounded-r-none",
           )}
           title={`${name} · ${dateRange}`}
           onClick={() => onOpenBooking(booking.id)}
@@ -97,11 +109,13 @@ export function TimelineCell({
             if (event.key === "Enter") onOpenBooking(booking.id);
           }}
         >
-          {showCheckedInLabel && (
+          {(showCheckedInLabel || isDepartureReminder) && (
             <span className="min-w-0">
               <span className="block truncate text-xs font-semibold leading-3">{name}</span>
               <span className="block truncate text-[8px] font-semibold opacity-85">
-                {bookingLabels[booking.status] ?? statusDisplayLabel(booking.status, locale)}
+                {isDepartureReminder
+                  ? departureLabel
+                  : (bookingLabels[booking.status] ?? statusDisplayLabel(booking.status, locale))}
               </span>
             </span>
           )}

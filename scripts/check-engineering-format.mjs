@@ -445,6 +445,7 @@ const files = [
   'tests/daily-calendar-skeleton.test.tsx',
   'tests/mobile-daily-readonly.test.tsx',
   'tests/legacy-calendar-overdue.test.ts',
+  'tests/calendar-fixed-departure.test.tsx',
   'tests/daily-workbench.test.tsx',
   'tests/daily-workbench-timeline.test.tsx',
   'tests/daily-room-calendar-model.test.ts',

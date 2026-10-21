@@ -225,9 +225,11 @@ function resolveCalendarCheckOut(b: DailyBookingRow, opts: BuildBookingMapOption
     return b.actual_check_out <= b.check_in ? addDays(b.check_in, 1) : b.actual_check_out;
   }
 
-  // The planned departure cannot release a still-checked-in room. Keep the
-  // unresolved stay visible through this bounded read window until verified.
-  if (hasUnresolvedFixedCheckout(b, todayStr)) return opts.visibleTo ?? opts.tomorrowStr;
+  // Keep an unconfirmed departure visible TODAY, but do not turn a known
+  // planned departure into an indefinite reservation that hides later guests.
+  // A missing departure remains unknown and must not imply future vacancy.
+  if (hasUnresolvedFixedCheckout(b, todayStr))
+    return b.check_out ? opts.tomorrowStr : (opts.visibleTo ?? opts.tomorrowStr);
 
   if (b.checkout_mode !== "open") {
     // Fixed: strictly bounded by check_out
@@ -279,7 +281,12 @@ export function getBookingColorClass(booking: DailyBookingRow): string {
 
 /** Does this booking need to appear on the room-state display for this date? */
 function coversDisplayDate(b: DailyBookingRow, dateStr: string, todayStr?: string): boolean {
-  if (hasUnresolvedFixedCheckout(b, todayStr) && dateStr >= b.check_in) return true;
+  if (
+    hasUnresolvedFixedCheckout(b, todayStr) &&
+    dateStr >= b.check_in &&
+    (!b.check_out || (todayStr !== undefined && dateStr <= todayStr))
+  )
+    return true;
   if (bookingOccupiesDate(b, dateStr)) return true;
 
   // Fixed checked-in bookings should still appear on checkout day so the
@@ -287,7 +294,18 @@ function coversDisplayDate(b: DailyBookingRow, dateStr: string, todayStr?: strin
   return b.status === "checked_in" && b.checkout_mode === "fixed" && b.check_out === dateStr;
 }
 
-/** Presentation only: unresolved current occupancy is not a confirmed future vacancy. */
+/** A current departure reminder is separate from the planned future occupancy. */
+export function isFixedCheckoutReminder(
+  booking: DailyBookingRow | null,
+  dateStr: string,
+  todayStr: string,
+): boolean {
+  return Boolean(
+    booking?.check_out && dateStr === todayStr && hasUnresolvedFixedCheckout(booking, todayStr),
+  );
+}
+
+/** Presentation only: never auto-check out a guest when the planned date passes. */
 function hasUnresolvedFixedCheckout(b: DailyBookingRow, todayStr?: string): boolean {
   return Boolean(
     todayStr &&

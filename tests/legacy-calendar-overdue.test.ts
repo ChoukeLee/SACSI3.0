@@ -4,6 +4,7 @@ import {
   buildBookingMap,
   buildDailyRoomStateMap,
   getDailyRoomStateForDate,
+  isFixedCheckoutReminder,
 } from "@/features/daily-rentals/room-status";
 import { computeRoomStates } from "@/features/mobile/room-state";
 import { getUnitTimelineStatus } from "@/features/daily-rentals/calendar-model";
@@ -55,9 +56,10 @@ function state(dateStr: string, bookings = [booking()]) {
 }
 
 describe("legacy calendar unresolved current departures", () => {
-  it("keeps overdue checked-in guests occupied today and in future planning", () => {
+  it("keeps overdue guests occupied today without inventing future stays", () => {
     expect(state(todayStr).status).toBe("occupied");
-    expect(state("2026-10-25").booking?.id).toBe("b1");
+    expect(state("2026-10-25").status).toBe("available");
+    expect(state("2026-10-25").booking).toBeNull();
     expect(state("2026-10-16").status).toBe("available");
   });
 
@@ -71,23 +73,14 @@ describe("legacy calendar unresolved current departures", () => {
     expect(result.status).toBe("available");
   });
 
-  it("extends the unresolved grid band only through the requested window", () => {
+  it("limits the unresolved grid band to today rather than the requested window", () => {
     const map = buildBookingMap([booking()], {
       todayStr,
       tomorrowStr: "2026-10-21",
       visibleFrom: todayStr,
       visibleTo: "2026-10-28",
     }).get("u1")!;
-    expect([...map.keys()]).toEqual([
-      "2026-10-20",
-      "2026-10-21",
-      "2026-10-22",
-      "2026-10-23",
-      "2026-10-24",
-      "2026-10-25",
-      "2026-10-26",
-      "2026-10-27",
-    ]);
+    expect([...map.keys()]).toEqual([todayStr]);
     expect(map.has("2026-10-28")).toBe(false);
   });
 
@@ -123,7 +116,7 @@ describe("legacy calendar unresolved current departures", () => {
     expect(map.has(todayStr)).toBe(false);
   });
 
-  it("prioritizes actual unresolved occupancy over a conflicting reservation", () => {
+  it("does not hide a future reservation behind an unresolved departure", () => {
     const upcoming = booking({
       id: "future",
       status: "confirmed",
@@ -131,20 +124,66 @@ describe("legacy calendar unresolved current departures", () => {
       check_out: "2026-10-22",
     });
     const bookings = [booking(), upcoming];
-    expect(state("2026-10-21", bookings).booking?.id).toBe("b1");
+    expect(state("2026-10-21", bookings).booking?.id).toBe("future");
     const map = buildBookingMap(bookings, {
       todayStr,
       tomorrowStr: "2026-10-21",
       visibleFrom: todayStr,
       visibleTo: "2026-10-28",
     }).get("u1")!;
-    expect(map.get("2026-10-21")?.id).toBe("b1");
+    expect(map.get("2026-10-21")?.id).toBe("future");
   });
 
   it("does not declare a checked-in stay with a missing planned departure vacant", () => {
     const unknown = booking({ check_out: null });
     expect(state(todayStr, [unknown]).status).toBe("occupied");
     expect(state("2026-10-27", [unknown]).status).toBe("occupied");
+  });
+
+  it("keeps unknown fixed departures blocked throughout a future window", () => {
+    const map = buildBookingMap([booking({ check_out: null })], {
+      todayStr,
+      tomorrowStr: "2026-10-21",
+      visibleFrom: "2026-10-24",
+      visibleTo: "2026-10-28",
+    }).get("u1")!;
+    expect([...map.keys()]).toEqual(["2026-10-24", "2026-10-25", "2026-10-26", "2026-10-27"]);
+  });
+
+  it("does not paint an expired known departure in a wholly future window", () => {
+    const map = buildBookingMap([booking()], {
+      todayStr,
+      tomorrowStr: "2026-10-21",
+      visibleFrom: "2026-10-24",
+      visibleTo: "2026-10-28",
+    }).get("u1")!;
+    expect(map.size).toBe(0);
+  });
+
+  it("keeps actual current occupancy ahead of a same-day incoming reservation", () => {
+    const incoming = booking({
+      id: "incoming",
+      status: "confirmed",
+      check_in: todayStr,
+      check_out: "2026-10-22",
+    });
+    const bookings = [booking(), incoming];
+    expect(state(todayStr, bookings).booking?.id).toBe("b1");
+    expect(state("2026-10-21", bookings).booking?.id).toBe("incoming");
+  });
+
+  it("marks only today's unresolved known fixed departure as a reminder", () => {
+    const due = booking({ check_out: todayStr });
+    expect(isFixedCheckoutReminder(due, todayStr, todayStr)).toBe(true);
+    expect(isFixedCheckoutReminder(booking(), todayStr, todayStr)).toBe(true);
+    expect(isFixedCheckoutReminder(due, "2026-10-21", todayStr)).toBe(false);
+    expect(isFixedCheckoutReminder(booking({ check_out: null }), todayStr, todayStr)).toBe(false);
+    expect(isFixedCheckoutReminder(booking({ checkout_mode: "open" }), todayStr, todayStr)).toBe(
+      false,
+    );
+    expect(isFixedCheckoutReminder(booking({ status: "checked_out" }), todayStr, todayStr)).toBe(
+      false,
+    );
   });
 
   it("keeps current summary, grid filters and mobile room states consistent", () => {
