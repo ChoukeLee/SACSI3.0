@@ -245,6 +245,7 @@ export async function createBooking(input: {
 export async function createBackfillBooking(input: {
   unitId: string; customerId: string; checkIn: string; checkOut: string;
   nightlyPriceXof: number; prepaidAmountXof: number; reason: string; notes?: string; requestId: string;
+  paymentDate?: string; paymentMethod?: "cash" | "check" | "bank_transfer" | "other";
 }) {
   await requireRole("admin");
   const supabase = await createClient();

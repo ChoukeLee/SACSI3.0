@@ -36,6 +36,14 @@ import {
   calendarOtherBuilding,
   calendarWindowFixture,
 } from "./fixtures/calendar-window";
+
+it.each(["admin", "front_desk", "finance", "boss"])(
+  "only exposes the backfill entry to administrators (%s)",
+  async (role) => {
+    await render(role);
+    expect(host.textContent?.includes("补录已结束住宿")).toBe(role === "admin");
+  },
+);
 let host: HTMLDivElement, root: Root;
 const fetchMock = vi.fn();
 const cashResult = (buildingId = calendarBuilding, net = 100) => ({

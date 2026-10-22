@@ -185,6 +185,10 @@
     {
       "file": "20261020124527_audit_workbench_business_amount_projection.sql",
       "sha256": "2e7e0856630159fd58f6b0c00fa3883f22a99e65f799a46993fde5188922e367"
+    },
+    {
+      "file": "20261022092703_daily_backfill_payment_facts.sql",
+      "sha256": "c4a68bff0b88827b58129a43a13aa5f95cc38a10743d5d3447faa18b45e12b12"
     }
   ],
   "excluded": [

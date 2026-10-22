@@ -155,6 +155,8 @@ const backfill = (f: Awaited<ReturnType<typeof seed>>) => ({
   checkOut: "2026-01-03",
   nightlyPriceXof: 100,
   prepaidAmountXof: 50,
+  paymentDate: "2026-01-01",
+  paymentMethod: "cash",
   reason: "Synthetic backfill",
 });
 
@@ -177,26 +179,102 @@ it("backfills historical accounts once without changing current room status and 
     ).rows[0],
   ).toEqual({ amount_xof: "200.00", paid_amount_xof: "50.00" });
 });
-it.each(["daily_bookings", "receivables", "payments", "ledger_entries", "audit_logs"])(
-  "backfill leaves no partial booking or account when %s fails",
-  async (table) => {
-    const f = await seed();
+it("preserves the actual cash date independently of checkout with linked balances and authenticated audit", async () => {
+  const f = await seed(),
+    id = randomUUID();
+  const input = { ...backfill(f), nightlyPriceXof: 80000, prepaidAmountXof: 160000 };
+  const result = await rpc("daily_backfill", input, id);
+  const bookingId = result.data.booking.id;
+  expect(result.data.booking).toMatchObject({
+    check_in: "2026-01-01",
+    check_out: "2026-01-03",
+    actual_check_out: "2026-01-03",
+    total_amount_xof: 160000,
+    prepaid_amount_xof: 160000,
+    billing_status: "settled",
+    status: "checked_out",
+  });
+  const row = (
     await owner(
-      `create trigger reject_backfill before insert on public.${table} for each row execute function private.test_reject_write()`,
-    );
-    try {
-      await login(f.actor);
-      await expect(rpc("daily_backfill", backfill(f))).rejects.toThrow("injected_failure");
-      expect(await counts(f)).toEqual({ payments: 0, ledger: 0, receivables: 0, requests: 0 });
-      expect(
-        (await db.query("select count(*)::int n from daily_bookings where unit_id=$1", [f.unit]))
-          .rows[0].n,
-      ).toBe(0);
-    } finally {
-      await owner(`drop trigger reject_backfill on public.${table}`);
-    }
-  },
-);
+      `select p.payment_date::text, p.payment_method, p.recorded_by,
+    p.receipt_no, p.actual_collector, l.entry_date::text, l.amount_xof,
+    r.status, r.paid_amount_xof, a.amount_xof allocated, a.actor_id,
+    (select actor_id from audit_logs where entity_id=$1 and action='daily_booking_backfill') audit_actor
+    from payments p join ledger_entries l on l.payment_id=p.id
+    join payment_receivable_allocations a on a.payment_id=p.id
+    join receivables r on r.id=a.receivable_id where p.source_id=$1`,
+      [bookingId],
+    )
+  ).rows[0];
+  expect(row).toMatchObject({
+    payment_date: "2026-01-01",
+    payment_method: "cash",
+    entry_date: "2026-01-01",
+    recorded_by: f.actor,
+    actor_id: f.actor,
+    audit_actor: f.actor,
+    amount_xof: "160000.00",
+    allocated: "160000.00",
+    paid_amount_xof: "160000.00",
+    status: "paid",
+    actual_collector: null,
+  });
+  await login(f.actor);
+  expect((await rpc("daily_backfill", input, id)).idempotent).toBe(true);
+  await expect(rpc("daily_backfill", { ...input, paymentDate: "2026-01-02" }, id)).rejects.toThrow(
+    "requestIdConflict",
+  );
+  await owner("update user_profiles set role='front_desk' where id=$1", [f.actor]);
+  await login(f.actor);
+  await expect(rpc("daily_backfill", input, id)).rejects.toThrow("financePermissionDenied");
+});
+it.each([
+  { paymentDate: undefined },
+  { paymentMethod: undefined },
+  { paymentDate: "infinity" },
+  { paymentDate: "2999-01-01" },
+  { paymentMethod: "unverified" },
+  { paymentDate: "2026-02-30" },
+])("rejects incomplete or invalid backfill receipt facts atomically: %j", async (extra) => {
+  const f = await seed();
+  await expect(rpc("daily_backfill", { ...backfill(f), ...extra })).rejects.toThrow();
+  expect(await counts(f)).toEqual({ payments: 0, ledger: 0, receivables: 0, requests: 0 });
+});
+it("does not require or invent a receipt for an unpaid backfill", async () => {
+  const f = await seed();
+  const input = {
+    ...backfill(f),
+    prepaidAmountXof: 0,
+    paymentDate: undefined,
+    paymentMethod: undefined,
+  };
+  expect((await rpc("daily_backfill", input)).success).toBe(true);
+  expect(await counts(f)).toEqual({ payments: 0, ledger: 0, receivables: 1, requests: 1 });
+});
+it.each([
+  "daily_bookings",
+  "receivables",
+  "payments",
+  "ledger_entries",
+  "payment_receivable_allocations",
+  "audit_logs",
+])("backfill leaves no partial booking or account when %s fails", async (table) => {
+  const f = await seed();
+  await owner(
+    `create trigger reject_backfill before insert on public.${table} for each row execute function private.test_reject_write()`,
+  );
+  try {
+    await login(f.actor);
+    await expect(rpc("daily_backfill", backfill(f))).rejects.toThrow("injected_failure");
+    expect(await counts(f)).toEqual({ payments: 0, ledger: 0, receivables: 0, requests: 0 });
+    expect(
+      (await db.query("select count(*)::int n from daily_bookings where unit_id=$1", [f.unit]))
+        .rows[0].n,
+    ).toBe(0);
+  } finally {
+    await owner(`drop trigger reject_backfill on public.${table}`);
+  }
+});
 it("rejects a non-agent customer or blacklisted agent in direct database calls", async () => {
   const f = await seed();
   await owner("update customers set is_blacklisted=true where id=$1", [f.customer]);

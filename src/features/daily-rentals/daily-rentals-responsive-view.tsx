@@ -10,6 +10,7 @@ import type { CalendarFinanceSnapshot } from "./calendar-finance-model";
 import { businessDate } from "./receipt-analysis-query";
 import { decodeCalendarCash, type CalendarCashSummary } from "./calendar-context-model";
 import { DAILY_DATA_CHANGED } from "./daily-read-invalidation";
+import { BackfillLauncher } from "./backfill-launcher";
 import {
   decodeCalendarWindow,
   sameCalendarWindow,
@@ -374,6 +375,14 @@ export function DailyRentalsResponsiveView({
         {locale === "zh" ? "刷新房态与收款快照" : "Actualiser occupation et paiements"}
       </button>
       <div key={selectedBuildingId}>{content}</div>
+      {userRole === "admin" && !windowPending && !windowError && (
+        <BackfillLauncher
+          key={`backfill-${selectedBuildingId}`}
+          units={scopedDailyUnits}
+          customers={currentCustomers}
+          locale={locale}
+        />
+      )}
     </div>
   );
 }

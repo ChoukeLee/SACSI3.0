@@ -61,6 +61,7 @@ import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
 import { shouldShowAdvanceReservationPayment } from "./daily-rental-policy";
 import { notifyDailyDataChanged } from "./daily-read-invalidation";
 import { DailyCustomerSelect } from "./daily-customer-select";
+import { businessDate } from "./receipt-analysis-query";
 
 interface BookingPanelProps {
   booking: DailyBookingRow | null;
@@ -163,6 +164,8 @@ export function BookingPanel({
   const [bfCheckOut, setBfCheckOut] = useState("");
   const [bfNightlyPrice, setBfNightlyPrice] = useState("40000");
   const [bfPaidAmount, setBfPaidAmount] = useState("0");
+  const [bfPaymentDate, setBfPaymentDate] = useState("");
+  const [bfPaymentMethod, setBfPaymentMethod] = useState("");
   const [bfReason, setBfReason] = useState("");
   const [bfNotes, setBfNotes] = useState("");
   const [bfError, setBfError] = useState("");
@@ -506,7 +509,7 @@ export function BookingPanel({
   const bfNights = useMemo(() => {
     if (!bfCheckIn || !bfCheckOut) return 0;
     return Math.max(
-      1,
+      0,
       Math.ceil(
         (new Date(bfCheckOut).getTime() - new Date(bfCheckIn).getTime()) / (1000 * 60 * 60 * 24),
       ),
@@ -527,8 +530,34 @@ export function BookingPanel({
       setBfError(formatError("invalidDateRange"));
       return;
     }
+    if (bfCheckIn >= businessDate() || bfCheckOut <= bfCheckIn || bfCheckOut > businessDate()) {
+      setBfError(formatError("backfillMustBeCompleted"));
+      return;
+    }
+    if (
+      !Number.isSafeInteger(Number(bfNightlyPrice)) ||
+      Number(bfNightlyPrice) <= 0 ||
+      !Number.isSafeInteger(Number(bfPaidAmount)) ||
+      Number(bfPaidAmount) < 0 ||
+      Number(bfPaidAmount) > bfTotal
+    ) {
+      setBfError(
+        locale === "zh"
+          ? "请核对整数日价和已收金额，已收不能超过房费。"
+          : "Vérifiez le tarif entier et le montant perçu.",
+      );
+      return;
+    }
     if (!bfReason) {
       setBfError(locale === "zh" ? "请填写补录原因。" : "Veuillez indiquer la raison du backfill.");
+      return;
+    }
+    if (Number(bfPaidAmount) > 0 && (!bfPaymentDate || !bfPaymentMethod)) {
+      setBfError(
+        locale === "zh"
+          ? "请填写实际收款日期和方式。"
+          : "Renseignez la date et le mode de paiement.",
+      );
       return;
     }
     setBfError("");
@@ -539,8 +568,14 @@ export function BookingPanel({
           customerId: bfCustomerId,
           checkIn: bfCheckIn,
           checkOut: bfCheckOut,
-          nightlyPriceXof: parseInt(bfNightlyPrice, 10) || 40000,
-          prepaidAmountXof: parseInt(bfPaidAmount, 10) || 0,
+          nightlyPriceXof: Number(bfNightlyPrice),
+          prepaidAmountXof: Number(bfPaidAmount),
+          ...(Number(bfPaidAmount) > 0
+            ? {
+                paymentDate: bfPaymentDate,
+                paymentMethod: bfPaymentMethod as "cash" | "check" | "bank_transfer" | "other",
+              }
+            : {}),
           reason: bfReason,
           notes: bfNotes || undefined,
         };
@@ -693,8 +728,11 @@ export function BookingPanel({
               </div>
 
               <div>
-                <label className={labelClass}>{locale === "zh" ? "房间" : "Chambre"}</label>
+                <label htmlFor="backfill-unit" className={labelClass}>
+                  {locale === "zh" ? "房间" : "Chambre"}
+                </label>
                 <select
+                  id="backfill-unit"
                   value={bfUnitId}
                   onChange={(e) => setBfUnitId(e.target.value)}
                   className={inputClass}
@@ -721,6 +759,7 @@ export function BookingPanel({
                 <div>
                   <label className={labelClass}>{t.booking.checkInDate}</label>
                   <DateInput
+                    aria-label={t.booking.checkInDate}
                     value={bfCheckIn}
                     onChangeValue={setBfCheckIn}
                     className={inputClass}
@@ -729,6 +768,7 @@ export function BookingPanel({
                 <div>
                   <label className={labelClass}>{t.booking.checkOutDate}</label>
                   <DateInput
+                    aria-label={t.booking.checkOutDate}
                     value={bfCheckOut}
                     onChangeValue={setBfCheckOut}
                     className={inputClass}
@@ -739,6 +779,7 @@ export function BookingPanel({
                 <div>
                   <label className={labelClass}>{t.booking.nightlyPrice}</label>
                   <input
+                    aria-label={t.booking.nightlyPrice}
                     type="number"
                     value={bfNightlyPrice}
                     onChange={(e) => setBfNightlyPrice(e.target.value)}
@@ -750,6 +791,7 @@ export function BookingPanel({
                     {locale === "zh" ? "已收金额" : "Montant percu"}
                   </label>
                   <input
+                    aria-label={locale === "zh" ? "已收金额" : "Montant percu"}
                     type="number"
                     value={bfPaidAmount}
                     onChange={(e) => setBfPaidAmount(e.target.value)}
@@ -757,6 +799,41 @@ export function BookingPanel({
                   />
                 </div>
               </div>
+              {Number(bfPaidAmount) > 0 && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="backfill-payment-date" className={labelClass}>
+                      {locale === "zh" ? "实际收款日期" : "Date d’encaissement"}
+                    </label>
+                    <DateInput
+                      id="backfill-payment-date"
+                      value={bfPaymentDate}
+                      onChangeValue={setBfPaymentDate}
+                      max={businessDate()}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="backfill-payment-method" className={labelClass}>
+                      {locale === "zh" ? "收款方式" : "Mode de paiement"}
+                    </label>
+                    <select
+                      id="backfill-payment-method"
+                      value={bfPaymentMethod}
+                      onChange={(e) => setBfPaymentMethod(e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">{locale === "zh" ? "请选择" : "Choisir"}</option>
+                      <option value="cash">{locale === "zh" ? "现金" : "Espèces"}</option>
+                      <option value="bank_transfer">
+                        {locale === "zh" ? "银行转账" : "Virement"}
+                      </option>
+                      <option value="check">{locale === "zh" ? "支票" : "Chèque"}</option>
+                      <option value="other">{locale === "zh" ? "其他" : "Autre"}</option>
+                    </select>
+                  </div>
+                </div>
+              )}
               {bfCheckIn && bfCheckOut && (
                 <p className="text-xs text-muted-foreground">
                   {bfNights} {locale === "zh" ? "晚 ×" : "nuits ×"}{" "}
@@ -772,6 +849,7 @@ export function BookingPanel({
                 <label className={labelClass}>{locale === "zh" ? "补录原因 *" : "Raison *"}</label>
                 <input
                   type="text"
+                  aria-label={locale === "zh" ? "补录原因" : "Raison"}
                   value={bfReason}
                   onChange={(e) => setBfReason(e.target.value)}
                   className={inputClass}
