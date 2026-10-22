@@ -35,6 +35,38 @@ describe("operator protocol manifest", () => {
     });
   });
 
+  it("advertises explicit-instruction execution without granting extra account permissions", () => {
+    const manifest = buildOperatorProtocolManifest({
+      user,
+      directWorkflows: ["booking_operation", "collection", "daily_payment", "collection"],
+    });
+    expect(manifest.minimumConnectorVersion).toBe("0.6.0");
+    expect(manifest.directExecution).toEqual({
+      available: true,
+      version: 1,
+      authorization: "explicit_instruction",
+      workflows: ["daily_payment", "collection", "booking_operation"],
+    });
+    expect(manifest.safeguards).toMatchObject({
+      arbitrarySqlAllowed: false,
+      serviceRoleAllowed: false,
+      systemChangesAllowed: false,
+      screenshotWritesRequireConfirmation: false,
+      batchWritesRequireConfirmation: false,
+    });
+    expect(manifest.actions.every((action) => !action.authorized)).toBe(true);
+  });
+
+  it("keeps legacy browser confirmation when no direct workflow is enabled", () => {
+    expect(buildOperatorProtocolManifest({ user }).directExecution).toEqual({
+      available: false,
+      version: 1,
+      authorization: "explicit_instruction",
+      workflows: [],
+    });
+    expect(buildOperatorProtocolManifest({ user }).minimumConnectorVersion).toBe("0.1.0");
+  });
+
   it("advertises routine and high-risk confirmation behavior", () => {
     const manifest = buildOperatorProtocolManifest({ user });
     const byName = new Map(manifest.actions.map((action) => [action.name, action]));
@@ -49,11 +81,13 @@ describe("operator protocol manifest", () => {
     const financeUser = { ...user, role: "finance" as const };
     const manifest = buildOperatorProtocolManifest({
       user: financeUser,
-      databaseCapabilities: [{
-        action_name: "create_sale_draft",
-        authorized: true,
-        authorization_source: "explicit_grant",
-      }],
+      databaseCapabilities: [
+        {
+          action_name: "create_sale_draft",
+          authorized: true,
+          authorization_source: "explicit_grant",
+        },
+      ],
     });
     const action = manifest.actions.find((item) => item.name === "create_sale_draft");
     expect(action).toMatchObject({ authorized: true, authorizationSource: "explicit_grant" });

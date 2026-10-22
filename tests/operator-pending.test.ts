@@ -1,51 +1,305 @@
-import {beforeEach,afterEach,it,expect,vi} from 'vitest';
-import {mkdtempSync,readFileSync,readdirSync,writeFileSync,rmSync} from 'node:fs';
-import {join} from 'node:path';
-import {tmpdir} from 'node:os';
-import {createCipheriv,createDecipheriv,randomBytes} from 'node:crypto';
+import { beforeEach, afterEach, it, expect, vi } from "vitest";
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 // @ts-expect-error Standalone connector.
-import {pendingStore} from '../operator-connector/pending-store.mjs';
+import { pendingStore } from "../operator-connector/pending-store.mjs";
 // @ts-expect-error Standalone connector.
-import {durableClient} from '../operator-connector/pending-client.mjs';
-let directory:string,journal:ReturnType<typeof pendingStore>;const key=randomBytes(32);
-const crypt=(value:string|Buffer,mode:string)=>{if(mode==='protect'){const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key,iv);const bytes=Buffer.concat([cipher.update(value),cipher.final()]);return Buffer.concat([iv,cipher.getAuthTag(),bytes]);}const bytes=Buffer.from(value),dec=createDecipheriv('aes-256-gcm',key,bytes.subarray(0,12));dec.setAuthTag(bytes.subarray(12,28));return Buffer.concat([dec.update(bytes.subarray(28)),dec.final()]);};
-const id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',config={appUrl:'https://test.invalid',supabaseUrl:'https://db.invalid'};
-let owner:string|null,client:any,wrapped:any;
-beforeEach(()=>{directory=mkdtempSync(join(tmpdir(),'sacsi-pending-'));journal=pendingStore(directory,config.appUrl,crypt);owner='actor-a';
-  client={capabilities:vi.fn().mockResolvedValue({}),dailyWorkflow:vi.fn().mockResolvedValue({status:'awaiting_account_confirmation',confirmationUrl:`${config.appUrl}/operator/daily-workflows/${id}`}),collection:vi.fn(),execute:vi.fn(),api:vi.fn()};
-  wrapped=durableClient(client,{load:async()=>owner?{...config,userId:owner}:null},journal,config);
+import { durableClient } from "../operator-connector/pending-client.mjs";
+let directory: string, journal: ReturnType<typeof pendingStore>;
+const key = randomBytes(32);
+const crypt = (value: string | Buffer, mode: string) => {
+  if (mode === "protect") {
+    const iv = randomBytes(12),
+      cipher = createCipheriv("aes-256-gcm", key, iv);
+    const bytes = Buffer.concat([cipher.update(value), cipher.final()]);
+    return Buffer.concat([iv, cipher.getAuthTag(), bytes]);
+  }
+  const bytes = Buffer.from(value),
+    dec = createDecipheriv("aes-256-gcm", key, bytes.subarray(0, 12));
+  dec.setAuthTag(bytes.subarray(12, 28));
+  return Buffer.concat([dec.update(bytes.subarray(28)), dec.final()]);
+};
+const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  config = { appUrl: "https://test.invalid", supabaseUrl: "https://db.invalid" };
+let owner: string | null, client: any, wrapped: any;
+beforeEach(() => {
+  directory = mkdtempSync(join(tmpdir(), "sacsi-pending-"));
+  journal = pendingStore(directory, config.appUrl, crypt);
+  owner = "actor-a";
+  client = {
+    capabilities: vi.fn().mockResolvedValue({}),
+    dailyWorkflow: vi.fn().mockResolvedValue({
+      status: "awaiting_account_confirmation",
+      confirmationUrl: `${config.appUrl}/operator/daily-workflows/${id}`,
+    }),
+    collection: vi.fn(),
+    execute: vi.fn(),
+    api: vi.fn(),
+  };
+  wrapped = durableClient(
+    client,
+    { load: async () => (owner ? { ...config, userId: owner } : null) },
+    journal,
+    config,
+  );
 });
-afterEach(()=>rmSync(directory,{recursive:true,force:true}));
-it('saves ciphertext before any outbound call and survives restart',async()=>{client.dailyWorkflow.mockImplementation(async()=>{expect(journal.get(owner,id).state).toBe('preparing');throw new Error('server_unreachable');});
-  await expect(wrapped.dailyWorkflow('prepare',{requestId:id,originalInstruction:'sensitive receipt'})).rejects.toThrow('server_unreachable');
-  const reopened=pendingStore(directory,config.appUrl,crypt);expect(reopened.get(owner,id).state).toBe('unknown');
-  for(const file of readdirSync(join(directory,'pending-v1')))expect(readFileSync(join(directory,'pending-v1',file)).includes(Buffer.from('sensitive receipt'))).toBe(false);
+afterEach(() => rmSync(directory, { recursive: true, force: true }));
+it("saves ciphertext before any outbound call and survives restart", async () => {
+  client.dailyWorkflow.mockImplementation(async () => {
+    expect(journal.get(owner, id).state).toBe("preparing");
+    throw new Error("server_unreachable");
+  });
+  await expect(
+    wrapped.dailyWorkflow("prepare", { requestId: id, originalInstruction: "sensitive receipt" }),
+  ).rejects.toThrow("server_unreachable");
+  const reopened = pendingStore(directory, config.appUrl, crypt);
+  expect(reopened.get(owner, id).state).toBe("unknown");
+  for (const file of readdirSync(join(directory, "pending-v1")))
+    expect(
+      readFileSync(join(directory, "pending-v1", file)).includes(Buffer.from("sensitive receipt")),
+    ).toBe(false);
 });
-it('isolates accounts and blocks access after logout',async()=>{await wrapped.pending('capture',{requestId:id,sourceText:'receipt'});owner='actor-b';expect((await wrapped.pending('list')).items).toEqual([]);await expect(wrapped.pending('read',{requestId:id})).rejects.toThrow('pending_not_found');owner=null;await expect(wrapped.pending('list')).rejects.toThrow('login_required');});
-it('captures incomplete offline text without a network call',async()=>{await wrapped.pending('capture',{requestId:id,sourceText:'amount unknown'});expect(client.capabilities).not.toHaveBeenCalled();expect((await wrapped.pending('read',{requestId:id})).sourceText).toBe('amount unknown');});
-it('refuses changed payload until an explicit replacement references the old confirmation',async()=>{await wrapped.dailyWorkflow('prepare',{requestId:id,amountXof:10});await expect(wrapped.dailyWorkflow('prepare',{requestId:id,amountXof:20})).rejects.toThrow('pending_request_changed');expect(client.dailyWorkflow).toHaveBeenCalledTimes(1);await wrapped.dailyWorkflow('prepare',{requestId:id,amountXof:20,replacesConfirmationId:id});expect(client.dailyWorkflow).toHaveBeenCalledTimes(2);});
-it('recovers an already completed operation without preparing again',async()=>{await wrapped.dailyWorkflow('prepare',{requestId:id});client.dailyWorkflow.mockResolvedValue({status:'completed',verified:false,confirmationPath:`/operator/daily-workflows/${id}`});const result=await wrapped.pending('recover',{requestId:id});expect(result.verified).toBe(false);expect(journal.get(owner,id).state).toBe('completed_history');expect(client.dailyWorkflow.mock.calls.map((c:any[])=>c[0])).toEqual(['prepare','status']);await expect(wrapped.dailyWorkflow('prepare',{requestId:id})).rejects.toThrow('pending_already_completed');});
-it('only re-prepares after explicit recovery and a not_found response, retaining request id',async()=>{const input={requestId:id,amountXof:10};client.dailyWorkflow.mockRejectedValueOnce(new Error('offline'));await expect(wrapped.dailyWorkflow('prepare',input)).rejects.toThrow();client.dailyWorkflow.mockResolvedValueOnce({status:'not_found'}).mockResolvedValueOnce({status:'awaiting_account_confirmation',confirmationUrl:`${config.appUrl}/operator/daily-workflows/${id}`});await wrapped.pending('recover',{requestId:id});expect(client.dailyWorkflow.mock.calls.at(-1)).toEqual(['prepare',input]);});
-it('refuses unsupported future format and corrupted storage without replacing it',async()=>{await wrapped.pending('capture',{requestId:id,sourceText:'test'});const file=join(directory,'pending-v1',readdirSync(join(directory,'pending-v1'))[0]);writeFileSync(file,crypt(JSON.stringify({formatVersion:9}),'protect'));await expect(wrapped.pending('list')).rejects.toThrow('pending_format_upgrade_required');writeFileSync(file,'broken');await expect(wrapped.pending('list')).rejects.toThrow('pending_storage_unreadable');expect(readFileSync(file,'utf8')).toBe('broken');});
-it('storage failure blocks all preparation calls',async()=>{const bad=durableClient(client,{load:async()=>({...config,userId:owner})},{get:()=>{throw new Error('storage failed');}},config);await expect(bad.dailyWorkflow('prepare',{requestId:id})).rejects.toThrow('storage failed');expect(client.dailyWorkflow).not.toHaveBeenCalled();});
-it('permission revocation prevents recovery without dropping the local draft',async()=>{await wrapped.pending('capture',{requestId:id,sourceText:'test'});client.capabilities.mockRejectedValue(new Error('action_forbidden'));await expect(wrapped.pending('recover',{requestId:id})).rejects.toThrow('action_forbidden');expect(journal.get(owner,id).sourceText).toBe('test');});
-it('persists and recovers booking operations through their own endpoint without replaying completed writes',async()=>{
- client.bookingOperation=vi.fn().mockRejectedValueOnce(new Error('outcome_unknown_keep_original_request_id'));
- const request={requestId:id,operation:'refund',originalInstruction:'synthetic refund'};
- await expect(wrapped.bookingOperation('prepare',request)).rejects.toThrow('outcome_unknown');
- expect(journal.get(owner,id)).toMatchObject({kind:'booking_operation',state:'unknown',request});
- client.bookingOperation.mockResolvedValue({status:'completed',verified:false,confirmationPath:`/operator/booking-operations/${id}`});
- const found=await wrapped.pending('recover',{requestId:id});expect(found.verified).toBe(false);
- expect(client.bookingOperation.mock.calls.map((c:any[])=>c[0])).toEqual(['prepare','status']);
- expect(client.api).not.toHaveBeenCalled();expect(client.execute).not.toHaveBeenCalled();
- await expect(wrapped.bookingOperation('prepare',request)).rejects.toThrow('pending_already_completed');
+it("isolates accounts and blocks access after logout", async () => {
+  await wrapped.pending("capture", { requestId: id, sourceText: "receipt" });
+  owner = "actor-b";
+  expect((await wrapped.pending("list")).items).toEqual([]);
+  await expect(wrapped.pending("read", { requestId: id })).rejects.toThrow("pending_not_found");
+  owner = null;
+  await expect(wrapped.pending("list")).rejects.toThrow("login_required");
 });
-it.each(['payment','collection'])('recovers %s by original request without executing payments',async kind=>{
-  const request={requestId:id,actionName:'record_daily_payment'},result={status:'awaiting_account_confirmation',confirmationUrl:`${config.appUrl}/operator/${kind==='payment'?'confirmations':'collections'}/${id}`};
-  client.execute.mockResolvedValue(result);client.collection.mockResolvedValue(result);
-  if(kind==='payment')await wrapped.execute(request);else await wrapped.collection('prepare',request);
-  client.api.mockResolvedValue({status:'completed',verified:false});client.collection.mockResolvedValue({status:'completed',verified:false});
-  expect((await wrapped.pending('recover',{requestId:id})).status).toBe('completed');
-  expect(client.execute).toHaveBeenCalledTimes(kind==='payment'?1:0);
-  if(kind==='collection')expect(client.collection.mock.calls.map((c:any[])=>c[0])).toEqual(['prepare','status']);
+it("captures incomplete offline text without a network call", async () => {
+  await wrapped.pending("capture", { requestId: id, sourceText: "amount unknown" });
+  expect(client.capabilities).not.toHaveBeenCalled();
+  expect((await wrapped.pending("read", { requestId: id })).sourceText).toBe("amount unknown");
+});
+it("refuses changed payload until an explicit replacement references the old confirmation", async () => {
+  await wrapped.dailyWorkflow("prepare", { requestId: id, amountXof: 10 });
+  await expect(wrapped.dailyWorkflow("prepare", { requestId: id, amountXof: 20 })).rejects.toThrow(
+    "pending_request_changed",
+  );
+  expect(client.dailyWorkflow).toHaveBeenCalledTimes(1);
+  await wrapped.dailyWorkflow("prepare", {
+    requestId: id,
+    amountXof: 20,
+    replacesConfirmationId: id,
+  });
+  expect(client.dailyWorkflow).toHaveBeenCalledTimes(2);
+});
+it("recovers an already completed operation without preparing again", async () => {
+  await wrapped.dailyWorkflow("prepare", { requestId: id });
+  client.dailyWorkflow.mockResolvedValue({
+    status: "completed",
+    verified: false,
+    confirmationPath: `/operator/daily-workflows/${id}`,
+  });
+  const result = await wrapped.pending("recover", { requestId: id });
+  expect(result.verified).toBe(false);
+  expect(journal.get(owner, id).state).toBe("completed_history");
+  expect(client.dailyWorkflow.mock.calls.map((c: any[]) => c[0])).toEqual(["prepare", "status"]);
+  await expect(wrapped.dailyWorkflow("prepare", { requestId: id })).rejects.toThrow(
+    "pending_already_completed",
+  );
+});
+it("only re-prepares after explicit recovery and a not_found response, retaining request id", async () => {
+  const input = { requestId: id, amountXof: 10 };
+  client.dailyWorkflow.mockRejectedValueOnce(new Error("offline"));
+  await expect(wrapped.dailyWorkflow("prepare", input)).rejects.toThrow();
+  client.dailyWorkflow.mockResolvedValueOnce({ status: "not_found" }).mockResolvedValueOnce({
+    status: "awaiting_account_confirmation",
+    confirmationUrl: `${config.appUrl}/operator/daily-workflows/${id}`,
+  });
+  await wrapped.pending("recover", { requestId: id });
+  expect(client.dailyWorkflow.mock.calls.at(-1)).toEqual(["prepare", input]);
+});
+it("refuses unsupported future format and corrupted storage without replacing it", async () => {
+  await wrapped.pending("capture", { requestId: id, sourceText: "test" });
+  const file = join(directory, "pending-v1", readdirSync(join(directory, "pending-v1"))[0]);
+  writeFileSync(file, crypt(JSON.stringify({ formatVersion: 9 }), "protect"));
+  await expect(wrapped.pending("list")).rejects.toThrow("pending_format_upgrade_required");
+  writeFileSync(file, "broken");
+  await expect(wrapped.pending("list")).rejects.toThrow("pending_storage_unreadable");
+  expect(readFileSync(file, "utf8")).toBe("broken");
+});
+it("storage failure blocks all preparation calls", async () => {
+  const bad = durableClient(
+    client,
+    { load: async () => ({ ...config, userId: owner }) },
+    {
+      get: () => {
+        throw new Error("storage failed");
+      },
+    },
+    config,
+  );
+  await expect(bad.dailyWorkflow("prepare", { requestId: id })).rejects.toThrow("storage failed");
+  expect(client.dailyWorkflow).not.toHaveBeenCalled();
+});
+it("permission revocation prevents recovery without dropping the local draft", async () => {
+  await wrapped.pending("capture", { requestId: id, sourceText: "test" });
+  client.capabilities.mockRejectedValue(new Error("action_forbidden"));
+  await expect(wrapped.pending("recover", { requestId: id })).rejects.toThrow("action_forbidden");
+  expect(journal.get(owner, id).sourceText).toBe("test");
+});
+it("persists and recovers booking operations through their own endpoint without replaying completed writes", async () => {
+  client.bookingOperation = vi
+    .fn()
+    .mockRejectedValueOnce(new Error("outcome_unknown_keep_original_request_id"));
+  const request = { requestId: id, operation: "refund", originalInstruction: "synthetic refund" };
+  await expect(wrapped.bookingOperation("prepare", request)).rejects.toThrow("outcome_unknown");
+  expect(journal.get(owner, id)).toMatchObject({
+    kind: "booking_operation",
+    state: "unknown",
+    request,
+  });
+  client.bookingOperation.mockResolvedValue({
+    status: "completed",
+    verified: false,
+    confirmationPath: `/operator/booking-operations/${id}`,
+  });
+  const found = await wrapped.pending("recover", { requestId: id });
+  expect(found.verified).toBe(false);
+  expect(client.bookingOperation.mock.calls.map((c: any[]) => c[0])).toEqual(["prepare", "status"]);
+  expect(client.api).not.toHaveBeenCalled();
+  expect(client.execute).not.toHaveBeenCalled();
+  await expect(wrapped.bookingOperation("prepare", request)).rejects.toThrow(
+    "pending_already_completed",
+  );
+});
+it.each(["payment", "collection"])(
+  "recovers %s by original request without executing payments",
+  async (kind) => {
+    const request = { requestId: id, actionName: "record_daily_payment" },
+      result = {
+        status: "awaiting_account_confirmation",
+        confirmationUrl: `${config.appUrl}/operator/${kind === "payment" ? "confirmations" : "collections"}/${id}`,
+      };
+    client.execute.mockResolvedValue(result);
+    client.collection.mockResolvedValue(result);
+    if (kind === "payment") await wrapped.execute(request);
+    else await wrapped.collection("prepare", request);
+    client.api.mockResolvedValue({ status: "completed", verified: false });
+    client.collection.mockResolvedValue({ status: "completed", verified: false });
+    expect((await wrapped.pending("recover", { requestId: id })).status).toBe("completed");
+    expect(client.execute).toHaveBeenCalledTimes(kind === "payment" ? 1 : 0);
+    if (kind === "collection")
+      expect(client.collection.mock.calls.map((c: any[]) => c[0])).toEqual(["prepare", "status"]);
+  },
+);
+
+it.each(["payment", "collection", "daily", "booking_operation"])(
+  "journals direct %s before execution and accepts verified results without a webpage link",
+  async (kind) => {
+    const request = {
+      requestId: id,
+      actionName: "record_daily_payment",
+      originalInstruction: "synthetic explicit instruction",
+    };
+    const send = vi.fn().mockImplementation(async () => {
+      expect(journal.get(owner, id)).toMatchObject({
+        state: "preparing",
+        executionMode: "direct",
+        request,
+      });
+      return { requestId: id, status: "completed", verified: true };
+    });
+    client.executePayment = send;
+    client.collection = send;
+    client.dailyWorkflow = send;
+    client.bookingOperation = send;
+    const result =
+      kind === "payment"
+        ? await wrapped.executePayment(request)
+        : kind === "collection"
+          ? await wrapped.collection("execute", request)
+          : kind === "daily"
+            ? await wrapped.dailyWorkflow("execute", request)
+            : await wrapped.bookingOperation("execute", request);
+    expect(result).toMatchObject({ status: "completed", verified: true, localPendingSaved: true });
+    expect(journal.get(owner, id)).toMatchObject({
+      executionMode: "direct",
+      state: "completed_history",
+    });
+    expect(journal.get(owner, id).confirmationUrl).toBeUndefined();
+    expect(send).toHaveBeenCalledTimes(1);
+  },
+);
+it("retains a direct unknown result and only queries during recovery, never replaying or falling back to a web draft", async () => {
+  client.dailyWorkflow.mockRejectedValueOnce(new Error("outcome_unknown_keep_original_request_id"));
+  const request = { requestId: id, originalInstruction: "synthetic checkout and collect" };
+  await expect(wrapped.dailyWorkflow("execute", request)).rejects.toThrow("outcome_unknown");
+  expect(journal.get(owner, id)).toMatchObject({
+    executionMode: "direct",
+    state: "unknown",
+    request,
+  });
+  client.dailyWorkflow.mockResolvedValueOnce({ status: "not_found" });
+  expect(await wrapped.pending("recover", { requestId: id })).toMatchObject({
+    status: "not_found",
+    requestId: id,
+  });
+  expect(client.dailyWorkflow.mock.calls.map((call: any[]) => call[0])).toEqual([
+    "execute",
+    "status",
+  ]);
+  expect(journal.get(owner, id).state).toBe("unknown");
+});
+it("does not record an unverified direct result as completed", async () => {
+  client.executePayment = vi
+    .fn()
+    .mockResolvedValue({ requestId: id, status: "completed", verified: false });
+  await expect(wrapped.executePayment({ requestId: id })).rejects.toThrow("direct_result_invalid");
+  expect(journal.get(owner, id)).toMatchObject({ executionMode: "direct", state: "unknown" });
+});
+it("labels a recovered direct completion as history even if the server stored a verified result", async () => {
+  client.collection.mockRejectedValueOnce(new Error("outcome_unknown_keep_original_request_id"));
+  await expect(wrapped.collection("execute", { requestId: id })).rejects.toThrow("outcome_unknown");
+  client.collection.mockResolvedValueOnce({ requestId: id, status: "completed", verified: true });
+  expect(await wrapped.pending("recover", { requestId: id })).toMatchObject({
+    requestId: id,
+    status: "completed_previously",
+    verified: false,
+  });
+  expect(journal.get(owner, id).state).toBe("completed_history");
+  expect(client.collection.mock.calls.map((call: any[]) => call[0])).toEqual(["execute", "status"]);
+});
+it.each([undefined, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"])(
+  "rejects a recovered direct result with a missing or mismatched request id: %s",
+  async (requestId) => {
+    client.collection.mockRejectedValueOnce(new Error("outcome_unknown_keep_original_request_id"));
+    await expect(wrapped.collection("execute", { requestId: id })).rejects.toThrow(
+      "outcome_unknown",
+    );
+    client.collection.mockResolvedValueOnce({ requestId, status: "completed", verified: true });
+    await expect(wrapped.pending("recover", { requestId: id })).rejects.toThrow(
+      "pending_server_identity_mismatch",
+    );
+    expect(journal.get(owner, id).state).toBe("unknown");
+    expect(client.collection.mock.calls.map((call: any[]) => call[0])).toEqual([
+      "execute",
+      "status",
+    ]);
+  },
+);
+it("records direct completed history without claiming a fresh verification and prevents duplicate execution", async () => {
+  client.executePayment = vi
+    .fn()
+    .mockResolvedValue({ requestId: id, status: "completed_previously", verified: false });
+  expect(await wrapped.executePayment({ requestId: id })).toMatchObject({
+    verified: false,
+    status: "completed_previously",
+  });
+  await expect(wrapped.executePayment({ requestId: id })).rejects.toThrow(
+    "pending_already_completed",
+  );
+  expect(client.executePayment).toHaveBeenCalledTimes(1);
+});
+it("rejects a changed direct payload under the same request identity before any outbound call", async () => {
+  client.executePayment = vi.fn().mockRejectedValue(new Error("offline"));
+  await expect(wrapped.executePayment({ requestId: id, amountXof: 10 })).rejects.toThrow("offline");
+  await expect(wrapped.executePayment({ requestId: id, amountXof: 20 })).rejects.toThrow(
+    "pending_request_changed",
+  );
+  expect(client.executePayment).toHaveBeenCalledTimes(1);
 });

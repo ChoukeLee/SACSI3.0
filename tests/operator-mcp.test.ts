@@ -21,11 +21,11 @@ describe('SACSI narrow MCP surface',()=>{
   });
   it('shows understandable identity and does not equate connection with payment release',()=>{
     const text=humanResult('capabilities',{identity:{displayName:'Ying',role:'admin',userId:id},actions:[{name:'record_daily_payment',authorized:true,availability:'implemented'}]});
-    expect(text).toContain('Ying');expect(text).toContain('与 Codex 订阅账号无关');expect(text).toContain('不代表服务器截图确认功能已发布');expect(humanError('login_required')).toContain('本人');
+    expect(text).toContain('Ying');expect(text).toContain('与 Codex 订阅账号无关');expect(text).toContain('不代表直接办理已上线');expect(humanError('login_required')).toContain('本人');
     expect(humanError('outcome_unknown_keep_original_request_id')).toContain('不要重新编号');
   });
   it('only exposes bounded tools, no login, confirm, SQL or arbitrary action',()=>{
-    expect(tools.map((t:{name:string})=>t.name)).toEqual(['query_booking_options','booking_operation_status','plan_booking_operation','prepare_booking_operation','list_pending','capture_pending','read_pending','recover_pending','daily_workflow_status','prepare_daily_workflow','search_daily_bookings','plan_daily_change','collection_status','query_collection_position','prepare_collection_batch','capabilities','new_request_id','query_daily_booking','prepare_daily_payment']);
+    expect(tools.map((t:{name:string})=>t.name)).toEqual(['query_booking_options','booking_operation_status','plan_booking_operation','prepare_booking_operation','list_pending','capture_pending','read_pending','recover_pending','daily_workflow_status','prepare_daily_workflow','search_daily_bookings','plan_daily_change','collection_status','query_collection_position','prepare_collection_batch','capabilities','new_request_id','query_daily_booking','prepare_daily_payment','execute_daily_payment','execute_collection_batch','execute_daily_workflow','execute_booking_operation']);
     expect(tools.find((t:{name:string})=>t.name==='prepare_daily_payment').annotations.readOnlyHint).toBe(false);
   });
   it('retains stable request and predecessor, enforces screenshot scope',async()=>{
@@ -55,7 +55,7 @@ describe('SACSI narrow MCP surface',()=>{
   });
   it('lists tools, calls capabilities, rejects unknown tools and methods',async()=>{
     const {dispatch}=await start();
-    expect((await dispatch({jsonrpc:'2.0',id:2,method:'tools/list'})).result.tools).toHaveLength(19);
+    expect((await dispatch({jsonrpc:'2.0',id:2,method:'tools/list'})).result.tools).toHaveLength(23);
     expect((await dispatch({jsonrpc:'2.0',id:3,method:'tools/call',params:{name:'capabilities'}})).result.content[0].text).toContain('test@example.invalid');
     expect((await dispatch({jsonrpc:'2.0',id:4,method:'tools/call',params:{name:'confirm_payment'}})).error.code).toBe(-32602);
     expect((await dispatch({jsonrpc:'2.0',id:5,method:'sql'})).error.code).toBe(-32601);

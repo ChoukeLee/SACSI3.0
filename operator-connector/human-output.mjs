@@ -8,9 +8,9 @@ export function humanResult(command,result) {
     const allowed=name=>result.actions?.some(a=>a.name===name && a.authorized && a.availability==='implemented');
     return ['SACSI 连接成功',`当前身份：${identity.displayName??'未知'}（${identity.role??'未知'}）`,
       `账号标识：${identity.userId??'未知'}`,`日租查询：${allowed('query_daily_booking')?'有权限':'不可用'}`,
-      `截图收款权限：${allowed('record_daily_payment')?'有权限，仍需网页确认':'不可用'}`,
+      `截图收款权限：${allowed('record_daily_payment')?result.directExecution?.available?'有权限，明确指令后在 Codex 直接办理':'有权限，当前服务器仍使用网页确认':'不可用'}`,
       '此处显示的是 SACSI 业务身份，与 Codex 订阅账号无关。共用电脑时，实际录入人必须切换为自己的 SACSI 账号。',
-      '注意：连接成功不代表服务器截图确认功能已发布。请先由管理员完成上线核验。',
+      result.directExecution?.available?'直接办理只使用当前账号已有业务权限；缺项或冲突时停止，退款和冲正不是实际转账。':'注意：连接成功不代表直接办理已上线，服务器未开放时不会自动绕过网页确认。',
       '确认是本人身份后，可回到 Codex 对话。请勿共用他人账号。'].join('\n');
   }
   return JSON.stringify(result);
@@ -26,6 +26,14 @@ export function humanError(code) {
     connector_busy_or_stale_lock:'有操作正在进行或上次操作异常中断。请联系管理员，勿自行删锁或重复录入。',
     server_unreachable:'暂时无法连接服务器，请检查网络。',
     outcome_unknown_keep_original_request_id:'网络中断，结果尚不明确。请保留原请求号核查，不要重新编号录入。',
+    direct_execution_not_enabled:'服务端尚未启用直接办理；本次没有改用网页确认或尝试业务写入。请联系管理员完成发布。',
+    direct_execution_outcome_unknown:'提交后的结果暂未核实，可能已经入账。请按原请求号查询，禁止换号或自动重试。',
+    direct_database_upgrade_required:'服务端缺少本次业务需要的数据库迁移，未尝试写入。请管理员完成发布，不要换请求号。',
+    pending_server_identity_mismatch:'查回的服务器请求号与本地原单不一致，已停止恢复；保留原请求号请管理员核对。',
+    direct_execution_upgrade_required:'当前服务器或连接器还不支持这类直接办理，请联系管理员升级；不要另换请求号重录。',
+    direct_result_invalid_keep_original_request_id:'提交结果未通过核验，可能已经执行。保留原请求号查询，不要重新编号或重复入账。',
+    execution_result_invalid_keep_original_request_id:'服务器结果不完整，业务可能已经执行。保留原请求号查询，不要重复入账。',
+    execution_verification_failed_keep_original_request_id:'结果核验未通过，保留原请求号核查，不能当作未执行后重新录入。',
     login_cancelled:'已取消登录。',connector_upgrade_required:'连接器需要升级，请联系管理员。'};
   return `${messages[code]??'操作未完成，请保留错误编号联系管理员。'}\n错误编号：${code}\n不要向 AI 或他人发送密码、访问令牌。`;
 }

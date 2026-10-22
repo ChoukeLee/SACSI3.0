@@ -4,15 +4,22 @@ const digest=value=>createHash('sha256').update(canonical(value)).digest('hex');
 
 export function durableClient(client,store,journal,config){
   async function actor(){const session=await store.load();if(!session||session.appUrl!==config.appUrl||session.supabaseUrl!==config.supabaseUrl)throw new Error('login_required');return session.userId;}
-  async function prepare(kind,request,send){
+  async function prepare(kind,request,send,executionMode='web'){
     const owner=await actor();let old;try{old=journal.get(owner,request.requestId);}catch(e){if(e.message!=='pending_not_found')throw e;}
     if(old&&old.kind!=='note'&&(old.kind!==kind||digest(old.request)!==digest(request))){
       if(!request.replacesConfirmationId||request.replacesConfirmationId!==old.confirmationId||old.state==='completed_history')throw new Error('pending_request_changed_reconcile_first');
     }
     if(old?.state==='completed_history')throw new Error('pending_already_completed_do_not_repeat');
-    let item=journal.put(owner,{...old,requestId:request.requestId,kind,request,state:'preparing'});
+    let item=journal.put(owner,{...old,requestId:request.requestId,kind,request,executionMode,state:'preparing'});
     try{
       const result=await send();
+      if(executionMode==='direct'){
+        if(result.requestId!==request.requestId || !['completed','completed_previously'].includes(result.status)
+          || (result.status==='completed' && result.verified!==true)
+          || (result.status==='completed_previously' && result.verified!==false))throw new Error('direct_result_invalid_keep_original_request_id');
+        journal.put(owner,{...item,state:'completed_history',confirmationId:result.confirmationId??old?.confirmationId});
+        return {...result,localPendingSaved:true};
+      }
       const url=new URL(result.confirmationUrl);if(url.origin!==config.appUrl)throw new Error('invalid_confirmation_link');
       item=journal.put(owner,{...item,state:result.status==='completed_previously'?'completed_history':'awaiting_confirmation',confirmationId:url.pathname.split('/').at(-1),confirmationUrl:result.confirmationUrl});
       return {...result,localPendingSaved:true};
@@ -23,10 +30,11 @@ export function durableClient(client,store,journal,config){
     }
   }
   const wrapped=Object.create(client);
-  wrapped.bookingOperation=(op,body)=>op==='prepare'?prepare('booking_operation',body,()=>client.bookingOperation(op,body)):client.bookingOperation(op,body);
-  wrapped.dailyWorkflow=(op,body)=>op==='prepare'?prepare('daily',body,()=>client.dailyWorkflow(op,body)):client.dailyWorkflow(op,body);
-  wrapped.collection=(op,body)=>op==='prepare'?prepare('collection',body,()=>client.collection(op,body)):client.collection(op,body);
+  wrapped.bookingOperation=(op,body)=>['prepare','execute'].includes(op)?prepare('booking_operation',body,()=>client.bookingOperation(op,body),op==='execute'?'direct':'web'):client.bookingOperation(op,body);
+  wrapped.dailyWorkflow=(op,body)=>['prepare','execute'].includes(op)?prepare('daily',body,()=>client.dailyWorkflow(op,body),op==='execute'?'direct':'web'):client.dailyWorkflow(op,body);
+  wrapped.collection=(op,body)=>['prepare','execute'].includes(op)?prepare('collection',body,()=>client.collection(op,body),op==='execute'?'direct':'web'):client.collection(op,body);
   wrapped.execute=body=>body.actionName==='record_daily_payment'?prepare('payment',body,()=>client.execute(body)):client.execute(body);
+  wrapped.executePayment=body=>prepare('payment',body,()=>client.executePayment(body),'direct');
   wrapped.pending=async(op,args={})=>{
     const owner=await actor();
     if(op==='list')return {items:journal.list(owner),notice:'本地待办不是入账凭证。断网时可查看，联网恢复前必须重新核实。'};
@@ -46,16 +54,18 @@ export function durableClient(client,store,journal,config){
     if(result.status==='not_found'){
       // An explicit recovery call may only recreate an unexecuted proposal using its original id.
       if(item.state==='completed_history')throw new Error('pending_history_conflicts_with_server');
+      if(item.executionMode==='direct')return {status:'not_found',requestId:item.requestId,state:item.state,notice:'未找到服务器执行记录。未自动重试；请核对原指令后明确要求按原请求号执行，不得换号。'};
       return item.kind==='booking_operation'?wrapped.bookingOperation('prepare',item.request):item.kind==='daily'?wrapped.dailyWorkflow('prepare',item.request):item.kind==='collection'?wrapped.collection('prepare',item.request):wrapped.execute(item.request);
     }
     if(!['pending','completed'].includes(result.status))throw new Error('pending_server_state_requires_review');
+    if(item.executionMode==='direct' && result.requestId!==item.requestId)throw new Error('pending_server_identity_mismatch');
     let confirmationUrl=item.confirmationUrl;
     if(result.confirmationPath){
       if(!/^\/operator\/(confirmations|collections|daily-workflows|booking-operations)\/[0-9a-f-]{36}$/i.test(result.confirmationPath))throw new Error('invalid_confirmation_link');
       confirmationUrl=config.appUrl+result.confirmationPath;
     }
-    journal.put(owner,{...item,state:result.status==='completed'?'completed_history':'awaiting_confirmation',confirmationUrl,confirmationId:confirmationUrl?.split('/').at(-1)});
-    return {...result,confirmationUrl,notice:result.status==='completed'?'服务器记录原单已完成，禁止重录；历史状态不等于已复核当前全部账务。':'已找回原单。请核对网页；失效需用原请求号和旧确认 ID 重新准备。'};
+    journal.put(owner,{...item,state:result.status==='completed'?'completed_history':item.executionMode==='direct'?'unknown':'awaiting_confirmation',confirmationUrl,confirmationId:confirmationUrl?.split('/').at(-1)??result.id});
+    return {...result,...(item.executionMode==='direct'?{verified:false,...(result.status==='completed'?{status:'completed_previously'}:{})}:{confirmationUrl}),notice:result.status==='completed'?'服务器记录原单已完成，禁止重录；历史状态不等于已复核当前全部账务。':item.executionMode==='direct'?'已找回原请求，未自动执行。若数据无冲突且你仍要求执行，请沿用原请求号；内容变化须核对后引用旧确认 ID 替换。':'已找回原单。请核对网页；失效需用原请求号和旧确认 ID 重新准备。'};
   };
   return wrapped;
 }

@@ -449,6 +449,23 @@ const files = [
   'tests/daily-workbench.test.tsx',
   'tests/daily-workbench-timeline.test.tsx',
   'tests/daily-room-calendar-model.test.ts',
+  'src/features/business-actions/operator-direct-execution.ts',
+  'src/app/api/operator/v1/confirmations/execute/route.ts',
+  'src/app/api/operator/v1/collections/execute/route.ts',
+  'src/app/api/operator/v1/bookings/execute/route.ts',
+  'src/app/api/operator/v1/booking-operations/execute/route.ts',
+  'src/app/api/operator/v1/capabilities/route.ts',
+  'src/app/api/operator/v1/confirmations/prepare/route.ts',
+  'src/features/business-actions/operator-payment-preview.ts',
+  'src/features/business-actions/operator-protocol.ts',
+  'src/features/business-actions/operator-protocol.test.ts',
+  'tests/operator-direct-execution.test.ts',
+  'tests/operator-direct-execution.native.ts',
+  'tests/operator-direct-connector.test.ts',
+  'tests/operator-payment-preview.test.ts',
+  'tests/operator-pending.test.ts',
+  'tests/operator-permission-boundary.test.ts',
+  'tests/operator-preview-route.test.ts',
 ];
 let invalid=0;
 for(const filepath of files){

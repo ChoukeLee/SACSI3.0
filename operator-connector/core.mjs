@@ -1,5 +1,10 @@
-export const VERSION = '0.5.0';
+export const VERSION = '0.6.0';
 export const PROTOCOL = '1.0';
+const DIRECT_WORKFLOWS = new Set(['daily_payment','collection','daily_workflow','booking_operation']);
+const stableRequest = request => {
+  if (!request || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(request.requestId ?? '')) throw new Error('stable_request_uuid_required');
+  if (typeof request.originalInstruction !== 'string' || !request.originalInstruction.trim() || request.originalInstruction.length > 4000) throw new Error('explicit_instruction_required');
+};
 export function validateConfig(value) {
   if (value?.formatVersion !== 1) throw new Error('invalid_configuration');
   const app = new URL(value.appUrl), auth = new URL(value.supabaseUrl);
@@ -20,7 +25,17 @@ export function checkManifest(manifest) {
   for (let i=0;i<3;i++) { if (actual[i] > minimum[i]) break; if (actual[i] < minimum[i]) throw new Error('connector_upgrade_required'); }
   if (!manifest.identity?.userId || !Array.isArray(manifest.actions)) throw new Error('invalid_capabilities');
   const s = manifest.safeguards;
-  if (!s || s.serviceRoleAllowed !== false || s.arbitrarySqlAllowed !== false || s.systemChangesAllowed !== false || s.screenshotWritesRequireConfirmation !== true) throw new Error('unsafe_server_capabilities');
+  const direct = manifest.directExecution;
+  if (direct !== undefined && (!direct || typeof direct.available !== 'boolean' || direct.version !== 1
+    || direct.authorization !== 'explicit_instruction' || !Array.isArray(direct.workflows)
+    || direct.workflows.some(workflow => !DIRECT_WORKFLOWS.has(workflow))
+    || new Set(direct.workflows).size !== direct.workflows.length
+    || (direct.available && direct.workflows.length === 0))) throw new Error('unsafe_direct_execution_capabilities');
+  const confirmationRequired = direct?.available !== true;
+  if (!s || s.serviceRoleAllowed !== false || s.arbitrarySqlAllowed !== false || s.systemChangesAllowed !== false
+    || s.screenshotWritesRequireConfirmation !== confirmationRequired
+    || (direct?.available === true ? s.batchWritesRequireConfirmation !== false
+      : s.batchWritesRequireConfirmation !== undefined && s.batchWritesRequireConfirmation !== true)) throw new Error('unsafe_server_capabilities');
   return manifest;
 }
 export class OperatorClient {
@@ -69,12 +84,45 @@ export class OperatorClient {
     if(manifest.identity.userId!==(await this.store.load())?.userId) throw new Error('session_identity_changed');
     return manifest;
   }
+  async directBusiness(manifest, workflow, family, request, replacesConfirmationId) {
+    stableRequest(request);
+    if (manifest.directExecution?.available !== true || !manifest.directExecution.workflows.includes(workflow)) throw new Error('direct_execution_not_available');
+    const previous = await this.api(`${family}/status?requestId=${encodeURIComponent(request.requestId)}`);
+    if (!previous || !['not_found','pending','completed'].includes(previous.status)
+      || (previous.requestId !== undefined && previous.requestId !== request.requestId)
+      || (previous.status !== 'not_found' && previous.requestId !== request.requestId)) throw new Error('request_state_requires_reconciliation');
+    if (previous.status === 'completed') return {status:'completed_previously',requestId:request.requestId,verified:false,
+      notice:'原请求此前已经完成，未执行当前指令，也未核对当前请求内容或当前全部账务。请查原记录，禁止换号重录。'};
+    const preview = await this.api(`${family}/prepare`, request);
+    if (typeof preview?.previewProof !== 'string' || !preview.previewProof) throw new Error('invalid_execution_preview');
+    let result;
+    try {
+      result = await this.api(`${family}/execute`, {request, previewProof:preview.previewProof,
+        ...(replacesConfirmationId ? {replacesConfirmationId} : {})});
+    } catch (error) {
+      // A broken response after the POST may hide a committed transaction.
+      // Never describe it as an ordinary failed/unused request.
+      if (error?.message === 'invalid_server_response') throw new Error('outcome_unknown_keep_original_request_id');
+      throw error;
+    }
+    if (result?.requestId !== request.requestId || !['completed','completed_previously'].includes(result.status)) throw new Error('execution_result_invalid_keep_original_request_id');
+    if (result.status === 'completed_previously') return {...result,verified:false,
+      notice:'原请求此前已经完成，未重新执行。此历史状态不等于已复核当前全部账务，禁止换号重录。'};
+    if (result.verified !== true
+      || (request.totalXof !== undefined && result.totalXof !== request.totalXof)
+      || (request.amountXof !== undefined && result.amountXof !== request.amountXof)) throw new Error('execution_verification_failed_keep_original_request_id');
+    return {...result,notice:'已按本人明确指令执行并核验，无需打开网页再次确认。请保留原请求号；异常或重试只能沿用原号。'};
+  }
   async dailyWorkflow(operation, body) {
-    if (!['search','plan','prepare','status'].includes(operation)) throw new Error('connector_action_not_supported');
+    if (!['search','plan','prepare','execute','status'].includes(operation)) throw new Error('connector_action_not_supported');
     const manifest = await this.capabilities();
     if (manifest.dailyWorkflow?.version !== 1 || manifest.dailyWorkflow?.readOnlyPlanning !== true) throw new Error('daily_workflow_upgrade_required');
-    if (['prepare','status'].includes(operation) && manifest.dailyWorkflow.executionAvailable !== true) throw new Error('daily_workflow_upgrade_required');
+    if (['prepare','execute','status'].includes(operation) && manifest.dailyWorkflow.executionAvailable !== true) throw new Error('daily_workflow_upgrade_required');
     if (operation === 'status') return this.api(`bookings/status?requestId=${encodeURIComponent(body.requestId)}`);
+    if (operation === 'execute') {
+      const {replacesConfirmationId,...request}=body;
+      return this.directBusiness(manifest,'daily_workflow','bookings',request,replacesConfirmationId);
+    }
     if (operation !== 'prepare') return this.api(`bookings/${operation}`,body);
     const {replacesConfirmationId,...request}=body;
     const preview=await this.api('bookings/prepare',request);
@@ -83,10 +131,14 @@ export class OperatorClient {
     return {status:draft.status,requestId:request.requestId,preview:preview.preview,confirmationUrl:this.config.appUrl+draft.confirmationPath,notice:'仅创建确认单，未执行业务。请本人核对完整影响并在网页确认；未知结果按原号查询，禁止拆成单独写操作。'};
   }
   async bookingOperation(operation, body) {
-    if(!['options','preview','prepare','status'].includes(operation))throw new Error('connector_action_not_supported');
+    if(!['options','preview','prepare','execute','status'].includes(operation))throw new Error('connector_action_not_supported');
     const manifest=await this.capabilities();
     if(manifest.bookingOperations?.available!==true||manifest.bookingOperations.version!==1)throw new Error('booking_operations_upgrade_required');
     if(operation==='status')return this.api(`booking-operations/status?requestId=${encodeURIComponent(body.requestId)}`);
+    if(operation==='execute') {
+      const {replacesConfirmationId,...request}=body;
+      return this.directBusiness(manifest,'booking_operation','booking-operations',request,replacesConfirmationId);
+    }
     if(operation!=='prepare')return this.api(`booking-operations/${operation}`,body);
     const {replacesConfirmationId,...request}=body;
     const preview=await this.api('booking-operations/prepare',request);
@@ -99,9 +151,10 @@ export class OperatorClient {
     if (manifest.collectionWorkflow?.available !== true || manifest.collectionWorkflow.version !== 1) throw new Error('collection_upgrade_required');
     if (operation === 'status') return this.api(`collections/status?requestId=${encodeURIComponent(body.requestId)}`);
     if (operation === 'query') return this.api('collections/query', body);
-    if (operation !== 'prepare') throw new Error('connector_action_not_supported');
+    if (!['prepare','execute'].includes(operation)) throw new Error('connector_action_not_supported');
     const { replacesConfirmationId, ...request } = body;
     const payload = { ...request, protocolVersion: PROTOCOL, connectorVersion: VERSION };
+    if(operation==='execute') return this.directBusiness(manifest,'collection','collections',payload,replacesConfirmationId);
     const preview = await this.api('collections/prepare', payload);
     const draft = await this.api('collections/drafts', { request: payload, previewProof: preview.previewProof,
       ...(replacesConfirmationId ? { replacesConfirmationId } : {}) });
@@ -126,6 +179,18 @@ export class OperatorClient {
     if (!/^\/operator\/confirmations\/[0-9a-f-]{36}$/.test(draft.confirmationPath ?? '')) throw new Error('invalid_confirmation_link');
     return {status:draft.status,requestId:request.requestId,preview:preview.preview,
       confirmationUrl:this.config.appUrl+draft.confirmationPath,notice:'请本人打开链接核对。此结果仅为待确认，不代表收款成功。'};
+  }
+  async executePayment(request) {
+    stableRequest(request);
+    if (request.scope !== 'business_data' || request.exceptionalBusinessCase !== false
+      || request.actionName !== 'record_daily_payment' || !['natural_language','excel_screenshot'].includes(request.inputSource)) throw new Error('unsupported_scope');
+    const manifest=await this.capabilities();
+    const action=manifest.actions.find(item=>item.name==='record_daily_payment');
+    if (!action?.authorized || action.availability !== 'implemented' || action.write !== true) throw new Error('action_not_available');
+    const {replacesConfirmationId,...input}=request;
+    return this.directBusiness(manifest,'daily_payment','confirmations',{
+      ...input,protocolVersion:PROTOCOL,connectorVersion:VERSION,
+    },replacesConfirmationId);
   }
   async logout() {
     try {

@@ -4,6 +4,14 @@ import { decideOperatorExecution } from "./operator-execution-policy";
 
 export const SACSI_OPERATOR_PROTOCOL_VERSION = "1.0";
 export const SACSI_OPERATOR_MIN_CONNECTOR_VERSION = "0.1.0";
+export const OPERATOR_DIRECT_CONNECTOR_VERSION = "0.6.0";
+export const OPERATOR_DIRECT_WORKFLOWS = [
+  "daily_payment",
+  "collection",
+  "daily_workflow",
+  "booking_operation",
+] as const;
+export type OperatorDirectWorkflow = (typeof OPERATOR_DIRECT_WORKFLOWS)[number];
 export const IMPLEMENTED_OPERATOR_ACTIONS = new Set([
   "query_daily_booking",
   "record_daily_payment",
@@ -25,8 +33,14 @@ export interface OperatorProtocolManifest {
     serviceRoleAllowed: false;
     arbitrarySqlAllowed: false;
     systemChangesAllowed: false;
-    screenshotWritesRequireConfirmation: true;
-    batchWritesRequireConfirmation: true;
+    screenshotWritesRequireConfirmation: boolean;
+    batchWritesRequireConfirmation: boolean;
+  };
+  directExecution: {
+    available: boolean;
+    version: 1;
+    authorization: "explicit_instruction";
+    workflows: OperatorDirectWorkflow[];
   };
   actions: Array<{
     name: string;
@@ -47,17 +61,25 @@ export interface DatabaseOperatorCapability {
   authorization_source: "role" | "explicit_grant" | "none";
 }
 
-export function isDatabaseOperatorCapabilityList(value: unknown): value is DatabaseOperatorCapability[] {
+export function isDatabaseOperatorCapabilityList(
+  value: unknown,
+): value is DatabaseOperatorCapability[] {
   if (!Array.isArray(value)) return false;
   const names = new Set<string>();
   return value.every((row) => {
-    if (!row || typeof row !== "object" || Array.isArray(row)
-      || typeof row.action_name !== "string" || !row.action_name.trim()
-      || typeof row.authorized !== "boolean"
-      || !["role", "explicit_grant", "none"].includes(row.authorization_source)
-      || (row.authorized && row.authorization_source === "none")
-      || (!row.authorized && row.authorization_source !== "none")
-      || names.has(row.action_name)) return false;
+    if (
+      !row ||
+      typeof row !== "object" ||
+      Array.isArray(row) ||
+      typeof row.action_name !== "string" ||
+      !row.action_name.trim() ||
+      typeof row.authorized !== "boolean" ||
+      !["role", "explicit_grant", "none"].includes(row.authorization_source) ||
+      (row.authorized && row.authorization_source === "none") ||
+      (!row.authorized && row.authorization_source !== "none") ||
+      names.has(row.action_name)
+    )
+      return false;
     names.add(row.action_name);
     return true;
   });
@@ -78,14 +100,21 @@ export function buildOperatorProtocolManifest(input: {
   serverRelease?: string;
   now?: Date;
   databaseCapabilities?: DatabaseOperatorCapability[];
+  directWorkflows?: readonly OperatorDirectWorkflow[];
 }): OperatorProtocolManifest {
   const now = input.now ?? new Date();
   const databaseCapabilities = new Map(
     (input.databaseCapabilities ?? []).map((capability) => [capability.action_name, capability]),
   );
+  const directWorkflows = OPERATOR_DIRECT_WORKFLOWS.filter((workflow) =>
+    input.directWorkflows?.includes(workflow),
+  );
+  const direct = directWorkflows.length > 0;
   return {
     protocolVersion: SACSI_OPERATOR_PROTOCOL_VERSION,
-    minimumConnectorVersion: SACSI_OPERATOR_MIN_CONNECTOR_VERSION,
+    minimumConnectorVersion: direct
+      ? OPERATOR_DIRECT_CONNECTOR_VERSION
+      : SACSI_OPERATOR_MIN_CONNECTOR_VERSION,
     serverRelease: cleanRelease(input.serverRelease),
     generatedAt: now.toISOString(),
     timezone: "Africa/Abidjan",
@@ -98,8 +127,14 @@ export function buildOperatorProtocolManifest(input: {
       serviceRoleAllowed: false,
       arbitrarySqlAllowed: false,
       systemChangesAllowed: false,
-      screenshotWritesRequireConfirmation: true,
-      batchWritesRequireConfirmation: true,
+      screenshotWritesRequireConfirmation: !direct,
+      batchWritesRequireConfirmation: !direct,
+    },
+    directExecution: {
+      available: direct,
+      version: 1,
+      authorization: "explicit_instruction",
+      workflows: directWorkflows,
     },
     actions: BUSINESS_ACTIONS.map((action) => {
       const databaseCapability = databaseCapabilities.get(action.name);
