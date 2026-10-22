@@ -375,9 +375,10 @@ export function DailyRentalsResponsiveView({
         {locale === "zh" ? "刷新房态与收款快照" : "Actualiser occupation et paiements"}
       </button>
       <div key={selectedBuildingId}>{content}</div>
-      {userRole === "admin" && !windowPending && !windowError && (
+      {userRole === "admin" && (
         <BackfillLauncher
           key={`backfill-${selectedBuildingId}`}
+          disabled={windowPending || windowError}
           units={scopedDailyUnits}
           customers={currentCustomers}
           locale={locale}
