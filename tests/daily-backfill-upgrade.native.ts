@@ -65,7 +65,9 @@ it("upgrades without changing old financial rows, access or completed request re
   ) snapshot`)
     ).rows[0].snapshot;
   const before = await snapshot();
-  await db.query(readFileSync(`supabase/migrations/${file}`, "utf8"));
+  // Match the rebuild loader and the Git/production SQL byte convention.
+  // Windows checkout CRLF must not alter multiline drift-guard literals.
+  await db.query(readFileSync(`supabase/migrations/${file}`, "utf8").replaceAll("\r\n", "\n"));
   expect(await snapshot()).toEqual(before);
   await db.query("set role authenticated");
   expect((await call()).rows[0].result.idempotent).toBe(true);

@@ -741,7 +741,7 @@ it("recovers a committed-but-lost response by original identity without executin
 });
 
 it("upgrades an existing pending web payment without changing its facts, audit channel or function grants", async () => {
-  const migration = "20261022193343_operator_direct_payment_audit.sql";
+  const migration = "20261022202257_operator_direct_payment_audit.sql";
   const originalDb = db;
   const originalActor = actorId;
   const upgradeCluster = await createNativePaymentPostgres();
