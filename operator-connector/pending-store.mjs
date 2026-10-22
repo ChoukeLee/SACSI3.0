@@ -5,13 +5,15 @@ import {protect} from './session-store.mjs';
 
 // Caller holds the existing site-wide operation lock. Nothing sensitive is plaintext.
 export function pendingStore(directory,site,crypt=protect) {
+  const kinds=new Set(['note','payment','collection','daily','booking_operation','native_collection']);
   const root=join(directory,'pending-v1');mkdirSync(root,{recursive:true});
   function path(actor){if(typeof actor!=='string'||!actor)throw new Error('login_required');return join(root,createHash('sha256').update(site+'|'+actor).digest('hex')+'.dpapi');}
   function load(actor){
     const file=path(actor);if(!existsSync(file))return {formatVersion:1,site,actor,items:[]};
     let data;try{const bytes=readFileSync(file);if(bytes.length>8*1024*1024)throw new Error();data=JSON.parse(crypt(bytes,'unprotect').toString('utf8'));}catch{throw new Error('pending_storage_unreadable_do_not_reset');}
-    if(data.formatVersion!==1)throw new Error('pending_format_upgrade_required');
+    if(![1,2].includes(data.formatVersion))throw new Error('pending_format_upgrade_required');
     if(data.site!==site||data.actor!==actor||!Array.isArray(data.items)||data.items.length>500)throw new Error('pending_storage_identity_mismatch');
+    if(data.items.some(item=>!item || !kinds.has(item.kind) || (item.kind==='native_collection' && data.formatVersion!==2)))throw new Error('pending_kind_upgrade_required');
     return data;
   }
   function save(actor,data){
@@ -26,11 +28,13 @@ export function pendingStore(directory,site,crypt=protect) {
     list(actor){return load(actor).items.map(({requestId,kind,state,createdAt,updatedAt})=>({requestId,kind,state,createdAt,updatedAt}));},
     get(actor,id){const item=load(actor).items.find(x=>x.requestId===id);if(!item)throw new Error('pending_not_found');return structuredClone(item);},
     put(actor,item){
-      if(!/^[0-9a-f-]{36}$/i.test(item.requestId)||!['note','payment','collection','daily','booking_operation'].includes(item.kind))throw new Error('invalid_pending_request');
+      if(!/^[0-9a-f-]{36}$/i.test(item.requestId)||!kinds.has(item.kind))throw new Error('invalid_pending_request');
       const data=load(actor),index=data.items.findIndex(x=>x.requestId===item.requestId);
       if(index<0&&data.items.length>=500)throw new Error('pending_storage_full');
       const now=new Date().toISOString(),value={...item,createdAt:index<0?now:data.items[index].createdAt,updatedAt:now};
-      if(index<0)data.items.push(value);else data.items[index]=value;save(actor,data);return structuredClone(value);
+      if(index<0)data.items.push(value);else data.items[index]=value;
+      if(item.kind==='native_collection')data.formatVersion=2;
+      save(actor,data);return structuredClone(value);
     },
   };
 }

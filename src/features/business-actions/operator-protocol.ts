@@ -5,11 +5,13 @@ import { decideOperatorExecution } from "./operator-execution-policy";
 export const SACSI_OPERATOR_PROTOCOL_VERSION = "1.0";
 export const SACSI_OPERATOR_MIN_CONNECTOR_VERSION = "0.1.0";
 export const OPERATOR_DIRECT_CONNECTOR_VERSION = "0.6.0";
+export const OPERATOR_NATIVE_CONNECTOR_VERSION = "0.7.0";
 export const OPERATOR_DIRECT_WORKFLOWS = [
   "daily_payment",
   "collection",
   "daily_workflow",
   "booking_operation",
+  "native_collection",
 ] as const;
 export type OperatorDirectWorkflow = (typeof OPERATOR_DIRECT_WORKFLOWS)[number];
 export const IMPLEMENTED_OPERATOR_ACTIONS = new Set([
@@ -112,9 +114,11 @@ export function buildOperatorProtocolManifest(input: {
   const direct = directWorkflows.length > 0;
   return {
     protocolVersion: SACSI_OPERATOR_PROTOCOL_VERSION,
-    minimumConnectorVersion: direct
-      ? OPERATOR_DIRECT_CONNECTOR_VERSION
-      : SACSI_OPERATOR_MIN_CONNECTOR_VERSION,
+    minimumConnectorVersion: directWorkflows.includes("native_collection")
+      ? OPERATOR_NATIVE_CONNECTOR_VERSION
+      : direct
+        ? OPERATOR_DIRECT_CONNECTOR_VERSION
+        : SACSI_OPERATOR_MIN_CONNECTOR_VERSION,
     serverRelease: cleanRelease(input.serverRelease),
     generatedAt: now.toISOString(),
     timezone: "Africa/Abidjan",

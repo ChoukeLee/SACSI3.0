@@ -59,7 +59,19 @@ export async function GET(request: Request) {
     /* No published migration means no new write surface. */
   }
   const directWorkflows: OperatorDirectWorkflow[] = [];
+  let nativeCollectionAvailable = false;
   if (directExecutionEnabled()) {
+    try {
+      const [version, allowed] = await Promise.all([
+        auth.supabase.rpc("operator_native_collection_protocol_version"),
+        auth.supabase.rpc("can_execute_operator_native_collection"),
+      ]);
+      nativeCollectionAvailable =
+        !version.error && version.data === 1 && !allowed.error && allowed.data === true;
+      if (nativeCollectionAvailable) directWorkflows.push("native_collection");
+    } catch {
+      /* No native write capability until the audited transaction is installed. */
+    }
     if (collectionAvailable) directWorkflows.push("collection");
     if (dailyExecutionAvailable) directWorkflows.push("daily_workflow");
     if (bookingOperationsAvailable) directWorkflows.push("booking_operation");
@@ -136,6 +148,17 @@ export async function GET(request: Request) {
         maximumRows: 30,
         maximumAllocations: 100,
         confirmationRequired: !directCollection,
+      },
+      nativeCollectionWorkflow: {
+        available: nativeCollectionAvailable,
+        version: 1,
+        domain: "lease",
+        currencies: ["USD", "CNY"],
+        nativeOnly: true,
+        maximumAllocations: 100,
+        confirmationRequired: false,
+        automaticConversion: false,
+        paidThroughUpdate: "explicit_coverage_only",
       },
     },
     {

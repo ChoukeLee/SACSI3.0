@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {normalizeNativeCollectionRequest} from './core.mjs';
 const canonical=value=>Array.isArray(value)?`[${value.map(canonical)}]`:value&&typeof value==='object'?`{${Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+canonical(value[k])).join(',')}}`:JSON.stringify(value);
 const digest=value=>createHash('sha256').update(canonical(value)).digest('hex');
 
@@ -33,6 +34,11 @@ export function durableClient(client,store,journal,config){
   wrapped.bookingOperation=(op,body)=>['prepare','execute'].includes(op)?prepare('booking_operation',body,()=>client.bookingOperation(op,body),op==='execute'?'direct':'web'):client.bookingOperation(op,body);
   wrapped.dailyWorkflow=(op,body)=>['prepare','execute'].includes(op)?prepare('daily',body,()=>client.dailyWorkflow(op,body),op==='execute'?'direct':'web'):client.dailyWorkflow(op,body);
   wrapped.collection=(op,body)=>['prepare','execute'].includes(op)?prepare('collection',body,()=>client.collection(op,body),op==='execute'?'direct':'web'):client.collection(op,body);
+  wrapped.nativeCollection=async(op,body)=>{
+    if(op!=='execute')return client.nativeCollection(op,body);
+    const request=normalizeNativeCollectionRequest(body);
+    return prepare('native_collection',request,()=>client.nativeCollection(op,request),'direct');
+  };
   wrapped.execute=body=>body.actionName==='record_daily_payment'?prepare('payment',body,()=>client.execute(body)):client.execute(body);
   wrapped.executePayment=body=>prepare('payment',body,()=>client.executePayment(body),'direct');
   wrapped.pending=async(op,args={})=>{
@@ -50,6 +56,19 @@ export function durableClient(client,store,journal,config){
     // Online authentication and permissions are checked before consulting server state.
     await client.capabilities();
     if(item.kind==='note')return {requestId:item.requestId,state:'needs_details',sourceText:item.sourceText,notice:'请补齐订单、金额、日期、方式后，沿用原请求号准备确认单。'};
+    if(item.kind==='native_collection'){
+      if(item.executionMode!=='direct')throw new Error('pending_server_state_requires_review');
+      const result=await client.nativeCollection('status',{requestId:item.requestId});
+      if(result.requestId!==item.requestId || !['not_found','completed_previously'].includes(result.status)
+        || (result.status==='completed_previously' && result.verified!==false))throw new Error('pending_server_identity_mismatch');
+      if(result.status==='not_found'){
+        if(item.state==='completed_history')throw new Error('pending_history_conflicts_with_server');
+        return {...result,state:item.state,notice:'未找到原币执行记录，未自动重放或转为网页草稿。核对原指令后只能按原请求号明确要求继续；不能换号重录。'};
+      }
+      journal.put(owner,{...item,state:'completed_history'});
+      return {...result,verified:false,notice:'原币请求此前已经完成，禁止重录；历史完成不表示已重新核验当前全部账务。'};
+    }
+    if(!['booking_operation','daily','collection','payment'].includes(item.kind))throw new Error('pending_kind_upgrade_required');
     const result=item.kind==='booking_operation'?await client.bookingOperation('status',{requestId:item.requestId}):item.kind==='daily'?await client.dailyWorkflow('status',{requestId:item.requestId}):item.kind==='collection'?await client.collection('status',{requestId:item.requestId}):await client.api(`confirmations/status?requestId=${encodeURIComponent(item.requestId)}`);
     if(result.status==='not_found'){
       // An explicit recovery call may only recreate an unexecuted proposal using its original id.

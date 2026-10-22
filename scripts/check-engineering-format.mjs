@@ -4,6 +4,19 @@ import * as prettier from 'prettier';
 // A reviewed, explicit adoption scope. Legacy files are added when refactored;
 // this avoids burying meaningful business changes under a repository-wide reflow.
 const files = [
+  'src/app/api/operator/v1/native-collections/query/route.ts',
+  'src/app/api/operator/v1/native-collections/prepare/route.ts',
+  'src/app/api/operator/v1/native-collections/execute/route.ts',
+  'src/app/api/operator/v1/native-collections/status/route.ts',
+  'src/features/business-actions/operator-native-collection.ts',
+  'src/features/business-actions/operator-native-collection-http.ts',
+  'src/features/business-actions/operator-native-collection-verification.ts',
+  'tests/fixtures/native-collection.ts',
+  'tests/operator-native-collection.test.ts',
+  'tests/operator-native-collection-http.test.ts',
+  'tests/operator-native-connector.test.ts',
+  'tests/operator-native-collection.native.ts',
+  'tests/operator-native-direct.native.ts',
   'src/components/native-currency-summary.tsx',
   'src/components/native-currency-summary.module.css',
   'tests/native-currency-summary.test.tsx',

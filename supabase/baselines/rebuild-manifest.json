@@ -193,6 +193,10 @@
     {
       "file": "20261022202257_operator_direct_payment_audit.sql",
       "sha256": "91206d0085a2ff7a77eab19217ff6c4e58b811d96d18bcfa331a1da5c01a480a"
+    },
+    {
+      "file": "20261022223110_operator_native_collection.sql",
+      "sha256": "d97728eba0215b67d7b69d5eb10f51a0a50bb0b8bc31f4148cac46a777a373c4"
     }
   ],
   "excluded": [
