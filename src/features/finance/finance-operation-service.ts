@@ -16,6 +16,8 @@ const errors: Record<string, string> = {
   installmentAlreadyExists: "该分期编号已存在，请刷新核对。",
   ambiguousSaleReceivable: "存在同日期同金额的应收，不能自动判断分期对应关系。",
   paymentLinkRequiresReview: "原收款与本次流水不匹配或已记账，请先核对。",
+  backfillPaymentFactsRequired: "请填写补录收款的实际日期和方式，不能用退房日期代替。",
+  backfillPaymentDateInvalid: "请填写有效且不晚于今天的实际收款日期。",
 };
 export async function submitFinanceOperation<T = unknown>(
   operation: string,

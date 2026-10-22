@@ -187,6 +187,10 @@
       "sha256": "2e7e0856630159fd58f6b0c00fa3883f22a99e65f799a46993fde5188922e367"
     },
     {
+      "file": "20261022092703_daily_backfill_payment_facts.sql",
+      "sha256": "c4a68bff0b88827b58129a43a13aa5f95cc38a10743d5d3447faa18b45e12b12"
+    },
+    {
       "file": "20261022193343_operator_direct_payment_audit.sql",
       "sha256": "91206d0085a2ff7a77eab19217ff6c4e58b811d96d18bcfa331a1da5c01a480a"
     }

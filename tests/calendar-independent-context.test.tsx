@@ -2,32 +2,35 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { UnitRow } from "@/types/database";
 vi.mock("next/dynamic", () => ({
   default: (loader: () => Promise<unknown>) =>
     loader.toString().includes("mobile-daily-cards")
       ? () => null
-      : function Calendar(props: {
-          financeSnapshot?: { cash: { net: number } | null };
-          cashPending: boolean;
-          cashAsOf?: string;
-          onRetryCash: () => void;
-          onVisibleRangeChange: (from: string, to: string) => void;
-        }) {
-          return (
-            <div>
-              <span data-cash>{props.financeSnapshot?.cash?.net ?? "unknown"}</span>
-              <span data-asof>{props.cashAsOf}</span>
-              <span data-cash-pending>{String(props.cashPending)}</span>
-              <button onClick={() => props.onVisibleRangeChange("2020-01-01", "2020-01-09")}>
-                OLD RANGE
-              </button>
-              <button onClick={() => props.onVisibleRangeChange("2026-10-15", "2026-10-23")}>
-                TODAY RANGE
-              </button>
-              <button onClick={props.onRetryCash}>RETRY CASH</button>
-            </div>
-          );
-        },
+      : loader.toString().includes("booking-panel")
+        ? () => <input aria-label="合成补录内容" defaultValue="" />
+        : function Calendar(props: {
+            financeSnapshot?: { cash: { net: number } | null };
+            cashPending: boolean;
+            cashAsOf?: string;
+            onRetryCash: () => void;
+            onVisibleRangeChange: (from: string, to: string) => void;
+          }) {
+            return (
+              <div>
+                <span data-cash>{props.financeSnapshot?.cash?.net ?? "unknown"}</span>
+                <span data-asof>{props.cashAsOf}</span>
+                <span data-cash-pending>{String(props.cashPending)}</span>
+                <button onClick={() => props.onVisibleRangeChange("2020-01-01", "2020-01-09")}>
+                  OLD RANGE
+                </button>
+                <button onClick={() => props.onVisibleRangeChange("2026-10-15", "2026-10-23")}>
+                  TODAY RANGE
+                </button>
+                <button onClick={props.onRetryCash}>RETRY CASH</button>
+              </div>
+            );
+          },
 }));
 import { DailyRentalsResponsiveView } from "@/features/daily-rentals/daily-rentals-responsive-view";
 import { notifyDailyDataChanged } from "@/features/daily-rentals/daily-read-invalidation";
@@ -36,6 +39,14 @@ import {
   calendarOtherBuilding,
   calendarWindowFixture,
 } from "./fixtures/calendar-window";
+
+it.each(["admin", "front_desk", "finance", "boss"])(
+  "only exposes the backfill entry to administrators (%s)",
+  async (role) => {
+    await render(role);
+    expect(host.textContent?.includes("补录已结束住宿")).toBe(role === "admin");
+  },
+);
 let host: HTMLDivElement, root: Root;
 const fetchMock = vi.fn();
 const cashResult = (buildingId = calendarBuilding, net = 100) => ({
@@ -120,6 +131,32 @@ async function click(text: string) {
   });
 }
 const calls = (part: string) => fetchMock.mock.calls.filter(([url]) => String(url).includes(part));
+it("keeps an open backfill and its entered values across focus refresh, including a failed window read", async () => {
+  const unit = { id: "unit", building_id: calendarBuilding, unit_no: "204" } as UnitRow;
+  await render("admin", calendarWindowFixture({ dailyUnits: [unit] }));
+  await click("补录已结束住宿");
+  const field = host.querySelector('[aria-label="合成补录内容"]') as HTMLInputElement;
+  expect(field).not.toBeNull();
+  field.value = "204，10月21日，现金80000";
+  let rejectRead!: (error: Error) => void;
+  fetchMock.mockImplementation((url: string) =>
+    url.includes("/cash?")
+      ? Promise.resolve(response(cashResult()))
+      : new Promise((_resolve, reject) => {
+          rejectRead = reject;
+        }),
+  );
+  await act(async () => {
+    window.dispatchEvent(new Event("focus"));
+  });
+  expect(host.querySelector('[aria-label="合成补录内容"]')).toBe(field);
+  expect(field.value).toBe("204，10月21日，现金80000");
+  await act(async () => {
+    rejectRead(new Error("Synthetic window read failure"));
+  });
+  expect(host.querySelector('[aria-label="合成补录内容"]')).toBe(field);
+  expect(field.value).toBe("204，10月21日，现金80000");
+});
 it("loads one scalar cash snapshot independently, with no receipt or customer detail during date changes", async () => {
   await render();
   expect(host.querySelector("[data-cash]")?.textContent).toBe("100");
