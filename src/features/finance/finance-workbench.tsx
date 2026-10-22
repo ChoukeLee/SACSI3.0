@@ -147,7 +147,6 @@ export function FinanceWorkbench({
 
   return (
     <div className={styles.workbench} aria-busy={pending}>
-      <NativeCurrencySummaryPanel rows={result?.nativeSummary} kind={query.kind} locale={locale} />
       <header className={styles.heading}>
         <div>
           <p className={styles.eyebrow}>FINANCE WORKSPACE</p>
@@ -391,6 +390,11 @@ export function FinanceWorkbench({
                 </div>
               ))}
             </section>
+            <NativeCurrencySummaryPanel
+              rows={result.nativeSummary}
+              kind={query.kind}
+              locale={locale}
+            />
             <div className={styles.appliedScope}>
               <span>
                 {text("当前结果", "Résultats appliqués")}：{scopeCaption} · {dateCaption}

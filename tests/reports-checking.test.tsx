@@ -89,6 +89,77 @@ function render(data = fixture(), locale: "zh" | "fr" = "zh") {
 }
 
 describe("financial checking workspace", () => {
+  it.each(["zh", "fr"] as const)(
+    "keeps one localized native disclosure after report metrics in %s without changing XOF totals or trend",
+    (locale) => {
+      const data = fixture();
+      data.result.nativeSummary = [
+        {
+          currency: "USD",
+          income: -250,
+          expense: 0,
+          liability_in: 0,
+          liability_out: 0,
+          receivable: 0,
+          paid: 0,
+          outstanding: 0,
+          overdue: 0,
+        },
+      ];
+      const root = render(data, locale);
+      const panels = root.querySelectorAll<HTMLDetailsElement>(
+        "details[data-native-currency-summary]",
+      );
+      expect(panels).toHaveLength(1);
+      const panel = panels[0];
+      expect(panel.open).toBe(false);
+      expect(panel.dataset.nativeCurrencySummary).toBe("ledger");
+      expect(panel.previousElementSibling?.textContent).toContain(
+        locale === "zh" ? "登记净额" : "Solde inscrit",
+      );
+      expect(panel.querySelector("summary")?.textContent).toContain(
+        locale === "zh" ? "其他币种" : "Autres devises",
+      );
+      expect(panel.querySelector("summary")?.textContent).toContain("-250");
+      expect(panel.previousElementSibling?.textContent).toContain(
+        locale === "zh" ? "80.25" : "80,25",
+      );
+      expect(panel.previousElementSibling?.textContent).not.toContain("-250");
+      const trend = root.querySelector(
+        'section[aria-label="项目登记净额趋势"], section[aria-label="Tendance du solde inscrit"]',
+      );
+      expect(trend).not.toBeNull();
+      expect(trend!.textContent).not.toContain("USD");
+      expect(trend!.textContent).not.toContain("-250");
+    },
+  );
+  it("retains fully settled native receivables in collapsed report details instead of treating zero debt as no history", () => {
+    const data = fixture("receivables");
+    data.result.nativeSummary = [
+      {
+        currency: "USD",
+        income: 0,
+        expense: 0,
+        liability_in: 0,
+        liability_out: 0,
+        receivable: 19200,
+        paid: 19200,
+        outstanding: 0,
+        overdue: 0,
+      },
+    ];
+    const root = render(data);
+    const panel = root.querySelector<HTMLDetailsElement>(
+      'details[data-native-currency-summary="receivables"]',
+    )!;
+    expect(panel.open).toBe(false);
+    expect(panel.previousElementSibling?.textContent).toContain("管理应收未收");
+    expect(panel.querySelector("summary")?.textContent).toContain("19,200");
+    expect(panel.querySelector("summary")?.textContent).not.toContain("$0");
+    expect(panel.querySelectorAll("dd")).toHaveLength(4);
+    expect(panel.textContent).toContain("已核销");
+    expect(panel.textContent).toContain("不折算或并入 XOF 合计");
+  });
   it("draws negative trend values below the same zero axis as positive values", () => {
     const root = render();
     const positive = root.querySelector<HTMLElement>('a[aria-label="2026-08 · 200 XOF"] > span');

@@ -115,8 +115,6 @@ export function OperatingDashboard({
   ];
   return (
     <section className={styles.surface} aria-label={zh ? "项目经营驾驶舱" : "Pilotage du projet"}>
-      <NativeCurrencySummaryPanel rows={data.nativeSummary} kind="ledger" locale={locale} />
-      <NativeCurrencySummaryPanel rows={data.nativeSummary} kind="receivables" locale={locale} />
       <div className={styles.metrics}>
         <div className={styles.metric}>
           <div className={styles.metricLabel}>
@@ -166,6 +164,7 @@ export function OperatingDashboard({
           </span>
         </div>
       </div>
+      <NativeCurrencySummaryPanel rows={data.nativeSummary} kind="operating" locale={locale} />
       <div className={styles.grid}>
         <section>
           <div className={styles.panelHead}>

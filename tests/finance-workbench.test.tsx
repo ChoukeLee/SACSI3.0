@@ -87,6 +87,68 @@ async function click(button: Element) {
   await act(async () => button.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 }
 describe("finance checking workbench", () => {
+  it.each(["zh", "fr"] as const)(
+    "keeps native currency details after the filtered XOF summary in %s, never above the heading",
+    async (locale) => {
+      const result = baseProps().result!;
+      result.nativeSummary = [
+        {
+          currency: "USD",
+          income: -250,
+          expense: 0,
+          liability_in: 0,
+          liability_out: 0,
+          receivable: 0,
+          paid: 0,
+          outstanding: 0,
+          overdue: 0,
+        },
+      ];
+      await render({ locale, result });
+      const panels = host.querySelectorAll<HTMLDetailsElement>(
+        "details[data-native-currency-summary]",
+      );
+      expect(panels).toHaveLength(1);
+      const panel = panels[0];
+      expect(panel.open).toBe(false);
+      expect(panel.dataset.nativeCurrencySummary).toBe("ledger");
+      expect(panel.previousElementSibling?.getAttribute("aria-label")).toBe(
+        locale === "zh" ? "当前筛选范围汇总" : "Synthèse des filtres appliqués",
+      );
+      expect(
+        host.querySelector("h1")!.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(panel.querySelector("summary")?.textContent).toContain(
+        locale === "zh" ? "其他币种" : "Autres devises",
+      );
+      expect(panel.querySelector("summary")?.textContent).toContain("-250");
+      expect(panel.previousElementSibling?.textContent).not.toContain("-250");
+    },
+  );
+  it("does not leak filtered native totals into global reconciliation, even if a previous result is retained", async () => {
+    const result = baseProps().result!;
+    result.nativeSummary = [
+      {
+        currency: "USD",
+        income: 19200,
+        expense: 0,
+        liability_in: 0,
+        liability_out: 0,
+        receivable: 0,
+        paid: 0,
+        outstanding: 0,
+        overdue: 0,
+      },
+    ];
+    await render({
+      mode: "reconciliation",
+      result,
+      reconciliation: { available: true, count: 0, issues: [] },
+    });
+    expect(host.querySelector("details[data-native-currency-summary]")).toBeNull();
+    expect(host.textContent).not.toContain("19,200");
+    expect(host.textContent).toContain("不随上方项目与日期筛选变化");
+  });
   it("renders the checking workspace without fetching or auto-selecting the first record", async () => {
     await render();
     expect(host.querySelector("h1")?.textContent).toBe("财务工作台");

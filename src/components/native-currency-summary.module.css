@@ -1,0 +1,125 @@
+.root {
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.trigger {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-height: 32px;
+  padding: 6px 0;
+  color: hsl(var(--muted-foreground));
+  list-style: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.trigger::-webkit-details-marker {
+  display: none;
+}
+.trigger:hover,
+.trigger:focus-visible {
+  color: hsl(var(--foreground));
+}
+.trigger:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 4px;
+}
+.chevron {
+  align-self: flex-start;
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+.root[open] .chevron {
+  transform: rotate(90deg);
+}
+.title,
+.hint {
+  flex: 0 0 auto;
+}
+.preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  min-width: 0;
+}
+.currencyPreview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+}
+.currencyPreview strong {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.amount {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.hint {
+  margin-left: auto;
+}
+.body {
+  margin: 8px 0 4px;
+  padding: 14px 0 4px;
+  border-top: 1px solid hsl(var(--border));
+}
+.note {
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 16px;
+}
+.currencyDetail {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
+  padding: 10px 0;
+}
+.currencyDetail + .currencyDetail {
+  border-top: 1px solid hsl(var(--border));
+}
+.currencyDetail h3 {
+  font-size: 12px;
+  font-weight: 600;
+}
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+  gap: 12px 20px;
+}
+.metrics dt {
+  color: hsl(var(--muted-foreground));
+}
+.metrics dd {
+  margin-top: 3px;
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .trigger {
+    display: grid;
+    grid-template-columns: 14px auto 1fr;
+    gap: 4px 8px;
+  }
+  .preview {
+    grid-row: 2;
+    grid-column: 2 / -1;
+  }
+  .hint {
+    grid-row: 1;
+    grid-column: 3;
+  }
+  .currencyDetail {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
