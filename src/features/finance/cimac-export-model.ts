@@ -79,6 +79,21 @@ function amount(value: unknown): number {
   return result;
 }
 
+function nativeMinor(value: unknown): bigint {
+  const raw = typeof value === "number" ? String(value) : value;
+  if (typeof raw !== "string" || !/^(0|[1-9]\d{0,11})(\.\d{1,2})?$/.test(raw)) return fail();
+  const [whole, fraction = ""] = raw.split(".");
+  return BigInt(whole) * BigInt(100) + BigInt(fraction.padEnd(2, "0"));
+}
+
+function nativeLedger(row: Row): boolean {
+  return (
+    (row.currency === "CNY" || row.currency === "USD") &&
+    row.amount_native !== null &&
+    row.amount_native !== undefined
+  );
+}
+
 function isDate(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
@@ -128,6 +143,27 @@ export function decodeCimacLedger(data: unknown): Row[] {
     seen.add(key);
     if (!isDate(row.entry_date) || !directions.has(String(row.direction))) return fail();
     if (typeof row.direction !== "string" || !own(row, "amount_cny")) return fail();
+    // Old exports may lack both native fields; that is unknown, never an inferred currency.
+    if (own(row, "currency") || own(row, "amount_native")) {
+      if (
+        !own(row, "currency") ||
+        !own(row, "amount_native") ||
+        !["XOF", "CNY", "USD"].includes(String(row.currency))
+      )
+        return fail();
+      if (row.currency === "XOF") {
+        if (row.amount_native !== null) return fail();
+      } else {
+        nativeMinor(row.amount_native);
+        if (
+          amount(row.amount_xof) !== 0 ||
+          (row.currency === "CNY" &&
+            row.amount_cny !== null &&
+            nativeMinor(row.amount_cny) !== nativeMinor(row.amount_native))
+        )
+          return fail();
+      }
+    }
     return {
       ...row,
       id: key,
@@ -445,8 +481,32 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
     payment.source_id = nullableId(payment, "source_id");
     payment.source_type = text(payment.source_type);
     payment.amount = amount(payment.amount);
-    payment.exchange_rate_to_xof = amount(payment.exchange_rate_to_xof);
     payment.currency = text(payment.currency);
+    if (own(payment, "native_settlement") && typeof payment.native_settlement !== "boolean")
+      return fail();
+    if (payment.native_settlement === true) {
+      if (
+        !["CNY", "USD"].includes(String(payment.currency)) ||
+        payment.exchange_rate_to_xof !== null ||
+        nativeMinor(payment.amount) <= BigInt(0) ||
+        !["lease_rent", "lease_deposit", "lease_deposit_refund"].includes(
+          String(payment.source_type),
+        )
+      )
+        return fail();
+      const linked = references.get(key)!;
+      if (
+        linked.some(
+          (row) => !nativeLedger(row) || row.currency !== payment.currency || row.amount_xof !== 0,
+        ) ||
+        linked.reduce((sum, row) => sum + nativeMinor(row.amount_native), BigInt(0)) !==
+          nativeMinor(payment.amount)
+      )
+        return fail();
+    } else {
+      payment.exchange_rate_to_xof = amount(payment.exchange_rate_to_xof);
+      if (references.get(key)!.some(nativeLedger)) return fail();
+    }
     if (!isDate(payment.payment_date)) return fail();
     if (payment.reversal_of_payment_id !== undefined && payment.reversal_of_payment_id !== null)
       payment.reversal_of_payment_id = id(payment.reversal_of_payment_id);
@@ -515,6 +575,9 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
           "关联分录数",
           "冲销原收款 ID",
           "关联说明",
+          "分录币种（仅已登记）",
+          "未折算原币金额",
+          "折算状态",
         ]
       : [
           "Lecture à",
@@ -540,6 +603,9 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
           "Nombre d’écritures liées",
           "ID du paiement annulé",
           "Remarque du lien",
+          "Devise de l’écriture enregistrée",
+          "Montant original non converti",
+          "Statut de conversion",
         ];
     rows = ledger.map((row) => {
       const loc = location(row);
@@ -558,8 +624,8 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
         loc.unitSource,
         row.direction,
         row.category,
-        row.amount_xof,
-        row.amount_cny,
+        nativeLedger(row) ? null : row.amount_xof,
+        row.currency === "CNY" && nativeLedger(row) ? row.amount_native : row.amount_cny,
         row.payment_id,
         optionalText(payment?.receipt_no),
         optionalText(payment?.external_receipt_no),
@@ -571,6 +637,14 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
           (!payment
             ? at("未关联收款记录，不代表漏账", "Aucun paiement lié ; ne signifie pas une omission")
             : ""),
+        row.currency ?? null,
+        nativeLedger(row) ? row.amount_native : null,
+        nativeLedger(row)
+          ? at(
+              "原币登记，未折算；不计入XOF合计",
+              "Devise originale non convertie ; exclue des totaux XOF",
+            )
+          : "",
       ];
     });
   } else {
@@ -648,6 +722,7 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
         at("登记付款方式", "Mode de paiement enregistré"),
       );
     }
+    headers.push(at("折算状态", "Statut de conversion"));
     rows = [...references]
       .filter(([key]) => {
         const type = payments.get(key)!.source_type;
@@ -747,6 +822,14 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
               : methods[String(payment.payment_method)],
           );
         }
+        values.push(
+          payment.native_settlement === true
+            ? at(
+                "原币登记，未折算；不计入XOF合计",
+                "Devise originale non convertie ; exclue des totaux XOF",
+              )
+            : "",
+        );
         return values;
       });
   }

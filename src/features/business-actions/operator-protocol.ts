@@ -6,12 +6,14 @@ export const SACSI_OPERATOR_PROTOCOL_VERSION = "1.0";
 export const SACSI_OPERATOR_MIN_CONNECTOR_VERSION = "0.1.0";
 export const OPERATOR_DIRECT_CONNECTOR_VERSION = "0.6.0";
 export const OPERATOR_NATIVE_CONNECTOR_VERSION = "0.7.0";
+export const OPERATOR_CIMAC_CONNECTOR_VERSION = "0.8.0";
 export const OPERATOR_DIRECT_WORKFLOWS = [
   "daily_payment",
   "collection",
   "daily_workflow",
   "booking_operation",
   "native_collection",
+  "cimac_maintenance",
 ] as const;
 export type OperatorDirectWorkflow = (typeof OPERATOR_DIRECT_WORKFLOWS)[number];
 export const IMPLEMENTED_OPERATOR_ACTIONS = new Set([
@@ -108,17 +110,21 @@ export function buildOperatorProtocolManifest(input: {
   const databaseCapabilities = new Map(
     (input.databaseCapabilities ?? []).map((capability) => [capability.action_name, capability]),
   );
-  const directWorkflows = OPERATOR_DIRECT_WORKFLOWS.filter((workflow) =>
-    input.directWorkflows?.includes(workflow),
+  const directWorkflows = OPERATOR_DIRECT_WORKFLOWS.filter(
+    (workflow) =>
+      input.directWorkflows?.includes(workflow) &&
+      (workflow !== "cimac_maintenance" || input.user.role === "admin"),
   );
   const direct = directWorkflows.length > 0;
   return {
     protocolVersion: SACSI_OPERATOR_PROTOCOL_VERSION,
-    minimumConnectorVersion: directWorkflows.includes("native_collection")
-      ? OPERATOR_NATIVE_CONNECTOR_VERSION
-      : direct
-        ? OPERATOR_DIRECT_CONNECTOR_VERSION
-        : SACSI_OPERATOR_MIN_CONNECTOR_VERSION,
+    minimumConnectorVersion: directWorkflows.includes("cimac_maintenance")
+      ? OPERATOR_CIMAC_CONNECTOR_VERSION
+      : directWorkflows.includes("native_collection")
+        ? OPERATOR_NATIVE_CONNECTOR_VERSION
+        : direct
+          ? OPERATOR_DIRECT_CONNECTOR_VERSION
+          : SACSI_OPERATOR_MIN_CONNECTOR_VERSION,
     serverRelease: cleanRelease(input.serverRelease),
     generatedAt: now.toISOString(),
     timezone: "Africa/Abidjan",

@@ -1,4 +1,12 @@
-# SACSI 员工连接器 0.7.0
+# SACSI 员工连接器 0.8.0
+
+0.8.0 新增仅对具备 CIMAC 范围权限管理员开放的建材城受控维护：`query_cimac_maintenance`、`execute_cimac_maintenance`、`cimac_maintenance_status`。服务器必须同时验证管理员角色、CIMAC 权限、专用迁移协议和直办开关；旧页面角色或普通业务 grant 不能代替此权限。未安装迁移、RPC 返回 null/1 等非 true 值或停止直办时，不宣称维护可用，不回退到 SQL、通用 RPC 或其他收款工具。
+
+受控操作只有七类：合同价格及已确认免租/物业参数、取消未起租占位并登记实际押金退款、退原客户另建新客户押金、预留铺位归属、面积、更正/新增真实铺位预留、既有原币备注补正式流水。不能传表名、列名、任意 patch、权限或 SQL；每批最多 30 项，整批原子执行。人民币转账与 XOF 现金保留实际原币；原币补账不填写虚构汇率，旧已折算押金退款保留原历史汇率。退款仅为登记已发生业务，不调用银行。仓库等用户搁置事项不得夹带。
+
+CLI 仍使用本人 DPAPI 会话，可向 `cli.mjs execute` 发送受控命令：顶层 `actionName="cimac_maintenance"`、`operation="query"|"execute"|"status"`、`scope="business_data"`、`exceptionalBusinessCase=false`，其余为同一请求 `requestId`、`originalInstruction`、`inputSource`、七类 `operations`。`status` 只需原请求号。不要传密码、令牌或管理员数据库密钥。查询和准备不会执行；执行先查原号，再签名预览，结果要求原指令/actor/operations/每笔 payment 与 ledger 证据一致。只有 `completed` 且 `verified=true` 才报告本次完成；原号历史完成始终 `completed_previously / verified=false`，未知状态不重放。
+
+首次保存建材城维护待办时，本账号加密文件升为 v3，保留旧 v1/v2 项。恢复只查原号，不自动重放；旧连接器遇 v3 必须升级，不能删除密文绕过。0.8 仍支持原币收款，但原币 v1 的 wire stamp 保持 0.7.0，避免破坏既有数据库严格协议。管理员新能力开放后 manifest 要求最低 0.8.0，旧 0.7 会安全拒绝。
 
 0.7.0 在 0.6.0 的“明确指令后直接执行业务”通道上增加 USD/CNY 长租已有应收原币收款。当前源码和候选包不等于线上放行；必须先完成数据库迁移、服务端发布、能力核验，再替换员工连接器。旧版发布记录见仓库 docs/OPERATOR_BUSINESS_STAGE2.md。
 
@@ -8,7 +16,7 @@ Windows 独立连接器自带 Node，不要求员工安装 Git/npm，不提供�
 
 服务器 directExecution 必须声明 available=true、version=1、authorization=explicit_instruction，且包含所需 workflow。原币收款须包含 native_collection，并要求连接器 0.7.0 或更高；未开放时拒绝，不退回 XOF 工具。不能只关闭 Codex 审批或修改输入来源绕过限制。
 
-共有五个独立写工具，旧 prepare_* 仍只生成确认单：
+共有六个独立写工具，旧 prepare_* 仍只生成确认单：
 
 | 工具 | 现有业务范围 |
 | --- | --- |
@@ -17,6 +25,7 @@ Windows 独立连接器自带 Node，不要求员工安装 Git/npm，不提供�
 | execute_daily_workflow | 固定住期续住并收款、退房并收款的整件原子业务 |
 | execute_booking_operation | 预订、仅入住、取消、改期改价、未入住换房、纠正录错房号、冲正、登记实际退款、撤销误入住 |
 | execute_native_collection | 单个 USD/CNY 长租合同的已有应收收款，原币金额、最多 100 个明确应收分项，不自动修改已缴至日期 |
+| execute_cimac_maintenance | CIMAC 管理员七类受控维护，最多 30 项；不是任意数据库编辑 |
 
 原币另有只读工具 query_native_collection_position（合同 ID 或楼栋加房号）和 native_collection_status（原请求号）。prepare 仅在连接器内部获取签名预览，不产生网页待确认草稿。
 
@@ -52,7 +61,7 @@ Windows 独立连接器自带 Node，不要求员工安装 Git/npm，不提供�
 
 发布顺序见仓库 docs/OPERATOR_DIRECT_EXECUTION.md。原币上线后服务端要求最低 0.7.0；未开启时仍可查询或明确使用旧 prepare 工具。运行中的旧工具不会因源码修改自动改变。
 
-原 cli.mjs execute 仍为旧版兼容路径；新直接写入口是五个 MCP execute_* 工具，不悄悄升级旧 CLI。员工不需要同步仓库，只接收完整版本化安装包和可信渠道的校验清单。
+原 cli.mjs execute 的既有 action 仍保持旧版兼容语义；只有显式 `cimac_maintenance` 命令走本节新增受控直办，不悄悄升级旧付款 CLI。员工不需要同步仓库，只接收完整版本化安装包和可信渠道的校验清单。
 
 ## 停电、恢复和回滚
 

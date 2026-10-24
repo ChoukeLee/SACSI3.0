@@ -340,7 +340,7 @@ describe("explicit-instruction connector execution", () => {
 
   it("declares direct tools as real bounded writes, not read-only approvals", () => {
     const direct = tools.filter((tool: { name: string }) => tool.name.startsWith("execute_"));
-    expect(direct).toHaveLength(5);
+    expect(direct).toHaveLength(6);
     for (const tool of direct) {
       expect(tool.annotations.readOnlyHint).toBe(false);
       expect(tool.annotations.idempotentHint).toBe(true);

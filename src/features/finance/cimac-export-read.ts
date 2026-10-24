@@ -15,7 +15,7 @@ export class CimacExportReadError extends Error {
 
 const uuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const paymentColumns =
-  "id,unit_id,source_type,source_id,payment_date,amount,currency,exchange_rate_to_xof,receipt_no,external_receipt_no,reversal_of_payment_id,payment_method";
+  "id,unit_id,source_type,source_id,payment_date,amount,currency,exchange_rate_to_xof,native_settlement,receipt_no,external_receipt_no,reversal_of_payment_id,payment_method";
 type Row = Record<string, unknown>;
 type ReadClient = Pick<SupabaseClient, "from" | "rpc">;
 

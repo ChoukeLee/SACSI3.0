@@ -188,6 +188,37 @@ afterEach(() => {
 });
 
 describe("CIMAC dedicated finance export", () => {
+  it("reads explicit native settlement facts and exports unvalued CNY without an FX fallback", async () => {
+    const nativeEntry = {
+      ...entry,
+      amount_xof: 0,
+      amount_cny: null,
+      currency: "CNY",
+      amount_native: 2000,
+    };
+    const nativePayment = {
+      ...payment,
+      amount: 2000,
+      native_settlement: true,
+      exchange_rate_to_xof: null,
+      payment_method: "bank_transfer",
+    };
+    mocks.rpc.mockResolvedValue({ data: result([nativeEntry]), error: null });
+    mocks.related.mockImplementation(async (table: string, keys: string[]) => ({
+      data: (
+        { payments: [nativePayment], units: [unit], buildings: [building] }[table] || []
+      ).filter((row) => keys.includes(row.id)),
+      error: null,
+    }));
+    const response = await GET(request("?view=deposits"));
+    expect(response.status).toBe(200);
+    expect(mocks.selected.mock.calls.find(([table]) => table === "payments")?.[1]).toContain(
+      "native_settlement",
+    );
+    const csv = await response.text();
+    expect(csv).toContain("未折算；不计入XOF合计");
+    expect(csv).toContain('"2000","CNY",""');
+  });
   it("rejects anonymous and operations roles before any query", async () => {
     for (const user of [null, { role: "front_desk" }, { role: "rental_sales" }]) {
       mocks.user.mockResolvedValue(user);

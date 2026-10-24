@@ -171,7 +171,7 @@ describe("native currency standalone direct connector", () => {
         currency,
         amount: "0.30",
       });
-      expect(VERSION).toBe("0.7.0");
+      expect(VERSION).toBe("0.8.0");
       expect(input.amount).toBe("0.3");
       expect(transport.mock.calls.map((call) => call[0])).toEqual([
         `${config.appUrl}/api/operator/v1/capabilities`,
@@ -730,7 +730,7 @@ describe("native currency standalone direct connector", () => {
     expect(transport).toHaveBeenCalledTimes(2);
   });
   it("rejects old protocol or a newer required connector without touching native endpoints", async () => {
-    for (const change of [{ protocolVersion: "2.0" }, { minimumConnectorVersion: "0.8.0" }]) {
+    for (const change of [{ protocolVersion: "2.0" }, { minimumConnectorVersion: "0.9.0" }]) {
       const transport = vi.fn().mockResolvedValueOnce(reply({ ...manifest, ...change }));
       await expect(
         new OperatorClient(config, store(), transport).nativeCollection("execute", request()),

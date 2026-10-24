@@ -335,7 +335,7 @@ it.each([
   async ({ currency, source, amount, first, second }) => {
     const f = await seed(currency);
     const wire = connection(f);
-    expect(VERSION).toBe("0.7.0");
+    expect(VERSION).toBe("0.8.0");
     const manifest = await wire.client.capabilities();
     expect(manifest.nativeCollectionWorkflow).toMatchObject({
       available: true,

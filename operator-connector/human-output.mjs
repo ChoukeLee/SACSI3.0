@@ -10,6 +10,7 @@ export function humanResult(command,result) {
       `账号标识：${identity.userId??'未知'}`,`日租查询：${allowed('query_daily_booking')?'有权限':'不可用'}`,
       `截图收款权限：${allowed('record_daily_payment')?result.directExecution?.available?'有权限，明确指令后在 Codex 直接办理':'有权限，当前服务器仍使用网页确认':'不可用'}`,
       `USD/CNY长租原币收款：${result.directExecution?.available && result.directExecution.workflows?.includes('native_collection')?'已开放专用工具，不折算XOF':'未开放，不能改用XOF工具'}`,
+      `建材城受控维护：${identity.role==='admin' && result.cimacMaintenanceWorkflow?.available===true && result.directExecution?.workflows?.includes('cimac_maintenance')?'管理员专用已开放':'未开放，不可改用SQL或其他收款工具绕过'}`,
       '此处显示的是 SACSI 业务身份，与 Codex 订阅账号无关。共用电脑时，实际录入人必须切换为自己的 SACSI 账号。',
       result.directExecution?.available?'直接办理只使用当前账号已有业务权限；缺项或冲突时停止，退款和冲正不是实际转账。':'注意：连接成功不代表直接办理已上线，服务器未开放时不会自动绕过网页确认。',
       '确认是本人身份后，可回到 Codex 对话。请勿共用他人账号。'].join('\n');
@@ -30,6 +31,10 @@ export function humanError(code) {
     outcome_unknown_keep_original_request_id:'网络中断，结果尚不明确。请保留原请求号核查，不要重新编号录入。',
     direct_execution_not_enabled:'服务端尚未启用直接办理；本次没有改用网页确认或尝试业务写入。请联系管理员完成发布。',
     native_collection_not_available:'服务端尚未开放USD/CNY长租原币收款，未改用XOF工具、网页确认或尝试收款。请联系管理员完成发布。',
+    cimac_maintenance_not_available:'本人账号或服务端尚未开放建材城管理员受控维护，未改用SQL、通用RPC或其他业务写入。',
+    invalidCimacMaintenance:'建材城维护字段、日期、原币金额或整组分项不合法，未尝试写入。只允许受控业务类型，不支持任意表或列。',
+    cimac_maintenance_outcome_unknown:'建材城维护结果尚未核实，可能已执行；请保留原请求号查询，禁止换号或自动重放。',
+    cimacMaintenancePermissionDenied:'本人账号没有建材城管理员维护权限，不可借用他人账号或改用SQL绕过。',
     invalid_native_collection_amount:'原币金额必须为大于零、最多两位小数的十进制字符串，不能填汇率或换算XOF。',
     native_collection_allocation_mismatch:'原币收款总额与分项合计不一致，未发送收款。请核对所有分项，不要丢弃冲突项。',
     native_collection_collector_basis_required:'实际收款人与依据必须同时填写或同时留空，不能猜测为当前录入人。',

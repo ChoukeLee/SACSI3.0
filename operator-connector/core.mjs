@@ -1,6 +1,10 @@
-export const VERSION = '0.7.0';
+import { isDeepStrictEqual } from 'node:util';
+import { normalizeCimacMaintenanceRequest, verifyCimacMaintenanceResult } from './cimac-maintenance.mjs';
+export const VERSION = '0.8.0';
 export const PROTOCOL = '1.0';
-const DIRECT_WORKFLOWS = new Set(['daily_payment','collection','daily_workflow','booking_operation','native_collection']);
+// Native v1 databases require this exact wire stamp even on a newer connector.
+const NATIVE_WIRE_VERSION = '0.7.0';
+const DIRECT_WORKFLOWS = new Set(['daily_payment','collection','daily_workflow','booking_operation','native_collection','cimac_maintenance']);
 const nativeUuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 const nativeKeys = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).every(key=>keys.includes(key));
 const nativeText = (value, limit) => typeof value === 'string' && !!value.trim() && value.length <= limit;
@@ -286,7 +290,7 @@ export class OperatorClient {
       || (previous.status==='completed_previously' && previous.verified!==false))throw new Error('request_state_requires_reconciliation');
     if(operation==='status' || previous.status==='completed_previously')return {...previous,
       ...(previous.status==='completed_previously'?{verified:false,notice:'原请求此前已完成，未执行当前指令，也未重新核验当前全部账务。保留原请求号，禁止换号重录。'}:{})};
-    const request={...body,inputSource:body.inputSource??'natural_language',protocolVersion:PROTOCOL,connectorVersion:VERSION};
+    const request={...body,inputSource:body.inputSource??'natural_language',protocolVersion:PROTOCOL,connectorVersion:NATIVE_WIRE_VERSION};
     const preview=await this.api('native-collections/prepare',request);
     if(preview?.status!=='ready_for_direct_execution' || typeof preview.previewProof!=='string' || !preview.previewProof)throw new Error('invalid_execution_preview');
     let result;
@@ -299,7 +303,54 @@ export class OperatorClient {
     verifyNativeResult(result,request,manifest.identity.userId);
     return {...result,notice:'已按本人明确指令执行并核验原币长租收款；未折算或并入 XOF。请保留原请求号。'};
   }
+  async cimacMaintenance(operation,body) {
+    if(!['query','execute','status'].includes(operation))throw new Error('connector_action_not_supported');
+    if(operation==='status'){
+      if(!nativeKeys(body,['requestId']) || !nativeUuid(body.requestId))throw new Error('invalid_cimac_maintenance_request');
+      body={requestId:body.requestId.toLowerCase()};
+    }else{
+      if(operation==='execute')stableRequest(body);
+      body=normalizeCimacMaintenanceRequest(body);
+    }
+    const manifest=await this.capabilities();
+    if(manifest.identity.role!=='admin' || (operation!=='status' && (manifest.directExecution?.available!==true
+      || !manifest.directExecution.workflows.includes('cimac_maintenance') || manifest.cimacMaintenanceWorkflow?.available!==true
+      || manifest.cimacMaintenanceWorkflow.version!==1)))throw new Error('cimac_maintenance_not_available');
+    if(operation==='query')return this.api('cimac-maintenance/query',body);
+    const previous=await this.api(`cimac-maintenance/status?requestId=${encodeURIComponent(body.requestId)}`);
+    if(!previous || previous.requestId!==body.requestId || !['not_found','completed_previously'].includes(previous.status)
+      || (previous.status==='completed_previously' && (previous.verified!==false || previous.actorId!==manifest.identity.userId)))throw new Error('request_state_requires_reconciliation');
+    if(operation==='status')return {...previous,verified:false};
+    if(previous.status==='completed_previously'){
+      if(!isDeepStrictEqual(previous.request,body))throw new Error('request_state_requires_reconciliation');
+      return {...previous,verified:false,notice:'原请求此前完成，未重新执行或核验当前账务；保留原号，禁止换号重录。'};
+    }
+    const preview=await this.api('cimac-maintenance/prepare',body);
+    if(preview?.status==='completed_previously'){
+      if(preview.requestId!==body.requestId || preview.actorId!==manifest.identity.userId || preview.verified!==false)throw new Error('execution_result_invalid_keep_original_request_id');
+      return {...preview,verified:false};
+    }
+    if(preview?.status!=='ready_for_direct_execution' || preview.requestId!==body.requestId
+      || preview.preview?.requestId!==body.requestId || preview.preview?.operationCount!==body.operations.length
+      || typeof preview.preview?.snapshot?.fingerprint!=='string' || !preview.preview.snapshot.fingerprint
+      || typeof preview.preview?.snapshot?.requestHash!=='string' || !preview.preview.snapshot.requestHash
+      || typeof preview.previewProof!=='string' || !preview.previewProof)throw new Error('invalid_execution_preview');
+    let result;
+    try{result=await this.api('cimac-maintenance/execute',{request:body,previewProof:preview.previewProof});}
+    catch(error){if(error?.message==='invalid_server_response')throw new Error('outcome_unknown_keep_original_request_id');throw error;}
+    if(result?.status==='completed_previously'){
+      if(result.requestId!==body.requestId || result.actorId!==manifest.identity.userId || result.verified!==false)throw new Error('execution_result_invalid_keep_original_request_id');
+      return {...result,verified:false};
+    }
+    if(result?.executionMode!=='explicit_instruction' || !verifyCimacMaintenanceResult(result,body,manifest.identity.userId))throw new Error('execution_verification_failed_keep_original_request_id');
+    return {...result,notice:'已按明确指令执行并核验建材城受控维护；退款仅为登记已发生资金业务。保留原请求号。'};
+  }
   async execute(request) {
+    if(request?.actionName==='cimac_maintenance'){
+      const {actionName,operation,scope,exceptionalBusinessCase,...body}=request;
+      if(scope!=='business_data' || exceptionalBusinessCase!==false)throw new Error('unsupported_scope');
+      return this.cimacMaintenance(operation,body);
+    }
     if (!request || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(request.requestId ?? '')) throw new Error('stable_request_uuid_required');
     if (request.scope!=='business_data' || request.exceptionalBusinessCase!==false) throw new Error('unsupported_scope');
     const manifest=await this.capabilities();
