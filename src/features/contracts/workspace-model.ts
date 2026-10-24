@@ -10,6 +10,7 @@ import type {
 import type { LeaseBuilding } from "@/features/leases/project-scope";
 import type { ContractReceivableSummary, ContractSort } from "./contract-list-model";
 import type { LeaseOverdueResolution } from "@/features/leases/lease-receivable-summary";
+import { readCimacContractAllocation } from "./cimac-contract-allocation";
 export type WorkspaceKind = "lease" | "sale";
 export type WorkspaceMode = "list" | "scope" | "detail" | "context";
 export type WorkspaceContract = LeaseContractRow | SaleContractRow;
@@ -354,7 +355,29 @@ export function decodeWorkspace(
   }
   if (mode === "detail") {
     for (const payment of data.payments as PaymentRow[]) {
-      if (payment.source_id !== contractId || !paymentTypes[kind].includes(payment.source_type))
+      if (payment.source_type === "cimac_customer_collection") {
+        const contract = (data.contracts as WorkspaceContract[]).find((c) => c.id === contractId);
+        const allocation =
+          kind === "lease" && contract
+            ? readCimacContractAllocation(payment, contractId, contract.customer_id)
+            : null;
+        if (
+          !allocation ||
+          !allocation.receivableIds.every((id) =>
+            (data.receivables as ReceivableRow[]).some(
+              (r) =>
+                r.id === id &&
+                r.source_type === "lease_contract" &&
+                r.source_id === contractId &&
+                ["lease_rent", "property_fee"].includes(r.category),
+            ),
+          )
+        )
+          throw new WorkspaceReadError();
+      } else if (
+        payment.source_id !== contractId ||
+        !paymentTypes[kind].includes(payment.source_type)
+      )
         throw new WorkspaceReadError();
       decimal(payment.amount);
       if (payment.exchange_rate_to_xof !== null) decimal(payment.exchange_rate_to_xof);

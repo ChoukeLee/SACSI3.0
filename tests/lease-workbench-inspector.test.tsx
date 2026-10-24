@@ -411,4 +411,45 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect(host.textContent).toContain("原币结算");
     expect(host.textContent).toContain("非现金抵扣");
   });
+
+  it("shows only this contract's allocation of a shared customer receipt in cash and record history", async () => {
+    const contractId = "33333333-3333-4333-8333-333333333333";
+    const customerId = "55555555-5555-4555-8555-555555555555";
+    const shared = {
+      ...payment(),
+      id: "11111111-1111-4111-8111-111111111111",
+      customer_id: customerId,
+      unit_id: null,
+      source_id: customerId,
+      source_type: "cimac_customer_collection",
+      amount: 640000,
+      exchange_rate_to_xof: 1,
+      native_settlement: false,
+      request_kind: "cimac_customer_collection",
+      request_id: "22222222-2222-4222-8222-222222222222",
+      reversal_of_payment_id: null,
+      receipt_no: "ONE-ACTUAL-RECEIPT",
+      actual_collector: "测试实收人",
+      cimac_contract_allocation: {
+        contractId,
+        amount: "600000",
+        currency: "XOF",
+        receivableIds: ["77777777-7777-4777-8777-777777777777"],
+      },
+    };
+    await render({
+      contract: { ...contract, id: contractId, customer_id: customerId },
+      payments: [shared],
+      initialSection: "finance",
+    });
+    expect(fact("已录经营收款")).toBe("600,000 XOF");
+    await tab("记录");
+    expect(host.querySelectorAll("ol li")).toHaveLength(1);
+    expect(host.textContent).toContain("客户总账 · 本合同分配");
+    expect(host.textContent).toContain("+600,000 XOF");
+    expect(host.textContent).toContain("ONE-ACTUAL-RECEIPT");
+    expect(host.textContent).toContain("不复制整笔实收");
+    expect(host.textContent).not.toContain("640,000");
+    expect(host.textContent).toContain("测试实收人");
+  });
 });

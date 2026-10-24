@@ -13,6 +13,7 @@ import {
 import { resolveContractProjectLink } from "./project-link";
 import type { LeaseBuilding } from "@/features/leases/project-scope";
 import { projectLeaseWorkspaceUnit } from "@/features/leases/lease-unit-projection";
+import { decodeCimacLeaseCollectionProjection } from "./cimac-contract-allocation";
 import {
   defaultLeaseScope,
   leaseScopeCookieName,
@@ -33,7 +34,33 @@ export async function readWorkspace(
   });
   if (error)
     throw new WorkspaceReadError(error.code === "42501" ? 403 : error.code === "22023" ? 400 : 503);
-  const decoded = decodeWorkspace(data, kind, query, mode, contractId);
+  let decoded = decodeWorkspace(data, kind, query, mode, contractId);
+  if (kind === "lease" && mode === "detail" && contractId) {
+    const contract = decoded.contracts.find((row) => row.id === contractId);
+    if (!contract) throw new WorkspaceReadError();
+    const projection = await client.rpc("cimac_lease_collection_projection_rpc", {
+      p_contract_id: contractId,
+    });
+    if (projection.error || !projection.data) throw new WorkspaceReadError();
+    const attributed = decodeCimacLeaseCollectionProjection(
+      projection.data,
+      contractId,
+      contract.customer_id,
+    );
+    const existing = new Set(decoded.payments.map((payment) => payment.id));
+    if (attributed.some((payment) => existing.has(payment.id))) throw new WorkspaceReadError();
+    decoded = decodeWorkspace(
+      {
+        ...decoded,
+        payments: [...decoded.payments, ...attributed],
+        paymentCount: decoded.paymentCount + attributed.length,
+      },
+      kind,
+      query,
+      mode,
+      contractId,
+    );
+  }
   return kind === "lease"
     ? { ...decoded, units: decoded.units.map(projectLeaseWorkspaceUnit) }
     : decoded;

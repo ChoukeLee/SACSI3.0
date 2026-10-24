@@ -1,6 +1,10 @@
 "use client";
 import Link from "next/link";
 import { leaseRentLabel } from "@/lib/native-money";
+import {
+  paymentBelongsToContract,
+  readCimacContractAllocation,
+} from "@/features/contracts/cimac-contract-allocation";
 import { formatMoney, paymentDisplay } from "@/lib/currency";
 import { NativeLeaseFinance } from "./native-lease-finance";
 import { getOriginalMonthlyRent, getRecordedOriginalPayment } from "./lease-display-model";
@@ -167,7 +171,9 @@ function InspectorContent({
     );
   }
 
-  const contractPayments = payments.filter((payment) => payment.source_id === contract.id);
+  const contractPayments = payments.filter((payment) =>
+    paymentBelongsToContract(payment, contract.id),
+  );
   const contractReceivables = receivables.filter(
     (row) => row.source_type === "lease_contract" && row.source_id === contract.id,
   );
@@ -512,18 +518,25 @@ function InspectorContent({
             ) : (
               <ol className="divide-y divide-border/60">
                 {orderedPayments.map((payment) => {
+                  const allocation = readCimacContractAllocation(
+                    payment,
+                    contract.id,
+                    contract.customer_id,
+                  );
                   const line = classifyContractCashPayment(payment);
                   const original = getRecordedOriginalPayment(payment);
                   const display = paymentDisplay(payment, locale);
                   const config = getLeaseFinancialConfigBySourceType(payment.source_type);
-                  const label = config
-                    ? text(config.labelZh, config.labelFr)
-                    : payment.source_type === "lease_deposit_deduction"
-                      ? text("押金扣款", "Retenue sur dépôt")
-                      : payment.source_type === "lease_rent_refund"
-                        ? text("租金退款", "Remboursement de loyer")
-                        : (categories[payment.source_type as keyof typeof categories] ??
-                          text("其他财务记录", "Autre écriture"));
+                  const label = allocation
+                    ? text("客户总账 · 本合同分配", "Compte client · part de ce contrat")
+                    : config
+                      ? text(config.labelZh, config.labelFr)
+                      : payment.source_type === "lease_deposit_deduction"
+                        ? text("押金扣款", "Retenue sur dépôt")
+                        : payment.source_type === "lease_rent_refund"
+                          ? text("租金退款", "Remboursement de loyer")
+                          : (categories[payment.source_type as keyof typeof categories] ??
+                            text("其他财务记录", "Autre écriture"));
                   const sign =
                     line.kind === "expense" || line.kind === "deposit_out"
                       ? "−"
@@ -540,10 +553,21 @@ function InspectorContent({
                       </div>
                       <p className="mt-1.5 text-sm font-semibold tabular-nums">
                         {sign}
-                        {original
-                          ? formatMoney(original.amount, original.currency, locale)
-                          : display.primary}
+                        {allocation
+                          ? money(Number(allocation.amount))
+                          : original
+                            ? formatMoney(original.amount, original.currency, locale)
+                            : display.primary}
                       </p>
+                      {allocation ? (
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          {text(
+                            "仅计入本合同已核销份额；同一原始收据可能覆盖多份合同，不复制整笔实收。",
+                            "Seule la part imputée à ce contrat est comptée. Le reçu d’origine peut couvrir plusieurs contrats ; son total n’est pas dupliqué.",
+                          )}
+                          {` ${payment.receipt_no ?? payment.id}`}
+                        </p>
+                      ) : null}
                       {line.kind === "excluded" ? (
                         <p className="mt-1 text-xs leading-5 text-muted-foreground">
                           {payment.native_settlement

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { CIMAC_PROJECT_ID } from "@/features/finance/cimac-export-model";
 vi.mock("server-only", () => ({}));
 import {
   FinanceRecordContextReadError,
@@ -21,30 +22,46 @@ type Row = Record<string, unknown>;
 let data: Record<string, Row[]>;
 let errors: Record<string, { code?: string; message?: string }>;
 let calls: { table: string; id: string; columns: string }[];
+const proofRpc = vi.fn();
 const client = {
+  rpc: proofRpc,
   from(table: string) {
     return {
       select(columns: string) {
         return {
           eq(key: string, id: string) {
-            expect(key).toBe("id");
+            expect(["id", "payment_id"]).toContain(key);
             calls.push({ table, id, columns });
             return {
               maybeSingle: async () => ({
                 data: data[table]?.find((row) => row.id === id) ?? null,
                 error: errors[table] ?? null,
               }),
+              limit: async (limit: number) => ({
+                data: (data[table] ?? []).filter((row) => row[key] === id).slice(0, limit),
+                error: errors[table] ?? null,
+              }),
             };
+          },
+          in(key: string, keys: string[]) {
+            expect(key).toBe("id");
+            calls.push({ table, id: keys.join("/"), columns });
+            return Promise.resolve({
+              data: (data[table] ?? []).filter((row) => keys.includes(String(row.id))),
+              error: errors[table] ?? null,
+            });
           },
         };
       },
     };
   },
-} as unknown as Pick<SupabaseClient, "from">;
+} as unknown as Pick<SupabaseClient, "from" | "rpc">;
 const query = { kind: "ledger" as const, id: ids.entry };
 beforeEach(() => {
   calls = [];
   errors = {};
+  proofRpc.mockReset();
+  proofRpc.mockResolvedValue({ data: true, error: null });
   data = {
     ledger_entries: [
       {
@@ -102,6 +119,117 @@ beforeEach(() => {
     daily_bookings: [],
     customers: [{ id: ids.customer, name: "历史合同客户" }],
   };
+});
+
+function customerCollectionFixture() {
+  data.buildings[0].project_id = CIMAC_PROJECT_ID;
+  data.buildings.push({
+    id: ids.otherBuilding,
+    project_id: CIMAC_PROJECT_ID,
+    display_name: "其他授权CIMAC楼栋",
+  });
+  Object.assign(data.ledger_entries[0], {
+    direction: "income",
+    category: "property_fee",
+    amount_xof: "1000",
+    currency: "XOF",
+    amount_native: null,
+  });
+  data.ledger_entries.push({
+    ...data.ledger_entries[0],
+    id: "55555555-5555-4555-8555-555555555555",
+    unit_id: ids.otherUnit,
+    building_id: ids.otherBuilding,
+    category: "lease_rent",
+    amount_xof: "2000",
+  });
+  Object.assign(data.payments[0], {
+    unit_id: null,
+    source_type: "cimac_customer_collection",
+    source_id: ids.customer,
+    currency: "XOF",
+    amount: "3000",
+    exchange_rate_to_xof: 1,
+    native_settlement: false,
+    payment_date: "2026-10-15",
+    payment_method: "cash",
+  });
+  Object.assign(data.receivables[0], {
+    category: "property_fee",
+    currency: "XOF",
+    amount_native: null,
+    paid_amount_native: null,
+  });
+  const otherReceivable = "66666666-6666-4666-8666-666666666666";
+  data.receivables.push({
+    ...data.receivables[0],
+    id: otherReceivable,
+    unit_id: ids.otherUnit,
+    building_id: ids.otherBuilding,
+    source_id: "77777777-7777-4777-8777-777777777777",
+    category: "lease_rent",
+  });
+  data.payment_receivable_allocations = [
+    { payment_id: ids.payment, receivable_id: ids.entry, amount_xof: "1000" },
+    { payment_id: ids.payment, receivable_id: otherReceivable, amount_xof: "2000" },
+  ];
+}
+
+describe("customer collection exact selected-record context", () => {
+  it("uses sealed proof and explicit allocations without changing the customer-level header source into a contract", async () => {
+    customerCollectionFixture();
+    const result = await readFinanceRecordContext(client, query);
+    expect(proofRpc).toHaveBeenCalledWith("cimac_customer_collection_proof_rpc", {
+      p_payment_id: ids.payment,
+    });
+    expect(result).toMatchObject({
+      amountXof: 1000,
+      customer: { id: ids.customer, label: "历史合同客户" },
+      paymentMethod: "cash",
+      source: {
+        type: "cimac_customer_collection",
+        id: ids.customer,
+        label: "L-OLD",
+        href: null,
+        linkKind: null,
+      },
+    });
+    expect(result.paymentId).toBe(ids.payment);
+    expect(calls.some((call) => call.table === "lease_contracts" && call.id === ids.customer)).toBe(
+      false,
+    );
+    expect(result.period).toBeNull();
+  });
+  it.each([
+    "unsealed",
+    "other-customer",
+    "other-project",
+    "truncated",
+    "shifted",
+    "hidden-receivable",
+  ])(
+    "keeps inconsistent %s association unknown without zeroing the selected entry",
+    async (kind) => {
+      customerCollectionFixture();
+      if (kind === "unsealed") proofRpc.mockResolvedValue({ data: false, error: null });
+      if (kind === "other-customer") data.receivables[1].customer_id = ids.otherUnit;
+      if (kind === "other-project") data.buildings[1].project_id = ids.project;
+      if (kind === "truncated") data.payment_receivable_allocations.pop();
+      if (kind === "shifted") data.ledger_entries[1].amount_xof = "1000";
+      if (kind === "hidden-receivable") data.receivables.pop();
+      const result = await readFinanceRecordContext(client, query);
+      expect(result.amountXof).toBe(1000);
+      expect(result.source).toBeNull();
+      expect(result.customer).toBeNull();
+    },
+  );
+  it("preserves an original financial customer instead of substituting a later contract customer", async () => {
+    customerCollectionFixture();
+    data.lease_contracts[0].customer_id = ids.otherUnit;
+    const result = await readFinanceRecordContext(client, query);
+    expect(result.customer?.id).toBe(ids.customer);
+    expect(result.source?.label).toBeNull();
+  });
 });
 describe("selected finance record read", () => {
   it("reads exact IDs, retains ledger date and liabilities, never calls RPC or scans all pages", async () => {

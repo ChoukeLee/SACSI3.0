@@ -43,7 +43,10 @@ beforeAll(async () => {
       "select md5(pg_get_functiondef('daily_calendar_window_rpc(uuid,date,date)'::regprocedure)) hash",
     )
   ).rows[0].hash;
-  await db.query(readFileSync(resolve("supabase/migrations", migration), "utf8"));
+  // Windows checkout CRLF must not become part of the migration's exact SQL anchors.
+  await db.query(
+    readFileSync(resolve("supabase/migrations", migration), "utf8").replace(/\r\n/g, "\n"),
+  );
   await db.query("insert into auth.users(id,email) values($1,'context@test.invalid')", [actor]);
   await db.query(
     "insert into user_profiles(id,role,display_name) values($1,'admin','Synthetic context')",

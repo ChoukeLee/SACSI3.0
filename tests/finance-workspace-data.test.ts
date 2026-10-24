@@ -5,6 +5,9 @@ const mock = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), metadataError: fal
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => mock }));
 vi.mock("@/features/finance/finance-workbench", () => ({ FinanceWorkbench: () => null }));
+vi.mock("@/features/finance/cimac-customer-workbench", () => ({
+  CimacCustomerWorkbench: () => null,
+}));
 import { FinanceWorkspace } from "@/features/finance/finance-workspace";
 const project = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   building = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -39,7 +42,10 @@ beforeEach(() => {
     error: null,
   }));
 });
-async function load(params: Record<string, string | undefined> = {}, canWrite = true) {
+async function load(
+  params: Record<string, string | undefined> = { kind: "ledger" },
+  canWrite = true,
+) {
   return (await FinanceWorkspace({
     params,
     locale: "zh",
@@ -48,9 +54,9 @@ async function load(params: Record<string, string | undefined> = {}, canWrite = 
 }
 describe("finance server read path", () => {
   it.each([true, false])(
-    "first load does not fetch all units or run a reconciliation scan, write=%s",
+    "explicit ledger does not fetch all units or run a reconciliation scan, write=%s",
     async (canWrite) => {
-      const page = await load({}, canWrite);
+      const page = await load({ kind: "ledger" }, canWrite);
       expect(mock.from.mock.calls.map((c) => c[0])).toEqual(["buildings", "projects"]);
       expect(mock.rpc).toHaveBeenCalledExactlyOnceWith("finance_read_rpc", {
         p_kind: "ledger",

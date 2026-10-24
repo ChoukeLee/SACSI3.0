@@ -1,5 +1,6 @@
 import type { PaymentRow } from "@/types/database";
 import { historicalXofAmount } from "@/lib/financial-amount";
+import { readCimacContractAllocation } from "./cimac-contract-allocation";
 
 export type ContractCashKind = "income" | "expense" | "deposit_in" | "deposit_out" | "excluded";
 export interface ContractCashLine {
@@ -41,6 +42,12 @@ const EXPENSE_TYPES = new Set([
 
 /** Contract cash projection only. No note guessing, FX defaults, or allocation inference. */
 export function classifyContractCashPayment(payment: PaymentRow): ContractCashLine {
+  if (payment.source_type === "cimac_customer_collection") {
+    const allocation = readCimacContractAllocation(payment);
+    return allocation
+      ? { kind: "income", amountXof: Number(allocation.amount) }
+      : { kind: "excluded", amountXof: null, reason: "unsupported_source" };
+  }
   if (payment.native_settlement)
     return { kind: "excluded", amountXof: null, reason: "native_currency" };
   if (payment.payment_method === "offset")

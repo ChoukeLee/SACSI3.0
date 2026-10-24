@@ -192,6 +192,7 @@ export const financeIssueLabels: Record<"zh" | "fr", Record<string, string>> = {
     sale_schedule_status_disagreement: "出售计划与应收结清状态不一致",
     allocation_amount_mismatch: "收款分配金额不一致",
     duplicate_payment_ledger: "同一付款关联多笔分录（需核对，不一定重复）",
+    cimac_customer_collection_mismatch: "客户总账收款分配或分录不一致",
   },
   fr: {
     sale_schedule_unlinked: "Échéance sans lien avec une créance (ne prouve pas une dette)",
@@ -201,5 +202,7 @@ export const financeIssueLabels: Record<"zh" | "fr", Record<string, string>> = {
     allocation_amount_mismatch: "Montant réparti incohérent",
     duplicate_payment_ledger:
       "Plusieurs écritures pour un paiement (à vérifier, pas forcément un doublon)",
+    cimac_customer_collection_mismatch:
+      "Répartition ou écritures d’un encaissement client incohérentes",
   },
 };

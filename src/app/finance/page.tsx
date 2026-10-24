@@ -22,6 +22,7 @@ export default async function FinancePage({
           params={await searchParams}
           locale="zh"
           canWrite={user.role === "admin" || user.role === "finance"}
+          viewerId={user.id}
         />
       </Suspense>
     </div>

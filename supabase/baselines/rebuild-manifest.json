@@ -201,6 +201,14 @@
     {
       "file": "20261024213304_cimac_preopening_controlled_maintenance.sql",
       "sha256": "33c7efc81fb0284065e7e6f96aa4ad395f4f72ba0355eb58f372120e6c1b80e4"
+    },
+    {
+      "file": "20261024222516_cimac_customer_billing_workbench.sql",
+      "sha256": "372ab1ecfde756051246919f40870b25239f25d9dadef8831f0cb49a9fb668a2"
+    },
+    {
+      "file": "20261024223452_cimac_customer_billing_set_based_read.sql",
+      "sha256": "29e3a7ab2d61a3779b6bf447775f7cc17d3a2a5efdfb46803e66cf76e18d9ab5"
     }
   ],
   "excluded": [

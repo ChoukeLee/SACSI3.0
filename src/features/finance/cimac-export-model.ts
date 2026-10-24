@@ -24,6 +24,11 @@ export type CimacExportBundle = {
   units: Row[];
   buildings: Row[];
   receivables?: Row[];
+  /** Exact read-only proof for customer-level receipts in the property-fee export. */
+  allocations?: Row[];
+  collectionReceivables?: Row[];
+  collectionLedger?: Row[];
+  verifiedCollectionPaymentIds?: string[];
 };
 
 const uuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
@@ -428,6 +433,150 @@ function specialPayment(payment: Row, linked: Row[]): void {
   }
 }
 
+function customerPropertyFeeProof(
+  bundle: CimacExportBundle,
+  payments: Map<string, Row>,
+  references: Map<string, Row[]>,
+  units: Map<string, Row>,
+  buildings: Map<string, Row>,
+): Map<
+  string,
+  { amountXof: string; receivableIds: string[]; hasFee: boolean; ambiguous: boolean }
+> {
+  const targets = [...payments].filter(
+    ([, payment]) => payment.source_type === "cimac_customer_collection",
+  );
+  const proof = new Map<
+    string,
+    { amountXof: string; receivableIds: string[]; hasFee: boolean; ambiguous: boolean }
+  >();
+  if (!targets.length) return proof;
+  if (
+    !Array.isArray(bundle.allocations) ||
+    !Array.isArray(bundle.collectionReceivables) ||
+    !Array.isArray(bundle.collectionLedger) ||
+    !Array.isArray(bundle.verifiedCollectionPaymentIds)
+  )
+    return fail();
+  const receivables = indexed(bundle.collectionReceivables);
+  const targetIds = new Set(targets.map(([key]) => key));
+  const verified = new Set(bundle.verifiedCollectionPaymentIds.map(id));
+  if (verified.size !== targetIds.size || [...targetIds].some((key) => !verified.has(key)))
+    return fail();
+  const fullLedger = decodeCimacLedger({
+    kind: "ledger",
+    total: bundle.collectionLedger.length,
+    rows: bundle.collectionLedger,
+  });
+  if (fullLedger.some((row) => !targetIds.has(String(row.payment_id)))) return fail();
+  const usedReceivables = new Set<string>();
+  const usedAllocationIds = new Set<string>();
+  for (const allocation of bundle.allocations) {
+    if (!targetIds.has(id(allocation.payment_id))) return fail();
+  }
+  for (const [key, payment] of targets) {
+    const customerId = id(payment.customer_id);
+    if (
+      payment.unit_id !== null ||
+      payment.source_id !== customerId ||
+      payment.currency !== "XOF" ||
+      payment.native_settlement === true ||
+      amount(payment.exchange_rate_to_xof) !== 1
+    )
+      return fail();
+    const linked = fullLedger.filter((row) => row.payment_id === key);
+    const allocations = bundle.allocations.filter((row) => row.payment_id === key);
+    if (!allocations.length || allocations.length > 100) return fail();
+    const allocationTargets = new Map<string, string[]>(),
+      ledgerCounts = new Map<string, number>();
+    let total = BigInt(0),
+      fee = BigInt(0);
+    const feeIds: string[] = [];
+    for (const allocation of allocations) {
+      const receivableId = id(allocation.receivable_id),
+        allocationId = `${key}:${receivableId}`;
+      if (usedAllocationIds.has(allocationId)) return fail();
+      usedAllocationIds.add(allocationId);
+      usedReceivables.add(receivableId);
+      const row = receivables.get(receivableId);
+      if (
+        !row ||
+        row.customer_id !== customerId ||
+        row.source_type !== "lease_contract" ||
+        !["lease_rent", "property_fee"].includes(String(row.category)) ||
+        row.currency !== "XOF"
+      )
+        return fail();
+      id(row.source_id);
+      const unitId = id(row.unit_id),
+        buildingId = id(row.building_id);
+      if (
+        !units.has(unitId) ||
+        units.get(unitId)!.building_id !== buildingId ||
+        buildings.get(buildingId)?.project_id !== CIMAC_PROJECT_ID
+      )
+        return fail();
+      const piece = nativeMinor(allocation.amount_xof);
+      if (piece <= BigInt(0) || piece % BigInt(100) !== BigInt(0)) return fail();
+      total += piece;
+      const group = `${unitId}:${buildingId}:${row.category}:${piece}`;
+      allocationTargets.set(group, [...(allocationTargets.get(group) ?? []), receivableId]);
+    }
+    for (const row of linked) {
+      if (
+        row.direction !== "income" ||
+        row.entry_date !== payment.payment_date ||
+        row.currency !== "XOF" ||
+        row.amount_native !== null ||
+        !["lease_rent", "property_fee"].includes(String(row.category))
+      )
+        return fail();
+      const group = `${id(row.unit_id)}:${id(row.building_id)}:${row.category}:${nativeMinor(row.amount_xof)}`;
+      ledgerCounts.set(group, (ledgerCounts.get(group) ?? 0) + 1);
+    }
+    if (
+      linked.length !== allocations.length ||
+      total !== nativeMinor(payment.amount) ||
+      allocationTargets.size !== ledgerCounts.size ||
+      [...allocationTargets].some(([group, values]) => ledgerCounts.get(group) !== values.length)
+    )
+      return fail();
+    const fullById = new Map(linked.map((row) => [row.id, row]));
+    const selectedGroups = new Map<string, number>();
+    for (const row of references.get(key)!) {
+      const original = fullById.get(row.id);
+      if (
+        !original ||
+        ["unit_id", "building_id", "category", "entry_date", "direction", "currency"].some(
+          (field) => original[field] !== row[field],
+        ) ||
+        nativeMinor(original.amount_xof) !== nativeMinor(row.amount_xof)
+      )
+        return fail();
+      if (row.category !== "property_fee") continue;
+      const piece = nativeMinor(row.amount_xof),
+        group = `${row.unit_id}:${row.building_id}:${row.category}:${piece}`;
+      fee += piece;
+      selectedGroups.set(group, (selectedGroups.get(group) ?? 0) + 1);
+    }
+    let ambiguous = false;
+    for (const [group, count] of selectedGroups) {
+      const ids = allocationTargets.get(group)!;
+      if (count === ids.length) feeIds.push(...ids);
+      else if (count < ids.length) ambiguous = true;
+      else return fail();
+    }
+    proof.set(key, {
+      amountXof: String(fee / BigInt(100)),
+      receivableIds: feeIds,
+      hasFee: fee > BigInt(0),
+      ambiguous,
+    });
+  }
+  if (usedReceivables.size !== receivables.size) return fail();
+  return proof;
+}
+
 export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuery): string {
   const checkedQuery = parseCimacExportQuery(
     new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined)),
@@ -523,6 +672,13 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
       ? cimacShopPropertyFeeNotice(checkedQuery.locale)
       : "";
   if (special) for (const [key, payment] of payments) specialPayment(payment, references.get(key)!);
+  const propertyProof =
+    checkedQuery.view === "property-fee-payments"
+      ? customerPropertyFeeProof(bundle, payments, references, units, buildings)
+      : new Map<
+          string,
+          { amountXof: string; receivableIds: string[]; hasFee: boolean; ambiguous: boolean }
+        >();
   const location = (row: Row) => {
     const payment = row.payment_id === null ? undefined : payments.get(String(row.payment_id));
     const effectiveUnit = row.unit_id ?? payment?.unit_id ?? null;
@@ -722,6 +878,20 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
         at("登记付款方式", "Mode de paiement enregistré"),
       );
     }
+    if (checkedQuery.view === "property-fee-payments") {
+      headers.push(
+        at(
+          "客户总账整笔实收原币金额（仅参考，不作为物业费合计）",
+          "Encaissement total du compte client (référence, pas un total de charges)",
+        ),
+        at("物业费关联分录金额 XOF", "Montant des écritures de charges XOF"),
+        at(
+          "其中已验证核销金额 XOF（历史未知留空）",
+          "Dont imputation vérifiée XOF (historique inconnu : vide)",
+        ),
+        at("已验证物业费应收 ID", "ID des créances de charges vérifiées"),
+      );
+    }
     headers.push(at("折算状态", "Statut de conversion"));
     rows = [...references]
       .filter(([key]) => {
@@ -733,11 +903,18 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
               String(type),
             )) ||
           (checkedQuery.view === "refunds" && type === "lease_deposit_refund") ||
-          (checkedQuery.view === "property-fee-payments" && type === "property_fee")
+          (checkedQuery.view === "property-fee-payments" &&
+            (type === "property_fee" ||
+              (type === "cimac_customer_collection" && propertyProof.get(key)?.hasFee)))
         );
       })
       .map(([key, linked]) => {
         const payment = payments.get(key)!;
+        if (
+          checkedQuery.view === "property-fee-payments" &&
+          payment.source_type === "cimac_customer_collection"
+        )
+          linked = linked.filter((row) => row.category === "property_fee");
         const locations = linked.map(location);
         const values = [
           bundle.readAt,
@@ -757,7 +934,10 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
           payment.source_id,
           optionalText(payment.receipt_no),
           optionalText(payment.external_receipt_no),
-          payment.amount,
+          checkedQuery.view === "property-fee-payments" &&
+          payment.source_type === "cimac_customer_collection"
+            ? null
+            : payment.amount,
           payment.currency,
           payment.exchange_rate_to_xof,
           unique(linked.map((row) => row.direction)),
@@ -766,6 +946,12 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
           payment.reversal_of_payment_id ?? null,
           unique([
             ...locations.map((loc) => loc.note),
+            propertyProof.get(key)?.ambiguous
+              ? at(
+                  "当前范围只含同组部分分录，具体应收无法唯一对应；不猜账期或应收编号",
+                  "Périmètre partiel d’un groupe identique : créance précise non attribuable sans ambiguïté ; aucune période ni référence déduite",
+                )
+              : "",
             linked.length > 1
               ? at(
                   "同一凭证关联多条分录；原币仅列一次，不自动分摊",
@@ -796,10 +982,15 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
                         "登记押金收入，不代表当前余额或可退额",
                         "Dépôt reçu enregistré, pas un solde actuel ni un montant remboursable",
                       )
-                    : at(
-                        "登记物业费收款，不推导服务账期或已核销金额",
-                        "Paiement de charges enregistré, sans déduction de période ni montant imputé",
-                      );
+                    : payment.source_type === "cimac_customer_collection"
+                      ? at(
+                          "客户总账混合实收，物业费仅按明确核销分配列示；整笔支付金额为参考，不重复计入物业费",
+                          "Encaissement multi-contrats : charges selon les affectations explicites uniquement ; montant total du paiement fourni en référence, sans double comptage",
+                        )
+                      : at(
+                          "登记物业费收款，不推导服务账期或已核销金额",
+                          "Paiement de charges enregistré, sans déduction de période ni montant imputé",
+                        );
           const methods: Record<string, string> = zh
             ? {
                 cash: "现金",
@@ -820,6 +1011,14 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
             payment.payment_method === null
               ? at("未登记", "Non enregistré")
               : methods[String(payment.payment_method)],
+          );
+        }
+        if (checkedQuery.view === "property-fee-payments") {
+          values.push(
+            payment.source_type === "cimac_customer_collection" ? payment.amount : null,
+            linked.reduce((sum, row) => sum + amount(row.amount_xof), 0),
+            propertyProof.get(key)?.amountXof ?? null,
+            propertyProof.get(key)?.receivableIds.join(" / ") ?? null,
           );
         }
         values.push(

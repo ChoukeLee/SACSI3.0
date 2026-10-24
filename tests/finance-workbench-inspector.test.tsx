@@ -145,6 +145,37 @@ async function click(label: string) {
 }
 
 describe("FinanceWorkbenchInspector selected-record facts", () => {
+  it.each(["zh", "fr"] as const)(
+    "keeps protected customer collection facts read-only in %s without a single-unit operation link",
+    async (locale) => {
+      fetchMock.mockImplementation(async (url: string) =>
+        response(
+          url.includes("/payment-context/")
+            ? { ...payment, unitId: null, buildingId: null }
+            : {
+                ...context,
+                source: {
+                  type: "cimac_customer_collection",
+                  id: customerId,
+                  label: "TEST-CONTRACT-001",
+                  href: null,
+                  linkKind: null,
+                },
+              },
+        ),
+      );
+      await render({ canWrite: true, locale });
+      expect(host.querySelector("button[data-payment]")?.getAttribute("data-writable")).toBe(
+        "false",
+      );
+      expect(host.textContent).toContain(
+        locale === "zh"
+          ? "客户级更正流程尚未开放"
+          : "correction multi-contrats n’est pas encore ouverte",
+      );
+      expect(host.querySelector("a")).toBeNull();
+    },
+  );
   it("does not fetch or invent amounts before a row is selected", async () => {
     await render({ row: null });
     expect(fetchMock).not.toHaveBeenCalled();

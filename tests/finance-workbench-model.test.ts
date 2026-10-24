@@ -135,6 +135,10 @@ describe("finance workbench boundaries", () => {
   });
   it("does not call all multi-line allocations duplicates", () =>
     expect(financeIssueLabels.zh.duplicate_payment_ledger).toContain("不一定重复"));
+  it("labels proven customer receipt reconciliation errors in both languages", () => {
+    expect(financeIssueLabels.zh.cimac_customer_collection_mismatch).toContain("客户总账");
+    expect(financeIssueLabels.fr.cimac_customer_collection_mismatch).toContain("incohérentes");
+  });
   it("does not conflate a reconciliation read failure with zero issues", () => {
     expect(decodeFinanceReconciliation({ count: 0, issues: [] })).toEqual({
       available: true,
