@@ -452,4 +452,72 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect(host.textContent).not.toContain("640,000");
     expect(host.textContent).toContain("测试实收人");
   });
+
+  it.each(["refund", "reversal"] as const)(
+    "shows %s as a separate negative contract share, preserving the original receipt without a doubled minus",
+    async (kind) => {
+      const contractId = "33333333-3333-4333-8333-333333333333";
+      const customerId = "55555555-5555-4555-8555-555555555555";
+      const originalId = "11111111-1111-4111-8111-111111111111";
+      const original = {
+        ...payment(),
+        id: originalId,
+        customer_id: customerId,
+        unit_id: null,
+        source_id: customerId,
+        source_type: "cimac_customer_collection",
+        amount: 640000,
+        native_settlement: false,
+        request_kind: "cimac_customer_collection",
+        request_id: "22222222-2222-4222-8222-222222222222",
+        reversal_of_payment_id: null,
+        receipt_no: "ORIGINAL-RECEIPT",
+        cimac_contract_allocation: {
+          contractId,
+          amount: "600000",
+          currency: "XOF",
+          receivableIds: ["77777777-7777-4777-8777-777777777777"],
+        },
+      };
+      const child = {
+        ...original,
+        id: "88888888-8888-4888-8888-888888888888",
+        source_type: `cimac_customer_${kind}`,
+        source_id: originalId,
+        request_kind: `cimac_customer_${kind}`,
+        request_id: "99999999-9999-4999-8999-999999999999",
+        amount: kind === "refund" ? 24000 : -640000,
+        payment_method: kind === "refund" ? ("cash" as const) : ("offset" as const),
+        reversal_of_payment_id: kind === "reversal" ? originalId : null,
+        receipt_no: "CHILD-CORRECTION",
+        recorded_by: "TEST-OPERATOR",
+        cimac_contract_allocation: {
+          ...original.cimac_contract_allocation,
+          amount: kind === "refund" ? "-20000" : "-600000",
+          adjustmentKind: kind,
+          originalPaymentId: originalId,
+        },
+      };
+      await render({
+        contract: { ...contract, id: contractId, customer_id: customerId },
+        payments: [original, child],
+        initialSection: "finance",
+      });
+      expect(fact("已录经营收款")).toBe(kind === "refund" ? "600,000 XOF" : "0 XOF");
+      if (kind === "refund") expect(fact("已录经营支出")).toBe("20,000 XOF");
+      await tab("记录");
+      expect(host.textContent).toContain("+600,000 XOF");
+      expect(host.textContent).toContain(kind === "refund" ? "−20,000 XOF" : "−600,000 XOF");
+      expect(host.textContent).not.toMatch(/\+[-−]|−-/);
+      expect(host.textContent).toContain(
+        kind === "refund" ? "本合同实际退款" : "错误收款冲正（非现金）",
+      );
+      expect(host.textContent).toContain("ORIGINAL-RECEIPT");
+      expect(host.textContent).toContain("CHILD-CORRECTION");
+      expect(host.textContent).not.toContain("640,000");
+      expect(
+        host.querySelector(`a[href*="#cimac-payment-${originalId}"]`)?.getAttribute("href"),
+      ).toContain(`customerId=${customerId}`);
+    },
+  );
 });

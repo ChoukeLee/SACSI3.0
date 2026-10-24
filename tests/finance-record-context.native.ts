@@ -69,6 +69,7 @@ const allowedColumns: Record<string, readonly string[]> = {
     "exchange_rate_to_xof",
     "native_settlement",
     "payment_date",
+    "reversal_of_payment_id",
   ],
   lease_contracts: ["id", "unit_id", "customer_id", "contract_no"],
   sale_contracts: ["id", "unit_id", "customer_id", "contract_no"],

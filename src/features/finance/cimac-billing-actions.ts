@@ -8,6 +8,9 @@ import type {
   CimacCollectionInput,
   CimacFeeTermInput,
   CimacMeterReadingInput,
+  CimacRefundInput,
+  CimacReversalInput,
+  CimacCollectionPositionResult,
 } from "./cimac-billing-types";
 import {
   decodeCimacWriteReceipt,
@@ -16,6 +19,9 @@ import {
   parseCimacFeeTermInput,
   parseCimacMeterReadingInput,
   parseCimacRequestId,
+  parseCimacRefundInput,
+  parseCimacReversalInput,
+  decodeCimacCollectionPosition,
   type CimacRequestInput,
   type CimacWriteReceiptResult,
   type CimacWriteResult,
@@ -34,7 +40,12 @@ const errors: Record<string, string> = {
 };
 const unknownResult =
   "操作结果暂未确认，请保留原操作编号和原内容，查询结果或原号重试，避免重复录入。";
-type WriteInput = CimacCollectionInput | CimacFeeTermInput | CimacMeterReadingInput;
+type WriteInput =
+  | CimacCollectionInput
+  | CimacFeeTermInput
+  | CimacMeterReadingInput
+  | CimacRefundInput
+  | CimacReversalInput;
 
 // Reviewed in each RPC: these guards run only after the request advisory lock
 // and after proving no earlier same-ID journal result exists. Target/permission/
@@ -43,6 +54,8 @@ const definiteRejections: Record<CimacBillingWriteKind, readonly string[]> = {
   collection: ["cimacBillingSnapshotChanged"],
   fee_terms: ["cimacBillingSnapshotChanged"],
   meter_reading: ["cimacBillingSnapshotChanged"],
+  refund: ["cimacBillingSnapshotChanged"],
+  reversal: ["cimacBillingSnapshotChanged"],
 };
 
 async function invalidate(customerId: string) {
@@ -131,6 +144,47 @@ export async function saveCimacMeterReading(
   raw: CimacRequestInput<CimacMeterReadingInput>,
 ): Promise<CimacWriteResult> {
   return write(raw, parseCimacMeterReadingInput, "meter_reading", "cimac_save_meter_reading_rpc");
+}
+
+/** Registers money actually returned; never initiates a bank transfer or waives the debt. */
+export async function recordCimacRefund(
+  raw: CimacRequestInput<CimacRefundInput>,
+): Promise<CimacWriteResult> {
+  return write(raw, parseCimacRefundInput, "refund", "cimac_refund_collection_rpc");
+}
+
+/** Full erroneous-receipt correction, not registration of a real refund. */
+export async function reverseCimacCollection(
+  raw: CimacRequestInput<CimacReversalInput>,
+): Promise<CimacWriteResult> {
+  return write(raw, parseCimacReversalInput, "reversal", "cimac_reverse_collection_rpc");
+}
+
+/** Lazy, scoped read of the original immutable receipt and all verified adjustments. */
+export async function readCimacCollectionPosition(
+  originalPaymentId: string,
+): Promise<CimacCollectionPositionResult> {
+  await requireRole("admin", "finance", "boss");
+  let target: string;
+  try {
+    target = parseCimacRequestId(originalPaymentId);
+  } catch {
+    return { status: "unavailable", error: "缺少有效的原收款标识，无法读取可退或可冲正位置。" };
+  }
+  try {
+    const client = await createClient();
+    const { data, error } = await client.rpc("cimac_collection_position_rpc", {
+      p_original_payment_id: target,
+    });
+    if (error)
+      return {
+        status: "unavailable",
+        error: errors[error.message] ?? "暂时无法核验原收款及调整链，请刷新重试。",
+      };
+    return { status: "available", position: decodeCimacCollectionPosition(data, target) };
+  } catch {
+    return { status: "unavailable", error: "暂时无法核验原收款及调整链，请刷新重试。" };
+  }
 }
 
 /** Read-only recovery; not_found is not proof an in-flight transaction cannot commit. */

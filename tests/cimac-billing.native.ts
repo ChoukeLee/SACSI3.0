@@ -74,6 +74,12 @@ beforeAll(async () => {
       "utf8",
     ),
   );
+  await db.query(
+    await readFile(
+      "supabase/migrations/20261024232058_cimac_customer_collection_adjustments.sql",
+      "utf8",
+    ),
+  );
   migrationPreservedHistory =
     JSON.stringify((await owner(snapshotSql)).rows[0].value) === JSON.stringify(before);
 }, 45000);

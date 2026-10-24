@@ -87,6 +87,12 @@ beforeAll(async () => {
         .value,
     });
   await owner(await readFile(`supabase/migrations/${migration}`, "utf8"));
+  await owner(
+    await readFile(
+      "supabase/migrations/20261024232058_cimac_customer_collection_adjustments.sql",
+      "utf8",
+    ),
+  );
 }, 45000);
 afterAll(async () => {
   await cluster?.close();

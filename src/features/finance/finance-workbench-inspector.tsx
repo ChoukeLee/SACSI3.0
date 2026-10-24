@@ -123,7 +123,15 @@ function InspectorContent({
   }
 
   const { record, payment } = data;
-  const customerCollection = record.source?.type === "cimac_customer_collection";
+  const customerCollection = [
+    "cimac_customer_collection",
+    "cimac_customer_refund",
+    "cimac_customer_reversal",
+  ].includes(record.source?.type ?? "");
+  const customerAccountHref =
+    customerCollection && record.customer?.id
+      ? `${locale === "fr" ? "/fr" : ""}/finance?view=customers&customerId=${encodeURIComponent(record.customer.id)}&tab=receipts`
+      : null;
   const deposit =
     record.direction === "liability_in" ||
     record.direction === "liability_out" ||
@@ -390,7 +398,7 @@ function InspectorContent({
             {text("刷新详情", "Actualiser le détail")}
           </button>
         </div>
-        {payment ? (
+        {payment && !customerCollection ? (
           <p className="text-[11px] leading-5 text-muted-foreground">
             {text(
               "付款事实确认后，关闭抽屉并刷新详情读取最新记录；金额、币种与付款日仍由原业务流程办理。",
@@ -401,9 +409,20 @@ function InspectorContent({
         {customerCollection ? (
           <p className="text-[11px] leading-5 text-muted-foreground">
             {text(
-              "这是受核销保护的客户总账收款。当前只读核对；不能使用旧单房修改、退款、冲正或付款事实确认入口，客户级更正流程尚未开放。",
-              "Encaissement du compte client protégé par ses imputations. Lecture seule : les anciennes modifications, remboursements, annulations et confirmations par lot ne s’appliquent pas. La correction multi-contrats n’est pas encore ouverte.",
+              "这是受保护的客户总账收款或校正记录。此处只读核对，不能使用旧单房修改、退款、冲正或付款事实确认入口；请从客户总账的原收款区分办理实际退款与错误冲正。历史旧单仍沿用原流程。",
+              "Reçu ou correction du compte client protégé. Lecture seule ici ; les anciennes opérations par lot ne s’appliquent pas. Ouvrez le reçu d’origine dans le compte client pour distinguer remboursement réel et contrepassation d’erreur. Les anciens reçus gardent leur processus existant.",
             )}
+            {customerAccountHref ? (
+              <>
+                {" "}
+                <a
+                  href={customerAccountHref}
+                  className="font-medium text-blue-700 hover:underline dark:text-blue-300"
+                >
+                  {text("打开客户总账原收款", "Ouvrir les reçus du compte client")} ↗
+                </a>
+              </>
+            ) : null}
           </p>
         ) : null}
       </footer>

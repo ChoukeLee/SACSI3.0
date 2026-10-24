@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { adjustmentHistory } from "./fixtures/cimac-adjustments";
 import { CIMAC_PROJECT_ID } from "@/features/finance/cimac-export-model";
 vi.mock("server-only", () => ({}));
 import {
@@ -229,6 +230,90 @@ describe("customer collection exact selected-record context", () => {
     const result = await readFinanceRecordContext(client, query);
     expect(result.customer?.id).toBe(ids.customer);
     expect(result.source?.label).toBeNull();
+  });
+});
+
+function correctionContextFixture(kind: "refund" | "reversal") {
+  customerCollectionFixture();
+  const originalId = "88888888-8888-4888-8888-888888888888",
+    a = adjustmentHistory(kind),
+    reverse = kind === "reversal";
+  Object.assign(a, {
+    originalPaymentId: originalId,
+    paymentId: ids.payment,
+    paymentDate: "2026-10-15",
+    effectiveDate: "2026-10-15",
+    amount: reverse ? "3000" : "300",
+    allocations: [
+      { receivableId: ids.entry, amount: reverse ? "1000" : "100" },
+      { receivableId: String(data.receivables[1].id), amount: reverse ? "2000" : "200" },
+    ],
+  });
+  Object.assign(data.payments[0], {
+    source_type: reverse ? "cimac_customer_reversal" : "cimac_customer_refund",
+    source_id: originalId,
+    amount: reverse ? "-3000" : "300",
+    payment_method: a.paymentMethod,
+    reversal_of_payment_id: reverse ? originalId : null,
+  });
+  for (const [index, line] of data.ledger_entries.entries())
+    line.amount_xof = String(-Number(a.allocations[index].amount));
+  proofRpc.mockImplementation(async (name: string) =>
+    name === "cimac_collection_adjustments_rpc"
+      ? { data: [{ paymentId: ids.payment, adjustment: a }], error: null }
+      : { data: true, error: null },
+  );
+  return a;
+}
+describe("verified correction selected-record context", () => {
+  it.each(["refund", "reversal"] as const)(
+    "reads %s negative ledger attribution without treating original payment ID as a contract",
+    async (kind) => {
+      const a = correctionContextFixture(kind),
+        result = await readFinanceRecordContext(client, query);
+      expect(result.amountXof).toBe(kind === "refund" ? -100 : -1000);
+      expect(result.source).toMatchObject({
+        type: kind === "refund" ? "cimac_customer_refund" : "cimac_customer_reversal",
+        id: a.originalPaymentId,
+        label: "L-OLD",
+      });
+      expect(result.customer?.id).toBe(ids.customer);
+      expect(result.paymentMethod).toBe(kind === "refund" ? "bank_transfer" : "offset");
+      expect(proofRpc).toHaveBeenCalledWith("cimac_collection_adjustments_rpc", {
+        p_payment_ids: [ids.payment],
+      });
+      expect(calls.some((c) => c.table === "payment_receivable_allocations")).toBe(false);
+      expect(calls.some((c) => c.table === "lease_contracts" && c.id === a.originalPaymentId)).toBe(
+        false,
+      );
+      expect(result.period).toBeNull();
+    },
+  );
+  it.each(["wrong-original", "wrong-header", "wrong-sign", "wrong-method", "foreign-target"])(
+    "does not attach misleading source/customer information for %s",
+    async (kind) => {
+      const a = correctionContextFixture("refund");
+      if (kind === "wrong-original") a.originalPaymentId = ids.otherUnit;
+      if (kind === "wrong-header") data.payments[0].amount = "301";
+      if (kind === "wrong-sign") data.ledger_entries[0].amount_xof = "100";
+      if (kind === "wrong-method") data.payments[0].payment_method = "cash";
+      if (kind === "foreign-target") data.receivables[1].customer_id = ids.otherUnit;
+      const result = await readFinanceRecordContext(client, query);
+      expect(result.source).toBeNull();
+      expect(result.customer).toBeNull();
+      expect(Math.abs(result.amountXof)).toBe(100);
+    },
+  );
+  it("rejects unavailable or incomplete private correction proof rather than guessing from negative ledger groups", async () => {
+    correctionContextFixture("refund");
+    proofRpc.mockImplementation(async (name: string) =>
+      name === "cimac_collection_adjustments_rpc"
+        ? { data: [], error: null }
+        : { data: true, error: null },
+    );
+    await expect(readFinanceRecordContext(client, query)).rejects.toThrow(
+      "CimacAdjustmentReadUnavailable",
+    );
   });
 });
 describe("selected finance record read", () => {

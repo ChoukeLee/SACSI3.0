@@ -390,7 +390,14 @@ function CustomerAccountContent({
                   />
                 ) : null}
                 {tab === "receipts" ? (
-                  <CimacCustomerReceipts data={data} locale={locale} returnHref={href()} />
+                  <CimacCustomerReceipts
+                    data={data}
+                    locale={locale}
+                    returnHref={href()}
+                    viewerId={viewerId}
+                    today={today}
+                    canWrite={writable}
+                  />
                 ) : null}
                 {tab === "meters" ? (
                   <CimacMeterPanel

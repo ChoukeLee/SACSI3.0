@@ -528,7 +528,17 @@ function InspectorContent({
                   const display = paymentDisplay(payment, locale);
                   const config = getLeaseFinancialConfigBySourceType(payment.source_type);
                   const label = allocation
-                    ? text("客户总账 · 本合同分配", "Compte client · part de ce contrat")
+                    ? allocation.adjustmentKind === "refund"
+                      ? text(
+                          "客户总账 · 本合同实际退款",
+                          "Compte client · remboursement réel de ce contrat",
+                        )
+                      : allocation.adjustmentKind === "reversal"
+                        ? text(
+                            "客户总账 · 本合同错误收款冲正（非现金）",
+                            "Compte client · contrepassation d’erreur (hors caisse)",
+                          )
+                        : text("客户总账 · 本合同分配", "Compte client · part de ce contrat")
                     : config
                       ? text(config.labelZh, config.labelFr)
                       : payment.source_type === "lease_deposit_deduction"
@@ -538,7 +548,9 @@ function InspectorContent({
                           : (categories[payment.source_type as keyof typeof categories] ??
                             text("其他财务记录", "Autre écriture"));
                   const sign =
-                    line.kind === "expense" || line.kind === "deposit_out"
+                    allocation?.adjustmentKind ||
+                    line.kind === "expense" ||
+                    line.kind === "deposit_out"
                       ? "−"
                       : line.kind === "income" || line.kind === "deposit_in"
                         ? "+"
@@ -554,18 +566,42 @@ function InspectorContent({
                       <p className="mt-1.5 text-sm font-semibold tabular-nums">
                         {sign}
                         {allocation
-                          ? money(Number(allocation.amount))
+                          ? money(Math.abs(Number(allocation.amount)))
                           : original
                             ? formatMoney(original.amount, original.currency, locale)
                             : display.primary}
                       </p>
                       {allocation ? (
                         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                          {text(
-                            "仅计入本合同已核销份额；同一原始收据可能覆盖多份合同，不复制整笔实收。",
-                            "Seule la part imputée à ce contrat est comptée. Le reçu d’origine peut couvrir plusieurs contrats ; son total n’est pas dupliqué.",
-                          )}
+                          {allocation.adjustmentKind
+                            ? text(
+                                allocation.adjustmentKind === "refund"
+                                  ? "仅登记本合同已实际退回的份额，恢复相应应收，不自动免除合同义务。"
+                                  : "仅纠正本合同原错误收款份额，恢复相应应收；非实际退款。",
+                                allocation.adjustmentKind === "refund"
+                                  ? "Seule la part réellement remboursée de ce contrat est enregistrée. Créances rétablies, sans remise des obligations."
+                                  : "Seule la part erronée de ce contrat est contrepassée. Créances rétablies, sans remboursement réel.",
+                              )
+                            : text(
+                                "仅计入本合同已核销份额；同一原始收据可能覆盖多份合同，不复制整笔实收。",
+                                "Seule la part imputée à ce contrat est comptée. Le reçu d’origine peut couvrir plusieurs contrats ; son total n’est pas dupliqué.",
+                              )}
                           {` ${payment.receipt_no ?? payment.id}`}
+                          {allocation.originalPaymentId && contract.customer_id ? (
+                            <>
+                              {" "}
+                              <Link
+                                href={`${locale === "fr" ? "/fr" : ""}/finance?view=customers&customerId=${encodeURIComponent(contract.customer_id)}&tab=receipts#cimac-payment-${allocation.originalPaymentId}`}
+                                className="text-blue-700 hover:underline dark:text-blue-300"
+                              >
+                                {text(
+                                  "查看原收款及校正链",
+                                  "Voir le reçu d’origine et ses corrections",
+                                )}{" "}
+                                ↗
+                              </Link>
+                            </>
+                          ) : null}
                         </p>
                       ) : null}
                       {line.kind === "excluded" ? (
@@ -583,8 +619,13 @@ function InspectorContent({
                         </p>
                       ) : null}
                       <p className="mt-1 break-words text-xs leading-5 text-muted-foreground">
-                        {text("实收人", "Encaisseur")}:{" "}
-                        {payment.actual_collector || text("待核对", "À vérifier")}
+                        {allocation?.adjustmentKind
+                          ? text("录入账号", "Opérateur")
+                          : text("实收人", "Encaisseur")}
+                        :{" "}
+                        {(allocation?.adjustmentKind
+                          ? payment.recorded_by
+                          : payment.actual_collector) || text("待核对", "À vérifier")}
                         {payment.receipt_no ? ` · ${payment.receipt_no}` : ""}
                       </p>
                     </li>

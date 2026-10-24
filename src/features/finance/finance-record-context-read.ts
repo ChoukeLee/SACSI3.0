@@ -2,6 +2,8 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FinanceKind } from "./finance-read";
 import { CIMAC_PROJECT_ID } from "./cimac-export-model";
+import { isCimacProtectedPayment, cimacAdjustmentKind } from "./cimac-payment-kinds";
+import { readCimacCollectionAdjustments } from "./cimac-adjustment-read";
 import {
   decodeFinanceRecordContext,
   financeRecordContextUuid,
@@ -81,6 +83,10 @@ function minor(value: unknown): bigint {
   const [whole, fraction = ""] = raw.split(".");
   return BigInt(whole) * BigInt(100) + BigInt(fraction.padEnd(2, "0"));
 }
+function signedMinor(value: unknown): bigint {
+  const raw = typeof value === "number" ? String(value) : value;
+  return typeof raw === "string" && raw.startsWith("-") ? -minor(raw.slice(1)) : minor(raw);
+}
 
 /** A customer receipt is never relabelled as a single-contract payment header. */
 async function readCustomerCollectionContext(
@@ -89,11 +95,13 @@ async function readCustomerCollectionContext(
   row: Row,
   payment: Row,
 ): Promise<FinanceRecordContext> {
+  const adjustmentKind = cimacAdjustmentKind(String(payment.source_type)),
+    sign = adjustmentKind ? -BigInt(1) : BigInt(1);
   if (
     !context.unit ||
     context.building?.projectId !== CIMAC_PROJECT_ID ||
     payment.unit_id !== null ||
-    payment.source_id !== payment.customer_id ||
+    (!adjustmentKind && payment.source_id !== payment.customer_id) ||
     payment.currency !== "XOF" ||
     payment.native_settlement !== false ||
     numeric(payment.exchange_rate_to_xof) !== 1 ||
@@ -112,12 +120,41 @@ async function readCustomerCollectionContext(
   if (proof.error)
     throw new FinanceRecordContextReadError(proof.error.code === "42501" ? 403 : 503);
   if (proof.data !== true) return decodeFinanceRecordContext(context);
+  const adjustment = adjustmentKind
+    ? (
+        await readCimacCollectionAdjustments({ rpc: client.rpc.bind(client) }, [String(payment.id)])
+      )[0]
+    : null;
+  if (
+    adjustmentKind &&
+    (!adjustment ||
+      adjustment.kind !== adjustmentKind ||
+      adjustment.originalPaymentId !== payment.source_id ||
+      adjustment.paymentId !== payment.id ||
+      adjustment.paymentDate !== payment.payment_date ||
+      adjustment.paymentMethod !== payment.payment_method ||
+      (adjustmentKind === "reversal"
+        ? payment.reversal_of_payment_id !== adjustment.originalPaymentId
+        : payment.reversal_of_payment_id !== null) ||
+      signedMinor(payment.amount) !==
+        (adjustmentKind === "reversal" ? -minor(adjustment.amount) : minor(adjustment.amount)))
+  )
+    return decodeFinanceRecordContext(context);
   const [allocationResult, ledgerResult] = await Promise.all([
-    client
-      .from("payment_receivable_allocations")
-      .select("payment_id,receivable_id,amount_xof")
-      .eq("payment_id", String(payment.id))
-      .limit(101),
+    adjustment
+      ? Promise.resolve({
+          data: adjustment.allocations.map((link) => ({
+            payment_id: payment.id,
+            receivable_id: link.receivableId,
+            amount_xof: link.amount,
+          })),
+          error: null,
+        })
+      : client
+          .from("payment_receivable_allocations")
+          .select("payment_id,receivable_id,amount_xof")
+          .eq("payment_id", String(payment.id))
+          .limit(101),
     client
       .from("ledger_entries")
       .select(ledgerColumns)
@@ -187,8 +224,9 @@ async function readCustomerCollectionContext(
   const matchingContracts = new Set<string>();
   for (const allocation of allocations) {
     const receivable = byId.get(allocation.receivable_id)!;
-    const value = minor(allocation.amount_xof);
-    if (value <= BigInt(0)) return decodeFinanceRecordContext(context);
+    const magnitude = minor(allocation.amount_xof),
+      value = magnitude * sign;
+    if (magnitude <= BigInt(0)) return decodeFinanceRecordContext(context);
     const key = `${receivable.unit_id}:${receivable.building_id}:${receivable.category}`;
     groups.set(key, (groups.get(key) ?? BigInt(0)) + value);
     total += value;
@@ -196,7 +234,7 @@ async function readCustomerCollectionContext(
       receivable.unit_id === row.unit_id &&
       receivable.building_id === row.building_id &&
       receivable.category === row.category &&
-      value === minor(row.amount_xof)
+      value === signedMinor(row.amount_xof)
     )
       matchingContracts.add(String(receivable.source_id));
   }
@@ -215,7 +253,9 @@ async function readCustomerCollectionContext(
       return decodeFinanceRecordContext(context);
     seen.add(entryId);
     const key = `${entry.unit_id}:${entry.building_id}:${entry.category}`;
-    posted.set(key, (posted.get(key) ?? BigInt(0)) + minor(entry.amount_xof));
+    const piece = signedMinor(entry.amount_xof);
+    if (piece * sign <= BigInt(0)) return decodeFinanceRecordContext(context);
+    posted.set(key, (posted.get(key) ?? BigInt(0)) + piece);
   }
   const principal = ledger.find((entry) => entry.id === row.id);
   if (
@@ -223,8 +263,8 @@ async function readCustomerCollectionContext(
     ["unit_id", "building_id", "category", "entry_date"].some(
       (key) => principal[key] !== row[key],
     ) ||
-    minor(principal.amount_xof) !== minor(row.amount_xof) ||
-    total !== minor(payment.amount) ||
+    signedMinor(principal.amount_xof) !== signedMinor(row.amount_xof) ||
+    total !== (adjustment ? -minor(adjustment.amount) : minor(payment.amount)) ||
     groups.size !== posted.size ||
     [...groups].some(([key, value]) => posted.get(key) !== value) ||
     !matchingContracts.size
@@ -244,8 +284,8 @@ async function readCustomerCollectionContext(
   context.paymentMethod = payment.payment_method === null ? null : text(payment.payment_method);
   // source_id remains the real customer ID; paymentId is already a separate field.
   context.source = {
-    type: "cimac_customer_collection",
-    id: customerId,
+    type: String(payment.source_type),
+    id: adjustment ? adjustment.originalPaymentId : customerId,
     label: contractLabel,
     href: null,
     linkKind: null,
@@ -342,7 +382,7 @@ export async function readFinanceRecordContext(
     ? await one(
         client,
         "payments",
-        "id,unit_id,customer_id,source_type,source_id,payment_method,amount,currency,exchange_rate_to_xof,native_settlement,payment_date",
+        "id,unit_id,customer_id,source_type,source_id,payment_method,amount,currency,exchange_rate_to_xof,native_settlement,payment_date,reversal_of_payment_id",
         context.paymentId,
       )
     : null;
@@ -361,7 +401,7 @@ export async function readFinanceRecordContext(
   const paymentUnitId = payment ? nullableId(payment.unit_id) : null;
   if (paymentUnitId && unitId && paymentUnitId !== unitId)
     return decodeFinanceRecordContext(context);
-  if (payment && sourceType === "cimac_customer_collection")
+  if (payment && isCimacProtectedPayment(sourceType ?? ""))
     return readCustomerCollectionContext(client, context, row, payment);
 
   const matchesScope = async (candidateUnitId: string | null) => {

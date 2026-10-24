@@ -37,19 +37,24 @@ export function useCimacWrite<T>({
   kind,
   viewerId,
   customerId,
+  originalPaymentId,
   locale,
   action,
 }: {
   kind: CimacBillingWriteKind;
   viewerId: string;
   customerId: string;
+  originalPaymentId?: string;
   locale: "zh" | "fr";
   action: (input: T & { requestId: string }) => Promise<Result>;
 }) {
   const text = (zh: string, fr: string) => (locale === "zh" ? zh : fr);
   const router = useRouter();
-  const operation = `cimac_${kind}`;
-  const target = `${viewerId}:${customerId}`;
+  const correctionFamily = kind === "refund" || kind === "reversal";
+  // A refund with an unknown outcome must also block a reversal of the same
+  // receipt, including after closing/reopening the panel or changing the kind.
+  const operation = correctionFamily ? "cimac_adjustment" : `cimac_${kind}`;
+  const target = `${viewerId}:${customerId}${correctionFamily ? `:${originalPaymentId ?? "missing"}` : ""}`;
   const [phase, setPhase] = useState<Phase>("checking");
   const [message, setMessage] = useState("");
   const [requestId, setRequestId] = useState<string | null>(null);
@@ -60,6 +65,21 @@ export function useCimacWrite<T>({
   const original = useRef<T | null>(null);
   useEffect(() => {
     mounted.current = true;
+    if (
+      correctionFamily &&
+      (!originalPaymentId ||
+        !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(originalPaymentId))
+    ) {
+      setPhase("unknown");
+      setMessage(
+        locale === "zh"
+          ? "缺少可核验的原收款标识，不能办理退款或冲正。"
+          : "Identifiant du paiement d’origine manquant : remboursement ou annulation impossible.",
+      );
+      return () => {
+        mounted.current = false;
+      };
+    }
     const pending = readPending(operation, target);
     if (pending.status === "none") setPhase("editing");
     else {
@@ -74,7 +94,7 @@ export function useCimacWrite<T>({
     return () => {
       mounted.current = false;
     };
-  }, [operation, target, locale]);
+  }, [operation, target, locale, correctionFamily, originalPaymentId]);
 
   async function submit(payload: T) {
     if (busy.current || phase === "checking" || phase === "success") return;
@@ -97,7 +117,8 @@ export function useCimacWrite<T>({
             (response.requestId !== id ||
               response.customerId !== customerId ||
               response.actorId !== viewerId ||
-              response.kind !== kind)
+              response.kind !== kind ||
+              (correctionFamily && response.originalPaymentId !== originalPaymentId))
           )
             return {
               success: false,
@@ -115,7 +136,8 @@ export function useCimacWrite<T>({
         if (
           result.customerId !== customerId ||
           result.actorId !== viewerId ||
-          result.kind !== kind
+          result.kind !== kind ||
+          (correctionFamily && result.originalPaymentId !== originalPaymentId)
         ) {
           setPhase("unknown");
           setMessage(
@@ -171,7 +193,10 @@ export function useCimacWrite<T>({
           value.requestId !== requestId ||
           value.customerId !== customerId ||
           value.actorId !== viewerId ||
-          value.kind !== kind ||
+          (correctionFamily
+            ? !["refund", "reversal"].includes(value.kind) ||
+              value.originalPaymentId !== originalPaymentId
+            : value.kind !== kind) ||
           pending.status !== "pending" ||
           pending.requestId !== requestId
         ) {

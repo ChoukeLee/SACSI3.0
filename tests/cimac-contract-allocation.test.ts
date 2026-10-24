@@ -46,6 +46,106 @@ function payment(): CimacContractPayment {
   };
 }
 
+function correction(kind: "refund" | "reversal"): CimacContractPayment {
+  const reverse = kind === "reversal",
+    original = payment();
+  return {
+    ...original,
+    id: id(20),
+    request_id: id(21),
+    source_type: reverse ? "cimac_customer_reversal" : "cimac_customer_refund",
+    source_id: original.id,
+    request_kind: reverse ? "cimac_customer_reversal" : "cimac_customer_refund",
+    amount: reverse ? -640000 : 40000,
+    payment_date: reverse ? original.payment_date : "2026-01-02",
+    payment_method: reverse ? "offset" : "bank_transfer",
+    reversal_of_payment_id: reverse ? original.id : null,
+    cimac_contract_allocation: {
+      ...original.cimac_contract_allocation,
+      amount: reverse ? "-600000" : "-30000",
+      adjustmentKind: kind,
+      originalPaymentId: original.id,
+    },
+  };
+}
+describe("contract-level signed correction attribution", () => {
+  it.each(["refund", "reversal"] as const)(
+    "keeps original receipt and exact contract %s share separate",
+    (kind) => {
+      const original = payment(),
+        child = correction(kind),
+        raw = { contractId: workspaceContract, paymentCount: 2, payments: [original, child] };
+      const decoded = decodeCimacLeaseCollectionProjection(
+        raw,
+        workspaceContract,
+        workspaceCustomer,
+      );
+      expect(decoded[0].amount).toBe(640000);
+      expect(decoded[1].cimac_contract_allocation.amount).toBe(
+        kind === "refund" ? "-30000" : "-600000",
+      );
+      expect(classifyContractCashPayment(child)).toEqual(
+        kind === "refund"
+          ? { kind: "expense", amountXof: 30000 }
+          : { kind: "income", amountXof: -600000 },
+      );
+      expect(summarizeContractCash(decoded)).toMatchObject(
+        kind === "refund"
+          ? { income: 600000, expense: 30000, net: 570000 }
+          : { income: 0, expense: 0, net: 0 },
+      );
+      const data = workspaceFixture({ payments: decoded, paymentCount: 2 }, undefined, "detail");
+      expect(
+        decodeWorkspace(data, "lease", data.query, "detail", workspaceContract).payments,
+      ).toHaveLength(2);
+    },
+  );
+  it.each([
+    { amount: "30000" },
+    { amount: "-640001" },
+    { amount: "-1.5" },
+    { originalPaymentId: id(99) },
+    { adjustmentKind: "reversal" },
+    { receivableIds: [] },
+  ])("rejects invalid correction attribution %#", (patch) => {
+    const child = correction("refund");
+    Object.assign(child.cimac_contract_allocation, patch);
+    expect(readCimacContractAllocation(child)).toBeNull();
+  });
+  it.each([
+    "missing-original",
+    "over-refund",
+    "refund-plus-reversal",
+    "partial-reversal",
+    "unknown-bill",
+    "date-before-original",
+  ])("rejects an incomplete or impossible %s chain", (kind) => {
+    const original = payment(),
+      child = correction("refund"),
+      payments = [original, child];
+    if (kind === "missing-original") payments.shift();
+    if (kind === "over-refund") {
+      child.amount = 640000;
+      child.cimac_contract_allocation.amount = "-600001";
+    }
+    if (kind === "refund-plus-reversal")
+      payments.push({ ...correction("reversal"), id: id(22), request_id: id(23) });
+    if (kind === "partial-reversal") {
+      Object.assign(child, correction("reversal"));
+      child.cimac_contract_allocation.amount = "-599999";
+    }
+    if (kind === "unknown-bill") child.cimac_contract_allocation.receivableIds = [id(99)];
+    if (kind === "date-before-original") child.payment_date = "2025-12-31";
+    expect(() =>
+      decodeCimacLeaseCollectionProjection(
+        { contractId: workspaceContract, paymentCount: payments.length, payments },
+        workspaceContract,
+        workspaceCustomer,
+      ),
+    ).toThrow();
+  });
+});
+
 describe("one actual receipt with explicit contract-attributed cash", () => {
   it("counts only each contract's exact portion and never rewrites or multiplies the original receipt", () => {
     const first = payment(),

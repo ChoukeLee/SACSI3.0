@@ -3,6 +3,7 @@ vi.mock("server-only", () => ({}));
 import { decodeCimacCustomerAccount, cimacReadMinor } from "@/features/finance/cimac-billing-model";
 import { readCimacCustomerAccount } from "@/features/finance/cimac-billing-read";
 import { parseCimacBillingQuery } from "@/features/finance/cimac-billing-query";
+import { adjustmentHistory, adjustmentId } from "./fixtures/cimac-adjustments";
 
 const project = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   customer = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -238,5 +239,139 @@ describe("complete authorized CIMAC account read", () => {
     await expect(
       readCimacCustomerAccount(client as never, parseCimacBillingQuery({})),
     ).rejects.toThrow("CimacAccountUnavailable");
+  });
+});
+
+function adjustedAccount(kind: "refund" | "reversal") {
+  const raw = account(),
+    reverse = kind === "reversal",
+    history = adjustmentHistory(kind);
+  Object.assign(history, {
+    amount: reverse ? "100" : "20",
+    allocations: [{ receivableId: receivable, amount: reverse ? "100" : "20" }],
+  });
+  const original = {
+    id: history.originalPaymentId,
+    customer_id: customer,
+    unit_id: null,
+    source_type: "cimac_customer_collection",
+    source_id: customer,
+    amount: "100",
+    currency: "XOF",
+    exchange_rate_to_xof: 1,
+    native_settlement: false,
+    payment_date: "2026-01-01",
+    payment_method: "cash",
+    receipt_no: "TEST-ORIGINAL",
+    external_receipt_no: null,
+    request_id: adjustmentId(30),
+    request_kind: "cimac_customer_collection",
+    recorded_by: adjustmentId(8),
+    reversal_of_payment_id: null,
+    protected_collection: true,
+    notes: null,
+  };
+  const child = {
+    ...original,
+    id: history.paymentId,
+    source_id: original.id,
+    source_type: reverse ? "cimac_customer_reversal" : "cimac_customer_refund",
+    request_kind: reverse ? "cimac_customer_reversal" : "cimac_customer_refund",
+    request_id: history.requestId,
+    amount: reverse ? "-100" : "20",
+    payment_date: history.paymentDate,
+    payment_method: history.paymentMethod,
+    reversal_of_payment_id: reverse ? original.id : null,
+    receipt_no: history.receiptNo,
+    recorded_by: history.recordedBy,
+    cimac_adjustment: history,
+  };
+  raw.receivables[0].paid_amount_xof = reverse ? 0 : 80;
+  raw.receivables[0].outstanding = reverse ? "100" : "20";
+  raw.receivables[0].status = reverse ? "pending" : "partial";
+  raw.customer.balances[0] = {
+    currency: "XOF",
+    receivable: "100",
+    paid: reverse ? "0" : "80",
+    outstanding: reverse ? "100" : "20",
+    overdue: "0",
+  };
+  return {
+    ...raw,
+    payments: [original, child],
+    allocations: [
+      { paymentId: original.id, receivableId: receivable, amount: "100", currency: "XOF" },
+    ],
+  };
+}
+describe("account correction proof preserves original allocations and current debt", () => {
+  it.each(["refund", "reversal"] as const)(
+    "reads %s only with immutable original, complete audit metadata and exact allocation chain",
+    (kind) => {
+      const raw = adjustedAccount(kind),
+        before = structuredClone(raw),
+        read = decodeCimacCustomerAccount(raw, customer);
+      expect(read.payments).toHaveLength(2);
+      expect(read.payments[0].amount).toBe("100");
+      expect(read.payments[1].amount).toBe(kind === "refund" ? "20" : "-100");
+      expect(read.allocations).toEqual(raw.allocations);
+      expect(read.receivables[0].outstanding).toBe(kind === "refund" ? "20" : "100");
+      expect(raw).toEqual(before);
+    },
+  );
+  it.each([
+    "missing-original",
+    "hidden-child-proof",
+    "foreign-customer",
+    "wrong-original",
+    "wrong-request",
+    "wrong-actor",
+    "wrong-currency",
+    "wrong-method",
+    "wrong-audit",
+    "wrong-header",
+    "wrong-target",
+    "wrong-line-total",
+    "incomplete-original-allocation",
+    "forged-public-child-allocation",
+    "over-refund",
+    "refund-before-original",
+    "reversal-cash-date",
+  ])("does not render a reassuring account from %s", (issue) => {
+    const raw = adjustedAccount(issue === "reversal-cash-date" ? "reversal" : "refund"),
+      child = raw.payments[1] as (typeof raw.payments)[1],
+      history = (child as { cimac_adjustment: ReturnType<typeof adjustmentHistory> })
+        .cimac_adjustment;
+    if (issue === "missing-original") raw.payments.shift();
+    if (issue === "hidden-child-proof") Reflect.deleteProperty(child, "cimac_adjustment");
+    if (issue === "foreign-customer") child.customer_id = unit;
+    if (issue === "wrong-original") history.originalPaymentId = unit;
+    if (issue === "wrong-request") child.request_id = unit;
+    if (issue === "wrong-actor") child.recorded_by = unit;
+    if (issue === "wrong-currency") child.currency = "USD";
+    if (issue === "wrong-method") child.payment_method = "cash";
+    if (issue === "wrong-audit") history.auditId = "bad";
+    if (issue === "wrong-header") child.amount = "21";
+    if (issue === "wrong-target") history.allocations[0].receivableId = unit;
+    if (issue === "wrong-line-total") history.allocations[0].amount = "21";
+    if (issue === "incomplete-original-allocation") raw.allocations[0].amount = "99";
+    if (issue === "forged-public-child-allocation")
+      raw.allocations.push({ ...raw.allocations[0], paymentId: child.id, amount: "20" });
+    if (issue === "over-refund") {
+      child.amount = "101";
+      history.amount = "101";
+      history.allocations[0].amount = "101";
+    }
+    if (issue === "refund-before-original") {
+      child.payment_date = "2025-12-31";
+      history.paymentDate = "2025-12-31";
+      history.effectiveDate = "2025-12-31";
+    }
+    if (issue === "reversal-cash-date") {
+      child.payment_date = "2026-01-02";
+      history.paymentDate = "2026-01-02";
+      history.effectiveDate = "2026-01-02";
+    }
+    expect(() => decodeCimacCustomerAccount(raw, customer)).toThrow();
   });
 });

@@ -3,6 +3,8 @@ import type {
   CimacCustomerSummary,
   CimacCurrencyBalance,
 } from "./cimac-billing-types";
+import { decodeCimacCollectionAdjustment } from "./cimac-billing-service";
+import { cimacAdjustmentKind, isCimacProtectedPayment } from "./cimac-payment-kinds";
 
 const uuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const currencies = ["XOF", "USD", "CNY"];
@@ -256,6 +258,7 @@ export function decodeCimacCustomerAccount(
     )
       return fail();
   }
+  const paymentsById = new Map(payments.map((p) => [String(p.id), p]));
   for (const p of payments) {
     date(p.payment_date);
     text(p.source_type);
@@ -269,6 +272,50 @@ export function decodeCimacCustomerAccount(
       return fail();
     for (const key of ["actual_collector", "recorded_by", "receipt_no"])
       if (p[key] !== undefined) nullable(p[key], optionalText);
+    if (isCimacProtectedPayment(String(p.source_type)) && p.protected_collection !== true)
+      return fail();
+    const adjustmentKind = cimacAdjustmentKind(String(p.source_type));
+    if (adjustmentKind) {
+      const adjustment = decodeCimacCollectionAdjustment(p.cimac_adjustment),
+        original = paymentsById.get(adjustment.originalPaymentId);
+      if (
+        !original ||
+        original.source_type !== "cimac_customer_collection" ||
+        original.customer_id !== selected ||
+        p.customer_id !== selected ||
+        p.unit_id !== null ||
+        p.source_id !== adjustment.originalPaymentId ||
+        p.request_kind !== p.source_type ||
+        p.currency !== "XOF" ||
+        Number(p.exchange_rate_to_xof) !== 1 ||
+        p.native_settlement !== false ||
+        adjustment.kind !== adjustmentKind ||
+        adjustment.paymentId !== p.id ||
+        adjustment.requestId !== p.request_id ||
+        adjustment.paymentDate !== p.payment_date ||
+        adjustment.paymentMethod !== p.payment_method ||
+        adjustment.recordedBy !== p.recorded_by ||
+        adjustment.receiptNo !== p.receipt_no ||
+        (adjustmentKind === "refund"
+          ? p.reversal_of_payment_id !== null
+          : p.reversal_of_payment_id !== adjustment.originalPaymentId)
+      )
+        return fail();
+      const rawAmount = String(p.amount),
+        absolute =
+          adjustmentKind === "reversal" && rawAmount.startsWith("-")
+            ? rawAmount.slice(1)
+            : rawAmount;
+      if (
+        (adjustmentKind === "reversal" && !rawAmount.startsWith("-")) ||
+        cimacReadMinor(absolute) !== cimacReadMinor(adjustment.amount) ||
+        (adjustmentKind === "refund"
+          ? String(p.payment_date) < String(original.payment_date)
+          : p.payment_date !== original.payment_date)
+      )
+        return fail();
+      p.cimac_adjustment = adjustment;
+    }
   }
   const allocations = array(data.allocations).map((raw) => {
     const a = record(raw);
@@ -283,9 +330,56 @@ export function decodeCimacCustomerAccount(
   });
   const links = new Set<string>();
   for (const a of allocations) {
+    if (cimacAdjustmentKind(String(paymentsById.get(String(a.paymentId))?.source_type)))
+      return fail();
     const key = `${a.paymentId}:${a.receivableId}`;
     if (links.has(key)) return fail();
     links.add(key);
+  }
+  for (const original of payments.filter((p) => p.source_type === "cimac_customer_collection")) {
+    const adjusted = payments.filter(
+      (p) => cimacAdjustmentKind(String(p.source_type)) && p.source_id === original.id,
+    );
+    if (!adjusted.length) continue;
+    const history = adjusted.map(
+      (p) => p.cimac_adjustment as ReturnType<typeof decodeCimacCollectionAdjustment>,
+    );
+    const refunded = history.filter((a) => a.kind === "refund"),
+      reversed = history.filter((a) => a.kind === "reversal");
+    if (
+      reversed.length > 1 ||
+      (refunded.length && reversed.length) ||
+      history.reduce((sum, a) => sum + cimacReadMinor(a.amount), BigInt(0)) >
+        cimacReadMinor(original.amount)
+    )
+      return fail();
+    const originalLinks = allocations.filter((a) => a.paymentId === original.id);
+    if (
+      !originalLinks.length ||
+      originalLinks.length > 100 ||
+      originalLinks.some((a) => a.currency !== "XOF" || cimacReadMinor(a.amount) <= BigInt(0)) ||
+      originalLinks.reduce((sum, a) => sum + cimacReadMinor(a.amount), BigInt(0)) !==
+        cimacReadMinor(original.amount)
+    )
+      return fail();
+    for (const a of history.flatMap((h) => h.allocations)) {
+      if (
+        !receivableIds.has(a.receivableId) ||
+        !originalLinks.some((l) => l.receivableId === a.receivableId)
+      )
+        return fail();
+    }
+    for (const link of originalLinks) {
+      const total = history
+        .flatMap((a) => a.allocations)
+        .filter((a) => a.receivableId === link.receivableId)
+        .reduce((sum, a) => sum + cimacReadMinor(a.amount), BigInt(0));
+      if (
+        total > cimacReadMinor(link.amount) ||
+        (reversed.length && total !== cimacReadMinor(link.amount))
+      )
+        return fail();
+    }
   }
   for (const t of terms) {
     if (

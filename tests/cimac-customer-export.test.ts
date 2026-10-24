@@ -7,6 +7,7 @@ import {
   type CimacExportBundle,
 } from "@/features/finance/cimac-export-model";
 import { readCimacExport } from "@/features/finance/cimac-export-read";
+import { adjustmentHistory } from "./fixtures/cimac-adjustments";
 
 type Row = Record<string, unknown>;
 const id = (n: number) => `bbbbbbbb-bbbb-4bbb-8bbb-${String(n).padStart(12, "0")}`;
@@ -124,7 +125,9 @@ describe("customer collections in the property-fee CSV", () => {
         row[
           headers.findIndex((value) =>
             value.startsWith(
-              locale === "zh" ? "客户总账整笔实收" : "Encaissement total du compte client",
+              locale === "zh"
+                ? "客户总账支付／校正"
+                : "Montant du paiement / correction du compte client",
             ),
           )
         ],
@@ -222,10 +225,17 @@ function readClient(data: CimacExportBundle, verified = true) {
   const rpc = vi.fn(async (name: string, input: Row) =>
     name === "finance_read_rpc"
       ? { data: { kind: "ledger", total: data.ledger.length, rows: data.ledger }, error: null }
-      : {
-          data: (input.p_payment_ids as string[]).map((paymentId) => ({ paymentId, verified })),
-          error: null,
-        },
+      : name === "cimac_collection_adjustments_rpc"
+        ? {
+            data: (data.collectionAdjustments ?? [])
+              .filter((a) => (input.p_payment_ids as string[]).includes(a.paymentId))
+              .map((adjustment) => ({ paymentId: adjustment.paymentId, adjustment })),
+            error: null,
+          }
+        : {
+            data: (input.p_payment_ids as string[]).map((paymentId) => ({ paymentId, verified })),
+            error: null,
+          },
   );
   const client = {
     rpc,
@@ -336,5 +346,135 @@ describe("customer-collection export reads remain bounded and authenticated", ()
     await readCimacExport(client, { view: "payments", locale: "zh" });
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(calls.some((call) => call.table === "payment_receivable_allocations")).toBe(false);
+  });
+});
+
+function correctionFixture(kind: "refund" | "reversal"): CimacExportBundle {
+  const data = fixture(),
+    a = adjustmentHistory(kind),
+    reversal = kind === "reversal";
+  Object.assign(a, {
+    paymentId: id(41),
+    originalPaymentId: paymentId,
+    paymentDate: reversal ? "2026-10-24" : "2026-10-24",
+    effectiveDate: "2026-10-24",
+    amount: reversal ? "3000" : "300",
+    allocations: [
+      { receivableId: id(21), amount: reversal ? "1000" : "100" },
+      { receivableId: id(22), amount: reversal ? "2000" : "200" },
+    ],
+  });
+  data.collectionAdjustments = [a];
+  const p = {
+    ...data.payments[0],
+    id: a.paymentId,
+    source_type: reversal ? "cimac_customer_reversal" : "cimac_customer_refund",
+    source_id: paymentId,
+    payment_date: a.paymentDate,
+    amount: reversal ? -3000 : 300,
+    payment_method: a.paymentMethod,
+    reversal_of_payment_id: reversal ? paymentId : null,
+    receipt_no: "CIMAC-CORRECTION-1",
+  };
+  data.payments.push(p);
+  const correctionLines = data.ledger.map((row, index) => ({
+    ...row,
+    id: id(51 + index),
+    payment_id: p.id,
+    amount_xof: -Number(a.allocations[index].amount),
+  }));
+  data.ledger.push(...correctionLines);
+  data.collectionLedger!.push(...structuredClone(correctionLines));
+  data.verifiedCollectionPaymentIds!.push(p.id);
+  return data;
+}
+
+describe("customer correction exports preserve immutable receipts and explicit negative attribution", () => {
+  it.each(["refund", "reversal"] as const)(
+    "exports %s signed fee attribution without duplicating total, refund or historic receipt",
+    (kind) => {
+      const data = correctionFixture(kind),
+        csv = cimacExportCsv(data, query),
+        [headers, ...rows] = cells(csv),
+        child = rows.find((r) => r.includes("CIMAC-CORRECTION-1"))!;
+      expect(rows).toHaveLength(2);
+      expect(child[headers.indexOf("原币金额")]).toBe("");
+      expect(child[headers.indexOf("客户总账支付／校正原币金额（仅参考，不作为物业费合计）")]).toBe(
+        kind === "refund" ? "300" : "-3000",
+      );
+      expect(child[headers.indexOf("来源类型")]).toBe(
+        kind === "refund" ? "cimac_customer_refund" : "cimac_customer_reversal",
+      );
+      expect(child[headers.indexOf("物业费关联分录金额 XOF")]).toBe(
+        kind === "refund" ? "-100" : "-1000",
+      );
+      expect(child[headers.indexOf("其中已验证核销金额 XOF（历史未知留空）")]).toBe(
+        kind === "refund" ? "-100" : "-1000",
+      );
+      expect(child[headers.indexOf("已验证物业费应收 ID")]).toBe(id(21));
+      expect(child.join(" ")).toContain(kind === "refund" ? "实际退款" : "非实际退款");
+      expect(rows[0][headers.indexOf("物业费关联分录金额 XOF")]).toBe("1000");
+      expect(
+        rows[0][headers.indexOf("客户总账支付／校正原币金额（仅参考，不作为物业费合计）")],
+      ).toBe("3000");
+      expect(rows[0][headers.indexOf("来源类型")]).toBe("cimac_customer_collection");
+      expect(data.payments[0].amount).toBe(3000);
+      for (const locale of ["zh", "fr"] as const)
+        expect(
+          cells(cimacExportCsv(data, { ...query, locale })).every(
+            (r) => r.length === headers.length,
+          ),
+        ).toBe(true);
+    },
+  );
+  it.each(["ledger", "payments"] as const)(
+    "preserves raw reversal negative amount in generic %s export",
+    (view) => {
+      const csv = cimacExportCsv(correctionFixture("reversal"), { view, locale: "zh" });
+      expect(csv).toContain(view === "ledger" ? '"-1000"' : '"-3000"');
+      expect(csv).not.toContain("'-3000");
+    },
+  );
+  it("reads the exact child private links and all sealed ledger rows in a scoped partial export", async () => {
+    const data = correctionFixture("refund");
+    data.ledger = data.ledger.filter((r) => r.payment_id === id(41)).slice(0, 1);
+    data.payments = data.payments.filter((p) => p.id === id(41));
+    data.collectionLedger = data.collectionLedger!.filter((r) => r.payment_id === id(41));
+    data.allocations = [];
+    const { client, rpc, calls } = readClient(data),
+      read = await readCimacExport(client, query);
+    expect(rpc).toHaveBeenCalledWith("cimac_collection_adjustments_rpc", {
+      p_payment_ids: [id(41)],
+    });
+    expect(read.collectionAdjustments).toHaveLength(1);
+    expect(read.collectionReceivables).toHaveLength(2);
+    expect(calls.some((c) => c.table === "payment_receivable_allocations")).toBe(false);
+    expect(cimacExportCsv(read, query)).toContain('"-100"');
+  });
+  it.each([
+    "missing-chain",
+    "wrong-original",
+    "wrong-kind",
+    "wrong-method",
+    "positive-ledger",
+    "wrong-piece",
+    "unsealed-child",
+    "foreign-customer",
+    "wrong-header-sign",
+  ])("fails closed for %s and never guesses allocation from memo text", (kind) => {
+    const data = correctionFixture("refund");
+    if (kind === "missing-chain") data.collectionAdjustments = [];
+    if (kind === "wrong-original") data.collectionAdjustments![0].originalPaymentId = id(99);
+    if (kind === "wrong-kind") data.collectionAdjustments![0].kind = "reversal";
+    if (kind === "wrong-method") data.collectionAdjustments![0].paymentMethod = "cash";
+    if (kind === "positive-ledger") data.collectionLedger![2].amount_xof = 100;
+    if (kind === "wrong-piece") {
+      data.collectionLedger![2].amount_xof = -150;
+      data.collectionLedger![3].amount_xof = -150;
+    }
+    if (kind === "unsealed-child") data.verifiedCollectionPaymentIds!.pop();
+    if (kind === "foreign-customer") data.payments[1].customer_id = id(99);
+    if (kind === "wrong-header-sign") data.payments[1].amount = -300;
+    expect(() => cimacExportCsv(data, query)).toThrow();
   });
 });

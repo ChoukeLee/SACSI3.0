@@ -6,6 +6,8 @@ import {
   decodeCimacReceivables,
   type CimacExportQuery,
 } from "./cimac-export-model";
+import { isCimacProtectedPayment, cimacAdjustmentKind } from "./cimac-payment-kinds";
+import { readCimacCollectionAdjustments } from "./cimac-adjustment-read";
 
 export class CimacExportReadError extends Error {
   constructor(public readonly status: 403 | 413 | 503) {
@@ -66,7 +68,11 @@ async function collectionParts(
   table: "payment_receivable_allocations" | "ledger_entries",
 ): Promise<Row[]> {
   const keys = payments
-    .filter((row) => row.source_type === "cimac_customer_collection")
+    .filter((row) =>
+      table === "ledger_entries"
+        ? isCimacProtectedPayment(String(row.source_type))
+        : row.source_type === "cimac_customer_collection",
+    )
     .map((row) => String(row.id));
   const rows: Row[] = [];
   for (let offset = 0; offset < keys.length; offset += 100) {
@@ -103,7 +109,7 @@ async function collectionParts(
 
 async function collectionProofs(client: ReadClient, payments: Row[]): Promise<string[]> {
   const keys = payments
-    .filter((row) => row.source_type === "cimac_customer_collection")
+    .filter((row) => isCimacProtectedPayment(String(row.source_type)))
     .map((row) => String(row.id));
   const verified: string[] = [];
   for (let offset = 0; offset < keys.length; offset += 100) {
@@ -157,19 +163,30 @@ export async function readCimacExport(client: ReadClient, query: CimacExportQuer
   const payments = isReceivable
     ? []
     : await related(client, "payments", paymentColumns, ids(ledger, "payment_id"));
-  const [allocations, collectionLedger, verifiedCollectionPaymentIds] =
+  const [allocations, collectionLedger, verifiedCollectionPaymentIds, collectionAdjustments] =
     query.view === "property-fee-payments"
       ? await Promise.all([
           collectionParts(client, payments, "payment_receivable_allocations"),
           collectionParts(client, payments, "ledger_entries"),
           collectionProofs(client, payments),
+          readCimacCollectionAdjustments(
+            client,
+            payments
+              .filter((row) => cimacAdjustmentKind(String(row.source_type)))
+              .map((row) => String(row.id)),
+          ),
         ])
-      : [[], [], []];
+      : [[], [], [], []];
   const collectionReceivables = await related(
     client,
     "receivables",
     "id,customer_id,unit_id,building_id,source_type,source_id,category,currency",
-    ids(allocations, "receivable_id"),
+    [
+      ...new Set([
+        ...ids(allocations, "receivable_id"),
+        ...collectionAdjustments.flatMap((a) => a.allocations.map((link) => link.receivableId)),
+      ]),
+    ],
   );
   const unitIds = [
     ...new Set([
@@ -203,5 +220,6 @@ export async function readCimacExport(client: ReadClient, query: CimacExportQuer
     collectionReceivables,
     collectionLedger,
     verifiedCollectionPaymentIds,
+    collectionAdjustments,
   };
 }

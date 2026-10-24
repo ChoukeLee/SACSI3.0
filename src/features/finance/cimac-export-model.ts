@@ -1,5 +1,8 @@
 /** Pure export boundaries. No credentials, database clients or business writes. */
 import { cimacShopPropertyFeeNotice } from "./cimac-property-fee-policy";
+import { isCimacProtectedPayment, cimacAdjustmentKind } from "./cimac-payment-kinds";
+import { decodeCimacCollectionAdjustment } from "./cimac-billing-service";
+import type { CimacCollectionAdjustment } from "./cimac-billing-types";
 
 export const CIMAC_PROJECT_ID = "33c1528b-6c2f-45fd-bbf1-92863765809a";
 
@@ -29,6 +32,7 @@ export type CimacExportBundle = {
   collectionReceivables?: Row[];
   collectionLedger?: Row[];
   verifiedCollectionPaymentIds?: string[];
+  collectionAdjustments?: CimacCollectionAdjustment[];
 };
 
 const uuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
@@ -89,6 +93,19 @@ function nativeMinor(value: unknown): bigint {
   if (typeof raw !== "string" || !/^(0|[1-9]\d{0,11})(\.\d{1,2})?$/.test(raw)) return fail();
   const [whole, fraction = ""] = raw.split(".");
   return BigInt(whole) * BigInt(100) + BigInt(fraction.padEnd(2, "0"));
+}
+
+function signedMinor(value: unknown): bigint {
+  const raw = typeof value === "number" ? String(value) : value;
+  return typeof raw === "string" && raw.startsWith("-")
+    ? -nativeMinor(raw.slice(1))
+    : nativeMinor(raw);
+}
+function signedAmount(value: unknown): number {
+  const raw = typeof value === "number" ? String(value) : value;
+  if (typeof raw !== "string" || !/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(raw)) return fail();
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fail();
 }
 
 function nativeLedger(row: Row): boolean {
@@ -176,7 +193,7 @@ export function decodeCimacLedger(data: unknown): Row[] {
       unit_id: nullableId(row, "unit_id"),
       payment_id: nullableId(row, "payment_id"),
       category: text(row.category),
-      amount_xof: amount(row.amount_xof),
+      amount_xof: signedAmount(row.amount_xof),
       amount_cny: row.amount_cny === null ? null : amount(row.amount_cny),
     };
   });
@@ -443,8 +460,8 @@ function customerPropertyFeeProof(
   string,
   { amountXof: string; receivableIds: string[]; hasFee: boolean; ambiguous: boolean }
 > {
-  const targets = [...payments].filter(
-    ([, payment]) => payment.source_type === "cimac_customer_collection",
+  const targets = [...payments].filter(([, payment]) =>
+    isCimacProtectedPayment(String(payment.source_type)),
   );
   const proof = new Map<
     string,
@@ -471,21 +488,58 @@ function customerPropertyFeeProof(
   if (fullLedger.some((row) => !targetIds.has(String(row.payment_id)))) return fail();
   const usedReceivables = new Set<string>();
   const usedAllocationIds = new Set<string>();
+  const adjustments = new Map<string, CimacCollectionAdjustment>();
+  for (const raw of bundle.collectionAdjustments ?? []) {
+    const adjustment = decodeCimacCollectionAdjustment(raw);
+    if (!targetIds.has(adjustment.paymentId) || adjustments.has(adjustment.paymentId))
+      return fail();
+    adjustments.set(adjustment.paymentId, adjustment);
+  }
   for (const allocation of bundle.allocations) {
-    if (!targetIds.has(id(allocation.payment_id))) return fail();
+    if (
+      !targetIds.has(id(allocation.payment_id)) ||
+      payments.get(id(allocation.payment_id))?.source_type !== "cimac_customer_collection"
+    )
+      return fail();
   }
   for (const [key, payment] of targets) {
     const customerId = id(payment.customer_id);
+    const adjustmentKind = cimacAdjustmentKind(String(payment.source_type));
+    const adjustment = adjustments.get(key);
     if (
       payment.unit_id !== null ||
-      payment.source_id !== customerId ||
+      (!adjustmentKind && payment.source_id !== customerId) ||
       payment.currency !== "XOF" ||
       payment.native_settlement === true ||
       amount(payment.exchange_rate_to_xof) !== 1
     )
       return fail();
+    if (
+      adjustmentKind &&
+      (!adjustment ||
+        adjustment.kind !== adjustmentKind ||
+        adjustment.originalPaymentId !== payment.source_id ||
+        adjustment.paymentDate !== payment.payment_date ||
+        adjustment.paymentMethod !== payment.payment_method ||
+        signedMinor(payment.amount) !==
+          (adjustmentKind === "reversal"
+            ? -nativeMinor(adjustment.amount)
+            : nativeMinor(adjustment.amount)) ||
+        (adjustmentKind === "reversal"
+          ? payment.reversal_of_payment_id !== adjustment.originalPaymentId
+          : payment.reversal_of_payment_id != null))
+    )
+      return fail();
+    if (!adjustmentKind && adjustment) return fail();
+    const sign = adjustmentKind ? -BigInt(1) : BigInt(1);
     const linked = fullLedger.filter((row) => row.payment_id === key);
-    const allocations = bundle.allocations.filter((row) => row.payment_id === key);
+    const allocations = adjustment
+      ? adjustment.allocations.map((a) => ({
+          payment_id: key,
+          receivable_id: a.receivableId,
+          amount_xof: a.amount,
+        }))
+      : bundle.allocations.filter((row) => row.payment_id === key);
     if (!allocations.length || allocations.length > 100) return fail();
     const allocationTargets = new Map<string, string[]>(),
       ledgerCounts = new Map<string, number>();
@@ -516,8 +570,9 @@ function customerPropertyFeeProof(
         buildings.get(buildingId)?.project_id !== CIMAC_PROJECT_ID
       )
         return fail();
-      const piece = nativeMinor(allocation.amount_xof);
-      if (piece <= BigInt(0) || piece % BigInt(100) !== BigInt(0)) return fail();
+      const magnitude = nativeMinor(allocation.amount_xof);
+      if (magnitude <= BigInt(0) || magnitude % BigInt(100) !== BigInt(0)) return fail();
+      const piece = magnitude * sign;
       total += piece;
       const group = `${unitId}:${buildingId}:${row.category}:${piece}`;
       allocationTargets.set(group, [...(allocationTargets.get(group) ?? []), receivableId]);
@@ -531,12 +586,14 @@ function customerPropertyFeeProof(
         !["lease_rent", "property_fee"].includes(String(row.category))
       )
         return fail();
-      const group = `${id(row.unit_id)}:${id(row.building_id)}:${row.category}:${nativeMinor(row.amount_xof)}`;
+      const piece = signedMinor(row.amount_xof);
+      if (piece * sign <= BigInt(0)) return fail();
+      const group = `${id(row.unit_id)}:${id(row.building_id)}:${row.category}:${piece}`;
       ledgerCounts.set(group, (ledgerCounts.get(group) ?? 0) + 1);
     }
     if (
       linked.length !== allocations.length ||
-      total !== nativeMinor(payment.amount) ||
+      total !== (adjustment ? -nativeMinor(adjustment.amount) : nativeMinor(payment.amount)) ||
       allocationTargets.size !== ledgerCounts.size ||
       [...allocationTargets].some(([group, values]) => ledgerCounts.get(group) !== values.length)
     )
@@ -550,11 +607,11 @@ function customerPropertyFeeProof(
         ["unit_id", "building_id", "category", "entry_date", "direction", "currency"].some(
           (field) => original[field] !== row[field],
         ) ||
-        nativeMinor(original.amount_xof) !== nativeMinor(row.amount_xof)
+        signedMinor(original.amount_xof) !== signedMinor(row.amount_xof)
       )
         return fail();
       if (row.category !== "property_fee") continue;
-      const piece = nativeMinor(row.amount_xof),
+      const piece = signedMinor(row.amount_xof),
         group = `${row.unit_id}:${row.building_id}:${row.category}:${piece}`;
       fee += piece;
       selectedGroups.set(group, (selectedGroups.get(group) ?? 0) + 1);
@@ -569,7 +626,7 @@ function customerPropertyFeeProof(
     proof.set(key, {
       amountXof: String(fee / BigInt(100)),
       receivableIds: feeIds,
-      hasFee: fee > BigInt(0),
+      hasFee: fee !== BigInt(0),
       ambiguous,
     });
   }
@@ -629,7 +686,44 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
     payment.unit_id = unitId;
     payment.source_id = nullableId(payment, "source_id");
     payment.source_type = text(payment.source_type);
-    payment.amount = amount(payment.amount);
+    payment.amount =
+      payment.source_type === "cimac_customer_reversal"
+        ? signedAmount(payment.amount)
+        : amount(payment.amount);
+    const correction = cimacAdjustmentKind(String(payment.source_type));
+    if (
+      correction &&
+      (payment.unit_id !== null ||
+        !uuid.test(String(payment.customer_id)) ||
+        !uuid.test(String(payment.source_id)) ||
+        payment.currency !== "XOF" ||
+        payment.native_settlement !== false ||
+        Number(payment.exchange_rate_to_xof) !== 1 ||
+        (correction === "reversal"
+          ? !(
+              Number(payment.amount) < 0 &&
+              payment.payment_method === "offset" &&
+              payment.reversal_of_payment_id === payment.source_id
+            )
+          : !(
+              Number(payment.amount) > 0 &&
+              ["cash", "check", "bank_transfer", "other"].includes(
+                String(payment.payment_method),
+              ) &&
+              payment.reversal_of_payment_id === null
+            )) ||
+        references
+          .get(key)!
+          .some(
+            (row) =>
+              row.direction !== "income" ||
+              row.entry_date !== payment.payment_date ||
+              row.currency !== "XOF" ||
+              row.amount_native !== null ||
+              signedMinor(row.amount_xof) >= BigInt(0),
+          ))
+    )
+      return fail();
     payment.currency = text(payment.currency);
     if (own(payment, "native_settlement") && typeof payment.native_settlement !== "boolean")
       return fail();
@@ -881,8 +975,8 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
     if (checkedQuery.view === "property-fee-payments") {
       headers.push(
         at(
-          "客户总账整笔实收原币金额（仅参考，不作为物业费合计）",
-          "Encaissement total du compte client (référence, pas un total de charges)",
+          "客户总账支付／校正原币金额（仅参考，不作为物业费合计）",
+          "Montant du paiement / correction du compte client (référence, pas un total de charges)",
         ),
         at("物业费关联分录金额 XOF", "Montant des écritures de charges XOF"),
         at(
@@ -905,14 +999,14 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
           (checkedQuery.view === "refunds" && type === "lease_deposit_refund") ||
           (checkedQuery.view === "property-fee-payments" &&
             (type === "property_fee" ||
-              (type === "cimac_customer_collection" && propertyProof.get(key)?.hasFee)))
+              (isCimacProtectedPayment(String(type)) && propertyProof.get(key)?.hasFee)))
         );
       })
       .map(([key, linked]) => {
         const payment = payments.get(key)!;
         if (
           checkedQuery.view === "property-fee-payments" &&
-          payment.source_type === "cimac_customer_collection"
+          isCimacProtectedPayment(String(payment.source_type))
         )
           linked = linked.filter((row) => row.category === "property_fee");
         const locations = linked.map(location);
@@ -935,7 +1029,7 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
           optionalText(payment.receipt_no),
           optionalText(payment.external_receipt_no),
           checkedQuery.view === "property-fee-payments" &&
-          payment.source_type === "cimac_customer_collection"
+          isCimacProtectedPayment(String(payment.source_type))
             ? null
             : payment.amount,
           payment.currency,
@@ -962,35 +1056,46 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
         ];
         if (special) {
           const operation =
-            payment.reversal_of_payment_id !== null && payment.reversal_of_payment_id !== undefined
+            payment.source_type === "cimac_customer_refund"
               ? at(
-                  "冲销关联记录，非新收款或新退款；仅保留原记录引用，不推导原收据",
-                  "Écriture liée à une annulation, pas un nouvel encaissement ou remboursement ; référence conservée sans déduction du reçu d’origine",
+                  "登记实际退款，按原核销明确分配恢复应收；不代表免除合同义务",
+                  "Remboursement réel enregistré selon les affectations explicites ; obligation contractuelle maintenue",
                 )
-              : payment.source_type === "lease_deposit_deduction"
+              : payment.source_type === "cimac_customer_reversal"
                 ? at(
-                    "押金扣除／抵扣，非现金退款",
-                    "Retenue / compensation du dépôt, pas un remboursement en espèces",
+                    "错误收款整单账务冲正，非实际退款；原凭证保留",
+                    "Annulation comptable intégrale d’un encaissement erroné, pas un remboursement réel ; reçu original conservé",
                   )
-                : payment.source_type === "lease_deposit_refund"
+                : payment.reversal_of_payment_id !== null &&
+                    payment.reversal_of_payment_id !== undefined
                   ? at(
-                      "登记押金退款，不推导对应哪张原押金收据",
-                      "Remboursement de dépôt enregistré, sans déduire le reçu d’origine",
+                      "冲销关联记录，非新收款或新退款；仅保留原记录引用，不推导原收据",
+                      "Écriture liée à une annulation, pas un nouvel encaissement ou remboursement ; référence conservée sans déduction du reçu d’origine",
                     )
-                  : payment.source_type === "lease_deposit"
+                  : payment.source_type === "lease_deposit_deduction"
                     ? at(
-                        "登记押金收入，不代表当前余额或可退额",
-                        "Dépôt reçu enregistré, pas un solde actuel ni un montant remboursable",
+                        "押金扣除／抵扣，非现金退款",
+                        "Retenue / compensation du dépôt, pas un remboursement en espèces",
                       )
-                    : payment.source_type === "cimac_customer_collection"
+                    : payment.source_type === "lease_deposit_refund"
                       ? at(
-                          "客户总账混合实收，物业费仅按明确核销分配列示；整笔支付金额为参考，不重复计入物业费",
-                          "Encaissement multi-contrats : charges selon les affectations explicites uniquement ; montant total du paiement fourni en référence, sans double comptage",
+                          "登记押金退款，不推导对应哪张原押金收据",
+                          "Remboursement de dépôt enregistré, sans déduire le reçu d’origine",
                         )
-                      : at(
-                          "登记物业费收款，不推导服务账期或已核销金额",
-                          "Paiement de charges enregistré, sans déduction de période ni montant imputé",
-                        );
+                      : payment.source_type === "lease_deposit"
+                        ? at(
+                            "登记押金收入，不代表当前余额或可退额",
+                            "Dépôt reçu enregistré, pas un solde actuel ni un montant remboursable",
+                          )
+                        : payment.source_type === "cimac_customer_collection"
+                          ? at(
+                              "客户总账混合实收，物业费仅按明确核销分配列示；整笔支付金额为参考，不重复计入物业费",
+                              "Encaissement multi-contrats : charges selon les affectations explicites uniquement ; montant total du paiement fourni en référence, sans double comptage",
+                            )
+                          : at(
+                              "登记物业费收款，不推导服务账期或已核销金额",
+                              "Paiement de charges enregistré, sans déduction de période ni montant imputé",
+                            );
           const methods: Record<string, string> = zh
             ? {
                 cash: "现金",
@@ -1015,9 +1120,9 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
         }
         if (checkedQuery.view === "property-fee-payments") {
           values.push(
-            payment.source_type === "cimac_customer_collection" ? payment.amount : null,
-            linked.reduce((sum, row) => sum + amount(row.amount_xof), 0),
-            propertyProof.get(key)?.amountXof ?? null,
+            isCimacProtectedPayment(String(payment.source_type)) ? payment.amount : null,
+            linked.reduce((sum, row) => sum + signedAmount(row.amount_xof), 0),
+            propertyProof.has(key) ? Number(propertyProof.get(key)!.amountXof) : null,
             propertyProof.get(key)?.receivableIds.join(" / ") ?? null,
           );
         }

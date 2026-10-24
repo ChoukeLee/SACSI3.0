@@ -2,6 +2,10 @@ import type {
   CimacBillingWriteKind,
   CimacBillingWriteResult,
   CimacCollectionInput,
+  CimacCollectionAdjustment,
+  CimacCollectionPosition,
+  CimacRefundInput,
+  CimacReversalInput,
   CimacFeeTerm,
   CimacFeeTermInput,
   CimacMeterReading,
@@ -125,6 +129,305 @@ function revision(input: Record<string, unknown>): { id?: string; expectedUpdate
   return {
     id: parseCimacRequestId(input.id),
     expectedUpdatedAt: timestamp(input.expectedUpdatedAt),
+  };
+}
+
+function positionToken(value: unknown): string {
+  if (typeof value !== "string" || !/^[0-9a-f]{32}$/i.test(value)) throw invalid();
+  return value.toLowerCase();
+}
+
+function parseAdjustment(value: unknown, kind: "refund" | "reversal") {
+  const input = object(value);
+  keys(input, [
+    "requestId",
+    "originalPaymentId",
+    "customerId",
+    "currency",
+    "amount",
+    "reason",
+    "expectedPositionToken",
+    "allocations",
+    "notes",
+    ...(kind === "refund" ? ["paymentDate", "paymentMethod", "externalReceiptNo"] : []),
+  ]);
+  const amount = xof(input.amount, true);
+  if (
+    !Array.isArray(input.allocations) ||
+    !input.allocations.length ||
+    input.allocations.length > 100
+  )
+    throw invalid();
+  const allocations = input.allocations.map((raw) => {
+    const row = object(raw);
+    keys(row, ["receivableId", "amount", "expectedRemaining", "expectedPaid", "expectedUpdatedAt"]);
+    const piece = xof(row.amount, true),
+      expectedRemaining = xof(row.expectedRemaining, true),
+      expectedPaid = decimal(row.expectedPaid, 2);
+    if (
+      minor(piece) > minor(expectedRemaining) ||
+      minor(piece) > minor(expectedPaid) ||
+      (kind === "reversal" && piece !== expectedRemaining)
+    )
+      throw invalid();
+    return {
+      receivableId: parseCimacRequestId(row.receivableId),
+      amount: piece,
+      expectedRemaining,
+      expectedPaid,
+      expectedUpdatedAt: timestamp(row.expectedUpdatedAt),
+    };
+  });
+  if (
+    new Set(allocations.map((row) => row.receivableId)).size !== allocations.length ||
+    allocations.reduce((sum, row) => sum + minor(row.amount), BigInt(0)) !== minor(amount)
+  )
+    throw invalid();
+  const notes = optionalText(input.notes, 2000);
+  return {
+    requestId: parseCimacRequestId(input.requestId),
+    originalPaymentId: parseCimacRequestId(input.originalPaymentId),
+    customerId: parseCimacRequestId(input.customerId),
+    currency: oneOf(input.currency, ["XOF"]),
+    amount,
+    reason: text(input.reason, 1000),
+    expectedPositionToken: positionToken(input.expectedPositionToken),
+    allocations,
+    ...(notes ? { notes } : {}),
+  };
+}
+
+export function parseCimacRefundInput(value: unknown): CimacRequestInput<CimacRefundInput> {
+  const common = parseAdjustment(value, "refund"),
+    input = object(value);
+  const paymentDate = date(input.paymentDate);
+  if (paymentDate > new Date().toISOString().slice(0, 10)) throw invalid();
+  const externalReceiptNo = optionalText(input.externalReceiptNo, 200);
+  return {
+    ...common,
+    paymentDate,
+    paymentMethod: oneOf(input.paymentMethod, ["cash", "check", "bank_transfer", "other"]),
+    ...(externalReceiptNo ? { externalReceiptNo } : {}),
+  };
+}
+
+export function parseCimacReversalInput(value: unknown): CimacRequestInput<CimacReversalInput> {
+  return parseAdjustment(value, "reversal");
+}
+
+export function decodeCimacCollectionAdjustment(value: unknown): CimacCollectionAdjustment {
+  const a = object(value),
+    kind = oneOf(a.kind, ["refund", "reversal"] as const),
+    amount = xof(a.amount, true),
+    paymentDate = date(a.paymentDate),
+    effectiveDate = date(a.effectiveDate),
+    originalPaymentId = parseCimacRequestId(a.originalPaymentId);
+  if (
+    a.currency !== "XOF" ||
+    paymentDate !== effectiveDate ||
+    paymentDate > new Date().toISOString().slice(0, 10) ||
+    !Array.isArray(a.allocations) ||
+    !a.allocations.length ||
+    a.allocations.length > 100
+  )
+    throw invalid();
+  const allocations = a.allocations.map((raw) => {
+    const link = object(raw);
+    return { receivableId: parseCimacRequestId(link.receivableId), amount: xof(link.amount, true) };
+  });
+  if (
+    new Set(allocations.map((l) => l.receivableId)).size !== allocations.length ||
+    allocations.reduce((sum, l) => sum + minor(l.amount), BigInt(0)) !== minor(amount) ||
+    a.paymentId === originalPaymentId
+  )
+    throw invalid();
+  return {
+    id: parseCimacRequestId(a.id),
+    requestId: parseCimacRequestId(a.requestId),
+    paymentId: parseCimacRequestId(a.paymentId),
+    originalPaymentId,
+    kind,
+    paymentDate,
+    effectiveDate,
+    amount,
+    currency: "XOF",
+    paymentMethod:
+      kind === "refund"
+        ? oneOf(a.paymentMethod, ["cash", "check", "bank_transfer", "other"] as const)
+        : oneOf(a.paymentMethod, ["offset"] as const),
+    reason: text(a.reason, 1000),
+    recordedBy: parseCimacRequestId(a.recordedBy),
+    auditId: parseCimacRequestId(a.auditId),
+    receiptNo: a.receiptNo === null ? null : text(a.receiptNo, 200),
+    createdAt: timestamp(a.createdAt),
+    allocations,
+  };
+}
+
+/** Full historical chain, not just a reassuring remaining total or a boolean capability. */
+export function decodeCimacCollectionPosition(
+  value: unknown,
+  originalPaymentId: string,
+): CimacCollectionPosition {
+  const row = object(value),
+    original = parseCimacRequestId(originalPaymentId);
+  if (
+    row.originalPaymentId !== original ||
+    row.currency !== "XOF" ||
+    typeof row.canRefund !== "boolean" ||
+    typeof row.canReverse !== "boolean" ||
+    !Array.isArray(row.allocations) ||
+    !row.allocations.length ||
+    row.allocations.length > 100 ||
+    !Array.isArray(row.adjustments) ||
+    row.adjustments.length > 10000
+  )
+    throw invalid();
+  const originalAmount = xof(row.originalAmount, true),
+    refundedAmount = xof(row.refundedAmount),
+    reversedAmount = xof(row.reversedAmount),
+    remainingAmount = xof(row.remainingAmount);
+  if (
+    minor(originalAmount) !==
+      minor(refundedAmount) + minor(reversedAmount) + minor(remainingAmount) ||
+    (minor(reversedAmount) > BigInt(0) &&
+      (reversedAmount !== originalAmount || refundedAmount !== "0")) ||
+    (row.canReverse &&
+      (remainingAmount !== originalAmount || refundedAmount !== "0" || reversedAmount !== "0")) ||
+    (row.canRefund && (remainingAmount === "0" || reversedAmount !== "0"))
+  )
+    throw invalid();
+  const originalPaymentDate = date(row.originalPaymentDate);
+  if (originalPaymentDate > new Date().toISOString().slice(0, 10)) throw invalid();
+  const allocations = row.allocations.map((raw) => {
+    const a = object(raw),
+      originalAmount = xof(a.originalAmount, true),
+      refundedAmount = xof(a.refundedAmount),
+      reversedAmount = xof(a.reversedAmount),
+      remainingAmount = xof(a.remainingAmount),
+      paidAmount = decimal(a.paidAmount, 2);
+    if (
+      minor(originalAmount) !==
+        minor(refundedAmount) + minor(reversedAmount) + minor(remainingAmount) ||
+      ((row.canRefund || row.canReverse) && minor(paidAmount) < minor(remainingAmount))
+    )
+      throw invalid();
+    return {
+      receivableId: parseCimacRequestId(a.receivableId),
+      contractId: parseCimacRequestId(a.contractId),
+      unitId: parseCimacRequestId(a.unitId),
+      title: text(a.title, 1000),
+      originalAmount,
+      refundedAmount,
+      reversedAmount,
+      remainingAmount,
+      paidAmount,
+      updatedAt: timestamp(a.updatedAt),
+    };
+  });
+  if (new Set(allocations.map((a) => a.receivableId)).size !== allocations.length) throw invalid();
+  for (const [key, expected] of Object.entries({
+    originalAmount,
+    refundedAmount,
+    reversedAmount,
+    remainingAmount,
+  }))
+    if (
+      allocations.reduce((sum, a) => sum + minor(a[key as "originalAmount"]), BigInt(0)) !==
+      minor(expected)
+    )
+      throw invalid();
+  const targets = new Map(allocations.map((a) => [a.receivableId, a]));
+  const adjustments: CimacCollectionAdjustment[] = row.adjustments.map((raw) => {
+    const a = decodeCimacCollectionAdjustment(raw),
+      { kind, amount, paymentDate, effectiveDate } = a;
+    if (
+      a.originalPaymentId !== original ||
+      a.currency !== "XOF" ||
+      paymentDate < originalPaymentDate ||
+      (kind === "refund"
+        ? effectiveDate !== paymentDate
+        : effectiveDate !== originalPaymentDate || paymentDate !== originalPaymentDate) ||
+      !Array.isArray(a.allocations) ||
+      !a.allocations.length ||
+      a.allocations.length > 100
+    )
+      throw invalid();
+    const links = a.allocations.map((raw) => {
+      const link = raw,
+        receivableId = parseCimacRequestId(link.receivableId);
+      if (!targets.has(receivableId)) throw invalid();
+      return { receivableId, amount: xof(link.amount, true) };
+    });
+    if (
+      new Set(links.map((l) => l.receivableId)).size !== links.length ||
+      links.reduce((sum, l) => sum + minor(l.amount), BigInt(0)) !== minor(amount)
+    )
+      throw invalid();
+    return {
+      id: parseCimacRequestId(a.id),
+      requestId: parseCimacRequestId(a.requestId),
+      paymentId: parseCimacRequestId(a.paymentId),
+      originalPaymentId: original,
+      kind,
+      paymentDate,
+      effectiveDate,
+      amount,
+      currency: "XOF",
+      paymentMethod:
+        kind === "refund"
+          ? oneOf(a.paymentMethod, ["cash", "check", "bank_transfer", "other"])
+          : oneOf(a.paymentMethod, ["offset"]),
+      reason: text(a.reason, 1000),
+      recordedBy: parseCimacRequestId(a.recordedBy),
+      auditId: parseCimacRequestId(a.auditId),
+      receiptNo: a.receiptNo === null ? null : text(a.receiptNo, 200),
+      createdAt: timestamp(a.createdAt),
+      allocations: links,
+    };
+  });
+  for (const key of ["id", "requestId", "paymentId", "auditId"] as const)
+    if (new Set(adjustments.map((a) => a[key])).size !== adjustments.length) throw invalid();
+  if (adjustments.some((a) => a.paymentId === original)) throw invalid();
+  for (const kind of ["refund", "reversal"] as const) {
+    const key = kind === "refund" ? "refundedAmount" : "reversedAmount";
+    if (
+      adjustments
+        .filter((a) => a.kind === kind)
+        .reduce((sum, a) => sum + minor(a.amount), BigInt(0)) !== minor(row[key] as string)
+    )
+      throw invalid();
+    for (const target of allocations)
+      if (
+        adjustments
+          .filter((a) => a.kind === kind)
+          .flatMap((a) => a.allocations)
+          .filter((a) => a.receivableId === target.receivableId)
+          .reduce((sum, a) => sum + minor(a.amount), BigInt(0)) !== minor(target[key])
+      )
+        throw invalid();
+  }
+  return {
+    originalPaymentId: original,
+    customerId: parseCimacRequestId(row.customerId),
+    currency: "XOF",
+    originalPaymentDate,
+    originalPaymentMethod: oneOf(row.originalPaymentMethod, [
+      "cash",
+      "check",
+      "bank_transfer",
+      "other",
+    ]),
+    originalReceiptNo: row.originalReceiptNo === null ? null : text(row.originalReceiptNo, 200),
+    originalAmount,
+    refundedAmount,
+    reversedAmount,
+    remainingAmount,
+    positionToken: positionToken(row.positionToken),
+    canRefund: row.canRefund,
+    canReverse: row.canReverse,
+    allocations,
+    adjustments,
   };
 }
 
@@ -417,7 +720,7 @@ export function decodeCimacWriteReceipt(
     typeof row.idempotent !== "boolean"
   )
     throw invalid();
-  const kind = oneOf(row.kind, ["collection", "fee_terms", "meter_reading"]);
+  const kind = oneOf(row.kind, ["collection", "fee_terms", "meter_reading", "refund", "reversal"]);
   const result: CimacBillingWriteResult = {
     success: true,
     status: "completed",
@@ -429,7 +732,7 @@ export function decodeCimacWriteReceipt(
     auditId: parseCimacRequestId(row.auditId),
     idempotent: row.idempotent,
   };
-  if (kind === "collection") {
+  if (kind === "collection" || kind === "refund" || kind === "reversal") {
     const paymentId = parseCimacRequestId(row.paymentId),
       amount = xof(row.amount, true);
     if (
@@ -456,13 +759,39 @@ export function decodeCimacWriteReceipt(
       allocations.reduce((sum, a) => sum + minor(a.amount), BigInt(0)) !== minor(amount)
     )
       throw invalid();
-    return {
+    const paymentResult: CimacBillingWriteResult = {
       ...result,
       paymentId,
       amount,
       currency: "XOF",
       allocations,
       receiptNo: row.receiptNo === null ? null : text(row.receiptNo, 200),
+    };
+    if (kind === "collection") return paymentResult;
+    const originalPaymentId = parseCimacRequestId(row.originalPaymentId),
+      remainingBefore = xof(row.remainingBefore, true),
+      remainingAfter = xof(row.remainingAfter),
+      paymentDate = date(row.paymentDate),
+      effectiveDate = date(row.effectiveDate);
+    if (
+      originalPaymentId === paymentId ||
+      minor(remainingBefore) - minor(amount) !== minor(remainingAfter) ||
+      (kind === "reversal" && remainingAfter !== "0") ||
+      paymentDate !== effectiveDate ||
+      paymentDate > new Date().toISOString().slice(0, 10)
+    )
+      throw invalid();
+    return {
+      ...paymentResult,
+      originalPaymentId,
+      remainingBefore,
+      remainingAfter,
+      paymentDate,
+      effectiveDate,
+      paymentMethod:
+        kind === "refund"
+          ? oneOf(row.paymentMethod, ["cash", "check", "bank_transfer", "other"] as const)
+          : oneOf(row.paymentMethod, ["offset"] as const),
     };
   }
   const record = kind === "fee_terms" ? decodeFeeTerm(row.record) : decodeMeterReading(row.record);
@@ -478,7 +807,13 @@ export function decodeCimacWriteReceipt(
 /** Malformed or mismatched success must remain unknown: the transaction may have committed. */
 export function decodeCimacWriteResult(
   value: unknown,
-  input: CimacRequestInput<CimacCollectionInput | CimacFeeTermInput | CimacMeterReadingInput>,
+  input: CimacRequestInput<
+    | CimacCollectionInput
+    | CimacFeeTermInput
+    | CimacMeterReadingInput
+    | CimacRefundInput
+    | CimacReversalInput
+  >,
   kind: CimacBillingWriteKind,
   actorId: string,
 ): CimacBillingWriteResult {
@@ -489,8 +824,10 @@ export function decodeCimacWriteResult(
     result.actorId !== parseCimacRequestId(actorId)
   )
     throw invalid();
-  if (kind === "collection") {
-    const expected = input as CimacRequestInput<CimacCollectionInput>;
+  if (kind === "collection" || kind === "refund" || kind === "reversal") {
+    const expected = input as CimacRequestInput<
+      CimacCollectionInput | CimacRefundInput | CimacReversalInput
+    >;
     if (
       result.amount !== expected.amount ||
       result.currency !== expected.currency ||
@@ -499,6 +836,20 @@ export function decodeCimacWriteResult(
       throw invalid();
     const amounts = new Map(expected.allocations.map((a) => [a.receivableId, a.amount]));
     if (!result.allocations.every((a) => amounts.get(a.receivableId) === a.amount)) throw invalid();
+    if (kind === "refund" || kind === "reversal") {
+      const adjustment = expected as CimacRequestInput<CimacRefundInput | CimacReversalInput>;
+      if (result.originalPaymentId !== adjustment.originalPaymentId) throw invalid();
+      if (kind === "refund") {
+        const refund = expected as CimacRequestInput<CimacRefundInput>;
+        if (
+          result.paymentDate !== refund.paymentDate ||
+          result.effectiveDate !== refund.paymentDate ||
+          result.paymentMethod !== refund.paymentMethod
+        )
+          throw invalid();
+      } else if (result.remainingBefore !== adjustment.amount || result.remainingAfter !== "0")
+        throw invalid();
+    }
     return result;
   }
   const record = result.record!;

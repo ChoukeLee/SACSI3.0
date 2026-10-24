@@ -6,6 +6,7 @@ export function AuditBusinessDetail({ log, locale }: { log: AuditLogRow; locale:
   const info = auditBusinessSummary(log, locale);
   const zh = locale === "zh";
   const collection = info.leaseCollection;
+  const correction = info.cimacAdjustment;
   const methods: Record<string, string> = zh
     ? { cash: "现金", check: "支票", bank_transfer: "银行转账", other: "其他" }
     : { cash: "Espèces", check: "Chèque", bank_transfer: "Virement bancaire", other: "Autre" };
@@ -15,8 +16,50 @@ export function AuditBusinessDetail({ log, locale }: { log: AuditLogRow; locale:
     [zh ? "业务经办人" : "Responsable métier", info.agent],
     [zh ? "录入渠道（记录值）" : "Canal déclaré", info.channel],
     ...(!collection ? [[zh ? "输入来源" : "Source", info.source]] : []),
-    [zh ? "本次收款" : "Ce paiement", info.paymentAmount],
-    [zh ? "收款日期" : "Date du paiement", info.paymentDate],
+    [
+      correction
+        ? correction.kind === "refund"
+          ? zh
+            ? "已实际退款金额"
+            : "Montant réellement remboursé"
+          : zh
+            ? "非现金冲正金额"
+            : "Montant contrepassé hors caisse"
+        : zh
+          ? "本次收款"
+          : "Ce paiement",
+      info.paymentAmount,
+    ],
+    [
+      correction
+        ? correction.kind === "refund"
+          ? zh
+            ? "实际退款日期"
+            : "Date réelle du remboursement"
+          : zh
+            ? "冲正生效日（原收款日）"
+            : "Date d’effet (reçu d’origine)"
+        : zh
+          ? "收款日期"
+          : "Date du paiement",
+      info.paymentDate,
+    ],
+    ...(correction
+      ? [
+          [zh ? "原收款编号" : "Reçu d’origine", correction.originalPaymentId],
+          [zh ? "操作原因（记录值）" : "Motif enregistré", correction.reason],
+          [
+            zh ? "业务含义" : "Portée de l’opération",
+            correction.kind === "refund"
+              ? zh
+                ? "登记已实际退款，不执行转账；恢复应收，不自动免除合同义务。"
+                : "Remboursement déjà effectué, sans ordre de virement. Créances rétablies, sans remise des obligations contractuelles."
+              : zh
+                ? "整笔错误收款纠正，非实际退款；保留原单，恢复应收。"
+                : "Correction intégrale d’un reçu erroné, sans remboursement réel. Reçu conservé et créances rétablies.",
+          ],
+        ]
+      : []),
     [
       collection ? (zh ? "系统收据号" : "Références internes") : zh ? "收据号" : "Numéro de reçu",
       info.receiptNo,

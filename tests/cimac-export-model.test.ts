@@ -126,12 +126,18 @@ describe("CIMAC complete ledger decoder", () => {
     delete value[key];
     expect(() => decodeCimacLedger(rpc([value]))).toThrow();
   });
-  it.each([null, undefined, "", " ", "oops", NaN, Infinity, -1, "-1"])(
+  it.each([null, undefined, "", " ", "oops", NaN, Infinity, "--1"])(
     "does not convert invalid XOF %s into zero",
     (amount_xof) => {
       expect(() => decodeCimacLedger(rpc([{ ...row(), amount_xof }]))).toThrow();
     },
   );
+  it("retains signed XOF correction entries instead of rejecting or zeroing accounting history", () => {
+    for (const amount_xof of [-1, "-1.25"])
+      expect(decodeCimacLedger(rpc([{ ...row(), amount_xof }]))[0].amount_xof).toBe(
+        Number(amount_xof),
+      );
+  });
   it.each([
     { unit_id: "601" },
     { direction: "refund" },

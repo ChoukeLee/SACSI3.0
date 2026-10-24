@@ -209,6 +209,10 @@
     {
       "file": "20261024223452_cimac_customer_billing_set_based_read.sql",
       "sha256": "29e3a7ab2d61a3779b6bf447775f7cc17d3a2a5efdfb46803e66cf76e18d9ab5"
+    },
+    {
+      "file": "20261024232058_cimac_customer_collection_adjustments.sql",
+      "sha256": "2a3e16d6998aabdc3100466c115481874d6a0e3209dd1e531f12f57e1edfb91d"
     }
   ],
   "excluded": [

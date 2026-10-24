@@ -48,6 +48,7 @@ export interface CimacAccountReceivable extends ReceivableRow {
 }
 export interface CimacAccountPayment extends PaymentRow {
   protected_collection: boolean;
+  cimac_adjustment?: CimacCollectionAdjustment;
 }
 export interface CimacAccountAllocation {
   paymentId: string;
@@ -162,7 +163,83 @@ export interface CimacCollectionInput {
     expectedUpdatedAt: string;
   }>;
 }
-export type CimacBillingWriteKind = "fee_terms" | "meter_reading" | "collection";
+export type CimacCollectionAdjustmentKind = "refund" | "reversal";
+export interface CimacAdjustmentAllocationInput {
+  receivableId: string;
+  amount: CimacMoney;
+  expectedRemaining: CimacMoney;
+  expectedPaid: CimacMoney;
+  expectedUpdatedAt: string;
+}
+export interface CimacCollectionAdjustmentInput {
+  originalPaymentId: string;
+  customerId: string;
+  currency: "XOF";
+  amount: CimacMoney;
+  reason: string;
+  expectedPositionToken: string;
+  allocations: CimacAdjustmentAllocationInput[];
+  notes?: string;
+}
+export interface CimacRefundInput extends CimacCollectionAdjustmentInput {
+  /** Actual money already returned; this is a registration, not a bank transfer. */
+  paymentDate: string;
+  paymentMethod: "cash" | "check" | "bank_transfer" | "other";
+  externalReceiptNo?: string;
+}
+/** Full erroneous-receipt correction, not an actual money-out transaction. */
+export type CimacReversalInput = CimacCollectionAdjustmentInput;
+export interface CimacCollectionAdjustment {
+  id: string;
+  requestId: string;
+  paymentId: string;
+  originalPaymentId: string;
+  kind: CimacCollectionAdjustmentKind;
+  paymentDate: string;
+  effectiveDate: string;
+  amount: CimacMoney;
+  currency: "XOF";
+  paymentMethod: CimacRefundInput["paymentMethod"] | "offset";
+  reason: string;
+  recordedBy: string;
+  auditId: string;
+  receiptNo: string | null;
+  createdAt: string;
+  allocations: Array<{ receivableId: string; amount: CimacMoney }>;
+}
+export interface CimacCollectionPosition {
+  originalPaymentId: string;
+  customerId: string;
+  currency: "XOF";
+  originalPaymentDate: string;
+  originalPaymentMethod: CimacRefundInput["paymentMethod"];
+  originalReceiptNo: string | null;
+  originalAmount: CimacMoney;
+  refundedAmount: CimacMoney;
+  reversedAmount: CimacMoney;
+  remainingAmount: CimacMoney;
+  positionToken: string;
+  canRefund: boolean;
+  canReverse: boolean;
+  allocations: Array<{
+    receivableId: string;
+    contractId: string;
+    unitId: string;
+    title: string;
+    originalAmount: CimacMoney;
+    refundedAmount: CimacMoney;
+    reversedAmount: CimacMoney;
+    remainingAmount: CimacMoney;
+    paidAmount: CimacMoney;
+    updatedAt: string;
+  }>;
+  adjustments: CimacCollectionAdjustment[];
+}
+export type CimacCollectionPositionResult =
+  | { status: "available"; position: CimacCollectionPosition }
+  | { status: "unavailable"; error: string };
+export type CimacBillingWriteKind =
+  "fee_terms" | "meter_reading" | "collection" | CimacCollectionAdjustmentKind;
 export interface CimacBillingWriteResult {
   success: true;
   status: "completed";
@@ -177,6 +254,12 @@ export interface CimacBillingWriteResult {
   receiptNo?: string | null;
   amount?: CimacMoney;
   currency?: "XOF";
+  originalPaymentId?: string;
+  remainingBefore?: CimacMoney;
+  remainingAfter?: CimacMoney;
+  paymentDate?: string;
+  effectiveDate?: string;
+  paymentMethod?: CimacRefundInput["paymentMethod"] | "offset";
   allocations?: CimacAccountAllocation[];
   record?: CimacFeeTerm | CimacMeterReading;
 }

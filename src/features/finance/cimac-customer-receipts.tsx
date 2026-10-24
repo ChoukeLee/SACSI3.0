@@ -4,22 +4,38 @@ import Link from "next/link";
 import type { CimacAccountAllocation, CimacCustomerAccount } from "./cimac-billing-types";
 import { billingCategory, billingNumber } from "./cimac-billing-display";
 import { buildLeaseCollectionHref } from "@/features/leases/lease-collection-links";
+import { CimacCollectionAdjustments } from "./cimac-collection-adjustments";
 import styles from "./cimac-customer-workbench.module.css";
 
 export function CimacCustomerReceipts({
   data,
   locale,
   returnHref,
+  viewerId,
+  today,
+  canWrite,
 }: {
   data: CimacCustomerAccount;
   locale: "zh" | "fr";
   returnHref: string;
+  viewerId: string;
+  today: string;
+  canWrite: boolean;
 }) {
   const text = (zh: string, fr: string) => (locale === "zh" ? zh : fr);
   const base = locale === "fr" ? "/fr" : "";
   const oldLedger = `${base}/finance?kind=ledger&projectId=${encodeURIComponent(data.project.id)}`;
   const units = new Map(data.units.map((unit) => [unit.id, unit]));
   const receivablesById = new Map(data.receivables.map((row) => [row.id, row]));
+  const unitLabels = Object.fromEntries(
+    data.units.map((unit) => [
+      unit.id,
+      `${unit.building_label || unit.building_code} · ${unit.unit_no}`,
+    ]),
+  );
+  const contractLabels = Object.fromEntries(
+    data.contracts.map((contract) => [contract.id, contract.contractNo]),
+  );
   const allocationsByPayment = new Map<string, CimacAccountAllocation[]>();
   for (const allocation of data.allocations) {
     const values = allocationsByPayment.get(allocation.paymentId) ?? [];
@@ -45,7 +61,11 @@ export function CimacCustomerReceipts({
       </div>
       {data.payments.length ? (
         data.payments.map((payment) => (
-          <section className={`${styles.panel} ${styles.receipt}`} key={payment.id}>
+          <section
+            className={`${styles.panel} ${styles.receipt}`}
+            key={payment.id}
+            id={`cimac-payment-${payment.id}`}
+          >
             <div className={styles.receiptTop}>
               <div>
                 <p className={styles.meta}>
@@ -62,14 +82,21 @@ export function CimacCustomerReceipts({
                 </p>
               </div>
               <span className={styles.status}>
-                {payment.reversal_of_payment_id
-                  ? text("收款冲正记录", "Annulation d’encaissement")
-                  : payment.payment_method === "offset"
-                    ? text("非现金抵扣", "Compensation non monétaire")
-                    : payment.protected_collection ||
-                        payment.source_type === "cimac_customer_collection"
-                      ? text("客户总账收款", "Encaissement du compte client")
-                      : text("已有支付记录", "Paiement existant")}
+                {payment.source_type === "cimac_customer_refund"
+                  ? text("客户总账 · 实际退款", "Compte client · remboursement réel")
+                  : payment.source_type === "cimac_customer_reversal"
+                    ? text(
+                        "客户总账 · 错误收款冲正（非现金）",
+                        "Compte client · contrepassation d’erreur (hors caisse)",
+                      )
+                    : payment.reversal_of_payment_id
+                      ? text("收款冲正记录", "Annulation d’encaissement")
+                      : payment.payment_method === "offset"
+                        ? text("非现金抵扣", "Compensation non monétaire")
+                        : payment.protected_collection ||
+                            payment.source_type === "cimac_customer_collection"
+                          ? text("客户总账收款", "Encaissement du compte client")
+                          : text("已有支付记录", "Paiement existant")}
               </span>
             </div>
             <div className={styles.allocationLines}>
@@ -102,7 +129,11 @@ export function CimacCustomerReceipts({
             </div>
             <div className={styles.receiptFacts}>
               <span>
-                {text("实际收款人", "Encaisseur")}：
+                {payment.source_type === "cimac_customer_refund" ||
+                payment.source_type === "cimac_customer_reversal"
+                  ? text("原收款人", "Encaisseur d’origine")
+                  : text("实际收款人", "Encaisseur")}
+                ：
                 <strong>
                   {payment.actual_collector ||
                     text("未登记，不能用录入人代替", "Non renseigné, distinct de l’opérateur")}
@@ -121,13 +152,54 @@ export function CimacCustomerReceipts({
               </p>
             ) : null}
             {payment.notes ? <p className={styles.meta}>{payment.notes}</p> : null}
-            {payment.protected_collection || payment.source_type === "cimac_customer_collection" ? (
+            {payment.source_type === "cimac_customer_refund" ||
+            payment.source_type === "cimac_customer_reversal" ? (
               <p className={styles.note}>
-                {text(
-                  "客户总账收款已受核销保护；不能使用旧单房修改、退款或冲正入口。客户级更正流程尚未开放，需要时先核对完整分账并联系管理员处理。",
-                  "Cet encaissement est protégé par ses imputations. Les anciennes opérations par lot (modification, remboursement, annulation) ne s’appliquent pas. La correction multi-contrats n’est pas encore ouverte ; faites vérifier toutes les affectations avec l’administrateur.",
-                )}
+                {payment.source_type === "cimac_customer_refund"
+                  ? text(
+                      "这是已实际退款的登记，不是银行转账指令；相应应收已恢复，未自动减免。",
+                      "Ceci enregistre un remboursement déjà effectué, sans ordre de virement. Les créances sont rétablies, sans remise de dette.",
+                    )
+                  : text(
+                      "这是整单错误收款冲正，不是实际退款；保留原收款及审计。",
+                      "Contrepassation intégrale d’un reçu erroné, sans remboursement réel. Le reçu d’origine et l’audit sont conservés.",
+                    )}
+                {payment.source_id ? (
+                  <>
+                    {" "}
+                    <a
+                      className={styles.correctionLink}
+                      href={`#cimac-payment-${payment.source_id}`}
+                    >
+                      {text("查看原收款与校正链", "Voir le reçu d’origine et ses corrections")} ↑
+                    </a>
+                  </>
+                ) : null}
               </p>
+            ) : payment.protected_collection ||
+              payment.source_type === "cimac_customer_collection" ? (
+              <>
+                <p className={styles.note}>
+                  {text(
+                    "客户总账收款已受核销保护；不能使用旧单房修改、退款或冲正入口。请从原单下方区分实际退款与错误收款冲正；历史旧单仍沿用原处理流程。",
+                    "Cet encaissement est protégé. Les anciennes opérations par lot ne s’appliquent pas. Distinguez ci-dessous remboursement réel et contrepassation d’erreur ; les anciens reçus gardent leur processus existant.",
+                  )}
+                </p>
+                {payment.source_type === "cimac_customer_collection" &&
+                payment.customer_id &&
+                payment.customer_id === data.selectedCustomerId ? (
+                  <CimacCollectionAdjustments
+                    originalPaymentId={payment.id}
+                    customerId={payment.customer_id}
+                    viewerId={viewerId}
+                    locale={locale}
+                    today={today}
+                    canWrite={canWrite && data.canWrite}
+                    unitLabels={unitLabels}
+                    contractLabels={contractLabels}
+                  />
+                ) : null}
+              </>
             ) : (
               <Link className={styles.quietButton} href={oldLedger}>
                 {text(

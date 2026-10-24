@@ -189,6 +189,16 @@ export function auditBusinessSummary(log: AuditLogRow, locale: Locale) {
   const zh = locale === "zh";
   const meta = log.metadata ?? {};
   const leaseCollection = auditLeaseCollectionEvidence(log, locale);
+  const cimacAdjustment =
+    (log.action === "refund" && log.entity_type === "cimac_customer_refund") ||
+    (log.action === "reversal" && log.entity_type === "cimac_customer_reversal")
+      ? {
+          kind: log.action as "refund" | "reversal",
+          amount: auditNativeMoney(meta.amount, meta.currency, locale),
+          originalPaymentId: auditText(meta.original_payment_id),
+          reason: auditText(meta.reason),
+        }
+      : null;
   const requestId = leaseCollection?.requestId || auditText(meta.request_id);
   const agentId = auditText(meta.booking_agent_id);
   // Current directory lookup is supplementary, not a historical name snapshot.
@@ -251,12 +261,14 @@ export function auditBusinessSummary(log: AuditLogRow, locale: Locale) {
   const operationSummary = bookingOperationNames[bookingOperation]
     ? `${bookingOperationNames[bookingOperation]}${paymentAmount !== null ? ` ${auditMoney(paymentAmount, locale)}` : ""}${bookingOperation === "correct_room" ? ` ${auditText(bookingPlan.unitCode)} → ${auditText(bookingPlan.targetUnitCode)}` : ""}`
     : "";
-  const summary = leaseCollection
-    ? `${zh ? "登记长租实收并核销" : "Encaissement locatif affecté"}${leaseCollection.amount ? ` ${leaseCollection.amount}` : zh ? "（结果金额未记录）" : " (montant confirmé non enregistré)"}`
-    : operationSummary ||
-      (paymentAmount !== null
-        ? `${collectionPayment ? (zh ? "截图分账收款" : "Encaissement ventilé") : zh ? "登记日租收款" : "Paiement journalier enregistré"} ${auditMoney(paymentAmount, locale)}`
-        : "");
+  const summary = cimacAdjustment
+    ? `${cimacAdjustment.kind === "refund" ? (zh ? "登记客户实际退款" : "Remboursement réel du client enregistré") : zh ? "冲正客户错误收款（非现金退款）" : "Contrepassation d’un reçu erroné (sans remboursement)"} ${cimacAdjustment.amount}`
+    : leaseCollection
+      ? `${zh ? "登记长租实收并核销" : "Encaissement locatif affecté"}${leaseCollection.amount ? ` ${leaseCollection.amount}` : zh ? "（结果金额未记录）" : " (montant confirmé non enregistré)"}`
+      : operationSummary ||
+        (paymentAmount !== null
+          ? `${collectionPayment ? (zh ? "截图分账收款" : "Encaissement ventilé") : zh ? "登记日租收款" : "Paiement journalier enregistré"} ${auditMoney(paymentAmount, locale)}`
+          : "");
   return {
     actor: auditActorText(log, locale),
     actorId: log.actor_id || "",
@@ -269,7 +281,9 @@ export function auditBusinessSummary(log: AuditLogRow, locale: Locale) {
     agentId,
     summary,
     paymentAmount:
-      leaseCollection?.amount || (paymentAmount === null ? "" : auditMoney(paymentAmount, locale)),
+      cimacAdjustment?.amount ||
+      leaseCollection?.amount ||
+      (paymentAmount === null ? "" : auditMoney(paymentAmount, locale)),
     paymentDate: leaseCollection?.paymentDate || auditText(meta.payment_date),
     receiptNo: leaseCollection
       ? leaseCollection.referenceNos.join(" · ")
@@ -296,6 +310,7 @@ export function auditBusinessSummary(log: AuditLogRow, locale: Locale) {
     connectorVersion: auditText(meta.connector_version),
     protocolVersion: auditText(meta.protocol_version),
     leaseCollection,
+    cimacAdjustment,
   };
 }
 
@@ -314,6 +329,8 @@ export function auditSearchText(log: AuditLogRow, locale: Locale) {
     info.identityStatus,
     info.leaseCollection?.actualCollector,
     info.leaseCollection?.externalReceiptNo,
+    info.cimacAdjustment?.originalPaymentId,
+    info.cimacAdjustment?.reason,
     ...(info.leaseCollection?.paymentIds ?? []),
   ]
     .join(" ")

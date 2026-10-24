@@ -10,7 +10,11 @@ import type {
 import type { LeaseBuilding } from "@/features/leases/project-scope";
 import type { ContractReceivableSummary, ContractSort } from "./contract-list-model";
 import type { LeaseOverdueResolution } from "@/features/leases/lease-receivable-summary";
-import { readCimacContractAllocation } from "./cimac-contract-allocation";
+import {
+  readCimacContractAllocation,
+  decodeCimacLeaseCollectionProjection,
+} from "./cimac-contract-allocation";
+import { isCimacProtectedPayment } from "@/features/finance/cimac-payment-kinds";
 export type WorkspaceKind = "lease" | "sale";
 export type WorkspaceMode = "list" | "scope" | "detail" | "context";
 export type WorkspaceContract = LeaseContractRow | SaleContractRow;
@@ -354,8 +358,24 @@ export function decodeWorkspace(
     }
   }
   if (mode === "detail") {
+    const protectedPayments = (data.payments as PaymentRow[]).filter((p) =>
+      isCimacProtectedPayment(p.source_type),
+    );
+    if (protectedPayments.length) {
+      const contract = (data.contracts as WorkspaceContract[]).find((c) => c.id === contractId);
+      if (kind !== "lease" || !contract) throw new WorkspaceReadError();
+      try {
+        decodeCimacLeaseCollectionProjection(
+          { contractId, paymentCount: protectedPayments.length, payments: protectedPayments },
+          contractId!,
+          contract.customer_id,
+        );
+      } catch {
+        throw new WorkspaceReadError();
+      }
+    }
     for (const payment of data.payments as PaymentRow[]) {
-      if (payment.source_type === "cimac_customer_collection") {
+      if (isCimacProtectedPayment(payment.source_type)) {
         const contract = (data.contracts as WorkspaceContract[]).find((c) => c.id === contractId);
         const allocation =
           kind === "lease" && contract

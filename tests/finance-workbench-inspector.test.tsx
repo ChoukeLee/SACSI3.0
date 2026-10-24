@@ -170,10 +170,40 @@ describe("FinanceWorkbenchInspector selected-record facts", () => {
       );
       expect(host.textContent).toContain(
         locale === "zh"
-          ? "客户级更正流程尚未开放"
-          : "correction multi-contrats n’est pas encore ouverte",
+          ? "请从客户总账的原收款区分办理实际退款与错误冲正"
+          : "Ouvrez le reçu d’origine dans le compte client",
       );
-      expect(host.querySelector("a")).toBeNull();
+      expect(host.querySelector("a")?.getAttribute("href")).toBe(
+        `${locale === "fr" ? "/fr" : ""}/finance?view=customers&customerId=${customerId}&tab=receipts`,
+      );
+    },
+  );
+  it.each(["cimac_customer_refund", "cimac_customer_reversal"])(
+    "keeps %s protected from legacy mutation and links the verified customer instead of the source payment ID",
+    async (sourceType) => {
+      fetchMock.mockImplementation(async (url: string) =>
+        response(
+          url.includes("/payment-context/")
+            ? { ...payment, unitId: null, buildingId: null }
+            : {
+                ...context,
+                source: {
+                  type: sourceType,
+                  id: sourceId,
+                  label: "Original customer receipt correction",
+                  href: null,
+                  linkKind: null,
+                },
+              },
+        ),
+      );
+      await render({ canWrite: true });
+      expect(host.querySelector("button[data-payment]")?.getAttribute("data-writable")).toBe(
+        "false",
+      );
+      expect(host.querySelector("a")?.getAttribute("href")).toContain(`customerId=${customerId}`);
+      expect(host.querySelector("a")?.getAttribute("href")).not.toContain(`customerId=${sourceId}`);
+      expect(host.textContent).not.toContain("客户级更正流程尚未开放");
     },
   );
   it("does not fetch or invent amounts before a row is selected", async () => {
