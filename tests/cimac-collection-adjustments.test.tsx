@@ -141,7 +141,34 @@ function button(label: string) {
   return result;
 }
 async function click(label: string) {
-  await act(async () => button(label).click());
+  await writeInteraction(() => button(label).click());
+}
+
+async function writeInteraction(dispatch: () => unknown) {
+  const writes = [api.refund, api.reversal];
+  const before = writes.map((action) => action.mock.calls.length);
+  await act(async () => {
+    dispatch();
+  });
+  await act(async () => {
+    // React act flushes its queue, not the native WebCrypto worker pool. If
+    // hashing is still pending, wait for the real action boundary and result.
+    const submitting = [...host.querySelectorAll('button[type="submit"]')].some((control) =>
+      /^(?:正在核验并登记…|Vérification et enregistrement…)$/.test(control.textContent ?? ""),
+    );
+    if (submitting)
+      await vi.waitFor(() => {
+        expect(writes.some((action, index) => action.mock.calls.length > before[index])).toBe(true);
+      });
+    await Promise.allSettled(
+      writes.flatMap((action, index) =>
+        action.mock.results
+          .slice(before[index])
+          .filter((result) => result.type === "return")
+          .map((result) => result.value),
+      ),
+    );
+  });
 }
 function field(label: string) {
   const parent = [...host.querySelectorAll("label")].find(
@@ -167,7 +194,7 @@ async function input(label: string, value: string) {
   });
 }
 async function submit() {
-  await act(async () =>
+  await writeInteraction(() =>
     host
       .querySelector("form")!
       .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })),

@@ -197,14 +197,21 @@ async function waitForRecordedRequests(count: number) {
   });
 }
 async function submit() {
+  const submitting = () =>
+    /^(?:正在核验并入账…|Vérification et enregistrement…)$/.test(
+      host.querySelector('button[type="submit"]')?.textContent ?? "",
+    );
+  const wasSubmitting = submitting();
+  const before = record.mock.calls.length;
   await act(async () => {
     host
       .querySelector("form")!
       .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-    await new Promise((resolve) => {
-      setTimeout(resolve, 10);
-    });
   });
+  // Observe completion of native hashing through the action boundary. Do not
+  // await a deliberately deferred server result or expect a duplicate submit
+  // to create a new call: those behaviours are tested independently below.
+  if (!wasSubmitting && submitting()) await waitForRecordedRequests(before + 1);
 }
 async function validDraft() {
   await click(checkbox("九月租金"));
@@ -467,6 +474,48 @@ describe("independent lease collection workbench", () => {
     await submit();
     expect(record.mock.calls[1][0].requestId).not.toBe(originalId);
     expect(record.mock.calls[1][0].amount).toBe(100000);
+  });
+
+  it("waits for a gated native digest before reading a known-rejection request ID", async () => {
+    record.mockResolvedValueOnce({ success: false, rejected: true, error: "账单余额已变化" });
+    await render();
+    await validDraft();
+    const nativeDigest = webcrypto.subtle.digest.bind(webcrypto.subtle);
+    let release!: () => void;
+    let started!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const entered = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const digestSpy = vi
+      .spyOn(webcrypto.subtle, "digest")
+      .mockImplementationOnce(async (...args) => {
+        started();
+        await blocked;
+        return nativeDigest(...args);
+      });
+    try {
+      let settled = false;
+      const interaction = submit().then(() => {
+        settled = true;
+      });
+      await entered;
+      await nativeDigest("SHA-256", new TextEncoder().encode("native-worker-boundary"));
+      expect(settled).toBe(false);
+      expect(record).not.toHaveBeenCalled();
+      release();
+      await interaction;
+      expect(record).toHaveBeenCalledTimes(1);
+      expect(record.mock.calls[0][0].requestId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(host.textContent).toContain("本次未提交成功");
+      expect(host.querySelector<HTMLFieldSetElement>("fieldset")?.disabled).toBe(false);
+      expect(sessionStorage.length).toBe(0);
+    } finally {
+      release();
+      digestSpy.mockRestore();
+    }
   });
 
   it("only changes 万西法 after an explicit unit toggle and preserves the represented sum", async () => {

@@ -265,7 +265,36 @@ function findButton(label: string) {
   return item;
 }
 async function click(element: Element) {
-  await act(async () => element.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  await writeInteraction(() => element.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+}
+
+async function writeInteraction(dispatch: () => unknown) {
+  const writes = [actions.collection, actions.terms, actions.meter];
+  const before = writes.map((action) => action.mock.calls.length);
+  await act(async () => {
+    dispatch();
+  });
+  await act(async () => {
+    // A native WebCrypto digest may resolve after act's first queue flush.
+    // Wait for the submitted action and its result, not a fixed number of ticks.
+    const submitting = [...host.querySelectorAll('button[type="submit"]')].some((control) =>
+      /^(?:正在核验并入账…|正在保存…|Vérification et enregistrement…|Enregistrement…)$/.test(
+        control.textContent ?? "",
+      ),
+    );
+    if (submitting)
+      await vi.waitFor(() => {
+        expect(writes.some((action, index) => action.mock.calls.length > before[index])).toBe(true);
+      });
+    await Promise.allSettled(
+      writes.flatMap((action, index) =>
+        action.mock.results
+          .slice(before[index])
+          .filter((result) => result.type === "return")
+          .map((result) => result.value),
+      ),
+    );
+  });
 }
 async function input(
   element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
@@ -295,7 +324,7 @@ function field(label: string): HTMLInputElement | HTMLSelectElement | HTMLTextAr
   return control as HTMLInputElement;
 }
 async function submit(form: HTMLFormElement) {
-  await act(async () => {
+  await writeInteraction(() => {
     form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
   });
 }
@@ -498,6 +527,65 @@ describe("CIMAC customer-first finance workspace", () => {
 });
 
 describe("CIMAC collection safety", () => {
+  it("waits across a gated real WebCrypto digest and preserves the original request on unknown retry", async () => {
+    actions.collection.mockResolvedValue({ success: false, rejected: false, error: "unknown" });
+    await render();
+    const panel = await openCollection();
+    await fillCollection(panel);
+    const nativeDigest = webcrypto.subtle.digest.bind(webcrypto.subtle);
+    const digestSpy = vi.spyOn(webcrypto.subtle, "digest");
+    const releases: Array<() => void> = [];
+    try {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        let release!: () => void;
+        let started!: () => void;
+        const blocked = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        const entered = new Promise<void>((resolve) => {
+          started = resolve;
+        });
+        releases.push(release);
+        digestSpy.mockImplementationOnce(async (...args) => {
+          started();
+          await blocked;
+          return nativeDigest(...args);
+        });
+        let settled = false;
+        const interaction = (
+          attempt === 0
+            ? submit(panel.querySelector("form")!)
+            : click(findButton("按原内容同号重试"))
+        ).then(() => {
+          settled = true;
+        });
+        await entered;
+        // An independent real worker completion is an event-loop boundary,
+        // not a delay or a guessed number of Promise flushes. The write's
+        // own digest is still gated, so its interaction cannot be finished.
+        await nativeDigest("SHA-256", new TextEncoder().encode("worker-boundary"));
+        expect(settled).toBe(false);
+        expect(actions.collection).toHaveBeenCalledTimes(attempt);
+        release();
+        await interaction;
+        expect(actions.collection).toHaveBeenCalledTimes(attempt + 1);
+        expect(panel.querySelector("fieldset")?.disabled).toBe(true);
+        expect(findButton("按原内容同号重试")).toBeDefined();
+      }
+      expect(actions.collection.mock.calls[1][0]).toEqual(actions.collection.mock.calls[0][0]);
+      const { requestId, ...payload } = actions.collection.mock.calls[0][0];
+      const stored = JSON.parse(sessionStorage.getItem(sessionStorage.key(0)!)!);
+      expect(stored.requestId).toBe(requestId);
+      expect(stored.fingerprint).toBe(
+        Buffer.from(
+          await nativeDigest("SHA-256", new TextEncoder().encode(JSON.stringify(payload))),
+        ).toString("hex"),
+      );
+    } finally {
+      releases.forEach((release) => release());
+      digestSpy.mockRestore();
+    }
+  });
   it("offers only existing collectible XOF non-deposit bills, with blank allocations", async () => {
     await render();
     const panel = await openCollection();
