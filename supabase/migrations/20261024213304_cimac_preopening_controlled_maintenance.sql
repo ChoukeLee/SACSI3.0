@@ -1,5 +1,7 @@
 begin;
 
+-- Filename matches the hosted migration history timestamp from this release.
+
 -- Deliberately separate from active-lease lifecycle and ordinary cash entry.
 -- This is an authenticated, admin-only, preview-bound pre-opening maintenance
 -- transaction. It never signs/starts a lease or invents an FX rate or receivable.

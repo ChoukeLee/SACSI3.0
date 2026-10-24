@@ -516,5 +516,6 @@ export function verifyCimacMaintenanceResult(value, request, actorId) {
     }
 }
 
-export function normalizeCimacMaintenanceRequest(value) { return parseCimacMaintenance({...value, protocolVersion: value?.protocolVersion ?? "1.0", connectorVersion: value?.connectorVersion ?? "0.8.0", inputSource: value?.inputSource ?? "natural_language"}); }
-
+export function normalizeCimacMaintenanceRequest(value) {
+    return parseCimacMaintenance({...value, protocolVersion: value?.protocolVersion ?? "1.0", connectorVersion: value?.connectorVersion ?? "0.8.0", inputSource: value?.inputSource ?? "natural_language"});
+}

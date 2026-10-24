@@ -199,8 +199,8 @@
       "sha256": "d97728eba0215b67d7b69d5eb10f51a0a50bb0b8bc31f4148cac46a777a373c4"
     },
     {
-      "file": "20261024204811_cimac_preopening_controlled_maintenance.sql",
-      "sha256": "6d24b8f49f0f72bdab44ae65b4320d00e245cbd908b1849dea8a6cf4cefc9879"
+      "file": "20261024213304_cimac_preopening_controlled_maintenance.sql",
+      "sha256": "33c7efc81fb0284065e7e6f96aa4ad395f4f72ba0355eb58f372120e6c1b80e4"
     }
   ],
   "excluded": [

@@ -16,11 +16,11 @@ beforeAll(async () => {
   db = await cluster.connect();
   const applied = await installApplicationRebuild(db);
   const migration = await readFile(
-    "supabase/migrations/20261024204811_cimac_preopening_controlled_maintenance.sql",
+    "supabase/migrations/20261024213304_cimac_preopening_controlled_maintenance.sql",
     "utf8",
   );
   try {
-    if (!applied.includes("20261024204811_cimac_preopening_controlled_maintenance.sql"))
+    if (!applied.includes("20261024213304_cimac_preopening_controlled_maintenance.sql"))
       await db.query(migration);
   } catch (error) {
     const details = error as {
