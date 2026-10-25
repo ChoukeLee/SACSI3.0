@@ -232,7 +232,15 @@ export function CimacShell({
           </p>
         )}
         <main id="cimac-main" className={styles.main} tabIndex={-1} data-app-main data-cimac-main>
-          {children}
+          {/* The shared route-isolation CSS only exposes the current route root. */}
+          <div
+            key={pathname}
+            data-route-root={pathname}
+            data-current-route-root
+            className="min-w-0"
+          >
+            {children}
+          </div>
         </main>
       </div>
     </div>

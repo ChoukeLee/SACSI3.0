@@ -4,6 +4,7 @@ import * as prettier from 'prettier';
 // A reviewed, explicit adoption scope. Legacy files are added when refactored;
 // this avoids burying meaningful business changes under a repository-wide reflow.
 const files = [
+  'tests/cimac-shell-visibility.test.tsx',
   'src/features/finance/cimac-account-lazy.tsx',
   'tests/cimac-workspace-views.test.tsx',
   'src/app/cimac/assets/[id]/page.tsx',
