@@ -1,15 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState } from "react";
-import { ArrowUpRight, Building2, House, Search, Store, Warehouse } from "lucide-react";
+import { useState } from "react";
+import { ArrowUpRight, Building2, Search } from "lucide-react";
 import type { CimacCustomerAccount } from "./cimac-billing-types";
-import { CimacBillingRuleReference } from "./cimac-billing-rule-reference";
-import { CimacCollectionPanel } from "./cimac-collection-panel";
-import { CimacMeterPanel, CimacFeeTermsPanel } from "./cimac-pending-panels";
-import { billingKind, billingNumber } from "./cimac-billing-display";
-import { CimacCustomerBills } from "./cimac-customer-bills";
-import { CimacCustomerReceipts } from "./cimac-customer-receipts";
+import { billingNumber } from "./cimac-billing-display";
+import { CimacAccountContent } from "./cimac-account-content";
 import {
   cimacBillingHref,
   type CimacBillingQuery,
@@ -47,9 +43,7 @@ function CustomerAccountContent({
   const text = (zh: string, fr: string) => (locale === "zh" ? zh : fr);
   const base = locale === "fr" ? "/fr" : "";
   const [tab, setTab] = useState<CimacBillingTab>(query?.tab ?? "bills");
-  const [kind, setKind] = useState("all");
   const [collectionOpen, setCollectionOpen] = useState(false);
-  const tabsId = useId();
   const customer = data.customer;
   const writable = canWrite && data.canWrite;
   const href = (patch: Partial<CimacBillingQuery> = {}) =>
@@ -66,14 +60,6 @@ function CustomerAccountContent({
   const balances = customer?.balances ?? [];
   const mainBalance = balances.find((balance) => balance.currency === "XOF");
   const nativeBalances = balances.filter((balance) => balance.currency !== "XOF");
-  const categories = [
-    "storefront",
-    "apartment",
-    "warehouse",
-    ...Array.from(new Set(data.units.map((unit) => unit.kind))).filter(
-      (value) => !["storefront", "apartment", "warehouse"].includes(value),
-    ),
-  ];
   const totalPages = Math.max(1, Math.ceil(data.customerPage.total / data.customerPage.pageSize));
   const oldLedger = `${base}/finance?kind=ledger&projectId=${encodeURIComponent(data.project.id)}`;
   return (
@@ -289,138 +275,19 @@ function CustomerAccountContent({
                   </details>
                 ) : null}
               </section>
-              <div
-                className={styles.assets}
-                aria-label={text("客户关联物业类型", "Types de biens du client")}
-              >
-                {categories.map((value) => {
-                  const matching = data.units.filter((unit) => unit.kind === value);
-                  const Icon =
-                    value === "storefront" ? Store : value === "warehouse" ? Warehouse : House;
-                  return (
-                    <button
-                      type="button"
-                      key={value}
-                      className={styles.asset}
-                      aria-pressed={kind === value}
-                      onClick={() => {
-                        setKind(kind === value ? "all" : value);
-                      }}
-                    >
-                      <span className={styles.assetTitle}>
-                        <Icon size={15} aria-hidden="true" />
-                        {billingKind(value, locale)}
-                        <strong>{matching.length}</strong>
-                      </span>
-                      <span className={styles.assetRooms}>
-                        {matching.length
-                          ? matching.map((unit) => unit.unit_no).join(" / ")
-                          : text("无关联物业", "Aucun bien associé")}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              <div
-                className={styles.tabs}
-                role="tablist"
-                aria-label={text("客户收费工作视图", "Vues de facturation client")}
-              >
-                {(
-                  [
-                    ["bills", text("收费账单", "Créances")],
-                    ["receipts", text("收款核销", "Encaissements")],
-                    ["meters", text("水电抄表", "Relevés")],
-                    ["rules", text("规则与约定", "Conventions")],
-                  ] as const
-                ).map(([value, label]) => (
-                  <button
-                    type="button"
-                    key={value}
-                    role="tab"
-                    id={`${tabsId}-${value}`}
-                    aria-selected={tab === value}
-                    aria-controls={`${tabsId}-panel`}
-                    tabIndex={tab === value ? 0 : -1}
-                    className={styles.tab}
-                    onClick={() => setTab(value)}
-                    onKeyDown={(event) => {
-                      const order: CimacBillingTab[] = ["bills", "receipts", "meters", "rules"];
-                      let index = order.indexOf(value);
-                      if (event.key === "ArrowRight") index = (index + 1) % order.length;
-                      else if (event.key === "ArrowLeft")
-                        index = (index + order.length - 1) % order.length;
-                      else if (event.key === "Home") index = 0;
-                      else if (event.key === "End") index = order.length - 1;
-                      else return;
-                      event.preventDefault();
-                      setTab(order[index]);
-                      document.getElementById(`${tabsId}-${order[index]}`)?.focus();
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {collectionOpen ? (
-                <CimacCollectionPanel
-                  data={data}
-                  locale={locale}
-                  viewerId={viewerId}
-                  today={today}
-                  canWrite={writable}
-                  onClose={() => setCollectionOpen(false)}
-                />
-              ) : null}
-              <div
-                role="tabpanel"
-                id={`${tabsId}-panel`}
-                aria-labelledby={`${tabsId}-${tab}`}
-                className={styles.tabPanel}
-              >
-                {tab === "bills" ? (
-                  <CimacCustomerBills
-                    key={kind}
-                    data={data}
-                    locale={locale}
-                    today={today}
-                    kind={kind}
-                    onClearKind={() => setKind("all")}
-                    onShowRules={() => setTab("rules")}
-                  />
-                ) : null}
-                {tab === "receipts" ? (
-                  <CimacCustomerReceipts
-                    data={data}
-                    locale={locale}
-                    returnHref={href()}
-                    viewerId={viewerId}
-                    today={today}
-                    canWrite={writable}
-                  />
-                ) : null}
-                {tab === "meters" ? (
-                  <CimacMeterPanel
-                    data={data}
-                    locale={locale}
-                    today={today}
-                    viewerId={viewerId}
-                    canWrite={writable}
-                  />
-                ) : null}
-                {tab === "rules" ? (
-                  <>
-                    <CimacBillingRuleReference locale={locale} />
-                    <CimacFeeTermsPanel
-                      data={data}
-                      locale={locale}
-                      today={today}
-                      viewerId={viewerId}
-                      canWrite={writable}
-                    />
-                  </>
-                ) : null}
-              </div>
+              <CimacAccountContent
+                data={data}
+                locale={locale}
+                viewerId={viewerId}
+                canWrite={canWrite}
+                today={today}
+                query={query}
+                tab={tab}
+                onTabChange={setTab}
+                collectionOpen={collectionOpen}
+                onCollectionOpenChange={setCollectionOpen}
+                showCollectionTrigger={false}
+              />
             </>
           )}
         </div>

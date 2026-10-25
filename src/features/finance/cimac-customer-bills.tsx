@@ -19,6 +19,7 @@ export function CimacCustomerBills({
   kind,
   onClearKind,
   onShowRules,
+  returnHref,
 }: {
   data: CimacCustomerAccount;
   locale: "zh" | "fr";
@@ -26,6 +27,7 @@ export function CimacCustomerBills({
   kind: string;
   onClearKind: () => void;
   onShowRules: () => void;
+  returnHref?: string;
 }) {
   const text = (zh: string, fr: string) => (locale === "zh" ? zh : fr);
   const base = locale === "fr" ? "/fr" : "";
@@ -57,7 +59,7 @@ export function CimacCustomerBills({
     );
   };
   const leaseHref = (id: string) =>
-    `${base}/leases?${new URLSearchParams({ project: data.project.id, contract: id, ...(units.get(contracts.get(id)?.unitId ?? "")?.building_id ? { building: units.get(contracts.get(id)!.unitId)!.building_id } : {}), returnTo: `${base}/finance?${new URLSearchParams({ view: "customers", customerId: data.selectedCustomerId! })}` })}`;
+    `${base}/leases?${new URLSearchParams({ project: data.project.id, contract: id, ...(units.get(contracts.get(id)?.unitId ?? "")?.building_id ? { building: units.get(contracts.get(id)!.unitId)!.building_id } : {}), returnTo: returnHref ?? `${base}/finance?${new URLSearchParams({ view: "customers", customerId: data.selectedCustomerId! })}` })}`;
   return (
     <>
       <div className={styles.toolbar}>

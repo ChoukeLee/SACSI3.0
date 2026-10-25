@@ -33,6 +33,7 @@ import { navigationGroupsForRole } from "@/lib/navigation-access";
 import { useSidebar } from "@/components/ui/sidebar";
 import { Logo } from "@/components/logo";
 import { SheetTitle } from "@/components/ui/sheet";
+import { canAccessCimacWorkspace } from "@/features/cimac/cimac-workspace-access";
 
 type NavKey =
   | "management"
@@ -143,6 +144,29 @@ export function AppSidebar({ locale, userRole }: { locale: Locale; userRole?: Us
         )}
       </SidebarHeader>
       <SidebarContent>
+        {canAccessCimacWorkspace(userRole) && (
+          <SidebarGroup>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={locale === "zh" ? "建材城工作区" : "Espace CIMAC"}
+                >
+                  <Link
+                    href={routeFor(locale, "/cimac")}
+                    prefetch={false}
+                    onNavigate={() => setOpenMobile(false)}
+                  >
+                    <Building2 className="h-4 w-4" />
+                    <span className="text-[13px] font-medium">
+                      {locale === "zh" ? "建材城工作区" : "Espace CIMAC"}
+                    </span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+        )}
         {visible.map((group, gi) => (
           <SidebarGroup key={group.key} className={gi === 0 ? "" : ""}>
             <SidebarGroupLabel className="h-7 text-xs font-medium text-sidebar-foreground/50">

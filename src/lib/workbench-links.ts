@@ -29,6 +29,10 @@ const directBusinessPaths = new Set([
   "reports",
   "daily-rentals",
   "daily-rentals/receipts",
+  "cimac",
+  "cimac/customers",
+  "cimac/assets",
+  "cimac/finance",
 ]);
 const sensitiveParameters = new Set([
   "token",
@@ -64,7 +68,7 @@ export function safeWorkbenchReturnTo(value: unknown): string | null {
   }
   if (url.origin !== returnOrigin || url.username || url.password) return null;
   const path = url.pathname.replace(/^\/fr\//, "/").slice(1);
-  const detail = path.match(/^(customers|units)\/([^/]+)$/);
+  const detail = path.match(/^(customers|units|cimac\/customers|cimac\/assets)\/([^/]+)$/);
   if (!directBusinessPaths.has(path) && !(detail && uuid.test(detail[2]))) return null;
   for (const [key, parameter] of [...url.searchParams.entries()]) {
     if (sensitiveParameters.has(key.toLowerCase()) || controlCharacters.test(parameter))

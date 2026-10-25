@@ -1,3 +1,5 @@
+import { safeWorkbenchReturnTo } from "@/lib/workbench-links";
+
 export type CimacBillingTab = "bills" | "receipts" | "meters" | "rules";
 
 export interface CimacBillingQuery {
@@ -43,8 +45,28 @@ export function cimacBillingHref(
   query: CimacBillingQuery,
   locale: "zh" | "fr",
   patch: Partial<CimacBillingQuery> = {},
+  baseHref?: string,
+  context?: { returnTo?: string | null; building?: string | null },
 ) {
   const next = { ...query, ...patch };
+  if (baseHref) {
+    const path = baseHref.match(/^\/(?:fr\/)?cimac\/customers\/([0-9a-f-]+)$/i);
+    if (
+      !path ||
+      !identifier.test(path[1]) ||
+      path[1].toLowerCase() !== next.customerId?.toLowerCase() ||
+      !tabs.includes(next.tab)
+    )
+      throw new Error("InvalidCimacBillingQuery");
+    const params = new URLSearchParams({ tab: "account", accountTab: next.tab });
+    if (context?.building) {
+      if (!identifier.test(context.building)) throw new Error("InvalidCimacBillingQuery");
+      params.set("building", context.building);
+    }
+    const returnTo = safeWorkbenchReturnTo(context?.returnTo);
+    if (returnTo) params.set("returnTo", returnTo);
+    return `${baseHref}?${params}`;
+  }
   const params = new URLSearchParams({ view: "customers" });
   if (next.customerId) params.set("customerId", next.customerId);
   if (next.search) params.set("search", next.search);

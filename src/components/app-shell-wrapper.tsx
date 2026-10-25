@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import type { UserRole } from "@/lib/auth";
+import { isCimacWorkspacePath } from "@/features/cimac/cimac-workspace-access";
 
 export function AppShellWrapper({
   children,
@@ -16,7 +17,7 @@ export function AppShellWrapper({
   const pathname = usePathname();
   const locale = pathname.startsWith("/fr") ? "fr" : "zh";
 
-  if (pathname === "/login") return <>{children}</>;
+  if (pathname === "/login" || isCimacWorkspacePath(pathname)) return <>{children}</>;
 
   return (
     <AppShell locale={locale} userRole={userRole} userDisplayName={userDisplayName}>

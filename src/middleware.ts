@@ -108,6 +108,7 @@ export const config = {
     "/fr",
     "/fr/:path*",
     "/management/:path*",
+    "/cimac/:path*",
     "/units/:path*",
     "/daily-rentals/:path*",
     "/leases/:path*",

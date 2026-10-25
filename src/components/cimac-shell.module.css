@@ -1,0 +1,320 @@
+.shell {
+  --cimac-line: #e8e9ed;
+  --cimac-blue: #3558d8;
+  display: grid;
+  grid-template-columns: 192px minmax(0, 1fr);
+  min-height: 100dvh;
+  color: #20232b;
+  background: #f7f8fa;
+}
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--cimac-line);
+  background: #fff;
+}
+.brand {
+  height: 74px;
+  padding: 0 17px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mark {
+  flex: 0 0 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--cimac-blue);
+  color: #fff;
+  font-size: 21px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.brandName {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.brandName strong {
+  font-size: 17px;
+  letter-spacing: 0.06em;
+}
+.brandName small {
+  font-size: 10px;
+  color: #7d8290;
+  white-space: nowrap;
+}
+.collapseButton {
+  margin-left: auto;
+  color: #8a8e99;
+  cursor: pointer;
+}
+.navigation {
+  padding: 10px 11px;
+}
+.groupLabel {
+  padding: 11px 12px 9px;
+  font-size: 10px;
+  color: #898e9b;
+  letter-spacing: 0.08em;
+}
+.navLink,
+.workspaceSwitch,
+.planned {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 42px;
+  padding: 10px 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  text-decoration: none;
+}
+.navLink {
+  color: #606674;
+  margin: 3px 0;
+}
+.navLink:hover {
+  background: #f5f7fc;
+  color: #1f399f;
+}
+.navLink.active {
+  color: #3456d2;
+  background: #edf1ff;
+  font-weight: 650;
+}
+.navLink svg,
+.workspaceSwitch svg,
+.planned svg {
+  flex-shrink: 0;
+}
+.external {
+  margin-left: auto;
+  opacity: 0.65;
+}
+.planned {
+  color: #858996;
+}
+.planned small {
+  margin-left: auto;
+  font-size: 9px;
+  border: 1px solid var(--cimac-line);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.sidebarFooter {
+  margin-top: auto;
+  padding: 12px 11px;
+  border-top: 1px solid var(--cimac-line);
+}
+.workspaceSwitch {
+  color: #717785;
+  font-size: 11px;
+}
+.workspaceSwitch:hover {
+  background: #f6f7fa;
+}
+.body {
+  min-width: 0;
+}
+.header {
+  height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 25px;
+  background: #fff;
+  border-bottom: 1px solid var(--cimac-line);
+}
+.workspaceLabel {
+  font-size: 12px;
+  color: #525969;
+}
+.workspaceLabel small {
+  display: inline-block;
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid var(--cimac-line);
+  font-size: 10px;
+  color: #9a9eaa;
+  letter-spacing: 0.06em;
+}
+.headerActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #727785;
+  font-size: 11px;
+}
+.headerActions button {
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 5px;
+}
+.headerActions button:hover {
+  background: #f3f5fa;
+}
+.headerActions button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+.userName {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.main {
+  min-width: 0;
+  max-width: 1640px;
+  margin: 0 auto;
+  padding: 25px;
+}
+.mobileMenu {
+  display: none;
+}
+.skip {
+  position: fixed;
+  z-index: 100;
+  left: 10px;
+  top: 0;
+  transform: translateY(-120%);
+  background: #fff;
+  padding: 8px 12px;
+  border: 2px solid var(--cimac-blue);
+}
+.skip:focus {
+  transform: translateY(5px);
+}
+.shell :is(button, a):focus-visible {
+  outline: 2px solid var(--cimac-blue);
+  outline-offset: 3px;
+}
+.collapsed {
+  grid-template-columns: 64px minmax(0, 1fr);
+}
+.collapsed .brand {
+  padding: 0 16px;
+}
+.collapsed .brandName,
+.collapsed .collapseButton,
+.collapsed .groupLabel,
+.collapsed .navLink span,
+.collapsed .planned span,
+.collapsed .planned small,
+.collapsed .workspaceSwitch span,
+.collapsed .external,
+.collapsed .workspaceSwitch svg:last-child {
+  display: none;
+}
+.collapsed .navLink,
+.collapsed .planned,
+.collapsed .workspaceSwitch {
+  justify-content: center;
+  padding: 11px 0;
+}
+.logoutError {
+  padding: 8px 25px;
+  color: #b42318;
+  font-size: 12px;
+  background: #fff0ed;
+}
+@media (max-width: 760px) {
+  .shell,
+  .collapsed {
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--cimac-line);
+  }
+  .brand,
+  .collapsed .brand {
+    height: 58px;
+    padding: 0 15px;
+  }
+  .collapsed .brandName {
+    display: grid;
+  }
+  .collapseButton,
+  .navigation,
+  .sidebarFooter {
+    display: none;
+  }
+  .mobileOpen .navigation {
+    display: block;
+  }
+  .mobileOpen .sidebarFooter {
+    display: block;
+    margin-top: 0;
+  }
+  .collapsed .navLink span,
+  .collapsed .planned span,
+  .collapsed .planned small,
+  .collapsed .workspaceSwitch span {
+    display: initial;
+  }
+  .collapsed .groupLabel {
+    display: block;
+  }
+  .collapsed .navLink,
+  .collapsed .planned,
+  .collapsed .workspaceSwitch {
+    justify-content: flex-start;
+    padding: 10px 12px;
+  }
+  .header {
+    height: 48px;
+    padding: 0 15px;
+    gap: 8px;
+  }
+  .mobileMenu {
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    width: 30px;
+    height: 30px;
+  }
+  .headerActions {
+    gap: 4px;
+  }
+  .workspaceLabel small {
+    display: none;
+  }
+  .userName {
+    max-width: 75px;
+    font-size: 10px;
+  }
+  .main {
+    padding: 20px 15px;
+  }
+}
+:global(.dark) .shell {
+  --cimac-line: #30343d;
+  background: #171a20;
+  color: #e6e8ed;
+}
+:global(.dark) .sidebar,
+:global(.dark) .header {
+  background: #1d2027;
+}
+:global(.dark) .navLink {
+  color: #aeb6c6;
+}
+:global(.dark) .navLink.active {
+  color: #aebfff;
+  background: #273255;
+}
+:global(.dark) .workspaceLabel {
+  color: #c1c6d1;
+}
