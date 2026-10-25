@@ -12,7 +12,7 @@ export const customerDirectoryFilters = [
 ] as const;
 export type CustomerDirectoryFilter = (typeof customerDirectoryFilters)[number];
 export type CustomerRelationRole =
-  "lease" | "sale" | "daily_guest" | "daily_agent" | "daily_unknown";
+  "lease" | "sale" | "daily_guest" | "daily_agent" | "daily_unknown" | "park_link";
 export interface CustomerDirectoryQuery {
   projectId: string;
   buildingId: string;
@@ -27,6 +27,7 @@ export interface CustomerDirectoryBuilding {
   project: { id: string; code: string; label: string } | null;
 }
 export interface CustomerDirectoryRow {
+  membershipStatus?: "current" | "archived";
   id: string;
   name: string;
   phone: string | null;
@@ -39,6 +40,11 @@ export interface CustomerDirectoryRow {
   lastBusinessDate: string | null;
 }
 export interface CustomerRelation {
+  brand?: string | null;
+  relationshipKind?: "signed_contract" | "reservation" | null;
+  signingState?: "signed_effective" | "unconfirmed" | null;
+  sourceReference?: string | null;
+  signedDate?: string | null;
   id: string;
   role: CustomerRelationRole;
   unitId: string;
@@ -54,6 +60,7 @@ export interface CustomerRelation {
 }
 export type CustomerDirectoryProfile = Omit<CustomerRow, "encrypted_document_no"> & {
   hasDocument: boolean;
+  membershipStatus?: "current" | "archived";
 };
 export interface CustomerDirectoryData {
   mode: "list" | "detail";
@@ -137,7 +144,7 @@ function date(value: unknown) {
 function nullableText(value: unknown) {
   if (value !== null && typeof value !== "string") throw new CustomerDirectoryError();
 }
-const roles = ["lease", "sale", "daily_guest", "daily_agent", "daily_unknown"];
+const roles = ["lease", "sale", "daily_guest", "daily_agent", "daily_unknown", "park_link"];
 export function decodeCustomerDirectory(
   value: unknown,
   query: CustomerDirectoryQuery,
@@ -207,6 +214,11 @@ export function decodeCustomerDirectory(
     )
       throw new CustomerDirectoryError();
     nullableText(row.phone);
+    if (
+      row.membershipStatus !== undefined &&
+      !["current", "archived"].includes(String(row.membershipStatus))
+    )
+      throw new CustomerDirectoryError();
     date(row.lastBusinessDate);
     count(row.roomCount);
     count(row.relationshipCount);
@@ -228,6 +240,11 @@ export function decodeCustomerDirectory(
       throw new CustomerDirectoryError();
   } else {
     const profile = object(data.profile);
+    if (
+      profile.membershipStatus !== undefined &&
+      !["current", "archived"].includes(String(profile.membershipStatus))
+    )
+      throw new CustomerDirectoryError();
     if (
       !customerId ||
       profile.id !== customerId ||
@@ -281,6 +298,24 @@ export function decodeCustomerDirectory(
     )
       throw new CustomerDirectoryError();
     nullableText(rel.code);
+    for (const key of ["brand", "sourceReference"])
+      if (rel[key] !== undefined) nullableText(rel[key]);
+    if (rel.signedDate !== undefined) date(rel.signedDate);
+    if (
+      rel.relationshipKind != null &&
+      !["signed_contract", "reservation"].includes(String(rel.relationshipKind))
+    )
+      throw new CustomerDirectoryError();
+    if (
+      rel.signingState != null &&
+      !["signed_effective", "unconfirmed"].includes(String(rel.signingState))
+    )
+      throw new CustomerDirectoryError();
+    if (
+      rel.role === "park_link" &&
+      !["signed_effective", "unconfirmed"].includes(String(rel.status))
+    )
+      throw new CustomerDirectoryError();
     date(rel.startDate);
     date(rel.endDate);
     if (

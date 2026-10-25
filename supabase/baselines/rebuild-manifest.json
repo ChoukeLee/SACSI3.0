@@ -213,6 +213,14 @@
     {
       "file": "20261024232058_cimac_customer_collection_adjustments.sql",
       "sha256": "2a3e16d6998aabdc3100466c115481874d6a0e3209dd1e531f12f57e1edfb91d"
+    },
+    {
+      "file": "20261025115930_cimac_customer_profiles_membership_links.sql",
+      "sha256": "d64ba7febdb4b239acaff91448cfae3fab8ad0d395c4059fa2dbe916c7815624"
+    },
+    {
+      "file": "20261025115933_cimac_asset_area_profiles_correction.sql",
+      "sha256": "fe774edd1f499a985caceb8d7b272b7fa2177896e7244a2811b43bec4a9e151a"
     }
   ],
   "excluded": [

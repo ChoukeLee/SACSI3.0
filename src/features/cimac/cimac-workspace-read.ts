@@ -1,8 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { readCustomerDirectory } from "@/features/customers/customer-directory-service";
 import {
   CustomerDirectoryError,
+  decodeCustomerDirectory,
   type CustomerDirectoryRow,
   type CustomerDirectoryProfile,
   type CustomerRelation,
@@ -36,6 +36,7 @@ import {
 type Client = Pick<SupabaseClient, "from" | "rpc">;
 type Row = Record<string, unknown>;
 const customerRow = (r: CustomerDirectoryRow): CustomerDirectoryRow => ({
+  ...(r.membershipStatus ? { membershipStatus: r.membershipStatus } : {}),
   id: r.id,
   name: r.name,
   phone: r.phone,
@@ -48,6 +49,7 @@ const customerRow = (r: CustomerDirectoryRow): CustomerDirectoryRow => ({
   lastBusinessDate: r.lastBusinessDate,
 });
 const profileRow = (p: CustomerDirectoryProfile): CustomerDirectoryProfile => ({
+  ...(p.membershipStatus ? { membershipStatus: p.membershipStatus } : {}),
   id: p.id,
   name: p.name,
   gender: p.gender,
@@ -64,6 +66,11 @@ const profileRow = (p: CustomerDirectoryProfile): CustomerDirectoryProfile => ({
   hasDocument: p.hasDocument,
 });
 const relationRow = (r: CustomerRelation): CustomerRelation => ({
+  ...(r.brand !== undefined ? { brand: r.brand } : {}),
+  ...(r.relationshipKind !== undefined ? { relationshipKind: r.relationshipKind } : {}),
+  ...(r.signingState !== undefined ? { signingState: r.signingState } : {}),
+  ...(r.sourceReference !== undefined ? { sourceReference: r.sourceReference } : {}),
+  ...(r.signedDate !== undefined ? { signedDate: r.signedDate } : {}),
   id: r.id,
   role: r.role,
   unitId: r.unitId,
@@ -200,19 +207,43 @@ async function customerDirectory(
   id?: string,
 ) {
   assertCimacWorkspaceQuery(scope, query);
+  const baseQuery = {
+    projectId: scope.project.id,
+    buildingId: query.building,
+    search: id ? "" : query.q,
+    filter: id ? "all" : (query.filter as "all"),
+    page: id ? 1 : query.page,
+  };
+  const membershipStatus = query.membershipStatus ?? "current";
+  const { data: raw, error } = await client.rpc("cimac_customer_directory_read_rpc", {
+    p_input: { ...baseQuery, membershipStatus },
+    p_mode: id ? "detail" : "list",
+    p_customer_id: id ?? null,
+    p_relation_page: query.relationPage,
+  });
+  if (error)
+    throw new CimacWorkspaceReadError(
+      error.code === "42501"
+        ? 403
+        : error.code === "P0002"
+          ? 404
+          : error.code === "22023"
+            ? 400
+            : 503,
+    );
+  const result = cimacWorkspaceObject(raw);
+  const { membershipStatus: echoedMembership, ...echoedBase } = cimacWorkspaceObject(result.query);
+  if (echoedMembership !== membershipStatus) fail();
+  // CIMAC-only filter is validated here; the shared directory query remains unchanged.
   const data = await existingRead(
-    readCustomerDirectory(
-      client as SupabaseClient,
-      {
-        projectId: scope.project.id,
-        buildingId: query.building,
-        search: id ? "" : query.q,
-        filter: id ? "all" : (query.filter as "all"),
-        page: id ? 1 : query.page,
-      },
-      id ? "detail" : "list",
-      id,
-      query.relationPage,
+    Promise.resolve().then(() =>
+      decodeCustomerDirectory(
+        { ...result, query: echoedBase },
+        baseQuery,
+        id ? "detail" : "list",
+        id,
+        query.relationPage,
+      ),
     ),
   );
   if (
@@ -251,13 +282,7 @@ export async function readCimacCustomer(
   const id = cimacWorkspaceId(customerId),
     query = queryFor(scope, raw, "customers"),
     data = await customerDirectory(client, scope, query, id);
-  if (
-    !data.profile ||
-    data.profile.id !== id ||
-    data.rows.length !== 1 ||
-    data.rows[0].id !== id ||
-    data.relationshipTotal < 1
-  )
+  if (!data.profile || data.profile.id !== id || data.rows.length !== 1 || data.rows[0].id !== id)
     throw new CimacWorkspaceReadError(404);
   if (query.relationPage > 1 && (query.relationPage - 1) * 25 >= data.relationshipTotal)
     throw new CimacWorkspaceReadError(404);

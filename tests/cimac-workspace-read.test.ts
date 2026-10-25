@@ -105,7 +105,7 @@ const profile = () => ({
   accountBalance: "DO_NOT_FORWARD",
 });
 const rpc = vi.fn(async (name: string, input: Row) => {
-  expect(name).toBe("customer_directory_read_rpc");
+  expect(name).toBe("cimac_customer_directory_read_rpc");
   if (rpcError) return { data: null, error: rpcError };
   if (input.p_customer_id && input.p_customer_id !== customer)
     return { data: null, error: { code: "P0002" } };
@@ -383,7 +383,7 @@ describe("current-session scoped operational reads", () => {
     expect(data.rows).toHaveLength(1);
     expect(data.total).toBe(41);
     expect(rpc).toHaveBeenLastCalledWith(
-      "customer_directory_read_rpc",
+      "cimac_customer_directory_read_rpc",
       expect.objectContaining({
         p_input: expect.objectContaining({ projectId: project, page: 2 }),
       }),
@@ -419,6 +419,82 @@ describe("current-session scoped operational reads", () => {
     await expect(readCimacCustomers(client, scope)).rejects.toMatchObject({ status: 403 });
     rpcError = { code: "57014" };
     await expect(readCimacHome(client, scope)).rejects.toMatchObject({ status: 503 });
+  });
+  it("keeps current/archive scoped to the CIMAC RPC and permits a membership-only customer", async () => {
+    const scope = await readCimacWorkspaceScope(client);
+    const original = rpc.getMockImplementation()!;
+    rpc.mockImplementationOnce(async (name, input) => {
+      const result = await original(name, input);
+      if (result.error) return result;
+      return {
+        ...result,
+        data: {
+          ...result.data!,
+          rows: [
+            {
+              ...summary(),
+              roles: [],
+              rooms: [],
+              roomCount: 0,
+              relationshipCount: 0,
+              membershipStatus: "archived",
+            },
+          ],
+          profile: { ...profile(), membershipStatus: "archived" },
+          relationships: [],
+          relationshipTotal: 0,
+        },
+      };
+    });
+    const data = await readCimacCustomer(
+      client,
+      scope,
+      customer,
+      parseCimacWorkspaceQuery({ membershipStatus: "archived" }, "customers"),
+    );
+    expect(data.relationTotal).toBe(0);
+    expect(data.summary.membershipStatus).toBe("archived");
+    expect(rpc).toHaveBeenLastCalledWith(
+      "cimac_customer_directory_read_rpc",
+      expect.objectContaining({
+        p_input: expect.objectContaining({ membershipStatus: "archived", projectId: project }),
+      }),
+    );
+  });
+  it("preserves per-unit brands and confirmed signing metadata on documentary relationships", async () => {
+    const scope = await readCimacWorkspaceScope(client);
+    const original = rpc.getMockImplementation()!;
+    rpc.mockImplementationOnce(async (name, input) => {
+      const result = await original(name, input);
+      if (result.error) return result;
+      return {
+        ...result,
+        data: {
+          ...result.data!,
+          rows: [{ ...summary(), roles: ["park_link"] }],
+          relationships: [
+            {
+              ...relation(),
+              role: "park_link",
+              status: "signed_effective",
+              brand: "箭牌卫浴",
+              signingState: "signed_effective",
+              relationshipKind: "signed_contract",
+              signedDate: null,
+              sourceReference: "原合同资料",
+            },
+          ],
+        },
+      };
+    });
+    const data = await readCimacCustomer(client, scope, customer);
+    expect(data.relations[0]).toMatchObject({
+      role: "park_link",
+      brand: "箭牌卫浴",
+      signingState: "signed_effective",
+      signedDate: null,
+      sourceReference: "原合同资料",
+    });
   });
   it("rejects out-of-range customer pages rather than describing a populated customer as having no relations", async () => {
     const scope = await readCimacWorkspaceScope(client);

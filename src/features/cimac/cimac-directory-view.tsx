@@ -134,6 +134,17 @@ export function CimacCustomerDirectoryView({
           </select>
         </label>
         <label className={styles.field}>
+          <span>{t("名册范围", "Répertoire")}</span>
+          <select
+            className={styles.input}
+            name="membershipStatus"
+            defaultValue={data.query.membershipStatus ?? "current"}
+          >
+            <option value="current">{t("当前客户", "Clients courants")}</option>
+            <option value="archived">{t("归档客户", "Clients archivés")}</option>
+          </select>
+        </label>
+        <label className={styles.field}>
           <span>{t("关联筛选", "Relations")}</span>
           <select className={styles.input} name="filter" defaultValue={data.query.filter}>
             {filters.map((filter) => (
@@ -148,7 +159,11 @@ export function CimacCustomerDirectoryView({
         </button>
       </form>
       <CimacPanel
-        title={t("当前项目客户", "Clients du projet")}
+        title={
+          data.query.membershipStatus === "archived"
+            ? t("园区归档客户", "Clients archivés du parc")
+            : t("当前项目客户", "Clients du projet")
+        }
         aside={
           <span className={styles.small}>
             {t(`${data.total} 位匹配客户`, `${data.total} clients correspondants`)}
@@ -195,7 +210,11 @@ export function CimacCustomerDirectoryView({
                     ? t("黑名单标记", "Liste noire")
                     : row.roles.includes("lease")
                       ? t("租赁关联", "Relation locative")
-                      : t("按登记关系核对", "Relation à vérifier")}
+                      : row.roles.includes("park_link")
+                        ? t("园区资料关联", "Lien documentaire du parc")
+                        : row.relationshipCount === 0
+                          ? t("园区名册客户", "Client du répertoire")
+                          : t("按登记关系核对", "Relation à vérifier")}
                 </CimacPill>
               </li>
             ))}

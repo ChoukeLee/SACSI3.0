@@ -41,6 +41,9 @@ vi.mock("@/features/cimac/cimac-profile-operations", () => ({
     <button>{locale === "zh" ? "新建客户" : "Nouveau client"}</button>
   ),
 }));
+vi.mock("@/features/cimac/cimac-customer-management", () => ({
+  CimacCustomerManagement: () => <button>维护园区名册与铺位关联</button>,
+}));
 
 vi.mock("next/link", () => ({
   default: ({
@@ -370,6 +373,58 @@ describe("CIMAC directories preserve navigation context", () => {
 });
 
 describe("CIMAC customer detail separates overview, operations and accounts", () => {
+  it("shows effective documentary links per brand without routing a park link as a lease or using hashes as headings", () => {
+    const data = customer(parseCimacWorkspaceQuery({ tab: "contracts" }, "customers"));
+    data.relations = [
+      {
+        ...data.relations[0],
+        role: "park_link",
+        status: "signed_effective",
+        brand: "箭牌卫浴",
+        relationshipKind: "signed_contract",
+        signingState: "signed_effective",
+        signedDate: null,
+        sourceReference: "HASH_SOURCE_" + "a".repeat(64),
+      },
+      {
+        ...data.relations[0],
+        id: id(30),
+        unitId: id(31),
+        unitNo: "601",
+        brand: "马可波罗",
+        status: "draft",
+        relationshipKind: "signed_contract",
+        signingState: "signed_effective",
+        signedDate: "2026-10-12",
+        sourceReference: "另一份已核合同",
+      },
+    ];
+    render(<CimacCustomerView data={data} locale="zh" />);
+    expect(host.textContent).toContain("箭牌卫浴");
+    expect(host.textContent).toContain("马可波罗");
+    expect(host.textContent).toContain("已生效合同资料");
+    expect(host.textContent).toContain("草稿");
+    expect(
+      [...host.querySelectorAll("h3")].every((h) => !h.textContent?.includes("HASH_SOURCE")),
+    ).toBe(true);
+    expect(host.querySelector("details")?.textContent).toContain("HASH_SOURCE");
+    expect(
+      [...host.querySelectorAll("a")].filter((a) => a.textContent === "办理合同"),
+    ).toHaveLength(1);
+  });
+  it("offers administrative management only when explicitly authorized and keeps zero-link archived history visible", () => {
+    const data = customer();
+    data.profile.membershipStatus = "archived";
+    data.summary.roomCount = 0;
+    data.summary.relationshipCount = 0;
+    data.relations = [];
+    data.relationTotal = 0;
+    render(<CimacCustomerView data={data} locale="zh" />);
+    expect(host.textContent).toContain("园区已归档");
+    expect(host.textContent).not.toContain("维护园区名册与铺位关联");
+    render(<CimacCustomerView data={data} locale="zh" canManage />);
+    expect(host.textContent).toContain("维护园区名册与铺位关联");
+  });
   it("uses complete business relation counts without claiming 100 contracts", () => {
     render(<CimacCustomerView data={customer()} locale="zh" />);
     expect(host.textContent).toContain("80 处关联资产");

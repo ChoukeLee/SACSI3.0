@@ -24,6 +24,9 @@ vi.mock("@/features/cimac/cimac-profile-operations", () => ({
   CimacAssetConditionOperation: () => null,
   CimacCustomerCreateOperation: () => null,
 }));
+vi.mock("@/features/cimac/cimac-customer-management", () => ({
+  CimacCustomerManagement: () => null,
+}));
 vi.mock("next/navigation", () => ({
   usePathname: () => navigation.pathname,
   useSearchParams: () => new URLSearchParams(),

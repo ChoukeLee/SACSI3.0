@@ -59,6 +59,11 @@ describe("fixed-project CIMAC workspace query boundaries", () => {
     expect(() => parseCimacWorkspaceQuery(raw)).toThrow();
   });
   it("separates customer and asset filter/tab vocabularies", () => {
+    expect(
+      parseCimacWorkspaceQuery({ membershipStatus: "archived" }, "customers").membershipStatus,
+    ).toBe("archived");
+    expect(() => parseCimacWorkspaceQuery({ membershipStatus: "archived" }, "assets")).toThrow();
+    expect(() => parseCimacWorkspaceQuery({ membershipStatus: "deleted" }, "customers")).toThrow();
     for (const raw of [{ filter: "contract" }, { tab: "account" }, { accountTab: "receipts" }])
       expect(() => parseCimacWorkspaceQuery(raw, "assets")).toThrow();
     expect(() => parseCimacWorkspaceQuery({ kind: "warehouse" }, "customers")).toThrow();

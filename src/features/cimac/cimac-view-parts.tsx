@@ -225,6 +225,8 @@ export function cimacConstruction(value: string | null | undefined, locale: Cima
 export function cimacContractStatus(status: string, locale: CimacViewLocale) {
   const labels: Record<string, [string, string]> = {
     active: ["生效中", "Actif"],
+    signed_effective: ["合同资料已生效", "Dossier contractuel en vigueur"],
+    unconfirmed: ["资料待核", "Dossier à vérifier"],
     draft: ["草稿", "Brouillon"],
     terminated: ["已终止", "Résilié"],
     expired: ["已到期（登记）", "Échu (enregistré)"],

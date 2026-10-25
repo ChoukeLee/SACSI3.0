@@ -180,6 +180,7 @@ export async function CimacCustomerPage({
       locale={locale}
       canEdit={hasPermission(user, "customers:write")}
       canReadAccount={canReadAccount}
+      canManage={user.role === "admin"}
       accountSection={accountSection}
       recordSection={
         parsed.tab === "records" ? (

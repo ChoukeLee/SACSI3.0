@@ -22,6 +22,7 @@ import {
 } from "./cimac-view-parts";
 import styles from "./cimac-workspace.module.css";
 import { CimacCustomerProfileOperation } from "./cimac-profile-operations";
+import { CimacCustomerManagement } from "./cimac-customer-management";
 
 export interface CimacCustomerViewProps {
   data: CimacCustomerData;
@@ -30,6 +31,7 @@ export interface CimacCustomerViewProps {
   recordSection?: ReactNode;
   canEdit?: boolean;
   canReadAccount?: boolean;
+  canManage?: boolean;
 }
 
 export function CimacCustomerView({
@@ -39,6 +41,7 @@ export function CimacCustomerView({
   recordSection,
   canEdit = false,
   canReadAccount = true,
+  canManage = false,
 }: CimacCustomerViewProps) {
   const t = (zh: string, fr: string) => cimacText(locale, zh, fr);
   const { profile, summary, query } = data;
@@ -96,6 +99,11 @@ export function CimacCustomerView({
         }
       >
         <div className={styles.tags}>
+          {profile.membershipStatus === "archived" ? (
+            <CimacPill tone="amber">
+              {t("园区已归档 · 保留历史", "Archivé dans le parc · historique conservé")}
+            </CimacPill>
+          ) : null}
           <CimacPill tone="blue">
             {t(`${summary.roomCount} 处关联资产`, `${summary.roomCount} actifs liés`)}
           </CimacPill>
@@ -117,6 +125,11 @@ export function CimacCustomerView({
         items={tabs}
         active={query.tab}
       />
+      {canManage ? (
+        <CimacPanel title={t("园区名册维护", "Gestion du répertoire du parc")}>
+          <CimacCustomerManagement profile={profile} relations={data.relations} locale={locale} />
+        </CimacPanel>
+      ) : null}
       <section
         aria-label={
           tabs.find((tab) => tab.key === query.tab)?.label ?? t("客户详情", "Fiche client")
@@ -144,7 +157,15 @@ export function CimacCustomerView({
                           {relations
                             .map(
                               (relation) =>
-                                relation.code || t("业务编号待核", "Référence à vérifier"),
+                                [
+                                  relation.brand,
+                                  relation.role === "park_link" ? null : relation.code,
+                                  relation.signingState === "signed_effective"
+                                    ? t("已生效合同资料", "Dossier confirmé")
+                                    : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ") || t("铺位资料关联", "Lien documentaire du lot"),
                             )
                             .join(" · ")}
                         </p>
@@ -247,22 +268,50 @@ export function CimacCustomerView({
                     <div className={styles.contract} key={`${relation.role}:${relation.id}`}>
                       <div>
                         <div className={styles.contractTitle}>
-                          <h3>{relation.code || t("业务编号待核", "Référence à vérifier")}</h3>
+                          <h3>
+                            {relation.role === "park_link"
+                              ? relation.brand || t("铺位资料关联", "Lien documentaire du lot")
+                              : relation.code || t("业务编号待核", "Référence à vérifier")}
+                          </h3>
+                          {relation.signingState === "signed_effective" ? (
+                            <CimacPill tone="blue">
+                              {t("已生效合同资料", "Dossier contractuel confirmé en vigueur")}
+                            </CimacPill>
+                          ) : null}
                           <CimacPill tone={relation.status === "active" ? "blue" : undefined}>
                             {cimacContractStatus(relation.status, locale)}
                           </CimacPill>
                         </div>
                         <p className={styles.propertySub}>
                           {relation.buildingLabel} · {relation.unitNo}
+                          {relation.brand ? ` · ${relation.brand}` : ""}
                         </p>
-                        <p className={styles.propertySub}>
-                          {t("登记起日", "Début enregistré")}{" "}
-                          {cimacDate(relation.startDate, locale)} ·{" "}
-                          {relation.endDateKind === "actual"
-                            ? t("实际止日", "Fin réelle")
-                            : t("预计止日（非交付日）", "Fin prévue (pas une livraison)")}{" "}
-                          {cimacDate(relation.endDate, locale)}
-                        </p>
+                        {relation.sourceReference ? (
+                          <details className={styles.propertySub}>
+                            <summary>{t("合同资料来源", "Pièce source du contrat")}</summary>
+                            <p style={{ overflowWrap: "anywhere" }}>{relation.sourceReference}</p>
+                          </details>
+                        ) : null}
+                        {relation.relationshipKind ? (
+                          <p className={styles.propertySub}>
+                            {relation.relationshipKind === "reservation"
+                              ? t("预留铺位资料", "Dossier de réservation du lot")
+                              : t("签约资料关联", "Lien du dossier contractuel")}
+                            {" · "}
+                            {t("签署日期", "Date de signature")}{" "}
+                            {cimacDate(relation.signedDate, locale)}
+                          </p>
+                        ) : null}
+                        {relation.role !== "park_link" ? (
+                          <p className={styles.propertySub}>
+                            {t("登记起日", "Début enregistré")}{" "}
+                            {cimacDate(relation.startDate, locale)} ·{" "}
+                            {relation.endDateKind === "actual"
+                              ? t("实际止日", "Fin réelle")
+                              : t("预计止日（非交付日）", "Fin prévue (pas une livraison)")}{" "}
+                            {cimacDate(relation.endDate, locale)}
+                          </p>
+                        ) : null}
                         <p className={styles.propertySub}>
                           {t(
                             "交付、开业与收费起算需另行核实。",

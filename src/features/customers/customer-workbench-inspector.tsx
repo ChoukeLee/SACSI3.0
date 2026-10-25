@@ -22,6 +22,7 @@ export function customerRelationRoleLabel(role: CustomerRelationRole, locale: "z
     daily_guest: ["实际住客", "Client hébergé"],
     daily_agent: ["代订联系人", "Contact de réservation"],
     daily_unknown: ["日租身份待核", "Identité historique à vérifier"],
+    park_link: ["园区资料关联", "Lien documentaire du parc"],
   };
   return labels[role][locale === "zh" ? 0 : 1];
 }

@@ -15,6 +15,7 @@ export function cimacWorkspaceId(value: unknown): string {
 }
 const controls = /[\u0000-\u001f\u007f]/;
 const queryKeys = [
+  "membershipStatus",
   "project",
   "q",
   "building",
@@ -147,6 +148,12 @@ export function parseCimacWorkspaceQuery(
   const returnTo = returnValue === undefined ? null : safeCimacReturnTo(returnValue);
   if (returnValue !== undefined && !returnTo) throw new CimacWorkspaceReadError(400);
   const accountTab = value("accountTab", 16) || "bills";
+  const membershipStatus = value("membershipStatus", 16) || "current";
+  if (
+    (raw.membershipStatus !== undefined && section !== "customers") ||
+    !["current", "archived"].includes(membershipStatus)
+  )
+    throw new CimacWorkspaceReadError(400);
   if (
     (raw.accountTab !== undefined && section !== "customers") ||
     !["bills", "receipts", "meters", "rules"].includes(accountTab)
@@ -163,7 +170,10 @@ export function parseCimacWorkspaceQuery(
     tab: tab as CimacWorkspaceTab,
     returnTo,
     ...(section === "customers"
-      ? { accountTab: accountTab as NonNullable<CimacWorkspaceQuery["accountTab"]> }
+      ? {
+          accountTab: accountTab as NonNullable<CimacWorkspaceQuery["accountTab"]>,
+          membershipStatus: membershipStatus as "current" | "archived",
+        }
       : {}),
   };
 }
@@ -187,7 +197,8 @@ export function cimacWorkspaceHref(
       ((key === "page" || key === "relationPage") && v === 1) ||
       (key === "tab" && v === "overview") ||
       (key === "filter" && v === "all") ||
-      (key === "accountTab" && v === "bills")
+      (key === "accountTab" && v === "bills") ||
+      (key === "membershipStatus" && v === "current")
     )
       continue;
     params.set(key, String(v));

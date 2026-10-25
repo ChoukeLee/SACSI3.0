@@ -21,6 +21,7 @@ export interface CimacWorkspaceScope {
 export type CimacWorkspaceSection = "home" | "customers" | "assets";
 export type CimacWorkspaceTab = "overview" | "contracts" | "account" | "records" | "service";
 export interface CimacWorkspaceQuery {
+  membershipStatus?: "current" | "archived";
   project: string;
   q: string;
   building: string;
