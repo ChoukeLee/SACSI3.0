@@ -26,6 +26,8 @@ import {
 } from "./cimac-view-parts";
 import { cimacAttentionLabel } from "./cimac-home-view";
 import styles from "./cimac-workspace.module.css";
+import type { UnitRow } from "@/types/database";
+import { CimacAssetConditionOperation } from "./cimac-profile-operations";
 
 export interface CimacAssetViewProps {
   data: CimacAssetData;
@@ -33,6 +35,8 @@ export interface CimacAssetViewProps {
   canEdit?: boolean;
   canReadAccount?: boolean;
   serviceSection?: ReactNode;
+  recordSection?: ReactNode;
+  operationUnit?: UnitRow;
 }
 
 export function CimacAssetView({
@@ -41,6 +45,8 @@ export function CimacAssetView({
   canEdit = false,
   canReadAccount = true,
   serviceSection,
+  recordSection,
+  operationUnit,
 }: CimacAssetViewProps) {
   const t = (zh: string, fr: string) => cimacText(locale, zh, fr);
   const { asset, query } = data;
@@ -59,16 +65,6 @@ export function CimacAssetView({
     { key: "service", label: t("物业与表计", "Services et compteurs"), href: href("service") },
     { key: "records", label: t("文件与记录", "Documents et historique"), href: href("records") },
   ];
-  const maintenanceHref = canEdit
-    ? buildWorkbenchRecordHref({
-        workspace: "units",
-        id: asset.id,
-        project: data.scope.project.id,
-        building: asset.buildingId,
-        locale,
-        returnTo: current,
-      })
-    : null;
   const customerLink = (
     relation: UnitBusinessRelation,
     tab: "overview" | "contracts" | "account" = "overview",
@@ -109,6 +105,7 @@ export function CimacAssetView({
             relation.type === "lease" || relation.type === "sale"
               ? buildWorkbenchRecordHref({
                   workspace: relation.type === "lease" ? "leases" : "sales",
+                  workArea: "cimac",
                   id: relation.id,
                   project: data.scope.project.id,
                   building: asset.buildingId,
@@ -144,9 +141,7 @@ export function CimacAssetView({
                   </CimacLink>
                 ) : null}
                 {legacyHref ? (
-                  <CimacLink href={legacyHref}>
-                    {t("原业务办理", "Opérations existantes")}
-                  </CimacLink>
+                  <CimacLink href={legacyHref}>{t("办理合同", "Gérer le contrat")}</CimacLink>
                 ) : null}
               </div>
             </div>
@@ -186,10 +181,13 @@ export function CimacAssetView({
         actions={
           <>
             <CimacBackLink href={query.returnTo ?? directory} locale={locale} />
-            {maintenanceHref ? (
-              <CimacLink href={maintenanceHref} button>
-                {t("原资产维护入口", "Gérer l’actif existant")}
-              </CimacLink>
+            {canEdit && operationUnit ? (
+              <CimacAssetConditionOperation
+                unit={operationUnit}
+                position={asset.position ?? undefined}
+                buildingName={asset.buildingName}
+                locale={locale}
+              />
             ) : null}
           </>
         }
@@ -348,6 +346,20 @@ export function CimacAssetView({
                     value: t("不从客户或租赁关系推断", "Non déduite du client ou du bail"),
                   },
                   { label: t("资产编号", "Référence d’actif"), value: asset.code },
+                  ...(operationUnit
+                    ? [
+                        {
+                          label: t("登记户型", "Configuration enregistrée"),
+                          value: operationUnit.layout,
+                        },
+                        { label: t("区域", "Zone"), value: operationUnit.zone_label },
+                        {
+                          label: t("登记经营项目", "Activité enregistrée"),
+                          value: operationUnit.reservation_main_business,
+                        },
+                        { label: t("资料备注", "Notes de la fiche"), value: operationUnit.notes },
+                      ]
+                    : []),
                 ]}
               />
             </CimacPanel>
@@ -429,36 +441,39 @@ export function CimacAssetView({
             </CimacPanel>
           </div>
         ) : (
-          <div className={styles.detailGrid}>
-            <CimacPanel title={t("资产原始记录", "Enregistrements de l’actif")}>
-              <CimacFacts
-                locale={locale}
-                rows={[
-                  { label: t("资产编号", "Référence d’actif"), value: asset.code },
-                  { label: t("档案更新时间", "Fiche mise à jour le"), value: asset.updatedAt },
-                  {
-                    label: t("建设资料", "État du bâti"),
-                    value: cimacConstruction(asset.constructionStatus, locale),
-                  },
-                  {
-                    label: t("占用核验", "Occupation vérifiée"),
-                    value:
-                      asset.occupancyVerified === true
-                        ? t("已登记核验标记", "Indicateur de vérification enregistré")
-                        : t("待核", "À vérifier"),
-                  },
-                ]}
-              />
-              <p className={styles.indexNote}>
-                {t(
-                  "这是当前档案事实，不是完整变更历史；未从更新时间推断操作人或变更内容。",
-                  "Il s’agit de faits actuels, pas d’un historique complet. Ni opérateur ni contenu de modification n’est déduit de la date.",
-                )}
-              </p>
-            </CimacPanel>
-            <CimacPanel title={t("交付与服务资料", "Pièces de livraison et de service")}>
-              <CimacPendingOperations locale={locale} />
-            </CimacPanel>
+          <div className={styles.stack}>
+            <div className={styles.detailGrid}>
+              <CimacPanel title={t("资产原始记录", "Enregistrements de l’actif")}>
+                <CimacFacts
+                  locale={locale}
+                  rows={[
+                    { label: t("资产编号", "Référence d’actif"), value: asset.code },
+                    { label: t("档案更新时间", "Fiche mise à jour le"), value: asset.updatedAt },
+                    {
+                      label: t("建设资料", "État du bâti"),
+                      value: cimacConstruction(asset.constructionStatus, locale),
+                    },
+                    {
+                      label: t("占用核验", "Occupation vérifiée"),
+                      value:
+                        asset.occupancyVerified === true
+                          ? t("已登记核验标记", "Indicateur de vérification enregistré")
+                          : t("待核", "À vérifier"),
+                    },
+                  ]}
+                />
+                <p className={styles.indexNote}>
+                  {t(
+                    "这是当前档案事实，不是完整变更历史；未从更新时间推断操作人或变更内容。",
+                    "Il s’agit de faits actuels, pas d’un historique complet. Ni opérateur ni contenu de modification n’est déduit de la date.",
+                  )}
+                </p>
+              </CimacPanel>
+              <CimacPanel title={t("交付与服务资料", "Pièces de livraison et de service")}>
+                <CimacPendingOperations locale={locale} />
+              </CimacPanel>
+            </div>
+            {recordSection}
           </div>
         )}
       </section>

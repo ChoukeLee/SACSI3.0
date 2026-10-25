@@ -14,8 +14,8 @@ export interface LeaseScopePreference {
   cookieName: string;
   serverResolved: boolean;
 }
-export function leaseScopeCookieName(viewerId?: string) {
-  return viewerId && uuid.test(viewerId) ? `sacsi_lease_scope_${viewerId}` : undefined;
+export function leaseScopeCookieName(viewerId?: string, workArea: "sacsi" | "cimac" = "sacsi") {
+  return viewerId && uuid.test(viewerId) ? `${workArea}_lease_scope_${viewerId}` : undefined;
 }
 export function defaultLeaseScope(buildings: LeaseBuilding[]) {
   const initial = buildings.find((b) => b.code === "SACSI11");

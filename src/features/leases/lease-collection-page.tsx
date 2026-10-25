@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { buildWorkbenchRecordHref, safeWorkbenchReturnTo } from "@/lib/workbench-links";
-import { validLeaseCollectionId } from "./lease-collection-links";
+import { buildLeaseCollectionHref, validLeaseCollectionId } from "./lease-collection-links";
 import { readLeaseCollectionContext } from "./lease-collection-read";
 import { LeaseCollectionWorkbench } from "./lease-collection-workbench";
 
@@ -16,10 +16,11 @@ export async function LeaseCollectionPage({
   params,
   searchParams,
   locale,
-}: LeaseCollectionRouteProps & { locale: "zh" | "fr" }) {
+  workArea,
+}: LeaseCollectionRouteProps & { locale: "zh" | "fr"; workArea?: "sacsi" | "cimac" }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  const base = locale === "fr" ? "/fr/leases" : "/leases";
+  const base = `${locale === "fr" ? "/fr" : ""}/${workArea === "cimac" ? "cimac/contracts" : "leases"}`;
   if (user.role !== "admin" && user.role !== "finance") redirect(base);
   const { id } = await params;
   if (!validLeaseCollectionId(id)) notFound();
@@ -45,6 +46,7 @@ export async function LeaseCollectionPage({
         viewerId={user.id}
         recordedByLabel={user.displayName}
         returnTo={returnTo}
+        workArea={workArea}
       />
     </Suspense>
   );
@@ -56,16 +58,20 @@ async function CollectionData({
   recordedByLabel,
   viewerId,
   returnTo,
+  workArea,
 }: {
   id: string;
   locale: "zh" | "fr";
   recordedByLabel: string;
   viewerId: string;
   returnTo: string | null;
+  workArea?: "sacsi" | "cimac";
 }) {
   let data: Awaited<ReturnType<typeof readLeaseCollectionContext>>;
   try {
-    data = await readLeaseCollectionContext(id, locale);
+    data = await (workArea
+      ? readLeaseCollectionContext(id, locale, workArea)
+      : readLeaseCollectionContext(id, locale));
   } catch {
     return (
       <section className="mx-auto max-w-xl rounded-2xl border bg-card p-8">
@@ -78,7 +84,10 @@ async function CollectionData({
             : "Le contrat, le client ou les créances complètes ne sont pas accessibles. Aucun encaissement n’a été ouvert et les soldes ne sont pas présumés nuls."}
         </p>
         <Link
-          href={returnTo ?? (locale === "fr" ? "/fr/leases" : "/leases")}
+          href={
+            returnTo ??
+            `${locale === "fr" ? "/fr" : ""}/${workArea === "cimac" ? "cimac/contracts" : "leases"}`
+          }
           className="text-sm text-blue-600 underline"
         >
           {locale === "zh" ? "返回合同核对" : "Revenir au contrat"}
@@ -86,10 +95,13 @@ async function CollectionData({
       </section>
     );
   }
+  if (!workArea && data.building.project?.code === "CIMAC")
+    redirect(buildLeaseCollectionHref({ contractId: id, locale, returnTo, workArea: "cimac" })!);
   const returnHref =
     returnTo ??
     buildWorkbenchRecordHref({
       workspace: "leases",
+      workArea,
       id,
       locale,
       project: data.building.project_id,
@@ -97,6 +109,7 @@ async function CollectionData({
     })!;
   return (
     <LeaseCollectionWorkbench
+      workArea={workArea}
       key={id}
       contract={data.contract}
       unit={data.unit}

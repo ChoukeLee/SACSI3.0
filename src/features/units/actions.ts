@@ -75,5 +75,7 @@ export async function updateUnitStatus(
   revalidatePath("/fr/daily-rentals");
   revalidatePath(`/units/${unitId}`);
   revalidatePath(`/fr/units/${unitId}`);
+  revalidatePath("/cimac", "layout");
+  revalidatePath("/fr/cimac", "layout");
   return { success: true };
 }

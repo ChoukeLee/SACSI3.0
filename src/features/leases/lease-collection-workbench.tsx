@@ -21,6 +21,7 @@ import type { LeaseCollectionInput, LeaseCollectionSuccess } from "./lease-colle
 import styles from "./lease-collection.module.css";
 
 export interface LeaseCollectionWorkbenchProps {
+  workArea?: "sacsi" | "cimac";
   contract: LeaseContractRow;
   unit: UnitRow;
   customer: CustomerRow;
@@ -42,6 +43,7 @@ export function LeaseCollectionWorkbench(props: LeaseCollectionWorkbenchProps) {
 }
 
 function CollectionContent({
+  workArea = "sacsi",
   contract,
   unit,
   customer,
@@ -506,7 +508,7 @@ function CollectionContent({
                 </Link>
                 {receipt.referenceNos[0] ? (
                   <Link
-                    href={`${locale === "fr" ? "/fr" : ""}/finance?kind=ledger&search=${encodeURIComponent(receipt.referenceNos[0])}`}
+                    href={`${locale === "fr" ? "/fr" : ""}/${workArea === "cimac" ? "cimac/finance" : "finance"}?kind=ledger&search=${encodeURIComponent(receipt.referenceNos[0])}`}
                   >
                     {text("按凭证号查看财务记录", "Rechercher la référence dans le journal")}
                     <ArrowUpRight aria-hidden="true" />

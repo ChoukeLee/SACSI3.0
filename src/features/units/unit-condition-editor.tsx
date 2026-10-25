@@ -17,6 +17,7 @@ export function UnitConditionEditor(props: {
   canEdit: boolean;
   onClose: () => void;
   onStatusChanged: () => void;
+  saveAction?: typeof updateUnitStatus;
 }) {
   if (!props.canEdit) return null;
   return <ConditionForm key={`${props.unit.id}:${props.unit.updated_at}`} {...props} />;
@@ -29,6 +30,7 @@ function ConditionForm({
   locale,
   onClose,
   onStatusChanged,
+  saveAction = updateUnitStatus,
 }: React.ComponentProps<typeof UnitConditionEditor>) {
   const zh = locale === "zh";
   const current =
@@ -78,7 +80,7 @@ function ConditionForm({
     setBusy(true);
     setError("");
     try {
-      const result = await updateUnitStatus(
+      const result = await saveAction(
         unit.id,
         condition === "normal" ? "available" : condition,
         unit.updated_at,

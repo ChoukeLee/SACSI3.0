@@ -153,7 +153,7 @@ it("does not consume another viewer's cookie or any anonymous preference; explic
       : undefined,
   );
   expect((await initialWorkspace("lease", "zh", undefined, viewer)).query.projectId).toBe(
-    cimacProject,
+    workspaceProject,
   );
   expect((await initialWorkspace("lease", "zh", undefined, otherViewer)).query).toMatchObject({
     projectId: workspaceProject,
@@ -169,9 +169,12 @@ it("does not consume another viewer's cookie or any anonymous preference; explic
   });
 });
 it.each(["lease", "sale"] as const)(
-  "keeps explicit %s project links across all their authorized buildings",
+  "rejects CIMAC in the legacy %s workspace and keeps it in its explicit work area",
   async (kind) => {
-    expect((await initialWorkspace(kind, "zh", "CIMAC")).query).toMatchObject({
+    await expect(initialWorkspace(kind, "zh", "CIMAC")).rejects.toMatchObject({ status: 403 });
+    expect(
+      (await initialWorkspace(kind, "zh", "CIMAC", undefined, undefined, "cimac")).query,
+    ).toMatchObject({
       projectId: cimacProject,
       buildingId: "",
     });
@@ -201,5 +204,13 @@ it("never treats an unavailable project or failed authorized building read as a 
   expect(mocks.rpc).not.toHaveBeenCalled();
   mocks.order.mockResolvedValue({ data: null, error: { message: "synthetic denied" } });
   await expect(initialWorkspace("lease", "zh")).rejects.toThrow();
+  expect(mocks.rpc).not.toHaveBeenCalled();
+});
+it("never broadens an empty legacy perimeter to all projects for a CIMAC-only account", async () => {
+  mocks.order.mockResolvedValue({
+    data: buildings.filter((building) => building.project.code === "CIMAC"),
+    error: null,
+  });
+  await expect(initialWorkspace("lease", "zh")).rejects.toMatchObject({ status: 403 });
   expect(mocks.rpc).not.toHaveBeenCalled();
 });

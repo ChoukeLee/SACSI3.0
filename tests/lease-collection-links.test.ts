@@ -8,6 +8,19 @@ import {
 const id = "11111111-1111-4111-8111-111111111111";
 
 describe("lease collection navigation", () => {
+  it.each(["zh", "fr"] as const)(
+    "keeps %s park collections and safe return destinations inside the park workspace",
+    (locale) => {
+      const prefix = locale === "fr" ? "/fr" : "";
+      const returnTo = `${prefix}/cimac/contracts?contract=${id}`;
+      const link = new URL(
+        buildLeaseCollectionHref({ contractId: id, locale, returnTo, workArea: "cimac" })!,
+        "https://local.invalid",
+      );
+      expect(link.pathname).toBe(`${prefix}/cimac/contracts/${id}/collect`);
+      expect(link.searchParams.get("returnTo")).toBe(returnTo);
+    },
+  );
   it("keeps new collection audits recognizable in both languages", () => {
     expect(auditActionLabel("record_lease_collection", "zh")).toBe("登记长租实际收款并核销");
     expect(auditEntityLabel("lease_collection", "zh")).toBe("长租实收核销");

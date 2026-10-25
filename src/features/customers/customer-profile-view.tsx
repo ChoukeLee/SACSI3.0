@@ -215,9 +215,13 @@ function CustomerProfile({ data, locale, userRole, returnTo }: Props) {
             <CustomerStatusBadge status={customerStatus} labels={L} locale={locale} />
           </div>
           <p className={workbench.subtitle}>
-            {locale === "zh"
-              ? "客户完整历史 · 合同、资金、单据与操作记录分别核对。"
-              : "Historique client · contrats, mouvements, documents et opérations distincts."}
+            {data.projectScope === "SACSI"
+              ? locale === "zh"
+                ? "SACSI 客户档案 · 仅展示明确归属本项目的业务；共享身份保留，未归属账务与附件不计入。"
+                : "Dossier SACSI · opérations explicitement attribuées au projet. Identité partagée ; éléments non attribués exclus."
+              : locale === "zh"
+                ? "客户完整历史 · 合同、资金、单据与操作记录分别核对。"
+                : "Historique client · contrats, mouvements, documents et opérations distincts."}
           </p>
         </div>
         {canEdit && (

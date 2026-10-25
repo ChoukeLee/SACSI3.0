@@ -31,6 +31,7 @@ export interface ReportTrend {
 }
 
 export interface ReportWorkspaceData {
+  workArea?: "sacsi" | "cimac";
   query: ReportQuery;
   projects: ReportProject[];
   result: FinanceReadResult;

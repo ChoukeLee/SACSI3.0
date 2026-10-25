@@ -26,12 +26,14 @@ export function CustomerWorkbench({
   canEdit,
   initialSelectedId,
   returnTo,
+  projectLocked = false,
 }: {
   data: CustomerDirectoryData;
   locale: "zh" | "fr";
   canEdit: boolean;
   initialSelectedId: string | null;
   returnTo: string | null;
+  projectLocked?: boolean;
 }) {
   const zh = locale === "zh";
   const text = (a: string, b: string) => (zh ? a : b);
@@ -178,9 +180,11 @@ export function CustomerWorkbench({
             onChange={(e) => navigate(href({ projectId: e.target.value, buildingId: "", page: 1 }))}
             disabled={pending}
           >
-            <option value="">
-              {text("全部可见项目与未关联档案", "Tous les projets et dossiers sans lien")}
-            </option>
+            {!projectLocked && (
+              <option value="">
+                {text("全部可见项目与未关联档案", "Tous les projets et dossiers sans lien")}
+              </option>
+            )}
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.label}

@@ -27,8 +27,8 @@ import { parseWorkspaceQuery } from "@/features/contracts/workspace-model";
 function props(locale: "zh" | "fr" = "zh", id = workspaceContract, returnTo?: string | string[]) {
   return { params: Promise.resolve({ id }), searchParams: Promise.resolve({ returnTo }), locale };
 }
-async function content(returnTo?: string | string[]) {
-  const page = await LeaseCollectionPage(props("zh", workspaceContract, returnTo));
+async function content(returnTo?: string | string[], workArea?: "sacsi" | "cimac") {
+  const page = await LeaseCollectionPage({ ...props("zh", workspaceContract, returnTo), workArea });
   const child = (page as ReactElement<{ children: ReactElement<Record<string, unknown>> }>).props
     .children;
   return (
@@ -97,4 +97,19 @@ it("does not expose an empty form when a complete contract context cannot be loa
   expect(html).toContain("暂时无法核对这份合同");
   expect(html).toContain("未开放收款");
   expect(html).not.toContain("<form");
+});
+it("redirects an old bookmarked park collection into its native workspace before rendering a write form", async () => {
+  const data = await deps.read();
+  data.building.project.code = "CIMAC";
+  await expect(content()).rejects.toThrow(`redirect:/cimac/contracts/${workspaceContract}/collect`);
+});
+it("keeps a native park collection's exact-contract read and default return inside the park", async () => {
+  const data = await deps.read();
+  data.building.project.code = "CIMAC";
+  const result = await content(undefined, "cimac");
+  expect(deps.read).toHaveBeenLastCalledWith(workspaceContract, "zh", "cimac");
+  expect(result.props.workArea).toBe("cimac");
+  const href = new URL(String(result.props.returnHref), "https://local.invalid");
+  expect(href.pathname).toBe("/cimac/contracts");
+  expect(href.searchParams.get("contract")).toBe(workspaceContract);
 });

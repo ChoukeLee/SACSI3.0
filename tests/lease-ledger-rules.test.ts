@@ -38,7 +38,7 @@ describe("lease ledger rules", () => {
   it("reads only an explicitly selected contract and invalidates previews across query and page changes", () => {
     expect(ledger).toMatch(/useState<\{[\s\S]*?scope: string;[\s\S]*?\}\s*\|\s*null>\(null\)/);
     expect(
-      /useLeaseWorkbenchPreview\(\s*workspace\.query,\s*previewId,\s*previewSelection\?\.version\s*\)/.test(
+      /useLeaseWorkbenchPreview\(\s*workspace\.query,\s*previewId,\s*previewSelection\?\.version,\s*workArea\s*,?\s*\)/.test(
         ledger,
       ),
     ).toBe(true);
@@ -50,6 +50,7 @@ describe("lease ledger rules", () => {
     expect(preview).toContain("if (!query || !contractId || !key) return;");
     expect(preview).toContain('params.set("mode", "detail")');
     expect(preview).toContain('params.set("contractId", contractId)');
+    expect(preview).toContain('if (workArea === "cimac") params.set("workspace", workArea)');
     expect(preview).toContain('cache: "no-store"');
     expect(preview).toContain("new AbortController()");
     expect(preview).toContain("controller.abort()");

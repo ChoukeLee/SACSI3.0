@@ -6,7 +6,11 @@ import type { LeaseContractRow } from "@/types/database";
 import { validLeaseCollectionId } from "./lease-collection-links";
 
 /** Reuse the complete, RLS-scoped detail read; never collect from a list snapshot. */
-export async function readLeaseCollectionContext(contractId: string, locale: "zh" | "fr") {
+export async function readLeaseCollectionContext(
+  contractId: string,
+  locale: "zh" | "fr",
+  workArea?: "sacsi" | "cimac",
+) {
   if (!validLeaseCollectionId(contractId)) throw new WorkspaceReadError(400);
   const client = await createClient();
   // Both collection endpoints are installed in the same atomic migration. A
@@ -37,6 +41,8 @@ export async function readLeaseCollectionContext(contractId: string, locale: "zh
   const customer = data.customers.find((row) => row.id === contract?.customer_id);
   const building = data.buildings.find((row) => row.id === unit?.building_id);
   if (!contract || !unit || !customer || !building) throw new WorkspaceReadError(403);
+  if (workArea && (building.project?.code === "CIMAC") !== (workArea === "cimac"))
+    throw new WorkspaceReadError(403);
   if (
     data.receivableCount !== data.receivables.length ||
     data.receivables.some(

@@ -491,7 +491,9 @@ describe("CIMAC customer-first finance workspace", () => {
     expect(host.textContent).toContain(`录入账号标识：${viewerId}`);
     expect(host.textContent).toContain("Original-10");
     expect(
-      host.querySelector('a[href*="/leases/40000000-0000-4000-8000-000000000002/collect"]'),
+      host.querySelector(
+        'a[href*="/cimac/contracts/40000000-0000-4000-8000-000000000002/collect"]',
+      ),
     ).not.toBeNull();
   });
   it("does not direct a protected customer collection to unsupported single-unit corrections", async () => {

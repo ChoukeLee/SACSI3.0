@@ -65,6 +65,41 @@ beforeEach(() => {
   }));
 });
 describe("financial checking server read", () => {
+  it.each(["sacsi", "cimac"] as const)(
+    "locks %s report content, trend, summary and export to the same project",
+    async (workArea) => {
+      const data = await loadReportData({ month: "2026-10" }, { workArea });
+      const projectId = workArea === "cimac" ? cimac : sacsi;
+      expect(data.query.projectId).toBe(projectId);
+      expect(data.projects.map((p) => p.id)).toEqual([projectId]);
+      expect(data.workArea).toBe(workArea);
+      expect(mocks.rpc).toHaveBeenCalledWith("finance_read_rpc", {
+        p_kind: "ledger",
+        p_page: 1,
+        p_filters: { projectId, dateFrom: "2026-10-01", dateTo: "2026-10-31" },
+      });
+      expect(mocks.rpc).toHaveBeenCalledWith("reports_trend_rpc", {
+        p_project_id: projectId,
+        p_end_month: "2026-10-01",
+      });
+      expect(data.exportHref).toContain(`projectId=${projectId}`);
+    },
+  );
+  it.each(["sacsi", "cimac"] as const)(
+    "rejects foreign or missing project scope in %s without falling back to another project",
+    async (workArea) => {
+      await expect(
+        loadReportData({ projectId: workArea === "cimac" ? sacsi : cimac }, { workArea }),
+      ).rejects.toThrow("ReportProjectPermissionDenied");
+      expect(mocks.rpc).not.toHaveBeenCalled();
+      mocks.projects.mockResolvedValue({
+        data: projectRows.filter((p) => p.code.toLowerCase() !== workArea),
+        error: null,
+      });
+      await expect(loadReportData({}, { workArea })).rejects.toThrow("ReportNoAuthorizedProjects");
+      expect(mocks.rpc).not.toHaveBeenCalled();
+    },
+  );
   it("selects authorized SACSI by default and transfers only a bounded current page", async () => {
     const data = await loadReportData({ month: "2026-10" });
     expect(data.query.projectId).toBe(sacsi);

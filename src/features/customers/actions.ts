@@ -33,7 +33,7 @@ async function decryptDocumentNo(encrypted: string): Promise<string> {
 // ── CRUD ──
 
 export async function createCustomer(
-  input: CustomerFormInput
+  input: CustomerFormInput,
 ): Promise<{ success: boolean; data?: CustomerRow; error?: string }> {
   requirePermission(await getCurrentUser(), "customers:write");
   const supabase = await createClient();
@@ -68,7 +68,8 @@ export async function createCustomer(
 }
 export async function updateCustomer(
   id: string,
-  input: CustomerFormInput
+  input: CustomerFormInput,
+  expectedUpdatedAt?: string,
 ): Promise<{ success: boolean; data?: CustomerRow; error?: string }> {
   requirePermission(await getCurrentUser(), "customers:write");
   const supabase = await createClient();
@@ -91,17 +92,19 @@ export async function updateCustomer(
   if (input.phone !== undefined) update.phone = input.phone;
   if (input.notes !== undefined) update.notes = input.notes;
 
-  const { data, error } = await supabase
-    .from("customers")
-    .update(update)
-    .eq("id", id)
-    .select("*")
-    .single();
+  let mutation = supabase.from("customers").update(update).eq("id", id);
+  if (expectedUpdatedAt !== undefined) mutation = mutation.eq("updated_at", expectedUpdatedAt);
+  const { data, error } = await mutation.select("*").maybeSingle();
 
   if (error) return { success: false, error: error.message };
+  if (!data) return { success: false, error: "客户资料已变化或不可访问，请刷新后重试。" };
 
   revalidatePath("/customers");
   revalidatePath("/fr/customers");
+  revalidatePath("/cimac", "layout");
+  revalidatePath("/fr/cimac", "layout");
+  revalidatePath(`/customers/${id}`);
+  revalidatePath(`/fr/customers/${id}`);
 
   // audit log
   await supabase.from("audit_logs").insert({

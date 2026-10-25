@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RightDrawer } from "@/components/ui/operational";
 import { createCustomer, updateCustomer, type CustomerFormInput } from "./actions";
 import type { CustomerDirectoryProfile } from "./customer-directory-model";
@@ -11,11 +11,19 @@ export function CustomerWorkbenchForm({
   locale,
   onClose,
   onSaved,
+  saveAction,
+  scopeNote,
 }: {
   profile: CustomerDirectoryProfile | null;
   locale: "zh" | "fr";
   onClose: () => void;
   onSaved: (id: string, created: boolean) => void;
+  saveAction?: (input: CustomerFormInput) => Promise<{
+    success: boolean;
+    data?: { id: string };
+    error?: string;
+  }>;
+  scopeNote?: string;
 }) {
   const zh = locale === "zh";
   const text = (a: string, b: string) => (zh ? a : b);
@@ -27,9 +35,17 @@ export function CustomerWorkbenchForm({
   const [notes, setNotes] = useState(profile?.notes ?? "");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const savingGuard = useRef(false);
+  const active = useRef(true);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving) return;
+    if (savingGuard.current) return;
     if (name.trim().length < 2) {
       setError(
         text("姓名 / 企业名称至少需要 2 个字符。", "Le nom doit comporter au moins 2 caractères."),
@@ -37,6 +53,7 @@ export function CustomerWorkbenchForm({
       return;
     }
     setSaving(true);
+    savingGuard.current = true;
     setError("");
     const input: CustomerFormInput = {
       name: name.trim(),
@@ -48,26 +65,31 @@ export function CustomerWorkbenchForm({
     // Blank means unchanged on edit. Risk flags and business relationships are never submitted.
     if (documentNo.trim()) input.document_no_plain = documentNo.trim();
     try {
-      const result = profile
-        ? await updateCustomer(profile.id, input)
-        : await createCustomer(input);
+      const result = saveAction
+        ? await saveAction(input)
+        : profile
+          ? await updateCustomer(profile.id, input)
+          : await createCustomer(input);
+      if (!active.current) return;
       if (!result.success || !result.data)
         throw new Error(result.error || text("保存失败，请重试。", "Échec de l'enregistrement."));
       onSaved(result.data.id, !profile);
     } catch (cause) {
+      if (!active.current) return;
       setError(
         cause instanceof Error
           ? cause.message
           : text("保存失败，请重试。", "Échec de l'enregistrement."),
       );
       setSaving(false);
+      savingGuard.current = false;
     }
   }
   return (
     <RightDrawer
       open
       onClose={() => {
-        if (!saving) onClose();
+        if (!savingGuard.current) onClose();
       }}
       title={
         profile
@@ -81,6 +103,11 @@ export function CustomerWorkbenchForm({
       width="wide"
     >
       <form onSubmit={save} className={styles.form}>
+        {scopeNote && (
+          <p className={styles.callout} role="note">
+            {scopeNote}
+          </p>
+        )}
         <label>
           {text("姓名 / 企业名称", "Nom / entreprise")}
           <input

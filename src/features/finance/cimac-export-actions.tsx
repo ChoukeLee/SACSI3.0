@@ -7,10 +7,12 @@ export function CimacExportActions({
   kind,
   filters,
   locale,
+  workArea = "sacsi",
 }: {
   kind: FinanceKind;
   filters: FinanceFilters;
   locale: "zh" | "fr";
+  workArea?: "sacsi" | "cimac";
 }) {
   if (filters.projectId !== CIMAC_PROJECT_ID) return null;
   const zh = locale === "zh";
@@ -27,7 +29,7 @@ export function CimacExportActions({
   const resetParams = new URLSearchParams({ projectId: CIMAC_PROJECT_ID, kind });
   if (filters.dateFrom) resetParams.set("dateFrom", filters.dateFrom);
   if (filters.dateTo) resetParams.set("dateTo", filters.dateTo);
-  const resetHref = `${zh ? "" : "/fr"}/finance?${resetParams}`;
+  const resetHref = `${zh ? "" : "/fr"}${workArea === "cimac" ? "/cimac" : ""}/finance?${resetParams}`;
   const linkClass = "rounded-md border bg-background p-2 text-sm";
   return (
     <section

@@ -23,6 +23,8 @@ import { CimacCustomerDirectoryView, CimacAssetDirectoryView } from "./cimac-dir
 import { CimacCustomerView } from "./cimac-customer-view";
 import { CimacAssetView } from "./cimac-asset-view";
 import { CimacAccountLazy } from "@/features/finance/cimac-account-lazy";
+import { readCimacOperationUnit, readCimacProfileRecords } from "./cimac-profile-service";
+import { CimacProfileRecordSections } from "./cimac-profile-records";
 
 export type CimacSearchParams = Record<string, string | string[] | undefined>;
 export interface CimacPageProps {
@@ -100,7 +102,15 @@ export async function CimacCustomersPage({
   if (accounts && !canReadCimacAccount(user.role)) notFound();
   const params = query(await searchParams, "customers");
   const data = await scopedRead(() => readCimacCustomers(client, scope, params));
-  return <CimacCustomerDirectoryView data={data} locale={locale} accountLinks={accounts} />;
+  return (
+    <CimacCustomerDirectoryView
+      data={data}
+      locale={locale}
+      accountLinks={accounts}
+      canEdit={hasPermission(user, "customers:write")}
+      canCreateContract={hasPermission(user, "leases:write")}
+    />
+  );
 }
 
 export async function CimacCustomerPage({
@@ -156,7 +166,7 @@ export async function CimacCustomerPage({
           </p>
           <Link
             className="text-blue-700 underline"
-            href={`${locale === "fr" ? "/fr" : ""}/finance?${ledgerParams}`}
+            href={`${locale === "fr" ? "/fr" : ""}/cimac/finance?${ledgerParams}`}
           >
             {locale === "zh" ? "查看原有收支流水" : "Consulter les écritures"}
           </Link>
@@ -171,6 +181,18 @@ export async function CimacCustomerPage({
       canEdit={hasPermission(user, "customers:write")}
       canReadAccount={canReadAccount}
       accountSection={accountSection}
+      recordSection={
+        parsed.tab === "records" ? (
+          <CimacProfileRecordSections
+            data={await readCimacProfileRecords(client, scope, {
+              type: "customer",
+              id: data.profile.id,
+            })}
+            locale={locale}
+            sharedIdentity
+          />
+        ) : undefined
+      }
     />
   );
 }
@@ -193,13 +215,25 @@ export async function CimacAssetPage({
   const { user, client, scope } = await getCimacWorkspaceContext();
   const [{ id }, rawQuery] = await Promise.all([params, searchParams]);
   const parsed = query(rawQuery, "assets");
-  const data = await scopedRead(() => readCimacAsset(client, scope, id, parsed));
+  const [data, operationUnit] = await Promise.all([
+    scopedRead(() => readCimacAsset(client, scope, id, parsed)),
+    scopedRead(() => readCimacOperationUnit(client, scope, id)),
+  ]);
   return (
     <CimacAssetView
       data={data}
       locale={locale}
       canEdit={hasPermission(user, "units:write")}
       canReadAccount={canReadCimacAccount(user.role)}
+      operationUnit={operationUnit}
+      recordSection={
+        parsed.tab === "records" ? (
+          <CimacProfileRecordSections
+            data={await readCimacProfileRecords(client, scope, { type: "unit", id: data.asset.id })}
+            locale={locale}
+          />
+        ) : undefined
+      }
     />
   );
 }

@@ -6,8 +6,8 @@ vi.mock("@/lib/auth", () => ({
   hasPermission: (user: { role: string }) => !!user,
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.client }));
-vi.mock("@/features/customers/customer-directory-service", () => ({
-  readCustomerDirectory: mocks.read,
+vi.mock("@/features/customers/sacsi-directory-service", () => ({
+  readSacsiCustomerDirectory: mocks.read,
 }));
 import { GET } from "../src/app/api/customers/directory/route";
 import { CustomerDirectoryError } from "../src/features/customers/customer-directory-model";

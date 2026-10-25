@@ -1,113 +1,133 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
-const mock = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), cimac: true, write: true }));
-vi.mock("server-only", () => ({}));
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => mock }));
-vi.mock("@/features/finance/cimac-customer-workbench", () => ({
-  CimacCustomerWorkbench: () => null,
+import type { FinanceWorkbenchProps } from "@/features/finance/finance-workbench";
+const mock = vi.hoisted(() => ({
+  context: vi.fn(),
+  customers: vi.fn(),
+  from: vi.fn(),
+  rpc: vi.fn(),
 }));
+vi.mock("server-only", () => ({}));
+vi.mock("next/navigation", () => ({
+  notFound: () => {
+    throw new Error("notFound");
+  },
+}));
+vi.mock("@/features/cimac/cimac-workspace-pages", () => ({
+  getCimacWorkspaceContext: mock.context,
+  CimacCustomersPage: mock.customers,
+}));
+vi.mock("@/lib/auth", () => ({
+  hasPermission: (user: { role: string }) => ["admin", "finance"].includes(user.role),
+}));
+vi.mock("@/lib/supabase/server", () => ({ createClient: async () => mock }));
 vi.mock("@/features/finance/finance-workbench", () => ({ FinanceWorkbench: () => null }));
 import { FinanceWorkspace } from "@/features/finance/finance-workspace";
+import { CimacFinancePage } from "@/features/finance/cimac-finance-page";
 
 const project = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-const actor = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
-function empty() {
-  return {
-    project: { id: project, code: "CIMAC", display_name: "CIMAC" },
-    canWrite: mock.write,
-    complete: true,
-    customerPage: { rows: [], total: 0, page: 1, pageSize: 50 },
-    selectedCustomerId: null,
-    customer: null,
-    units: [],
-    contracts: [],
-    receivables: [],
-    payments: [],
-    allocations: [],
-    feeTerms: [],
-    meterReadings: [],
-  };
-}
+const other = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const building = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 beforeEach(() => {
   vi.clearAllMocks();
-  mock.cimac = true;
-  mock.write = true;
+  mock.context.mockResolvedValue({ user: { id: other, role: "finance" } });
   mock.from.mockImplementation((table: string) => ({
     select: () => ({
       order: () => ({
         range: async () => ({
           data:
             table === "projects"
-              ? [{ id: project, code: mock.cimac ? "CIMAC" : "OTHER", display_name: "Project" }]
-              : [],
+              ? [
+                  { id: project, code: "CIMAC", display_name: "CIMAC" },
+                  { id: other, code: "SACSI", display_name: "SACSI" },
+                ]
+              : [{ id: building, project_id: project, code: "B3", display_name: "3" }],
           error: null,
         }),
       }),
     }),
   }));
-  mock.rpc.mockImplementation(async (name: string) => ({
-    data:
-      name === "cimac_customer_account_rpc"
-        ? empty()
-        : {
-            kind: "ledger",
-            page: 1,
-            pageSize: 50,
-            total: 0,
-            summary: { income: 0, expense: 0, liability_in: 0, liability_out: 0 },
-            rows: [],
-          },
+  mock.rpc.mockResolvedValue({
+    data: {
+      kind: "ledger",
+      page: 1,
+      pageSize: 50,
+      total: 0,
+      summary: { income: 0, expense: 0, liability_in: 0, liability_out: 0 },
+      rows: [],
+    },
     error: null,
-  }));
+  });
 });
-async function load(params: Record<string, string | undefined> = {}, canWrite = true) {
-  return (await FinanceWorkspace({
-    params,
-    locale: "zh",
-    canWrite,
-    viewerId: actor,
-  })) as ReactElement<Record<string, unknown>>;
-}
-describe("approved CIMAC customer workspace entry", () => {
-  it("uses the customer account by default for a verified CIMAC account", async () => {
-    const result = await load();
-    expect(result.props.viewerId).toBe(actor);
-    expect(result.props.canWrite).toBe(true);
-    expect(mock.rpc).toHaveBeenCalledExactlyOnceWith("cimac_customer_account_rpc", {
-      p_customer_id: null,
-      p_search: null,
+describe("independent CIMAC finance entry", () => {
+  it("keeps customer accounts as default with financial views inside CIMAC", async () => {
+    const page = await CimacFinancePage({ searchParams: Promise.resolve({}), locale: "zh" });
+    expect(page.props.children[1].type).toBe(mock.customers);
+    expect(page.props.children[1].props.accounts).toBe(true);
+    expect(mock.rpc).not.toHaveBeenCalled();
+  });
+  it.each(["ledger", "receivables"])(
+    "locks %s content to CIMAC instead of mounting an old finance page",
+    async (kind) => {
+      const page = await CimacFinancePage({
+        searchParams: Promise.resolve({ kind }),
+        locale: "fr",
+      });
+      expect(page.type).toBe(FinanceWorkspace);
+      expect(page.props.workArea).toBe("cimac");
+      expect(page.props.locale).toBe("fr");
+    },
+  );
+  it.each(["rental_sales", "front_desk"])("does not expose financial views to %s", async (role) => {
+    mock.context.mockResolvedValue({ user: { role } });
+    await expect(
+      CimacFinancePage({ searchParams: Promise.resolve({ kind: "ledger" }), locale: "zh" }),
+    ).rejects.toThrow("notFound");
+    expect(mock.rpc).not.toHaveBeenCalled();
+  });
+  it("keeps boss read-only", async () => {
+    mock.context.mockResolvedValue({ user: { role: "boss" } });
+    const page = await CimacFinancePage({
+      searchParams: Promise.resolve({ kind: "ledger" }),
+      locale: "zh",
+    });
+    expect(page.props.canWrite).toBe(false);
+  });
+  it("injects CIMAC before the financial RPC and sends no foreign project options to the browser", async () => {
+    const page = (await FinanceWorkspace({
+      params: { kind: "ledger" },
+      locale: "zh",
+      canWrite: true,
+      workArea: "cimac",
+    })) as ReactElement<FinanceWorkbenchProps>;
+    expect(mock.rpc).toHaveBeenCalledExactlyOnceWith("finance_read_rpc", {
+      p_kind: "ledger",
+      p_filters: { projectId: project },
       p_page: 1,
     });
-    expect(mock.from.mock.calls.map((c) => c[0])).toEqual(["buildings", "projects"]);
+    expect(page.props.projects.map((p) => p.id)).toEqual([project]);
+    expect(page.props.buildings.map((b) => b.id)).toEqual([building]);
+    expect(page.props.projectLocked).toBe(true);
   });
-  it.each([
-    [false, true],
-    [true, false],
-  ])("requires both page and database write permission", async (pageWrite, dbWrite) => {
-    mock.write = dbWrite;
-    const result = await load({}, pageWrite);
-    expect(result.props.canWrite).toBe(false);
-  });
-  it("keeps the established generic ledger default without CIMAC access", async () => {
-    mock.cimac = false;
-    const result = await load();
-    expect(result.props.mode).toBe("ledger");
-    expect(mock.rpc.mock.calls[0][0]).toBe("finance_read_rpc");
-  });
-  it("keeps explicit generic ledger links even when CIMAC is authorized", async () => {
-    const result = await load({ kind: "ledger" });
-    expect(result.props.mode).toBe("ledger");
-    expect(mock.rpc.mock.calls[0][0]).toBe("finance_read_rpc");
-  });
-  it("shows an unavailable state rather than an empty account if the customer read fails", async () => {
-    mock.rpc.mockResolvedValue({ data: null, error: { code: "42501" } });
-    const result = await load();
-    expect(result.props.role).toBe("alert");
-    expect(result.props.data).toBeUndefined();
-  });
-  it("does not reinterpret a foreign project as the CIMAC scope", async () => {
-    const result = await load({ view: "customers", projectId: actor });
-    expect(result.props.role).toBe("alert");
+  it("rejects an explicit foreign project before any financial read", async () => {
+    const page = (await FinanceWorkspace({
+      params: { projectId: other },
+      locale: "zh",
+      canWrite: true,
+      workArea: "cimac",
+    })) as ReactElement<{ role: string }>;
+    expect(page.props.role).toBe("alert");
     expect(mock.rpc).not.toHaveBeenCalled();
+  });
+  it("does not run unscoped company checks in CIMAC or show false zero anomalies", async () => {
+    const page = (await FinanceWorkspace({
+      params: { view: "reconciliation" },
+      locale: "zh",
+      canWrite: true,
+      workArea: "cimac",
+    })) as ReactElement<FinanceWorkbenchProps>;
+    expect(mock.rpc).not.toHaveBeenCalled();
+    expect(page.props.reconciliation).toEqual({ available: false, count: null, issues: [] });
+    expect(page.props.reconciliationPending).toBe(true);
   });
 });

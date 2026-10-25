@@ -180,7 +180,7 @@ export function ReportInspector({
   });
   const unit = row?.unit_label;
   if (typeof unit === "string" && unit) financeParams.set("search", unit);
-  const financeHref = `${zh ? "" : "/fr"}/finance?${financeParams.toString()}`;
+  const financeHref = `${zh ? "" : "/fr"}${data.workArea === "cimac" ? "/cimac" : ""}/finance?${financeParams.toString()}`;
   const value = row ? financeRowMoney(row) : { amount: 0, currency: "XOF" };
   const amount = value.amount;
 

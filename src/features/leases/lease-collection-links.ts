@@ -7,16 +7,18 @@ export function buildLeaseCollectionHref({
   contractId,
   locale = "zh",
   returnTo,
+  workArea = "sacsi",
 }: {
   contractId: string;
   locale?: "zh" | "fr";
   returnTo?: string | null;
+  workArea?: "sacsi" | "cimac";
 }): string | null {
   if (!uuid.test(contractId)) return null;
   const safeReturn = safeWorkbenchReturnTo(returnTo);
   const params = new URLSearchParams();
   if (safeReturn) params.set("returnTo", safeReturn);
-  return `${locale === "fr" ? "/fr" : ""}/leases/${contractId}/collect${params.size ? `?${params}` : ""}`;
+  return `${locale === "fr" ? "/fr" : ""}/${workArea === "cimac" ? "cimac/contracts" : "leases"}/${contractId}/collect${params.size ? `?${params}` : ""}`;
 }
 
 export function validLeaseCollectionId(value: string): boolean {

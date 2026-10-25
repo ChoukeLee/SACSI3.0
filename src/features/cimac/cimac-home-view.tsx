@@ -50,9 +50,14 @@ export function CimacHomeView({ data, locale }: { data: CimacHomeData; locale: C
           "Construction, clients et exploitation : les points à vérifier avant les opérations détaillées.",
         )}
         actions={
-          <CimacLink href={cimacWorkspaceHref("customers", locale)} button>
-            {t("查看客户", "Voir les clients")}
-          </CimacLink>
+          <>
+            <CimacLink href={`${locale === "fr" ? "/fr" : ""}/cimac/map`}>
+              {t("商铺分布", "Plan des commerces")}
+            </CimacLink>
+            <CimacLink href={cimacWorkspaceHref("customers", locale)} button>
+              {t("查看客户", "Voir les clients")}
+            </CimacLink>
+          </>
         }
       />
       <div className={styles.summary} aria-label={t("授权园区范围", "Périmètre autorisé du parc")}>

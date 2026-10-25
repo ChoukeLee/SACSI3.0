@@ -5,7 +5,7 @@ import {
   customerDirectoryId,
   parseCustomerDirectoryQuery,
 } from "@/features/customers/customer-directory-model";
-import { readCustomerDirectory } from "@/features/customers/customer-directory-service";
+import { readSacsiCustomerDirectory } from "@/features/customers/sacsi-directory-service";
 
 export const dynamic = "force-dynamic";
 const headers = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     )
       return fail(400);
     const query = parseCustomerDirectoryQuery(raw);
-    const result = await readCustomerDirectory(
+    const result = await readSacsiCustomerDirectory(
       await createClient(),
       query,
       mode,

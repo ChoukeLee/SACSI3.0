@@ -39,6 +39,10 @@ export interface FinanceWorkbenchProps {
   canWrite: boolean;
   today: string;
   exportActions?: ReactNode;
+  workArea?: "sacsi" | "cimac";
+  projectLocked?: boolean;
+  reconciliationPending?: boolean;
+  companyReconciliation?: boolean;
 }
 
 export function FinanceWorkbench({
@@ -53,6 +57,10 @@ export function FinanceWorkbench({
   canWrite,
   today,
   exportActions,
+  workArea = "sacsi",
+  projectLocked = false,
+  reconciliationPending = false,
+  companyReconciliation = false,
 }: FinanceWorkbenchProps) {
   const zh = locale === "zh";
   const text = (a: string, b: string) => (zh ? a : b);
@@ -68,7 +76,7 @@ export function FinanceWorkbench({
   const ledger = query.kind === "ledger";
   const reviewing = mode === "reconciliation";
   const filters = query.filters;
-  const base = locale === "fr" ? "/fr" : "";
+  const base = `${locale === "fr" ? "/fr" : ""}${workArea === "cimac" ? "/cimac" : ""}`;
   const formId = `finance-query-${locale}`;
   const scopeBuildings = buildings.filter(
     (b) => !filters.projectId || b.project_id === filters.projectId,
@@ -80,7 +88,7 @@ export function FinanceWorkbench({
       ? (result.rows.find((r) => r.id === selection.id) ?? null)
       : null;
   const href = (nextMode: FinanceWorkbenchMode, patch?: Record<string, string | undefined>) =>
-    financeWorkbenchHref(query, locale, nextMode, patch);
+    financeWorkbenchHref(query, locale, nextMode, patch, workArea);
   const navigateScope = (patch: Record<string, string | undefined>) => {
     setSelection(null);
     startTransition(() => router.push(href(mode, { ...patch, page: undefined })));
@@ -150,7 +158,13 @@ export function FinanceWorkbench({
       <header className={styles.heading}>
         <div>
           <p className={styles.eyebrow}>FINANCE WORKSPACE</p>
-          <h1>{text("财务工作台", "Espace finance")}</h1>
+          <h1>
+            {companyReconciliation
+              ? text("公司级关联核对", "Rapprochement de l’entreprise")
+              : workArea === "cimac"
+                ? text("收费与资金", "Facturation et trésorerie")
+                : text("财务工作台", "Espace finance")}
+          </h1>
           <p className={styles.subtitle}>
             {text(
               "查一笔钱，看清业务、分账和付款事实。",
@@ -181,73 +195,81 @@ export function FinanceWorkbench({
           )}
         </div>
       </header>
-      <form
-        id={formId}
-        action={`${base}/finance`}
-        method="get"
-        className={styles.scopeForm}
-        onSubmit={() => setSelection(null)}
-      >
-        <input type="hidden" name="kind" value={query.kind} />
-        <label>
-          {text("项目", "Projet")}
-          <select
-            name="projectId"
-            value={filters.projectId || ""}
-            disabled={pending || reviewing}
-            onChange={(e) => navigateScope({ projectId: e.target.value, buildingId: undefined })}
-          >
-            <option value="">{text("全部授权项目", "Tous les projets autorisés")}</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.display_name || p.code}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          {text("楼栋", "Bâtiment")}
-          <select
-            name="buildingId"
-            value={filters.buildingId || ""}
-            disabled={pending || reviewing}
-            onChange={(e) => navigateScope({ buildingId: e.target.value })}
-          >
-            <option value="">{text("全部楼栋", "Tous les bâtiments")}</option>
-            {scopeBuildings.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.display_name || b.code}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className={styles.dateFields}>
+      {!companyReconciliation && (
+        <form
+          id={formId}
+          action={`${base}/finance`}
+          method="get"
+          className={styles.scopeForm}
+          onSubmit={() => setSelection(null)}
+        >
+          <input type="hidden" name="kind" value={query.kind} />
+          {projectLocked && <input type="hidden" name="projectId" value={filters.projectId} />}
           <label>
-            {ledger
-              ? text("流水日期 · 起", "Date d’écriture · du")
-              : text("到期日期 · 起", "Échéance · du")}
-            <input
-              type="date"
-              name="dateFrom"
-              defaultValue={filters.dateFrom || ""}
-              disabled={reviewing}
-            />
+            {text("项目", "Projet")}
+            <select
+              name={projectLocked ? undefined : "projectId"}
+              value={filters.projectId || ""}
+              disabled={pending || reviewing || projectLocked}
+              onChange={(e) => navigateScope({ projectId: e.target.value, buildingId: undefined })}
+            >
+              {!projectLocked && (
+                <option value="">{text("全部授权项目", "Tous les projets autorisés")}</option>
+              )}
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.display_name || p.code}
+                </option>
+              ))}
+            </select>
           </label>
-          <span aria-hidden="true">—</span>
           <label>
-            {ledger
-              ? text("流水日期 · 止", "Date d’écriture · au")
-              : text("到期日期 · 止", "Échéance · au")}
-            <input
-              type="date"
-              name="dateTo"
-              defaultValue={filters.dateTo || ""}
-              disabled={reviewing}
-            />
+            {text("楼栋", "Bâtiment")}
+            <select
+              name="buildingId"
+              value={filters.buildingId || ""}
+              disabled={pending || reviewing}
+              onChange={(e) => navigateScope({ buildingId: e.target.value })}
+            >
+              <option value="">{text("全部楼栋", "Tous les bâtiments")}</option>
+              {scopeBuildings.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.display_name || b.code}
+                </option>
+              ))}
+            </select>
           </label>
-        </div>
-      </form>
+          <div className={styles.dateFields}>
+            <label>
+              {ledger
+                ? text("流水日期 · 起", "Date d’écriture · du")
+                : text("到期日期 · 起", "Échéance · du")}
+              <input
+                type="date"
+                name="dateFrom"
+                defaultValue={filters.dateFrom || ""}
+                disabled={reviewing}
+              />
+            </label>
+            <span aria-hidden="true">—</span>
+            <label>
+              {ledger
+                ? text("流水日期 · 止", "Date d’écriture · au")
+                : text("到期日期 · 止", "Échéance · au")}
+              <input
+                type="date"
+                name="dateTo"
+                defaultValue={filters.dateTo || ""}
+                disabled={reviewing}
+              />
+            </label>
+          </div>
+        </form>
+      )}
       <nav className={styles.tabs} aria-label={text("财务视图", "Vues financières")}>
+        {workArea === "cimac" && (
+          <Link href={`${base}/finance`}>{text("客户总账", "Comptes clients")}</Link>
+        )}
         {(
           [
             ["ledger", text("收支流水", "Écritures")],
@@ -257,12 +279,18 @@ export function FinanceWorkbench({
         ).map(([key, label]) => (
           <Link
             key={key}
-            href={href(key)}
+            href={
+              key === "reconciliation" && projectLocked
+                ? `${locale === "fr" ? "/fr" : ""}/settings/finance-reconciliation`
+                : href(key)
+            }
             prefetch={false}
             aria-current={mode === key ? "page" : undefined}
             onClick={() => setSelection(null)}
           >
-            {label}
+            {key === "reconciliation" && projectLocked
+              ? text("公司级关联核对", "Rapprochement de l’entreprise")
+              : label}
           </Link>
         ))}
         <Link href={`${base}/reports`} className={styles.reportLink}>
@@ -303,23 +331,45 @@ export function FinanceWorkbench({
             <ScanSearch size={19} aria-hidden="true" />
             <div>
               <h2>
-                {text("全部授权范围的关联核对", "Rapprochement de tout le périmètre autorisé")}
+                {projectLocked
+                  ? text("当前项目的关联核对", "Rapprochement du projet")
+                  : text("全部授权范围的关联核对", "Rapprochement de tout le périmètre autorisé")}
               </h2>
               <p>
                 {text(
-                  "不随上方项目与日期筛选变化；这是只读一致性检查，不是收款待审批。",
-                  "Indépendant des filtres de projet et dates ; lecture seule, pas une file d’approbation.",
+                  reconciliationPending
+                    ? "项目级核对待处理：现有接口为公司全局范围，未将其他项目结果混入当前工作区。"
+                    : "不随上方项目与日期筛选变化；这是只读一致性检查，不是收款待审批。",
+                  reconciliationPending
+                    ? "Contrôle par projet à compléter : le contrôle global n’est pas mélangé avec cet espace."
+                    : "Indépendant des filtres de projet et dates ; lecture seule, pas une file d’approbation.",
                 )}
               </p>
             </div>
           </div>
           {!reconciliation?.available ? (
             <div role="alert" className={styles.reviewError}>
-              <h3>{text("核对结果暂时无法读取", "Rapprochement indisponible")}</h3>
+              <h3>
+                {reconciliationPending
+                  ? text("项目级关联核对待处理", "Contrôle par projet à compléter")
+                  : text("核对结果暂时无法读取", "Rapprochement indisponible")}
+              </h3>
+              {reconciliationPending && (
+                <Link href={`${locale === "fr" ? "/fr" : ""}/settings/finance-reconciliation`}>
+                  {text(
+                    "打开公司级关联核对（全部授权项目）",
+                    "Ouvrir le rapprochement de tous les projets autorisés",
+                  )}
+                </Link>
+              )}
               <p>
                 {text(
-                  "没有将读取失败显示为“零异常”，流水与应收账仍可独立查看。",
-                  "L’échec n’est pas présenté comme zéro anomalie. Les écritures et créances restent accessibles.",
+                  reconciliationPending
+                    ? "尚未进行项目级核对，不能视为零异常。流水、应收与公司级核对仍可独立查看。"
+                    : "没有将读取失败显示为“零异常”，流水与应收账仍可独立查看。",
+                  reconciliationPending
+                    ? "Aucun contrôle par projet effectué ; cela ne signifie pas zéro anomalie. Journal, créances et contrôle global restent accessibles."
+                    : "L’échec n’est pas présenté comme zéro anomalie. Les écritures et créances restent accessibles.",
                 )}
               </p>
               <button
@@ -537,6 +587,7 @@ export function FinanceWorkbench({
                       )}
                 </p>
                 <FinanceWorkbenchTable
+                  workArea={workArea}
                   result={result}
                   query={query}
                   locale={locale}
@@ -549,6 +600,7 @@ export function FinanceWorkbench({
               </section>
               <div ref={inspector} className={styles.inspector}>
                 <FinanceWorkbenchInspector
+                  workArea={workArea}
                   row={selected}
                   kind={query.kind}
                   locale={locale}
@@ -564,10 +616,12 @@ export function FinanceWorkbench({
                 "La synthèse couvre tous les résultats, pas seulement la page. Un paiement ne se compte qu’une fois ; écritures, encaissements, imputations et dépôts restent distincts.",
               )}
             </p>
-            <Link href={`${base}/daily-rentals/receipts`} className={styles.relatedLink}>
-              {text("日租历史收款与增长分析", "Historique des encaissements courts séjours")}
-              <ArrowUpRight size={13} aria-hidden="true" />
-            </Link>
+            {workArea !== "cimac" && (
+              <Link href={`${base}/daily-rentals/receipts`} className={styles.relatedLink}>
+                {text("日租历史收款与增长分析", "Historique des encaissements courts séjours")}
+                <ArrowUpRight size={13} aria-hidden="true" />
+              </Link>
+            )}
           </>
         )
       )}

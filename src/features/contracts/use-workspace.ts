@@ -11,7 +11,10 @@ import {
 const merge = <T extends { id: string }>(...lists: (T[] | undefined)[]) => [
   ...new Map(lists.flatMap((rows) => rows ?? []).map((row) => [row.id, row])).values(),
 ];
-export function useContractWorkspace(initial: WorkspaceData | undefined) {
+export function useContractWorkspace(
+  initial: WorkspaceData | undefined,
+  workArea: "sacsi" | "cimac" = "sacsi",
+) {
   const [pageData, setPageData] = useState(initial),
     [scopeData, setScopeData] = useState<WorkspaceData>(),
     [detailData, setDetailData] = useState<WorkspaceData>(),
@@ -35,6 +38,7 @@ export function useContractWorkspace(initial: WorkspaceData | undefined) {
       if (!initial) throw new WorkspaceReadError();
       const search = new URLSearchParams(Object.entries(q).map(([k, v]) => [k, String(v)]));
       search.set("mode", mode);
+      if (workArea === "cimac") search.set("workspace", workArea);
       if (id) search.set("contractId", id);
       const response = await fetch(`/api/contracts/${initial.kind}?${search}`, {
         cache: "no-store",
@@ -43,7 +47,7 @@ export function useContractWorkspace(initial: WorkspaceData | undefined) {
       if (!response.ok) throw new WorkspaceReadError(response.status);
       return decodeWorkspace(await response.json(), initial.kind, q, mode, id);
     },
-    [initial?.kind],
+    [initial?.kind, workArea],
   );
   useEffect(() => {
     const first = initialRef.current;

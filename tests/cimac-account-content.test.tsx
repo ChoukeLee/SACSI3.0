@@ -280,7 +280,9 @@ it("shares the original-receipt refund/reversal chain and preserves native-curre
   expect(host.textContent).toContain("退款");
   expect(host.textContent).toContain("冲正");
   expect(host.textContent).toContain("押金单独核算");
-  const link = host.querySelector<HTMLAnchorElement>(`a[href*="/leases/${contractId}/collect"]`)!;
+  const link = host.querySelector<HTMLAnchorElement>(
+    `a[href*="/cimac/contracts/${contractId}/collect"]`,
+  )!;
   expect(link).not.toBeNull();
   expect(new URL(link.href).searchParams.get("returnTo")).toBe(
     `${workspace}?tab=account&accountTab=receipts`,

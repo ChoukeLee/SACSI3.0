@@ -28,7 +28,6 @@ import styles from "./cimac-shell.module.css";
 export function CimacShell({
   children,
   locale,
-  projectId,
   displayName,
   role,
   sacsiHref,
@@ -47,7 +46,7 @@ export function CimacShell({
   const [logoutError, setLogoutError] = useState(false);
   const zh = locale === "zh";
   const base = routeFor(locale, "/cimac");
-  const contractHref = `${routeFor(locale, "/leases")}?${new URLSearchParams({ project: projectId, returnTo: base })}`;
+  const contractHref = `${base}/contracts`;
   const nav = [
     { href: base, label: zh ? "工作首页" : "Vue d’ensemble", icon: LayoutDashboard, exact: true },
     { href: `${base}/customers`, label: zh ? "招商与客户" : "Clients", icon: UsersRound },
@@ -55,7 +54,7 @@ export function CimacShell({
       href: contractHref,
       label: zh ? "合同与履约" : "Contrats",
       icon: FileSignature,
-      external: true,
+      external: false,
     },
     { href: `${base}/assets`, label: zh ? "园区资产" : "Patrimoine", icon: Building2 },
     ...(canReadCimacAccount(role)
@@ -64,6 +63,11 @@ export function CimacShell({
             href: `${base}/finance`,
             label: zh ? "收费与资金" : "Comptes clients",
             icon: WalletCards,
+          },
+          {
+            href: `${base}/reports`,
+            label: zh ? "经营分析" : "Analyse",
+            icon: ChartNoAxesCombined,
           },
         ]
       : []),
@@ -160,25 +164,17 @@ export function CimacShell({
             <span>{zh ? "物业与服务" : "Services"}</span>
             <small>{zh ? "规划" : "Prévu"}</small>
           </div>
-          <div
-            className={styles.planned}
-            title={zh ? "园区专属经营分析待建设" : "Analyse dédiée à définir"}
-          >
-            <ChartNoAxesCombined size={17} />
-            <span>{zh ? "经营分析" : "Analyse"}</span>
-            <small>{zh ? "规划" : "Prévu"}</small>
-          </div>
         </nav>
         <div className={styles.sidebarFooter}>
           {(role === "admin" || role === "boss") && (
             <Link
               className={styles.navLink}
               href={routeFor(locale, "/settings/audit-logs")}
-              title={zh ? "查看审计日志" : "Journal d’audit"}
+              title={zh ? "查看公司级审计日志" : "Journal d’audit de l’entreprise"}
               prefetch={false}
             >
               <ShieldCheck size={17} />
-              <span>{zh ? "审计日志" : "Journal d’audit"}</span>
+              <span>{zh ? "公司审计" : "Audit de l’entreprise"}</span>
               <ArrowUpRight size={12} className={styles.external} />
             </Link>
           )}

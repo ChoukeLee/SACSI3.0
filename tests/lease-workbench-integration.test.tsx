@@ -14,7 +14,11 @@ vi.mock("@/features/leases/actions", () => ({
 vi.mock("@/features/print", () => ({ printLeaseContract: vi.fn(), printSaleContract: vi.fn() }));
 
 import { LeaseList } from "@/features/leases/lease-list";
-import { activateContract, recordLeaseFinancialEntry } from "@/features/leases/actions";
+import {
+  activateContract,
+  recordLeaseFinancialEntry,
+  createLeaseContract,
+} from "@/features/leases/actions";
 import { parseWorkspaceQuery, type WorkspaceData } from "@/features/contracts/workspace-model";
 import type { LeaseContractRow } from "@/types/database";
 import {
@@ -22,6 +26,7 @@ import {
   workspaceContract,
   workspaceFixture,
   workspaceProject,
+  workspaceCustomer,
 } from "./fixtures/contract-workspace";
 
 const secondBuilding = "88888888-8888-4888-8888-888888888888";
@@ -85,6 +90,7 @@ function requestInfo(input: RequestInfo | URL) {
   const contractId = url.searchParams.get("contractId");
   url.searchParams.delete("mode");
   url.searchParams.delete("contractId");
+  url.searchParams.delete("workspace");
   return { mode, contractId, query: parseWorkspaceQuery(Object.fromEntries(url.searchParams)) };
 }
 
@@ -121,8 +127,15 @@ function detailFor(input: RequestInfo | URL, balance = 123456) {
 
 async function render(
   data = dataFor(),
-  linked: { initialContract?: string; returnTo?: string } = {},
+  linked: {
+    initialContract?: string;
+    initialCustomer?: string;
+    initialCustomerName?: string;
+    returnTo?: string;
+    workArea?: "sacsi" | "cimac";
+  } = {},
   permissions: Partial<{
+    canCreate: boolean;
     canRecordFinance: boolean;
     canActivate: boolean;
     canMoveOut: boolean;
@@ -216,6 +229,120 @@ it("keeps SSR idle, then fetches only the explicitly selected contract into a no
   expect(preview()?.textContent).toContain("123,456");
   expect(document.querySelector('[role="dialog"]')).toBeNull();
   expect(host.querySelectorAll("tbody tr")).toHaveLength(2);
+});
+
+it("keeps park previews, focused actions, collection links and refresh reads in the park without project switching", async () => {
+  const data = dataFor(parseWorkspaceQuery({ projectId: otherProject }));
+  data.buildings = data.buildings.filter((building) => building.project_id === otherProject);
+  await render(data, { workArea: "cimac" }, { canRecordFinance: true });
+  await settle();
+  expect(host.querySelector('[aria-label="项目切换"]')).toBeNull();
+  expect(host.textContent).toContain("合同与履约");
+  expect(fetch).not.toHaveBeenCalled();
+  await click(previewButtons()[0]);
+  await settle();
+  expect(fetch).toHaveBeenCalledTimes(1);
+  const url = new URL(String(vi.mocked(fetch).mock.calls[0][0]), "https://local.invalid");
+  expect(url.searchParams.get("workspace")).toBe("cimac");
+  expect(url.searchParams.get("projectId")).toBe(otherProject);
+  await showFinance();
+  const collect = Array.from(host.querySelectorAll("a")).find((link) =>
+    link.getAttribute("href")?.includes("/collect"),
+  );
+  expect(collect?.getAttribute("href")).toMatch(/^\/cimac\/contracts\//);
+});
+
+it("prefills the selected visible shared customer only when the user explicitly opens a new park contract", async () => {
+  const data = dataFor(parseWorkspaceQuery({ projectId: otherProject }));
+  data.buildings = data.buildings.filter((building) => building.project_id === otherProject);
+  vi.mocked(fetch).mockImplementation(async (input) => {
+    const { query, mode } = requestInfo(input);
+    const context = dataFor(query);
+    context.mode = mode;
+    return Response.json(context);
+  });
+  await render(
+    data,
+    {
+      workArea: "cimac",
+      initialCustomer: workspaceCustomer,
+      initialCustomerName: "Shared pre-contract customer",
+    },
+    { canCreate: true },
+  );
+  await settle();
+  expect(fetch).not.toHaveBeenCalled();
+  expect(host.textContent).toContain("Shared pre-contract customer");
+  expect(host.textContent).toContain("点击“新建合同”继续");
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  const create = Array.from(host.querySelectorAll("button")).find((button) =>
+    button.textContent?.includes("新建合同"),
+  );
+  await click(create);
+  await settle();
+  const customerOption = document.querySelector<HTMLOptionElement>(
+    `[role="dialog"] option[value="${workspaceCustomer}"]`,
+  );
+  expect(customerOption?.selected).toBe(true);
+  expect(
+    new URL(String(vi.mocked(fetch).mock.calls[0][0]), "https://local.invalid").searchParams.get(
+      "workspace",
+    ),
+  ).toBe("cimac");
+  expect(createLeaseContract).not.toHaveBeenCalled();
+  expect(recordLeaseFinancialEntry).not.toHaveBeenCalled();
+});
+
+it("does not open a new park contract with a silently substituted customer when fresh context no longer contains the selected identity", async () => {
+  const data = dataFor(parseWorkspaceQuery({ projectId: otherProject }));
+  data.buildings = data.buildings.filter((building) => building.project_id === otherProject);
+  vi.mocked(fetch).mockImplementation(async (input) => {
+    const { query, mode } = requestInfo(input);
+    const context = dataFor(query, 0);
+    context.mode = mode;
+    context.customers = [];
+    return Response.json(context);
+  });
+  await render(
+    data,
+    { workArea: "cimac", initialCustomer: workspaceCustomer },
+    { canCreate: true },
+  );
+  await click(
+    Array.from(host.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("新建合同"),
+    ),
+  );
+  await settle();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain("所选客户暂不可核验");
+  expect(createLeaseContract).not.toHaveBeenCalled();
+  expect(recordLeaseFinancialEntry).not.toHaveBeenCalled();
+});
+it("shows finance a shared-customer handoff without a new-contract button, form, or automatic write", async () => {
+  const data = dataFor(parseWorkspaceQuery({ projectId: otherProject }));
+  data.buildings = data.buildings.filter((building) => building.project_id === otherProject);
+  await render(
+    data,
+    {
+      workArea: "cimac",
+      initialCustomer: workspaceCustomer,
+      initialCustomerName: "Shared customer handoff",
+    },
+    { canCreate: false, canRecordFinance: true },
+  );
+  await settle();
+  expect(host.textContent).toContain("Shared customer handoff");
+  expect(host.textContent).toContain("当前账号没有建约权限，请交由租售账号或管理员继续");
+  expect(
+    Array.from(host.querySelectorAll("button")).some((button) =>
+      button.textContent?.includes("新建合同"),
+    ),
+  ).toBe(false);
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(fetch).not.toHaveBeenCalled();
+  expect(createLeaseContract).not.toHaveBeenCalled();
+  expect(recordLeaseFinancialEntry).not.toHaveBeenCalled();
 });
 
 it("opens an exact linked contract outside the visible list without loading every contract", async () => {

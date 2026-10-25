@@ -8,6 +8,8 @@ export interface WorkbenchRecordLink {
   project?: string | null;
   building?: string | null;
   returnTo?: string | null;
+  /** Explicit UI boundary; it never grants permission to a project. */
+  workArea?: "sacsi" | "cimac";
 }
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -33,6 +35,10 @@ const directBusinessPaths = new Set([
   "cimac/customers",
   "cimac/assets",
   "cimac/finance",
+  "cimac/contracts",
+  "cimac/reports",
+  "cimac/map",
+  "settings/finance-reconciliation",
 ]);
 const sensitiveParameters = new Set([
   "token",
@@ -68,8 +74,17 @@ export function safeWorkbenchReturnTo(value: unknown): string | null {
   }
   if (url.origin !== returnOrigin || url.username || url.password) return null;
   const path = url.pathname.replace(/^\/fr\//, "/").slice(1);
-  const detail = path.match(/^(customers|units|cimac\/customers|cimac\/assets)\/([^/]+)$/);
-  if (!directBusinessPaths.has(path) && !(detail && uuid.test(detail[2]))) return null;
+  const detail = path.match(
+    /^(customers|units|cimac\/customers|cimac\/assets|cimac\/contracts)\/([^/]+)(?:\/(collect))?$/,
+  );
+  if (detail?.[3] && detail[1] !== "cimac/contracts") return null;
+  const historicalSale = path.match(/^cimac\/contracts\/history\/sales\/([^/]+)$/);
+  if (
+    !directBusinessPaths.has(path) &&
+    !(detail && uuid.test(detail[2])) &&
+    !(historicalSale && uuid.test(historicalSale[1]))
+  )
+    return null;
   for (const [key, parameter] of [...url.searchParams.entries()]) {
     if (sensitiveParameters.has(key.toLowerCase()) || controlCharacters.test(parameter))
       return null;
@@ -85,6 +100,7 @@ export function buildWorkbenchRecordHref({
   project,
   building,
   returnTo,
+  workArea,
 }: WorkbenchRecordLink): string | null {
   if (!uuid.test(id) || !Object.prototype.hasOwnProperty.call(targetKeys, workspace)) return null;
   const params = new URLSearchParams();
@@ -93,5 +109,16 @@ export function buildWorkbenchRecordHref({
   if (building && uuid.test(building)) params.set("building", building);
   const safeReturn = safeWorkbenchReturnTo(returnTo);
   if (safeReturn) params.set("returnTo", safeReturn);
+  if (workArea === "cimac") {
+    params.delete(targetKeys[workspace]);
+    params.delete("project");
+    if (workspace === "sales")
+      return `${locale === "fr" ? "/fr" : ""}/cimac/contracts/history/sales/${id}${params.size ? `?${params}` : ""}`;
+    if (workspace === "leases") {
+      params.set("contract", id);
+      return `${locale === "fr" ? "/fr" : ""}/cimac/contracts?${params}`;
+    }
+    return `${locale === "fr" ? "/fr" : ""}/cimac/${workspace === "units" ? "assets" : "customers"}/${id}${params.size ? `?${params}` : ""}`;
+  }
   return `${locale === "fr" ? "/fr" : ""}/${workspace}?${params}`;
 }

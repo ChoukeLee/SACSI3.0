@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
 import { ReportsView } from "@/features/reports/reports-view";
 import { loadReportData } from "@/features/reports/report-data";
+import { redirectLegacyCimac } from "@/features/cimac/cimac-legacy-redirect";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -18,6 +19,7 @@ export default async function ReportsPage({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!["admin", "boss", "finance"].includes(user.role)) redirect("/fr");
+  await redirectLegacyCimac("reports", await searchParams, "fr");
 
   return (
     <div className="space-y-5">
@@ -29,6 +31,6 @@ export default async function ReportsPage({
 }
 
 async function ReportsData({ params }: { params: Promise<ReportParams> }) {
-  const data = await loadReportData(await params);
+  const data = await loadReportData(await params, { workArea: "sacsi" });
   return <ReportsView data={data} locale="fr" />;
 }

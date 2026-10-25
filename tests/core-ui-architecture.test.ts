@@ -48,7 +48,7 @@ describe("core UI architecture", () => {
     expect(lease).toContain("<LeaseWorkbenchTable");
     expect(lease).toContain("<LeaseWorkbenchInspector");
     expect(
-      /useLeaseWorkbenchPreview\(\s*workspace\.query,\s*previewId,\s*previewSelection\?\.version\s*\)/.test(
+      /useLeaseWorkbenchPreview\(\s*workspace\.query,\s*previewId,\s*previewSelection\?\.version,\s*workArea\s*,?\s*\)/.test(
         lease,
       ),
     ).toBe(true);

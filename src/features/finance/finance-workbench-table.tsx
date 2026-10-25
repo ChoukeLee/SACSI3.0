@@ -26,6 +26,7 @@ export interface FinanceWorkbenchTableProps {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onPageNavigate: () => void;
+  workArea?: "sacsi" | "cimac";
 }
 
 /** Pure paged presentation: summaries and selection lifetime remain in the workspace. */
@@ -38,6 +39,7 @@ export function FinanceWorkbenchTable({
   selectedId,
   onSelect,
   onPageNavigate,
+  workArea = "sacsi",
 }: FinanceWorkbenchTableProps) {
   const ledger = query.kind === "ledger";
   const text = (zh: string, fr: string) => (locale === "zh" ? zh : fr);
@@ -179,9 +181,15 @@ export function FinanceWorkbenchTable({
         <nav aria-label={text("账目分页", "Pagination financière")}>
           {query.page > 1 ? (
             <Link
-              href={financeWorkbenchHref(query, locale, query.kind, {
-                page: String(query.page - 1),
-              })}
+              href={financeWorkbenchHref(
+                query,
+                locale,
+                query.kind,
+                {
+                  page: String(query.page - 1),
+                },
+                workArea,
+              )}
               prefetch={false}
               aria-label={text("上一页", "Page précédente")}
               onClick={onPageNavigate}
@@ -198,9 +206,15 @@ export function FinanceWorkbenchTable({
           </span>
           {query.page * 50 < result.total ? (
             <Link
-              href={financeWorkbenchHref(query, locale, query.kind, {
-                page: String(query.page + 1),
-              })}
+              href={financeWorkbenchHref(
+                query,
+                locale,
+                query.kind,
+                {
+                  page: String(query.page + 1),
+                },
+                workArea,
+              )}
               prefetch={false}
               aria-label={text("下一页", "Page suivante")}
               onClick={onPageNavigate}

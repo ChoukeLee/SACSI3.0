@@ -18,6 +18,7 @@ export interface FinanceWorkbenchInspectorProps {
   canWrite: boolean;
   scopeKey: string;
   onClose?: () => void;
+  workArea?: "sacsi" | "cimac";
 }
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -46,6 +47,7 @@ function InspectorContent({
   canWrite,
   scopeKey,
   onClose,
+  workArea = "sacsi",
 }: FinanceWorkbenchInspectorProps) {
   const text = (zh: string, fr: string) => (locale === "zh" ? zh : fr);
   const recordId = typeof row?.id === "string" ? row.id : row ? "invalid" : null;
@@ -130,7 +132,7 @@ function InspectorContent({
   ].includes(record.source?.type ?? "");
   const customerAccountHref =
     customerCollection && record.customer?.id
-      ? `${locale === "fr" ? "/fr" : ""}/finance?view=customers&customerId=${encodeURIComponent(record.customer.id)}&tab=receipts`
+      ? `${locale === "fr" ? "/fr" : ""}/cimac/customers/${encodeURIComponent(record.customer.id)}?tab=account&accountTab=receipts`
       : null;
   const deposit =
     record.direction === "liability_in" ||
@@ -157,9 +159,13 @@ function InspectorContent({
         : record.managementStatus === "excluded"
           ? text("已排除", "Exclue")
           : pending;
-  const sourceHref = record.source?.href
-    ? `${locale === "fr" ? "/fr" : ""}${record.source.href}`
-    : null;
+  const sourcePath =
+    workArea === "cimac" && record.source?.href?.startsWith("/sales") && record.source.id
+      ? `/cimac/contracts/history/sales/${encodeURIComponent(record.source.id)}`
+      : workArea === "cimac" && record.source?.href?.startsWith("/leases")
+        ? `${record.source.href.replace(/^\/leases(?=\/|\?|$)/, "/cimac/contracts")}${record.source.id ? `&contract=${encodeURIComponent(record.source.id)}` : ""}`
+        : record.source?.href;
+  const sourceHref = sourcePath ? `${locale === "fr" ? "/fr" : ""}${sourcePath}` : null;
 
   return (
     <aside
@@ -371,8 +377,12 @@ function InspectorContent({
               </a>
               <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
                 {text(
-                  "进入对应业务工作台后，按上述房源或编号查找，不会直接打开指定合同。",
-                  "Dans l'espace métier, recherchez le lot ou l'identifiant ci-dessus ; le contrat précis ne s'ouvre pas automatiquement.",
+                  workArea === "cimac" && record.source?.type === "lease_contract"
+                    ? "按已核验的原合同编号打开建材城合同工作台，不改变合同或账务。"
+                    : "进入对应业务工作台后，按上述房源或编号查找，不会直接打开指定合同。",
+                  workArea === "cimac" && record.source?.type === "lease_contract"
+                    ? "Ouvre le contrat CIMAC vérifié sans modifier le contrat ni ses écritures."
+                    : "Dans l'espace métier, recherchez le lot ou l'identifiant ci-dessus ; le contrat précis ne s'ouvre pas automatiquement.",
                 )}
               </p>
             </>

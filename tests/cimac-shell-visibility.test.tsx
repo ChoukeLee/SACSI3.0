@@ -18,6 +18,12 @@ import type {
 } from "@/features/cimac/cimac-workspace-types";
 
 const navigation = vi.hoisted(() => ({ pathname: "/cimac" }));
+// This suite checks the real shell + stylesheet, not server-action or form behavior.
+vi.mock("@/features/cimac/cimac-profile-operations", () => ({
+  CimacCustomerProfileOperation: () => null,
+  CimacAssetConditionOperation: () => null,
+  CimacCustomerCreateOperation: () => null,
+}));
 vi.mock("next/navigation", () => ({
   usePathname: () => navigation.pathname,
   useSearchParams: () => new URLSearchParams(),

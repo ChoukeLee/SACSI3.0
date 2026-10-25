@@ -66,3 +66,30 @@ it("preserves denied database scope instead of returning an empty successful led
   mocks.read.mockRejectedValue(new WorkspaceReadError(403));
   expect((await call()).status).toBe(403);
 });
+it("keeps default follow-up reads in SACSI and explicitly tags park reads for boundary verification", async () => {
+  await call("?projectId=11111111-1111-4111-8111-111111111111");
+  expect(mocks.read).toHaveBeenLastCalledWith(
+    {},
+    "lease",
+    expect.anything(),
+    "list",
+    undefined,
+    "sacsi",
+  );
+  await call("?workspace=cimac&projectId=11111111-1111-4111-8111-111111111111");
+  expect(mocks.read).toHaveBeenLastCalledWith(
+    {},
+    "lease",
+    expect.anything(),
+    "list",
+    undefined,
+    "cimac",
+  );
+});
+it("does not treat an unknown workspace or a front-desk legacy lease permission as park access", async () => {
+  expect((await call("?workspace=unknown")).status).toBe(400);
+  expect((await call("?workspace=cimac", "sale")).status).toBe(400);
+  mocks.user.mockResolvedValue({ id: "actor", role: "front_desk" });
+  expect((await call("?workspace=cimac")).status).toBe(403);
+  expect(mocks.read).not.toHaveBeenCalled();
+});

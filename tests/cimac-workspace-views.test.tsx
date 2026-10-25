@@ -30,6 +30,17 @@ import type {
   CimacHomeData,
   CimacWorkspaceScope,
 } from "@/features/cimac/cimac-workspace-types";
+import type { UnitRow } from "@/types/database";
+
+vi.mock("@/features/cimac/cimac-profile-operations", () => ({
+  CimacCustomerProfileOperation: ({ locale }: { locale: string }) => (
+    <button>{locale === "zh" ? "编辑客户资料" : "Modifier la fiche client"}</button>
+  ),
+  CimacAssetConditionOperation: () => <button>维护运行条件</button>,
+  CimacCustomerCreateOperation: ({ locale }: { locale: string }) => (
+    <button>{locale === "zh" ? "新建客户" : "Nouveau client"}</button>
+  ),
+}));
 
 vi.mock("next/link", () => ({
   default: ({
@@ -265,6 +276,42 @@ describe("CIMAC workspace home uses current scoped facts", () => {
 });
 
 describe("CIMAC directories preserve navigation context", () => {
+  it("exposes a real create operation only to customer writers, not read-only directory viewers", () => {
+    render(
+      <CimacCustomerDirectoryView
+        data={customerDirectory()}
+        locale="zh"
+        canEdit
+        canCreateContract
+      />,
+    );
+    expect(
+      [...host.querySelectorAll("button")].some((button) => button.textContent === "新建客户"),
+    ).toBe(true);
+    expect(link("办理合同").pathname).toBe("/cimac/contracts");
+    expect(host.textContent).not.toContain("办理合同 / 新增客户");
+    render(<CimacCustomerDirectoryView data={customerDirectory()} locale="zh" />);
+    expect(host.textContent).not.toContain("新建客户");
+  });
+  it("does not add customer creation into a read-only account chooser", () => {
+    render(
+      <CimacCustomerDirectoryView data={customerDirectory()} locale="fr" canEdit accountLinks />,
+    );
+    expect(host.textContent).not.toContain("Nouveau client");
+  });
+  it("keeps identity creation separate from read-only contract access for finance", () => {
+    render(
+      <CimacCustomerDirectoryView
+        data={customerDirectory()}
+        locale="zh"
+        canEdit
+        canCreateContract={false}
+      />,
+    );
+    expect(host.textContent).toContain("新建客户");
+    expect(link("查看合同").pathname).toBe("/cimac/contracts");
+    expect(host.textContent).not.toContain("办理合同");
+  });
   it("preserves customer filters and page in detail return and pagination", () => {
     render(<CimacCustomerDirectoryView data={customerDirectory()} locale="zh" />);
     const target = link("测试商户");
@@ -386,24 +433,24 @@ describe("CIMAC customer detail separates overview, operations and accounts", ()
     );
     expect(host.textContent).toContain("未以零余额替代");
   });
-  it("opens existing client and lease operations with project and return context", () => {
+  it("keeps client editing and lease operations inside the independent workspace", () => {
     const data = customer(parseCimacWorkspaceQuery({ tab: "contracts" }, "customers"));
     render(<CimacCustomerView data={data} locale="fr" canEdit />);
-    const original = link("Bail et opérations existantes");
-    expect(original.pathname).toBe("/fr/leases");
+    const original = link("Gérer le contrat");
+    expect(original.pathname).toBe("/fr/cimac/contracts");
     expect(Object.fromEntries(original.searchParams)).toMatchObject({
-      project: id(1),
       building: id(2),
       contract: id(6),
     });
     expect(original.searchParams.get("returnTo")).toContain(`/fr/cimac/customers/${id(5)}`);
-    expect(link("Gérer la fiche existante").searchParams.get("project")).toBe(id(1));
+    expect(host.textContent).toContain("Modifier la fiche client");
+    expect(host.querySelector('a[href^="/fr/customers"]')).toBeNull();
     expect(host.querySelectorAll("h1")).toHaveLength(1);
     expect(host.querySelectorAll("form")).toHaveLength(0);
   });
   it("does not expose editing links when canEdit is omitted", () => {
     render(<CimacCustomerView data={customer()} locale="zh" />);
-    expect(host.textContent).not.toContain("原客户资料办理");
+    expect(host.textContent).not.toContain("编辑客户资料");
   });
   it("shows notes only as escaped facts, not instructions or completed actions", () => {
     const data = customer(parseCimacWorkspaceQuery({ tab: "records" }, "customers"));
@@ -458,18 +505,20 @@ describe("CIMAC asset detail keeps physical and business states independent", ()
     expect(host.textContent).not.toContain("2029-03-31");
     expect(host.textContent).toContain("租赁关联，不代表产权");
   });
-  it("preserves customer context and links original maintenance only with permission", () => {
-    render(<CimacAssetView data={assetData()} locale="zh" canEdit />);
+  it("preserves customer context and exposes an inline condition operation only with permission", () => {
+    render(
+      <CimacAssetView
+        data={assetData()}
+        locale="zh"
+        canEdit
+        operationUnit={{ id: id(4) } as UnitRow}
+      />,
+    );
     expect(link("测试商户").pathname).toBe(`/cimac/customers/${id(5)}`);
-    const maintenance = link("原资产维护入口");
-    expect(Object.fromEntries(maintenance.searchParams)).toMatchObject({
-      project: id(1),
-      building: id(2),
-      unit: id(4),
-    });
-    expect(maintenance.searchParams.get("returnTo")).toContain(`/cimac/assets/${id(4)}`);
+    expect(host.textContent).toContain("维护运行条件");
+    expect(host.querySelector('a[href^="/units"]')).toBeNull();
     render(<CimacAssetView data={assetData()} locale="zh" />);
-    expect(host.textContent).not.toContain("原资产维护入口");
+    expect(host.textContent).not.toContain("维护运行条件");
   });
   it.each([
     ["storefront", "900 XOF / ㎡ / 月"],
@@ -514,7 +563,7 @@ describe("CIMAC asset detail keeps physical and business states independent", ()
       tab: "contracts",
       relationPage: "2",
     });
-    expect(link("Opérations existantes").searchParams.get("project")).toBe(id(1));
+    expect(link("Gérer le contrat").pathname).toBe("/fr/cimac/contracts");
   });
 });
 

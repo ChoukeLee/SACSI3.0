@@ -60,6 +60,16 @@ const definiteRejections: Record<CimacBillingWriteKind, readonly string[]> = {
 
 async function invalidate(customerId: string) {
   for (const path of [
+    "/cimac",
+    "/fr/cimac",
+    "/cimac/finance",
+    "/fr/cimac/finance",
+    "/cimac/contracts",
+    "/fr/cimac/contracts",
+    "/cimac/reports",
+    "/fr/cimac/reports",
+    `/cimac/customers/${customerId}`,
+    `/fr/cimac/customers/${customerId}`,
     "/finance",
     "/fr/finance",
     "/customers",

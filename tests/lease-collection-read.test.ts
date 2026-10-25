@@ -66,3 +66,17 @@ it("does not replace a failed database read with empty or zero-balance context",
   deps.read.mockRejectedValue(new Error("offline"));
   await expect(readLeaseCollectionContext(workspaceContract, "zh")).rejects.toThrow("offline");
 });
+it("never opens a park collection form for a legacy contract, or vice versa", async () => {
+  await expect(readLeaseCollectionContext(workspaceContract, "zh", "cimac")).rejects.toMatchObject({
+    status: 403,
+  });
+  const data = fixture();
+  data.buildings[0].project!.code = "CIMAC";
+  deps.read.mockResolvedValue(data);
+  await expect(readLeaseCollectionContext(workspaceContract, "zh", "sacsi")).rejects.toMatchObject({
+    status: 403,
+  });
+  await expect(readLeaseCollectionContext(workspaceContract, "zh", "cimac")).resolves.toMatchObject(
+    { contract: { id: workspaceContract } },
+  );
+});

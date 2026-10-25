@@ -13,6 +13,7 @@ export function useLeaseWorkbenchPreview(
   query: WorkspaceQuery | undefined,
   contractId: string | null,
   selectionVersion = 0,
+  workArea: "sacsi" | "cimac" = "sacsi",
 ) {
   const [revision, setRevision] = useState(0);
   const [result, setResult] = useState<{
@@ -33,6 +34,7 @@ export function useLeaseWorkbenchPreview(
       Object.entries(query).map(([name, value]) => [name, String(value)]),
     );
     params.set("mode", "detail");
+    if (workArea === "cimac") params.set("workspace", workArea);
     params.set("contractId", contractId);
     void fetch(`/api/contracts/lease?${params}`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
@@ -49,7 +51,7 @@ export function useLeaseWorkbenchPreview(
       active = false;
       controller.abort();
     };
-  }, [query, contractId, key]);
+  }, [query, contractId, key, workArea]);
 
   const current = key && result?.key === key ? result : null;
   const retry = useCallback(() => setRevision((value) => value + 1), []);

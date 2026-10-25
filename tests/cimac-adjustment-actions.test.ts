@@ -44,6 +44,12 @@ describe("authenticated correction and recovery actions", () => {
         { p_request_id: requestId, p_input: payload },
       );
       for (const path of [
+        "/cimac/finance",
+        "/fr/cimac/finance",
+        "/cimac/reports",
+        "/fr/cimac/reports",
+        `/cimac/customers/${id(3)}`,
+        `/fr/cimac/customers/${id(3)}`,
         "/finance",
         "/fr/finance",
         "/leases",

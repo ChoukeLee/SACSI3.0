@@ -24,7 +24,7 @@ export function CimacCustomerReceipts({
 }) {
   const text = (zh: string, fr: string) => (locale === "zh" ? zh : fr);
   const base = locale === "fr" ? "/fr" : "";
-  const oldLedger = `${base}/finance?kind=ledger&projectId=${encodeURIComponent(data.project.id)}`;
+  const oldLedger = `${base}/cimac/finance?kind=ledger&projectId=${encodeURIComponent(data.project.id)}`;
   const units = new Map(data.units.map((unit) => [unit.id, unit]));
   const receivablesById = new Map(data.receivables.map((row) => [row.id, row]));
   const unitLabels = Object.fromEntries(
@@ -252,6 +252,7 @@ export function CimacCustomerReceipts({
                 contractId: contract.id,
                 locale,
                 returnTo: returnHref,
+                workArea: "cimac",
               });
               return link ? (
                 <Link className={styles.quietButton} key={contract.id} href={link}>

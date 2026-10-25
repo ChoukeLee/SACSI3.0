@@ -16,6 +16,7 @@ import {
   type CimacViewLocale,
 } from "./cimac-view-parts";
 import styles from "./cimac-workspace.module.css";
+import { CimacCustomerCreateOperation } from "./cimac-profile-operations";
 
 interface DirectoryPresentation {
   locale: CimacViewLocale;
@@ -25,6 +26,8 @@ interface DirectoryPresentation {
 export interface CimacCustomerDirectoryViewProps extends DirectoryPresentation {
   data: CimacCustomerDirectoryData;
   accountLinks?: boolean;
+  canEdit?: boolean;
+  canCreateContract?: boolean;
 }
 export interface CimacAssetDirectoryViewProps extends DirectoryPresentation {
   data: CimacAssetDirectoryData;
@@ -34,6 +37,8 @@ export function CimacCustomerDirectoryView({
   data,
   locale,
   accountLinks = false,
+  canEdit = false,
+  canCreateContract = false,
   title,
   description,
 }: CimacCustomerDirectoryViewProps) {
@@ -77,6 +82,23 @@ export function CimacCustomerDirectoryView({
                 "一位客户关联多类资产；关系来自已登记业务，不代表产权归属。",
                 "Un client peut être lié à plusieurs catégories d’actifs. Les relations enregistrées ne prouvent pas la propriété.",
               ))
+        }
+        actions={
+          !accountLinks ? (
+            <>
+              <CimacLink href={`${locale === "fr" ? "/fr" : ""}/cimac/contracts`} button>
+                {canCreateContract
+                  ? t("办理合同", "Gérer les contrats")
+                  : t("查看合同", "Consulter les contrats")}
+              </CimacLink>
+              {canEdit ? (
+                <CimacCustomerCreateOperation
+                  locale={locale}
+                  canCreateContract={canCreateContract}
+                />
+              ) : null}
+            </>
+          ) : undefined
         }
       />
       <form

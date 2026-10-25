@@ -21,11 +21,13 @@ import {
   type CimacViewLocale,
 } from "./cimac-view-parts";
 import styles from "./cimac-workspace.module.css";
+import { CimacCustomerProfileOperation } from "./cimac-profile-operations";
 
 export interface CimacCustomerViewProps {
   data: CimacCustomerData;
   locale: CimacViewLocale;
   accountSection?: ReactNode;
+  recordSection?: ReactNode;
   canEdit?: boolean;
   canReadAccount?: boolean;
 }
@@ -34,6 +36,7 @@ export function CimacCustomerView({
   data,
   locale,
   accountSection,
+  recordSection,
   canEdit = false,
   canReadAccount = true,
 }: CimacCustomerViewProps) {
@@ -62,15 +65,6 @@ export function CimacCustomerView({
     rows.push(relation);
     byUnit.set(relation.unitId, rows);
   }
-  const editHref = canEdit
-    ? buildWorkbenchRecordHref({
-        workspace: "customers",
-        id: profile.id,
-        project: data.scope.project.id,
-        locale,
-        returnTo: current,
-      })
-    : null;
   const relationsLabel = t(
     `本页 ${data.relations.length} 条 / 共 ${data.relationTotal} 条业务关联`,
     `${data.relations.length} relations sur cette page / ${data.relationTotal} au total`,
@@ -97,11 +91,7 @@ export function CimacCustomerView({
         actions={
           <>
             <CimacBackLink href={query.returnTo ?? directory} locale={locale} />
-            {editHref ? (
-              <CimacLink href={editHref} button>
-                {t("原客户资料办理", "Gérer la fiche existante")}
-              </CimacLink>
-            ) : null}
+            {canEdit ? <CimacCustomerProfileOperation profile={profile} locale={locale} /> : null}
           </>
         }
       >
@@ -221,6 +211,16 @@ export function CimacCustomerView({
                   },
                 ]}
               />
+              {profile.is_blacklisted ? (
+                <div className={styles.sideItem}>
+                  <h3>{t("已登记黑名单依据", "Informations de liste noire enregistrées")}</h3>
+                  <p>{profile.blacklist_reason || t("原因未登记", "Motif non renseigné")}</p>
+                  <p>
+                    {profile.blacklist_date || t("日期待核", "Date à vérifier")} ·{" "}
+                    {profile.blacklist_permanent ? t("永久", "Permanent") : t("临时", "Temporaire")}
+                  </p>
+                </div>
+              ) : null}
             </CimacPanel>
           </>
         ) : query.tab === "contracts" ? (
@@ -235,6 +235,7 @@ export function CimacCustomerView({
                     relation.role === "lease"
                       ? buildWorkbenchRecordHref({
                           workspace: "leases",
+                          workArea: "cimac",
                           id: relation.id,
                           project: data.scope.project.id,
                           building: relation.buildingId,
@@ -275,7 +276,7 @@ export function CimacCustomerView({
                         </CimacLink>
                         {contractHref ? (
                           <CimacLink href={contractHref}>
-                            {t("原租约办理", "Bail et opérations existantes")}
+                            {t("办理合同", "Gérer le contrat")}
                           </CimacLink>
                         ) : null}
                       </div>
@@ -318,32 +319,38 @@ export function CimacCustomerView({
             </CimacPanel>
           )
         ) : (
-          <div className={styles.detailGrid}>
-            <CimacPanel title={t("档案与原始记录", "Fiche et enregistrements d’origine")}>
-              <CimacFacts
-                locale={locale}
-                rows={[
-                  { label: t("资料建立时间", "Fiche créée le"), value: profile.created_at },
-                  { label: t("资料更新时间", "Fiche mise à jour le"), value: profile.updated_at },
-                  { label: t("已登记备注", "Note enregistrée"), value: profile.notes },
-                  {
-                    label: t("证件资料", "Pièce d’identité"),
-                    value: profile.hasDocument
-                      ? t("已登记，敏感号码不在此展示", "Enregistrée ; numéro sensible non affiché")
-                      : t("未登记", "Non renseignée"),
-                  },
-                ]}
-              />
-              <p className={styles.indexNote}>
-                {t(
-                  "以上为档案保存事实，不是完整审计时间线，备注不代表已确认的收费或交付指令。",
-                  "Il s’agit de faits de fiche, pas d’un audit complet. Une note n’est pas une décision tarifaire ou de livraison confirmée.",
-                )}
-              </p>
-            </CimacPanel>
-            <CimacPanel title={t("事项与交付资料", "Suivi et pièces de livraison")}>
-              <CimacPendingOperations locale={locale} />
-            </CimacPanel>
+          <div className={styles.stack}>
+            <div className={styles.detailGrid}>
+              <CimacPanel title={t("档案与原始记录", "Fiche et enregistrements d’origine")}>
+                <CimacFacts
+                  locale={locale}
+                  rows={[
+                    { label: t("资料建立时间", "Fiche créée le"), value: profile.created_at },
+                    { label: t("资料更新时间", "Fiche mise à jour le"), value: profile.updated_at },
+                    { label: t("已登记备注", "Note enregistrée"), value: profile.notes },
+                    {
+                      label: t("证件资料", "Pièce d’identité"),
+                      value: profile.hasDocument
+                        ? t(
+                            "已登记，敏感号码不在此展示",
+                            "Enregistrée ; numéro sensible non affiché",
+                          )
+                        : t("未登记", "Non renseignée"),
+                    },
+                  ]}
+                />
+                <p className={styles.indexNote}>
+                  {t(
+                    "以上为档案保存事实，不是完整审计时间线，备注不代表已确认的收费或交付指令。",
+                    "Il s’agit de faits de fiche, pas d’un audit complet. Une note n’est pas une décision tarifaire ou de livraison confirmée.",
+                  )}
+                </p>
+              </CimacPanel>
+              <CimacPanel title={t("事项与交付资料", "Suivi et pièces de livraison")}>
+                <CimacPendingOperations locale={locale} />
+              </CimacPanel>
+            </div>
+            {recordSection}
           </div>
         )}
       </section>

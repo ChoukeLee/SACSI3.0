@@ -139,6 +139,7 @@ export function financeWorkbenchHref(
   locale: "zh" | "fr",
   mode: FinanceWorkbenchMode,
   patch: Record<string, string | undefined> = {},
+  workArea: "sacsi" | "cimac" = "sacsi",
 ): string {
   const kind = mode === "reconciliation" ? query.kind : mode;
   const parameters = new URLSearchParams({ ...query.filters, kind });
@@ -152,7 +153,7 @@ export function financeWorkbenchHref(
   const clean = new URLSearchParams({ ...parsed.filters, kind: parsed.kind });
   if (parsed.page > 1) clean.set("page", String(parsed.page));
   if (mode === "reconciliation") clean.set("view", "reconciliation");
-  return `${locale === "fr" ? "/fr" : ""}/finance?${clean}`;
+  return `${locale === "fr" ? "/fr" : ""}${workArea === "cimac" ? "/cimac" : ""}/finance?${clean}`;
 }
 export function financeWorkbenchKey(
   query: FinanceWorkbenchQuery,

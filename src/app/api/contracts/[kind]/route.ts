@@ -27,9 +27,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
         throw new WorkspaceReadError(400);
       const mode = search.get("mode") ?? "list",
         id = search.get("contractId") ?? undefined;
+      const workArea = search.get("workspace") ?? "sacsi";
+      if (workArea === "cimac" && !["admin", "boss", "finance", "rental_sales"].includes(user.role))
+        throw new WorkspaceReadError(403);
       search.delete("mode");
       search.delete("contractId");
+      search.delete("workspace");
       if (
+        (workArea !== "sacsi" && workArea !== "cimac") ||
+        (workArea === "cimac" && kind !== "lease") ||
         !["list", "scope", "detail", "context"].includes(mode) ||
         (mode === "detail" ? !id || !/^[0-9a-f-]{36}$/i.test(id) : Boolean(id))
       )
@@ -42,6 +48,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
           query,
           mode as WorkspaceMode,
           id,
+          workArea,
         ),
       );
       return timing.measure("response", () => Response.json(data, { headers }));

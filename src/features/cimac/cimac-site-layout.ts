@@ -8,10 +8,15 @@ export const CIMAC_SITE_GROUPS = {
   south: [[9], [7, 5], [3], [1]],
 } as const;
 
-export function orderCimacShopsForPlan<T extends { unitNo: string }>(buildingNumber: number, shops: T[]): T[] {
+export function orderCimacShopsForPlan<T extends { unitNo: string }>(
+  buildingNumber: number,
+  shops: T[],
+): T[] {
   const northSide = buildingNumber % 2 === 0;
   if (buildingNumber > 4) {
-    return [...shops].sort((left, right) => (Number(left.unitNo) - Number(right.unitNo)) * (northSide ? -1 : 1));
+    return [...shops].sort(
+      (left, right) => (Number(left.unitNo) - Number(right.unitNo)) * (northSide ? -1 : 1),
+    );
   }
 
   return [...shops].sort((left, right) => {

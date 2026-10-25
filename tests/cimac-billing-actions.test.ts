@@ -188,6 +188,12 @@ describe("authenticated, narrowly scoped server actions", () => {
   it("invalidates Chinese and French customer, finance, lease and reporting reads", async () => {
     await recordCimacCollection(collection());
     for (const path of [
+      "/cimac/finance",
+      "/fr/cimac/finance",
+      "/cimac/reports",
+      "/fr/cimac/reports",
+      `/cimac/customers/${id(2)}`,
+      `/fr/cimac/customers/${id(2)}`,
       "/finance",
       "/fr/finance",
       "/customers",

@@ -59,7 +59,7 @@ export function CimacCustomerBills({
     );
   };
   const leaseHref = (id: string) =>
-    `${base}/leases?${new URLSearchParams({ project: data.project.id, contract: id, ...(units.get(contracts.get(id)?.unitId ?? "")?.building_id ? { building: units.get(contracts.get(id)!.unitId)!.building_id } : {}), returnTo: returnHref ?? `${base}/finance?${new URLSearchParams({ view: "customers", customerId: data.selectedCustomerId! })}` })}`;
+    `${base}/cimac/contracts?${new URLSearchParams({ project: data.project.id, contract: id, ...(units.get(contracts.get(id)?.unitId ?? "")?.building_id ? { building: units.get(contracts.get(id)!.unitId)!.building_id } : {}), returnTo: returnHref ?? `${base}/cimac/customers/${data.selectedCustomerId}?tab=account` })}`;
   return (
     <>
       <div className={styles.toolbar}>
@@ -191,7 +191,7 @@ export function CimacCustomerBills({
             )}
           </span>
           <Link
-            href={`${base}/finance?kind=receivables&projectId=${encodeURIComponent(data.project.id)}`}
+            href={`${base}/cimac/finance?kind=receivables&projectId=${encodeURIComponent(data.project.id)}`}
           >
             {text("全部应收与原处理入口", "Toutes les créances et opérations existantes")} ↗
           </Link>
@@ -271,6 +271,14 @@ export function CimacCustomerBills({
               {contracts.get(selected.source_id ?? "")?.kind === "lease" ? (
                 <Link className={styles.quietButton} href={leaseHref(selected.source_id!)}>
                   {text("查看原合同与业务操作", "Contrat et opérations existantes")} ↗
+                </Link>
+              ) : null}
+              {contracts.get(selected.source_id ?? "")?.kind === "sale" ? (
+                <Link
+                  className={styles.quietButton}
+                  href={`${base}/cimac/contracts/history/sales/${selected.source_id}`}
+                >
+                  {text("查看历史出售合同", "Voir le contrat de vente historique")} ↗
                 </Link>
               ) : null}
             </div>

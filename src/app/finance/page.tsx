@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { FinanceWorkspace } from "@/features/finance/finance-workspace";
 import { FinanceWorkbenchSkeleton } from "@/features/finance/finance-workbench-skeleton";
+import { redirectLegacyCimac } from "@/features/cimac/cimac-legacy-redirect";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -15,11 +16,13 @@ export default async function FinancePage({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!["admin", "boss", "finance"].includes(user.role)) redirect("/");
+  const params = await searchParams;
+  await redirectLegacyCimac("finance", params, "zh");
   return (
     <div className="space-y-5">
       <Suspense fallback={<FinanceWorkbenchSkeleton locale="zh" />}>
         <FinanceWorkspace
-          params={await searchParams}
+          params={params}
           locale="zh"
           canWrite={user.role === "admin" || user.role === "finance"}
           viewerId={user.id}

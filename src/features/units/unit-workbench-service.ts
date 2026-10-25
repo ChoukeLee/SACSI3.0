@@ -47,6 +47,7 @@ const emptySummary = () => ({ occupied: 0, attention: 0, unverified: 0 });
 export async function readUnitWorkbench(
   client: Client,
   input: UnitWorkbenchSearch = {},
+  workArea?: "sacsi",
 ): Promise<UnitWorkbenchData> {
   const query = parseUnitWorkbenchQuery(input);
   const buildingRows = await fetchAllPages<BuildingResult>(
@@ -66,7 +67,8 @@ export async function readUnitWorkbench(
   );
   const buildings = buildingRows.flatMap((row): UnitWorkbenchBuilding[] => {
     const project = Array.isArray(row.project) ? row.project[0] : row.project;
-    if (!project || !row.project_id) return [];
+    if (!project || !row.project_id || (workArea === "sacsi" && project.code === "CIMAC"))
+      return [];
     return [
       {
         id: row.id,
@@ -123,7 +125,9 @@ export async function readUnitWorkbench(
     : ((selectedUnit ? candidates.find((row) => row.id === selectedUnit.building_id) : undefined) ??
       candidates.find((row) => row.code === "SACSI7") ??
       candidates[0]);
-  const scopeUnavailable = !building && !!(query.project || query.building);
+  const scopeUnavailable =
+    !building &&
+    (!!(query.project || query.building) || (workArea === "sacsi" && !buildings.length));
   const blank: UnitWorkbenchData = {
     query,
     buildings,
@@ -255,5 +259,5 @@ export async function readUnitWorkbench(
 }
 
 export async function loadUnitWorkbench(input: UnitWorkbenchSearch = {}) {
-  return readUnitWorkbench(await createClient(), input);
+  return readUnitWorkbench(await createClient(), input, "sacsi");
 }

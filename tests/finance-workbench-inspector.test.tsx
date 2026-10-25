@@ -145,6 +145,35 @@ async function click(label: string) {
 }
 
 describe("FinanceWorkbenchInspector selected-record facts", () => {
+  it("retains a CIMAC historical sale source as a sale, never reinterprets it as a lease", async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      response(
+        url.includes("/payment-context/")
+          ? payment
+          : {
+              ...context,
+              source: {
+                ...context.source,
+                type: "sale_contract",
+                href: `/sales?project=${projectId}`,
+              },
+            },
+      ),
+    );
+    await render({ workArea: "cimac", locale: "fr" });
+    expect(host.querySelector("a")?.getAttribute("href")).toBe(
+      `/fr/cimac/contracts/history/sales/${sourceId}`,
+    );
+  });
+  it.each(["zh", "fr"] as const)(
+    "opens the verified CIMAC lease by immutable contract ID in %s without bouncing to the old page",
+    async (locale) => {
+      await render({ workArea: "cimac", locale });
+      expect(host.querySelector("a")?.getAttribute("href")).toBe(
+        `${locale === "fr" ? "/fr" : ""}/cimac/contracts?project=${projectId}&contract=${sourceId}`,
+      );
+    },
+  );
   it.each(["zh", "fr"] as const)(
     "keeps protected customer collection facts read-only in %s without a single-unit operation link",
     async (locale) => {
@@ -174,7 +203,7 @@ describe("FinanceWorkbenchInspector selected-record facts", () => {
           : "Ouvrez le reçu d’origine dans le compte client",
       );
       expect(host.querySelector("a")?.getAttribute("href")).toBe(
-        `${locale === "fr" ? "/fr" : ""}/finance?view=customers&customerId=${customerId}&tab=receipts`,
+        `${locale === "fr" ? "/fr" : ""}/cimac/customers/${customerId}?tab=account&accountTab=receipts`,
       );
     },
   );
@@ -201,8 +230,12 @@ describe("FinanceWorkbenchInspector selected-record facts", () => {
       expect(host.querySelector("button[data-payment]")?.getAttribute("data-writable")).toBe(
         "false",
       );
-      expect(host.querySelector("a")?.getAttribute("href")).toContain(`customerId=${customerId}`);
-      expect(host.querySelector("a")?.getAttribute("href")).not.toContain(`customerId=${sourceId}`);
+      expect(host.querySelector("a")?.getAttribute("href")).toContain(
+        `/cimac/customers/${customerId}`,
+      );
+      expect(host.querySelector("a")?.getAttribute("href")).not.toContain(
+        `/cimac/customers/${sourceId}`,
+      );
       expect(host.textContent).not.toContain("客户级更正流程尚未开放");
     },
   );

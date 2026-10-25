@@ -117,7 +117,10 @@ function decodeTrend(value: unknown, endMonth: string): ReportTrend[] {
   });
 }
 
-export async function loadReportData(params: ReportParams = {}): Promise<ReportWorkspaceData> {
+export async function loadReportData(
+  params: ReportParams = {},
+  options: { workArea?: "sacsi" | "cimac" } = {},
+): Promise<ReportWorkspaceData> {
   const asOf = new Date().toISOString().slice(0, 10);
   parseReportQuery(params, asOf);
   const supabase = await createClient();
@@ -127,8 +130,12 @@ export async function loadReportData(params: ReportParams = {}): Promise<ReportW
     .eq("is_active", true)
     .order("code");
   if (error || !data) throw new Error("ReportProjectsUnavailable");
-  const projects = data as ReportProject[];
+  const workArea = options.workArea;
+  const projects = (data as ReportProject[]).filter(
+    (project) => !workArea || project.code.toUpperCase() === workArea.toUpperCase(),
+  );
   if (!projects.length) throw new Error("ReportNoAuthorizedProjects");
+  if (workArea && projects.length !== 1) throw new Error("ReportProjectScopeAmbiguous");
   const defaultProject =
     projects.find((project) => project.code.toUpperCase() === "SACSI") ?? projects[0];
   const query = parseReportQuery(params, asOf, defaultProject.id);
@@ -158,5 +165,5 @@ export async function loadReportData(params: ReportParams = {}): Promise<ReportW
   )
     throw new Error("ReportReadScopeMismatch");
   const trend = query.kind === "ledger" ? decodeTrend(trendRead.data, query.month) : [];
-  return { query, projects, result, trend, asOf, exportHref: reportExportHref(query) };
+  return { query, projects, result, trend, asOf, exportHref: reportExportHref(query), workArea };
 }

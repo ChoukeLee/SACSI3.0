@@ -6,7 +6,7 @@ import {
   customerDirectoryQueryKey,
   parseCustomerDirectoryQuery,
 } from "./customer-directory-model";
-import { readCustomerDirectory } from "./customer-directory-service";
+import { readSacsiCustomerDirectory } from "./sacsi-directory-service";
 import { CustomerWorkbench } from "./customer-workbench";
 
 export async function CustomerDirectoryWorkspace({
@@ -32,13 +32,14 @@ export async function CustomerDirectoryWorkspace({
     );
     const customer = searchParams.customer;
     if (customer && !customerDirectoryId(customer)) throw new CustomerDirectoryError(400);
-    const data = await readCustomerDirectory(await createClient(), query);
+    const data = await readSacsiCustomerDirectory(await createClient(), query);
     return (
       <CustomerWorkbench
         key={`${customerDirectoryQueryKey(query)}:${typeof customer === "string" ? customer : ""}`}
         data={data}
         locale={locale}
         canEdit={canEdit}
+        projectLocked
         initialSelectedId={typeof customer === "string" ? customer : null}
         returnTo={safeWorkbenchReturnTo(searchParams.returnTo)}
       />

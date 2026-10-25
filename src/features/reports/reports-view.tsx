@@ -82,7 +82,7 @@ function MonthTrend({ data, locale }: { data: ReportWorkspaceData; locale: Local
           return (
             <Link
               key={item.month}
-              href={`${zh ? "" : "/fr"}${reportHref(data.query, { month: item.month, page: 1 })}`}
+              href={`${zh ? "" : "/fr"}${data.workArea === "cimac" ? "/cimac" : ""}${reportHref(data.query, { month: item.month, page: 1 })}`}
               aria-label={label}
               aria-current={selected ? "date" : undefined}
               title={label}
@@ -119,7 +119,7 @@ export function ReportsView({ data, locale }: { data: ReportWorkspaceData; local
   const managed = query.management === "managed";
   const project = data.projects.find((item) => item.id === query.projectId);
   const cimac = project?.code.toUpperCase() === "CIMAC";
-  const prefix = zh ? "" : "/fr";
+  const prefix = `${zh ? "" : "/fr"}${data.workArea === "cimac" ? "/cimac" : ""}`;
   const href = (patch: Partial<ReportQuery>) => `${prefix}${reportHref(query, patch)}`;
   const scope = JSON.stringify(query);
   const [selection, setSelection] = useState<{ scope: string; id: string } | null>(null);
@@ -153,7 +153,11 @@ export function ReportsView({ data, locale }: { data: ReportWorkspaceData; local
           <div className={styles.eyebrow}>
             {text("财务分析 / 来源核查", "ANALYSE FINANCIÈRE / SOURCES")}
           </div>
-          <h1>{text("财务核查台", "Contrôle financier")}</h1>
+          <h1>
+            {data.workArea === "cimac"
+              ? text("园区经营分析", "Analyse du parc")
+              : text("财务核查台", "Contrôle financier")}
+          </h1>
           <p>
             {text("看清账务，再回到每一笔来源。", "Du journal à la source de chaque écriture.")}
           </p>

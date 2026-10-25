@@ -11,6 +11,8 @@ const deps = vi.hoisted(() => ({
   assets: vi.fn(),
   asset: vi.fn(),
   account: vi.fn(),
+  operationUnit: vi.fn(),
+  profileRecords: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("react", async (original) => ({
@@ -30,7 +32,11 @@ vi.mock("@/lib/auth", () => ({
   hasPermission: (user: { role: string }, permission: string) =>
     permission === "finance:write"
       ? ["admin", "finance"].includes(user.role)
-      : user.role === "admin",
+      : permission === "customers:write"
+        ? ["admin", "finance", "rental_sales"].includes(user.role)
+        : permission === "leases:write"
+          ? ["admin", "rental_sales"].includes(user.role)
+          : user.role === "admin",
   homePathForRole: () => "/management",
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => deps.client }));
@@ -46,6 +52,13 @@ vi.mock("@/features/finance/cimac-billing-read", () => ({
   readCimacCustomerAccount: deps.account,
 }));
 vi.mock("@/features/finance/cimac-account-lazy", () => ({ CimacAccountLazy: () => null }));
+vi.mock("@/features/cimac/cimac-profile-service", () => ({
+  readCimacOperationUnit: deps.operationUnit,
+  readCimacProfileRecords: deps.profileRecords,
+}));
+vi.mock("@/features/cimac/cimac-profile-records", () => ({
+  CimacProfileRecordSections: () => null,
+}));
 vi.mock("@/components/cimac-shell", () => ({ CimacShell: () => null }));
 vi.mock("@/features/cimac/cimac-home-view", () => ({ CimacHomeView: () => null }));
 vi.mock("@/features/cimac/cimac-directory-view", () => ({
@@ -91,7 +104,9 @@ beforeEach(() => {
   deps.home.mockResolvedValue({ scope });
   deps.customers.mockResolvedValue({ scope });
   deps.assets.mockResolvedValue({ scope });
-  deps.asset.mockResolvedValue({ scope });
+  deps.asset.mockResolvedValue({ scope, asset: { id: customer } });
+  deps.operationUnit.mockResolvedValue({ id: customer });
+  deps.profileRecords.mockResolvedValue({ auditLogs: [], attachments: [] });
   deps.customer.mockResolvedValue({ scope, profile: { id: customer } });
   deps.account.mockResolvedValue({
     project: scope.project,
@@ -101,6 +116,16 @@ beforeEach(() => {
 });
 
 describe("CIMAC verified-auth route boundaries", () => {
+  it.each(["admin", "finance", "rental_sales", "boss"])(
+    "passes create capability to the customer directory according to %s permissions",
+    async (role) => {
+      deps.user.mockResolvedValue({ id: "actor", role, displayName: "viewer" });
+      const page = await CimacCustomersPage(props());
+      expect(getProps(page).canEdit).toBe(role !== "boss");
+      expect(getProps(page).canCreateContract).toBe(["admin", "rental_sales"].includes(role));
+      expect(deps.account).not.toHaveBeenCalled();
+    },
+  );
   it.each([CimacHomePage, CimacCustomersPage, CimacAssetsPage])(
     "rejects logged-out directories before querying",
     async (page) => {
@@ -152,6 +177,20 @@ describe("CIMAC verified-auth route boundaries", () => {
     await CimacAssetPage(detail());
     await CimacCustomersPage(props());
     expect(deps.account).not.toHaveBeenCalled();
+    expect(deps.profileRecords).not.toHaveBeenCalled();
+  });
+  it("loads project-attributed profile documents only on records without preloading finance", async () => {
+    await CimacCustomerPage(detail({ tab: "records" }));
+    expect(deps.profileRecords).toHaveBeenCalledExactlyOnceWith(deps.client, scope, {
+      type: "customer",
+      id: customer,
+    });
+    await CimacAssetPage(detail({ tab: "records" }));
+    expect(deps.profileRecords).toHaveBeenLastCalledWith(deps.client, scope, {
+      type: "unit",
+      id: customer,
+    });
+    expect(deps.account).not.toHaveBeenCalled();
   });
   it("keeps rental-sales customer access but excludes account capabilities", async () => {
     deps.user.mockResolvedValue({ id: "actor", role: "rental_sales" });
@@ -192,6 +231,20 @@ describe("CIMAC verified-auth route boundaries", () => {
     expect(getProps(account).role).toBe("alert");
     expect(getProps(account)).not.toHaveProperty("canWrite");
   });
+  it.each(["zh", "fr"] as const)(
+    "keeps the %s account failure fallback inside the park workspace",
+    async (locale) => {
+      deps.account.mockRejectedValue(new Error("read unavailable"));
+      const page = await CimacCustomerPage({ ...detail({ tab: "account" }), locale });
+      const account = getProps(page).accountSection as ReactElement;
+      const children = getProps(account).children as ReactElement[];
+      const fallback = children.find((child) => typeof getProps(child).href === "string");
+      expect(fallback).toBeDefined();
+      expect(getProps(fallback!).href).toBe(
+        `${locale === "fr" ? "/fr" : ""}/cimac/finance?kind=ledger&projectId=${project}`,
+      );
+    },
+  );
 });
 
 describe("CIMAC shell and legacy return contract", () => {

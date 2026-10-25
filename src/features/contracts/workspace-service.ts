@@ -15,17 +15,26 @@ import type { LeaseBuilding } from "@/features/leases/project-scope";
 import { projectLeaseWorkspaceUnit } from "@/features/leases/lease-unit-projection";
 import { decodeCimacLeaseCollectionProjection } from "./cimac-contract-allocation";
 import {
+  assertContractWorkspaceBoundary,
+  contractBuildingsForWorkArea,
+  type ContractWorkArea,
+} from "./workspace-boundary";
+import {
   defaultLeaseScope,
   leaseScopeCookieName,
   validatedLeaseScope,
 } from "./lease-scope-preference";
 export async function readWorkspace(
-  client: Pick<SupabaseClient, "rpc">,
+  client: Pick<SupabaseClient, "rpc"> & Partial<Pick<SupabaseClient, "from">>,
   kind: WorkspaceKind,
   query: WorkspaceQuery,
   mode: WorkspaceMode = "list",
   contractId?: string,
+  workArea?: ContractWorkArea,
 ) {
+  const allowedBuildings = workArea
+    ? await assertContractWorkspaceBoundary(client as Pick<SupabaseClient, "from">, query, workArea)
+    : undefined;
   const { data, error } = await client.rpc("contract_workspace_read_rpc", {
     p_kind: kind,
     p_input: query,
@@ -35,6 +44,15 @@ export async function readWorkspace(
   if (error)
     throw new WorkspaceReadError(error.code === "42501" ? 403 : error.code === "22023" ? 400 : 503);
   let decoded = decodeWorkspace(data, kind, query, mode, contractId);
+  if (allowedBuildings) {
+    const allowed = new Set(allowedBuildings.map((building) => building.id));
+    if (decoded.units.some((unit) => !allowed.has(unit.building_id)))
+      throw new WorkspaceReadError(403);
+    decoded = {
+      ...decoded,
+      buildings: decoded.buildings.filter((building) => allowed.has(building.id)),
+    };
+  }
   if (kind === "lease" && mode === "detail" && contractId) {
     const contract = decoded.contracts.find((row) => row.id === contractId);
     if (!contract) throw new WorkspaceReadError();
@@ -71,6 +89,7 @@ export async function initialWorkspace(
   requestedProject?: string,
   viewerId?: string,
   requestedBuilding?: string,
+  workArea: ContractWorkArea = "sacsi",
 ) {
   const client = await createClient();
   const { data, error } = await client
@@ -82,10 +101,24 @@ export async function initialWorkspace(
     .eq("project.is_active", true)
     .order("code");
   if (error || !data) throw new WorkspaceReadError();
-  const buildings = data
-    .map((b) => ({ ...b, project: Array.isArray(b.project) ? b.project[0] : b.project }))
-    .filter((b) => kind === "lease" || b.project?.allows_sale) as unknown as LeaseBuilding[];
-  const projectId = resolveContractProjectLink(buildings, requestedProject);
+  const buildings = contractBuildingsForWorkArea(
+    data
+      .map((b) => ({ ...b, project: Array.isArray(b.project) ? b.project[0] : b.project }))
+      .filter((b) => kind === "lease" || b.project?.allows_sale) as unknown as LeaseBuilding[],
+    workArea,
+  );
+  const cimacProjects = new Set(buildings.map((building) => building.project_id));
+  if (!buildings.length) throw new WorkspaceReadError(403);
+  if (workArea === "cimac" && cimacProjects.size !== 1) throw new WorkspaceReadError(403);
+  let projectId: string | undefined;
+  try {
+    projectId = resolveContractProjectLink(
+      buildings,
+      requestedProject ?? (workArea === "cimac" ? "CIMAC" : undefined),
+    );
+  } catch {
+    throw new WorkspaceReadError(403);
+  }
   const linkedBuilding = requestedBuilding
     ? buildings.find(
         (b) => b.id === requestedBuilding && (!projectId || b.project_id === projectId),
@@ -93,7 +126,7 @@ export async function initialWorkspace(
     : undefined;
   if (requestedBuilding && !linkedBuilding) throw new WorkspaceReadError(403);
   const first = buildings.find((b) => b.code === "SACSI11") ?? buildings[0];
-  const cookieName = kind === "lease" ? leaseScopeCookieName(viewerId) : undefined;
+  const cookieName = kind === "lease" ? leaseScopeCookieName(viewerId, workArea) : undefined;
   const stored = cookieName ? (await cookies()).get(cookieName) : undefined;
   const preferred = validatedLeaseScope(buildings, stored?.value);
   const leaseScope = preferred ?? defaultLeaseScope(buildings);

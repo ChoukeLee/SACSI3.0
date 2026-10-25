@@ -90,6 +90,36 @@ function render(data = fixture(), locale: "zh" | "fr" = "zh") {
 
 describe("financial checking workspace", () => {
   it.each(["zh", "fr"] as const)(
+    "keeps CIMAC report filtering, trend links and source inspection inside the independent workspace in %s",
+    (locale) => {
+      const data = fixture();
+      data.workArea = "cimac";
+      data.query.projectId = cimacId;
+      data.projects = [{ id: cimacId, code: "CIMAC", display_name: "CIMAC" }];
+      data.exportHref = reportExportHref(data.query);
+      const host = render(data, locale);
+      const prefix = locale === "fr" ? "/fr/cimac" : "/cimac";
+      expect(host.querySelector("h1")?.textContent).toBe(
+        locale === "zh" ? "园区经营分析" : "Analyse du parc",
+      );
+      for (const form of host.querySelectorAll("form"))
+        expect(form.getAttribute("action")).toBe(`${prefix}/reports`);
+      const internal = [...host.querySelectorAll<HTMLAnchorElement>("a")].map((link) =>
+        link.getAttribute("href")!,
+      );
+      expect(internal.some((href) => href.startsWith(`${prefix}/finance?`))).toBe(true);
+      expect(internal.some((href) => href.startsWith(`${prefix}/reports?`))).toBe(true);
+      expect(
+        internal.every(
+          (href) => href.startsWith(prefix) || href.startsWith("/api/reports/export?"),
+        ),
+      ).toBe(true);
+      expect(host.textContent).not.toContain(
+        locale === "zh" ? "日租收款专题" : "Encaissements courts séjours",
+      );
+    },
+  );
+  it.each(["zh", "fr"] as const)(
     "keeps one localized native disclosure after report metrics in %s without changing XOF totals or trend",
     (locale) => {
       const data = fixture();

@@ -34,6 +34,7 @@ import type {
 } from "@/types/database";
 
 export interface LeaseWorkbenchInspectorProps {
+  workArea?: "sacsi" | "cimac";
   contract: LeaseContractRow | null;
   unit?: UnitRow | null;
   customer?: CustomerRow | null;
@@ -81,6 +82,7 @@ export function LeaseWorkbenchInspector(props: LeaseWorkbenchInspectorProps) {
 }
 
 function InspectorContent({
+  workArea = "sacsi",
   contract,
   unit,
   customer,
@@ -591,7 +593,11 @@ function InspectorContent({
                             <>
                               {" "}
                               <Link
-                                href={`${locale === "fr" ? "/fr" : ""}/finance?view=customers&customerId=${encodeURIComponent(contract.customer_id)}&tab=receipts#cimac-payment-${allocation.originalPaymentId}`}
+                                href={
+                                  workArea === "cimac"
+                                    ? `${locale === "fr" ? "/fr" : ""}/cimac/customers/${encodeURIComponent(contract.customer_id)}?tab=account&accountTab=receipts#cimac-payment-${allocation.originalPaymentId}`
+                                    : `${locale === "fr" ? "/fr" : ""}/finance?view=customers&customerId=${encodeURIComponent(contract.customer_id)}&tab=receipts#cimac-payment-${allocation.originalPaymentId}`
+                                }
                                 className="text-blue-700 hover:underline dark:text-blue-300"
                               >
                                 {text(

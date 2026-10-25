@@ -13,7 +13,7 @@ import {
 import { MetricGrid, StatTile } from "@/components/ui/operational";
 import { routeFor, type Locale } from "@/lib/i18n";
 import { cn, formatXof } from "@/lib/utils";
-import type { CimacOverview } from "./management-data";
+import type { CimacOverview } from "./cimac-overview-data";
 import { CimacShopMap } from "./cimac-shop-map";
 
 export function CimacProjectOverview({
@@ -24,7 +24,7 @@ export function CimacProjectOverview({
   locale: Locale;
 }) {
   const zh = locale === "zh";
-  const unitsHref = routeFor(locale, "/units?project=CIMAC");
+  const unitsHref = routeFor(locale, "/cimac/assets");
   const types = [
     { key: "commercial_shop", icon: Store, title: zh ? "商业区商铺" : "Commerces" },
     { key: "warehouse", icon: Warehouse, title: zh ? "仓储区" : "Entrepôts" },

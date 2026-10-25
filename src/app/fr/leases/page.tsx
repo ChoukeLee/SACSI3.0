@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { LeaseLazyView } from "@/features/leases/lease-lazy-view";
 import { loadLeaseWorkspace } from "@/features/leases/lease-workspace-data";
 import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
+import { redirectLegacyCimac } from "@/features/cimac/cimac-legacy-redirect";
 
 export default async function FrenchLeasesPage({
   searchParams,
@@ -22,6 +23,7 @@ export default async function FrenchLeasesPage({
   if (!user) redirect("/login");
   if (!["admin", "front_desk", "finance", "boss", "rental_sales"].includes(user.role))
     redirect("/");
+  await redirectLegacyCimac("leases", params, "fr");
 
   return (
     <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>

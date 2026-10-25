@@ -30,6 +30,9 @@ export interface ProfileAuditRow {
 
 export interface ProfileAttachmentRow {
   id: string;
+  unit_id?: string | null;
+  linked_id?: string | null;
+  linked_type?: string | null;
   storage_path: string;
   file_type: string;
   ocr_text: string | null;
@@ -39,6 +42,7 @@ export interface ProfileAttachmentRow {
 }
 
 export interface CustomerProfileData {
+  projectScope?: "SACSI";
   customer: CustomerRow;
   units: UnitRow[];
   /** Only bookings with an explicit guest relationship. */
@@ -163,7 +167,7 @@ export async function fetchCustomerProfile(
         supabase
           .from("attachments")
           .select(
-            "id, storage_path, file_type, ocr_text, metadata, paper_archive_status, uploaded_at",
+            "id, unit_id, linked_id, linked_type, storage_path, file_type, ocr_text, metadata, paper_archive_status, uploaded_at",
             { count: "exact" },
           )
           .eq("customer_id", customerId)
@@ -226,6 +230,8 @@ export async function fetchCustomerProfile(
         ...unresolvedBookings,
         ...leaseContracts,
         ...saleContracts,
+        ...receivables,
+        ...payments,
       ]
         .map((row) => row.unit_id)
         .filter(Boolean),
@@ -292,7 +298,7 @@ export async function fetchCustomerProfile(
               supabase
                 .from("attachments")
                 .select(
-                  "id, storage_path, file_type, ocr_text, metadata, paper_archive_status, uploaded_at",
+                  "id, unit_id, linked_id, linked_type, storage_path, file_type, ocr_text, metadata, paper_archive_status, uploaded_at",
                   { count: "exact" },
                 )
                 .in("linked_id", entities.slice(offset, offset + 100))

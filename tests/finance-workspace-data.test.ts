@@ -30,7 +30,10 @@ beforeEach(() => {
           data: mock.metadataError
             ? null
             : table === "projects"
-              ? [{ id: project, code: "CIMAC", display_name: "CIMAC" }]
+              ? [
+                  { id: project, code: "SACSI", display_name: "SACSI" },
+                  { id: other, code: "CIMAC", display_name: "CIMAC" },
+                ]
               : [{ id: building, project_id: project, code: "B3", display_name: "3" }],
           error: mock.metadataError ? { message: "unavailable" } : null,
         }),
@@ -60,7 +63,7 @@ describe("finance server read path", () => {
       expect(mock.from.mock.calls.map((c) => c[0])).toEqual(["buildings", "projects"]);
       expect(mock.rpc).toHaveBeenCalledExactlyOnceWith("finance_read_rpc", {
         p_kind: "ledger",
-        p_filters: {},
+        p_filters: { projectId: project },
         p_page: 1,
       });
       expect(page.props.result?.total).toBe(0);
@@ -90,11 +93,11 @@ describe("finance server read path", () => {
     });
     expect(page.props.scopeKey).toContain("说明");
   });
-  it("reads reconciliation only on its explicit view and does not read the ledger", async () => {
+  it("does not mix company-wide reconciliation into a project workspace", async () => {
     const page = await load({ view: "reconciliation" });
-    expect(mock.rpc).toHaveBeenCalledExactlyOnceWith("finance_reconciliation_rpc");
+    expect(mock.rpc).not.toHaveBeenCalled();
     expect(page.props.result).toBeNull();
-    expect(page.props.reconciliation).toEqual({ available: true, count: 0, issues: [] });
+    expect(page.props.reconciliation).toEqual({ available: false, count: null, issues: [] });
   });
   it("isolate reconciliation errors without converting failure into zero issues", async () => {
     mock.rpc.mockRejectedValue(new Error("network"));
@@ -126,8 +129,8 @@ describe("finance server read path", () => {
             data:
               table === "projects"
                 ? [
-                    { id: project, code: "A", display_name: "A" },
-                    { id: other, code: "B", display_name: "B" },
+                    { id: project, code: "SACSI", display_name: "A" },
+                    { id: other, code: "CIMAC", display_name: "B" },
                   ]
                 : [{ id: building, project_id: other, code: "B", display_name: "B" }],
             error: null,

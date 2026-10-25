@@ -114,9 +114,12 @@ type LeaseUnitRow = UnitRow & {
 
 interface LeaseListProps {
   workspace?: WorkspaceData;
+  workArea?: "sacsi" | "cimac";
   initialProject?: string;
   initialBuilding?: string;
   initialContract?: string;
+  initialCustomer?: string;
+  initialCustomerName?: string;
   returnTo?: string;
   scopePreference?: LeaseScopePreference;
   contracts: LeaseContractRow[];
@@ -179,9 +182,12 @@ function paymentAmountXof(payment: PaymentRow) {
 
 export function LeaseList({
   workspace: initialWorkspace,
+  workArea = "sacsi",
   initialProject,
   initialBuilding,
   initialContract,
+  initialCustomer,
+  initialCustomerName,
   returnTo,
   scopePreference,
   contracts: initialContracts,
@@ -198,7 +204,7 @@ export function LeaseList({
   canMoveOut = true,
 }: LeaseListProps) {
   const router = useRouter();
-  const workspace = useContractWorkspace(initialWorkspace);
+  const workspace = useContractWorkspace(initialWorkspace, workArea);
   const contracts = (workspace.data?.contracts ?? initialContracts) as LeaseContractRow[];
   const units = (workspace.data?.units ?? initialUnits) as LeaseUnitRow[];
   const customers = workspace.data?.customers ?? initialCustomers;
@@ -233,12 +239,15 @@ export function LeaseList({
   } | null>(null);
   const [linkedPreviewDismissed, setLinkedPreviewDismissed] = useState(false);
   const actionRequestRef = useRef(0);
+  const initialCustomerRef = useRef(initialCustomer);
+  initialCustomerRef.current = initialCustomer;
   const actionSelectionRef = useRef("");
   const safeReturnTo = safeWorkbenchReturnTo(returnTo);
   useEffect(() => {
+    actionRequestRef.current += 1;
     setLinkedPreviewDismissed(false);
     setPreviewSelection(null);
-  }, [initialProject, initialBuilding, initialContract]);
+  }, [initialProject, initialBuilding, initialContract, initialCustomer]);
   const previewVersion = useRef(0);
   const previewColumnRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
@@ -292,7 +301,9 @@ export function LeaseList({
           b.id === initialBuilding && (!requestedProjectId || b.project_id === requestedProjectId),
       )?.id
     : undefined;
-  const scopeStorageKey = leaseScopeStorageKey(scopePreference?.cookieName);
+  const scopeStorageKey = leaseScopeStorageKey(
+    scopePreference?.cookieName ?? (workArea === "cimac" ? "cimac_lease_scope" : undefined),
+  );
   const [scope, setScope] = useState(() => {
     const initial = defaultLeaseScope(buildings);
     const serverScope = scopePreference && initialWorkspace ? initialWorkspace.query : undefined;
@@ -311,7 +322,7 @@ export function LeaseList({
   const [scopeLoaded, setScopeLoaded] = useState(false);
   useEffect(() => {
     let canReadLegacy = false;
-    if (scopePreference?.cookieName) {
+    if (workArea === "sacsi" && scopePreference?.cookieName) {
       try {
         let owner = localStorage.getItem(LEASE_SCOPE_LEGACY_CLAIM_KEY);
         if (!owner && localStorage.getItem(LEASE_SCOPE_LEGACY_KEY)) {
@@ -380,6 +391,7 @@ export function LeaseList({
     scopePreference?.serverResolved,
     initialWorkspace?.query.projectId,
     initialWorkspace?.query.buildingId,
+    workArea,
   ]);
   useEffect(() => {
     if (scopeLoaded) {
@@ -626,7 +638,12 @@ export function LeaseList({
           ? previewSelection.id
           : null))
       : null;
-  const preview = useLeaseWorkbenchPreview(workspace.query, previewId, previewSelection?.version);
+  const preview = useLeaseWorkbenchPreview(
+    workspace.query,
+    previewId,
+    previewSelection?.version,
+    workArea,
+  );
   const previewContract = previewId
     ? workspace.enabled
       ? ((preview.data?.contracts.find((row) => row.id === previewId) as
@@ -900,10 +917,10 @@ export function LeaseList({
     return buildLeaseContractNumber(building?.code ?? "SACSI", selectedNewUnit.unit_no, fStartDate);
   }, [buildingMap, fStartDate, selectedNewUnit]);
 
-  const resetNewForm = () => {
+  const resetNewForm = (customerId = "") => {
     setFContractNo("");
     setFUnitId("");
-    setFCustomerId("");
+    setFCustomerId(customerId);
     setFStartDate("");
     setFEndDate("");
     setFCycle("monthly");
@@ -917,17 +934,33 @@ export function LeaseList({
     setError("");
   };
   const openNew = async () => {
-    if (writePending()) return;
-    actionRequestRef.current += 1;
+    if (!canCreate || writePending()) return;
+    const request = ++actionRequestRef.current;
+    const requestedCustomer = initialCustomer;
     setPreviewSelection(null);
+    let creationCustomers = customers;
     if (workspace.enabled) {
       try {
-        await workspace.ensure("context");
+        const context = await workspace.ensure("context");
+        creationCustomers = context.customers;
       } catch {
         return;
       }
     }
-    resetNewForm();
+    if (request !== actionRequestRef.current || requestedCustomer !== initialCustomerRef.current)
+      return;
+    if (
+      requestedCustomer &&
+      !creationCustomers.some((customer) => customer.id === requestedCustomer)
+    ) {
+      setError(
+        locale === "zh"
+          ? "所选客户暂不可核验，请返回客户目录重新选择。未创建合同或收费。"
+          : "Le client sélectionné n’est plus vérifiable. Revenez au répertoire. Aucun contrat ni frais créé.",
+      );
+      return;
+    }
+    resetNewForm(requestedCustomer);
     setPanel("new");
     setSelectedId(null);
   };
@@ -988,8 +1021,10 @@ export function LeaseList({
     buildLeaseCollectionHref({
       contractId: contract.id,
       locale,
+      workArea,
       returnTo: buildWorkbenchRecordHref({
         workspace: "leases",
+        workArea,
         id: contract.id,
         locale,
         project: unit ? buildingMap.get(unit.building_id)?.project_id : project?.id,
@@ -1415,8 +1450,16 @@ export function LeaseList({
   return (
     <OperationalPage
       className={styles.workbench}
-      eyebrow="LEASE WORKSPACE"
-      title={locale === "zh" ? "长租工作台" : "Espace location"}
+      eyebrow={workArea === "cimac" ? "CIMAC · CONTRACTS" : "LEASE WORKSPACE"}
+      title={
+        workArea === "cimac"
+          ? locale === "zh"
+            ? "合同与履约"
+            : "Contrats et exécution"
+          : locale === "zh"
+            ? "长租工作台"
+            : "Espace location"
+      }
       description={
         locale === "zh"
           ? "合同、应收与收款，在同一个工作区核对。"
@@ -1444,26 +1487,54 @@ export function LeaseList({
           {locale === "zh" ? "← 返回来源工作台" : "← Revenir à l'espace précédent"}
         </Link>
       )}
+      {initialCustomer && error && panel !== "new" ? (
+        <p role="alert" className="mb-3 text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
+      {initialCustomer ? (
+        <p role="status" className="mb-3 text-sm text-muted-foreground">
+          {canCreate
+            ? locale === "zh"
+              ? "待建约客户："
+              : "Client à contractualiser : "
+            : locale === "zh"
+              ? "已登记客户："
+              : "Client enregistré : "}
+          <strong className="font-medium text-foreground">
+            {initialCustomerName || initialCustomer}
+          </strong>
+          {canCreate
+            ? locale === "zh"
+              ? " · 点击“新建合同”继续填写房号和条款；提交后才建立合同，收费另行办理。"
+              : ` · Cliquez « ${t.form.newContract} » pour préciser le bien et les clauses. Le contrat est créé après soumission ; l’encaissement est distinct.`
+            : locale === "zh"
+              ? " · 当前账号没有建约权限，请交由租售账号或管理员继续。这里不会创建合同或收费。"
+              : " · Ce compte ne peut pas créer de contrat. Confiez la suite au service location ou à un administrateur. Aucun contrat ni frais n’est créé ici."}
+        </p>
+      ) : null}
       <section
         className={styles.scopeRow}
         aria-label={locale === "zh" ? "项目与楼栋" : "Projet et bâtiment"}
       >
         <div className={styles.scopeFields}>
-          <nav
-            className={styles.scopeProjects}
-            aria-label={locale === "zh" ? "项目切换" : "Choix du projet"}
-          >
-            {projects.map((p) => (
-              <button
-                type="button"
-                key={p.id}
-                aria-pressed={project?.id === p.id}
-                onClick={() => changeProject(p.id)}
-              >
-                {projectLabel(p)}
-              </button>
-            ))}
-          </nav>
+          {workArea !== "cimac" && (
+            <nav
+              className={styles.scopeProjects}
+              aria-label={locale === "zh" ? "项目切换" : "Choix du projet"}
+            >
+              {projects.map((p) => (
+                <button
+                  type="button"
+                  key={p.id}
+                  aria-pressed={project?.id === p.id}
+                  onClick={() => changeProject(p.id)}
+                >
+                  {projectLabel(p)}
+                </button>
+              ))}
+            </nav>
+          )}
           <div className={styles.scopeBuildings}>
             <span className={styles.scopeLabel}>{locale === "zh" ? "楼栋" : "Bâtiment"}</span>
             <select
@@ -1853,6 +1924,7 @@ export function LeaseList({
         {contractView === "table" && (
           <div className={styles.inspectorColumn} ref={previewColumnRef} tabIndex={-1}>
             <LeaseWorkbenchInspector
+              workArea={workArea}
               contract={previewContract}
               unit={previewUnit}
               customer={previewCustomer}

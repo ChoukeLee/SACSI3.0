@@ -6,6 +6,7 @@ import {
   UnitWorkbenchSkeleton,
 } from "@/features/units/unit-workbench-workspace";
 import type { UnitWorkbenchSearch } from "@/features/units/unit-workbench-model";
+import { redirectLegacyCimac } from "@/features/cimac/cimac-legacy-redirect";
 
 export default async function UnitsPage({
   searchParams,
@@ -15,11 +16,13 @@ export default async function UnitsPage({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!["admin", "finance", "boss", "rental_sales"].includes(user.role)) redirect("/");
+  const params = await searchParams;
+  await redirectLegacyCimac("units", params, "zh");
 
   return (
     <Suspense fallback={<UnitWorkbenchSkeleton locale="zh" />}>
       <UnitWorkbenchWorkspace
-        input={await searchParams}
+        input={params}
         locale="zh"
         canEdit={user.role === "admin"}
         viewerId={user.id}

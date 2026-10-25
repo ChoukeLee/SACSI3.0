@@ -88,6 +88,44 @@ async function click(button: Element) {
 }
 describe("finance checking workbench", () => {
   it.each(["zh", "fr"] as const)(
+    "keeps CIMAC tabs, forms, paging and exports scoped without a fictitious daily-rental route in %s",
+    async (locale) => {
+      const props = baseProps();
+      await render({
+        locale,
+        workArea: "cimac",
+        projectLocked: true,
+        projects: props.projects.slice(0, 1),
+      });
+      const prefix = locale === "fr" ? "/fr/cimac" : "/cimac";
+      expect(host.querySelector("form")?.getAttribute("action")).toBe(`${prefix}/finance`);
+      expect(host.querySelector<HTMLInputElement>('input[name="projectId"]')?.value).toBe(project);
+      expect(host.querySelector<HTMLSelectElement>("select")?.disabled).toBe(true);
+      const links = [...host.querySelectorAll<HTMLAnchorElement>("a")].map((a) =>
+        a.getAttribute("href")!,
+      );
+      expect(links).toContain(`${prefix}/finance`);
+      expect(links).toContain(`${prefix}/reports`);
+      expect(links).toContain(`${locale === "fr" ? "/fr" : ""}/settings/finance-reconciliation`);
+      expect(
+        links.some((href) => href.startsWith(`${prefix}/finance?`) && href.includes("page=2")),
+      ).toBe(true);
+      expect(links.some((href) => href.includes("daily-rentals"))).toBe(false);
+      expect(
+        links.every(
+          (href) => href.startsWith(prefix) || href.includes("/settings/finance-reconciliation"),
+        ),
+      ).toBe(true);
+      await click(
+        [...host.querySelectorAll("button")].find(
+          (button) => button.textContent === (locale === "zh" ? "导出" : "Exporter"),
+        )!,
+      );
+      const exportLink = host.querySelector<HTMLAnchorElement>('a[href^="/api/finance/export?"]')!;
+      expect(new URL(exportLink.href).searchParams.get("projectId")).toBe(project);
+    },
+  );
+  it.each(["zh", "fr"] as const)(
     "keeps native currency details after the filtered XOF summary in %s, never above the heading",
     async (locale) => {
       const result = baseProps().result!;

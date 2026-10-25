@@ -48,8 +48,32 @@ export async function loadSaleWorkspace(
   })) as unknown as (LeaseBuilding & {
     project: NonNullable<LeaseBuilding["project"]> & { allows_sale: boolean };
   })[];
-  const projectId = resolveContractProjectLink(buildings, params.project);
-  const scopedBuildings = buildings.filter(
+  const sacsiBuildings = buildings.filter((building) => building.project?.code !== "CIMAC");
+  let projectId = resolveContractProjectLink(sacsiBuildings, params.project);
+  let linkedBuilding: string | undefined;
+  if (params.contract && !projectId && !params.building) {
+    // A legacy bare contract bookmark must resolve its real unit, not broaden
+    // to every project or silently fall back to the first SACSI building.
+    const contract = await client
+      .from("sale_contracts")
+      .select("unit_id")
+      .eq("id", params.contract)
+      .maybeSingle();
+    if (contract.error || !contract.data?.unit_id)
+      throw new WorkspaceReadError(contract.error ? 503 : 403);
+    const unit = await client
+      .from("units")
+      .select("building_id")
+      .eq("id", contract.data.unit_id)
+      .maybeSingle();
+    if (unit.error || !unit.data?.building_id) throw new WorkspaceReadError(unit.error ? 503 : 403);
+    const actualBuildingId = unit.data.building_id;
+    const actualBuilding = sacsiBuildings.find((building) => building.id === actualBuildingId);
+    if (!actualBuilding?.project_id) throw new WorkspaceReadError(403);
+    projectId = actualBuilding.project_id;
+    linkedBuilding = actualBuilding.id;
+  }
+  const scopedBuildings = sacsiBuildings.filter(
     (building) => !projectId || building.project_id === projectId,
   );
   if (params.building && !scopedBuildings.some((building) => building.id === params.building))
@@ -59,11 +83,13 @@ export async function loadSaleWorkspace(
     scopedBuildings.length > 0 &&
     scopedBuildings.every((building) => !building.project.allows_sale);
   const first =
-    buildings.find((building) => building.project.allows_sale && building.code === "SACSI11") ??
-    buildings.find((building) => building.project.allows_sale);
+    sacsiBuildings.find(
+      (building) => building.project.allows_sale && building.code === "SACSI11",
+    ) ?? sacsiBuildings.find((building) => building.project.allows_sale);
+  if (!projectId && !params.building && !first) throw new WorkspaceReadError(403);
   const query = parseWorkspaceQuery({
     projectId: projectId ?? "",
-    buildingId: params.building ?? (projectId ? "" : params.contract ? "" : (first?.id ?? "")),
+    buildingId: params.building ?? linkedBuilding ?? (projectId ? "" : (first?.id ?? "")),
     search: params.q ?? "",
     status: params.status ?? "current",
     page: params.page ?? "1",
@@ -73,7 +99,7 @@ export async function loadSaleWorkspace(
   });
   if (
     params.building &&
-    !buildings.find((building) => building.id === params.building)?.project.allows_sale &&
+    !sacsiBuildings.find((building) => building.id === params.building)?.project.allows_sale &&
     !noSaleProject
   )
     throw new WorkspaceReadError(403);
@@ -87,8 +113,8 @@ export async function loadSaleWorkspace(
     customers: workspace?.customers ?? [],
     payments: workspace?.payments ?? [],
     receivables: workspace?.receivables ?? [],
-    buildings,
-    workspace: workspace ? { ...workspace, buildings } : undefined,
+    buildings: sacsiBuildings,
+    workspace: workspace ? { ...workspace, buildings: sacsiBuildings } : undefined,
     initialProject: projectId,
     initialContract: params.contract,
     returnTo: params.returnTo,

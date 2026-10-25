@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { LeaseLazyView } from "@/features/leases/lease-lazy-view";
 import { loadLeaseWorkspace } from "@/features/leases/lease-workspace-data";
 import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
+import { redirectLegacyCimac } from "@/features/cimac/cimac-legacy-redirect";
 
 export default async function LeasesPage({
   searchParams,
@@ -30,6 +31,8 @@ export default async function LeasesPage({
     }
     redirect(`/fr/leases${query.size ? `?${query}` : ""}`);
   }
+
+  await redirectLegacyCimac("leases", params, "zh");
 
   return (
     <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>

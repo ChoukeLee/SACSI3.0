@@ -3,8 +3,7 @@ import Link from "next/link";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { routeFor, type Locale } from "@/lib/i18n";
-import { getCimacOverview, getProjects } from "@/app/management/management-data";
-import { CimacProjectOverview } from "@/app/management/management-projects";
+import { getProjects } from "@/app/management/management-data";
 import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
 import { getOperatingSnapshot } from "./operating-data";
 import { OperatingDashboard } from "./operating-dashboard";
@@ -20,8 +19,14 @@ export async function ManagementPageContent({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!["admin", "boss", "finance"].includes(user.role)) redirect(routeFor(locale, "/leases"));
-  const projects = await getProjects();
+  const authorizedProjects = await getProjects();
   const requested = params.project?.toUpperCase() ?? "SACSI";
+  if (
+    requested === "CIMAC" ||
+    authorizedProjects.some((item) => item.code === "CIMAC" && item.id.toUpperCase() === requested)
+  )
+    redirect(routeFor(locale, "/cimac"));
+  const projects = authorizedProjects.filter((item) => item.code !== "CIMAC");
   const project =
     projects.find((item) => item.code === requested) ??
     projects.find((item) => item.code === "SACSI") ??
@@ -42,23 +47,11 @@ export async function ManagementPageContent({
           <div className={styles.eyebrow}>
             {zh ? "经营总览" : "Pilotage de l’activité"} · {project.code}
           </div>
-          <h1>
-            {zh
-              ? project.code === "CIMAC"
-                ? "科建建材城"
-                : "SACSI 经营驾驶舱"
-              : project.code === "CIMAC"
-                ? "CIMAC · pilotage"
-                : "SACSI · pilotage"}
-          </h1>
+          <h1>{zh ? "SACSI 经营驾驶舱" : "SACSI · pilotage"}</h1>
           <p>
-            {project.code === "CIMAC"
-              ? zh
-                ? "建设与交付、租赁准备、收款跟进 · 只租不卖"
-                : "Construction, livraison, location et encaissements · location uniquement"
-              : zh
-                ? "长租、出售与资产经营，先看全局，再处理具体事项"
-                : "Locations, ventes et actifs : une vue d’ensemble, puis les actions"}
+            {zh
+              ? "长租、出售与资产经营，先看全局，再处理具体事项"
+              : "Locations, ventes et actifs : une vue d’ensemble, puis les actions"}
           </p>
         </div>
       </header>
@@ -85,11 +78,6 @@ export async function ManagementPageContent({
           financeMode={user.role === "finance"}
         />
       </Suspense>
-      {project.code === "CIMAC" && (
-        <Suspense fallback={<OperationalPageSkeleton kind="records" rows={4} />}>
-          <CimacSection locale={locale} />
-        </Suspense>
-      )}
     </main>
   );
 }
@@ -107,54 +95,20 @@ export async function DashboardSection(props: {
     // Preserve Next.js redirects/auth/static-render interruptions. Only this
     // section's unavailable data becomes a local unknown state.
     unstable_rethrow(error);
-    return (
-      <ManagementSectionUnavailable
-        locale={props.locale}
-        kind="operating"
-        projectId={props.projectId}
-      />
-    );
+    return <ManagementSectionUnavailable locale={props.locale} projectId={props.projectId} />;
   }
   return <OperatingDashboard snapshot={snapshot} {...props} />;
 }
-export async function CimacSection({ locale }: { locale: Locale }) {
-  let overview: Awaited<ReturnType<typeof getCimacOverview>>;
-  try {
-    overview = await getCimacOverview();
-  } catch (error) {
-    unstable_rethrow(error);
-    return <ManagementSectionUnavailable locale={locale} kind="cimac" />;
-  }
-  if (!overview) return <ManagementSectionUnavailable locale={locale} kind="cimac" />;
-  return (
-    <div className="mt-6">
-      <CimacProjectOverview overview={overview} locale={locale} />
-    </div>
-  );
-}
-
 function ManagementSectionUnavailable({
   locale,
-  kind,
   projectId,
 }: {
   locale: Locale;
-  kind: "operating" | "cimac";
-  projectId?: string;
+  projectId: string;
 }) {
   const zh = locale === "zh";
-  const title =
-    kind === "operating"
-      ? zh
-        ? "经营汇总暂不可用"
-        : "Synthèse temporairement indisponible"
-      : zh
-        ? "CIMAC 资产库存暂不可用"
-        : "Inventaire CIMAC temporairement indisponible";
-  const href =
-    kind === "operating"
-      ? `/finance?${new URLSearchParams({ projectId: projectId ?? "" })}`
-      : "/units?project=CIMAC";
+  const title = zh ? "经营汇总暂不可用" : "Synthèse temporairement indisponible";
+  const href = `/finance?${new URLSearchParams({ projectId })}`;
   return (
     <section className={`${styles.surface} mt-6`} role="status" aria-label={title}>
       <h2 className="text-base font-semibold">{title}</h2>
@@ -172,14 +126,7 @@ function ManagementSectionUnavailable({
         className="mt-3 inline-block text-sm text-blue-700 underline-offset-4 hover:underline dark:text-blue-300"
         href={routeFor(locale, href)}
       >
-        {kind === "operating"
-          ? zh
-            ? "打开财务工作区"
-            : "Ouvrir l’espace finance"
-          : zh
-            ? "打开 CIMAC 资产档案"
-            : "Ouvrir les actifs CIMAC"}{" "}
-        ↗
+        {zh ? "打开财务工作区" : "Ouvrir l’espace finance"} ↗
       </Link>
     </section>
   );
