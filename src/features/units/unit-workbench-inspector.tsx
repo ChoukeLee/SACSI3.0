@@ -144,13 +144,17 @@ export function UnitWorkbenchInspector({
                   ? zh
                     ? "状态尚未完成核实，不计作明确空置或可出租。"
                     : "État à vérifier : ne pas considérer comme vacant ou prêt à louer."
-                  : position?.operational_condition !== "normal"
+                  : position?.lease_pending
                     ? zh
-                      ? "运行条件受限；无占用也不代表具备出租条件。"
-                      : "État limité : sans occupation ne signifie pas prêt à louer."
-                    : zh
-                      ? "无占用不等于可出租；已售资产仍可以有独立的代管或租赁关系。"
-                      : "Sans occupation ne signifie pas prêt à louer ; un bien vendu peut avoir un bail distinct."}
+                      ? "已关联未来长租，资产已预留；待起租不计作当前占用，也不代表可再次出租。"
+                      : "Réservé pour un bail à venir ; exclu de l’occupation actuelle et indisponible à la relocation."
+                    : position?.operational_condition !== "normal"
+                      ? zh
+                        ? "运行条件受限；无占用也不代表具备出租条件。"
+                        : "État limité : sans occupation ne signifie pas prêt à louer."
+                      : zh
+                        ? "无占用不等于可出租；已售资产仍可以有独立的代管或租赁关系。"
+                        : "Sans occupation ne signifie pas prêt à louer ; un bien vendu peut avoir un bail distinct."}
                 <br />
                 {zh
                   ? "“已售”沿用现有业务投影，不作为产权登记或过户完成凭证。"

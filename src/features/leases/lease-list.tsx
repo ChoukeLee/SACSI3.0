@@ -23,6 +23,7 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
 import { nativeLease, leaseRentLabel } from "@/lib/native-money";
+import { isCurrentLease, isFutureLease, leaseStatusLabel } from "@/lib/lease-timing";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -501,7 +502,8 @@ export function LeaseList({
   const customerMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
   const buildingMap = useMemo(() => new Map(buildings.map((b) => [b.id, b])), [buildings]);
 
-  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const localToday = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const todayStr = workspace.pageData?.today ?? localToday;
 
   const filteredByStatus = useMemo(
     () =>
@@ -509,8 +511,10 @@ export function LeaseList({
         ? filteredByBuilding.filter((c) => c.status !== "terminated")
         : statusFilter === "all"
           ? filteredByBuilding
-          : filteredByBuilding.filter((c) => c.status === statusFilter),
-    [filteredByBuilding, statusFilter],
+          : filteredByBuilding.filter((c) =>
+              statusFilter === "active" ? isCurrentLease(c, todayStr) : c.status === statusFilter,
+            ),
+    [filteredByBuilding, statusFilter, todayStr],
   );
 
   const contractSummaryMap = useMemo(
@@ -568,7 +572,12 @@ export function LeaseList({
                 : "Aucune créance vérifiée",
             balanceOverdue: summary.overdue > 0,
             status: contract.status,
-            statusLabel: t.contractStatus[contract.status as keyof typeof t.contractStatus],
+            statusLabel: leaseStatusLabel(
+              contract,
+              todayStr,
+              locale,
+              t.contractStatus[contract.status as keyof typeof t.contractStatus],
+            ),
             secondaryLabel:
               unit && isManagedLeaseUnit(unit)
                 ? locale === "zh"
@@ -588,6 +597,7 @@ export function LeaseList({
       t.contractStatus,
       workspace.enabled,
       workspace.pageData?.contracts,
+      todayStr,
     ],
   );
   const searchedTableRows = useMemo(
@@ -775,7 +785,7 @@ export function LeaseList({
   const selectedCustomer = selected ? customers.find((c) => c.id === selected.customer_id) : null;
 
   const leaseAttention = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayStr;
     const buildingMap = new Map(buildings.map((building) => [building.id, building]));
     const rows = filteredByBuilding.flatMap((contract) => {
       if (contract.status !== "active") return [];
@@ -833,12 +843,13 @@ export function LeaseList({
     unitMap,
     workspace.enabled,
     workspace.data,
+    todayStr,
   ]);
   const attentionRows = leaseAttention[attentionTab];
 
   const dashboardStats = useMemo(() => {
     if (workspace.enabled && workspace.pageData) return workspace.pageData.stats;
-    const active = filteredByBuilding.filter((c) => c.status === "active");
+    const active = filteredByBuilding.filter((c) => isCurrentLease(c, todayStr));
     const scopeIds = new Set(filteredByBuilding.map((contract) => contract.id));
     const related = receivables.filter(
       (row) => row.source_type === "lease_contract" && row.source_id && scopeIds.has(row.source_id),
@@ -1683,6 +1694,7 @@ export function LeaseList({
                   : undefined
               }
               rows={searchedTableRows}
+              today={todayStr}
               selectedId={previewId}
               onSelect={selectPreview}
               onVisibleIdsChange={syncVisiblePreview}
@@ -1765,7 +1777,13 @@ export function LeaseList({
                         <RoomCard
                           key={contract.id}
                           roomNo={unit?.unit_no ?? "-"}
-                          status={isManaged ? "managed" : "leased"}
+                          status={
+                            isFutureLease(contract, todayStr)
+                              ? "reserved"
+                              : isManaged
+                                ? "managed"
+                                : "leased"
+                          }
                           locale={locale}
                           onClick={() => openDetail(contract.id)}
                         >
@@ -1792,10 +1810,21 @@ export function LeaseList({
                                 </Badge>
                               )}
                               <Badge
-                                variant={statusVariant[contract.status]}
+                                variant={
+                                  isFutureLease(contract, todayStr)
+                                    ? "warning"
+                                    : statusVariant[contract.status]
+                                }
                                 className="h-5 px-2 text-[10px]"
                               >
-                                {t.contractStatus[contract.status as keyof typeof t.contractStatus]}
+                                {leaseStatusLabel(
+                                  contract,
+                                  todayStr,
+                                  locale,
+                                  t.contractStatus[
+                                    contract.status as keyof typeof t.contractStatus
+                                  ],
+                                )}
                               </Badge>
                             </div>
                           </div>
@@ -1917,8 +1946,8 @@ export function LeaseList({
 
           <p className={styles.summaryExplanation}>
             {locale === "zh"
-              ? "上方摘要覆盖当前项目与楼栋的全部合同，不随搜索、状态或分页截断。月租规模不是实收；15 天内跟进仅含明确未结账单，不等于合同到期。覆盖待确认另行核对，不推算为应缴。"
-              : "La synthèse couvre tous les contrats du périmètre, sans limitation de recherche, statut ou page. Le loyer mensuel n’est pas un encaissement ; le suivi sous 15 jours porte sur les créances ouvertes vérifiées, pas sur les fins de bail. La couverture à confirmer est vérifiée séparément, sans dette présumée."}
+              ? "上方摘要覆盖当前项目与楼栋的全部合同，不随搜索、状态或分页截断。待起租合同保留在当前/全部列表，起租前不计入生效合同和月租规模。月租规模不是实收；15 天内跟进仅含明确未结账单，不等于合同到期。覆盖待确认另行核对，不推算为应缴。"
+              : "La synthèse couvre tous les contrats du périmètre, sans limitation de recherche, statut ou page. Les contrats à venir restent dans En cours/Tous ; ils sont exclus des contrats actifs et du loyer mensuel avant leur début. Le loyer mensuel n’est pas un encaissement ; le suivi sous 15 jours porte sur les créances ouvertes vérifiées, pas sur les fins de bail. La couverture à confirmer est vérifiée séparément, sans dette présumée."}
           </p>
         </section>
         {contractView === "table" && (
@@ -2026,8 +2055,8 @@ export function LeaseList({
             currentDue: locale === "zh" ? "已建应收未收" : "Créances restantes",
             overdue: locale === "zh" ? "逾期明细" : "Détail des retards",
           };
-          const activeRows = leaseInsightContracts.filter(
-            (row) => row.contract.status === "active",
+          const activeRows = leaseInsightContracts.filter((row) =>
+            isCurrentLease(row.contract, todayStr),
           );
           const rentRows = [...activeRows].sort(
             (a, b) => Number(b.contract.monthly_rent_xof) - Number(a.contract.monthly_rent_xof),

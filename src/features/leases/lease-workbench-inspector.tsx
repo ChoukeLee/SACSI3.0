@@ -25,6 +25,7 @@ import {
 import { addIsoDays } from "@/features/finance/metrics";
 import { dictionaries, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { isFutureLease, leaseStatusLabel } from "@/lib/lease-timing";
 import type {
   CustomerRow,
   LeaseContractRow,
@@ -205,8 +206,12 @@ function InspectorContent({
       : contract.expected_end_date;
   const contractStatus = dictionaries[locale].leases.contractStatus;
   const cycleLabels = dictionaries[locale].leases.paymentCycle;
-  const status =
-    contractStatus[contract.status as keyof typeof contractStatus] ?? text("待核对", "À vérifier");
+  const status = leaseStatusLabel(
+    contract,
+    today,
+    locale,
+    contractStatus[contract.status as keyof typeof contractStatus] ?? text("待核对", "À vérifier"),
+  );
   const cycle =
     cycleLabels[contract.payment_cycle as keyof typeof cycleLabels] ??
     text("待确认", "À confirmer");
@@ -228,31 +233,39 @@ function InspectorContent({
             "Vérifiez les justificatifs et le rapprochement dans les onglets Finances et Écritures avant toute opération.",
           ),
         }
-      : contract.status === "draft" || !contract.start_date || !endKnown
+      : isFutureLease(contract, today)
         ? {
-            title: text("核实合同资料", "Vérifier les informations du contrat"),
+            title: text("等待起租", "En attente du début du bail"),
             detail: text(
-              "先核对客户、合同日期与约定，再办理相应操作。",
-              "Confirmez le client, les dates et les conditions avant toute opération.",
+              `合同将于 ${contract.start_date} 起租；押金和预收款按实际收款日期登记。`,
+              `Le bail débutera le ${contract.start_date} ; les dépôts et avances sont enregistrés à la date de leur encaissement.`,
             ),
           }
-        : contract.status === "active" &&
-            contract.expected_end_date < "2099-01-01" &&
-            contract.expected_end_date <= addIsoDays(today, 30)
+        : contract.status === "draft" || !contract.start_date || !endKnown
           ? {
-              title: text("确认续租 / 退租安排", "Confirmer la suite du bail"),
+              title: text("核实合同资料", "Vérifier les informations du contrat"),
               detail: text(
-                "合同已到期或将在 30 天内到期，不代表已经退租；请先确认客户安排。",
-                "Le bail est échu ou arrive à échéance sous 30 jours. Cela ne confirme pas une sortie ; vérifiez les dispositions avec le client.",
+                "先核对客户、合同日期与约定，再办理相应操作。",
+                "Confirmez le client, les dates et les conditions avant toute opération.",
               ),
             }
-          : {
-              title: text("查看合同与账务", "Consulter le contrat et les écritures"),
-              detail: text(
-                "合同、账务和完整收支记录集中在这里；办理入口只显示当前身份有权执行的操作。",
-                "Contrat, finances et écritures complètes sont réunis ici. Seules les opérations autorisées sont proposées.",
-              ),
-            };
+          : contract.status === "active" &&
+              contract.expected_end_date < "2099-01-01" &&
+              contract.expected_end_date <= addIsoDays(today, 30)
+            ? {
+                title: text("确认续租 / 退租安排", "Confirmer la suite du bail"),
+                detail: text(
+                  "合同已到期或将在 30 天内到期，不代表已经退租；请先确认客户安排。",
+                  "Le bail est échu ou arrive à échéance sous 30 jours. Cela ne confirme pas une sortie ; vérifiez les dispositions avec le client.",
+                ),
+              }
+            : {
+                title: text("查看合同与账务", "Consulter le contrat et les écritures"),
+                detail: text(
+                  "合同、账务和完整收支记录集中在这里；办理入口只显示当前身份有权执行的操作。",
+                  "Contrat, finances et écritures complètes sont réunis ici. Seules les opérations autorisées sont proposées.",
+                ),
+              };
 
   return (
     <aside

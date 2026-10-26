@@ -147,6 +147,52 @@ function unitProfile(overrides: Partial<UnitProfileData> = {}): UnitProfileData 
   } as UnitProfileData;
 }
 describe("profile identities, balances and history", () => {
+  it.each(["zh", "fr"] as const)(
+    "keeps a future tenant separate from the current customer and labels the reservation (%s)",
+    async (locale) => {
+      const data = unitProfile({
+        unit: { ...unitProfile().unit, status: "leased", occupancy_verified: true },
+        position: {
+          ownership: "sold",
+          operational_condition: "normal",
+          daily_occupied: false,
+          lease_occupied: false,
+          lease_pending: true,
+          lease_start_date: "2099-11-15",
+          cleaning_pending: false,
+          daily_enabled: false,
+          lease_enabled: true,
+        },
+        leaseContracts: [
+          {
+            id: "lease",
+            contract_no: "L-FUTURE",
+            customer_id: "tenant",
+            status: "active",
+            start_date: "2099-11-15",
+            paid_through_date: null,
+            monthly_rent_xof: 4500000,
+          },
+        ] as UnitProfileData["leaseContracts"],
+        customers: [{ id: "tenant", name: "Future tenant" }] as UnitProfileData["customers"],
+      });
+      await act(async () => root.render(<UnitProfileView data={data} locale={locale} />));
+      expect(host.textContent).toContain(`${locale === "zh" ? "待起租" : "À venir"} · 2099-11-15`);
+      const currentLabel = [...host.querySelectorAll("p")].find(
+        (row) => row.textContent === (locale === "zh" ? "当前客户" : "Client actuel"),
+      );
+      expect(currentLabel?.parentElement?.textContent).not.toContain("Future tenant");
+      expect(host.textContent).toContain(
+        locale === "zh" ? "不可再次出租" : "indisponible à la relocation",
+      );
+      await click(locale === "zh" ? "长租 / 出售" : "Bail / Vente");
+      expect(host.querySelector("tbody")?.textContent).toContain(
+        locale === "zh" ? "待起租" : "À venir",
+      );
+      expect(data.unit.status).toBe("leased");
+      expect(data.leaseContracts[0].status).toBe("active");
+    },
+  );
   it("resets the asset dossier tab when the target changes and retains a safe return destination", async () => {
     await act(async () =>
       root.render(
@@ -402,6 +448,35 @@ describe("independent asset dimensions", () => {
     expect(table.textContent).toContain("业务配置待核对");
     expect(table.textContent).not.toContain("120.00万");
     expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
+  });
+  it("labels the future tenant in the legacy catalogue without presenting actual occupation or availability", async () => {
+    await act(async () =>
+      root.render(
+        <UnitList
+          units={[{ ...unit, status: "leased" }]}
+          businessFlagsMap={{ unit: [] }}
+          positionsMap={{
+            unit: {
+              ...position,
+              lease_occupied: false,
+              lease_pending: true,
+              lease_start_date: "2026-11-15",
+            },
+          }}
+          unitPartySummaries={{
+            unit: { pendingLeaseCustomerName: "Future tenant", pendingLeaseEndDate: "2030-02-14" },
+          }}
+          buildings={buildings}
+          locale="zh"
+          canEdit={false}
+        />,
+      ),
+    );
+    const table = host.querySelector("[data-unit-asset-table]")!;
+    expect(table.textContent).toContain("待起租 · 2026-11-15");
+    expect(table.textContent).toContain("Future tenant");
+    expect(table.textContent).toContain("已预留，不作当前占用或可出租");
+    expect(table.textContent).not.toContain("无当前占用");
   });
   it("honors a project UUID link instead of the saved other project, including an inaccessible project", async () => {
     localStorage.setItem("sacsi_active_building_id", "sacsi-building");

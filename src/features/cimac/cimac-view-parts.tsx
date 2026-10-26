@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowLeft, ArrowUpRight, Building2, Store, Warehouse } from "lucide-react";
 import { constructionLabel } from "@/features/units/unit-workbench-model";
-import type { UnitPosition } from "@/features/units/operational-position";
+import { pendingLeaseLabel, type UnitPosition } from "@/features/units/operational-position";
 import styles from "./cimac-workspace.module.css";
 
 export type CimacViewLocale = "zh" | "fr";
@@ -187,20 +187,30 @@ export function cimacOccupancy(
   asset: { position: UnitPosition | null; occupancyVerified: boolean | null },
   locale: CimacViewLocale,
 ) {
+  const pending = pendingLeaseLabel(asset.position, locale);
+  const reservation = pending
+    ? `${pending} · ${cimacText(locale, "已预留，不可再次出租", "Réservé, indisponible à la relocation")}`
+    : null;
+  const withReservation = (text: string) => (reservation ? `${text} · ${reservation}` : text);
   if (asset.position?.daily_occupied && asset.position.lease_occupied)
-    return cimacText(locale, "占用冲突 · 待核", "Occupations incompatibles · à vérifier");
+    return withReservation(
+      cimacText(locale, "占用冲突 · 待核", "Occupations incompatibles · à vérifier"),
+    );
   if (asset.position?.lease_occupied)
-    return asset.occupancyVerified === true
-      ? cimacText(locale, "租约占用", "Occupation par bail")
-      : cimacText(
-          locale,
-          "登记租约占用 · 现场待核",
-          "Occupation par bail enregistrée · terrain à vérifier",
-        );
+    return withReservation(
+      asset.occupancyVerified === true
+        ? cimacText(locale, "租约占用", "Occupation par bail")
+        : cimacText(
+            locale,
+            "登记租约占用 · 现场待核",
+            "Occupation par bail enregistrée · terrain à vérifier",
+          ),
+    );
   if (asset.position?.daily_occupied)
-    return cimacText(locale, "日租占用 · 需核", "Séjour journalier · à vérifier");
+    return withReservation(cimacText(locale, "日租占用 · 需核", "Séjour journalier · à vérifier"));
   if (!asset.position || asset.occupancyVerified !== true)
-    return cimacText(locale, "占用待核", "Occupation à vérifier");
+    return withReservation(cimacText(locale, "占用待核", "Occupation à vérifier"));
+  if (reservation) return reservation;
   return cimacText(locale, "无当前占用", "Sans occupation actuelle");
 }
 

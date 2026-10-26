@@ -12,7 +12,7 @@ import type { UnitRow } from "@/types/database";
 import type { UnitStatus, BusinessType } from "@/types/domain";
 import { getUnitAuditLogs, updateUnitStatus } from "./actions";
 import type { UnitAuditLogEntry } from "./actions";
-import { conditionLabel, type UnitPosition } from "./operational-position";
+import { conditionLabel, pendingLeaseLabel, type UnitPosition } from "./operational-position";
 import { HistoryPagination, useHistoryPage } from "@/features/profiles/history-pagination";
 
 interface UnitBusinessFlag {
@@ -172,9 +172,17 @@ export function UnitDetailPanel({
                     ? "有生效长租"
                     : "Bail actif"
                   : locale === "zh"
-                    ? "无生效长租"
-                    : "Aucun bail actif",
+                    ? "无当前长租占用"
+                    : "Aucune occupation actuelle par bail",
             ],
+            ...(position?.lease_pending
+              ? [
+                  [
+                    locale === "zh" ? "未来租约" : "Bail à venir",
+                    `${pendingLeaseLabel(position, locale)} · ${locale === "zh" ? "资产已预留，不可再次出租" : "Actif réservé, indisponible à la relocation"}`,
+                  ],
+                ]
+              : []),
             [
               locale === "zh" ? "保洁" : "Nettoyage",
               !position

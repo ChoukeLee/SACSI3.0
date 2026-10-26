@@ -14,6 +14,7 @@ import {
 import type { Locale } from "@/lib/i18n";
 import { contractStatusVariant } from "@/lib/status-styles";
 import { cn } from "@/lib/utils";
+import { isFutureLease } from "@/lib/lease-timing";
 
 const PAGE_SIZE = 25;
 
@@ -22,6 +23,7 @@ export interface LeaseWorkbenchTableProps {
   locale: Locale;
   amountLabel: string;
   periodLabel: string;
+  today?: string;
   toolbar?: ReactNode;
   selectedId?: string | null;
   onSelect: (id: string) => void;
@@ -110,6 +112,7 @@ export function LeaseWorkbenchTable({
   locale,
   amountLabel,
   periodLabel,
+  today,
   toolbar,
   selectedId,
   onSelect,
@@ -353,7 +356,12 @@ export function LeaseWorkbenchTable({
               </td>
               <td data-col="status" className="px-2.5 py-3 leading-5">
                 <Badge
-                  variant={contractStatusVariant[row.status] ?? "secondary"}
+                  variant={
+                    today &&
+                    isFutureLease({ status: row.status, start_date: row.periodStart }, today)
+                      ? "warning"
+                      : (contractStatusVariant[row.status] ?? "secondary")
+                  }
                   className="max-w-full whitespace-normal px-2 py-0.5 text-center font-medium"
                 >
                   {row.statusLabel}

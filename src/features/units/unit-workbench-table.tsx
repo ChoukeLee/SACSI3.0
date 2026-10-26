@@ -83,7 +83,11 @@ export function UnitWorkbenchRow({
         <span
           className={cn(
             styles.badge,
-            occupied ? styles.occupied : unitNeedsVerification(record) ? styles.warn : undefined,
+            occupied
+              ? styles.occupied
+              : unitNeedsVerification(record) || position?.lease_pending
+                ? styles.warn
+                : undefined,
           )}
         >
           {unitOccupancyText(record, locale)}

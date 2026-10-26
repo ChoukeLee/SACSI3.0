@@ -5,6 +5,7 @@ import {
   matchesUnitWorkbenchFilter,
   parseUnitWorkbenchQuery,
   unitNeedsVerification,
+  unitOccupancyText,
   unitWorkbenchHref,
   type UnitWorkbenchPositionRecord,
 } from "@/features/units/unit-workbench-model";
@@ -113,6 +114,37 @@ describe("asset workbench query and independent state dimensions", () => {
     expect(matchesUnitWorkbenchFilter(row, "maintenance")).toBe(true);
     expect(constructionLabel("under_construction", "zh")).toBe("建设中");
     expect(constructionLabel(undefined, "fr")).toBe("À vérifier");
+  });
+  it("labels a future lease as reserved without counting current occupation or conflating sold and maintenance dimensions", () => {
+    const row = record({
+      position: {
+        ...record().position!,
+        lease_occupied: false,
+        lease_pending: true,
+        lease_start_date: "2026-11-15",
+        operational_condition: "maintenance",
+      },
+    });
+    expect(unitOccupancyText(row, "zh")).toBe("待起租 · 2026-11-15");
+    expect(unitOccupancyText(row, "fr")).toBe("À venir · 2026-11-15");
+    expect(matchesUnitWorkbenchFilter(row, "occupied")).toBe(false);
+    expect(matchesUnitWorkbenchFilter(row, "unoccupied")).toBe(true);
+    expect(matchesUnitWorkbenchFilter(row, "sold")).toBe(true);
+    expect(matchesUnitWorkbenchFilter(row, "maintenance")).toBe(true);
+  });
+  it("keeps actual daily occupation visible alongside a future lease reservation", () => {
+    const row = record({
+      position: {
+        ...record().position!,
+        lease_occupied: false,
+        daily_occupied: true,
+        lease_pending: true,
+        lease_start_date: "2026-11-15",
+      },
+    });
+    expect(unitOccupancyText(row, "zh")).toBe("日租实际入住 · 待起租 · 2026-11-15");
+    expect(matchesUnitWorkbenchFilter(row, "occupied")).toBe(true);
+    expect(matchesUnitWorkbenchFilter(row, "unoccupied")).toBe(false);
   });
 });
 

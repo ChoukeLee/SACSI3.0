@@ -313,6 +313,23 @@ describe("current-session scoped operational reads", () => {
     expect(data.summary).toMatchObject({ occupied: 0, unoccupied: 0, occupancyUnknown: 1 });
     expect(data.rows[0].position).toBeNull();
   });
+  it("explicitly loads and decodes future lease reservations without counting actual occupation", async () => {
+    const scope = await readCimacWorkspaceScope(client);
+    Object.assign(tables.unit_operational_position[0], {
+      lease_occupied: false,
+      lease_pending: true,
+      lease_start_date: "2026-11-15",
+    });
+    const data = await readCimacAssets(client, scope);
+    expect(data.summary).toMatchObject({ occupied: 0, unoccupied: 1 });
+    expect(data.rows[0].position).toMatchObject({
+      lease_pending: true,
+      lease_start_date: "2026-11-15",
+    });
+    const read = calls.find((call) => call.table === "unit_operational_position");
+    expect(read?.columns.split(",")).toContain("lease_pending");
+    expect(read?.columns.split(",")).toContain("lease_start_date");
+  });
   it("reads every bounded light inventory page but only returns50, with no contract/money scans", async () => {
     const scope = await readCimacWorkspaceScope(client);
     tables.units = Array.from({ length: 1051 }, (_, n) => unitRow(100 + n));

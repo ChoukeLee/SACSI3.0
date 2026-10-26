@@ -18,6 +18,7 @@ import { routeFor } from "@/lib/i18n";
 import { buildWorkbenchRecordHref, safeWorkbenchReturnTo } from "@/lib/workbench-links";
 import { cn, formatXof } from "@/lib/utils";
 import { paymentDisplay } from "@/lib/currency";
+import { isCurrentLease, isFutureLease, leaseStatusLabel } from "@/lib/lease-timing";
 import { ProfileAuditTimeline } from "@/features/profiles/audit-timeline";
 import {
   computeFinanceMetrics,
@@ -36,6 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { conditionLabel } from "./operational-position";
+import { unitOccupancyText } from "./unit-workbench-model";
 import type { ContractStatus, UnitKind } from "@/types/domain";
 import type { UnitProfileData } from "./unit-profile-service";
 import styles from "./unit-profile.module.css";
@@ -66,7 +68,10 @@ function UnitProfile({ data, locale, returnTo }: UnitProfileProps) {
     id ? (customerMap.get(id)?.name ?? (zh ? "客户待补" : "Client à compléter")) : "-";
 
   const activeBooking = data.dailyBookings.find((row) => row.status === "checked_in");
-  const activeLease = data.leaseContracts.find((row) => row.status === "active");
+  const activeLease = data.leaseContracts.find((row) => isCurrentLease(row, today));
+  const pendingLease = [...data.leaseContracts]
+    .filter((row) => isFutureLease(row, today))
+    .sort((left, right) => left.start_date.localeCompare(right.start_date))[0];
   const activeSale = data.saleContracts.find((row) => row.status === "active");
   const currentCustomer = activeBooking
     ? activeBooking.guest_customer_id
@@ -212,18 +217,7 @@ function UnitProfile({ data, locale, returnTo }: UnitProfileProps) {
               />
               <InfoRow
                 label={zh ? "实际占用" : "Occupation réelle"}
-                value={
-                  !data.position
-                    ? zh
-                      ? "待核实"
-                      : "À vérifier"
-                    : [
-                        data.position.daily_occupied && (zh ? "日租入住" : "Séjour"),
-                        data.position.lease_occupied && (zh ? "长租" : "Bail"),
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || (zh ? "无当前入住" : "Aucune occupation")
-                }
+                value={unitOccupancyText({ unit, position: data.position ?? null }, locale)}
               />
               <InfoRow
                 label={zh ? "运行条件" : "État opérationnel"}
@@ -250,6 +244,11 @@ function UnitProfile({ data, locale, returnTo }: UnitProfileProps) {
               {zh
                 ? "权属、实际占用与运行条件独立判断。“已售”是业务投影，不作为产权登记凭证；无占用不等于可出租。"
                 : "Propriété, occupation et état sont indépendants. « Vendu » n’est pas une preuve de titre ; sans occupation ne signifie pas prêt à louer."}
+              {data.position?.lease_pending
+                ? zh
+                  ? " 已关联未来长租，资产已预留，不可再次出租。"
+                  : " Réservé pour un bail à venir, indisponible à la relocation."
+                : null}
             </p>
             <div className={styles.metrics}>
               <Metric
@@ -282,6 +281,18 @@ function UnitProfile({ data, locale, returnTo }: UnitProfileProps) {
                     value={currentBusinessLabel({ activeBooking, activeLease, activeSale }, locale)}
                   />
                   <InfoRow label={zh ? "当前客户" : "Client actuel"} value={currentCustomerLabel} />
+                  {pendingLease && (
+                    <>
+                      <InfoRow
+                        label={zh ? "未来租约" : "Bail à venir"}
+                        value={`${leaseStatusLabel(pendingLease, today, locale, statusDisplayLabel(pendingLease.status, locale))} · ${pendingLease.start_date}`}
+                      />
+                      <InfoRow
+                        label={zh ? "待起租承租人" : "Locataire à venir"}
+                        value={customerName(pendingLease.customer_id)}
+                      />
+                    </>
+                  )}
                   {activeBooking && (
                     <InfoRow
                       label={zh ? "经办人" : "Responsable"}
@@ -449,8 +460,17 @@ function UnitProfile({ data, locale, returnTo }: UnitProfileProps) {
                         </td>
                         <td className="px-4 py-3 tabular-nums">{leaseRentLabel(row, locale)}</td>
                         <td className="px-4 py-3">
-                          <Badge variant={contractTone(row.status)}>
-                            {statusDisplayLabel(row.status, locale)}
+                          <Badge
+                            variant={
+                              isFutureLease(row, today) ? "warning" : contractTone(row.status)
+                            }
+                          >
+                            {leaseStatusLabel(
+                              row,
+                              today,
+                              locale,
+                              statusDisplayLabel(row.status, locale),
+                            )}
                           </Badge>
                         </td>
                         <td className="px-4 py-3 text-right">

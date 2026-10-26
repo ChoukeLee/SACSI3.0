@@ -6,6 +6,7 @@ import { ArrowUpRight } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { buildWorkbenchRecordHref } from "@/lib/workbench-links";
 import { statusDisplayLabel } from "@/lib/display-labels";
+import { isFutureLease, leaseStatusLabel } from "@/lib/lease-timing";
 import { conditionLabel } from "./operational-position";
 import { getUnitAuditLogs, type UnitAuditLogEntry } from "./actions";
 import {
@@ -35,6 +36,7 @@ export function UnitBusinessRelations({
     error: boolean;
   } | null>(null);
   const zh = locale === "zh";
+  const today = new Date().toISOString().slice(0, 10);
   const key = `${record.unit.id}:${building.id}:${page}:${retry}`;
   useEffect(() => {
     const controller = new AbortController();
@@ -167,7 +169,11 @@ export function UnitBusinessRelations({
                         ? "日租订单"
                         : "Séjour"}
                 </span>
-                <span>{statusDisplayLabel(row.status, locale)}</span>
+                <span>
+                  {row.type === "lease"
+                    ? `${leaseStatusLabel({ status: row.status, start_date: row.start }, today, locale, statusDisplayLabel(row.status, locale))}${isFutureLease({ status: row.status, start_date: row.start }, today) ? ` · ${row.start}` : ""}`
+                    : statusDisplayLabel(row.status, locale)}
+                </span>
               </div>
               <span className={styles.sub}>{row.contractNo ?? (zh ? "订单" : "Réservation")}</span>
               <span className={styles.sub}>
