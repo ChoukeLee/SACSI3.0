@@ -16,6 +16,7 @@ export interface OperatingSnapshot {
   assetCount: number;
   assetAttention: number;
   leaseCount: number;
+  pendingLeaseCount?: number;
   renewalCount: number;
   saleCount: number;
   saleAttention: number;
@@ -88,6 +89,13 @@ export function decodeOperatingSnapshot(value: unknown): OperatingSnapshot {
     OperatingSnapshot,
     (typeof amounts)[number]
   >;
+  const pendingLeaseCount =
+    raw.pendingLeaseCount === undefined ? undefined : numeric(raw.pendingLeaseCount);
+  if (
+    pendingLeaseCount !== undefined &&
+    (!Number.isSafeInteger(pendingLeaseCount) || pendingLeaseCount < 0)
+  )
+    throw new Error("OperatingSnapshotUnavailable");
   for (const key of amounts.filter((key) => !["netCollected", "dailyNet"].includes(key))) {
     if (result[key] < 0) throw new Error("OperatingSnapshotUnavailable");
   }
@@ -127,6 +135,7 @@ export function decodeOperatingSnapshot(value: unknown): OperatingSnapshot {
   );
   return {
     ...result,
+    ...(pendingLeaseCount !== undefined ? { pendingLeaseCount } : {}),
     ...(raw.nativeSummary !== undefined
       ? { nativeSummary: decodeNativeSummary(raw.nativeSummary) }
       : {}),

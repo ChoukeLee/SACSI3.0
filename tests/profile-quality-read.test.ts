@@ -490,6 +490,54 @@ describe("quality read completeness", () => {
 });
 
 describe("asset catalogue database facts", () => {
+  it("keeps current and future tenant identities distinct while retaining future business reservations", async () => {
+    database({
+      units: [
+        {
+          id: "office",
+          unit_no: "4F前楼",
+          code: "SACSI5-4F-FRONT",
+          building_id: "building",
+          building: {
+            id: "building",
+            code: "SACSI5",
+            display_name: "5",
+            project_id: "project",
+            project: { code: "SACSI", display_name: "SACSI" },
+          },
+          lease_contracts: [
+            {
+              status: "active",
+              start_date: "2099-11-15",
+              customer: { name: "Future tenant" },
+              expected_end_date: "2103-02-14",
+              expected_end_confirmed: true,
+            },
+            {
+              status: "active",
+              start_date: "2000-01-01",
+              customer: { name: "Current tenant" },
+              expected_end_date: null,
+              expected_end_confirmed: false,
+            },
+          ],
+          sale_contracts: [],
+          daily_bookings: [],
+        },
+      ],
+      unit_operational_position: [
+        { id: "office", lease_occupied: true, lease_pending: true, lease_start_date: "2099-11-15" },
+      ],
+    });
+    const catalogue = await loadUnitPageData();
+    expect(catalogue.unitPartySummaries.office).toMatchObject({
+      leaseCustomerName: "Current tenant",
+      leaseEndConfirmed: false,
+      pendingLeaseCustomerName: "Future tenant",
+      pendingLeaseEndDate: "2103-02-14",
+    });
+    expect(catalogue.managedLeaseUnitIds).toContain("office");
+  });
   it("does not fabricate missing storefront flags or remove the recorded disabled daily flag", async () => {
     const building = {
       id: "building",

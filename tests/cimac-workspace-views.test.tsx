@@ -528,6 +528,53 @@ describe("CIMAC customer detail separates overview, operations and accounts", ()
 });
 
 describe("CIMAC asset detail keeps physical and business states independent", () => {
+  it.each(["zh", "fr"] as const)(
+    "preserves future reservations across asset and client views (%s)",
+    (locale) => {
+      const value = assetData(parseCimacWorkspaceQuery({ tab: "contracts" }));
+      value.asset.position = {
+        ...value.asset.position!,
+        lease_occupied: false,
+        lease_pending: true,
+        lease_start_date: "2080-11-15",
+      };
+      value.relations[0].start = "2080-11-15";
+      const pending = locale === "zh" ? "待起租 · 2080-11-15" : "À venir · 2080-11-15";
+      const reserved =
+        locale === "zh" ? "已预留，不可再次出租" : "Réservé, indisponible à la relocation";
+      expect(cimacOccupancy(value.asset, locale)).toContain(pending);
+      expect(cimacOccupancy(value.asset, locale)).toContain(reserved);
+      const directory = assetDirectory();
+      directory.rows = [value.asset];
+      directory.summary = cimacAssetCounts(directory.rows);
+      render(<CimacAssetDirectoryView data={directory} locale={locale} />);
+      expect(host.textContent).toContain(pending);
+      expect(host.textContent).toContain(reserved);
+      render(<CimacAssetView data={value} locale={locale} />);
+      expect(host.textContent).toContain(pending);
+      expect(host.textContent).toContain(reserved);
+      const client = customer(parseCimacWorkspaceQuery({ tab: "contracts" }, "customers"));
+      client.relations[0].startDate = "2080-11-15";
+      render(<CimacCustomerView data={client} locale={locale} />);
+      expect(host.textContent).toContain(pending);
+      expect(value.relations[0].status).toBe("active");
+      expect(client.relations[0].status).toBe("active");
+    },
+  );
+  it("keeps actual occupation and unverified field evidence visible alongside a future reservation", () => {
+    const value = asset({ occupancyVerified: false });
+    value.position = {
+      ...value.position!,
+      lease_occupied: false,
+      lease_pending: true,
+      lease_start_date: "2026-11-15",
+    };
+    expect(cimacOccupancy(value, "zh")).toBe(
+      "占用待核 · 待起租 · 2026-11-15 · 已预留，不可再次出租",
+    );
+    value.position.daily_occupied = true;
+    expect(cimacOccupancy(value, "zh")).toContain("日租占用 · 需核 · 待起租 · 2026-11-15");
+  });
   it("shows four separate states without treating a lease as delivery or opening", () => {
     render(<CimacAssetView data={assetData()} locale="zh" />);
     const state = host.querySelector("dl[aria-label='资产独立状态']")!;

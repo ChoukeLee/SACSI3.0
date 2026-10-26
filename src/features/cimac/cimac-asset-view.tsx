@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { buildWorkbenchRecordHref } from "@/lib/workbench-links";
+import { isFutureLease, leaseStatusLabel } from "@/lib/lease-timing";
 import type { UnitBusinessRelation } from "@/features/units/unit-workbench-model";
 import type { CimacAssetData } from "./cimac-workspace-types";
 import { cimacWorkspaceHref } from "./cimac-workspace-query";
@@ -50,6 +51,7 @@ export function CimacAssetView({
 }: CimacAssetViewProps) {
   const t = (zh: string, fr: string) => cimacText(locale, zh, fr);
   const { asset, query } = data;
+  const today = new Date().toISOString().slice(0, 10);
   const current = cimacWorkspaceHref("assets", locale, query, asset.id);
   const directory = cimacWorkspaceHref("assets", locale, {
     ...query,
@@ -101,6 +103,8 @@ export function CimacAssetView({
     <>
       {data.relations.length ? (
         data.relations.map((relation) => {
+          const timing = { status: relation.status, start_date: relation.start };
+          const pendingLease = relation.type === "lease" && isFutureLease(timing, today);
           const legacyHref =
             relation.type === "lease" || relation.type === "sale"
               ? buildWorkbenchRecordHref({
@@ -119,8 +123,14 @@ export function CimacAssetView({
               <div>
                 <div className={styles.contractTitle}>
                   <h3>{relation.contractNo || t("业务编号待核", "Référence à vérifier")}</h3>
-                  <CimacPill tone={relation.status === "active" ? "blue" : undefined}>
-                    {cimacContractStatus(relation.status, locale)}
+                  <CimacPill
+                    tone={
+                      pendingLease ? "amber" : relation.status === "active" ? "blue" : undefined
+                    }
+                  >
+                    {relation.type === "lease"
+                      ? `${leaseStatusLabel(timing, today, locale, cimacContractStatus(relation.status, locale))}${pendingLease ? ` · ${relation.start}` : ""}`
+                      : cimacContractStatus(relation.status, locale)}
                   </CimacPill>
                 </div>
                 <p className={styles.propertySub}>

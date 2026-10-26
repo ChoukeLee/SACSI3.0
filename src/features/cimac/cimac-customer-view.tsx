@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { buildWorkbenchRecordHref } from "@/lib/workbench-links";
+import { isFutureLease, leaseStatusLabel } from "@/lib/lease-timing";
 import type { CustomerRelation } from "@/features/customers/customer-directory-model";
 import type { CimacCustomerData } from "./cimac-workspace-types";
 import { cimacWorkspaceHref } from "./cimac-workspace-query";
@@ -45,6 +46,7 @@ export function CimacCustomerView({
 }: CimacCustomerViewProps) {
   const t = (zh: string, fr: string) => cimacText(locale, zh, fr);
   const { profile, summary, query } = data;
+  const today = new Date().toISOString().slice(0, 10);
   const current = cimacWorkspaceHref("customers", locale, query, profile.id);
   const directory = cimacWorkspaceHref("customers", locale, {
     ...query,
@@ -252,6 +254,8 @@ export function CimacCustomerView({
             >
               {data.relations.length ? (
                 data.relations.map((relation) => {
+                  const timing = { status: relation.status, start_date: relation.startDate };
+                  const pendingLease = relation.role === "lease" && isFutureLease(timing, today);
                   const contractHref =
                     relation.role === "lease"
                       ? buildWorkbenchRecordHref({
@@ -278,8 +282,18 @@ export function CimacCustomerView({
                               {t("已生效合同资料", "Dossier contractuel confirmé en vigueur")}
                             </CimacPill>
                           ) : null}
-                          <CimacPill tone={relation.status === "active" ? "blue" : undefined}>
-                            {cimacContractStatus(relation.status, locale)}
+                          <CimacPill
+                            tone={
+                              pendingLease
+                                ? "amber"
+                                : relation.status === "active"
+                                  ? "blue"
+                                  : undefined
+                            }
+                          >
+                            {relation.role === "lease"
+                              ? `${leaseStatusLabel(timing, today, locale, cimacContractStatus(relation.status, locale))}${pendingLease ? ` · ${relation.startDate}` : ""}`
+                              : cimacContractStatus(relation.status, locale)}
                           </CimacPill>
                         </div>
                         <p className={styles.propertySub}>

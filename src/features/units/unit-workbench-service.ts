@@ -164,7 +164,7 @@ export async function readUnitWorkbench(
         client
           .from("unit_operational_position")
           .select(
-            "id,building_id,ownership,operational_condition,daily_occupied,lease_occupied,cleaning_pending,daily_enabled,lease_enabled",
+            "id,building_id,ownership,operational_condition,daily_occupied,lease_occupied,cleaning_pending,daily_enabled,lease_enabled,lease_pending,lease_start_date",
             { count: "exact" },
           )
           .eq("building_id", building.id)

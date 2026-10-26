@@ -35,9 +35,14 @@ export function OperatingDashboard({
     {
       key: "lease",
       label: zh ? "长租经营" : "Location longue",
-      value: `${data.leaseCount} ${zh ? "份生效合同" : "contrats actifs"}`,
+      value: `${data.leaseCount} ${zh ? "份已起租合同" : "baux commencés"}`,
       money: data.businessNet.lease,
-      note: `${data.renewalCount} ${zh ? "份未来30天到期" : "à échéance sous 30 jours"}`,
+      note: [
+        `${data.renewalCount} ${zh ? "份未来30天到期" : "à échéance sous 30 jours"}`,
+        ...(data.pendingLeaseCount !== undefined
+          ? [`${data.pendingLeaseCount} ${zh ? "份待起租" : "baux à venir"}`]
+          : []),
+      ].join(" · "),
       href: "/leases",
     },
     ...(allowsSale

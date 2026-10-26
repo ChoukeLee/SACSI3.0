@@ -298,6 +298,41 @@ describe("asset directory UI", () => {
     expect(fetcher).not.toHaveBeenCalled();
     expect(mocks.audit).not.toHaveBeenCalled();
   });
+  it("labels a future active contract as pending in the asset business relation", async () => {
+    fetcher.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          unitId: uuid(100),
+          buildingId: building,
+          projectId: project,
+          total: 1,
+          page: 1,
+          relations: [
+            {
+              id: uuid(900),
+              type: "lease",
+              contractNo: "L-FUTURE",
+              status: "active",
+              start: "2099-11-15",
+              end: "2103-02-14",
+              endDateKind: "expected",
+              endConfirmed: true,
+              customerId: uuid(901),
+              customerName: "Future tenant",
+              agentId: null,
+              agentName: null,
+            },
+          ],
+        }),
+      ),
+    );
+    await render();
+    await selectFirst();
+    await click(button("业务关联"));
+    const relation = host.querySelector("article");
+    expect(relation?.textContent).toContain("待起租 · 2099-11-15");
+    expect(relation?.textContent).toContain("Future tenant");
+  });
   it("preserves concurrent sold, leased and cleaning conditions, leaving unknown occupancy unknown", async () => {
     await render();
     expect(host.querySelector("tbody")?.textContent).toContain("已售");
@@ -305,6 +340,25 @@ describe("asset directory UI", () => {
     expect(host.querySelector("tbody")?.textContent).toContain("待保洁");
     expect(host.querySelector("tbody")?.textContent).toContain("占用待核实");
     expect(host.querySelector("tbody")?.textContent).not.toContain("可出租");
+  });
+  it("shows a future reserved lease with its start date while preserving independent states", async () => {
+    const value = data();
+    value.rows[0].unit.status = "leased";
+    value.rows[0].position = {
+      ...value.rows[0].position!,
+      lease_occupied: false,
+      lease_pending: true,
+      lease_start_date: "2026-11-15",
+    };
+    await render(value);
+    expect(host.querySelector("tbody")?.textContent).toContain("待起租 · 2026-11-15");
+    expect(host.querySelector("tbody")?.textContent).not.toContain("长租占用");
+    expect(host.querySelector("tbody")?.textContent).toContain("已售");
+    expect(host.querySelector("tbody")?.textContent).toContain("维修中");
+    await selectFirst();
+    expect(host.textContent).toContain("资产已预留");
+    expect(host.textContent).toContain("不代表可再次出租");
+    expect(value.rows[0].unit.status).toBe("leased");
   });
   it("selects the exact asset, updates its stable URL and does not read business/history until requested", async () => {
     await render();

@@ -38,6 +38,7 @@ export interface WorkspaceQuery {
 export interface WorkspaceStats {
   scopeCount: number;
   active: number;
+  pending?: number;
   rent: number;
   total: number;
   currentDue: number;
@@ -276,6 +277,13 @@ export function decodeWorkspace(
     "dueSoon",
   ])
     finite(stats[key]);
+  if (
+    stats.pending !== undefined &&
+    (!Number.isSafeInteger(stats.pending) ||
+      Number(stats.pending) < 0 ||
+      Number(stats.pending) > Number(stats.scopeCount))
+  )
+    throw new WorkspaceReadError();
   if (
     typeof stats.unknownAll !== "boolean" ||
     stats.scopeCount !== data.scopeCount ||

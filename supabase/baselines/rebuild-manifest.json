@@ -221,6 +221,14 @@
     {
       "file": "20261025115933_cimac_asset_area_profiles_correction.sql",
       "sha256": "fe774edd1f499a985caceb8d7b272b7fa2177896e7244a2811b43bec4a9e151a"
+    },
+    {
+      "file": "20261026160811_fix_operator_collection_lease_receipts.sql",
+      "sha256": "374b8991633cbb00cd82456b091bf95fc3a12d4eb991508a76a9dffd7799f7b3"
+    },
+    {
+      "file": "20261026091738_future_lease_operating_projection.sql",
+      "sha256": "9906aef61c5fbeaa75673d6300ca525c7cf4d36cb208f92661236acd7d4515c5"
     }
   ],
   "excluded": [

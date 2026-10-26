@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import { sortUnits } from "@/lib/utils";
+import { isCurrentLease, isFutureLease } from "@/lib/lease-timing";
 import type { UnitPartySummary } from "@/features/units/unit-party-summary";
 import type { BuildingRow, UnitBusinessFlagRow, UnitRow } from "@/types/database";
 import type { UnitPosition } from "./operational-position";
@@ -28,6 +29,7 @@ type CatalogUnit = UnitRow & {
     expected_end_date: string | null;
     expected_end_confirmed: boolean | null;
     start_date: string;
+    status: string;
     customer: RelatedCustomer;
   }>;
   sale_contracts: Array<{
@@ -94,7 +96,7 @@ export async function loadUnitPageData() {
         supabase
           .from("unit_operational_position")
           .select(
-            "id,ownership,operational_condition,daily_occupied,lease_occupied,cleaning_pending,daily_enabled,lease_enabled",
+            "id,ownership,operational_condition,daily_occupied,lease_occupied,cleaning_pending,daily_enabled,lease_enabled,lease_pending,lease_start_date",
             { count: "exact" },
           )
           .order("id")
@@ -124,9 +126,13 @@ export async function loadUnitPageData() {
 
     businessFlagsMap[unit.id] = (unit.unit_business_flags ?? []) as UnitBusinessFlagRow[];
 
-    const lease = [...(unit.lease_contracts ?? [])].sort((left, right) =>
-      right.start_date.localeCompare(left.start_date),
-    )[0];
+    const leases = unit.lease_contracts ?? [];
+    const lease = leases
+      .filter((row) => isCurrentLease(row, today))
+      .sort((left, right) => right.start_date.localeCompare(left.start_date))[0];
+    const pendingLease = leases
+      .filter((row) => isFutureLease(row, today))
+      .sort((left, right) => left.start_date.localeCompare(right.start_date))[0];
     const sale = [...(unit.sale_contracts ?? [])].sort((left, right) =>
       right.signed_date.localeCompare(left.signed_date),
     )[0];
@@ -138,11 +144,16 @@ export async function loadUnitPageData() {
       return leftFuture - rightFuture || left.check_in.localeCompare(right.check_in);
     })[0];
 
-    if (lease) managedLeaseUnitIds.push(unit.id);
+    if (leases.length) managedLeaseUnitIds.push(unit.id);
     unitPartySummaries[unit.id] = {
       leaseCustomerName: lease ? customerName(lease.customer) : undefined,
       leaseEndDate: lease?.expected_end_date ?? undefined,
       leaseEndConfirmed: lease ? lease.expected_end_confirmed !== false : undefined,
+      pendingLeaseCustomerName: pendingLease ? customerName(pendingLease.customer) : undefined,
+      pendingLeaseEndDate: pendingLease?.expected_end_date ?? undefined,
+      pendingLeaseEndConfirmed: pendingLease
+        ? pendingLease.expected_end_confirmed !== false
+        : undefined,
       saleCustomerName: sale ? customerName(sale.customer) : undefined,
       dailyCustomerName: booking
         ? customerName(booking.guest_customer) || booking.guest_name?.trim()

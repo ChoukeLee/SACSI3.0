@@ -7,9 +7,20 @@ export interface UnitPosition {
   operational_condition: string;
   daily_occupied: boolean;
   lease_occupied: boolean;
+  /** An active future lease reserves the asset without counting as current occupation. */
+  lease_pending?: boolean;
+  lease_start_date?: string | null;
   cleaning_pending: boolean;
   daily_enabled: boolean;
   lease_enabled: boolean;
+}
+
+export function pendingLeaseLabel(
+  position: UnitPosition | null | undefined,
+  locale: Locale,
+): string | null {
+  if (!position?.lease_pending) return null;
+  return `${locale === "zh" ? "待起租" : "À venir"}${position.lease_start_date ? ` · ${position.lease_start_date}` : ""}`;
 }
 
 export function conditionLabel(condition: string | undefined, locale: Locale): string {

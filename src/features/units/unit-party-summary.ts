@@ -6,5 +6,8 @@ export interface UnitPartySummary {
   leaseCustomerName?: string;
   leaseEndDate?: string;
   leaseEndConfirmed?: boolean;
+  pendingLeaseCustomerName?: string;
+  pendingLeaseEndDate?: string;
+  pendingLeaseEndConfirmed?: boolean;
   saleCustomerName?: string;
 }

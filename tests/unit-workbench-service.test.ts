@@ -156,6 +156,25 @@ describe("bounded asset workbench reads", () => {
     expect(result.rows.at(-1)?.unit.unit_no).toBe("123");
     expect(result.total).toBe(123);
   });
+  it("reads future reservations explicitly and excludes them from current occupancy totals", async () => {
+    Object.assign(tables.unit_operational_position[0], {
+      lease_occupied: false,
+      daily_occupied: false,
+      lease_pending: true,
+      lease_start_date: "2026-11-15",
+    });
+    tables.units[0].status = "leased";
+    const result = await readUnitWorkbench(client());
+    expect(result.summary.occupied).toBe(0);
+    expect(result.rows[0].unit.status).toBe("leased");
+    expect(result.rows[0].position).toMatchObject({
+      lease_pending: true,
+      lease_start_date: "2026-11-15",
+    });
+    const positionRead = calls.find((call) => call.table === "unit_operational_position");
+    expect(positionRead?.columns.split(",")).toContain("lease_pending");
+    expect(positionRead?.columns.split(",")).toContain("lease_start_date");
+  });
   it("fully reads lightweight index pages even when the Data API limit is smaller", async () => {
     pageCap = 11;
     const result = await readUnitWorkbench(client(), { floor: "2F" });

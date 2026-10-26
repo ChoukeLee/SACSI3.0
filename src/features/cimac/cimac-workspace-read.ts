@@ -87,7 +87,7 @@ const relationRow = (r: CustomerRelation): CustomerRelation => ({
 const unitColumns =
   "id,building_id,code,unit_no,kind,asset_subtype,floor_label,area_sqm,construction_status,occupancy_verified,updated_at";
 const positionColumns =
-  "id,building_id,ownership,operational_condition,daily_occupied,lease_occupied,cleaning_pending,daily_enabled,lease_enabled";
+  "id,building_id,ownership,operational_condition,daily_occupied,lease_occupied,cleaning_pending,daily_enabled,lease_enabled,lease_pending,lease_start_date";
 const fail = (error?: { code?: string } | null): never => {
   throw new CimacWorkspaceReadError(error?.code === "42501" ? 403 : 503);
 };

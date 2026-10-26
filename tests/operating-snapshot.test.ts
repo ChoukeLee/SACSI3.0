@@ -23,4 +23,12 @@ describe("operating snapshot boundary", () => {
     const missingCount = { ...data, trend: data.trend.map(({ count: _count, ...row }) => row) };
     expect(() => decodeOperatingSnapshot(missingCount)).toThrow("OperatingSnapshotUnavailable");
   });
+  it("accepts the separate future lease count while retaining compatibility with older snapshots", () => {
+    const base = operatingSnapshotFixture();
+    expect(decodeOperatingSnapshot(base).pendingLeaseCount).toBeUndefined();
+    expect(decodeOperatingSnapshot({ ...base, pendingLeaseCount: 3 }).pendingLeaseCount).toBe(3);
+    for (const pendingLeaseCount of [-1, 1.5, null, "NaN"]) {
+      expect(() => decodeOperatingSnapshot({ ...base, pendingLeaseCount })).toThrow();
+    }
+  });
 });

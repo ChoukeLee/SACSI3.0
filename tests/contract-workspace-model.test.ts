@@ -1,6 +1,17 @@
 import { expect, it } from "vitest";
 import { decodeWorkspace, parseWorkspaceQuery } from "../src/features/contracts/workspace-model";
 import { workspaceContract, workspaceFixture } from "./fixtures/contract-workspace";
+it("validates the separate pending lease count without requiring it from older responses", () => {
+  const d = workspaceFixture();
+  expect(decodeWorkspace(d, "lease", d.query, "list").stats.pending).toBeUndefined();
+  d.stats.pending = 1;
+  expect(decodeWorkspace(d, "lease", d.query, "list").stats.pending).toBe(1);
+  for (const pending of [-1, 0.5, d.scopeCount + 1]) {
+    expect(() =>
+      decodeWorkspace({ ...d, stats: { ...d.stats, pending } }, "lease", d.query, "list"),
+    ).toThrow();
+  }
+});
 it("validates scope stats, records and counts without manufacturing unknown money", () => {
   const d = workspaceFixture();
   expect(decodeWorkspace(d, "lease", d.query, "list")).toEqual(d);

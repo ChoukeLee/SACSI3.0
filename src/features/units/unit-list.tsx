@@ -13,7 +13,12 @@ import { FilterBar, OperationalPage, SegmentedControl } from "@/components/ui/op
 import { HistoryPagination, useHistoryPage } from "@/features/profiles/history-pagination";
 import { UnitDetailPanel } from "./unit-detail-panel";
 import { UnitFilters } from "./unit-filters";
-import { conditionLabel, matchesUnitPosition, type UnitPosition } from "./operational-position";
+import {
+  conditionLabel,
+  matchesUnitPosition,
+  pendingLeaseLabel,
+  type UnitPosition,
+} from "./operational-position";
 import type { UnitRow, UnitBusinessFlagRow } from "@/types/database";
 import type { UnitPartySummary } from "./unit-party-summary";
 
@@ -161,6 +166,7 @@ export function UnitList({
             unit.notes,
             party?.dailyCustomerName,
             party?.leaseCustomerName,
+            party?.pendingLeaseCustomerName,
             party?.saleCustomerName,
           ]
             .filter(Boolean)
@@ -398,6 +404,17 @@ function UnitTableRow({
               {party?.leaseCustomerName || (zh ? "客户待补" : "Client à compléter")}
             </div>
           )}
+          {position?.lease_pending && (
+            <div className="text-amber-700">
+              <span className="font-medium">{pendingLeaseLabel(position, locale)}</span> ·{" "}
+              {party?.pendingLeaseCustomerName || (zh ? "客户待补" : "Client à compléter")}
+              <span className="block text-xs">
+                {zh
+                  ? "已预留，不作当前占用或可出租"
+                  : "Réservé, sans occupation actuelle ni disponibilité"}
+              </span>
+            </div>
+          )}
           {position?.daily_occupied && (
             <div>
               <span className="font-medium">{zh ? "日租入住" : "Séjour"}</span> ·{" "}
@@ -413,6 +430,7 @@ function UnitTableRow({
           {position &&
             !position.daily_occupied &&
             !position.lease_occupied &&
+            !position.lease_pending &&
             party?.dailyStatus !== "confirmed" && (
               <span className="text-muted-foreground">
                 {zh ? "无当前占用" : "Aucune occupation actuelle"}
@@ -465,10 +483,21 @@ function UnitTableRow({
                 : (party?.leaseEndDate ?? "—")}
             </div>
           )}
+          {position?.lease_pending && (
+            <div>
+              {zh ? "未来租约到期" : "Fin du bail à venir"} ·{" "}
+              {party?.pendingLeaseEndConfirmed === false
+                ? zh
+                  ? "未确认"
+                  : "Non confirmée"
+                : (party?.pendingLeaseEndDate ?? "—")}
+            </div>
+          )}
           {(position?.daily_occupied || party?.dailyStatus === "confirmed") && (
             <div>{party?.dailyDateText?.replace("未定", zh ? "未定" : "Ouvert") ?? "—"}</div>
           )}
           {!position?.lease_occupied &&
+            !position?.lease_pending &&
             !position?.daily_occupied &&
             party?.dailyStatus !== "confirmed" &&
             "—"}

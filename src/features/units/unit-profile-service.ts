@@ -54,7 +54,13 @@ export async function fetchUnitProfile(unitId: string): Promise<UnitProfileData 
     payments,
   ] = await Promise.all([
     supabase.from("buildings").select("display_name, code").eq("id", unit.building_id).single(),
-    supabase.from("unit_operational_position").select("*").eq("id", unitId).single(),
+    supabase
+      .from("unit_operational_position")
+      .select(
+        "id,ownership,operational_condition,daily_occupied,lease_occupied,cleaning_pending,daily_enabled,lease_enabled,lease_pending,lease_start_date",
+      )
+      .eq("id", unitId)
+      .single(),
     fetchAllPages<DailyBookingRow>(
       (from, to) =>
         supabase

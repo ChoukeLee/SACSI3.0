@@ -99,6 +99,27 @@ describe("operational facts do not invent business stages or money", () => {
     );
     expect(rows[0]).not.toHaveProperty("assignee");
   });
+  it("preserves a future lease reservation independently of current occupation, ownership and condition", () => {
+    const row = decodeCimacAsset(
+      scope(),
+      unit(),
+      position({
+        lease_pending: true,
+        lease_start_date: "2026-11-15",
+        ownership: "sold",
+        operational_condition: "maintenance",
+      }),
+    );
+    expect(row.position).toMatchObject({
+      lease_pending: true,
+      lease_start_date: "2026-11-15",
+      ownership: "sold",
+    });
+    expect(cimacAssetCounts([row])).toMatchObject({ occupied: 0, unoccupied: 1, maintenance: 1 });
+    expect(filterCimacAssets([row], parseCimacWorkspaceQuery({ filter: "occupied" }))).toHaveLength(
+      0,
+    );
+  });
   it.each([
     { kind: "invalid" },
     { id: "bad" },
@@ -135,6 +156,10 @@ describe("operational facts do not invent business stages or money", () => {
     { ownership: "owned" },
     { daily_occupied: null },
     { operational_condition: "maybe" },
+    { lease_pending: "true" },
+    { lease_pending: null },
+    { lease_start_date: "tomorrow" },
+    { lease_start_date: "2026-02-30" },
   ])("verifies exact position identity %#", (extra) => {
     expect(() => decodeCimacPosition(position(extra), id(3), id(2))).toThrow();
   });

@@ -17,6 +17,19 @@ afterEach(async () => {
   host.remove();
   vi.unstubAllGlobals();
 });
+it("shows future leases separately from contracts whose start date has arrived", async () => {
+  await act(async () =>
+    root.render(
+      <OperatingDashboard
+        snapshot={{ ...operatingSnapshotFixture(), leaseCount: 7, pendingLeaseCount: 3 }}
+        locale="zh"
+      />,
+    ),
+  );
+  const row = host.querySelector('tr[data-business="lease"]')!;
+  expect(row.textContent).toContain("7 份已起租合同");
+  expect(row.textContent).toContain("3 份待起租");
+});
 it("keeps daily rental in one final overview row, not a misleading occupancy hero", async () => {
   await act(async () =>
     root.render(<OperatingDashboard snapshot={operatingSnapshotFixture()} locale="zh" />),

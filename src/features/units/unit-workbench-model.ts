@@ -1,7 +1,7 @@
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import type { UnitBusinessFlagRow, UnitRow } from "@/types/database";
-import type { UnitPosition } from "./operational-position";
+import { pendingLeaseLabel, type UnitPosition } from "./operational-position";
 
 export const UNIT_WORKBENCH_PAGE_SIZE = 50;
 export const unitWorkbenchUuid =
@@ -116,10 +116,15 @@ export function unitOccupancyVerified(record: UnitWorkbenchPositionRecord): bool
 }
 export function unitOccupancyText(record: UnitWorkbenchPositionRecord, locale: Locale): string {
   const zh = locale === "zh";
+  const pending = pendingLeaseLabel(record.position, locale);
+  const withPending = (text: string) => (pending ? `${text} · ${pending}` : text);
   if (record.position?.daily_occupied && record.position.lease_occupied)
-    return zh ? "日租与长租同时占用 · 需核对" : "Séjour et bail simultanés · à vérifier";
-  if (record.position?.daily_occupied) return zh ? "日租实际入住" : "Séjour effectif";
-  if (record.position?.lease_occupied) return zh ? "长租占用" : "Bail actif";
+    return withPending(
+      zh ? "日租与长租同时占用 · 需核对" : "Séjour et bail simultanés · à vérifier",
+    );
+  if (record.position?.daily_occupied) return withPending(zh ? "日租实际入住" : "Séjour effectif");
+  if (record.position?.lease_occupied) return withPending(zh ? "长租占用" : "Bail actif");
+  if (pending) return pending;
   if (!unitOccupancyVerified(record)) return zh ? "占用待核实" : "Occupation à vérifier";
   return zh ? "无当前占用" : "Sans occupation actuelle";
 }

@@ -113,6 +113,7 @@ export function decodeCimacPosition(
   buildingId: string,
 ): UnitPosition {
   const row = cimacWorkspaceObject(value);
+  const leaseStart = row.lease_start_date;
   if (
     row.id !== unitId ||
     row.building_id !== buildingId ||
@@ -120,7 +121,14 @@ export function decodeCimacPosition(
     !["normal", "maintenance", "locked"].includes(String(row.operational_condition)) ||
     ["daily_occupied", "lease_occupied", "cleaning_pending", "daily_enabled", "lease_enabled"].some(
       (k) => typeof row[k] !== "boolean",
-    )
+    ) ||
+    (row.lease_pending !== undefined && typeof row.lease_pending !== "boolean") ||
+    (leaseStart !== undefined &&
+      leaseStart !== null &&
+      (typeof leaseStart !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(leaseStart) ||
+        !Number.isFinite(Date.parse(leaseStart)) ||
+        new Date(`${leaseStart}T00:00:00Z`).toISOString().slice(0, 10) !== leaseStart))
   )
     return fail();
   return {
@@ -129,6 +137,8 @@ export function decodeCimacPosition(
     operational_condition: String(row.operational_condition),
     daily_occupied: row.daily_occupied as boolean,
     lease_occupied: row.lease_occupied as boolean,
+    lease_pending: row.lease_pending as boolean | undefined,
+    lease_start_date: (leaseStart as string | null | undefined) ?? null,
     cleaning_pending: row.cleaning_pending as boolean,
     daily_enabled: row.daily_enabled as boolean,
     lease_enabled: row.lease_enabled as boolean,
