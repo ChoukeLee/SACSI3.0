@@ -301,3 +301,56 @@ it('can disable only historical corrections at the database boundary without ena
  finally {await owner("create or replace function public.booking_checkout_correction_protocol_version() returns integer language sql security invoker set search_path='' as $$ select 1; $$;");}
  await login(f.actor);expect((await preview(correction(f))).plan.outstandingAfter).toBe(0);
 });
+
+async function settledOpenStay() {
+ const f=await seed('checked_out');
+ const dates=(await owner('select (current_date-6)::text arrival,current_date::text departure')).rows[0];
+ await owner(`update daily_bookings set checkout_mode='open',check_in=current_date-6,check_out=current_date,
+   actual_check_out=current_date,nightly_price_xof=80000,total_amount_xof=480000,final_amount_xof=480000 where id=$1`,[f.booking]);
+ await owner('update receivables set due_date=current_date-6,amount_xof=480000 where source_id=$1',[f.booking]);
+ await login(f.actor);return {...f,...dates};
+}
+it('waives a checked-out open stay without changing dates, mode, money history or another cancelled record',async()=>{
+ const cancelled=await seed('cancelled');
+ await owner("update receivables set status='cancelled' where source_id=$1",[cancelled.booking]);
+ const cancelledBefore=await correctionState(cancelled);
+ const f=await settledOpenStay(),q=correction(f,{actualCheckOut:f.departure,discountAmountXof:480000}),before=await correctionState(f);
+ await login(f.actor);expect((await preview(q)).plan).toMatchObject({grossAfter:480000,discountAfter:480000,paidAfter:0,totalAfter:0,outstandingAfter:0});
+ const d=await draft(q);expect(await confirm(d.id)).toMatchObject({status:'completed',verified:true});
+ const after=await correctionState(f);
+ expect(after.booking).toMatchObject({checkout_mode:'open',check_in:f.arrival,check_out:f.departure,actual_check_out:f.departure,
+   nightly_price_xof:80000,total_amount_xof:480000,manual_discount_amount_xof:480000,final_amount_xof:0,prepaid_amount_xof:0,billing_status:'settled'});
+ expect(after.receivables[0]).toMatchObject({amount_xof:0,paid_amount_xof:0,status:'paid'});
+ for(const key of ['payments','ledger','unit','cleaning'])expect(after[key]).toEqual(before[key]);
+ expect(await correctionState(cancelled)).toEqual(cancelledBefore);
+});
+it('never changes the historical dates of a checked-out open stay',async()=>{
+ const f=await settledOpenStay(),earlier=(await db.query('select (current_date-1)::text d')).rows[0].d;
+ await expect(preview(correction(f,{actualCheckOut:earlier,discountAmountXof:0}))).rejects.toThrow('operationAssistanceRequired');
+ await owner('update daily_bookings set check_out=current_date+1 where id=$1',[f.booking]);await login(f.actor);
+ await expect(preview(correction(f,{actualCheckOut:f.departure,discountAmountXof:480000}))).rejects.toThrow('operationAssistanceRequired');
+});
+it('rejects open stays that have not checked out or lack an actual checkout',async()=>{
+ const f=await settledOpenStay();
+ await owner("update daily_bookings set status='checked_in' where id=$1",[f.booking]);await login(f.actor);
+ await expect(preview(correction(f,{actualCheckOut:f.departure,discountAmountXof:480000}))).rejects.toThrow('operationAssistanceRequired');
+ await owner("update daily_bookings set status='checked_out',actual_check_out=null where id=$1",[f.booking]);await login(f.actor);
+ await expect(preview(correction(f,{actualCheckOut:f.departure,discountAmountXof:480000}))).rejects.toThrow('operationAssistanceRequired');
+});
+it('does not reprice inconsistent open stay history or silently refund existing receipts',async()=>{
+ const f=await settledOpenStay();
+ await owner('update daily_bookings set total_amount_xof=480001 where id=$1',[f.booking]);await login(f.actor);
+ await expect(preview(correction(f,{actualCheckOut:f.departure,discountAmountXof:480000}))).rejects.toThrow('operationFinanceMismatch');
+ await owner('update daily_bookings set total_amount_xof=480000 where id=$1',[f.booking]);await login(f.actor);
+ await db.query("select public.daily_record_payment_rpc($1,20000,current_date,null,$2,'{}')",[f.booking,randomUUID()]);
+ await expect(preview(correction(f,{actualCheckOut:f.departure,discountAmountXof:480000}))).rejects.toThrow('operationRefundReviewRequired');
+});
+it('can disable open-stay discounts independently while preserving fixed-stay corrections',async()=>{
+ const f=await settledOpenStay();
+ await owner("create or replace function public.booking_open_checkout_discount_protocol_version() returns integer language sql security invoker set search_path='' as $$ select 0; $$;");
+ try {
+   await login(f.actor);await expect(preview(correction(f,{actualCheckOut:f.departure,discountAmountXof:480000}))).rejects.toThrow('operationAssistanceRequired');
+   const fixed=await missedCheckout();expect((await preview(correction(fixed))).plan.totalAfter).toBe(40000);
+ } finally {await owner("create or replace function public.booking_open_checkout_discount_protocol_version() returns integer language sql security invoker set search_path='' as $$ select 1; $$;");}
+ expect((await owner("select has_function_privilege('anon','public.booking_open_checkout_discount_protocol_version()','execute') anon,has_function_privilege('service_role','public.booking_open_checkout_discount_protocol_version()','execute') service")).rows[0]).toEqual({anon:false,service:false});
+});
