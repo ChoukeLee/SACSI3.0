@@ -59,10 +59,17 @@ export async function GET(request: Request) {
     /* No published migration means no new write surface. */
   }
   let checkoutCorrectionInstalled = false;
+  let settledOpenDiscountInstalled = false;
   if (bookingOperationsAvailable && auth.user.role === "admin") {
     try {
       const version = await auth.supabase.rpc("booking_checkout_correction_protocol_version");
       checkoutCorrectionInstalled = !version.error && version.data === 1;
+      if (checkoutCorrectionInstalled) {
+        const openVersion = await auth.supabase.rpc(
+          "booking_open_checkout_discount_protocol_version",
+        );
+        settledOpenDiscountInstalled = !openVersion.error && openVersion.data === 1;
+      }
     } catch {
       /* Old databases must not advertise historical corrections. */
     }
@@ -164,7 +171,11 @@ export async function GET(request: Request) {
         version: 1,
         confirmationRequired: !directBooking,
         operations: availableBookingOperations(Object.values(bookingOperationActions).flat()),
-        checkoutCorrection: { available: checkoutCorrectionAvailable, version: 1 },
+        checkoutCorrection: {
+          available: checkoutCorrectionAvailable,
+          version: 1,
+          settledOpenDiscountAvailable: checkoutCorrectionAvailable && settledOpenDiscountInstalled,
+        },
       },
       dailyWorkflow: {
         version: 1,

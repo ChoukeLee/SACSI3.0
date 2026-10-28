@@ -268,14 +268,14 @@ export function CalendarFinancePanel({
                       ) : (
                         [...financeStats.outstandingBookings]
                           .sort((a, b) => {
-                            const aOut = calculateBilling(a, todayStr).outstanding;
-                            const bOut = calculateBilling(b, todayStr).outstanding;
-                            if (bOut !== aOut) return bOut - aOut;
                             const dateCompare = a.check_in.localeCompare(b.check_in);
                             if (dateCompare !== 0) return dateCompare;
                             const aUnit = allUnitById.get(a.unit_id)?.unit_no ?? "";
                             const bUnit = allUnitById.get(b.unit_id)?.unit_no ?? "";
-                            return aUnit.localeCompare(bUnit, undefined, { numeric: true });
+                            const unitCompare = aUnit.localeCompare(bUnit, undefined, {
+                              numeric: true,
+                            });
+                            return unitCompare || a.id.localeCompare(b.id);
                           })
                           .map((b) => {
                             const u = allUnitById.get(b.unit_id);

@@ -27,11 +27,13 @@ const snapshot = {
   plan: { operation: "correct_checkout", totalAfter: 40000, paidAfter: 40000 },
 };
 let installed = true;
+let openInstalled = true;
 let allowed = true;
 let role = "admin";
 beforeEach(() => {
   vi.resetAllMocks();
   installed = true;
+  openInstalled = true;
   allowed = true;
   role = "admin";
   vi.stubEnv("SACSI_OPERATOR_CONFIRMATIONS_ENABLED", "true");
@@ -44,6 +46,8 @@ beforeEach(() => {
     supabase: { rpc },
   }));
   rpc.mockImplementation(async (name: string, args?: Record<string, unknown>) => {
+    if (name === "booking_open_checkout_discount_protocol_version")
+      return openInstalled ? { data: 1 } : { error: { message: "missing function" } };
     if (name === "booking_checkout_correction_protocol_version")
       return installed ? { data: 1 } : { error: { message: "missing function" } };
     if (name === "get_my_operator_capabilities")
@@ -111,6 +115,20 @@ it.each([false, true])(
         .find((a: { name: string }) => a.name === "correct_daily_booking")
         .supportedOperations.includes("correct_checkout"),
     ).toBe(ready);
+  },
+);
+it.each([false, true])(
+  "advertises settled open discounts only after the separate migration: %s",
+  async (ready) => {
+    openInstalled = ready;
+    const body = await (
+      await GET(new Request("https://test.invalid/api/operator/v1/capabilities"))
+    ).json();
+    expect(body.bookingOperations.checkoutCorrection).toMatchObject({
+      available: true,
+      version: 1,
+      settledOpenDiscountAvailable: ready,
+    });
   },
 );
 it.each(["no_action_grant", "not_admin"])(

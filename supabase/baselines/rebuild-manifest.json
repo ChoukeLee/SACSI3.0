@@ -225,6 +225,10 @@
     {
       "file": "20261028110428_operator_correct_checkout.sql",
       "sha256": "d0a2c64711695c969c5654b55bff639e78360cc872e2841ef93e1fe952f2ccf3"
+    },
+    {
+      "file": "20261028114712_operator_settled_open_discount.sql",
+      "sha256": "5cb0d24a6c581808cd9a695a1b5896ea3ea3396af9714e4a9dd7b5595fd2fdb3"
     }
   ],
   "excluded": [
