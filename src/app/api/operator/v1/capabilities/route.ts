@@ -58,6 +58,15 @@ export async function GET(request: Request) {
   } catch {
     /* No published migration means no new write surface. */
   }
+  let checkoutCorrectionInstalled = false;
+  if (bookingOperationsAvailable && auth.user.role === "admin") {
+    try {
+      const version = await auth.supabase.rpc("booking_checkout_correction_protocol_version");
+      checkoutCorrectionInstalled = !version.error && version.data === 1;
+    } catch {
+      /* Old databases must not advertise historical corrections. */
+    }
+  }
   const directWorkflows: OperatorDirectWorkflow[] = [];
   let nativeCollectionAvailable = false;
   let cimacMaintenanceAvailable = false;
@@ -109,6 +118,13 @@ export async function GET(request: Request) {
       process.env.NEXT_PUBLIC_APP_VERSION ??
       "local-development",
   });
+  const checkoutCorrectionAvailable =
+    checkoutCorrectionInstalled &&
+    manifest.actions.some((action) => action.name === "correct_daily_booking" && action.authorized);
+  const availableBookingOperations = (operations: readonly string[]) =>
+    operations.filter(
+      (operation) => operation !== "correct_checkout" || checkoutCorrectionAvailable,
+    );
   const directBooking = directWorkflows.includes("booking_operation");
   const directCollection = directWorkflows.includes("collection");
   const collectionActions = new Set([
@@ -125,7 +141,7 @@ export async function GET(request: Request) {
         ...action,
         availability: "implemented",
         entryPoint: "booking_operations",
-        supportedOperations: bookingOperationActions[action.name],
+        supportedOperations: availableBookingOperations(bookingOperationActions[action.name]),
         confirmationRequired: !directBooking,
         ...(directBooking ? { naturalLanguageDecision: "execute" as const } : {}),
       };
@@ -147,7 +163,8 @@ export async function GET(request: Request) {
         available: bookingOperationsAvailable,
         version: 1,
         confirmationRequired: !directBooking,
-        operations: Object.values(bookingOperationActions).flat(),
+        operations: availableBookingOperations(Object.values(bookingOperationActions).flat()),
+        checkoutCorrection: { available: checkoutCorrectionAvailable, version: 1 },
       },
       dailyWorkflow: {
         version: 1,

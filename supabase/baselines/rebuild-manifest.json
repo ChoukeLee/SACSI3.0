@@ -221,6 +221,10 @@
     {
       "file": "20261025115933_cimac_asset_area_profiles_correction.sql",
       "sha256": "fe774edd1f499a985caceb8d7b272b7fa2177896e7244a2811b43bec4a9e151a"
+    },
+    {
+      "file": "20261028110428_operator_correct_checkout.sql",
+      "sha256": "d0a2c64711695c969c5654b55bff639e78360cc872e2841ef93e1fe952f2ccf3"
     }
   ],
   "excluded": [

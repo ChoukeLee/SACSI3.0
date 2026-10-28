@@ -30,6 +30,7 @@ export function humanError(code) {
     server_unreachable:'暂时无法连接服务器，请检查网络。',
     outcome_unknown_keep_original_request_id:'网络中断，结果尚不明确。请保留原请求号核查，不要重新编号录入。',
     direct_execution_not_enabled:'服务端尚未启用直接办理；本次没有改用网页确认或尝试业务写入。请联系管理员完成发布。',
+    checkout_correction_upgrade_required:'本人账号或服务端尚未开放已退房订单更正，未发送写入。请先完成数据库、应用和连接器发布。',
     native_collection_not_available:'服务端尚未开放USD/CNY长租原币收款，未改用XOF工具、网页确认或尝试收款。请联系管理员完成发布。',
     cimac_maintenance_not_available:'本人账号或服务端尚未开放建材城管理员受控维护，未改用SQL、通用RPC或其他业务写入。',
     invalidCimacMaintenance:'建材城维护字段、日期、原币金额或整组分项不合法，未尝试写入。只允许受控业务类型，不支持任意表或列。',

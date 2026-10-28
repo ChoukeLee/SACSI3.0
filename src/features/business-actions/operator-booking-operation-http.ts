@@ -24,6 +24,7 @@ function failure(error: { message?: string }) {
     operationFinanceMismatch: "订单与账务不一致，请先对账，不要重复录入。",
     operationRefundReviewRequired:
       "请核对已退房订单的最终应收、已收和实际退款；不能超额退款或把冲正当退款。",
+    operationInvalidDate: "实际退房日期必须晚于入住日、不晚于原实际退房日和业务当天。",
     operationRoomConflict: "房间存在冲突、清洁或不可用状态，请核对后处理。",
     operationRequestConflict: "请求号已用于其他业务，请核对原单，勿换号重录。",
   };

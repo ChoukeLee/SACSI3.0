@@ -171,3 +171,133 @@ it('a future reservation preserves a currently occupied room',async()=>{
  await confirm(d.id);
  expect((await owner('select status from public.units where id=$1',[f.unit])).rows[0].status).toBe('daily_occupied');
 });
+
+// Synthetic reproduction of a missed checkout: expected one night, actual
+// checkout accidentally recorded 21 days later. No production IDs or sessions.
+async function missedCheckout() {
+ const f=await seed('checked_out');
+ const dates=(await owner(`select (current_date-21)::text arrival,(current_date-20)::text departure,
+   current_date::text recorded,(current_date+1)::text future`)).rows[0];
+ await owner(`update daily_bookings set check_in=current_date-21,check_out=current_date-20,
+   actual_check_out=current_date,nightly_price_xof=80000,total_amount_xof=1680000,final_amount_xof=1680000 where id=$1`,[f.booking]);
+ await owner(`update receivables set due_date=current_date-21,amount_xof=1680000 where source_id=$1`,[f.booking]);
+ await owner(`update units set status='available' where id=$1`,[f.unit]);
+ await owner(`insert into cleaning_tasks(unit_id,daily_booking_id,is_completed,completed_at) values($1,$2,true,now())`,[f.unit,f.booking]);
+ await login(f.actor);
+ await db.query("select public.daily_record_payment_rpc($1,40000,current_date-21,null,$2,'{}')",[f.booking,randomUUID()]);
+ return {...f,...dates};
+}
+function correction(f:any,extra:Record<string,unknown>={}) {
+ return request(f,'correct_checkout',{actualCheckOut:f.departure,discountAmountXof:40000,
+   reason:'合成测试：漏退房，一晚房费八万优惠四万',inputSource:'excel_screenshot',...extra});
+}
+async function correctionState(f:any) {
+ return (await owner(`select jsonb_build_object('booking',(select to_jsonb(b) from daily_bookings b where id=$1),
+   'receivables',(select jsonb_agg(to_jsonb(r) order by r.id) from receivables r where source_id=$1),
+   'payments',(select jsonb_agg(to_jsonb(p) order by p.id) from payments p where source_id=$1),
+   'ledger',(select jsonb_agg(to_jsonb(l) order by l.id) from ledger_entries l join payments p on p.id=l.payment_id where p.source_id=$1),
+   'cleaning',(select jsonb_agg(to_jsonb(c) order by c.id) from cleaning_tasks c where daily_booking_id=$1),
+   'unit',(select to_jsonb(u) from units u where id=$2)) v`,[f.booking,f.unit])).rows[0].v;
+}
+it('previews and atomically settles a missed checkout with explicit discount, preserving all money and room history',async()=>{
+ const f=await missedCheckout(),q=correction(f),before=await correctionState(f);
+ await login(f.actor);const snap=await preview(q);
+ expect(snap.plan).toMatchObject({actualCheckOutBefore:f.recorded,actualCheckOutAfter:f.departure,
+   priceAfter:80000,grossBefore:1680000,grossAfter:80000,discountAfter:40000,
+   totalAfter:40000,paidAfter:40000,outstandingBefore:1640000,outstandingAfter:0});
+ expect(await correctionState(f)).toEqual(before);
+ await login(f.actor);const d=await draft(q),done=await confirm(d.id);
+ expect(done).toMatchObject({status:'completed',verified:true,requestId:q.requestId,operation:'correct_checkout'});
+ const after=await correctionState(f);
+ expect(after.booking).toMatchObject({status:'checked_out',check_in:f.arrival,check_out:f.departure,
+   actual_check_out:f.departure,nightly_price_xof:80000,total_amount_xof:80000,
+   manual_discount_amount_xof:40000,final_amount_xof:40000,prepaid_amount_xof:40000,billing_status:'settled',booking_agent_id:f.agent});
+ expect(after.receivables[0]).toMatchObject({amount_xof:40000,paid_amount_xof:40000,status:'paid'});
+ for(const key of ['payments','ledger','cleaning','unit'])expect(after[key]).toEqual(before[key]);
+ const audit=(await owner("select * from audit_logs where entity_id=$1 and action='operator_booking_correct_checkout'",[f.booking])).rows[0];
+ expect(audit.actor_id).toBe(f.actor);expect(audit.before_data.actual_check_out).toBe(f.recorded);
+ expect(audit.after_data.actual_check_out).toBe(f.departure);
+ expect(audit.metadata.input_source).toBe('excel_screenshot');
+ expect(audit.metadata.checkout_correction_before.payments).toEqual(before.payments);
+ await login(f.actor);expect(await confirm(d.id)).toMatchObject({status:'completed_previously',verified:false});
+ expect((await db.query("select public.operator_booking_operation('status',$1) v",[{requestId:q.requestId}])).rows[0].v).toMatchObject({status:'completed',verified:false});
+ await expect(draft({...q,discountAmountXof:0})).rejects.toThrow('operationRequestConflict');
+});
+it('rejects settlement reductions below real receipts without inventing a refund',async()=>{
+ const f=await missedCheckout(),before=await correctionState(f);await login(f.actor);
+ await expect(preview(correction(f,{discountAmountXof:50000}))).rejects.toThrow('operationRefundReviewRequired');
+ expect(await correctionState(f)).toEqual(before);
+});
+it('rejects unsupported dates, discounts, sources and injected payment fields',async()=>{
+ const f=await missedCheckout();
+ for(const extra of [
+   {actualCheckOut:f.arrival},{actualCheckOut:f.future},{actualCheckOut:'2026-02-30'},
+   {actualCheckOut:'infinity'},{discountAmountXof:-1},{discountAmountXof:0.5},
+   {discountAmountXof:80001},{discountAmountXof:'40000'},
+   {inputSource:'screenshot_claimed_as_language'},{inputSource:null},{paymentMethod:'cash'},{finalAmountXof:0},
+ ])await expect(preview(correction(f,extra))).rejects.toThrow(/operationInvalid(Date|Request)/);
+});
+it('keeps historical corrections admin-only and rechecks revoked roles and other actors',async()=>{
+ const f=await missedCheckout(),d=await draft(correction(f));
+ const other=await seed('checked_out','front_desk');
+ await expect(preview(correction(f))).rejects.toThrow('operationForbidden');
+ await expect(confirm(d.id)).rejects.toThrow('operationForbidden');
+ await owner("update user_profiles set role='rental_sales' where id=$1",[f.actor]);await login(f.actor);
+ await expect(confirm(d.id)).rejects.toThrow('operationForbidden');
+ expect(other.actor).not.toBe(f.actor);
+});
+it('refuses non-checked-out records and inconsistent receivables or ledger before mutation',async()=>{
+ const f=await missedCheckout();
+ await owner("update daily_bookings set status='checked_in' where id=$1",[f.booking]);await login(f.actor);
+ await expect(preview(correction(f))).rejects.toThrow('operationAssistanceRequired');
+ await owner("update daily_bookings set status='checked_out' where id=$1;",[f.booking]);
+ await owner('update receivables set amount_xof=amount_xof-1 where source_id=$1',[f.booking]);await login(f.actor);
+ await expect(preview(correction(f))).rejects.toThrow('operationFinanceMismatch');
+ await owner('update receivables set amount_xof=1680000 where source_id=$1',[f.booking]);
+ await owner('update ledger_entries set amount_xof=amount_xof+1 where payment_id in(select id from payments where source_id=$1)',[f.booking]);await login(f.actor);
+ await expect(preview(correction(f))).rejects.toThrow('operationFinanceMismatch');
+});
+it('rejects a changed checkout snapshot and replaces only under the same request',async()=>{
+ const f=await missedCheckout(),q=correction(f),d=await draft(q);
+ await owner("update daily_bookings set notes='合成测试并发修改' where id=$1",[f.booking]);await login(f.actor);
+ await expect(confirm(d.id)).rejects.toThrow('operationChanged');
+ const replacement=await draft(q,d.id);expect(replacement.request_id).toBe(q.requestId);
+ await expect(confirm(d.id)).rejects.toThrow('operationExpired');
+ expect(await confirm(replacement.id)).toMatchObject({status:'completed',verified:true});
+});
+it('rolls back both correction and receivable when audit fails',async()=>{
+ const f=await missedCheckout(),d=await draft(correction(f)),before=await correctionState(f);
+ await owner(`create function public.test_checkout_audit_failure() returns trigger language plpgsql as $$
+ begin if new.action='operator_booking_correct_checkout' then raise exception 'syntheticCheckoutAuditFailure'; end if; return new; end; $$;
+ create trigger test_checkout_audit_failure before insert on audit_logs for each row execute function public.test_checkout_audit_failure();`);
+ try {
+   await login(f.actor);await expect(confirm(d.id)).rejects.toThrow('syntheticCheckoutAuditFailure');
+   expect(await correctionState(f)).toEqual(before);
+   expect((await owner('select status from private.operator_booking_operations where id=$1',[d.id])).rows[0].status).toBe('pending');
+ } finally {await owner('drop trigger test_checkout_audit_failure on audit_logs; drop function public.test_checkout_audit_failure()');}
+});
+it('serializes concurrent historical correction confirmations and writes exactly one audit',async()=>{
+ const f=await missedCheckout(),d=await draft(correction(f)),clients=await Promise.all([cluster.connect(),cluster.connect()]);
+ try {
+   for(const client of clients){await client.query("select set_config('request.jwt.claims',$1,false)",[JSON.stringify({sub:f.actor,role:'authenticated'})]);await client.query('set role authenticated');}
+   const result=await Promise.all(clients.map(client=>client.query("select public.operator_booking_operation('confirm',null,$1,null,null,'test') v",[d.id])));
+   expect(result.map(r=>r.rows[0].v.status).sort()).toEqual(['completed','completed_previously']);
+   expect((await owner("select count(*)::int n from audit_logs where entity_id=$1 and action='operator_booking_correct_checkout'",[f.booking])).rows[0].n).toBe(1);
+ } finally {for(const client of clients)await client.end();}
+});
+it('keeps correction helpers inaccessible and preserves later operational room safeguards',async()=>{
+ await db.query('reset role');
+ const grants=(await db.query(`select has_function_privilege('authenticated','private.apply_checkout_correction(jsonb,jsonb)','execute') helper,
+   has_function_privilege('anon','public.booking_checkout_correction_protocol_version()','execute') anon,
+   has_function_privilege('service_role','public.booking_checkout_correction_protocol_version()','execute') service`)).rows[0];
+ expect(grants).toEqual({helper:false,anon:false,service:false});
+ const definition=(await db.query("select pg_get_functiondef('private.preview_booking_operation(jsonb)'::regprocedure) d")).rows[0].d;
+ expect(definition).toContain('operational_condition');
+});
+it('can disable only historical corrections at the database boundary without enabling a generic RPC bypass',async()=>{
+ const f=await missedCheckout();
+ await owner("create or replace function public.booking_checkout_correction_protocol_version() returns integer language sql security invoker set search_path='' as $$ select 0; $$;");
+ try { await login(f.actor);await expect(preview(correction(f))).rejects.toThrow('operationForbidden'); }
+ finally {await owner("create or replace function public.booking_checkout_correction_protocol_version() returns integer language sql security invoker set search_path='' as $$ select 1; $$;");}
+ await login(f.actor);expect((await preview(correction(f))).plan.outstandingAfter).toBe(0);
+});
