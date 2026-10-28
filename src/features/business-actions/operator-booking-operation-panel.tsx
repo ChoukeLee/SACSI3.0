@@ -11,6 +11,14 @@ const fields: Record<string, string> = {
   checkInAfter: "新入住日期",
   checkOutBefore: "原退房日期",
   checkOutAfter: "新退房日期",
+  actualCheckOutBefore: "原实际退房日",
+  actualCheckOutAfter: "更正后实际退房日",
+  grossBefore: "原房费（优惠前，XOF）",
+  grossAfter: "新房费（优惠前，XOF）",
+  discountBefore: "原优惠（XOF）",
+  discountAfter: "新优惠（XOF）",
+  outstandingBefore: "原欠款（XOF）",
+  outstandingAfter: "新欠款（XOF）",
   priceBefore: "原日价（XOF）",
   priceAfter: "新日价（XOF）",
   totalBefore: "原应收（XOF）",
@@ -34,6 +42,14 @@ const fieldsFr: Record<string, string> = {
   checkInAfter: "Nouvelle arrivée",
   checkOutBefore: "Ancien départ",
   checkOutAfter: "Nouveau départ",
+  actualCheckOutBefore: "Ancien départ réel",
+  actualCheckOutAfter: "Départ réel corrigé",
+  grossBefore: "Ancien montant avant remise (XOF)",
+  grossAfter: "Nouveau montant avant remise (XOF)",
+  discountBefore: "Ancienne remise (XOF)",
+  discountAfter: "Nouvelle remise (XOF)",
+  outstandingBefore: "Ancien solde dû (XOF)",
+  outstandingAfter: "Nouveau solde dû (XOF)",
   priceBefore: "Ancien tarif journalier (XOF)",
   priceAfter: "Nouveau tarif journalier (XOF)",
   totalBefore: "Ancien montant dû (XOF)",
@@ -52,6 +68,7 @@ const operationsFr: Record<string, string> = {
   create: "Créer une réservation",
   check_in: "Enregistrer une arrivée (sans paiement)",
   cancel: "Annuler une réservation non arrivée",
+  correct_checkout: "Corriger le séjour terminé et la remise",
   change_stay: "Modifier les dates ou le tarif",
   correct_room: "Corriger le lot saisi par erreur",
   transfer: "Transférer une réservation non arrivée",
@@ -205,10 +222,15 @@ export function BookingOperationPanel({
                     "我确认款项已经实际退给客户，日期、方式和金额正确。",
                     "Je confirme le remboursement réel au client, avec la bonne date, le bon moyen et le bon montant.",
                   )
-                : text(
-                    "我确认变更原因及影响；冲正不是实际退钱。不确定时先联系 Chucke。",
-                    "Je confirme le motif et les effets. Une extourne n’est pas un remboursement réel. En cas de doute, contactez d’abord Chucke.",
-                  )}
+                : plan.operation === "correct_checkout"
+                  ? text(
+                      "我确认实际退房日、优惠及最终欠款；原收款保留，本次没有退款。",
+                      "Je confirme le départ réel, la remise et le solde final. Les paiements restent inchangés, sans remboursement.",
+                    )
+                  : text(
+                      "我确认变更原因及影响；冲正不是实际退钱。不确定时先联系 Chucke。",
+                      "Je confirme le motif et les effets. Une extourne n’est pas un remboursement réel. En cas de doute, contactez d’abord Chucke.",
+                    )}
             </label>
           )}
           <button

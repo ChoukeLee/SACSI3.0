@@ -21,3 +21,13 @@ it('unknown result only retries the same confirmation after another human click'
  await click('button');expect(fetchMock.mock.calls.map(([url])=>url)).toEqual(['/api/operator/v1/booking-operations/confirmations/same-id','/api/operator/v1/booking-operations/confirmations/same-id']);
 });
 it.each(['completed','superseded'])('never submits a %s historical page',async status=>{await render('refund',status);expect(host.querySelector('button')).toBeNull();expect(fetchMock).not.toHaveBeenCalled();});
+it('shows the actual dates, gross fee, discount and final balance for a historical correction',async()=>{
+ await act(async()=>root.render(<BookingOperationPanel id="same-id" requestId="same-request" actor="synthetic"
+   originalInstruction="合成测试漏退房" expiresAt="2026-10-28T23:59:00Z" status="pending"
+   plan={{operation:'correct_checkout',actualCheckOutBefore:'2026-10-28',actualCheckOutAfter:'2026-10-08',
+     grossAfter:80000,discountAfter:40000,totalAfter:40000,paidAfter:40000,outstandingAfter:0}}/>));
+ expect(host.textContent).toContain('更正已退房住期与优惠');expect(host.textContent).toContain('2026-10-08');
+ expect(host.textContent).toContain('新房费（优惠前，XOF）');expect(host.textContent).toContain('新优惠（XOF）');
+ expect(host.textContent).toContain('新欠款（XOF）');expect(host.querySelector('button')?.disabled).toBe(true);
+ expect(fetchMock).not.toHaveBeenCalled();
+});

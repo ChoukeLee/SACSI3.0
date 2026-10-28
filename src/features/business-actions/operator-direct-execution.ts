@@ -157,6 +157,9 @@ function parseInput(workflow: DirectExecutionWorkflow, value: unknown): ObjectVa
       "finalAmountXof",
       "paymentDate",
       "paymentMethod",
+      "actualCheckOut",
+      "discountAmountXof",
+      "inputSource",
     ])
   )
     throw new DirectFailure("operationInvalidRequest", 400);
@@ -165,7 +168,17 @@ function parseInput(workflow: DirectExecutionWorkflow, value: unknown): ObjectVa
   return value;
 }
 
-async function checkReadiness(auth: OperatorAuth, workflow: DirectExecutionWorkflow) {
+async function checkReadiness(
+  auth: OperatorAuth,
+  workflow: DirectExecutionWorkflow,
+  input: ObjectValue,
+) {
+  if (
+    workflow === "booking_operation" &&
+    input.operation === "correct_checkout" &&
+    (await rpc(auth, "booking_checkout_correction_protocol_version")) !== 1
+  )
+    throw new DirectFailure("direct_database_upgrade_required", 503);
   const versions: Array<[string, number]> =
     workflow === "daily_payment"
       ? [
@@ -395,7 +408,7 @@ export async function executeOperatorDirect(request: Request, workflow: DirectEx
       return reply({ code: "invalid_direct_request" }, 400);
     const input = parseInput(workflow, body.request);
     requestId = input.requestId as string;
-    await checkReadiness(auth, workflow);
+    await checkReadiness(auth, workflow, input);
     const existing = await findExisting(auth, workflow, requestId);
     if (existing.status === "completed") {
       if (!batchUuid(existing.id)) throw new DirectFailure("direct_status_unavailable", 503);

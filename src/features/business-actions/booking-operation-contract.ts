@@ -4,6 +4,7 @@ export const BOOKING_OPERATIONS = {
   create: { label: "新建预订", highRisk: false },
   check_in: { label: "办理入住（不收款）", highRisk: false },
   cancel: { label: "取消未入住预订", highRisk: true },
+  correct_checkout: { label: "更正已退房住期与优惠", highRisk: true },
   change_stay: { label: "调整住期或房价", highRisk: true },
   correct_room: { label: "纠正录错房号", highRisk: true },
   transfer: { label: "转移未入住预订", highRisk: true },
@@ -20,7 +21,7 @@ export const BOOKING_OPERATION_ACTIONS: Record<string, BookingOperation[]> = {
   transfer_daily_booking: ["transfer", "correct_room"],
   reverse_daily_payment: ["reverse"],
   refund_daily_payment: ["refund"],
-  correct_daily_booking: ["change_stay", "void_checkin"],
+  correct_daily_booking: ["change_stay", "correct_checkout", "void_checkin"],
 };
 export function isBookingOperation(value: unknown): value is BookingOperation {
   return typeof value === "string" && Object.hasOwn(BOOKING_OPERATIONS, value);

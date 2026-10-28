@@ -117,6 +117,65 @@ const cases = [
   },
 ];
 
+describe("historical checkout correction connector", () => {
+  const correction = {
+    requestId: id,
+    operation: "correct_checkout",
+    bookingId: other,
+    actualCheckOut: "2026-10-08",
+    discountAmountXof: 40000,
+    inputSource: "excel_screenshot",
+    reason: "合成测试漏办退房及优惠",
+    originalInstruction: "截图定位，用户确认只住一晚，优惠四万，已结清",
+  };
+  it("fails closed against older manifests before requesting a preview or write", async () => {
+    const transport = vi.fn().mockResolvedValue(reply(manifest));
+    await expect(
+      new OperatorClient(config, store(), transport).bookingOperation("execute", correction),
+    ).rejects.toThrow("checkout_correction_upgrade_required");
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+  it("retains explicit source, date, discount and request id across prepare and execute", async () => {
+    const transport = vi
+      .fn()
+      .mockResolvedValueOnce(
+        reply({
+          ...manifest,
+          bookingOperations: {
+            ...manifest.bookingOperations,
+            operations: ["correct_checkout"],
+            checkoutCorrection: { available: true, version: 1 },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(reply({ status: "not_found" }))
+      .mockResolvedValueOnce(reply({ previewProof: "signed-correction" }))
+      .mockResolvedValueOnce(
+        reply({
+          status: "completed",
+          verified: true,
+          requestId: id,
+          operation: "correct_checkout",
+          bookingId: other,
+        }),
+      );
+    expect(
+      await new OperatorClient(config, store(), transport).bookingOperation("execute", correction),
+    ).toMatchObject({ status: "completed", verified: true, requestId: id });
+    expect(JSON.parse(transport.mock.calls[2][1].body)).toEqual(correction);
+    expect(JSON.parse(transport.mock.calls[3][1].body)).toEqual({
+      request: correction,
+      previewProof: "signed-correction",
+    });
+    const schema = tools.find(
+      (t: { name: string }) => t.name === "execute_booking_operation",
+    ).inputSchema;
+    expect(schema.properties.operation.enum).toContain("correct_checkout");
+    expect(schema.properties.discountAmountXof.minimum).toBe(0);
+    expect(schema.properties.inputSource.enum).toContain("excel_screenshot");
+  });
+});
+
 describe("explicit-instruction connector execution", () => {
   it.each(cases)(
     "executes $workflow once through its signed preview without a webpage",

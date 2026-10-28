@@ -24,7 +24,7 @@ describe("shared booking operation contract", () => {
   it("maps every operation exactly once without exposing arbitrary actions", () => {
     const operations = Object.values(BOOKING_OPERATION_ACTIONS).flat();
     expect([...operations].sort()).toEqual(Object.keys(BOOKING_OPERATIONS).sort());
-    expect(new Set(operations).size).toBe(9);
+    expect(new Set(operations).size).toBe(10);
     for (const value of [null, {}, "constructor", "__proto__", "drop_table"]) {
       expect(isBookingOperation(value)).toBe(false);
       expect(isHighRiskBookingOperation(value)).toBe(true);
@@ -36,6 +36,8 @@ describe("shared booking operation contract", () => {
     expect(bookingOperationLabel("correct_room")).toBe("纠正录错房号");
     expect(isHighRiskBookingOperation("create")).toBe(false);
     expect(isHighRiskBookingOperation("refund")).toBe(true);
+    expect(bookingOperationLabel("correct_checkout")).toBe("更正已退房住期与优惠");
+    expect(isHighRiskBookingOperation("correct_checkout")).toBe(true);
   });
 });
 

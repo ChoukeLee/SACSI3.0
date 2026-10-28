@@ -244,6 +244,9 @@ export class OperatorClient {
     const manifest=await this.capabilities();
     if(manifest.bookingOperations?.available!==true||manifest.bookingOperations.version!==1)throw new Error('booking_operations_upgrade_required');
     if(operation==='status')return this.api(`booking-operations/status?requestId=${encodeURIComponent(body.requestId)}`);
+    if(body.operation==='correct_checkout' && (manifest.bookingOperations.checkoutCorrection?.available!==true
+      || manifest.bookingOperations.checkoutCorrection.version!==1
+      || !manifest.bookingOperations.operations?.includes('correct_checkout')))throw new Error('checkout_correction_upgrade_required');
     if(operation==='execute') {
       const {replacesConfirmationId,...request}=body;
       return this.directBusiness(manifest,'booking_operation','booking-operations',request,replacesConfirmationId);
