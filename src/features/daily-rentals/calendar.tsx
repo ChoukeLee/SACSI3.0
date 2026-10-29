@@ -1112,6 +1112,7 @@ export function DailyCalendar({
           locale={locale}
           readOnly={!canOperateDaily}
           canCorrectCheckin={userRole === "admin"}
+          canCorrectCheckout={userRole === "admin"}
           onClose={() => {
             setSelectedBookingId(null);
             setNewBookingUnitId(null);

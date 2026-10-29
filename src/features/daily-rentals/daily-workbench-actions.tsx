@@ -283,6 +283,7 @@ function OpenDailyWorkbenchActions({
       locale={locale}
       readOnly={!canOperate}
       canCorrectCheckin={userRole === "admin"}
+      canCorrectCheckout={userRole === "admin"}
       backfillMode={isBackfill}
       onClose={onClose}
       onChanged={changed}

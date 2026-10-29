@@ -95,6 +95,7 @@ interface BookingPanelProps {
   backfillMode?: boolean;
   readOnly?: boolean;
   canCorrectCheckin?: boolean;
+  canCorrectCheckout?: boolean;
 }
 
 type DailyPricedUnit = UnitRow & { daily_rental_price_xof?: number | null };
@@ -120,6 +121,7 @@ export function BookingPanel({
   backfillMode,
   readOnly = false,
   canCorrectCheckin = false,
+  canCorrectCheckout = false,
 }: BookingPanelProps) {
   const t = dictionaries[locale].dailyRentals;
   const router = useRouter();
@@ -160,6 +162,14 @@ export function BookingPanel({
   const [correctionReason, setCorrectionReason] = useState("");
   const [confirmCorrection, setConfirmCorrection] = useState(false);
   const changeCheckoutRequestIdRef = useRef<string | null>(null);
+  const [checkoutCorrectionDate, setCheckoutCorrectionDate] = useState(
+    booking?.actual_check_out ?? booking?.check_out ?? "",
+  );
+  const [checkoutCorrectionReason, setCheckoutCorrectionReason] = useState("");
+  const [checkoutCorrectionPreparing, setCheckoutCorrectionPreparing] = useState(false);
+  const checkoutCorrectionRequestRef = useRef<{ signature: string; requestId: string } | null>(
+    null,
+  );
 
   // ── Backfill form state ──
   const [bfUnitId, setBfUnitId] = useState("");
@@ -195,8 +205,11 @@ export function BookingPanel({
     setCorrectionReason("");
     setConfirmCorrection(false);
     setChangedCheckOutDate(booking?.check_out ?? "");
+    setCheckoutCorrectionDate(booking?.actual_check_out ?? booking?.check_out ?? "");
+    setCheckoutCorrectionReason("");
+    checkoutCorrectionRequestRef.current = null;
     changeCheckoutRequestIdRef.current = null;
-  }, [booking?.id, booking?.check_out]);
+  }, [booking?.id, booking?.check_out, booking?.actual_check_out]);
 
   const selectedUnit = unitId
     ? (units.find((u) => u.id === unitId) as DailyPricedUnit | null)
@@ -493,6 +506,80 @@ export function BookingPanel({
     changedCheckoutNights * Number(booking?.nightly_price_xof ?? 0) -
       Number(booking?.manual_discount_amount_xof ?? 0),
   );
+
+  const checkoutCorrectionNights = useMemo(() => {
+    if (!booking || !checkoutCorrectionDate) return 0;
+    return Math.max(
+      0,
+      Math.round(
+        (Date.parse(`${checkoutCorrectionDate}T00:00:00Z`) -
+          Date.parse(`${booking.check_in}T00:00:00Z`)) /
+          86400000,
+      ),
+    );
+  }, [booking, checkoutCorrectionDate]);
+  const checkoutCorrectionGross =
+    checkoutCorrectionNights * Number(booking?.nightly_price_xof ?? 0);
+  const checkoutCorrectionFinal = Math.max(
+    0,
+    checkoutCorrectionGross - Number(booking?.manual_discount_amount_xof ?? 0),
+  );
+
+  const handlePrepareCheckoutCorrection = async () => {
+    if (!booking || !checkoutCorrectionDate || checkoutCorrectionReason.trim().length < 5) return;
+    setCheckoutCorrectionPreparing(true);
+    setActionError("");
+    try {
+      const requestFields = {
+        operation: "correct_checkout",
+        originalInstruction: `更正日租订单实际退房日期为 ${checkoutCorrectionDate}；保留已有收款并按原日价重算应收。`,
+        bookingId: booking.id,
+        actualCheckOut: checkoutCorrectionDate,
+        discountAmountXof: Number(booking.manual_discount_amount_xof ?? 0),
+        reason: checkoutCorrectionReason.trim(),
+        inputSource: "natural_language",
+      };
+      const signature = JSON.stringify(requestFields);
+      if (checkoutCorrectionRequestRef.current?.signature !== signature) {
+        checkoutCorrectionRequestRef.current = { signature, requestId: crypto.randomUUID() };
+      }
+      const request = {
+        ...requestFields,
+        requestId: checkoutCorrectionRequestRef.current.requestId,
+      };
+      const preparedResponse = await fetch("/api/operator/v1/booking-operations/prepare", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      });
+      const prepared = await preparedResponse.json();
+      if (!preparedResponse.ok || typeof prepared.previewProof !== "string") {
+        throw new Error(prepared.message ?? prepared.code ?? "operation_unavailable");
+      }
+      const draftResponse = await fetch("/api/operator/v1/booking-operations/drafts", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ request, previewProof: prepared.previewProof }),
+      });
+      const draft = await draftResponse.json();
+      if (
+        !draftResponse.ok ||
+        typeof draft.confirmationPath !== "string" ||
+        !["awaiting_account_confirmation", "completed_previously"].includes(draft.status)
+      ) {
+        throw new Error(draft.message ?? draft.code ?? "operation_unavailable");
+      }
+      router.push(`${locale === "fr" ? "/fr" : ""}${draft.confirmationPath}`);
+    } catch (prepareError) {
+      setActionError(
+        formatError(prepareError instanceof Error ? prepareError.message : "operation_unavailable"),
+      );
+    } finally {
+      setCheckoutCorrectionPreparing(false);
+    }
+  };
 
   // ── Backfill handler ──
   const handleCancelBooking = async () => {
@@ -1928,6 +2015,113 @@ export function BookingPanel({
                     {primaryAction?.action === "view_settlement" && (
                       <div className="rounded-lg bg-muted/50 p-3 text-center text-sm text-foreground/70">
                         {t.bookingStatus.checked_out}
+                      </div>
+                    )}
+
+                    {booking.status === "checked_out" && canCorrectCheckout && !readOnly && (
+                      <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                        <div>
+                          <p className="text-sm font-semibold text-amber-900">
+                            {locale === "zh" ? "更正已退房日期" : "Corriger le départ enregistré"}
+                          </p>
+                          <p className="mt-0.5 text-xs text-amber-900/80">
+                            {locale === "zh"
+                              ? "只更正已发生的实际退房日期。系统会按原日价重算应收，保留原收款、房态和保洁记录；提交后还需本人核对确认。"
+                              : "Corrige uniquement un départ déjà effectué. Le montant est recalculé au tarif initial ; les paiements, l’état du logement et le ménage sont conservés. Une confirmation personnelle sera demandée."}
+                          </p>
+                        </div>
+                        {booking.checkout_mode !== "fixed" ||
+                        Number(booking.settlement_adjustment_amount_xof ?? 0) !== 0 ||
+                        !booking.actual_check_out ? (
+                          <p className="text-xs text-amber-900/80">
+                            {locale === "zh"
+                              ? "此订单使用开放式住期、特殊结算价或缺少实际退房日期，暂不适用自助更正。"
+                              : "Ce séjour ouvert, règlement spécial ou départ manquant nécessite une vérification manuelle."}
+                          </p>
+                        ) : (
+                          <>
+                            <div>
+                              <label className={labelClass}>
+                                {locale === "zh" ? "更正后的实际退房日期" : "Départ réel corrigé"}
+                              </label>
+                              <DateInput
+                                value={checkoutCorrectionDate}
+                                onChangeValue={setCheckoutCorrectionDate}
+                                className={inputClass}
+                                min={addDays(booking.check_in, 1)}
+                                max={
+                                  booking.actual_check_out < businessDate()
+                                    ? booking.actual_check_out
+                                    : businessDate()
+                                }
+                              />
+                            </div>
+                            <p className="text-xs text-amber-900/80">
+                              {locale === "zh"
+                                ? `原优惠 ${formatXof(Number(booking.manual_discount_amount_xof ?? 0))} 保留。`
+                                : `La remise existante de ${formatXof(Number(booking.manual_discount_amount_xof ?? 0))} est conservée.`}
+                            </p>
+                            <div className="rounded-lg border border-amber-200/70 bg-white/70 p-2 text-xs text-foreground/80">
+                              <p>
+                                {locale === "zh" ? "预计房费" : "Montant estimé"}：
+                                {checkoutCorrectionNights} {locale === "zh" ? "晚" : "nuits"} ·{" "}
+                                {formatXof(checkoutCorrectionFinal)}
+                              </p>
+                              <p>
+                                {locale === "zh" ? "已收" : "Déjà payé"} {formatXof(totalPaid)} ·{" "}
+                                {locale === "zh" ? "更正后欠款" : "Solde après correction"}{" "}
+                                {formatXof(Math.max(0, checkoutCorrectionFinal - totalPaid))}
+                              </p>
+                              {checkoutCorrectionFinal < totalPaid && (
+                                <p className="mt-1 font-medium text-accentRed-700">
+                                  {locale === "zh"
+                                    ? "更正后应收低于已收，需先核对并登记实际退款，暂不能直接提交。"
+                                    : "Le nouveau montant est inférieur aux paiements reçus. Vérifiez d’abord le remboursement réel."}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className={labelClass}>
+                                {locale === "zh" ? "更正原因" : "Motif de correction"}
+                              </label>
+                              <Input
+                                value={checkoutCorrectionReason}
+                                onChange={(event) =>
+                                  setCheckoutCorrectionReason(event.target.value)
+                                }
+                                disabled={checkoutCorrectionPreparing}
+                                placeholder={
+                                  locale === "zh"
+                                    ? "例如：客人10月14日实际离店，原记录日期错误"
+                                    : "Ex. : départ réel le 14 octobre, date enregistrée incorrecte"
+                                }
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={handlePrepareCheckoutCorrection}
+                              disabled={
+                                checkoutCorrectionPreparing ||
+                                !checkoutCorrectionDate ||
+                                checkoutCorrectionDate >= booking.actual_check_out ||
+                                checkoutCorrectionDate > businessDate() ||
+                                checkoutCorrectionNights <= 0 ||
+                                checkoutCorrectionReason.trim().length < 5 ||
+                                checkoutCorrectionFinal < totalPaid
+                              }
+                              className="w-full border-amber-300"
+                            >
+                              {checkoutCorrectionPreparing
+                                ? locale === "zh"
+                                  ? "正在准备核对单…"
+                                  : "Préparation…"
+                                : locale === "zh"
+                                  ? "查看并确认更正"
+                                  : "Vérifier et confirmer"}
+                            </Button>
+                          </>
+                        )}
                       </div>
                     )}
 
