@@ -203,6 +203,32 @@ it("keeps exact JS billing across fixed/open modes, zero/stored totals, discount
   expect(result.currentOutstanding).toBe(expected.currentOutstanding);
   expect(result.monthSettled).toBe(expected.monthSettled);
 });
+it("retains an explicit agreed settlement adjustment and its final amount in the native calendar context", async () => {
+  const id = randomUUID();
+  await db.query(
+    `insert into daily_bookings(id,unit_id,customer_id,check_in,check_out,actual_check_out,checkout_mode,status,
+      nightly_price_xof,total_amount_xof,final_amount_xof,prepaid_amount_xof,settlement_adjustment_amount_xof,settlement_adjustment_reason)
+      values($1,$2,$3,current_date-13,current_date,current_date,'fixed','checked_out',40000,520000,560000,560000,40000,'Synthetic explicit agreed settlement')`,
+    [id, unit, guest],
+  );
+  const result = await read();
+  expect(result.bookings.find((booking) => booking.id === id)).toMatchObject({
+    total_amount_xof: 520000,
+    settlement_adjustment_amount_xof: 40000,
+    settlement_adjustment_reason: "Synthetic explicit agreed settlement",
+    final_amount_xof: 560000,
+    prepaid_amount_xof: 560000,
+  });
+  const full = (
+    await db.query(
+      "select to_jsonb(b) doc from daily_bookings b where unit_id=$1 order by check_in desc,id desc",
+      [unit],
+    )
+  ).rows.map((row) => row.doc) as DailyBookingRow[];
+  const expected = dailyBookingFinancePosition(full, today);
+  expect(result.currentOutstanding).toBe(expected.currentOutstanding);
+  expect(result.monthSettled).toBe(expected.monthSettled);
+});
 it("rejects oversized/invalid windows and rechecks current role/project grants; anonymous cannot execute", async () => {
   await expect(read(to, from)).rejects.toThrow("invalidCalendarWindow");
   const far = (await db.query("select (current_date+100)::text d")).rows[0].d;

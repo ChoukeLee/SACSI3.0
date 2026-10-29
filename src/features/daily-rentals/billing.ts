@@ -64,10 +64,7 @@ export function calculateBilling(
     mode === "open" &&
     booking.status === "checked_in" &&
     !booking.actual_check_out;
-  const settlementGross = shouldRecalculateOpenStay
-    ? grossAmount
-    : Number(booking.total_amount_xof ?? grossAmount);
-  const adjustedFinal = Math.max(0, settlementGross + settlementAdjustment - discount);
+  const adjustedFinal = Math.max(0, grossAmount + settlementAdjustment - discount);
   const finalAmount = shouldRecalculateOpenStay
     ? adjustedFinal
     : (storedFinal ?? adjustedFinal);
