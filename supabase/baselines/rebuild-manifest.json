@@ -237,6 +237,10 @@
     {
       "file": "20261029140409_operator_checkout_revision_payment.sql",
       "sha256": "26a6fa0d0d0d7a3d2389c9b269a8a9e0ebd23fddf8e4e00266ee593578b54a2c"
+    },
+    {
+      "file": "20261029160500_daily_change_checkout_date.sql",
+      "sha256": "6ea30f5386b3f5cc1d384d79e6ea8e64aafc02732466e5a25ec85524d65b225b"
     }
   ],
   "excluded": [
