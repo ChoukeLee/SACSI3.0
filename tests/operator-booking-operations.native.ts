@@ -354,3 +354,91 @@ it('can disable open-stay discounts independently while preserving fixed-stay co
  } finally {await owner("create or replace function public.booking_open_checkout_discount_protocol_version() returns integer language sql security invoker set search_path='' as $$ select 1; $$;");}
  expect((await owner("select has_function_privilege('anon','public.booking_open_checkout_discount_protocol_version()','execute') anon,has_function_privilege('service_role','public.booking_open_checkout_discount_protocol_version()','execute') service")).rows[0]).toEqual({anon:false,service:false});
 });
+
+async function agreedCheckout() {
+ const f=await seed('checked_out');
+ const dates=(await owner(`select (current_date-19)::text arrival,(current_date-6)::text departure,
+   current_date::text recorded`)).rows[0];
+ await owner(`update daily_bookings set check_in=current_date-19,check_out=current_date-5,
+   actual_check_out=current_date,nightly_price_xof=40000,total_amount_xof=760000,final_amount_xof=760000 where id=$1`,[f.booking]);
+ await owner('update receivables set due_date=current_date-19,amount_xof=760000 where source_id=$1',[f.booking]);
+ await owner(`update units set status='available' where id=$1`,[f.unit]);
+ await owner(`insert into cleaning_tasks(unit_id,daily_booking_id,is_completed,completed_at) values($1,$2,true,now())`,[f.unit,f.booking]);
+ await login(f.actor);
+ await db.query("select public.daily_record_payment_rpc($1,560000,current_date-7,null,$2,'{}')",[f.booking,randomUUID()]);
+ return {...f,...dates};
+}
+function agreedCorrection(f:any,extra:Record<string,unknown>={}) {
+ return {...correction(f,{discountAmountXof:0,finalAmountXof:560000}),
+   reason:'合成测试：实际入住十三晚，用户明确约定按已收五十六万结清',...extra};
+}
+it('records an explicit agreed settled price separately from thirteen real nights without inventing money',async()=>{
+ const f=await agreedCheckout(),q=agreedCorrection(f),before=await correctionState(f);
+ await login(f.actor);const snap=await preview(q);
+ expect(snap.plan).toMatchObject({grossAfter:520000,calculatedGrossAfter:520000,adjustmentBefore:0,
+   adjustmentAfter:40000,totalAfter:560000,paidAfter:560000,outstandingAfter:0,discountAfter:0,priceAfter:40000});
+ expect(await correctionState(f)).toEqual(before);
+ await login(f.actor);const d=await draft(q),done=await confirm(d.id);
+ expect(done).toMatchObject({status:'completed',verified:true,requestId:q.requestId});
+ const after=await correctionState(f);
+ expect(after.booking).toMatchObject({check_in:f.arrival,check_out:f.departure,actual_check_out:f.departure,
+   nightly_price_xof:40000,total_amount_xof:520000,settlement_adjustment_amount_xof:40000,
+   settlement_adjustment_reason:q.reason,manual_discount_amount_xof:0,final_amount_xof:560000,
+   prepaid_amount_xof:560000,billing_status:'settled'});
+ expect(after.receivables[0]).toMatchObject({amount_xof:560000,paid_amount_xof:560000,status:'paid'});
+ for(const key of ['payments','ledger','cleaning','unit'])expect(after[key]).toEqual(before[key]);
+ const audit=(await owner("select metadata,before_data,after_data from audit_logs where entity_id=$1 and action='operator_booking_correct_checkout'",[f.booking])).rows[0];
+ expect(audit.metadata.input_source).toBe('excel_screenshot');
+ expect(audit.metadata.checkout_correction_before.payments).toEqual(before.payments);
+ expect(audit.before_data.settlement_adjustment_amount_xof).toBe(0);
+ expect(audit.after_data.settlement_adjustment_amount_xof).toBe(40000);
+ await login(f.actor);expect(await confirm(d.id)).toMatchObject({status:'completed_previously',verified:false});
+ await expect(draft({...q,reason:q.reason+'，保留原请求号'})).rejects.toThrow('operationRequestConflict');
+});
+it('requires explicit integer agreed price equal to actual receipts and never a negative settlement adjustment',async()=>{
+ const f=await agreedCheckout(),before=await correctionState(f);await login(f.actor);
+ for(const extra of [{finalAmountXof:560000.5},{finalAmountXof:'560000'},{finalAmountXof:0},
+   {finalAmountXof:-1},{finalAmountXof:519999},{discountAmountXof:1}]) {
+   await expect(preview(agreedCorrection(f,extra))).rejects.toThrow('operationInvalidRequest');
+ }
+ for(const finalAmountXof of [520000,600000,760001]) {
+   await expect(preview(agreedCorrection(f,{finalAmountXof}))).rejects.toThrow('operationFinanceMismatch');
+ }
+ expect(await correctionState(f)).toEqual(before);
+});
+it('keeps agreed settlement prices fixed-stay only and independently switchable',async()=>{
+ const open=await settledOpenStay();
+ await expect(preview(agreedCorrection(open))).rejects.toThrow('operationAssistanceRequired');
+ const f=await agreedCheckout();
+ await owner("create or replace function public.booking_checkout_settled_price_protocol_version() returns integer language sql security invoker set search_path='' as $$ select 0; $$;");
+ try {
+   await login(f.actor);await expect(preview(agreedCorrection(f))).rejects.toThrow('operationAssistanceRequired');
+   const ordinary=await missedCheckout();expect((await preview(correction(ordinary))).plan.totalAfter).toBe(40000);
+ } finally {await owner("create or replace function public.booking_checkout_settled_price_protocol_version() returns integer language sql security invoker set search_path='' as $$ select 1; $$;");}
+ expect((await owner("select has_function_privilege('anon','public.booking_checkout_settled_price_protocol_version()','execute') anon,has_function_privilege('service_role','public.booking_checkout_settled_price_protocol_version()','execute') service")).rows[0]).toEqual({anon:false,service:false});
+});
+it('preserves agreed price through financial repair and refuses older refund/reversal or implicit repricing',async()=>{
+ const f=await agreedCheckout(),q=agreedCorrection(f),d=await draft(q);await confirm(d.id);
+ const before=await correctionState(f);
+ await login(f.actor);
+ await db.query("select public.finance_operation_rpc('daily_sync',$1,$2)",[{bookingId:f.booking},randomUUID()]);
+ const repaired=await correctionState(f);
+ expect(repaired.booking).toMatchObject({total_amount_xof:520000,settlement_adjustment_amount_xof:40000,
+   final_amount_xof:560000,prepaid_amount_xof:560000,billing_status:'settled'});
+ for(const key of ['payments','ledger','cleaning','unit'])expect(repaired[key]).toEqual(before[key]);
+ await login(f.actor);
+ await expect(preview(correction(f,{discountAmountXof:0}))).rejects.toThrow('operationAssistanceRequired');
+ await expect(preview(request(f,'refund',{amountXof:40000,finalAmountXof:520000,paymentDate:f.today,paymentMethod:'cash',reason:'合成测试旧退款入口'}))).rejects.toThrow('operationAssistanceRequired');
+ await expect(preview(request(f,'reverse',{paymentId:before.payments[0].id,reason:'合成测试旧冲正入口'}))).rejects.toThrow('operationAssistanceRequired');
+ await expect(db.query("select public.daily_reverse_payment_rpc($1,'合成测试旧冲正入口',$2,'{}')",[before.payments[0].id,randomUUID()])).rejects.toThrow('operationAssistanceRequired');
+ expect((await correctionState(f)).payments).toEqual(before.payments);
+});
+it('protects agreed price fields from direct table writes and invalidates stale agreed-price snapshots',async()=>{
+ const f=await agreedCheckout(),q=agreedCorrection(f),d=await draft(q);
+ await expect(db.query('update daily_bookings set settlement_adjustment_amount_xof=40000,settlement_adjustment_reason=$2 where id=$1',[f.booking,q.reason])).rejects.toThrow('operationForbidden');
+ await owner("update daily_bookings set notes='合成测试同时更改订单' where id=$1",[f.booking]);await login(f.actor);
+ await expect(confirm(d.id)).rejects.toThrow('operationChanged');
+ const replacement=await draft(q,d.id);await confirm(replacement.id);
+ await expect(db.query('update daily_bookings set settlement_adjustment_amount_xof=0,settlement_adjustment_reason=null where id=$1',[f.booking])).rejects.toThrow('operationForbidden');
+ await expect(owner('update daily_bookings set final_amount_xof=520000 where id=$1',[f.booking])).rejects.toThrow('daily_booking_settlement_adjustment_valid');
+});

@@ -17,7 +17,9 @@ export interface DailyBookingFinanceState {
   grossAmount: number;
   /** Manual discount subtracted from gross. */
   discount: number;
-  /** Final amount the customer owes: gross - discount, or explicit override. */
+  /** Explicit agreed settlement adjustment, separate from discounts. */
+  settlementAdjustment: number;
+  /** Final amount the customer owes: gross + settlement adjustment - discount. */
   finalAmount: number;
   /** Total received from all payments for this booking. */
   paidAmount: number;
@@ -39,6 +41,8 @@ export interface DailyBookingForFinance {
   total_amount_xof: number;
   prepaid_amount_xof: number;
   manual_discount_amount_xof: number | null;
+  settlement_adjustment_amount_xof?: number;
+  settlement_adjustment_reason?: string | null;
   final_amount_xof: number | null;
   billing_status: string | null;
   status: string;
@@ -48,6 +52,7 @@ export interface DailyBookingAmountState {
   nights: number;
   grossAmount: number;
   discount: number;
+  settlementAdjustment: number;
   finalAmount: number;
   effectiveCheckOut: string;
 }
@@ -59,13 +64,22 @@ export function computeFinanceState(
   booking: DailyBookingForFinance,
   payments: { amount: number }[],
 ): DailyBookingFinanceState {
-  const { grossAmount, discount, finalAmount } = computeBookingAmountState(booking);
+  const { grossAmount, discount, settlementAdjustment, finalAmount } =
+    computeBookingAmountState(booking);
   const paidAmount = payments.reduce((s, p) => s + Number(p.amount), 0);
   const balanceDue = Math.max(0, finalAmount - paidAmount);
 
   const billingStatus = resolveBillingStatus(paidAmount, finalAmount, booking.status);
 
-  return { grossAmount, discount, finalAmount, paidAmount, balanceDue, billingStatus };
+  return {
+    grossAmount,
+    discount,
+    settlementAdjustment,
+    finalAmount,
+    paidAmount,
+    balanceDue,
+    billingStatus,
+  };
 }
 
 export function computeBookingAmountState(
@@ -82,13 +96,15 @@ export function computeBookingAmountState(
     ? Math.round(nights * Number(booking.nightly_price_xof))
     : Number(booking.total_amount_xof);
   const discount = Number(booking.manual_discount_amount_xof ?? 0);
-  const finalAmount = Math.max(0, grossAmount - discount);
+  const settlementAdjustment = Number(booking.settlement_adjustment_amount_xof ?? 0);
+  const finalAmount = Math.max(0, grossAmount + settlementAdjustment - discount);
 
-  return { nights, grossAmount, discount, finalAmount, effectiveCheckOut };
+  return { nights, grossAmount, discount, settlementAdjustment, finalAmount, effectiveCheckOut };
 }
 
 function resolveEffectiveCheckOut(booking: DailyBookingForFinance, referenceDate: string): string {
   const mode = booking.checkout_mode ?? "fixed";
+  if (booking.status === "checked_out" && booking.actual_check_out) return booking.actual_check_out;
   if (mode === "fixed" && booking.check_out) return booking.check_out;
   if (mode === "open" && booking.actual_check_out) return booking.actual_check_out;
   return referenceDate;

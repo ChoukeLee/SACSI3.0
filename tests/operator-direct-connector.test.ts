@@ -135,45 +135,71 @@ describe("historical checkout correction connector", () => {
     ).rejects.toThrow("checkout_correction_upgrade_required");
     expect(transport).toHaveBeenCalledTimes(1);
   });
-  it("retains explicit source, date, discount and request id across prepare and execute", async () => {
-    const transport = vi
-      .fn()
-      .mockResolvedValueOnce(
-        reply({
-          ...manifest,
-          bookingOperations: {
-            ...manifest.bookingOperations,
-            operations: ["correct_checkout"],
-            checkoutCorrection: { available: true, version: 1 },
-          },
-        }),
-      )
-      .mockResolvedValueOnce(reply({ status: "not_found" }))
-      .mockResolvedValueOnce(reply({ previewProof: "signed-correction" }))
-      .mockResolvedValueOnce(
-        reply({
-          status: "completed",
-          verified: true,
-          requestId: id,
-          operation: "correct_checkout",
-          bookingId: other,
-        }),
-      );
-    expect(
-      await new OperatorClient(config, store(), transport).bookingOperation("execute", correction),
-    ).toMatchObject({ status: "completed", verified: true, requestId: id });
-    expect(JSON.parse(transport.mock.calls[2][1].body)).toEqual(correction);
-    expect(JSON.parse(transport.mock.calls[3][1].body)).toEqual({
-      request: correction,
-      previewProof: "signed-correction",
-    });
-    const schema = tools.find(
-      (t: { name: string }) => t.name === "execute_booking_operation",
-    ).inputSchema;
-    expect(schema.properties.operation.enum).toContain("correct_checkout");
-    expect(schema.properties.discountAmountXof.minimum).toBe(0);
-    expect(schema.properties.inputSource.enum).toContain("excel_screenshot");
+  it("requires the separate agreed price capability before any request", async () => {
+    const transport = vi.fn().mockResolvedValue(
+      reply({
+        ...manifest,
+        bookingOperations: {
+          ...manifest.bookingOperations,
+          operations: ["correct_checkout"],
+          checkoutCorrection: { available: true, version: 1 },
+        },
+      }),
+    );
+    await expect(
+      new OperatorClient(config, store(), transport).bookingOperation("execute", {
+        ...correction,
+        discountAmountXof: 0,
+        finalAmountXof: 560000,
+      }),
+    ).rejects.toThrow("checkout_settled_price_upgrade_required");
+    expect(transport).toHaveBeenCalledTimes(1);
   });
+  it.each([false, true])(
+    "retains source, date, discount and optional settled price across execution: %s",
+    async (agreed) => {
+      const request = agreed
+        ? { ...correction, discountAmountXof: 0, finalAmountXof: 560000 }
+        : correction;
+      const transport = vi
+        .fn()
+        .mockResolvedValueOnce(
+          reply({
+            ...manifest,
+            bookingOperations: {
+              ...manifest.bookingOperations,
+              operations: ["correct_checkout"],
+              checkoutCorrection: { available: true, version: 1, settledPriceAvailable: true },
+            },
+          }),
+        )
+        .mockResolvedValueOnce(reply({ status: "not_found" }))
+        .mockResolvedValueOnce(reply({ previewProof: "signed-correction" }))
+        .mockResolvedValueOnce(
+          reply({
+            status: "completed",
+            verified: true,
+            requestId: id,
+            operation: "correct_checkout",
+            bookingId: other,
+          }),
+        );
+      expect(
+        await new OperatorClient(config, store(), transport).bookingOperation("execute", request),
+      ).toMatchObject({ status: "completed", verified: true, requestId: id });
+      expect(JSON.parse(transport.mock.calls[2][1].body)).toEqual(request);
+      expect(JSON.parse(transport.mock.calls[3][1].body)).toEqual({
+        request,
+        previewProof: "signed-correction",
+      });
+      const schema = tools.find(
+        (t: { name: string }) => t.name === "execute_booking_operation",
+      ).inputSchema;
+      expect(schema.properties.operation.enum).toContain("correct_checkout");
+      expect(schema.properties.discountAmountXof.minimum).toBe(0);
+      expect(schema.properties.inputSource.enum).toContain("excel_screenshot");
+    },
+  );
 });
 
 describe("explicit-instruction connector execution", () => {

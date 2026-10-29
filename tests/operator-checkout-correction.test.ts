@@ -28,12 +28,14 @@ const snapshot = {
 };
 let installed = true;
 let openInstalled = true;
+let priceInstalled = true;
 let allowed = true;
 let role = "admin";
 beforeEach(() => {
   vi.resetAllMocks();
   installed = true;
   openInstalled = true;
+  priceInstalled = true;
   allowed = true;
   role = "admin";
   vi.stubEnv("SACSI_OPERATOR_CONFIRMATIONS_ENABLED", "true");
@@ -46,6 +48,8 @@ beforeEach(() => {
     supabase: { rpc },
   }));
   rpc.mockImplementation(async (name: string, args?: Record<string, unknown>) => {
+    if (name === "booking_checkout_settled_price_protocol_version")
+      return priceInstalled ? { data: 1 } : { error: { message: "missing function" } };
     if (name === "booking_open_checkout_discount_protocol_version")
       return openInstalled ? { data: 1 } : { error: { message: "missing function" } };
     if (name === "booking_checkout_correction_protocol_version")
@@ -142,6 +146,17 @@ it.each(["no_action_grant", "not_admin"])(
     expect(body.bookingOperations.operations).not.toContain("correct_checkout");
   },
 );
+it.each([false, true])("advertises agreed settled prices only with its independent migration: %s", async (ready) => {
+  priceInstalled = ready;
+  const body = await (await GET(new Request("https://test.invalid/api/operator/v1/capabilities"))).json();
+  expect(body.bookingOperations.checkoutCorrection.settledPriceAvailable).toBe(ready);
+});
+it("rejects an agreed price against an older database before any write", async () => {
+  priceInstalled = false;
+  const r = await direct({ ...input, discountAmountXof: 0, finalAmountXof: 560000 });
+  expect(r.status).toBe(503);
+  expect(writes()).toEqual([]);
+});
 it("executes the complete correction via a signed live preview, retaining its screenshot source", async () => {
   const r = await direct();
   expect(r.status).toBe(200);

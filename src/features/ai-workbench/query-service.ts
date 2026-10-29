@@ -287,7 +287,7 @@ async function queryDailyStatus(locale: Locale, query: string, intent: Workbench
       .in("status", ["available", "reserved", "daily_occupied", "cleaning_pending", "maintenance", "locked"])
       .order("unit_no"),
     supabase.from("daily_bookings")
-      .select("id, unit_id, customer_id, booking_agent_id, guest_customer_id, guest_name, check_in, check_out, checkout_mode, actual_check_out, nightly_price_xof, total_amount_xof, prepaid_amount_xof, billing_status, manual_discount_amount_xof, final_amount_xof, status, notes, created_at, updated_at")
+      .select("id, unit_id, customer_id, booking_agent_id, guest_customer_id, guest_name, check_in, check_out, checkout_mode, actual_check_out, nightly_price_xof, total_amount_xof, prepaid_amount_xof, billing_status, manual_discount_amount_xof, manual_discount_reason, settlement_adjustment_amount_xof, settlement_adjustment_reason, final_amount_xof, status, notes, created_at, updated_at")
       .in("status", ["pending_review", "confirmed", "checked_in"])
       .lte("check_in", intent.asOfDate)
       .order("check_in", { ascending: false })
@@ -406,7 +406,7 @@ async function queryUnitSnapshot(locale: Locale, query: string, intent: Workbenc
   const [leasesRes, salesRes, bookingsRes, receivablesRes] = await Promise.all([
     supabase.from("lease_contracts").select("id, customer_id, contract_no, start_date, expected_end_date, paid_through_date, monthly_rent_xof, status").eq("unit_id", unit.id).eq("status", "active").limit(5),
     supabase.from("sale_contracts").select("id, customer_id, contract_no, signed_date, transfer_status, total_amount_xof, status").eq("unit_id", unit.id).eq("status", "active").limit(5),
-    supabase.from("daily_bookings").select("id, customer_id, booking_agent_id, guest_customer_id, guest_name, check_in, check_out, checkout_mode, actual_check_out, final_amount_xof, total_amount_xof, prepaid_amount_xof, status").eq("unit_id", unit.id).neq("status", "cancelled").order("check_in", { ascending: false }).limit(5),
+    supabase.from("daily_bookings").select("id, customer_id, booking_agent_id, guest_customer_id, guest_name, check_in, check_out, checkout_mode, actual_check_out, settlement_adjustment_amount_xof, settlement_adjustment_reason, final_amount_xof, total_amount_xof, prepaid_amount_xof, status").eq("unit_id", unit.id).neq("status", "cancelled").order("check_in", { ascending: false }).limit(5),
     supabase.from("receivables").select("id, building_id, unit_id, customer_id, source_type, source_id, category, title, due_date, amount_xof, paid_amount_xof, status, management_status, currency, created_at, updated_at").eq("unit_id", unit.id).eq("management_status", "managed").neq("status", "cancelled").limit(500),
   ]);
   const checks: Array<{ error: { message: string } | null; labelZh: string; labelFr: string }> = [
