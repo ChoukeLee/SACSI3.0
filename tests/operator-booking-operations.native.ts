@@ -442,3 +442,121 @@ it('protects agreed price fields from direct table writes and invalidates stale 
  await expect(db.query('update daily_bookings set settlement_adjustment_amount_xof=0,settlement_adjustment_reason=null where id=$1',[f.booking])).rejects.toThrow('operationForbidden');
  await expect(owner('update daily_bookings set final_amount_xof=520000 where id=$1',[f.booking])).rejects.toThrow('daily_booking_settlement_adjustment_valid');
 });
+// A later explicit instruction revises a completed correction. The parent is
+// immutable; a stable child request links the new date and receipt atomically.
+async function completedShortCorrection() {
+ const f=await seed('checked_out');
+ const dates=(await owner(`select (current_date-10)::text arrival,(current_date-9)::text short,
+   (current_date-8)::text revised,(current_date-7)::text original,current_date::text today`)).rows[0];
+ await owner(`update daily_bookings set check_in=current_date-10,check_out=current_date-9,
+   actual_check_out=current_date-7,nightly_price_xof=40000,total_amount_xof=120000,final_amount_xof=120000 where id=$1`,[f.booking]);
+ await owner(`update receivables set due_date=current_date-10,amount_xof=120000 where source_id=$1`,[f.booking]);
+ await owner(`update units set status='available' where id=$1`,[f.unit]);
+ await owner(`insert into cleaning_tasks(unit_id,daily_booking_id,is_completed,completed_at) values($1,$2,true,now())`,[f.unit,f.booking]);
+ await login(f.actor);await db.query("select public.daily_record_payment_rpc($1,40000,current_date-10,null,$2,'{}')",[f.booking,randomUUID()]);
+ const parent=correction({...f,departure:dates.short},{discountAmountXof:0,reason:'Synthetic first correction to one night'});
+ const d=await draft(parent);await confirm(d.id);
+ return {...f,...dates,parent,parentId:d.id};
+}
+function revision(f:any,extra:Record<string,unknown>={}) {
+ return request(f,'revise_checkout_and_collect',{correctsRequestId:f.parent.requestId,actualCheckOut:f.revised,
+   amountXof:40000,paymentDate:f.today,paymentMethod:'cash',reason:'Synthetic revised stay: two nights and another 40000 received',inputSource:'excel_screenshot',...extra});
+}
+it('revises a completed one-night correction to two nights and atomically collects the remaining 40000',async()=>{
+ const f=await completedShortCorrection(),q=revision(f),before=await correctionState(f);
+ const parentBefore=(await owner('select to_jsonb(x) v from private.operator_booking_operations x where id=$1',[f.parentId])).rows[0].v;
+ const parentAuditBefore=(await owner("select to_jsonb(a) v from audit_logs a where entity_id=$1 and action='operator_booking_correct_checkout'",[f.booking])).rows[0].v;
+ await login(f.actor);const plan=await preview(q);
+ expect(plan.plan).toMatchObject({correctsRequestId:f.parent.requestId,actualCheckOutBefore:f.short,actualCheckOutAfter:f.revised,
+   grossAfter:80000,totalAfter:80000,paidBefore:40000,amountXof:40000,paidAfter:80000,outstandingAfter:0,discountAfter:0,adjustmentAfter:0});
+ const d=await draft(q),done=await confirm(d.id);
+ expect(done).toMatchObject({status:'completed',verified:true,amountXof:40000,correctsRequestId:f.parent.requestId,requestId:q.requestId});
+ const after=await correctionState(f);
+ expect(after.booking).toMatchObject({status:'checked_out',check_in:f.arrival,actual_check_out:f.revised,check_out:f.revised,
+   nightly_price_xof:40000,total_amount_xof:80000,final_amount_xof:80000,prepaid_amount_xof:80000,billing_status:'settled'});
+ expect(after.payments).toHaveLength(2);expect(after.ledger).toHaveLength(2);
+ const payment=after.payments.find((p:any)=>p.request_id===q.requestId);
+ expect(payment).toMatchObject({amount:40000,currency:'XOF',exchange_rate_to_xof:1,payment_date:f.today,payment_method:'cash',recorded_by:f.actor,request_kind:'daily_payment'});
+ expect(done.paymentId).toBe(payment.id);
+ expect(after.payments.filter((p:any)=>p.id!==payment.id)).toEqual(before.payments);
+ expect(after.ledger.filter((l:any)=>l.payment_id!==payment.id)).toEqual(before.ledger);
+ for(const key of ['unit','cleaning'])expect(after[key]).toEqual(before[key]);
+ expect((await owner('select to_jsonb(x) v from private.operator_booking_operations x where id=$1',[f.parentId])).rows[0].v).toEqual(parentBefore);
+ expect((await owner("select to_jsonb(a) v from audit_logs a where entity_id=$1 and action='operator_booking_correct_checkout'",[f.booking])).rows[0].v).toEqual(parentAuditBefore);
+ const audit=(await owner("select * from audit_logs where entity_id=$1 and action='operator_booking_revise_checkout_and_collect'",[f.booking])).rows[0];
+ expect(audit.actor_id).toBe(f.actor);expect(audit.metadata).toMatchObject({input_source:'excel_screenshot',corrects_request_id:f.parent.requestId});
+ expect(audit.metadata.checkout_correction_before.booking.actual_check_out).toBe(f.short);
+ await login(f.actor);expect(await confirm(d.id)).toMatchObject({status:'completed_previously',verified:false,amountXof:40000});
+ await expect(preview(revision(f))).rejects.toThrow('operationCorrectionAlreadyRevised');
+ await expect(preview(revision(f,{correctsRequestId:f.parent.requestId.toUpperCase()}))).rejects.toThrow('operationCorrectionAlreadyRevised');
+ expect((await owner('select count(*)::int n from payments where source_id=$1',[f.booking])).rows[0].n).toBe(2);
+});
+it('preserves an explicitly partial supplementary receipt without inventing a discount',async()=>{
+ const f=await completedShortCorrection(),q=revision(f,{amountXof:10000});const d=await draft(q);await confirm(d.id);
+ const after=await correctionState(f);
+ expect(after.booking).toMatchObject({final_amount_xof:80000,prepaid_amount_xof:50000,manual_discount_amount_xof:0,billing_status:'partially_paid'});
+ expect(after.receivables[0]).toMatchObject({amount_xof:80000,paid_amount_xof:50000});
+});
+it.each(['parent_missing','parent_same_alias','parent_other_actor','parent_other_booking','after_changed','receipts_changed','beyond_original','not_extending','overpayment','fraction','future_payment','source_injection'])(
+ 'fails the entire revision closed for %s',async scenario=>{
+ const f=await completedShortCorrection();let q=revision(f);
+ if(scenario==='parent_missing')q=revision(f,{correctsRequestId:randomUUID()});
+ if(scenario==='parent_same_alias')q=revision(f,{requestId:f.parent.requestId,correctsRequestId:f.parent.requestId.toUpperCase()});
+ if(scenario==='parent_other_actor'){const another=await seed();await owner('update private.operator_booking_operations set actor_id=$1 where id=$2',[another.actor,f.parentId]);}
+ if(scenario==='parent_other_booking')q=revision({...f,booking:randomUUID()});
+ if(scenario==='after_changed')await owner("update daily_bookings set notes='later edit' where id=$1",[f.booking]);
+ if(scenario==='receipts_changed')await owner("update payments set notes='later edit' where source_id=$1",[f.booking]);
+ if(scenario==='beyond_original')q=revision(f,{actualCheckOut:f.today});
+ if(scenario==='not_extending')q=revision(f,{actualCheckOut:f.short});
+ if(scenario==='overpayment')q=revision(f,{amountXof:40001});
+ if(scenario==='fraction')q=revision(f,{amountXof:0.5});
+ if(scenario==='future_payment')q=revision(f,{paymentDate:(await owner("select (current_date+1)::text d")).rows[0].d});
+ if(scenario==='source_injection')q=revision(f,{actor_id:f.actor});
+ const before=await correctionState(f);await login(f.actor);
+ await expect(preview(q)).rejects.toThrow();expect(await correctionState(f)).toEqual(before);
+});
+it('detects historical daily and long-lease conflicts in the restored night, and ignores cancelled stays',async()=>{
+ const f=await completedShortCorrection(),other=randomUUID();
+ await owner(`insert into daily_bookings(id,unit_id,customer_id,booking_agent_id,check_in,check_out,actual_check_out,status,nightly_price_xof,total_amount_xof,final_amount_xof)
+   values($1,$2,$3,$3,$4,$5,$5,'checked_out',40000,40000,40000)`,[other,f.unit,f.agent,f.short,f.revised]);
+ await login(f.actor);await expect(preview(revision(f))).rejects.toThrow('operationRoomConflict');
+ await owner("update daily_bookings set status='cancelled' where id=$1",[other]);await login(f.actor);expect((await preview(revision(f))).plan.totalAfter).toBe(80000);
+ const lease=randomUUID();await owner(`insert into lease_contracts(id,unit_id,customer_id,contract_no,start_date,expected_end_date,actual_end_date,payment_cycle,payment_day,monthly_rent_xof,deposit_amount_xof,status)
+   values($1::uuid,$2,$3,$1::uuid::text,$4,$5,$5,'monthly',1,100000,0,'terminated')`,[lease,f.unit,f.agent,f.short,f.revised]);
+ await login(f.actor);await expect(preview(revision(f))).rejects.toThrow('operationRoomConflict');
+});
+it('rechecks payment and correction grants, scope and the independent protocol at confirmation',async()=>{
+ const f=await completedShortCorrection(),q=revision(f),d=await draft(q);
+ const roles=(await owner("select action_name,default_roles from private.operator_action_catalog where action_name in ('record_daily_payment','correct_daily_booking')")).rows;
+ try{
+  for(const name of ['record_daily_payment','correct_daily_booking']){
+   await owner("update private.operator_action_catalog set default_roles=array['front_desk'] where action_name=$1",[name]);await login(f.actor);
+   await expect(confirm(d.id)).rejects.toThrow('operationForbidden');
+   await owner('update private.operator_action_catalog set default_roles=$2 where action_name=$1',[name,roles.find((x:any)=>x.action_name===name).default_roles]);
+  }
+  await owner("create or replace function public.booking_checkout_revision_payment_protocol_version() returns integer language sql security invoker set search_path='' as $$ select 0; $$;");
+  await login(f.actor);await expect(confirm(d.id)).rejects.toThrow('operationForbidden');
+ } finally{
+  for(const row of roles)await owner('update private.operator_action_catalog set default_roles=$2 where action_name=$1',[row.action_name,row.default_roles]);
+  await owner("create or replace function public.booking_checkout_revision_payment_protocol_version() returns integer language sql security invoker set search_path='' as $$ select 1; $$;");
+ }
+ const project=(await owner('select project_id from buildings where id=(select building_id from units where id=$1)',[f.unit])).rows[0].project_id;
+ await owner("update projects set access_mode='restricted' where id=$1",[project]);await login(f.actor);await expect(confirm(d.id)).rejects.toThrow('operationForbidden');
+ await owner("update projects set access_mode='open' where id=$1",[project]);await login(f.actor);expect((await confirm(d.id)).status).toBe('completed');
+ expect((await owner("select has_function_privilege('anon','public.booking_checkout_revision_payment_protocol_version()','execute') anon,has_function_privilege('service_role','public.booking_checkout_revision_payment_protocol_version()','execute') service,has_function_privilege('authenticated','private.apply_checkout_revision_payment(jsonb,jsonb)','execute') direct")).rows[0]).toEqual({anon:false,service:false,direct:false});
+});
+it('rejects stale revisions and rolls date, receipt and allocation back on audit failure',async()=>{
+ const f=await completedShortCorrection(),q=revision(f),d=await draft(q);
+ await owner(`insert into daily_bookings(unit_id,customer_id,booking_agent_id,check_in,check_out,actual_check_out,status,nightly_price_xof,total_amount_xof,final_amount_xof)
+   values($1,$2,$2,$3,$4,$4,'checked_out',40000,40000,40000)`,[f.unit,f.agent,f.short,f.revised]);
+ await login(f.actor);await expect(confirm(d.id)).rejects.toThrow('operationRoomConflict');
+ await owner('delete from daily_bookings where unit_id=$1 and id<>$2',[f.unit,f.booking]);
+ const before=await correctionState(f);
+ await owner(`create function public.synthetic_revision_audit_failure() returns trigger language plpgsql as $$ begin
+   if new.action='operator_booking_revise_checkout_and_collect' then raise exception 'syntheticRevisionAuditFailure'; end if; return new; end; $$;
+   create trigger synthetic_revision_audit_failure before insert on audit_logs for each row execute function public.synthetic_revision_audit_failure();`);
+ try{await login(f.actor);await expect(confirm(d.id)).rejects.toThrow('syntheticRevisionAuditFailure');expect(await correctionState(f)).toEqual(before);
+  expect((await owner('select status from private.operator_booking_operations where id=$1',[d.id])).rows[0].status).toBe('pending');
+ }finally{await owner('drop trigger synthetic_revision_audit_failure on audit_logs;drop function public.synthetic_revision_audit_failure()');}
+ await login(f.actor);expect((await confirm(d.id)).status).toBe('completed');
+});

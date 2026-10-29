@@ -61,17 +61,20 @@ export async function GET(request: Request) {
   let checkoutCorrectionInstalled = false;
   let settledOpenDiscountInstalled = false;
   let settledPriceInstalled = false;
+  let checkoutRevisionPaymentInstalled = false;
   if (bookingOperationsAvailable && auth.user.role === "admin") {
     try {
       const version = await auth.supabase.rpc("booking_checkout_correction_protocol_version");
       checkoutCorrectionInstalled = !version.error && version.data === 1;
       if (checkoutCorrectionInstalled) {
-        const [openVersion, priceVersion] = await Promise.all([
+        const [openVersion, priceVersion, revisionVersion] = await Promise.all([
           auth.supabase.rpc("booking_open_checkout_discount_protocol_version"),
           auth.supabase.rpc("booking_checkout_settled_price_protocol_version"),
+          auth.supabase.rpc("booking_checkout_revision_payment_protocol_version"),
         ]);
         settledOpenDiscountInstalled = !openVersion.error && openVersion.data === 1;
         settledPriceInstalled = !priceVersion.error && priceVersion.data === 1;
+        checkoutRevisionPaymentInstalled = !revisionVersion.error && revisionVersion.data === 1;
       }
     } catch {
       /* Old databases must not advertise historical corrections. */
@@ -131,9 +134,15 @@ export async function GET(request: Request) {
   const checkoutCorrectionAvailable =
     checkoutCorrectionInstalled &&
     manifest.actions.some((action) => action.name === "correct_daily_booking" && action.authorized);
+  const checkoutRevisionPaymentAvailable =
+    checkoutCorrectionAvailable &&
+    checkoutRevisionPaymentInstalled &&
+    manifest.actions.some((action) => action.name === "record_daily_payment" && action.authorized);
   const availableBookingOperations = (operations: readonly string[]) =>
     operations.filter(
-      (operation) => operation !== "correct_checkout" || checkoutCorrectionAvailable,
+      (operation) =>
+        (operation !== "correct_checkout" || checkoutCorrectionAvailable) &&
+        (operation !== "revise_checkout_and_collect" || checkoutRevisionPaymentAvailable),
     );
   const directBooking = directWorkflows.includes("booking_operation");
   const directCollection = directWorkflows.includes("collection");
@@ -180,6 +189,7 @@ export async function GET(request: Request) {
           settledOpenDiscountAvailable: checkoutCorrectionAvailable && settledOpenDiscountInstalled,
           settledPriceAvailable: checkoutCorrectionAvailable && settledPriceInstalled,
         },
+        checkoutRevisionPayment: { available: checkoutRevisionPaymentAvailable, version: 1 },
       },
       dailyWorkflow: {
         version: 1,

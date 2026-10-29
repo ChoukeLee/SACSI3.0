@@ -160,6 +160,7 @@ function parseInput(workflow: DirectExecutionWorkflow, value: unknown): ObjectVa
       "actualCheckOut",
       "discountAmountXof",
       "inputSource",
+      "correctsRequestId",
     ])
   )
     throw new DirectFailure("operationInvalidRequest", 400);
@@ -173,6 +174,13 @@ async function checkReadiness(
   workflow: DirectExecutionWorkflow,
   input: ObjectValue,
 ) {
+  if (
+    workflow === "booking_operation" &&
+    input.operation === "revise_checkout_and_collect" &&
+    ((await rpc(auth, "booking_checkout_correction_protocol_version")) !== 1 ||
+      (await rpc(auth, "booking_checkout_revision_payment_protocol_version")) !== 1)
+  )
+    throw new DirectFailure("direct_database_upgrade_required", 503);
   if (
     workflow === "booking_operation" &&
     input.operation === "correct_checkout" &&
