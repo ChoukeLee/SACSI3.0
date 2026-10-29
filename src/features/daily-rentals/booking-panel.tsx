@@ -520,13 +520,14 @@ export function BookingPanel({
   }, [booking, checkoutCorrectionDate]);
   const checkoutCorrectionGross =
     checkoutCorrectionNights * Number(booking?.nightly_price_xof ?? 0);
+  const checkoutCorrectionReasonLength = Array.from(checkoutCorrectionReason.trim()).length;
   const checkoutCorrectionFinal = Math.max(
     0,
     checkoutCorrectionGross - Number(booking?.manual_discount_amount_xof ?? 0),
   );
 
   const handlePrepareCheckoutCorrection = async () => {
-    if (!booking || !checkoutCorrectionDate || checkoutCorrectionReason.trim().length < 5) return;
+    if (!booking || !checkoutCorrectionDate || checkoutCorrectionReasonLength < 5) return;
     setCheckoutCorrectionPreparing(true);
     setActionError("");
     try {
@@ -2096,6 +2097,13 @@ export function BookingPanel({
                                     : "Ex. : départ réel le 14 octobre, date enregistrée incorrecte"
                                 }
                               />
+                              {checkoutCorrectionReasonLength < 5 && (
+                                <p className="mt-1 text-xs text-amber-900/80" role="status">
+                                  {locale === "zh"
+                                    ? `更正原因至少5个字符，当前${checkoutCorrectionReasonLength}个；例如“客人提前退房”。`
+                                    : `Saisissez au moins 5 caractères (${checkoutCorrectionReasonLength} actuellement), par exemple « départ anticipé du client ».`}
+                                </p>
+                              )}
                             </div>
                             <Button
                               type="button"
@@ -2107,7 +2115,7 @@ export function BookingPanel({
                                 checkoutCorrectionDate >= booking.actual_check_out ||
                                 checkoutCorrectionDate > businessDate() ||
                                 checkoutCorrectionNights <= 0 ||
-                                checkoutCorrectionReason.trim().length < 5 ||
+                                checkoutCorrectionReasonLength < 5 ||
                                 checkoutCorrectionFinal < totalPaid
                               }
                               className="w-full border-amber-300"
