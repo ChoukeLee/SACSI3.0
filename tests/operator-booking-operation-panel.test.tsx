@@ -31,3 +31,48 @@ it('shows the actual dates, gross fee, discount and final balance for a historic
  expect(host.textContent).toContain('新欠款（XOF）');expect(host.querySelector('button')?.disabled).toBe(true);
  expect(fetchMock).not.toHaveBeenCalled();
 });
+
+const revisionSource = '11111111-1111-4111-8111-111111111111';
+async function renderRevision(locale:'zh'|'fr',status='pending') {
+ await act(async()=>root.render(<BookingOperationPanel id="same-id" requestId="new-revision-request" actor="synthetic"
+   originalInstruction="修订先前退房记录，后来又收了四万；保留原收款，无优惠指令。"
+   expiresAt="2026-10-29T23:59:00Z" status={status} locale={locale}
+   plan={{operation:'revise_checkout_and_collect',correctsRequestId:revisionSource,correctionDateLimit:'2026-10-31',
+     checkInBefore:'2026-10-17',checkInAfter:'2026-10-17',actualCheckOutBefore:'2026-10-18',actualCheckOutAfter:'2026-10-19',
+     totalBefore:40000,totalAfter:80000,paidBefore:40000,paidAfter:80000,amountXof:40000,
+     discountBefore:0,discountAfter:0,outstandingAfter:0,paymentDate:'2026-10-29',paymentMethod:'cash'}}/>));
+}
+it.each(['zh','fr'] as const)('labels the checkout revision as collection and displays the source and bound (%s)',async locale=>{
+ await renderRevision(locale);
+ const text=host.textContent??'';
+ expect(text).toContain(locale==='zh'?'修订退房更正并补收':'Réviser le départ corrigé et encaisser un complément');
+ expect(text).toContain(locale==='zh'?'来源原请求号':'Identifiant de la demande d’origine');
+ expect(text).toContain(revisionSource);expect(text).toContain('2026-10-31');expect(text).toContain('2026-10-19');
+ expect(text).toContain(locale==='zh'?'本次补收（XOF）':'Encaissement complémentaire (XOF)');
+ expect(text).toContain(locale==='zh'?'收款日期':'Date d’encaissement');
+ expect(text).toContain(locale==='zh'?'收款方式':'Moyen d’encaissement');
+ expect(text).toContain(locale==='zh'?'现金':'Espèces');
+ expect(text).not.toMatch(/退款|冲正|remboursement|extourne/i);
+ const fields=new Map([...host.querySelectorAll('dl > div')].map(row=>[row.querySelector('dt')?.textContent,row.querySelector('dd')?.textContent]));
+ expect(fields.get(locale==='zh'?'新应收（XOF）':'Nouveau montant dû (XOF)')).toBe('80000');
+ expect(fields.get(locale==='zh'?'新净收款（XOF）':'Nouvel encaissement net (XOF)')).toBe('80000');
+ expect(fields.get(locale==='zh'?'新欠款（XOF）':'Nouveau solde dû (XOF)')).toBe('0');
+ expect(fields.get(locale==='zh'?'新优惠（XOF）':'Nouvelle remise (XOF)')).toBe('0');
+ expect(host.querySelector('button')?.disabled).toBe(true);expect(fetchMock).not.toHaveBeenCalled();
+});
+it('requires both revision checks before a single request and preserves the confirmation id',async()=>{
+ await renderRevision('zh');
+ const boxes=host.querySelectorAll('input');
+ await act(async()=>{(boxes[0] as HTMLElement).click();});
+ expect(host.querySelector('button')?.disabled).toBe(true);expect(fetchMock).not.toHaveBeenCalled();
+ expect(host.textContent).toContain('我确认修订后的退房日期、本次补收和剩余欠款；原收款记录保留。');
+ await act(async()=>{(boxes[1] as HTMLElement).click();});
+ expect(host.querySelector('button')?.disabled).toBe(false);
+ fetchMock.mockResolvedValue({ok:true,json:async()=>({status:'completed',verified:true})});await click('button');
+ expect(fetchMock).toHaveBeenCalledExactlyOnceWith('/api/operator/v1/booking-operations/confirmations/same-id',
+   {method:'POST',credentials:'same-origin'});
+ expect(host.textContent).toContain('业务已完成并通过本次执行核验');
+});
+it.each(['completed','superseded'])('never submits a %s historical checkout revision',async status=>{
+ await renderRevision('zh',status);expect(host.querySelector('button')).toBeNull();expect(fetchMock).not.toHaveBeenCalled();
+});

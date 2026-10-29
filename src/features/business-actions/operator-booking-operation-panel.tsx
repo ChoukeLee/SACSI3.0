@@ -1,8 +1,14 @@
 "use client";
 import { useRef, useState } from "react";
-import { operatorSourceMessage, type OperatorLocale } from "./operator-inbox-panel-labels";
+import {
+  operatorMethodLabel,
+  operatorSourceMessage,
+  type OperatorLocale,
+} from "./operator-inbox-panel-labels";
 import { bookingOperationLabel, isHighRiskBookingOperation } from "./booking-operation-contract";
 const fields: Record<string, string> = {
+  correctsRequestId: "来源原请求号",
+  correctionDateLimit: "原退房日期上界",
   unitCode: "原房间",
   targetUnitCode: "目标房间",
   bookingAgent: "业务经办人",
@@ -36,6 +42,8 @@ const fields: Record<string, string> = {
   reason: "变更原因",
 };
 const fieldsFr: Record<string, string> = {
+  correctsRequestId: "Identifiant de la demande d’origine",
+  correctionDateLimit: "Date limite du départ d’origine",
   unitCode: "Lot d’origine",
   targetUnitCode: "Lot cible",
   bookingAgent: "Responsable du dossier",
@@ -73,12 +81,18 @@ const operationsFr: Record<string, string> = {
   check_in: "Enregistrer une arrivée (sans paiement)",
   cancel: "Annuler une réservation non arrivée",
   correct_checkout: "Corriger le séjour terminé et la remise",
+  revise_checkout_and_collect: "Réviser le départ corrigé et encaisser un complément",
   change_stay: "Modifier les dates ou le tarif",
   correct_room: "Corriger le lot saisi par erreur",
   transfer: "Transférer une réservation non arrivée",
   reverse: "Extourner un paiement erroné",
   refund: "Enregistrer un remboursement réel",
   void_checkin: "Annuler une arrivée erronée",
+};
+const revisionCollectionFields: Record<string, [string, string]> = {
+  amountXof: ["本次补收（XOF）", "Encaissement complémentaire (XOF)"],
+  paymentDate: ["收款日期", "Date d’encaissement"],
+  paymentMethod: ["收款方式", "Moyen d’encaissement"],
 };
 export function BookingOperationPanel({
   id,
@@ -108,6 +122,7 @@ export function BookingOperationPanel({
     [highRiskChecked, setHighRiskChecked] = useState(false),
     [message, setMessage] = useState("");
   const highRisk = isHighRiskBookingOperation(plan.operation);
+  const isCheckoutRevision = plan.operation === "revise_checkout_and_collect";
   async function confirm() {
     if (
       busy.current ||
@@ -180,9 +195,17 @@ export function BookingOperationPanel({
           .map(([key, label]) => (
             <div key={key}>
               <dt className="text-sm text-muted-foreground">
-                {locale === "zh" ? label : fieldsFr[key]}
+                {isCheckoutRevision && revisionCollectionFields[key]
+                  ? revisionCollectionFields[key][locale === "zh" ? 0 : 1]
+                  : locale === "zh"
+                    ? label
+                    : fieldsFr[key]}
               </dt>
-              <dd className="break-words">{String(plan[key])}</dd>
+              <dd className="break-words">
+                {isCheckoutRevision && key === "paymentMethod"
+                  ? operatorMethodLabel(String(plan[key]), locale)
+                  : String(plan[key])}
+              </dd>
             </div>
           ))}
       </dl>
@@ -226,15 +249,20 @@ export function BookingOperationPanel({
                     "我确认款项已经实际退给客户，日期、方式和金额正确。",
                     "Je confirme le remboursement réel au client, avec la bonne date, le bon moyen et le bon montant.",
                   )
-                : plan.operation === "correct_checkout"
+                : isCheckoutRevision
                   ? text(
-                      "我确认实际退房日、优惠、约定结算调整及最终欠款；原收款保留，本次没有退款。",
-                      "Je confirme le départ réel, la remise, l’ajustement convenu et le solde final. Les paiements restent inchangés, sans remboursement.",
+                      "我确认修订后的退房日期、本次补收和剩余欠款；原收款记录保留。",
+                      "Je confirme le départ révisé, l’encaissement complémentaire et le solde restant. Les paiements d’origine sont conservés.",
                     )
-                  : text(
-                      "我确认变更原因及影响；冲正不是实际退钱。不确定时先联系 Chucke。",
-                      "Je confirme le motif et les effets. Une extourne n’est pas un remboursement réel. En cas de doute, contactez d’abord Chucke.",
-                    )}
+                  : plan.operation === "correct_checkout"
+                    ? text(
+                        "我确认实际退房日、优惠、约定结算调整及最终欠款；原收款保留，本次没有退款。",
+                        "Je confirme le départ réel, la remise, l’ajustement convenu et le solde final. Les paiements restent inchangés, sans remboursement.",
+                      )
+                    : text(
+                        "我确认变更原因及影响；冲正不是实际退钱。不确定时先联系 Chucke。",
+                        "Je confirme le motif et les effets. Une extourne n’est pas un remboursement réel. En cas de doute, contactez d’abord Chucke.",
+                      )}
             </label>
           )}
           <button
