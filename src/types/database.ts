@@ -144,6 +144,9 @@ export interface DailyBookingRow {
   billing_status: "prepaid" | "partially_paid" | "need_top_up" | "settled";
   manual_discount_amount_xof: number;
   manual_discount_reason: string | null;
+  /** Explicit agreed settlement adjustment, separate from room charges and discounts. */
+  settlement_adjustment_amount_xof?: number;
+  settlement_adjustment_reason?: string | null;
   final_amount_xof: number | null;
   status: string;
   ota_source: string | null;

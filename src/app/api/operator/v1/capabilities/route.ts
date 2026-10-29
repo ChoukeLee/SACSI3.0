@@ -60,15 +60,18 @@ export async function GET(request: Request) {
   }
   let checkoutCorrectionInstalled = false;
   let settledOpenDiscountInstalled = false;
+  let settledPriceInstalled = false;
   if (bookingOperationsAvailable && auth.user.role === "admin") {
     try {
       const version = await auth.supabase.rpc("booking_checkout_correction_protocol_version");
       checkoutCorrectionInstalled = !version.error && version.data === 1;
       if (checkoutCorrectionInstalled) {
-        const openVersion = await auth.supabase.rpc(
-          "booking_open_checkout_discount_protocol_version",
-        );
+        const [openVersion, priceVersion] = await Promise.all([
+          auth.supabase.rpc("booking_open_checkout_discount_protocol_version"),
+          auth.supabase.rpc("booking_checkout_settled_price_protocol_version"),
+        ]);
         settledOpenDiscountInstalled = !openVersion.error && openVersion.data === 1;
+        settledPriceInstalled = !priceVersion.error && priceVersion.data === 1;
       }
     } catch {
       /* Old databases must not advertise historical corrections. */
@@ -175,6 +178,7 @@ export async function GET(request: Request) {
           available: checkoutCorrectionAvailable,
           version: 1,
           settledOpenDiscountAvailable: checkoutCorrectionAvailable && settledOpenDiscountInstalled,
+          settledPriceAvailable: checkoutCorrectionAvailable && settledPriceInstalled,
         },
       },
       dailyWorkflow: {

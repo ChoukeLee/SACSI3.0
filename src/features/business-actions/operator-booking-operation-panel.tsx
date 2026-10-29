@@ -17,6 +17,8 @@ const fields: Record<string, string> = {
   grossAfter: "新房费（优惠前，XOF）",
   discountBefore: "原优惠（XOF）",
   discountAfter: "新优惠（XOF）",
+  adjustmentBefore: "原约定结算调整（XOF）",
+  adjustmentAfter: "新约定结算调整（XOF）",
   outstandingBefore: "原欠款（XOF）",
   outstandingAfter: "新欠款（XOF）",
   priceBefore: "原日价（XOF）",
@@ -48,6 +50,8 @@ const fieldsFr: Record<string, string> = {
   grossAfter: "Nouveau montant avant remise (XOF)",
   discountBefore: "Ancienne remise (XOF)",
   discountAfter: "Nouvelle remise (XOF)",
+  adjustmentBefore: "Ancien ajustement convenu (XOF)",
+  adjustmentAfter: "Nouvel ajustement convenu (XOF)",
   outstandingBefore: "Ancien solde dû (XOF)",
   outstandingAfter: "Nouveau solde dû (XOF)",
   priceBefore: "Ancien tarif journalier (XOF)",
@@ -224,8 +228,8 @@ export function BookingOperationPanel({
                   )
                 : plan.operation === "correct_checkout"
                   ? text(
-                      "我确认实际退房日、优惠及最终欠款；原收款保留，本次没有退款。",
-                      "Je confirme le départ réel, la remise et le solde final. Les paiements restent inchangés, sans remboursement.",
+                      "我确认实际退房日、优惠、约定结算调整及最终欠款；原收款保留，本次没有退款。",
+                      "Je confirme le départ réel, la remise, l’ajustement convenu et le solde final. Les paiements restent inchangés, sans remboursement.",
                     )
                   : text(
                       "我确认变更原因及影响；冲正不是实际退钱。不确定时先联系 Chucke。",

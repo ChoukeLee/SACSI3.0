@@ -994,14 +994,35 @@ export function BookingPanel({
                         {formatXof(billing.finalAmount)}
                       </p>
                     </div>
-                    {billing.discount > 0 && (
+                    {(billing.discount > 0 || billing.settlementAdjustment !== 0) && (
                       <div className="col-span-3 flex items-center justify-between border-t border-border pt-2">
                         <span className="text-muted-foreground">
                           {t.billing.grossAmount} {formatXof(billing.grossAmount)}
                         </span>
-                        <span className="font-medium tabular-nums text-accentGreen-700">
-                          {t.billing.discount} -{formatXof(billing.discount)}
-                        </span>
+                        {billing.discount > 0 && (
+                          <span className="font-medium tabular-nums text-accentGreen-700">
+                            {t.billing.discount} -{formatXof(billing.discount)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {billing.settlementAdjustment !== 0 && (
+                      <div className="col-span-3 space-y-1 border-t border-border pt-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">
+                            {locale === "zh" ? "约定结算调整" : "Ajustement de règlement convenu"}
+                          </span>
+                          <span className="font-medium tabular-nums text-foreground">
+                            {billing.settlementAdjustment > 0 ? "+" : ""}
+                            {formatXof(billing.settlementAdjustment)}
+                          </span>
+                        </div>
+                        <p className="break-words text-muted-foreground">
+                          {booking.settlement_adjustment_reason ||
+                            (locale === "zh"
+                              ? "调整原因待核对"
+                              : "Motif de l’ajustement à vérifier")}
+                        </p>
                       </div>
                     )}
                     <div className="col-span-3 flex items-center justify-between border-t border-border pt-2 text-sm">

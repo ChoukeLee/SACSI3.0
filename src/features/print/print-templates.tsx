@@ -6,6 +6,7 @@ import { financeRowMoney } from "@/lib/native-money";
 import { formatMoney } from "@/lib/currency";
 import { paymentPlanDisplayLabel, statusDisplayLabel } from "@/lib/display-labels";
 import { formatXofExact } from "@/lib/financial-amount";
+import { calculateBilling } from "@/features/daily-rentals/billing";
 import type {
   CustomerRow,
   DailyBookingRow,
@@ -354,6 +355,7 @@ export interface DailyReceiptPrintData {
 }
 
 export function printDailyReceipt(data: DailyReceiptPrintData, locale: "zh" | "fr") {
+  data = escapePrintData(data);
   const labels =
     locale === "zh"
       ? {
@@ -366,6 +368,10 @@ export function printDailyReceipt(data: DailyReceiptPrintData, locale: "zh" | "f
           nights: "晚数",
           nightlyPrice: "每晚价格",
           total: "总金额",
+          gross: "住宿房费（调整前）",
+          settlementAdjustment: "约定结算调整",
+          adjustmentReasonMissing: "调整原因待核对",
+          discount: "优惠",
           prepaid: "预付金额",
           remaining: "待付余额",
         }
@@ -379,19 +385,16 @@ export function printDailyReceipt(data: DailyReceiptPrintData, locale: "zh" | "f
           nights: "Nuits",
           nightlyPrice: "Prix/nuit",
           total: "Total",
+          gross: "Montant du séjour avant ajustement",
+          settlementAdjustment: "Ajustement de règlement convenu",
+          adjustmentReasonMissing: "Motif de l’ajustement à vérifier",
+          discount: "Remise",
           prepaid: "Avance",
           remaining: "Solde",
         };
 
-  const effectiveCheckOut =
-    data.booking.check_out ??
-    data.booking.actual_check_out ??
-    new Date().toISOString().slice(0, 10);
-  const nights = Math.ceil(
-    (new Date(effectiveCheckOut).getTime() - new Date(data.booking.check_in).getTime()) /
-      (1000 * 60 * 60 * 24),
-  );
-  const remaining = Number(data.booking.total_amount_xof) - Number(data.booking.prepaid_amount_xof);
+  const billing = calculateBilling(data.booking);
+  const remaining = billing.outstanding;
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${labels.title}</title>${a4Styles}</head><body>
     <div class="header"><div class="company">${labels.company}</div><div class="meta">${labels.title}</div></div>
@@ -400,11 +403,14 @@ export function printDailyReceipt(data: DailyReceiptPrintData, locale: "zh" | "f
       <tr><td class="label">${labels.room}</td><td class="value">${data.unit?.unit_no ?? "-"}</td></tr>
       <tr><td class="label">${labels.guest}</td><td class="value">${data.customer?.name ?? "-"}</td></tr>
       <tr><td class="label">${labels.checkIn}</td><td class="value">${data.booking.check_in}</td></tr>
-      <tr><td class="label">${labels.checkOut}</td><td class="value">${data.booking.check_out}</td></tr>
-      <tr><td class="label">${labels.nights}</td><td class="value">${nights} ${locale === "zh" ? "晚" : ""}</td></tr>
+      <tr><td class="label">${labels.checkOut}</td><td class="value">${billing.effectiveCheckOut}</td></tr>
+      <tr><td class="label">${labels.nights}</td><td class="value">${billing.nights} ${locale === "zh" ? "晚" : ""}</td></tr>
       <tr><td class="label">${labels.nightlyPrice}</td><td class="value">${formatXof(Number(data.booking.nightly_price_xof))}</td></tr>
     </table>
-    <div class="row"><span class="value">${labels.total}</span><span class="value">${formatXof(Number(data.booking.total_amount_xof))}</span></div>
+    ${billing.settlementAdjustment !== 0 || billing.discount > 0 ? `<div class="row"><span class="label">${labels.gross}</span><span>${formatXof(billing.grossAmount)}</span></div>` : ""}
+    ${billing.settlementAdjustment !== 0 ? `<div class="row"><span class="label">${labels.settlementAdjustment}</span><span>${billing.settlementAdjustment > 0 ? "+" : ""}${formatXof(billing.settlementAdjustment)}</span></div><p>${data.booking.settlement_adjustment_reason || labels.adjustmentReasonMissing}</p>` : ""}
+    ${billing.discount > 0 ? `<div class="row"><span class="label">${labels.discount}</span><span>-${formatXof(billing.discount)}</span></div>` : ""}
+    <div class="row"><span class="value">${labels.total}</span><span class="value">${formatXof(billing.finalAmount)}</span></div>
     <div class="row"><span class="label">${labels.prepaid}</span><span>${formatXof(Number(data.booking.prepaid_amount_xof))}</span></div>
     ${remaining > 0 ? `<div class="row"><span class="label" style="color:#dc2626">${labels.remaining}</span><span style="color:#dc2626;font-weight:700">${formatXof(remaining)}</span></div>` : ""}
     <div class="footer">${labels.company} - ${new Date().toLocaleDateString()}</div>

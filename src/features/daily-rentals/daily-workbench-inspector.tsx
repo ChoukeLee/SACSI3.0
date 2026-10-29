@@ -189,6 +189,25 @@ export function DailyWorkbenchInspector({
           className={styles.money}
           aria-label={text("住宿收款位置", "Position des encaissements")}
         >
+          {billing.settlementAdjustment !== 0 && (
+            <>
+              <div className={styles.moneyRow}>
+                <span>{text("住宿房费（调整前）", "Montant du séjour avant ajustement")}</span>
+                <strong>{formatXof(billing.grossAmount, locale)}</strong>
+              </div>
+              <div className={styles.moneyRow}>
+                <span>{text("约定结算调整", "Ajustement de règlement convenu")}</span>
+                <strong>
+                  {billing.settlementAdjustment > 0 ? "+" : ""}
+                  {formatXof(billing.settlementAdjustment, locale)}
+                </strong>
+              </div>
+              <p className={styles.notice}>
+                {booking?.settlement_adjustment_reason ||
+                  text("调整原因待核对", "Motif de l’ajustement à vérifier")}
+              </p>
+            </>
+          )}
           <div className={styles.moneyRow}>
             <span>{text("住宿订单计费", "Facturation du séjour")}</span>
             <strong>{formatXof(billing.finalAmount, locale)}</strong>

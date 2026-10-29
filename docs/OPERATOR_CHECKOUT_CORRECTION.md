@@ -42,3 +42,9 @@
 `booking_open_checkout_discount_protocol_version()=1` 时，capabilities 额外公布 `checkoutCorrection.settledOpenDiscountAvailable`。此扩展仅允许已退房、实际退房日与最终退房日一致、优惠前房费与实际晚数×日价一致的open订单调整优惠。请求必须沿用已记录的实际退房日，不能缩短或延长open订单住期、切换模式或重算不一致的历史金额。退款边界、本人admin/L3/项目权限、原请求号、签名快照、保留收款及审计事务与固定住期相同。
 
 可单独将该版本函数返回值改为0以停用open订单优惠入口，固定住期更正仍保留原权限。免单是明确的全额优惠，不登记虚构收款。已撤销订单及其取消应收不属于可执行对象。
+
+## 已收款订单的约定结算价
+
+独立版本 `booking_checkout_settled_price_protocol_version()=1` 开放后，capabilities 公布 `checkoutCorrection.settledPriceAvailable=true`。`correct_checkout` 可额外明确 `finalAmountXof`：仅限固定住期且已退房、优惠为0、最终金额等于实时净已收且不低于按实际晚数计算的基础房费、不超过原最终应收。未明确约定金额不得自动按已收凑平。
+
+基础房费和原日价保留，差额写入 `settlement_adjustment_amount_xof` 与原因，界面显示“约定结算调整”。它不是负优惠、虚构费用或新增收款。所有付款、账本、房态及保洁保留；预览、签名快照及认证审计同时包含调整前后金额。已有调整的订单不能再用不带约定价的更正或旧退款入口覆盖；停用独立版本可阻止新的约定价操作。未知结果继续按原请求号查询。

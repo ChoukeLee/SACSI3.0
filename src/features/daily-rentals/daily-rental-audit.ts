@@ -5,11 +5,13 @@ const today = new Date().toISOString().slice(0, 10);
 
 interface RawRow { [key: string]: unknown; }
 
-function expectedDailyAmount(booking: RawRow): { nights: number; gross: number; discount: number; final: number; effectiveCheckOut: string } {
+function expectedDailyAmount(booking: RawRow): { nights: number; gross: number; discount: number; settlementAdjustment: number; final: number; effectiveCheckOut: string } {
   const checkIn = booking.check_in as string;
   const mode = (booking.checkout_mode as string | null) ?? "fixed";
   const effectiveCheckOut =
-    mode === "fixed" && booking.check_out
+    booking.status === "checked_out" && booking.actual_check_out
+      ? booking.actual_check_out as string
+      : mode === "fixed" && booking.check_out
       ? booking.check_out as string
       : mode === "open" && booking.actual_check_out
         ? booking.actual_check_out as string
@@ -17,8 +19,9 @@ function expectedDailyAmount(booking: RawRow): { nights: number; gross: number; 
   const nights = Math.max(1, Math.ceil((new Date(effectiveCheckOut).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24)));
   const gross = Number(booking.total_amount_xof ?? 0);
   const discount = Number(booking.manual_discount_amount_xof ?? 0);
-  const final = Math.max(0, gross - discount);
-  return { nights, gross, discount, final, effectiveCheckOut };
+  const settlementAdjustment = Number(booking.settlement_adjustment_amount_xof ?? 0);
+  const final = Math.max(0, gross + settlementAdjustment - discount);
+  return { nights, gross, discount, settlementAdjustment, final, effectiveCheckOut };
 }
 
 function iss(
@@ -222,8 +225,8 @@ export function scanDailyRentalIssues(data: AuditSnapshot): QualityIssue[] {
       issues.push(iss(
         `dr_fin_amount_${bId.slice(0, 8)}`, "high", "finance",
         `订单最终应收不同步 ${label}`,
-        `房间 ${label} 订单总额 ${expected.gross}，折扣 ${expected.discount}，最终应收应为 ${expected.final}，订单记录为 ${storedFinal}`,
-        "修复：按订单总额和折扣重新同步最终应收与应收账款。",
+        `房间 ${label} 订单总额 ${expected.gross}，约定结算调整 ${expected.settlementAdjustment}，折扣 ${expected.discount}，最终应收应为 ${expected.final}，订单记录为 ${storedFinal}`,
+        "修复：按订单总额、约定结算调整和折扣重新同步最终应收与应收账款。",
         "daily_booking", bId, label, [bId], `/daily-rentals`,
         true, bId,
       ));

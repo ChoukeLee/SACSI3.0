@@ -179,6 +179,13 @@ async function checkReadiness(
     (await rpc(auth, "booking_checkout_correction_protocol_version")) !== 1
   )
     throw new DirectFailure("direct_database_upgrade_required", 503);
+  if (
+    workflow === "booking_operation" &&
+    input.operation === "correct_checkout" &&
+    Object.hasOwn(input, "finalAmountXof") &&
+    (await rpc(auth, "booking_checkout_settled_price_protocol_version")) !== 1
+  )
+    throw new DirectFailure("direct_database_upgrade_required", 503);
   const versions: Array<[string, number]> =
     workflow === "daily_payment"
       ? [

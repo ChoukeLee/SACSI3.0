@@ -229,6 +229,10 @@
     {
       "file": "20261028114712_operator_settled_open_discount.sql",
       "sha256": "5cb0d24a6c581808cd9a695a1b5896ea3ea3396af9714e4a9dd7b5595fd2fdb3"
+    },
+    {
+      "file": "20261029084504_operator_settled_checkout_price.sql",
+      "sha256": "82f8e8944e90994f219fd13feb9af81cb75ef7acb762552f4afe033f399adb66"
     }
   ],
   "excluded": [

@@ -12,6 +12,8 @@ export interface BillingResult {
   grossAmount: number;
   /** Manual discount applied by admin */
   discount: number;
+  /** Explicit agreed settlement adjustment, not a discount or a payment. */
+  settlementAdjustment: number;
   /** Final amount currently owed. Open checked-in bookings are recalculated through the reference date. */
   finalAmount: number;
   /** Already paid */
@@ -56,14 +58,19 @@ export function calculateBilling(
 
   const grossAmount = Math.round(nights * Number(booking.nightly_price_xof));
   const discount = Number(booking.manual_discount_amount_xof) || 0;
+  const settlementAdjustment = Number(booking.settlement_adjustment_amount_xof) || 0;
   const storedFinal = booking.final_amount_xof != null ? Number(booking.final_amount_xof) : null;
   const shouldRecalculateOpenStay =
     mode === "open" &&
     booking.status === "checked_in" &&
     !booking.actual_check_out;
+  const settlementGross = shouldRecalculateOpenStay
+    ? grossAmount
+    : Number(booking.total_amount_xof ?? grossAmount);
+  const adjustedFinal = Math.max(0, settlementGross + settlementAdjustment - discount);
   const finalAmount = shouldRecalculateOpenStay
-    ? Math.max(0, grossAmount - discount)
-    : (storedFinal ?? Math.max(0, grossAmount - discount));
+    ? adjustedFinal
+    : (storedFinal ?? adjustedFinal);
 
   const paid = Number(booking.prepaid_amount_xof) || 0;
 
@@ -71,6 +78,7 @@ export function calculateBilling(
     nights,
     grossAmount,
     discount,
+    settlementAdjustment,
     finalAmount,
     paid,
     outstanding: Math.max(0, finalAmount - paid),
