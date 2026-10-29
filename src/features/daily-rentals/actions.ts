@@ -378,6 +378,23 @@ export async function setFixedCheckout(bookingId: string, newCheckOut: string): 
   return { success: true, data: data as DailyOperationSnapshot };
 }
 
+export async function changeCheckoutDate(
+  bookingId: string,
+  newCheckOut: string,
+  requestId: string,
+): Promise<DailyActionResult> {
+  const user = await guardWrite();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("daily_change_checkout_date_rpc", {
+    p_booking_id: bookingId,
+    p_new_check_out: newCheckOut,
+    p_request_id: requestId,
+    p_actor: actorPayload(user),
+  });
+  if (error) return { success: false, error: error.message };
+  return { success: true, data: data as DailyOperationSnapshot };
+}
+
 // ── Complete cleaning ──
 export async function completeCleaning(taskId: string): Promise<DailyActionResult & { taskId?: string; unitId?: string; unitStatus?: UnitStatus }> {
   const user = await guardWrite();

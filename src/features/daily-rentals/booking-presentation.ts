@@ -69,6 +69,38 @@ export function formatDailyRentalError(message: string | null | undefined, local
       zh: "离店日期必须晚于入住日期。",
       fr: "La date de depart doit etre apres la date d'arrivee.",
     },
+    checkoutDateMustBeTodayOrLater: {
+      zh: "入住中的订单不能把计划退房日改到今天之前；如客人已离店，请办理退房或使用退房纠错。",
+      fr: "Un séjour en cours ne peut pas être déplacé avant aujourd'hui. Enregistrez le départ réel ou utilisez la correction de départ.",
+    },
+    checkoutDateCreatesOverpayment: {
+      zh: "修改后应收会低于已登记收款，请先核对实际退款或结算方式。",
+      fr: "Le nouveau montant serait inférieur aux paiements enregistrés. Vérifiez le remboursement ou le règlement avant de modifier.",
+    },
+    doubleBooked: {
+      zh: "该房间在所选日期已被其他订单占用。",
+      fr: "Cette chambre est déjà réservée sur les dates choisies.",
+    },
+    checkoutDateUnchanged: {
+      zh: "新退房日期与当前日期相同。",
+      fr: "La nouvelle date est identique à la date actuelle.",
+    },
+    bookingCannotChangeCheckoutDate: {
+      zh: "只有待入住或入住中的订单可以修改计划退房日期。",
+      fr: "Seuls les séjours confirmés ou en cours peuvent modifier la date de départ prévue.",
+    },
+    bookingAlreadyCheckedOut: {
+      zh: "该订单已退房，请使用已退房订单的纠错流程。",
+      fr: "Ce séjour est déjà clôturé. Utilisez la procédure de correction après départ.",
+    },
+    operationAssistanceRequired: {
+      zh: "该订单含特殊结算调整，请由维护者核对后处理。",
+      fr: "Ce séjour comporte un règlement spécial. Demandez une vérification au responsable.",
+    },
+    requestIdConflict: {
+      zh: "该修改请求已提交且参数不同，请刷新订单后重新操作。",
+      fr: "Cette demande a déjà été utilisée avec d'autres paramètres. Actualisez le dossier.",
+    },
     pastDateNotAllowed: {
       zh: "不能创建过去日期的普通预订。如需补录历史订单，请使用历史补录流程。",
       fr: "Impossible de creer une reservation normale dans le passe. Utilisez le mode de rattrapage historique.",

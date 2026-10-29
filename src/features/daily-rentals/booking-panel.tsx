@@ -49,6 +49,7 @@ import {
   checkOut,
   completeCleaning,
   extendStay,
+  changeCheckoutDate,
   cancelBooking,
   recordSupplementaryPayment,
   applyDiscount,
@@ -98,7 +99,8 @@ interface BookingPanelProps {
 
 type DailyPricedUnit = UnitRow & { daily_rental_price_xof?: number | null };
 
-type AdvancedTask = "payment" | "discount" | "extend" | "fixedCheckout" | "correction" | null;
+type AdvancedTask =
+  "payment" | "discount" | "extend" | "changeCheckout" | "fixedCheckout" | "correction" | null;
 
 export function BookingPanel({
   booking,
@@ -148,6 +150,7 @@ export function BookingPanel({
   const [discountReason, setDiscountReason] = useState("");
   const [extendDays, setExtendDays] = useState("1");
   const [fixedCheckOutDate, setFixedCheckOutDate] = useState("");
+  const [changedCheckOutDate, setChangedCheckOutDate] = useState("");
   const [actionError, setActionError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; amount: number } | null>(null);
   const [reversalReason, setReversalReason] = useState("");
@@ -156,6 +159,7 @@ export function BookingPanel({
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [correctionReason, setCorrectionReason] = useState("");
   const [confirmCorrection, setConfirmCorrection] = useState(false);
+  const changeCheckoutRequestIdRef = useRef<string | null>(null);
 
   // ── Backfill form state ──
   const [bfUnitId, setBfUnitId] = useState("");
@@ -190,7 +194,9 @@ export function BookingPanel({
     setActionError("");
     setCorrectionReason("");
     setConfirmCorrection(false);
-  }, [booking?.id]);
+    setChangedCheckOutDate(booking?.check_out ?? "");
+    changeCheckoutRequestIdRef.current = null;
+  }, [booking?.id, booking?.check_out]);
 
   const selectedUnit = unitId
     ? (units.find((u) => u.id === unitId) as DailyPricedUnit | null)
@@ -458,6 +464,35 @@ export function BookingPanel({
       closeOnSuccess: true,
     });
   };
+
+  const handleChangeCheckoutDate = async () => {
+    if (!changedCheckOutDate) {
+      setActionError(formatError("checkOutRequired"));
+      return;
+    }
+    const requestId = changeCheckoutRequestIdRef.current ?? crypto.randomUUID();
+    changeCheckoutRequestIdRef.current = requestId;
+    await runPanelAction(() => changeCheckoutDate(booking!.id, changedCheckOutDate, requestId), {
+      closeOnSuccess: true,
+    });
+  };
+
+  const changedCheckoutNights = useMemo(() => {
+    if (!booking || !changedCheckOutDate) return 0;
+    return Math.max(
+      0,
+      Math.round(
+        (Date.parse(`${changedCheckOutDate}T00:00:00Z`) -
+          Date.parse(`${booking.check_in}T00:00:00Z`)) /
+          86400000,
+      ),
+    );
+  }, [booking, changedCheckOutDate]);
+  const changedCheckoutFinal = Math.max(
+    0,
+    changedCheckoutNights * Number(booking?.nightly_price_xof ?? 0) -
+      Number(booking?.manual_discount_amount_xof ?? 0),
+  );
 
   // ── Backfill handler ──
   const handleCancelBooking = async () => {
@@ -1328,6 +1363,65 @@ export function BookingPanel({
                           <UserX />
                           {t.booking.cancelBooking}
                         </Button>
+                        {booking.checkout_mode === "fixed" &&
+                          (activeAdvancedTask === "changeCheckout" ? (
+                            <div className="space-y-2 rounded-lg border border-border p-3">
+                              <p className="text-sm font-semibold">
+                                {locale === "zh" ? "修改退房日期" : "Modifier la date de départ"}
+                              </p>
+                              <DateInput
+                                value={changedCheckOutDate}
+                                onChangeValue={setChangedCheckOutDate}
+                                className={inputClass}
+                                min={booking.check_in}
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                {locale === "zh"
+                                  ? "会按原每晚价格重算应收，已有收款保留。"
+                                  : "Le montant sera recalculé au tarif actuel ; les paiements restent inchangés."}
+                              </p>
+                              {changedCheckoutNights > 0 && (
+                                <p className="text-xs text-foreground/70">
+                                  {locale === "zh"
+                                    ? `${changedCheckoutNights} 晚 · 应收 ${formatXof(changedCheckoutFinal)}`
+                                    : `${changedCheckoutNights} nuits · dû ${formatXof(changedCheckoutFinal)}`}
+                                </p>
+                              )}
+                              <div className="flex gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => setActiveAdvancedTask(null)}
+                                  disabled={saving}
+                                >
+                                  {locale === "zh" ? "取消" : "Annuler"}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  onClick={handleChangeCheckoutDate}
+                                  disabled={
+                                    saving ||
+                                    !changedCheckOutDate ||
+                                    changedCheckoutNights <= 0 ||
+                                    changedCheckOutDate === booking.check_out
+                                  }
+                                >
+                                  {locale === "zh" ? "保存日期" : "Enregistrer"}
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setActiveAdvancedTask("changeCheckout")}
+                              disabled={saving}
+                              className="w-full"
+                            >
+                              <CalendarClock />
+                              {locale === "zh" ? "修改退房日期" : "Modifier la date de départ"}
+                            </Button>
+                          ))}
                       </div>
                     )}
 
@@ -1428,18 +1522,20 @@ export function BookingPanel({
                                   {booking.checkout_mode === "fixed" && (
                                     <button
                                       type="button"
-                                      onClick={() => setActiveAdvancedTask("extend")}
+                                      onClick={() => setActiveAdvancedTask("changeCheckout")}
                                       className="flex min-h-14 items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/70"
                                     >
                                       <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
                                       <span>
                                         <span className="block text-sm font-semibold">
-                                          {t.booking.extendStay}
+                                          {locale === "zh"
+                                            ? "修改退房日期"
+                                            : "Modifier la date de départ"}
                                         </span>
                                         <span className="block text-xs text-muted-foreground">
                                           {locale === "zh"
-                                            ? "延长固定离店日期"
-                                            : "Prolonger le sejour"}
+                                            ? "可提前或延后，自动重算应收"
+                                            : "Avancer ou repousser et recalculer le montant"}
                                         </span>
                                       </span>
                                     </button>
@@ -1495,6 +1591,10 @@ export function BookingPanel({
                                         {activeAdvancedTask === "discount" &&
                                           (locale === "zh" ? "优惠调整" : "Remise")}
                                         {activeAdvancedTask === "extend" && t.booking.extendStay}
+                                        {activeAdvancedTask === "changeCheckout" &&
+                                          (locale === "zh"
+                                            ? "修改退房日期"
+                                            : "Modifier la date de départ")}
                                         {activeAdvancedTask === "fixedCheckout" &&
                                           t.setFixedCheckout}
                                         {activeAdvancedTask === "correction" &&
@@ -1607,6 +1707,46 @@ export function BookingPanel({
                                         >
                                           {t.booking.extendStay}
                                         </Button>
+                                      </div>
+                                    )}
+
+                                  {activeAdvancedTask === "changeCheckout" &&
+                                    booking.checkout_mode === "fixed" && (
+                                      <div className="space-y-2">
+                                        <p className="text-xs text-muted-foreground">
+                                          {locale === "zh"
+                                            ? "修改后会按原每晚价格重算房费并同步应收；已有收款保留。若新应收低于已收，系统会阻止提交。"
+                                            : "Le montant sera recalculé au tarif actuel et la créance synchronisée. Les paiements restent inchangés."}
+                                        </p>
+                                        <div className="flex items-center gap-2">
+                                          <DateInput
+                                            value={changedCheckOutDate}
+                                            onChangeValue={setChangedCheckOutDate}
+                                            className={inputClass}
+                                            min={booking.check_in}
+                                          />
+                                          <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={handleChangeCheckoutDate}
+                                            disabled={
+                                              saving ||
+                                              !changedCheckOutDate ||
+                                              changedCheckoutNights <= 0 ||
+                                              changedCheckOutDate === booking.check_out
+                                            }
+                                            className="shrink-0"
+                                          >
+                                            {locale === "zh" ? "保存日期" : "Enregistrer"}
+                                          </Button>
+                                        </div>
+                                        {changedCheckoutNights > 0 && (
+                                          <p className="text-xs text-foreground/70">
+                                            {locale === "zh"
+                                              ? `${changedCheckoutNights} 晚 · 应收 ${formatXof(changedCheckoutFinal)}`
+                                              : `${changedCheckoutNights} nuits · dû ${formatXof(changedCheckoutFinal)}`}
+                                          </p>
+                                        )}
                                       </div>
                                     )}
 
