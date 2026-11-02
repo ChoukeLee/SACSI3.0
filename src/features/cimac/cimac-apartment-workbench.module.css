@@ -321,6 +321,27 @@
 .room:hover {
   filter: brightness(0.98);
 }
+.reservedRoom {
+  border-color: hsl(var(--primary) / 0.25);
+  border-style: dashed;
+  gap: 4px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+.room .roomName {
+  max-width: 100%;
+  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ap-ink);
+}
+.room .roomCaption {
+  font-size: 10px;
+}
+.reservationSummary {
+  color: var(--ap-blue);
+  white-space: nowrap;
+}
 .corridor {
   display: flex;
   align-items: center;
@@ -402,6 +423,17 @@
   max-width: 125px;
   text-align: center;
 }
+.reservedBadge {
+  color: var(--ap-blue);
+  background: var(--ap-blue-soft);
+}
+.reservationName {
+  color: var(--ap-ink);
+  font-size: 12px;
+  margin-top: 7px !important;
+  max-width: 190px;
+  overflow-wrap: anywhere;
+}
 .detailTabs {
   display: flex;
   gap: 20px;
@@ -434,11 +466,93 @@
 }
 .fact dt {
   color: var(--ap-muted);
+  flex: 0 0 auto;
+  max-width: 55%;
 }
 .fact dd {
+  flex: 1;
   text-align: right;
   min-width: 0;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.reservationOperations {
+  min-width: 0;
+  border-top: 1px solid var(--ap-line);
+  margin-top: 16px;
+  padding-top: 13px;
+  font-size: 12px;
+}
+.reservationButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.reservationButtons button {
+  padding: 7px 10px;
+  min-height: 34px;
+  border: 1px solid var(--ap-line);
+  border-radius: 5px;
+  color: var(--ap-blue);
+  background: var(--ap-panel);
+  text-align: center;
+  line-height: 1.4;
+}
+.reservationButtons button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.reservationButtons .reservationSubmit {
+  color: #fff;
+  background: #345ee9;
+  border-color: #345ee9;
+}
+.reservationForm {
+  display: grid;
+  gap: 11px;
+  min-width: 0;
+}
+.reservationForm h3 {
+  font-size: 12px;
+  font-weight: 600;
+}
+.reservationForm label {
+  display: grid;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--ap-muted);
+}
+.reservationForm :is(input, textarea) {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--ap-line);
+  border-radius: 5px;
+  padding: 8px;
+  background: var(--ap-panel);
+  color: var(--ap-ink);
+  font: inherit;
+  font-size: 12px;
+}
+.reservationForm :is(input, textarea):focus-visible {
+  outline: 2px solid var(--ap-blue);
+  outline-offset: 2px;
+}
+.reservationForm textarea {
+  resize: vertical;
+}
+.reservationOperations :is(.error, [role="status"]) {
+  margin-top: 10px !important;
+}
+.reservationRecovery {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--ap-muted);
+  font-size: 11px;
+}
+.reservationRecovery code {
+  display: block;
+  overflow-wrap: anywhere;
 }
 .ruleTotal {
   margin-top: 16px;
@@ -578,6 +692,9 @@
   .assetLink {
     grid-column: 1;
   }
+  .reservationOperations {
+    grid-column: 1 / -1;
+  }
   .detail .facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 13px 28px;
@@ -676,6 +793,24 @@
   .mobileRoom span {
     flex-shrink: 0;
   }
+  .mobileRoom.reservedRoom {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 2px 6px;
+    padding: 8px;
+  }
+  .mobileRoom.reservedRoom::before {
+    display: none;
+  }
+  .mobileRoom.reservedRoom strong {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+  .mobileRoom .roomName,
+  .mobileRoom .roomCaption {
+    grid-column: 2;
+    padding: 0;
+  }
   .mobileCorridor {
     grid-column: 2;
     grid-row: 2 / span 9;
@@ -707,6 +842,9 @@
   }
   .detailFoot {
     margin-top: 17px !important;
+  }
+  .reservationButtons button {
+    min-height: 40px;
   }
   .rulesPanel {
     padding: 17px 14px;

@@ -6,6 +6,8 @@ export function verifyPackage(directory){
   let manifest;try{manifest=JSON.parse(readFileSync(join(directory,'manifest.json'),'utf8'));}catch{throw new Error('package_manifest_unreadable');}
   if(!/^\d+\.\d+\.\d+$/.test(manifest.version)||!manifest.checksums||typeof manifest.checksums!=='object')throw new Error('package_manifest_invalid');
   const critical=['core.mjs','runtime.mjs','cli.mjs','mcp-server.mjs','mcp-tools.mjs','session-store.mjs','node.exe','SessionProtection.exe','config.json'];
+  const [major,minor]=manifest.version.split('.').map(Number);
+  if(major>0 || minor>=9)critical.push('apartment-reservations.mjs','pending-client.mjs','pending-store.mjs','human-output.mjs');
   if(critical.some(file=>!manifest.checksums[file]))throw new Error('package_manifest_incomplete');
   for(const [file,hash] of Object.entries(manifest.checksums)){
     if(!/^[a-zA-Z0-9_.-]+$/.test(file)||file==='.'||file==='..'||!/^([a-f0-9]{64})$/.test(hash))throw new Error('package_manifest_invalid');

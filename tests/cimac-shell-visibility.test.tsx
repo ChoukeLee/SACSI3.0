@@ -28,6 +28,10 @@ const apartmentActions = vi.hoisted(() => ({ initialize: vi.fn(), refresh: vi.fn
 vi.mock("@/features/cimac/cimac-apartment-actions", () => ({
   initializeCimacApartments: apartmentActions.initialize,
 }));
+vi.mock("@/features/cimac/cimac-apartment-reservation-actions", () => ({
+  executeCimacApartmentReservations: vi.fn(),
+  checkCimacApartmentReservationStatus: vi.fn(),
+}));
 vi.mock("@/features/cimac/cimac-profile-operations", () => ({
   CimacCustomerProfileOperation: () => null,
   CimacAssetConditionOperation: () => null,

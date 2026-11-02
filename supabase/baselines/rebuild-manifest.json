@@ -245,6 +245,10 @@
     {
       "file": "20261102184837_cimac_b17_apartment_directory.sql",
       "sha256": "8cea1ccf5975d0a21dec9bddfe99123314f765b7d6abc85484cbca455d490a6b"
+    },
+    {
+      "file": "20261102193036_cimac_b17_apartment_reservations.sql",
+      "sha256": "f25c05b8795d00ae7d7c323d0200815873142846a583f5f376338ed1eabcbae2"
     }
   ],
   "excluded": [

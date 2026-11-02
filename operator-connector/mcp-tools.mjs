@@ -57,6 +57,19 @@ for (const [name, source, description] of [
 }
 
 const nativeAmount={type:'string',minLength:1,maxLength:15,pattern:'^(?:0|[1-9][0-9]{0,11})(?:\\.[0-9]{1,2})?$'};
+const apartmentNull={enum:[null]};
+const apartmentTimestamp={type:'string',minLength:1,maxLength:80};
+const apartmentOperation=(type)=>schema({
+  type:{type:'string',enum:[type]},unitId:uuid,expectedUnitUpdatedAt:apartmentTimestamp,
+  expectedReservationId:type==='reserve'?apartmentNull:uuid,
+  expectedReservationUpdatedAt:type==='reserve'?apartmentNull:apartmentTimestamp,
+  reserverName:type==='cancel'?apartmentNull:string(200),reason:string(2000),
+},['type','unitId','expectedUnitUpdatedAt','expectedReservationId','expectedReservationUpdatedAt','reserverName','reason']);
+tools.push(
+  tool('query_cimac_apartment_reservations','只读查询建材城17栋二至五层公寓当前预留及真实资产ID/CAS版本。unitNos可选，不按项目内房号猜楼栋。预留不代表入住或收款；没有记录不等于已核空房。',schema({unitNos:{type:'array',minItems:1,maxItems:64,items:{type:'string',pattern:'^[2-5](?:0[1-9]|1[0-6])$'}}}),true),
+  tool('execute_cimac_apartment_reservations','本人明确指令后，仅登记、取消或更正17栋公寓未收款预留人。先查询使用真实unitId及全部CAS字段；最多64套不同房间，固定原requestId，冲突集中核对。无日期/金额/入住/合同/收款字段，不得套用商铺预留或日租；取消reserverName必须为null。不自动补齐、换号或重放，未知只按原号查回。',schema({requestId:uuid,originalInstruction:string(4000),operations:{type:'array',minItems:1,maxItems:64,items:{oneOf:['reserve','cancel','correct_name'].map(apartmentOperation)}}},['requestId','originalInstruction','operations']),false),
+  tool('cimac_apartment_reservation_status','按原请求号只读查回公寓预留。completed_previously且verified=false只表示此前完成，不是本次重新核验；not_found不自动重放，不改用商铺或日租工具。',schema({requestId:uuid},['requestId']),true),
+);
 const nativeDate={type:'string',pattern:'^\\d{4}-\\d{2}-\\d{2}$'};
 const cimacXof={type:'string',minLength:1,maxLength:12,pattern:'^[1-9][0-9]{0,11}$'};
 const cimacCny={type:'string',minLength:1,maxLength:15,pattern:'^(?:0|[1-9][0-9]{0,11})(?:\\.[0-9]{1,2})?$'};
@@ -121,6 +134,7 @@ export async function callTool(name,args,client,store) {
   }
   if(['list_pending','capture_pending','read_pending','recover_pending'].includes(name))return store.lock(()=>client.pending(name.split('_')[0],args));
   if(['query_cimac_maintenance','execute_cimac_maintenance','cimac_maintenance_status'].includes(name))return store.lock(()=>client.cimacMaintenance({query_cimac_maintenance:'query',execute_cimac_maintenance:'execute',cimac_maintenance_status:'status'}[name],args));
+  if(['query_cimac_apartment_reservations','execute_cimac_apartment_reservations','cimac_apartment_reservation_status'].includes(name))return store.lock(()=>client.cimacApartmentReservations({query_cimac_apartment_reservations:'query',execute_cimac_apartment_reservations:'execute',cimac_apartment_reservation_status:'status'}[name],args));
   if(['query_native_collection_position','execute_native_collection','native_collection_status'].includes(name))return store.lock(()=>client.nativeCollection({query_native_collection_position:'query',execute_native_collection:'execute',native_collection_status:'status'}[name],args));
   if(name==='daily_workflow_status'||name==='prepare_daily_workflow'||name==='execute_daily_workflow')return store.lock(()=>client.dailyWorkflow(name==='daily_workflow_status'?'status':name==='execute_daily_workflow'?'execute':'prepare',args));
   if(name==='search_daily_bookings' || name==='plan_daily_change') return store.lock(()=>client.dailyWorkflow(name==='search_daily_bookings'?'search':'plan',args));

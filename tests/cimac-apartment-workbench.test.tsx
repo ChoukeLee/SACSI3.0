@@ -11,10 +11,19 @@ import {
 } from "@/features/cimac/cimac-apartment-model";
 import type { Locale } from "@/lib/i18n";
 
-const mocks = vi.hoisted(() => ({ initialize: vi.fn(), refresh: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  initialize: vi.fn(),
+  refresh: vi.fn(),
+  executeReservation: vi.fn(),
+  checkReservation: vi.fn(),
+}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refresh }) }));
 vi.mock("@/features/cimac/cimac-apartment-actions", () => ({
   initializeCimacApartments: mocks.initialize,
+}));
+vi.mock("@/features/cimac/cimac-apartment-reservation-actions", () => ({
+  executeCimacApartmentReservations: mocks.executeReservation,
+  checkCimacApartmentReservationStatus: mocks.checkReservation,
 }));
 
 let host: HTMLDivElement;
@@ -105,6 +114,136 @@ afterEach(async () => {
 });
 
 describe("CIMAC apartment workbench", () => {
+  it("shows named unpaid reservations separately from actual residents and unknown occupancy", async () => {
+    const data = fixture();
+    data.reservationSchemaAvailable = true;
+    data.registeredCount = 2;
+    const fullName = "Synthetic Reservation Name With A Long Label";
+    data.rooms[0] = {
+      ...data.rooms[0],
+      registered: true,
+      unitId: "92000000-0000-4000-8000-000000000001",
+      unitUpdatedAt: "2026-11-02T12:00:00Z",
+      reservation: {
+        id: "92000000-0000-4000-8000-000000000002",
+        reserverName: fullName,
+        status: "reserved",
+        paymentStatus: "unpaid",
+        updatedAt: "2026-11-02T12:00:00Z",
+      },
+    };
+    data.rooms[16] = {
+      ...data.rooms[16],
+      registered: true,
+      unitId: "92000000-0000-4000-8000-000000000003",
+      unitUpdatedAt: "2026-11-02T12:00:00Z",
+      reservation: {
+        id: "92000000-0000-4000-8000-000000000004",
+        reserverName: "Another Synthetic Name",
+        status: "reserved",
+        paymentStatus: "unpaid",
+        updatedAt: "2026-11-02T12:00:00Z",
+      },
+    };
+    await render({ data, initialQuery: { floor: 2, suffix: 1, tab: "room" } });
+    expect(host.textContent).toContain("已预留 2 套 · 未付款");
+    expect(host.textContent).toContain("本层预留 1 套");
+    expect(room("201").getAttribute("aria-label")).toContain(`已预留 · ${fullName}`);
+    expect(room("201").querySelector(`[title="${fullName}"]`)?.textContent).toBe(fullName);
+    const info = host.querySelector("#apartment-room-info")!.textContent;
+    expect(info).toContain(`预订人${fullName}`);
+    expect(info).toContain("预留付款未付款");
+    expect(info).toContain("预计入住日期待定");
+    expect(info).toContain("租期待定");
+    expect(info).toContain("实际住户待补充");
+    expect(info).toContain("入住日期待补充");
+    expect(host.textContent).toContain("64套待核 · 不等于空房");
+    expect(host.textContent).not.toContain("入住率");
+    expect(button("更正预订人")).not.toBeNull();
+    await click(button("3层"));
+    expect(room("301").textContent).toContain("Another Synthetic Name");
+    expect(host.textContent).toContain("本层预留 1 套");
+    expect(mocks.executeReservation).not.toHaveBeenCalled();
+  });
+
+  it("keeps reservations readable without exposing mutation controls to read-only roles", async () => {
+    const data = fixture();
+    data.reservationSchemaAvailable = true;
+    data.registeredCount = 1;
+    data.rooms[0] = {
+      ...data.rooms[0],
+      registered: true,
+      unitId: "asset-201",
+      unitUpdatedAt: "2026-11-02T12:00:00Z",
+      reservation: {
+        id: "reservation-201",
+        reserverName: "Synthetic Reservation",
+        status: "reserved",
+        paymentStatus: "unpaid",
+        updatedAt: "2026-11-02T12:00:00Z",
+      },
+    };
+    await render({ data, canInitialize: false });
+    expect(room("201").textContent).toContain("Synthetic Reservation");
+    expect(host.querySelector('[aria-label="房间预留操作"]')).toBeNull();
+    expect(mocks.executeReservation).not.toHaveBeenCalled();
+    data.reservationSchemaAvailable = false;
+    await render({ data });
+    expect(host.textContent).toContain("房间预留功能待部署");
+    expect(host.querySelector('[aria-label="房间预留操作"]')).toBeNull();
+  });
+
+  it("does not display cancelled reservation names as current room reservations", async () => {
+    const data = fixture();
+    data.reservationSchemaAvailable = true;
+    data.registeredCount = 1;
+    data.rooms[0] = {
+      ...data.rooms[0],
+      registered: true,
+      unitId: "asset-201",
+      unitUpdatedAt: "2026-11-02T12:00:00Z",
+      reservation: {
+        id: "reservation-201",
+        reserverName: "Cancelled Synthetic Name",
+        status: "cancelled",
+        paymentStatus: "unpaid",
+        updatedAt: "2026-11-02T12:00:00Z",
+      },
+    };
+    await render({ data });
+    expect(room("201").getAttribute("aria-label")).toContain("业务占用待核");
+    expect(host.textContent).not.toContain("Cancelled Synthetic Name");
+    expect(host.textContent).toContain("已预留 0 套");
+    expect(button("登记房间预留")).not.toBeNull();
+  });
+
+  it("localizes reservation names, unpaid state and pending dates in French", async () => {
+    const data = fixture();
+    data.reservationSchemaAvailable = true;
+    data.registeredCount = 1;
+    data.rooms[0] = {
+      ...data.rooms[0],
+      registered: true,
+      unitId: "asset-201",
+      unitUpdatedAt: "2026-11-02T12:00:00Z",
+      reservation: {
+        id: "reservation-201",
+        reserverName: "Synthetic Réservataire",
+        status: "reserved",
+        paymentStatus: "unpaid",
+        updatedAt: "2026-11-02T12:00:00Z",
+      },
+    };
+    await render({ data, locale: "fr", initialQuery: { floor: 2, suffix: 1, tab: "room" } });
+    expect(room("201").getAttribute("aria-label")).toContain("Réservé · Synthetic Réservataire");
+    const info = host.querySelector("#apartment-room-info")!.textContent;
+    expect(info).toContain("RéservataireSynthetic Réservataire");
+    expect(info).toContain("Paiement de la réservationNon payé");
+    expect(info).toContain("Arrivée prévueÀ préciser");
+    expect(info).toContain("Résident réelÀ compléter");
+    expect(button("Corriger le réservataire")).not.toBeNull();
+  });
+
   it("separates the 64 confirmed plans from asset registration and unknown occupancy", async () => {
     await render();
     expect(host.textContent).toContain("已确认房间清单64套");
