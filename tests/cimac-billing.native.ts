@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type pg from "pg";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { installApplicationRebuild } from "./helpers/application-rebuild";
+import { applicationMigrationSql, installApplicationRebuild } from "./helpers/application-rebuild";
 import { createNativePaymentPostgres } from "./helpers/native-payment-postgres";
 import { checkNativeAdvisors } from "./helpers/native-advisors";
 import type {
@@ -67,18 +67,12 @@ beforeAll(async () => {
   const snapshotSql =
     "select jsonb_build_object('customers',(select jsonb_agg(to_jsonb(x) order by id) from customers x),'contracts',(select jsonb_agg(to_jsonb(x) order by id) from lease_contracts x),'units',(select jsonb_agg(to_jsonb(x) order by id) from units x),'payments',(select jsonb_agg(to_jsonb(x) order by id) from payments x),'ledger',(select jsonb_agg(to_jsonb(x) order by id) from ledger_entries x),'receivables',(select jsonb_agg(to_jsonb(x) order by id) from receivables x),'rules',(select jsonb_agg(to_jsonb(x) order by id) from property_fee_rules x)) value";
   const before = (await owner(snapshotSql)).rows[0].value;
-  await db.query(await readFile(`supabase/migrations/${migrationName}`, "utf8"));
+  await db.query(applicationMigrationSql(migrationName));
   await db.query(
-    await readFile(
-      "supabase/migrations/20261024223452_cimac_customer_billing_set_based_read.sql",
-      "utf8",
-    ),
+    applicationMigrationSql("20261024223452_cimac_customer_billing_set_based_read.sql"),
   );
   await db.query(
-    await readFile(
-      "supabase/migrations/20261024232058_cimac_customer_collection_adjustments.sql",
-      "utf8",
-    ),
+    applicationMigrationSql("20261024232058_cimac_customer_collection_adjustments.sql"),
   );
   migrationPreservedHistory =
     JSON.stringify((await owner(snapshotSql)).rows[0].value) === JSON.stringify(before);

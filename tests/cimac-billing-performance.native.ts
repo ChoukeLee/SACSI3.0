@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
 import type pg from "pg";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { installApplicationRebuild } from "./helpers/application-rebuild";
+import { applicationMigrationSql, installApplicationRebuild } from "./helpers/application-rebuild";
 import { createNativePaymentPostgres } from "./helpers/native-payment-postgres";
 
 const migration = "20261024223452_cimac_customer_billing_set_based_read.sql";
@@ -86,13 +86,8 @@ beforeAll(async () => {
       value: (await db.query("select cimac_customer_account_rpc($1,$2,$3) value", query)).rows[0]
         .value,
     });
-  await owner(await readFile(`supabase/migrations/${migration}`, "utf8"));
-  await owner(
-    await readFile(
-      "supabase/migrations/20261024232058_cimac_customer_collection_adjustments.sql",
-      "utf8",
-    ),
-  );
+  await owner(applicationMigrationSql(migration));
+  await owner(applicationMigrationSql("20261024232058_cimac_customer_collection_adjustments.sql"));
 }, 45000);
 afterAll(async () => {
   await cluster?.close();

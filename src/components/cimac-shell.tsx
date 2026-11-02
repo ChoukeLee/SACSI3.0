@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
   ArrowUpRight,
+  BedDouble,
   Building2,
   ChevronLeft,
   FileSignature,
@@ -57,6 +58,7 @@ export function CimacShell({
       external: false,
     },
     { href: `${base}/assets`, label: zh ? "园区资产" : "Patrimoine", icon: Building2 },
+    { href: `${base}/apartments`, label: zh ? "公寓住宿" : "Appartements", icon: BedDouble },
     ...(canReadCimacAccount(role)
       ? [
           {

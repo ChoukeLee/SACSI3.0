@@ -61,7 +61,7 @@ export function safeCimacReturnTo(value: unknown): string | null {
     url.origin !== "https://cimac.invalid" ||
     url.username ||
     url.password ||
-    !/^\/(?:fr\/)?cimac(?:\/(?:customers|assets)(?:\/[0-9a-f-]{36})?|\/contracts(?:\/[0-9a-f-]{36}\/collect|\/history\/sales\/[0-9a-f-]{36})?|\/(?:finance|reports|map))?$/.test(
+    !/^\/(?:fr\/)?cimac(?:\/(?:customers|assets)(?:\/[0-9a-f-]{36})?|\/contracts(?:\/[0-9a-f-]{36}\/collect|\/history\/sales\/[0-9a-f-]{36})?|\/(?:finance|reports|map|apartments))?$/.test(
       url.pathname,
     )
   )
@@ -91,6 +91,8 @@ export function safeCimacReturnTo(value: unknown): string | null {
         "search",
         "month",
         "metric",
+        "floor",
+        "room",
       ].includes(key) ||
       controls.test(parameter) ||
       url.searchParams.getAll(key).length !== 1

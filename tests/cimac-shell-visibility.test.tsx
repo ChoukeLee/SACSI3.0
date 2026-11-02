@@ -10,6 +10,11 @@ import CimacLoading from "@/app/cimac/loading";
 import { CimacHomeView } from "@/features/cimac/cimac-home-view";
 import { CimacCustomerView } from "@/features/cimac/cimac-customer-view";
 import { CimacAssetView } from "@/features/cimac/cimac-asset-view";
+import { CimacApartmentWorkbench } from "@/features/cimac/cimac-apartment-workbench";
+import {
+  cimacApartmentPlan,
+  type CimacApartmentData,
+} from "@/features/cimac/cimac-apartment-model";
 import { cimacAssetCounts } from "@/features/cimac/cimac-workspace-model";
 import { parseCimacWorkspaceQuery } from "@/features/cimac/cimac-workspace-query";
 import type {
@@ -18,7 +23,11 @@ import type {
 } from "@/features/cimac/cimac-workspace-types";
 
 const navigation = vi.hoisted(() => ({ pathname: "/cimac" }));
+const apartmentActions = vi.hoisted(() => ({ initialize: vi.fn(), refresh: vi.fn() }));
 // This suite checks the real shell + stylesheet, not server-action or form behavior.
+vi.mock("@/features/cimac/cimac-apartment-actions", () => ({
+  initializeCimacApartments: apartmentActions.initialize,
+}));
 vi.mock("@/features/cimac/cimac-profile-operations", () => ({
   CimacCustomerProfileOperation: () => null,
   CimacAssetConditionOperation: () => null,
@@ -30,6 +39,7 @@ vi.mock("@/features/cimac/cimac-customer-management", () => ({
 vi.mock("next/navigation", () => ({
   usePathname: () => navigation.pathname,
   useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ refresh: apartmentActions.refresh }),
 }));
 vi.mock("next/link", () => ({
   default: ({
@@ -81,6 +91,22 @@ const summary = {
   roomCount: 1,
   relationshipCount: 1,
   lastBusinessDate: null,
+};
+const apartmentData: CimacApartmentData = {
+  projectId: id(1),
+  buildingId: id(17),
+  buildingName: "第十七栋",
+  schemaAvailable: true,
+  registeredCount: 0,
+  rooms: cimacApartmentPlan().map((room) => ({
+    ...room,
+    unitId: null,
+    registered: false,
+    constructionStatus: null,
+    occupancyState: "unknown",
+    operationalCondition: null,
+    areaSqm: null,
+  })),
 };
 
 function pageChild(kind: string, locale: "zh" | "fr"): ReactElement {
@@ -145,6 +171,15 @@ function pageChild(kind: string, locale: "zh" | "fr"): ReactElement {
         }}
       />
     );
+  if (kind === "apartment")
+    return (
+      <CimacApartmentWorkbench
+        data={apartmentData}
+        locale={locale}
+        initialQuery={{ floor: 2, suffix: 1, tab: "fees" }}
+        canInitialize={false}
+      />
+    );
   if (kind === "loading") return <CimacLoading />;
   return <CimacWorkspaceFeedback />;
 }
@@ -170,6 +205,8 @@ const globalCss = readFileSync(resolve(process.cwd(), "src/app/globals.css"), "u
 const visibilityRules = globalCss.match(/\[data-app-main\]\s*>\s*[^{}]+\{[^{}]*\}/g) ?? [];
 let style: HTMLStyleElement;
 beforeEach(() => {
+  apartmentActions.initialize.mockClear();
+  apartmentActions.refresh.mockClear();
   style = document.createElement("style");
   style.textContent = visibilityRules.join("\n");
   document.head.append(style);
@@ -179,16 +216,16 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-function expectDisplayedThroughMain(element: HTMLElement, main: HTMLElement) {
+function expectDisplayedThroughRoot(element: HTMLElement, root: HTMLElement) {
   let current: HTMLElement | null = element;
   while (current) {
     const computed = getComputedStyle(current);
     expect(computed.display, `${current.tagName} must not be display:none`).not.toBe("none");
     expect(computed.visibility, `${current.tagName} must be visible`).toBe("visible");
-    if (current === main) return;
+    if (current === root) return;
     current = current.parentElement;
   }
-  throw new Error("Expected content must belong to the real shell main");
+  throw new Error("Expected content must belong to the specified real shell root");
 }
 
 describe("CIMAC shell visibility under global route isolation CSS", () => {
@@ -212,13 +249,16 @@ describe("CIMAC shell visibility under global route isolation CSS", () => {
 
   it.each(
     (["zh", "fr"] as const).flatMap((locale) =>
-      ["home", "customer", "asset", "loading", "error"].map((kind) => ({ locale, kind })),
+      ["home", "customer", "asset", "apartment", "loading", "error"].map((kind) => ({
+        locale,
+        kind,
+      })),
     ),
   )(
     "renders $locale $kind content visibly inside the current route wrapper",
     ({ locale, kind }) => {
       const prefix = locale === "fr" ? "/fr" : "";
-      navigation.pathname = `${prefix}/cimac${kind === "customer" ? `/customers/${id(4)}` : kind === "asset" ? `/assets/${id(3)}` : ""}`;
+      navigation.pathname = `${prefix}/cimac${kind === "customer" ? `/customers/${id(4)}` : kind === "asset" ? `/assets/${id(3)}` : kind === "apartment" ? "/apartments" : ""}`;
       const main = renderShell(pageChild(kind, locale), locale);
       expect(main).not.toBeNull();
       const wrapper = main.firstElementChild as HTMLElement;
@@ -229,15 +269,39 @@ describe("CIMAC shell visibility under global route isolation CSS", () => {
       const child = wrapper.firstElementChild as HTMLElement;
       expect(child).not.toBeNull();
       expect(getComputedStyle(child).display).toBe("block");
-      expectDisplayedThroughMain(child, main);
+      expectDisplayedThroughRoot(child, main);
       const content =
         kind === "loading"
           ? wrapper.querySelector<HTMLElement>("[role=status]")
           : wrapper.querySelector<HTMLElement>("h1");
       expect(content).not.toBeNull();
-      expectDisplayedThroughMain(content!, main);
+      expectDisplayedThroughRoot(content!, main);
       expect(main.querySelectorAll("[data-current-route-root]")).toHaveLength(1);
       expect(main.querySelectorAll("[data-app-main]")).toHaveLength(0);
+      if (kind === "apartment") {
+        expect(content!.textContent).toBe(
+          locale === "zh" ? "17栋 · 公寓住宿" : "Bâtiment 17 · Appartements",
+        );
+        expect(document.querySelectorAll("[data-current-route-root]")).toHaveLength(1);
+        expect(document.querySelectorAll("[data-cimac-shell]")).toHaveLength(1);
+        expect(document.querySelectorAll("main[data-cimac-main]")).toHaveLength(1);
+        expect(main.querySelectorAll("[data-cimac-shell], main, nav")).toHaveLength(0);
+        const apartmentLink = document.querySelector<HTMLAnchorElement>(
+          `#cimac-navigation a[href="${prefix}/cimac/apartments"]`,
+        );
+        expect(apartmentLink).not.toBeNull();
+        expect(apartmentLink!.textContent).toBe(locale === "zh" ? "公寓住宿" : "Appartements");
+        expect(apartmentLink!.getAttribute("aria-current")).toBe("page");
+        expect(document.querySelectorAll('#cimac-navigation a[aria-current="page"]')).toHaveLength(
+          1,
+        );
+        expectDisplayedThroughRoot(
+          apartmentLink!,
+          document.querySelector<HTMLElement>("[data-cimac-shell]")!,
+        );
+        expect(apartmentActions.initialize).not.toHaveBeenCalled();
+        expect(apartmentActions.refresh).not.toHaveBeenCalled();
+      }
     },
   );
 });

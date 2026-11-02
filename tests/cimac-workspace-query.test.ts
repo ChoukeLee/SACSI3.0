@@ -88,6 +88,8 @@ describe("fixed-project CIMAC workspace query boundaries", () => {
     "/cimac",
     "/fr/cimac",
     "/cimac/finance",
+    "/cimac/apartments?floor=5&room=516&tab=fees",
+    "/fr/cimac/apartments?floor=2&room=214&tab=room",
     `/cimac/customers/${id}?tab=account&accountTab=meters`,
     `/fr/cimac/assets/${id}?tab=contracts`,
   ])("allows CIMAC GET return %s", (value) => {

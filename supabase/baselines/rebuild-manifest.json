@@ -241,6 +241,10 @@
     {
       "file": "20261029160500_daily_change_checkout_date.sql",
       "sha256": "6ea30f5386b3f5cc1d384d79e6ea8e64aafc02732466e5a25ec85524d65b225b"
+    },
+    {
+      "file": "20261102184837_cimac_b17_apartment_directory.sql",
+      "sha256": "8cea1ccf5975d0a21dec9bddfe99123314f765b7d6abc85484cbca455d490a6b"
     }
   ],
   "excluded": [

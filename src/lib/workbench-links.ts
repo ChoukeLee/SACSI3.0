@@ -34,6 +34,7 @@ const directBusinessPaths = new Set([
   "cimac",
   "cimac/customers",
   "cimac/assets",
+  "cimac/apartments",
   "cimac/finance",
   "cimac/contracts",
   "cimac/reports",

@@ -4,6 +4,19 @@ import * as prettier from "prettier";
 // A reviewed, explicit adoption scope. Legacy files are added when refactored;
 // this avoids burying meaningful business changes under a repository-wide reflow.
 const files = [
+  "src/app/cimac/apartments/page.tsx",
+  "src/app/fr/cimac/apartments/page.tsx",
+  "src/features/cimac/cimac-apartment-actions.ts",
+  "src/features/cimac/cimac-apartment-model.ts",
+  "src/features/cimac/cimac-apartment-page.tsx",
+  "src/features/cimac/cimac-apartment-read.ts",
+  "src/features/cimac/cimac-apartment-workbench.tsx",
+  "src/features/cimac/cimac-apartment-workbench.module.css",
+  "tests/cimac-apartment-actions.test.ts",
+  "tests/cimac-apartment-model.test.ts",
+  "tests/cimac-apartment-read.test.ts",
+  "tests/cimac-apartment-workbench.test.tsx",
+  "tests/cimac-apartments.native.ts",
   "src/app/cimac/contracts/[id]/collect/page.tsx",
   "src/app/cimac/contracts/history/sales/[id]/page.tsx",
   "src/app/cimac/contracts/page.tsx",

@@ -60,6 +60,8 @@ describe("workbench return destinations", () => {
     `/fr/customers/${record}`,
     "/daily-rentals/receipts?dateFrom=2026-10-01",
     "/management?project=CIMAC",
+    "/cimac/apartments?floor=2&room=216&tab=fees",
+    "/fr/cimac/apartments?floor=4&room=414&tab=room",
     "/finance?kind=receivables&outstandingOnly=true",
   ])("accepts an existing business page %s", (path) => {
     expect(safeWorkbenchReturnTo(path)).toBe(

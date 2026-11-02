@@ -2,6 +2,15 @@ import type pg from "pg";
 // @ts-expect-error Build-time data-free schema compiler.
 import { applicationRebuildPlan } from "../../scripts/lib/application-rebuild.mjs";
 
+/** Use the same checksum-verified, LF-normalized SQL for upgrade fixtures. */
+export function applicationMigrationSql(name: string): string {
+  const step = applicationRebuildPlan().steps.find(
+    (candidate: { name: string; sql: string }) => candidate.name === name,
+  );
+  if (!step) throw new Error(`Unknown rebuild migration: ${name}`);
+  return step.sql;
+}
+
 /** Native test cluster only. Hosted platform Auth is deliberately a minimal shim. */
 export async function installApplicationRebuild(
   db: pg.Client,

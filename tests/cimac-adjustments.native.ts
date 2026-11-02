@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import type pg from "pg";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { installApplicationRebuild } from "./helpers/application-rebuild";
+import { applicationMigrationSql, installApplicationRebuild } from "./helpers/application-rebuild";
 import { createNativePaymentPostgres } from "./helpers/native-payment-postgres";
 import {
   decodeCimacCollectionPosition,
@@ -144,7 +143,7 @@ beforeAll(async () => {
   await collect();
   const before = (await owner(snapshot)).rows[0].hash;
   try {
-    await db.query(await readFile(`supabase/migrations/${migration}`, "utf8"));
+    await db.query(applicationMigrationSql(migration));
   } catch (error) {
     throw new Error(JSON.stringify(error));
   }

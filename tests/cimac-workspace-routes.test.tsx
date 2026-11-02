@@ -13,6 +13,7 @@ const deps = vi.hoisted(() => ({
   account: vi.fn(),
   operationUnit: vi.fn(),
   profileRecords: vi.fn(),
+  apartments: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("react", async (original) => ({
@@ -60,6 +61,10 @@ vi.mock("@/features/cimac/cimac-profile-records", () => ({
   CimacProfileRecordSections: () => null,
 }));
 vi.mock("@/components/cimac-shell", () => ({ CimacShell: () => null }));
+vi.mock("@/features/cimac/cimac-apartment-read", () => ({ readCimacApartments: deps.apartments }));
+vi.mock("@/features/cimac/cimac-apartment-workbench", () => ({
+  CimacApartmentWorkbench: () => null,
+}));
 vi.mock("@/features/cimac/cimac-home-view", () => ({ CimacHomeView: () => null }));
 vi.mock("@/features/cimac/cimac-directory-view", () => ({
   CimacCustomerDirectoryView: () => null,
@@ -83,6 +88,7 @@ import {
 } from "@/features/cimac/cimac-workspace-pages";
 import { CimacWorkspaceReadError } from "@/features/cimac/cimac-workspace-types";
 import { safeWorkbenchReturnTo } from "@/lib/workbench-links";
+import { CimacApartmentsPage } from "@/features/cimac/cimac-apartment-page";
 
 const project = "11111111-1111-4111-8111-111111111111";
 const customer = "22222222-2222-4222-8222-222222222222";
@@ -102,6 +108,7 @@ beforeEach(() => {
   deps.user.mockResolvedValue({ id: "actor", role: "admin", displayName: "Test actor" });
   deps.scope.mockResolvedValue(scope);
   deps.home.mockResolvedValue({ scope });
+  deps.apartments.mockResolvedValue({ registeredCount: 0, rooms: [], schemaAvailable: false });
   deps.customers.mockResolvedValue({ scope });
   deps.assets.mockResolvedValue({ scope });
   deps.asset.mockResolvedValue({ scope, asset: { id: customer } });
@@ -116,6 +123,35 @@ beforeEach(() => {
 });
 
 describe("CIMAC verified-auth route boundaries", () => {
+  it.each(["admin", "boss", "finance", "rental_sales"])(
+    "scopes apartment read and initializer for %s",
+    async (role) => {
+      deps.user.mockResolvedValue({ id: "actor", role, displayName: "viewer" });
+      const page = await CimacApartmentsPage({
+        ...props({ floor: "5", room: "516", tab: "room" }),
+        locale: "fr",
+      });
+      expect(deps.apartments).toHaveBeenCalledExactlyOnceWith(deps.client, scope);
+      expect(getProps(page)).toMatchObject({
+        locale: "fr",
+        initialQuery: { floor: 5, suffix: 16, tab: "room" },
+        canInitialize: role === "admin",
+      });
+    },
+  );
+  it("rejects front desk and invalid apartment scope before querying", async () => {
+    deps.user.mockResolvedValue({ id: "actor", role: "front_desk" });
+    await expect(CimacApartmentsPage(props())).rejects.toThrow("not-found");
+    deps.user.mockResolvedValue({ id: "actor", role: "admin" });
+    await expect(CimacApartmentsPage(props({ project: "SACSI" }))).rejects.toThrow("not-found");
+    expect(deps.apartments).not.toHaveBeenCalled();
+  });
+  it("separates denied apartment read from operational failure", async () => {
+    deps.apartments.mockRejectedValue(new CimacWorkspaceReadError(403));
+    await expect(CimacApartmentsPage(props())).rejects.toThrow("not-found");
+    deps.apartments.mockRejectedValue(new CimacWorkspaceReadError(503));
+    await expect(CimacApartmentsPage(props())).rejects.toThrow("CimacWorkspaceUnavailable");
+  });
   it.each(["admin", "finance", "rental_sales", "boss"])(
     "passes create capability to the customer directory according to %s permissions",
     async (role) => {
@@ -126,7 +162,7 @@ describe("CIMAC verified-auth route boundaries", () => {
       expect(deps.account).not.toHaveBeenCalled();
     },
   );
-  it.each([CimacHomePage, CimacCustomersPage, CimacAssetsPage])(
+  it.each([CimacHomePage, CimacCustomersPage, CimacAssetsPage, CimacApartmentsPage])(
     "rejects logged-out directories before querying",
     async (page) => {
       deps.user.mockResolvedValue(null);
