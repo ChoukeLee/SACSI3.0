@@ -1,4 +1,12 @@
-# SACSI 员工连接器 0.8.0
+# SACSI 员工连接器 0.9.0
+
+0.9.0 新增独立 `cimac_finance` 受控财务族：`query_cimac_finance`、`execute_cimac_finance`、`cimac_finance_status`。只对实时验证具备 CIMAC 权限的管理员开放。最多 30 项、100 个明确部分，全部保留 `inputSource=excel_screenshot` 与收据原文。四类操作是：已有待开业合同的押金/明确年度物业费收款、新客户明确拆分押金、整笔已登记 CNY 收款重分类、指定铺位身份标签/管理人文档说明；不是通用表编辑。
+
+每张 XOF 现金收据的全部分项必须精确等于总额。物业费明确期间和每铺优惠，优惠只改变本期净应收，不能变成现金或降低标准费率。重分类保留原收款/流水 ID、金额、日期、币种、历史汇率及全部现金事实，不制造退款重收。新客户不继承旧客资金，不凭收押金编造签约日/起租日/租金账单。身份操作不能推猜姓名汉字、改全局客户或夹带无关铺位。
+
+CLI 沿用本人正常登录会话及 `execute` 命令；新族须明确 `actionName="cimac_finance"`、`operation="query"|"execute"|"status"`、`scope="business_data"`、`exceptionalBusinessCase=false`。写入先按原号查状态、签名预览，再原子执行和逐行核对 raw payment/ledger/receivable/contract/unit 证据。只有本次 `completed / verified=true` 可报完成；`completed_previously / verified=false` 仅为历史完成，未知结果绝不重放或换工具绕过。
+
+包版本 0.9.0 不改变全局 protocolVersion 1.0。旧维护 v1 wire 继续 0.8.0，原币收款 wire 继续 0.7.0。新财务待办升级本账号密文为 v4，完整保留 v1—v3 条目；以后调用旧维护/native 也不能降级文件。旧版本应安全拒绝 v4，不能删密文后重录。旧维护能力保持独立，不能用它代办新财务操作。
 
 0.8.0 新增仅对具备 CIMAC 范围权限管理员开放的建材城受控维护：`query_cimac_maintenance`、`execute_cimac_maintenance`、`cimac_maintenance_status`。服务器必须同时验证管理员角色、CIMAC 权限、专用迁移协议和直办开关；旧页面角色或普通业务 grant 不能代替此权限。未安装迁移、RPC 返回 null/1 等非 true 值或停止直办时，不宣称维护可用，不回退到 SQL、通用 RPC 或其他收款工具。
 
@@ -16,7 +24,7 @@ Windows 独立连接器自带 Node，不要求员工安装 Git/npm，不提供�
 
 服务器 directExecution 必须声明 available=true、version=1、authorization=explicit_instruction，且包含所需 workflow。原币收款须包含 native_collection，并要求连接器 0.7.0 或更高；未开放时拒绝，不退回 XOF 工具。不能只关闭 Codex 审批或修改输入来源绕过限制。
 
-共有六个独立写工具，旧 prepare_* 仍只生成确认单：
+共有七个独立写工具，旧 prepare_* 仍只生成确认单：
 
 | 工具 | 现有业务范围 |
 | --- | --- |
@@ -26,6 +34,7 @@ Windows 独立连接器自带 Node，不要求员工安装 Git/npm，不提供�
 | execute_booking_operation | 预订、仅入住、取消、改期改价、未入住换房、纠正录错房号、冲正、登记实际退款、撤销误入住 |
 | execute_native_collection | 单个 USD/CNY 长租合同的已有应收收款，原币金额、最多 100 个明确应收分项，不自动修改已缴至日期 |
 | execute_cimac_maintenance | CIMAC 管理员七类受控维护，最多 30 项；不是任意数据库编辑 |
+| execute_cimac_finance | CIMAC 管理员四类受控财务补齐，最多 30 项/100 部分，严格保留收据及历史现金事实 |
 
 原币另有只读工具 query_native_collection_position（合同 ID 或楼栋加房号）和 native_collection_status（原请求号）。prepare 仅在连接器内部获取签名预览，不产生网页待确认草稿。
 

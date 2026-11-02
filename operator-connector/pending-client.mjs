@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {normalizeNativeCollectionRequest} from './core.mjs';
 import {normalizeCimacMaintenanceRequest} from './cimac-maintenance.mjs';
+import {normalizeCimacFinanceRequest} from './cimac-finance.mjs';
 const canonical=value=>Array.isArray(value)?`[${value.map(canonical)}]`:value&&typeof value==='object'?`{${Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+canonical(value[k])).join(',')}}`:JSON.stringify(value);
 const digest=value=>createHash('sha256').update(canonical(value)).digest('hex');
 
@@ -45,11 +46,16 @@ export function durableClient(client,store,journal,config){
     const request=normalizeCimacMaintenanceRequest(body);
     return prepare('cimac_maintenance',request,()=>client.cimacMaintenance(op,request),'direct');
   };
+  wrapped.cimacFinance=async(op,body)=>{
+    if(op!=='execute')return client.cimacFinance(op,body);
+    const request=normalizeCimacFinanceRequest(body);
+    return prepare('cimac_finance',request,()=>client.cimacFinance(op,request),'direct');
+  };
   wrapped.execute=body=>{
-    if(body?.actionName==='cimac_maintenance'){
+    if(['cimac_maintenance','cimac_finance'].includes(body?.actionName)){
       const {actionName,operation,scope,exceptionalBusinessCase,...request}=body;
       if(scope!=='business_data' || exceptionalBusinessCase!==false)throw new Error('unsupported_scope');
-      return wrapped.cimacMaintenance(operation,request);
+      return actionName==='cimac_finance'?wrapped.cimacFinance(operation,request):wrapped.cimacMaintenance(operation,request);
     }
     return body.actionName==='record_daily_payment'?prepare('payment',body,()=>client.execute(body)):client.execute(body);
   };
@@ -69,9 +75,9 @@ export function durableClient(client,store,journal,config){
     // Online authentication and permissions are checked before consulting server state.
     await client.capabilities();
     if(item.kind==='note')return {requestId:item.requestId,state:'needs_details',sourceText:item.sourceText,notice:'请补齐订单、金额、日期、方式后，沿用原请求号准备确认单。'};
-    if(item.kind==='cimac_maintenance'){
+    if(item.kind==='cimac_maintenance' || item.kind==='cimac_finance'){
       if(item.executionMode!=='direct')throw new Error('pending_server_state_requires_review');
-      const result=await client.cimacMaintenance('status',{requestId:item.requestId});
+      const result=await client[item.kind==='cimac_finance'?'cimacFinance':'cimacMaintenance']('status',{requestId:item.requestId});
       if(result.requestId!==item.requestId || !['not_found','completed_previously'].includes(result.status)
         || (result.status==='completed_previously' && (result.verified!==false || !result.request || digest(result.request)!==digest(item.request))))throw new Error('pending_server_identity_mismatch');
       if(result.status==='not_found'){

@@ -44,15 +44,17 @@ export async function serve(input,output,dispatch) {
     pending=Buffer.concat([pending,Buffer.from(chunk)]);
     let newline;
     while((newline=pending.indexOf(10))>=0) {
-      if(newline>65536) throw new Error('input_too_large');
+      if(newline>262144) throw new Error('input_too_large');
       const line=pending.subarray(0,newline).toString('utf8'); pending=pending.subarray(newline+1);
       if(!line.trim()) continue;
       let message;
-      try { message=JSON.parse(line); } catch { await send(failure(null,-32700,'Parse error'));continue; }
+      try { message=JSON.parse(line); } catch { if(newline>65536)throw new Error('input_too_large');await send(failure(null,-32700,'Parse error'));continue; }
+      if(newline>65536 && !(message?.method==='tools/call' && ['query_cimac_finance','execute_cimac_finance'].includes(message.params?.name)))throw new Error('input_too_large');
       await send(await dispatch(message));
     }
-    if(pending.length>65536) throw new Error('input_too_large');
+    if(pending.length>262144) throw new Error('input_too_large');
   }
+  if(pending.length>65536)throw new Error('input_too_large');
   if(pending.length) await send(failure(null,-32700,'Incomplete message'));
 }
 if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {

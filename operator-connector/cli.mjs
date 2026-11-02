@@ -1,4 +1,4 @@
-import { VERSION } from './core.mjs';
+import { VERSION, parseCommandInput } from './core.mjs';
 import { runtime } from './runtime.mjs';
 import { loginPrompt } from './login-prompt.mjs';
 import { humanResult, humanError } from './human-output.mjs';
@@ -8,7 +8,7 @@ try {
   const {store,client}=runtime();
   const command=process.argv[2];
   if (!['login','logout','capabilities','execute','version','pending','capture','recover-lock'].includes(command)) throw new Error('usage_login_logout_capabilities_execute_version_pending');
-  const stdin=async()=>{let text='';for await(const chunk of process.stdin){text+=chunk;if(Buffer.byteLength(text)>65536) throw new Error('input_too_large');}return JSON.parse(text);};
+  const stdin=async()=>{let text='';for await(const chunk of process.stdin){text+=chunk;if(Buffer.byteLength(text)>(command==='execute'?262144:65536)) throw new Error('input_too_large');}return parseCommandInput(text,command);};
   const result=command==='recover-lock'?store.recoverLock():await store.lock(async()=>{
     if(command==='version') return {version:VERSION};
     if(command==='pending') return client.pending('list');

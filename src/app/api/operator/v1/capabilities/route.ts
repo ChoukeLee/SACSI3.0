@@ -83,8 +83,20 @@ export async function GET(request: Request) {
   const directWorkflows: OperatorDirectWorkflow[] = [];
   let nativeCollectionAvailable = false;
   let cimacMaintenanceAvailable = false;
+  let cimacFinanceAvailable = false;
   if (directExecutionEnabled()) {
     if (auth.user.role === "admin") {
+      try {
+        const [version, allowed] = await Promise.all([
+          auth.supabase.rpc("cimac_finance_protocol_version"),
+          auth.supabase.rpc("can_execute_cimac_finance"),
+        ]);
+        cimacFinanceAvailable =
+          !version.error && version.data === 1 && !allowed.error && allowed.data === true;
+        if (cimacFinanceAvailable) directWorkflows.push("cimac_finance");
+      } catch {
+        /* New finance writes require the independently authorized database workflow. */
+      }
       try {
         const [version, allowed] = await Promise.all([
           auth.supabase.rpc("cimac_maintenance_protocol_version"),
@@ -225,6 +237,20 @@ export async function GET(request: Request) {
         confirmationRequired: false,
         arbitrarySqlAllowed: false,
         refundMeaning: "record_already_completed_refund_only",
+      },
+      cimacFinanceWorkflow: {
+        available: cimacFinanceAvailable,
+        version: 1,
+        connectorVersion: "0.9.0",
+        project: "CIMAC",
+        adminOnly: true,
+        maximumOperations: 30,
+        maximumParts: 100,
+        confirmationRequired: false,
+        arbitrarySqlAllowed: false,
+        operations: ["collect", "new_deposit", "reclassify", "identity"],
+        originalReceiptsPreserved: true,
+        automaticConversion: false,
       },
     },
     {

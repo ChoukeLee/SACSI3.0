@@ -36,6 +36,8 @@ const errors: Record<string, string> = {
   cimacBillingUnsupportedCurrency:
     "客户跨合同收款目前只支持 XOF；USD、CNY 保留原币并继续使用原有收款入口。",
   cimacBillingProtectedPayment: "该收款受核销保护，请使用对应的冲正或退款流程，不能直接改写。",
+  cimacFinanceRowProtected:
+    "该记录已完成建材城账务核对并受审计保护，请通过受控纠正流程处理，不能直接改写。",
   cimacBillingAccountTooLarge: "该客户账务记录较多，暂时无法完整加载，请联系管理员核对。",
 };
 const unknownResult =

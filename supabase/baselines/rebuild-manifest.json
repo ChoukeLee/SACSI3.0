@@ -245,6 +245,14 @@
     {
       "file": "20261102184837_cimac_b17_apartment_directory.sql",
       "sha256": "8cea1ccf5975d0a21dec9bddfe99123314f765b7d6abc85484cbca455d490a6b"
+    },
+    {
+      "file": "20261102192233_cimac_finance_completion.sql",
+      "sha256": "b5885745cddc7066065e14e482026c45dce6d042aea7311664a62a7b3772af33"
+    },
+    {
+      "file": "20261102192937_cimac_finance_commercial_scope.sql",
+      "sha256": "4658ee4e01f6937785ea97edd4b18d218d774e90ccb0e2be94acc327827b159a"
     }
   ],
   "excluded": [

@@ -173,7 +173,7 @@ describe("CIMAC standalone bounded maintenance connector", () => {
       request(),
     );
     expect(result).toMatchObject({ status: "completed", verified: true, actorId: ids.actor });
-    expect(VERSION).toBe("0.8.0");
+    expect(VERSION).toBe("0.9.0");
     expect(transport.mock.calls.map(([url]) => new URL(url).pathname)).toEqual([
       "/api/operator/v1/capabilities",
       "/api/operator/v1/cimac-maintenance/status",

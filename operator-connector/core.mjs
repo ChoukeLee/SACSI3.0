@@ -1,10 +1,17 @@
 import { isDeepStrictEqual } from 'node:util';
 import { normalizeCimacMaintenanceRequest, verifyCimacMaintenanceResult } from './cimac-maintenance.mjs';
-export const VERSION = '0.8.0';
+import { normalizeCimacFinanceRequest, verifyCimacFinanceResult } from './cimac-finance.mjs';
+export const VERSION = '0.9.0';
 export const PROTOCOL = '1.0';
+export function parseCommandInput(text,command) {
+  if(typeof text!=='string' || Buffer.byteLength(text)>(command==='execute'?262144:65536))throw new Error('input_too_large');
+  const body=JSON.parse(text);
+  if(Buffer.byteLength(text)>65536 && (command!=='execute' || body?.actionName!=='cimac_finance'))throw new Error('input_too_large');
+  return body;
+}
 // Native v1 databases require this exact wire stamp even on a newer connector.
 const NATIVE_WIRE_VERSION = '0.7.0';
-const DIRECT_WORKFLOWS = new Set(['daily_payment','collection','daily_workflow','booking_operation','native_collection','cimac_maintenance']);
+const DIRECT_WORKFLOWS = new Set(['daily_payment','collection','daily_workflow','booking_operation','native_collection','cimac_maintenance','cimac_finance']);
 const nativeUuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 const nativeKeys = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).every(key=>keys.includes(key));
 const nativeText = (value, limit) => typeof value === 'string' && !!value.trim() && value.length <= limit;
@@ -353,11 +360,49 @@ export class OperatorClient {
     if(result?.executionMode!=='explicit_instruction' || !verifyCimacMaintenanceResult(result,body,manifest.identity.userId))throw new Error('execution_verification_failed_keep_original_request_id');
     return {...result,notice:'已按明确指令执行并核验建材城受控维护；退款仅为登记已发生资金业务。保留原请求号。'};
   }
+  async cimacFinance(operation,body) {
+    if(!['query','execute','status'].includes(operation))throw new Error('connector_action_not_supported');
+    if(operation==='status'){
+      if(!nativeKeys(body,['requestId']) || !nativeUuid(body.requestId))throw new Error('invalid_cimac_finance_request');
+      body={requestId:body.requestId.toLowerCase()};
+    }else{
+      if(operation==='execute')stableRequest(body);
+      body=normalizeCimacFinanceRequest(body);
+    }
+    const manifest=await this.capabilities();
+    if(manifest.identity.role!=='admin' || (operation!=='status' && (manifest.directExecution?.available!==true
+      || !manifest.directExecution.workflows.includes('cimac_finance') || manifest.cimacFinanceWorkflow?.available!==true
+      || manifest.cimacFinanceWorkflow.version!==1)))throw new Error('cimac_finance_not_available');
+    if(operation==='query')return this.api('cimac-finance/query',body);
+    const previous=await this.api(`cimac-finance/status?requestId=${encodeURIComponent(body.requestId)}`);
+    if(!previous || previous.requestId!==body.requestId || !['not_found','completed_previously'].includes(previous.status)
+      || (previous.status==='completed_previously' && (previous.verified!==false || previous.actorId!==manifest.identity.userId)))throw new Error('request_state_requires_reconciliation');
+    if(operation==='status')return {...previous,verified:false};
+    const history=result=>{
+      if(result.requestId!==body.requestId || result.actorId!==manifest.identity.userId || result.verified!==false
+        || !isDeepStrictEqual(result.request,body))throw new Error('execution_result_invalid_keep_original_request_id');
+      return {...result,verified:false,notice:'建材城财务原请求此前完成，未重放或重新核验当前账务；保留原号，禁止重录。'};
+    };
+    if(previous.status==='completed_previously')return history(previous);
+    const preview=await this.api('cimac-finance/prepare',body);
+    if(preview?.status==='completed_previously')return history(preview);
+    if(preview?.status!=='ready_for_direct_execution' || preview.requestId!==body.requestId
+      || preview.preview?.requestId!==body.requestId || preview.preview?.operationCount!==body.operations.length
+      || typeof preview.preview?.snapshot?.fingerprint!=='string' || !preview.preview.snapshot.fingerprint
+      || typeof preview.preview?.snapshot?.requestHash!=='string' || !preview.preview.snapshot.requestHash
+      || typeof preview.previewProof!=='string' || !preview.previewProof)throw new Error('invalid_execution_preview');
+    let result;
+    try{result=await this.api('cimac-finance/execute',{request:body,previewProof:preview.previewProof});}
+    catch(error){if(error?.message==='invalid_server_response')throw new Error('outcome_unknown_keep_original_request_id');throw error;}
+    if(result?.status==='completed_previously')return history(result);
+    if(result?.executionMode!=='explicit_instruction' || !verifyCimacFinanceResult(result,body,manifest.identity.userId))throw new Error('execution_verification_failed_keep_original_request_id');
+    return {...result,notice:'已按明确指令执行并逐行核验建材城财务凭证及分类；未包含搁置项或无关费用。保留原请求号。'};
+  }
   async execute(request) {
-    if(request?.actionName==='cimac_maintenance'){
+    if(['cimac_maintenance','cimac_finance'].includes(request?.actionName)){
       const {actionName,operation,scope,exceptionalBusinessCase,...body}=request;
       if(scope!=='business_data' || exceptionalBusinessCase!==false)throw new Error('unsupported_scope');
-      return this.cimacMaintenance(operation,body);
+      return actionName==='cimac_finance'?this.cimacFinance(operation,body):this.cimacMaintenance(operation,body);
     }
     if (!request || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(request.requestId ?? '')) throw new Error('stable_request_uuid_required');
     if (request.scope!=='business_data' || request.exceptionalBusinessCase!==false) throw new Error('unsupported_scope');

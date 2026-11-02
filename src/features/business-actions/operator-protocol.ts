@@ -7,6 +7,7 @@ export const SACSI_OPERATOR_MIN_CONNECTOR_VERSION = "0.1.0";
 export const OPERATOR_DIRECT_CONNECTOR_VERSION = "0.6.0";
 export const OPERATOR_NATIVE_CONNECTOR_VERSION = "0.7.0";
 export const OPERATOR_CIMAC_CONNECTOR_VERSION = "0.8.0";
+export const OPERATOR_CIMAC_FINANCE_CONNECTOR_VERSION = "0.9.0";
 export const OPERATOR_DIRECT_WORKFLOWS = [
   "daily_payment",
   "collection",
@@ -14,6 +15,7 @@ export const OPERATOR_DIRECT_WORKFLOWS = [
   "booking_operation",
   "native_collection",
   "cimac_maintenance",
+  "cimac_finance",
 ] as const;
 export type OperatorDirectWorkflow = (typeof OPERATOR_DIRECT_WORKFLOWS)[number];
 export const IMPLEMENTED_OPERATOR_ACTIONS = new Set([
@@ -113,18 +115,20 @@ export function buildOperatorProtocolManifest(input: {
   const directWorkflows = OPERATOR_DIRECT_WORKFLOWS.filter(
     (workflow) =>
       input.directWorkflows?.includes(workflow) &&
-      (workflow !== "cimac_maintenance" || input.user.role === "admin"),
+      (!["cimac_maintenance", "cimac_finance"].includes(workflow) || input.user.role === "admin"),
   );
   const direct = directWorkflows.length > 0;
   return {
     protocolVersion: SACSI_OPERATOR_PROTOCOL_VERSION,
-    minimumConnectorVersion: directWorkflows.includes("cimac_maintenance")
-      ? OPERATOR_CIMAC_CONNECTOR_VERSION
-      : directWorkflows.includes("native_collection")
-        ? OPERATOR_NATIVE_CONNECTOR_VERSION
-        : direct
-          ? OPERATOR_DIRECT_CONNECTOR_VERSION
-          : SACSI_OPERATOR_MIN_CONNECTOR_VERSION,
+    minimumConnectorVersion: directWorkflows.includes("cimac_finance")
+      ? OPERATOR_CIMAC_FINANCE_CONNECTOR_VERSION
+      : directWorkflows.includes("cimac_maintenance")
+        ? OPERATOR_CIMAC_CONNECTOR_VERSION
+        : directWorkflows.includes("native_collection")
+          ? OPERATOR_NATIVE_CONNECTOR_VERSION
+          : direct
+            ? OPERATOR_DIRECT_CONNECTOR_VERSION
+            : SACSI_OPERATOR_MIN_CONNECTOR_VERSION,
     serverRelease: cleanRelease(input.serverRelease),
     generatedAt: now.toISOString(),
     timezone: "Africa/Abidjan",
