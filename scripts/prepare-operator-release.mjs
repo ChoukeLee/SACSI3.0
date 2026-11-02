@@ -14,9 +14,11 @@ try{
   if(version.version===old.version)throw new Error('distinct_release_versions_required');
   mkdirSync(resolve('work'),{recursive:true});const output=mkdtempSync(resolve('work/operator-release-'));
   const hash=directory=>createHash('sha256').update(readFileSync(join(directory,'manifest.json'))).digest('hex');
+  const [major,minor]=version.version.split('.').map(Number);
+  const pendingFormat=major>0||minor>=9?4:minor>=8?3:minor>=7?2:1;
   // Disabled until the administrator finishes server rollout and reconciliation.
   writeFileSync(join(output,'upgrade-config.toml'),mcpConfig(next,config.localTest===true).replace('enabled = true','enabled = false'));
   writeFileSync(join(output,'rollback-config.toml'),mcpConfig(previous,config.localTest===true).replace('enabled = true','enabled = false'));
-  writeFileSync(join(output,'release.json'),JSON.stringify({formatVersion:1,status:'candidate_not_deployed',next:{path:next,...version,manifestSha256:hash(next)},previous:{path:previous,...old,manifestSha256:hash(previous)},site:config.appUrl,pendingFormat:1,automaticReplay:false,automaticInstallation:false},null,2));
+  writeFileSync(join(output,'release.json'),JSON.stringify({formatVersion:1,status:'candidate_not_deployed',next:{path:next,...version,manifestSha256:hash(next)},previous:{path:previous,...old,manifestSha256:hash(previous)},site:config.appUrl,pendingFormat,automaticReplay:false,automaticInstallation:false},null,2));
   console.log('Prepared disabled upgrade/rollback configuration and integrity metadata: '+output);
 }catch(e){console.error(/^[a-z_]+$/.test(e.message)?e.message:'release_preparation_failed');process.exitCode=1;}

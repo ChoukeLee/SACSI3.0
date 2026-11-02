@@ -2,6 +2,7 @@ import {createHash} from 'node:crypto';
 import {normalizeNativeCollectionRequest} from './core.mjs';
 import {normalizeCimacMaintenanceRequest} from './cimac-maintenance.mjs';
 import {normalizeCimacFinanceRequest} from './cimac-finance.mjs';
+import {normalizeApartmentReservationRequest} from './apartment-reservations.mjs';
 const canonical=value=>Array.isArray(value)?`[${value.map(canonical)}]`:value&&typeof value==='object'?`{${Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+canonical(value[k])).join(',')}}`:JSON.stringify(value);
 const digest=value=>createHash('sha256').update(canonical(value)).digest('hex');
 
@@ -51,6 +52,11 @@ export function durableClient(client,store,journal,config){
     const request=normalizeCimacFinanceRequest(body);
     return prepare('cimac_finance',request,()=>client.cimacFinance(op,request),'direct');
   };
+  wrapped.cimacApartmentReservations=async(op,body)=>{
+    if(op!=='execute')return client.cimacApartmentReservations(op,body);
+    const request=normalizeApartmentReservationRequest(body);
+    return prepare('cimac_apartment_reservations',request,()=>client.cimacApartmentReservations(op,request),'direct');
+  };
   wrapped.execute=body=>{
     if(['cimac_maintenance','cimac_finance'].includes(body?.actionName)){
       const {actionName,operation,scope,exceptionalBusinessCase,...request}=body;
@@ -75,6 +81,19 @@ export function durableClient(client,store,journal,config){
     // Online authentication and permissions are checked before consulting server state.
     await client.capabilities();
     if(item.kind==='note')return {requestId:item.requestId,state:'needs_details',sourceText:item.sourceText,notice:'请补齐订单、金额、日期、方式后，沿用原请求号准备确认单。'};
+    if(item.kind==='cimac_apartment_reservations'){
+      if(item.executionMode!=='direct')throw new Error('pending_server_state_requires_review');
+      const result=await client.cimacApartmentReservations('status',{requestId:item.requestId});
+      if(result.requestId!==item.requestId || !['not_found','completed_previously'].includes(result.status)
+        || result.verified!==false || (result.status==='completed_previously'
+          && (!result.request || digest(result.request)!==digest(item.request))))throw new Error('pending_server_identity_mismatch');
+      if(result.status==='not_found'){
+        if(item.state==='completed_history')throw new Error('pending_history_conflicts_with_server');
+        return {...result,state:item.state,notice:'未找到公寓预留原号；未自动重放、未改用商铺或日租流程。核对原指令后只能按原号明确继续。'};
+      }
+      journal.put(owner,{...item,state:'completed_history'});
+      return {...result,verified:false,notice:'公寓预留原号此前完成；未重新执行或核验当前房态，禁止重录。'};
+    }
     if(item.kind==='cimac_maintenance' || item.kind==='cimac_finance'){
       if(item.executionMode!=='direct')throw new Error('pending_server_state_requires_review');
       const result=await client[item.kind==='cimac_finance'?'cimacFinance':'cimacMaintenance']('status',{requestId:item.requestId});

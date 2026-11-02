@@ -84,6 +84,7 @@ export async function GET(request: Request) {
   let nativeCollectionAvailable = false;
   let cimacMaintenanceAvailable = false;
   let cimacFinanceAvailable = false;
+  let cimacApartmentReservationsAvailable = false;
   if (directExecutionEnabled()) {
     if (auth.user.role === "admin") {
       try {
@@ -96,6 +97,16 @@ export async function GET(request: Request) {
         if (cimacFinanceAvailable) directWorkflows.push("cimac_finance");
       } catch {
         /* New finance writes require the independently authorized database workflow. */
+      }
+      try {
+        const [version, allowed] = await Promise.all([
+          auth.supabase.rpc("cimac_apartment_reservations_protocol_version"),
+          auth.supabase.rpc("can_execute_cimac_apartment_reservations"),
+        ]);
+        cimacApartmentReservationsAvailable =
+          !version.error && version.data === 1 && !allowed.error && allowed.data === true;
+      } catch {
+        // An optional extension must not break existing 0.8 connector workflows.
       }
       try {
         const [version, allowed] = await Promise.all([
@@ -251,6 +262,15 @@ export async function GET(request: Request) {
         operations: ["collect", "new_deposit", "reclassify", "identity"],
         originalReceiptsPreserved: true,
         automaticConversion: false,
+      },
+      cimacApartmentReservations: {
+        available: cimacApartmentReservationsAvailable,
+        version: 1,
+        actions: ["reserve", "cancel", "correct_name"],
+        minimumConnectorVersion: "0.9.0",
+        unpaidOnly: true,
+        dates: "undetermined",
+        confirmationRequired: false,
       },
     },
     {

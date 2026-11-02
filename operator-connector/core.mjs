@@ -1,7 +1,8 @@
 import { isDeepStrictEqual } from 'node:util';
 import { normalizeCimacMaintenanceRequest, verifyCimacMaintenanceResult } from './cimac-maintenance.mjs';
 import { normalizeCimacFinanceRequest, verifyCimacFinanceResult } from './cimac-finance.mjs';
-export const VERSION = '0.9.0';
+import { normalizeApartmentReservationQuery, normalizeApartmentReservationRequest, normalizeApartmentReservationStatus, apartmentReservationFeatureAvailable, verifyApartmentReservationQuery, assertApartmentReservationSnapshot, verifyApartmentReservationResult, verifyApartmentReservationHistory } from './apartment-reservations.mjs';
+export const VERSION = '0.10.0';
 export const PROTOCOL = '1.0';
 export function parseCommandInput(text,command) {
   if(typeof text!=='string' || Buffer.byteLength(text)>(command==='execute'?262144:65536))throw new Error('input_too_large');
@@ -397,6 +398,48 @@ export class OperatorClient {
     if(result?.status==='completed_previously')return history(result);
     if(result?.executionMode!=='explicit_instruction' || !verifyCimacFinanceResult(result,body,manifest.identity.userId))throw new Error('execution_verification_failed_keep_original_request_id');
     return {...result,notice:'已按明确指令执行并逐行核验建材城财务凭证及分类；未包含搁置项或无关费用。保留原请求号。'};
+  }
+  async cimacApartmentReservations(operation, body) {
+    if (!['query','execute','status'].includes(operation)) throw new Error('connector_action_not_supported');
+    const request = operation === 'query' ? normalizeApartmentReservationQuery(body)
+      : operation === 'status' ? normalizeApartmentReservationStatus(body) : normalizeApartmentReservationRequest(body);
+    const manifest = await this.capabilities();
+    if (!apartmentReservationFeatureAvailable(manifest, VERSION, operation === 'execute')) throw new Error('cimac_apartment_reservations_not_available');
+    const actorId = manifest.identity.userId;
+    const family = 'cimac-apartment-reservations';
+    if (operation === 'query') {
+      return verifyApartmentReservationQuery(await this.api(`${family}/query`, request), request, actorId);
+    }
+    const previous = verifyApartmentReservationHistory(
+      await this.api(`${family}/status?requestId=${encodeURIComponent(request.requestId)}`),
+      request.requestId, actorId, operation === 'execute' ? request : undefined,
+    );
+    if (operation === 'status' || previous.status === 'completed_previously') return {
+      ...previous, verified: false,
+      notice: previous.status === 'completed_previously'
+        ? '公寓预留原请求此前完成，未重放或重新核验当前房态；保留原号，禁止重复登记。'
+        : '未找到原请求记录；未自动重放。核对原指令后仅可沿用原号明确继续。',
+    };
+    // Unit IDs and all CAS versions come from the actor's current B17 query.
+    // Never invent a room ID or turn a reservation into a stay/contract/payment.
+    const snapshot = verifyApartmentReservationQuery(await this.api(`${family}/query`, {}), {}, actorId);
+    assertApartmentReservationSnapshot(snapshot, request);
+    let result;
+    try { result = await this.api(`${family}/execute`, request); }
+    catch (error) {
+      if (['invalid_server_response','outcome_unknown_keep_original_request_id'].includes(error?.message)) throw new Error('apartment_reservation_outcome_unknown');
+      throw error;
+    }
+    verifyApartmentReservationResult(result, request, actorId, snapshot);
+    if (result.idempotent) return {
+      status: 'completed_previously', verified: false, requestId: request.requestId,
+      actorId, request, result,
+      notice: '原请求此前已完成，本次没有再次登记或核验当前房态；禁止换号重录。',
+    };
+    return {
+      ...result, status: 'completed', verified: true, executionMode: 'explicit_instruction',
+      notice: '已按本人明确指令核验公寓预留；仍为未收款，不代表入住、合同生效或已收费。请保留原请求号。',
+    };
   }
   async execute(request) {
     if(['cimac_maintenance','cimac_finance'].includes(request?.actionName)){

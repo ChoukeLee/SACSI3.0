@@ -4,6 +4,20 @@ import * as prettier from "prettier";
 // A reviewed, explicit adoption scope. Legacy files are added when refactored;
 // this avoids burying meaningful business changes under a repository-wide reflow.
 const files = [
+  "src/app/api/operator/v1/cimac-apartment-reservations/query/route.ts",
+  "src/app/api/operator/v1/cimac-apartment-reservations/execute/route.ts",
+  "src/app/api/operator/v1/cimac-apartment-reservations/status/route.ts",
+  "src/features/business-actions/cimac-apartment-reservation-http.ts",
+  "src/features/cimac/cimac-apartment-reservation-actions.ts",
+  "src/features/cimac/cimac-apartment-reservation-model.ts",
+  "src/features/cimac/cimac-apartment-reservation-service.ts",
+  "src/features/cimac/cimac-apartment-reservation-form.tsx",
+  "tests/cimac-apartment-reservation-actions.test.ts",
+  "tests/cimac-apartment-reservation-service.test.ts",
+  "tests/cimac-apartment-reservation-http.test.ts",
+  "tests/cimac-apartment-reservation-form.test.tsx",
+  "tests/cimac-apartment-reservations-connector.test.ts",
+  "tests/cimac-apartment-reservations.native.ts",
   "src/app/cimac/apartments/page.tsx",
   "src/app/fr/cimac/apartments/page.tsx",
   "src/features/cimac/cimac-apartment-actions.ts",

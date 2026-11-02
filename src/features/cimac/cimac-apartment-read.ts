@@ -5,6 +5,11 @@ import { assertCimacWorkspaceScope } from "./cimac-workspace-model";
 import { CimacWorkspaceReadError, type CimacWorkspaceScope } from "./cimac-workspace-types";
 import { cimacWorkspaceId } from "./cimac-workspace-query";
 import {
+  apartmentTimestamp,
+  apartmentUuid,
+  type CimacApartmentReservation,
+} from "./cimac-apartment-reservation-model";
+import {
   cimacApartmentPlan,
   type CimacApartmentData,
   type CimacApartmentPlan,
@@ -32,7 +37,7 @@ const constructionStates = [
 const profileFields =
   "unit_id,building_id,floor_number,room_suffix,bedrooms,facing,monthly_rent_xof,monthly_property_fee_xof,deposit_months,rent_prepay_months,property_prepay_months";
 const unitFields =
-  "id,building_id,code,unit_no,kind,asset_subtype,floor_label,area_sqm,construction_status,occupancy_verified";
+  "id,building_id,code,unit_no,kind,asset_subtype,floor_label,area_sqm,construction_status,occupancy_verified,updated_at";
 const positionFields = "id,building_id,operational_condition,daily_occupied,lease_occupied";
 const columns: [string, keyof CimacApartmentPlan][] = [
   ["floor_number", "floor"],
@@ -73,13 +78,20 @@ export async function readCimacApartments(
     occupancyState: "unknown",
     operationalCondition: null,
     areaSqm: null,
+    unitUpdatedAt: null,
+    reservation: null,
   }));
-  const data = (rooms: CimacApartmentRoom[], schemaAvailable = true): CimacApartmentData => ({
+  const data = (
+    rooms: CimacApartmentRoom[],
+    schemaAvailable = true,
+    reservationSchemaAvailable = false,
+  ): CimacApartmentData => ({
     projectId: scope.project.id,
     buildingId: building.id,
     buildingName: building.name,
     rooms,
     schemaAvailable,
+    reservationSchemaAvailable,
     registeredCount: rooms.filter((r) => r.registered).length,
   });
   const result = await client
@@ -114,7 +126,7 @@ export async function readCimacApartments(
     profilesByNumber.set(number, profile);
   }
   const ids = [...seenIds];
-  const [unitResult, positionResult] = await Promise.all([
+  const [unitResult, positionResult, reservationResult] = await Promise.all([
     client
       .from("units")
       .select(unitFields, { count: "exact" })
@@ -129,9 +141,46 @@ export async function readCimacApartments(
       .in("id", ids)
       .order("id")
       .range(0, 64),
+    client
+      .from("cimac_apartment_reservations")
+      .select("id,unit_id,building_id,reserver_name,status,payment_status,updated_at", {
+        count: "exact",
+      })
+      .eq("building_id", building.id)
+      .eq("status", "reserved")
+      .in("unit_id", ids)
+      .order("unit_id")
+      .range(0, 64),
   ]);
   const units = exactRows(unitResult);
   const positions = exactRows(positionResult);
+  const reservationSchemaAvailable =
+    !reservationResult.error || !["42P01", "PGRST205"].includes(reservationResult.error.code);
+  const reservations = reservationSchemaAvailable ? exactRows(reservationResult) : [];
+  const reservationMap = new Map<string, CimacApartmentReservation>();
+  for (const reservation of reservations) {
+    const unitId = cimacWorkspaceId(reservation.unit_id);
+    if (
+      !seenIds.has(unitId) ||
+      reservationMap.has(unitId) ||
+      reservation.building_id !== building.id ||
+      !apartmentUuid(reservation.id) ||
+      reservation.status !== "reserved" ||
+      reservation.payment_status !== "unpaid" ||
+      typeof reservation.reserver_name !== "string" ||
+      !reservation.reserver_name.trim() ||
+      reservation.reserver_name.length > 200 ||
+      !apartmentTimestamp(reservation.updated_at)
+    )
+      return fail();
+    reservationMap.set(unitId, {
+      id: reservation.id,
+      reserverName: reservation.reserver_name,
+      status: "reserved",
+      paymentStatus: "unpaid",
+      updatedAt: reservation.updated_at,
+    });
+  }
   if (units.length !== profiles.length) return fail();
   const unitMap = new Map<string, Row>(),
     positionMap = new Map<string, Row>();
@@ -165,7 +214,8 @@ export async function readCimacApartments(
       unit.asset_subtype !== "apartment" ||
       unit.floor_label !== `${room.floor}F` ||
       typeof unit.occupancy_verified !== "boolean" ||
-      !constructionStates.includes(String(unit.construction_status))
+      !constructionStates.includes(String(unit.construction_status)) ||
+      !apartmentTimestamp(unit.updated_at)
     )
       return fail();
     const area = unit.area_sqm === null ? null : Number(unit.area_sqm);
@@ -175,6 +225,8 @@ export async function readCimacApartments(
       ...room,
       registered: true,
       unitId: String(unit.id),
+      unitUpdatedAt: unit.updated_at,
+      reservation: reservationMap.get(String(unit.id)) ?? null,
       areaSqm: area,
       constructionStatus: unit.construction_status as UnitConstructionStatus,
       operationalCondition: position
@@ -188,5 +240,5 @@ export async function readCimacApartments(
             : "unoccupied",
     };
   });
-  return data(rooms);
+  return data(rooms, true, reservationSchemaAvailable);
 }

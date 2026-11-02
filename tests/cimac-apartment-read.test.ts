@@ -50,6 +50,7 @@ const unit = (index: number): Row => ({
   area_sqm: null,
   construction_status: "unverified",
   occupancy_verified: false,
+  updated_at: "2026-11-02T18:00:00.000000+00:00",
   notes: "DO_NOT_FORWARD",
 });
 const position = (index: number): Row => ({
@@ -96,19 +97,20 @@ beforeEach(() => {
     cimac_apartment_profiles: plans.map((_, i) => profile(i)),
     units: plans.map((_, i) => unit(i)),
     unit_operational_position: plans.map((_, i) => position(i)),
+    cimac_apartment_reservations: [],
   };
   errors = {};
   calls = [];
   wrongCount = false;
 });
 describe("apartment RLS-scoped read and quote boundary", () => {
-  it("loads 64 registered records in three bounded queries and leaves occupancy unknown", async () => {
+  it("loads 64 registered records in four bounded queries and leaves occupancy unknown", async () => {
     const data = await readCimacApartments(client, scope);
     expect(data.registeredCount).toBe(64);
     expect(data.rooms.every((r) => r.occupancyState === "unknown")).toBe(true);
     expect(data.rooms[0]).not.toHaveProperty("notes");
     expect(JSON.stringify(data)).not.toContain("DO_NOT_FORWARD");
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(4);
     expect(
       calls.every((c) =>
         c.filters.some(([key, value]) => key === "building_id" && value === building),
@@ -163,6 +165,47 @@ describe("apartment RLS-scoped read and quote boundary", () => {
     tables.units[0].occupancy_verified = true;
     tables.unit_operational_position = tables.unit_operational_position.slice(1);
     expect((await readCimacApartments(client, scope)).rooms[0].occupancyState).toBe("unknown");
+  });
+  it("shows an unpaid room hold without turning it into an actual resident or verified occupancy", async () => {
+    tables.cimac_apartment_reservations = [
+      {
+        id: id(100),
+        unit_id: id(10),
+        building_id: building,
+        reserver_name: "Synthetic Booker",
+        status: "reserved",
+        payment_status: "unpaid",
+        updated_at: "2026-11-02T18:01:00.123456+00:00",
+      },
+    ];
+    const data = await readCimacApartments(client, scope);
+    expect(data.reservationSchemaAvailable).toBe(true);
+    expect(data.rooms[0]).toMatchObject({
+      occupancyState: "unknown",
+      reservation: { reserverName: "Synthetic Booker", paymentStatus: "unpaid" },
+    });
+    expect(data.rooms[0]).not.toHaveProperty("occupantName");
+    errors.cimac_apartment_reservations = { code: "PGRST205" };
+    const older = await readCimacApartments(client, scope);
+    expect(older.reservationSchemaAvailable).toBe(false);
+    expect(older.rooms[0].reservation).toBeNull();
+  });
+  it("does not hide denied reservations or a duplicate/foreign hold as vacant", async () => {
+    errors.cimac_apartment_reservations = { code: "42501" };
+    await expect(readCimacApartments(client, scope)).rejects.toMatchObject({ status: 403 });
+    errors = {};
+    tables.cimac_apartment_reservations = [
+      {
+        id: id(100),
+        unit_id: id(99),
+        building_id: building,
+        reserver_name: "Synthetic Booker",
+        status: "reserved",
+        payment_status: "unpaid",
+        updated_at: "2026-11-02T18:01:00Z",
+      },
+    ];
+    await expect(readCimacApartments(client, scope)).rejects.toThrow();
   });
   it.each([
     "profile building",

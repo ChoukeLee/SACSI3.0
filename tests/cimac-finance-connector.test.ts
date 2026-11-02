@@ -109,7 +109,7 @@ describe("standalone CIMAC finance 0.9 controlled transport", () => {
       requestId: financeRequestId,
       actorId: financeActorId,
     });
-    expect(VERSION).toBe("0.9.0");
+    expect(VERSION).toBe("0.10.0");
     expect(transport.mock.calls.map(([url]) => new URL(url).pathname)).toEqual([
       "/api/operator/v1/capabilities",
       "/api/operator/v1/cimac-finance/status",

@@ -1,4 +1,4 @@
-# SACSI 员工连接器 0.9.0
+# SACSI 员工连接器 0.10.0
 
 0.9.0 新增独立 `cimac_finance` 受控财务族：`query_cimac_finance`、`execute_cimac_finance`、`cimac_finance_status`。只对实时验证具备 CIMAC 权限的管理员开放。最多 30 项、100 个明确部分，全部保留 `inputSource=excel_screenshot` 与收据原文。四类操作是：已有待开业合同的押金/明确年度物业费收款、新客户明确拆分押金、整笔已登记 CNY 收款重分类、指定铺位身份标签/管理人文档说明；不是通用表编辑。
 
@@ -6,7 +6,9 @@
 
 CLI 沿用本人正常登录会话及 `execute` 命令；新族须明确 `actionName="cimac_finance"`、`operation="query"|"execute"|"status"`、`scope="business_data"`、`exceptionalBusinessCase=false`。写入先按原号查状态、签名预览，再原子执行和逐行核对 raw payment/ledger/receivable/contract/unit 证据。只有本次 `completed / verified=true` 可报完成；`completed_previously / verified=false` 仅为历史完成，未知结果绝不重放或换工具绕过。
 
-包版本 0.9.0 不改变全局 protocolVersion 1.0。旧维护 v1 wire 继续 0.8.0，原币收款 wire 继续 0.7.0。新财务待办升级本账号密文为 v4，完整保留 v1—v3 条目；以后调用旧维护/native 也不能降级文件。旧版本应安全拒绝 v4，不能删密文后重录。旧维护能力保持独立，不能用它代办新财务操作。
+包版本 0.10.0 整合财务与公寓预留，不改变全局 protocolVersion 1.0。旧维护 v1 wire 继续 0.8.0，原币收款 wire 继续 0.7.0。新财务待办升级本账号密文为 v4，完整保留 v1—v3 条目；以后调用旧维护/native 也不能降级文件。旧版本应安全拒绝 v4，不能删密文后重录。旧维护能力保持独立，不能用它代办新财务操作。
+
+建材城17栋公寓的独立预留直办仅在明确房号和预订人、未付款且日期待定时登记预留、取消预留或纠正预订人；不生成租约、实际入住、应收或收款。按楼栋和资产ID定位，不与同号商铺混用。新能力通过 `cimacApartmentReservations` 独立声明，旧0.8业务保持兼容；加密待办支持格式4，恢复只查原号，不自动重放。
 
 0.8.0 新增仅对具备 CIMAC 范围权限管理员开放的建材城受控维护：`query_cimac_maintenance`、`execute_cimac_maintenance`、`cimac_maintenance_status`。服务器必须同时验证管理员角色、CIMAC 权限、专用迁移协议和直办开关；旧页面角色或普通业务 grant 不能代替此权限。未安装迁移、RPC 返回 null/1 等非 true 值或停止直办时，不宣称维护可用，不回退到 SQL、通用 RPC 或其他收款工具。
 
