@@ -265,6 +265,10 @@
     {
       "file": "20261107164453_asset_operations_pilot.sql",
       "sha256": "a1fb4502f76df0e22f2a8fcf33d6b099659762f3b7db925ed90d90e68b0b4cb7"
+    },
+    {
+      "file": "20261107172242_asset_operations_finance_intake.sql",
+      "sha256": "700527a129f8946fe4a5f6c54e5aef366455ca2a77f7ce2b09ff439215226fd9"
     }
   ],
   "excluded": [

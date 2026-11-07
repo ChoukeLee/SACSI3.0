@@ -7,6 +7,7 @@ import {
   assetOperationsCsv,
   assetReportPeriod,
   buildAssetOperationsReport,
+  assetSourceLabel,
   type AssetOperationAsset,
   type AssetOperationKind,
   type AssetOperationCategory,
@@ -23,6 +24,7 @@ import {
 } from "./asset-operations-actions";
 import type { AssetOperationEntry } from "./asset-operations-model";
 import type { CurrencyCode } from "@/types/domain";
+import { AssetFinanceImport, AssetTermsEditor } from "./asset-operations-intake";
 import styles from "./asset-operations-workspace.module.css";
 
 type Locale = "zh" | "fr";
@@ -787,6 +789,32 @@ export function AssetOperationsWorkspace({
         entry.description,
         entry.voidReason ?? "",
       ]);
+    for (const pending of report.pendingCurrencies) {
+      for (const [label, amount] of [
+        [text("来源待核经营收入", "Recettes source à vérifier"), pending.income],
+        [text("来源待核经营支出", "Dépenses source à vérifier"), pending.expense],
+        [text("来源待核押金收取", "Dépôts reçus source à vérifier"), pending.depositIn],
+        [text("来源待核押金退还", "Dépôts remboursés source à vérifier"), pending.depositOut],
+      ] as const)
+        rows.push([
+          "source_pending",
+          report.period.start,
+          report.period.end,
+          "",
+          label,
+          "",
+          pending.currency,
+          amount,
+          "",
+          "",
+          "",
+          "",
+          text("待核实，不计入确认金额", "À vérifier, hors montants confirmés"),
+          "",
+          "",
+          "",
+        ]);
+    }
     if (!rows.length)
       rows.push([
         "coverage",
@@ -806,7 +834,35 @@ export function AssetOperationsWorkspace({
         text("不代表无收支或无欠款", "Ne prouve pas l’absence de flux ou de dette"),
         "",
       ]);
-    downloadReport(`SACSI_${mode}_${report.period.start}_${report.period.end}.csv`, headers, rows);
+    const scope = [
+      data.projectId,
+      group || "all",
+      category || "all",
+      verification || "all",
+      filtered.length,
+      new Date().toISOString(),
+      search,
+    ];
+    const scopeRow: (string | number | null)[] = Array(headers.length).fill("");
+    scopeRow[0] = "scope";
+    scopeRow[1] = report.period.start;
+    scopeRow[2] = report.period.end;
+    rows.unshift(scopeRow);
+    const filenameGroup = (group || "all_groups").replace(/[^a-z0-9_-]/gi, "_");
+    downloadReport(
+      `SACSI_${filenameGroup}_${mode}_${report.period.start}_${report.period.end}.csv`,
+      [
+        ...headers,
+        "projectId",
+        "group",
+        "categoryFilter",
+        "assetStatusFilter",
+        "assetCount",
+        "generatedAt",
+        "assetSearch",
+      ],
+      rows.map((row) => [...row, ...scope]),
+    );
   }
   return (
     <div className={styles.root}>
@@ -1005,7 +1061,48 @@ export function AssetOperationsWorkspace({
           )}
         </p>
       )}
-      {canImport ? <CatalogImport projectId={data.projectId} zh={zh} /> : null}
+      {report?.pendingCurrencies.length ? (
+        <section className={styles.section}>
+          <h2>{text("来源待核收付", "Flux source à vérifier")}</h2>
+          <p className={styles.cellSub}>
+            {text(
+              "按来源记载的收付日筛选；以下金额尚未核实，不计入已核实收支或利润。",
+              "Sélection selon la date inscrite dans la source ; montants non vérifiés, exclus des flux confirmés et du bénéfice.",
+            )}
+          </p>
+          <div className={styles.summaries}>
+            {report.pendingCurrencies.map((pending) => (
+              <article key={pending.currency} className={styles.summary}>
+                <h3>
+                  {pending.currency} · {pending.entryCount} {text("笔", "écritures")}
+                </h3>
+                <dl>
+                  {[
+                    [text("来源待核经营收入", "Recettes source à vérifier"), pending.income],
+                    [text("来源待核经营支出", "Dépenses source à vérifier"), pending.expense],
+                    [text("来源待核押金收取", "Dépôts reçus source à vérifier"), pending.depositIn],
+                    [
+                      text("来源待核押金退还", "Dépôts remboursés source à vérifier"),
+                      pending.depositOut,
+                    ],
+                  ].map(([label, amount]) => (
+                    <div key={String(label)}>
+                      <dt>{label}</dt>
+                      <dd>{money(Number(amount), pending.currency, locale)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {canImport ? (
+        <>
+          <CatalogImport projectId={data.projectId} zh={zh} />
+          <AssetFinanceImport projectId={data.projectId} zh={zh} assets={data.assets} />
+        </>
+      ) : null}
       {data.canWrite && data.assets.length ? (
         <EntryForm assets={data.assets} zh={zh} today={today} />
       ) : null}
@@ -1054,10 +1151,15 @@ export function AssetOperationsWorkspace({
                       {asset.monthlyRentNative !== null && asset.rentCurrency
                         ? money(asset.monthlyRentNative, asset.rentCurrency, locale)
                         : text("待确认／组合计租", "À confirmer / loyer groupé")}
+                      {data.canWrite ? <AssetTermsEditor asset={asset} zh={zh} /> : null}
                     </td>
                     <td className={styles.source}>
                       {asset.sourceRefs.length
-                        ? asset.sourceRefs.map((source) => <span key={source}>{source}</span>)
+                        ? asset.sourceRefs.map((source) => (
+                            <span key={source} title={source}>
+                              {assetSourceLabel(source)}
+                            </span>
+                          ))
                         : "—"}
                     </td>
                   </tr>
@@ -1126,7 +1228,9 @@ export function AssetOperationsWorkspace({
                             ? text("已核实", "Vérifié")
                             : text("待核实", "À vérifier")}
                       </span>
-                      <span className={styles.cellSub}>{entry.sourceRef}</span>
+                      <span className={styles.cellSub} title={entry.sourceRef}>
+                        {assetSourceLabel(entry.sourceRef)}
+                      </span>
                       {entry.voidedAt ? (
                         <span className={styles.cellSub}>
                           {entry.voidedAt.slice(0, 10)} · {entry.voidReason}

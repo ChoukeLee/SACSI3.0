@@ -10,6 +10,8 @@ vi.mock("./asset-operations-actions", () => ({
   createAssetOperationEntry: vi.fn(),
   importAssetOperationCatalog: vi.fn(),
   voidAssetOperationEntry: vi.fn(),
+  updateAssetOperationTerms: vi.fn(),
+  importAssetOperationEntries: vi.fn(),
 }));
 
 const data: AssetOperationsData = {

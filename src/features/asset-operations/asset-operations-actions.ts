@@ -11,6 +11,12 @@ export interface AssetOperationResult {
   ok: boolean;
   error?: string;
   rejected?: boolean;
+  idempotent?: boolean;
+  importedCount?: number;
+  matchedCount?: number;
+  updatedTermsCount?: number;
+  entryIds?: string[];
+  termAssetIds?: string[];
 }
 
 export interface AssetOperationCatalogRow {
@@ -28,10 +34,14 @@ async function submit(
   operation: string,
   input: unknown,
   requestId: string,
+  rpcName:
+    | "asset_operations_write_rpc"
+    | "asset_operations_update_terms_rpc"
+    | "asset_operations_import_entries_rpc" = "asset_operations_write_rpc",
 ): Promise<AssetOperationResult> {
   const supabase = await createClient();
-  const result = await supabase.rpc("asset_operations_write_rpc", {
-    p_operation: operation,
+  const result = await supabase.rpc(rpcName, {
+    ...(rpcName === "asset_operations_write_rpc" ? { p_operation: operation } : {}),
     p_input: input,
     p_request_id: requestId,
   });
@@ -55,7 +65,24 @@ async function submit(
     return { ok: false, error: "assetOperationResultUnknown", rejected: false };
   revalidatePath("/asset-operations");
   revalidatePath("/fr/asset-operations");
-  return { ok: true };
+  const data = result.data.data;
+  return {
+    ok: true,
+    idempotent: result.data.idempotent === true,
+    ...(typeof data?.importedCount === "number" ? { importedCount: data.importedCount } : {}),
+    ...(typeof data?.matchedCount === "number" ? { matchedCount: data.matchedCount } : {}),
+    ...(typeof data?.updatedTermsCount === "number"
+      ? { updatedTermsCount: data.updatedTermsCount }
+      : {}),
+    ...(Array.isArray(data?.entryIds) &&
+    data.entryIds.every((id: unknown) => typeof id === "string")
+      ? { entryIds: data.entryIds as string[] }
+      : {}),
+    ...(Array.isArray(data?.termAssetIds) &&
+    data.termAssetIds.every((id: unknown) => typeof id === "string")
+      ? { termAssetIds: data.termAssetIds as string[] }
+      : {}),
+  };
 }
 
 export async function createAssetOperationEntry(input: {
@@ -135,4 +162,54 @@ export async function voidAssetOperationEntry(input: {
   await requireRole("admin", "finance");
   const { requestId, ...payload } = input;
   return submit("void_entry", payload, requestId);
+}
+
+export async function updateAssetOperationTerms(input: {
+  requestId: string;
+  assetId: string;
+  expectedUpdatedAt: string;
+  monthlyRentNative: number | null;
+  rentCurrency: CurrencyCode | null;
+  reason: string;
+}): Promise<AssetOperationResult> {
+  await requireRole("admin", "finance");
+  const { requestId, ...payload } = input;
+  return submit("update_asset_terms", payload, requestId, "asset_operations_update_terms_rpc");
+}
+
+export interface AssetOperationEntryImport {
+  requestId?: string;
+  assetId?: string;
+  assetSourceKey?: string;
+  kind: AssetOperationKind;
+  category?: Parameters<typeof createAssetOperationEntry>[0]["category"];
+  amountNative: number;
+  currency: CurrencyCode;
+  cashDate?: string | null;
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  sourceRef: string;
+  description?: string;
+}
+
+export interface AssetOperationTermsImport {
+  requestId?: string;
+  assetId?: string;
+  assetSourceKey?: string;
+  expectedUpdatedAt: string;
+  monthlyRentNative: number | null;
+  rentCurrency: CurrencyCode | null;
+  reason: string;
+}
+
+export async function importAssetOperationEntries(input: {
+  requestId: string;
+  projectId: string;
+  sourceFingerprint: string;
+  entries?: AssetOperationEntryImport[];
+  terms?: AssetOperationTermsImport[];
+}): Promise<AssetOperationResult> {
+  await requireRole("admin");
+  const { requestId, ...payload } = input;
+  return submit("import_entries", payload, requestId, "asset_operations_import_entries_rpc");
 }

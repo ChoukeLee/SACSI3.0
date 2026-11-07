@@ -4,6 +4,7 @@ export interface AssetOperationAsset {
   id: string;
   projectId: string;
   unitId: string | null;
+  sourceKey?: string;
   code: string;
   name: string;
   group: string;
@@ -80,6 +81,7 @@ export interface AssetCurrencySummary {
 export interface AssetOperationsReport {
   period: AssetReportPeriod;
   currencies: AssetCurrencySummary[];
+  pendingCurrencies: AssetPendingCurrencySummary[];
   pendingEntryCount: number;
   pendingAssetCount: number;
   unallocatedServiceCount: number;
@@ -87,6 +89,15 @@ export interface AssetOperationsReport {
   voidedEntryCount: number;
   exclusions: { entryId: string; reason: string }[];
   entries: AssetOperationEntry[];
+}
+
+export interface AssetPendingCurrencySummary {
+  currency: CurrencyCode;
+  income: number;
+  expense: number;
+  depositIn: number;
+  depositOut: number;
+  entryCount: number;
 }
 
 const DAY = 86_400_000;
@@ -201,9 +212,11 @@ export function buildAssetOperationsReport(
     throw new Error("InvalidReportPeriod");
   const assetMap = new Map(assets.map((asset) => [asset.id, asset]));
   const summaries = new Map<CurrencyCode, AssetCurrencySummary>();
+  const pendingSummaries = new Map<CurrencyCode, AssetPendingCurrencySummary>();
   const report: AssetOperationsReport = {
     period,
     currencies: [],
+    pendingCurrencies: [],
     pendingEntryCount: 0,
     pendingAssetCount: assets.filter((asset) => asset.verification !== "verified").length,
     unallocatedServiceCount: 0,
@@ -264,6 +277,25 @@ export function buildAssetOperationsReport(
     }
     if (entry.verification !== "verified" || asset.verification !== "verified") {
       report.pendingEntryCount += 1;
+      if (cashInPeriod) {
+        const pending = pendingSummaries.get(entry.currency) ?? {
+          currency: entry.currency,
+          income: 0,
+          expense: 0,
+          depositIn: 0,
+          depositOut: 0,
+          entryCount: 0,
+        };
+        const target = {
+          income: "income",
+          expense: "expense",
+          deposit_in: "depositIn",
+          deposit_out: "depositOut",
+        }[entry.kind] as "income" | "expense" | "depositIn" | "depositOut";
+        pending[target] = addMoney(pending[target], entry.amountNative);
+        pending.entryCount += 1;
+        pendingSummaries.set(entry.currency, pending);
+      }
       continue;
     }
     const summary = summaries.get(entry.currency) ?? emptySummary(entry.currency);
@@ -303,12 +335,29 @@ export function buildAssetOperationsReport(
     summary.periodNet = addMoney(summary.periodIncome, -summary.periodExpense);
     return [summary];
   });
+  report.pendingCurrencies = currencies.flatMap((currency) => {
+    const summary = pendingSummaries.get(currency);
+    return summary ? [summary] : [];
+  });
   report.entries.sort(
     (a, b) =>
       (b.cashDate ?? b.periodStart ?? "").localeCompare(a.cashDate ?? a.periodStart ?? "") ||
       a.id.localeCompare(b.id),
   );
   return report;
+}
+
+export function assetSourceLabel(source: string) {
+  const fields = new Map(
+    source.split("|").map((part) => {
+      const colon = part.indexOf(":");
+      return colon < 0 ? [part, ""] : [part.slice(0, colon), part.slice(colon + 1)];
+    }),
+  );
+  const file = fields.get("file");
+  const sheet = fields.get("sheet");
+  const range = fields.get("range") ?? fields.get("cell");
+  return file && sheet ? `${file} · ${sheet}${range ? `!${range}` : ""}` : source;
 }
 
 /** Avoid formula execution if a source label is opened in Excel. */
