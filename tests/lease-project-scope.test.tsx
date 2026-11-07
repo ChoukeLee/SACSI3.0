@@ -105,7 +105,7 @@ function metric(label: string) {
   return [...host.querySelectorAll("button")].find((b) => b.textContent?.startsWith(label))
     ?.textContent;
 }
-async function changeView(label: "明细核对" | "房源总览") {
+async function changeView(label: "明细核对" | "长租房源") {
   const button = [...host.querySelectorAll("button")].find((b) => b.textContent === label);
   expect(button).toBeTruthy();
   await act(async () => (button as HTMLButtonElement).click());
@@ -125,7 +125,7 @@ it("scopes buildings, contract cards and statistics together; remembers each pro
   await changeView("明细核对");
   expect(metric("生效合同")).toContain("2");
   expect(host.querySelectorAll("tbody tr")).toHaveLength(2);
-  await changeView("房源总览");
+  await changeView("长租房源");
   expect(host.querySelector('[aria-label="第一栋 1F"]')).not.toBeNull();
   expect(host.querySelector('[aria-label="第二栋 1F"]')).not.toBeNull();
   await clickNav("楼栋切换", "第二栋");

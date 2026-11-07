@@ -774,10 +774,10 @@ it("hides the dossier when returning from the retained table to the room catalog
   await settle();
   await showFinance();
   expect(preview()?.textContent).toContain("123,456");
-  await click(namedButton("房源总览"));
+  await click(namedButton("长租房源"));
   expect(preview()).toBeNull();
   await settle();
-  expect(host.querySelector('[aria-label="楼栋房源总览"]')).toBeTruthy();
+  expect(host.querySelector('[aria-label="楼栋长租房源"]')).toBeTruthy();
   expect(recordRequests()).toHaveLength(1);
 });
 

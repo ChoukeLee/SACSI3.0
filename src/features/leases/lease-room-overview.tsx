@@ -9,7 +9,11 @@ import { leaseRentLabel, nativeLease } from "@/lib/native-money";
 import type { LeaseRoomOverviewRow } from "./lease-room-overview-model";
 import styles from "./lease-room-overview.module.css";
 
-type Filter = "all" | "overdue" | "upcoming" | "review" | "available";
+type Filter = "all" | "overdue" | "upcoming" | "review";
+
+function needsLeaseReview(row: LeaseRoomOverviewRow) {
+  return row.conflict || row.reviewReasons.includes("active_record_has_end");
+}
 
 export function leaseRoomFloorLabel(unit: LeaseRoomOverviewRow["unit"], locale: Locale) {
   const recorded = unit.floor_label?.trim();
@@ -49,6 +53,7 @@ function roomFloorSort(label: string) {
 }
 
 function occupancyLabel(row: LeaseRoomOverviewRow, zh: boolean) {
+  if (needsLeaseReview(row)) return zh ? "租赁待核" : "Location à vérifier";
   const labels: Record<LeaseRoomOverviewRow["occupancy"], [string, string]> = {
     leased: ["在租", "Loué"],
     scheduled: ["待起租", "Location à venir"],
@@ -70,6 +75,8 @@ export function leaseRoomOccupancyLabel(row: LeaseRoomOverviewRow, locale: Local
 
 function tenantLabel(row: LeaseRoomOverviewRow, zh: boolean) {
   if (row.conflict) return zh ? "多条租赁记录待核" : "Plusieurs locations à vérifier";
+  if (row.reviewReasons.includes("active_record_has_end"))
+    return zh ? "租赁状态待核" : "Statut locatif à vérifier";
   if (row.customer?.name) return row.customer.name;
   return row.contract
     ? zh
@@ -81,7 +88,7 @@ function tenantLabel(row: LeaseRoomOverviewRow, zh: boolean) {
 }
 
 function attentionLabel(row: LeaseRoomOverviewRow, zh: boolean) {
-  if (row.conflict) return zh ? "租赁资料待核" : "Dossier à vérifier";
+  if (needsLeaseReview(row)) return zh ? "租赁资料待核" : "Dossier à vérifier";
   const attention = row.attention;
   if (!attention) return null;
   if (attention.kind === "overdue")
@@ -108,6 +115,7 @@ function attentionLabel(row: LeaseRoomOverviewRow, zh: boolean) {
 }
 
 function attentionAmount(row: LeaseRoomOverviewRow, locale: Locale) {
+  if (needsLeaseReview(row)) return locale === "zh" ? "查看资料核对" : "Vérifier le dossier";
   const value = row.attention;
   if (value && value.kind !== "coverage" && value.amount === null)
     return locale === "zh" ? "多币种 · 查看明细" : "Plusieurs devises · voir le détail";
@@ -153,36 +161,43 @@ export function LeaseRoomOverview({
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
   const [followup, setFollowup] = useState(false);
+  const rentalRows = useMemo(
+    () => rows.filter((row) => row.contract !== null || needsLeaseReview(row)),
+    [rows],
+  );
   const counts = useMemo(
     () => ({
-      all: rows.length,
-      overdue: rows.filter((row) => !row.conflict && row.attention?.kind === "overdue").length,
-      upcoming: rows.filter((row) => !row.conflict && row.attention?.kind === "upcoming").length,
-      review: rows.filter((row) => row.conflict || row.attention?.kind === "coverage").length,
-      available: rows.filter((row) => row.occupancy === "available").length,
+      all: rentalRows.length,
+      overdue: rentalRows.filter(
+        (row) => !needsLeaseReview(row) && row.attention?.kind === "overdue",
+      ).length,
+      upcoming: rentalRows.filter(
+        (row) => !needsLeaseReview(row) && row.attention?.kind === "upcoming",
+      ).length,
+      review: rentalRows.filter(
+        (row) => needsLeaseReview(row) || row.attention?.kind === "coverage",
+      ).length,
     }),
-    [rows],
+    [rentalRows],
   );
   const searched = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
     return !query
-      ? rows
-      : rows.filter((row) =>
+      ? rentalRows
+      : rentalRows.filter((row) =>
           `${row.unit.unit_no} ${row.unit.code} ${row.building?.display_name ?? ""} ${row.customer?.name ?? ""}`
             .toLocaleLowerCase()
             .includes(query),
         );
-  }, [rows, search]);
+  }, [rentalRows, search]);
   const filtered = useMemo(
     () =>
       searched.filter(
         (row) =>
           filter === "all" ||
           (filter === "review"
-            ? row.conflict || row.attention?.kind === "coverage"
-            : filter === "available"
-              ? row.occupancy === "available"
-              : !row.conflict && row.attention?.kind === filter),
+            ? needsLeaseReview(row) || row.attention?.kind === "coverage"
+            : !needsLeaseReview(row) && row.attention?.kind === filter),
       ),
     [searched, filter],
   );
@@ -226,7 +241,7 @@ export function LeaseRoomOverview({
   const followupRows = useMemo(
     () =>
       searched
-        .filter((row) => row.conflict || row.attention)
+        .filter((row) => needsLeaseReview(row) || row.attention)
         .sort((a, b) => {
           const rank = (row: LeaseRoomOverviewRow) =>
             row.attention?.kind === "overdue" ? 0 : row.attention?.kind === "upcoming" ? 1 : 2;
@@ -239,25 +254,24 @@ export function LeaseRoomOverview({
     [searched],
   );
   const filters: { key: Filter; label: string }[] = [
-    { key: "all", label: text("全部房源", "Tous les lots") },
+    { key: "all", label: text("全部租赁", "Toutes les locations") },
     { key: "overdue", label: text("已逾期", "En retard") },
     { key: "upcoming", label: text("15天内应缴", "Dû sous 15 jours") },
-    { key: "review", label: text("缴费待核", "À vérifier") },
-    { key: "available", label: text("可用房源", "Disponibles") },
+    { key: "review", label: text("待核事项", "À vérifier") },
   ];
   if (error || loading)
     return (
       <section className={styles.unavailable} role={error ? "alert" : "status"} aria-busy={loading}>
         <h2>
           {error
-            ? text("房源暂时无法读取", "Lots momentanément indisponibles")
-            : text("正在读取全部房源…", "Chargement de tous les lots…")}
+            ? text("长租房源暂时无法读取", "Locations momentanément indisponibles")
+            : text("正在读取长租房源…", "Chargement des locations…")}
         </h2>
         <p>
           {error
             ? text(
-                "请重试读取当前楼栋；暂不显示旧房源或旧缴费信息。",
-                "Réessayez pour ce bâtiment ; les anciens lots et paiements sont masqués.",
+                "请重试读取当前楼栋；暂不显示旧租赁或旧缴费信息。",
+                "Réessayez pour ce bâtiment ; les anciennes locations et paiements sont masqués.",
               )
             : text(
                 "按当前楼栋核对房间与租赁记录。",
@@ -274,7 +288,7 @@ export function LeaseRoomOverview({
   return (
     <section
       className={styles.overview}
-      aria-label={text("楼栋房源总览", "Vue des lots par bâtiment")}
+      aria-label={text("楼栋长租房源", "Locations par bâtiment")}
     >
       <div className={styles.toolbar}>
         <div
@@ -363,7 +377,7 @@ export function LeaseRoomOverview({
                   >
                     <strong>{attentionLabel(row, zh)}</strong>
                     <small>
-                      {row.attention?.kind === "coverage" || row.conflict
+                      {row.attention?.kind === "coverage" || needsLeaseReview(row)
                         ? text("查看资料核对", "Vérifier le dossier")
                         : row.attention?.dueDate}
                     </small>
@@ -384,11 +398,11 @@ export function LeaseRoomOverview({
       ) : null}
       {!floors.length ? (
         <p className={styles.empty}>
-          {rows.length
-            ? text("没有符合筛选条件的房源。", "Aucun lot ne correspond aux filtres.")
+          {rentalRows.length
+            ? text("没有符合筛选条件的租赁。", "Aucune location ne correspond aux filtres.")
             : text(
-                "当前楼栋尚无可读取的已建档房源。",
-                "Aucun lot enregistré lisible dans ce bâtiment.",
+                "当前楼栋暂无租赁记录。历史资料可在明细核对中查阅。",
+                "Aucune location actuelle dans ce bâtiment. Consultez l’historique dans le détail à vérifier.",
               )}
         </p>
       ) : (

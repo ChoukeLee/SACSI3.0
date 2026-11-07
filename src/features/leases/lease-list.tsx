@@ -1602,14 +1602,14 @@ export function LeaseList({
             ? "合同与履约"
             : "Contrats et exécution"
           : locale === "zh"
-            ? "房源总览"
-            : "Vue des logements"
+            ? "长租房源"
+            : "Locations longue durée"
       }
       description={
         workArea === "sacsi"
           ? locale === "zh"
-            ? "按楼栋查看房间、租客、月租与已交至；选房查看资料并办理。"
-            : "Lots, locataires, loyers et paiements par bâtiment. Choisissez un lot pour consulter son dossier et agir."
+            ? "按楼栋查看当前租赁的房间、租客、月租与已交至；选房查看资料并办理。"
+            : "Locations actuelles, locataires, loyers et paiements par bâtiment. Choisissez un lot pour consulter son dossier et agir."
           : locale === "zh"
             ? "合同、应收与收款，在同一个工作区核对。"
             : "Contrats, créances et encaissements réunis pour vérification."
@@ -1629,7 +1629,7 @@ export function LeaseList({
                   void changeView("rooms");
                 }}
               >
-                {locale === "zh" ? "房源总览" : "Vue des logements"}
+                {locale === "zh" ? "长租房源" : "Locations longue durée"}
               </button>
               <button
                 type="button"

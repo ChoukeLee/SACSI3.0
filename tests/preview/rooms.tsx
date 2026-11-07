@@ -171,9 +171,9 @@ function Preview() {
         </p>
         <header className="mb-6">
           <p className="text-xs text-muted-foreground">SACSI / 示例公寓</p>
-          <h1 className="mt-2 text-2xl font-semibold">房源总览</h1>
+          <h1 className="mt-2 text-2xl font-semibold">长租房源</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            按房间查看租客、租金与交租情况，纸质合同资料可后补。
+            按楼层查看已有租赁的房间、租客与交租情况，纸质合同资料可后补。
           </p>
         </header>
         <LeaseRoomOverview
