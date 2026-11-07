@@ -360,8 +360,10 @@ export function SaleList({
             unit: unit?.unit_no ?? "—",
             customer: customer?.name ?? (locale === "zh" ? "客户待补" : "Client à compléter"),
             searchText: customer?.phone ?? "",
-            periodStart: contract.signed_date,
-            periodLabel: contract.signed_date,
+            periodStart: contract.signed_date ?? "",
+            periodLabel:
+              contract.signed_date ??
+              (locale === "zh" ? "签约日期未登记" : "Signature non renseignée"),
             periodDetail: contract.transfer_date
               ? `${locale === "zh" ? "过户" : "Transfert"} ${contract.transfer_date}`
               : undefined,

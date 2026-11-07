@@ -450,7 +450,9 @@ export function SaleWorkbenchInspector({
           <>
             <h3>{text("合同资料", "Informations contractuelles")}</h3>
             <dl className={styles.facts}>
-              <Fact label={text("签约日期", "Signature")}>{contract.signed_date}</Fact>
+              <Fact label={text("签约日期", "Signature")}>
+                {contract.signed_date ?? text("未登记", "Non renseignée")}
+              </Fact>
               <Fact label={text("合同总额", "Total contractuel")}>{money(price)}</Fact>
               <Fact label={text("付款方式", "Plan")}>
                 {dictionaries[locale].sales.paymentPlan[

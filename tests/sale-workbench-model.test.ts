@@ -16,6 +16,24 @@ import {
 } from "./fixtures/contract-workspace";
 
 const contract = saleFixture().contracts[0] as SaleContractRow;
+it("reads an Excel sale with an unknown signing date only when its source is retained", () => {
+  const data = saleFixture();
+  Object.assign(data.contracts[0], {
+    signed_date: null,
+    registration_basis: "source_record",
+    source_reference: "Synthetic workbook / Sheet1!A2",
+  });
+  expect(decodeWorkspace(data, "sale", data.query, "list")).toEqual(data);
+  for (const patch of [
+    { registration_basis: "contract" },
+    { source_reference: " " },
+    { signed_date: undefined },
+  ]) {
+    const invalid = structuredClone(data);
+    Object.assign(invalid.contracts[0], patch);
+    expect(() => decodeWorkspace(invalid, "sale", invalid.query, "list")).toThrow();
+  }
+});
 const schedule = {
   id: "88888888-8888-4888-8888-888888888888",
   sale_contract_id: workspaceContract,

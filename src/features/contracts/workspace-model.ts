@@ -346,7 +346,11 @@ export function decodeWorkspace(
         throw new WorkspaceReadError();
     } else {
       decimal(c.total_amount_xof, true);
-      date(c.signed_date);
+      const sourceRegistration =
+        c.registration_basis === "source_record" &&
+        typeof c.source_reference === "string" &&
+        c.source_reference.trim().length > 0;
+      date(c.signed_date, sourceRegistration);
       date(c.transfer_date, true);
       if (
         typeof c.payment_plan_type !== "string" ||
