@@ -86,6 +86,122 @@ def range_bounds(value):
     return x, int(y), xx, int(yy)
 
 
+def correction_cells(address):
+    """Expand a bounded correction range, never a whole row or column."""
+    if not isinstance(address, str) or not re.fullmatch(r"[A-Z]+[1-9]\d*(?::[A-Z]+[1-9]\d*)?", address):
+        raise ValueError("invalid_correction_range")
+    left, top, right, bottom = range_bounds(address)
+    def index(label):
+        value = 0
+        for character in label:
+            value = value * 26 + ord(character) - 64
+        return value
+    def label(value):
+        result = ""
+        while value:
+            value, remainder = divmod(value - 1, 26)
+            result = chr(65 + remainder) + result
+        return result
+    first, last = index(left), index(right)
+    if first > last or top > bottom or last > 16384 or bottom > 1048576 or (last-first+1)*(bottom-top+1) > 10000:
+        raise ValueError("invalid_correction_range")
+    return [[label(column) + str(row) for column in range(first, last+1)] for row in range(top, bottom+1)]
+
+
+def load_source_corrections(path, books):
+    """Validate an evidence overlay. No source cell or workbook is mutated."""
+    if path is None:
+        return []
+    document = json.loads(path.read_text(encoding="utf-8"))
+    corrections = document.get("corrections") if isinstance(document, dict) else document
+    if not isinstance(corrections, list) or any(not isinstance(item, dict) for item in corrections):
+        raise ValueError("Corrections must be a JSON array or an object with corrections[]")
+    by_hash = {book["sha256"]: book for book in books}
+    result = []
+    for position, item in enumerate(corrections):
+        record = {**item, "applied": False, "cellChanges": []}
+        record.setdefault("correctionId", "correction-" + str(position + 1))
+        digest = text(item.get("fileHash")).lower()
+        address = item.get("cell") or item.get("range")
+        record["fileHash"] = digest
+        try:
+            if not re.fullmatch(r"[0-9a-f]{64}", digest) or digest not in by_hash:
+                raise ValueError("source_hash_not_found")
+            book = by_hash[digest]
+            sheet = next((s for s in book["sheets"] if s["name"] == item.get("sheet")), None)
+            if sheet is None:
+                raise ValueError("source_sheet_not_found")
+            grid = correction_cells(address)
+            values = {c["cell"]: c["value"] for row in sheet["rows"] for c in row["cells"]}
+            if "originalValue" not in item or "normalizedValue" not in item:
+                raise ValueError("original_and_normalized_values_required")
+            original, normalized = item["originalValue"], item["normalizedValue"]
+            if isinstance(original, list):
+                if (not isinstance(normalized, list) or len(original) != len(grid) or len(normalized) != len(grid)
+                    or any(not isinstance(row, list) or len(row) != len(grid[0]) for row in original + normalized)):
+                    raise ValueError("correction_matrix_shape_mismatch")
+                changes = [{"cell":cell,"originalValue":original[y][x],"normalizedValue":normalized[y][x]}
+                    for y,row in enumerate(grid) for x,cell in enumerate(row)]
+            elif len(grid) == 1 and len(grid[0]) == 1:
+                changes = [{"cell":grid[0][0],"originalValue":original,"normalizedValue":normalized}]
+            elif address in sheet["merges"]:
+                # A merged range owns one value; do not broadcast it to members.
+                changes = [{"cell":grid[0][0],"originalValue":original,"normalizedValue":normalized}]
+            else:
+                raise ValueError("range_requires_matrix_or_exact_merged_anchor")
+            if any(type(values.get(change["cell"])) is not type(change["originalValue"])
+                   or values.get(change["cell"]) != change["originalValue"] for change in changes):
+                raise ValueError("source_original_value_mismatch")
+            record["sourceRef"] = {"fileHash":digest,"filename":book["filename"],"sheet":sheet["name"],"range":address}
+            record["cellChanges"] = changes
+            if item.get("status") != "confirmed":
+                record["validationStatus"] = "pending_confirmation"
+            elif not item.get("evidence"):
+                record["validationStatus"] = "confirmation_evidence_required"
+            else:
+                record["validationStatus"] = "exact_source_original_match"
+                record["applied"] = True
+        except ValueError as error:
+            record["validationStatus"] = str(error)
+        result.append(record)
+    owners = collections.defaultdict(list)
+    for record in result:
+        if record["applied"]:
+            for change in record["cellChanges"]:
+                owners[(record["fileHash"], record["sheet"], change["cell"])].append((record,change["normalizedValue"]))
+    for matches in owners.values():
+        if len({json.dumps(value, ensure_ascii=False, sort_keys=True) for _,value in matches}) > 1:
+            for record,_ in matches:
+                record["applied"] = False
+                record["validationStatus"] = "conflicting_normalized_values"
+    return result
+
+
+def attach_source_corrections(assets, groups, corrections):
+    """Expose overlays separately, including shared merged-cell scope."""
+    by_id = {asset["candidateId"]:asset for asset in assets}
+    for record in corrections:
+        if not record["applied"]:
+            continue
+        for change in record["cellChanges"]:
+            affected = set()
+            for asset in assets:
+                if any(row["source"]["fileHash"] == record["fileHash"] and row["source"]["sheet"] == record["sheet"]
+                       and any(cell["cell"] == change["cell"] for cell in row["cells"]) for row in asset["rawRows"]):
+                    affected.add(asset["candidateId"])
+            for group in groups:
+                if any(ref["fileHash"] == record["fileHash"] and ref["sheet"] == record["sheet"]
+                       and any(change["cell"] in row for row in correction_cells(ref["range"])) for ref in group["sourceRefs"]):
+                    group.setdefault("normalizedCorrections", []).append(record)
+                    affected.update(group["memberCandidateIds"])
+            for candidate_id in affected:
+                overlay = {"correctionId":record["correctionId"],"sourceRef":record["sourceRef"], **change,
+                    "status":record["status"],"evidence":record["evidence"],"reason":record.get("reason"),
+                    "confirmedAt":record.get("confirmedAt"),"scope":record.get("scope"),
+                    "applicationScope":"source_cell_or_shared_group_only_not_individual_financial_allocation"}
+                by_id[candidate_id].setdefault("normalizedCorrections", []).append(overlay)
+
+
 class Inventory:
     def __init__(self, sources):
         self.sources = sources
@@ -174,7 +290,7 @@ class Inventory:
                 "scopeNote": "只含精确资产当前非terminated合同所关联付款；日租及其他客户历史不混入，不替代独立现金分类核验"})
         return {"snapshotAt": target.get("snapshot_at"), "targets": targets}
 
-    def business_issues(self, standard, cutoff, target_review=None):
+    def business_issues(self, standard, cutoff, target_review=None, corrections=()):
         def ref(book, sheet, cell_range):
             return {"fileHash": book["sha256"], "filename": book["filename"], "sheet": sheet, "range": cell_range}
         result = []
@@ -200,7 +316,18 @@ class Inventory:
         add("formula-4-e76", "4#代租汇总存在循环公式", "E76=SUM(E72:E76)引用自身，缓存85不能证明公式正确。", "核实应求和范围后在单独授权下修复；本次保留原文件。", [ref(standard,"4#公寓代租","E76")], "high")
         add("share-4", "4#服务费分配口径待确认", "已租汇总E3=967.2万、F3=50%、G3仍为967.2万；若服务费也按50%分，应为483.6万。", "确认服务费归属与分成规则，不能先改为数学推算数。", [ref(standard,"已租汇总","E3:G3")])
         add("share-11", "11#分配金额与两种常见规则都不一致", "C7年租22368万、D7物业1296万、E7服务570万、F7占比60%、G7为14752.8万；三项全乘60%为14540.4万，服务费全归属为14768.4万。", "逐项确认物业与服务费是否分成，再核对分配金额。", [ref(standard,"已租汇总","C7:G7")])
-        add("front-floor-native-currency", "5#六楼原币与源表符号冲突", "5#C28写3200￥、D28组租183万。" + live_summary("SACSI5","6F前楼"), "以合同及美元原币付款保留事实，源表符号及组租金额标待核，不做历史汇率反推或重复入账。", [ref(standard,"5#公寓","C28:D30")], "high")
+        front_correction = next((change for record in corrections if record["applied"]
+            and record["fileHash"] == standard["sha256"] and record["sheet"] == "5#公寓"
+            for change in record["cellChanges"] if change["cell"] == "C28"
+            and re.search(r"美元|USD", text(change["normalizedValue"]), re.I)), None)
+        if front_correction:
+            add("front-floor-native-currency", "美元币种已确认，源表折算待核",
+                "C28原￥符号为手误，按用户确认的规范值“" + text(front_correction["normalizedValue"]).replace("\n", " / ") +
+                "”纠正解释；D28的183万折算值仍待核，不据此推算历史汇率。" + live_summary("SACSI5","6F前楼"),
+                "后续按USD原币保留租金与付款事实；另核183万的折算依据，不新增或修改历史收款。原始Excel和rawRows保留原文，更正及证据单独保存。",
+                [ref(standard,"5#公寓","C28:D30")], "review")
+        else:
+            add("front-floor-native-currency", "5#六楼原币与源表符号冲突", "5#C28写3200￥、D28组租183万。" + live_summary("SACSI5","6F前楼"), "以合同及美元原币付款保留事实，源表符号及组租金额标待核，不做历史汇率反推或重复入账。", [ref(standard,"5#公寓","C28:D30")], "high")
         add("lease-5-1101-rent", "5#1101源租金与当前合同不同", "源表D53月租140万。" + live_summary("SACSI5","1101"), "核对合同与源表更新时间；保留现有合同及实际付款，不按源标准自动覆盖。", [ref(standard,"5#公寓","A53:D53")], "high")
         add("lease-11-1205-payment", "11#1205源表新增押金与当前账务待核", "源表E80记9月30日押一租三340万、G80另记10月3日押金85万，源表覆盖截止写2027-01-03。" + live_summary("SACSI11","1205"), "查10月3日原始凭证及关联归属，同时核对覆盖截止日；不依据历史交接说法改系统，也不据缺失关联断言未付款。", [ref(cutoff,"11#公寓","A80:G80")], "high")
         add("dates-4-agency", "4#代租明细存在倒序日期及年份冲突", "J8写2025.11.01-2025.04.30；J95写2029.11.01-2026.12.31；F11付款日期2025.04.29与4#公寓E4对应2026.04.29不一致。", "以凭证核对具体年份，源文保留，不能批量自动修年。", [ref(cutoff,"4#代租明细","J8"),ref(cutoff,"4#代租明细","J95"),ref(cutoff,"4#代租明细","F11"),ref(cutoff,"4#公寓","E4")], "high")
@@ -456,6 +583,7 @@ def main():
     parser.add_argument("--snapshot", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--target-finance", type=Path)
+    parser.add_argument("--corrections", type=Path, help="Evidence-backed source overlays; never modifies original XLSX cells")
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     files = sorted(args.source_dir.glob("*.xlsx"), key=lambda p: ("(1)" in p.name, p.name))
@@ -473,9 +601,11 @@ def main():
     inv.standards(standards)
     inv.cutoffs(cutoffs)
     inv.add_summary_claims(standards)
+    corrections = load_source_corrections(args.corrections, books)
     snapshot = json.loads(args.snapshot.read_text(encoding="utf-8"))
     system_only = inv.reconcile(snapshot)
     assets = list(inv.assets.values())
+    attach_source_corrections(assets, inv.groups, corrections)
     # Flag historical role claims without mistaking separate roles for duplicate assets.
     for asset in assets:
         asset["sourceOwners"] = sorted({r["nameRaw"] for r in asset["roles"] if r["role"] == "owner"})
@@ -495,7 +625,7 @@ def main():
     inv.issue("incubator_group_scope", "孵化园A02注明3间但没有明确对应A03/A04/A05；宿舍数量不是房号，保留组范围而不创造单间")
     inv.issue("source_financial_conflicts", "5#六楼USD/CNY符号、11#1205押租、仓库优惠/费用差异均不得据源表自动改账")
     result = {"schemaVersion": 1, "mode": "read_only_source_inventory", "snapshotAt": snapshot.get("snapshot_at"),
-        "sourceDirectory": str(args.source_dir.resolve()), "sourceManifest": manifest,
+        "sourceDirectory": str(args.source_dir.resolve()), "sourceManifest": manifest, "sourceCorrections": corrections,
         "rules": ["候选资产数量不是已确认实物资产总数", "source_only不等于资产不存在", "相同门牌必须结合项目、楼栋、类别", "源表金额不是已核实实收，不直接入账", "不同币种不直接合并", "业主、租客、历史交易和当前房态独立", "合并单元格值只记一份，不按成员重复计价或猜测分摊"],
         "summary": {"sourceFileCount": len(files), "uniqueSourceCount": len(books), "sourceCandidateCount": len(assets),
             "byScope": dict(collections.Counter(a["scope"] for a in assets)),
@@ -508,7 +638,13 @@ def main():
         "systemOnlyUnits": system_only, "excludedAggregateViews": inv.ignored}
     if args.target_finance:
         result["targetFinanceReview"] = inv.add_target_finance_findings(snapshot, json.loads(args.target_finance.read_text(encoding="utf-8")))
-    result["businessIssues"] = inv.business_issues(standards, cutoffs, result.get("targetFinanceReview"))
+    result["businessIssues"] = inv.business_issues(standards, cutoffs, result.get("targetFinanceReview"), corrections)
+    for correction in corrections:
+        if not correction["applied"]:
+            result["businessIssues"].append({"issueId":correction["correctionId"],"title":"来源更正尚未应用",
+                "detail":correction["validationStatus"],"suggestedAction":"核对源文件哈希、单元格原文、确认状态与证据；不得直接覆盖源表。",
+                "priority":"review","sourceRefs":[correction["sourceRef"]] if correction.get("sourceRef") else [],
+                "candidateIds":[],"businessWritesAuthorized":False})
     fingerprint = hashlib.sha256("\n".join(sorted(hashes)).encode("ascii")).hexdigest()
     project_id = next(p["id"] for p in snapshot["projects"] if p["code"] == "SACSI")
     pilot, review = [], []
