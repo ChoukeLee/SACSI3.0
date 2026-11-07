@@ -134,10 +134,12 @@ function InspectorContent({
     customerCollection && record.customer?.id
       ? `${locale === "fr" ? "/fr" : ""}/cimac/customers/${encodeURIComponent(record.customer.id)}?tab=account&accountTab=receipts`
       : null;
+  const ownerSettlement = record.category === "owner_settlement";
   const deposit =
-    record.direction === "liability_in" ||
-    record.direction === "liability_out" ||
-    /(?:deposit|caution)/i.test(record.category);
+    !ownerSettlement &&
+    (record.direction === "liability_in" ||
+      record.direction === "liability_out" ||
+      /(?:deposit|caution)/i.test(record.category));
   const period = record.period;
   const method =
     record.paymentMethod === "cash"
@@ -348,7 +350,14 @@ function InspectorContent({
           )}
         </section>
 
-        {deposit ? (
+        {ownerSettlement ? (
+          <p className="rounded-lg border bg-muted/40 px-3 py-2 text-[11px] leading-5 text-muted-foreground">
+            {text(
+              "房东结算属于往来款，不计作本方经营成本；本条流水不代表已核实的全部应付房东余额。",
+              "Le règlement au propriétaire est un mouvement de passif, pas un coût d’exploitation propre ; cette écriture ne représente pas le solde total vérifié dû au propriétaire.",
+            )}
+          </p>
+        ) : deposit ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
             {text(
               "押金为独立负债口径，不计作经营收入；本条记录也不代表当前可退押金余额。",

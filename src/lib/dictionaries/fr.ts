@@ -507,8 +507,8 @@ export const frDict = {
       directions: {
         income: "Revenu",
         expense: "Depense",
-        liability_in: "Caution recue",
-        liability_out: "Caution rendue"
+        liability_in: "Dépôts et autres passifs reçus",
+        liability_out: "Dépôts et autres passifs versés"
       },
       categories: {
         daily_rental: "Revenu journalier",
@@ -518,6 +518,7 @@ export const frDict = {
         lease_deposit_deduction: "Retenue sur caution location",
         lease_agency_income: "Commission location recue",
         lease_agency_expense: "Commission location versee",
+        owner_settlement: "Règlement au propriétaire",
         property_fee: "Charges de copropriete",
         furniture_fee: "Frais de mobilier",
         agency_fee: "Commission agence",
