@@ -196,7 +196,11 @@ export interface SaleContractRow {
   unit_id: string;
   customer_id: string;
   contract_no: string;
-  signed_date: string;
+  signed_date: string | null;
+  registration_basis?: "contract" | "source_record";
+  source_reference?: string | null;
+  sale_currency?: CurrencyCode;
+  total_amount_native?: number | null;
   transfer_date: string | null;
   transfer_status: string;
   title_certificate_no: string | null;
