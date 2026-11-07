@@ -106,7 +106,170 @@ function fact(name: string) {
     ?.nextElementSibling?.textContent;
 }
 
+function disclosure(label: string) {
+  return [...host.querySelectorAll("details")].find(
+    (item) => item.querySelector(":scope > summary")?.textContent === label,
+  );
+}
+
+async function openDisclosure(label: string) {
+  const details = disclosure(label);
+  expect(details).toBeTruthy();
+  if (!details!.open) await act(async () => details!.querySelector("summary")!.click());
+  return details!;
+}
+
+function isVisibleByDisclosure(element: Element) {
+  for (let parent: Element | null = element; parent; parent = parent.parentElement) {
+    if (
+      parent instanceof HTMLDetailsElement &&
+      !parent.open &&
+      !parent.querySelector(":scope > summary")?.contains(element)
+    )
+      return false;
+  }
+  return true;
+}
+
 describe("LeaseWorkbenchInspector single contract dossier", () => {
+  it("keeps the default overview read-only and requires explicit disclosure for permitted operations", async () => {
+    const manage = vi.fn();
+    const correct = vi.fn();
+    const props = await render({
+      actions: <button onClick={manage}>办理本租赁</button>,
+      financeTools: <button onClick={correct}>更正租金账期</button>,
+      collectionHref: "/leases/lease-1/collect",
+    });
+    expect([...host.querySelectorAll('[role="tab"]')].map((item) => item.textContent)).toEqual([
+      "概况",
+      "收支明细",
+    ]);
+    const more = disclosure("更多操作")!;
+    expect(more.open).toBe(false);
+    for (const action of more.querySelectorAll("button, a")) {
+      expect(isVisibleByDisclosure(action)).toBe(false);
+    }
+    const view = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
+      (item) => item.textContent === "查看收支明细",
+    );
+    expect(view).toBeUndefined();
+    expect(
+      [...host.querySelectorAll("button")]
+        .filter(isVisibleByDisclosure)
+        .every((item) => item.getAttribute("role") === "tab"),
+    ).toBe(true);
+    await tab("收支明细");
+    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("收支明细");
+    expect(manage).not.toHaveBeenCalled();
+    expect(correct).not.toHaveBeenCalled();
+    expect(props.onPrint).not.toHaveBeenCalled();
+    expect(more.open).toBe(false);
+    await openDisclosure("更多操作");
+    const operation = [...more.querySelectorAll<HTMLButtonElement>("button")].find(
+      (item) => item.textContent === "办理本租赁",
+    )!;
+    expect(isVisibleByDisclosure(operation)).toBe(true);
+    await act(async () => operation.click());
+    expect(manage).toHaveBeenCalledTimes(1);
+    await render({
+      contract: { ...contract, id: "other-rental" },
+      actions: undefined,
+      financeTools: undefined,
+    });
+    expect(host.textContent).not.toContain("办理本租赁");
+    expect(host.textContent).not.toContain("更正租金账期");
+    expect(host.querySelector('a[href*="/collect"]')).toBeNull();
+  });
+
+  it("keeps native rental accounting out of the overview and renders it once in the merged detail tab", async () => {
+    await render({
+      contract: {
+        ...contract,
+        rent_currency: "USD",
+        monthly_rent_amount: 3200,
+        monthly_rent_xof: 0,
+      },
+      payments: [payment({ currency: "USD", amount: 1000, native_settlement: true })],
+      receivables: [
+        receivable({
+          currency: "USD",
+          amount_xof: 0,
+          paid_amount_xof: 0,
+          amount_native: 3200,
+          paid_amount_native: 1000,
+        }),
+      ],
+    });
+    expect(host.querySelectorAll('[aria-label="原币租金账务"]')).toHaveLength(0);
+    await tab("收支明细");
+    expect(host.querySelectorAll('[aria-label="原币租金账务"]')).toHaveLength(1);
+    expect(host.querySelectorAll("ol li")).toHaveLength(1);
+    expect(host.textContent).toContain("2,200");
+    expect(host.textContent).toContain("USD");
+    await tab("概况");
+    expect(host.querySelectorAll('[aria-label="原币租金账务"]')).toHaveLength(0);
+  });
+
+  it("suppresses the inner title and close action only for the embedded SACSI dossier", async () => {
+    const onClose = vi.fn();
+    await render({ embedded: true, onClose });
+    expect(host.querySelector('button[aria-label="关闭预览"]')).toBeNull();
+    expect([...host.querySelectorAll("h2")].some((item) => item.textContent === "租赁资料")).toBe(
+      false,
+    );
+    await render({ embedded: false, onClose });
+    const close = host.querySelector<HTMLButtonElement>('button[aria-label="关闭预览"]')!;
+    expect(close).toBeTruthy();
+    await act(async () => close.click());
+    expect(onClose).toHaveBeenCalledTimes(1);
+    await render({ workArea: "cimac", embedded: true, onClose });
+    expect(host.querySelector('button[aria-label="关闭预览"]')).toBeTruthy();
+    expect([...host.querySelectorAll('[role="tab"]')].map((item) => item.textContent)).toEqual([
+      "合同",
+      "账务",
+      "记录",
+    ]);
+  });
+
+  it("prevents every disclosed operation while busy and removes stale operations on loading or error", async () => {
+    const manage = vi.fn();
+    const correct = vi.fn();
+    const props = await render({
+      busy: true,
+      actions: <button onClick={manage}>办理本租赁</button>,
+      financeTools: <button onClick={correct}>更正租金账期</button>,
+      collectionHref: "/leases/lease-1/collect",
+      operationError: "该笔登记仍待核验",
+    });
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain("该笔登记仍待核验");
+    expect(isVisibleByDisclosure(host.querySelector('[role="alert"]')!)).toBe(true);
+    if (disclosure("更多操作")) await openDisclosure("更多操作");
+    for (const button of host.querySelectorAll<HTMLButtonElement>("details button")) {
+      await act(async () => button.click());
+    }
+    const link = host.querySelector('a[href*="/collect"]');
+    if (link) {
+      const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+      await act(async () => link.dispatchEvent(event));
+      expect(event.defaultPrevented).toBe(true);
+    }
+    expect(manage).not.toHaveBeenCalled();
+    expect(correct).not.toHaveBeenCalled();
+    expect(props.onPrint).not.toHaveBeenCalled();
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain("该笔登记仍待核验");
+    for (const state of [{ loading: true }, { error: true }]) {
+      await render({
+        ...state,
+        actions: <button onClick={manage}>旧办理动作</button>,
+        financeTools: <button onClick={correct}>旧更正动作</button>,
+        collectionHref: "/leases/lease-1/collect",
+      });
+      expect(host.textContent).not.toContain("旧办理动作");
+      expect(host.textContent).not.toContain("旧更正动作");
+      expect(host.querySelector('a[href*="/collect"]')).toBeNull();
+    }
+  });
+
   it("keeps a historical tenant's contact and unsettled finances separate from the next rental", async () => {
     await render({
       contract: { ...contract, status: "terminated", actual_end_date: "2026-10-01" },
@@ -121,15 +284,16 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       ],
     });
     expect(host.textContent).toContain("TEST-PHONE");
-    expect(host.textContent).toContain("不与该房间后续租赁合并");
+    await openDisclosure("租期与登记资料");
     expect(fact("实际结束")).toBe("2026-10-01");
-    await tab("账务");
+    await tab("收支明细");
+    expect(host.textContent).toContain("不与后续租客合并");
     expect(fact("其中已逾期")).toBe("60 XOF");
     expect(fact("已录经营收款")).toBe("40 XOF");
     expect(host.textContent).not.toContain("999,999");
-    await tab("记录");
+    await tab("收支明细");
     expect(host.querySelectorAll("ol li")).toHaveLength(1);
-    expect(host.textContent).toContain("本租赁记录的收付款明细");
+    expect(host.textContent).toContain("以下为这次租赁的已登记收付款");
   });
 
   it("does not require a paper contract or number to read a registered rental and collect", async () => {
@@ -147,10 +311,14 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     });
     expect(fact("月租金")).toContain("120,000");
     expect(fact("租金已交至（登记）")).toBe("2026-09-30");
-    expect(host.querySelector("details")?.open).toBe(false);
-    expect(host.querySelector("details")?.textContent).toContain("纸质合同不影响");
+    expect(disclosure("租期与登记资料")?.open).toBe(false);
+    expect(disclosure("租期与登记资料")?.textContent).toContain("纸质合同不影响");
+    const collection = host.querySelector('a[href="' + href + '"]')!;
+    expect(isVisibleByDisclosure(collection)).toBe(false);
+    await openDisclosure("更多操作");
     expect(host.querySelector('a[href="' + href + '"]')).not.toBeNull();
-    await tab("账务");
+    expect(isVisibleByDisclosure(collection)).toBe(true);
+    await tab("收支明细");
     expect(fact("已录经营收款")).toContain("120,000");
   });
 
@@ -160,6 +328,11 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect([...host.querySelectorAll('[role="tab"]')].map((item) => item.textContent)).toContain(
       "合同",
     );
+    expect([...host.querySelectorAll('[role="tab"]')].map((item) => item.textContent)).toEqual([
+      "合同",
+      "账务",
+      "记录",
+    ]);
     expect(host.querySelector('section[aria-label="建议下一步"]')?.textContent).toContain(
       "核实合同资料",
     );
@@ -177,6 +350,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       },
     });
     expect(fact("月租金")).toContain("USD");
+    await openDisclosure("租期与登记资料");
     expect(fact("登记押金")).toBe("原币押金待核");
     expect(host.textContent).not.toContain("免押");
   });
@@ -184,8 +358,9 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
   it("offers a separate exact-contract collection route only when a permitted caller supplies it", async () => {
     const href = "/leases/11111111-1111-4111-8111-111111111111/collect";
     await render({ collectionHref: href });
+    await openDisclosure("更多操作");
     const link = [...host.querySelectorAll("a")].find((item) =>
-      item.textContent?.includes("登记实际收款"),
+      item.textContent?.includes("手工登记租金/物业费"),
     );
     expect(link?.getAttribute("href")).toBe(href);
     await render({ collectionHref: undefined });
@@ -219,29 +394,54 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect(host.querySelector("button")).toBeNull();
   });
 
-  it("shows the registered status instead of inferring a move-out from the end date", async () => {
-    await render();
+  it("keeps the CIMAC registered status and formal end-date details without inferring a move-out", async () => {
+    await render({ workArea: "cimac" });
     expect(host.textContent).toContain("生效中");
     expect(host.textContent).not.toContain("已终止");
     expect(fact("预计到期")).toBe("2026-10-01");
-    expect(host.textContent).toContain("租期到期不代表已搬离");
-    await render({ contract: { ...contract, expected_end_confirmed: false } });
+    expect(host.textContent).toContain("合同到期不等于已退租");
+    await render({ workArea: "cimac", contract: { ...contract, expected_end_confirmed: false } });
     expect(fact("预计到期")).toBe("待确认");
-    await render({ contract: { ...contract, expected_end_date: "2099-12-31" } });
+    await render({ workArea: "cimac", contract: { ...contract, expected_end_date: "2099-12-31" } });
     expect(fact("预计到期")).toBe("长期");
     expect(fact("原登记日期")).toBe("2099-12-31");
     await render({
+      workArea: "cimac",
       contract: { ...contract, expected_end_date: "2099-12-31", expected_end_confirmed: false },
     });
     expect(fact("预计到期")).toBe("待确认");
   });
+
+  it.each([
+    ["2026-10-01", true, "2026-10-01"],
+    ["2099-12-31", true, "长期"],
+    ["2099-12-31", false, "待确认"],
+  ])(
+    "keeps the SACSI overview period factual without inventing a move-out (%s)",
+    async (end, confirmed, label) => {
+      await render({
+        contract: {
+          ...contract,
+          expected_end_date: end,
+          expected_end_confirmed: confirmed,
+          actual_end_date: null,
+        },
+      });
+      expect(host.textContent).toContain("生效中");
+      expect(host.textContent).not.toContain("已终止");
+      expect(fact("登记租期")).toBe(`2026-01-01 → ${label}`);
+      expect(fact("实际结束")).toBeUndefined();
+    },
+  );
 
   it("does not present an old coverage registration as proof of current arrears", async () => {
     await render({
       receivables: [receivable({ amount_xof: 100, paid_amount_xof: 100, status: "paid" })],
     });
     expect(fact("租金已交至（登记）")).toBe("2026-09-30");
-    expect(host.textContent).toContain("交租截止和欠款分别记录");
+    await tab("收支明细");
+    expect(fact("其中已逾期")).toBe("0 XOF");
+    expect(fact("应收已核销")).toBe("100 XOF");
   });
 
   it("separates managed receivable applications, operating cash, and deposit movements", async () => {
@@ -263,7 +463,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
         receivable({ id: "unrelated", source_id: "another-contract", amount_xof: 999999 }),
       ],
     });
-    await tab("账务");
+    await tab("收支明细");
     expect(fact("应收已核销")).toBe("140 XOF");
     expect(fact("其中已逾期")).toBe("0 XOF");
     expect(fact("最早未结到期")).toBe("2026-10-19");
@@ -284,7 +484,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       ],
       receivables: [receivable({ management_status: "historical_pending" })],
     });
-    await tab("账务");
+    await tab("收支明细");
     expect(host.textContent).toContain("未有已核应收，不代表没有欠款");
     expect(fact("应收已核销")).toBe("—");
     expect(fact("已录押金实收")).toBe("暂无已核记录");
@@ -303,7 +503,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
         count: 4,
       },
     });
-    await tab("账务");
+    await tab("收支明细");
     expect(host.textContent).toContain("400 XOF");
     expect(fact("其中已逾期")).toBe("300 XOF");
     expect(fact("应收已核销")).toBe("600 XOF");
@@ -314,15 +514,15 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     await render({
       payments: [payment({ recorded_by: "admin-account-id", receipt_no: "TEST-RECEIPT" })],
     });
-    await tab("记录");
-    expect(host.textContent).toContain("不等于完整操作审计");
+    await tab("收支明细");
+    expect(host.textContent).toContain("以下为这次租赁的已登记收付款");
     expect(host.textContent).toContain("实收人: 待核对");
     expect(host.textContent).toContain("TEST-RECEIPT");
     expect(host.textContent).not.toContain("admin-account-id");
     await render({
       payments: [payment({ actual_collector: "已核实收人", recorded_by: "admin-account-id" })],
     });
-    await tab("记录");
+    await tab("收支明细");
     expect(host.textContent).toContain("实收人: 已核实收人");
   });
 
@@ -337,6 +537,12 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       await act(async () => button.click());
     };
     expect(host.textContent).not.toContain("打开合同详情 / 办理");
+    expect(
+      isVisibleByDisclosure(
+        [...host.querySelectorAll("button")].find((item) => item.textContent === "办理本合同")!,
+      ),
+    ).toBe(false);
+    await openDisclosure("更多操作");
     await clickText("办理本合同");
     expect(manage).toHaveBeenCalledTimes(1);
     const contractTab = host.querySelector<HTMLButtonElement>(
@@ -345,13 +551,14 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     await act(async () =>
       contractTab.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })),
     );
-    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("账务");
-    expect(document.activeElement?.textContent).toBe("账务");
+    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("收支明细");
+    expect(document.activeElement?.textContent).toBe("收支明细");
     expect(host.textContent).not.toContain("打开完整财务记录");
-    await clickText("合同 / 打印");
+    await openDisclosure("更多操作");
+    await clickText("打印登记合同");
     expect(props.onPrint).toHaveBeenCalledTimes(1);
     await render({ contract: { ...contract, id: "lease-2", contract_no: "TEST-LEASE-002" } });
-    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("租赁");
+    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("概况");
   });
 
   it("localizes the French preview, missing data, and accessible labels", async () => {
@@ -359,13 +566,14 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect(host.querySelector('aside[aria-label="Dossier de location"]')).not.toBeNull();
     expect(host.textContent).toContain("Actif");
     expect(host.textContent).toContain("Mensuel");
-    await tab("Finances");
+    await tab("Encaissements et dépenses");
     expect(host.textContent).toContain("Aucune créance vérifiée");
     expect(host.textContent).not.toContain("0 XOF");
   });
 
   it("suggests verifying managed overdue receivables before draft or expiry follow-up", async () => {
     await render({
+      workArea: "cimac",
       contract: { ...contract, status: "draft" },
       summary: {
         total: 100,
@@ -383,19 +591,21 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
   });
 
   it("keeps Excel rental records readable when formal contract dates are incomplete", async () => {
-    await render({ contract: { ...contract, status: "draft" } });
-    expect(host.querySelector('section[aria-label="建议下一步"]')?.textContent).toContain(
-      "查看租赁与收支",
-    );
+    await render({ contract: { ...contract, status: "draft", attachment_url: null } });
+    expect(fact("月租金")).toContain("120,000");
+    expect(fact("租金已交至（登记）")).toBe("2026-09-30");
+    expect(fact("登记租期")).toBe("2026-01-01 → 2026-10-01");
+    await openDisclosure("租期与登记资料");
+    expect(host.textContent).toContain("未附纸质合同不影响查看已登记资料");
     await render({ contract: { ...contract, expected_end_confirmed: false } });
-    const suggestion = host.querySelector('section[aria-label="建议下一步"]');
-    expect(suggestion?.textContent).toContain("查看租赁与收支");
-    expect(suggestion?.textContent).toContain("纸质合同可后补");
-    expect(suggestion?.textContent).not.toContain("确认续租");
+    expect(fact("月租金")).toContain("120,000");
+    expect(fact("租金已交至（登记）")).toBe("2026-09-30");
+    expect(fact("登记租期")).toBe("2026-01-01 → 待确认");
+    expect(host.textContent).not.toContain("确认续租");
   });
 
   it("suggests confirming arrangements for active confirmed expiries within 30 days, not long-term or later dates", async () => {
-    await render({ contract: { ...contract, expected_end_date: "2026-11-18" } });
+    await render({ workArea: "cimac", contract: { ...contract, expected_end_date: "2026-11-18" } });
     expect(host.querySelector('section[aria-label="建议下一步"]')?.textContent).toContain(
       "确认续租 / 退租安排",
     );
@@ -403,9 +613,9 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       "不代表已经退租",
     );
     for (const expected_end_date of ["2026-11-19", "2099-12-31"]) {
-      await render({ contract: { ...contract, expected_end_date } });
+      await render({ workArea: "cimac", contract: { ...contract, expected_end_date } });
       expect(host.querySelector('section[aria-label="建议下一步"]')?.textContent).toContain(
-        "查看租赁与收支",
+        "查看合同与账务",
       );
       expect(host.querySelector('section[aria-label="建议下一步"]')?.textContent).not.toContain(
         "确认续租",
@@ -414,7 +624,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
   });
 
   it("keeps follow-up suggestions French and read-only without another full-detail link", async () => {
-    await render({ locale: "fr" });
+    await render({ workArea: "cimac", locale: "fr" });
     const suggestion = host.querySelector('section[aria-label="Prochaine étape suggérée"]');
     expect(suggestion?.textContent).toContain("Confirmer la suite du bail");
     expect(suggestion?.querySelector("button")).toBeNull();
@@ -436,10 +646,11 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
         }),
       ),
     });
+    await openDisclosure("租期与登记资料");
     expect(fact("免租天数")).toBe("15");
     expect(fact("签约人")).toBe("Test signer");
     expect(fact("约定付款日")).toContain("5");
-    await tab("记录");
+    await tab("收支明细");
     expect(host.querySelectorAll("ol li")).toHaveLength(8);
     expect(host.textContent).toContain("RECEIPT-7");
     expect(host.textContent).toContain("$250");
@@ -448,8 +659,13 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
 
   it("opens the requested finance section without an intermediate dossier", async () => {
     await render({ initialSection: "finance", financeTools: <button>更正租金账期</button> });
-    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("账务");
-    expect(host.querySelector('[aria-label="账务办理"]')?.textContent).toContain("更正租金账期");
+    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("收支明细");
+    await openDisclosure("更多操作");
+    expect(disclosure("更多操作")?.textContent).toContain("更正租金账期");
+    const correction = [...host.querySelectorAll("button")].find(
+      (item) => item.textContent === "更正租金账期",
+    )!;
+    expect(isVisibleByDisclosure(correction)).toBe(true);
     expect(host.querySelector('[role="dialog"]')).toBeNull();
   });
 
@@ -474,7 +690,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
         payment({ id: "refund", source_type: "lease_rent_refund", amount: 500 }),
       ],
     });
-    await tab("记录");
+    await tab("收支明细");
     const amounts = [...host.querySelectorAll("ol li")].map(
       (item) => item.querySelector(":scope > p")?.textContent,
     );
@@ -518,7 +734,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       initialSection: "finance",
     });
     expect(fact("已录经营收款")).toBe("600,000 XOF");
-    await tab("记录");
+    await tab("收支明细");
     expect(host.querySelectorAll("ol li")).toHaveLength(1);
     expect(host.textContent).toContain("客户总账 · 本合同分配");
     expect(host.textContent).toContain("+600,000 XOF");
@@ -580,7 +796,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       });
       expect(fact("已录经营收款")).toBe(kind === "refund" ? "600,000 XOF" : "0 XOF");
       if (kind === "refund") expect(fact("已录经营支出")).toBe("20,000 XOF");
-      await tab("记录");
+      await tab("收支明细");
       expect(host.textContent).toContain("+600,000 XOF");
       expect(host.textContent).toContain(kind === "refund" ? "−20,000 XOF" : "−600,000 XOF");
       expect(host.textContent).not.toMatch(/\+[-−]|−-/);

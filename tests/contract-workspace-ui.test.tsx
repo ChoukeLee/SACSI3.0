@@ -390,6 +390,11 @@ it("never repeats a confirmed successful mutation when the following data refres
   const customer = host.querySelector<HTMLButtonElement>("[data-room-id]")!;
   await act(async () => customer.click());
   await pause();
+  const more = [...document.querySelectorAll("summary")].find(
+    (item) => item.textContent === "更多操作",
+  )!;
+  expect(more).toBeTruthy();
+  await act(async () => more.click());
   const activate = [...document.querySelectorAll("button")].find(
     (b) => b.textContent === dictionaries.zh.leases.form.activateContract,
   )!;

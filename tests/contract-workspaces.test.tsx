@@ -134,7 +134,10 @@ async function openCustomer() {
 }
 async function openFinance(inspector: Element) {
   const finance = [...inspector.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
-    (button) => /^(账务|Finances|付款事实|Paiements)$/.test(button.textContent ?? ""),
+    (button) =>
+      /^(收支明细|Encaissements et dépenses|账务|Finances|付款事实|Paiements)$/.test(
+        button.textContent ?? "",
+      ),
   );
   expect(finance).toBeTruthy();
   await act(async () => finance!.click());

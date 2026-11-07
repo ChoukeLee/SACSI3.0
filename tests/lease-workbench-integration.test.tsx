@@ -234,7 +234,28 @@ function namedButton(text: string, within: ParentNode = host) {
 async function showFinance() {
   const inspector = preview();
   expect(inspector).toBeTruthy();
-  await click(namedButton("账务", inspector!));
+  await click(namedButton("收支明细", inspector!) ?? namedButton("账务", inspector!));
+}
+
+async function openDossierDisclosure(label: string, within: ParentNode = preview()!) {
+  const summary = [...within.querySelectorAll<HTMLElement>("summary")].find(
+    (item) => item.textContent === label,
+  );
+  expect(summary).toBeTruthy();
+  if (!(summary!.parentElement as HTMLDetailsElement).open) await click(summary);
+  return summary!.parentElement as HTMLDetailsElement;
+}
+
+async function openFinancialAction() {
+  await openDossierDisclosure("更多操作");
+  await click(namedButton("登记押金/其他收支", preview()!));
+}
+
+function closeDossierButton() {
+  return (
+    preview()?.closest('[role="dialog"]')?.querySelector('button[aria-label="Close"]') ??
+    preview()?.querySelector('button[aria-label="关闭预览"]')
+  );
 }
 
 beforeEach(() => {
@@ -273,6 +294,13 @@ it("reads only the selected room's contract into a dossier drawer", async () => 
   expect(recordRequests()).toHaveLength(1);
   expect(requestInfo(recordRequests()[0][0]).mode).toBe("detail");
   expect(requestInfo(recordRequests()[0][0]).contractId).toBe(workspaceContract);
+  const drawer = preview()!.closest('[role="dialog"]')!;
+  expect(drawer).toBeTruthy();
+  expect(
+    drawer.querySelectorAll('button[aria-label="Close"], button[aria-label="关闭预览"]'),
+  ).toHaveLength(1);
+  expect(preview()!.querySelector('button[aria-label="关闭预览"]')).toBeNull();
+  expect(drawer.querySelector("h2")?.textContent).toContain("101");
   await showFinance();
   expect(preview()?.textContent).toContain("123,456");
   expect(operationDialog()).toBeNull();
@@ -411,7 +439,7 @@ it("opens an exact linked contract outside the visible list without loading ever
   expect(preview()?.textContent).toContain("123,456");
   expect(host.querySelectorAll("tbody tr")).toHaveLength(0);
   expect(host.querySelector('a[href^="/customers?"]')?.getAttribute("href")).toContain("page=2");
-  await click(preview()?.querySelector('button[aria-label="关闭预览"]'));
+  await click(closeDossierButton());
   expect(preview()?.textContent ?? "").not.toContain("123,456");
   await settle();
   expect(recordRequests()).toHaveLength(1);
@@ -438,6 +466,7 @@ it("opens the complete dossier drawer from the rental room card", async () => {
   await click(previewButtons()[0]);
   await settle();
   expect(preview()?.textContent).toContain("Synthetic guest");
+  await openDossierDisclosure("租期与登记资料");
   expect(preview()?.textContent).toContain("约定付款日");
   expect(operationDialog()).toBeNull();
   expect(recordRequests()).toHaveLength(1);
@@ -448,9 +477,12 @@ it("opens focused deposit and move-out forms directly and returns to the same do
   await click(previewButtons()[0]);
   await settle();
   const dossier = preview();
-  expect(dossier?.querySelector('a[href*="/collect"]')?.textContent).toContain("登记实际收款");
+  expect(dossier?.querySelector('a[href*="/collect"]')?.textContent).toContain(
+    "手工登记租金/物业费",
+  );
+  expect(dossier?.querySelector('a[href*="/collect"]')?.closest("details")?.open).toBe(false);
   expect(dossier?.textContent).not.toContain("打开合同详情 / 办理");
-  await click(namedButton("押金 / 其他收支", dossier!));
+  await openFinancialAction();
   await settle();
   expect(recordRequests()).toHaveLength(2);
   const depositForm = operationDialog()!;
@@ -463,6 +495,7 @@ it("opens focused deposit and move-out forms directly and returns to the same do
   await settle();
   expect(operationDialog()).toBeNull();
   expect(preview()?.textContent).toContain("SYNTHETIC-0");
+  await openDossierDisclosure("更多操作");
   const moveOut = [...preview()!.querySelectorAll("button")].find((button) =>
     button.textContent?.includes("退租"),
   );
@@ -479,7 +512,8 @@ it("hides all mutation controls for viewers while retaining the full contract an
   await render();
   await click(previewButtons()[0]);
   await settle();
-  expect(preview()?.textContent ?? "").not.toContain("押金 / 其他收支");
+  await openDossierDisclosure("更多操作");
+  expect(preview()?.textContent ?? "").not.toContain("登记押金/其他收支");
   expect(preview()?.querySelector('a[href*="/collect"]')).toBeNull();
   expect(
     [...preview()!.querySelectorAll("button")].some((button) =>
@@ -488,8 +522,7 @@ it("hides all mutation controls for viewers while retaining the full contract an
   ).toBe(false);
   await showFinance();
   expect(preview()?.textContent ?? "").not.toContain("更正租金账期");
-  await click(namedButton("记录", preview()!));
-  expect(preview()?.textContent).toContain("本租赁记录的收付款明细");
+  expect(preview()?.textContent).toContain("以下为这次租赁的已登记收付款");
 });
 
 it("does not open an operation form if its exact-contract fresh read fails", async () => {
@@ -497,11 +530,11 @@ it("does not open an operation form if its exact-contract fresh read fails", asy
   await click(previewButtons()[0]);
   await settle();
   vi.mocked(fetch).mockResolvedValueOnce(new Response("", { status: 503 }));
-  await click(namedButton("押金 / 其他收支", preview()!));
+  await openFinancialAction();
   await settle();
   expect(operationDialog()).toBeNull();
   expect(host.querySelector('[role="alert"]')?.textContent).toContain("长租房源暂时无法读取");
-  expect(preview()?.textContent ?? "").not.toContain("押金 / 其他收支");
+  expect(preview()?.textContent ?? "").not.toContain("登记押金/其他收支");
 });
 
 it("discards an in-flight operation read after changing the project", async () => {
@@ -515,7 +548,7 @@ it("discards an in-flight operation read after changing the project", async () =
         complete = resolve;
       }),
   );
-  await click(namedButton("押金 / 其他收支", preview()!));
+  await openFinancialAction();
   const pendingInput = recordRequests().at(-1)![0];
   const nav = host.querySelector('nav[aria-label="项目切换"]')!;
   await click(namedButton("科建建材城", nav));
@@ -535,6 +568,7 @@ it("requires the latest active status before opening a move-out form", async () 
     value.contracts[0].status = "terminated";
     return Response.json(value);
   });
+  await openDossierDisclosure("更多操作");
   const moveOut = [...preview()!.querySelectorAll("button")].find((button) =>
     button.textContent?.includes("退租"),
   );
@@ -564,18 +598,16 @@ it.each([
     }
     await click(previewButtons()[0]);
     await settle();
+    await openDossierDisclosure("更多操作");
     const action =
       operation === "finance"
-        ? namedButton("押金 / 其他收支", preview()!)
+        ? namedButton("登记押金/其他收支", preview()!)
         : operation === "activate"
           ? namedButton("激活合同", preview()!)
           : [...preview()!.querySelectorAll("button")].find((button) =>
               button.textContent?.includes("退租"),
             );
-    const navigationButton =
-      navigation === "select"
-        ? previewButtons()[1]
-        : preview()!.querySelector('button[aria-label="关闭预览"]');
+    const navigationButton = navigation === "select" ? previewButtons()[1] : closeDossierButton();
     let complete!: (value: Response) => void;
     let pendingInput!: RequestInfo | URL;
     vi.mocked(fetch).mockImplementationOnce((input) => {
@@ -610,7 +642,7 @@ it("keeps the focused financial form open and prevents duplicate submits while a
   await render(dataFor(), {}, { canRecordFinance: true });
   await click(previewButtons()[0]);
   await settle();
-  await click(namedButton("押金 / 其他收支", preview()!));
+  await openFinancialAction();
   await settle();
   const form = operationDialog()!;
   const amount = form.querySelector<HTMLInputElement>('input[type="number"]')!;
@@ -668,7 +700,7 @@ it("reads a fresh result after closing and reopening the same contract instead o
   await settle();
   await showFinance();
   expect(preview()?.textContent).toContain("123,456");
-  await click(preview()?.querySelector('button[aria-label="关闭预览"]'));
+  await click(closeDossierButton());
   expect(preview()?.textContent ?? "").not.toContain("123,456");
   let resolveReopened!: (response: Response) => void;
   vi.mocked(fetch).mockImplementationOnce(
@@ -922,6 +954,7 @@ it("opens a former tenant's partial USD debt by the old record without changing 
   await settle();
   expect(requestInfo(recordRequests().at(-1)![0]).contractId).toBe(oldId);
   expect(preview()?.textContent).toContain("Former tenant");
+  await openDossierDisclosure("本房租赁历史", document.querySelector('[role="dialog"]')!);
   await click(document.querySelector(`[data-room-record-id="${workspaceContract}"]`));
   await settle();
   expect(requestInfo(recordRequests().at(-1)![0]).contractId).toBe(workspaceContract);

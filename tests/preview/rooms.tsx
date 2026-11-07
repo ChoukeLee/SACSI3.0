@@ -8,7 +8,8 @@ import {
   type LeaseRoomOverviewRow,
 } from "@/features/leases/lease-room-overview-model";
 import { LeaseWorkbenchInspector } from "@/features/leases/lease-workbench-inspector";
-import type { LeaseContractRow, ReceivableRow, CustomerRow } from "@/types/database";
+import { RightDrawer } from "@/components/ui/operational";
+import type { LeaseContractRow, ReceivableRow, CustomerRow, PaymentRow } from "@/types/database";
 import type { WorkspaceUnit } from "@/features/contracts/workspace-model";
 import { workspaceFixture } from "../fixtures/contract-workspace";
 import "@/app/globals.css";
@@ -154,6 +155,38 @@ const receivables = definitions.flatMap((item, index): ReceivableRow[] =>
       ]
     : [],
 );
+const currentA102 = contracts.find((record) => record.unit_id === units[1].id)!;
+currentA102.deposit_amount_xof = 1300000;
+currentA102.deposit_received = true;
+const previewPayment = (index: number, unitIndex: number): PaymentRow => ({
+  id: uuid(index + 901),
+  unit_id: units[unitIndex].id,
+  customer_id: uuid(unitIndex + 201),
+  source_id: uuid(unitIndex + 101),
+  source_type: "lease_rent",
+  payment_date: "2026-11-01",
+  amount: 500000,
+  currency: "XOF",
+  exchange_rate_to_xof: 1,
+  payment_method: "cash",
+  receipt_no: `SYNTHETIC-RECEIPT-${index}`,
+  notes: "合成演示资料，不代表真实收付款",
+  actual_collector: "示例实收人",
+  recorded_by: "示例录入账号",
+  created_at: "2026-11-01T12:00:00Z",
+});
+const previewPayments: PaymentRow[] = [
+  previewPayment(1, 1),
+  { ...previewPayment(2, 1), source_type: "lease_deposit", amount: 1300000 },
+  {
+    ...previewPayment(3, 4),
+    amount: 1000,
+    currency: "USD",
+    exchange_rate_to_xof: null,
+    payment_method: "bank_transfer",
+    native_settlement: true,
+  },
+];
 const historySamples = [
   {
     unit: 0,
@@ -260,47 +293,61 @@ function Preview() {
           onRetry={() => {}}
         />
         {selected ? (
-          <div
-            className="fixed inset-0 z-50 flex justify-end bg-black/25"
-            onClick={() => setSelected(null)}
+          <RightDrawer
+            open
+            width="wide"
+            title={`示例公寓 · ${selected.unit.unit_no}`}
+            onClose={() => setSelected(null)}
           >
-            <section
-              className="h-full w-full max-w-xl overflow-y-auto bg-background p-4 shadow-xl"
-              role="dialog"
-              aria-modal="true"
-              aria-label="租赁资料"
-              onClick={(event) => event.stopPropagation()}
-            >
-              {selected.contract ? (
-                <LeaseWorkbenchInspector
-                  contract={selected.contract}
-                  unit={selected.unit}
-                  customer={selected.customer}
-                  buildingLabel="示例公寓"
-                  locale="zh"
-                  today="2026-11-07"
-                  payments={[]}
-                  receivables={receivables.filter(
-                    (bill) => bill.source_id === selected.contract?.id,
-                  )}
-                  onClose={() => setSelected(null)}
-                  onPrint={() => {}}
-                />
-              ) : (
-                <>
+            {selected.contract ? (
+              <LeaseWorkbenchInspector
+                embedded
+                contract={selected.contract}
+                unit={selected.unit}
+                customer={selected.customer}
+                buildingLabel="示例公寓"
+                locale="zh"
+                today="2026-11-07"
+                payments={previewPayments}
+                receivables={receivables.filter((bill) => bill.source_id === selected.contract?.id)}
+                onClose={() => setSelected(null)}
+                onPrint={() => {}}
+                collectionHref={
+                  selected.contract.status === "active" ? "#synthetic-no-write" : undefined
+                }
+                actions={
                   <button
                     type="button"
-                    className="mb-5 rounded border px-4 py-2"
-                    onClick={() => setSelected(null)}
+                    disabled
+                    className="rounded-lg border p-2 text-sm opacity-60"
                   >
-                    关闭
+                    登记押金/其他收支（演示）
                   </button>
-                  <h2 className="text-xl font-semibold">{selected.unit.unit_no} · 房源资料</h2>
-                  <p className="mt-4 text-sm">当前没有租赁记录，房间仍在楼层总览中保留。</p>
-                </>
-              )}
-            </section>
-          </div>
+                }
+                financeTools={
+                  <button
+                    type="button"
+                    disabled
+                    className="rounded-lg border p-2 text-sm opacity-60"
+                  >
+                    更正租金账期（演示）
+                  </button>
+                }
+              />
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="mb-5 rounded border px-4 py-2"
+                  onClick={() => setSelected(null)}
+                >
+                  关闭
+                </button>
+                <h2 className="text-xl font-semibold">{selected.unit.unit_no} · 房源资料</h2>
+                <p className="mt-4 text-sm">当前没有租赁记录，房间仍在楼层总览中保留。</p>
+              </>
+            )}
+          </RightDrawer>
         ) : null}
       </div>
     </main>

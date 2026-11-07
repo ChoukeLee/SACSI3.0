@@ -754,6 +754,13 @@ export function LeaseList({
   const previewUnit = previewUnits?.find((row) => row.id === previewContract?.unit_id) ?? null;
   const previewCustomer =
     previewCustomers?.find((row) => row.id === previewContract?.customer_id) ?? null;
+  const previewRecordContext = leaseRecordRows.find((row) => row.id === previewId);
+  const previewTitleUnit = previewUnit ?? previewRecordContext?.unit;
+  const previewDrawerTitle = previewTitleUnit
+    ? `${buildingMap.get(previewTitleUnit.building_id)?.display_name ?? "—"} · ${previewTitleUnit.unit_no}`
+    : locale === "zh"
+      ? "租赁资料"
+      : "Dossier de location";
   const previewPayments = workspace.enabled ? (preview.data?.payments ?? []) : payments;
   const previewReceivables = workspace.enabled ? (preview.data?.receivables ?? []) : receivables;
   const selectPreview = (
@@ -2142,12 +2149,13 @@ export function LeaseList({
           (workArea === "sacsi" && previewId)) && (
           <LeasePreviewSurface
             overlay={workArea === "sacsi"}
-            title={locale === "zh" ? "租赁资料" : "Dossier de location"}
+            title={previewDrawerTitle}
             onClose={closePreview}
             previewRef={previewColumnRef}
           >
             <LeaseWorkbenchInspector
               workArea={workArea}
+              embedded={workArea === "sacsi"}
               contract={previewContract}
               unit={previewUnit}
               customer={previewCustomer}
@@ -2178,7 +2186,13 @@ export function LeaseList({
                         disabled={saving}
                       >
                         <Plus aria-hidden="true" />
-                        {locale === "zh" ? "押金 / 其他收支" : "Dépôt / autres écritures"}
+                        {workArea === "sacsi"
+                          ? locale === "zh"
+                            ? "登记押金/其他收支"
+                            : "Saisir dépôt / autres écritures"
+                          : locale === "zh"
+                            ? "押金 / 其他收支"
+                            : "Dépôt / autres écritures"}
                       </Button>
                     ) : null}
                     {canActivate && previewContract.status === "draft" ? (
@@ -2230,11 +2244,13 @@ export function LeaseList({
             !workspace.roomContextError &&
             !preview.error &&
             !preview.loading ? (
-              <section
+              <details
                 className={styles.roomRecords}
-                aria-label={locale === "zh" ? "同房租赁记录" : "Locations de ce lot"}
+                aria-label={locale === "zh" ? "本房租赁历史" : "Historique des locations du lot"}
               >
-                <h3>{locale === "zh" ? "同房租赁记录" : "Locations de ce lot"}</h3>
+                <summary>
+                  {locale === "zh" ? "本房租赁历史" : "Historique des locations du lot"}
+                </summary>
                 <p>
                   {locale === "zh"
                     ? "每次租赁分别保存。选择记录查看对应资料、已有收付款及账务。"
@@ -2271,7 +2287,7 @@ export function LeaseList({
                       </small>
                     </button>
                   ))}
-              </section>
+              </details>
             ) : null}
             {previewId && preview.error && (
               <Button

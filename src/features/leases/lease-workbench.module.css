@@ -288,7 +288,8 @@
   border-radius: 0.65rem;
   background: hsl(var(--card));
 }
-.roomRecords h3 {
+.roomRecords summary {
+  cursor: pointer;
   font-size: 0.875rem;
   font-weight: 600;
 }
