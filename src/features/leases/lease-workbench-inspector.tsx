@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { leaseRentLabel } from "@/lib/native-money";
+import { leaseRentLabel, nativeLease } from "@/lib/native-money";
 import {
   paymentBelongsToContract,
   readCimacContractAllocation,
@@ -109,9 +109,13 @@ function InspectorContent({
   const id = useId();
   const zh = locale === "zh";
   const text = (chinese: string, french: string) => (zh ? chinese : french);
+  const rentalRecord = workArea === "sacsi";
+  const previewLabel = rentalRecord
+    ? text("租赁资料", "Dossier de location")
+    : text("合同预览", "Aperçu du contrat");
   const money = (value: number | null | undefined) => formatContractXof(value, locale);
   const tabs: { id: InspectorTab; label: string }[] = [
-    { id: "contract", label: text("合同", "Contrat") },
+    { id: "contract", label: rentalRecord ? text("租赁", "Location") : text("合同", "Contrat") },
     { id: "finance", label: text("账务", "Finances") },
     { id: "records", label: text("记录", "Écritures") },
   ];
@@ -134,7 +138,7 @@ function InspectorContent({
   if (!contract || error || loading) {
     return (
       <aside
-        aria-label={text("合同预览", "Aperçu du contrat")}
+        aria-label={previewLabel}
         aria-busy={loading}
         className="min-w-0 rounded-2xl border border-border/75 bg-card p-6"
       >
@@ -147,26 +151,37 @@ function InspectorContent({
             role={error ? "alert" : loading ? "status" : undefined}
           >
             {error
-              ? text("合同暂时无法核验", "Contrat momentanément indisponible")
+              ? rentalRecord
+                ? text("租赁资料暂时无法读取", "Dossier momentanément indisponible")
+                : text("合同暂时无法核验", "Contrat momentanément indisponible")
               : loading
-                ? text("正在读取合同…", "Chargement du contrat…")
-                : text("选一份合同，展开工作", "Choisissez un contrat")}
+                ? rentalRecord
+                  ? text("正在读取租赁资料…", "Chargement de la location…")
+                  : text("正在读取合同…", "Chargement du contrat…")
+                : rentalRecord
+                  ? text("选择房间，查看租赁与收支", "Choisissez un lot")
+                  : text("选一份合同，展开工作", "Choisissez un contrat")}
           </h2>
           <p className="mt-2 max-w-64 text-xs leading-6 text-muted-foreground">
             {error
               ? text(
-                  "未展示旧合同与旧金额，请重新选择或稍后重试。",
-                  "Aucun ancien contrat ou montant n’est affiché. Réessayez après avoir sélectionné le contrat.",
+                  "未展示上一条记录与旧金额，请重新选择或稍后重试。",
+                  "Aucun ancien dossier ou montant n’est affiché. Sélectionnez à nouveau le dossier ou réessayez.",
                 )
               : loading
                 ? text(
                     "核对租期与实时账务后再显示预览。",
                     "Vérification de la location et des écritures avant affichage.",
                   )
-                : text(
-                    "选择一份合同，在这里查看完整资料、核对账务并直接办理。",
-                    "Sélectionnez un contrat pour consulter son dossier, ses écritures et les opérations disponibles ici.",
-                  )}
+                : rentalRecord
+                  ? text(
+                      "查看已登记的租客、租金、交租日期和收付款，纸质合同资料可以后补。",
+                      "Consultez l’occupant, le loyer, les dates et les écritures enregistrées. Le bail papier peut être ajouté plus tard.",
+                    )
+                  : text(
+                      "选择一份合同，在这里查看完整资料、核对账务并直接办理。",
+                      "Sélectionnez un contrat pour consulter son dossier, ses écritures et les opérations disponibles ici.",
+                    )}
           </p>
         </div>
       </aside>
@@ -228,7 +243,7 @@ function InspectorContent({
             "Vérifiez les justificatifs et le rapprochement dans les onglets Finances et Écritures avant toute opération.",
           ),
         }
-      : contract.status === "draft" || !contract.start_date || !endKnown
+      : !rentalRecord && (contract.status === "draft" || !contract.start_date || !endKnown)
         ? {
             title: text("核实合同资料", "Vérifier les informations du contrat"),
             detail: text(
@@ -237,6 +252,7 @@ function InspectorContent({
             ),
           }
         : contract.status === "active" &&
+            endKnown &&
             contract.expected_end_date < "2099-01-01" &&
             contract.expected_end_date <= addIsoDays(today, 30)
           ? {
@@ -247,23 +263,32 @@ function InspectorContent({
               ),
             }
           : {
-              title: text("查看合同与账务", "Consulter le contrat et les écritures"),
-              detail: text(
-                "合同、账务和完整收支记录集中在这里；办理入口只显示当前身份有权执行的操作。",
-                "Contrat, finances et écritures complètes sont réunis ici. Seules les opérations autorisées sont proposées.",
-              ),
+              title: rentalRecord
+                ? text("查看租赁与收支", "Consulter la location et les écritures")
+                : text("查看合同与账务", "Consulter le contrat et les écritures"),
+              detail: rentalRecord
+                ? text(
+                    "按已登记资料查看租客、租金和收付款。纸质合同可后补；付款安排或金额有疑问时再核对对应资料。",
+                    "Consultez les informations et écritures enregistrées. Le bail papier peut être ajouté plus tard ; vérifiez séparément les échéances ou montants incertains.",
+                  )
+                : text(
+                    "合同、账务和完整收支记录集中在这里；办理入口只显示当前身份有权执行的操作。",
+                    "Contrat, finances et écritures complètes sont réunis ici. Seules les opérations autorisées sont proposées.",
+                  ),
             };
 
   return (
     <aside
-      aria-label={text("合同预览", "Aperçu du contrat")}
+      aria-label={previewLabel}
       aria-busy={loading}
       className="min-w-0 overflow-hidden rounded-2xl border border-border/75 bg-card"
     >
       <div className="border-b border-blue-100/80 bg-blue-50/65 px-5 pb-4 pt-5 dark:border-blue-900/50 dark:bg-blue-950/25">
         <div className="mb-4 flex items-start justify-between gap-2">
           <span className="text-[11px] font-medium tracking-[0.1em] text-blue-600 dark:text-blue-300">
-            {text("合同档案", "DOSSIER DU CONTRAT")}
+            {rentalRecord
+              ? text("租赁资料", "DOSSIER DE LOCATION")
+              : text("合同档案", "DOSSIER DU CONTRAT")}
           </span>
           {onClose ? (
             <Button
@@ -297,12 +322,18 @@ function InspectorContent({
         <p className="mt-4 break-words text-sm font-medium">
           {customer?.name || text("客户资料待补充", "Client à compléter")}
         </p>
-        <p className="mt-1 break-all text-xs text-muted-foreground">{contract.contract_no}</p>
+        {!rentalRecord ? (
+          <p className="mt-1 break-all text-xs text-muted-foreground">{contract.contract_no}</p>
+        ) : null}
       </div>
 
       <div
         role="tablist"
-        aria-label={text("合同预览内容", "Détails de l’aperçu")}
+        aria-label={
+          rentalRecord
+            ? text("租赁资料内容", "Détails de la location")
+            : text("合同预览内容", "Détails de l’aperçu")
+        }
         className="grid grid-cols-3 border-b px-4"
       >
         {tabs.map((item) => (
@@ -352,7 +383,7 @@ function InspectorContent({
                 {contract.start_date || text("待确认", "À confirmer")}
               </Fact>
               <Fact label={text("预计到期", "Fin prévue")}>{endLabel}</Fact>
-              {contract.expected_end_date >= "2099-01-01" ? (
+              {!rentalRecord && contract.expected_end_date >= "2099-01-01" ? (
                 <Fact label={text("原登记日期", "Date enregistrée")}>
                   {contract.expected_end_date}
                 </Fact>
@@ -376,11 +407,25 @@ function InspectorContent({
                   ? `${contract.payment_day}${text(" 号", " du mois")}`
                   : text("待确认", "À confirmer")}
               </Fact>
-              <Fact label={text("登记覆盖至", "Couverture enregistrée jusqu’au")}>
+              <Fact
+                label={
+                  rentalRecord
+                    ? text("租金已交至（登记）", "Loyer couvert jusqu’au (enregistré)")
+                    : text("登记覆盖至", "Couverture enregistrée jusqu’au")
+                }
+              >
                 {contract.paid_through_date || text("未登记", "Non renseigné")}
               </Fact>
-              <Fact label={text("约定押金", "Caution contractuelle")}>
-                {money(contract.deposit_amount_xof)}
+              <Fact
+                label={
+                  rentalRecord
+                    ? text("登记押金", "Caution enregistrée")
+                    : text("约定押金", "Caution contractuelle")
+                }
+              >
+                {rentalRecord && nativeLease(contract) && Number(contract.deposit_amount_xof) === 0
+                  ? text("原币押金待核", "Caution en devise à vérifier")
+                  : money(contract.deposit_amount_xof)}
               </Fact>
               <Fact label={text("押金登记状态", "Indicateur de caution")}>
                 {contract.deposit_received
@@ -392,15 +437,51 @@ function InspectorContent({
                   {contract.rent_free_days}
                 </Fact>
               ) : null}
-              {contract.signer_name ? (
+              {!rentalRecord && contract.signer_name ? (
                 <Fact label={text("签约人", "Signataire")}>{contract.signer_name}</Fact>
               ) : null}
             </dl>
+            {rentalRecord ? (
+              <details className="mt-4 rounded-lg border border-border/70 px-3 py-2.5 text-xs">
+                <summary className="cursor-pointer font-medium">
+                  {text("合同与补充资料（可后补）", "Bail et compléments (facultatifs à ce stade)")}
+                </summary>
+                <dl className="mt-2 divide-y divide-border/60">
+                  {contract.expected_end_date >= "2099-01-01" ? (
+                    <Fact label={text("原登记日期", "Date enregistrée")}>
+                      {contract.expected_end_date}
+                    </Fact>
+                  ) : null}
+                  <Fact label={text("记录编号", "Référence")}>
+                    {contract.contract_no || text("未填写", "Non renseignée")}
+                  </Fact>
+                  <Fact label={text("签约人", "Signataire")}>
+                    {contract.signer_name || text("可后补", "À compléter")}
+                  </Fact>
+                  <Fact label={text("合同附件", "Pièce jointe")}>
+                    {contract.attachment_url
+                      ? text("已有登记", "Référencée")
+                      : text("可后补", "À compléter")}
+                  </Fact>
+                </dl>
+                <p className="mt-2 leading-5 text-muted-foreground">
+                  {text(
+                    "租赁记录可依据Excel、财务明细或合同登记。未上传纸质合同不影响查看已登记的租赁和收付款信息。",
+                    "Le dossier peut provenir d’un tableau Excel, d’écritures ou d’un bail. L’absence du bail papier ne masque pas les informations enregistrées.",
+                  )}
+                </p>
+              </details>
+            ) : null}
             <p className="mt-3 rounded-lg bg-muted/45 px-3 py-2.5 text-xs leading-5 text-muted-foreground">
-              {text(
-                "合同到期不等于已退租；约定押金不等于实收或可退金额。登记覆盖日不等于当前欠款；实收核销与覆盖确认分别核对。",
-                "La fin prévue ne confirme pas une sortie. La caution prévue n’est ni un encaissement ni un montant remboursable. La couverture enregistrée ne prouve pas un impayé actuel ; encaissement et couverture sont distincts.",
-              )}
+              {rentalRecord
+                ? text(
+                    "交租截止和欠款分别记录，遇到差异时核对财务明细。租期到期不代表已搬离。",
+                    "La couverture et les impayés sont distincts. Vérifiez les écritures en cas d’écart. La fin prévue ne confirme pas un départ.",
+                  )
+                : text(
+                    "合同到期不等于已退租；约定押金不等于实收或可退金额。登记覆盖日不等于当前欠款；实收核销与覆盖确认分别核对。",
+                    "La fin prévue ne confirme pas une sortie. La caution prévue n’est ni un encaissement ni un montant remboursable. La couverture enregistrée ne prouve pas un impayé actuel ; encaissement et couverture sont distincts.",
+                  )}
             </p>
           </>
         ) : loading ? (

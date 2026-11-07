@@ -79,7 +79,9 @@ describe("lease ledger rules", () => {
   });
 
   it("uses explicit UI capabilities for creation and finance writes", () => {
-    expect(ledger).toMatch(/action=\{\s*canCreate\s*\?/);
+    expect(ledger).toMatch(/\{canCreate\s*\?\s*\(\s*<Button/);
+    expect(ledger).toContain("if (!canCreate || writePending()) return;");
+    expect(ledger).toContain("if (!canCreate) return;");
     expect(ledger).toMatch(/canRecordFinance/);
     expect(ledger).toMatch(/requestId/);
     expect(ledger).toMatch(/crypto\.randomUUID\(\)/);

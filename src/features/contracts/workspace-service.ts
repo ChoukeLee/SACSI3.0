@@ -1,6 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllPages } from "@/lib/supabase/fetch-all";
+import type { ReceivableRow } from "@/types/database";
 import { cookies } from "next/headers";
 import {
   decodeWorkspace,
@@ -31,7 +33,9 @@ export async function readWorkspace(
   mode: WorkspaceMode = "list",
   contractId?: string,
   workArea?: ContractWorkArea,
+  roomOverview = false,
 ) {
+  if (roomOverview && (kind !== "lease" || mode !== "context")) throw new WorkspaceReadError(400);
   const allowedBuildings = workArea
     ? await assertContractWorkspaceBoundary(client as Pick<SupabaseClient, "from">, query, workArea)
     : undefined;
@@ -78,6 +82,45 @@ export async function readWorkspace(
       mode,
       contractId,
     );
+  }
+  if (roomOverview) {
+    if (!client.from && decoded.contracts.length) throw new WorkspaceReadError();
+    const ids = decoded.contracts.map((record) => record.id);
+    const batches: string[][] = [];
+    for (let index = 0; index < ids.length; index += 100)
+      batches.push(ids.slice(index, index + 100));
+    try {
+      const bills = (
+        await Promise.all(
+          batches.map((batch) =>
+            fetchAllPages<ReceivableRow>(
+              (from, to) =>
+                client.from!("receivables")
+                  .select(
+                    "id,building_id,unit_id,customer_id,source_type,source_id,category,title,due_date,amount_xof,paid_amount_xof,amount_native,paid_amount_native,currency,status,management_status,service_period_start,service_period_end,service_period_source,created_at,updated_at",
+                    { count: "exact" },
+                  )
+                  .eq("source_type", "lease_contract")
+                  .in("source_id", batch)
+                  .order("due_date")
+                  .order("id")
+                  .range(from, to),
+              "lease room bills",
+            ),
+          ),
+        )
+      ).flat();
+      decoded = decodeWorkspace(
+        { ...decoded, roomReceivables: bills },
+        kind,
+        query,
+        mode,
+        undefined,
+        true,
+      );
+    } catch {
+      throw new WorkspaceReadError();
+    }
   }
   return kind === "lease"
     ? { ...decoded, units: decoded.units.map(projectLeaseWorkspaceUnit) }

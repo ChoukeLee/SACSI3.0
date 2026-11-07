@@ -91,6 +91,7 @@ function requestInfo(input: RequestInfo | URL) {
   url.searchParams.delete("mode");
   url.searchParams.delete("contractId");
   url.searchParams.delete("workspace");
+  url.searchParams.delete("roomOverview");
   return { mode, contractId, query: parseWorkspaceQuery(Object.fromEntries(url.searchParams)) };
 }
 
@@ -159,6 +160,11 @@ async function render(
       />,
     ),
   );
+  // These legacy regressions deliberately enter the retained table; the new
+  // default room catalogue read is tested separately and counted separately.
+  if (linked.workArea !== "cimac" && !linked.initialContract) {
+    await click(namedButton("明细核对"));
+  }
 }
 
 async function settle(ms = 20) {
@@ -180,9 +186,20 @@ function previewButtons() {
 }
 
 function preview() {
-  return host.querySelector('aside[aria-label="合同预览"]');
+  return document.querySelector('aside[aria-label="租赁资料"], aside[aria-label="合同预览"]');
 }
 
+// A SACSI dossier is now a portal drawer. It is not a financial operation form.
+function operationDialog() {
+  return (
+    [...document.querySelectorAll('[role="dialog"]')].find(
+      (dialog) => !dialog.querySelector('aside[aria-label="租赁资料"]'),
+    ) ?? null
+  );
+}
+function recordRequests() {
+  return vi.mocked(fetch).mock.calls.filter(([input]) => requestInfo(input).mode !== "context");
+}
 function namedButton(text: string, within: ParentNode = host) {
   return [...within.querySelectorAll("button")].find((button) => button.textContent === text);
 }
@@ -203,7 +220,11 @@ beforeEach(() => {
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       const request = requestInfo(input);
-      return Response.json(request.mode === "detail" ? detailFor(input) : dataFor(request.query));
+      if (request.mode === "detail") return Response.json(detailFor(input));
+      const value = dataFor(request.query);
+      value.mode = request.mode;
+      if (request.mode === "context") value.roomReceivables = [];
+      return Response.json(value);
     }),
   );
 });
@@ -215,19 +236,19 @@ afterEach(async () => {
   vi.clearAllMocks();
 });
 
-it("keeps SSR idle, then fetches only the explicitly selected contract into a non-modal preview", async () => {
+it("keeps the retained table idle, then reads only the selected contract into a dossier drawer", async () => {
   await render();
   await settle();
-  expect(fetch).not.toHaveBeenCalled();
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(recordRequests()).toHaveLength(0);
+  expect(operationDialog()).toBeNull();
   await click(previewButtons()[0]);
   await settle();
-  expect(fetch).toHaveBeenCalledTimes(1);
-  expect(requestInfo(vi.mocked(fetch).mock.calls[0][0]).mode).toBe("detail");
-  expect(requestInfo(vi.mocked(fetch).mock.calls[0][0]).contractId).toBe(workspaceContract);
+  expect(recordRequests()).toHaveLength(1);
+  expect(requestInfo(recordRequests()[0][0]).mode).toBe("detail");
+  expect(requestInfo(recordRequests()[0][0]).contractId).toBe(workspaceContract);
   await showFinance();
   expect(preview()?.textContent).toContain("123,456");
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(operationDialog()).toBeNull();
   expect(host.querySelectorAll("tbody tr")).toHaveLength(2);
 });
 
@@ -238,11 +259,11 @@ it("keeps park previews, focused actions, collection links and refresh reads in 
   await settle();
   expect(host.querySelector('[aria-label="项目切换"]')).toBeNull();
   expect(host.textContent).toContain("合同与履约");
-  expect(fetch).not.toHaveBeenCalled();
+  expect(recordRequests()).toHaveLength(0);
   await click(previewButtons()[0]);
   await settle();
-  expect(fetch).toHaveBeenCalledTimes(1);
-  const url = new URL(String(vi.mocked(fetch).mock.calls[0][0]), "https://local.invalid");
+  expect(recordRequests()).toHaveLength(1);
+  const url = new URL(String(recordRequests()[0][0]), "https://local.invalid");
   expect(url.searchParams.get("workspace")).toBe("cimac");
   expect(url.searchParams.get("projectId")).toBe(otherProject);
   await showFinance();
@@ -271,10 +292,10 @@ it("prefills the selected visible shared customer only when the user explicitly 
     { canCreate: true },
   );
   await settle();
-  expect(fetch).not.toHaveBeenCalled();
+  expect(recordRequests()).toHaveLength(0);
   expect(host.textContent).toContain("Shared pre-contract customer");
   expect(host.textContent).toContain("点击“新建合同”继续");
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(operationDialog()).toBeNull();
   const create = Array.from(host.querySelectorAll("button")).find((button) =>
     button.textContent?.includes("新建合同"),
   );
@@ -314,7 +335,7 @@ it("does not open a new park contract with a silently substituted customer when 
     ),
   );
   await settle();
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(operationDialog()).toBeNull();
   expect(host.querySelector('[role="alert"]')?.textContent).toContain("所选客户暂不可核验");
   expect(createLeaseContract).not.toHaveBeenCalled();
   expect(recordLeaseFinancialEntry).not.toHaveBeenCalled();
@@ -339,8 +360,8 @@ it("shows finance a shared-customer handoff without a new-contract button, form,
       button.textContent?.includes("新建合同"),
     ),
   ).toBe(false);
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
-  expect(fetch).not.toHaveBeenCalled();
+  expect(operationDialog()).toBeNull();
+  expect(recordRequests()).toHaveLength(0);
   expect(createLeaseContract).not.toHaveBeenCalled();
   expect(recordLeaseFinancialEntry).not.toHaveBeenCalled();
 });
@@ -352,20 +373,20 @@ it("opens an exact linked contract outside the visible list without loading ever
     returnTo: "/customers?project=" + workspaceProject + "&q=Synthetic&page=2",
   });
   await settle();
-  expect(fetch).toHaveBeenCalledTimes(1);
-  expect(requestInfo(vi.mocked(fetch).mock.calls[0][0])).toMatchObject({
+  expect(recordRequests()).toHaveLength(1);
+  expect(requestInfo(recordRequests()[0][0])).toMatchObject({
     mode: "detail",
     contractId: linkedId,
     query: { projectId: workspaceProject, buildingId: "" },
   });
   await showFinance();
   expect(preview()?.textContent).toContain("123,456");
-  expect(host.querySelectorAll("tbody tr")).toHaveLength(2);
+  expect(host.querySelectorAll("tbody tr")).toHaveLength(0);
   expect(host.querySelector('a[href^="/customers?"]')?.getAttribute("href")).toContain("page=2");
-  await click(host.querySelector('button[aria-label="关闭预览"]'));
-  expect(preview()?.textContent).not.toContain("123,456");
+  await click(preview()?.querySelector('button[aria-label="关闭预览"]'));
+  expect(preview()?.textContent ?? "").not.toContain("123,456");
   await settle();
-  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(recordRequests()).toHaveLength(1);
 });
 
 it("drops a linked contract immediately when changing project and rejects an external return URL", async () => {
@@ -379,19 +400,19 @@ it("drops a linked contract immediately when changing project and rejects an ext
   expect(host.querySelector('a[href^="https://external.invalid"]')).toBeNull();
   const nav = host.querySelector('nav[aria-label="项目切换"]');
   await click(namedButton("科建建材城", nav!));
-  expect(preview()?.textContent).not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toContain("123,456");
   await settle();
-  expect(preview()?.textContent).not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toContain("123,456");
 });
 
-it("opens the same complete dossier from the customer name without another detail dialog", async () => {
+it("opens the same complete dossier drawer from the table customer name", async () => {
   await render();
   await click(host.querySelector("tbody td:nth-child(2) button"));
   await settle();
   expect(preview()?.textContent).toContain("Synthetic guest");
   expect(preview()?.textContent).toContain("约定付款日");
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
-  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(operationDialog()).toBeNull();
+  expect(recordRequests()).toHaveLength(1);
 });
 
 it("opens focused deposit and move-out forms directly and returns to the same dossier", async () => {
@@ -403,8 +424,8 @@ it("opens focused deposit and move-out forms directly and returns to the same do
   expect(dossier?.textContent).not.toContain("打开合同详情 / 办理");
   await click(namedButton("押金 / 其他收支", dossier!));
   await settle();
-  expect(fetch).toHaveBeenCalledTimes(2);
-  const depositForm = document.querySelector('[role="dialog"]')!;
+  expect(recordRequests()).toHaveLength(2);
+  const depositForm = operationDialog()!;
   expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
   expect(depositForm.textContent).toContain("新增长租财务记录");
   expect(depositForm.textContent).toContain("SYNTHETIC-0");
@@ -412,14 +433,14 @@ it("opens focused deposit and move-out forms directly and returns to the same do
   expect(depositForm.textContent).not.toContain("风险概览");
   await click(depositForm.querySelector('button[aria-label="Close"]'));
   await settle();
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(operationDialog()).toBeNull();
   expect(preview()?.textContent).toContain("SYNTHETIC-0");
   const moveOut = [...preview()!.querySelectorAll("button")].find((button) =>
     button.textContent?.includes("退租"),
   );
   await click(moveOut);
   await settle();
-  const moveOutForm = document.querySelector('[role="dialog"]')!;
+  const moveOutForm = operationDialog()!;
   expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
   expect(moveOutForm.textContent).toContain("本次已实际补收租金");
   expect(moveOutForm.textContent).toContain("本次实际退还押金");
@@ -430,7 +451,7 @@ it("hides all mutation controls for viewers while retaining the full contract an
   await render();
   await click(previewButtons()[0]);
   await settle();
-  expect(preview()?.textContent).not.toContain("押金 / 其他收支");
+  expect(preview()?.textContent ?? "").not.toContain("押金 / 其他收支");
   expect(preview()?.querySelector('a[href*="/collect"]')).toBeNull();
   expect(
     [...preview()!.querySelectorAll("button")].some((button) =>
@@ -438,7 +459,7 @@ it("hides all mutation controls for viewers while retaining the full contract an
     ),
   ).toBe(false);
   await showFinance();
-  expect(preview()?.textContent).not.toContain("更正租金账期");
+  expect(preview()?.textContent ?? "").not.toContain("更正租金账期");
   await click(namedButton("记录", preview()!));
   expect(preview()?.textContent).toContain("本合同完整财务记录");
 });
@@ -450,9 +471,9 @@ it("does not open an operation form if its exact-contract fresh read fails", asy
   vi.mocked(fetch).mockResolvedValueOnce(new Response("", { status: 503 }));
   await click(namedButton("押金 / 其他收支", preview()!));
   await settle();
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(operationDialog()).toBeNull();
   expect(host.textContent).toContain("合同数据暂不可核验");
-  expect(preview()?.textContent).not.toContain("押金 / 其他收支");
+  expect(preview()?.textContent ?? "").not.toContain("押金 / 其他收支");
 });
 
 it("discards an in-flight operation read after changing the project", async () => {
@@ -467,14 +488,14 @@ it("discards an in-flight operation read after changing the project", async () =
       }),
   );
   await click(namedButton("押金 / 其他收支", preview()!));
-  const pendingInput = vi.mocked(fetch).mock.calls.at(-1)![0];
+  const pendingInput = recordRequests().at(-1)![0];
   const nav = host.querySelector('nav[aria-label="项目切换"]')!;
   await click(namedButton("科建建材城", nav));
   await settle();
   await act(async () => complete(Response.json(detailFor(pendingInput))));
   await settle();
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
-  expect(preview()?.textContent).not.toContain("SYNTHETIC-0");
+  expect(operationDialog()).toBeNull();
+  expect(preview()?.textContent ?? "").not.toContain("SYNTHETIC-0");
 });
 
 it("requires the latest active status before opening a move-out form", async () => {
@@ -491,7 +512,7 @@ it("requires the latest active status before opening a move-out form", async () 
   );
   await click(moveOut);
   await settle();
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(operationDialog()).toBeNull();
   expect(host.textContent).toContain("合同状态已变化");
 });
 
@@ -505,6 +526,7 @@ it.each([
 ] as const)(
   "cancels delayed %s preparation when the same-scope dossier is %s",
   async (operation, navigation) => {
+    await render(dataFor(), {}, { canRecordFinance: true, canMoveOut: true, canActivate: true });
     if (operation === "activate") {
       vi.mocked(fetch).mockImplementationOnce(async (input) => {
         const detail = detailFor(input);
@@ -512,7 +534,6 @@ it.each([
         return Response.json(detail);
       });
     }
-    await render(dataFor(), {}, { canRecordFinance: true, canMoveOut: true, canActivate: true });
     await click(previewButtons()[0]);
     await settle();
     const action =
@@ -545,16 +566,14 @@ it.each([
     if (operation === "activate") delayed.contracts[0].status = "draft";
     await act(async () => complete(Response.json(delayed)));
     await settle();
-    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(operationDialog()).toBeNull();
     expect(activateContract).not.toHaveBeenCalled();
     expect(recordLeaseFinancialEntry).not.toHaveBeenCalled();
-    if (navigation === "close") expect(preview()?.textContent).not.toContain("SYNTHETIC-0");
+    if (navigation === "close") expect(preview()?.textContent ?? "").not.toContain("SYNTHETIC-0");
     else {
-      expect(preview()?.textContent).not.toContain("新增长租财务记录");
+      expect(preview()?.textContent ?? "").not.toContain("新增长租财务记录");
       expect(host.querySelectorAll('tbody tr[data-selected="true"]')).toHaveLength(1);
-      expect(requestInfo(vi.mocked(fetch).mock.calls.at(-1)![0]).contractId).toBe(
-        dataFor().contracts[1].id,
-      );
+      expect(requestInfo(recordRequests().at(-1)![0]).contractId).toBe(dataFor().contracts[1].id);
     }
   },
 );
@@ -565,7 +584,7 @@ it("keeps the focused financial form open and prevents duplicate submits while a
   await settle();
   await click(namedButton("押金 / 其他收支", preview()!));
   await settle();
-  const form = document.querySelector('[role="dialog"]')!;
+  const form = operationDialog()!;
   const amount = form.querySelector<HTMLInputElement>('input[type="number"]')!;
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(amount, "1");
@@ -586,7 +605,7 @@ it("keeps the focused financial form open and prevents duplicate submits while a
   expect(recordLeaseFinancialEntry).toHaveBeenCalledTimes(1);
   expect(form.querySelector("fieldset")?.disabled).toBe(true);
   await click(form.querySelector('button[aria-label="Close"]'));
-  expect(document.querySelector('[role="dialog"]')).toBe(form);
+  expect(operationDialog()).toBe(form);
   await act(async () => complete({ success: false, error: "Synthetic rejection" }));
   expect(form.querySelector("fieldset")?.disabled).toBe(false);
   expect(form.textContent).toContain("Synthetic rejection");
@@ -606,13 +625,13 @@ it("does not reuse the preceding contract balance while the next selected previe
       }),
   );
   await click(previewButtons()[1]);
-  expect(preview()?.textContent).not.toContain("123,456");
-  const input = vi.mocked(fetch).mock.calls.at(-1)![0];
+  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  const input = recordRequests().at(-1)![0];
   await act(async () => resolveNext(Response.json(detailFor(input, 654321))));
   await settle();
   await showFinance();
   expect(preview()?.textContent).toContain("654,321");
-  expect(preview()?.textContent).not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toContain("123,456");
 });
 
 it("reads a fresh result after closing and reopening the same contract instead of restoring its old balance", async () => {
@@ -621,8 +640,8 @@ it("reads a fresh result after closing and reopening the same contract instead o
   await settle();
   await showFinance();
   expect(preview()?.textContent).toContain("123,456");
-  await click(host.querySelector('button[aria-label="关闭预览"]'));
-  expect(preview()?.textContent).not.toContain("123,456");
+  await click(preview()?.querySelector('button[aria-label="关闭预览"]'));
+  expect(preview()?.textContent ?? "").not.toContain("123,456");
   let resolveReopened!: (response: Response) => void;
   vi.mocked(fetch).mockImplementationOnce(
     () =>
@@ -631,16 +650,16 @@ it("reads a fresh result after closing and reopening the same contract instead o
       }),
   );
   await click(previewButtons()[0]);
-  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(recordRequests()).toHaveLength(2);
   expect(preview()?.getAttribute("aria-busy")).toBe("true");
-  expect(preview()?.textContent).toContain("正在读取合同");
-  expect(preview()?.textContent).not.toContain("123,456");
-  const input = vi.mocked(fetch).mock.calls.at(-1)![0];
+  expect(preview()?.textContent).toContain("正在读取租赁资料");
+  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  const input = recordRequests().at(-1)![0];
   await act(async () => resolveReopened(Response.json(detailFor(input, 654321))));
   await settle();
   await showFinance();
   expect(preview()?.textContent).toContain("654,321");
-  expect(preview()?.textContent).not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toContain("123,456");
 });
 
 it("ignores an aborted old contract response even when the transport still returns it late", async () => {
@@ -662,7 +681,7 @@ it("ignores an aborted old contract response even when the transport still retur
   await act(async () => pending[0].resolve(Response.json(detailFor(pending[0].input, 123456))));
   await settle();
   expect(preview()?.textContent).toContain("654,321");
-  expect(preview()?.textContent).not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toContain("123,456");
 });
 
 it.each([
@@ -677,9 +696,9 @@ it.each([
   expect(preview()?.textContent).toContain("123,456");
   const scopeNav = host.querySelector(`nav[aria-label="${nav}"]`);
   await click(namedButton(label, scopeNav ?? host));
-  expect(preview()?.textContent).not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toContain("123,456");
   await settle();
-  expect(preview()?.textContent).not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toContain("123,456");
 });
 
 it("hides a selected preview before the debounced empty search response returns", async () => {
@@ -700,12 +719,12 @@ it("hides a selected preview before the debounced empty search response returns"
     );
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  expect(preview()?.textContent).not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toContain("123,456");
   await settle(260);
   expect(previewButtons()).toHaveLength(0);
   expect(host.querySelector("tbody")?.textContent).toContain("没有匹配的合同");
-  expect(preview()?.textContent).not.toContain("123,456");
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(operationDialog()).toBeNull();
 });
 
 it("clears the old preview before changing the server-side contract page", async () => {
@@ -718,11 +737,11 @@ it("clears the old preview before changing the server-side contract page", async
   await settle();
   await showFinance();
   await click(namedButton("下一页"));
-  expect(preview()?.textContent).not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toContain("123,456");
   await settle();
   expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
   expect(host.textContent).toContain("26–26 / 26");
-  expect(preview()?.textContent).not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toContain("123,456");
 });
 
 it("clears a local page selection when its contract is no longer on the visible page", async () => {
@@ -739,37 +758,27 @@ it("clears a local page selection when its contract is no longer on the visible 
       />,
     ),
   );
+  await click(namedButton("明细核对"));
   await click(previewButtons()[0]);
   expect(preview()?.textContent).toContain("SYNTHETIC-0");
   await click(namedButton("下一页"));
-  expect(preview()?.textContent).not.toContain("SYNTHETIC-0");
+  expect(preview()?.textContent ?? "").not.toContain("SYNTHETIC-0");
   expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
-  expect(fetch).not.toHaveBeenCalled();
+  expect(recordRequests()).toHaveLength(0);
 });
 
-it("hides the preview when entering the floor view, without an initial all-scope read", async () => {
+it("hides the dossier when returning from the retained table to the room catalogue", async () => {
   await render();
-  expect(fetch).not.toHaveBeenCalled();
+  expect(recordRequests()).toHaveLength(0);
   await click(previewButtons()[0]);
   await settle();
   await showFinance();
-  let resolveScope!: (response: Response) => void;
-  vi.mocked(fetch).mockImplementationOnce(
-    () =>
-      new Promise<Response>((resolve) => {
-        resolveScope = resolve;
-      }),
-  );
-  await click(namedButton("楼层房源"));
-  expect(preview()?.textContent).not.toContain("123,456");
-  const input = vi.mocked(fetch).mock.calls.at(-1)![0];
-  const { mode, query } = requestInfo(input);
-  expect(mode).toBe("scope");
-  const scope = dataFor(query);
-  scope.mode = "scope";
-  await act(async () => resolveScope(Response.json(scope)));
-  await settle();
+  expect(preview()?.textContent).toContain("123,456");
+  await click(namedButton("房源总览"));
   expect(preview()).toBeNull();
+  await settle();
+  expect(host.querySelector('[aria-label="楼栋房源总览"]')).toBeTruthy();
+  expect(recordRequests()).toHaveLength(1);
 });
 
 it("fails closed after a preview read error without keeping an old balance or mutation actions", async () => {
@@ -781,12 +790,12 @@ it("fails closed after a preview read error without keeping an old balance or mu
   vi.mocked(fetch).mockResolvedValueOnce(new Response("", { status: 503 }));
   await click(previewButtons()[1]);
   await settle();
-  expect(preview()?.textContent).not.toContain("123,456");
-  expect(preview()?.textContent).not.toContain("654,321");
+  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toContain("654,321");
   expect(preview()?.textContent).toMatch(/无法|失败|不可|重试/);
-  expect(preview()?.textContent).not.toContain("打开合同详情 / 办理");
-  expect(preview()?.textContent).not.toContain("打开完整财务记录");
-  expect(preview()?.textContent).not.toContain("合同 / 打印");
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(preview()?.textContent ?? "").not.toContain("打开合同详情 / 办理");
+  expect(preview()?.textContent ?? "").not.toContain("打开完整财务记录");
+  expect(preview()?.textContent ?? "").not.toContain("合同 / 打印");
+  expect(operationDialog()).toBeNull();
   expect(host.querySelectorAll("tbody tr")).toHaveLength(2);
 });

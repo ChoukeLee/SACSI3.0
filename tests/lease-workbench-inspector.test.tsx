@@ -107,6 +107,55 @@ function fact(name: string) {
 }
 
 describe("LeaseWorkbenchInspector single contract dossier", () => {
+  it("does not require a paper contract or number to read a registered rental and collect", async () => {
+    const href = "/leases/11111111-1111-4111-8111-111111111111/collect";
+    await render({
+      contract: {
+        ...contract,
+        contract_no: "",
+        attachment_url: null,
+        signer_name: null,
+        expected_end_confirmed: false,
+      },
+      collectionHref: href,
+      payments: [payment({ amount: 120000 })],
+    });
+    expect(fact("月租金")).toContain("120,000");
+    expect(fact("租金已交至（登记）")).toBe("2026-09-30");
+    expect(host.querySelector("details")?.open).toBe(false);
+    expect(host.querySelector("details")?.textContent).toContain("纸质合同不影响");
+    expect(host.querySelector('a[href="' + href + '"]')).not.toBeNull();
+    await tab("账务");
+    expect(fact("已录经营收款")).toContain("120,000");
+  });
+
+  it("preserves the CIMAC contract-oriented dossier and incomplete-date follow-up", async () => {
+    await render({ workArea: "cimac", contract: { ...contract, expected_end_confirmed: false } });
+    expect(host.querySelector('aside[aria-label="合同预览"]')).not.toBeNull();
+    expect([...host.querySelectorAll('[role="tab"]')].map((item) => item.textContent)).toContain(
+      "合同",
+    );
+    expect(host.querySelector('section[aria-label="建议下一步"]')?.textContent).toContain(
+      "核实合同资料",
+    );
+  });
+
+  it("does not turn an empty XOF deposit slot on a native rental into an exemption", async () => {
+    await render({
+      contract: {
+        ...contract,
+        rent_currency: "USD",
+        monthly_rent_amount: 3200,
+        monthly_rent_xof: 0,
+        deposit_amount_xof: 0,
+        attachment_url: null,
+      },
+    });
+    expect(fact("月租金")).toContain("USD");
+    expect(fact("登记押金")).toBe("原币押金待核");
+    expect(host.textContent).not.toContain("免押");
+  });
+
   it("offers a separate exact-contract collection route only when a permitted caller supplies it", async () => {
     const href = "/leases/11111111-1111-4111-8111-111111111111/collect";
     await render({ collectionHref: href });
@@ -126,8 +175,8 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
 
   it("keeps the empty preview useful without phantom amounts or business actions", async () => {
     await render({ contract: null });
-    expect(host.querySelector('aside[aria-label="合同预览"]')).not.toBeNull();
-    expect(host.textContent).toContain("选一份合同");
+    expect(host.querySelector('aside[aria-label="租赁资料"]')).not.toBeNull();
+    expect(host.textContent).toContain("选择房间");
     expect(host.textContent).not.toContain("XOF");
     expect(host.querySelector("button")).toBeNull();
   });
@@ -135,12 +184,12 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
   it("withholds stale details and all business actions during loading or a failed read", async () => {
     await render({ loading: true, payments: [payment()] });
     expect(host.querySelector('aside[aria-busy="true"]')).not.toBeNull();
-    expect(host.querySelector('[role="status"]')?.textContent).toContain("正在读取合同");
+    expect(host.querySelector('[role="status"]')?.textContent).toContain("正在读取租赁资料");
     expect(host.textContent).not.toContain(contract.contract_no);
     expect(host.textContent).not.toContain("XOF");
     expect(host.querySelector("button")).toBeNull();
     await render({ error: true, payments: [payment()] });
-    expect(host.querySelector('[role="alert"]')?.textContent).toContain("无法核验");
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain("无法读取");
     expect(host.textContent).not.toContain(contract.contract_no);
     expect(host.querySelector("button")).toBeNull();
   });
@@ -150,7 +199,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect(host.textContent).toContain("生效中");
     expect(host.textContent).not.toContain("已终止");
     expect(fact("预计到期")).toBe("2026-10-01");
-    expect(host.textContent).toContain("合同到期不等于已退租");
+    expect(host.textContent).toContain("租期到期不代表已搬离");
     await render({ contract: { ...contract, expected_end_confirmed: false } });
     expect(fact("预计到期")).toBe("待确认");
     await render({ contract: { ...contract, expected_end_date: "2099-12-31" } });
@@ -166,8 +215,8 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     await render({
       receivables: [receivable({ amount_xof: 100, paid_amount_xof: 100, status: "paid" })],
     });
-    expect(fact("登记覆盖至")).toBe("2026-09-30");
-    expect(host.textContent).toContain("登记覆盖日不等于当前欠款");
+    expect(fact("租金已交至（登记）")).toBe("2026-09-30");
+    expect(host.textContent).toContain("交租截止和欠款分别记录");
   });
 
   it("separates managed receivable applications, operating cash, and deposit movements", async () => {
@@ -277,12 +326,12 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     await clickText("合同 / 打印");
     expect(props.onPrint).toHaveBeenCalledTimes(1);
     await render({ contract: { ...contract, id: "lease-2", contract_no: "TEST-LEASE-002" } });
-    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("合同");
+    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("租赁");
   });
 
   it("localizes the French preview, missing data, and accessible labels", async () => {
     await render({ locale: "fr" });
-    expect(host.querySelector('aside[aria-label="Aperçu du contrat"]')).not.toBeNull();
+    expect(host.querySelector('aside[aria-label="Dossier de location"]')).not.toBeNull();
     expect(host.textContent).toContain("Actif");
     expect(host.textContent).toContain("Mensuel");
     await tab("Finances");
@@ -308,14 +357,15 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect(suggestion?.querySelector("button")).toBeNull();
   });
 
-  it("suggests verifying draft or unknown contract dates instead of assuming expiry", async () => {
+  it("keeps Excel rental records readable when formal contract dates are incomplete", async () => {
     await render({ contract: { ...contract, status: "draft" } });
     expect(host.querySelector('section[aria-label="建议下一步"]')?.textContent).toContain(
-      "核实合同资料",
+      "查看租赁与收支",
     );
     await render({ contract: { ...contract, expected_end_confirmed: false } });
     const suggestion = host.querySelector('section[aria-label="建议下一步"]');
-    expect(suggestion?.textContent).toContain("核实合同资料");
+    expect(suggestion?.textContent).toContain("查看租赁与收支");
+    expect(suggestion?.textContent).toContain("纸质合同可后补");
     expect(suggestion?.textContent).not.toContain("确认续租");
   });
 
@@ -330,7 +380,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     for (const expected_end_date of ["2026-11-19", "2099-12-31"]) {
       await render({ contract: { ...contract, expected_end_date } });
       expect(host.querySelector('section[aria-label="建议下一步"]')?.textContent).toContain(
-        "查看合同与账务",
+        "查看租赁与收支",
       );
       expect(host.querySelector('section[aria-label="建议下一步"]')?.textContent).not.toContain(
         "确认续租",

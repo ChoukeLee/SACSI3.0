@@ -15,6 +15,7 @@ import {
   decodeCimacLeaseCollectionProjection,
 } from "./cimac-contract-allocation";
 import { isCimacProtectedPayment } from "@/features/finance/cimac-payment-kinds";
+import { decodeLeaseRoomReceivables } from "@/features/leases/lease-room-overview-model";
 export type WorkspaceKind = "lease" | "sale";
 export type WorkspaceMode = "list" | "scope" | "detail" | "context";
 export type WorkspaceContract = LeaseContractRow | SaleContractRow;
@@ -74,6 +75,7 @@ export interface WorkspaceData {
   summaries: Record<string, ContractReceivableSummary & { dueOutstanding: number }>;
   accruals: Record<string, LeaseOverdueResolution | null>;
   attentionDue: Record<string, string | null>;
+  roomReceivables?: ReceivableRow[];
 }
 export class WorkspaceReadError extends Error {
   constructor(public status = 503) {
@@ -195,6 +197,7 @@ export function decodeWorkspace(
   query: WorkspaceQuery,
   mode: WorkspaceMode,
   contractId?: string,
+  roomOverview = false,
 ): WorkspaceData {
   const data = object(value);
   if (
@@ -443,6 +446,23 @@ export function decodeWorkspace(
       (row) => row.status !== "cancelled" && (row.management_status ?? "managed") === "managed",
     );
     if (managed.length !== object(summaries[contractId!]).count) throw new WorkspaceReadError();
+  }
+  if (
+    roomOverview &&
+    (kind !== "lease" || mode !== "context" || data.roomReceivables === undefined)
+  )
+    throw new WorkspaceReadError();
+  if (data.roomReceivables !== undefined) {
+    if (kind !== "lease" || mode !== "context") throw new WorkspaceReadError();
+    try {
+      data.roomReceivables = decodeLeaseRoomReceivables(
+        data.roomReceivables,
+        contracts as LeaseContractRow[],
+        data.units as WorkspaceUnit[],
+      );
+    } catch {
+      throw new WorkspaceReadError();
+    }
   }
   return data as unknown as WorkspaceData;
 }

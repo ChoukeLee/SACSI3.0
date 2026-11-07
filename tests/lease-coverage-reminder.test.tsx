@@ -70,8 +70,12 @@ beforeEach(() => {
     vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input), "http://test.invalid");
       const mode = url.searchParams.get("mode") as WorkspaceMode;
+      const roomOverview = url.searchParams.has("roomOverview");
       url.searchParams.delete("mode");
-      return Response.json(data(mode, parseWorkspaceQuery(Object.fromEntries(url.searchParams))));
+      url.searchParams.delete("roomOverview");
+      const value = data(mode, parseWorkspaceQuery(Object.fromEntries(url.searchParams)));
+      if (roomOverview) value.roomReceivables = [];
+      return Response.json(value);
     }),
   );
   host = document.createElement("div");
@@ -113,7 +117,12 @@ async function click(button: Element | undefined) {
 }
 it("keeps settled stale coverage as reachable verification work, without another payable or negative upcoming days", async () => {
   await render();
-  expect(fetch).not.toHaveBeenCalled();
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain("roomOverview=1");
+  expect(host.querySelector("[data-room-id]")?.textContent).toContain("缴费待核");
+  await click(
+    [...host.querySelectorAll("button")].find((button) => button.textContent === "明细核对"),
+  );
   await click(
     [...host.querySelectorAll("button")].find((button) => button.textContent?.includes("覆盖核对")),
   );
@@ -124,10 +133,13 @@ it("keeps settled stale coverage as reachable verification work, without another
   expect(drawer?.textContent).toContain("登记覆盖至");
   expect(drawer?.textContent).not.toContain("-19天后应缴");
   expect(drawer?.textContent).not.toContain("600,000 XOF");
-  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(fetch).toHaveBeenCalledTimes(2);
 });
 it("does not include the fully settled stale coverage in upcoming collectible reminders", async () => {
   await render();
+  await click(
+    [...host.querySelectorAll("button")].find((button) => button.textContent === "明细核对"),
+  );
   await click(
     [...host.querySelectorAll("button")].find((button) => button.textContent?.includes("覆盖核对")),
   );

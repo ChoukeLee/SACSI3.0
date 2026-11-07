@@ -114,6 +114,13 @@ function summaryValue(label: string) {
   return card?.textContent;
 }
 async function openCustomer() {
+  const room = host.querySelector<HTMLButtonElement>("[data-room-id]");
+  if (room) {
+    await act(async () => room.click());
+    const inspector = document.querySelector('aside[aria-label="租赁资料"]');
+    expect(inspector).not.toBeNull();
+    return inspector!;
+  }
   await act(async () =>
     (host.querySelector("tbody td:nth-child(2) button") as HTMLButtonElement).click(),
   );
