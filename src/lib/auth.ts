@@ -167,6 +167,7 @@ export async function requireRole(...roles: UserRole[]): Promise<CurrentUser> {
 /** Roles that can access each route section. */
 const pageAccess: Record<string, UserRole[]> = {
   management: ["admin", "boss", "finance"],
+  "asset-operations": ["admin", "boss", "finance"],
   finance: ["admin", "boss", "finance"],
   settings: ["admin"],
   "daily-rentals": ["admin", "front_desk", "finance", "boss", "rental_sales"],
