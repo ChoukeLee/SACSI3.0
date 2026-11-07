@@ -358,3 +358,287 @@ export function buildLeaseRoomOverview(input: LeaseRoomOverviewInput): LeaseRoom
     };
   });
 }
+
+export interface LeaseRecordAttention extends Omit<LeaseRoomAttention, "kind"> {
+  kind: LeaseRoomAttention["kind"] | "unsettled";
+}
+
+export interface LeaseRecordBalance {
+  currency: CurrencyCode;
+  category: ReceivableRow["category"];
+  outstanding: number;
+  overdue: number;
+  nextDue: string | null;
+}
+
+export interface LeaseRecordOverviewRow {
+  id: string;
+  unit: WorkspaceUnit;
+  building: LeaseBuilding | null;
+  contract: LeaseContractRow;
+  customer: CustomerRow | null;
+  historical: boolean;
+  occupancy: LeaseRoomOccupancy;
+  attention: LeaseRecordAttention | null;
+  paidThrough: string | null;
+  conflict: boolean;
+  reviewReasons: string[];
+  balances: LeaseRecordBalance[];
+}
+
+function recordReviewAttention(
+  rows: readonly ReceivableRow[],
+  today: string,
+): LeaseRecordAttention {
+  const knownDate = rows
+    .map((row) => row.due_date)
+    .filter(date)
+    .sort()[0];
+  // For a review this is only a source date/as-of fallback, never a due-date claim.
+  return {
+    kind: "coverage",
+    dueDate: knownDate ?? today,
+    days: null,
+    amount: null,
+    amountIsEstimated: false,
+  };
+}
+
+function recordBilling(
+  record: LeaseContractRow,
+  unit: WorkspaceUnit,
+  historical: boolean,
+  input: LeaseRoomOverviewInput,
+  reviews: string[],
+): { balances: LeaseRecordBalance[]; attention: LeaseRecordAttention | null } {
+  const summary = input.summaries?.[record.id];
+  if (!input.receivables) {
+    if (!historical)
+      return { balances: [], attention: billingAttention(record, unit, input, reviews) };
+    if (summary && summary.count > 0 && (summary.outstanding > 0 || summary.overdue > 0)) {
+      reviews.push("historical_balance_requires_review");
+      return { balances: [], attention: recordReviewAttention([], input.today) };
+    }
+    return { balances: [], attention: null };
+  }
+  const sourceRows = input.receivables.filter(
+    (row) => row.source_type === "lease_contract" && row.source_id === record.id,
+  );
+  const rows = sourceRows.filter(
+    (row) => row.status !== "cancelled" && row.management_status !== "excluded",
+  );
+  const groups = new Map<
+    string,
+    {
+      currency: CurrencyCode;
+      category: ReceivableRow["category"];
+      outstanding: number;
+      overdue: number;
+      nextDue: string | null;
+    }
+  >();
+  const uncertain: ReceivableRow[] = [];
+  const payable: { currency: CurrencyCode; balance: number; dueDate: string }[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const currency = row.currency as CurrencyCode;
+    // Original native money is authoritative; a shadow XOF valuation is not a second bill.
+    const amount = money(nativeAmount(row)),
+      paid = money(nativePaid(row));
+    const open = amount !== null && paid !== null ? Math.max(0, amount - paid) : null;
+    const shadowAmount = money(row.amount_xof),
+      shadowPaid = money(row.paid_amount_xof);
+    const uncertainNativeShadow =
+      currency !== "XOF" &&
+      row.status === "pending" &&
+      shadowAmount !== null &&
+      shadowPaid !== null &&
+      shadowAmount > shadowPaid;
+    const unpaidEvidence =
+      open !== null
+        ? open > 0
+        : row.status === "overdue" ||
+          row.status === "partial" ||
+          (amount !== null && amount > 0 && paid === null && row.status === "pending") ||
+          uncertainNativeShadow;
+    const matches =
+      (row.unit_id === null || row.unit_id === unit.id) &&
+      (row.building_id === null || row.building_id === unit.building_id) &&
+      (row.customer_id === null || row.customer_id === record.customer_id);
+    const valid =
+      !seen.has(row.id) &&
+      matches &&
+      ["XOF", "CNY", "USD"].includes(currency) &&
+      ["pending", "partial", "paid", "overdue"].includes(row.status) &&
+      date(row.due_date) &&
+      amount !== null &&
+      paid !== null &&
+      typeof row.category === "string" &&
+      (row.category !== "lease_rent" || currency === (record.rent_currency ?? "XOF")) &&
+      (row.category !== "property_fee" || currency === "XOF") &&
+      (row.status !== "paid" || open === 0);
+    seen.add(row.id);
+    if (!valid) {
+      reviews.push("billing_data_conflict");
+      if (unpaidEvidence) uncertain.push(row);
+      continue;
+    }
+    if (open === 0) continue;
+    if (row.management_status !== "managed") {
+      reviews.push("historical_balance_requires_review");
+      uncertain.push(row);
+      continue;
+    }
+    payable.push({ currency, balance: open!, dueDate: row.due_date });
+    const key = `${currency}:${row.category}`;
+    const group = groups.get(key) ?? {
+      currency,
+      category: row.category,
+      outstanding: 0,
+      overdue: 0,
+      nextDue: null,
+    };
+    group.outstanding += open!;
+    if (row.due_date < input.today) group.overdue += open!;
+    if (!group.nextDue || row.due_date < group.nextDue) group.nextDue = row.due_date;
+    groups.set(key, group);
+  }
+  const balances = [...groups.values()].map((group) => ({
+    ...group,
+    outstanding: group.outstanding / 100,
+    overdue: group.overdue / 100,
+  }));
+  if (uncertain.length)
+    return { balances, attention: recordReviewAttention(uncertain, input.today) };
+  const currencies = new Map<
+    CurrencyCode,
+    { outstanding: number; overdue: number; nextDue: string | null }
+  >();
+  for (const balance of groups.values()) {
+    const total = currencies.get(balance.currency) ?? { outstanding: 0, overdue: 0, nextDue: null };
+    total.outstanding += balance.outstanding;
+    total.overdue += balance.overdue;
+    if (balance.nextDue && (!total.nextDue || balance.nextDue < total.nextDue))
+      total.nextDue = balance.nextDue;
+    currencies.set(balance.currency, total);
+  }
+  const candidates: LeaseRecordAttention[] = [];
+  for (const [currency, total] of currencies) {
+    if (!total.nextDue) continue;
+    if (historical) {
+      const overdue = total.overdue > 0;
+      candidates.push({
+        kind: overdue ? "overdue" : "unsettled",
+        dueDate: total.nextDue,
+        days:
+          (Date.parse(`${total.nextDue}T00:00:00Z`) - Date.parse(`${input.today}T00:00:00Z`)) /
+          86400000,
+        amount: (overdue ? total.overdue : total.outstanding) / 100,
+        currency,
+        amountIsEstimated: false,
+      });
+    } else {
+      const resolved = resolveLeaseAttention({
+        today: input.today,
+        paidThroughDate: record.paid_through_date ?? null,
+        outstanding: total.outstanding / 100,
+        overdue: total.overdue / 100,
+        nextDue: total.nextDue,
+      });
+      if (resolved) {
+        if (resolved.kind === "upcoming") {
+          const end = new Date(`${input.today}T00:00:00Z`);
+          end.setUTCDate(end.getUTCDate() + 15);
+          const through = end.toISOString().slice(0, 10);
+          resolved.amount =
+            payable
+              .filter(
+                (row) =>
+                  row.currency === currency && row.dueDate >= input.today && row.dueDate <= through,
+              )
+              .reduce((sum, row) => sum + row.balance, 0) / 100;
+        }
+        candidates.push({ ...resolved, ...(resolved.kind !== "coverage" ? { currency } : {}) });
+      }
+    }
+  }
+  const rank = { overdue: 0, unsettled: 1, upcoming: 2, coverage: 3 };
+  candidates.sort((a, b) => rank[a.kind] - rank[b.kind] || a.dueDate.localeCompare(b.dueDate));
+  let attention = candidates[0] ?? null;
+  if (
+    attention &&
+    candidates.some(
+      (other) => other.kind === attention!.kind && other.currency !== attention!.currency,
+    )
+  )
+    attention = { ...attention, amount: null, currency: undefined };
+  if (attention) return { balances, attention };
+  if (historical) {
+    if (
+      !sourceRows.length &&
+      summary &&
+      summary.count > 0 &&
+      (summary.outstanding > 0 || summary.overdue > 0)
+    ) {
+      reviews.push("historical_balance_requires_review");
+      return { balances, attention: recordReviewAttention([], input.today) };
+    }
+    // Closed records never acquire a debt or reminder from their old paid-through date.
+    return { balances, attention: null };
+  }
+  return { balances, attention: billingAttention(record, unit, input, reviews) };
+}
+
+/** Every authorized rental record remains reachable, including former users of a room. */
+export function buildLeaseRecordOverview(input: LeaseRoomOverviewInput): LeaseRecordOverviewRow[] {
+  if (!date(input.today)) throw new Error("InvalidLeaseRoomDate");
+  const units = new Map(input.units.map((unit) => [unit.id, unit]));
+  const buildings = new Map(input.buildings.map((building) => [building.id, building]));
+  const customers = new Map(input.customers.map((customer) => [customer.id, customer]));
+  const roomRows = new Map(buildLeaseRoomOverview(input).map((row) => [row.unit.id, row]));
+  return [...new Map(input.contracts.map((record) => [record.id, record])).values()].flatMap(
+    (record) => {
+      const unit = units.get(record.unit_id);
+      if (!unit) return [];
+      const historical =
+        record.status === "terminated" ||
+        record.status === "expired" ||
+        (date(record.actual_end_date) && record.actual_end_date <= input.today);
+      const room = roomRows.get(unit.id)!;
+      const ownsRoomState = room.contract?.id === record.id;
+      const conflict = !historical && record.status === "active" && room.conflict;
+      const reviews = ownsRoomState ? [...room.reviewReasons] : [];
+      if (conflict) reviews.push("multiple_current_records");
+      if (record.status === "active" && historical) reviews.push("record_status_end_conflict");
+      if (historical && date(record.actual_end_date) && record.actual_end_date > input.today)
+        reviews.push("record_status_end_conflict");
+      const financial = recordBilling(record, unit, historical, input, reviews);
+      const occupancy: LeaseRoomOccupancy = historical
+        ? "unknown"
+        : conflict
+          ? "conflict"
+          : ownsRoomState
+            ? room.occupancy
+            : record.status === "draft" ||
+                (date(record.start_date) && record.start_date > input.today)
+              ? "scheduled"
+              : "unknown";
+      return [
+        {
+          id: record.id,
+          unit,
+          building: buildings.get(unit.building_id) ?? null,
+          contract: record,
+          customer: customers.get(record.customer_id) ?? null,
+          historical,
+          occupancy,
+          attention: financial.attention,
+          paidThrough: date(record.paid_through_date) ? record.paid_through_date : null,
+          conflict,
+          reviewReasons: [...new Set(reviews)],
+          balances: financial.balances,
+        },
+      ];
+    },
+  );
+}

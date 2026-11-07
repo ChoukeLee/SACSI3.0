@@ -35,6 +35,11 @@ const otherBuilding = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 let host: HTMLDivElement;
 let root: Root;
 
+const unitIdentity = (index: number) =>
+  index === 0
+    ? "44444444-4444-4444-8444-444444444444"
+    : `44444444-4444-4444-8444-${String(index).padStart(12, "0")}`;
+
 function dataFor(query = parseWorkspaceQuery({ projectId: workspaceProject }), total = 2) {
   const data = workspaceFixture({ total }, query);
   const firstBuilding = data.buildings[0];
@@ -71,6 +76,20 @@ function dataFor(query = parseWorkspaceQuery({ projectId: workspaceProject }), t
         : `66666666-6666-4666-8666-${String((query.page - 1) * 25 + index).padStart(12, "0")}`,
     contract_no: `SYNTHETIC-${(query.page - 1) * 25 + index}`,
   }));
+  const templateUnit = data.units[0];
+  data.units = data.contracts.map((_, index) => {
+    const position = (query.page - 1) * 25 + index;
+    return {
+      ...templateUnit,
+      id: unitIdentity(position),
+      code: `SYNTHETIC-ROOM-${position}`,
+      unit_no: String(101 + position),
+    };
+  });
+  data.contracts = data.contracts.map((contract, index) => ({
+    ...contract,
+    unit_id: data.units[index].id,
+  }));
   data.summaries = Object.fromEntries(
     data.contracts.map((contract) => [
       contract.id,
@@ -81,6 +100,12 @@ function dataFor(query = parseWorkspaceQuery({ projectId: workspaceProject }), t
   data.attentionDue = Object.fromEntries(
     data.contracts.map((contract) => [contract.id, "2026-10-01"]),
   );
+  return data;
+}
+
+function parkData(total = 2, page = 1) {
+  const data = dataFor(parseWorkspaceQuery({ projectId: otherProject, page }), total);
+  data.buildings = data.buildings.filter((building) => building.project_id === otherProject);
   return data;
 }
 
@@ -102,6 +127,10 @@ function detailFor(input: RequestInfo | URL, balance = 123456) {
   data.page = query.page;
   data.mode = "detail";
   data.contracts[0].id = contractId!;
+  const position = contractId === workspaceContract ? 0 : Number(contractId?.slice(-12)) || 0;
+  data.units[0].id = unitIdentity(position);
+  data.units[0].unit_no = String(101 + position);
+  data.contracts[0].unit_id = data.units[0].id;
   data.summaries = {
     [contractId!]: {
       total: balance,
@@ -160,11 +189,6 @@ async function render(
       />,
     ),
   );
-  // These legacy regressions deliberately enter the retained table; the new
-  // default room catalogue read is tested separately and counted separately.
-  if (linked.workArea !== "cimac" && !linked.initialContract) {
-    await click(namedButton("明细核对"));
-  }
 }
 
 async function settle(ms = 20) {
@@ -182,7 +206,7 @@ async function click(element: Element | null | undefined) {
 }
 
 function previewButtons() {
-  return [...host.querySelectorAll('tbody button[aria-label^="预览合同"]')];
+  return [...host.querySelectorAll('[data-room-id], tbody button[aria-label^="预览合同"]')];
 }
 
 function preview() {
@@ -201,7 +225,10 @@ function recordRequests() {
   return vi.mocked(fetch).mock.calls.filter(([input]) => requestInfo(input).mode !== "context");
 }
 function namedButton(text: string, within: ParentNode = host) {
-  return [...within.querySelectorAll("button")].find((button) => button.textContent === text);
+  return [...within.querySelectorAll("button")].find((button) => {
+    const label = button.textContent ?? "";
+    return label === text || (label.startsWith(text) && /^\d+$/.test(label.slice(text.length)));
+  });
 }
 
 async function showFinance() {
@@ -236,7 +263,7 @@ afterEach(async () => {
   vi.clearAllMocks();
 });
 
-it("keeps the retained table idle, then reads only the selected contract into a dossier drawer", async () => {
+it("reads only the selected room's contract into a dossier drawer", async () => {
   await render();
   await settle();
   expect(recordRequests()).toHaveLength(0);
@@ -249,7 +276,8 @@ it("keeps the retained table idle, then reads only the selected contract into a 
   await showFinance();
   expect(preview()?.textContent).toContain("123,456");
   expect(operationDialog()).toBeNull();
-  expect(host.querySelectorAll("tbody tr")).toHaveLength(2);
+  expect(host.querySelectorAll("[data-room-id]")).toHaveLength(2);
+  expect(host.querySelector("table")).toBeNull();
 });
 
 it("keeps park previews, focused actions, collection links and refresh reads in the park without project switching", async () => {
@@ -405,9 +433,9 @@ it("drops a linked contract immediately when changing project and rejects an ext
   expect(preview()?.textContent ?? "").not.toContain("123,456");
 });
 
-it("opens the same complete dossier drawer from the table customer name", async () => {
+it("opens the complete dossier drawer from the rental room card", async () => {
   await render();
-  await click(host.querySelector("tbody td:nth-child(2) button"));
+  await click(previewButtons()[0]);
   await settle();
   expect(preview()?.textContent).toContain("Synthetic guest");
   expect(preview()?.textContent).toContain("约定付款日");
@@ -461,7 +489,7 @@ it("hides all mutation controls for viewers while retaining the full contract an
   await showFinance();
   expect(preview()?.textContent ?? "").not.toContain("更正租金账期");
   await click(namedButton("记录", preview()!));
-  expect(preview()?.textContent).toContain("本合同完整财务记录");
+  expect(preview()?.textContent).toContain("本租赁记录的收付款明细");
 });
 
 it("does not open an operation form if its exact-contract fresh read fails", async () => {
@@ -472,7 +500,7 @@ it("does not open an operation form if its exact-contract fresh read fails", asy
   await click(namedButton("押金 / 其他收支", preview()!));
   await settle();
   expect(operationDialog()).toBeNull();
-  expect(host.textContent).toContain("合同数据暂不可核验");
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain("长租房源暂时无法读取");
   expect(preview()?.textContent ?? "").not.toContain("押金 / 其他收支");
 });
 
@@ -513,7 +541,7 @@ it("requires the latest active status before opening a move-out form", async () 
   await click(moveOut);
   await settle();
   expect(operationDialog()).toBeNull();
-  expect(host.textContent).toContain("合同状态已变化");
+  expect(document.body.textContent).toContain("合同状态已变化");
 });
 
 it.each([
@@ -572,7 +600,7 @@ it.each([
     if (navigation === "close") expect(preview()?.textContent ?? "").not.toContain("SYNTHETIC-0");
     else {
       expect(preview()?.textContent ?? "").not.toContain("新增长租财务记录");
-      expect(host.querySelectorAll('tbody tr[data-selected="true"]')).toHaveLength(1);
+      expect(host.querySelectorAll('[data-room-id][aria-pressed="true"]')).toHaveLength(1);
       expect(requestInfo(recordRequests().at(-1)![0]).contractId).toBe(dataFor().contracts[1].id);
     }
   },
@@ -689,20 +717,31 @@ it.each([
   ["building", "楼栋切换", "Synthetic 4"],
   ["status", "合同状态筛选", "全部"],
 ] as const)("hides the old preview immediately on %s changes", async (_kind, nav, label) => {
-  await render();
+  await render(
+    _kind === "status" ? parkData() : dataFor(),
+    _kind === "status" ? { workArea: "cimac" } : {},
+  );
   await click(previewButtons()[0]);
   await settle();
   await showFinance();
   expect(preview()?.textContent).toContain("123,456");
-  const scopeNav = host.querySelector(`nav[aria-label="${nav}"]`);
-  await click(namedButton(label, scopeNav ?? host));
+  if (_kind === "building") {
+    const select = host.querySelector<HTMLSelectElement>('select[aria-label="选择楼栋"]')!;
+    await act(async () => {
+      select.value = secondBuilding;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  } else {
+    const scopeNav = host.querySelector(`nav[aria-label="${nav}"]`);
+    await click(namedButton(label, scopeNav ?? host));
+  }
   expect(preview()?.textContent ?? "").not.toContain("123,456");
   await settle();
   expect(preview()?.textContent ?? "").not.toContain("123,456");
 });
 
-it("hides a selected preview before the debounced empty search response returns", async () => {
-  await render();
+it("hides a selected CIMAC table preview before the debounced empty search response returns", async () => {
+  await render(parkData(), { workArea: "cimac" });
   await click(previewButtons()[0]);
   await settle();
   await showFinance();
@@ -727,8 +766,8 @@ it("hides a selected preview before the debounced empty search response returns"
   expect(operationDialog()).toBeNull();
 });
 
-it("clears the old preview before changing the server-side contract page", async () => {
-  await render(dataFor(undefined, 26));
+it("clears the old CIMAC table preview before changing the server-side contract page", async () => {
+  await render(parkData(26), { workArea: "cimac" });
   vi.mocked(fetch).mockImplementation(async (input) => {
     const { mode, query } = requestInfo(input);
     return Response.json(mode === "detail" ? detailFor(input) : dataFor(query, 26));
@@ -744,21 +783,22 @@ it("clears the old preview before changing the server-side contract page", async
   expect(preview()?.textContent ?? "").not.toContain("123,456");
 });
 
-it("clears a local page selection when its contract is no longer on the visible page", async () => {
-  const initial = dataFor(undefined, 26);
-  const last = dataFor(parseWorkspaceQuery({ projectId: workspaceProject, page: 2 }), 26);
+it("clears a local CIMAC table selection when its contract is no longer on the visible page", async () => {
+  const initial = parkData(26);
+  const last = parkData(26, 2);
   await act(async () =>
     root.render(
       <LeaseList
         {...initial}
+        workArea="cimac"
         contracts={[...initial.contracts, ...last.contracts] as LeaseContractRow[]}
+        units={[...initial.units, ...last.units]}
         locale="zh"
         canCreate={false}
         canRecordFinance={false}
       />,
     ),
   );
-  await click(namedButton("明细核对"));
   await click(previewButtons()[0]);
   expect(preview()?.textContent).toContain("SYNTHETIC-0");
   await click(namedButton("下一页"));
@@ -767,18 +807,129 @@ it("clears a local page selection when its contract is no longer on the visible 
   expect(recordRequests()).toHaveLength(0);
 });
 
-it("hides the dossier when returning from the retained table to the room catalogue", async () => {
+it("keeps the room catalogue and a lightweight history entry without a separate contract table", async () => {
   await render();
   expect(recordRequests()).toHaveLength(0);
-  await click(previewButtons()[0]);
-  await settle();
-  await showFinance();
-  expect(preview()?.textContent).toContain("123,456");
-  await click(namedButton("长租房源"));
+  await click(namedButton("查看历史"));
   expect(preview()).toBeNull();
   await settle();
   expect(host.querySelector('[aria-label="楼栋长租房源"]')).toBeTruthy();
-  expect(recordRequests()).toHaveLength(1);
+  expect(host.querySelector('[aria-label="租赁记录查询"]')).toBeTruthy();
+  expect(
+    host.querySelector('select[aria-label="租赁记录状态"]')?.getAttribute("value") ??
+      (host.querySelector('select[aria-label="租赁记录状态"]') as HTMLSelectElement)?.value,
+  ).toBe("historical");
+  expect(host.querySelector("table")).toBeNull();
+  expect(namedButton("明细核对")).toBeUndefined();
+  expect(recordRequests()).toHaveLength(0);
+});
+
+it("opens a former tenant's partial USD debt by the old record without changing the new tenant's balance", async () => {
+  const initial = dataFor();
+  const oldId = initial.contracts[1].id;
+  const oldCustomer = {
+    ...initial.customers[0],
+    id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    name: "Former tenant",
+  };
+  initial.customers[0].name = "Current tenant";
+  initial.customers.push(oldCustomer);
+  initial.units = [initial.units[0]];
+  Object.assign(initial.contracts[0], { paid_through_date: "2027-01-01" });
+  Object.assign(initial.contracts[1], {
+    unit_id: initial.units[0].id,
+    customer_id: oldCustomer.id,
+    status: "terminated",
+    start_date: "2024-01-01",
+    expected_end_date: "2024-12-31",
+    actual_end_date: "2024-12-31",
+    paid_through_date: "2024-12-31",
+    rent_currency: "USD",
+    monthly_rent_xof: 0,
+    monthly_rent_amount: 3200,
+  });
+  const currentSummary = {
+    total: 100,
+    paid: 100,
+    outstanding: 0,
+    overdue: 0,
+    nextDue: null,
+    count: 1,
+    dueOutstanding: 0,
+  };
+  const oldSummary = { ...currentSummary, total: 0, paid: 0 };
+  initial.summaries = { [workspaceContract]: currentSummary, [oldId]: oldSummary };
+  const currentBill = {
+    ...workspaceFixture({}, initial.query, "detail").receivables[0],
+    id: "77777777-7777-4777-8777-777777777771",
+    building_id: workspaceBuilding,
+    unit_id: initial.units[0].id,
+    customer_id: initial.customers[0].id,
+    source_id: workspaceContract,
+    currency: "XOF" as const,
+    amount_xof: 100,
+    paid_amount_xof: 100,
+    amount_native: null,
+    paid_amount_native: null,
+    status: "paid" as const,
+  };
+  const oldBill = {
+    ...currentBill,
+    id: "77777777-7777-4777-8777-777777777772",
+    source_id: oldId,
+    customer_id: oldCustomer.id,
+    due_date: "2024-12-01",
+    currency: "USD" as const,
+    amount_xof: 0,
+    paid_amount_xof: 0,
+    amount_native: 3200,
+    paid_amount_native: 1000,
+    status: "partial" as const,
+  };
+  vi.mocked(fetch).mockImplementation(async (input) => {
+    const { query, mode, contractId } = requestInfo(input);
+    if (mode === "context")
+      return Response.json({
+        ...initial,
+        query,
+        page: query.page,
+        mode,
+        roomReceivables: [currentBill, oldBill],
+      });
+    const historical = contractId === oldId;
+    const detail = detailFor(input, historical ? 0 : 100);
+    detail.contracts = [initial.contracts[historical ? 1 : 0]];
+    detail.units = initial.units;
+    detail.customers = [initial.customers[historical ? 1 : 0]];
+    detail.receivables = [historical ? oldBill : currentBill];
+    detail.summaries = { [contractId!]: historical ? oldSummary : currentSummary };
+    return Response.json(detail);
+  });
+  await render(initial);
+  expect(previewButtons()).toHaveLength(1);
+  expect(previewButtons()[0].textContent).toContain("Current tenant");
+  expect(previewButtons()[0].textContent).not.toContain("Former tenant");
+  await click(namedButton("收款跟进"));
+  const followup = host.querySelector(`[data-followup-record-id="${oldId}"]`);
+  expect(followup?.textContent).toContain("Former tenant");
+  expect(followup?.textContent).toContain("2,200");
+  expect(followup?.textContent).toContain("USD");
+  expect(host.querySelector(`[data-followup-record-id="${workspaceContract}"]`)).toBeNull();
+  await click(namedButton("查看历史"));
+  expect(host.querySelector(`[data-history-record-id="${oldId}"]`)).toBeTruthy();
+  expect(host.querySelector(`[data-history-record-id="${workspaceContract}"]`)).toBeNull();
+  await click(followup);
+  await settle();
+  expect(requestInfo(recordRequests().at(-1)![0]).contractId).toBe(oldId);
+  expect(preview()?.textContent).toContain("Former tenant");
+  await click(document.querySelector(`[data-room-record-id="${workspaceContract}"]`));
+  await settle();
+  expect(requestInfo(recordRequests().at(-1)![0]).contractId).toBe(workspaceContract);
+  expect(preview()?.textContent).toContain("Current tenant");
+  await showFinance();
+  expect(preview()?.textContent).not.toContain("2,200");
+  expect(activateContract).not.toHaveBeenCalled();
+  expect(recordLeaseFinancialEntry).not.toHaveBeenCalled();
 });
 
 it("fails closed after a preview read error without keeping an old balance or mutation actions", async () => {
@@ -797,5 +948,5 @@ it("fails closed after a preview read error without keeping an old balance or mu
   expect(preview()?.textContent ?? "").not.toContain("打开完整财务记录");
   expect(preview()?.textContent ?? "").not.toContain("合同 / 打印");
   expect(operationDialog()).toBeNull();
-  expect(host.querySelectorAll("tbody tr")).toHaveLength(2);
+  expect(host.querySelectorAll("[data-room-id]")).toHaveLength(2);
 });

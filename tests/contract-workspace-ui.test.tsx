@@ -74,14 +74,6 @@ const render = async (
       ),
     ),
   );
-  // These regressions cover the retained table/legacy scope preferences.
-  // The room catalogue has its own explicit context-read coverage.
-  if (workArea === "sacsi") {
-    const table = [...host.querySelectorAll("button")].find(
-      (button) => button.textContent === (locale === "zh" ? "明细核对" : "Détail à vérifier"),
-    );
-    if (table?.getAttribute("aria-pressed") !== "true") await act(async () => table?.click());
-  }
 };
 function recordRequests() {
   return vi
@@ -125,8 +117,11 @@ afterEach(async () => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
-it("renders actual unchanged lease table with full-scope stats and reads the next DB page", async () => {
-  await act(async () => render(workspaceFixture({ total: 26 })));
+it("retains the CIMAC contract table with full-scope stats and reads the next DB page", async () => {
+  const data = workspaceFixture({ total: 26 });
+  data.buildings[0].code = "CIMAC";
+  data.buildings[0].project!.code = "CIMAC";
+  await act(async () => render(data, "zh", workspaceProject, undefined, "cimac"));
   expect(recordRequests()).toHaveLength(0);
   expect(host.textContent).toContain("1–25 / 26");
   expect(host.textContent).toContain("5,100");
@@ -147,7 +142,7 @@ it.each(["zh", "fr"] as const)(
     await act(async () => render(data, locale, null, { cookieName, serverResolved: false }));
     await pause();
     expect(recordRequests()).toHaveLength(0);
-    expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
+    expect(host.querySelectorAll("[data-room-id]")).toHaveLength(1);
     expect(host.textContent).toContain("Synthetic 11");
   },
 );
@@ -388,12 +383,11 @@ it("never repeats a confirmed successful mutation when the following data refres
     if (mocks.activate.mock.calls.length) return new Response("", { status: 503 });
     const data = workspaceFixture({}, parseWorkspaceQuery(raw), mode);
     (data.contracts[0] as LeaseContractRow).status = "draft";
+    if (mode === "context") data.roomReceivables = [];
     return Response.json(data);
   });
   await act(async () => render(initial));
-  const customer = [...host.querySelectorAll("button")].find(
-    (b) => b.textContent === "Synthetic guest",
-  )!;
+  const customer = host.querySelector<HTMLButtonElement>("[data-room-id]")!;
   await act(async () => customer.click());
   await pause();
   const activate = [...document.querySelectorAll("button")].find(
@@ -412,7 +406,7 @@ it("keeps disabled historical units readable but excludes a daily-only available
     { business_type: "long_lease", is_enabled: false, default_price_xof: null },
   ];
   await act(async () => render(initial));
-  expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
+  expect(host.querySelectorAll("[data-room-id]")).toHaveLength(1);
   vi.mocked(fetch).mockImplementation(async (input: any) => {
     const raw = Object.fromEntries(new URL(String(input), "http://local.invalid").searchParams);
     delete raw.mode;
@@ -432,7 +426,7 @@ it("keeps disabled historical units readable but excludes a daily-only available
   await act(async () => create.click());
   await pause();
   expect(document.querySelector(`option[value="${workspaceUnit}"]`)).toBeNull();
-  expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
+  expect(host.querySelectorAll("[data-room-id]")).toHaveLength(1);
 });
 it.each(["zh", "fr"] as const)(
   "keeps CIMAC draft dates explicitly unknown in the real list, room and detail views (%s)",

@@ -6,12 +6,16 @@ import type { Locale } from "@/lib/i18n";
 import { cn, floorSortValue, normalizeFloorLabel } from "@/lib/utils";
 import { formatMoney } from "@/lib/currency";
 import { leaseRentLabel, nativeLease } from "@/lib/native-money";
-import type { LeaseRoomOverviewRow } from "./lease-room-overview-model";
+import type {
+  LeaseRecordAttention,
+  LeaseRecordOverviewRow,
+  LeaseRoomOverviewRow,
+} from "./lease-room-overview-model";
 import styles from "./lease-room-overview.module.css";
 
 type Filter = "all" | "overdue" | "upcoming" | "review";
 
-function needsLeaseReview(row: LeaseRoomOverviewRow) {
+function needsLeaseReview(row: Pick<LeaseRoomOverviewRow, "conflict" | "reviewReasons">) {
   return row.conflict || row.reviewReasons.includes("active_record_has_end");
 }
 
@@ -73,7 +77,10 @@ export function leaseRoomOccupancyLabel(row: LeaseRoomOverviewRow, locale: Local
   return occupancyLabel(row, locale === "zh");
 }
 
-function tenantLabel(row: LeaseRoomOverviewRow, zh: boolean) {
+function tenantLabel(
+  row: Pick<LeaseRoomOverviewRow, "conflict" | "reviewReasons" | "contract" | "customer">,
+  zh: boolean,
+) {
   if (row.conflict) return zh ? "多条租赁记录待核" : "Plusieurs locations à vérifier";
   if (row.reviewReasons.includes("active_record_has_end"))
     return zh ? "租赁状态待核" : "Statut locatif à vérifier";
@@ -87,10 +94,17 @@ function tenantLabel(row: LeaseRoomOverviewRow, zh: boolean) {
       : "Aucune location en cours";
 }
 
-function attentionLabel(row: LeaseRoomOverviewRow, zh: boolean) {
-  if (needsLeaseReview(row)) return zh ? "租赁资料待核" : "Dossier à vérifier";
+function attentionLabel(
+  row: Pick<LeaseRoomOverviewRow, "conflict" | "reviewReasons"> & {
+    attention: LeaseRecordAttention | null;
+  },
+  zh: boolean,
+) {
   const attention = row.attention;
+  if (needsLeaseReview(row) && (!attention || attention.kind === "coverage"))
+    return zh ? "租赁资料待核" : "Dossier à vérifier";
   if (!attention) return null;
+  if (attention.kind === "unsettled") return zh ? "历史待结清" : "Ancien solde à régler";
   if (attention.kind === "overdue")
     return attention.days === null
       ? zh
@@ -114,15 +128,77 @@ function attentionLabel(row: LeaseRoomOverviewRow, zh: boolean) {
   return zh ? "缴费待核" : "Paiement à vérifier";
 }
 
-function attentionAmount(row: LeaseRoomOverviewRow, locale: Locale) {
-  if (needsLeaseReview(row)) return locale === "zh" ? "查看资料核对" : "Vérifier le dossier";
+function attentionAmount(
+  row: Pick<LeaseRoomOverviewRow, "conflict" | "reviewReasons"> & {
+    attention: LeaseRecordAttention | null;
+  },
+  locale: Locale,
+) {
   const value = row.attention;
+  if (needsLeaseReview(row) && (!value || value.kind === "coverage"))
+    return locale === "zh" ? "查看资料核对" : "Vérifier le dossier";
   if (value && value.kind !== "coverage" && value.amount === null)
     return locale === "zh" ? "多币种 · 查看明细" : "Plusieurs devises · voir le détail";
   if (!value || value.amount === null) return locale === "zh" ? "金额待核" : "Montant à vérifier";
   const currency = value.currency ?? "XOF";
   const label = formatMoney(value.amount, currency, locale);
   return currency === "XOF" ? label : `${label} ${currency}`;
+}
+
+function recordStatusLabel(row: LeaseRecordOverviewRow, zh: boolean) {
+  if (needsLeaseReview(row) || row.reviewReasons.includes("record_status_end_conflict"))
+    return zh ? "租赁待核" : "Location à vérifier";
+  if (row.contract.status === "expired") return zh ? "已过期" : "Expiré";
+  if (row.contract.status === "terminated") return zh ? "已终止" : "Résilié";
+  if (row.historical) return zh ? "历史租赁" : "Ancienne location";
+  if (row.contract.status === "draft") return zh ? "草稿 · 待起租" : "Brouillon · à venir";
+  return row.occupancy === "scheduled"
+    ? zh
+      ? "待起租"
+      : "À venir"
+    : zh
+      ? "当前租赁"
+      : "Location actuelle";
+}
+
+function recordSearchText(row: LeaseRecordOverviewRow) {
+  return [
+    row.unit.unit_no,
+    row.unit.code,
+    row.building?.display_name,
+    row.customer?.name,
+    row.contract.contract_no,
+    row.contract.start_date,
+    row.contract.expected_end_date,
+    row.contract.actual_end_date,
+    row.paidThrough,
+    row.contract.status,
+    recordStatusLabel(row, true),
+    recordStatusLabel(row, false),
+  ]
+    .join(" ")
+    .toLocaleLowerCase();
+}
+
+export function leaseRecordPeriodLabel(
+  contract: LeaseRecordOverviewRow["contract"],
+  locale: Locale,
+) {
+  const zh = locale === "zh";
+  const start = contract.start_date || (zh ? "起租待补" : "Début à compléter");
+  if (contract.actual_end_date)
+    return `${start} · ${zh ? "实际结束" : "Fin effective"} ${contract.actual_end_date}`;
+  const end =
+    !contract.expected_end_date || contract.expected_end_confirmed === false
+      ? zh
+        ? "到期待补"
+        : "Fin à compléter"
+      : contract.expected_end_date >= "2099-01-01"
+        ? zh
+          ? "长期"
+          : "Long terme"
+        : contract.expected_end_date;
+  return `${start} · ${zh ? "约定至" : "Fin prévue"} ${end}`;
 }
 
 function monthlyRent(row: LeaseRoomOverviewRow, locale: Locale) {
@@ -139,21 +215,25 @@ function monthlyRent(row: LeaseRoomOverviewRow, locale: Locale) {
 
 export function LeaseRoomOverview({
   rows,
+  records,
   locale,
   loading,
   error,
   selectedUnitId,
   disabled = false,
   onSelectUnit,
+  onSelectRecord,
   onRetry,
 }: {
   rows: LeaseRoomOverviewRow[];
+  records: LeaseRecordOverviewRow[];
   locale: Locale;
   loading: boolean;
   error: boolean;
   selectedUnitId?: string | null;
   disabled?: boolean;
   onSelectUnit: (row: LeaseRoomOverviewRow) => void;
+  onSelectRecord: (row: LeaseRecordOverviewRow) => void;
   onRetry: () => void;
 }) {
   const zh = locale === "zh";
@@ -161,6 +241,9 @@ export function LeaseRoomOverview({
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
   const [followup, setFollowup] = useState(false);
+  const [history, setHistory] = useState(false);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyStatus, setHistoryStatus] = useState("historical");
   const rentalRows = useMemo(
     () => rows.filter((row) => row.contract !== null || needsLeaseReview(row)),
     [rows],
@@ -240,19 +323,42 @@ export function LeaseRoomOverview({
   }, [filtered, locale]);
   const followupRows = useMemo(
     () =>
-      searched
+      records
+        .filter(
+          (row) =>
+            !search.trim() || recordSearchText(row).includes(search.trim().toLocaleLowerCase()),
+        )
         .filter((row) => needsLeaseReview(row) || row.attention)
         .sort((a, b) => {
-          const rank = (row: LeaseRoomOverviewRow) =>
-            row.attention?.kind === "overdue" ? 0 : row.attention?.kind === "upcoming" ? 1 : 2;
+          const rank = (row: LeaseRecordOverviewRow) =>
+            row.attention?.kind === "overdue"
+              ? 0
+              : row.attention?.kind === "upcoming"
+                ? 1
+                : row.attention?.kind === "unsettled"
+                  ? 2
+                  : 3;
           return (
             rank(a) - rank(b) ||
             (a.attention?.dueDate ?? "").localeCompare(b.attention?.dueDate ?? "") ||
             a.unit.unit_no.localeCompare(b.unit.unit_no, undefined, { numeric: true })
           );
         }),
-    [searched],
+    [records, search],
   );
+  const historyRows = useMemo(() => {
+    const query = historySearch.trim().toLocaleLowerCase();
+    return records.filter(
+      (row) =>
+        (historyStatus === "all" ||
+          (historyStatus === "historical"
+            ? row.historical
+            : historyStatus === "current"
+              ? !row.historical
+              : row.contract.status === historyStatus)) &&
+        (!query || recordSearchText(row).includes(query)),
+    );
+  }, [records, historySearch, historyStatus]);
   const filters: { key: Filter; label: string }[] = [
     { key: "all", label: text("全部租赁", "Toutes les locations") },
     { key: "overdue", label: text("已逾期", "En retard") },
@@ -335,6 +441,14 @@ export function LeaseRoomOverview({
             {text("收款跟进", "Suivi des loyers")}
             <span>{followupRows.length}</span>
           </button>
+          <button
+            type="button"
+            className={styles.followupButton}
+            aria-expanded={history}
+            onClick={() => setHistory((value) => !value)}
+          >
+            {text("查看历史", "Voir l’historique")}
+          </button>
         </div>
       </div>
       {followup ? (
@@ -346,8 +460,8 @@ export function LeaseRoomOverview({
             <h2>{text("收款跟进", "Suivi des loyers")}</h2>
             <p>
               {text(
-                "当前楼栋与搜索范围，先处理逾期，再核对近期应缴及缴费资料。",
-                "Bâtiment et recherche actuels : retards, échéances proches, puis données à vérifier.",
+                "包含历史租赁的未结清款；按每次租赁单独跟进，条目数可能多于当前房间数。",
+                "Inclut les soldes non réglés des anciennes locations ; chaque location est suivie séparément, leur nombre peut dépasser celui des lots actuels.",
               )}
             </p>
           </div>
@@ -356,9 +470,10 @@ export function LeaseRoomOverview({
               {followupRows.map((row) => (
                 <button
                   type="button"
-                  key={row.unit.id}
+                  key={row.id}
+                  data-followup-record-id={row.id}
                   disabled={disabled}
-                  onClick={() => onSelectUnit(row)}
+                  onClick={() => onSelectRecord(row)}
                   className={styles.followupRow}
                 >
                   <span>
@@ -366,8 +481,14 @@ export function LeaseRoomOverview({
                       {row.building?.display_name} · {row.unit.unit_no}
                     </strong>
                     <small>
-                      {tenantLabel(row, zh)}
+                      {row.customer?.name ?? text("租客待登记", "Locataire à compléter")}
                       {row.customer?.phone ? ` · ${row.customer.phone}` : ""}
+                    </small>
+                    <small>
+                      {row.historical
+                        ? text("历史租赁", "Ancienne location")
+                        : text("当前租赁", "Location actuelle")}{" "}
+                      · {row.contract.start_date || "—"}
                     </small>
                   </span>
                   <span
@@ -396,13 +517,99 @@ export function LeaseRoomOverview({
           )}
         </section>
       ) : null}
+      {history ? (
+        <section
+          className={styles.followup}
+          aria-label={text("租赁记录查询", "Recherche de locations")}
+        >
+          <div className={styles.followupHeading}>
+            <h2>{text("租赁记录", "Dossiers de location")}</h2>
+            <p>
+              {text(
+                "历史按每次租赁保留，点击查看该次租赁资料与已有收付款。",
+                "Chaque location reste distincte. Ouvrez un dossier pour consulter ses données et paiements.",
+              )}
+            </p>
+            <div className={styles.historyControls}>
+              <label className={styles.search}>
+                <Search size={15} aria-hidden="true" />
+                <span className="sr-only">{text("搜索租赁记录", "Rechercher une location")}</span>
+                <input
+                  type="search"
+                  value={historySearch}
+                  placeholder={text("房号、租客或日期", "Lot, locataire ou date")}
+                  onChange={(event) => setHistorySearch(event.target.value)}
+                />
+              </label>
+              <select
+                aria-label={text("租赁记录状态", "Statut des locations")}
+                value={historyStatus}
+                onChange={(event) => setHistoryStatus(event.target.value)}
+              >
+                {[
+                  ["historical", text("历史租赁", "Anciennes locations")],
+                  ["all", text("全部记录", "Tous les dossiers")],
+                  ["current", text("当前租赁", "Locations actuelles")],
+                  ["draft", text("草稿", "Brouillons")],
+                  ["active", text("生效", "Actifs")],
+                  ["terminated", text("已终止", "Résiliés")],
+                  ["expired", text("已过期", "Expirés")],
+                ].map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <span>
+                {historyRows.length} {text("条", "dossiers")}
+              </span>
+            </div>
+          </div>
+          <div className={styles.followupRows}>
+            {historyRows.map((row) => (
+              <button
+                type="button"
+                key={row.id}
+                data-history-record-id={row.id}
+                disabled={disabled}
+                className={styles.followupRow}
+                onClick={() => onSelectRecord(row)}
+                aria-label={`${text("查看租赁记录", "Voir la location")} ${row.building?.display_name ?? ""} ${row.unit.unit_no} · ${row.customer?.name ?? "—"} · ${row.contract.start_date || "—"}`}
+              >
+                <span>
+                  <strong>
+                    {row.building?.display_name} · {row.unit.unit_no}
+                  </strong>
+                  <small>{row.customer?.name ?? text("租客待登记", "Locataire à compléter")}</small>
+                </span>
+                <span>
+                  <strong>{recordStatusLabel(row, zh)}</strong>
+                  <small>{leaseRecordPeriodLabel(row.contract, locale)}</small>
+                </span>
+                <span className={styles.followupAmount}>
+                  {attentionLabel(row, zh) ?? text("查看资料", "Voir le dossier")}
+                  <ArrowRight size={15} aria-hidden="true" />
+                </span>
+              </button>
+            ))}
+          </div>
+          {!historyRows.length ? (
+            <p className={styles.empty}>
+              {text("没有符合条件的租赁记录。", "Aucun dossier correspondant.")}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
       {!floors.length ? (
         <p className={styles.empty}>
           {rentalRows.length
-            ? text("没有符合筛选条件的租赁。", "Aucune location ne correspond aux filtres.")
+            ? text(
+                "没有符合筛选条件的当前租赁。",
+                "Aucune location actuelle ne correspond aux filtres.",
+              )
             : text(
-                "当前楼栋暂无租赁记录。历史资料可在明细核对中查阅。",
-                "Aucune location actuelle dans ce bâtiment. Consultez l’historique dans le détail à vérifier.",
+                "当前楼栋暂无当前租赁；可展开“查看历史”查阅此前租赁。",
+                "Aucune location actuelle dans ce bâtiment. Ouvrez l’historique pour consulter les anciennes locations.",
               )}
         </p>
       ) : (

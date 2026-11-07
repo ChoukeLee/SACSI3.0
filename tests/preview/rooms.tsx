@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { LeaseRoomOverview } from "@/features/leases/lease-room-overview";
 import {
   buildLeaseRoomOverview,
+  buildLeaseRecordOverview,
+  type LeaseRecordOverviewRow,
   type LeaseRoomOverviewRow,
 } from "@/features/leases/lease-room-overview-model";
 import { LeaseWorkbenchInspector } from "@/features/leases/lease-workbench-inspector";
@@ -152,17 +154,87 @@ const receivables = definitions.flatMap((item, index): ReceivableRow[] =>
       ]
     : [],
 );
-const rows = buildLeaseRoomOverview({
+const historySamples = [
+  {
+    unit: 0,
+    tenant: "示例原租客甲",
+    amount: 900000,
+    paid: 700000,
+    due: "2026-10-01",
+    currency: "XOF",
+  },
+  {
+    unit: 3,
+    tenant: "示例已结清租客",
+    amount: 800000,
+    paid: 800000,
+    due: "2026-09-01",
+    currency: "XOF",
+  },
+  { unit: 4, tenant: "示例原外币租客", amount: 200, paid: 50, due: "2026-12-10", currency: "USD" },
+] as const;
+for (const [index, sample] of historySamples.entries()) {
+  const recordId = uuid(index + 601);
+  const customerId = uuid(index + 701);
+  contracts.push({
+    ...contracts[0],
+    id: recordId,
+    unit_id: units[sample.unit].id,
+    customer_id: customerId,
+    status: "terminated",
+    start_date: "2025-11-01",
+    expected_end_date: "2026-10-31",
+    expected_end_confirmed: true,
+    actual_end_date: "2026-10-31",
+    paid_through_date: "2026-09-30",
+    rent_currency: sample.currency,
+    monthly_rent_xof: sample.currency === "XOF" ? sample.amount : 0,
+    monthly_rent_amount: sample.currency === "USD" ? sample.amount : null,
+  });
+  customers.push({ ...template.customers[0], id: customerId, name: sample.tenant, phone: null });
+  receivables.push({
+    ...receivables[0],
+    id: uuid(index + 801),
+    unit_id: units[sample.unit].id,
+    customer_id: customerId,
+    source_id: recordId,
+    due_date: sample.due,
+    currency: sample.currency,
+    amount_xof: sample.currency === "XOF" ? sample.amount : 0,
+    paid_amount_xof: sample.currency === "XOF" ? sample.paid : 0,
+    amount_native: sample.currency === "USD" ? sample.amount : null,
+    paid_amount_native: sample.currency === "USD" ? sample.paid : null,
+    status: sample.amount === sample.paid ? "paid" : "partial",
+    service_period_start: "2026-09-01",
+    service_period_end: "2026-09-30",
+    title: "合成历史未结算账单",
+  });
+}
+for (const current of contracts.filter((record) => record.status === "active"))
+  if ([units[0].id, units[4].id].includes(current.unit_id)) current.start_date = "2026-11-01";
+const previewInput = {
   units,
   contracts,
   customers,
   receivables,
   today: "2026-11-07",
   buildings: template.buildings.map((building) => ({ ...building, display_name: "示例公寓" })),
-});
+};
+const rows = buildLeaseRoomOverview(previewInput);
+const records = buildLeaseRecordOverview(previewInput);
 
 function Preview() {
   const [selected, setSelected] = useState<LeaseRoomOverviewRow | null>(null);
+  const selectRecord = (record: LeaseRecordOverviewRow) => {
+    const asset = rows.find((row) => row.unit.id === record.unit.id);
+    if (asset)
+      setSelected({
+        ...asset,
+        contract: record.contract,
+        customer: record.customer,
+        paidThrough: record.paidThrough,
+      });
+  };
   return (
     <main className="min-h-screen bg-background p-5 text-foreground md:p-8">
       <div className="mx-auto max-w-[1380px]">
@@ -178,11 +250,13 @@ function Preview() {
         </header>
         <LeaseRoomOverview
           rows={rows}
+          records={records}
           locale="zh"
           loading={false}
           error={false}
           selectedUnitId={selected?.unit.id}
           onSelectUnit={setSelected}
+          onSelectRecord={selectRecord}
           onRetry={() => {}}
         />
         {selected ? (

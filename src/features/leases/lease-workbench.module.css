@@ -142,26 +142,6 @@
 .roomsWorkspace {
   grid-template-columns: minmax(0, 1fr);
 }
-.viewSwitch {
-  display: flex;
-  gap: 3px;
-  padding: 3px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 8px;
-  background: hsl(var(--card));
-}
-.viewSwitch button {
-  min-height: 32px;
-  padding: 5px 10px;
-  border-radius: 5px;
-  font-size: 12px;
-  color: hsl(var(--muted-foreground));
-}
-.viewSwitch button[aria-pressed="true"] {
-  color: var(--lease-accent);
-  background: var(--lease-accent-soft);
-  font-weight: 600;
-}
 .recordSearch {
   display: block;
   max-width: 24rem;
@@ -175,7 +155,6 @@
   padding: 8px 10px;
   font-size: 13px;
 }
-.viewSwitch button:focus-visible,
 .recordSearch input:focus-visible {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 3px;
@@ -302,6 +281,42 @@
   width: 100%;
   margin-top: 10px;
 }
+.roomRecords {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.65rem;
+  background: hsl(var(--card));
+}
+.roomRecords h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.roomRecords p {
+  margin: 0.4rem 0 0.8rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+}
+.roomRecords button {
+  display: grid;
+  width: 100%;
+  gap: 0.3rem;
+  padding: 0.7rem;
+  border-top: 1px solid hsl(var(--border));
+  text-align: left;
+  font-size: 0.8125rem;
+}
+.roomRecords button[aria-pressed="true"] {
+  background: hsl(var(--muted));
+}
+.roomRecords button small {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+}
+.roomRecords button:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
 @media (max-width: 1279px) {
   .workspaceGrid {
     grid-template-columns: minmax(0, 1fr);
@@ -369,8 +384,7 @@
 }
 @media (pointer: coarse) {
   .scopeProjects button,
-  .statusRow nav button,
-  .viewSwitch button {
+  .statusRow nav button {
     min-height: 44px;
   }
 }

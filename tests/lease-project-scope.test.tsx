@@ -105,13 +105,8 @@ function metric(label: string) {
   return [...host.querySelectorAll("button")].find((b) => b.textContent?.startsWith(label))
     ?.textContent;
 }
-async function changeView(label: "明细核对" | "长租房源") {
-  const button = [...host.querySelectorAll("button")].find((b) => b.textContent === label);
-  expect(button).toBeTruthy();
-  await act(async () => (button as HTMLButtonElement).click());
-}
 
-it("scopes buildings, contract cards and statistics together; remembers each project's building", async () => {
+it("scopes buildings, rental cards and rental counts together; remembers each project's building", async () => {
   await render();
   expect(host.querySelector('nav[aria-label="楼栋切换"]')?.textContent).not.toContain("第一栋");
   expect(host.textContent).toContain("客户a11");
@@ -122,17 +117,15 @@ it("scopes buildings, contract cards and statistics together; remembers each pro
   expect(host.textContent).toContain("客户c2");
   expect(host.textContent).not.toContain("客户a11");
   expect(host.querySelectorAll("[data-room-id]")).toHaveLength(2);
-  await changeView("明细核对");
-  expect(metric("生效合同")).toContain("2");
-  expect(host.querySelectorAll("tbody tr")).toHaveLength(2);
-  await changeView("长租房源");
+  expect(metric("全部租赁")).toBe("全部租赁2");
+  expect(host.querySelector("table")).toBeNull();
+  expect(host.textContent).not.toContain("明细核对");
   expect(host.querySelector('[aria-label="第一栋 1F"]')).not.toBeNull();
   expect(host.querySelector('[aria-label="第二栋 1F"]')).not.toBeNull();
   await clickNav("楼栋切换", "第二栋");
   expect(host.textContent).not.toContain("客户c1");
   expect(host.querySelectorAll("[data-room-id]")).toHaveLength(1);
-  await changeView("明细核对");
-  expect(metric("生效合同")).toContain("1");
+  expect(metric("全部租赁")).toBe("全部租赁1");
   await clickNav("项目切换", "公寓项目");
   await clickNav("项目切换", "科建建材城");
   expect(host.textContent).not.toContain("客户c1");
@@ -190,6 +183,5 @@ it("opens an explicit project link across all its buildings instead of restoring
   expect(host.textContent).toContain("客户c2");
   expect(host.textContent).not.toContain("客户a11");
   expect(host.querySelectorAll("[data-room-id]")).toHaveLength(2);
-  await changeView("明细核对");
-  expect(metric("生效合同")).toContain("2");
+  expect(metric("全部租赁")).toBe("全部租赁2");
 });

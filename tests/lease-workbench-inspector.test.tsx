@@ -6,7 +6,7 @@ import {
   LeaseWorkbenchInspector,
   type LeaseWorkbenchInspectorProps,
 } from "@/features/leases/lease-workbench-inspector";
-import type { LeaseContractRow, PaymentRow, ReceivableRow } from "@/types/database";
+import type { CustomerRow, LeaseContractRow, PaymentRow, ReceivableRow } from "@/types/database";
 
 const contract: LeaseContractRow = {
   id: "lease-1",
@@ -107,6 +107,31 @@ function fact(name: string) {
 }
 
 describe("LeaseWorkbenchInspector single contract dossier", () => {
+  it("keeps a historical tenant's contact and unsettled finances separate from the next rental", async () => {
+    await render({
+      contract: { ...contract, status: "terminated", actual_end_date: "2026-10-01" },
+      customer: { id: "customer-1", name: "历史租客示例", phone: "TEST-PHONE" } as CustomerRow,
+      receivables: [
+        receivable({ due_date: "2026-10-01" }),
+        receivable({ id: "next-bill", source_id: "next-rental", amount_xof: 999999 }),
+      ],
+      payments: [
+        payment({ amount: 40 }),
+        payment({ id: "next-payment", source_id: "next-rental", amount: 999999 }),
+      ],
+    });
+    expect(host.textContent).toContain("TEST-PHONE");
+    expect(host.textContent).toContain("不与该房间后续租赁合并");
+    expect(fact("实际结束")).toBe("2026-10-01");
+    await tab("账务");
+    expect(fact("其中已逾期")).toBe("60 XOF");
+    expect(fact("已录经营收款")).toBe("40 XOF");
+    expect(host.textContent).not.toContain("999,999");
+    await tab("记录");
+    expect(host.querySelectorAll("ol li")).toHaveLength(1);
+    expect(host.textContent).toContain("本租赁记录的收付款明细");
+  });
+
   it("does not require a paper contract or number to read a registered rental and collect", async () => {
     const href = "/leases/11111111-1111-4111-8111-111111111111/collect";
     await render({

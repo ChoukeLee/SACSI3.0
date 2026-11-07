@@ -6,7 +6,12 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { LeaseContractRow, ReceivableRow } from "@/types/database";
 import type { WorkspaceUnit } from "@/features/contracts/workspace-model";
 import { workspaceFixture } from "../../../tests/fixtures/contract-workspace";
-import { buildLeaseRoomOverview, type LeaseRoomOverviewRow } from "./lease-room-overview-model";
+import {
+  buildLeaseRoomOverview,
+  buildLeaseRecordOverview,
+  type LeaseRecordOverviewRow,
+  type LeaseRoomOverviewRow,
+} from "./lease-room-overview-model";
 import { LeaseRoomOverview, leaseRoomFloorLabel } from "./lease-room-overview";
 
 let host: HTMLDivElement;
@@ -74,16 +79,42 @@ afterEach(async () => {
 async function render(
   value: LeaseRoomOverviewRow[],
   onSelect = vi.fn(),
-  state: { loading?: boolean; error?: boolean; onRetry?: () => void } = {},
+  state: {
+    loading?: boolean;
+    error?: boolean;
+    onRetry?: () => void;
+    records?: LeaseRecordOverviewRow[];
+    onSelectRecord?: (record: LeaseRecordOverviewRow) => void;
+  } = {},
 ) {
   await act(async () =>
     root.render(
       <LeaseRoomOverview
         rows={value}
+        records={
+          state.records ??
+          value.flatMap((row) =>
+            row.records.map((contract): LeaseRecordOverviewRow => ({
+              id: `${contract.id}/${row.unit.id}`,
+              contract,
+              unit: row.unit,
+              building: row.building,
+              customer: row.customer,
+              historical: ["terminated", "expired"].includes(contract.status),
+              occupancy: row.occupancy,
+              conflict: row.conflict,
+              reviewReasons: row.reviewReasons,
+              paidThrough: row.paidThrough,
+              attention: row.attention,
+              balances: [],
+            })),
+          )
+        }
         locale="zh"
         loading={state.loading ?? false}
         error={state.error ?? false}
         onSelectUnit={onSelect}
+        onSelectRecord={state.onSelectRecord ?? vi.fn()}
         onRetry={state.onRetry ?? vi.fn()}
       />,
     ),
@@ -149,7 +180,7 @@ it("uses one rental scope for cards, counts, search and follow-up while retainin
     paid_through_date: null,
     ...extra,
   });
-  const value = buildLeaseRoomOverview({
+  const source = {
     units: [
       sourceUnit,
       unit("draft", "102"),
@@ -171,8 +202,9 @@ it("uses one rental scope for cards, counts, search and follow-up while retainin
     buildings: fixture.buildings,
     today: "2026-11-07",
     receivables: [],
-  });
-  const select = await render(value);
+  };
+  const value = buildLeaseRoomOverview(source);
+  const select = await render(value, vi.fn(), { records: buildLeaseRecordOverview(source) });
   expect(host.querySelectorAll("[data-room-id]")).toHaveLength(4);
   expect(button("全部租赁").textContent).toBe("全部租赁4");
   expect(button("待核事项").textContent).toBe("待核事项4");
@@ -193,12 +225,16 @@ it("uses one rental scope for cards, counts, search and follow-up while retainin
   expect(select.mock.calls[0][0].records[0].id).toBe("ended-record");
   await act(async () => button("收款跟进").click());
   const followup = host.querySelector('[aria-label="集中收款跟进"]')!;
-  expect(followup.querySelectorAll("button")).toHaveLength(4);
+  expect(followup.querySelectorAll("button")).toHaveLength(3);
   const endedFollowup = [...followup.querySelectorAll("button")].find((element) =>
     element.textContent?.includes("107"),
-  )!;
-  expect(endedFollowup.textContent).toContain("租赁资料待核");
-  expect(endedFollowup.textContent).not.toMatch(/XOF|金额待核|已逾期/);
+  );
+  expect(endedFollowup).toBeUndefined();
+  await act(async () => button("查看历史").click());
+  const history = host.querySelector('[aria-label="租赁记录查询"]')!;
+  expect(history.querySelector("[data-history-record-id='ended-record']")?.textContent).toContain(
+    "租赁待核",
+  );
 
   const input = host.querySelector<HTMLInputElement>('input[type="search"]')!;
   const search = async (text: string) => {
@@ -293,6 +329,146 @@ it("hides stale cards on loading or a failed read and exposes an explicit retry"
   expect(host.querySelectorAll("[data-room-id]")).toHaveLength(0);
   await act(async () => button("重试").click());
   expect(retry).toHaveBeenCalledTimes(1);
+});
+
+it("keeps historical balances under their own rental and opens searched history by record identity", async () => {
+  const room = rows()[0];
+  const current: LeaseRecordOverviewRow = {
+    id: "current-record",
+    contract: { ...room.contract!, id: "current-record" },
+    unit: room.unit,
+    customer: { ...fixture.customers[0], name: "Current tenant" },
+    building: room.building,
+    historical: false,
+    occupancy: "leased",
+    attention: null,
+    paidThrough: room.paidThrough,
+    conflict: false,
+    reviewReasons: [],
+    balances: [],
+  };
+  const old: LeaseRecordOverviewRow = {
+    ...current,
+    id: "old-record",
+    contract: {
+      ...current.contract,
+      id: "old-record",
+      status: "terminated",
+      start_date: "2025-02-01",
+      actual_end_date: "2025-12-31",
+    },
+    customer: { ...fixture.customers[0], id: "old-customer", name: "Old tenant" },
+    historical: true,
+    attention: {
+      kind: "overdue",
+      dueDate: "2025-12-01",
+      days: -341,
+      amount: 40,
+      currency: "USD",
+      amountIsEstimated: false,
+    },
+  };
+  const expired: LeaseRecordOverviewRow = {
+    ...old,
+    id: "expired-record",
+    contract: {
+      ...old.contract,
+      id: "expired-record",
+      status: "expired",
+      start_date: "2024-02-01",
+      actual_end_date: null,
+      expected_end_confirmed: false,
+    },
+    customer: { ...old.customer!, name: "Expired tenant" },
+    attention: {
+      kind: "unsettled",
+      dueDate: "2026-12-01",
+      days: null,
+      amount: 60,
+      currency: "CNY",
+      amountIsEstimated: false,
+    },
+  };
+  const cleared: LeaseRecordOverviewRow = {
+    ...old,
+    id: "cleared-record",
+    contract: {
+      ...old.contract,
+      id: "cleared-record",
+      start_date: "2023-01-01",
+      actual_end_date: null,
+      expected_end_date: "2099-12-31",
+      expected_end_confirmed: true,
+    },
+    attention: null,
+  };
+  const selected = vi.fn();
+  await render([{ ...room, customer: current.customer }], vi.fn(), {
+    records: [current, old, expired, cleared],
+    onSelectRecord: selected,
+  });
+  expect(host.querySelectorAll("[data-room-id]")).toHaveLength(1);
+  expect(host.querySelector("[data-room-id]")?.textContent).toContain("Current tenant");
+  expect(host.querySelector('[aria-label="租赁记录查询"]')).toBeNull();
+  await act(async () => button("收款跟进").click());
+  const followup = host.querySelector('[aria-label="集中收款跟进"]')!;
+  expect(followup.querySelectorAll("[data-followup-record-id]")).toHaveLength(2);
+  expect(followup.textContent).toContain("USD");
+  expect(followup.textContent).toContain("CNY");
+  expect(
+    followup.querySelector("[data-followup-record-id='expired-record']")?.textContent,
+  ).toContain("历史待结清");
+  expect(
+    followup.querySelector("[data-followup-record-id='expired-record']")?.textContent,
+  ).not.toContain("天内应缴");
+  await act(async () =>
+    followup.querySelector<HTMLButtonElement>("[data-followup-record-id='old-record']")!.click(),
+  );
+  expect(selected).toHaveBeenLastCalledWith(old);
+  await act(async () => button("查看历史").click());
+  const history = host.querySelector('[aria-label="租赁记录查询"]')!;
+  expect(history.querySelectorAll("[data-history-record-id]")).toHaveLength(3);
+  expect(history.querySelector("[data-history-record-id='expired-record']")?.textContent).toContain(
+    "已过期",
+  );
+  expect(
+    history.querySelector("[data-history-record-id='expired-record']")?.textContent,
+  ).not.toContain("已退租");
+  expect(history.querySelector("[data-history-record-id='expired-record']")?.textContent).toContain(
+    "到期待补",
+  );
+  expect(history.querySelector("[data-history-record-id='old-record']")?.textContent).toContain(
+    "实际结束 2025-12-31",
+  );
+  expect(history.querySelector("[data-history-record-id='cleared-record']")?.textContent).toContain(
+    "约定至 长期",
+  );
+  expect(history.textContent).not.toContain("2099");
+  const search = history.querySelector<HTMLInputElement>('input[type="search"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(
+      search,
+      "2025-02-01",
+    );
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  expect(history.querySelectorAll("[data-history-record-id]")).toHaveLength(1);
+  await act(async () =>
+    history.querySelector<HTMLButtonElement>("[data-history-record-id='old-record']")!.click(),
+  );
+  expect(selected).toHaveBeenLastCalledWith(old);
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(search, "");
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+    const status = history.querySelector<HTMLSelectElement>("select")!;
+    status.value = "current";
+    status.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(history.querySelectorAll("[data-history-record-id]")).toHaveLength(1);
+  await act(async () =>
+    history.querySelector<HTMLButtonElement>("[data-history-record-id='current-record']")!.click(),
+  );
+  expect(selected).toHaveBeenLastCalledWith(current);
 });
 
 it("retains named floors and marks genuinely unknown floor labels explicitly", () => {

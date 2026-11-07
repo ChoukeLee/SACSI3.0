@@ -213,6 +213,11 @@ function InspectorContent({
         classifyContractCashPayment(payment).kind === "excluded",
     );
   const endKnown = !!contract.expected_end_date && contract.expected_end_confirmed !== false;
+  const historicalRental =
+    rentalRecord &&
+    (contract.status === "terminated" ||
+      contract.status === "expired" ||
+      (!!contract.actual_end_date && contract.actual_end_date <= today));
   const endLabel = !endKnown
     ? text("待确认", "À confirmer")
     : contract.expected_end_date >= "2099-01-01"
@@ -322,6 +327,12 @@ function InspectorContent({
         <p className="mt-4 break-words text-sm font-medium">
           {customer?.name || text("客户资料待补充", "Client à compléter")}
         </p>
+        {rentalRecord && customer?.phone ? (
+          <p className="mt-1 break-words text-xs text-muted-foreground">
+            {text("联系电话：", "Téléphone : ")}
+            {customer.phone}
+          </p>
+        ) : null}
         {!rentalRecord ? (
           <p className="mt-1 break-all text-xs text-muted-foreground">{contract.contract_no}</p>
         ) : null}
@@ -441,6 +452,14 @@ function InspectorContent({
                 <Fact label={text("签约人", "Signataire")}>{contract.signer_name}</Fact>
               ) : null}
             </dl>
+            {historicalRental ? (
+              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/25 dark:text-amber-200">
+                {text(
+                  "历史租赁的未结清款仍归原租客和原租赁记录核对，不与该房间后续租赁合并。",
+                  "Les soldes historiques restent rattachés au locataire et à la location d’origine, séparément des locations suivantes du même lot.",
+                )}
+              </p>
+            ) : null}
             {rentalRecord ? (
               <details className="mt-4 rounded-lg border border-border/70 px-3 py-2.5 text-xs">
                 <summary className="cursor-pointer font-medium">
@@ -589,10 +608,15 @@ function InspectorContent({
         ) : (
           <>
             <p className="mb-3 text-xs leading-5 text-muted-foreground">
-              {text(
-                "本合同完整财务记录，不等于完整操作审计；操作身份以审计日志为准。",
-                "Toutes les écritures financières du contrat, pas un journal d’audit complet. L’identité de l’opérateur se vérifie dans l’audit.",
-              )}
+              {rentalRecord
+                ? text(
+                    "本租赁记录的收付款明细，不等于完整操作审计；操作身份以审计日志为准。",
+                    "Écritures de cette location, pas un journal d’audit complet. L’identité de l’opérateur se vérifie dans l’audit.",
+                  )
+                : text(
+                    "本合同完整财务记录，不等于完整操作审计；操作身份以审计日志为准。",
+                    "Toutes les écritures financières du contrat, pas un journal d’audit complet. L’identité de l’opérateur se vérifie dans l’audit.",
+                  )}
             </p>
             {orderedPayments.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
