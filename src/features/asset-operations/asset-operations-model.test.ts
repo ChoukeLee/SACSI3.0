@@ -6,6 +6,7 @@ import {
   buildAssetOperationsReport,
   type AssetOperationAsset,
   type AssetOperationEntry,
+  assetSourceLabel,
 } from "./asset-operations-model";
 
 const asset: AssetOperationAsset = {
@@ -85,12 +86,60 @@ describe("warehouse cash and period reporting", () => {
     );
     expect(report.currencies).toEqual([]);
     expect(report.pendingEntryCount).toBe(1);
+    expect(report.pendingCurrencies).toEqual([
+      { currency: "XOF", income: 6000000, expense: 0, depositIn: 0, depositOut: 0, entryCount: 1 },
+    ]);
     const pendingAsset = buildAssetOperationsReport(
       [{ ...asset, verification: "pending" }],
       [entry],
       assetReportPeriod("month", "2026-09"),
     );
     expect(pendingAsset.currencies).toEqual([]);
+  });
+
+  it("keeps pending source totals separated by currency and excludes voided or out-of-period cash", () => {
+    const facts: AssetOperationEntry[] = [
+      { ...entry, id: "cny", currency: "CNY", amountNative: 100, verification: "pending" },
+      {
+        ...entry,
+        id: "deposit",
+        kind: "deposit_in",
+        currency: "XOF",
+        amountNative: 500,
+        verification: "pending",
+      },
+      {
+        ...entry,
+        id: "voided",
+        amountNative: 900,
+        verification: "pending",
+        voidedAt: "2026-11-07T00:00:00Z",
+      },
+      {
+        ...entry,
+        id: "future",
+        amountNative: 800,
+        cashDate: "2026-12-01",
+        verification: "pending",
+      },
+    ];
+    const report = buildAssetOperationsReport(
+      [asset],
+      facts,
+      assetReportPeriod("month", "2026-09"),
+    );
+    expect(report.currencies).toEqual([]);
+    expect(report.pendingCurrencies).toEqual([
+      { currency: "XOF", income: 0, expense: 0, depositIn: 500, depositOut: 0, entryCount: 1 },
+      { currency: "CNY", income: 100, expense: 0, depositIn: 0, depositOut: 0, entryCount: 1 },
+    ]);
+  });
+
+  it("uses the source file, sheet and range as its readable label", () => {
+    expect(
+      assetSourceLabel(`sha256:${"a".repeat(64)}|file:test.xlsx|sheet:old warehouses|range:H2:J2`),
+    ).toBe("test.xlsx · old warehouses!H2:J2");
+    expect(assetSourceLabel("receipt-line-1")).toBe("receipt-line-1");
   });
 
   it("separates deposits and currencies, excludes duplicate IDs, and flags absent service allocation", () => {

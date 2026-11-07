@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import type { AssetOperationsData } from "./asset-operations-model";
 
 export async function fetchAssetOperations(
@@ -29,5 +30,22 @@ export async function fetchAssetOperations(
     typeof result.data.canWrite !== "boolean"
   )
     throw new Error("AssetOperationsReadUnavailable");
-  return result.data as AssetOperationsData;
+  const sourceKeys = await fetchAllPages<{ id: string; source_key: string }>(
+    (from, to) =>
+      supabase
+        .from("asset_operation_assets")
+        .select("id,source_key", { count: "exact" })
+        .eq("project_id", projectId)
+        .order("id")
+        .range(from, to),
+    "asset operation source identities",
+  );
+  const keys = new Map(sourceKeys.map((row) => [row.id, row.source_key]));
+  const data = result.data as AssetOperationsData;
+  if (data.assets.some((asset) => !keys.has(asset.id)))
+    throw new Error("AssetOperationsReadUnavailable");
+  return {
+    ...data,
+    assets: data.assets.map((asset) => ({ ...asset, sourceKey: keys.get(asset.id)! })),
+  };
 }

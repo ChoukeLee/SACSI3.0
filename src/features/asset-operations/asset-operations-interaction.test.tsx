@@ -14,6 +14,8 @@ vi.mock("./asset-operations-actions", () => ({
   createAssetOperationEntry: operations.create,
   importAssetOperationCatalog: vi.fn(),
   voidAssetOperationEntry: vi.fn(),
+  updateAssetOperationTerms: vi.fn(),
+  importAssetOperationEntries: vi.fn(),
 }));
 
 it("reuses the request ID when an unknown save result is retried without changing the financial input", async () => {
@@ -179,6 +181,10 @@ it("exports deposit totals and net metrics alongside the same filtered source en
     expect(csv).toContain("已录经营现金净额,,XOF,0");
     expect(csv).toContain("按日分摊差额（测算）,,XOF,,");
     expect(csv).toContain("test-deposit-line");
+    expect(csv).toContain(
+      "group,categoryFilter,assetStatusFilter,assetCount,generatedAt,assetSearch",
+    );
+    expect(csv.split("\r\n")[1]).toMatch(/^scope,/);
     expect(csv.split("\r\n").filter((line) => line.startsWith("summary,")).length).toBe(8);
   } finally {
     await act(async () => root.unmount());
