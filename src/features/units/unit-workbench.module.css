@@ -727,6 +727,21 @@
   border-color: #374555;
   max-width: min(720px, 100vw);
 }
+.assetDrawer > div:first-child {
+  color: #edf2fa;
+  background: #19232f;
+  border-color: #374555;
+}
+.assetDrawer > div:first-child h2 {
+  color: #edf2fa;
+}
+.assetDrawer > div:first-child button {
+  color: #b9c6d9;
+}
+.assetDrawer > div:first-child button:hover {
+  color: #edf2fa;
+  background: #203650;
+}
 .assetCard {
   padding: 19px;
   gap: 5px;
@@ -932,6 +947,16 @@
 .totalLine > strong {
   font-size: 19px;
   font-weight: 600;
+}
+.monthlyLine {
+  justify-content: flex-start;
+  align-items: baseline;
+  gap: 7px;
+  margin-top: 6px;
+  font-size: 16px;
+}
+.monthlyLine > strong {
+  font-size: 17px;
 }
 .paymentBanner {
   display: flex;

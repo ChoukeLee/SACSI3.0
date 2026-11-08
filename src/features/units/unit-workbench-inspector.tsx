@@ -449,7 +449,7 @@ function PartyHero({
     distance >= -15;
   return (
     <>
-      <div className={styles.totalLine}>
+      <div className={cn(styles.totalLine, styles.monthlyLine)}>
         <span>{zh ? "月租" : "Loyer mensuel"}</span>
         <strong>
           <UnitAmountValue
