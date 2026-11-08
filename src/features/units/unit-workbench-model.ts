@@ -68,6 +68,7 @@ const filters: UnitWorkbenchFilter[] = [
 export function parseUnitWorkbenchQuery(input: UnitWorkbenchSearch): UnitWorkbenchQuery {
   const requestedPage = one(input.page, 8);
   const unit = typeof input.unit === "string" ? input.unit.trim() : "";
+  const view = input.view === "list" ? "list" : "floor";
   return {
     project: one(input.project, 80),
     building: one(input.building, 80),
@@ -82,8 +83,11 @@ export function parseUnitWorkbenchQuery(input: UnitWorkbenchSearch): UnitWorkben
     business: ["daily_rental", "long_lease", "sale"].includes(one(input.business))
       ? one(input.business)
       : "",
-    view: input.view === "floor" ? "floor" : "list",
-    page: /^\d+$/.test(requestedPage) ? Math.max(1, Math.min(Number(requestedPage), 100000)) : 1,
+    view,
+    page:
+      view === "list" && /^\d+$/.test(requestedPage)
+        ? Math.max(1, Math.min(Number(requestedPage), 100000))
+        : 1,
     unit: unitWorkbenchUuid.test(unit) ? unit : "",
     returnTo: one(input.returnTo, 2048),
   };
@@ -107,8 +111,8 @@ export function unitWorkbenchHref(
   ] as const)
     if (next[key]) params.set(key, next[key]);
   if (next.filter !== "all") params.set("filter", next.filter);
-  if (next.view !== "list") params.set("view", next.view);
-  if (next.page > 1) params.set("page", String(next.page));
+  if (next.view === "list") params.set("view", next.view);
+  if (next.view === "list" && next.page > 1) params.set("page", String(next.page));
   return routeFor(locale, `/units${params.size ? `?${params}` : ""}`);
 }
 export function unitOccupancyVerified(record: UnitWorkbenchPositionRecord): boolean {
@@ -139,6 +143,7 @@ export function matchesUnitWorkbenchFilter(
   if (filter === "attention")
     return (
       unitNeedsVerification(record) ||
+      !!(position?.daily_occupied && position.lease_occupied) ||
       !!position?.cleaning_pending ||
       position?.operational_condition === "maintenance" ||
       position?.operational_condition === "locked"

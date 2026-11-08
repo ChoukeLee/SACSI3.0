@@ -1,153 +1,118 @@
 "use client";
 
+import { ArrowRight } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { cn, compareFloorLabels } from "@/lib/utils";
 import { conditionLabel } from "./operational-position";
 import {
-  constructionLabel,
   unitNeedsVerification,
   unitOccupancyText,
   type UnitWorkbenchRecord,
 } from "./unit-workbench-model";
 import styles from "./unit-workbench.module.css";
 
-export function UnitWorkbenchRow({
-  record,
-  locale,
-  selected,
-  onSelect,
-  allowsSale,
-}: {
-  record: UnitWorkbenchRecord;
-  locale: Locale;
-  selected: boolean;
-  onSelect: () => void;
-  allowsSale: boolean;
-}) {
-  const zh = locale === "zh";
-  const { unit, position } = record;
-  const t = dictionaries[locale].units;
-  const enabled = record.flags.filter(
-    (flag) => flag.is_enabled && (allowsSale || flag.business_type !== "sale"),
-  );
-  const occupied = !!position?.daily_occupied || !!position?.lease_occupied;
-  return (
-    <tr data-selected={selected}>
-      <td data-label={zh ? "资产 / 业务" : "Actif / activité"}>
-        <button
-          className={styles.record}
-          type="button"
-          aria-label={zh ? `查看资产 ${unit.unit_no}` : `Voir l’actif ${unit.unit_no}`}
-          aria-pressed={selected}
-          onClick={onSelect}
-        >
-          {unit.unit_no}
-        </button>
-        <span className={styles.sub}>
-          {t.kinds[unit.kind]} · {unit.floor_label}
-        </span>
-        <span className={styles.sub}>
-          {unit.area_sqm == null
-            ? zh
-              ? "面积待核"
-              : "Surface à vérifier"
-            : `${Number(unit.area_sqm)} m²`}
-        </span>
-        <span className={styles.sub}>
-          {!record.flags.length ||
-          (!allowsSale &&
-            record.flags.some((flag) => flag.business_type === "sale" && flag.is_enabled))
-            ? zh
-              ? "业务配置待核对"
-              : "Configuration à vérifier"
-            : enabled.length
-              ? enabled.map((flag) => t.businessTypes[flag.business_type]).join(" · ")
-              : zh
-                ? "业务未启用"
-                : "Activités désactivées"}
-        </span>
-      </td>
-      <td data-label={zh ? "权属" : "Propriété"}>
-        <span className={cn(styles.badge, position?.ownership !== "sold" && styles.warn)}>
-          {position?.ownership === "sold"
-            ? zh
-              ? "已售"
-              : "Vendu"
-            : zh
-              ? "权属未明确"
-              : "Non précisée"}
-        </span>
-      </td>
-      <td data-label={zh ? "实际占用" : "Occupation"}>
-        <span
-          className={cn(
-            styles.badge,
-            occupied ? styles.occupied : unitNeedsVerification(record) ? styles.warn : undefined,
-          )}
-        >
-          {unitOccupancyText(record, locale)}
-        </span>
-      </td>
-      <td data-label={zh ? "运行条件" : "État"}>
-        <span
-          className={cn(styles.badge, position?.operational_condition !== "normal" && styles.warn)}
-        >
-          {conditionLabel(position?.operational_condition, locale)}
-        </span>
-        <span className={styles.sub}>{constructionLabel(unit.construction_status, locale)}</span>
-        {position?.cleaning_pending ? (
-          <span className={cn(styles.sub, styles.warn)}>{zh ? "待保洁" : "À nettoyer"}</span>
-        ) : null}
-      </td>
-    </tr>
-  );
+function attention(record: UnitWorkbenchRecord, locale: Locale) {
+  const zh = locale === "zh",
+    position = record.position;
+  if (position?.daily_occupied && position.lease_occupied)
+    return { label: zh ? "占用冲突" : "Occupation conflictuelle", critical: true };
+  if (position?.operational_condition === "locked")
+    return { label: conditionLabel("locked", locale), critical: true };
+  if (position?.operational_condition === "maintenance")
+    return { label: conditionLabel("maintenance", locale), critical: false };
+  if (position?.cleaning_pending) return { label: zh ? "待保洁" : "À nettoyer", critical: false };
+  if (unitNeedsVerification(record))
+    return { label: zh ? "待核实" : "À vérifier", critical: false };
+  return null;
 }
 
+/** Complete filtered assets are grouped by floor; ownership never substitutes for occupancy. */
 export function UnitFloorIndex({
   rows,
   selectedId,
   locale,
+  disabled = false,
   onSelect,
 }: {
   rows: UnitWorkbenchRecord[];
   selectedId: string | null;
   locale: Locale;
+  disabled?: boolean;
   onSelect: (record: UnitWorkbenchRecord) => void;
 }) {
-  const zh = locale === "zh";
-  const floors = [...new Set(rows.map((row) => row.unit.floor_label))].sort(compareFloorLabels);
+  const zh = locale === "zh",
+    t = dictionaries[locale].units;
+  const floorLabel = (record: UnitWorkbenchRecord) =>
+    record.unit.floor_label?.trim() || (zh ? "楼层待登记" : "Étage à renseigner");
+  const floors = [...new Set(rows.map(floorLabel))].sort(compareFloorLabels);
   return (
-    <div className={styles.floorIndex}>
-      <p className={styles.note}>
-        {zh
-          ? "楼层索引 · 仅当前分页，房号排列不表示真实空间位置。"
-          : "Index des étages · page actuelle, pas la position physique des locaux."}
-      </p>
+    <div className={styles.floorIndex} aria-label={zh ? "楼层资产" : "Actifs par étage"}>
       {floors.map((floor) => (
-        <div className={styles.floorRow} key={floor}>
-          <span className={styles.floorLabel}>{floor}</span>
-          <div className={styles.rooms}>
+        <section className={styles.floorGroup} key={floor} aria-label={floor}>
+          <header className={styles.floorHeading}>
+            <h2>{floor}</h2>
+            <span>
+              {rows.filter((row) => floorLabel(row) === floor).length} {zh ? "项资产" : "actifs"}
+            </span>
+          </header>
+          <div className={styles.assetCards}>
             {rows
-              .filter((row) => row.unit.floor_label === floor)
-              .map((record) => (
-                <button
-                  type="button"
-                  key={record.unit.id}
-                  className={styles.room}
-                  data-occupied={
-                    !!record.position?.daily_occupied || !!record.position?.lease_occupied
-                  }
-                  data-unknown={unitNeedsVerification(record)}
-                  aria-pressed={record.unit.id === selectedId}
-                  aria-label={`${record.unit.unit_no} · ${unitOccupancyText(record, locale)} · ${conditionLabel(record.position?.operational_condition, locale)}`}
-                  onClick={() => onSelect(record)}
-                >
-                  {record.unit.unit_no}
-                </button>
-              ))}
+              .filter((row) => floorLabel(row) === floor)
+              .sort(
+                (a, b) =>
+                  a.unit.unit_no.localeCompare(b.unit.unit_no, undefined, { numeric: true }) ||
+                  a.unit.id.localeCompare(b.unit.id),
+              )
+              .map((record) => {
+                const { unit, position } = record,
+                  warning = attention(record, locale);
+                return (
+                  <button
+                    type="button"
+                    key={unit.id}
+                    data-unit-card-id={unit.id}
+                    className={cn(
+                      styles.assetCard,
+                      warning && styles.attentionCard,
+                      warning?.critical && styles.criticalCard,
+                    )}
+                    disabled={disabled}
+                    aria-label={zh ? `查看资产 ${unit.unit_no}` : `Voir l’actif ${unit.unit_no}`}
+                    aria-describedby={`asset-use-${unit.id}${warning ? ` asset-attention-${unit.id}` : ""}`}
+                    aria-pressed={unit.id === selectedId}
+                    data-occupied={!!position?.daily_occupied || !!position?.lease_occupied}
+                    data-unknown={unitNeedsVerification(record)}
+                    onClick={() => onSelect(record)}
+                  >
+                    <span className={styles.assetCardHeading}>
+                      <strong>{unit.unit_no}</strong>
+                      {position?.ownership === "sold" ? (
+                        <small className={styles.soldMark}>{zh ? "已售" : "Vendu"}</small>
+                      ) : null}
+                    </span>
+                    <span className={styles.assetType}>{t.kinds[unit.kind]}</span>
+                    <span id={`asset-use-${unit.id}`} className={styles.assetUse}>
+                      {unitOccupancyText(record, locale)}
+                    </span>
+                    <span className={styles.assetCardFooter}>
+                      <span
+                        id={`asset-attention-${unit.id}`}
+                        className={
+                          warning
+                            ? cn(styles.attentionMark, warning.critical && styles.criticalMark)
+                            : styles.detailHint
+                        }
+                      >
+                        {warning?.label ?? (zh ? "查看详情" : "Voir les détails")}
+                      </span>
+                      <ArrowRight size={15} aria-hidden="true" />
+                    </span>
+                  </button>
+                );
+              })}
           </div>
-        </div>
+        </section>
       ))}
     </div>
   );

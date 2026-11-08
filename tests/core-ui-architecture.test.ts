@@ -63,6 +63,9 @@ describe("core UI architecture", () => {
     expect(sale).toContain("<SaleWorkbenchInspector");
     expect(sale).toContain("<RightDrawer");
     expect(assets).toContain("<UnitWorkbenchInspector");
+    expect(assets).toContain("<UnitFloorIndex");
+    expect(assets).toContain("<RightDrawer");
+    expect(assets).not.toContain("inspectorRef");
     expect(assets).toContain("UnitConditionDrawer");
     expect(assets).not.toContain("<RoomBoard");
     expect(customers).toContain("<CustomerWorkbenchInspector");

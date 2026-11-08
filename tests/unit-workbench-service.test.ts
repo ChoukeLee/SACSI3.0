@@ -20,6 +20,7 @@ let calls: {
   to?: number;
 }[];
 let pageCap: number;
+let detailFault: "missing" | "duplicate" | "foreign" | "rogueId" | "failure" | null;
 function client(): Pick<SupabaseClient, "from"> {
   return {
     from(table: string) {
@@ -33,10 +34,15 @@ function client(): Pick<SupabaseClient, "from"> {
             filters.every(([key, value]) => key.includes(".") || row[key] === value) &&
             (!ids || ids.includes(row.id)),
         );
+        const fault = columns.includes("area_sqm") && ids?.includes(uuid(250)) ? detailFault : null;
+        if (fault === "missing") rows.shift();
+        if (fault === "duplicate") rows[0] = rows[1];
+        if (fault === "foreign") rows[0] = { ...rows[0], building_id: otherBuilding };
+        if (fault === "rogueId") rows[0] = { ...rows[0], id: uuid(999999) };
         return {
           data: rows,
           count: rows.length,
-          error: table === failure ? { message: "synthetic failure" } : null,
+          error: table === failure || fault === "failure" ? { message: "synthetic failure" } : null,
         };
       };
       const query = {
@@ -95,6 +101,7 @@ beforeEach(() => {
   failure = null;
   calls = [];
   pageCap = Infinity;
+  detailFault = null;
   tables = {
     buildings: [
       {
@@ -130,9 +137,10 @@ beforeEach(() => {
 });
 
 describe("bounded asset workbench reads", () => {
-  it("reads one building's lightweight index but only 50 complete assets and no business history", async () => {
+  it("defaults to all building assets in bounded full-detail batches without business history", async () => {
     const result = await readUnitWorkbench(client());
-    expect(result.rows).toHaveLength(50);
+    expect(result.query).toMatchObject({ view: "floor", page: 1 });
+    expect(result.rows).toHaveLength(123);
     expect(result.total).toBe(123);
     expect(result.scopeTotal).toBe(123);
     expect(result.summary).toEqual({ occupied: 1, attention: 2, unverified: 0 });
@@ -144,13 +152,17 @@ describe("bounded asset workbench reads", () => {
     const complete = calls.filter(
       (call) => call.table === "units" && call.columns.includes("area_sqm"),
     );
-    expect(complete).toHaveLength(1);
-    expect(complete[0].ids).toHaveLength(50);
-    expect(complete[0].filters).toContainEqual(["building_id", building]);
+    expect(complete).toHaveLength(2);
+    expect(complete.map((call) => call.ids!.length)).toEqual([100, 23]);
+    expect(
+      complete.every((call) =>
+        call.filters.some(([key, value]) => key === "building_id" && value === building),
+      ),
+    ).toBe(true);
     expect(result.buildings[1].allows_sale).toBe(false);
   });
   it("paginates with stable numeric asset order without truncating the scope total", async () => {
-    const result = await readUnitWorkbench(client(), { page: "3" });
+    const result = await readUnitWorkbench(client(), { view: "list", page: "3" });
     expect(result.rows).toHaveLength(23);
     expect(result.rows[0].unit.unit_no).toBe("101");
     expect(result.rows.at(-1)?.unit.unit_no).toBe("123");
@@ -160,7 +172,7 @@ describe("bounded asset workbench reads", () => {
     pageCap = 11;
     const result = await readUnitWorkbench(client(), { floor: "2F" });
     expect(result.total).toBe(68);
-    expect(result.rows).toHaveLength(50);
+    expect(result.rows).toHaveLength(68);
     expect(calls.some((call) => call.table === "units" && call.from === 121)).toBe(true);
     expect(result.floors).toEqual(["1F", "2F"]);
   });
@@ -169,11 +181,63 @@ describe("bounded asset workbench reads", () => {
       project,
       building: "SACSI7",
       unit: uuid(220),
+      view: "list",
     });
     expect(result.query.building).toBe(building);
     expect(result.selected?.unit.unit_no).toBe("121");
     expect(result.rows.some((row) => row.unit.id === uuid(220))).toBe(false);
     expect(result.selectedUnavailable).toBe(false);
+  });
+  it("returns more than one thousand full assets with stable order and no per-asset reads", async () => {
+    tables.units = Array.from({ length: 1101 }, (_, n) => unit(n));
+    tables.unit_operational_position = Array.from({ length: 1101 }, (_, n) => ({
+      ...tables.unit_operational_position[1],
+      id: uuid(100 + n),
+    }));
+    const result = await readUnitWorkbench(client(), { view: "floor", page: "99" });
+    expect(result.query.page).toBe(1);
+    expect(result.rows).toHaveLength(1101);
+    expect(result.total).toBe(1101);
+    expect(result.rows[0].unit.unit_no).toBe("1");
+    expect(result.rows.at(-1)?.unit.unit_no).toBe("1101");
+    const complete = calls.filter(
+      (call) => call.table === "units" && call.columns.includes("area_sqm"),
+    );
+    expect(complete).toHaveLength(12);
+    expect(complete.every((call) => call.ids!.length <= 100)).toBe(true);
+    expect(new Set(complete.flatMap((call) => call.ids!)).size).toBe(1101);
+  });
+  it.each(["missing", "duplicate", "foreign", "rogueId", "failure"] as const)(
+    "rejects the whole floor when a later detail batch is %s instead of showing a partial directory",
+    async (fault) => {
+      tables.units = Array.from({ length: 151 }, (_, n) => unit(n));
+      detailFault = fault;
+      await expect(readUnitWorkbench(client())).rejects.toThrow();
+    },
+  );
+  it("keeps a selected asset available outside current card filters without substituting another asset", async () => {
+    const result = await readUnitWorkbench(client(), { unit: uuid(220), q: "no matching unit" });
+    expect(result.rows).toEqual([]);
+    expect(result.selected?.unit.id).toBe(uuid(220));
+    expect(result.selectedUnavailable).toBe(false);
+  });
+  it("includes sold, occupied, verified unoccupied and unknown assets in the default all range", async () => {
+    tables.units[2].occupancy_verified = false;
+    tables.unit_operational_position = tables.unit_operational_position.filter(
+      (p) => p.id !== uuid(103),
+    );
+    const result = await readUnitWorkbench(client());
+    expect(result.rows).toHaveLength(123);
+    expect(result.rows[0].position).toMatchObject({
+      ownership: "sold",
+      daily_occupied: true,
+      lease_occupied: true,
+    });
+    expect(result.rows.find((row) => row.unit.id === uuid(102))?.unit.occupancy_verified).toBe(
+      false,
+    );
+    expect(result.rows.find((row) => row.unit.id === uuid(103))?.position).toBeNull();
+    expect(result.summary.unverified).toBe(2);
   });
   it("resolves an asset-only deep link to its exact authorized building", async () => {
     tables.units.push(unit(900, { building_id: otherBuilding }));

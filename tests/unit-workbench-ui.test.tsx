@@ -5,12 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UnitWorkbench } from "@/features/units/unit-workbench";
 import {
   parseUnitWorkbenchQuery,
+  UNIT_WORKBENCH_PAGE_SIZE,
   type UnitWorkbenchData,
   type UnitWorkbenchRecord,
 } from "@/features/units/unit-workbench-model";
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
+  replace: vi.fn(),
   refresh: vi.fn(),
   audit: vi.fn(),
   params: new URLSearchParams(),
@@ -35,8 +37,11 @@ vi.mock("next/link", () => ({
 vi.mock("next/dynamic", () => ({
   default:
     () =>
-    ({ unit }: { unit: { id: string } }) => (
-      <div data-condition-target={unit.id}>原运行条件操作</div>
+    ({ unit, onClose }: { unit: { id: string }; onClose: () => void }) => (
+      <div role="dialog" aria-label="运行条件维护">
+        <div data-condition-target={unit.id}>原运行条件操作</div>
+        <button onClick={onClose}>取消维护</button>
+      </div>
     ),
 }));
 vi.mock("@/features/units/actions", () => ({ getUnitAuditLogs: mocks.audit }));
@@ -105,9 +110,9 @@ function data(): UnitWorkbenchData {
     selected: null,
     selectedUnavailable: false,
     floors: ["1F", "2F"],
-    total: 123,
-    scopeTotal: 300,
-    summary: { occupied: 120, attention: 40, unverified: 9 },
+    total: 2,
+    scopeTotal: 2,
+    summary: { occupied: 1, attention: 2, unverified: 1 },
   };
 }
 let host: HTMLDivElement, root: Root, fetcher: ReturnType<typeof vi.fn>;
@@ -133,115 +138,86 @@ const render = async (value = data(), canEdit = false, locale: "zh" | "fr" = "zh
 const click = async (element: Element) =>
   act(async () => element.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 const button = (text: string) =>
-  [...host.querySelectorAll("button")].find((item) => item.textContent?.trim() === text)!;
+  [...document.querySelectorAll("button")].find((item) => item.textContent?.trim() === text)!;
 const selectFirst = async () => click(host.querySelector('[aria-label="查看资产 101"]')!);
+const drawer = () => document.querySelector('[role="dialog"]');
+const card = (id: string) => host.querySelector(`[data-unit-card-id="${id}"]`);
+async function openDetails(label: string) {
+  const details = [...document.querySelectorAll("details")].find(
+    (item) => item.querySelector(":scope > summary")?.textContent === label,
+  );
+  expect(details).toBeTruthy();
+  if (!details!.open) await click(details!.querySelector("summary")!);
+  return details!;
+}
+async function openMaintenance() {
+  await openDetails("更多操作");
+  await click(button("核对 / 修改运行条件"));
+}
 
 describe("asset directory UI", () => {
   it.each([false, true])(
-    "focuses and scrolls the selected asset on narrow screens, respecting reduced motion %s",
+    "opens one focused asset drawer on narrow screens with reduced motion %s",
     async (reducedMotion) => {
-      const frames: FrameRequestCallback[] = [];
-      const frame = vi.fn((callback: FrameRequestCallback) => {
-        frames.push(callback);
-        return frames.length;
-      });
-      vi.stubGlobal("requestAnimationFrame", frame);
       vi.stubGlobal(
         "matchMedia",
         vi.fn((query: string) => ({
+          media: query,
           matches:
             query === "(max-width: 1199px)" ||
             (query === "(prefers-reduced-motion: reduce)" && reducedMotion),
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
         })),
       );
       await render();
-      const target = host.querySelector('[aria-label="选中资产详情区域"]') as HTMLDivElement;
-      const focus = vi.spyOn(target, "focus");
-      target.scrollIntoView = vi.fn();
       await selectFirst();
-      expect(focus).not.toHaveBeenCalled();
-      expect(frame).toHaveBeenCalledOnce();
-      await act(async () => frames[0](0));
-      expect(focus).toHaveBeenCalledWith({ preventScroll: true });
-      expect(document.activeElement).toBe(target);
-      expect(target.scrollIntoView).toHaveBeenCalledWith({
-        block: "start",
-        behavior: reducedMotion ? "auto" : "smooth",
-      });
+      expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+      expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')).toBeTruthy();
+      expect(drawer()?.contains(document.activeElement)).toBe(true);
+      expect(drawer()?.querySelectorAll('button[aria-label="Close"]')).toHaveLength(1);
+      expect(drawer()?.querySelector('[aria-label="关闭资产档案"]')).toBeNull();
+      expect(fetcher).not.toHaveBeenCalled();
+      expect(mocks.audit).not.toHaveBeenCalled();
     },
   );
-  it("does not reposition the desktop inspector or automatically steal focus for an SSR deep link", async () => {
-    const frame = vi.fn();
-    vi.stubGlobal("requestAnimationFrame", frame);
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn(() => ({ matches: false })),
-    );
+  it("opens the exact server-selected deep link in one drawer without reading unrelated business or history", async () => {
+    const value = data();
+    value.selected = value.rows[1];
+    value.query.unit = value.selected.unit.id;
+    await render(value);
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(drawer()?.querySelector('[aria-label="资产 102 的档案"]')).toBeTruthy();
+    expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
+    expect(card(uuid(101))?.getAttribute("aria-pressed")).toBe("true");
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
+  it("keeps an authorized exact deep link outside the visible floor results instead of opening the first card", async () => {
+    const value = data();
+    value.query.floor = "1F";
+    value.selected = row(98, { unit: { ...row(98).unit, floor_label: "9F" } });
+    value.query.unit = value.selected.unit.id;
+    await render(value);
+    expect(card(value.selected.unit.id)).toBeNull();
+    expect(drawer()?.querySelector('[aria-label="资产 199 的档案"]')).toBeTruthy();
+    expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("does not reopen an explicitly closed detail after a same-scope refresh of the same version", async () => {
     const value = data();
     value.selected = value.rows[0];
     value.query.unit = value.selected.unit.id;
     await render(value);
-    const target = host.querySelector('[aria-label="选中资产详情区域"]') as HTMLDivElement;
-    const focus = vi.spyOn(target, "focus");
-    expect(button("查看选中资产详情")).toBeTruthy();
-    expect(frame).not.toHaveBeenCalled();
-    await selectFirst();
-    expect(frame).not.toHaveBeenCalled();
-    expect(focus).not.toHaveBeenCalled();
-  });
-  it("gives a narrow-screen deep link an explicit detail jump without automatic focus on refresh", async () => {
-    const frames: FrameRequestCallback[] = [];
-    vi.stubGlobal(
-      "requestAnimationFrame",
-      vi.fn((callback: FrameRequestCallback) => {
-        frames.push(callback);
-        return frames.length;
-      }),
-    );
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn((query: string) => ({ matches: query === "(max-width: 1199px)" })),
-    );
-    const value = data();
-    value.selected = value.rows[0];
-    value.query.unit = value.selected.unit.id;
-    await render(value);
-    const target = host.querySelector('[aria-label="选中资产详情区域"]') as HTMLDivElement;
-    target.scrollIntoView = vi.fn();
-    expect(frames).toHaveLength(0);
-    const jump = button("查看选中资产详情");
-    expect(jump.getAttribute("aria-controls")).toBe(target.id);
-    await click(jump);
-    await act(async () => frames[0](0));
-    expect(document.activeElement).toBe(target);
-    expect(target.scrollIntoView).toHaveBeenCalledOnce();
-  });
-  it("does not focus a stale animation-frame target after a project change clears selection", async () => {
-    const frames: FrameRequestCallback[] = [];
-    vi.stubGlobal(
-      "requestAnimationFrame",
-      vi.fn((callback: FrameRequestCallback) => {
-        frames.push(callback);
-        return frames.length;
-      }),
-    );
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn(() => ({ matches: true })),
-    );
-    await render();
-    const target = host.querySelector('[aria-label="选中资产详情区域"]') as HTMLDivElement;
-    const focus = vi.spyOn(target, "focus");
-    target.scrollIntoView = vi.fn();
-    await selectFirst();
-    const projectSelect = host.querySelector('[aria-label="资产项目"]') as HTMLSelectElement;
-    await act(async () => {
-      projectSelect.value = otherProject;
-      projectSelect.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-    await act(async () => frames[0](0));
-    expect(focus).not.toHaveBeenCalled();
-    expect(target.scrollIntoView).not.toHaveBeenCalled();
+    await click(drawer()!.querySelector('button[aria-label="Close"]')!);
+    expect(drawer()).toBeNull();
+    await render({ ...value, rows: [...value.rows] });
+    expect(drawer()).toBeNull();
+    expect(document.querySelector("[data-condition-target]")).toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
   });
   it.each(["actual", "expected"] as const)(
     "labels the %s business end date instead of presenting every date as an actual departure",
@@ -275,9 +251,11 @@ describe("asset directory UI", () => {
       );
       await render();
       await selectFirst();
-      await click(button("业务关联"));
-      expect(host.textContent).toContain(`${kind === "actual" ? "实际" : "预计"} 2026-09-15`);
-      const contractLink = host.querySelector(`a[href^="/leases?contract=${uuid(900)}"]`);
+      await click(button("业务记录"));
+      expect(document.body.textContent).toContain(
+        `${kind === "actual" ? "实际" : "预计"} 2026-09-15`,
+      );
+      const contractLink = document.querySelector(`a[href^="/leases?contract=${uuid(900)}"]`);
       expect(contractLink).not.toBeNull();
       expect(
         new URL(contractLink!.getAttribute("href")!, "https://example.invalid").searchParams.get(
@@ -286,37 +264,39 @@ describe("asset directory UI", () => {
       ).toBe(building);
     },
   );
-  it("shows a compact four-column catalogue with full-building summary and no eager detail/history calls", async () => {
+  it("defaults to full-range floor cards without opening or eagerly reading an asset detail", async () => {
     await render();
-    expect(host.querySelector("h1")?.textContent).toBe("资产目录");
-    expect(host.querySelectorAll("th")).toHaveLength(4);
-    expect(host.querySelectorAll("tbody tr")).toHaveLength(2);
-    expect(host.textContent).toContain("300");
-    expect(host.textContent).toContain("123 / 300");
-    expect(host.textContent).toContain("选一项资产");
-    expect(host.textContent).toContain("不随下方筛选变化");
+    expect(host.querySelector("h1")?.textContent).toBe("资产总览");
+    expect(host.querySelector("table")).toBeNull();
+    expect(host.querySelectorAll("[data-unit-card-id]")).toHaveLength(2);
+    expect(drawer()).toBeNull();
+    expect(mocks.replace).not.toHaveBeenCalled();
     expect(fetcher).not.toHaveBeenCalled();
     expect(mocks.audit).not.toHaveBeenCalled();
   });
   it("preserves concurrent sold, leased and cleaning conditions, leaving unknown occupancy unknown", async () => {
     await render();
-    expect(host.querySelector("tbody")?.textContent).toContain("已售");
-    expect(host.querySelector("tbody")?.textContent).toContain("长租占用");
-    expect(host.querySelector("tbody")?.textContent).toContain("待保洁");
-    expect(host.querySelector("tbody")?.textContent).toContain("占用待核实");
-    expect(host.querySelector("tbody")?.textContent).not.toContain("可出租");
+    expect(card(uuid(100))?.textContent).toContain("已售");
+    expect(card(uuid(100))?.textContent).toContain("长租占用");
+    expect(card(uuid(100))?.textContent).toContain("维修中");
+    expect(card(uuid(101))?.textContent).toContain("待核");
+    expect(card(uuid(101))?.textContent).not.toMatch(/无当前占用|可出租|空置/);
+    await selectFirst();
+    await openDetails("资产资料");
+    expect(drawer()?.textContent).toContain("待保洁");
   });
   it("selects the exact asset, updates its stable URL and does not read business/history until requested", async () => {
     await render();
     await selectFirst();
-    expect(host.querySelector('[aria-label="资产 101 的档案"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="资产 101 的档案"]')).not.toBeNull();
     expect(new URL(window.location.href).searchParams.get("unit")).toBe(uuid(100));
-    expect(host.textContent).toContain("已售（业务口径）");
-    expect(host.textContent).toContain("业务配置待核对；不推定默认价格");
+    expect(drawer()?.textContent).toContain("已售");
+    await openDetails("业务配置与标准价");
+    expect(drawer()?.textContent).toContain("业务配置待核对；不推定默认价格");
     expect(fetcher).not.toHaveBeenCalled();
     expect(mocks.audit).not.toHaveBeenCalled();
-    await click(host.querySelector('[aria-label="关闭资产档案"]')!);
-    expect(host.textContent).toContain("选一项资产");
+    await click(drawer()!.querySelector('button[aria-label="Close"]')!);
+    expect(drawer()).toBeNull();
   });
   it("does not fabricate a default tariff or hide an explicitly configured zero tariff", async () => {
     const value = data();
@@ -331,24 +311,27 @@ describe("asset directory UI", () => {
     ];
     await render(value);
     await selectFirst();
-    expect(host.querySelector('[aria-label="资产 101 的档案"]')?.textContent).toContain("0 XOF");
-    expect(host.textContent).not.toContain("XOF XOF");
-    expect(host.textContent).toContain("未配置价格");
+    await openDetails("业务配置与标准价");
+    expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')?.textContent).toContain(
+      "0 XOF",
+    );
+    expect(drawer()?.textContent).not.toContain("XOF XOF");
+    expect(drawer()?.textContent).toContain("未配置价格");
   });
   it("immediately clears selected record and status editor when the project changes before the server response", async () => {
     await render(data(), true);
     await selectFirst();
-    await click(button("核对 / 修改运行条件"));
+    await openMaintenance();
     expect(
-      host.querySelector("[data-condition-target]")?.getAttribute("data-condition-target"),
+      document.querySelector("[data-condition-target]")?.getAttribute("data-condition-target"),
     ).toBe(uuid(100));
     const projectSelect = host.querySelector('[aria-label="资产项目"]') as HTMLSelectElement;
     await act(async () => {
       projectSelect.value = otherProject;
       projectSelect.dispatchEvent(new Event("change", { bubbles: true }));
     });
-    expect(host.querySelector("[data-condition-target]")).toBeNull();
-    expect(host.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
+    expect(document.querySelector("[data-condition-target]")).toBeNull();
+    expect(document.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
     expect(mocks.push).toHaveBeenCalledWith(expect.stringContaining(`project=${otherProject}`), {
       scroll: false,
     });
@@ -359,17 +342,65 @@ describe("asset directory UI", () => {
   it("does not carry an open operation into a different server-selected asset or version", async () => {
     await render(data(), true);
     await selectFirst();
-    await click(button("核对 / 修改运行条件"));
+    await openMaintenance();
     expect(
-      host.querySelector("[data-condition-target]")?.getAttribute("data-condition-target"),
+      document.querySelector("[data-condition-target]")?.getAttribute("data-condition-target"),
     ).toBe(uuid(100));
     const next = data();
     next.selected = { ...row(1), unit: { ...row(1).unit, updated_at: "2026-10-20T12:00:00Z" } };
     next.query.unit = next.selected.unit.id;
     await render(next, true);
-    expect(host.querySelector('[aria-label="资产 102 的档案"]')).not.toBeNull();
-    expect(host.querySelector("[data-condition-target]")).toBeNull();
+    expect(document.querySelector('[aria-label="资产 102 的档案"]')).not.toBeNull();
+    expect(document.querySelector("[data-condition-target]")).toBeNull();
   });
+  it("keeps maintenance behind more actions and returns from its single dialog to the selected asset", async () => {
+    await render(data(), true);
+    await selectFirst();
+    const initialMore = [...document.querySelectorAll("details")].find(
+      (item) => item.querySelector(":scope > summary")?.textContent === "更多操作",
+    )!;
+    expect(initialMore.open).toBe(false);
+    const more = await openDetails("更多操作");
+    expect(document.querySelector("[data-condition-target]")).toBeNull();
+    expect(more.open).toBe(true);
+    await click(button("核对 / 修改运行条件"));
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(document.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
+    expect(
+      document.querySelector("[data-condition-target]")?.getAttribute("data-condition-target"),
+    ).toBe(uuid(100));
+    await click(button("取消维护"));
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')).toBeTruthy();
+    expect(document.querySelector("[data-condition-target]")).toBeNull();
+  });
+  it.each(["permission", "version"] as const)(
+    "clears a maintenance dialog after a %s change without leaving the selected detail hidden",
+    async (change) => {
+      await render(data(), true);
+      await selectFirst();
+      await openMaintenance();
+      expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+      const next = data();
+      next.selected = next.rows[0];
+      next.query.unit = next.selected.unit.id;
+      if (change === "version") {
+        next.selected = {
+          ...next.selected,
+          unit: { ...next.selected.unit, updated_at: "2026-10-20T12:00:00Z" },
+        };
+        next.rows[0] = next.selected;
+      }
+      await render(next, change !== "permission");
+      expect(document.querySelector("[data-condition-target]")).toBeNull();
+      expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+      expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')).toBeTruthy();
+      if (change === "permission") {
+        await openDetails("更多操作");
+        expect(button("核对 / 修改运行条件")).toBeUndefined();
+      }
+    },
+  );
   it("binds selection to scope/result props and does not retain the previous asset on a new scope", async () => {
     await render();
     await selectFirst();
@@ -379,26 +410,83 @@ describe("asset directory UI", () => {
     next.building = next.buildings[1];
     next.rows = [];
     await render(next);
-    expect(host.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
-    expect(host.textContent).toContain("选一项资产");
+    expect(document.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
+    expect(drawer()).toBeNull();
   });
   it("retains invalid scope/selection distinctions rather than selecting an arbitrary first row", async () => {
     const value = data();
     value.selectedUnavailable = true;
     await render(value);
     expect(host.textContent).toContain("指定资产不存在、不可见或与当前范围不符");
-    expect(host.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
+    expect(document.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
     await render({ ...data(), scopeUnavailable: true, building: null });
     expect(host.textContent).toContain("指定的项目或楼栋不可用");
     expect(host.querySelector("table")).toBeNull();
+    expect(host.querySelectorAll("[data-unit-card-id]")).toHaveLength(0);
+    expect(drawer()).toBeNull();
   });
-  it("uses a labeled paginated floor index rather than claiming an architectural floor plan", async () => {
+  it("renders every filtered room across floors beyond the legacy page size without inventing a tenant or rent", async () => {
     const value = data();
-    value.query.view = "floor";
+    value.rows = Array.from({ length: UNIT_WORKBENCH_PAGE_SIZE + 3 }, (_, index) =>
+      row(index, {
+        unit: { ...row(index).unit, floor_label: index < 30 ? "1F" : "2F" },
+      }),
+    );
+    value.rows[1] = row(1, { position: null, unit: { ...row(1).unit, occupancy_verified: false } });
+    value.rows[2] = row(2, {
+      unit: { ...row(2).unit, status: "available" },
+      position: {
+        ownership: "unspecified",
+        operational_condition: "normal",
+        daily_occupied: false,
+        lease_occupied: false,
+        cleaning_pending: false,
+        daily_enabled: false,
+        lease_enabled: false,
+      },
+    });
+    value.total = value.rows.length;
+    value.scopeTotal = value.rows.length;
     await render(value);
     expect(host.querySelector("table")).toBeNull();
-    expect(host.textContent).toContain("仅当前分页，房号排列不表示真实空间位置");
-    expect(host.querySelector('[data-unknown="true"]')).not.toBeNull();
+    const cards = [...host.querySelectorAll("[data-unit-card-id]")];
+    expect(cards).toHaveLength(UNIT_WORKBENCH_PAGE_SIZE + 3);
+    expect(new Set(cards.map((item) => item.getAttribute("data-unit-card-id"))).size).toBe(
+      cards.length,
+    );
+    expect(card(value.rows.at(-1)!.unit.id)).toBeTruthy();
+    expect(host.textContent).toContain("1F");
+    expect(host.textContent).toContain("2F");
+    expect(card(uuid(100))?.textContent).toContain("已售");
+    expect(card(uuid(100))?.textContent).toContain("长租占用");
+    expect(card(uuid(101))?.textContent).not.toMatch(/无当前占用|可出租|空置/);
+    expect(card(uuid(102))?.textContent).not.toMatch(/租客|XOF|CNY|USD|可出租/);
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
+  it("normalizes a legacy paginated list link without presenting that partial page as the full floor view", async () => {
+    const value = data();
+    value.query.view = "list";
+    value.query.page = 3;
+    value.selected = value.rows[0];
+    value.query.unit = value.selected.unit.id;
+    value.query.returnTo = `/leases?contract=${uuid(900)}`;
+    value.total = 123;
+    await render(value);
+    expect(mocks.replace).toHaveBeenCalledOnce();
+    const href = new URL(mocks.replace.mock.calls[0][0], "https://example.invalid");
+    expect(href.searchParams.get("view")).not.toBe("list");
+    expect(href.searchParams.get("page")).toBeNull();
+    expect(href.searchParams.get("unit")).toBe(uuid(100));
+    expect(href.searchParams.get("returnTo")).toBe(value.query.returnTo);
+    expect(host.querySelectorAll("[data-unit-card-id]")).toHaveLength(0);
+    const next = data();
+    next.selected = next.rows[0];
+    next.query.unit = uuid(100);
+    next.query.returnTo = value.query.returnTo;
+    await render(next);
+    expect(host.querySelectorAll("[data-unit-card-id]")).toHaveLength(2);
+    expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')).toBeTruthy();
   });
   it("gates state actions to existing admin permission and hides sale setup for CIMAC", async () => {
     const value = data();
@@ -408,19 +496,20 @@ describe("asset directory UI", () => {
     await render(value);
     await selectFirst();
     expect(button("核对 / 修改运行条件")).toBeUndefined();
-    expect(host.textContent).toContain("CIMAC 只租不卖");
+    await openDetails("业务配置与标准价");
+    expect(drawer()?.textContent).toContain("CIMAC 只租不卖");
     expect(host.querySelector('select[name="business"] option[value="sale"]')).toBeNull();
   });
   it("uses the existing status audit service only after opening history and shows explicit failures", async () => {
     mocks.audit.mockRejectedValueOnce(new Error("offline"));
     await render();
     await selectFirst();
-    await click(button("状态历史"));
+    await click(button("变更记录"));
     expect(mocks.audit).toHaveBeenCalledExactlyOnceWith(uuid(100));
-    expect(host.textContent).toContain("状态历史读取失败");
-    expect(host.textContent).not.toContain("暂无可见的状态变更记录");
+    expect(document.body.textContent).toContain("状态历史读取失败");
+    expect(document.body.textContent).not.toContain("暂无可见的状态变更记录");
     await click(button("重试"));
-    expect(host.textContent).toContain("暂无可见的状态变更记录");
+    expect(document.body.textContent).toContain("暂无可见的状态变更记录");
   });
   it("requests exact-scoped relations only when the business tab opens and distinguishes guest/agent links", async () => {
     fetcher.mockResolvedValue(
@@ -452,14 +541,14 @@ describe("asset directory UI", () => {
     );
     await render();
     await selectFirst();
-    await click(button("业务关联"));
+    await click(button("业务记录"));
     expect(fetcher).toHaveBeenCalledOnce();
     expect(fetcher.mock.calls[0][0]).toContain(`unit=${uuid(100)}`);
     expect(fetcher.mock.calls[0][0]).toContain(`building=${building}`);
     expect(fetcher.mock.calls[0][0]).toContain(`project=${project}`);
-    expect(host.textContent).toContain("实际住客 · Guest Alice");
-    expect(host.textContent).toContain("代订 / 经办 · Agent Bob");
-    const links = [...host.querySelectorAll("a")];
+    expect(document.body.textContent).toContain("实际住客 · Guest Alice");
+    expect(document.body.textContent).toContain("代订 / 经办 · Agent Bob");
+    const links = [...document.querySelectorAll("a")];
     expect(links.some((link) => link.href.includes(`customer=${uuid(901)}`))).toBe(true);
     expect(links.some((link) => link.href.includes(`customer=${uuid(902)}`))).toBe(true);
   });
@@ -472,7 +561,8 @@ describe("asset directory UI", () => {
     );
     await render();
     await selectFirst();
-    await click(button("业务关联"));
+    await click(button("业务记录"));
+    await click(drawer()!.querySelector('button[aria-label="Close"]')!);
     await click(host.querySelector('[aria-label="查看资产 102"]')!);
     await act(async () =>
       resolve(
@@ -488,8 +578,8 @@ describe("asset directory UI", () => {
         ),
       ),
     );
-    expect(host.querySelector('[aria-label="资产 102 的档案"]')).not.toBeNull();
-    expect(host.textContent).not.toContain("合同与入住关系 · 0");
+    expect(document.querySelector('[aria-label="资产 102 的档案"]')).not.toBeNull();
+    expect(document.body.textContent).not.toContain("合同与入住关系 · 0");
   });
   it("rejects external return links while preserving a safe source and exact complete profile link", async () => {
     const value = data();
@@ -499,13 +589,20 @@ describe("asset directory UI", () => {
     value.query.returnTo = `/sales?contract=${uuid(900)}`;
     await render(value);
     await selectFirst();
-    expect(host.querySelector('a[href^="/sales?"]')).not.toBeNull();
-    expect(host.querySelector(`a[href^="/units/${uuid(100)}?returnTo="]`)).not.toBeNull();
+    expect(document.querySelector('a[href^="/sales?"]')).not.toBeNull();
+    await openDetails("更多操作");
+    expect(document.querySelector(`a[href^="/units/${uuid(100)}?returnTo="]`)).not.toBeNull();
   });
   it("renders the same workbench in French without granting editing", async () => {
     await render(data(), false, "fr");
-    expect(host.querySelector("h1")?.textContent).toBe("Répertoire des actifs");
+    expect(host.querySelector("h1")?.textContent).toBe("Vue des actifs");
     expect(host.querySelector('[aria-label="Voir l’actif 101"]')).not.toBeNull();
     expect(host.querySelector("form")?.getAttribute("action")).toBe("/fr/units");
+    await click(host.querySelector('[aria-label="Voir l’actif 101"]')!);
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(drawer()?.querySelector('[aria-label="Dossier de 101"]')).toBeTruthy();
+    const more = await openDetails("Autres opérations");
+    expect(more.querySelectorAll("button")).toHaveLength(0);
+    expect(document.querySelector("[data-condition-target]")).toBeNull();
   });
 });

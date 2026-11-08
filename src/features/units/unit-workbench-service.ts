@@ -42,8 +42,9 @@ const unitColumns =
   "id,building_id,code,unit_no,floor_label,kind,status,area_sqm,layout,furnishing,notes,operational_condition,reservation_holder_name,asset_subtype,construction_status,location_grade,zone_label,occupancy_verified,created_at,updated_at,unit_business_flags(unit_id,business_type,is_enabled,default_price_xof)";
 type FullUnit = UnitRow & { unit_business_flags: UnitBusinessFlagRow[] };
 const emptySummary = () => ({ occupied: 0, attention: 0, unverified: 0 });
+const detailBatchSize = 100;
 
-/** Only one building's lightweight index is scanned. Full records are read in 50-ID pages; no contracts, payments or history are read here. */
+/** One authorized building index; full filtered floor or a legacy list page, read in bounded ID batches. No contracts, payments or history. */
 export async function readUnitWorkbench(
   client: Client,
   input: UnitWorkbenchSearch = {},
@@ -206,22 +207,48 @@ export async function readUnitWorkbench(
     }),
     building.code,
   );
-  query.page = Math.min(
-    query.page,
-    Math.max(1, Math.ceil(filtered.length / UNIT_WORKBENCH_PAGE_SIZE)),
-  );
-  const ids = filtered
-    .slice((query.page - 1) * UNIT_WORKBENCH_PAGE_SIZE, query.page * UNIT_WORKBENCH_PAGE_SIZE)
-    .map((row) => row.id);
+  query.page =
+    query.view === "floor"
+      ? 1
+      : Math.min(query.page, Math.max(1, Math.ceil(filtered.length / UNIT_WORKBENCH_PAGE_SIZE)));
+  const visible =
+    query.view === "floor"
+      ? filtered
+      : filtered.slice(
+          (query.page - 1) * UNIT_WORKBENCH_PAGE_SIZE,
+          query.page * UNIT_WORKBENCH_PAGE_SIZE,
+        );
+  const ids = visible.map((row) => row.id);
   let rows: UnitWorkbenchRecord[] = [];
   if (ids.length) {
-    const { data, error } = await client
-      .from("units")
-      .select(unitColumns)
-      .eq("building_id", building.id)
-      .in("id", ids);
-    if (error || !data || data.length !== ids.length) throw new Error("AssetPageUnavailable");
-    const byId = new Map((data as FullUnit[]).map((row) => [row.id, row]));
+    const batches: string[][] = [];
+    for (let index = 0; index < ids.length; index += detailBatchSize)
+      batches.push(ids.slice(index, index + detailBatchSize));
+    const complete = await Promise.all(
+      batches.map(async (batch) => {
+        const data = await fetchAllPages<FullUnit>(
+          (from, to) =>
+            client
+              .from("units")
+              .select(unitColumns, { count: "exact" })
+              .eq("building_id", building.id)
+              .in("id", batch)
+              .order("id")
+              .range(from, to),
+          "asset full records",
+          detailBatchSize,
+        );
+        const expected = new Set(batch);
+        if (
+          data.length !== batch.length ||
+          new Set(data.map((row) => row.id)).size !== batch.length ||
+          data.some((row) => row.building_id !== building.id || !expected.has(row.id))
+        )
+          throw new Error("AssetPageUnavailable");
+        return data;
+      }),
+    );
+    const byId = new Map(complete.flat().map((row) => [row.id, row]));
     rows = ids.map((id) => {
       const row = byId.get(id);
       if (!row) throw new Error("AssetPageUnavailable");

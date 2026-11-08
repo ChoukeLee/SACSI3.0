@@ -23,6 +23,7 @@ export function UnitWorkbenchInspector({
   locale,
   canEdit,
   returnTo,
+  embedded = false,
   onClose,
   onManage,
 }: {
@@ -31,6 +32,7 @@ export function UnitWorkbenchInspector({
   locale: Locale;
   canEdit: boolean;
   returnTo: string;
+  embedded?: boolean;
   onClose: () => void;
   onManage: () => void;
 }) {
@@ -55,26 +57,31 @@ export function UnitWorkbenchInspector({
   const isCimac = building.project_code === "CIMAC";
   return (
     <aside
-      className={styles.inspector}
+      className={embedded ? styles.embeddedInspector : styles.inspector}
       aria-label={zh ? `资产 ${unit.unit_no} 的档案` : `Dossier de ${unit.unit_no}`}
     >
       <header className={styles.inspectorHeader}>
-        <p className={styles.eyebrow}>
-          {building.project_code} · {zh ? "资产档案" : "DOSSIER DE L’ACTIF"}
-        </p>
-        <div className={styles.titleRow}>
-          <h2>{unit.unit_no}</h2>
-          <button
-            type="button"
-            className={styles.close}
-            aria-label={zh ? "关闭资产档案" : "Fermer le dossier"}
-            onClick={onClose}
-          >
-            <X size={15} />
-          </button>
-        </div>
+        {!embedded ? (
+          <>
+            <p className={styles.eyebrow}>
+              {building.project_code} · {zh ? "资产档案" : "DOSSIER DE L’ACTIF"}
+            </p>
+            <div className={styles.titleRow}>
+              <h2>{unit.unit_no}</h2>
+              <button
+                type="button"
+                className={styles.close}
+                aria-label={zh ? "关闭资产档案" : "Fermer le dossier"}
+                onClick={onClose}
+              >
+                <X size={15} />
+              </button>
+            </div>
+          </>
+        ) : null}
         <p className={styles.sub}>
-          {building.display_name} · {unit.floor_label} · {t.kinds[unit.kind]}
+          {!embedded ? `${building.display_name} · ` : ""}
+          {unit.floor_label} · {t.kinds[unit.kind]}
           {unit.area_sqm != null ? ` · ${Number(unit.area_sqm)} m²` : ""}
         </p>
       </header>
@@ -86,8 +93,8 @@ export function UnitWorkbenchInspector({
         {(
           [
             ["overview", zh ? "概况" : "Aperçu"],
-            ["business", zh ? "业务关联" : "Relations"],
-            ["history", zh ? "状态历史" : "Historique"],
+            ["business", zh ? "业务记录" : "Relations"],
+            ["history", zh ? "变更记录" : "Historique"],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -112,15 +119,15 @@ export function UnitWorkbenchInspector({
         {tab === "overview" ? (
           <>
             <section className={styles.section}>
-              <h3>{zh ? "独立状态维度" : "Dimensions indépendantes"}</h3>
+              <h3>{zh ? "使用情况" : "Situation de l’actif"}</h3>
               <div className={styles.dimensions}>
                 <Dimension
-                  label={zh ? "权属 / 出售口径" : "Propriété / vente"}
+                  label={zh ? "出售状态" : "Vente"}
                   value={
                     position?.ownership === "sold"
                       ? zh
-                        ? "已售（业务口径）"
-                        : "Vendu (projection métier)"
+                        ? "已售"
+                        : "Vendu"
                       : zh
                         ? "权属未明确"
                         : "Propriété non précisée"
@@ -139,26 +146,22 @@ export function UnitWorkbenchInspector({
                   value={constructionLabel(unit.construction_status, locale)}
                 />
               </div>
-              <div className={styles.callout}>
+              <p className={styles.callout}>
                 {unitNeedsVerification(record)
                   ? zh
-                    ? "状态尚未完成核实，不计作明确空置或可出租。"
-                    : "État à vérifier : ne pas considérer comme vacant ou prêt à louer."
+                    ? "状态待核，不视为空置或可出租。"
+                    : "État à vérifier ; ne pas considérer comme vacant ou prêt à louer."
                   : position?.operational_condition !== "normal"
                     ? zh
-                      ? "运行条件受限；无占用也不代表具备出租条件。"
-                      : "État limité : sans occupation ne signifie pas prêt à louer."
+                      ? "运行条件受限，需结合实际情况安排使用。"
+                      : "État limité ; vérifier la situation avant utilisation."
                     : zh
-                      ? "无占用不等于可出租；已售资产仍可以有独立的代管或租赁关系。"
-                      : "Sans occupation ne signifie pas prêt à louer ; un bien vendu peut avoir un bail distinct."}
-                <br />
-                {zh
-                  ? "“已售”按已登记出售记录显示，房款收支在对应出售明细中核对。"
-                  : "« Vendu » suit la vente enregistrée ; vérifiez les paiements dans son dossier."}
-              </div>
+                      ? "出售与使用情况分别记录，房款和租金在对应业务明细中核对。"
+                      : "Vente et occupation sont distinctes ; consultez les paiements dans le dossier concerné."}
+              </p>
             </section>
-            <section className={styles.section}>
-              <h3>{zh ? "资产基础资料" : "Informations de base"}</h3>
+            <details className={`${styles.section} ${styles.secondaryDetails}`}>
+              <summary>{zh ? "资产资料" : "Informations de l’actif"}</summary>
               <dl className={styles.facts}>
                 <Fact
                   label={zh ? "面积" : "Surface"}
@@ -205,9 +208,9 @@ export function UnitWorkbenchInspector({
                   }
                 />
               </dl>
-            </section>
-            <section className={styles.section}>
-              <h3>{zh ? "业务配置与标准价" : "Activités et tarifs configurés"}</h3>
+            </details>
+            <details className={`${styles.section} ${styles.secondaryDetails}`}>
+              <summary>{zh ? "业务配置与标准价" : "Activités et tarifs configurés"}</summary>
               {isCimac ? (
                 <p className={styles.note}>
                   {zh
@@ -250,7 +253,7 @@ export function UnitWorkbenchInspector({
                     : "Une ancienne configuration de vente est à vérifier ; aucune vente n’est ouverte ici."}
                 </p>
               ) : null}
-            </section>
+            </details>
             {unit.notes ? (
               <section className={styles.section}>
                 <h3>{zh ? "资产备注" : "Notes"}</h3>
@@ -269,21 +272,24 @@ export function UnitWorkbenchInspector({
         ) : (
           <UnitStatusHistory key={unit.id} id={unit.id} locale={locale} />
         )}
-        <div className={styles.actions}>
-          <Link
-            className={styles.secondary}
-            href={`${routeFor(locale, `/units/${unit.id}`)}?${new URLSearchParams({ returnTo })}`}
-            prefetch={false}
-          >
-            {zh ? "完整资产档案" : "Dossier complet"}
-            <ArrowUpRight size={12} />
-          </Link>
-          {canEdit ? (
-            <button className={styles.secondary} type="button" onClick={onManage}>
-              {zh ? "核对 / 修改运行条件" : "Vérifier / modifier l’état"}
-            </button>
-          ) : null}
-        </div>
+        <details className={styles.secondaryDetails}>
+          <summary>{zh ? "更多操作" : "Autres opérations"}</summary>
+          <div className={styles.actions}>
+            <Link
+              className={styles.secondary}
+              href={`${routeFor(locale, `/units/${unit.id}`)}?${new URLSearchParams({ returnTo })}`}
+              prefetch={false}
+            >
+              {zh ? "完整资产档案" : "Dossier complet"}
+              <ArrowUpRight size={12} />
+            </Link>
+            {canEdit ? (
+              <button className={styles.secondary} type="button" onClick={onManage}>
+                {zh ? "核对 / 修改运行条件" : "Vérifier / modifier l’état"}
+              </button>
+            ) : null}
+          </div>
+        </details>
       </div>
     </aside>
   );
