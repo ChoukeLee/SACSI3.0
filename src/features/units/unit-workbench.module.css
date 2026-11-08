@@ -6,6 +6,7 @@
   gap: 20px;
   color: hsl(var(--foreground));
   min-width: 0;
+  font-size: 1rem;
 }
 :global(.dark) .workbench,
 :global(.dark) .embeddedInspector {
@@ -33,7 +34,7 @@
   letter-spacing: -0.65px;
 }
 .subtitle {
-  font-size: 12px;
+  font-size: 1rem;
   color: hsl(var(--muted-foreground));
   margin-top: 7px;
   line-height: 1.7;
@@ -46,7 +47,7 @@
 }
 .scope label,
 .filters label {
-  font-size: 0.8125rem;
+  font-size: 1rem;
   color: hsl(var(--muted-foreground));
   display: flex;
   flex-direction: column;
@@ -79,7 +80,7 @@
   background: hsl(var(--card));
   color: hsl(var(--foreground));
   min-height: 34px;
-  font-size: 0.8125rem;
+  font-size: 1rem;
   line-height: 1.5;
 }
 .primary {
@@ -146,7 +147,7 @@
   color: var(--asset-warn);
 }
 .note {
-  font-size: 11px;
+  font-size: 1rem;
   line-height: 1.8;
   color: hsl(var(--muted-foreground));
 }
@@ -179,12 +180,12 @@
   padding: 17px 18px 12px;
 }
 .listHeading h2 {
-  font-size: 13px;
+  font-size: 1.125rem;
   font-weight: 600;
 }
 .counter {
   color: hsl(var(--muted-foreground));
-  font-size: 0.8125rem;
+  font-size: 1rem;
 }
 .toolbar {
   display: flex;
@@ -208,7 +209,7 @@
 .search input {
   width: 100%;
   padding-left: 31px;
-  font-size: 0.8125rem;
+  font-size: 1rem;
 }
 .viewSwitch {
   display: flex;
@@ -240,7 +241,7 @@
   background: hsl(var(--muted) / 0.12);
 }
 .filters select {
-  font-size: 0.8125rem;
+  font-size: 1rem;
   padding: 6px 8px;
   min-height: 38px;
   max-width: 180px;
@@ -292,7 +293,7 @@
 .sub {
   display: block;
   color: hsl(var(--muted-foreground));
-  font-size: 10px;
+  font-size: 1rem;
   line-height: 1.75;
   margin-top: 3px;
 }
@@ -349,7 +350,7 @@
   border: 1px solid transparent;
   border-radius: 0.5rem;
   padding: 0.5rem 0.7rem;
-  font-size: 0.8125rem;
+  font-size: 1rem;
   color: hsl(var(--muted-foreground));
 }
 .categories button[aria-pressed="true"] {
@@ -364,12 +365,12 @@
 .filterDetails > summary {
   cursor: pointer;
   margin: 0 18px 0.65rem;
-  font-size: 0.8125rem;
+  font-size: 1rem;
   color: hsl(var(--muted-foreground));
 }
 .scopeNote {
   margin: 0.65rem 18px 0;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   color: hsl(var(--muted-foreground));
   line-height: 1.6;
 }
@@ -385,24 +386,24 @@
   margin-bottom: 0.75rem;
 }
 .floorHeading h2 {
-  font-size: 0.875rem;
+  font-size: 1.125rem;
   font-weight: 600;
 }
 .floorHeading > span {
   color: hsl(var(--muted-foreground));
-  font-size: 0.8125rem;
+  font-size: 1rem;
 }
 .assetCards {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.85rem;
 }
 .assetCard {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
-  padding: 0.85rem 1rem;
+  gap: 0.75rem;
+  padding: 1.2rem;
   text-align: left;
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
@@ -422,12 +423,23 @@
   border-top-color: #c65750;
 }
 .assetCardHeading > strong {
-  font-size: 1.25rem;
+  font-size: 1.75rem;
   font-weight: 650;
   overflow-wrap: anywhere;
 }
+.assetCardMarks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.4rem;
+}
+.assetCardMarks .attentionMark {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
 .soldMark {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   color: var(--asset-accent);
   border: 1px solid hsl(var(--border));
   border-radius: 0.25rem;
@@ -435,18 +447,247 @@
   flex-shrink: 0;
 }
 .assetType {
-  font-size: 0.8125rem;
+  font-size: 1rem;
   color: hsl(var(--muted-foreground));
 }
 .assetUse {
-  font-size: 0.875rem;
+  font-size: 1rem;
   line-height: 1.6;
   overflow-wrap: anywhere;
+}
+.cardBusiness,
+.businessBlock,
+.businessPerson,
+.paidThrough {
+  display: block;
+}
+.cardBusiness {
+  display: grid;
+  gap: 1rem;
+}
+.businessBlock {
+  padding-top: 1rem;
+  border-top: 1px solid hsl(var(--border));
+}
+.businessPerson {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.7rem;
+  margin-bottom: 1rem;
+}
+.personRole {
+  font-size: 1rem;
+  color: hsl(var(--muted-foreground));
+}
+.businessPerson > strong {
+  font-size: 1.375rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.partyReview {
+  color: var(--asset-warn);
+  font-size: 0.875rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.35rem;
+}
+.businessMoney {
+  display: grid;
+  gap: 0.65rem;
+}
+.businessMoneyRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.businessMoneyRow > span {
+  font-size: 1rem;
+  color: hsl(var(--muted-foreground));
+  flex-shrink: 0;
+}
+.businessMoneyRow > strong {
+  min-width: 0;
+  text-align: right;
+  font-size: 1.375rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+.moneyCurrency {
+  display: block;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.balanceBasis {
+  display: inline-block;
+  margin-left: 0.35rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+.moneyAlert {
+  color: #b33135;
+}
+:global(.dark) .moneyAlert {
+  color: #ffabaa;
+}
+.paidThrough {
+  margin-top: 1rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.5rem;
+  background: hsl(var(--muted) / 0.45);
+}
+.paidThrough > span {
+  color: hsl(var(--muted-foreground));
+  font-size: 1rem;
+}
+.paidThrough small {
+  margin-left: 0.5rem;
+  font-size: 0.875rem;
+}
+.paidThrough > strong {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 1.375rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.businessUnavailable,
+.businessMissing p {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: hsl(var(--muted-foreground));
+}
+.customerOverview {
+  display: grid;
+  gap: 1.3rem;
+}
+.currentUse {
+  font-size: 1rem;
+  color: hsl(var(--muted-foreground));
+}
+.customerSection {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  padding: 1.15rem;
+}
+.customerSection .businessPerson > strong {
+  font-size: 1.5rem;
+}
+.customerSection .businessMoney {
+  margin-top: 1rem;
+  gap: 0.9rem;
+}
+.customerSection .businessMoneyRow > strong,
+.customerSection .paidThrough > strong {
+  font-size: 1.75rem;
+}
+.businessMissing h3,
+.receiptsHeading h3 {
+  font-size: 1.125rem;
+  font-weight: 650;
+}
+.recentReceipts {
+  margin-top: 1.5rem;
+}
+.receiptsHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.receiptsHeading > span,
+.receiptLimit {
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+}
+.receiptRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.receiptRow > div > strong {
+  font-size: 1.0625rem;
+  font-weight: 550;
+}
+.receiptRow time {
+  display: block;
+  margin-top: 0.3rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem;
+}
+.receiptRow > strong {
+  font-size: 1.375rem;
+  font-weight: 650;
+  text-align: right;
+}
+.receiptSource {
+  grid-column: 1 / -1;
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+}
+.receiptSource summary {
+  cursor: pointer;
+}
+.receiptSource p,
+.sourceReference {
+  overflow-wrap: anywhere;
+}
+.receiptToggle {
+  color: var(--asset-accent);
+  font-size: 1rem;
+  padding: 0.75rem 0;
+  text-align: left;
+}
+.auxiliaryMoney {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-top: 0.8rem;
+  font-size: 1rem;
+}
+.auxiliaryMoney > strong {
+  font-size: 1.25rem;
+  text-align: right;
+  font-weight: 550;
+}
+.sourceDetails {
+  margin: 1rem 0;
+  font-size: 1rem;
+}
+.sourceDetails > summary {
+  cursor: pointer;
+  color: var(--asset-accent);
+}
+.sourceDetails > p {
+  margin-top: 0.7rem;
+  font-size: 0.875rem;
+  line-height: 1.8;
+  color: hsl(var(--muted-foreground));
+}
+.sourceDetails .reviewNote {
+  color: var(--asset-warn);
+}
+.receiptLimit {
+  margin-top: 0.75rem;
+  line-height: 1.7;
+}
+.drawerTitle {
+  font-size: 1.375rem;
+  line-height: 1.5;
+  font-weight: 650;
 }
 .assetCardFooter {
   margin-top: auto;
   padding-top: 0.25rem;
-  font-size: 0.75rem;
+  font-size: 1rem;
 }
 .detailHint {
   color: hsl(var(--muted-foreground));
@@ -478,10 +719,11 @@
   background: hsl(var(--card));
   border: 0;
   border-radius: 0;
+  font-size: 1rem;
 }
 .secondaryDetails > summary {
   cursor: pointer;
-  font-size: 0.8125rem;
+  font-size: 1rem;
   font-weight: 550;
 }
 .secondaryDetails[open] > summary {
@@ -490,14 +732,14 @@
 .secondaryDetails .actions {
   margin-top: 0.8rem;
 }
-@container (max-width: 979px) {
+@container (max-width: 1050px) {
   .assetCards {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @container (max-width: 699px) {
   .assetCards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @container (max-width: 459px) {
@@ -569,7 +811,7 @@
   border-bottom: 1px solid hsl(var(--border));
 }
 .tabs button {
-  font-size: 11px;
+  font-size: 1rem;
   padding: 11px 0;
   color: hsl(var(--muted-foreground));
   border-bottom: 2px solid transparent;
@@ -585,7 +827,7 @@
   gap: 20px;
 }
 .section h3 {
-  font-size: 11px;
+  font-size: 1.125rem;
   font-weight: 650;
   margin-bottom: 12px;
 }
@@ -610,11 +852,11 @@
 .dimension label {
   display: block;
   color: hsl(var(--muted-foreground));
-  font-size: 10px;
+  font-size: 1rem;
   margin-bottom: 5px;
 }
 .dimension span {
-  font-size: 11px;
+  font-size: 1.125rem;
   line-height: 1.7;
 }
 .facts {
@@ -623,12 +865,12 @@
   gap: 14px 16px;
 }
 .facts dt {
-  font-size: 10px;
+  font-size: 1rem;
   color: hsl(var(--muted-foreground));
 }
 .facts dd {
   margin-top: 5px;
-  font-size: 11px;
+  font-size: 1rem;
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
@@ -636,7 +878,7 @@
   background: hsl(var(--muted) / 0.3);
   border-left: 2px solid var(--asset-warn);
   padding: 10px 12px;
-  font-size: 10px;
+  font-size: 0.875rem;
   line-height: 1.9;
   color: hsl(var(--muted-foreground));
   margin-top: 12px;
@@ -651,7 +893,7 @@
   align-items: center;
   gap: 5px;
   color: var(--asset-accent);
-  font-size: 11px;
+  font-size: 1rem;
   text-decoration: none;
 }
 .inlineLink:hover {
@@ -666,12 +908,12 @@
   margin: 0 auto 14px;
 }
 .empty h3 {
-  font-size: 13px;
+  font-size: 1.125rem;
   font-weight: 600;
   margin-bottom: 7px;
 }
 .empty p {
-  font-size: 11px;
+  font-size: 1rem;
   color: hsl(var(--muted-foreground));
   line-height: 1.9;
 }
@@ -687,7 +929,7 @@
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  font-size: 11px;
+  font-size: 1rem;
   font-weight: 600;
   margin-bottom: 7px;
 }
@@ -701,12 +943,12 @@
 .history li {
   padding-left: 13px;
   border-left: 2px solid hsl(var(--border));
-  font-size: 11px;
+  font-size: 1rem;
   line-height: 1.8;
 }
 .history time {
   display: block;
-  font-size: 10px;
+  font-size: 0.875rem;
   color: hsl(var(--muted-foreground));
 }
 .pending {

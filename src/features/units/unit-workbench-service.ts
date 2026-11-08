@@ -5,6 +5,7 @@ import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import { compareFloorLabels, sortUnitsForBuilding } from "@/lib/utils";
 import type { UnitBusinessFlagRow, UnitRow } from "@/types/database";
 import type { UnitPosition } from "./operational-position";
+import { readUnitBusinessSummaries } from "./unit-business-summary-read";
 import {
   matchesUnitWorkbenchFilter,
   parseUnitWorkbenchQuery,
@@ -44,7 +45,7 @@ type FullUnit = UnitRow & { unit_business_flags: UnitBusinessFlagRow[] };
 const emptySummary = () => ({ occupied: 0, attention: 0, unverified: 0 });
 const detailBatchSize = 100;
 
-/** One authorized building index; full filtered floor or a legacy list page, read in bounded ID batches. No contracts, payments or history. */
+/** One authorized building index; current business summaries are read in bounded batches without changing financial records. */
 export async function readUnitWorkbench(
   client: Client,
   input: UnitWorkbenchSearch = {},
@@ -202,7 +203,7 @@ export async function readUnitWorkbench(
             unit.unit_business_flags.some(
               (flag) => flag.business_type === query.business && flag.is_enabled,
             ))) &&
-        matchesUnitWorkbenchFilter(record, query.filter)
+        (query.filter === "attention" || matchesUnitWorkbenchFilter(record, query.filter))
       );
     }),
     building.code,
@@ -212,7 +213,7 @@ export async function readUnitWorkbench(
       ? 1
       : Math.min(query.page, Math.max(1, Math.ceil(filtered.length / UNIT_WORKBENCH_PAGE_SIZE)));
   const visible =
-    query.view === "floor"
+    query.view === "floor" || query.filter === "attention"
       ? filtered
       : filtered.slice(
           (query.page - 1) * UNIT_WORKBENCH_PAGE_SIZE,
@@ -269,6 +270,28 @@ export async function readUnitWorkbench(
       position: positionMap.get(unit.id) ?? null,
     };
   }
+  const business = await readUnitBusinessSummaries(
+    client,
+    [...rows, ...(selected ? [selected] : [])],
+    building,
+    new Date().toISOString().slice(0, 10),
+  );
+  rows = rows.map((row) => ({ ...row, business: business[row.unit.id] }));
+  if (selected) selected = { ...selected, business: business[selected.unit.id] };
+  let resultTotal = filtered.length;
+  if (query.filter === "attention") {
+    rows = rows.filter((row) => matchesUnitWorkbenchFilter(row, "attention"));
+    resultTotal = rows.length;
+    query.page =
+      query.view === "floor"
+        ? 1
+        : Math.min(query.page, Math.max(1, Math.ceil(resultTotal / UNIT_WORKBENCH_PAGE_SIZE)));
+    if (query.view === "list")
+      rows = rows.slice(
+        (query.page - 1) * UNIT_WORKBENCH_PAGE_SIZE,
+        query.page * UNIT_WORKBENCH_PAGE_SIZE,
+      );
+  }
   // A target in another explicit scope is never substituted with the current occupant or first asset.
   return {
     query,
@@ -279,7 +302,7 @@ export async function readUnitWorkbench(
     selected,
     selectedUnavailable: !!input.unit && !selected,
     floors: [...new Set(catalogue.map((row) => row.floor_label))].sort(compareFloorLabels),
-    total: filtered.length,
+    total: resultTotal,
     scopeTotal: catalogue.length,
     summary,
   };

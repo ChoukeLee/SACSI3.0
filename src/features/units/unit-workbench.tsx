@@ -37,16 +37,19 @@ export function UnitWorkbench({
   const [pending, startTransition] = useTransition();
   const { query, building } = data;
   const floorReady = query.view === "floor";
-  const selectionKey = `${JSON.stringify(query)}:${data.rows.map((row) => `${row.unit.id}:${row.unit.updated_at}`).join(",")}:${data.selected?.unit.updated_at ?? ""}`;
-  const [selection, setSelection] = useState<{ key: string; record: UnitWorkbenchRecord | null }>({
+  const selectionKey = JSON.stringify(query);
+  const [selection, setSelection] = useState<{ key: string; id: string | null }>({
     key: selectionKey,
-    record: data.selected,
+    id: data.selected?.unit.id ?? null,
   });
+  const selectedId =
+    selection.key === selectionKey ? selection.id : (data.selected?.unit.id ?? null);
+  const currentRecord =
+    data.rows.find((row) => row.unit.id === selectedId) ??
+    (data.selected?.unit.id === selectedId ? data.selected : null);
   const selected =
-    floorReady && !data.scopeUnavailable
-      ? selection.key === selectionKey
-        ? selection.record
-        : data.selected
+    floorReady && !data.scopeUnavailable && currentRecord?.unit.building_id === building?.id
+      ? currentRecord
       : null;
   const [conditionTarget, setConditionTarget] = useState<string | null>(null);
   const selectedVersion = selected
@@ -84,7 +87,7 @@ export function UnitWorkbench({
   }, [canEdit]);
 
   const navigate = (patch: Partial<UnitWorkbenchQuery>) => {
-    setSelection({ key: selectionKey, record: null });
+    setSelection({ key: selectionKey, id: null });
     setConditionTarget(null);
     startTransition(() =>
       router.push(
@@ -100,7 +103,7 @@ export function UnitWorkbench({
   };
   const select = (record: UnitWorkbenchRecord | null) => {
     if (pending || !floorReady) return;
-    setSelection({ key: selectionKey, record });
+    setSelection({ key: selectionKey, id: record?.unit.id ?? null });
     setConditionTarget(null);
     window.history.replaceState(
       window.history.state,
@@ -125,7 +128,7 @@ export function UnitWorkbench({
   const categories: [UnitWorkbenchFilter, string][] = [
     ["all", zh ? "全部资产" : "Tous les actifs"],
     ["occupied", zh ? "使用中" : "En usage"],
-    ["unoccupied", zh ? "已核无占用" : "Sans occupation vérifiée"],
+    ["unoccupied", zh ? "暂无租住记录" : "Sans bail ni séjour"],
     ["attention", zh ? "需关注" : "À examiner"],
   ];
   const extraFilters: [UnitWorkbenchFilter, string][] = [
@@ -398,8 +401,8 @@ export function UnitWorkbench({
             </form>
             <p className={styles.scopeNote}>
               {zh
-                ? "无当前占用不等于可出租，未知状态单独标记。"
-                : "Sans occupation ne signifie pas disponible à louer ; les états inconnus sont signalés."}
+                ? "买方、租客和收款按业务分别显示；房屋使用情况以核实记录为准。"
+                : "Acquéreurs, locataires et encaissements sont présentés par activité ; l’usage du bien repose sur les informations vérifiées."}
               {building.project_code === "CIMAC"
                 ? zh
                   ? " CIMAC只租不卖。"
@@ -437,7 +440,11 @@ export function UnitWorkbench({
             <RightDrawer
               open
               width="wide"
-              title={`${building.display_name} · ${selected.unit.unit_no}`}
+              title={
+                <span className={styles.drawerTitle}>
+                  {building.display_name} · {selected.unit.unit_no}
+                </span>
+              }
               onClose={() => select(null)}
             >
               <UnitWorkbenchInspector

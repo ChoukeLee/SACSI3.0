@@ -31,7 +31,11 @@ function client(): Pick<SupabaseClient, "from"> {
         calls.push({ table, columns, filters: [...filters], ids });
         const rows = (tables[table] ?? []).filter(
           (row) =>
-            filters.every(([key, value]) => key.includes(".") || row[key] === value) &&
+            filters.every(
+              ([key, value]) =>
+                key.includes(".") ||
+                (Array.isArray(value) ? value.includes(row[key]) : row[key] === value),
+            ) &&
             (!ids || ids.includes(row.id)),
         );
         const fault = columns.includes("area_sqm") && ids?.includes(uuid(250)) ? detailFault : null;
@@ -54,8 +58,9 @@ function client(): Pick<SupabaseClient, "from"> {
           filters.push([key, value]);
           return query;
         },
-        in(_key: string, value: unknown[]) {
-          ids = value;
+        in(key: string, value: unknown[]) {
+          if (key === "id") ids = value;
+          else filters.push([key, value]);
           return query;
         },
         order() {
@@ -137,7 +142,7 @@ beforeEach(() => {
 });
 
 describe("bounded asset workbench reads", () => {
-  it("defaults to all building assets in bounded full-detail batches without business history", async () => {
+  it("defaults to all building assets in bounded batches with current-only business summaries", async () => {
     const result = await readUnitWorkbench(client());
     expect(result.query).toMatchObject({ view: "floor", page: 1 });
     expect(result.rows).toHaveLength(123);
@@ -146,9 +151,30 @@ describe("bounded asset workbench reads", () => {
     expect(result.summary).toEqual({ occupied: 1, attention: 2, unverified: 0 });
     expect(
       calls.every((call) =>
-        ["buildings", "units", "unit_operational_position"].includes(call.table),
+        [
+          "buildings",
+          "units",
+          "unit_operational_position",
+          "lease_contracts",
+          "sale_contracts",
+          "daily_bookings",
+        ].includes(call.table),
       ),
     ).toBe(true);
+    const currentBusiness = calls.filter((call) =>
+      ["lease_contracts", "sale_contracts", "daily_bookings"].includes(call.table),
+    );
+    expect(currentBusiness.length).toBeGreaterThan(0);
+    expect(currentBusiness.length).toBeLessThan(12);
+    for (const call of currentBusiness) {
+      expect(call.filters).toContainEqual([
+        "status",
+        call.table === "daily_bookings" ? ["checked_in"] : ["active", "draft"],
+      ]);
+      const ids = call.filters.find(([key]) => key === "unit_id")?.[1] as string[];
+      expect(ids.length).toBeLessThanOrEqual(100);
+      expect(ids.every((id) => tables.units.some((unit) => unit.id === id))).toBe(true);
+    }
     const complete = calls.filter(
       (call) => call.table === "units" && call.columns.includes("area_sqm"),
     );

@@ -6,6 +6,19 @@ import { ArrowUpRight, Building2, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
 import { formatXof } from "@/lib/utils";
+import { buildWorkbenchRecordHref } from "@/lib/workbench-links";
+import type {
+  UnitBusinessReceipt,
+  UnitLeaseBrief,
+  UnitSaleBrief,
+} from "./unit-business-summary-model";
+import {
+  UnitAmountValue,
+  UnitPaidThrough,
+  UnitPartyHeading,
+  UnitPartyMoney,
+  unitReviewText,
+} from "./unit-workbench-table";
 import { conditionLabel } from "./operational-position";
 import {
   constructionLabel,
@@ -82,7 +95,6 @@ export function UnitWorkbenchInspector({
         <p className={styles.sub}>
           {!embedded ? `${building.display_name} · ` : ""}
           {unit.floor_label} · {t.kinds[unit.kind]}
-          {unit.area_sqm != null ? ` · ${Number(unit.area_sqm)} m²` : ""}
         </p>
       </header>
       <div
@@ -118,8 +130,14 @@ export function UnitWorkbenchInspector({
       >
         {tab === "overview" ? (
           <>
-            <section className={styles.section}>
-              <h3>{zh ? "使用情况" : "Situation de l’actif"}</h3>
+            <UnitCustomerOverview
+              record={record}
+              building={building}
+              locale={locale}
+              returnTo={returnTo}
+            />
+            <details className={`${styles.section} ${styles.secondaryDetails}`}>
+              <summary>{zh ? "资产资料" : "Informations de l’actif"}</summary>
               <div className={styles.dimensions}>
                 <Dimension
                   label={zh ? "出售状态" : "Vente"}
@@ -159,9 +177,6 @@ export function UnitWorkbenchInspector({
                       ? "出售与使用情况分别记录，房款和租金在对应业务明细中核对。"
                       : "Vente et occupation sont distinctes ; consultez les paiements dans le dossier concerné."}
               </p>
-            </section>
-            <details className={`${styles.section} ${styles.secondaryDetails}`}>
-              <summary>{zh ? "资产资料" : "Informations de l’actif"}</summary>
               <dl className={styles.facts}>
                 <Fact
                   label={zh ? "面积" : "Surface"}
@@ -255,10 +270,10 @@ export function UnitWorkbenchInspector({
               ) : null}
             </details>
             {unit.notes ? (
-              <section className={styles.section}>
-                <h3>{zh ? "资产备注" : "Notes"}</h3>
+              <details className={`${styles.section} ${styles.secondaryDetails}`}>
+                <summary>{zh ? "资产备注" : "Notes"}</summary>
                 <p className={styles.note}>{unit.notes}</p>
-              </section>
+              </details>
             ) : null}
           </>
         ) : tab === "business" ? (
@@ -309,4 +324,295 @@ function Fact({ label, value }: { label: string; value?: string | null }) {
       <dd>{value ?? "—"}</dd>
     </div>
   );
+}
+
+function UnitCustomerOverview({
+  record,
+  building,
+  locale,
+  returnTo,
+}: {
+  record: UnitWorkbenchRecord;
+  building: UnitWorkbenchBuilding;
+  locale: Locale;
+  returnTo: string;
+}) {
+  const zh = locale === "zh",
+    summary = record.business;
+  if (!summary || summary.status !== "ready")
+    return (
+      <section className={styles.businessMissing} role="status">
+        <h3>{zh ? "客户与收款" : "Clients et paiements"}</h3>
+        <p>
+          {summary?.status === "unavailable"
+            ? zh
+              ? "当前客户与收款资料暂不可读取，未显示旧金额或零余额。"
+              : "Clients et paiements indisponibles ; anciens montants et faux soldes nuls masqués."
+            : zh
+              ? "关联客户与收款资料待核，不据资产状态推算款项。"
+              : "Clients et paiements à vérifier ; aucun montant déduit du statut de l’actif."}
+        </p>
+      </section>
+    );
+  const parties = [
+    ...summary.sales.map((party) => ({ role: "sale" as const, party })),
+    ...summary.leases.map((party) => ({ role: "lease" as const, party })),
+  ];
+  return (
+    <div className={styles.customerOverview}>
+      <p className={styles.currentUse}>{unitOccupancyText(record, locale)}</p>
+      {parties.map(({ role, party }) => {
+        const link = buildWorkbenchRecordHref({
+          workspace: role === "sale" ? "sales" : "leases",
+          id: party.recordId,
+          locale,
+          project: building.project_id,
+          building: building.id,
+          returnTo,
+          workArea: building.project_code === "CIMAC" ? "cimac" : "sacsi",
+        });
+        return (
+          <section
+            key={`${role}:${party.recordId}`}
+            className={styles.customerSection}
+            data-unit-party-record-id={party.recordId}
+            aria-label={
+              role === "sale"
+                ? zh
+                  ? "买方与房款"
+                  : "Acquéreur et prix du bien"
+                : zh
+                  ? "租客与租金"
+                  : "Locataire et loyers"
+            }
+          >
+            <UnitPartyHeading party={party} role={role} locale={locale} />
+            {role === "sale" ? (
+              <UnitPartyMoney sale={party as UnitSaleBrief} locale={locale} />
+            ) : (
+              <>
+                <UnitPartyMoney lease={party as UnitLeaseBrief} locale={locale} />
+                <UnitPaidThrough party={party as UnitLeaseBrief} locale={locale} />
+              </>
+            )}
+            <PartyReceipts party={party} role={role} locale={locale} />
+            {(role === "lease"
+              ? [
+                  {
+                    label: zh ? "另收押金" : "Dépôts reçus",
+                    values: (party as UnitLeaseBrief).depositReceived,
+                  },
+                ]
+              : []
+            )
+              .concat([
+                { label: zh ? "另收中介费" : "Commissions reçues", values: party.agencyReceived },
+                { label: zh ? "其他收款" : "Autres encaissements", values: party.otherReceived },
+                { label: zh ? "已退金额" : "Remboursements versés", values: party.refundPaid },
+              ])
+              .filter((item) => item.values?.length)
+              .map((item) => (
+                <div className={styles.auxiliaryMoney} key={item.label}>
+                  <span>{item.label}</span>
+                  <strong>
+                    <UnitAmountValue values={item.values} locale={locale} />
+                  </strong>
+                </div>
+              ))}
+            <details className={styles.sourceDetails}>
+              <summary>{zh ? "来源与待核事项" : "Sources et points à vérifier"}</summary>
+              <p>
+                {role === "sale"
+                  ? zh
+                    ? "总价、已录实收和已核账单分别核对；登记余款不自动当作已核应收。"
+                    : "Prix, encaissements enregistrés et créances sont distincts ; un solde enregistré ne devient pas une créance vérifiée."
+                  : zh
+                    ? "租金实收不含押金、中介费和其他收款；登记交至日期不代替实收或账单。"
+                    : "Les loyers encaissés excluent dépôts, commissions et autres recettes ; la date enregistrée ne remplace ni encaissements ni créances."}
+              </p>
+              {party.reviewReasons.length ? (
+                <p className={styles.reviewNote}>{unitReviewText(party.reviewReasons, locale)}</p>
+              ) : null}
+              {party.sourceRef ? <p className={styles.sourceReference}>{party.sourceRef}</p> : null}
+              {role === "sale" && (party as UnitSaleBrief).balance.sourceRef ? (
+                <p className={styles.sourceReference}>
+                  {(party as UnitSaleBrief).balance.sourceRef}
+                </p>
+              ) : null}
+            </details>
+            {link ? (
+              <Link href={link} prefetch={false} className={styles.inlineLink}>
+                {role === "sale"
+                  ? zh
+                    ? "打开出售记录"
+                    : "Ouvrir le dossier de vente"
+                  : zh
+                    ? "打开租赁记录"
+                    : "Ouvrir le dossier de location"}
+                <ArrowUpRight size={15} aria-hidden="true" />
+              </Link>
+            ) : null}
+          </section>
+        );
+      })}
+      {summary.daily.map((party) => (
+        <section className={styles.customerSection} key={`daily:${party.recordId}`}>
+          <span className={styles.businessPerson}>
+            <span className={styles.personRole}>{zh ? "日租住客" : "Client du séjour"}</span>
+            <strong>{party.customerName || (zh ? "姓名待核" : "Identité à vérifier")}</strong>
+          </span>
+          <p className={styles.note}>
+            {zh ? "经办" : "Intermédiaire"}：{party.agentName || (zh ? "未登记" : "Non renseigné")}
+          </p>
+          <p className={styles.note}>
+            {zh ? "入住" : "Arrivée"} {party.checkIn || "—"} · {zh ? "退房" : "Départ"}{" "}
+            {party.checkOut || "—"}
+          </p>
+        </section>
+      ))}
+      {!parties.length && !summary.daily.length ? (
+        <p className={styles.businessUnavailable}>
+          {zh
+            ? "尚未关联买方或租客，未推定任何收款。"
+            : "Aucun acquéreur ou locataire associé ; aucun encaissement présumé."}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function PartyReceipts({
+  party,
+  role,
+  locale,
+}: {
+  party: UnitSaleBrief | UnitLeaseBrief;
+  role: "sale" | "lease";
+  locale: Locale;
+}) {
+  const zh = locale === "zh";
+  const [expanded, setExpanded] = useState(false);
+  const primary = party.recentReceipts.filter(
+    (row) =>
+      row.role === role &&
+      row.recordId === party.recordId &&
+      row.unitId === party.unitId &&
+      row.direction === "in" &&
+      row.kind === (role === "sale" ? "purchase" : "rent"),
+  );
+  const other = party.recentReceipts.filter(
+    (row) =>
+      row.role === role &&
+      row.recordId === party.recordId &&
+      row.unitId === party.unitId &&
+      !primary.some((receipt) => receipt.id === row.id),
+  );
+  const shown = expanded ? primary : primary.slice(0, 3);
+  const receipt = (row: UnitBusinessReceipt) => (
+    <article className={styles.receiptRow} key={row.id} data-unit-receipt-id={row.id}>
+      <div>
+        <strong>{receiptLabel(row, locale)}</strong>
+        <time dateTime={row.date}>{row.date}</time>
+      </div>
+      <strong>
+        {row.direction === "out" ? "− " : ""}
+        <UnitAmountValue values={[row.amount]} locale={locale} />
+      </strong>
+      {row.sourceRef ? (
+        <details className={styles.receiptSource}>
+          <summary>{zh ? "来源" : "Source"}</summary>
+          <p>{row.sourceRef}</p>
+        </details>
+      ) : null}
+    </article>
+  );
+  return (
+    <div className={styles.recentReceipts}>
+      <div className={styles.receiptsHeading}>
+        <h3>
+          {role === "sale"
+            ? zh
+              ? "最近房款收款"
+              : "Derniers encaissements du prix"
+            : zh
+              ? "最近租金收款"
+              : "Derniers loyers encaissés"}
+        </h3>
+        <span>
+          {zh
+            ? `已录${party.receiptCount}笔收付款`
+            : `${party.receiptCount} mouvements enregistrés`}
+        </span>
+      </div>
+      {shown.length ? (
+        shown.map(receipt)
+      ) : (
+        <p className={styles.note}>
+          {zh
+            ? "最近记录中未见此类实收，完整资料可在业务明细核对。"
+            : "Aucun encaissement de ce type parmi les mouvements récents ; consultez le dossier complet."}
+        </p>
+      )}
+      {primary.length > 3 ? (
+        <button
+          type="button"
+          className={styles.receiptToggle}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded
+            ? zh
+              ? "收起"
+              : "Réduire"
+            : zh
+              ? "展开最近收款"
+              : "Voir les encaissements récents"}
+        </button>
+      ) : null}
+      {other.length ? (
+        <details className={styles.sourceDetails}>
+          <summary>
+            {zh ? "押金、中介及其他收支" : "Dépôts, commissions et autres mouvements"}
+          </summary>
+          {other.map(receipt)}
+        </details>
+      ) : null}
+      {party.receiptCount > party.recentReceipts.length ? (
+        <p className={styles.receiptLimit}>
+          {zh
+            ? "这里只列最近记录，全部流水见对应业务收支明细。"
+            : "Seuls les mouvements récents sont présentés ; consultez les paiements du dossier pour la liste complète."}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function receiptLabel(receipt: UnitBusinessReceipt, locale: Locale) {
+  const zh = locale === "zh";
+  if (receipt.kind === "purchase") return zh ? "房款" : "Prix du bien";
+  if (receipt.kind === "rent") return zh ? "租金" : "Loyer";
+  if (receipt.kind === "deposit")
+    return receipt.direction === "out"
+      ? zh
+        ? "押金退还"
+        : "Dépôt remboursé"
+      : zh
+        ? "押金"
+        : "Dépôt";
+  if (receipt.kind === "agency")
+    return receipt.direction === "out"
+      ? zh
+        ? "中介费支出"
+        : "Commission versée"
+      : zh
+        ? "中介费收款"
+        : "Commission reçue";
+  if (receipt.kind === "refund") return zh ? "退款" : "Remboursement";
+  return receipt.direction === "out"
+    ? zh
+      ? "其他支出"
+      : "Autre décaissement"
+    : zh
+      ? "其他收款"
+      : "Autre encaissement";
 }

@@ -3,6 +3,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UnitWorkbench } from "@/features/units/unit-workbench";
+import type { UnitBusinessSummary } from "@/features/units/unit-business-summary-model";
 import {
   parseUnitWorkbenchQuery,
   UNIT_WORKBENCH_PAGE_SIZE,
@@ -113,6 +114,59 @@ function data(): UnitWorkbenchData {
     total: 2,
     scopeTotal: 2,
     summary: { occupied: 1, attention: 2, unverified: 1 },
+  };
+}
+function business(unitId = uuid(100)): UnitBusinessSummary {
+  const party = {
+    unitId,
+    status: "active",
+    historical: false,
+    sourceRef: "Synthetic source",
+    reviewReasons: [],
+    recentReceipts: [],
+    receiptCount: 0,
+  };
+  return {
+    status: "ready",
+    today: "2026-11-08",
+    daily: [],
+    reviewReasons: [],
+    sales: [
+      {
+        ...party,
+        recordId: uuid(600),
+        customerId: uuid(700),
+        customerName: "Synthetic buyer Alpha",
+        signedDate: null,
+        total: { currency: "XOF", amount: 1000000 },
+        received: [{ currency: "XOF", amount: 600000 }],
+        balance: { basis: "verified_bills", amounts: [{ currency: "XOF", amount: 400000 }] },
+        agencyReceived: [{ currency: "XOF", amount: 30000 }],
+        otherReceived: [],
+        refundPaid: [],
+      },
+    ],
+    leases: [
+      {
+        ...party,
+        recordId: uuid(601),
+        customerId: uuid(701),
+        customerName: "Synthetic tenant Alpha",
+        occupancy: "leased",
+        monthlyRent: { currency: "USD", amount: 1000 },
+        rentReceived: [{ currency: "USD", amount: 2000 }],
+        dueUnpaid: [{ currency: "USD", amount: 500 }],
+        rentUnpaid: [{ currency: "USD", amount: 1000 }],
+        paidThrough: "2026-12-31",
+        startDate: "2026-01-01",
+        nextDue: "2026-11-01",
+        overdue: [{ currency: "USD", amount: 500 }],
+        depositReceived: [{ currency: "USD", amount: 1500 }],
+        agencyReceived: [{ currency: "USD", amount: 200 }],
+        otherReceived: [],
+        refundPaid: [],
+      },
+    ],
   };
 }
 let host: HTMLDivElement, root: Root, fetcher: ReturnType<typeof vi.fn>;
@@ -318,6 +372,170 @@ describe("asset directory UI", () => {
     expect(drawer()?.textContent).not.toContain("XOF XOF");
     expect(drawer()?.textContent).toContain("未配置价格");
   });
+  it("keeps the buyer and tenant of one sold-and-leased room together without borrowing another room's party or currency", async () => {
+    const value = data();
+    value.rows[0].business = business();
+    const nextRoom = business(uuid(101));
+    nextRoom.sales = [];
+    nextRoom.leases = [
+      {
+        ...nextRoom.leases[0],
+        recordId: uuid(602),
+        customerId: uuid(702),
+        customerName: "Synthetic tenant Beta",
+      },
+    ];
+    value.rows[1].business = nextRoom;
+    await render(value);
+    expect(card(uuid(100))?.textContent).toContain("Synthetic buyer Alpha");
+    expect(card(uuid(100))?.textContent).toContain("Synthetic tenant Alpha");
+    expect(card(uuid(100))?.textContent).not.toContain("Synthetic tenant Beta");
+    expect(card(uuid(101))?.textContent).toContain("Synthetic tenant Beta");
+    expect(card(uuid(101))?.textContent).not.toContain("Synthetic buyer Alpha");
+    expect(card(uuid(100))?.textContent).toContain("600,000");
+    expect(card(uuid(100))?.textContent).toContain("2,000");
+    expect(card(uuid(100))?.textContent).toContain("USD");
+    expect(card(uuid(100))?.textContent).toContain("2026-12-31");
+    expect(card(uuid(100))?.textContent).not.toContain("1,500");
+    await selectFirst();
+    expect(drawer()?.textContent).toContain("Synthetic buyer Alpha");
+    expect(drawer()?.textContent).toContain("Synthetic tenant Alpha");
+    expect(drawer()?.textContent).not.toContain("Synthetic tenant Beta");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("refreshes selected money and paid-through facts when only the business summary changes", async () => {
+    const value = data();
+    value.rows[0].business = business();
+    await render(value);
+    await selectFirst();
+    expect(drawer()?.textContent).toContain("2,000");
+    expect(drawer()?.textContent).toContain("2026-12-31");
+    const next = data();
+    next.rows[0].business = business();
+    next.rows[0].business.leases[0].rentReceived = [{ currency: "USD", amount: 3000 }];
+    next.rows[0].business.leases[0].paidThrough = "2027-01-31";
+    expect(next.rows[0].unit.updated_at).toBe(value.rows[0].unit.updated_at);
+    await render(next);
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')).toBeTruthy();
+    expect(drawer()?.textContent).toContain("3,000");
+    expect(drawer()?.textContent).toContain("2027-01-31");
+    expect(drawer()?.textContent).not.toContain("2,000");
+    expect(drawer()?.textContent).not.toContain("2026-12-31");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("keeps missing money and an unavailable business read distinct from a zero balance", async () => {
+    const value = data();
+    const unknown = business();
+    unknown.sales[0].total = null;
+    unknown.sales[0].received = null;
+    unknown.sales[0].balance = { basis: "unknown", amounts: null };
+    unknown.leases[0].monthlyRent = null;
+    unknown.leases[0].rentReceived = null;
+    unknown.leases[0].rentUnpaid = null;
+    unknown.leases[0].dueUnpaid = null;
+    value.rows[0].business = unknown;
+    value.rows[1].business = {
+      status: "unavailable",
+      today: "2026-11-08",
+      sales: [],
+      leases: [],
+      daily: [],
+      reviewReasons: ["Synthetic read denied"],
+    };
+    await render(value);
+    const zeroMoney = /(?:^|[^\d,])0\s*(?:XOF|USD|CNY)|(?:XOF|USD|CNY)\s*0(?:[^\d]|$)/;
+    expect(card(uuid(100))?.textContent).toContain("待核");
+    expect(card(uuid(100))?.textContent).not.toMatch(zeroMoney);
+    expect(card(uuid(101))?.textContent).not.toMatch(zeroMoney);
+    await selectFirst();
+    expect(drawer()?.textContent).not.toMatch(zeroMoney);
+    expect(drawer()?.textContent).not.toContain("已结清");
+  });
+  it.each([
+    ["2026-11-08", "今日应缴"],
+    ["2026-11-23", "15天内应缴"],
+    ["2026-11-24", null],
+  ])(
+    "uses a verified next due date %s for its reminder while keeping registered paid-through separate",
+    async (nextDue, label) => {
+      const value = data();
+      value.rows[0].position = {
+        ...value.rows[0].position!,
+        operational_condition: "normal",
+        cleaning_pending: false,
+      };
+      const summary = business();
+      summary.sales = [];
+      summary.leases[0].overdue = [];
+      summary.leases[0].nextDue = nextDue;
+      summary.leases[0].paidThrough = "2027-12-31";
+      value.rows[0].business = summary;
+      await render(value);
+      const warning = host.querySelector(`[id="asset-attention-${uuid(100)}"]`);
+      if (label) expect(warning?.textContent).toBe(label);
+      else expect(warning).toBeNull();
+      expect(card(uuid(100))?.textContent).toContain("2027-12-31");
+      expect(warning?.textContent ?? "").not.toContain("逾期");
+    },
+  );
+  it("prioritizes overdue rent ahead of an upcoming reminder and a locked condition ahead of both", async () => {
+    const value = data();
+    value.rows[0].position = {
+      ...value.rows[0].position!,
+      operational_condition: "normal",
+      cleaning_pending: false,
+    };
+    value.rows[0].business = business();
+    value.rows[0].business.leases[0].nextDue = "2026-11-09";
+    await render(value);
+    expect(host.querySelector(`[id="asset-attention-${uuid(100)}"]`)?.textContent).toContain(
+      "逾期",
+    );
+    value.rows[0].position.operational_condition = "locked";
+    await render({ ...value, rows: [...value.rows] });
+    expect(host.querySelector(`[id="asset-attention-${uuid(100)}"]`)?.textContent).toBe("封锁");
+  });
+  it("does not turn a nearby due date with an unknown due amount into a confirmed payment reminder", async () => {
+    const value = data();
+    value.rows[0].position = {
+      ...value.rows[0].position!,
+      operational_condition: "normal",
+      cleaning_pending: false,
+    };
+    const summary = business();
+    summary.sales = [];
+    summary.leases[0].overdue = null;
+    summary.leases[0].dueUnpaid = null;
+    summary.leases[0].nextDue = "2026-11-09";
+    value.rows[0].business = summary;
+    await render(value);
+    expect(host.querySelector(`[id="asset-attention-${uuid(100)}"]`)).toBeNull();
+    expect(card(uuid(100))?.textContent).toContain("待核");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("marks only a known positive purchase balance for follow-up and never calls it overdue", async () => {
+    for (const basis of ["verified_bills", "registered", "unknown"] as const) {
+      const value = data();
+      value.rows[0].position = {
+        ...value.rows[0].position!,
+        operational_condition: "normal",
+        cleaning_pending: false,
+      };
+      const summary = business();
+      summary.leases = [];
+      summary.sales[0].balance = {
+        basis,
+        amounts: basis === "unknown" ? null : [{ currency: "XOF", amount: 400000 }],
+      };
+      value.rows[0].business = summary;
+      await render(value);
+      const warning = host.querySelector(`[id="asset-attention-${uuid(100)}"]`);
+      if (basis === "unknown") expect(warning).toBeNull();
+      else expect(warning?.textContent).toBe("余款待跟进");
+      expect(warning?.textContent ?? "").not.toContain("逾期");
+    }
+  });
   it("immediately clears selected record and status editor when the project changes before the server response", async () => {
     await render(data(), true);
     await selectFirst();
@@ -493,6 +711,10 @@ describe("asset directory UI", () => {
     value.building = value.buildings[1];
     value.query.building = otherBuilding;
     value.query.project = otherProject;
+    value.rows = value.rows.map((record) => ({
+      ...record,
+      unit: { ...record.unit, building_id: otherBuilding },
+    }));
     await render(value);
     await selectFirst();
     expect(button("核对 / 修改运行条件")).toBeUndefined();
