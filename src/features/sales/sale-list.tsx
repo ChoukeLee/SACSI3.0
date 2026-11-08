@@ -443,9 +443,15 @@ export function SaleList({
               ? `${locale === "zh" ? "过户" : "Transfert"} ${contract.transfer_date}`
               : undefined,
             amountXof: salePrice(contract),
-            amountDetail:
+            nativeAmountLabel:
               (contract.sale_currency ?? "XOF") !== "XOF" && saleRegisteredPrice(contract)
                 ? `${formatMoney(saleRegisteredPrice(contract)!.amount, contract.sale_currency!, locale)} ${contract.sale_currency}`
+                : undefined,
+            amountDetail:
+              (contract.sale_currency ?? "XOF") !== "XOF" && saleRegisteredPrice(contract)
+                ? locale === "zh"
+                  ? "原币价格，未折算西法"
+                  : "Prix d’origine, sans conversion en XOF"
                 : contract.total_amount_confirmed === false
                   ? locale === "zh"
                     ? "合同总额待核实"
@@ -465,7 +471,12 @@ export function SaleList({
                 : "Aucune créance vérifiée",
             balanceOverdue: summary.overdue > 0,
             status: contract.status,
-            statusLabel: t.contractStatus[contract.status as keyof typeof t.contractStatus],
+            statusLabel:
+              contract.registration_basis === "source_record" && contract.status === "active"
+                ? locale === "zh"
+                  ? "初始登记"
+                  : "Enregistrement initial"
+                : t.contractStatus[contract.status as keyof typeof t.contractStatus],
             secondaryLabel:
               transferLabel[contract.transfer_status as keyof typeof transferLabel] ??
               (locale === "zh" ? "过户状态待核实" : "Transfert à vérifier"),

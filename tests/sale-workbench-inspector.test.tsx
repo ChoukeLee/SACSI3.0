@@ -86,6 +86,50 @@ const payment = (patch: Partial<PaymentRow> = {}): PaymentRow => ({
   ...patch,
 });
 
+function nativeSourceData() {
+  const data = saleFixture(undefined, "detail", 1);
+  const contract = data.contracts[0] as SaleContractRow;
+  Object.assign(contract, {
+    registration_basis: "source_record",
+    source_reference: "Synthetic.xlsx|Sheet1!A1",
+    sale_currency: "CNY",
+    total_amount_xof: 0,
+    total_amount_native: 720000,
+    total_amount_confirmed: true,
+    signed_date: null,
+    payment_plan_type: "unconfirmed",
+    transfer_status: "unconfirmed",
+    source_balance_native: 0,
+    source_balance_reference: "Synthetic.xlsx|Sheet1!B1",
+  });
+  data.receivables = [];
+  data.schedules = [];
+  data.summaries[contract.id] = {
+    total: 0,
+    paid: 0,
+    outstanding: 0,
+    overdue: 0,
+    nextDue: null,
+    count: 0,
+    dueOutstanding: 0,
+  };
+  data.payments = [700000, 20000].map((amount, index) =>
+    payment({
+      id: `native-payment-${index}`,
+      source_type: "sale_contract",
+      source_id: contract.id,
+      unit_id: contract.unit_id,
+      customer_id: contract.customer_id,
+      amount,
+      currency: "CNY",
+      native_settlement: true,
+      exchange_rate_to_xof: null,
+      payment_method: null,
+    }),
+  );
+  return data;
+}
+
 it("has a useful no-selection state without a phantom contract or amount", async () => {
   await render({ selectedId: null });
   expect(host.textContent).toContain("选中左侧合同");
@@ -256,6 +300,74 @@ it("does not turn unknown prices or absence of verified receivables into zero de
   await tab("收支明细");
   expect(fact("已建应收未收")).toBe("暂无已核应收");
   expect(host.textContent).not.toContain("0 XOF");
+});
+it("keeps a source-only native price and receipts separate from unknown bills and XOF actions", async () => {
+  const data = nativeSourceData();
+  const props = await render({ data, canRecordFinance: true, canManage: true });
+  expect(fact("登记总价")).toBe("¥720,000 CNY");
+  expect(fact("登记余款（Excel）")).toBe("¥0 CNY");
+  expect(host.textContent).toContain("暂无已登记付款计划，不代表已付款");
+  expect(host.textContent).not.toContain("0 XOF");
+
+  await openDisclosure("更多操作");
+  for (const label of ["手工登记出售收款", "新增分期"]) {
+    const action = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent === label,
+    );
+    expect(action?.disabled).toBe(true);
+    await act(async () => action!.click());
+  }
+  expect(props.onAction).not.toHaveBeenCalled();
+  expect(host.textContent).toContain("不支持手工西法收款或新增西法分期");
+
+  await openDisclosure("合同登记资料");
+  expect(fact("签约日期")).toBe("未登记");
+  expect(fact("登记总价")).toBe("¥720,000 CNY");
+
+  await tab("收支明细");
+  expect(fact("已建应收未收")).toBe("暂无已核应收");
+  expect(fact("应收已核销")).toBe("—");
+  const receiptHeading = [...host.querySelectorAll("h3")].find(
+    (heading) => heading.textContent === "房款原币实收",
+  );
+  expect(receiptHeading?.nextElementSibling?.textContent).toBe("¥720,000 CNY");
+  expect(fact("西法经营收款")).toBe("暂无已核记录");
+  const articles = [...host.querySelectorAll("article")];
+  expect(articles).toHaveLength(2);
+  expect(articles.every((row) => row.textContent?.includes("原币房款实收 · 未折算西法"))).toBe(
+    true,
+  );
+  expect(host.textContent).not.toContain("不计入现金汇总");
+  expect(host.textContent).not.toContain("2 笔待核");
+  expect(host.textContent).not.toContain("2 笔非现金变动");
+  expect(host.textContent).not.toContain("0 XOF");
+});
+it("excludes mismatched native purchase receipts and keeps XOF registration fees independent", async () => {
+  const data = nativeSourceData();
+  data.payments[1].unit_id = "88888888-8888-4888-8888-888888888888";
+  data.payments.push(
+    payment({
+      id: "registration-payment",
+      source_type: "sale_registration_fee",
+      unit_id: data.contracts[0].unit_id,
+      customer_id: data.contracts[0].customer_id,
+      amount: 300000,
+    }),
+  );
+  await render({ data });
+  await tab("收支明细");
+  const receiptHeading = [...host.querySelectorAll("h3")].find(
+    (heading) => heading.textContent === "房款原币实收",
+  );
+  expect(receiptHeading?.nextElementSibling?.textContent).toBe("¥700,000 CNY");
+  expect(fact("西法经营收款")).toBe("300,000 XOF");
+  const articles = [...host.querySelectorAll("article")];
+  const mismatched = articles.find((row) => row.textContent?.includes("¥20,000"));
+  expect(mismatched?.textContent).toContain("原币登记待核 · 未折算西法");
+  expect(mismatched?.textContent).not.toContain("原币房款实收");
+  const registration = articles.find((row) => row.textContent?.includes("300,000 XOF"));
+  expect(registration?.textContent).toContain("注册金收款");
+  expect(registration?.textContent).not.toContain("原币房款实收");
 });
 it("links only explicit customer/asset IDs and carries the sanitized return scope", async () => {
   await render();

@@ -9,9 +9,10 @@ import {
   type ContractReceivableSummary,
 } from "@/features/contracts/contract-list-model";
 import { dictionaries, type Locale } from "@/lib/i18n";
+import { formatMoney } from "@/lib/currency";
 import { contractStatusVariant } from "@/lib/status-styles";
 import type { SaleContractRow, UnitRow, CustomerRow } from "@/types/database";
-import { salePrice } from "./sale-workbench-model";
+import { saleRegisteredPrice } from "./sale-workbench-model";
 
 /** Optional floor view. Its complete scope is fetched only after explicitly opened. */
 export function SaleWorkbenchRooms({
@@ -50,7 +51,8 @@ export function SaleWorkbenchRooms({
               const unit = units.get(contract.unit_id),
                 customer = customers.get(contract.customer_id),
                 summary = summaries.get(contract.id),
-                price = salePrice(contract);
+                nativeSale = (contract.sale_currency ?? "XOF") !== "XOF",
+                price = saleRegisteredPrice(contract);
               return (
                 <article
                   className="flex min-w-0 flex-col rounded-lg border border-border px-3.5 py-3"
@@ -65,11 +67,12 @@ export function SaleWorkbenchRooms({
                       {unit?.unit_no ?? "—"}
                     </button>
                     <Badge variant={contractStatusVariant[contract.status]}>
-                      {
-                        dictionaries[locale].sales.contractStatus[
-                          contract.status as keyof typeof dictionaries.zh.sales.contractStatus
-                        ]
-                      }
+                      {contract.registration_basis === "source_record" &&
+                      contract.status === "active"
+                        ? text("初始登记", "Enregistrement initial")
+                        : dictionaries[locale].sales.contractStatus[
+                            contract.status as keyof typeof dictionaries.zh.sales.contractStatus
+                          ]}
                     </Badge>
                   </div>
                   <p className="mt-2 break-words text-sm font-medium">
@@ -80,13 +83,19 @@ export function SaleWorkbenchRooms({
                   </p>
                   <p className="mt-3 text-xs tabular-nums">
                     {text("合同价", "Prix")}:{" "}
-                    {price === null ? text("金额待核实", "Montant à vérifier") : money(price)}
+                    {price === null
+                      ? text("金额待核实", "Montant à vérifier")
+                      : price.currency === "XOF"
+                        ? money(price.amount)
+                        : `${formatMoney(price.amount, price.currency, locale)} ${price.currency}`}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {text("应收未收", "Créances restantes")}:{" "}
-                    {summary?.count
-                      ? money(summary.outstanding)
-                      : text("暂无已核应收", "Aucune créance vérifiée")}
+                    {nativeSale && summary?.count
+                      ? text("原币应收未并入西法汇总", "Créances en devise hors synthèse XOF")
+                      : summary?.count
+                        ? money(summary.outstanding)
+                        : text("暂无已核应收", "Aucune créance vérifiée")}
                   </p>
                   <div className="mt-3 flex flex-wrap items-center justify-end gap-1 border-t pt-2">
                     {[

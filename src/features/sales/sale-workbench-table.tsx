@@ -157,10 +157,12 @@ export function SaleWorkbenchTable({
                 ) : null}
               </td>
               <td>
-                <p className={styles.money}>{money(row.amountXof)}</p>
-                {row.amountDetail && row.amountDetail !== "XOF" && (
-                  <p className={styles.sub}>{row.amountDetail}</p>
-                )}
+                <p className={styles.money}>{row.nativeAmountLabel ?? money(row.amountXof)}</p>
+                {row.amountDetail &&
+                  row.amountDetail !== "XOF" &&
+                  row.amountDetail !== row.nativeAmountLabel && (
+                    <p className={styles.sub}>{row.amountDetail}</p>
+                  )}
               </td>
               <td>
                 <Badge variant={contractStatusVariant[row.status] ?? "secondary"}>

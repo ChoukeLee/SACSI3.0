@@ -219,6 +219,67 @@ function operationDialog() {
   );
 }
 
+function nativeSource(data: WorkspaceData) {
+  Object.assign(data.contracts[0], {
+    sale_currency: "CNY",
+    total_amount_native: 720000,
+    total_amount_xof: 0,
+    registration_basis: "source_record",
+    source_reference: "Synthetic workbook / Sheet1!E5",
+    signed_date: null,
+    payment_plan_type: "unconfirmed",
+    transfer_status: "unconfirmed",
+  });
+  data.receivables = [];
+  data.receivableCount = 0;
+  data.schedules = [];
+  data.scheduleCount = 0;
+  data.summaries = Object.fromEntries(
+    data.contracts.map((row) => [
+      row.id,
+      { count: 0, total: 0, paid: 0, outstanding: 0, overdue: 0, nextDue: null, dueOutstanding: 0 },
+    ]),
+  );
+  return data;
+}
+
+it("shows a known native source price in the existing table and does not infer a cleared balance", async () => {
+  vi.mocked(fetch).mockImplementation(async (input) =>
+    Response.json(nativeSource(responseFor(input))),
+  );
+  await render(nativeSource(saleFixture(undefined, "list", 1)));
+  await openDisclosure("列表核对", host);
+  const row = host.querySelector("tbody tr")!;
+  expect(row.textContent).toContain("720,000 CNY");
+  expect(row.textContent).toContain("初始登记");
+  expect(row.textContent).not.toContain("已建应收已结清");
+  await click(tableButtons()[0]);
+  await settle();
+  expect(inspector()?.textContent).toContain("720,000 CNY");
+  expect(inspector()?.textContent).toContain("暂无已核应收");
+  expect(inspector()?.textContent).not.toContain("0 XOF");
+});
+
+it.each(["手工登记出售收款", "新增分期"])(
+  "refuses the old XOF action %s if the fresh record is native",
+  async (action) => {
+    await render(saleFixture(), undefined, { canManage: true, canRecordFinance: true });
+    await click(buttons()[0]);
+    await settle();
+    vi.mocked(fetch).mockImplementationOnce(async (input) =>
+      Response.json(nativeSource(responseFor(input))),
+    );
+    await clickAction(action);
+    await settle();
+    expect(operationDialog()).toBeNull();
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(document.querySelector("#sale-action-amount")).toBeNull();
+    expect(document.body.textContent).toContain("不能在此手工录入西法收款或分期");
+    expect(recordSalePaymentAtomic).not.toHaveBeenCalled();
+    expect(addFlexibleInstallment).not.toHaveBeenCalled();
+  },
+);
+
 it("keeps initial rendering idle and fetches only an explicitly selected contract", async () => {
   await render();
   await settle();
