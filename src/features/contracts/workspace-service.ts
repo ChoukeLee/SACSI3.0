@@ -2,7 +2,8 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllPages } from "@/lib/supabase/fetch-all";
-import type { ReceivableRow } from "@/types/database";
+import type { PaymentRow, ReceivableRow, SalePaymentScheduleRow } from "@/types/database";
+import { SALE_ROOM_PAYMENT_TYPES } from "@/features/sales/sale-room-overview-model";
 import { cookies } from "next/headers";
 import {
   decodeWorkspace,
@@ -35,7 +36,11 @@ export async function readWorkspace(
   workArea?: ContractWorkArea,
   roomOverview = false,
 ) {
-  if (roomOverview && (kind !== "lease" || mode !== "context")) throw new WorkspaceReadError(400);
+  if (
+    roomOverview &&
+    (mode !== "context" || query.status !== "all" || query.search !== "" || query.page !== 1)
+  )
+    throw new WorkspaceReadError(400);
   const allowedBuildings = workArea
     ? await assertContractWorkspaceBoundary(client as Pick<SupabaseClient, "from">, query, workArea)
     : undefined;
@@ -100,7 +105,7 @@ export async function readWorkspace(
                     "id,building_id,unit_id,customer_id,source_type,source_id,category,title,due_date,amount_xof,paid_amount_xof,amount_native,paid_amount_native,currency,status,management_status,service_period_start,service_period_end,service_period_source,created_at,updated_at",
                     { count: "exact" },
                   )
-                  .eq("source_type", "lease_contract")
+                  .eq("source_type", `${kind}_contract`)
                   .in("source_id", batch)
                   .order("due_date")
                   .order("id")
@@ -110,8 +115,61 @@ export async function readWorkspace(
           ),
         )
       ).flat();
+      const payments =
+        kind === "sale"
+          ? (
+              await Promise.all(
+                batches.map((batch) =>
+                  fetchAllPages<PaymentRow>(
+                    (from, to) =>
+                      client.from!("payments")
+                        .select("*", { count: "exact" })
+                        .in("source_type", SALE_ROOM_PAYMENT_TYPES)
+                        .in("source_id", batch)
+                        .order("payment_date")
+                        .order("id")
+                        .range(from, to),
+                    "sale room payments",
+                  ),
+                ),
+              )
+            ).flat()
+          : undefined;
+      const schedules =
+        kind === "sale"
+          ? (
+              await Promise.all(
+                batches.map((batch) =>
+                  fetchAllPages<SalePaymentScheduleRow>(
+                    (from, to) =>
+                      client.from!("sale_payment_schedule")
+                        .select("*", { count: "exact" })
+                        .in("sale_contract_id", batch)
+                        .order("installment_no")
+                        .order("id")
+                        .range(from, to),
+                    "sale room schedules",
+                  ),
+                ),
+              )
+            ).flat()
+          : undefined;
       decoded = decodeWorkspace(
-        { ...decoded, roomReceivables: bills },
+        {
+          ...decoded,
+          roomReceivables: bills,
+          ...(kind === "sale"
+            ? {
+                roomPayments: payments,
+                roomSchedules: schedules,
+                roomFinanceCounts: {
+                  payments: payments!.length,
+                  receivables: bills.length,
+                  schedules: schedules!.length,
+                },
+              }
+            : {}),
+        },
         kind,
         query,
         mode,

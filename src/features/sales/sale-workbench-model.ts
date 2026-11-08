@@ -19,6 +19,7 @@ export function saleWorkbenchHref(query: WorkspaceQuery, contractId?: string | n
 }
 
 export function salePrice(contract: SaleContractRow) {
+  if ((contract.sale_currency ?? "XOF") !== "XOF") return null;
   const value = Number(contract.total_amount_xof);
   return contract.total_amount_xof !== null &&
     contract.total_amount_confirmed === true &&

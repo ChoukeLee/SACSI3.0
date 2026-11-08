@@ -92,7 +92,7 @@
 }
 .grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 330px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   align-items: start;
 }
@@ -187,10 +187,69 @@
   color: hsl(var(--muted-foreground));
 }
 .inspector {
+  --sale-accent: #245cd3;
+  --sale-soft: #eef4ff;
   overflow: hidden;
   border: 1px solid hsl(var(--border));
   border-radius: 14px;
   background: hsl(var(--card));
+}
+:global(.dark) .inspector {
+  --sale-accent: #9abaff;
+  --sale-soft: #202f48;
+}
+.embeddedInspector {
+  border: 0;
+  border-radius: 0;
+}
+.secondaryDetails {
+  margin-top: 1rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  padding: 0.7rem;
+}
+.secondaryDetails summary {
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.paymentSourceDetails {
+  margin-top: 0.5rem;
+}
+.paymentSourceDetails summary {
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+.verification {
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 1rem;
+}
+.verification > summary {
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 1rem;
+}
+.recordHistory {
+  display: grid;
+  margin-top: 0.6rem;
+}
+.recordHistory button {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.7rem 0.2rem;
+  text-align: left;
+  border-top: 1px solid hsl(var(--border));
+  font-size: 0.8125rem;
+}
+.recordHistory button span {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+}
+.recordHistory button[aria-pressed="true"] {
+  color: var(--sale-accent);
 }
 .inspectorHeader {
   padding: 20px;

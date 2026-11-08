@@ -96,18 +96,30 @@ it("does not treat an unknown workspace or a front-desk legacy lease permission 
   expect(mocks.read).not.toHaveBeenCalled();
 });
 
-it("opts lease room context into the extended read without changing ordinary query keys", async () => {
-  expect((await call("?mode=context&roomOverview=1")).status).toBe(200);
-  expect(mocks.read).toHaveBeenLastCalledWith(
-    {},
-    "lease",
-    expect.not.objectContaining({ roomOverview: expect.anything() }),
-    "context",
-    undefined,
-    "sacsi",
-    true,
-  );
-  mocks.read.mockClear();
-  expect((await call("?mode=context&roomOverview=1", "sale")).status).toBe(400);
-  expect(mocks.read).not.toHaveBeenCalled();
-});
+it.each(["lease", "sale"])(
+  "opts full %s room context into the extended read without changing ordinary query keys",
+  async (kind) => {
+    expect((await call("?mode=context&roomOverview=1&status=all", kind)).status).toBe(200);
+    expect(mocks.read).toHaveBeenLastCalledWith(
+      {},
+      kind,
+      expect.not.objectContaining({ roomOverview: expect.anything() }),
+      "context",
+      undefined,
+      "sacsi",
+      true,
+    );
+  },
+);
+it.each(["lease", "sale"])(
+  "rejects filtered or paged %s room context before database reads",
+  async (kind) => {
+    for (const search of [
+      "?mode=context&roomOverview=1",
+      "?mode=context&roomOverview=1&status=all&search=buyer",
+      "?mode=context&roomOverview=1&status=all&page=2",
+    ])
+      expect((await call(search, kind)).status).toBe(400);
+    expect(mocks.read).not.toHaveBeenCalled();
+  },
+);

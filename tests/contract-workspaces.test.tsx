@@ -74,17 +74,26 @@ const lease = {
 const receivable = (source_type: string, source_id: string) =>
   ({
     id: "r",
+    building_id: "b",
+    unit_id: "u",
+    customer_id: "c",
     source_type,
     source_id,
+    category: source_type === "sale_contract" ? "sale_lump_sum" : "lease_rent",
     amount_xof: 1000000,
     paid_amount_xof: 200000,
     due_date: "2026-01-01",
     status: "partial",
     management_status: "managed",
+    currency: "XOF",
+    amount_native: null,
+    paid_amount_native: null,
   }) as ReceivableRow;
 const payment = (source_id: string, source_type: string, amount = 1200000) =>
   ({
     id: source_type,
+    unit_id: "u",
+    customer_id: "c",
     source_id,
     source_type,
     amount,
@@ -92,6 +101,9 @@ const payment = (source_id: string, source_type: string, amount = 1200000) =>
     currency: "XOF",
     exchange_rate_to_xof: 1,
     payment_method: "cash",
+    native_settlement: false,
+    request_kind: null,
+    reversal_of_payment_id: null,
   }) as PaymentRow;
 let root: Root;
 let host: HTMLDivElement;
@@ -114,10 +126,12 @@ function summaryValue(label: string) {
   return card?.textContent;
 }
 async function openCustomer() {
-  const room = host.querySelector<HTMLButtonElement>("[data-room-id]");
+  const room = host.querySelector<HTMLButtonElement>("[data-room-id], [data-sale-room-id]");
   if (room) {
     await act(async () => room.click());
-    const inspector = document.querySelector('aside[aria-label="租赁资料"]');
+    const inspector = document.querySelector(
+      'aside[aria-label="租赁资料"], aside[aria-label="出售合同履约详情"], aside[aria-label="Détails du contrat de vente"]',
+    );
     expect(inspector).not.toBeNull();
     return inspector!;
   }
@@ -143,7 +157,7 @@ async function openFinance(inspector: Element) {
   await act(async () => finance!.click());
 }
 
-it("sale default table keeps full identity and separates allocated receivables from recorded cash", async () => {
+it("sale default cards and their detail keep full identity and separate allocated receivables from recorded cash", async () => {
   await act(async () =>
     root.render(
       <SaleList
@@ -162,13 +176,18 @@ it("sale default table keeps full identity and separates allocated receivables f
       />,
     ),
   );
-  expect(host.querySelector("table")).toBeTruthy();
+  expect(host.querySelector("[data-sale-room-id]")).toBeTruthy();
+  const audit = [...host.querySelectorAll("summary")].find(
+    (item) => item.textContent === "列表核对",
+  )!;
+  expect((audit.parentElement as HTMLDetailsElement).open).toBe(false);
+  await act(async () => audit.click());
   expect(summaryValue("到期未收")).toContain("800,000 XOF");
   expect(host.querySelector("tbody")?.textContent).toContain("应收未收 800,000 XOF");
   expect(host.textContent).toContain(sale.contract_no);
   const dialog = await openCustomer();
-  expect(dialog.textContent).toContain("应收已核销200,000 XOF");
   await openFinance(dialog);
+  expect(dialog.textContent).toContain("应收已核销200,000 XOF");
   expect(dialog.textContent).toContain("经营收款1,200,000 XOF");
   expect(dialog.querySelector('[role="tabpanel"]')?.textContent).not.toContain("300,000 XOF"); // Contract commission flags are not cash evidence.
 });
@@ -193,6 +212,7 @@ it("sale missing managed obligations remains unknown instead of treating cash or
   expect(host.textContent).toContain("Aucune créance vérifiée");
   expect(host.textContent).not.toContain("万");
   const dialog = await openCustomer();
+  await openFinance(dialog);
   expect(dialog.textContent).toContain("Aucune créance vérifiée");
 });
 

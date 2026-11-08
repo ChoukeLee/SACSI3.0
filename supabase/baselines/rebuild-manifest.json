@@ -269,6 +269,10 @@
     {
       "file": "20261107172242_asset_operations_finance_intake.sql",
       "sha256": "700527a129f8946fe4a5f6c54e5aef366455ca2a77f7ce2b09ff439215226fd9"
+    },
+    {
+      "file": "20261107232358_source_sale_registration_native_money.sql",
+      "sha256": "2f9a9a986410080944f08e791f8db142599e5a22a995fdc422ed39dc60f51e58"
     }
   ],
   "excluded": [

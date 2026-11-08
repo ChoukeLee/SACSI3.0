@@ -1,0 +1,288 @@
+.overview {
+  display: grid;
+  gap: 1.1rem;
+  container: sale-rooms / inline-size;
+}
+.toolbar,
+.tools,
+.filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.toolbar {
+  justify-content: space-between;
+}
+.control,
+.filters button {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  background: hsl(var(--card));
+}
+.filters button {
+  border-color: transparent;
+  color: hsl(var(--muted-foreground));
+}
+.filters button[aria-pressed="true"] {
+  border-color: hsl(var(--border));
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
+.filters button.overdueFilter {
+  color: #ad423b;
+}
+.filters button.upcomingFilter {
+  color: #885d1e;
+}
+.filters button span {
+  margin-left: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+.search {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  background: hsl(var(--card));
+}
+.search input {
+  width: 10rem;
+  min-width: 0;
+  font-size: 0.8125rem;
+  background: transparent;
+  outline: none;
+}
+.search:focus-within,
+.overview button:focus-visible,
+.overview select:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+.panel {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.65rem;
+  background: hsl(var(--card));
+}
+.panel > header {
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.panel h2,
+.floor h2 {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.panel header p {
+  margin-top: 0.35rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+}
+.panel header .tools {
+  margin-top: 0.8rem;
+}
+.recordList {
+  display: grid;
+}
+.record {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 0.7rem;
+  align-items: center;
+  text-align: left;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.record:last-child {
+  border: 0;
+}
+.record strong {
+  font-size: 0.8125rem;
+  font-weight: 550;
+}
+.record small {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  overflow-wrap: anywhere;
+}
+.record:hover,
+.card:hover {
+  background: hsl(var(--muted) / 0.35);
+}
+.floor > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.7rem;
+}
+.floor header > span,
+.floor h2 span {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+}
+.floor h2 span {
+  margin-left: 0.5rem;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1rem;
+  min-width: 0;
+  text-align: left;
+  border: 1px solid hsl(var(--border));
+  border-top: 3px solid hsl(var(--border));
+  border-radius: 0.65rem;
+  background: hsl(var(--card));
+}
+.card[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px #477ec82a;
+  border-color: #7c9fc9;
+}
+.card.upcomingCard {
+  border-top-color: #c69c49;
+}
+.card.overdueCard {
+  border-top-color: #c65750;
+}
+.roomHeading {
+  display: flex;
+  align-items: start;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+.roomHeading > strong {
+  font-size: 1.25rem;
+  font-weight: 650;
+}
+.roomHeading small {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+.buyer {
+  font-size: 0.875rem;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+.transfer {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+.fact {
+  display: flex;
+  gap: 0.7rem;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+}
+.fact > span {
+  color: hsl(var(--muted-foreground));
+  flex-shrink: 0;
+}
+.fact > strong {
+  text-align: right;
+  overflow-wrap: anywhere;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.cardFooter {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 0.6rem;
+  font-size: 0.75rem;
+}
+.cardStatus {
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.25rem;
+  font-weight: 600;
+}
+.overdueStatus {
+  color: #a5332d;
+  background: #fff1ef;
+}
+.upcomingStatus {
+  color: #885d1e;
+  background: #fff5e1;
+}
+.reviewStatus {
+  color: #766e5c;
+  background: #f4f1e8;
+}
+:global(.dark) .filters button.overdueFilter {
+  color: #f3a49d;
+}
+:global(.dark) .filters button.upcomingFilter {
+  color: #edcb83;
+}
+:global(.dark) .overdueStatus {
+  color: #ffc4bf;
+  background: #4b2221;
+}
+:global(.dark) .upcomingStatus {
+  color: #f5d498;
+  background: #42351f;
+}
+:global(.dark) .reviewStatus {
+  color: #d6cbb4;
+  background: #39352b;
+}
+.overdueText {
+  color: #ad423b;
+}
+.empty,
+.emptyText {
+  padding: 1.3rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+}
+.empty {
+  border: 1px dashed hsl(var(--border));
+  border-radius: 0.65rem;
+}
+.empty .control {
+  margin-top: 0.6rem;
+}
+@container sale-rooms (max-width: 939px) {
+  .cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@container sale-rooms (max-width: 699px) {
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .record {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .record > svg {
+    display: none;
+  }
+}
+@container sale-rooms (max-width: 459px) {
+  .cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (pointer: coarse) {
+  .control,
+  .filters button,
+  .search {
+    min-height: 44px;
+  }
+}

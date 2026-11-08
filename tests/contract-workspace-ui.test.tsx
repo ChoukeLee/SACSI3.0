@@ -35,6 +35,7 @@ import {
 import { parseWorkspaceQuery, type WorkspaceData } from "../src/features/contracts/workspace-model";
 import type { LeaseContractRow, SaleContractRow } from "../src/types/database";
 import { dictionaries } from "../src/lib/i18n";
+import { saleFixture as saleWorkspaceFixture } from "./fixtures/sale-workbench";
 import {
   leaseScopeCookieName,
   leaseScopeStorageKey,
@@ -96,11 +97,26 @@ beforeEach(() => {
     vi.fn(async (input: string) => {
       const raw = Object.fromEntries(new URL(input, "http://local.invalid").searchParams),
         mode = raw.mode as WorkspaceData["mode"];
+      const room = raw.roomOverview === "1";
       delete raw.mode;
       delete raw.contractId;
       delete raw.roomOverview;
       delete raw.workspace;
       const q = parseWorkspaceQuery(raw);
+      if (String(input).includes("/api/contracts/sale")) {
+        const data = saleWorkspaceFixture(q, mode, 26);
+        return Response.json({
+          ...data,
+          ...(room
+            ? {
+                roomReceivables: [],
+                roomPayments: [],
+                roomSchedules: [],
+                roomFinanceCounts: { receivables: 0, payments: 0, schedules: 0 },
+              }
+            : {}),
+        });
+      }
       return Response.json(
         workspaceFixture(
           { total: 26, ...(mode === "context" ? { roomReceivables: [] } : {}) },

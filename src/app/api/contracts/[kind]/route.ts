@@ -39,12 +39,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
         (workArea !== "sacsi" && workArea !== "cimac") ||
         (workArea === "cimac" && kind !== "lease") ||
         !["list", "scope", "detail", "context"].includes(mode) ||
-        (roomOverview !== null &&
-          (roomOverview !== "1" || mode !== "context" || kind !== "lease")) ||
+        (roomOverview !== null && (roomOverview !== "1" || mode !== "context")) ||
         (mode === "detail" ? !id || !/^[0-9a-f-]{36}$/i.test(id) : Boolean(id))
       )
         throw new WorkspaceReadError(400);
       const query = parseWorkspaceQuery(Object.fromEntries(search));
+      if (
+        roomOverview === "1" &&
+        (query.status !== "all" || query.search !== "" || query.page !== 1)
+      )
+        throw new WorkspaceReadError(400);
       const data = await timing.measure("database", async () => {
         const client = await createClient();
         const args = [

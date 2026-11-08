@@ -17,8 +17,16 @@ import { buildWorkbenchRecordHref } from "@/lib/workbench-links";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatMoney } from "@/lib/currency";
+import { cn } from "@/lib/utils";
 import type { SaleContractRow } from "@/types/database";
-import { salePrice, saleScheduleReceivable, saleScheduleState } from "./sale-workbench-model";
+import { saleScheduleReceivable, saleScheduleState } from "./sale-workbench-model";
+import {
+  buildSalePurchaseReceiptSummary,
+  buildSaleRecordOverview,
+  saleRegisteredPrice,
+  saleRegisteredBalance,
+  type SaleCurrencyAmount,
+} from "./sale-room-overview-model";
 import styles from "./sale-workbench.module.css";
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -59,6 +67,8 @@ export function SaleWorkbenchInspector({
   busy = false,
   onAction,
   onPrint,
+  embedded = false,
+  operationError,
 }: {
   data: SaleInspectorData | null;
   locale: Locale;
@@ -75,13 +85,16 @@ export function SaleWorkbenchInspector({
   busy?: boolean;
   onAction: (action: SaleWorkbenchAction) => void;
   onPrint: (contract: SaleContractRow) => void;
+  embedded?: boolean;
+  operationError?: string;
 }) {
   const id = useId();
-  const [tab, setTab] = useState<"overview" | "finance" | "profile">(initialTab);
+  const [tab, setTab] = useState<"overview" | "finance">(initialTab);
+  const inspectorClass = cn(styles.inspector, embedded && styles.embeddedInspector);
   const text = (zh: string, fr: string) => (locale === "zh" ? zh : fr);
   if (!selectedId)
     return (
-      <aside className={styles.inspector}>
+      <aside className={inspectorClass}>
         <div className={styles.empty}>
           <h2 className="mb-2 font-medium text-foreground">
             {text("沿一笔出售查看履约", "Suivre une vente")}
@@ -95,7 +108,7 @@ export function SaleWorkbenchInspector({
     );
   if (loading || error || !data)
     return (
-      <aside className={styles.inspector} aria-busy={loading}>
+      <aside className={inspectorClass} aria-busy={loading}>
         <div className={styles.empty} role={error ? "alert" : "status"}>
           <p>
             {error
@@ -110,9 +123,16 @@ export function SaleWorkbenchInspector({
               {text("重试读取", "Réessayer")}
             </Button>
           ) : null}
-          <Button variant="ghost" size="sm" className="mt-3" onClick={onClose}>
-            {text("关闭", "Fermer")}
-          </Button>
+          {!embedded ? (
+            <Button variant="ghost" size="sm" className="mt-3" onClick={onClose}>
+              {text("关闭", "Fermer")}
+            </Button>
+          ) : null}
+          {operationError ? (
+            <p role="alert" className="mt-3 text-sm text-red-700">
+              {operationError}
+            </p>
+          ) : null}
         </div>
       </aside>
     );
@@ -120,7 +140,7 @@ export function SaleWorkbenchInspector({
     SaleContractRow | undefined;
   if (!contract)
     return (
-      <aside className={styles.inspector}>
+      <aside className={inspectorClass}>
         <div className={styles.empty} role="alert">
           {text("本合同不在当前可核验范围。", "Contrat hors du périmètre vérifiable.")}
         </div>
@@ -135,9 +155,30 @@ export function SaleWorkbenchInspector({
       : formatContractXof(amount, locale);
   const summary = data.summaries[contract.id],
     known = !!summary?.count,
-    price = salePrice(contract);
-  const payments = data.payments.filter((row) => row.source_id === contract.id),
-    cash = summarizeContractCash(payments);
+    price = saleRegisteredPrice(contract),
+    registeredBalance = saleRegisteredBalance(contract),
+    nativeSale = (contract.sale_currency ?? "XOF") !== "XOF";
+  const payments = data.payments.filter((row) => row.source_id === contract.id);
+  const purchaseReceipts = buildSalePurchaseReceiptSummary(contract, payments);
+  const nativePurchaseReceiptIds = new Set(
+    payments
+      .filter(
+        (payment) =>
+          payment.native_settlement === true &&
+          buildSalePurchaseReceiptSummary(contract, [payment]).amounts.length > 0,
+      )
+      .map((payment) => payment.id),
+  );
+  const cash = summarizeContractCash(
+    payments.filter((payment) => !nativePurchaseReceiptIds.has(payment.id)),
+  );
+  const originalMoney = (value: NonNullable<ReturnType<typeof saleRegisteredPrice>>) =>
+    `${formatMoney(value.amount, value.currency, locale)}${value.currency === "XOF" ? "" : ` ${value.currency}`}`;
+  const registeredStatus = contract.registration_basis === "source_record";
+  const stateLabel =
+    dictionaries[locale].sales.contractStatus[
+      contract.status as keyof typeof dictionaries.zh.sales.contractStatus
+    ];
   const cnyReceived = payments
     .filter(
       (payment) =>
@@ -164,6 +205,47 @@ export function SaleWorkbenchInspector({
   const recs = data.receivables.filter(
     (row) => row.source_type === "sale_contract" && row.source_id === contract.id,
   );
+  const nativeBillRecord =
+    nativeSale && unit
+      ? buildSaleRecordOverview({
+          units: [unit],
+          contracts: [contract],
+          customers: customer ? [customer] : [],
+          buildings: data.buildings,
+          today: data.today,
+          payments,
+          receivables: recs,
+          schedules,
+        })[0]
+      : null;
+  const formalKnown = nativeSale ? nativeBillRecord?.outstandingNative != null : known;
+  const formalBalanceLabel = nativeSale
+    ? nativeBillRecord?.outstandingNative?.length
+      ? nativeBillRecord.outstandingNative.map(originalMoney).join(" · ")
+      : formalKnown
+        ? text("已核账单已结清", "Créances vérifiées soldées")
+        : text("暂无已核应收", "Aucune créance vérifiée")
+    : known
+      ? money(summary.outstanding)
+      : text("暂无已核应收", "Aucune créance vérifiée");
+  const nativePaidAmounts: SaleCurrencyAmount[] = [];
+  const nativeOverdueAmounts: SaleCurrencyAmount[] = [];
+  if (nativeSale && formalKnown)
+    for (const row of recs.filter(
+      (row) => row.status !== "cancelled" && (row.management_status ?? "managed") === "managed",
+    )) {
+      const currency = (row.currency ?? "XOF") as SaleCurrencyAmount["currency"],
+        amount = Number(currency === "XOF" ? row.paid_amount_xof : row.paid_amount_native);
+      const item = nativePaidAmounts.find((item) => item.currency === currency);
+      if (item) item.amount = Math.round((item.amount + amount) * 100) / 100;
+      else nativePaidAmounts.push({ currency, amount });
+      const balance = Number(currency === "XOF" ? row.amount_xof : row.amount_native) - amount;
+      if (balance > 0 && row.due_date < data.today) {
+        const overdue = nativeOverdueAmounts.find((item) => item.currency === currency);
+        if (overdue) overdue.amount = Math.round((overdue.amount + balance) * 100) / 100;
+        else nativeOverdueAmounts.push({ currency, amount: balance });
+      }
+    }
   const customerHref = customer
     ? buildWorkbenchRecordHref({
         workspace: "customers",
@@ -192,9 +274,8 @@ export function SaleWorkbenchInspector({
       } as Record<string, string>
     )[contract.transfer_status] ?? text("待核对", "À vérifier");
   const tabs = [
-    { id: "overview", label: text("履约", "Exécution") },
-    { id: "finance", label: text("付款事实", "Paiements") },
-    { id: "profile", label: text("合同资料", "Dossier") },
+    { id: "overview", label: text("概况", "Aperçu") },
+    { id: "finance", label: text("收支明细", "Encaissements et dépenses") },
   ] as const;
   const stateLabels: Record<string, string> = {
     paid: text("已核销", "Rapprochée"),
@@ -207,39 +288,48 @@ export function SaleWorkbenchInspector({
   return (
     <aside
       aria-label={text("出售合同履约详情", "Détails du contrat de vente")}
-      className={styles.inspector}
+      className={inspectorClass}
     >
       <header className={styles.inspectorHeader}>
         <div className={styles.inspectorTop}>
-          <div>
-            <p className="mb-3 text-[11px] font-medium tracking-widest text-muted-foreground">
-              {text("出售履约", "VENTE · EXÉCUTION")}
-            </p>
-            <h2>{unit?.unit_no ?? text("房源待核", "Lot à vérifier")}</h2>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="-mr-2 -mt-2 size-8"
-            onClick={onClose}
-            aria-label={text("关闭合同预览", "Fermer l’aperçu")}
-          >
-            <X aria-hidden="true" />
-          </Button>
+          {!embedded ? (
+            <div>
+              <p className="mb-3 text-[11px] font-medium tracking-widest text-muted-foreground">
+                {text("出售履约", "VENTE · EXÉCUTION")}
+              </p>
+              <h2>{unit?.unit_no ?? text("房源待核", "Lot à vérifier")}</h2>
+            </div>
+          ) : (
+            <h2>{customer?.name ?? text("客户待核", "Client à vérifier")}</h2>
+          )}
+          {!embedded ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="-mr-2 -mt-2 size-8"
+              onClick={onClose}
+              aria-label={text("关闭合同预览", "Fermer l’aperçu")}
+            >
+              <X aria-hidden="true" />
+            </Button>
+          ) : null}
         </div>
+        {!embedded ? (
+          <p className={styles.sub}>
+            {building?.display_name ?? "—"} · {contract.contract_no}
+          </p>
+        ) : null}
+        {!embedded ? (
+          <p className="mt-3 text-sm font-medium">
+            {customer?.name ?? text("客户待核", "Client à vérifier")}
+          </p>
+        ) : null}
+        {customer?.phone ? (
+          <p className="mt-1 text-sm text-muted-foreground">{customer.phone}</p>
+        ) : null}
         <p className={styles.sub}>
-          {building?.display_name ?? "—"} · {contract.contract_no}
-        </p>
-        <p className="mt-3 text-sm font-medium">
-          {customer?.name ?? text("客户待核", "Client à vérifier")}
-        </p>
-        <p className={styles.sub}>
-          {
-            dictionaries[locale].sales.contractStatus[
-              contract.status as keyof typeof dictionaries.zh.sales.contractStatus
-            ]
-          }{" "}
-          · {transfer}
+          {registeredStatus ? text("按Excel登记", "Enregistré selon Excel") : stateLabel}
+          {registeredStatus && contract.status !== "active" ? ` · ${stateLabel}` : ""} · {transfer}
         </p>
       </header>
       <div
@@ -264,8 +354,8 @@ export function SaleWorkbenchInspector({
                 event.key === "Home"
                   ? 0
                   : event.key === "End"
-                    ? 2
-                    : (index + (event.key === "ArrowRight" ? 1 : 2)) % 3;
+                    ? tabs.length - 1
+                    : (index + (event.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length;
               setTab(tabs[next].id);
               document.getElementById(`${id}-${tabs[next].id}`)?.focus();
             }}
@@ -282,28 +372,77 @@ export function SaleWorkbenchInspector({
       >
         {tab === "overview" ? (
           <>
-            <h3>{text("分期与应收", "Échéances et créances")}</h3>
             <dl className={styles.facts}>
-              <Fact label={text("合同价", "Prix contractuel")}>{money(price)}</Fact>
-              <Fact label={text("已建应收未收", "Créances restantes")}>
-                {known
-                  ? money(summary.outstanding)
-                  : text("暂无已核应收", "Aucune créance vérifiée")}
+              <Fact label={text("登记总价", "Prix enregistré")}>
+                {price ? originalMoney(price) : text("待核对", "À vérifier")}
               </Fact>
-              <Fact label={text("其中已逾期", "Dont en retard")}>
-                {known ? money(summary.overdue) : "—"}
+              <Fact label={text("房款原币实收", "Encaissements du bien par devise")}>
+                {purchaseReceipts.amounts.length
+                  ? purchaseReceipts.amounts.map(originalMoney).join(" · ")
+                  : text("暂无已核房款实收", "Aucun encaissement du bien vérifié")}
               </Fact>
-              <Fact label={text("应收已核销", "Créances rapprochées")}>
-                {known ? money(summary.paid) : "—"}
+              <Fact
+                label={
+                  !formalKnown && registeredBalance
+                    ? text("登记余款（Excel）", "Solde enregistré (Excel)")
+                    : text("已核未收", "Créances vérifiées restantes")
+                }
+              >
+                {formalKnown
+                  ? formalBalanceLabel
+                  : registeredBalance
+                    ? originalMoney(registeredBalance)
+                    : text("暂无已核应收", "Aucune créance vérifiée")}
               </Fact>
               <Fact label={text("过户阶段", "Transfert")}>{transfer}</Fact>
             </dl>
-            <p className={styles.callout}>
-              {text(
-                "合同价、现金实收与应收核销分别核对；过户阶段不是付款状态。",
-                "Prix, encaissements et rapprochements sont distincts. Le transfert n’est pas un statut de paiement.",
-              )}
-            </p>
+            <details className={styles.secondaryDetails}>
+              <summary>{text("合同登记资料", "Informations enregistrées du contrat")}</summary>
+              <dl className={styles.facts}>
+                <Fact label={text("签约日期", "Signature")}>
+                  {contract.signed_date || text("未登记", "Non renseignée")}
+                </Fact>
+                {registeredStatus ? (
+                  <Fact label={text("登记依据", "Source de l’enregistrement")}>
+                    {contract.source_reference || text("未登记", "Non renseignée")}
+                  </Fact>
+                ) : null}
+                <Fact label={text("付款方式", "Plan")}>
+                  {dictionaries[locale].sales.paymentPlan[
+                    contract.payment_plan_type as keyof typeof dictionaries.zh.sales.paymentPlan
+                  ] ?? text("待核对", "À vérifier")}
+                </Fact>
+                <Fact label={text("合同编号", "Référence")}>
+                  {contract.contract_no || text("未登记", "Non renseignée")}
+                </Fact>
+                <Fact label={text("过户日期", "Date du transfert")}>
+                  {contract.transfer_date ?? text("未登记", "Non renseignée")}
+                </Fact>
+                <Fact label={text("产权证号", "Titre foncier")}>
+                  {contract.title_certificate_no || text("未登记", "Non renseigné")}
+                </Fact>
+                <Fact label={text("中介公司", "Agence")}>
+                  {contract.agency_company || text("未登记", "Non renseignée")}
+                </Fact>
+                <Fact label={text("中介经办", "Intermédiaire")}>
+                  {contract.agent_name || text("未登记", "Non renseigné")}
+                </Fact>
+                <Fact label={text("合同佣金", "Commission contractuelle")}>
+                  {money(contract.agency_commission_amount_xof)}
+                </Fact>
+                <Fact label={text("合同佣金标注", "Mention de commission")}>
+                  {contract.agency_commission_paid
+                    ? text("合同标注已付", "Mention payée")
+                    : text("未标注已付", "Non marquée payée")}
+                </Fact>
+              </dl>
+              <p className={styles.sub}>
+                {text(
+                  "合同标注不代替财务凭证；过户阶段不代表付款状态。",
+                  "Les mentions contractuelles ne remplacent pas les justificatifs ; le transfert n’est pas un statut de paiement.",
+                )}
+              </p>
+            </details>
             <h3 className="mt-5">{text("付款计划", "Plan de paiement")}</h3>
             {schedules.length ? (
               schedules.map((schedule) => {
@@ -346,19 +485,83 @@ export function SaleWorkbenchInspector({
           </>
         ) : tab === "finance" ? (
           <>
-            <h3>{text("已录付款事实", "Paiements enregistrés")}</h3>
+            <h3>{text("房款原币实收", "Encaissements du bien par devise")}</h3>
+            <p className="mb-3 text-sm font-medium">
+              {purchaseReceipts.amounts.length
+                ? purchaseReceipts.amounts.map(originalMoney).join(" · ")
+                : text("暂无已核房款实收", "Aucun encaissement du bien vérifié")}
+            </p>
+            {nativeSale ? (
+              <p className={styles.sub}>
+                {text(
+                  "原币房款未折算西法，不能与西法金额相加。",
+                  "Les encaissements en devise ne sont pas convertis en XOF et ne s’y additionnent pas.",
+                )}
+              </p>
+            ) : null}
+            <h3>{text("已核应收", "Créances vérifiées")}</h3>
             <dl className={styles.facts}>
-              <Fact label={text("经营收款", "Encaissements")}>
+              <Fact label={text("已建应收未收", "Créances restantes")}>
+                {formalKnown ? formalBalanceLabel : text("暂无已核应收", "Aucune créance vérifiée")}
+              </Fact>
+              <Fact label={text("其中已逾期", "Dont en retard")}>
+                {nativeSale
+                  ? formalKnown
+                    ? nativeOverdueAmounts.length
+                      ? nativeOverdueAmounts.map(originalMoney).join(" · ")
+                      : text("已核账单无逾期", "Aucun retard vérifié")
+                    : "—"
+                  : known
+                    ? money(summary.overdue)
+                    : "—"}
+              </Fact>
+              <Fact label={text("应收已核销", "Créances rapprochées")}>
+                {nativeSale
+                  ? formalKnown
+                    ? nativePaidAmounts.map(originalMoney).join(" · ")
+                    : "—"
+                  : known
+                    ? money(summary.paid)
+                    : "—"}
+              </Fact>
+            </dl>
+            <p className={styles.sub}>
+              {text(
+                "应收核销与现金实收分别核对，未建已核应收不代表没有欠款。",
+                "Créances rapprochées et encaissements restent distincts. L’absence de créance vérifiée ne prouve pas l’absence de dette.",
+              )}
+            </p>
+            <h3 className="mt-5">{text("已录付款事实", "Paiements enregistrés")}</h3>
+            <dl className={styles.facts}>
+              <Fact
+                label={
+                  nativeSale
+                    ? text("西法经营收款", "Encaissements en XOF")
+                    : text("经营收款", "Encaissements")
+                }
+              >
                 {payments.some((p) => classifyContractCashPayment(p).kind === "income")
                   ? money(cash.income)
                   : text("暂无已核记录", "Aucune écriture vérifiée")}
               </Fact>
-              <Fact label={text("经营支出", "Décaissements")}>
+              <Fact
+                label={
+                  nativeSale
+                    ? text("西法经营支出", "Décaissements en XOF")
+                    : text("经营支出", "Décaissements")
+                }
+              >
                 {payments.some((p) => classifyContractCashPayment(p).kind === "expense")
                   ? money(cash.expense)
                   : text("暂无已核记录", "Aucune écriture vérifiée")}
               </Fact>
-              <Fact label={text("经营现金净额", "Flux de caisse net")}>
+              <Fact
+                label={
+                  nativeSale
+                    ? text("西法现金净额", "Flux net en XOF")
+                    : text("经营现金净额", "Flux de caisse net")
+                }
+              >
                 {payments.some((p) =>
                   ["income", "expense"].includes(classifyContractCashPayment(p).kind),
                 )
@@ -400,6 +603,7 @@ export function SaleWorkbenchInspector({
               )
               .map((payment) => {
                 const classification = classifyContractCashPayment(payment);
+                const nativePurchaseReceipt = nativePurchaseReceiptIds.has(payment.id);
                 return (
                   <article className={styles.schedule} key={payment.id}>
                     <div className={styles.scheduleHead}>
@@ -415,28 +619,64 @@ export function SaleWorkbenchInspector({
                       </p>
                     ) : null}
                     <p className={styles.sub}>
-                      {paymentKindNames[payment.source_type] ??
-                        text("待核对财务记录", "Écriture à vérifier")}
-                      {classification.kind === "excluded"
+                      {payment.native_settlement
+                        ? nativePurchaseReceipt
+                          ? text(
+                              "原币房款实收 · 未折算西法",
+                              "Encaissement du bien en devise · sans conversion XOF",
+                            )
+                          : text(
+                              "原币登记待核 · 未折算西法",
+                              "Devise enregistrée à vérifier · sans conversion XOF",
+                            )
+                        : (paymentKindNames[payment.source_type] ??
+                          text("待核对财务记录", "Écriture à vérifier"))}
+                      {classification.kind === "excluded" && !payment.native_settlement
                         ? ` · ${text("不计入现金汇总", "Hors synthèse de caisse")}`
                         : ""}
                     </p>
-                    <p className={styles.sub}>
-                      {text("实际收款人", "Encaisseur")}:{" "}
-                      {payment.actual_collector || text("待核对", "À vérifier")}
-                    </p>
-                    <p className={styles.sub}>
-                      {text("录入账号", "Compte de saisie")}:{" "}
-                      {payment.recorded_by
-                        ? text("已记录，见审计详情", "Enregistré, voir l’audit")
-                        : text("待核对", "À vérifier")}
-                    </p>
-                    {payment.notes ? <p className={styles.sub}>{payment.notes}</p> : null}
-                    {payment.receipt_no ? (
+                    {payment.actual_collector ? (
                       <p className={styles.sub}>
-                        {text("凭证", "Référence")}: {payment.receipt_no}
+                        {text("实际收款人", "Encaisseur")}: {payment.actual_collector}
                       </p>
                     ) : null}
+                    <details className={styles.paymentSourceDetails}>
+                      <summary>
+                        {text("来源和登记信息", "Source et informations enregistrées")}
+                      </summary>
+                      {!payment.actual_collector ? (
+                        <p className={styles.sub}>
+                          {text("实际收款人", "Encaisseur")}: {text("待核对", "À vérifier")}
+                        </p>
+                      ) : null}
+                      <p className={styles.sub}>
+                        {text("录入账号", "Compte de saisie")}:{" "}
+                        {payment.recorded_by
+                          ? text("已记录，见审计详情", "Enregistré, voir l’audit")
+                          : text("未登记", "Non renseigné")}
+                      </p>
+                      {payment.notes ? <p className={styles.sub}>{payment.notes}</p> : null}
+                      {payment.receipt_no ? (
+                        <p className={styles.sub}>
+                          {text("凭证", "Référence")}: {payment.receipt_no}
+                        </p>
+                      ) : null}
+                      {payment.external_receipt_no ? (
+                        <p className={styles.sub}>
+                          {text("外部凭证", "Référence externe")}: {payment.external_receipt_no}
+                        </p>
+                      ) : null}
+                      {payment.collector_basis ? (
+                        <p className={styles.sub}>
+                          {text("收款人依据", "Justification de l’encaisseur")}:{" "}
+                          {payment.collector_basis}
+                        </p>
+                      ) : null}
+                      <p className={styles.sub}>
+                        {text("收款方式", "Mode de paiement")}:{" "}
+                        {payment.payment_method || text("未登记", "Non renseigné")}
+                      </p>
+                    </details>
                   </article>
                 );
               })}
@@ -446,46 +686,7 @@ export function SaleWorkbenchInspector({
               </p>
             ) : null}
           </>
-        ) : (
-          <>
-            <h3>{text("合同资料", "Informations contractuelles")}</h3>
-            <dl className={styles.facts}>
-              <Fact label={text("签约日期", "Signature")}>{contract.signed_date}</Fact>
-              <Fact label={text("合同总额", "Total contractuel")}>{money(price)}</Fact>
-              <Fact label={text("付款方式", "Plan")}>
-                {dictionaries[locale].sales.paymentPlan[
-                  contract.payment_plan_type as keyof typeof dictionaries.zh.sales.paymentPlan
-                ] ?? text("待核对", "À vérifier")}
-              </Fact>
-              <Fact label={text("过户日期", "Date du transfert")}>
-                {contract.transfer_date ?? text("未登记", "Non renseignée")}
-              </Fact>
-              <Fact label={text("产权证号", "Titre foncier")}>
-                {contract.title_certificate_no || text("未登记", "Non renseigné")}
-              </Fact>
-              <Fact label={text("中介公司", "Agence")}>
-                {contract.agency_company || text("未登记", "Non renseignée")}
-              </Fact>
-              <Fact label={text("中介经办", "Intermédiaire")}>
-                {contract.agent_name || text("未登记", "Non renseigné")}
-              </Fact>
-              <Fact label={text("合同佣金", "Commission contractuelle")}>
-                {money(contract.agency_commission_amount_xof)}
-              </Fact>
-              <Fact label={text("合同佣金标注", "Mention de commission")}>
-                {contract.agency_commission_paid
-                  ? text("合同标注已付", "Mention payée")
-                  : text("未标注已付", "Non marquée payée")}
-              </Fact>
-            </dl>
-            <p className={styles.callout}>
-              {text(
-                "合同标注不能代替财务凭证；关联只依据明确的客户与资产 ID。",
-                "Les mentions contractuelles ne remplacent pas les justificatifs. Les relations reposent sur des identifiants explicites.",
-              )}
-            </p>
-          </>
-        )}
+        ) : null}
         <div className={styles.links}>
           {customerHref ? (
             <Link prefetch={false} href={customerHref}>
@@ -500,64 +701,96 @@ export function SaleWorkbenchInspector({
         </div>
       </div>
       <footer className={styles.detailActions}>
-        {contract.status === "active" ? (
-          <div
-            className={styles.operationActions}
-            aria-label={text("办理此合同", "Gérer ce contrat")}
-          >
-            {canRecordFinance ? (
-              <Button type="button" size="sm" disabled={busy} onClick={() => onAction("payment")}>
-                <DollarSign aria-hidden="true" />
-                {text("登记收款", "Enregistrer un paiement")}
-              </Button>
-            ) : null}
-            {canManage ? (
-              <>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => onAction("installment")}
-                >
-                  <CalendarPlus aria-hidden="true" />
-                  {text("新增分期", "Ajouter une échéance")}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => onAction("transfer")}
-                >
-                  <TrendingUp aria-hidden="true" />
-                  {text("更新过户", "Mettre à jour le transfert")}
-                </Button>
-              </>
-            ) : null}
-            {canTerminate ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                disabled={busy}
-                onClick={() => onAction("terminate")}
-              >
-                <AlertTriangle aria-hidden="true" />
-                {text("终止合同", "Résilier le contrat")}
-              </Button>
-            ) : null}
-          </div>
+        {operationError ? (
+          <p role="alert" className="text-sm text-red-700">
+            {operationError}
+          </p>
         ) : null}
-        <Button
-          type="button"
-          variant="ghost"
-          className="w-full text-xs"
-          onClick={() => onPrint(contract)}
-        >
-          <Printer aria-hidden="true" />
-          {text("合同 / 打印", "Contrat / Imprimer")}
-        </Button>
+        <details className={styles.secondaryDetails}>
+          <summary>{text("更多操作", "Autres opérations")}</summary>
+          <fieldset disabled={busy} className="mt-3 grid gap-2">
+            {nativeSale ? (
+              <p className={styles.sub}>
+                {text(
+                  "原币登记仅供查看核对，此处不支持手工西法收款或新增西法分期。",
+                  "Dossier en devise consultable ; la saisie d’un encaissement ou d’une échéance en XOF n’est pas disponible ici.",
+                )}
+              </p>
+            ) : null}
+            {contract.status === "active" ? (
+              <div
+                className={styles.operationActions}
+                aria-label={text("办理此合同", "Gérer ce contrat")}
+              >
+                {canRecordFinance ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={busy || nativeSale}
+                    onClick={() => onAction("payment")}
+                  >
+                    <DollarSign aria-hidden="true" />
+                    {text("手工登记出售收款", "Saisir manuellement un paiement de vente")}
+                  </Button>
+                ) : null}
+                {canManage ? (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={busy || nativeSale}
+                      onClick={() => onAction("installment")}
+                    >
+                      <CalendarPlus aria-hidden="true" />
+                      {text("新增分期", "Ajouter une échéance")}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => onAction("transfer")}
+                    >
+                      <TrendingUp aria-hidden="true" />
+                      {text("更新过户", "Mettre à jour le transfert")}
+                    </Button>
+                  </>
+                ) : null}
+                {canTerminate ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => onAction("terminate")}
+                  >
+                    <AlertTriangle aria-hidden="true" />
+                    {text("终止合同", "Résilier le contrat")}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full text-xs"
+              disabled={busy || nativeSale || !contract.signed_date}
+              onClick={() => onPrint(contract)}
+            >
+              <Printer aria-hidden="true" />
+              {text("打印登记合同", "Imprimer le contrat enregistré")}
+            </Button>
+            {nativeSale || !contract.signed_date ? (
+              <p className={styles.sub}>
+                {text(
+                  "此初始登记暂无可打印的合同，现有资料仍可查看核对。",
+                  "Aucun contrat imprimable pour cet enregistrement initial ; le dossier reste consultable.",
+                )}
+              </p>
+            ) : null}
+          </fieldset>
+        </details>
       </footer>
     </aside>
   );

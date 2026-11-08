@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
+import { formatMoney } from "@/lib/currency";
 import { cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
 import { contractStatusVariant as statusVariant } from "@/lib/status-styles";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +50,12 @@ import { SaleWorkbenchTable } from "./sale-workbench-table";
 import { SaleWorkbenchRooms } from "./sale-workbench-rooms";
 import { SaleWorkbenchInspector, type SaleWorkbenchAction } from "./sale-workbench-inspector";
 import { useSaleWorkbenchPreview } from "./use-sale-workbench-preview";
+import { SaleRoomOverview } from "./sale-room-overview";
+import {
+  buildSaleRecordOverview,
+  buildSaleRoomOverview,
+  saleRegisteredPrice,
+} from "./sale-room-overview-model";
 import {
   SALE_UUID,
   salePrice,
@@ -215,26 +222,20 @@ export function SaleList({
   const currentHref = currentQuery
     ? saleWorkbenchHref(currentQuery, previewId)
     : `${locale === "fr" ? "/fr" : ""}/sales`;
+  const previewTitleContract = (preview.data?.contracts ?? initialContracts).find(
+    (row) => row.id === previewId,
+  );
+  const previewTitleUnit = (preview.data?.units ?? initialUnits).find(
+    (row) => row.id === previewTitleContract?.unit_id,
+  );
+  const previewDrawerTitle = previewTitleUnit
+    ? (buildings.find((row) => row.id === previewTitleUnit.building_id)?.display_name ?? "—") +
+      " · " +
+      previewTitleUnit.unit_no
+    : locale === "zh"
+      ? "出售资料"
+      : "Dossier de vente";
   const safeReturn = safeWorkbenchReturnTo(returnTo);
-  const previewColumnRef = useRef<HTMLDivElement | null>(null);
-  const revealPreview = () => {
-    if (
-      typeof window === "undefined" ||
-      typeof window.matchMedia !== "function" ||
-      typeof window.requestAnimationFrame !== "function" ||
-      !window.matchMedia("(max-width: 1199px)").matches
-    )
-      return;
-    window.requestAnimationFrame(() => {
-      const target = previewColumnRef.current;
-      if (!target) return;
-      target.focus({ preventScroll: true });
-      target.scrollIntoView?.({
-        block: "start",
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-      });
-    });
-  };
   actionSelectionRef.current =
     previewSelection?.scope === currentScope ? `${currentScope}/${previewSelection.id}` : "";
   const selectPreview = (id: string, section: "overview" | "finance" = "overview") => {
@@ -243,7 +244,6 @@ export function SaleList({
     setPreviewTab(section);
     setPanel(null);
     setSelectedId(null);
-    revealPreview();
   };
   const closePreview = () => {
     actionRequestRef.current += 1;
@@ -320,6 +320,82 @@ export function SaleList({
   }, [contracts, activeBuildingId, statusFilter, unitBuildingMap, scopeBuildingIds]);
 
   const unitMap = useMemo(() => new Map(units.map((u) => [u.id, u])), [units]);
+  const roomContext = workspace.contextData;
+  const roomContextReady =
+    !workspace.enabled ||
+    Boolean(
+      roomContext &&
+      Array.isArray(roomContext.roomReceivables) &&
+      Array.isArray(roomContext.roomPayments) &&
+      Array.isArray(roomContext.roomSchedules) &&
+      roomContext.query.projectId === (requestedProjectId ?? "") &&
+      roomContext.query.buildingId === activeBuildingId &&
+      roomContext.query.status === "all" &&
+      !roomContext.query.search,
+    );
+  useEffect(() => {
+    if (
+      !workspace.enabled ||
+      noSaleProject ||
+      !workspace.query ||
+      workspace.query.projectId !== (requestedProjectId ?? "") ||
+      workspace.query.buildingId !== activeBuildingId ||
+      roomContextReady ||
+      workspace.roomContextLoading ||
+      workspace.roomContextError ||
+      workspace.error
+    )
+      return;
+    void workspace.ensureRoomContext().catch(() => undefined);
+  }, [
+    workspace.enabled,
+    noSaleProject,
+    workspace.query?.projectId,
+    workspace.query?.buildingId,
+    requestedProjectId,
+    activeBuildingId,
+    roomContextReady,
+    workspace.roomContextLoading,
+    workspace.roomContextError,
+    workspace.error,
+    workspace.ensureRoomContext,
+  ]);
+  const roomOverview = useMemo(() => {
+    if (workspace.enabled && !roomContextReady) return { rows: [], records: [] };
+    const source = workspace.enabled ? roomContext : undefined;
+    const input = {
+      units: (source?.units ?? initialUnits).filter(
+        (unit) =>
+          scopeBuildingIds.has(unit.building_id) &&
+          (!activeBuildingId || unit.building_id === activeBuildingId),
+      ),
+      contracts: (source?.contracts ?? initialContracts) as SaleContractRow[],
+      customers: source?.customers ?? initialCustomers,
+      buildings: buildings.map((building) => ({
+        ...building,
+        project_id: building.project_id ?? null,
+        project: building.project ?? null,
+      })),
+      today: source?.today ?? new Date().toISOString().slice(0, 10),
+      receivables: source?.roomReceivables ?? initialReceivables,
+      payments: source?.roomPayments ?? initialPayments,
+      schedules: source?.roomSchedules ?? initialSchedules,
+    };
+    return { rows: buildSaleRoomOverview(input), records: buildSaleRecordOverview(input) };
+  }, [
+    workspace.enabled,
+    roomContextReady,
+    roomContext,
+    initialUnits,
+    initialContracts,
+    initialCustomers,
+    initialReceivables,
+    initialPayments,
+    initialSchedules,
+    scopeBuildingIds,
+    activeBuildingId,
+    buildings,
+  ]);
   const customerMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
   const contractSummaryMap = useMemo(
     () =>
@@ -360,18 +436,21 @@ export function SaleList({
             unit: unit?.unit_no ?? "—",
             customer: customer?.name ?? (locale === "zh" ? "客户待补" : "Client à compléter"),
             searchText: customer?.phone ?? "",
-            periodStart: contract.signed_date,
-            periodLabel: contract.signed_date,
+            periodStart: contract.signed_date ?? "",
+            periodLabel:
+              contract.signed_date || (locale === "zh" ? "签约未登记" : "Signature non renseignée"),
             periodDetail: contract.transfer_date
               ? `${locale === "zh" ? "过户" : "Transfert"} ${contract.transfer_date}`
               : undefined,
             amountXof: salePrice(contract),
             amountDetail:
-              contract.total_amount_confirmed === false
-                ? locale === "zh"
-                  ? "合同总额待核实"
-                  : "Total à confirmer"
-                : "XOF",
+              (contract.sale_currency ?? "XOF") !== "XOF" && saleRegisteredPrice(contract)
+                ? `${formatMoney(saleRegisteredPrice(contract)!.amount, contract.sale_currency!, locale)} ${contract.sale_currency}`
+                : contract.total_amount_confirmed === false
+                  ? locale === "zh"
+                    ? "合同总额待核实"
+                    : "Total à confirmer"
+                  : "XOF",
             balanceXof: summary.count ? summary.outstanding : null,
             balanceDetail: summary.count
               ? summary.overdue > 0
@@ -604,6 +683,17 @@ export function SaleList({
       fresh.status !== "active"
     )
       return;
+    if (
+      (action === "payment" || action === "installment") &&
+      (fresh.sale_currency ?? "XOF") !== "XOF"
+    ) {
+      setError(
+        locale === "zh"
+          ? "原币登记仅供查看核对，不能在此手工录入西法收款或分期。"
+          : "Dossier en devise consultable ; aucun encaissement ou échéancier en XOF ne peut être saisi ici.",
+      );
+      return;
+    }
     setSelectedId(id);
     if (action === "payment") {
       setPayScheduleId(freshSchedules.find((row) => row.status !== "paid")?.id ?? "");
@@ -638,6 +728,12 @@ export function SaleList({
         if (workspace.enabled) {
           const data = await workspace.ensure("detail", contract.id);
           const fresh = data.contracts[0] as SaleContractRow;
+          if (!fresh.signed_date || (fresh.sale_currency ?? "XOF") !== "XOF")
+            throw new Error(
+              locale === "zh"
+                ? "此初始登记暂无可打印的合同；请查看已登记资料。"
+                : "Aucun contrat imprimable pour cet enregistrement ; consultez le dossier.",
+            );
           return {
             contract: fresh,
             unit: data.units.find((row) => row.id === fresh.unit_id) ?? null,
@@ -645,6 +741,12 @@ export function SaleList({
             summary: data.summaries[fresh.id],
           };
         }
+        if (!contract.signed_date || (contract.sale_currency ?? "XOF") !== "XOF")
+          throw new Error(
+            locale === "zh"
+              ? "此初始登记暂无可打印的合同；请查看已登记资料。"
+              : "Aucun contrat imprimable pour cet enregistrement ; consultez le dossier.",
+          );
         return {
           contract,
           unit: unitMap.get(contract.unit_id) ?? null,
@@ -904,11 +1006,11 @@ export function SaleList({
     <OperationalPage
       className={styles.workbench}
       eyebrow="SALES WORKSPACE"
-      title={locale === "zh" ? "出售履约台" : "Suivi des ventes"}
+      title={locale === "zh" ? "出售房源" : "Lots en vente"}
       description={
         locale === "zh"
-          ? "合同、分期与过户，沿同一笔业务查看。"
-          : "Contrats, échéances et transfert dans un même dossier."
+          ? "按楼栋查看买方、已录房款、分期与过户；选择房间核对资料。"
+          : "Acquéreurs, paiements, échéances et transfert par bâtiment. Choisissez un lot pour vérifier son dossier."
       }
       action={
         canCreate ? (
@@ -925,34 +1027,13 @@ export function SaleList({
       }
     >
       {scopeToolbar}
-      <SaleWorkbenchSummary
-        locale={locale}
-        blocks={statBlocks}
-        unavailable={workspace.unavailable}
-        active={panel === "insight" ? statFilter : null}
-        onOpen={(key) => void openInsight(key)}
-      />
-      {previewId ? (
-        <button
-          type="button"
-          className="self-start rounded-md border border-border bg-card px-3 py-2 text-xs text-blue-700 min-[1200px]:hidden dark:text-blue-300"
-          onClick={revealPreview}
-        >
-          {locale === "zh" ? "查看选中合同 ↓" : "Voir le contrat sélectionné ↓"}
-        </button>
-      ) : null}
+
       {printer.error && (
         <p role="alert" className="text-sm text-destructive">
           {printer.error}
         </p>
       )}
-      {workspace.enabled && (
-        <p className="text-xs text-muted-foreground">
-          {locale === "zh"
-            ? "汇总范围：当前项目、楼栋及状态全部匹配合同，不随搜索或分页截断。"
-            : "Synthèse : tous les contrats du projet, bâtiment et statut ; indépendante de la recherche et des pages."}
-        </p>
-      )}
+
       {workspace.unavailable && (
         <div role="status" className="rounded-xl border bg-card p-5 text-sm">
           {workspace.error && writeConfirmed && (
@@ -976,97 +1057,176 @@ export function SaleList({
           )}
         </div>
       )}
+      <SaleRoomOverview
+        key={(requestedProjectId ?? "") + "/" + activeBuildingId}
+        rows={roomOverview.rows}
+        records={roomOverview.records}
+        locale={locale}
+        loading={
+          workspace.enabled &&
+          (!roomContextReady || workspace.roomContextLoading) &&
+          !workspace.roomContextError &&
+          !workspace.error
+        }
+        error={workspace.enabled && (workspace.roomContextError || workspace.error)}
+        selectedRecordId={previewId}
+        busy={saving}
+        onSelectRecord={(row) => selectPreview(row.id)}
+        onRetry={() => {
+          if (workspace.error) workspace.retry();
+          else void workspace.ensureRoomContext().catch(() => undefined);
+        }}
+      />
       <div className={styles.grid}>
-        <div className="min-w-0">
-          {!workspace.unavailable && contractView === "table" && (
-            <SaleWorkbenchTable
-              pagination={
-                workspace.pagination
-                  ? {
-                      ...workspace.pagination,
-                      onPageChange: (page) => {
-                        closePreview();
-                        setPanel(null);
-                        workspace.pagination?.onPageChange(page);
-                      },
-                      onSortChange: (key, direction) => {
-                        closePreview();
-                        setPanel(null);
-                        workspace.pagination?.onSortChange(key, direction);
-                      },
-                    }
-                  : undefined
-              }
-              rows={searchedTableRows}
-              locale={locale}
-              selectedId={previewId}
-              onSelect={selectPreview}
-              onNavigate={closePreview}
-              toolbar={tableToolbar}
-            />
+        <details className={styles.verification}>
+          <summary>{locale === "zh" ? "列表核对" : "Vérification en liste"}</summary>
+          <SaleWorkbenchSummary
+            locale={locale}
+            blocks={statBlocks}
+            unavailable={workspace.unavailable}
+            active={panel === "insight" ? statFilter : null}
+            onOpen={(key) => void openInsight(key)}
+          />
+          {workspace.enabled && (
+            <p className="text-xs text-muted-foreground">
+              {locale === "zh"
+                ? "汇总范围：当前项目、楼栋及状态全部匹配合同，不随搜索或分页截断。"
+                : "Synthèse : tous les contrats du projet, bâtiment et statut ; indépendante de la recherche et des pages."}
+            </p>
           )}
-          {contractView === "rooms" ? (
-            <div className="mb-4 rounded-xl border bg-card">{tableToolbar}</div>
-          ) : null}
-
-          {!workspace.unavailable && contractView === "rooms" ? (
-            <SaleWorkbenchRooms
-              groups={groupedContracts}
-              units={unitMap}
-              customers={customerMap}
-              summaries={contractSummaryMap}
-              locale={locale}
-              onOpen={(id, section) => selectPreview(id, section)}
-              onPrint={printContract}
-            />
-          ) : null}
-        </div>
-        {!workspace.unavailable ? (
-          <div
-            className={styles.inspectorColumn}
-            ref={previewColumnRef}
-            data-selected={Boolean(previewId)}
-            tabIndex={-1}
-            role="region"
-            aria-label={locale === "zh" ? "选中出售合同详情" : "Détails de la vente sélectionnée"}
-          >
-            <SaleWorkbenchInspector
-              key={`${previewId ?? "empty"}-${previewTab}`}
-              data={
-                workspace.enabled
-                  ? preview.data
-                  : previewId
+          <div className="min-w-0">
+            {!workspace.unavailable && contractView === "table" && (
+              <SaleWorkbenchTable
+                pagination={
+                  workspace.pagination
                     ? {
-                        contracts: contracts.filter((row) => row.id === previewId),
-                        units,
-                        customers,
-                        payments,
-                        receivables,
-                        schedules,
-                        summaries: Object.fromEntries(contractSummaryMap),
-                        buildings: buildings as WorkspaceData["buildings"],
-                        today: new Date().toISOString().slice(0, 10),
+                        ...workspace.pagination,
+                        onPageChange: (page) => {
+                          closePreview();
+                          setPanel(null);
+                          workspace.pagination?.onPageChange(page);
+                        },
+                        onSortChange: (key, direction) => {
+                          closePreview();
+                          setPanel(null);
+                          workspace.pagination?.onSortChange(key, direction);
+                        },
                       }
-                    : null
-              }
-              locale={locale}
-              loading={workspace.enabled && preview.loading}
-              error={workspace.enabled && preview.error}
-              selectedId={previewId}
-              returnTo={currentHref}
-              onClose={closePreview}
-              onRetry={preview.retry}
-              initialTab={previewTab}
-              canRecordFinance={canRecordFinance}
-              canManage={canManage}
-              canTerminate={canTerminate}
-              busy={saving}
-              onAction={(action) => {
-                if (previewId) void openAction(previewId, action);
-              }}
-              onPrint={printContract}
-            />
+                    : undefined
+                }
+                rows={searchedTableRows}
+                locale={locale}
+                selectedId={previewId}
+                onSelect={selectPreview}
+                onNavigate={closePreview}
+                toolbar={tableToolbar}
+              />
+            )}
+            {contractView === "rooms" ? (
+              <div className="mb-4 rounded-xl border bg-card">{tableToolbar}</div>
+            ) : null}
+
+            {!workspace.unavailable && contractView === "rooms" ? (
+              <SaleWorkbenchRooms
+                groups={groupedContracts}
+                units={unitMap}
+                customers={customerMap}
+                summaries={contractSummaryMap}
+                locale={locale}
+                onOpen={(id, section) => selectPreview(id, section)}
+                onPrint={printContract}
+              />
+            ) : null}
           </div>
+        </details>
+        {!workspace.unavailable && previewId && panel === null ? (
+          <RightDrawer open width="wide" title={previewDrawerTitle} onClose={closePreview}>
+            <div
+              role="region"
+              aria-label={locale === "zh" ? "选中出售合同详情" : "Détails de la vente sélectionnée"}
+            >
+              <SaleWorkbenchInspector
+                key={`${previewId ?? "empty"}-${previewTab}`}
+                data={
+                  workspace.enabled
+                    ? preview.data
+                    : previewId
+                      ? {
+                          contracts: contracts.filter((row) => row.id === previewId),
+                          units,
+                          customers,
+                          payments,
+                          receivables,
+                          schedules,
+                          summaries: Object.fromEntries(contractSummaryMap),
+                          buildings: buildings as WorkspaceData["buildings"],
+                          today: new Date().toISOString().slice(0, 10),
+                        }
+                      : null
+                }
+                embedded
+                operationError={error}
+                locale={locale}
+                loading={workspace.enabled && preview.loading}
+                error={workspace.enabled && preview.error}
+                selectedId={previewId}
+                returnTo={currentHref}
+                onClose={closePreview}
+                onRetry={preview.retry}
+                initialTab={previewTab}
+                canRecordFinance={canRecordFinance}
+                canManage={canManage}
+                canTerminate={canTerminate}
+                busy={saving}
+                onAction={(action) => {
+                  if (previewId) void openAction(previewId, action);
+                }}
+                onPrint={printContract}
+              />
+              {roomContextReady &&
+              !workspace.roomContextLoading &&
+              !workspace.roomContextError &&
+              !preview.loading &&
+              !preview.error ? (
+                <details
+                  className={styles.secondaryDetails}
+                  aria-label={locale === "zh" ? "本房出售历史" : "Historique des ventes du lot"}
+                >
+                  <summary>
+                    {locale === "zh" ? "本房出售历史" : "Historique des ventes du lot"}
+                  </summary>
+                  <div className={styles.recordHistory}>
+                    {roomOverview.records
+                      .filter(
+                        (row) =>
+                          row.unit.id ===
+                          roomOverview.records.find((record) => record.id === previewId)?.unit.id,
+                      )
+                      .map((record) => (
+                        <button
+                          key={record.id}
+                          type="button"
+                          data-sale-room-record-id={record.id}
+                          aria-pressed={record.id === previewId}
+                          disabled={saving}
+                          onClick={() => selectPreview(record.id)}
+                        >
+                          <strong>
+                            {record.customer?.name ??
+                              (locale === "zh" ? "买方待登记" : "Acquéreur à compléter")}
+                          </strong>
+                          <span>
+                            {record.contract.signed_date ||
+                              (locale === "zh" ? "签约未登记" : "Signature non renseignée")}{" "}
+                            · {t.contractStatus[record.contract.status]}
+                          </span>
+                        </button>
+                      ))}
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          </RightDrawer>
         ) : null}
       </div>
 

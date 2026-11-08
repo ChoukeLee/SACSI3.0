@@ -17,6 +17,12 @@ const roomQuery = (query: WorkspaceQuery): WorkspaceQuery => ({
   search: "",
   page: 1,
 });
+const completeRoomContext = (data: WorkspaceData) =>
+  Array.isArray(data.roomReceivables) &&
+  (data.kind === "lease" ||
+    (Array.isArray(data.roomPayments) &&
+      Array.isArray(data.roomSchedules) &&
+      !!data.roomFinanceCounts));
 export function useContractWorkspace(
   initial: WorkspaceData | undefined,
   workArea: "sacsi" | "cimac" = "sacsi",
@@ -174,7 +180,8 @@ export function useContractWorkspace(
         else if (mode === "scope") setScopeData(data);
         else if (mode === "context")
           setContextData((current) =>
-            current?.roomReceivables !== undefined &&
+            current &&
+            completeRoomContext(current) &&
             workspaceQueryKey(current.query) === workspaceQueryKey(data.query)
               ? current
               : data,
@@ -331,12 +338,12 @@ export function useContractWorkspace(
   }, []);
   const ensureRoomContext = useCallback(async () => {
     const q = queryRef.current;
-    if (!q || initial?.kind !== "lease") throw new WorkspaceReadError();
+    if (!q || !initial) throw new WorkspaceReadError();
     activeRoomContext.current = true;
     const expected = roomQuery(q);
     if (
       contextData &&
-      contextData.roomReceivables !== undefined &&
+      completeRoomContext(contextData) &&
       workspaceQueryKey(contextData.query) === workspaceQueryKey(expected)
     )
       return contextData;
