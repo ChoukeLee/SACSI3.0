@@ -1,6 +1,7 @@
 import type {
   CustomerRow,
   LeaseContractRow,
+  LedgerEntryRow,
   PaymentRow,
   ReceivableRow,
   SaleContractRow,
@@ -71,6 +72,8 @@ export interface WorkspaceData {
   receivables: ReceivableRow[];
   schedules: SalePaymentScheduleRow[];
   paymentCount: number;
+  /** Exact selected legacy receipts only; absent means purpose evidence was not read. */
+  leaseReceiptLedger?: LedgerEntryRow[];
   receivableCount: number;
   scheduleCount: number;
   summaries: Record<string, ContractReceivableSummary & { dueOutstanding: number }>;
@@ -503,6 +506,44 @@ export function decodeWorkspace(
       (row) => row.status !== "cancelled" && (row.management_status ?? "managed") === "managed",
     );
     if (managed.length !== object(summaries[contractId!]).count) throw new WorkspaceReadError();
+  }
+  if (data.leaseReceiptLedger !== undefined) {
+    if (kind !== "lease" || mode !== "detail" || !Array.isArray(data.leaseReceiptLedger))
+      throw new WorkspaceReadError();
+    const contract = contracts.find((row) => row.id === contractId);
+    const unit = contract && units.get(contract.unit_id);
+    // The server's explicit work-area boundary authorizes this read. Nested project
+    // metadata is optional; selected unit/project/payment fences remain mandatory.
+    if (!contract || !unit || buildings.get(unit.building_id)?.project?.code === "CIMAC")
+      throw new WorkspaceReadError();
+    const paymentIds = new Set(
+      (data.payments as PaymentRow[])
+        .filter((row) => row.source_id === contract.id && row.source_type === "lease_contract")
+        .map((row) => row.id),
+    );
+    const seen = new Set<string>();
+    for (const value of data.leaseReceiptLedger) {
+      const row = object(value);
+      if (
+        typeof row.id !== "string" ||
+        !uuid.test(row.id) ||
+        seen.has(row.id) ||
+        typeof row.payment_id !== "string" ||
+        !paymentIds.has(row.payment_id) ||
+        (row.unit_id !== null && row.unit_id !== unit.id) ||
+        (row.building_id !== null && row.building_id !== unit.building_id) ||
+        !["income", "expense", "liability_in", "liability_out"].includes(String(row.direction)) ||
+        typeof row.category !== "string" ||
+        typeof row.created_at !== "string" ||
+        !Number.isFinite(Date.parse(row.created_at))
+      )
+        throw new WorkspaceReadError();
+      seen.add(row.id);
+      date(row.entry_date, true);
+      for (const key of ["amount_xof", "amount_native", "amount_cny"]) decimal(row[key], true);
+      nullableText(row.currency);
+      nullableText(row.description);
+    }
   }
   if (
     roomOverview &&

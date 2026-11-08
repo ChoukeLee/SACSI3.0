@@ -25,6 +25,7 @@ import type { PaymentRow, LeaseContractRow, ReceivableRow } from "@/types/databa
 import { getOriginalMonthlyRent, getRecordedOriginalPayment } from "./lease-display-model";
 import { getLeaseFinancialConfigBySourceType } from "./lease-financial-entry-types";
 import { NativeLeaseFinance } from "./native-lease-finance";
+import { summarizeLeaseReceiptKinds } from "./lease-receipt-summary";
 import type { LeaseWorkbenchInspectorProps } from "./lease-workbench-inspector";
 import styles from "./lease-workbench.module.css";
 
@@ -57,6 +58,7 @@ export function LeaseRentalInspector({
   busy = false,
   collectionHref,
   historyContent,
+  receiptLedger,
   onPrint,
   onClose,
 }: LeaseWorkbenchInspectorProps) {
@@ -112,7 +114,47 @@ export function LeaseRentalInspector({
     summary ?? buildContractReceivableSummaries(bills, "lease_contract", today).get(contract.id);
   const known = !!financial && financial.count > 0;
   const cash = summarizeContractCash(rows);
-  const agency = summarizeContractCash(rows.filter((p) => p.source_type === "lease_agency_income"));
+  const receiptKinds = summarizeLeaseReceiptKinds(contract, rows, {
+    ledgerEntries: receiptLedger,
+    buildingId: unit?.building_id,
+  });
+  const auxiliary = [
+    {
+      key: "depositReceived",
+      label: text("另收押金", "Caution reçue"),
+      values: receiptKinds.depositReceived,
+    },
+    {
+      key: "depositReturned",
+      label: text("已退押金", "Caution remboursée"),
+      values: receiptKinds.depositReturned,
+    },
+    {
+      key: "agencyReceived",
+      label: text("另收中介费", "Commissions reçues"),
+      values: receiptKinds.agencyReceived,
+    },
+    {
+      key: "agencyPaid",
+      label: text("中介费支出", "Commissions versées"),
+      values: receiptKinds.agencyPaid,
+    },
+    {
+      key: "otherReceived",
+      label: text("其他收款", "Autres encaissements"),
+      values: receiptKinds.otherReceived,
+    },
+    {
+      key: "otherPaid",
+      label: text("其他支出", "Autres décaissements"),
+      values: receiptKinds.otherPaid,
+    },
+    {
+      key: "rentRefunded",
+      label: text("租金退款", "Loyers remboursés"),
+      values: receiptKinds.rentRefunded,
+    },
+  ].filter((item) => item.values === null || item.values.length > 0);
   const cashLines = rows.map(classifyContractCashPayment);
   const hasIncome = cashLines.some((r) => r.kind === "income");
   const hasExpense = cashLines.some((r) => r.kind === "expense");
@@ -134,16 +176,8 @@ export function LeaseRentalInspector({
     contract.rent_currency ?? "XOF",
     today,
   );
-  const nativeReceipts = originalRentReceipts(contract, rows);
   const nativeMoney = (n: number) =>
     formatPropertyMoney(n, contract.rent_currency!, locale) + " " + contract.rent_currency;
-  const receiptAmount = isNative
-    ? nativeReceipts.count
-      ? nativeMoney(nativeReceipts.amount)
-      : noCash
-    : hasIncome
-      ? money(cash.income)
-      : noCash;
   const balanceKnown = isNative ? nativeBills.length > 0 : known;
   const outstanding = isNative ? nativeSummary.outstanding : financial?.outstanding;
   const overdue = isNative ? nativeSummary.overdue : financial?.overdue;
@@ -261,21 +295,17 @@ export function LeaseRentalInspector({
             </dl>
             <dl className={styles.rentalSummary}>
               {fact(
-                isNative
-                  ? text("已录租金收款", "Loyers enregistrés")
-                  : text("已录经营收款", "Encaissements enregistrés"),
-                receiptAmount,
+                text("已收租金", "Loyers encaissés"),
+                <RentalReceiptAmounts values={receiptKinds.rentReceived} locale={locale} />,
               )}
               {fact(text("已核应收未收", "Créances restant dues"), balanceLabel)}
             </dl>
-            {!isNative ? (
-              <p className={styles.rentalNote}>
-                {text(
-                  "含中介费、其他经营收入；押金另列。",
-                  "Commissions et autres recettes d’exploitation incluses ; caution séparée.",
-                )}
-              </p>
-            ) : null}
+            <p className={styles.rentalNote}>
+              {text(
+                "不含押金、中介费及其他收款。",
+                "Hors caution, commissions et autres encaissements.",
+              )}
+            </p>
             {balanceKnown && (overdue ?? 0) > 0 ? (
               <p className={styles.rentalOverdue}>
                 {text("已核应收逾期", "Créances en retard")} ·{" "}
@@ -295,19 +325,26 @@ export function LeaseRentalInspector({
                 contract.paid_through_date || text("未登记", "Non renseigné"),
               )}
             </dl>
-            <dl className={styles.rentalAuxiliary}>
-              {fact(
-                text("已录押金实收", "Caution encaissée"),
-                hasDepositIn ? money(cash.depositIn) : noCash,
-              )}
-              {fact(
-                text("已录押金实退", "Caution remboursée"),
-                hasDepositOut ? money(cash.depositOut) : noCash,
-              )}
-              {agency.income > 0
-                ? fact(text("另收中介费", "Commissions encaissées"), money(agency.income))
-                : null}
-            </dl>
+            {auxiliary.length ? (
+              <dl className={styles.rentalAuxiliary}>
+                {auxiliary.map((item) => (
+                  <div key={item.key}>
+                    <dt>{item.label}</dt>
+                    <dd>
+                      <RentalReceiptAmounts values={item.values} locale={locale} />
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+            {receiptKinds.reviewReasons.length ? (
+              <p className={styles.rentalReview}>
+                {text(
+                  "收付款分类有待核事项，可查看逐笔依据。",
+                  "Certains mouvements restent à vérifier ; consultez leurs justificatifs.",
+                )}
+              </p>
+            ) : null}
             {historical ? (
               <p className={styles.rentalNote}>
                 {text(
@@ -577,35 +614,25 @@ function upcomingVerifiedBill(rows: ReceivableRow[], currency: string, today: st
   return candidates.sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
 }
 
-/** Same original-currency receipt boundaries used by NativeLeaseFinance. */
-function originalRentReceipts(contract: LeaseContractRow, payments: PaymentRow[]) {
-  let amount = 0,
-    count = 0;
-  for (const p of payments) {
-    if (
-      p.source_id !== contract.id ||
-      p.source_type !== "lease_rent" ||
-      p.native_settlement !== true ||
-      p.currency !== contract.rent_currency ||
-      p.exchange_rate_to_xof !== null ||
-      !["cash", "check", "bank_transfer", "other"].includes(String(p.payment_method)) ||
-      p.reversal_of_payment_id ||
-      p.request_kind?.includes("reversal")
-    )
-      continue;
-    const n = Number(p.amount),
-      minor = Math.round(n * 100);
-    if (
-      !Number.isFinite(n) ||
-      n <= 0 ||
-      !Number.isSafeInteger(minor) ||
-      Math.abs(minor / 100 - n) > 0.0000001
-    )
-      continue;
-    amount += minor;
-    count++;
-  }
-  return { amount: amount / 100, count };
+function RentalReceiptAmounts({
+  values,
+  locale,
+}: {
+  values: ReturnType<typeof summarizeLeaseReceiptKinds>["rentReceived"];
+  locale: Locale;
+}) {
+  if (values === null) return <>{locale === "zh" ? "待核" : "À vérifier"}</>;
+  if (!values.length) return <>{locale === "zh" ? "未见记录" : "Aucun enregistrement"}</>;
+  return (
+    <>
+      {values.map((value) => (
+        <span className="block" key={value.currency}>
+          {formatPropertyMoney(value.amount, value.currency, locale)}
+          {value.currency !== "XOF" ? ` ${value.currency}` : ""}
+        </span>
+      ))}
+    </>
+  );
 }
 
 function RentalPaymentTable({

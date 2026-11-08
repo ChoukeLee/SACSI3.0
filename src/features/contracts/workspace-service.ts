@@ -2,7 +2,12 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllPages } from "@/lib/supabase/fetch-all";
-import type { PaymentRow, ReceivableRow, SalePaymentScheduleRow } from "@/types/database";
+import type {
+  LedgerEntryRow,
+  PaymentRow,
+  ReceivableRow,
+  SalePaymentScheduleRow,
+} from "@/types/database";
 import { SALE_ROOM_PAYMENT_TYPES } from "@/features/sales/sale-room-overview-model";
 import { cookies } from "next/headers";
 import {
@@ -87,6 +92,53 @@ export async function readWorkspace(
       mode,
       contractId,
     );
+    const unit = decoded.units.find((row) => row.id === contract.unit_id);
+    const building = decoded.buildings.find((row) => row.id === unit?.building_id);
+    const legacyIds = decoded.payments
+      .filter((row) => row.source_id === contractId && row.source_type === "lease_contract")
+      .map((row) => row.id);
+    if (
+      (workArea === "sacsi" || (!workArea && building?.project?.code === "SACSI")) &&
+      legacyIds.length
+    ) {
+      if (!client.from) throw new WorkspaceReadError();
+      const batches: string[][] = [];
+      for (let offset = 0; offset < legacyIds.length; offset += 100)
+        batches.push(legacyIds.slice(offset, offset + 100));
+      try {
+        const ledger = (
+          await Promise.all(
+            batches.map(async (batch) => {
+              const rows = await fetchAllPages<LedgerEntryRow>(async (from, to) => {
+                const result = await client.from!("ledger_entries")
+                  .select(
+                    "id,building_id,unit_id,payment_id,entry_date,direction,category,amount_xof,currency,amount_native,amount_cny,description,created_at",
+                    { count: "exact" },
+                  )
+                  .in("payment_id", batch)
+                  .order("id")
+                  .range(from, to);
+                if (!Number.isSafeInteger(result.count) || Number(result.count) < 0)
+                  throw new WorkspaceReadError();
+                return result;
+              }, "lease legacy receipt ledger");
+              if (rows.some((row) => row.payment_id === null || !batch.includes(row.payment_id)))
+                throw new WorkspaceReadError();
+              return rows;
+            }),
+          )
+        ).flat();
+        decoded = decodeWorkspace(
+          { ...decoded, leaseReceiptLedger: ledger },
+          kind,
+          query,
+          mode,
+          contractId,
+        );
+      } catch {
+        throw new WorkspaceReadError();
+      }
+    }
   }
   if (roomOverview) {
     if (!client.from && decoded.contracts.length) throw new WorkspaceReadError();

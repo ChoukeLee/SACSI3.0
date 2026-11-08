@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import type {
   CustomerRow,
   LeaseContractRow,
+  LedgerEntryRow,
   PaymentRow,
   ReceivableRow,
   UnitRow,
@@ -44,6 +45,7 @@ export interface LeaseWorkbenchInspectorProps {
   buildingLabel?: string;
   summary?: ContractReceivableSummary | null;
   payments: PaymentRow[];
+  receiptLedger?: LedgerEntryRow[];
   receivables: ReceivableRow[];
   locale: Locale;
   today: string;

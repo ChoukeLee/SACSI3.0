@@ -356,6 +356,110 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect(host.querySelectorAll('[aria-label="原币租金账务"]')).toHaveLength(0);
   });
 
+  it("shows rent-only receipts in the overview while keeping deposits, fees and refunds separate", async () => {
+    await render({
+      payments: [
+        payment({ id: "rent", amount: 5200000 }),
+        payment({ id: "agency", source_type: "lease_agency_income", amount: 650000 }),
+        payment({ id: "deposit", source_type: "lease_deposit", amount: 1300000 }),
+        payment({ id: "deposit-return", source_type: "lease_deposit_refund", amount: 260000 }),
+        payment({ id: "agency-paid", source_type: "lease_agency_expense", amount: 65000 }),
+        payment({ id: "other", source_type: "lease_other_income", amount: 250000 }),
+        payment({ id: "other-paid", source_type: "lease_other_expense", amount: 25000 }),
+        payment({ id: "rent-refund", source_type: "lease_rent_refund", amount: 100000 }),
+        payment({ id: "offset", payment_method: "offset", amount: 9000000 }),
+        payment({ id: "another-contract", source_id: "another-contract", amount: 99000000 }),
+      ],
+    });
+    expect(fact("已收租金")).toBe("520 万西法");
+    expect(fact("另收押金")).toBe("130 万西法");
+    expect(fact("已退押金")).toBe("26 万西法");
+    expect(fact("另收中介费")).toBe("65 万西法");
+    expect(fact("中介费支出")).toBe("6.5 万西法");
+    expect(fact("其他收款")).toBe("25 万西法");
+    expect(fact("其他支出")).toBe("2.5 万西法");
+    expect(fact("租金退款")).toBe("10 万西法");
+    expect(fact("已录经营收款")).toBeUndefined();
+    expect(host.textContent).not.toContain("9,900 万西法");
+    await tab("收付款");
+    expect(fact("已录经营收款")).toBe("610 万西法");
+    expect(fact("已录经营支出")).toBe("19 万西法");
+    expect(fact("经营现金净额")).toBe("591 万西法");
+    expect(fact("已录押金实收")).toBe("130 万西法");
+    expect(fact("已录押金实退")).toBe("26 万西法");
+    expect(host.querySelectorAll("tr[data-lease-payment-id]")).toHaveLength(9);
+  });
+
+  it("derives rent-only totals from fresh records and never carries them to another rental or read failure", async () => {
+    await render({ payments: [payment({ amount: 5200000 })] });
+    expect(fact("已收租金")).toBe("520 万西法");
+    await render({ payments: [payment({ amount: 5100000 })] });
+    expect(fact("已收租金")).toBe("510 万西法");
+    expect(host.textContent).not.toContain("520 万西法");
+    await render({
+      contract: { ...contract, id: "next-rental" },
+      payments: [
+        payment({ amount: 5200000 }),
+        payment({
+          id: "next-fee",
+          source_id: "next-rental",
+          source_type: "lease_agency_income",
+          amount: 650000,
+        }),
+      ],
+    });
+    expect(fact("已收租金")).toBe("未见记录");
+    expect(fact("另收中介费")).toBe("65 万西法");
+    expect(host.textContent).not.toContain("520 万西法");
+    await render({ error: true, payments: [payment({ amount: 5200000 })] });
+    expect(fact("已收租金")).toBeUndefined();
+    expect(host.textContent).not.toContain("520 万西法");
+  });
+
+  it("keeps original-currency rent gross, separates its refunds and distinguishes unknown from no recorded rent", async () => {
+    const nativeContract = {
+      ...contract,
+      rent_currency: "USD" as const,
+      monthly_rent_amount: 3200,
+      monthly_rent_xof: 0,
+    };
+    const nativePayment = (overrides: Partial<PaymentRow> = {}) =>
+      payment({
+        currency: "USD",
+        native_settlement: true,
+        exchange_rate_to_xof: null,
+        ...overrides,
+      });
+    await render({
+      contract: nativeContract,
+      payments: [
+        nativePayment({ id: "native-rent", amount: 1000 }),
+        nativePayment({ id: "native-deposit", source_type: "lease_deposit", amount: 300 }),
+        nativePayment({ id: "native-fee", source_type: "lease_agency_income", amount: 200 }),
+        nativePayment({ id: "native-refund", source_type: "lease_rent_refund", amount: 50 }),
+        nativePayment({ id: "native-offset", amount: 900, payment_method: "offset" }),
+      ],
+    });
+    expect(fact("已收租金")).toBe("$1,000 USD");
+    expect(fact("另收押金")).toBe("$300 USD");
+    expect(fact("另收中介费")).toBe("$200 USD");
+    expect(fact("租金退款")).toBe("$50 USD");
+    expect(fact("已核应收未收")).toBe("暂无已核应收");
+    expect(fact("已收租金")).not.toMatch(/万西法|950|1,200|1,500|1,900/);
+    await render({ contract: nativeContract, payments: [] });
+    expect(fact("已收租金")).toBe("未见记录");
+    expect(fact("另收押金")).toBeUndefined();
+    await render({
+      contract: nativeContract,
+      payments: [
+        nativePayment({ amount: 80, payment_method: "invalid" as PaymentRow["payment_method"] }),
+      ],
+    });
+    expect(fact("已收租金")).toBe("待核");
+    expect(host.textContent).toContain("收付款分类有待核事项");
+    expect(host.textContent).not.toContain("$0 USD");
+  });
+
   it("suppresses the inner title and close action only for the embedded SACSI dossier", async () => {
     const onClose = vi.fn();
     await render({ embedded: true, onClose });

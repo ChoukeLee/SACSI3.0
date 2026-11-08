@@ -2186,6 +2186,7 @@ export function LeaseList({
                   : null
               }
               payments={previewPayments}
+              receiptLedger={workspace.enabled ? preview.data?.leaseReceiptLedger : undefined}
               receivables={previewReceivables}
               locale={locale}
               today={workspace.pageData?.today ?? todayStr}

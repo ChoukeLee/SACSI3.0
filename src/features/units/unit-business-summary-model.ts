@@ -190,8 +190,10 @@ const saleKinds: Record<string, UnitBusinessReceipt["kind"]> = {
   parking_fee: "other",
 };
 
-function cashForRecord(
-  input: UnitBusinessSummaryInput,
+export function projectUnitRecordCash(
+  input: Pick<UnitBusinessSummaryInput, "payments" | "ledger"> & {
+    building: { id?: string };
+  },
   record: LeaseContractRow | SaleContractRow,
   role: "lease" | "sale",
 ) {
@@ -398,7 +400,7 @@ export function buildUnitBusinessSummaries(
   });
   for (const row of saleRows) {
     const original = sales.find((s) => s.id === row.id)!;
-    const cash = cashForRecord(input, original, "sale");
+    const cash = projectUnitRecordCash(input, original, "sale");
     const received = cash.total("purchase");
     const refunded = cash.total("refund");
     const net = netPurchaseReceipts(received, refunded);
@@ -461,7 +463,7 @@ export function buildUnitBusinessSummaries(
   });
   for (const row of leaseRows) {
     const original = leases.find((s) => s.id === row.id)!;
-    const cash = cashForRecord(input, original, "lease"),
+    const cash = projectUnitRecordCash(input, original, "lease"),
       bills = rentBills(input, original);
     const currency = (original.rent_currency ?? "XOF") as CurrencyCode;
     const rent = minor(
