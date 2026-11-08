@@ -31,8 +31,18 @@ describe("contract card shortcuts", () => {
     expect(rooms).toContain("onClick={() => onSelectRecord(record)}");
     expect(source).toContain("onSelectRecord={(row) => selectPreview(row.id)}");
     expect(rooms).not.toContain("onPrint");
-    expect(inspector).toContain('label: text("收支明细", "Encaissements et dépenses")');
-    expect(inspector).toContain("onClick={() => setTab(item.id)}");
+    expect(inspector).toContain("<RecordDetailTabs");
+    for (const [value, label] of [
+      ["overview", "概览"],
+      ["payments", "收付款"],
+      ["info", "资料"],
+      ["history", "历史"],
+    ]) {
+      expect(inspector).toContain(`value: "${value}", label: text("${label}"`);
+    }
+    expect(inspector).toContain("items={tabs}");
+    expect(inspector).toContain("value={tab}");
+    expect(inspector).toContain('initialTab === "finance" ? "payments" : "overview"');
     expect(inspector).toContain('onClick={() => onAction("payment")}');
     expect(inspector).toContain("onClick={() => onPrint(contract)}");
     expect(source).toContain("onPrint={printContract}");

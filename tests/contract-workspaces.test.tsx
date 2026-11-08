@@ -132,7 +132,7 @@ async function openCustomer() {
 async function openFinance(inspector: Element) {
   const finance = [...inspector.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
     (button) =>
-      /^(收支明细|Encaissements et dépenses|账务|Finances|付款事实|Paiements)$/.test(
+      /^(收付款|收支明细|Encaissements et dépenses|账务|Finances|付款事实|Paiements)$/.test(
         button.textContent ?? "",
       ),
   );
@@ -167,9 +167,10 @@ it("sale default cards and their detail keep full identity and separate allocate
   expect(host.textContent).not.toContain("列表核对");
   const dialog = await openCustomer();
   expect(dialog.textContent).toContain(customers[0].name);
-  const registration = [...dialog.querySelectorAll("summary")].find(
-    (item) => item.textContent === "合同登记资料",
+  const registration = [...dialog.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
+    (item) => item.textContent === "资料",
   )!;
+  expect(registration).toBeTruthy();
   await act(async () => registration.click());
   expect(dialog.textContent).toContain(sale.contract_no);
   expect(dialog.textContent).toContain("2026-01-01");
