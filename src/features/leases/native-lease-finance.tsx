@@ -8,12 +8,14 @@ export function NativeLeaseFinance({
   receivables,
   locale,
   today,
+  showRentReceipts = true,
 }: {
   contract: LeaseContractRow;
   payments: PaymentRow[];
   receivables: ReceivableRow[];
   locale: "zh" | "fr";
   today: string;
+  showRentReceipts?: boolean;
 }) {
   if (!nativeLease(contract)) return null;
   const zh = locale === "zh",
@@ -68,9 +70,11 @@ export function NativeLeaseFinance({
       <p>
         {zh ? "月租" : "Loyer mensuel"}：{leaseRentLabel(contract, locale)}
       </p>
-      <p>
-        {zh ? "已录租金收款" : "Loyers reçus inscrits"}：{money(received)}
-      </p>
+      {showRentReceipts ? (
+        <p>
+          {zh ? "已录租金收款" : "Loyers reçus inscrits"}：{money(received)}
+        </p>
+      ) : null}
       <p>
         {zh ? "已建应收 / 已核销" : "Dû enregistré / imputé"}：{money(summary.total)} /{" "}
         {money(summary.paid)}

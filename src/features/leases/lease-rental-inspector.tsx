@@ -155,12 +155,9 @@ export function LeaseRentalInspector({
       values: receiptKinds.rentRefunded,
     },
   ].filter((item) => item.values === null || item.values.length > 0);
-  const cashLines = rows.map(classifyContractCashPayment);
-  const hasIncome = cashLines.some((r) => r.kind === "income");
-  const hasExpense = cashLines.some((r) => r.kind === "expense");
-  const hasDepositIn = cashLines.some((r) => r.kind === "deposit_in");
-  const hasDepositOut = cashLines.some((r) => r.kind === "deposit_out");
-  const noCash = text("暂无已核记录", "Aucune écriture vérifiée");
+  const nonCashCount =
+    cash.nonCashCount +
+    rows.filter((row) => row.native_settlement && row.payment_method === "offset").length;
   const money = (n: number | null | undefined) => formatPropertyXof(n, locale);
   const isNative = nativeLease(contract);
   const nativeBills = bills.filter(
@@ -207,14 +204,23 @@ export function LeaseRentalInspector({
     !historical && balanceKnown
       ? upcomingVerifiedBill(bills, isNative ? contract.rent_currency! : "XOF", today)
       : null;
+  const depositReceived = receiptKinds.depositReceived;
+  const invalidDepositRecord = rows.some(
+    (row) =>
+      row.source_type.startsWith("lease_deposit") &&
+      !row.native_settlement &&
+      classifyContractCashPayment(row).kind === "excluded",
+  );
   const depositNeedsReview =
-    contract.deposit_received !== hasDepositIn ||
-    cash.depositOut > cash.depositIn ||
-    rows.some(
-      (p) =>
-        p.source_type.startsWith("lease_deposit") &&
-        classifyContractCashPayment(p).kind === "excluded",
-    );
+    invalidDepositRecord ||
+    (depositReceived !== null &&
+      (contract.deposit_received !== depositReceived.length > 0 ||
+        receiptKinds.depositReturned?.some(
+          (returned) =>
+            returned.amount >
+            (depositReceived.find((received) => received.currency === returned.currency)?.amount ??
+              0),
+        )));
   const ordered = [...rows].sort(
     (a, b) =>
       b.payment_date.localeCompare(a.payment_date) ||
@@ -222,6 +228,35 @@ export function LeaseRentalInspector({
       b.id.localeCompare(a.id),
   );
   const disclosureTitle = text("更多操作", "Autres opérations");
+  const rentReceived = fact(
+    text("已收租金", "Loyers encaissés"),
+    <RentalReceiptAmounts values={receiptKinds.rentReceived} locale={locale} />,
+  );
+  const rentReceiptNote = (
+    <p className={styles.rentalNote}>
+      {text("不含押金、中介费及其他收款。", "Hors caution, commissions et autres encaissements.")}
+    </p>
+  );
+  const auxiliaryReceipts = auxiliary.length ? (
+    <dl className={styles.rentalAuxiliary}>
+      {auxiliary.map((item) => (
+        <div key={item.key}>
+          <dt>{item.label}</dt>
+          <dd>
+            <RentalReceiptAmounts values={item.values} locale={locale} />
+          </dd>
+        </div>
+      ))}
+    </dl>
+  ) : null;
+  const receiptReview = receiptKinds.reviewReasons.length ? (
+    <p className={styles.rentalReview}>
+      {text(
+        "收付款分类有待核事项，可查看逐笔依据。",
+        "Certains mouvements restent à vérifier ; consultez leurs justificatifs.",
+      )}
+    </p>
+  ) : null;
 
   return (
     <aside
@@ -294,18 +329,10 @@ export function LeaseRentalInspector({
               )}
             </dl>
             <dl className={styles.rentalSummary}>
-              {fact(
-                text("已收租金", "Loyers encaissés"),
-                <RentalReceiptAmounts values={receiptKinds.rentReceived} locale={locale} />,
-              )}
+              {rentReceived}
               {fact(text("已核应收未收", "Créances restant dues"), balanceLabel)}
             </dl>
-            <p className={styles.rentalNote}>
-              {text(
-                "不含押金、中介费及其他收款。",
-                "Hors caution, commissions et autres encaissements.",
-              )}
-            </p>
+            {rentReceiptNote}
             {balanceKnown && (overdue ?? 0) > 0 ? (
               <p className={styles.rentalOverdue}>
                 {text("已核应收逾期", "Créances en retard")} ·{" "}
@@ -325,26 +352,8 @@ export function LeaseRentalInspector({
                 contract.paid_through_date || text("未登记", "Non renseigné"),
               )}
             </dl>
-            {auxiliary.length ? (
-              <dl className={styles.rentalAuxiliary}>
-                {auxiliary.map((item) => (
-                  <div key={item.key}>
-                    <dt>{item.label}</dt>
-                    <dd>
-                      <RentalReceiptAmounts values={item.values} locale={locale} />
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            ) : null}
-            {receiptKinds.reviewReasons.length ? (
-              <p className={styles.rentalReview}>
-                {text(
-                  "收付款分类有待核事项，可查看逐笔依据。",
-                  "Certains mouvements restent à vérifier ; consultez leurs justificatifs.",
-                )}
-              </p>
-            ) : null}
+            {auxiliaryReceipts}
+            {receiptReview}
             {historical ? (
               <p className={styles.rentalNote}>
                 {text(
@@ -367,6 +376,43 @@ export function LeaseRentalInspector({
                 )}
               </p>
             ) : null}
+            <section className={styles.rentalSection}>
+              <h3>{text("收付款分类", "Répartition des paiements")}</h3>
+              <dl className={styles.rentalFacts}>{rentReceived}</dl>
+              {rentReceiptNote}
+              {auxiliaryReceipts}
+              {receiptReview}
+              {depositReceived?.length || receiptKinds.depositReturned?.length ? (
+                <p className={styles.rentalNote}>
+                  {text(
+                    "押金不计入经营收入；可退金额需在退租结算中核实扣减与原始凭证。",
+                    "La caution est distincte des recettes d’exploitation. Vérifiez retenues et justificatifs avant tout remboursement.",
+                  )}
+                </p>
+              ) : null}
+              {depositNeedsReview ? (
+                <p className={styles.rentalReview}>
+                  {text(
+                    "押金标记与已录收退记录存在待核差异，请核对后办理。",
+                    "Écart à vérifier entre l’indicateur de caution et les écritures enregistrées.",
+                  )}
+                </p>
+              ) : null}
+              {cash.excludedCount > 0 || nonCashCount > 0 ? (
+                <p className={styles.rentalReview}>
+                  {text(
+                    cash.excludedCount +
+                      " 笔待核记录未计入现金汇总；" +
+                      nonCashCount +
+                      " 笔非现金变动。",
+                    cash.excludedCount +
+                      " écritures à vérifier exclues du cash ; " +
+                      nonCashCount +
+                      " mouvements hors caisse.",
+                  )}
+                </p>
+              ) : null}
+            </section>
             <RentalPaymentTable contract={contract} payments={ordered} locale={locale} />
             <section className={styles.rentalSection}>
               <h3>{text("应收与付款安排", "Créances et échéances")}</h3>
@@ -376,6 +422,7 @@ export function LeaseRentalInspector({
                 receivables={bills}
                 locale={locale}
                 today={today}
+                showRentReceipts={false}
               />
               <dl className={styles.rentalFacts}>
                 {fact(
@@ -394,23 +441,11 @@ export function LeaseRentalInspector({
                   text("应收已核销", "Créances rapprochées"),
                   known ? money(financial!.paid) : "—",
                 )}
-                {fact(
-                  text("已录经营收款", "Encaissements enregistrés"),
-                  hasIncome ? money(cash.income) : noCash,
-                )}
-                {fact(
-                  text("已录经营支出", "Décaissements enregistrés"),
-                  hasExpense ? money(cash.expense) : noCash,
-                )}
-                {fact(
-                  text("经营现金净额", "Flux de caisse net"),
-                  hasIncome || hasExpense ? money(cash.net) : noCash,
-                )}
               </dl>
               <p className={styles.rentalNote}>
                 {known
                   ? text(
-                      "应收核销与现金收款是不同口径；非现金抵扣不计入经营收款。",
+                      "应收核销与现金收款是不同口径；非现金抵扣不计入实收。",
                       "Le rapprochement des créances est distinct des encaissements. Les compensations ne sont pas du cash.",
                     )
                   : text(
@@ -419,47 +454,6 @@ export function LeaseRentalInspector({
                     )}
               </p>
             </section>
-            <section className={styles.rentalSection}>
-              <h3>{text("押金独立核对", "Caution · Suivi distinct")}</h3>
-              <dl className={styles.rentalFacts}>
-                {fact(
-                  text("已录押金实收", "Caution encaissée"),
-                  hasDepositIn ? money(cash.depositIn) : noCash,
-                )}
-                {fact(
-                  text("已录押金实退", "Caution remboursée"),
-                  hasDepositOut ? money(cash.depositOut) : noCash,
-                )}
-              </dl>
-              <p className={styles.rentalNote}>
-                {text(
-                  "不计入经营收入；可退金额需在退租结算中核实扣减与原始凭证。",
-                  "Hors recettes d’exploitation. Vérifiez retenues et justificatifs avant tout remboursement.",
-                )}
-              </p>
-              {depositNeedsReview ? (
-                <p className={styles.rentalReview}>
-                  {text(
-                    "押金标记与已录收退记录存在待核差异，请核对后办理。",
-                    "Écart à vérifier entre l’indicateur de caution et les écritures enregistrées.",
-                  )}
-                </p>
-              ) : null}
-            </section>
-            {cash.excludedCount > 0 || cash.nonCashCount > 0 ? (
-              <p className={styles.rentalReview}>
-                {text(
-                  cash.excludedCount +
-                    " 笔待核记录未计入现金汇总；" +
-                    cash.nonCashCount +
-                    " 笔非现金变动。",
-                  cash.excludedCount +
-                    " écritures à vérifier exclues du cash ; " +
-                    cash.nonCashCount +
-                    " mouvements hors caisse.",
-                )}
-              </p>
-            ) : null}
           </>
         ) : tab === "info" ? (
           <>

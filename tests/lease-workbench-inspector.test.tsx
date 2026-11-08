@@ -335,7 +335,14 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
         monthly_rent_amount: 3200,
         monthly_rent_xof: 0,
       },
-      payments: [payment({ currency: "USD", amount: 1000, native_settlement: true })],
+      payments: [
+        payment({
+          currency: "USD",
+          amount: 1000,
+          native_settlement: true,
+          exchange_rate_to_xof: null,
+        }),
+      ],
       receivables: [
         receivable({
           currency: "USD",
@@ -350,13 +357,15 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     await tab("收付款");
     expect(host.querySelectorAll('[aria-label="原币租金账务"]')).toHaveLength(1);
     expect(host.querySelectorAll("tr[data-lease-payment-id], ol li")).toHaveLength(1);
+    expect(fact("已收租金")).toBe("$1,000 USD");
+    expect(host.textContent).not.toContain("已录租金收款");
     expect(host.textContent).toContain("2,200");
     expect(host.textContent).toContain("USD");
     await tab("概览");
     expect(host.querySelectorAll('[aria-label="原币租金账务"]')).toHaveLength(0);
   });
 
-  it("shows rent-only receipts in the overview while keeping deposits, fees and refunds separate", async () => {
+  it("keeps rent, deposits, fees and refunds separate in both the overview and payments tab", async () => {
     await render({
       payments: [
         payment({ id: "rent", amount: 5200000 }),
@@ -371,22 +380,23 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
         payment({ id: "another-contract", source_id: "another-contract", amount: 99000000 }),
       ],
     });
-    expect(fact("已收租金")).toBe("520 万西法");
-    expect(fact("另收押金")).toBe("130 万西法");
-    expect(fact("已退押金")).toBe("26 万西法");
-    expect(fact("另收中介费")).toBe("65 万西法");
-    expect(fact("中介费支出")).toBe("6.5 万西法");
-    expect(fact("其他收款")).toBe("25 万西法");
-    expect(fact("其他支出")).toBe("2.5 万西法");
-    expect(fact("租金退款")).toBe("10 万西法");
-    expect(fact("已录经营收款")).toBeUndefined();
-    expect(host.textContent).not.toContain("9,900 万西法");
-    await tab("收付款");
-    expect(fact("已录经营收款")).toBe("610 万西法");
-    expect(fact("已录经营支出")).toBe("19 万西法");
-    expect(fact("经营现金净额")).toBe("591 万西法");
-    expect(fact("已录押金实收")).toBe("130 万西法");
-    expect(fact("已录押金实退")).toBe("26 万西法");
+    for (const panel of ["概览", "收付款"]) {
+      await tab(panel);
+      expect(fact("已收租金")).toBe("520 万西法");
+      expect(fact("另收押金")).toBe("130 万西法");
+      expect(fact("已退押金")).toBe("26 万西法");
+      expect(fact("另收中介费")).toBe("65 万西法");
+      expect(fact("中介费支出")).toBe("6.5 万西法");
+      expect(fact("其他收款")).toBe("25 万西法");
+      expect(fact("其他支出")).toBe("2.5 万西法");
+      expect(fact("租金退款")).toBe("10 万西法");
+      expect(fact("已录经营收款")).toBeUndefined();
+      expect(fact("已录经营支出")).toBeUndefined();
+      expect(fact("经营现金净额")).toBeUndefined();
+      expect(fact("已录押金实收")).toBeUndefined();
+      expect(fact("已录押金实退")).toBeUndefined();
+      expect(host.textContent).not.toContain("9,900 万西法");
+    }
     expect(host.querySelectorAll("tr[data-lease-payment-id]")).toHaveLength(9);
   });
 
@@ -440,12 +450,15 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
         nativePayment({ id: "native-offset", amount: 900, payment_method: "offset" }),
       ],
     });
-    expect(fact("已收租金")).toBe("$1,000 USD");
-    expect(fact("另收押金")).toBe("$300 USD");
-    expect(fact("另收中介费")).toBe("$200 USD");
-    expect(fact("租金退款")).toBe("$50 USD");
     expect(fact("已核应收未收")).toBe("暂无已核应收");
-    expect(fact("已收租金")).not.toMatch(/万西法|950|1,200|1,500|1,900/);
+    for (const panel of ["概览", "收付款"]) {
+      await tab(panel);
+      expect(fact("已收租金")).toBe("$1,000 USD");
+      expect(fact("另收押金")).toBe("$300 USD");
+      expect(fact("另收中介费")).toBe("$200 USD");
+      expect(fact("租金退款")).toBe("$50 USD");
+    }
+    await tab("概览");
     await render({ contract: nativeContract, payments: [] });
     expect(fact("已收租金")).toBe("未见记录");
     expect(fact("另收押金")).toBeUndefined();
@@ -458,6 +471,10 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect(fact("已收租金")).toBe("待核");
     expect(host.textContent).toContain("收付款分类有待核事项");
     expect(host.textContent).not.toContain("$0 USD");
+    await tab("收付款");
+    expect(fact("已收租金")).toBe("待核");
+    expect(host.textContent).toContain("收付款分类有待核事项");
+    expect(host.textContent).not.toContain("已录租金收款");
   });
 
   it("suppresses the inner title and close action only for the embedded SACSI dossier", async () => {
@@ -539,7 +556,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     await tab("收付款");
     expect(host.textContent).toContain("不与后续租客合并");
     expect(fact("其中已逾期")).toBe("0.006 万西法");
-    expect(fact("已录经营收款")).toBe("0.004 万西法");
+    expect(fact("已收租金")).toBe("0.004 万西法");
     expect(host.textContent).not.toMatch(/999,999|99\.9999\s*万西法/);
     await tab("收付款");
     expect(host.querySelectorAll("tr[data-lease-payment-id], ol li")).toHaveLength(1);
@@ -571,7 +588,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect(host.querySelector('a[href="' + href + '"]')).not.toBeNull();
     expect(isVisibleByDisclosure(collection)).toBe(true);
     await tab("收付款");
-    expect(fact("已录经营收款")).toContain("12 万西法");
+    expect(fact("已收租金")).toBe("12 万西法");
   });
 
   it("preserves the CIMAC contract-oriented dossier and incomplete-date follow-up", async () => {
@@ -698,14 +715,13 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect(fact("应收已核销")).toBe("0.01 万西法");
   });
 
-  it("separates managed receivable applications, operating cash, and deposit movements", async () => {
+  it("separates managed receivable applications, rent receipts, and deposit movements", async () => {
     await render({
       payments: [
         payment(),
         payment({ id: "deposit", source_type: "lease_deposit", amount: 300 }),
         payment({ id: "refund", source_type: "lease_deposit_refund", amount: 50 }),
         payment({ id: "offset", payment_method: "offset", amount: 900 }),
-        payment({ id: "fx-missing", currency: "CNY", exchange_rate_to_xof: 0, amount: 800 }),
         payment({ id: "foreign-contract", source_id: "another-contract", amount: 999999 }),
       ],
       receivables: [
@@ -722,10 +738,9 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect(fact("其中已逾期")).toBe("0 万西法");
     expect(fact("最早未结到期")).toBe("2026-10-19");
     expect(host.textContent).toContain("0.006 万西法");
-    expect(fact("已录经营收款")).toBe("0.01 万西法");
-    expect(fact("已录押金实收")).toBe("0.03 万西法");
-    expect(fact("已录押金实退")).toBe("0.005 万西法");
-    expect(host.textContent).toContain("1 笔待核记录");
+    expect(fact("已收租金")).toBe("0.01 万西法");
+    expect(fact("另收押金")).toBe("0.03 万西法");
+    expect(fact("已退押金")).toBe("0.005 万西法");
     expect(host.textContent).toContain("1 笔非现金变动");
     expect(host.textContent).not.toMatch(/999,999|99\.9999\s*万西法/);
     expect(host.textContent).not.toContain("可退余额");
@@ -741,7 +756,10 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     await tab("收付款");
     expect(host.textContent).toContain("未有已核应收，不代表没有欠款");
     expect(fact("应收已核销")).toBe("—");
-    expect(fact("已录押金实收")).toBe("暂无已核记录");
+    expect(fact("已收租金")).toBe("待核");
+    expect(fact("另收押金")).toBe("待核");
+    expect(host.textContent).toContain("1 笔待核记录");
+    expect(host.textContent).toContain("收付款分类有待核事项");
     expect(host.textContent).toContain("押金标记与已录收退记录存在待核差异");
     expect(host.textContent).not.toContain("0 万西法");
   });
@@ -761,7 +779,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect(host.textContent).toContain("0.04 万西法");
     expect(fact("其中已逾期")).toBe("0.03 万西法");
     expect(fact("应收已核销")).toBe("0.06 万西法");
-    expect(fact("已录经营收款")).toBe("暂无已核记录");
+    expect(fact("已收租金")).toBe("未见记录");
   });
 
   it("labels payment records honestly and never guesses the collector from the recording account", async () => {

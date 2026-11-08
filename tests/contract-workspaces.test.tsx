@@ -252,14 +252,18 @@ it("keeps a no-sale CIMAC project read-only even when sale action capabilities a
   );
 });
 
-it("lease financial details keep refundable deposits outside operating income", async () => {
+it("lease payment details separate rent and deposits within the selected contract", async () => {
   await act(async () =>
     root.render(
       <LeaseList
         contracts={[lease]}
         units={units}
         customers={customers}
-        payments={[payment("lease", "lease_rent"), payment("lease", "lease_deposit", 3000000)]}
+        payments={[
+          payment("lease", "lease_rent"),
+          payment("lease", "lease_deposit", 3000000),
+          { ...payment("other-lease", "lease_rent", 9900000), id: "other-lease-rent" },
+        ]}
         receivables={[receivable("lease_contract", "lease")]}
         buildings={buildings}
         locale="zh"
@@ -270,7 +274,9 @@ it("lease financial details keep refundable deposits outside operating income", 
   );
   const dialog = await openCustomer();
   await openFinance(dialog);
-  expect(dialog.textContent).toContain("已录经营收款120 万西法");
-  expect(dialog.textContent).toContain("已录押金实收300 万西法");
-  expect(dialog.textContent).not.toContain("已录经营收款420 万西法");
+  expect(dialog.textContent).toContain("已收租金120 万西法");
+  expect(dialog.textContent).toContain("另收押金300 万西法");
+  expect(dialog.textContent).not.toContain("已录经营收款");
+  expect(dialog.textContent).not.toContain("已收租金420 万西法");
+  expect(dialog.textContent).not.toContain("990 万西法");
 });
