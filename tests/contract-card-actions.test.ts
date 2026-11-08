@@ -26,12 +26,23 @@ describe("contract card shortcuts", () => {
 
   it("keeps sale detail, finance and print actions distinct", () => {
     const source = read("src/features/sales/sale-list.tsx");
-    const rooms = read("src/features/sales/sale-workbench-rooms.tsx");
-    expect(rooms).toContain('action: () => onOpen(contract.id, "finance")');
-    expect(rooms).toMatch(/icon: FileText[\s\S]{0,180}onPrint\(contract\)/);
-    expect(source).toContain("onOpen={(id, section) => selectPreview(id, section)}");
+    const rooms = read("src/features/sales/sale-room-overview.tsx");
+    const inspector = read("src/features/sales/sale-workbench-inspector.tsx");
+    expect(rooms).toContain("onClick={() => onSelectRecord(record)}");
+    expect(source).toContain("onSelectRecord={(row) => selectPreview(row.id)}");
+    expect(rooms).not.toContain("onPrint");
+    expect(inspector).toContain('label: text("收支明细", "Encaissements et dépenses")');
+    expect(inspector).toContain("onClick={() => setTab(item.id)}");
+    expect(inspector).toContain('onClick={() => onAction("payment")}');
+    expect(inspector).toContain("onClick={() => onPrint(contract)}");
     expect(source).toContain("onPrint={printContract}");
-    expect(source).toContain('workspace.ensure("detail", contract.id)');
+    const printHandler = source.slice(
+      source.indexOf("const printContract ="),
+      source.indexOf("const handleCreate ="),
+    );
+    expect(printHandler).toContain('workspace.ensure("detail", contract.id)');
+    expect(printHandler).toContain("printSaleContract(");
+    expect(printHandler).not.toContain("openAction(");
     expect(source).toContain("<SaleWorkbenchInspector");
     expect(source).toContain("initialTab={previewTab}");
     expect(source).not.toContain('panel === "detail"');

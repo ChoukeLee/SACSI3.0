@@ -46,11 +46,12 @@ const old: SaleRecordOverviewRow = {
     amounts: [{ currency: "USD", amount: 40 }],
   },
 };
-const cleared = {
+const cleared: SaleRecordOverviewRow = {
   ...old,
   id: "cleared",
   contract: { ...old.contract, id: "cleared", signed_date: "2024-01-01" },
   attention: null,
+  outstandingNative: [],
 };
 const room: SaleRoomOverviewRow = {
   unit: current.unit,
@@ -86,6 +87,11 @@ async function render(
     error?: boolean;
     onRetry?: () => void;
     selected?: (record: SaleRecordOverviewRow) => void;
+    search?: string;
+    onSearchChange?: (value: string) => void;
+    recordStatus?: string;
+    initialRecordsOpen?: boolean;
+    onBrowseChange?: () => void;
   } = {},
 ) {
   const selected = state.selected ?? vi.fn();
@@ -99,6 +105,11 @@ async function render(
         error={state.error ?? false}
         onSelectRecord={selected}
         onRetry={state.onRetry ?? vi.fn()}
+        search={state.search}
+        onSearchChange={state.onSearchChange}
+        recordStatus={state.recordStatus}
+        initialRecordsOpen={state.initialRecordsOpen}
+        onBrowseChange={state.onBrowseChange}
       />,
     ),
   );
@@ -138,10 +149,10 @@ it("keeps current cards separate from historical balances and opens the exact ol
     followup.querySelector<HTMLButtonElement>("[data-sale-followup-record-id='old']")!.click(),
   );
   expect(selected).toHaveBeenLastCalledWith(old);
-  await act(async () => button("查看历史").click());
+  await act(async () => button("出售记录").click());
   const history = host.querySelector('[aria-label="出售记录查询"]')!;
-  expect(history.querySelectorAll("[data-sale-history-record-id]")).toHaveLength(2);
-  const search = history.querySelector<HTMLInputElement>("input")!;
+  expect(history.querySelectorAll("[data-sale-history-record-id]")).toHaveLength(3);
+  const search = host.querySelector<HTMLInputElement>('input[type="search"]')!;
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(
       search,
@@ -154,6 +165,57 @@ it("keeps current cards separate from historical balances and opens the exact ol
     history.querySelector<HTMLButtonElement>("[data-sale-history-record-id='cleared']")!.click(),
   );
   expect(selected).toHaveBeenLastCalledWith(cleared);
+});
+
+it("uses one visible search for room cards, history and collection follow-up", async () => {
+  const browse = vi.fn();
+  await render(undefined, undefined, { search: "Old buyer", onBrowseChange: browse });
+  expect(host.querySelectorAll('input[type="search"]')).toHaveLength(1);
+  expect(host.querySelectorAll("[data-sale-room-id]")).toHaveLength(0);
+  await act(async () => button("查看 2 条匹配的历史记录").click());
+  expect(browse).toHaveBeenCalledOnce();
+  const records = host.querySelector('[aria-label="出售记录查询"]')!;
+  expect(records.querySelectorAll("[data-sale-history-record-id]")).toHaveLength(2);
+  expect(records.textContent).toContain("登记价");
+  expect(records.textContent).toContain("40 USD");
+  expect(records.textContent).toContain("已建应收已结清");
+  await act(async () => button("出售款跟进").click());
+  expect(host.querySelectorAll("[data-sale-followup-record-id]")).toHaveLength(1);
+  expect(host.querySelector('[data-sale-followup-record-id="old"]')).toBeTruthy();
+});
+
+it("shows draft and status deep links in the same record query without a second search", async () => {
+  const draft: SaleRecordOverviewRow = {
+    ...current,
+    id: "draft",
+    contract: { ...current.contract, id: "draft", contract_no: "DRAFT-321", status: "draft" },
+    customer: { ...current.customer!, name: "Draft buyer" },
+  };
+  const changed = vi.fn(),
+    browse = vi.fn();
+  await render([{ ...room, record: draft, records: [draft] }], [current, draft, old], {
+    recordStatus: "draft",
+    initialRecordsOpen: true,
+    onSearchChange: changed,
+    onBrowseChange: browse,
+  });
+  const records = host.querySelector('[aria-label="出售记录查询"]')!;
+  expect(records.querySelector("select")?.value).toBe("draft");
+  expect(records.querySelectorAll("[data-sale-history-record-id]")).toHaveLength(1);
+  expect(records.textContent).toContain("Draft buyer");
+  expect(host.querySelectorAll('input[type="search"]')).toHaveLength(1);
+  const search = host.querySelector<HTMLInputElement>('input[type="search"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(
+      search,
+      "DRAFT-321",
+    );
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  expect(changed).toHaveBeenCalledWith("DRAFT-321");
+  expect(browse).toHaveBeenCalledOnce();
+  expect(host.querySelectorAll("[data-sale-room-id]")).toHaveLength(1);
+  expect(records.querySelectorAll("[data-sale-history-record-id]")).toHaveLength(1);
 });
 
 it("uses one conflict card and requires an explicit record choice without inventing missing receipts", async () => {

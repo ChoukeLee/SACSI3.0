@@ -349,7 +349,7 @@ it("still applies a new verified SSR scope when localStorage is unavailable", as
   }
 });
 it.each(["zh", "fr"] as const)(
-  "keeps sale default-building and explicit-project initial SSR scopes without duplicate requests (%s)",
+  "normalizes sale SSR reads once without losing the default building or explicit project scope (%s)",
   async (locale) => {
     for (const explicit of [false, true]) {
       const query = parseWorkspaceQuery({
@@ -367,6 +367,7 @@ it.each(["zh", "fr"] as const)(
         transfer_status: "not_started",
         transfer_date: null,
       });
+      const callsBefore = vi.mocked(fetch).mock.calls.length;
       await act(async () =>
         root.render(
           <SaleList
@@ -379,8 +380,31 @@ it.each(["zh", "fr"] as const)(
         ),
       );
       await pause();
-      expect(recordRequests()).toHaveLength(0);
-      expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
+      const requests = vi
+        .mocked(fetch)
+        .mock.calls.slice(callsBefore)
+        .map(([input]) => new URL(String(input), "http://local.invalid"));
+      expect(
+        requests.map((url) => url.searchParams.get("mode")).sort(),
+        requests.map((url) => url.href).join("\n"),
+      ).toEqual(["context", "list"]);
+      for (const url of requests) {
+        expect(url.pathname).toBe("/api/contracts/sale");
+        expect(url.searchParams.get("projectId")).toBe(query.projectId);
+        expect(url.searchParams.get("buildingId")).toBe(query.buildingId);
+        expect(url.searchParams.get("status")).toBe("all");
+        expect(url.searchParams.get("search") ?? "").toBe("");
+        expect(url.searchParams.get("page")).toBe("1");
+        expect(url.searchParams.get("sort")).toBe("unit");
+        expect(url.searchParams.get("direction")).toBe("asc");
+      }
+      expect(
+        requests
+          .find((url) => url.searchParams.get("mode") === "context")
+          ?.searchParams.get("roomOverview"),
+      ).toBe("1");
+      expect(host.querySelectorAll("[data-sale-room-id]")).toHaveLength(1);
+      expect(host.querySelector("tbody")).toBeNull();
       await act(async () => root.unmount());
       root = createRoot(host);
     }

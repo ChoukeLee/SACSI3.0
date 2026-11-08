@@ -170,6 +170,7 @@ async function render(
       />,
     ),
   );
+  await settle();
 }
 async function click(node: Element | null | undefined) {
   expect(node).toBeTruthy();
@@ -183,7 +184,6 @@ async function settle(ms = 20) {
       }),
   );
 }
-const tableButtons = () => [...host.querySelectorAll('tbody button[aria-label^="预览出售合同"]')];
 const buttons = () => [...host.querySelectorAll("[data-sale-room-id]")];
 const inspector = () => document.querySelector('aside[aria-label="出售合同履约详情"]');
 const named = (name: string, within: ParentNode = document) =>
@@ -209,7 +209,7 @@ async function clickAction(label: string) {
   await click(named(label, inspector()!));
 }
 function recordRequests() {
-  return vi.mocked(fetch).mock.calls.filter(([input]) => requestInfo(input).mode !== "context");
+  return vi.mocked(fetch).mock.calls.filter(([input]) => requestInfo(input).mode === "detail");
 }
 function operationDialog() {
   return (
@@ -243,17 +243,18 @@ function nativeSource(data: WorkspaceData) {
   return data;
 }
 
-it("shows a known native source price in the existing table and does not infer a cleared balance", async () => {
+it("shows a known native source price on its room card and does not infer a cleared balance", async () => {
   vi.mocked(fetch).mockImplementation(async (input) =>
     Response.json(nativeSource(responseFor(input))),
   );
   await render(nativeSource(saleFixture(undefined, "list", 1)));
-  await openDisclosure("列表核对", host);
-  const row = host.querySelector("tbody tr")!;
+  const row = buttons()[0];
   expect(row.textContent).toContain("720,000 CNY");
   expect(row.textContent).toContain("初始登记");
   expect(row.textContent).not.toContain("已建应收已结清");
-  await click(tableButtons()[0]);
+  expect(host.querySelector("table")).toBeNull();
+  expect(host.textContent).not.toContain("列表核对");
+  await click(row);
   await settle();
   expect(inspector()?.textContent).toContain("720,000 CNY");
   expect(inspector()?.textContent).toContain("暂无已核应收");
@@ -342,7 +343,72 @@ it("opens a stable ID deep link without loading all contracts, even outside the 
   await openDisclosure("合同登记资料");
   expect(inspector()?.textContent).toContain("SYNTHETIC-SALE-0");
 });
-it("preserves explicit initial building, search, status, sort and page without resetting them to defaults", async () => {
+it("preserves a legacy contract bookmark while normalization is pending or fails and opens that record after a read retry", async () => {
+  const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const query = parseWorkspaceQuery({
+    projectId: workspaceProject,
+    buildingId: workspaceBuilding,
+    search: "Bookmarked buyer",
+    status: "all",
+    page: 2,
+    sort: "balance",
+    direction: "desc",
+  });
+  window.history.replaceState(
+    {},
+    "",
+    `/sales?project=${workspaceProject}&building=${workspaceBuilding}&contract=${id}&q=Bookmarked+buyer&status=all&page=2`,
+  );
+  let listReads = 0;
+  let resolveList!: (response: Response) => void;
+  vi.mocked(fetch).mockImplementation((input) => {
+    if (requestInfo(input).mode === "list" && ++listReads === 1)
+      return new Promise((resolve) => {
+        resolveList = resolve;
+      });
+    return Promise.resolve(Response.json(responseFor(input)));
+  });
+  await render(saleFixture(query, "list", 26), id, {
+    canRecordFinance: true,
+    canManage: true,
+    canTerminate: true,
+  });
+  await settle(260);
+  expect(listReads).toBe(1);
+  const assertUnreadyBookmark = () => {
+    expect(Object.fromEntries(new URL(window.location.href).searchParams)).toMatchObject({
+      contract: id,
+      q: "Bookmarked buyer",
+      status: "all",
+      page: "2",
+    });
+    expect(document.body.textContent).not.toContain("800,000 XOF");
+    expect(document.querySelector('[aria-label="办理此合同"]')).toBeNull();
+    expect(document.querySelector("#sale-action-amount, #sale-action-transfer-status")).toBeNull();
+    expect(operationDialog()).toBeNull();
+    expect(recordRequests()).toHaveLength(0);
+  };
+  assertUnreadyBookmark();
+  await act(async () => resolveList(new Response("", { status: 503 })));
+  await settle();
+  expect(host.textContent).toContain("合同数据暂不可核验");
+  assertUnreadyBookmark();
+  await click(named("重试", host));
+  await settle(260);
+  expect(listReads).toBe(2);
+  expect(recordRequests()).toHaveLength(1);
+  expect(requestInfo(recordRequests()[0][0]).id).toBe(id);
+  expect(inspector()).toBeTruthy();
+  expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+  expect(operationDialog()).toBeNull();
+  expect(new URL(window.location.href).searchParams.get("contract")).toBe(id);
+  expect(new URL(window.location.href).searchParams.get("q")).toBe("Bookmarked buyer");
+  expect(recordSalePaymentAtomic).not.toHaveBeenCalled();
+  expect(addFlexibleInstallment).not.toHaveBeenCalled();
+  expect(updateTransferStatus).not.toHaveBeenCalled();
+  expect(terminateSaleContract).not.toHaveBeenCalled();
+});
+it("shows initial building, search and record status while reading the complete unfiltered scope", async () => {
   const query = parseWorkspaceQuery({
     projectId: workspaceProject,
     buildingId: workspaceBuilding,
@@ -353,7 +419,7 @@ it("preserves explicit initial building, search, status, sort and page without r
     direction: "desc",
   });
   await render(saleFixture(query, "list", 26));
-  await settle();
+  await settle(260);
   expect(recordRequests()).toHaveLength(0);
   const params = new URL(window.location.href).searchParams;
   expect(Object.fromEntries(params)).toMatchObject({
@@ -361,12 +427,123 @@ it("preserves explicit initial building, search, status, sort and page without r
     building: workspaceBuilding,
     q: "Synthetic",
     status: "all",
-    page: "2",
-    sort: "balance",
-    direction: "desc",
   });
-  await openDisclosure("列表核对", host);
-  expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
+  expect(host.querySelectorAll('input[type="search"]'), host.textContent ?? "").toHaveLength(1);
+  expect(host.querySelector<HTMLInputElement>('input[type="search"]')?.value).toBe("Synthetic");
+  const recordsButton = named("出售记录", host)!;
+  if (recordsButton.getAttribute("aria-expanded") !== "true") await click(recordsButton);
+  expect(host.querySelector<HTMLSelectElement>('select[aria-label="出售记录状态"]')?.value).toBe(
+    "all",
+  );
+  const contextRequests = vi
+    .mocked(fetch)
+    .mock.calls.filter(([input]) => requestInfo(input).mode === "context");
+  expect(contextRequests.length).toBeGreaterThan(0);
+  for (const [input] of contextRequests) {
+    expect(requestInfo(input).query).toMatchObject({ status: "all", search: "", page: 1 });
+  }
+  expect(host.querySelector("table")).toBeNull();
+});
+it("keeps draft and historical records reachable through one visible deep-linked search without new scope reads", async () => {
+  const query = parseWorkspaceQuery({
+    projectId: workspaceProject,
+    search: "Draft buyer",
+    status: "draft",
+  });
+  const scope = saleFixture(query, "context", 3);
+  const names = ["Current buyer", "Former buyer", "Draft buyer"];
+  scope.customers = names.map((name, index) => ({
+    ...scope.customers[0],
+    id: syntheticId(800000 + index),
+    name,
+  }));
+  scope.contracts = scope.contracts.map((contract, index) => ({
+    ...contract,
+    customer_id: scope.customers[index].id,
+    status: index === 1 ? "terminated" : index === 2 ? "draft" : "active",
+  }));
+  const oldId = scope.contracts[1].id;
+  const draftId = scope.contracts[2].id;
+  vi.mocked(fetch).mockImplementation(async (input) => {
+    const { query, mode, id } = requestInfo(input);
+    const data = saleFixture(query, mode, mode === "detail" ? 1 : 3, id ?? workspaceContract);
+    data.contracts =
+      mode === "detail" ? scope.contracts.filter((row) => row.id === id) : scope.contracts;
+    data.units = scope.units;
+    data.customers = scope.customers;
+    data.receivables = [];
+    data.receivableCount = 0;
+    data.schedules = [];
+    data.scheduleCount = 0;
+    data.payments = [];
+    data.paymentCount = 0;
+    data.summaries = Object.fromEntries(
+      data.contracts.map((row) => [
+        row.id,
+        {
+          count: 0,
+          total: 0,
+          paid: 0,
+          outstanding: 0,
+          overdue: 0,
+          nextDue: null,
+          dueOutstanding: 0,
+        },
+      ]),
+    );
+    data.attentionDue = Object.fromEntries(data.contracts.map((row) => [row.id, null]));
+    if (mode === "context") {
+      data.roomReceivables = [];
+      data.roomPayments = [];
+      data.roomSchedules = [];
+      data.roomFinanceCounts = { receivables: 0, payments: 0, schedules: 0 };
+    }
+    return Response.json(data);
+  });
+  await render({ ...scope, mode: "list" });
+  await settle(260);
+  const input = host.querySelector<HTMLInputElement>('input[type="search"]')!;
+  expect(host.querySelectorAll('input[type="search"]'), host.textContent ?? "").toHaveLength(1);
+  expect(input.value).toBe("Draft buyer");
+  const recordStatus = host.querySelector<HTMLSelectElement>('select[aria-label="出售记录状态"]')!;
+  expect(recordStatus.value).toBe("draft");
+  expect(host.querySelector(`[data-sale-history-record-id="${draftId}"]`)?.textContent).toContain(
+    "Draft buyer",
+  );
+  expect(host.querySelector(`[data-sale-history-record-id="${oldId}"]`)).toBeNull();
+  const readCount = vi.mocked(fetch).mock.calls.length;
+  await changeInput(input, "");
+  await act(async () => {
+    recordStatus.value = "all";
+    recordStatus.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(host.querySelectorAll("[data-sale-history-record-id]")).toHaveLength(3);
+  expect(host.querySelector(`[data-sale-history-record-id="${draftId}"]`)).toBeTruthy();
+  expect(host.querySelector(`[data-sale-history-record-id="${oldId}"]`)).toBeTruthy();
+  await click(named("出售记录", host));
+  expect(host.querySelector('section[aria-label="出售记录查询"]')).toBeNull();
+  await changeInput(input, "Former buyer");
+  expect(buttons()).toHaveLength(0);
+  const historyShortcut = [...host.querySelectorAll("button")].find((button) =>
+    /查看\s*1\s*条匹配的历史记录/.test(button.textContent ?? ""),
+  );
+  await click(historyShortcut);
+  const historyRecord = host.querySelector(`[data-sale-history-record-id="${oldId}"]`);
+  expect(historyRecord?.textContent).toContain("Former buyer");
+  expect(host.querySelector<HTMLSelectElement>('select[aria-label="出售记录状态"]')?.value).toBe(
+    "historical",
+  );
+  const params = new URL(window.location.href).searchParams;
+  expect(params.get("q")).toBe("Former buyer");
+  expect(params.get("status")).toBe("all");
+  expect(vi.mocked(fetch).mock.calls).toHaveLength(readCount);
+  await click(historyRecord);
+  await settle();
+  expect(requestInfo(recordRequests().at(-1)![0]).id).toBe(oldId);
+  expect(inspector()?.textContent).toContain("Former buyer");
+  expect(inspector()?.textContent).not.toContain("Draft buyer");
+  expect(recordSalePaymentAtomic).not.toHaveBeenCalled();
+  expect(addFlexibleInstallment).not.toHaveBeenCalled();
 });
 it("does not display previous selected balances while the next read is pending", async () => {
   await render();
@@ -446,26 +623,19 @@ it("clears preview and drawer before a changed scope request returns", async () 
   expect(inspector()).toBeNull();
   expect(new URL(window.location.href).searchParams.get("contract")).toBeNull();
 });
-it("clears selected facts before search debounce and empty result", async () => {
+it("clears selected facts immediately on local search and does not issue a filtered workspace read", async () => {
   await render();
-  const audit = await openDisclosure("列表核对", host);
-  await click(tableButtons()[0]);
+  await click(buttons()[0]);
   await settle();
-  vi.mocked(fetch).mockImplementation(async (input) => {
-    const { query, mode } = requestInfo(input);
-    return Response.json(saleFixture(query, mode, 0));
-  });
-  const input = audit.querySelector('input[placeholder*="搜索"]') as HTMLInputElement;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(
-      input,
-      "不存在",
-    );
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
+  const readCount = vi.mocked(fetch).mock.calls.length;
+  const input = host.querySelector('input[type="search"]') as HTMLInputElement;
+  await changeInput(input, "不存在");
   expect(inspector()?.textContent ?? "").not.toContain("800,000 XOF");
   await settle(260);
-  expect(host.querySelector("tbody")?.textContent).toContain("没有匹配的出售合同");
+  expect(buttons()).toHaveLength(0);
+  expect(inspector()).toBeNull();
+  expect(host.textContent).toContain("没有符合筛选条件的当前出售");
+  expect(vi.mocked(fetch).mock.calls).toHaveLength(readCount);
 });
 it("keeps row list available after isolated detail failure, without zero debt or operation actions", async () => {
   await render();
@@ -777,16 +947,20 @@ it("keeps a former buyer's debt on its original record and never adds it to the 
   initial.summaries = { [workspaceContract]: summary(false), [oldId]: summary(true) };
   vi.mocked(fetch).mockImplementation(async (input) => {
     const { query, mode, id } = requestInfo(input);
-    if (mode === "context")
+    if (mode !== "detail")
       return Response.json({
         ...initial,
         query,
         page: query.page,
         mode,
-        roomReceivables: [bill(false), bill(true)],
-        roomPayments: [receipt(false), receipt(true)],
-        roomSchedules: [],
-        roomFinanceCounts: { receivables: 2, payments: 2, schedules: 0 },
+        ...(mode === "context"
+          ? {
+              roomReceivables: [bill(false), bill(true)],
+              roomPayments: [receipt(false), receipt(true)],
+              roomSchedules: [],
+              roomFinanceCounts: { receivables: 2, payments: 2, schedules: 0 },
+            }
+          : {}),
       });
     const historical = id === oldId;
     const detail = saleFixture(query, "detail", 1, id!);
@@ -800,7 +974,7 @@ it("keeps a former buyer's debt on its original record and never adds it to the 
     return Response.json(detail);
   });
   await render(initial);
-  expect(buttons()).toHaveLength(1);
+  expect(buttons(), host.textContent ?? "").toHaveLength(1);
   expect(buttons()[0].textContent).toContain("Current buyer");
   expect(buttons()[0].textContent).not.toContain("Former buyer");
   expect(buttons()[0].textContent).not.toContain("75,000");
@@ -809,9 +983,18 @@ it("keeps a former buyer's debt on its original record and never adds it to the 
   expect(oldFollowup?.textContent).toContain("Former buyer");
   expect(oldFollowup?.textContent).toContain("75,000");
   expect(host.querySelector(`[data-sale-followup-record-id="${workspaceContract}"]`)).toBeNull();
-  await click(named("查看历史", host));
+  const sharedSearch = host.querySelector<HTMLInputElement>('input[type="search"]')!;
+  await changeInput(sharedSearch, "Current buyer");
+  expect(host.querySelector(`[data-sale-followup-record-id="${oldId}"]`)).toBeNull();
+  expect(buttons()).toHaveLength(1);
+  await changeInput(sharedSearch, "Former buyer");
+  expect(buttons()).toHaveLength(0);
+  expect(host.querySelector(`[data-sale-followup-record-id="${oldId}"]`)?.textContent).toContain(
+    "75,000",
+  );
+  await click(named("出售记录", host));
   expect(host.querySelector(`[data-sale-history-record-id="${oldId}"]`)).toBeTruthy();
-  await click(oldFollowup);
+  await click(host.querySelector(`[data-sale-followup-record-id="${oldId}"]`));
   await settle();
   expect(requestInfo(recordRequests().at(-1)![0]).id).toBe(oldId);
   expect(inspector()?.textContent).toContain("Former buyer");

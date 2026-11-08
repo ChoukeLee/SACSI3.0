@@ -111,6 +111,12 @@ export function SaleRoomOverview({
   error,
   selectedRecordId,
   busy = false,
+  search: controlledSearch,
+  onSearchChange,
+  recordStatus,
+  onRecordStatusChange,
+  initialRecordsOpen = false,
+  onBrowseChange,
   onSelectRecord,
   onRetry,
 }: {
@@ -121,17 +127,33 @@ export function SaleRoomOverview({
   error: boolean;
   selectedRecordId?: string | null;
   busy?: boolean;
+  search?: string;
+  onSearchChange?: (value: string) => void;
+  recordStatus?: string;
+  onRecordStatusChange?: (value: string) => void;
+  initialRecordsOpen?: boolean;
+  onBrowseChange?: () => void;
   onSelectRecord: (record: SaleRecordOverviewRow) => void;
   onRetry: () => void;
 }) {
   const text = (zh: string, fr: string) => (locale === "zh" ? zh : fr);
   const [filter, setFilter] = useState<Filter>("all");
-  const [search, setSearch] = useState("");
+  const [localSearch, setLocalSearch] = useState("");
+  const search = controlledSearch ?? localSearch;
   const [followup, setFollowup] = useState(false);
-  const [history, setHistory] = useState(false);
-  const [historySearch, setHistorySearch] = useState("");
-  const [historyStatus, setHistoryStatus] = useState("historical");
+  const [history, setHistory] = useState(initialRecordsOpen);
+  const [localHistoryStatus, setLocalHistoryStatus] = useState("all");
+  const historyStatus = recordStatus ?? localHistoryStatus;
   const [conflictUnitId, setConflictUnitId] = useState<string | null>(null);
+  const browse = () => {
+    setConflictUnitId(null);
+    onBrowseChange?.();
+  };
+  const changeRecordStatus = (value: string) => {
+    browse();
+    setLocalHistoryStatus(value);
+    onRecordStatusChange?.(value);
+  };
   const currentRows = useMemo(() => rows.filter((row) => row.record || row.conflict), [rows]);
   const counts = useMemo(
     () => ({
@@ -197,10 +219,18 @@ export function SaleRoomOverview({
               : historyStatus === "current"
                 ? !row.historical
                 : row.contract.status === historyStatus)) &&
-          (!historySearch.trim() ||
-            searchText(row).includes(historySearch.trim().toLocaleLowerCase())),
+          (!search.trim() || searchText(row).includes(search.trim().toLocaleLowerCase())),
       ),
-    [records, historySearch, historyStatus],
+    [records, search, historyStatus],
+  );
+  const matchingHistoryCount = useMemo(
+    () =>
+      search.trim()
+        ? records.filter(
+            (row) => row.historical && searchText(row).includes(search.trim().toLocaleLowerCase()),
+          ).length
+        : 0,
+    [records, search],
   );
   const floors = useMemo(() => {
     const grouped = new Map<
@@ -290,13 +320,35 @@ export function SaleRoomOverview({
           </span>
           <span className={record.attention?.kind === "overdue" ? styles.overdueText : undefined}>
             <strong>{attentionLabel(record, locale) ?? text("查看资料", "Voir le dossier")}</strong>
-            <small>
-              {record.attention?.amounts.length
-                ? amounts(record.attention.amounts, locale)
-                : record.attention
-                  ? text("金额待核", "Montant à vérifier")
-                  : ""}
-            </small>
+            {type === "history" ? (
+              <>
+                <small>
+                  {text("登记价", "Prix enregistré")}{" "}
+                  {record.priceNative
+                    ? amounts([record.priceNative], locale)
+                    : record.priceXof !== null
+                      ? amounts([{ currency: "XOF", amount: record.priceXof }], locale)
+                      : text("待核", "À vérifier")}
+                </small>
+                <small>
+                  {record.outstandingNative === null
+                    ? record.registeredBalance
+                      ? `${text("登记余款（Excel）", "Solde enregistré (Excel)")} ${amounts([record.registeredBalance], locale)}`
+                      : text("应收待核", "Créances à vérifier")
+                    : record.outstandingNative.length
+                      ? `${text("已核未收", "Solde vérifié")} ${amounts(record.outstandingNative, locale)}`
+                      : text("已建应收已结清", "Créances enregistrées soldées")}
+                </small>
+              </>
+            ) : (
+              <small>
+                {record.attention?.amounts.length
+                  ? amounts(record.attention.amounts, locale)
+                  : record.attention
+                    ? text("金额待核", "Montant à vérifier")
+                    : ""}
+              </small>
+            )}
           </span>
           <ArrowRight size={15} aria-hidden="true" />
         </button>
@@ -320,12 +372,16 @@ export function SaleRoomOverview({
             <button
               type="button"
               key={item.key}
+              disabled={busy}
               aria-pressed={filter === item.key}
               className={cn(
                 item.key === "overdue" && styles.overdueFilter,
                 item.key === "upcoming" && styles.upcomingFilter,
               )}
-              onClick={() => setFilter(item.key)}
+              onClick={() => {
+                browse();
+                setFilter(item.key);
+              }}
             >
               {item.label}
               <span>{counts[item.key]}</span>
@@ -336,30 +392,43 @@ export function SaleRoomOverview({
           <label className={styles.search}>
             <Search size={15} aria-hidden="true" />
             <span className="sr-only">
-              {text("搜索房号或买方", "Rechercher un lot ou acquéreur")}
+              {text("搜索房号、买方或合同编号", "Rechercher un lot, acquéreur ou contrat")}
             </span>
             <input
               type="search"
+              disabled={busy}
               value={search}
-              placeholder={text("房号或买方", "Lot ou acquéreur")}
-              onChange={(event) => setSearch(event.target.value)}
+              placeholder={text("房号、买方或合同编号", "Lot, acquéreur ou contrat")}
+              onChange={(event) => {
+                browse();
+                setLocalSearch(event.target.value);
+                onSearchChange?.(event.target.value);
+              }}
             />
           </label>
           <button
             type="button"
             className={styles.control}
+            disabled={busy}
             aria-expanded={followup}
-            onClick={() => setFollowup((value) => !value)}
+            onClick={() => {
+              browse();
+              setFollowup((value) => !value);
+            }}
           >
             {text("出售款跟进", "Suivi des paiements")} {followupRows.length}
           </button>
           <button
             type="button"
             className={styles.control}
+            disabled={busy}
             aria-expanded={history}
-            onClick={() => setHistory((value) => !value)}
+            onClick={() => {
+              browse();
+              setHistory((value) => !value);
+            }}
           >
-            {text("查看历史", "Voir l’historique")}
+            {text("出售记录", "Dossiers de vente")}
           </button>
         </div>
       </div>
@@ -384,21 +453,19 @@ export function SaleRoomOverview({
         <section className={styles.panel} aria-label={text("出售记录查询", "Recherche des ventes")}>
           <header>
             <h2>{text("出售记录", "Dossiers de vente")}</h2>
+            <p>
+              {text(
+                "当前、草稿和历史出售都在这里查询，点击记录打开同一份房间详情。",
+                "Consultez les ventes actuelles, brouillons et anciennes ; chaque dossier ouvre les mêmes détails du lot.",
+              )}
+            </p>
             <div className={styles.tools}>
-              <label className={styles.search}>
-                <span className="sr-only">{text("搜索出售记录", "Rechercher une vente")}</span>
-                <input
-                  type="search"
-                  placeholder={text("房号、买方或签约日期", "Lot, acquéreur ou date")}
-                  value={historySearch}
-                  onChange={(event) => setHistorySearch(event.target.value)}
-                />
-              </label>
               <select
                 className={styles.control}
+                disabled={busy}
                 aria-label={text("出售记录状态", "Statut des ventes")}
                 value={historyStatus}
-                onChange={(event) => setHistoryStatus(event.target.value)}
+                onChange={(event) => changeRecordStatus(event.target.value)}
               >
                 {[
                   ["historical", text("历史出售", "Anciennes ventes")],
@@ -563,14 +630,32 @@ export function SaleRoomOverview({
         </section>
       ))}
       {!floors.length ? (
-        <p className={styles.empty}>
-          {currentRows.length
-            ? text("没有符合筛选条件的当前出售。", "Aucune vente actuelle correspondante.")
-            : text(
-                "暂无当前出售；此前记录可在“查看历史”中查询。",
-                "Aucune vente actuelle ; consultez les anciennes ventes dans l’historique.",
+        <div className={styles.empty}>
+          <p>
+            {currentRows.length
+              ? text("没有符合筛选条件的当前出售。", "Aucune vente actuelle correspondante.")
+              : text(
+                  "暂无当前出售；此前记录可在“出售记录”中查询。",
+                  "Aucune vente actuelle ; consultez les anciennes ventes dans l’historique.",
+                )}
+          </p>
+          {matchingHistoryCount > 0 && !history ? (
+            <button
+              type="button"
+              disabled={busy}
+              className={styles.control}
+              onClick={() => {
+                changeRecordStatus("historical");
+                setHistory(true);
+              }}
+            >
+              {text(
+                `查看 ${matchingHistoryCount} 条匹配的历史记录`,
+                `Voir ${matchingHistoryCount} anciennes ventes correspondantes`,
               )}
-        </p>
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

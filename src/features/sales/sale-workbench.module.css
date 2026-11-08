@@ -221,17 +221,6 @@
   font-size: 0.75rem;
   color: hsl(var(--muted-foreground));
 }
-.verification {
-  border-top: 1px solid hsl(var(--border));
-  padding-top: 1rem;
-}
-.verification > summary {
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: hsl(var(--muted-foreground));
-  margin-bottom: 1rem;
-}
 .recordHistory {
   display: grid;
   margin-top: 0.6rem;
