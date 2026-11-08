@@ -55,6 +55,8 @@ export interface UnitSaleBrief extends UnitBusinessParty {
   signedDate: string | null;
   total: UnitBusinessMoney | null;
   received: UnitBusinessMoney[] | null;
+  /** Recorded purchase receipts minus explicit same-currency refunds, never FX or price-minus-cash. */
+  netReceived?: UnitBusinessMoney[] | null;
   balance: UnitBusinessBalance;
   agencyReceived: UnitBusinessMoney[] | null;
   otherReceived: UnitBusinessMoney[] | null;
@@ -72,6 +74,7 @@ export interface UnitLeaseBrief extends UnitBusinessParty {
   startDate: string | null;
   nextDue: string | null;
   overdue: UnitBusinessMoney[] | null;
+  overdueDueDate?: string | null;
   depositReceived: UnitBusinessMoney[] | null;
   agencyReceived: UnitBusinessMoney[] | null;
   otherReceived: UnitBusinessMoney[] | null;
@@ -142,6 +145,24 @@ function amounts(values: readonly UnitBusinessMoney[]): UnitBusinessMoney[] {
   return [...totals]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([currency, amount]) => ({ currency, amount: amount / 100 }));
+}
+
+function netPurchaseReceipts(
+  received: UnitBusinessMoney[] | null,
+  refunded: UnitBusinessMoney[] | null,
+) {
+  if (received === null || refunded === null) return { values: null, conflict: false };
+  const totals = new Map(received.map((value) => [value.currency, Math.round(value.amount * 100)]));
+  for (const refund of refunded) {
+    const available = totals.get(refund.currency);
+    const amount = Math.round(refund.amount * 100);
+    if (available === undefined || amount > available) return { values: null, conflict: true };
+    totals.set(refund.currency, available - amount);
+  }
+  return {
+    values: [...totals].map(([currency, amount]) => ({ currency, amount: amount / 100 })),
+    conflict: false,
+  };
 }
 const leaseKinds: Record<string, UnitBusinessReceipt["kind"]> = {
   lease_rent: "rent",
@@ -328,6 +349,7 @@ function rentBills(input: UnitBusinessSummaryInput, record: LeaseContractRow) {
     rentUnpaid: unknown ? null : amounts(all),
     dueUnpaid: unknown ? null : amounts(due),
     overdue: unknown ? null : amounts(overdue),
+    overdueDueDate: unknown ? null : (dates.filter((date) => date < input.today).sort()[0] ?? null),
     nextDue: dates.sort()[0] ?? null,
   };
 }
@@ -379,6 +401,7 @@ export function buildUnitBusinessSummaries(
     const cash = cashForRecord(input, original, "sale");
     const received = cash.total("purchase");
     const refunded = cash.total("refund");
+    const net = netPurchaseReceipts(received, refunded);
     const exceedsPrice =
       row.priceNative &&
       received?.some(
@@ -412,6 +435,7 @@ export function buildUnitBusinessSummaries(
         ...new Set([
           ...row.reviewReasons,
           ...cash.reviews,
+          ...(net.conflict ? ["refund_currency_or_amount_requires_review"] : []),
           ...(exceedsPrice ? ["cash_exceeds_registered_price"] : []),
         ]),
       ],
@@ -420,6 +444,7 @@ export function buildUnitBusinessSummaries(
       signedDate: validDate(original.signed_date) ? original.signed_date : null,
       total: row.priceNative ?? null,
       received,
+      netReceived: net.values,
       balance,
       agencyReceived: cash.total("agency"),
       otherReceived: cash.total("other"),
@@ -450,7 +475,19 @@ export function buildUnitBusinessSummaries(
       status: original.status,
       historical: row.historical,
       sourceRef: original.source_reference ?? null,
-      reviewReasons: [...new Set([...row.reviewReasons, ...cash.reviews, ...bills.reviews])],
+      reviewReasons: [
+        ...new Set([
+          // An unconfirmed legacy end may only be a copied payment cutoff.
+          // Missing formal terms do not make an otherwise valid rental a collection issue.
+          ...row.reviewReasons.filter(
+            (reason) =>
+              reason !== "registered_period_needs_review" ||
+              original.expected_end_confirmed === true,
+          ),
+          ...cash.reviews,
+          ...bills.reviews,
+        ]),
+      ],
       recentReceipts: cash.rows.slice(0, 6),
       receiptCount: cash.rows.length,
       occupancy: row.occupancy,
@@ -465,6 +502,7 @@ export function buildUnitBusinessSummaries(
       startDate: validDate(original.start_date) ? original.start_date : null,
       nextDue: bills.nextDue,
       overdue: bills.overdue,
+      overdueDueDate: bills.overdueDueDate,
       depositReceived: cash.total("deposit"),
       agencyReceived: cash.total("agency"),
       otherReceived: cash.total("other"),

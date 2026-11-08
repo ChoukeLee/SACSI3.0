@@ -423,6 +423,7 @@ export function UnitWorkbench({
               <UnitFloorIndex
                 rows={data.rows}
                 locale={locale}
+                buildingName={building.display_name}
                 selectedId={selected?.unit.id ?? null}
                 onSelect={select}
                 disabled={pending}
@@ -440,6 +441,22 @@ export function UnitWorkbench({
             <RightDrawer
               open
               width="wide"
+              className={styles.assetDrawer}
+              badge={
+                <span className={styles.drawerMarks}>
+                  {selected.position?.ownership === "sold" ? (
+                    <small className={styles.soldMark}>{zh ? "已售" : "Vendu"}</small>
+                  ) : null}
+                  {selected.position?.lease_occupied ? (
+                    <small className={styles.rentedMark}>{zh ? "在租" : "Loué"}</small>
+                  ) : null}
+                  {selected.position?.daily_occupied ? (
+                    <small className={styles.rentedMark}>
+                      {zh ? "日租入住" : "Séjour en cours"}
+                    </small>
+                  ) : null}
+                </span>
+              }
               title={
                 <span className={styles.drawerTitle}>
                   {building.display_name} · {selected.unit.unit_no}

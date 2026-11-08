@@ -3,7 +3,10 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UnitWorkbench } from "@/features/units/unit-workbench";
-import type { UnitBusinessSummary } from "@/features/units/unit-business-summary-model";
+import type {
+  UnitBusinessReceipt,
+  UnitBusinessSummary,
+} from "@/features/units/unit-business-summary-model";
 import {
   parseUnitWorkbenchQuery,
   UNIT_WORKBENCH_PAGE_SIZE,
@@ -202,6 +205,7 @@ async function openDetails(label: string) {
   );
   expect(details).toBeTruthy();
   if (!details!.open) await click(details!.querySelector("summary")!);
+  await act(async () => details!.dispatchEvent(new Event("toggle")));
   return details!;
 }
 async function openMaintenance() {
@@ -305,7 +309,7 @@ describe("asset directory UI", () => {
       );
       await render();
       await selectFirst();
-      await click(button("业务记录"));
+      await openDetails("业务记录");
       expect(document.body.textContent).toContain(
         `${kind === "actual" ? "实际" : "预计"} 2026-09-15`,
       );
@@ -367,7 +371,7 @@ describe("asset directory UI", () => {
     await selectFirst();
     await openDetails("业务配置与标准价");
     expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')?.textContent).toContain(
-      "0 XOF",
+      "0万西法",
     );
     expect(drawer()?.textContent).not.toContain("XOF XOF");
     expect(drawer()?.textContent).toContain("未配置价格");
@@ -392,7 +396,7 @@ describe("asset directory UI", () => {
     expect(card(uuid(100))?.textContent).not.toContain("Synthetic tenant Beta");
     expect(card(uuid(101))?.textContent).toContain("Synthetic tenant Beta");
     expect(card(uuid(101))?.textContent).not.toContain("Synthetic buyer Alpha");
-    expect(card(uuid(100))?.textContent).toContain("600,000");
+    expect(card(uuid(100))?.textContent).toContain("60万西法");
     expect(card(uuid(100))?.textContent).toContain("2,000");
     expect(card(uuid(100))?.textContent).toContain("USD");
     expect(card(uuid(100))?.textContent).toContain("2026-12-31");
@@ -424,6 +428,115 @@ describe("asset directory UI", () => {
     expect(drawer()?.textContent).not.toContain("2026-12-31");
     expect(fetcher).not.toHaveBeenCalled();
   });
+  it("matches the customer-money draft with two rent metrics, an actual due-date banner, registered paid-through and separately disclosed receipts", async () => {
+    const value = data();
+    const summary = business();
+    summary.sales = [];
+    const lease = summary.leases[0];
+    Object.assign(lease, {
+      monthlyRent: { currency: "XOF", amount: 650000 },
+      rentReceived: [{ currency: "XOF", amount: 5200000 }],
+      dueUnpaid: [{ currency: "XOF", amount: 650000 }],
+      rentUnpaid: [{ currency: "XOF", amount: 650000 }],
+      overdue: [{ currency: "XOF", amount: 650000 }],
+      overdueDueDate: "2026-11-07",
+      paidThrough: "2026-11-06",
+      depositReceived: [{ currency: "XOF", amount: 1300000 }],
+      agencyReceived: [{ currency: "XOF", amount: 650000 }],
+      refundPaid: [{ currency: "XOF", amount: 325000 }],
+    });
+    const receipt = (
+      n: number,
+      kind: UnitBusinessReceipt["kind"],
+      amount: number,
+    ): UnitBusinessReceipt => ({
+      id: uuid(800 + n),
+      recordId: lease.recordId,
+      unitId: lease.unitId,
+      role: "lease",
+      kind,
+      direction: kind === "refund" ? "out" : "in",
+      date: "2026-11-01",
+      amount: { currency: "XOF", amount },
+      sourceRef: `Synthetic source ${n}`,
+    });
+    lease.recentReceipts = [
+      receipt(1, "rent", 1950000),
+      receipt(2, "rent", 1950000),
+      receipt(3, "rent", 1300000),
+      receipt(4, "deposit", 1300000),
+      receipt(5, "agency", 650000),
+      receipt(6, "refund", 325000),
+    ];
+    lease.receiptCount = 6;
+    value.rows[0].business = summary;
+    await render(value);
+    await selectFirst();
+    const section = drawer()!.querySelector('[aria-label="租客与租金"]')!;
+    expect(drawer()?.querySelector('[role="tablist"]')).toBeNull();
+    const metrics = section.querySelector('[class*="heroMetrics"]')!;
+    expect(metrics.children).toHaveLength(2);
+    expect(metrics.textContent).toContain("累计已收租金520万西法");
+    expect(metrics.textContent).toContain("当前到期未收65万西法");
+    expect(metrics.textContent).not.toContain("130万西法");
+    const overdue = section.querySelector('[class*="overdueBanner"]');
+    expect(overdue?.textContent).toContain("2026-11-07 应付");
+    expect(overdue?.textContent).toContain("逾期1天");
+    expect(overdue?.textContent).toContain("65万西法");
+    expect(section.querySelector('[class*="dateHero"]')?.textContent).toContain(
+      "租金已交至登记2026-11-06",
+    );
+    expect(section.textContent).toContain("另收押金130万西法");
+    expect(section.textContent).toContain("另收中介费65万西法");
+    expect(section.textContent).toContain("已退金额32.5万西法");
+    expect(section.querySelector(`[data-unit-receipt-id="${uuid(801)}"]`)?.textContent).toContain(
+      "租金2026-11-01",
+    );
+    const extras = section
+      .querySelector(`[data-unit-receipt-id="${uuid(806)}"]`)
+      ?.closest("details")!;
+    expect(extras.open).toBe(false);
+    await openDetails("押金、中介及其他收支");
+    expect(extras.open).toBe(true);
+    expect(extras.querySelector(`[data-unit-receipt-id="${uuid(806)}"]`)?.textContent).toContain(
+      "− 32.5万西法",
+    );
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
+  it.each(["XOF", "CNY"] as const)(
+    "shows net %s purchase cash independently of gross and source zero, keeping an unknown net unknown",
+    async (currency) => {
+      const value = data();
+      const summary = business();
+      summary.leases = [];
+      const sale = summary.sales[0];
+      const net = currency === "XOF" ? 1000000 : 720000;
+      sale.total = { currency, amount: net };
+      sale.received = [{ currency, amount: net * 2 }];
+      sale.refundPaid = [{ currency, amount: net }];
+      sale.netReceived = [{ currency, amount: net }];
+      sale.balance = { basis: "registered", amounts: [{ currency, amount: 0 }] };
+      value.rows[0].business = summary;
+      await render(value);
+      await selectFirst();
+      const metric = () =>
+        [...drawer()!.querySelectorAll("div")].find(
+          (el) =>
+            el.querySelector(":scope > span")?.textContent === "净收房款" &&
+            el.querySelector(":scope > strong"),
+        )!;
+      expect(metric().textContent).toContain(currency === "XOF" ? "100万西法" : "720,000CNY");
+      expect(metric().textContent).not.toContain(currency === "XOF" ? "200万西法" : "1,440,000CNY");
+      expect(drawer()?.textContent).toContain("累计房款入款");
+      expect(drawer()?.textContent).toContain("来源登记余款为零");
+      expect(drawer()?.textContent).not.toContain("已核房款账单已结清");
+      sale.netReceived = null;
+      await render({ ...value, rows: [...value.rows] });
+      expect(metric().querySelector("strong")?.textContent).toBe("待核");
+      expect(fetcher).not.toHaveBeenCalled();
+    },
+  );
   it("keeps missing money and an unavailable business read distinct from a zero balance", async () => {
     const value = data();
     const unknown = business();
@@ -444,7 +557,8 @@ describe("asset directory UI", () => {
       reviewReasons: ["Synthetic read denied"],
     };
     await render(value);
-    const zeroMoney = /(?:^|[^\d,])0\s*(?:XOF|USD|CNY)|(?:XOF|USD|CNY)\s*0(?:[^\d]|$)/;
+    const zeroMoney =
+      /(?:^|[^\d,])0\s*(?:XOF|USD|CNY|万西法)|(?:XOF|USD|CNY|万西法)\s*0(?:[^\d]|$)/;
     expect(card(uuid(100))?.textContent).toContain("待核");
     expect(card(uuid(100))?.textContent).not.toMatch(zeroMoney);
     expect(card(uuid(101))?.textContent).not.toMatch(zeroMoney);
@@ -726,14 +840,14 @@ describe("asset directory UI", () => {
     mocks.audit.mockRejectedValueOnce(new Error("offline"));
     await render();
     await selectFirst();
-    await click(button("变更记录"));
+    await openDetails("变更记录");
     expect(mocks.audit).toHaveBeenCalledExactlyOnceWith(uuid(100));
     expect(document.body.textContent).toContain("状态历史读取失败");
     expect(document.body.textContent).not.toContain("暂无可见的状态变更记录");
     await click(button("重试"));
     expect(document.body.textContent).toContain("暂无可见的状态变更记录");
   });
-  it("requests exact-scoped relations only when the business tab opens and distinguishes guest/agent links", async () => {
+  it("requests exact-scoped relations only when business records expand and distinguishes guest/agent links", async () => {
     fetcher.mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -763,7 +877,7 @@ describe("asset directory UI", () => {
     );
     await render();
     await selectFirst();
-    await click(button("业务记录"));
+    await openDetails("业务记录");
     expect(fetcher).toHaveBeenCalledOnce();
     expect(fetcher.mock.calls[0][0]).toContain(`unit=${uuid(100)}`);
     expect(fetcher.mock.calls[0][0]).toContain(`building=${building}`);
@@ -783,7 +897,7 @@ describe("asset directory UI", () => {
     );
     await render();
     await selectFirst();
-    await click(button("业务记录"));
+    await openDetails("业务记录");
     await click(drawer()!.querySelector('button[aria-label="Close"]')!);
     await click(host.querySelector('[aria-label="查看资产 102"]')!);
     await act(async () =>

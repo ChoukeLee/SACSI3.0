@@ -2,7 +2,6 @@
 
 import { ArrowRight } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
-import { dictionaries } from "@/lib/i18n";
 import { formatMoney } from "@/lib/currency";
 import type { ReactNode } from "react";
 import type {
@@ -94,6 +93,10 @@ export function unitReviewText(reasons: readonly string[], locale: Locale) {
       "已录房款超过登记总价，需核对来源",
       "Les encaissements enregistrés dépassent le prix enregistré ; sources à vérifier",
     ],
+    refund_currency_or_amount_requires_review: [
+      "退款币种或金额关系待核",
+      "Devise ou montant des remboursements à vérifier",
+    ],
     multiple_current_records: [
       "有多条当前记录，需分别核对",
       "Plusieurs dossiers actuels à vérifier séparément",
@@ -127,8 +130,18 @@ export function UnitAmountValue({
     <>
       {values.map((value, index) => (
         <span className={styles.moneyCurrency} key={`${value.currency}:${index}`}>
-          {formatMoney(value.amount, value.currency, locale)}
-          {value.currency !== "XOF" ? ` ${value.currency}` : ""}
+          {value.currency === "XOF"
+            ? new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "fr-FR", {
+                maximumFractionDigits: 6,
+              }).format(value.amount / 10000)
+            : formatMoney(value.amount, value.currency, locale)}
+          <small className={styles.moneyUnit}>
+            {value.currency === "XOF"
+              ? locale === "zh"
+                ? "万西法"
+                : "× 10 000 XOF"
+              : value.currency}
+          </small>
         </span>
       ))}
     </>
@@ -208,8 +221,21 @@ export function UnitPartyMoney({
           <MoneyRow label={zh ? "总价" : "Prix enregistré"}>
             <UnitAmountValue values={sale.total ? [sale.total] : null} locale={locale} />
           </MoneyRow>
-          <MoneyRow label={zh ? "已收房款" : "Prix encaissé"}>
-            <UnitAmountValue values={sale.received} locale={locale} />
+          <MoneyRow
+            label={
+              sale.refundPaid?.length
+                ? zh
+                  ? "净收房款"
+                  : "Prix net encaissé"
+                : zh
+                  ? "已收房款"
+                  : "Prix encaissé"
+            }
+          >
+            <UnitAmountValue
+              values={sale.netReceived === undefined ? sale.received : sale.netReceived}
+              locale={locale}
+            />
           </MoneyRow>
           <MoneyRow
             label={zh ? "未收房款" : "Solde du prix"}
@@ -280,10 +306,18 @@ export function UnitPartyMoney({
   );
 }
 
-export function UnitPaidThrough({ party, locale }: { party: UnitLeaseBrief; locale: Locale }) {
+export function UnitPaidThrough({
+  party,
+  locale,
+  hero = false,
+}: {
+  party: UnitLeaseBrief;
+  locale: Locale;
+  hero?: boolean;
+}) {
   const zh = locale === "zh";
   return (
-    <span className={styles.paidThrough}>
+    <span className={cn(styles.paidThrough, hero && styles.dateHero)}>
       <span>
         {zh ? "租金已交至" : "Loyer enregistré jusqu’au"}
         <small>{zh ? "登记" : "Enregistré"}</small>
@@ -356,16 +390,17 @@ export function UnitFloorIndex({
   selectedId,
   locale,
   disabled = false,
+  buildingName,
   onSelect,
 }: {
   rows: UnitWorkbenchRecord[];
   selectedId: string | null;
   locale: Locale;
   disabled?: boolean;
+  buildingName?: string;
   onSelect: (record: UnitWorkbenchRecord) => void;
 }) {
-  const zh = locale === "zh",
-    t = dictionaries[locale].units;
+  const zh = locale === "zh";
   const floorLabel = (record: UnitWorkbenchRecord) =>
     record.unit.floor_label?.trim() || (zh ? "楼层待登记" : "Étage à renseigner");
   const floors = [...new Set(rows.map(floorLabel))].sort(compareFloorLabels);
@@ -409,7 +444,10 @@ export function UnitFloorIndex({
                     onClick={() => onSelect(record)}
                   >
                     <span className={styles.assetCardHeading}>
-                      <strong>{unit.unit_no}</strong>
+                      <span className={styles.cardContext}>
+                        {buildingName ? `${buildingName} · ` : ""}
+                        {floor}
+                      </span>
                       <span className={styles.assetCardMarks}>
                         {position?.ownership === "sold" ? (
                           <small className={styles.soldMark}>{zh ? "已售" : "Vendu"}</small>
@@ -427,7 +465,7 @@ export function UnitFloorIndex({
                         ) : null}
                       </span>
                     </span>
-                    <span className={styles.assetType}>{t.kinds[unit.kind]}</span>
+                    <strong className={styles.roomNumber}>{unit.unit_no}</strong>
                     <span id={`asset-use-${unit.id}`} className={styles.assetUse}>
                       {unitOccupancyText(record, locale)}
                     </span>

@@ -345,7 +345,42 @@ describe("asset business financial summaries", () => {
       expect(record.refundPaid).toEqual(
         sourceType === "sale_refund" ? [money(1000000, currency)] : [],
       );
+      expect(record.netReceived).toEqual(
+        currency !== "XOF" ? null : [money(sourceType === "sale_refund" ? 1000000 : 2000000)],
+      );
+      expect(record.reviewReasons.includes("refund_currency_or_amount_requires_review")).toBe(
+        currency !== "XOF",
+      );
       expect(record.reviewReasons.includes("cash_exceeds_registered_price")).toBe(exceeds);
+    },
+  );
+
+  it.each([1000000, 1100000])(
+    "does not hide or clamp an explicit purchase refund of %s",
+    (refundAmount) => {
+      const sold = sale();
+      const payments = [
+        payment(1, sold, { amount: 1000000 }),
+        payment(2, sold, { amount: refundAmount, source_type: "sale_refund" }),
+      ];
+      const record = buildUnitBusinessSummaries(
+        input({
+          sales: [sold],
+          payments,
+          ledger: payments.map((pay, n) =>
+            ledger(n, pay, { direction: n === 1 ? "expense" : "income" }),
+          ),
+        }),
+      )[unit().id].sales[0];
+      expect(record.received).toEqual([money(1000000)]);
+      expect(record.refundPaid).toEqual([money(refundAmount)]);
+      if (refundAmount > 1000000) {
+        expect(record.netReceived).toBeNull();
+        expect(record.reviewReasons).toContain("refund_currency_or_amount_requires_review");
+      } else {
+        expect(record.netReceived).toEqual([money(0)]);
+        expect(record.reviewReasons).not.toContain("refund_currency_or_amount_requires_review");
+      }
     },
   );
 
@@ -365,6 +400,45 @@ describe("asset business financial summaries", () => {
     expect(record.dueUnpaid).toBeNull();
     expect(record.overdue).toBeNull();
     expect(record.reviewReasons.length).toBeGreaterThan(0);
+  });
+
+  it("uses the earliest positive verified overdue rent bill date and leaves it unknown if the bill set needs review", () => {
+    const rented = lease();
+    const bills = [
+      bill(1, rented, {
+        due_date: "2026-10-01",
+        amount_xof: 1000,
+        paid_amount_xof: 1000,
+        status: "paid",
+      }),
+      bill(2, rented, {
+        due_date: "2026-11-03",
+        amount_xof: 1000,
+        paid_amount_xof: 500,
+        status: "partial",
+      }),
+      bill(3, rented, {
+        due_date: "2026-11-01",
+        amount_xof: 1000,
+        paid_amount_xof: 800,
+        status: "partial",
+      }),
+      bill(4, rented, { due_date: "2026-11-20", amount_xof: 1000 }),
+      bill(5, rented, { due_date: "2026-11-08", amount_xof: 1000 }),
+    ];
+    const summary = buildUnitBusinessSummaries(input({ leases: [rented], receivables: bills }))[
+      unit().id
+    ];
+    expect(summary.leases[0].overdueDueDate).toBe("2026-11-01");
+    expect(summary.leases[0].overdue).toEqual([money(700)]);
+    const unknown = buildUnitBusinessSummaries(
+      input({
+        leases: [rented],
+        receivables: [...bills, bill(6, rented, { management_status: "historical_pending" })],
+      }),
+    )[unit().id].leases[0];
+    expect(unknown.overdueDueDate).toBeNull();
+    expect(unknown.overdue).toBeNull();
   });
 
   it("preserves native cash and an explicit source zero balance without inventing FX or verified bills", () => {
@@ -416,6 +490,7 @@ describe("asset business financial summaries", () => {
     )[unit().id];
     expect(summary.sales[0].total).toEqual(money(720000, "CNY"));
     expect(summary.sales[0].received).toEqual([money(720000, "CNY")]);
+    expect(summary.sales[0].netReceived).toEqual([money(720000, "CNY")]);
     expect(summary.sales[0].balance).toMatchObject({
       basis: "registered",
       amounts: [money(0, "CNY")],
@@ -512,6 +587,49 @@ describe("asset business financial summaries", () => {
       expect(matchesUnitWorkbenchFilter(record, "attention")).toBe(expected);
       summary.leases[0].dueUnpaid = null;
       expect(matchesUnitWorkbenchFilter(record, "attention")).toBe(false);
+    },
+  );
+
+  it.each([false, true])(
+    "does not treat an unconfirmed old expected end as a lease-period exception (confirmed=%s)",
+    (confirmed) => {
+      const rented = lease(1, {
+        expected_end_date: "2026-10-31",
+        expected_end_confirmed: confirmed,
+      });
+      const pay = payment(1, rented);
+      const future = bill(1, rented, { due_date: "2026-12-01", amount_xof: 1000 });
+      const build = (receivables: ReceivableRow[]) =>
+        buildUnitBusinessSummaries(
+          input({ leases: [rented], payments: [pay], ledger: [ledger(1, pay)], receivables }),
+        )[unit().id];
+      const summary = build([future]);
+      expect(summary.leases[0].rentReceived).toEqual([money(1000)]);
+      expect(summary.leases[0].reviewReasons.includes("registered_period_needs_review")).toBe(
+        confirmed,
+      );
+      const record: UnitWorkbenchPositionRecord = {
+        unit: { occupancy_verified: true, construction_status: "operational" },
+        position: {
+          ownership: "unspecified",
+          operational_condition: "normal",
+          daily_occupied: false,
+          lease_occupied: true,
+          cleaning_pending: false,
+          daily_enabled: false,
+          lease_enabled: true,
+        },
+        business: summary,
+      };
+      expect(matchesUnitWorkbenchFilter(record, "attention")).toBe(confirmed);
+      const actualOverdue = build([
+        future,
+        bill(2, rented, { due_date: "2026-11-07", amount_xof: 1000 }),
+      ]);
+      expect(actualOverdue.leases[0].overdue).toEqual([money(1000)]);
+      expect(matchesUnitWorkbenchFilter({ ...record, business: actualOverdue }, "attention")).toBe(
+        true,
+      );
     },
   );
 

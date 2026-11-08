@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Building2, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
-import { formatXof } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { buildWorkbenchRecordHref } from "@/lib/workbench-links";
 import type {
   UnitBusinessReceipt,
@@ -16,7 +16,6 @@ import {
   UnitAmountValue,
   UnitPaidThrough,
   UnitPartyHeading,
-  UnitPartyMoney,
   unitReviewText,
 } from "./unit-workbench-table";
 import { conditionLabel } from "./operational-position";
@@ -49,7 +48,8 @@ export function UnitWorkbenchInspector({
   onClose: () => void;
   onManage: () => void;
 }) {
-  const [tab, setTab] = useState<"overview" | "business" | "history">("overview");
+  const [businessOpen, setBusinessOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const zh = locale === "zh";
   const t = dictionaries[locale].units;
   if (!record)
@@ -73,220 +73,200 @@ export function UnitWorkbenchInspector({
       className={embedded ? styles.embeddedInspector : styles.inspector}
       aria-label={zh ? `资产 ${unit.unit_no} 的档案` : `Dossier de ${unit.unit_no}`}
     >
-      <header className={styles.inspectorHeader}>
-        {!embedded ? (
-          <>
-            <p className={styles.eyebrow}>
-              {building.project_code} · {zh ? "资产档案" : "DOSSIER DE L’ACTIF"}
+      {!embedded ? (
+        <header className={styles.inspectorHeader}>
+          <p className={styles.eyebrow}>
+            {building.project_code} · {zh ? "资产档案" : "DOSSIER DE L’ACTIF"}
+          </p>
+          <div className={styles.titleRow}>
+            <h2>{unit.unit_no}</h2>
+            <button
+              type="button"
+              className={styles.close}
+              aria-label={zh ? "关闭资产档案" : "Fermer le dossier"}
+              onClick={onClose}
+            >
+              <X size={15} />
+            </button>
+          </div>
+          <p className={styles.sub}>
+            {building.display_name} · {unit.floor_label} · {t.kinds[unit.kind]}
+          </p>
+        </header>
+      ) : null}
+      <div className={styles.detailBody}>
+        <UnitCustomerOverview
+          record={record}
+          building={building}
+          locale={locale}
+          returnTo={returnTo}
+        />
+        <details className={`${styles.section} ${styles.secondaryDetails}`}>
+          <summary>{zh ? "资产资料" : "Informations de l’actif"}</summary>
+          <div className={styles.dimensions}>
+            <Dimension
+              label={zh ? "出售状态" : "Vente"}
+              value={
+                position?.ownership === "sold"
+                  ? zh
+                    ? "已售"
+                    : "Vendu"
+                  : zh
+                    ? "权属未明确"
+                    : "Propriété non précisée"
+              }
+            />
+            <Dimension
+              label={zh ? "实际占用" : "Occupation réelle"}
+              value={unitOccupancyText(record, locale)}
+            />
+            <Dimension
+              label={zh ? "运行条件" : "État opérationnel"}
+              value={conditionLabel(position?.operational_condition, locale)}
+            />
+            <Dimension
+              label={zh ? "建设 / 交付" : "Construction / livraison"}
+              value={constructionLabel(unit.construction_status, locale)}
+            />
+          </div>
+          <p className={styles.callout}>
+            {unitNeedsVerification(record)
+              ? zh
+                ? "状态待核，不视为空置或可出租。"
+                : "État à vérifier ; ne pas considérer comme vacant ou prêt à louer."
+              : position?.operational_condition !== "normal"
+                ? zh
+                  ? "运行条件受限，需结合实际情况安排使用。"
+                  : "État limité ; vérifier la situation avant utilisation."
+                : zh
+                  ? "出售与使用情况分别记录，房款和租金在对应业务明细中核对。"
+                  : "Vente et occupation sont distinctes ; consultez les paiements dans le dossier concerné."}
+          </p>
+          <dl className={styles.facts}>
+            <Fact
+              label={zh ? "面积" : "Surface"}
+              value={
+                unit.area_sqm == null
+                  ? zh
+                    ? "待核对"
+                    : "À vérifier"
+                  : `${Number(unit.area_sqm)} m²`
+              }
+            />
+            <Fact label={zh ? "户型 / 形态" : "Configuration"} value={unit.layout} />
+            <Fact
+              label={zh ? "装修配置" : "Équipement"}
+              value={unit.furnishing ? t.furnishing[unit.furnishing] : null}
+            />
+            <Fact label={zh ? "位置分区" : "Zone"} value={unit.zone_label} />
+            <Fact
+              label={zh ? "保洁" : "Nettoyage"}
+              value={
+                !position
+                  ? zh
+                    ? "待核实"
+                    : "À vérifier"
+                  : position.cleaning_pending
+                    ? zh
+                      ? "待保洁"
+                      : "À nettoyer"
+                    : zh
+                      ? "无待办保洁"
+                      : "Aucun nettoyage en attente"
+              }
+            />
+            <Fact
+              label={zh ? "状态核验" : "Vérification"}
+              value={
+                unit.occupancy_verified === true
+                  ? zh
+                    ? "占用已核实"
+                    : "Occupation vérifiée"
+                  : zh
+                    ? "占用待核实"
+                    : "Occupation à vérifier"
+              }
+            />
+          </dl>
+        </details>
+        <details className={`${styles.section} ${styles.secondaryDetails}`}>
+          <summary>{zh ? "业务配置与标准价" : "Activités et tarifs configurés"}</summary>
+          {isCimac ? (
+            <p className={styles.note}>
+              {zh
+                ? "CIMAC 只租不卖；建设交付与租赁状态分别查看。"
+                : "CIMAC : location uniquement, sans vente ; livraison et occupation restent distinctes."}
             </p>
-            <div className={styles.titleRow}>
-              <h2>{unit.unit_no}</h2>
-              <button
-                type="button"
-                className={styles.close}
-                aria-label={zh ? "关闭资产档案" : "Fermer le dossier"}
-                onClick={onClose}
-              >
-                <X size={15} />
-              </button>
-            </div>
-          </>
+          ) : null}
+          {!record.flags.some((flag) => building.allows_sale || flag.business_type !== "sale") ? (
+            <p className={styles.note}>
+              {zh
+                ? "业务配置待核对；不推定默认价格。"
+                : "Configuration à vérifier ; aucun tarif déduit."}
+            </p>
+          ) : (
+            <dl className={styles.facts}>
+              {record.flags
+                .filter((flag) => building.allows_sale || flag.business_type !== "sale")
+                .map((flag) => (
+                  <Fact
+                    key={flag.business_type}
+                    label={`${t.businessTypes[flag.business_type]} · ${flag.is_enabled ? (zh ? "已启用" : "Activé") : zh ? "未启用" : "Désactivé"}`}
+                    value={
+                      flag.default_price_xof == null ? (
+                        zh ? (
+                          "未配置价格"
+                        ) : (
+                          "Tarif non renseigné"
+                        )
+                      ) : (
+                        <UnitAmountValue
+                          values={[{ currency: "XOF", amount: flag.default_price_xof }]}
+                          locale={locale}
+                        />
+                      )
+                    }
+                  />
+                ))}
+            </dl>
+          )}
+          {!building.allows_sale &&
+          record.flags.some((flag) => flag.business_type === "sale" && flag.is_enabled) ? (
+            <p className={styles.callout}>
+              {zh
+                ? "存在历史出售配置冲突，请核对；本页不会据此开放出售。"
+                : "Une ancienne configuration de vente est à vérifier ; aucune vente n’est ouverte ici."}
+            </p>
+          ) : null}
+        </details>
+        {unit.notes ? (
+          <details className={`${styles.section} ${styles.secondaryDetails}`}>
+            <summary>{zh ? "资产备注" : "Notes"}</summary>
+            <p className={styles.note}>{unit.notes}</p>
+          </details>
         ) : null}
-        <p className={styles.sub}>
-          {!embedded ? `${building.display_name} · ` : ""}
-          {unit.floor_label} · {t.kinds[unit.kind]}
-        </p>
-      </header>
-      <div
-        className={styles.tabs}
-        role="tablist"
-        aria-label={zh ? "资产档案页签" : "Onglets du dossier"}
-      >
-        {(
-          [
-            ["overview", zh ? "概况" : "Aperçu"],
-            ["business", zh ? "业务记录" : "Relations"],
-            ["history", zh ? "变更记录" : "Historique"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            aria-selected={tab === value}
-            aria-controls={`asset-${unit.id}-${value}`}
-            id={`asset-tab-${unit.id}-${value}`}
-            onClick={() => setTab(value)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      <div
-        className={styles.detailBody}
-        role="tabpanel"
-        id={`asset-${unit.id}-${tab}`}
-        aria-labelledby={`asset-tab-${unit.id}-${tab}`}
-      >
-        {tab === "overview" ? (
-          <>
-            <UnitCustomerOverview
+        <details
+          className={styles.secondaryDetails}
+          onToggle={(event) => setBusinessOpen(event.currentTarget.open)}
+        >
+          <summary>{zh ? "业务记录" : "Relations"}</summary>
+          {businessOpen ? (
+            <UnitBusinessRelations
+              key={unit.id}
               record={record}
               building={building}
               locale={locale}
               returnTo={returnTo}
             />
-            <details className={`${styles.section} ${styles.secondaryDetails}`}>
-              <summary>{zh ? "资产资料" : "Informations de l’actif"}</summary>
-              <div className={styles.dimensions}>
-                <Dimension
-                  label={zh ? "出售状态" : "Vente"}
-                  value={
-                    position?.ownership === "sold"
-                      ? zh
-                        ? "已售"
-                        : "Vendu"
-                      : zh
-                        ? "权属未明确"
-                        : "Propriété non précisée"
-                  }
-                />
-                <Dimension
-                  label={zh ? "实际占用" : "Occupation réelle"}
-                  value={unitOccupancyText(record, locale)}
-                />
-                <Dimension
-                  label={zh ? "运行条件" : "État opérationnel"}
-                  value={conditionLabel(position?.operational_condition, locale)}
-                />
-                <Dimension
-                  label={zh ? "建设 / 交付" : "Construction / livraison"}
-                  value={constructionLabel(unit.construction_status, locale)}
-                />
-              </div>
-              <p className={styles.callout}>
-                {unitNeedsVerification(record)
-                  ? zh
-                    ? "状态待核，不视为空置或可出租。"
-                    : "État à vérifier ; ne pas considérer comme vacant ou prêt à louer."
-                  : position?.operational_condition !== "normal"
-                    ? zh
-                      ? "运行条件受限，需结合实际情况安排使用。"
-                      : "État limité ; vérifier la situation avant utilisation."
-                    : zh
-                      ? "出售与使用情况分别记录，房款和租金在对应业务明细中核对。"
-                      : "Vente et occupation sont distinctes ; consultez les paiements dans le dossier concerné."}
-              </p>
-              <dl className={styles.facts}>
-                <Fact
-                  label={zh ? "面积" : "Surface"}
-                  value={
-                    unit.area_sqm == null
-                      ? zh
-                        ? "待核对"
-                        : "À vérifier"
-                      : `${Number(unit.area_sqm)} m²`
-                  }
-                />
-                <Fact label={zh ? "户型 / 形态" : "Configuration"} value={unit.layout} />
-                <Fact
-                  label={zh ? "装修配置" : "Équipement"}
-                  value={unit.furnishing ? t.furnishing[unit.furnishing] : null}
-                />
-                <Fact label={zh ? "位置分区" : "Zone"} value={unit.zone_label} />
-                <Fact
-                  label={zh ? "保洁" : "Nettoyage"}
-                  value={
-                    !position
-                      ? zh
-                        ? "待核实"
-                        : "À vérifier"
-                      : position.cleaning_pending
-                        ? zh
-                          ? "待保洁"
-                          : "À nettoyer"
-                        : zh
-                          ? "无待办保洁"
-                          : "Aucun nettoyage en attente"
-                  }
-                />
-                <Fact
-                  label={zh ? "状态核验" : "Vérification"}
-                  value={
-                    unit.occupancy_verified === true
-                      ? zh
-                        ? "占用已核实"
-                        : "Occupation vérifiée"
-                      : zh
-                        ? "占用待核实"
-                        : "Occupation à vérifier"
-                  }
-                />
-              </dl>
-            </details>
-            <details className={`${styles.section} ${styles.secondaryDetails}`}>
-              <summary>{zh ? "业务配置与标准价" : "Activités et tarifs configurés"}</summary>
-              {isCimac ? (
-                <p className={styles.note}>
-                  {zh
-                    ? "CIMAC 只租不卖；建设交付与租赁状态分别查看。"
-                    : "CIMAC : location uniquement, sans vente ; livraison et occupation restent distinctes."}
-                </p>
-              ) : null}
-              {!record.flags.some(
-                (flag) => building.allows_sale || flag.business_type !== "sale",
-              ) ? (
-                <p className={styles.note}>
-                  {zh
-                    ? "业务配置待核对；不推定默认价格。"
-                    : "Configuration à vérifier ; aucun tarif déduit."}
-                </p>
-              ) : (
-                <dl className={styles.facts}>
-                  {record.flags
-                    .filter((flag) => building.allows_sale || flag.business_type !== "sale")
-                    .map((flag) => (
-                      <Fact
-                        key={flag.business_type}
-                        label={`${t.businessTypes[flag.business_type]} · ${flag.is_enabled ? (zh ? "已启用" : "Activé") : zh ? "未启用" : "Désactivé"}`}
-                        value={
-                          flag.default_price_xof == null
-                            ? zh
-                              ? "未配置价格"
-                              : "Tarif non renseigné"
-                            : formatXof(flag.default_price_xof, locale)
-                        }
-                      />
-                    ))}
-                </dl>
-              )}
-              {!building.allows_sale &&
-              record.flags.some((flag) => flag.business_type === "sale" && flag.is_enabled) ? (
-                <p className={styles.callout}>
-                  {zh
-                    ? "存在历史出售配置冲突，请核对；本页不会据此开放出售。"
-                    : "Une ancienne configuration de vente est à vérifier ; aucune vente n’est ouverte ici."}
-                </p>
-              ) : null}
-            </details>
-            {unit.notes ? (
-              <details className={`${styles.section} ${styles.secondaryDetails}`}>
-                <summary>{zh ? "资产备注" : "Notes"}</summary>
-                <p className={styles.note}>{unit.notes}</p>
-              </details>
-            ) : null}
-          </>
-        ) : tab === "business" ? (
-          <UnitBusinessRelations
-            key={unit.id}
-            record={record}
-            building={building}
-            locale={locale}
-            returnTo={returnTo}
-          />
-        ) : (
-          <UnitStatusHistory key={unit.id} id={unit.id} locale={locale} />
-        )}
+          ) : null}
+        </details>
+        <details
+          className={styles.secondaryDetails}
+          onToggle={(event) => setHistoryOpen(event.currentTarget.open)}
+        >
+          <summary>{zh ? "变更记录" : "Historique"}</summary>
+          {historyOpen ? <UnitStatusHistory key={unit.id} id={unit.id} locale={locale} /> : null}
+        </details>
         <details className={styles.secondaryDetails}>
           <summary>{zh ? "更多操作" : "Autres opérations"}</summary>
           <div className={styles.actions}>
@@ -317,13 +297,228 @@ function Dimension({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-function Fact({ label, value }: { label: string; value?: string | null }) {
+function Fact({ label, value }: { label: string; value?: ReactNode }) {
   return (
     <div>
       <dt>{label}</dt>
       <dd>{value ?? "—"}</dd>
     </div>
   );
+}
+
+function HeroMetric({
+  label,
+  values,
+  locale,
+  note,
+  empty,
+  alert = false,
+}: {
+  label: string;
+  values: UnitSaleBrief["received"];
+  locale: Locale;
+  note: string;
+  empty?: string;
+  alert?: boolean;
+}) {
+  return (
+    <div className={styles.heroMetric}>
+      <span>{label}</span>
+      <strong
+        className={cn(alert && styles.moneyAlert, (!values || !values.length) && styles.heroState)}
+      >
+        <UnitAmountValue values={values} locale={locale} empty={empty} />
+      </strong>
+      <small>{note}</small>
+    </div>
+  );
+}
+
+function PartyHero({
+  party,
+  role,
+  locale,
+  today,
+}: {
+  party: UnitSaleBrief | UnitLeaseBrief;
+  role: "sale" | "lease";
+  locale: Locale;
+  today: string;
+}) {
+  const zh = locale === "zh";
+  if (role === "sale") {
+    const sale = party as UnitSaleBrief;
+    const knownBalance =
+      sale.balance.basis === "verified_bills" ||
+      (sale.balance.basis === "registered" && sale.balance.amounts?.length)
+        ? sale.balance.amounts
+        : null;
+    const positive = knownBalance?.some((value) => value.amount > 0);
+    const settled = knownBalance !== null && knownBalance.every((value) => value.amount === 0);
+    return (
+      <>
+        {sale.signedDate ? (
+          <p className={styles.partyContext}>
+            {zh ? "出售登记日" : "Date enregistrée"} {sale.signedDate}
+          </p>
+        ) : null}
+        <div className={styles.heroMetrics}>
+          <HeroMetric
+            label={
+              sale.refundPaid?.length
+                ? zh
+                  ? "净收房款"
+                  : "Prix net encaissé"
+                : zh
+                  ? "已收房款"
+                  : "Prix encaissé"
+            }
+            values={sale.netReceived === undefined ? sale.received : sale.netReceived}
+            locale={locale}
+            note={
+              sale.refundPaid?.length
+                ? zh
+                  ? "已扣明确房款退款"
+                  : "Après remboursements identifiés du prix"
+                : zh
+                  ? "实际收款"
+                  : "Encaissements réels"
+            }
+          />
+          <HeroMetric
+            label={zh ? "未收房款" : "Solde du prix"}
+            values={knownBalance}
+            locale={locale}
+            alert={!!positive}
+            empty={zh ? "账单结清" : "Factures soldées"}
+            note={
+              sale.balance.basis === "verified_bills"
+                ? zh
+                  ? "已核房款账单"
+                  : "Créances vérifiées du prix"
+                : sale.balance.basis === "registered"
+                  ? zh
+                    ? "来源登记余款"
+                    : "Solde enregistré dans la source"
+                  : zh
+                    ? "余额依据待核"
+                    : "Solde à vérifier"
+            }
+          />
+        </div>
+        <div className={styles.totalLine}>
+          <span>{zh ? "登记总价" : "Prix enregistré"}</span>
+          <strong>
+            <UnitAmountValue values={sale.total ? [sale.total] : null} locale={locale} />
+          </strong>
+        </div>
+        {positive ? (
+          <div className={cn(styles.paymentBanner, styles.reviewBanner)}>
+            {zh ? "余款待跟进" : "Solde à suivre"}
+          </div>
+        ) : settled ? (
+          <div
+            className={cn(
+              styles.paymentBanner,
+              sale.balance.basis === "verified_bills" ? styles.paidBanner : styles.reviewBanner,
+            )}
+          >
+            {sale.balance.basis === "verified_bills"
+              ? zh
+                ? "已核房款账单已结清。"
+                : "Les créances vérifiées du prix sont soldées."
+              : zh
+                ? "来源登记余款为零。"
+                : "La source indique un solde nul."}
+          </div>
+        ) : null}
+      </>
+    );
+  }
+  const lease = party as UnitLeaseBrief;
+  const hasOverdue = !!lease.overdue?.some((value) => value.amount > 0);
+  const candidateDate = hasOverdue ? lease.overdueDueDate : lease.nextDue;
+  const distance = dayDistance(candidateDate, today);
+  const dueDate = distance === null ? null : candidateDate;
+  const dueSoon =
+    !hasOverdue &&
+    lease.dueUnpaid !== null &&
+    distance !== null &&
+    Number.isInteger(distance) &&
+    distance <= 0 &&
+    distance >= -15;
+  return (
+    <>
+      <div className={styles.totalLine}>
+        <span>{zh ? "月租" : "Loyer mensuel"}</span>
+        <strong>
+          <UnitAmountValue
+            values={lease.monthlyRent ? [lease.monthlyRent] : null}
+            locale={locale}
+          />
+        </strong>
+      </div>
+      <div className={styles.heroMetrics}>
+        <HeroMetric
+          label={zh ? "累计已收租金" : "Loyers encaissés"}
+          values={lease.rentReceived}
+          locale={locale}
+          note={zh ? "不含押金、中介费" : "Hors dépôts et commissions"}
+        />
+        <HeroMetric
+          label={zh ? "当前到期未收" : "Loyers échus impayés"}
+          values={lease.dueUnpaid}
+          locale={locale}
+          alert={hasOverdue}
+          empty={zh ? "无已核到期未收" : "Aucun impayé échu vérifié"}
+          note={zh ? "已核租金账单" : "Créances de loyer vérifiées"}
+        />
+      </div>
+      {hasOverdue ? (
+        <div className={cn(styles.paymentBanner, styles.overdueBanner)}>
+          <span>
+            {dueDate ? `${dueDate} ${zh ? "应付" : "échéance"} · ` : ""}
+            {distance !== null && Number.isInteger(distance) && distance > 0
+              ? zh
+                ? `逾期${distance}天`
+                : `${distance} jours de retard`
+              : zh
+                ? "租金逾期"
+                : "Loyer en retard"}{" "}
+            · {zh ? "需跟进" : "À suivre"}
+          </span>
+          <strong>
+            <UnitAmountValue values={lease.overdue} locale={locale} />
+          </strong>
+        </div>
+      ) : dueSoon ? (
+        <div className={cn(styles.paymentBanner, styles.reviewBanner)}>
+          {distance === 0
+            ? zh
+              ? "今日应缴"
+              : "Dû aujourd’hui"
+            : zh
+              ? "15天内应缴"
+              : "Dû sous 15 jours"}{" "}
+          · {dueDate}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function dayDistance(from: string | null | undefined, to: string) {
+  if (!from || !/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return null;
+  const start = Date.parse(`${from}T00:00:00Z`),
+    end = Date.parse(`${to}T00:00:00Z`);
+  if (
+    !Number.isFinite(start) ||
+    !Number.isFinite(end) ||
+    new Date(start).toISOString().slice(0, 10) !== from ||
+    new Date(end).toISOString().slice(0, 10) !== to
+  )
+    return null;
+  return (end - start) / 86400000;
 }
 
 function UnitCustomerOverview({
@@ -360,7 +555,6 @@ function UnitCustomerOverview({
   ];
   return (
     <div className={styles.customerOverview}>
-      <p className={styles.currentUse}>{unitOccupancyText(record, locale)}</p>
       {parties.map(({ role, party }) => {
         const link = buildWorkbenchRecordHref({
           workspace: role === "sale" ? "sales" : "leases",
@@ -387,40 +581,48 @@ function UnitCustomerOverview({
             }
           >
             <UnitPartyHeading party={party} role={role} locale={locale} />
-            {role === "sale" ? (
-              <UnitPartyMoney sale={party as UnitSaleBrief} locale={locale} />
-            ) : (
-              <>
-                <UnitPartyMoney lease={party as UnitLeaseBrief} locale={locale} />
-                <UnitPaidThrough party={party as UnitLeaseBrief} locale={locale} />
-              </>
-            )}
+            <PartyHero party={party} role={role} locale={locale} today={summary.today} />
+            {role === "lease" ? (
+              <UnitPaidThrough party={party as UnitLeaseBrief} locale={locale} hero />
+            ) : null}
+            <div className={styles.auxiliaryGroup}>
+              {(role === "lease"
+                ? [
+                    {
+                      label: zh ? "另收押金" : "Dépôts reçus",
+                      values: (party as UnitLeaseBrief).depositReceived,
+                    },
+                  ]
+                : []
+              )
+                .concat(
+                  role === "sale" && party.refundPaid?.length
+                    ? [
+                        {
+                          label: zh ? "累计房款入款" : "Encaissements bruts du prix",
+                          values: (party as UnitSaleBrief).received,
+                        },
+                      ]
+                    : [],
+                )
+                .concat([
+                  { label: zh ? "另收中介费" : "Commissions reçues", values: party.agencyReceived },
+                  { label: zh ? "其他收款" : "Autres encaissements", values: party.otherReceived },
+                  { label: zh ? "已退金额" : "Remboursements versés", values: party.refundPaid },
+                ])
+                .filter((item) => item.values?.length)
+                .map((item) => (
+                  <div className={styles.auxiliaryMoney} key={item.label}>
+                    <span>{item.label}</span>
+                    <strong>
+                      <UnitAmountValue values={item.values} locale={locale} />
+                    </strong>
+                  </div>
+                ))}
+            </div>
             <PartyReceipts party={party} role={role} locale={locale} />
-            {(role === "lease"
-              ? [
-                  {
-                    label: zh ? "另收押金" : "Dépôts reçus",
-                    values: (party as UnitLeaseBrief).depositReceived,
-                  },
-                ]
-              : []
-            )
-              .concat([
-                { label: zh ? "另收中介费" : "Commissions reçues", values: party.agencyReceived },
-                { label: zh ? "其他收款" : "Autres encaissements", values: party.otherReceived },
-                { label: zh ? "已退金额" : "Remboursements versés", values: party.refundPaid },
-              ])
-              .filter((item) => item.values?.length)
-              .map((item) => (
-                <div className={styles.auxiliaryMoney} key={item.label}>
-                  <span>{item.label}</span>
-                  <strong>
-                    <UnitAmountValue values={item.values} locale={locale} />
-                  </strong>
-                </div>
-              ))}
             <details className={styles.sourceDetails}>
-              <summary>{zh ? "来源与待核事项" : "Sources et points à vérifier"}</summary>
+              <summary>{zh ? "查看数据依据与待核事项" : "Sources et points à vérifier"}</summary>
               <p>
                 {role === "sale"
                   ? zh
@@ -529,15 +731,7 @@ function PartyReceipts({
   return (
     <div className={styles.recentReceipts}>
       <div className={styles.receiptsHeading}>
-        <h3>
-          {role === "sale"
-            ? zh
-              ? "最近房款收款"
-              : "Derniers encaissements du prix"
-            : zh
-              ? "最近租金收款"
-              : "Derniers loyers encaissés"}
-        </h3>
+        <h3>{zh ? "交了什么钱" : "Paiements reçus"}</h3>
         <span>
           {zh
             ? `已录${party.receiptCount}笔收付款`

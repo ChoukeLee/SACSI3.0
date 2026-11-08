@@ -563,26 +563,6 @@
   display: grid;
   gap: 1.3rem;
 }
-.currentUse {
-  font-size: 1rem;
-  color: hsl(var(--muted-foreground));
-}
-.customerSection {
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.75rem;
-  padding: 1.15rem;
-}
-.customerSection .businessPerson > strong {
-  font-size: 1.5rem;
-}
-.customerSection .businessMoney {
-  margin-top: 1rem;
-  gap: 0.9rem;
-}
-.customerSection .businessMoneyRow > strong,
-.customerSection .paidThrough > strong {
-  font-size: 1.75rem;
-}
 .businessMissing h3,
 .receiptsHeading h3 {
   font-size: 1.125rem;
@@ -721,6 +701,342 @@
   border-radius: 0;
   font-size: 1rem;
 }
+
+/* The asset cards and their portalled drawer share the approved local navy palette. */
+.assetCard,
+.inspector,
+.embeddedInspector,
+:global(.dark) .embeddedInspector,
+.assetDrawer {
+  --background: 215 33% 9%;
+  --card: 213 31% 14%;
+  --foreground: 217 57% 95%;
+  --muted: 214 28% 20%;
+  --muted-foreground: 216 30% 79%;
+  --border: 213 21% 27%;
+  --accent: 213 43% 22%;
+  --accent-foreground: 217 57% 95%;
+  --asset-accent: #93b9ff;
+  --asset-soft: #203650;
+  --asset-warn: #e9bf80;
+  color: #edf2fa;
+  background: #19232f;
+  color-scheme: dark;
+}
+.assetDrawer {
+  border-color: #374555;
+  max-width: min(720px, 100vw);
+}
+.assetCard {
+  padding: 19px;
+  gap: 5px;
+  border: 1px solid #374555;
+  border-radius: 13px;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.assetCard:hover {
+  background: #19232f;
+  box-shadow: 0 4px 18px #0003;
+  border-color: #6d819b;
+}
+.assetCard[aria-pressed="true"] {
+  border-color: #93b9ff;
+  box-shadow:
+    0 0 0 1px #93b9ff,
+    0 4px 16px #0003;
+}
+.assetCard.attentionCard {
+  border-top: 3px solid #b79d66;
+  padding-top: 17px;
+}
+.assetCard.criticalCard {
+  border-top-color: #ffabaa;
+}
+.cardContext {
+  font-size: 16px;
+  color: #b9c6d9;
+}
+.roomNumber {
+  font-size: 33px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.assetCard .assetUse {
+  font-size: 15px;
+  color: #b9c6d9;
+}
+.soldMark {
+  color: #93b9ff;
+  background: #203650;
+  border: 0;
+  padding: 4px 9px;
+  border-radius: 6px;
+}
+.drawerMarks {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.rentedMark {
+  color: #85d8b3;
+  background: #1d3c32;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 6px;
+}
+.assetCard .attentionMark {
+  color: #e9bf80;
+  background: #3e3523;
+}
+.assetCard .criticalMark {
+  color: #ffabaa;
+  background: #45272c;
+}
+.cardBusiness {
+  gap: 17px;
+}
+.businessBlock {
+  border-color: #374555;
+  padding-top: 14px;
+}
+.businessBlock:first-child {
+  border-top: 0;
+  padding-top: 5px;
+}
+.businessPerson {
+  margin-bottom: 17px;
+}
+.businessMoney {
+  gap: 7px;
+}
+.businessMoneyRow > span {
+  font-size: 16px;
+}
+.businessMoneyRow > strong {
+  font-size: 21px;
+}
+.moneyUnit {
+  margin-left: 4px;
+  font-size: 14px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.assetCard .moneyAlert,
+.inspector .moneyAlert,
+.embeddedInspector .moneyAlert {
+  color: #ffabaa;
+}
+.paidThrough {
+  margin-top: 13px;
+  padding: 11px 12px;
+  background: #101720;
+  border-radius: 8px;
+}
+.paidThrough > span {
+  font-size: 15px;
+}
+.paidThrough > strong {
+  font-size: 22px;
+}
+.assetCardFooter {
+  margin-top: 16px;
+  padding-top: 13px;
+  border-top: 1px solid #374555;
+  font-size: 16px;
+}
+.assetCardFooter .detailHint {
+  color: #93b9ff;
+}
+.embeddedInspector .detailBody {
+  padding: 0;
+}
+.customerOverview {
+  gap: 28px;
+}
+.customerSection {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+.customerSection + .customerSection {
+  padding-top: 25px;
+  border-top: 1px solid #374555;
+}
+.customerSection .businessPerson {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+.customerSection .businessPerson > strong {
+  font-size: 29px;
+  line-height: 1.5;
+}
+.partyContext {
+  margin-top: 6px;
+  color: #b9c6d9;
+  font-size: 15px;
+}
+.heroMetrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+  margin-top: 21px;
+}
+.heroMetric {
+  min-width: 0;
+  padding: 15px 14px;
+  border-radius: 10px;
+  background: #101720;
+}
+.heroMetric > span {
+  display: block;
+  font-size: 16px;
+  color: #b9c6d9;
+}
+.heroMetric > strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.heroMetric > strong.heroState {
+  font-size: 20px;
+  line-height: 1.6;
+}
+.heroMetric > small {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  color: #b9c6d9;
+}
+.totalLine {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 16px;
+  font-size: 17px;
+}
+.totalLine > span {
+  color: #b9c6d9;
+}
+.totalLine > strong {
+  font-size: 19px;
+  font-weight: 600;
+}
+.paymentBanner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 17px;
+  padding: 11px 13px;
+  border-radius: 8px;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.paymentBanner > strong {
+  font-size: 20px;
+  font-weight: 650;
+}
+.paidBanner {
+  color: #85d8b3;
+  background: #1d3c32;
+}
+.overdueBanner {
+  color: #ffabaa;
+  background: #45272c;
+}
+.reviewBanner {
+  color: #e9bf80;
+  background: #3e3523;
+}
+.customerSection .dateHero {
+  margin-top: 18px;
+  padding: 14px 0;
+  background: transparent;
+  border-radius: 0;
+  border-top: 1px solid #374555;
+  border-bottom: 1px solid #374555;
+}
+.customerSection .dateHero > span {
+  font-size: 16px;
+}
+.customerSection .dateHero > strong {
+  font-size: 29px;
+}
+.auxiliaryGroup:not(:empty) {
+  margin-top: 17px;
+  display: grid;
+  gap: 7px;
+}
+.auxiliaryMoney {
+  margin-top: 0;
+  font-size: 16px;
+}
+.auxiliaryMoney > span {
+  color: #b9c6d9;
+}
+.auxiliaryMoney > strong {
+  font-size: 18px;
+}
+.recentReceipts {
+  margin-top: 24px;
+}
+.receiptsHeading h3 {
+  font-size: 20px;
+}
+.receiptRow {
+  padding: 13px 0;
+}
+.receiptRow > div > strong {
+  font-size: 18px;
+}
+.receiptRow > strong {
+  font-size: 21px;
+}
+.sourceDetails {
+  margin: 18px 0;
+}
+.sourceDetails > summary,
+.secondaryDetails > summary {
+  font-size: 16px;
+  color: #93b9ff;
+}
+.embeddedInspector .secondaryDetails {
+  padding-top: 17px;
+  border-top: 1px solid #374555;
+}
+.assetCard:focus-visible {
+  outline: 3px solid #93b9ff;
+  outline-offset: 4px;
+}
+@media (max-width: 580px) {
+  .heroMetrics {
+    gap: 9px;
+  }
+  .heroMetric {
+    padding: 12px 9px;
+  }
+  .heroMetric > strong {
+    font-size: 25px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .assetCard {
+    transition: none;
+  }
+}
 .secondaryDetails > summary {
   cursor: pointer;
   font-size: 1rem;
@@ -803,23 +1119,6 @@
 .close {
   padding: 5px;
   color: hsl(var(--muted-foreground));
-}
-.tabs {
-  display: flex;
-  gap: 20px;
-  padding: 0 20px;
-  border-bottom: 1px solid hsl(var(--border));
-}
-.tabs button {
-  font-size: 1rem;
-  padding: 11px 0;
-  color: hsl(var(--muted-foreground));
-  border-bottom: 2px solid transparent;
-}
-.tabs button[aria-selected="true"] {
-  border-color: var(--asset-accent);
-  color: var(--asset-accent);
-  font-weight: 600;
 }
 .detailBody {
   padding: 20px;
@@ -1049,9 +1348,6 @@
   .inspectorHeader,
   .detailBody {
     padding: 16px;
-  }
-  .tabs {
-    padding: 0 16px;
   }
   .footer {
     padding: 12px;
