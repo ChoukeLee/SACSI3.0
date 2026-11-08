@@ -654,7 +654,13 @@ export function SaleList({
           summary: contractSummaryMap.get(contract.id),
         };
       },
-      (source, target) =>
+      (source, target) => {
+        if (
+          source.contract.registration_basis === "source_record" ||
+          !source.contract.signed_date ||
+          (source.contract.sale_currency ?? "XOF") !== "XOF"
+        )
+          throw new Error("Initial source registrations have no printable signed contract.");
         printSaleContract(
           {
             contract: source.contract,
@@ -665,7 +671,8 @@ export function SaleList({
           },
           locale,
           target,
-        ),
+        );
+      },
     );
 
   const handleCreate = async () => {

@@ -507,8 +507,8 @@ export const zhDict = {
       directions: {
         income: "收入",
         expense: "支出",
-        liability_in: "押金收",
-        liability_out: "押金退"
+        liability_in: "押金及往来流入",
+        liability_out: "押金及往来流出"
       },
       categories: {
         daily_rental: "日租收入",
@@ -518,6 +518,7 @@ export const zhDict = {
         lease_deposit_deduction: "扣除长租押金",
         lease_agency_income: "长租中介费收入",
         lease_agency_expense: "长租中介费支出",
+        owner_settlement: "房东结算往来",
         property_fee: "物业费",
         furniture_fee: "家具费",
         agency_fee: "中介费",

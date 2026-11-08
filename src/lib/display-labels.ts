@@ -20,6 +20,7 @@ const BUSINESS_LABELS: Record<string, Labels> = {
   lease_rent_refund: { zh: "租金退款", fr: "Remboursement du loyer" },
   lease_agency_income: { zh: "中介费收入", fr: "Commission reçue" },
   lease_agency_expense: { zh: "中介费支出", fr: "Commission versée" },
+  owner_settlement: { zh: "房东结算往来", fr: "Règlement au propriétaire" },
   lease_furniture_income: { zh: "家具费收入", fr: "Revenu mobilier" },
   lease_other_income: { zh: "长租其他收入", fr: "Autre revenu locatif" },
   lease_other_expense: { zh: "长租其他支出", fr: "Autre dépense locative" },
