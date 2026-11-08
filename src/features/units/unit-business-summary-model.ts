@@ -378,11 +378,15 @@ export function buildUnitBusinessSummaries(
     const original = sales.find((s) => s.id === row.id)!;
     const cash = cashForRecord(input, original, "sale");
     const received = cash.total("purchase");
+    const refunded = cash.total("refund");
     const exceedsPrice =
       row.priceNative &&
       received?.some(
         (value) =>
-          value.currency === row.priceNative!.currency && value.amount > row.priceNative!.amount,
+          value.currency === row.priceNative!.currency &&
+          Math.round(value.amount * 100) -
+            Math.round((refunded?.find((r) => r.currency === value.currency)?.amount ?? 0) * 100) >
+            Math.round(row.priceNative!.amount * 100),
       );
     const balance: UnitBusinessBalance =
       row.outstandingNative !== null
@@ -419,7 +423,7 @@ export function buildUnitBusinessSummaries(
       balance,
       agencyReceived: cash.total("agency"),
       otherReceived: cash.total("other"),
-      refundPaid: cash.total("refund"),
+      refundPaid: refunded,
     });
   }
   const leaseRows = buildLeaseRecordOverview({

@@ -314,6 +314,41 @@ describe("asset business financial summaries", () => {
     },
   );
 
+  it.each([
+    ["XOF", "sale_refund", false],
+    ["CNY", "sale_refund", true],
+    ["XOF", "sale_agency_expense", true],
+  ] as const)(
+    "compares price after only explicitly classified same-currency refunds (%s %s)",
+    (currency, sourceType, exceeds) => {
+      const sold = sale();
+      const payments = [
+        payment(1, sold, { amount: 1000000 }),
+        payment(2, sold, { amount: 1000000 }),
+        payment(3, sold, {
+          amount: 1000000,
+          source_type: sourceType,
+          currency,
+          exchange_rate_to_xof: currency === "XOF" ? 1 : 100,
+        }),
+      ];
+      const record = buildUnitBusinessSummaries(
+        input({
+          sales: [sold],
+          payments,
+          ledger: payments.map((pay, n) =>
+            ledger(n, pay, { direction: n === 2 ? "expense" : "income" }),
+          ),
+        }),
+      )[unit().id].sales[0];
+      expect(record.received).toEqual([money(2000000)]);
+      expect(record.refundPaid).toEqual(
+        sourceType === "sale_refund" ? [money(1000000, currency)] : [],
+      );
+      expect(record.reviewReasons.includes("cash_exceeds_registered_price")).toBe(exceeds);
+    },
+  );
+
   it("does not call a foreign-currency rent bill a verified balance of this lease", () => {
     const rented = lease(1, {
       rent_currency: "USD",
