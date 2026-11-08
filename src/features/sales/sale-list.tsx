@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
+import { formatMoney } from "@/lib/currency";
 import { cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
 import { contractStatusVariant as statusVariant } from "@/lib/status-styles";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +53,7 @@ import { useSaleWorkbenchPreview } from "./use-sale-workbench-preview";
 import {
   SALE_UUID,
   salePrice,
+  saleRegisteredPrice,
   saleWorkbenchHref,
   saleWorkbenchStats,
 } from "./sale-workbench-model";
@@ -96,7 +98,7 @@ function getSaleDataFlags(contract: SaleContractRow, customer?: CustomerRow | nu
   return {
     needsData:
       contract.payment_plan_type === "legacy_pending" ||
-      salePrice(contract) === null ||
+      saleRegisteredPrice(contract) === null ||
       customer?.name.includes("资料待补") ||
       customer?.notes?.includes("legacy_placeholder=true"),
     needsNumberCleanup: contract.contract_no.startsWith("LEGACY-SALE-"),
@@ -345,6 +347,12 @@ export function SaleList({
           const unit = unitMap.get(contract.unit_id);
           const customer = customerMap.get(contract.customer_id);
           const summary = contractSummaryMap.get(contract.id) ?? EMPTY_CONTRACT_RECEIVABLE_SUMMARY;
+          const price = saleRegisteredPrice(contract),
+            nativeSale = (contract.sale_currency ?? "XOF") !== "XOF";
+          const nativePriceLabel =
+            nativeSale && price
+              ? `${formatMoney(price.amount, price.currency, locale)} ${price.currency}`
+              : undefined;
           const transferLabel =
             locale === "zh"
               ? { not_started: "未开始过户", in_progress: "过户办理中", completed: "过户完成" }
@@ -368,27 +376,39 @@ export function SaleList({
               ? `${locale === "zh" ? "过户" : "Transfert"} ${contract.transfer_date}`
               : undefined,
             amountXof: salePrice(contract),
+            nativeAmountLabel: nativePriceLabel,
             amountDetail:
-              contract.total_amount_confirmed === false
+              nativePriceLabel ??
+              (contract.total_amount_confirmed === false
                 ? locale === "zh"
                   ? "合同总额待核实"
                   : "Total à confirmer"
-                : "XOF",
-            balanceXof: summary.count ? summary.outstanding : null,
-            balanceDetail: summary.count
-              ? summary.overdue > 0
-                ? `${locale === "zh" ? "逾期" : "Retard"} ${formatXof(summary.overdue)}`
-                : summary.nextDue
-                  ? `${locale === "zh" ? "下次到期" : "Échéance"} ${summary.nextDue}`
+                : "XOF"),
+            balanceXof: !nativeSale && summary.count ? summary.outstanding : null,
+            balanceDetail:
+              nativeSale && summary.count
+                ? locale === "zh"
+                  ? "原币应收未并入西法汇总"
+                  : "Créances en devise hors synthèse XOF"
+                : summary.count
+                  ? summary.overdue > 0
+                    ? `${locale === "zh" ? "逾期" : "Retard"} ${formatXof(summary.overdue)}`
+                    : summary.nextDue
+                      ? `${locale === "zh" ? "下次到期" : "Échéance"} ${summary.nextDue}`
+                      : locale === "zh"
+                        ? "已建应收已结清"
+                        : "Créances soldées"
                   : locale === "zh"
-                    ? "已建应收已结清"
-                    : "Créances soldées"
-              : locale === "zh"
-                ? "暂无已核应收"
-                : "Aucune créance vérifiée",
-            balanceOverdue: summary.overdue > 0,
+                    ? "暂无已核应收"
+                    : "Aucune créance vérifiée",
+            balanceOverdue: !nativeSale && summary.overdue > 0,
             status: contract.status,
-            statusLabel: t.contractStatus[contract.status as keyof typeof t.contractStatus],
+            statusLabel:
+              contract.registration_basis === "source_record" && contract.status === "active"
+                ? locale === "zh"
+                  ? "初始登记"
+                  : "Enregistrement initial"
+                : t.contractStatus[contract.status as keyof typeof t.contractStatus],
             secondaryLabel:
               transferLabel[contract.transfer_status as keyof typeof transferLabel] ??
               (locale === "zh" ? "过户状态待核实" : "Transfert à vérifier"),
@@ -478,7 +498,7 @@ export function SaleList({
     );
     const metrics = computeFinanceMetrics(related, { asOfDate: today });
     const due = computeFinanceMetrics(related, { scope: "asOf", asOfDate: today });
-    const total = active.reduce((s, c) => s + Number(c.total_amount_xof), 0);
+    const total = active.reduce((s, c) => s + (salePrice(c) ?? 0), 0);
     const unknownContracts = filteredByBuilding.filter(
       (contract) => !contractSummaryMap.has(contract.id),
     ).length;
@@ -606,6 +626,17 @@ export function SaleList({
       fresh.status !== "active"
     )
       return;
+    if (
+      (action === "payment" || action === "installment") &&
+      (fresh.sale_currency ?? "XOF") !== "XOF"
+    ) {
+      setError(
+        locale === "zh"
+          ? "原币出售记录可查看核对，此处不支持手工西法收款或新增西法分期。"
+          : "Vente en devise consultable ; saisie de paiements ou d’échéances XOF indisponible ici.",
+      );
+      return;
+    }
     setSelectedId(id);
     if (action === "payment") {
       setPayScheduleId(freshSchedules.find((row) => row.status !== "paid")?.id ?? "");
@@ -955,6 +986,11 @@ export function SaleList({
           {printer.error}
         </p>
       )}
+      {panel === null && error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
       {workspace.enabled && (
         <p className="text-xs text-muted-foreground">
           {locale === "zh"
@@ -1128,7 +1164,7 @@ export function SaleList({
               ? String(insightRows.length)
               : formatXof(
                   insightRows.reduce((sum, row) => {
-                    if (statFilter === "total") return sum + Number(row.contract.total_amount_xof);
+                    if (statFilter === "total") return sum + (salePrice(row.contract) ?? 0);
                     if (statFilter === "received") return sum + row.summary.paid;
                     if (statFilter === "due") return sum + row.summary.dueOutstanding;
                     if (statFilter === "overdue") return sum + row.summary.overdue;
@@ -1230,7 +1266,14 @@ export function SaleList({
                                     : "text-foreground",
                             )}
                           >
-                            {formatXof(valueForRow(row))}
+                            {(row.contract.sale_currency ?? "XOF") !== "XOF" &&
+                            ["active", "total", "transfer"].includes(statFilter)
+                              ? saleRegisteredPrice(row.contract)
+                                ? `${formatMoney(saleRegisteredPrice(row.contract)!.amount, row.contract.sale_currency!, locale)} ${row.contract.sale_currency}`
+                                : locale === "zh"
+                                  ? "原币金额待核"
+                                  : "Montant en devise à vérifier"
+                              : formatXof(valueForRow(row))}
                           </p>
                         </div>
                         <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
@@ -1239,14 +1282,27 @@ export function SaleList({
                           </span>
                           <span className="text-right">
                             {locale === "zh" ? "总额" : "Total"}{" "}
-                            {formatXof(Number(row.contract.total_amount_xof))}
+                            {(row.contract.sale_currency ?? "XOF") !== "XOF"
+                              ? saleRegisteredPrice(row.contract)
+                                ? `${formatMoney(saleRegisteredPrice(row.contract)!.amount, row.contract.sale_currency!, locale)} ${row.contract.sale_currency}`
+                                : locale === "zh"
+                                  ? "原币金额待核"
+                                  : "Montant en devise à vérifier"
+                              : formatXof(Number(row.contract.total_amount_xof))}
                           </span>
                           <span>
-                            {locale === "zh" ? "已收" : "Encaissé"} {formatXof(row.summary.paid)}
+                            {locale === "zh" ? "应收已核销" : "Créances rapprochées"}{" "}
+                            {row.summary.count && (row.contract.sale_currency ?? "XOF") === "XOF"
+                              ? formatXof(row.summary.paid)
+                              : "—"}
                           </span>
                           <span className="text-right">
                             {locale === "zh" ? "未收" : "Reste"}{" "}
-                            {formatXof(row.summary.outstanding)}
+                            {row.summary.count && (row.contract.sale_currency ?? "XOF") === "XOF"
+                              ? formatXof(row.summary.outstanding)
+                              : locale === "zh"
+                                ? "暂无已核西法应收"
+                                : "Aucune créance XOF vérifiée"}
                           </span>
                           {row.summary.nextDue && (
                             <span className="col-span-2">
