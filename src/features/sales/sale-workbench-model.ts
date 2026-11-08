@@ -1,4 +1,10 @@
-import type { SaleContractRow, SalePaymentScheduleRow, ReceivableRow } from "@/types/database";
+import type {
+  SaleContractRow,
+  SalePaymentScheduleRow,
+  ReceivableRow,
+  PaymentRow,
+} from "@/types/database";
+import type { CurrencyCode } from "@/types/domain";
 import type { WorkspaceQuery, WorkspaceStats } from "@/features/contracts/workspace-model";
 import { formatContractXof } from "@/features/contracts/contract-list-model";
 
@@ -19,6 +25,7 @@ export function saleWorkbenchHref(query: WorkspaceQuery, contractId?: string | n
 }
 
 export function salePrice(contract: SaleContractRow) {
+  if ((contract.sale_currency ?? "XOF") !== "XOF") return null;
   const value = Number(contract.total_amount_xof);
   return contract.total_amount_xof !== null &&
     contract.total_amount_confirmed === true &&
@@ -26,6 +33,106 @@ export function salePrice(contract: SaleContractRow) {
     value > 0
     ? value
     : null;
+}
+
+export interface SaleCurrencyAmount {
+  currency: CurrencyCode;
+  amount: number;
+}
+
+function minorUnits(value: unknown): number | null {
+  if (
+    (typeof value !== "number" && typeof value !== "string") ||
+    (typeof value === "string" && !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value))
+  )
+    return null;
+  const number = Number(value),
+    cents = Math.round(number * 100);
+  return Number.isFinite(number) &&
+    number >= 0 &&
+    Number.isSafeInteger(cents) &&
+    Math.abs(cents / 100 - number) < 0.0000001
+    ? cents
+    : null;
+}
+
+/** Registered price is independent of cash receipts and bill allocations. */
+export function saleRegisteredPrice(contract: SaleContractRow): SaleCurrencyAmount | null {
+  const currency = contract.sale_currency ?? "XOF";
+  if (currency === "XOF") {
+    const amount = salePrice(contract);
+    return amount === null ? null : { currency, amount };
+  }
+  const amount = minorUnits(contract.total_amount_native);
+  return ["USD", "CNY"].includes(currency) &&
+    contract.total_amount_confirmed === true &&
+    contract.total_amount_xof !== null &&
+    Number(contract.total_amount_xof) === 0 &&
+    amount !== null &&
+    amount > 0
+    ? { currency, amount: amount / 100 }
+    : null;
+}
+
+/** Original-currency gross purchase receipts; an unknown historical method is not an offset. */
+export function buildSalePurchaseReceiptSummary(
+  contract: SaleContractRow,
+  payments: readonly PaymentRow[],
+) {
+  const totals = new Map<CurrencyCode, number>(),
+    receiptIds = new Set<string>(),
+    seen = new Set<string>();
+  for (const payment of payments) {
+    if (
+      payment.source_id !== contract.id ||
+      !["sale", "sale_contract"].includes(payment.source_type) ||
+      seen.has(payment.id)
+    )
+      continue;
+    seen.add(payment.id);
+    if (
+      payment.payment_method === "offset" ||
+      payment.reversal_of_payment_id ||
+      payment.request_kind?.includes("reversal")
+    )
+      continue;
+    const amount = minorUnits(payment.amount),
+      rate = Number(payment.exchange_rate_to_xof);
+    const moneyBasis =
+      payment.native_settlement === true
+        ? payment.source_type === "sale_contract" &&
+          ["USD", "CNY"].includes(payment.currency) &&
+          payment.currency === (contract.sale_currency ?? "XOF") &&
+          payment.unit_id === contract.unit_id &&
+          payment.customer_id === contract.customer_id &&
+          payment.exchange_rate_to_xof === null
+        : Number.isFinite(rate) && rate > 0 && (payment.currency !== "XOF" || rate === 1);
+    const validDate =
+      /^\d{4}-\d{2}-\d{2}$/.test(payment.payment_date) &&
+      Number.isFinite(Date.parse(payment.payment_date + "T00:00:00Z")) &&
+      new Date(payment.payment_date + "T00:00:00Z").toISOString().slice(0, 10) ===
+        payment.payment_date;
+    if (
+      !["XOF", "CNY", "USD"].includes(payment.currency) ||
+      !validDate ||
+      amount === null ||
+      amount <= 0 ||
+      !moneyBasis ||
+      (payment.payment_method != null &&
+        !["cash", "check", "bank_transfer", "other"].includes(String(payment.payment_method))) ||
+      (payment.unit_id !== null && payment.unit_id !== contract.unit_id) ||
+      (payment.customer_id !== null && payment.customer_id !== contract.customer_id)
+    )
+      continue;
+    totals.set(payment.currency, (totals.get(payment.currency) ?? 0) + amount);
+    receiptIds.add(payment.id);
+  }
+  return {
+    amounts: [...totals]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([currency, amount]) => ({ currency, amount: amount / 100 })),
+    receiptIds,
+  };
 }
 
 export function saleWorkbenchStats(
@@ -46,9 +153,11 @@ export function saleWorkbenchStats(
     },
     {
       key: "total" as const,
-      label: zh ? "已录生效合同总额" : "Total actif enregistré",
+      label: zh ? "西法登记总额" : "Total enregistré en XOF",
       value: money(stats.total),
-      hint: zh ? "非现金实收 · 合同资料另行核对" : "Pas du cash · prix à vérifier au contrat",
+      hint: zh
+        ? "非现金实收 · 原币未折算部分另列，不与西法相加。"
+        : "Pas du cash · devises non converties présentées séparément, sans addition aux XOF.",
     },
     {
       key: "due" as const,

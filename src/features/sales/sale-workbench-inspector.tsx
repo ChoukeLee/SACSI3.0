@@ -18,7 +18,12 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { formatMoney } from "@/lib/currency";
 import type { SaleContractRow } from "@/types/database";
-import { salePrice, saleScheduleReceivable, saleScheduleState } from "./sale-workbench-model";
+import {
+  buildSalePurchaseReceiptSummary,
+  saleRegisteredPrice,
+  saleScheduleReceivable,
+  saleScheduleState,
+} from "./sale-workbench-model";
 import styles from "./sale-workbench.module.css";
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -134,10 +139,15 @@ export function SaleWorkbenchInspector({
       ? text("待核对", "À vérifier")
       : formatContractXof(amount, locale);
   const summary = data.summaries[contract.id],
-    known = !!summary?.count,
-    price = salePrice(contract);
+    nativeSale = (contract.sale_currency ?? "XOF") !== "XOF",
+    known = !nativeSale && !!summary?.count,
+    price = saleRegisteredPrice(contract);
+  const originalMoney = (value: NonNullable<typeof price>) =>
+    `${formatMoney(value.amount, value.currency, locale)}${value.currency === "XOF" ? "" : ` ${value.currency}`}`;
+  const priceLabel = price ? originalMoney(price) : text("待核对", "À vérifier");
   const payments = data.payments.filter((row) => row.source_id === contract.id),
     cash = summarizeContractCash(payments);
+  const receipts = buildSalePurchaseReceiptSummary(contract, payments);
   const cnyReceived = payments
     .filter(
       (payment) =>
@@ -234,11 +244,11 @@ export function SaleWorkbenchInspector({
           {customer?.name ?? text("客户待核", "Client à vérifier")}
         </p>
         <p className={styles.sub}>
-          {
-            dictionaries[locale].sales.contractStatus[
-              contract.status as keyof typeof dictionaries.zh.sales.contractStatus
-            ]
-          }{" "}
+          {contract.registration_basis === "source_record" && contract.status === "active"
+            ? text("初始登记", "Enregistrement initial")
+            : dictionaries[locale].sales.contractStatus[
+                contract.status as keyof typeof dictionaries.zh.sales.contractStatus
+              ]}{" "}
           · {transfer}
         </p>
       </header>
@@ -284,11 +294,21 @@ export function SaleWorkbenchInspector({
           <>
             <h3>{text("分期与应收", "Échéances et créances")}</h3>
             <dl className={styles.facts}>
-              <Fact label={text("合同价", "Prix contractuel")}>{money(price)}</Fact>
+              <Fact
+                label={
+                  contract.registration_basis === "source_record"
+                    ? text("登记总价", "Prix enregistré")
+                    : text("合同价", "Prix contractuel")
+                }
+              >
+                {priceLabel}
+              </Fact>
               <Fact label={text("已建应收未收", "Créances restantes")}>
                 {known
                   ? money(summary.outstanding)
-                  : text("暂无已核应收", "Aucune créance vérifiée")}
+                  : nativeSale && summary?.count
+                    ? text("原币应收未并入西法汇总", "Créances en devise hors synthèse XOF")
+                    : text("暂无已核应收", "Aucune créance vérifiée")}
               </Fact>
               <Fact label={text("其中已逾期", "Dont en retard")}>
                 {known ? money(summary.overdue) : "—"}
@@ -346,19 +366,53 @@ export function SaleWorkbenchInspector({
           </>
         ) : tab === "finance" ? (
           <>
+            {nativeSale ? (
+              <>
+                <h3>{text("房款原币实收", "Encaissements du bien en devise")}</h3>
+                <p className="mb-3 text-sm font-medium">
+                  {receipts.amounts.length
+                    ? receipts.amounts.map(originalMoney).join(" · ")
+                    : text("暂无已核房款实收", "Aucun encaissement du bien vérifié")}
+                </p>
+                <p className={styles.sub}>
+                  {text(
+                    "原币房款未折算西法，不与西法金额相加。",
+                    "Encaissements en devise sans conversion XOF, à ne pas additionner aux montants XOF.",
+                  )}
+                </p>
+              </>
+            ) : null}
             <h3>{text("已录付款事实", "Paiements enregistrés")}</h3>
             <dl className={styles.facts}>
-              <Fact label={text("经营收款", "Encaissements")}>
+              <Fact
+                label={
+                  nativeSale
+                    ? text("西法经营收款", "Encaissements XOF")
+                    : text("经营收款", "Encaissements")
+                }
+              >
                 {payments.some((p) => classifyContractCashPayment(p).kind === "income")
                   ? money(cash.income)
                   : text("暂无已核记录", "Aucune écriture vérifiée")}
               </Fact>
-              <Fact label={text("经营支出", "Décaissements")}>
+              <Fact
+                label={
+                  nativeSale
+                    ? text("西法经营支出", "Décaissements XOF")
+                    : text("经营支出", "Décaissements")
+                }
+              >
                 {payments.some((p) => classifyContractCashPayment(p).kind === "expense")
                   ? money(cash.expense)
                   : text("暂无已核记录", "Aucune écriture vérifiée")}
               </Fact>
-              <Fact label={text("经营现金净额", "Flux de caisse net")}>
+              <Fact
+                label={
+                  nativeSale
+                    ? text("西法现金净额", "Flux net XOF")
+                    : text("经营现金净额", "Flux de caisse net")
+                }
+              >
                 {payments.some((p) =>
                   ["income", "expense"].includes(classifyContractCashPayment(p).kind),
                 )
@@ -415,9 +469,19 @@ export function SaleWorkbenchInspector({
                       </p>
                     ) : null}
                     <p className={styles.sub}>
-                      {paymentKindNames[payment.source_type] ??
-                        text("待核对财务记录", "Écriture à vérifier")}
-                      {classification.kind === "excluded"
+                      {payment.native_settlement
+                        ? receipts.receiptIds.has(payment.id)
+                          ? text(
+                              "原币房款实收 · 未折算西法",
+                              "Encaissement du bien en devise · sans conversion XOF",
+                            )
+                          : text(
+                              "原币记录待核 · 未折算西法",
+                              "Écriture en devise à vérifier · sans conversion XOF",
+                            )
+                        : (paymentKindNames[payment.source_type] ??
+                          text("待核对财务记录", "Écriture à vérifier"))}
+                      {classification.kind === "excluded" && !payment.native_settlement
                         ? ` · ${text("不计入现金汇总", "Hors synthèse de caisse")}`
                         : ""}
                     </p>
@@ -453,7 +517,7 @@ export function SaleWorkbenchInspector({
               <Fact label={text("签约日期", "Signature")}>
                 {contract.signed_date ?? text("未登记", "Non renseignée")}
               </Fact>
-              <Fact label={text("合同总额", "Total contractuel")}>{money(price)}</Fact>
+              <Fact label={text("合同总额", "Total contractuel")}>{priceLabel}</Fact>
               <Fact label={text("付款方式", "Plan")}>
                 {dictionaries[locale].sales.paymentPlan[
                   contract.payment_plan_type as keyof typeof dictionaries.zh.sales.paymentPlan
@@ -502,13 +566,26 @@ export function SaleWorkbenchInspector({
         </div>
       </div>
       <footer className={styles.detailActions}>
+        {nativeSale ? (
+          <p className={styles.sub}>
+            {text(
+              "原币出售记录可查看核对，此处不支持手工西法收款或新增西法分期。",
+              "Vente en devise consultable ; saisie de paiements ou d’échéances XOF indisponible ici.",
+            )}
+          </p>
+        ) : null}
         {contract.status === "active" ? (
           <div
             className={styles.operationActions}
             aria-label={text("办理此合同", "Gérer ce contrat")}
           >
             {canRecordFinance ? (
-              <Button type="button" size="sm" disabled={busy} onClick={() => onAction("payment")}>
+              <Button
+                type="button"
+                size="sm"
+                disabled={busy || nativeSale}
+                onClick={() => onAction("payment")}
+              >
                 <DollarSign aria-hidden="true" />
                 {text("登记收款", "Enregistrer un paiement")}
               </Button>
@@ -519,7 +596,7 @@ export function SaleWorkbenchInspector({
                   type="button"
                   size="sm"
                   variant="outline"
-                  disabled={busy}
+                  disabled={busy || nativeSale}
                   onClick={() => onAction("installment")}
                 >
                   <CalendarPlus aria-hidden="true" />

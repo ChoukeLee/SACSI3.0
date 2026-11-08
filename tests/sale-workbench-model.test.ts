@@ -1,13 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
   salePrice,
+  saleRegisteredPrice,
+  buildSalePurchaseReceiptSummary,
   saleScheduleReceivable,
   saleScheduleState,
   saleWorkbenchHref,
   saleWorkbenchStats,
 } from "@/features/sales/sale-workbench-model";
 import { parseWorkspaceQuery, decodeWorkspace } from "@/features/contracts/workspace-model";
-import type { SaleContractRow, SalePaymentScheduleRow, ReceivableRow } from "@/types/database";
+import type {
+  SaleContractRow,
+  SalePaymentScheduleRow,
+  ReceivableRow,
+  PaymentRow,
+} from "@/types/database";
 import { saleFixture } from "./fixtures/sale-workbench";
 import {
   workspaceContract,
@@ -16,6 +23,61 @@ import {
 } from "./fixtures/contract-workspace";
 
 const contract = saleFixture().contracts[0] as SaleContractRow;
+it("keeps a registered native price separate from the legacy XOF slot", () => {
+  const native = {
+    ...contract,
+    sale_currency: "CNY" as const,
+    total_amount_native: 720000,
+    total_amount_xof: 0,
+  };
+  expect(salePrice(native)).toBeNull();
+  expect(saleRegisteredPrice(native)).toEqual({ currency: "CNY", amount: 720000 });
+  expect(salePrice({ ...native, total_amount_xof: 720000 })).toBeNull();
+  expect(saleRegisteredPrice({ ...native, total_amount_xof: 720000 })).toBeNull();
+  expect(saleRegisteredPrice({ ...native, total_amount_native: null })).toBeNull();
+});
+it("preserves actual native purchase cash with unknown method, without fees, offsets or cross-buyer records", () => {
+  const native = {
+    ...contract,
+    sale_currency: "CNY" as const,
+    total_amount_native: 720000,
+    total_amount_xof: 0,
+  };
+  const receipt = (id: string, amount: number, patch: Partial<PaymentRow> = {}): PaymentRow => ({
+    id,
+    source_id: contract.id,
+    source_type: "sale_contract",
+    unit_id: contract.unit_id,
+    customer_id: contract.customer_id,
+    currency: "CNY",
+    amount,
+    payment_date: "2026-10-17",
+    created_at: "2026-10-17T00:00:00Z",
+    native_settlement: true,
+    exchange_rate_to_xof: null,
+    payment_method: null,
+    notes: null,
+    receipt_no: null,
+    ...patch,
+  });
+  const first = receipt("native-first", 700000),
+    second = receipt("native-second", 20000);
+  const result = buildSalePurchaseReceiptSummary(native, [
+    first,
+    second,
+    first,
+    receipt("fee", 30000, { source_type: "sale_registration_fee" }),
+    receipt("offset", 500, { payment_method: "offset" }),
+    receipt("reversal", 500, { request_kind: "sale_reversal" }),
+    receipt("wrong-buyer", 500, { customer_id: "other-buyer" }),
+    receipt("bad-rate", 500, { exchange_rate_to_xof: 1 }),
+    receipt("wrong-currency", 500, { currency: "USD" }),
+    receipt("bad-method", 500, { payment_method: "unknown" as PaymentRow["payment_method"] }),
+    receipt("bad-date", 500, { payment_date: "2026-02-30" }),
+  ]);
+  expect(result.amounts).toEqual([{ currency: "CNY", amount: 720000 }]);
+  expect([...result.receiptIds]).toEqual([first.id, second.id]);
+});
 it("reads an Excel sale with an unknown signing date only when its source is retained", () => {
   const data = saleFixture();
   Object.assign(data.contracts[0], {
