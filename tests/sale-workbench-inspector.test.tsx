@@ -218,6 +218,33 @@ it("separates recorded price, receivable applications and cash", async () => {
   expect(host.textContent).toContain("1 笔非现金变动");
   expect(fact("经营收款")).not.toContain("200,000 XOF");
 });
+it.each(["zh", "fr"] as const)(
+  "shows payment rows immediately after buyer context and before summaries and the plan in %s",
+  async (locale) => {
+    await render({ locale });
+    await tab(locale === "zh" ? "收付款" : "Paiements");
+    const section = host.querySelector(
+      `[aria-label="${locale === "zh" ? "实际收付款" : "Mouvements réels"}"]`,
+    )!;
+    const buyer = section.querySelector("h3")!;
+    const table = section.querySelector("table")!;
+    expect(buyer.nextElementSibling?.contains(table)).toBe(true);
+    for (const label of locale === "zh"
+      ? ["房款原币实收", "已核应收", "已录付款事实", "付款计划"]
+      : [
+          "Encaissements du bien par devise",
+          "Créances vérifiées",
+          "Paiements enregistrés",
+          "Plan de paiement",
+        ]) {
+      const heading = [...host.querySelectorAll("h3")].find((row) => row.textContent === label)!;
+      expect(heading).toBeTruthy();
+      expect(
+        table.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+  },
+);
 it("retains the payment plan and does not call future installments overdue or allocation progress actual cash", async () => {
   const data = saleFixture(undefined, "detail", 1);
   data.today = "2026-11-07";

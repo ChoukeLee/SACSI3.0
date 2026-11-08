@@ -38,6 +38,20 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
     </div>
   );
 }
+
+function recordTimestamp(value: string | null | undefined, locale: Locale) {
+  const timestamp = value ? Date.parse(value) : NaN;
+  if (!Number.isFinite(timestamp)) return locale === "zh" ? "未登记" : "Non renseignée";
+  return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "fr-FR", {
+    timeZone: "Africa/Abidjan",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(timestamp);
+}
 type SaleInspectorData = Pick<
   WorkspaceData,
   | "contracts"
@@ -423,6 +437,13 @@ function ScopedSaleWorkbenchInspector({
                   {customer?.name ?? text("客户待核", "Client à vérifier")}
                 </span>
               </h3>
+              <SalePaymentTable
+                key={contract.id}
+                payments={payments}
+                locale={locale}
+                nativePurchaseReceiptIds={nativePurchaseReceiptIds}
+                paymentKindNames={paymentKindNames}
+              />
               <h3>{text("房款原币实收", "Encaissements du bien par devise")}</h3>
               <p className={styles.keyMoney}>
                 {purchaseReceipts.amounts.length
@@ -535,14 +556,6 @@ function ScopedSaleWorkbenchInspector({
                     )
                   : ""}
               </p>
-
-              <SalePaymentTable
-                key={contract.id}
-                payments={payments}
-                locale={locale}
-                nativePurchaseReceiptIds={nativePurchaseReceiptIds}
-                paymentKindNames={paymentKindNames}
-              />
             </section>
             <section className={styles.detailSection}>
               <h3 className="mt-5">{text("付款计划", "Plan de paiement")}</h3>
@@ -702,10 +715,10 @@ function ScopedSaleWorkbenchInspector({
               <dl className={styles.facts}>
                 <Fact label={text("出售状态", "État de la vente")}>{stateLabel}</Fact>
                 <Fact label={text("登记创建时间", "Création du dossier")}>
-                  {contract.created_at || text("未登记", "Non renseignée")}
+                  {recordTimestamp(contract.created_at, locale)}
                 </Fact>
                 <Fact label={text("最近更新时间", "Dernière mise à jour")}>
-                  {contract.updated_at || text("未登记", "Non renseignée")}
+                  {recordTimestamp(contract.updated_at, locale)}
                 </Fact>
               </dl>
               <p className={styles.note}>

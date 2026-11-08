@@ -204,14 +204,14 @@
   overflow: visible;
 }
 .secondaryDetails {
-  margin-top: 1rem;
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.5rem;
-  padding: 0.7rem;
+  margin-top: 16px;
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 12px;
 }
 .secondaryDetails summary {
   cursor: pointer;
-  font-size: 14px;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
   font-weight: 400;
 }
 .paymentSourceDetails {
@@ -324,7 +324,6 @@
   line-height: 1.7;
 }
 .detailActions {
-  border-top: 1px solid hsl(var(--border));
   padding: 14px;
   display: flex;
   flex-direction: column;

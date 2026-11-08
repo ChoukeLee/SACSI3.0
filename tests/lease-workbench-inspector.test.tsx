@@ -148,6 +148,81 @@ function isVisibleByDisclosure(element: Element) {
 }
 
 describe("LeaseWorkbenchInspector single contract dossier", () => {
+  it("restores upcoming payment reminders only for explicit managed unsettled bills within fifteen days", async () => {
+    for (const [due_date, label] of [
+      ["2026-10-19", "今日应缴"],
+      ["2026-11-03", "15天内应缴"],
+      ["2026-11-04", null],
+    ] as const) {
+      await render({ receivables: [receivable({ due_date })] });
+      if (label) expect(host.textContent).toContain(label + " · " + due_date);
+      else expect(host.textContent).not.toMatch(/今日应缴|15天内应缴/);
+    }
+    for (const row of [
+      receivable({ management_status: "historical_pending" }),
+      receivable({ management_status: "excluded" }),
+      receivable({ status: "cancelled" }),
+      receivable({ status: "paid", paid_amount_xof: 100 }),
+    ]) {
+      await render({ receivables: [row] });
+      expect(host.textContent).not.toMatch(/今日应缴|15天内应缴/);
+    }
+    await render({
+      contract: { ...contract, paid_through_date: "2020-01-01" },
+      receivables: [],
+      summary: {
+        total: 100,
+        paid: 40,
+        outstanding: 60,
+        overdue: 0,
+        nextDue: "2026-10-19",
+        count: 1,
+      },
+    });
+    expect(host.textContent).not.toMatch(/今日应缴|15天内应缴/);
+    await render({
+      receivables: [receivable({ id: "overdue", due_date: "2026-10-18" }), receivable()],
+    });
+    expect(host.textContent).toContain("已核应收逾期");
+    expect(host.textContent).not.toMatch(/今日应缴|15天内应缴/);
+  });
+
+  it("bases native upcoming reminders on known original-currency bills without using the XOF placeholder", async () => {
+    const nativeContract = {
+      ...contract,
+      rent_currency: "USD" as const,
+      monthly_rent_amount: 3200,
+      monthly_rent_xof: 0,
+    };
+    const bill = receivable({
+      currency: "USD",
+      amount_xof: 0,
+      paid_amount_xof: 0,
+      amount_native: 3200,
+      paid_amount_native: 1000,
+      due_date: "2026-11-03",
+    });
+    await render({
+      contract: nativeContract,
+      receivables: [
+        bill,
+        receivable({ id: "foreign", currency: "CNY", amount_native: 50, paid_amount_native: 0 }),
+      ],
+    });
+    expect(host.textContent).toContain("15天内应缴 · 2026-11-03");
+    expect(host.textContent).not.toContain("今日应缴");
+    await render({
+      contract: nativeContract,
+      receivables: [{ ...bill, paid_amount_native: null }],
+    });
+    expect(host.textContent).not.toMatch(/今日应缴|15天内应缴/);
+    await render({
+      contract: { ...nativeContract, status: "terminated", actual_end_date: "2026-10-01" },
+      receivables: [bill],
+    });
+    expect(host.textContent).not.toMatch(/今日应缴|15天内应缴/);
+  });
+
   it("keeps same-room history inside its section and navigates all four tabs by keyboard", async () => {
     const choose = vi.fn();
     await render({

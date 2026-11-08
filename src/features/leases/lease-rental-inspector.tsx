@@ -19,7 +19,7 @@ import {
 import { formatMoney, paymentDisplay } from "@/lib/currency";
 import { leaseRentLabel, nativeLease, nativeReceivableSummary } from "@/lib/native-money";
 import { dictionaries, type Locale } from "@/lib/i18n";
-import type { PaymentRow, LeaseContractRow } from "@/types/database";
+import type { PaymentRow, LeaseContractRow, ReceivableRow } from "@/types/database";
 import { getOriginalMonthlyRent, getRecordedOriginalPayment } from "./lease-display-model";
 import { getLeaseFinancialConfigBySourceType } from "./lease-financial-entry-types";
 import { NativeLeaseFinance } from "./native-lease-finance";
@@ -167,6 +167,10 @@ export function LeaseRentalInspector({
     contract.status === "terminated" ||
     contract.status === "expired" ||
     (!!contract.actual_end_date && contract.actual_end_date <= today);
+  const upcoming =
+    !historical && balanceKnown
+      ? upcomingVerifiedBill(bills, isNative ? contract.rent_currency! : "XOF", today)
+      : null;
   const depositNeedsReview =
     contract.deposit_received !== hasDepositIn ||
     cash.depositOut > cash.depositIn ||
@@ -274,6 +278,13 @@ export function LeaseRentalInspector({
               <p className={styles.rentalOverdue}>
                 {text("已核应收逾期", "Créances en retard")} ·{" "}
                 {isNative ? nativeMoney(overdue!) : money(overdue)}
+              </p>
+            ) : upcoming ? (
+              <p className={styles.rentalReview}>
+                {upcoming.days === 0
+                  ? text("今日应缴", "Dû aujourd’hui")
+                  : text("15天内应缴", "Dû sous 15 jours")}{" "}
+                · {upcoming.date}
               </p>
             ) : null}
             <dl className={styles.rentalFacts}>
@@ -523,6 +534,45 @@ export function LeaseRentalInspector({
       </details>
     </aside>
   );
+}
+
+function upcomingVerifiedBill(rows: ReceivableRow[], currency: string, today: string) {
+  const day = (date: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+    const timestamp = Date.parse(date + "T00:00:00Z");
+    return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === date
+      ? timestamp / 86400000
+      : null;
+  };
+  const current = day(today);
+  if (current === null) return null;
+  const candidates = rows.flatMap((row) => {
+    if (
+      row.currency !== currency ||
+      row.status === "cancelled" ||
+      row.status === "paid" ||
+      (row.management_status ?? "managed") !== "managed"
+    )
+      return [];
+    const rawAmount = currency === "XOF" ? row.amount_xof : row.amount_native;
+    const rawPaid = currency === "XOF" ? row.paid_amount_xof : row.paid_amount_native;
+    if (rawAmount == null || rawPaid == null) return [];
+    const amount = Number(rawAmount),
+      paid = Number(rawPaid),
+      due = day(row.due_date);
+    if (
+      !Number.isFinite(amount) ||
+      !Number.isFinite(paid) ||
+      amount <= 0 ||
+      paid < 0 ||
+      paid >= amount ||
+      due === null
+    )
+      return [];
+    const days = due - current;
+    return Number.isInteger(days) && days >= 0 && days <= 15 ? [{ date: row.due_date, days }] : [];
+  });
+  return candidates.sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
 }
 
 /** Same original-currency receipt boundaries used by NativeLeaseFinance. */
