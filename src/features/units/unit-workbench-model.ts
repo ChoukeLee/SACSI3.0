@@ -145,6 +145,7 @@ export function matchesUnitWorkbenchFilter(
   if (filter === "all") return true;
   if (filter === "attention")
     return (
+      (record.business?.reviewReasons.length ?? 0) > 0 ||
       record.business?.leases.some((lease) =>
         lease.overdue?.some((amount) => amount.amount > 0),
       ) === true ||

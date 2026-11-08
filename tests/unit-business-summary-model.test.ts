@@ -264,6 +264,56 @@ describe("asset business financial summaries", () => {
     });
   });
 
+  it("keeps gross purchase cash above a confirmed same-currency price and includes the discrepancy in attention", () => {
+    const sold = sale();
+    const payments = [payment(1, sold, { amount: 1000000 }), payment(2, sold, { amount: 1000000 })];
+    const summary = buildUnitBusinessSummaries(
+      input({ sales: [sold], payments, ledger: payments.map((pay, n) => ledger(n, pay)) }),
+    )[unit().id];
+    expect(summary.sales[0].total).toEqual(money(1000000));
+    expect(summary.sales[0].received).toEqual([money(2000000)]);
+    expect(summary.sales[0].reviewReasons).toContain("cash_exceeds_registered_price");
+    expect(summary.reviewReasons).toContain("cash_exceeds_registered_price");
+    const record: UnitWorkbenchPositionRecord = {
+      unit: { occupancy_verified: true, construction_status: "operational" },
+      position: {
+        ownership: "sold",
+        operational_condition: "normal",
+        daily_occupied: false,
+        lease_occupied: false,
+        cleaning_pending: false,
+        daily_enabled: false,
+        lease_enabled: false,
+      },
+      business: summary,
+    };
+    expect(summary.sales[0].balance.basis).toBe("unknown");
+    expect(matchesUnitWorkbenchFilter(record, "attention")).toBe(true);
+    expect(
+      matchesUnitWorkbenchFilter(
+        { ...record, business: { ...summary, reviewReasons: [] } },
+        "attention",
+      ),
+    ).toBe(false);
+  });
+
+  it.each(["unconfirmed_price", "different_currency"] as const)(
+    "does not compare purchase cash numerically against %s",
+    (caseName) => {
+      const sold = sale(1, { total_amount_confirmed: caseName !== "unconfirmed_price" });
+      const pay = payment(1, sold, {
+        amount: 2000000,
+        currency: caseName === "different_currency" ? "CNY" : "XOF",
+        exchange_rate_to_xof: caseName === "different_currency" ? 100 : 1,
+      });
+      const record = buildUnitBusinessSummaries(
+        input({ sales: [sold], payments: [pay], ledger: [ledger(1, pay)] }),
+      )[unit().id].sales[0];
+      expect(record.received).toEqual([money(2000000, pay.currency as "XOF" | "CNY")]);
+      expect(record.reviewReasons).not.toContain("cash_exceeds_registered_price");
+    },
+  );
+
   it("does not call a foreign-currency rent bill a verified balance of this lease", () => {
     const rented = lease(1, {
       rent_currency: "USD",

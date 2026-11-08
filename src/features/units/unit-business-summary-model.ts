@@ -377,6 +377,13 @@ export function buildUnitBusinessSummaries(
   for (const row of saleRows) {
     const original = sales.find((s) => s.id === row.id)!;
     const cash = cashForRecord(input, original, "sale");
+    const received = cash.total("purchase");
+    const exceedsPrice =
+      row.priceNative &&
+      received?.some(
+        (value) =>
+          value.currency === row.priceNative!.currency && value.amount > row.priceNative!.amount,
+      );
     const balance: UnitBusinessBalance =
       row.outstandingNative !== null
         ? { basis: "verified_bills", amounts: row.outstandingNative }
@@ -397,12 +404,18 @@ export function buildUnitBusinessSummaries(
       status: original.status,
       historical: row.historical,
       sourceRef: original.source_reference ?? null,
-      reviewReasons: [...new Set([...row.reviewReasons, ...cash.reviews])],
+      reviewReasons: [
+        ...new Set([
+          ...row.reviewReasons,
+          ...cash.reviews,
+          ...(exceedsPrice ? ["cash_exceeds_registered_price"] : []),
+        ]),
+      ],
       recentReceipts: cash.rows.slice(0, 6),
       receiptCount: cash.rows.length,
       signedDate: validDate(original.signed_date) ? original.signed_date : null,
       total: row.priceNative ?? null,
-      received: cash.total("purchase"),
+      received,
       balance,
       agencyReceived: cash.total("agency"),
       otherReceived: cash.total("other"),

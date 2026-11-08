@@ -76,7 +76,7 @@ function attention(record: UnitWorkbenchRecord, locale: Locale) {
   if (position?.operational_condition === "maintenance")
     return { label: conditionLabel("maintenance", locale), critical: false };
   if (position?.cleaning_pending) return { label: zh ? "待保洁" : "À nettoyer", critical: false };
-  if (unitNeedsVerification(record))
+  if (unitNeedsVerification(record) || record.business?.reviewReasons.length)
     return { label: zh ? "待核实" : "À vérifier", critical: false };
   return null;
 }
@@ -90,6 +90,10 @@ export function unitReviewText(reasons: readonly string[], locale: Locale) {
       "Écart entre solde enregistré et créances",
     ],
     cash_record_requires_review: ["收款资料待核", "Encaissements à vérifier"],
+    cash_exceeds_registered_price: [
+      "已录房款超过登记总价，需核对来源",
+      "Les encaissements enregistrés dépassent le prix enregistré ; sources à vérifier",
+    ],
     multiple_current_records: [
       "有多条当前记录，需分别核对",
       "Plusieurs dossiers actuels à vérifier séparément",
