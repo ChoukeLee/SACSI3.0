@@ -138,8 +138,8 @@
 .card {
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
-  padding: 1rem;
+  gap: 0.55rem;
+  padding: 0.85rem 1rem;
   min-width: 0;
   text-align: left;
   border: 1px solid hsl(var(--border));
@@ -150,6 +150,9 @@
 .card[aria-pressed="true"] {
   box-shadow: 0 0 0 2px #477ec82a;
   border-color: #7c9fc9;
+}
+.card.reviewCard {
+  border-top-color: #a89a75;
 }
 .card.upcomingCard {
   border-top-color: #c69c49;
@@ -176,10 +179,6 @@
   font-weight: 550;
   overflow-wrap: anywhere;
 }
-.transfer {
-  font-size: 0.75rem;
-  color: hsl(var(--muted-foreground));
-}
 .fact {
   display: flex;
   gap: 0.7rem;
@@ -203,14 +202,16 @@
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
-  border-top: 1px solid hsl(var(--border));
-  padding-top: 0.6rem;
+  padding-top: 0.2rem;
   font-size: 0.75rem;
 }
 .cardStatus {
   padding: 0.2rem 0.4rem;
   border-radius: 0.25rem;
   font-weight: 600;
+}
+.detailHint {
+  color: hsl(var(--muted-foreground));
 }
 .overdueStatus {
   color: #a5332d;

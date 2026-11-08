@@ -2,7 +2,7 @@
 
 import { useId, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { DollarSign, CalendarPlus, TrendingUp, AlertTriangle, Printer, X } from "lucide-react";
+import { DollarSign, CalendarPlus, AlertTriangle, Printer, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   formatContractXof,
@@ -49,7 +49,7 @@ type SaleInspectorData = Pick<
   | "receivables"
 > & { summaries: Record<string, ContractReceivableSummary> };
 
-export type SaleWorkbenchAction = "payment" | "installment" | "transfer" | "terminate";
+export type SaleWorkbenchAction = "payment" | "installment" | "terminate";
 
 export function SaleWorkbenchInspector({
   data,
@@ -100,8 +100,8 @@ export function SaleWorkbenchInspector({
             {text("沿一笔出售查看履约", "Suivre une vente")}
           </h2>
           {text(
-            "选中左侧合同，查看分期、付款事实和过户。详情按需读取，不读取全部历史。",
-            "Sélectionnez un contrat pour consulter ses échéances, ses paiements et son transfert.",
+            "选中左侧合同，查看付款计划和收支明细。详情按需读取，不读取全部历史。",
+            "Sélectionnez un contrat pour consulter ses échéances et ses encaissements et dépenses.",
           )}
         </div>
       </aside>
@@ -265,14 +265,6 @@ export function SaleWorkbenchInspector({
         returnTo,
       })
     : null;
-  const transfer =
-    (
-      {
-        not_started: text("未开始", "Non commencé"),
-        in_progress: text("办理中", "En cours"),
-        completed: text("已完成", "Terminé"),
-      } as Record<string, string>
-    )[contract.transfer_status] ?? text("待核对", "À vérifier");
   const tabs = [
     { id: "overview", label: text("概况", "Aperçu") },
     { id: "finance", label: text("收支明细", "Encaissements et dépenses") },
@@ -329,7 +321,7 @@ export function SaleWorkbenchInspector({
         ) : null}
         <p className={styles.sub}>
           {registeredStatus ? text("按Excel登记", "Enregistré selon Excel") : stateLabel}
-          {registeredStatus && contract.status !== "active" ? ` · ${stateLabel}` : ""} · {transfer}
+          {registeredStatus && contract.status !== "active" ? ` · ${stateLabel}` : ""}
         </p>
       </header>
       <div
@@ -394,7 +386,6 @@ export function SaleWorkbenchInspector({
                     ? originalMoney(registeredBalance)
                     : text("暂无已核应收", "Aucune créance vérifiée")}
               </Fact>
-              <Fact label={text("过户阶段", "Transfert")}>{transfer}</Fact>
             </dl>
             <details className={styles.secondaryDetails}>
               <summary>{text("合同登记资料", "Informations enregistrées du contrat")}</summary>
@@ -415,12 +406,6 @@ export function SaleWorkbenchInspector({
                 <Fact label={text("合同编号", "Référence")}>
                   {contract.contract_no || text("未登记", "Non renseignée")}
                 </Fact>
-                <Fact label={text("过户日期", "Date du transfert")}>
-                  {contract.transfer_date ?? text("未登记", "Non renseignée")}
-                </Fact>
-                <Fact label={text("产权证号", "Titre foncier")}>
-                  {contract.title_certificate_no || text("未登记", "Non renseigné")}
-                </Fact>
                 <Fact label={text("中介公司", "Agence")}>
                   {contract.agency_company || text("未登记", "Non renseignée")}
                 </Fact>
@@ -438,8 +423,8 @@ export function SaleWorkbenchInspector({
               </dl>
               <p className={styles.sub}>
                 {text(
-                  "合同标注不代替财务凭证；过户阶段不代表付款状态。",
-                  "Les mentions contractuelles ne remplacent pas les justificatifs ; le transfert n’est pas un statut de paiement.",
+                  "合同标注不代替财务凭证，付款事实以收支明细为准。",
+                  "Les mentions contractuelles ne remplacent pas les justificatifs ; consultez les encaissements et dépenses.",
                 )}
               </p>
             </details>
@@ -744,16 +729,6 @@ export function SaleWorkbenchInspector({
                     >
                       <CalendarPlus aria-hidden="true" />
                       {text("新增分期", "Ajouter une échéance")}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() => onAction("transfer")}
-                    >
-                      <TrendingUp aria-hidden="true" />
-                      {text("更新过户", "Mettre à jour le transfert")}
                     </Button>
                   </>
                 ) : null}

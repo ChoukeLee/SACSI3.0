@@ -67,8 +67,8 @@ export function SaleWorkbenchTable({
       <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2.5">
         <span className={styles.note}>
           {text(
-            "选中合同，核对分期、实收与过户",
-            "Sélectionnez un contrat pour vérifier ses échéances et son transfert",
+            "选中出售记录，核对分期与实收",
+            "Sélectionnez une vente pour vérifier ses échéances et ses paiements",
           )}
         </span>
         <label className="flex items-center gap-2 text-xs text-muted-foreground">

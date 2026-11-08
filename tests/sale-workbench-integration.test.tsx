@@ -152,6 +152,7 @@ async function render(
   capabilities: Partial<
     Pick<ComponentProps<typeof SaleList>, "canRecordFinance" | "canManage" | "canTerminate">
   > = {},
+  locale: "zh" | "fr" = "zh",
 ) {
   await act(async () =>
     root.render(
@@ -161,7 +162,7 @@ async function render(
         workspace={data}
         initialProject={data.query.projectId}
         initialContract={initialContract}
-        locale="zh"
+        locale={locale}
         canCreate={false}
         canRecordFinance={false}
         canManage={false}
@@ -185,7 +186,10 @@ async function settle(ms = 20) {
   );
 }
 const buttons = () => [...host.querySelectorAll("[data-sale-room-id]")];
-const inspector = () => document.querySelector('aside[aria-label="出售合同履约详情"]');
+const inspector = () =>
+  document.querySelector(
+    'aside[aria-label="出售合同履约详情"], aside[aria-label="Détails du contrat de vente"]',
+  );
 const named = (name: string, within: ParentNode = document) =>
   [...within.querySelectorAll("button")].find((button) => {
     const label = button.textContent ?? "";
@@ -234,6 +238,12 @@ function nativeSource(data: WorkspaceData) {
   data.receivableCount = 0;
   data.schedules = [];
   data.scheduleCount = 0;
+  if (data.mode === "context") {
+    data.roomReceivables = [];
+    data.roomPayments = [];
+    data.roomSchedules = [];
+    data.roomFinanceCounts = { receivables: 0, payments: 0, schedules: 0 };
+  }
   data.summaries = Object.fromEntries(
     data.contracts.map((row) => [
       row.id,
@@ -250,16 +260,120 @@ it("shows a known native source price on its room card and does not infer a clea
   await render(nativeSource(saleFixture(undefined, "list", 1)));
   const row = buttons()[0];
   expect(row.textContent).toContain("720,000 CNY");
-  expect(row.textContent).toContain("初始登记");
+  const unreceived = [...row.querySelectorAll(":scope > span")].find(
+    (item) => item.firstElementChild?.textContent === "未收",
+  );
+  expect(unreceived?.querySelector("strong")?.textContent).toBe("待核");
   expect(row.textContent).not.toContain("已建应收已结清");
   expect(host.querySelector("table")).toBeNull();
   expect(host.textContent).not.toContain("列表核对");
   await click(row);
   await settle();
   expect(inspector()?.textContent).toContain("720,000 CNY");
+  expect(inspector()?.textContent).toContain("按Excel登记");
   expect(inspector()?.textContent).toContain("暂无已核应收");
   expect(inspector()?.textContent).not.toContain("0 XOF");
 });
+it.each(["zh", "fr"] as const)(
+  "shows four financial card fields and no transfer workflow in %s while keeping receipts, installments and records reachable",
+  async (locale) => {
+    const decorate = (data: WorkspaceData) => {
+      for (const contract of data.contracts)
+        Object.assign(contract, {
+          transfer_status: "completed",
+          transfer_date: "2026-10-30",
+          title_certificate_no: "SYNTHETIC-LEGACY-CERTIFICATE",
+        });
+      const contract = data.contracts[0];
+      const cash: PaymentRow = {
+        id: syntheticId(600001),
+        source_id: contract.id,
+        source_type: "sale_contract",
+        unit_id: contract.unit_id,
+        customer_id: contract.customer_id,
+        payment_date: "2026-10-17",
+        amount: 300000,
+        currency: "XOF",
+        exchange_rate_to_xof: 1,
+        native_settlement: false,
+        payment_method: "cash",
+        receipt_no: null,
+        notes: null,
+        request_kind: null,
+        reversal_of_payment_id: null,
+        created_at: "2026-10-17T12:00:00Z",
+      };
+      if (data.mode === "detail") {
+        data.payments = [cash];
+        data.paymentCount = 1;
+      }
+      if (data.mode === "context") {
+        data.roomPayments = [cash];
+        data.roomFinanceCounts = {
+          receivables: data.roomReceivables!.length,
+          payments: 1,
+          schedules: data.roomSchedules!.length,
+        };
+      }
+      return data;
+    };
+    vi.mocked(fetch).mockImplementation(async (input) =>
+      Response.json(decorate(responseFor(input))),
+    );
+    await render(
+      decorate(saleFixture(parseWorkspaceQuery({ projectId: workspaceProject, locale }))),
+      undefined,
+      {
+        canRecordFinance: true,
+        canManage: true,
+        canTerminate: true,
+      },
+      locale,
+    );
+    const card = buttons()[0];
+    expect(card, host.textContent ?? "").toBeTruthy();
+    const fields = [...card.querySelectorAll(":scope > span")].filter(
+      (item) => item.firstElementChild?.tagName === "SPAN" && item.querySelector(":scope > strong"),
+    );
+    expect(fields.map((item) => item.firstElementChild?.textContent)).toEqual(
+      locale === "zh"
+        ? ["买方", "总价", "已收", "未收"]
+        : ["Acquéreur", "Prix enregistré", "Encaissé", "Restant"],
+    );
+    const amounts = fields
+      .slice(1)
+      .map((item) => item.querySelector("strong")!.textContent!.replace(/[\s,]/g, ""));
+    expect(amounts[0]).toBe("1000000XOF");
+    expect(amounts[1]).toBe("300000XOF");
+    expect(amounts[2]).toContain("800000XOF");
+    expect(card.textContent).toMatch(locale === "zh" ? /已逾期/ : /En retard/);
+    expect(card.textContent).not.toMatch(
+      /付款计划|下一应付|下一到期|Plan de paiement|Prochaine échéance/,
+    );
+    expect(host.textContent).not.toMatch(/过户|transfert/i);
+    await click(named(locale === "zh" ? "出售记录" : "Dossiers de vente", host));
+    await click(host.querySelector(`[data-sale-history-record-id="${workspaceContract}"]`));
+    await settle();
+    expect(inspector()).toBeTruthy();
+    await openDisclosure(locale === "zh" ? "更多操作" : "Autres opérations");
+    expect(
+      named(
+        locale === "zh" ? "手工登记出售收款" : "Saisir manuellement un paiement de vente",
+        inspector()!,
+      ),
+    ).toBeTruthy();
+    expect(named(locale === "zh" ? "新增分期" : "Ajouter une échéance", inspector()!)).toBeTruthy();
+    await click(named(locale === "zh" ? "收支明细" : "Encaissements et dépenses", inspector()!));
+    expect(inspector()?.textContent).toContain(
+      locale === "zh" ? "应收已核销" : "Créances rapprochées",
+    );
+    expect(document.body.textContent).not.toMatch(/过户|transfert|SYNTHETIC-LEGACY-CERTIFICATE/i);
+    expect(document.querySelector('[id^="sale-action-transfer"]')).toBeNull();
+    expect(updateTransferStatus).not.toHaveBeenCalled();
+    expect(recordSalePaymentAtomic).not.toHaveBeenCalled();
+    expect(addFlexibleInstallment).not.toHaveBeenCalled();
+  },
+);
 
 it.each(["手工登记出售收款", "新增分期"])(
   "refuses the old XOF action %s if the fresh record is native",
@@ -699,7 +813,6 @@ it("keeps the complete read-only contract in one inspector with no second detail
 it.each([
   ["手工登记出售收款", "登记出售收款", "确认收款"],
   ["新增分期", "新增付款分期", "新增"],
-  ["更新过户", "更新过户进度", "保存"],
   ["终止合同", "确认终止出售合同", "确认终止"],
 ])(
   "opens only the focused %s form, preserving selection on cancel",
@@ -794,8 +907,15 @@ it("preserves the existing installment mutation payload and optimistic concurren
     requestId: expect.any(String),
   });
 });
-it("preserves the existing transfer mutation signature", async () => {
-  vi.mocked(updateTransferStatus).mockResolvedValue({
+it("uses the fresh record version for installment optimistic concurrency instead of the displayed version", async () => {
+  const freshVersion = "2026-11-08T19:00:00Z";
+  let detailReads = 0;
+  vi.mocked(fetch).mockImplementation(async (input) => {
+    const data = responseFor(input);
+    if (data.mode === "detail" && ++detailReads >= 2) data.contracts[0].updated_at = freshVersion;
+    return Response.json(data);
+  });
+  vi.mocked(addFlexibleInstallment).mockResolvedValue({
     success: false,
     rejected: true,
     error: "SYNTHETIC no write",
@@ -803,26 +923,23 @@ it("preserves the existing transfer mutation signature", async () => {
   await render(saleFixture(), undefined, { canManage: true });
   await click(buttons()[0]);
   await settle();
-  await clickAction("更新过户");
+  await clickAction("新增分期");
   await settle();
   const dialog = document.querySelector('[role="dialog"]')!;
-  const status = dialog.querySelector<HTMLSelectElement>("#sale-action-transfer-status")!;
-  await act(async () => {
-    status.value = "completed";
-    status.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  await click(dialog.querySelector("#sale-action-transfer-date"));
+  await click(dialog.querySelector("#sale-action-due-date"));
   await click(named("今天", dialog));
-  await changeInput(dialog.querySelector("#sale-action-certificate")!, "SYNTHETIC-TITLE");
-  await click(named("保存", dialog));
-  expect(updateTransferStatus).toHaveBeenCalledWith(
-    workspaceContract,
-    "completed",
-    new Date().toISOString().slice(0, 10),
-    "SYNTHETIC-TITLE",
-    expect.any(String),
-    saleFixture().contracts[0].updated_at,
-  );
+  await changeInput(dialog.querySelector("#sale-action-amount")!, "12345");
+  await click(named("新增", dialog));
+  expect(detailReads).toBeGreaterThanOrEqual(2);
+  expect(addFlexibleInstallment).toHaveBeenCalledWith({
+    contractId: workspaceContract,
+    installmentNo: 1,
+    dueDate: new Date().toISOString().slice(0, 10),
+    amountXof: 12345,
+    expectedUpdatedAt: freshVersion,
+    requestId: expect.any(String),
+  });
+  expect(updateTransferStatus).not.toHaveBeenCalled();
 });
 it("preserves the atomic receipt payload without creating an automatic amount", async () => {
   vi.mocked(recordSalePaymentAtomic).mockResolvedValue({
@@ -881,7 +998,7 @@ it("does not revive a pending action after the workspace scope changes", async (
         resolveAction = resolve;
       }),
   );
-  await clickAction("更新过户");
+  await clickAction("新增分期");
   await render(
     saleFixture(parseWorkspaceQuery({ buildingId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" })),
     undefined,
@@ -894,6 +1011,8 @@ it("does not revive a pending action after the workspace scope changes", async (
   await settle(260);
   expect(document.querySelector('[role="dialog"]')).toBeNull();
   expect(new URL(window.location.href).searchParams.get("contract")).toBeNull();
+  expect(addFlexibleInstallment).not.toHaveBeenCalled();
+  expect(updateTransferStatus).not.toHaveBeenCalled();
 });
 
 it("uses the complete 26-record context for cards rather than the initial 25-record table page", async () => {
@@ -1049,36 +1168,32 @@ it("keeps a former buyer's debt on its original record and never adds it to the 
 });
 
 it("does not repeat a successful sale mutation when its subsequent refresh fails", async () => {
-  vi.mocked(updateTransferStatus).mockResolvedValue({ success: true, rejected: false });
+  vi.mocked(addFlexibleInstallment).mockResolvedValue({ success: true, rejected: false });
   vi.mocked(fetch).mockImplementation(async (input) =>
-    vi.mocked(updateTransferStatus).mock.calls.length
+    vi.mocked(addFlexibleInstallment).mock.calls.length
       ? new Response("", { status: 503 })
       : Response.json(responseFor(input)),
   );
   await render(saleFixture(), undefined, { canManage: true });
   await click(buttons()[0]);
   await settle();
-  await clickAction("更新过户");
+  await clickAction("新增分期");
   await settle();
   const dialog = operationDialog()!;
-  const status = dialog.querySelector<HTMLSelectElement>("#sale-action-transfer-status")!;
-  await act(async () => {
-    status.value = "completed";
-    status.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  await click(dialog.querySelector("#sale-action-transfer-date"));
+  await click(dialog.querySelector("#sale-action-due-date"));
   await click(named("今天", dialog));
-  await changeInput(dialog.querySelector("#sale-action-certificate")!, "SYNTHETIC-TITLE");
-  await click(named("保存", dialog));
+  await changeInput(dialog.querySelector("#sale-action-amount")!, "12345");
+  await click(named("新增", dialog));
   await settle();
-  expect(updateTransferStatus).toHaveBeenCalledTimes(1);
+  expect(addFlexibleInstallment).toHaveBeenCalledTimes(1);
   expect(document.body.textContent).toContain("上一笔操作已确认成功");
   expect(operationDialog()).toBeNull();
   const retry = named("重试读取当前范围", host) ?? named("重试", host);
   expect(retry).toBeTruthy();
   await click(retry);
   await settle();
-  expect(updateTransferStatus).toHaveBeenCalledTimes(1);
+  expect(addFlexibleInstallment).toHaveBeenCalledTimes(1);
+  expect(updateTransferStatus).not.toHaveBeenCalled();
 });
 
 it.each(["手工登记出售收款", "新增分期"])(

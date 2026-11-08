@@ -136,10 +136,7 @@ export function buildSalePurchaseReceiptSummary(
 }
 
 export function saleWorkbenchStats(
-  stats: Pick<
-    WorkspaceStats,
-    "active" | "total" | "unknownAll" | "dueOutstanding" | "transferDone"
-  >,
+  stats: Pick<WorkspaceStats, "active" | "total" | "unknownAll" | "dueOutstanding">,
   locale: "zh" | "fr",
 ) {
   const zh = locale === "zh",
@@ -164,12 +161,6 @@ export function saleWorkbenchStats(
       label: zh ? "到期未收" : "Dû impayé",
       value: stats.unknownAll ? "—" : money(stats.dueOutstanding),
       hint: zh ? "截至今日 · 仅已核应收" : "À ce jour · créances vérifiées",
-    },
-    {
-      key: "transfer" as const,
-      label: zh ? "已过户" : "Transferts terminés",
-      value: String(stats.transferDone),
-      hint: zh ? "过户不代表已付清" : "Transfert ≠ règlement intégral",
     },
   ];
 }

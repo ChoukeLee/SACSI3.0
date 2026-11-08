@@ -154,7 +154,7 @@ function Preview() {
           <p className="text-xs text-muted-foreground">SACSI / 示例公寓</p>
           <h1 className="mt-2 text-2xl font-semibold">出售房源</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            按楼层查看买方、房款实收、待收和过户情况。
+            按楼层查看买方、总价、已收与未收，需要跟进的房间单独标明。
           </p>
         </header>
         <SaleRoomOverview

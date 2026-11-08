@@ -153,8 +153,8 @@ export function UnitWorkbenchInspector({
                       : "Sans occupation ne signifie pas prêt à louer ; un bien vendu peut avoir un bail distinct."}
                 <br />
                 {zh
-                  ? "“已售”沿用现有业务投影，不作为产权登记或过户完成凭证。"
-                  : "« Vendu » est une projection métier, pas une preuve de titre ou de mutation."}
+                  ? "“已售”按已登记出售记录显示，房款收支在对应出售明细中核对。"
+                  : "« Vendu » suit la vente enregistrée ; vérifiez les paiements dans son dossier."}
               </div>
             </section>
             <section className={styles.section}>

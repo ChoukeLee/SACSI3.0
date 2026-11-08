@@ -6,6 +6,7 @@ import { saleFixture } from "../../../tests/fixtures/sale-workbench";
 import type { SaleContractRow } from "@/types/database";
 import type { SaleRecordOverviewRow, SaleRoomOverviewRow } from "./sale-room-overview-model";
 import { SaleRoomOverview } from "./sale-room-overview";
+import styles from "./sale-room-overview.module.css";
 
 const fixture = saleFixture(undefined, "detail", 1);
 const current: SaleRecordOverviewRow = {
@@ -92,6 +93,7 @@ async function render(
     recordStatus?: string;
     initialRecordsOpen?: boolean;
     onBrowseChange?: () => void;
+    locale?: "zh" | "fr";
   } = {},
 ) {
   const selected = state.selected ?? vi.fn();
@@ -100,7 +102,7 @@ async function render(
       <SaleRoomOverview
         rows={rows}
         records={records}
-        locale="zh"
+        locale={state.locale ?? "zh"}
         loading={state.loading ?? false}
         error={state.error ?? false}
         onSelectRecord={selected}
@@ -122,6 +124,10 @@ function button(text: string) {
   expect(value).toBeTruthy();
   return value!;
 }
+function fact(card: Element, label: string) {
+  return [...card.querySelectorAll("span")].find((item) => item.textContent === label)
+    ?.nextElementSibling?.textContent;
+}
 
 it("keeps current cards separate from historical balances and opens the exact old record", async () => {
   const selected = await render();
@@ -131,7 +137,11 @@ it("keeps current cards separate from historical balances and opens the exact ol
   expect(card.textContent).not.toContain("Old buyer");
   expect(card.textContent).toContain("10 USD");
   expect(card.textContent).toContain("20 CNY");
-  expect(card.textContent).toContain("2026-11-12");
+  expect(card.textContent).not.toContain("2026-11-12");
+  expect(card.textContent).toContain("15天内应付");
+  expect(fact(card, "未收")).toBe("900 XOF（账单）");
+  expect(card.textContent).not.toContain("过户");
+  expect(card.textContent).not.toContain("下一到期");
   expect(card.textContent).not.toContain("月租");
   expect(button("全部出售").textContent).toContain("1");
   await act(async () => button("已逾期").click());
@@ -277,7 +287,8 @@ it("keeps missing price and bill coverage reviewable without inventing a settled
   await act(async () => button("待核事项").click());
   expect(host.querySelectorAll("[data-sale-room-id]")).toHaveLength(1);
   expect(host.querySelector("[data-sale-room-id]")?.textContent).not.toContain("已建应收已结清");
-  expect(host.querySelector("[data-sale-room-id]")?.textContent).toContain("未有已核实收");
+  expect(fact(host.querySelector("[data-sale-room-id]")!, "已收")).toBe("待核");
+  expect(fact(host.querySelector("[data-sale-room-id]")!, "未收")).toBe("待核");
   await act(async () => button("出售款跟进").click());
   expect(host.querySelectorAll("[data-sale-followup-record-id]")).toHaveLength(0);
 });
@@ -304,10 +315,81 @@ it("shows a source registration's native price, receipts and explicit source bal
   };
   await render([{ ...room, record: source, records: [source] }], [source]);
   const card = host.querySelector("[data-sale-room-id]")!;
-  expect(card.textContent).toContain("初始登记");
+  expect(card.textContent).not.toContain("初始登记");
   expect(card.textContent).toContain("720,000 CNY");
-  expect(card.textContent).toContain("登记余款（Excel）");
+  expect(fact(card, "未收")).toContain("0 CNY（登记）");
   expect(card.textContent).toContain("0 CNY");
   expect(card.textContent).not.toContain("0 XOF");
   expect(card.textContent).not.toContain("已建应收已结清");
+  expect(card.querySelector("strong[title]")?.getAttribute("title")).toContain("workbook!K5");
+  await act(async () => button("出售记录").click());
+  expect(host.querySelector("[data-sale-history-record-id]")?.textContent).toContain("初始登记");
 });
+
+it.each([
+  { kind: "overdue" as const, label: "已逾期", filter: "已逾期", className: styles.overdueCard },
+  { kind: "review" as const, label: "待核", filter: "待核事项", className: styles.reviewCard },
+])(
+  "retains one visible $label warning on the compact card",
+  async ({ kind, label, filter, className }) => {
+    const flagged: SaleRecordOverviewRow = {
+      ...current,
+      attention: {
+        kind,
+        dueDate: "2026-11-01",
+        days: -1,
+        amounts: [{ currency: "XOF", amount: 100 }],
+      },
+    };
+    await render([{ ...room, record: flagged, records: [flagged] }], [flagged]);
+    await act(async () => button(filter).click());
+    const cards = host.querySelectorAll("[data-sale-room-id]");
+    expect(cards).toHaveLength(1);
+    expect(cards[0].textContent?.split(label)).toHaveLength(2);
+    expect(cards[0].classList.contains(className)).toBe(true);
+    expect(cards[0].textContent).not.toContain("2026-11-01");
+    expect(fact(cards[0], "未收")).toBe("900 XOF（账单）");
+  },
+);
+
+it.each(["zh", "fr"] as const)(
+  "keeps four readable financial fields and a simple detail footer without transfer or next-date rows (%s)",
+  async (locale) => {
+    const normal: SaleRecordOverviewRow = {
+      ...current,
+      attention: null,
+      nextDue: "2031-12-31",
+      outstandingNative: [],
+      contract: { ...current.contract, transfer_status: "completed", transfer_date: "2032-11-30" },
+    };
+    const selected = await render([{ ...room, record: normal, records: [normal] }], [normal], {
+      locale,
+      initialRecordsOpen: true,
+    });
+    const card = host.querySelector<HTMLButtonElement>("[data-sale-room-id]")!;
+    for (const label of locale === "zh"
+      ? ["买方", "总价", "已收", "未收"]
+      : ["Acquéreur", "Prix enregistré", "Encaissé", "Restant"])
+      expect(fact(card, label)).toBeTruthy();
+    expect(fact(card, locale === "zh" ? "未收" : "Restant")).toBe(
+      locale === "zh" ? "账单结清" : "Factures soldées",
+    );
+    expect(card.textContent).toContain(locale === "zh" ? "查看详情" : "Voir les détails");
+    expect(card.textContent).not.toMatch(
+      /过户|Transf|下一到期|Prochaine échéance|2031-12-31|2032-11-30/,
+    );
+    expect(host.querySelector("[data-sale-history-record-id]")).toBeTruthy();
+    expect(host.querySelector("[data-sale-history-record-id]")?.textContent).not.toMatch(
+      /过户|Transf|2032-11-30/,
+    );
+    await act(async () => card.click());
+    expect(selected).toHaveBeenCalledWith(normal);
+    await render([{ ...room, record: normal, records: [normal] }], [normal], {
+      locale,
+      search: "2032-11-30",
+      initialRecordsOpen: true,
+    });
+    expect(host.querySelector("[data-sale-room-id]")).toBeNull();
+    expect(host.querySelector("[data-sale-history-record-id]")).toBeNull();
+  },
+);

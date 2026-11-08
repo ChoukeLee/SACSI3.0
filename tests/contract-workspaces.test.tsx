@@ -197,9 +197,7 @@ it("sale missing managed obligations remains unknown instead of treating cash or
     ),
   );
   expect(host.querySelector("table")).toBeNull();
-  expect(host.querySelector("[data-sale-room-id]")?.textContent).toContain(
-    "Créances restantesÀ vérifier",
-  );
+  expect(host.querySelector("[data-sale-room-id]")?.textContent).toContain("RestantÀ vérifier");
   expect(host.textContent).not.toContain("万");
   const dialog = await openCustomer();
   await openFinance(dialog);

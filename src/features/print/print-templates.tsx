@@ -286,7 +286,6 @@ export function printSaleContract(
           paid: "应收已核销",
           outstanding: "已建应收未收",
           paymentPlan: "付款方式",
-          transfer: "过户状态",
           buyer: "买方",
           seller: "卖方",
         }
@@ -301,7 +300,6 @@ export function printSaleContract(
           paid: "Créances réglées",
           outstanding: "Créances restantes",
           paymentPlan: "Plan de paiement",
-          transfer: "Transfert",
           buyer: "Acheteur",
           seller: "Vendeur",
         };
@@ -321,7 +319,6 @@ export function printSaleContract(
         : "Aucune créance vérifiée"
       : formatSaleXof(amount);
   const paymentPlan = paymentPlanDisplayLabel(data.contract.payment_plan_type, locale);
-  const transferStatus = statusDisplayLabel(data.contract.transfer_status, locale);
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${labels.title}</title>${a4Styles}</head><body>
     <div class="header"><div class="company">${labels.company}</div><div class="meta">${labels.title}</div></div>
     <h1>${labels.title}</h1>
@@ -331,7 +328,6 @@ export function printSaleContract(
       <tr><td class="label">${labels.customer}</td><td class="value">${data.customer?.name ?? "-"}</td></tr>
       <tr><td class="label">${labels.signedDate}</td><td class="value">${data.contract.signed_date}</td></tr>
       <tr><td class="label">${labels.paymentPlan}</td><td class="value">${paymentPlan}</td></tr>
-      <tr><td class="label">${labels.transfer}</td><td class="value">${transferStatus}</td></tr>
     </table>
     <h2>${labels.title}</h2>
     <div class="total-grid">

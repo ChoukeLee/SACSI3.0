@@ -84,6 +84,22 @@ describe("core UI architecture", () => {
     expect(operational).toContain("top-12");
   });
 
+  it("keeps transfer fields and operations out of live sale views while preserving financial actions", () => {
+    for (const path of [
+      "src/features/sales/sale-list.tsx",
+      "src/features/sales/sale-workbench-inspector.tsx",
+      "src/features/sales/sale-room-overview.tsx",
+    ]) {
+      expect(read(path), path).not.toMatch(
+        /transfer_status|transfer_date|sale-action-transfer|updateTransferStatus/,
+      );
+    }
+    const list = read("src/features/sales/sale-list.tsx");
+    expect(list).toContain("recordSalePaymentAtomic");
+    expect(list).toContain("addFlexibleInstallment");
+    expect(list).toContain("terminateSaleContract");
+  });
+
   it("has one active long-lease implementation and no independent occupancy page", () => {
     expect(existsSync(resolve(root, "src/features/leases/lease-ledger.tsx"))).toBe(false);
     expect(existsSync(resolve(root, "src/app/daily-rentals/overview/page.tsx"))).toBe(false);

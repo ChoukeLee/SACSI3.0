@@ -22,7 +22,6 @@ import {
   createSaleContract,
   recordSalePaymentAtomic,
   addFlexibleInstallment,
-  updateTransferStatus,
   terminateSaleContract,
 } from "./actions";
 import { buildSaleContractNumber } from "@/lib/contract-number";
@@ -144,9 +143,6 @@ export function SaleList({
   const createRequestIdRef = useRef<string | null>(null);
   const [flexDueDate, setFlexDueDate] = useState("");
   const [flexAmount, setFlexAmount] = useState(0);
-  const [trStatus, setTrStatus] = useState("not_started");
-  const [trDate, setTrDate] = useState("");
-  const [trCertNo, setTrCertNo] = useState("");
   const [termReason, setTermReason] = useState("");
   const [showFlexForm, setShowFlexForm] = useState(false);
   const requestedProjectId = resolveContractProjectLink(buildings, initialProject);
@@ -468,7 +464,7 @@ export function SaleList({
       saving ||
       workspace.unavailable ||
       (action === "payment" && !canRecordFinance) ||
-      (["installment", "transfer"].includes(action) && !canManage) ||
+      (action === "installment" && !canManage) ||
       (action === "terminate" && !canTerminate)
     )
       return;
@@ -480,7 +476,6 @@ export function SaleList({
     setPayAmount(0);
     setPayReceiptNo("");
     setShowFlexForm(false);
-    setTrDate("");
     setTermReason("");
     setError("");
     let fresh: SaleContractRow | undefined;
@@ -520,10 +515,6 @@ export function SaleList({
       setShowFlexForm(true);
       setFlexDueDate("");
       setFlexAmount(0);
-    } else if (action === "transfer") {
-      setTrStatus(fresh.transfer_status);
-      setTrDate(new Date().toISOString().slice(0, 10));
-      setTrCertNo(fresh.title_certificate_no ?? "");
     }
     setPanel(action);
   };
@@ -691,30 +682,6 @@ export function SaleList({
       },
     );
   };
-  const handleTransfer = async () => {
-    if (!canManage || !selected || selected.status !== "active" || !trDate) return;
-    const payload = {
-      contractId: selected.id,
-      status: trStatus,
-      transferDate: trDate,
-      titleCertificateNo: trCertNo || undefined,
-      expectedUpdatedAt: selected.updated_at,
-    };
-    await runOperation(
-      "sale_transfer",
-      payload,
-      (id) =>
-        updateTransferStatus(
-          payload.contractId,
-          payload.status,
-          payload.transferDate,
-          payload.titleCertificateNo,
-          id,
-          payload.expectedUpdatedAt,
-        ),
-      () => setPanel(null),
-    );
-  };
   const handleTerminateSale = async () => {
     if (!canTerminate || !selected || selected.status !== "active") return;
     const payload = {
@@ -734,11 +701,6 @@ export function SaleList({
   const inputClass =
     "w-full rounded-md border bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border-strong outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60";
   const labelClass = "block text-xs font-semibold text-muted-foreground mb-1";
-  const transText = (s: string) =>
-    locale === "zh"
-      ? ({ not_started: "未开始", in_progress: "办理中", completed: "已完成" }[s] ?? "待核实")
-      : ({ not_started: "Non commencé", in_progress: "En cours", completed: "Terminé" }[s] ??
-        "À vérifier");
   const sellableUnits = useMemo(
     () =>
       units.filter(
@@ -783,8 +745,8 @@ export function SaleList({
       title={locale === "zh" ? "出售房源" : "Lots en vente"}
       description={
         locale === "zh"
-          ? "按楼栋查看买方、已录房款、分期与过户；选择房间核对资料。"
-          : "Acquéreurs, paiements, échéances et transfert par bâtiment. Choisissez un lot pour vérifier son dossier."
+          ? "按楼栋查看买方、已录房款与付款计划；选择房间核对资料。"
+          : "Acquéreurs, paiements et échéances par bâtiment. Choisissez un lot pour vérifier son dossier."
       }
       action={
         canCreate ? (
@@ -1094,7 +1056,7 @@ export function SaleList({
       )}
 
       {/* The inspector is the only contract detail. Drawers contain one action only. */}
-      {selected && ["payment", "installment", "transfer", "terminate"].includes(panel ?? "") && (
+      {selected && ["payment", "installment", "terminate"].includes(panel ?? "") && (
         <SalePanelShell
           onClose={() => {
             if (!saving) setPanel(null);
@@ -1108,13 +1070,9 @@ export function SaleList({
                 ? locale === "zh"
                   ? "新增付款分期"
                   : "Ajouter une échéance"
-                : panel === "transfer"
-                  ? locale === "zh"
-                    ? "更新过户进度"
-                    : "Mettre à jour le transfert"
-                  : locale === "zh"
-                    ? "确认终止出售合同"
-                    : "Confirmer la résiliation"
+                : locale === "zh"
+                  ? "确认终止出售合同"
+                  : "Confirmer la résiliation"
           }
         >
           <div className="space-y-5">
@@ -1296,80 +1254,6 @@ export function SaleList({
               </div>
             )}
 
-            {/* Transfer form */}
-            {canManage && panel === "transfer" && selected.status === "active" && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label
-                      htmlFor="sale-action-transfer-status"
-                      className="text-xs text-muted-foreground"
-                    >
-                      {locale === "zh" ? "过户状态" : "Transfert"}
-                    </label>
-                    <select
-                      id="sale-action-transfer-status"
-                      disabled={saving}
-                      value={trStatus}
-                      onChange={(e) => setTrStatus(e.target.value)}
-                      className={inputClass}
-                    >
-                      <option value="not_started">{transText("not_started")}</option>
-                      <option value="in_progress">{transText("in_progress")}</option>
-                      <option value="completed">{transText("completed")}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="sale-action-transfer-date"
-                      className="text-xs text-muted-foreground"
-                    >
-                      {locale === "zh" ? "过户日期" : "Date"}
-                    </label>
-                    <DateInput
-                      id="sale-action-transfer-date"
-                      disabled={saving}
-                      value={trDate}
-                      onChangeValue={setTrDate}
-                      className={inputClass}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label
-                      htmlFor="sale-action-certificate"
-                      className="text-xs text-muted-foreground"
-                    >
-                      {locale === "zh" ? "产权证号" : "Titre"}
-                    </label>
-                    <input
-                      id="sale-action-certificate"
-                      disabled={saving}
-                      type="text"
-                      value={trCertNo}
-                      onChange={(e) => setTrCertNo(e.target.value)}
-                      className={inputClass}
-                    />
-                  </div>
-                </div>
-                {error && <p className="text-xs text-red-600">{error}</p>}
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={handleTransfer} disabled={saving || !trDate}>
-                    {saving ? "..." : locale === "zh" ? "保存" : "OK"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={saving}
-                    onClick={() => {
-                      setTrDate("");
-                      setPanel(null);
-                    }}
-                  >
-                    {locale === "zh" ? "取消" : "Annuler"}
-                  </Button>
-                </div>
-              </div>
-            )}
             {canTerminate && panel === "terminate" && selected.status === "active" && (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">

@@ -15,8 +15,7 @@ export interface SaleBuilding {
   project?: { id: string; code: string; display_name: string; allows_sale?: boolean } | null;
 }
 export type SaleStatusFilter = "current" | "all" | "terminated" | "expired";
-export type SaleStatKey =
-  "active" | "total" | "received" | "receivable" | "due" | "overdue" | "transfer";
+export type SaleStatKey = "active" | "total" | "received" | "receivable" | "due" | "overdue";
 
 export function SaleWorkbenchScope({
   locale,
@@ -179,7 +178,7 @@ export function SaleWorkbenchSummary({
       aria-label={locale === "zh" ? "当前出售范围汇总" : "Synthèse des ventes"}
     >
       {blocks
-        .filter((block) => ["active", "total", "due", "transfer"].includes(block.key))
+        .filter((block) => ["active", "total", "due"].includes(block.key))
         .map((block) => (
           <button
             key={block.key}
@@ -221,8 +220,8 @@ export function SaleNoSaleWorkspace({
       title={zh ? "出售履约台" : "Suivi des ventes"}
       description={
         zh
-          ? "合同、分期与过户，沿同一笔业务查看。"
-          : "Contrats, échéances et transfert dans un même dossier."
+          ? "按房源查看买方、总价、已收与未收。"
+          : "Acquéreurs, prix, montants reçus et restant dus par lot."
       }
     >
       {scope}

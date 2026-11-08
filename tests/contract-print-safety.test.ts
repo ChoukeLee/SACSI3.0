@@ -106,6 +106,7 @@ it.each(["zh", "fr"] as const)(
     expect(html).not.toContain("<script");
     expect(html).not.toContain("&amp;lt;");
     expect(html).toContain("100");
+    expect(html).not.toMatch(/过户|Transfert/);
   },
 );
 it("reserves a non-financial loading document and safely closes it if the browser refuses document access", () => {

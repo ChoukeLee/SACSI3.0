@@ -396,7 +396,6 @@ it("opens focused actions directly and preserves print and keyboard tabs", async
   for (const [label, action] of [
     ["手工登记出售收款", "payment"],
     ["新增分期", "installment"],
-    ["更新过户", "transfer"],
     ["终止合同", "terminate"],
   ]) {
     await act(async () => find(label).click());
@@ -419,7 +418,7 @@ it("keeps operations hidden for viewers and inactive contracts", async () => {
 it("disables all mutation entry points while a business operation is pending", async () => {
   await render({ canRecordFinance: true, canManage: true, canTerminate: true, busy: true });
   const actions = host.querySelectorAll<HTMLButtonElement>('[aria-label="办理此合同"] button');
-  expect(actions).toHaveLength(4);
+  expect(actions).toHaveLength(3);
   expect([...actions].every((button) => button.disabled)).toBe(true);
 });
 it("retains every payment and its full notes in the single detail", async () => {
@@ -443,8 +442,35 @@ it("localizes the same read-only facts for French", async () => {
   expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("Aperçu");
   await openDisclosure("Informations enregistrées du contrat");
   expect(fact("Signature")).toBe("2026-01-01");
-  expect(host.textContent).toContain("Date du transfert");
+  expect(host.textContent).toContain("Plan de paiement");
 });
+
+it.each(["zh", "fr"] as const)(
+  "omits legacy transfer workflow fields and actions while retaining payment facts in %s",
+  async (locale) => {
+    const data = saleFixture(undefined, "detail", 1);
+    Object.assign(data.contracts[0], {
+      transfer_status: "completed",
+      transfer_date: "2039-12-31",
+      title_certificate_no: "SYNTHETIC-LEGACY-TITLE",
+    });
+    await render({ data, locale, canRecordFinance: true, canManage: true, canTerminate: true });
+    await openDisclosure(locale === "zh" ? "合同登记资料" : "Informations enregistrées du contrat");
+    await openDisclosure(locale === "zh" ? "更多操作" : "Autres opérations");
+    expect(host.textContent).not.toMatch(/过户|产权证|transfert|titre foncier/i);
+    expect(host.textContent).not.toContain("SYNTHETIC-LEGACY-TITLE");
+    expect(host.textContent).not.toContain("2039-12-31");
+    expect(fact(locale === "zh" ? "签约日期" : "Signature")).toBe("2026-01-01");
+    expect(host.textContent).toContain(locale === "zh" ? "付款计划" : "Plan de paiement");
+    const actions = host.querySelectorAll(
+      '[aria-label="' + (locale === "zh" ? "办理此合同" : "Gérer ce contrat") + '"] button',
+    );
+    expect(actions).toHaveLength(3);
+    await tab(locale === "zh" ? "收支明细" : "Encaissements et dépenses");
+    expect(host.querySelectorAll("article")).toHaveLength(data.payments.length);
+    expect(host.textContent).not.toMatch(/过户|产权证|transfert|titre foncier/i);
+  },
+);
 
 it.each([0, null])(
   "keeps native cash, source balance %s and unknown signing separate from managed receivables",

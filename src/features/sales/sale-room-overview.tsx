@@ -27,7 +27,6 @@ function searchText(record: SaleRecordOverviewRow) {
     record.customer?.phone,
     record.contract.contract_no,
     record.contract.signed_date,
-    record.contract.transfer_date,
   ]
     .join(" ")
     .toLocaleLowerCase();
@@ -68,18 +67,6 @@ function statusLabel(record: SaleRecordOverviewRow, locale: Locale) {
     return zh ? "初始登记" : "Enregistrement initial";
   if (record.contract.status === "draft") return zh ? "草稿" : "Brouillon";
   return zh ? "当前出售" : "Vente actuelle";
-}
-
-function transferLabel(record: SaleRecordOverviewRow, locale: Locale) {
-  const labels: Record<string, [string, string]> = {
-    not_started: ["过户未开始", "Transfert non commencé"],
-    in_progress: ["过户办理中", "Transfert en cours"],
-    completed: ["已过户", "Transféré"],
-  };
-  return (
-    labels[record.contract.transfer_status]?.[locale === "zh" ? 0 : 1] ??
-    (locale === "zh" ? "过户待核" : "Transfert à vérifier")
-  );
 }
 
 function floorLabel(row: SaleRoomOverviewRow, locale: Locale) {
@@ -309,8 +296,7 @@ export function SaleRoomOverview({
           <span>
             <strong>{statusLabel(record, locale)}</strong>
             <small>
-              {record.contract.signed_date || text("签约未登记", "Signature non renseignée")} ·{" "}
-              {transferLabel(record, locale)}
+              {record.contract.signed_date || text("签约未登记", "Signature non renseignée")}
             </small>
             {record.attention?.dueDate && record.attention.kind !== "review" ? (
               <small>
@@ -519,6 +505,12 @@ export function SaleRoomOverview({
           <div className={styles.cards}>
             {floor.rows.map((row) => {
               const record = row.record;
+              const attention = record ? attentionLabel(record, locale) : null;
+              const cardAttention =
+                attention &&
+                !["overdue", "upcoming", "unsettled"].includes(record?.attention?.kind ?? "")
+                  ? text("待核", "À vérifier")
+                  : attention;
               return (
                 <button
                   type="button"
@@ -533,30 +525,27 @@ export function SaleRoomOverview({
                   }
                   className={cn(
                     styles.card,
+                    needsReview(row) && styles.reviewCard,
                     record?.attention?.kind === "overdue" && !row.conflict && styles.overdueCard,
                     record?.attention?.kind === "upcoming" && !row.conflict && styles.upcomingCard,
                   )}
                 >
                   <span className={styles.roomHeading}>
                     <strong>{row.unit.unit_no}</strong>
-                    <small>
-                      {row.conflict
-                        ? text("出售待核", "Vente à vérifier")
-                        : record
-                          ? statusLabel(record, locale)
-                          : "—"}
-                    </small>
+                    {record?.contract.status === "draft" ? (
+                      <small>{text("草稿", "Brouillon")}</small>
+                    ) : null}
                   </span>
-                  <span className={styles.buyer}>
-                    {row.conflict
-                      ? text("多条出售记录待核", "Plusieurs ventes à vérifier")
-                      : (record?.customer?.name ?? text("买方待登记", "Acquéreur à compléter"))}
-                  </span>
-                  {record && !row.conflict ? (
-                    <span className={styles.transfer}>{transferLabel(record, locale)}</span>
-                  ) : null}
                   <span className={styles.fact}>
-                    <span>{text("登记总价", "Prix enregistré")}</span>
+                    <span>{text("买方", "Acquéreur")}</span>
+                    <strong className={styles.buyer}>
+                      {row.conflict
+                        ? text("多条出售记录待核", "Plusieurs ventes à vérifier")
+                        : (record?.customer?.name ?? text("待登记", "À renseigner"))}
+                    </strong>
+                  </span>
+                  <span className={styles.fact}>
+                    <span>{text("总价", "Prix enregistré")}</span>
                     <strong>
                       {record?.priceNative
                         ? amounts([record.priceNative], locale)
@@ -566,44 +555,45 @@ export function SaleRoomOverview({
                     </strong>
                   </span>
                   <span className={styles.fact}>
-                    <span>{text("已录房款实收", "Encaissements du bien")}</span>
+                    <span>{text("已收", "Encaissé")}</span>
                     <strong>
                       {row.conflict
                         ? text("按记录核对", "Vérifier par dossier")
                         : record?.receivedNative.length
                           ? amounts(record.receivedNative, locale)
-                          : text("未有已核实收", "Aucun encaissement vérifié")}
+                          : text("待核", "À vérifier")}
                     </strong>
                   </span>
                   <span className={styles.fact}>
-                    <span>
-                      {record?.outstandingNative == null && record?.registeredBalance
-                        ? text("登记余款（Excel）", "Solde enregistré (Excel)")
-                        : text("应收未收", "Créances restantes")}
-                    </span>
-                    <strong>
+                    <span>{text("未收", "Restant")}</span>
+                    <strong
+                      title={
+                        record?.outstandingNative == null
+                          ? record?.registeredBalance
+                            ? `${text("Excel登记余款，不等同于已核应收；依据：", "Solde enregistré dans Excel, distinct des créances vérifiées ; source : ")}${record.registeredBalance.sourceRef}`
+                            : text(
+                                "现有资料不足，未据总价减已收推算余款。",
+                                "Données insuffisantes ; aucun solde déduit du prix moins les encaissements.",
+                              )
+                          : text(
+                              "仅已核账单的未收余额，不代表全部房款余款。",
+                              "Solde des seules créances vérifiées, distinct du reste du prix du bien.",
+                            )
+                      }
+                    >
                       {record?.outstandingNative == null
                         ? record?.registeredBalance
-                          ? amounts([record.registeredBalance], locale)
+                          ? `${amounts([record.registeredBalance], locale)}${text("（登记）", " (enregistré)")}`
                           : text("待核", "À vérifier")
                         : record.outstandingNative.length
-                          ? amounts(record.outstandingNative, locale)
-                          : text("已建应收已结清", "Créances soldées")}
-                    </strong>
-                  </span>
-                  <span className={styles.fact}>
-                    <span>{text("下一到期", "Prochaine échéance")}</span>
-                    <strong>
-                      {record?.nextDue ??
-                        (record?.outstandingNative == null
-                          ? text("待核", "À vérifier")
-                          : text("无未结到期记录", "Aucune échéance ouverte"))}
+                          ? `${amounts(record.outstandingNative, locale)}${text("（账单）", " (factures)")}`
+                          : text("账单结清", "Factures soldées")}
                     </strong>
                   </span>
                   <span className={styles.cardFooter}>
                     <span
                       className={cn(
-                        styles.cardStatus,
+                        row.conflict || cardAttention ? styles.cardStatus : styles.detailHint,
                         row.conflict
                           ? styles.reviewStatus
                           : record?.attention?.kind === "overdue"
@@ -618,7 +608,7 @@ export function SaleRoomOverview({
                       {row.conflict
                         ? text("选择记录核对", "Choisir un dossier")
                         : record
-                          ? (attentionLabel(record, locale) ?? transferLabel(record, locale))
+                          ? (cardAttention ?? text("查看详情", "Voir les détails"))
                           : text("待核", "À vérifier")}
                     </span>
                     <ArrowRight size={15} aria-hidden="true" />
