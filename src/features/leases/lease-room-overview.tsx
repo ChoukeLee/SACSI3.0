@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import { ArrowRight, CalendarClock, Search } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { cn, floorSortValue, normalizeFloorLabel } from "@/lib/utils";
-import { formatMoney } from "@/lib/currency";
-import { leaseRentLabel, nativeLease } from "@/lib/native-money";
+import { formatPropertyMoney, propertyLeaseRentLabel } from "@/lib/property-money";
+import { nativeLease } from "@/lib/native-money";
 import type {
   LeaseRecordAttention,
   LeaseRecordOverviewRow,
@@ -141,7 +141,7 @@ function attentionAmount(
     return locale === "zh" ? "多币种 · 查看明细" : "Plusieurs devises · voir le détail";
   if (!value || value.amount === null) return locale === "zh" ? "金额待核" : "Montant à vérifier";
   const currency = value.currency ?? "XOF";
-  const label = formatMoney(value.amount, currency, locale);
+  const label = formatPropertyMoney(value.amount, currency, locale);
   return currency === "XOF" ? label : `${label} ${currency}`;
 }
 
@@ -207,7 +207,7 @@ function monthlyRent(row: LeaseRoomOverviewRow, locale: Locale) {
     ? Number(row.contract.monthly_rent_amount)
     : Number(row.contract.monthly_rent_xof);
   return Number.isFinite(amount) && amount > 0
-    ? leaseRentLabel(row.contract, locale)
+    ? propertyLeaseRentLabel(row.contract, locale)
     : locale === "zh"
       ? "待核"
       : "À vérifier";

@@ -211,12 +211,12 @@ it("separates recorded price, receivable applications and cash", async () => {
     payment({ id: "88888888-8888-4888-8888-888888888888", amount: 900, payment_method: "offset" }),
   ];
   await render({ data });
-  expect(fact("登记总价")).toBe("1,000,000 XOF");
+  expect(fact("登记总价")).toBe("100 万西法");
   await tab("收付款");
-  expect(fact("应收已核销")).toBe("200,000 XOF");
-  expect(fact("经营收款")).toBe("500 XOF");
+  expect(fact("应收已核销")).toBe("20 万西法");
+  expect(fact("经营收款")).toBe("0.05 万西法");
   expect(host.textContent).toContain("1 笔非现金变动");
-  expect(fact("经营收款")).not.toContain("200,000 XOF");
+  expect(fact("经营收款")).not.toContain("20 万西法");
 });
 it.each(["zh", "fr"] as const)(
   "shows payment rows immediately after buyer context and before summaries and the plan in %s",
@@ -297,7 +297,7 @@ it("retains the payment plan and does not call future installments overdue or al
   expect(future?.textContent).toContain("待付 / 未逾期");
   expect(future?.textContent).not.toContain("已逾期");
   await tab("收付款");
-  expect(fact("应收已核销")).toBe("200,000 XOF");
+  expect(fact("应收已核销")).toBe("20 万西法");
   expect(fact("经营收款")).toBe("暂无已核记录");
 });
 it("retains original currency and leaves collector unknown instead of using recording account", async () => {
@@ -313,7 +313,7 @@ it("retains original currency and leaves collector unknown instead of using reco
   ];
   await render({ data });
   await tab("收付款");
-  expect(fact("经营收款")).toBe("850 XOF");
+  expect(fact("经营收款")).toBe("0.085 万西法");
   expect(host.textContent).toContain("¥10");
   await paymentSource(data.payments[0].id);
   expect(fact("实际收款人")).toBe("待核对");
@@ -335,7 +335,7 @@ it("does not turn unknown prices or absence of verified receivables into zero de
   expect(fact("登记总价")).toBe("待核对");
   await tab("收付款");
   expect(fact("已建应收未收")).toBe("暂无已核应收");
-  expect(host.textContent).not.toContain("0 XOF");
+  expect(host.textContent).not.toMatch(/(?<![\d.,])0\s万西法/);
 });
 it("keeps a source-only native price and receipts separate from unknown bills and XOF actions", async () => {
   const data = nativeSourceData();
@@ -343,7 +343,7 @@ it("keeps a source-only native price and receipts separate from unknown bills an
   expect(fact("登记总价")).toBe("¥720,000 CNY");
   expect(fact("登记余款（Excel）")).toBe("¥0 CNY");
   expect(host.textContent).not.toContain("暂无已登记付款计划，不代表已付款");
-  expect(host.textContent).not.toContain("0 XOF");
+  expect(host.textContent).not.toMatch(/(?<![\d.,])0\s万西法/);
 
   await openDisclosure("更多操作");
   for (const label of ["手工登记出售收款", "新增分期"]) {
@@ -376,7 +376,7 @@ it("keeps a source-only native price and receipts separate from unknown bills an
   expect(host.textContent).not.toContain("不计入现金汇总");
   expect(host.textContent).not.toContain("2 笔待核");
   expect(host.textContent).not.toContain("2 笔非现金变动");
-  expect(host.textContent).not.toContain("0 XOF");
+  expect(host.textContent).not.toMatch(/(?<![\d.,])0\s万西法/);
 });
 it("excludes mismatched native purchase receipts and keeps XOF registration fees independent", async () => {
   const data = nativeSourceData();
@@ -396,12 +396,12 @@ it("excludes mismatched native purchase receipts and keeps XOF registration fees
     (heading) => heading.textContent === "房款原币实收",
   );
   expect(receiptHeading?.nextElementSibling?.textContent).toBe("¥700,000 CNY");
-  expect(fact("西法经营收款")).toBe("300,000 XOF");
+  expect(fact("西法经营收款")).toBe("30 万西法");
   const articles = [...host.querySelectorAll("[data-sale-payment-id]")];
   const mismatched = articles.find((row) => row.textContent?.includes("¥20,000"));
   expect(mismatched?.textContent).toContain("原币登记待核 · 未折算西法");
   expect(mismatched?.textContent).not.toContain("原币房款实收");
-  const registration = articles.find((row) => row.textContent?.includes("300,000 XOF"));
+  const registration = articles.find((row) => row.textContent?.includes("30 万西法"));
   expect(registration?.textContent).toContain("注册金收款");
   expect(registration?.textContent).not.toContain("原币房款实收");
 });
@@ -580,7 +580,7 @@ it.each([0, null])(
     expect(fact("登记总价")).toContain("720,000");
     expect(fact("登记总价")).toContain("CNY");
     expect(fact("累计房款入款")).toContain("720,000");
-    expect(fact("累计房款入款")).not.toContain("300,000");
+    expect(fact("累计房款入款")).not.toContain("万西法");
     if (sourceBalance === 0) expect(fact("登记余款（Excel）")).toMatch(/0 CNY/);
     else {
       expect(fact("登记余款（Excel）")).toBeUndefined();
@@ -594,7 +594,7 @@ it.each([0, null])(
     expect(host.textContent).toContain("原币房款实收 · 未折算西法");
     expect(host.textContent).not.toMatch(/[12] 笔待核/);
     expect(host.textContent).not.toContain("已核账单已结清");
-    expect(fact("西法经营收款")).toBe("300,000 XOF");
+    expect(fact("西法经营收款")).toBe("30 万西法");
     await openDisclosure("更多操作");
     for (const label of ["手工登记出售收款", "新增分期", "打印登记合同"]) {
       const button = [...host.querySelectorAll<HTMLButtonElement>("button")].find((item) =>
@@ -618,7 +618,7 @@ it("keeps a managed unpaid balance ahead of an Excel zero balance", async () => 
     source_balance_reference: "source:K33",
   });
   const props = await render({ data });
-  expect(fact("已核未收")).toBe("800,000 XOF");
+  expect(fact("已核未收")).toBe("80 万西法");
   expect(fact("登记余款（Excel）")).toBeUndefined();
   await openDisclosure("更多操作");
   const print = [...host.querySelectorAll<HTMLButtonElement>("button")].find((item) =>
@@ -729,13 +729,13 @@ it("keeps gross purchase receipts and explicit refunds separate without deriving
     payment({ id: "receipt-again", amount: 1000000 }),
   ];
   await render({ data });
-  expect(fact("累计房款入款")).toBe("2,000,000 XOF");
-  expect(fact("已录房款退款")).toBe("1,000,000 XOF");
-  expect(fact("已核未收")).toBe("800,000 XOF");
+  expect(fact("累计房款入款")).toBe("200 万西法");
+  expect(fact("已录房款退款")).toBe("100 万西法");
+  expect(fact("已核未收")).toBe("80 万西法");
   expect(fact("净收房款")).toBeUndefined();
   await tab("收付款");
   expect(host.querySelector('[data-sale-payment-id="refund-id"]')?.textContent).toContain(
-    "− 1,000,000 XOF",
+    "− 100 万西法",
   );
   expect(host.querySelectorAll("[data-sale-payment-id]")).toHaveLength(3);
 });

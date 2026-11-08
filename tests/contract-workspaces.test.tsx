@@ -162,7 +162,7 @@ it("sale default cards and their detail keep full identity and separate allocate
   const room = host.querySelector("[data-sale-room-id]");
   expect(room?.textContent).toContain("503");
   expect(room?.textContent).toContain(customers[0].name);
-  expect(room?.textContent).toContain("800,000 XOF");
+  expect(room?.textContent).toContain("80 万西法");
   expect(host.querySelector("table")).toBeNull();
   expect(host.textContent).not.toContain("列表核对");
   const dialog = await openCustomer();
@@ -175,10 +175,10 @@ it("sale default cards and their detail keep full identity and separate allocate
   expect(dialog.textContent).toContain(sale.contract_no);
   expect(dialog.textContent).toContain("2026-01-01");
   await openFinance(dialog);
-  expect(dialog.textContent).toContain("已建应收未收800,000 XOF");
-  expect(dialog.textContent).toContain("应收已核销200,000 XOF");
-  expect(dialog.textContent).toContain("经营收款1,200,000 XOF");
-  expect(dialog.querySelector('[role="tabpanel"]')?.textContent).not.toContain("300,000 XOF"); // Contract commission flags are not cash evidence.
+  expect(dialog.textContent).toContain("已建应收未收80 万西法");
+  expect(dialog.textContent).toContain("应收已核销20 万西法");
+  expect(dialog.textContent).toContain("经营收款120 万西法");
+  expect(dialog.querySelector('[role="tabpanel"]')?.textContent).not.toContain("30 万西法"); // Contract commission flags are not cash evidence.
 });
 
 it("sale missing managed obligations remains unknown instead of treating cash or contract total as allocation", async () => {
@@ -270,7 +270,7 @@ it("lease financial details keep refundable deposits outside operating income", 
   );
   const dialog = await openCustomer();
   await openFinance(dialog);
-  expect(dialog.textContent).toContain("已录经营收款1,200,000 XOF");
-  expect(dialog.textContent).toContain("已录押金实收3,000,000 XOF");
-  expect(dialog.textContent).not.toContain("已录经营收款4,200,000 XOF");
+  expect(dialog.textContent).toContain("已录经营收款120 万西法");
+  expect(dialog.textContent).toContain("已录押金实收300 万西法");
+  expect(dialog.textContent).not.toContain("已录经营收款420 万西法");
 });

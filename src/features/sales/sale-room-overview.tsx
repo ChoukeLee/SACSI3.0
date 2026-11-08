@@ -1,9 +1,10 @@
 "use client";
 
+import { formatPropertyMoney } from "@/lib/property-money";
+
 import { useMemo, useState } from "react";
 import { ArrowRight, Search } from "lucide-react";
 import { cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
-import { formatMoney } from "@/lib/currency";
 import type { Locale } from "@/lib/i18n";
 import type { SaleRecordOverviewRow, SaleRoomOverviewRow } from "./sale-room-overview-model";
 import styles from "./sale-room-overview.module.css";
@@ -36,7 +37,7 @@ function amounts(values: SaleRecordOverviewRow["receivedNative"], locale: Locale
   return values
     .map(
       (value) =>
-        `${formatMoney(value.amount, value.currency, locale)}${value.currency === "XOF" ? "" : ` ${value.currency}`}`,
+        `${formatPropertyMoney(value.amount, value.currency, locale)}${value.currency === "XOF" ? "" : ` ${value.currency}`}`,
     )
     .join(" · ");
 }
@@ -550,7 +551,7 @@ export function SaleRoomOverview({
                       {record?.priceNative
                         ? amounts([record.priceNative], locale)
                         : record?.priceXof != null
-                          ? formatMoney(record.priceXof, "XOF", locale)
+                          ? formatPropertyMoney(record.priceXof, "XOF", locale)
                           : text("待核", "À vérifier")}
                     </strong>
                   </span>

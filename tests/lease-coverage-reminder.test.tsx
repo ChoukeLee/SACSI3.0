@@ -132,7 +132,7 @@ it("keeps settled stale coverage as reachable verification work, without another
   expect(followup?.textContent).toContain("查看资料核对");
   expect(host.querySelector("[data-room-id]")?.textContent).toContain("2026-09-30");
   expect(followup?.textContent).not.toContain("-19天后应缴");
-  expect(followup?.textContent).not.toContain("600,000 XOF");
+  expect(followup?.textContent).not.toMatch(/600,000 XOF|60\s*万西法/);
   expect(fetch).toHaveBeenCalledTimes(1);
 });
 it("does not include the fully settled stale coverage in upcoming collectible reminders", async () => {
@@ -152,5 +152,5 @@ it("does not include the fully settled stale coverage in upcoming collectible re
   expect(followup.querySelectorAll("[data-followup-record-id]")).toHaveLength(1);
   expect(followup.textContent).toContain("缴费待核");
   expect(followup.textContent).not.toContain("天内应缴");
-  expect(followup.textContent).not.toContain("600,000 XOF");
+  expect(followup.textContent).not.toMatch(/600,000 XOF|60\s*万西法/);
 });

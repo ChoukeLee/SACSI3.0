@@ -306,7 +306,7 @@ it("reads only the selected room's contract into a dossier drawer", async () => 
   expect(preview()!.querySelector('button[aria-label="关闭预览"]')).toBeNull();
   expect(drawer.querySelector("h2")?.textContent).toContain("101");
   await showFinance();
-  expect(preview()?.textContent).toContain("123,456");
+  expect(preview()?.textContent).toContain("12.3456 万西法");
   expect(operationDialog()).toBeNull();
   expect(host.querySelectorAll("[data-room-id]")).toHaveLength(2);
   expect(host.querySelector("table")).toBeNull();
@@ -440,11 +440,11 @@ it("opens an exact linked contract outside the visible list without loading ever
     query: { projectId: workspaceProject, buildingId: "" },
   });
   await showFinance();
-  expect(preview()?.textContent).toContain("123,456");
+  expect(preview()?.textContent).toContain("12.3456 万西法");
   expect(host.querySelectorAll("tbody tr")).toHaveLength(0);
   expect(host.querySelector('a[href^="/customers?"]')?.getAttribute("href")).toContain("page=2");
   await click(closeDossierButton());
-  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toMatch(/123,456|12\.3456\s*万西法/);
   await settle();
   expect(recordRequests()).toHaveLength(1);
 });
@@ -456,13 +456,13 @@ it("drops a linked contract immediately when changing project and rejects an ext
   });
   await settle();
   await showFinance();
-  expect(preview()?.textContent).toContain("123,456");
+  expect(preview()?.textContent).toContain("12.3456 万西法");
   expect(host.querySelector('a[href^="https://external.invalid"]')).toBeNull();
   const nav = host.querySelector('nav[aria-label="项目切换"]');
   await click(namedButton("科建建材城", nav!));
-  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toMatch(/123,456|12\.3456\s*万西法/);
   await settle();
-  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toMatch(/123,456|12\.3456\s*万西法/);
 });
 
 it("opens the complete dossier drawer from the rental room card", async () => {
@@ -681,7 +681,7 @@ it("does not reuse the preceding contract balance while the next selected previe
   await click(previewButtons()[0]);
   await settle();
   await showFinance();
-  expect(preview()?.textContent).toContain("123,456");
+  expect(preview()?.textContent).toContain("12.3456 万西法");
   let resolveNext!: (response: Response) => void;
   vi.mocked(fetch).mockImplementationOnce(
     () =>
@@ -690,13 +690,13 @@ it("does not reuse the preceding contract balance while the next selected previe
       }),
   );
   await click(previewButtons()[1]);
-  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toMatch(/123,456|12\.3456\s*万西法/);
   const input = recordRequests().at(-1)![0];
   await act(async () => resolveNext(Response.json(detailFor(input, 654321))));
   await settle();
   await showFinance();
-  expect(preview()?.textContent).toContain("654,321");
-  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(preview()?.textContent).toContain("65.4321 万西法");
+  expect(preview()?.textContent ?? "").not.toMatch(/123,456|12\.3456\s*万西法/);
 });
 
 it("reads a fresh result after closing and reopening the same contract instead of restoring its old balance", async () => {
@@ -704,9 +704,9 @@ it("reads a fresh result after closing and reopening the same contract instead o
   await click(previewButtons()[0]);
   await settle();
   await showFinance();
-  expect(preview()?.textContent).toContain("123,456");
+  expect(preview()?.textContent).toContain("12.3456 万西法");
   await click(closeDossierButton());
-  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toMatch(/123,456|12\.3456\s*万西法/);
   let resolveReopened!: (response: Response) => void;
   vi.mocked(fetch).mockImplementationOnce(
     () =>
@@ -718,13 +718,13 @@ it("reads a fresh result after closing and reopening the same contract instead o
   expect(recordRequests()).toHaveLength(2);
   expect(preview()?.getAttribute("aria-busy")).toBe("true");
   expect(preview()?.textContent).toContain("正在读取租赁资料");
-  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toMatch(/123,456|12\.3456\s*万西法/);
   const input = recordRequests().at(-1)![0];
   await act(async () => resolveReopened(Response.json(detailFor(input, 654321))));
   await settle();
   await showFinance();
-  expect(preview()?.textContent).toContain("654,321");
-  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(preview()?.textContent).toContain("65.4321 万西法");
+  expect(preview()?.textContent ?? "").not.toMatch(/123,456|12\.3456\s*万西法/);
 });
 
 it("ignores an aborted old contract response even when the transport still returns it late", async () => {
@@ -742,11 +742,11 @@ it("ignores an aborted old contract response even when the transport still retur
   await act(async () => pending[1].resolve(Response.json(detailFor(pending[1].input, 654321))));
   await settle();
   await showFinance();
-  expect(preview()?.textContent).toContain("654,321");
+  expect(preview()?.textContent).toContain("65.4321 万西法");
   await act(async () => pending[0].resolve(Response.json(detailFor(pending[0].input, 123456))));
   await settle();
-  expect(preview()?.textContent).toContain("654,321");
-  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(preview()?.textContent).toContain("65.4321 万西法");
+  expect(preview()?.textContent ?? "").not.toMatch(/123,456|12\.3456\s*万西法/);
 });
 
 it.each([
@@ -761,7 +761,7 @@ it.each([
   await click(previewButtons()[0]);
   await settle();
   await showFinance();
-  expect(preview()?.textContent).toContain("123,456");
+  expect(preview()?.textContent).toContain(_kind === "status" ? "123,456" : "12.3456 万西法");
   if (_kind === "building") {
     const select = host.querySelector<HTMLSelectElement>('select[aria-label="选择楼栋"]')!;
     await act(async () => {
@@ -772,9 +772,9 @@ it.each([
     const scopeNav = host.querySelector(`nav[aria-label="${nav}"]`);
     await click(namedButton(label, scopeNav ?? host));
   }
-  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toMatch(/123,456|12\.3456\s*万西法/);
   await settle();
-  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toMatch(/123,456|12\.3456\s*万西法/);
 });
 
 it("hides a selected CIMAC table preview before the debounced empty search response returns", async () => {
@@ -795,11 +795,11 @@ it("hides a selected CIMAC table preview before the debounced empty search respo
     );
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toMatch(/123,456|12\.3456\s*万西法/);
   await settle(260);
   expect(previewButtons()).toHaveLength(0);
   expect(host.querySelector("tbody")?.textContent).toContain("没有匹配的合同");
-  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toMatch(/123,456|12\.3456\s*万西法/);
   expect(operationDialog()).toBeNull();
 });
 
@@ -813,11 +813,11 @@ it("clears the old CIMAC table preview before changing the server-side contract 
   await settle();
   await showFinance();
   await click(namedButton("下一页"));
-  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toMatch(/123,456|12\.3456\s*万西法/);
   await settle();
   expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
   expect(host.textContent).toContain("26–26 / 26");
-  expect(preview()?.textContent ?? "").not.toContain("123,456");
+  expect(preview()?.textContent ?? "").not.toMatch(/123,456|12\.3456\s*万西法/);
 });
 
 it("clears a local CIMAC table selection when its contract is no longer on the visible page", async () => {
@@ -975,12 +975,12 @@ it("fails closed after a preview read error without keeping an old balance or mu
   await click(previewButtons()[0]);
   await settle();
   await showFinance();
-  expect(preview()?.textContent).toContain("123,456");
+  expect(preview()?.textContent).toContain("12.3456 万西法");
   vi.mocked(fetch).mockResolvedValueOnce(new Response("", { status: 503 }));
   await click(previewButtons()[1]);
   await settle();
-  expect(preview()?.textContent ?? "").not.toContain("123,456");
-  expect(preview()?.textContent ?? "").not.toContain("654,321");
+  expect(preview()?.textContent ?? "").not.toMatch(/123,456|12\.3456\s*万西法/);
+  expect(preview()?.textContent ?? "").not.toMatch(/654,321|65\.4321\s*万西法/);
   expect(preview()?.textContent).toMatch(/无法|失败|不可|重试/);
   expect(preview()?.textContent ?? "").not.toContain("打开合同详情 / 办理");
   expect(preview()?.textContent ?? "").not.toContain("打开完整财务记录");

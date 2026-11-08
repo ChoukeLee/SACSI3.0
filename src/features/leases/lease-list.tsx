@@ -23,6 +23,7 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
 import { nativeLease, leaseRentLabel } from "@/lib/native-money";
+import { formatPropertyXof, propertyLeaseRentLabel } from "@/lib/property-money";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -222,7 +223,12 @@ export function LeaseList({
   const payments = workspace.data?.payments ?? initialPayments;
   const receivables = workspace.data?.receivables ?? initialReceivables;
   const t = dictionaries[locale].leases;
-  const formatXof = (amount: number) => formatContractXof(amount, locale);
+  const formatXof = (amount: number) =>
+    workArea === "cimac" ? formatContractXof(amount, locale) : formatPropertyXof(amount, locale);
+  const formatRent = (contract: LeaseContractRow) =>
+    workArea === "cimac"
+      ? leaseRentLabel(contract, locale)
+      : propertyLeaseRentLabel(contract, locale);
   const [statusFilter, setStatusFilter] = useState<string>("current");
   const [contractView, setContractView] = useState<"table" | "rooms">(
     workArea === "sacsi" ? "rooms" : "table",
@@ -648,11 +654,16 @@ export function LeaseList({
               : undefined,
             amountXof:
               Number(contract.monthly_rent_xof) > 0 ? Number(contract.monthly_rent_xof) : null,
-            nativeAmountLabel: nativeLease(contract) ? leaseRentLabel(contract, locale) : undefined,
+            nativeAmountLabel: nativeLease(contract) ? formatRent(contract) : undefined,
             nativeBalanceLabel: nativeLease(contract)
               ? `${contract.rent_currency} · ${locale === "zh" ? "原币账务另列" : "voir le détail en devise"}`
               : undefined,
-            amountDetail: `${locale === "zh" ? "每月" : "par mois"} · ${contract.rent_currency ?? "XOF"}`,
+            amountDetail:
+              workArea === "sacsi" && !nativeLease(contract)
+                ? locale === "zh"
+                  ? "每月"
+                  : "par mois"
+                : `${locale === "zh" ? "每月" : "par mois"} · ${contract.rent_currency ?? "XOF"}`,
             balanceXof: summary.count ? summary.outstanding : null,
             balanceDetail: summary.count
               ? summary.overdue > 0
@@ -1591,7 +1602,13 @@ export function LeaseList({
             {locale === "zh" ? "覆盖核对" : "Vérifier la couverture"}
           </Button>
           <span className={styles.scopeCaption}>
-            {locale === "zh" ? "金额统一以 XOF 展示" : "Montants en XOF"}
+            {workArea === "cimac"
+              ? locale === "zh"
+                ? "金额统一以 XOF 展示"
+                : "Montants en XOF"
+              : locale === "zh"
+                ? "西法金额以万西法展示，其他币种保留原币"
+                : "XOF par 10 000 ; autres devises conservées"}
           </span>
         </div>
       </div>
@@ -1854,6 +1871,7 @@ export function LeaseList({
           )}
           {workArea === "cimac" && !workspace.unavailable && contractView === "table" && (
             <LeaseWorkbenchTable
+              workArea={workArea}
               toolbar={listToolbar}
               pagination={
                 workspace.pagination
@@ -2357,7 +2375,7 @@ export function LeaseList({
                   </strong>
                   <span>{leaseRecordPeriodLabel(record, locale)}</span>
                   <span>
-                    {t.contractStatus[record.status]} · {leaseRentLabel(record, locale)}
+                    {t.contractStatus[record.status]} · {formatRent(record)}
                   </span>
                 </button>
               ))}

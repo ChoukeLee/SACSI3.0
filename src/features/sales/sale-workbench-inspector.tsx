@@ -1,14 +1,13 @@
 "use client";
 
+import { formatPropertyXof, formatPropertyMoney } from "@/lib/property-money";
+
 import { useId, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { DollarSign, CalendarPlus, AlertTriangle, Printer, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RecordDetailTabs } from "@/components/ui/record-detail-tabs";
-import {
-  formatContractXof,
-  type ContractReceivableSummary,
-} from "@/features/contracts/contract-list-model";
+import type { ContractReceivableSummary } from "@/features/contracts/contract-list-model";
 import {
   classifyContractCashPayment,
   summarizeContractCash,
@@ -17,7 +16,6 @@ import type { WorkspaceData } from "@/features/contracts/workspace-model";
 import { buildWorkbenchRecordHref } from "@/lib/workbench-links";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
-import { formatMoney } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import type { PaymentRow, SaleContractRow } from "@/types/database";
 import { saleScheduleReceivable, saleScheduleState } from "./sale-workbench-model";
@@ -181,7 +179,7 @@ function ScopedSaleWorkbenchInspector({
   const money = (amount: number | null | undefined) =>
     amount === null || amount === undefined
       ? text("待核对", "À vérifier")
-      : formatContractXof(amount, locale);
+      : formatPropertyXof(amount, locale);
   const summary = data.summaries[contract.id],
     known = !!summary?.count,
     price = saleRegisteredPrice(contract),
@@ -202,7 +200,7 @@ function ScopedSaleWorkbenchInspector({
     payments.filter((payment) => !nativePurchaseReceiptIds.has(payment.id)),
   );
   const originalMoney = (value: NonNullable<ReturnType<typeof saleRegisteredPrice>>) =>
-    `${formatMoney(value.amount, value.currency, locale)}${value.currency === "XOF" ? "" : ` ${value.currency}`}`;
+    `${formatPropertyMoney(value.amount, value.currency, locale)}${value.currency === "XOF" ? "" : ` ${value.currency}`}`;
   const registeredStatus = contract.registration_basis === "source_record";
   const stateLabel =
     dictionaries[locale].sales.contractStatus[
@@ -533,7 +531,7 @@ function ScopedSaleWorkbenchInspector({
               {cnyReceived > 0 ? (
                 <p className={styles.sub}>
                   {text("其中已录人民币收款", "Dont encaissements CNY")}{" "}
-                  {formatMoney(cnyReceived, "CNY", locale)}
+                  {formatPropertyMoney(cnyReceived, "CNY", locale)}
                 </p>
               ) : null}
               {contract.agency_commission_paid ? (
@@ -900,10 +898,10 @@ function SalePaymentTable({
                   </td>
                   <td className={styles.paymentAmount}>
                     {classification.kind === "expense" ? "− " : ""}
-                    {formatMoney(Number(payment.amount), payment.currency, locale)}
+                    {formatPropertyMoney(Number(payment.amount), payment.currency, locale)}
                     {payment.currency !== "XOF" && classification.amountXof !== null ? (
                       <small>
-                        {text("折合", "Soit")} {formatContractXof(classification.amountXof, locale)}
+                        {text("折合", "Soit")} {formatPropertyXof(classification.amountXof, locale)}
                       </small>
                     ) : null}
                   </td>

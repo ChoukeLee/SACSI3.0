@@ -12,12 +12,14 @@ import {
   classifyContractCashPayment,
   summarizeContractCash,
 } from "@/features/contracts/contract-cash-model";
+import { buildContractReceivableSummaries } from "@/features/contracts/contract-list-model";
 import {
-  buildContractReceivableSummaries,
-  formatContractXof,
-} from "@/features/contracts/contract-list-model";
-import { formatMoney, paymentDisplay } from "@/lib/currency";
-import { leaseRentLabel, nativeLease, nativeReceivableSummary } from "@/lib/native-money";
+  formatPropertyMoney,
+  formatPropertyXof,
+  propertyLeaseRentLabel,
+  propertyPaymentDisplay,
+} from "@/lib/property-money";
+import { nativeLease, nativeReceivableSummary } from "@/lib/native-money";
 import { dictionaries, type Locale } from "@/lib/i18n";
 import type { PaymentRow, LeaseContractRow, ReceivableRow } from "@/types/database";
 import { getOriginalMonthlyRent, getRecordedOriginalPayment } from "./lease-display-model";
@@ -117,7 +119,7 @@ export function LeaseRentalInspector({
   const hasDepositIn = cashLines.some((r) => r.kind === "deposit_in");
   const hasDepositOut = cashLines.some((r) => r.kind === "deposit_out");
   const noCash = text("暂无已核记录", "Aucune écriture vérifiée");
-  const money = (n: number | null | undefined) => formatContractXof(n, locale);
+  const money = (n: number | null | undefined) => formatPropertyXof(n, locale);
   const isNative = nativeLease(contract);
   const nativeBills = bills.filter(
     (r) =>
@@ -134,7 +136,7 @@ export function LeaseRentalInspector({
   );
   const nativeReceipts = originalRentReceipts(contract, rows);
   const nativeMoney = (n: number) =>
-    formatMoney(n, contract.rent_currency!, locale) + " " + contract.rent_currency;
+    formatPropertyMoney(n, contract.rent_currency!, locale) + " " + contract.rent_currency;
   const receiptAmount = isNative
     ? nativeReceipts.count
       ? nativeMoney(nativeReceipts.amount)
@@ -242,11 +244,11 @@ export function LeaseRentalInspector({
               {fact(
                 text("月租金", "Loyer mensuel"),
                 <>
-                  {leaseRentLabel(contract, locale)}
+                  {propertyLeaseRentLabel(contract, locale)}
                   {originalMonthlyRent ? (
                     <small>
                       {text("原币约 ", "Devise d’origine env. ")}
-                      {formatMoney(
+                      {formatPropertyMoney(
                         originalMonthlyRent.amount,
                         originalMonthlyRent.currency,
                         locale,
@@ -625,7 +627,7 @@ function RentalPaymentTable({
     const allocation = readCimacContractAllocation(p, contract.id, contract.customer_id);
     const line = classifyContractCashPayment(p),
       original = getRecordedOriginalPayment(p),
-      display = paymentDisplay(p, locale),
+      display = propertyPaymentDisplay(p, locale),
       config = getLeaseFinancialConfigBySourceType(p.source_type);
     const label = allocation
       ? allocation.adjustmentKind === "refund"
@@ -651,9 +653,9 @@ function RentalPaymentTable({
           ? "+"
           : "";
     const amount = allocation
-      ? formatContractXof(Math.abs(Number(allocation.amount)), locale)
+      ? formatPropertyXof(Math.abs(Number(allocation.amount)), locale)
       : original
-        ? formatMoney(original.amount, original.currency, locale)
+        ? formatPropertyMoney(original.amount, original.currency, locale)
         : display.primary;
     return { allocation, line, original, display, label, amount: sign + amount };
   };
@@ -749,7 +751,7 @@ function RentalPaymentTable({
           ) : detail.display.secondary || detail.original ? (
             <p>
               {text("折合 ", "Équiv. ")}
-              {formatContractXof(detail.line.amountXof, locale)}
+              {formatPropertyXof(detail.line.amountXof, locale)}
             </p>
           ) : null}
           <p>

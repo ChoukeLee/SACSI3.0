@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPropertyXof } from "@/lib/property-money";
+
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
@@ -26,10 +28,7 @@ import {
 } from "./actions";
 import { buildSaleContractNumber } from "@/lib/contract-number";
 import { printSaleContract } from "@/features/print";
-import {
-  buildContractReceivableSummaries,
-  formatContractXof,
-} from "@/features/contracts/contract-list-model";
+import { buildContractReceivableSummaries } from "@/features/contracts/contract-list-model";
 import { resolveContractProjectLink } from "@/features/contracts/project-link";
 import { useContractWorkspace } from "@/features/contracts/use-workspace";
 import type { WorkspaceData } from "@/features/contracts/workspace-model";
@@ -99,7 +98,7 @@ export function SaleList({
   const receivables = workspace.data?.receivables ?? initialReceivables;
   const schedules = workspace.data?.schedules ?? initialSchedules;
   const t = dictionaries[locale].sales;
-  const formatXof = (amount: number) => formatContractXof(amount, locale);
+  const formatXof = (amount: number) => formatPropertyXof(amount, locale);
   const [statusFilter, setStatusFilter] = useState(initialWorkspace?.query.status ?? "current");
   const [search, setSearch] = useState(initialWorkspace?.query.search ?? "");
   const [previewSelection, setPreviewSelection] = useState<{ id: string; scope: string } | null>(

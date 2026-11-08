@@ -272,7 +272,7 @@ it("shows a known native source price on its room card and does not infer a clea
   expect(inspector()?.textContent).toContain("720,000 CNY");
   expect(inspector()?.textContent).toContain("按Excel登记");
   expect(inspector()?.textContent).toContain("暂无已核应收");
-  expect(inspector()?.textContent).not.toContain("0 XOF");
+  expect(inspector()?.textContent).not.toMatch(/(?<![\d.,])0\s万西法/);
 });
 it.each(["zh", "fr"] as const)(
   "shows four financial card fields and no transfer workflow in %s while keeping receipts, installments and records reachable",
@@ -343,9 +343,9 @@ it.each(["zh", "fr"] as const)(
     const amounts = fields
       .slice(1)
       .map((item) => item.querySelector("strong")!.textContent!.replace(/[\s,]/g, ""));
-    expect(amounts[0]).toBe("1000000XOF");
-    expect(amounts[1]).toBe("300000XOF");
-    expect(amounts[2]).toContain("800000XOF");
+    expect(amounts[0]).toBe(locale === "zh" ? "100万西法" : "100×10000XOF");
+    expect(amounts[1]).toBe(locale === "zh" ? "30万西法" : "30×10000XOF");
+    expect(amounts[2]).toContain(locale === "zh" ? "80万西法" : "80×10000XOF");
     expect(card.textContent).toMatch(locale === "zh" ? /已逾期/ : /En retard/);
     expect(card.textContent).not.toMatch(
       /付款计划|下一应付|下一到期|Plan de paiement|Prochaine échéance/,
@@ -408,7 +408,7 @@ it("keeps initial rendering idle and fetches only an explicitly selected contrac
     id: workspaceContract,
   });
   await showFinance();
-  expect(inspector()?.textContent).toContain("800,000 XOF");
+  expect(inspector()?.textContent).toContain("80 万西法");
   expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
   expect(inspector()?.querySelector('[aria-label="关闭合同预览"]')).toBeNull();
   expect(new URL(window.location.href).searchParams.get("contract")).toBe(workspaceContract);
@@ -496,7 +496,7 @@ it("preserves a legacy contract bookmark while normalization is pending or fails
       status: "all",
       page: "2",
     });
-    expect(document.body.textContent).not.toContain("800,000 XOF");
+    expect(document.body.textContent).not.toContain("80 万西法");
     expect(document.querySelector('[aria-label="办理此合同"]')).toBeNull();
     expect(document.querySelector("#sale-action-amount, #sale-action-transfer-status")).toBeNull();
     expect(operationDialog()).toBeNull();
@@ -702,7 +702,7 @@ it("does not display previous selected balances while the next read is pending",
   await click(buttons()[0]);
   await settle();
   await showFinance();
-  expect(inspector()?.textContent).toContain("800,000 XOF");
+  expect(inspector()?.textContent).toContain("80 万西法");
   let resolveNext!: (value: Response) => void;
   vi.mocked(fetch).mockImplementationOnce(
     () =>
@@ -711,12 +711,12 @@ it("does not display previous selected balances while the next read is pending",
       }),
   );
   await click(buttons()[1]);
-  expect(inspector()?.textContent ?? "").not.toContain("800,000 XOF");
+  expect(inspector()?.textContent ?? "").not.toContain("80 万西法");
   const input = recordRequests().at(-1)![0];
   await act(async () => resolveNext(Response.json(responseFor(input, 123456))));
   await settle();
   await showFinance();
-  expect(inspector()?.textContent).toContain("123,456 XOF");
+  expect(inspector()?.textContent).toContain("12.3456 万西法");
 });
 it("does not restore cached facts when closing then reopening the same record", async () => {
   await render();
@@ -731,13 +731,13 @@ it("does not restore cached facts when closing then reopening the same record", 
       }),
   );
   await click(buttons()[0]);
-  expect(inspector()?.textContent ?? "").not.toContain("800,000 XOF");
+  expect(inspector()?.textContent ?? "").not.toContain("80 万西法");
   expect(recordRequests()).toHaveLength(2);
   const input = recordRequests().at(-1)![0];
   await act(async () => resolveNext(Response.json(responseFor(input, 654321))));
   await settle();
   await showFinance();
-  expect(inspector()?.textContent).toContain("654,321 XOF");
+  expect(inspector()?.textContent).toContain("65.4321 万西法");
 });
 it("ignores an aborted old detail response returned by the transport after a new selection", async () => {
   await render();
@@ -755,8 +755,8 @@ it("ignores an aborted old detail response returned by the transport after a new
   await act(async () => pending[0].resolve(Response.json(responseFor(pending[0].input, 123456))));
   await settle();
   await showFinance();
-  expect(inspector()?.textContent).toContain("654,321 XOF");
-  expect(inspector()?.textContent).not.toContain("123,456 XOF");
+  expect(inspector()?.textContent).toContain("65.4321 万西法");
+  expect(inspector()?.textContent).not.toContain("12.3456 万西法");
 });
 it("clears preview and drawer before a changed scope request returns", async () => {
   await render();
@@ -770,7 +770,7 @@ it("clears preview and drawer before a changed scope request returns", async () 
       }),
     ),
   );
-  expect(inspector()?.textContent ?? "").not.toContain("800,000 XOF");
+  expect(inspector()?.textContent ?? "").not.toContain("80 万西法");
   await settle();
   expect(inspector()).toBeNull();
   expect(new URL(window.location.href).searchParams.get("contract")).toBeNull();
@@ -782,7 +782,7 @@ it("clears selected facts immediately on local search and does not issue a filte
   const readCount = vi.mocked(fetch).mock.calls.length;
   const input = host.querySelector('input[type="search"]') as HTMLInputElement;
   await changeInput(input, "不存在");
-  expect(inspector()?.textContent ?? "").not.toContain("800,000 XOF");
+  expect(inspector()?.textContent ?? "").not.toContain("80 万西法");
   await settle(260);
   expect(buttons()).toHaveLength(0);
   expect(inspector()).toBeNull();
@@ -1134,11 +1134,11 @@ it("keeps a former buyer's debt on its original record and never adds it to the 
   expect(buttons(), host.textContent ?? "").toHaveLength(1);
   expect(buttons()[0].textContent).toContain("Current buyer");
   expect(buttons()[0].textContent).not.toContain("Former buyer");
-  expect(buttons()[0].textContent).not.toContain("75,000");
+  expect(buttons()[0].textContent).not.toContain("7.5 万西法");
   await click(named("出售款跟进", host));
   const oldFollowup = host.querySelector(`[data-sale-followup-record-id="${oldId}"]`);
   expect(oldFollowup?.textContent).toContain("Former buyer");
-  expect(oldFollowup?.textContent).toContain("75,000");
+  expect(oldFollowup?.textContent).toContain("7.5 万西法");
   expect(host.querySelector(`[data-sale-followup-record-id="${workspaceContract}"]`)).toBeNull();
   const sharedSearch = host.querySelector<HTMLInputElement>('input[type="search"]')!;
   await changeInput(sharedSearch, "Current buyer");
@@ -1147,7 +1147,7 @@ it("keeps a former buyer's debt on its original record and never adds it to the 
   await changeInput(sharedSearch, "Former buyer");
   expect(buttons()).toHaveLength(0);
   expect(host.querySelector(`[data-sale-followup-record-id="${oldId}"]`)?.textContent).toContain(
-    "75,000",
+    "7.5 万西法",
   );
   await click(named("出售记录", host));
   expect(host.querySelector(`[data-sale-history-record-id="${oldId}"]`)).toBeTruthy();
@@ -1156,14 +1156,14 @@ it("keeps a former buyer's debt on its original record and never adds it to the 
   expect(requestInfo(recordRequests().at(-1)![0]).id).toBe(oldId);
   expect(inspector()?.textContent).toContain("Former buyer");
   await showFinance();
-  expect(inspector()?.textContent).toContain("75,000 XOF");
+  expect(inspector()?.textContent).toContain("7.5 万西法");
   await click(named("历史", inspector()!));
   await click(document.querySelector(`[data-sale-room-record-id="${workspaceContract}"]`));
   await settle();
   expect(requestInfo(recordRequests().at(-1)![0]).id).toBe(workspaceContract);
   await showFinance();
   expect(inspector()?.textContent).toContain("Current buyer");
-  expect(inspector()?.textContent).not.toContain("75,000");
+  expect(inspector()?.textContent).not.toContain("7.5 万西法");
   expect(recordSalePaymentAtomic).not.toHaveBeenCalled();
 });
 

@@ -139,7 +139,7 @@ it("keeps current cards separate from historical balances and opens the exact ol
   expect(card.textContent).toContain("20 CNY");
   expect(card.textContent).not.toContain("2026-11-12");
   expect(card.textContent).toContain("15天内应付");
-  expect(fact(card, "未收")).toBe("900 XOF（账单）");
+  expect(fact(card, "未收")).toBe("0.09 万西法（账单）");
   expect(card.textContent).not.toContain("过户");
   expect(card.textContent).not.toContain("下一到期");
   expect(card.textContent).not.toContain("月租");
@@ -319,7 +319,7 @@ it("shows a source registration's native price, receipts and explicit source bal
   expect(card.textContent).toContain("720,000 CNY");
   expect(fact(card, "未收")).toContain("0 CNY（登记）");
   expect(card.textContent).toContain("0 CNY");
-  expect(card.textContent).not.toContain("0 XOF");
+  expect(card.textContent).not.toMatch(/(?<![\d.,])0\s万西法/);
   expect(card.textContent).not.toContain("已建应收已结清");
   expect(card.querySelector("strong[title]")?.getAttribute("title")).toContain("workbook!K5");
   await act(async () => button("出售记录").click());
@@ -348,7 +348,7 @@ it.each([
     expect(cards[0].textContent?.split(label)).toHaveLength(2);
     expect(cards[0].classList.contains(className)).toBe(true);
     expect(cards[0].textContent).not.toContain("2026-11-01");
-    expect(fact(cards[0], "未收")).toBe("900 XOF（账单）");
+    expect(fact(cards[0], "未收")).toBe("0.09 万西法（账单）");
   },
 );
 

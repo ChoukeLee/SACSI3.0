@@ -3,6 +3,7 @@
 import { ArrowRight } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { formatMoney } from "@/lib/currency";
+import { formatPropertyXofNumber } from "@/lib/property-money";
 import type { ReactNode } from "react";
 import type {
   UnitBusinessMoney,
@@ -131,9 +132,7 @@ export function UnitAmountValue({
       {values.map((value, index) => (
         <span className={styles.moneyCurrency} key={`${value.currency}:${index}`}>
           {value.currency === "XOF"
-            ? new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "fr-FR", {
-                maximumFractionDigits: 6,
-              }).format(value.amount / 10000)
+            ? formatPropertyXofNumber(value.amount, locale)
             : formatMoney(value.amount, value.currency, locale)}
           <small className={styles.moneyUnit}>
             {value.currency === "XOF"
