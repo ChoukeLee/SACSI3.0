@@ -728,7 +728,11 @@ export function SaleList({
         if (workspace.enabled) {
           const data = await workspace.ensure("detail", contract.id);
           const fresh = data.contracts[0] as SaleContractRow;
-          if (!fresh.signed_date || (fresh.sale_currency ?? "XOF") !== "XOF")
+          if (
+            fresh.registration_basis === "source_record" ||
+            !fresh.signed_date ||
+            (fresh.sale_currency ?? "XOF") !== "XOF"
+          )
             throw new Error(
               locale === "zh"
                 ? "此初始登记暂无可打印的合同；请查看已登记资料。"
@@ -741,7 +745,11 @@ export function SaleList({
             summary: data.summaries[fresh.id],
           };
         }
-        if (!contract.signed_date || (contract.sale_currency ?? "XOF") !== "XOF")
+        if (
+          contract.registration_basis === "source_record" ||
+          !contract.signed_date ||
+          (contract.sale_currency ?? "XOF") !== "XOF"
+        )
           throw new Error(
             locale === "zh"
               ? "此初始登记暂无可打印的合同；请查看已登记资料。"

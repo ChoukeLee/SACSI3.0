@@ -145,6 +145,25 @@ async function click(label: string) {
 }
 
 describe("FinanceWorkbenchInspector selected-record facts", () => {
+  it("keeps an owner settlement distinct from tenant deposits and operating costs", async () => {
+    fetchMock.mockImplementation(async () =>
+      response({
+        ...context,
+        direction: "liability_out",
+        category: "owner_settlement",
+        title: "Synthetic owner settlement",
+        paymentId: null,
+        paymentMethod: null,
+        customer: null,
+        source: null,
+      }),
+    );
+    await render({ row: { id: recordId } });
+    expect(host.textContent).toContain("房东结算");
+    expect(host.textContent).toContain("不计作本方经营成本");
+    expect(host.textContent).not.toContain("当前可退押金余额");
+    expect(host.querySelector("[data-payment]")).toBeNull();
+  });
   it("retains a CIMAC historical sale source as a sale, never reinterprets it as a lease", async () => {
     fetchMock.mockImplementation(async (url: string) =>
       response(

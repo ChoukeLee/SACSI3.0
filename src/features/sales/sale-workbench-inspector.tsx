@@ -775,13 +775,13 @@ export function SaleWorkbenchInspector({
               type="button"
               variant="ghost"
               className="w-full text-xs"
-              disabled={busy || nativeSale || !contract.signed_date}
+              disabled={busy || registeredStatus || nativeSale || !contract.signed_date}
               onClick={() => onPrint(contract)}
             >
               <Printer aria-hidden="true" />
               {text("打印登记合同", "Imprimer le contrat enregistré")}
             </Button>
-            {nativeSale || !contract.signed_date ? (
+            {registeredStatus || nativeSale || !contract.signed_date ? (
               <p className={styles.sub}>
                 {text(
                   "此初始登记暂无可打印的合同，现有资料仍可查看核对。",
