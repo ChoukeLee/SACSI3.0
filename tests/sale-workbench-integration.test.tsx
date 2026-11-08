@@ -444,6 +444,44 @@ it("shows initial building, search and record status while reading the complete 
   }
   expect(host.querySelector("table")).toBeNull();
 });
+it("normalizes a new same-scope server query and restores complete room cards instead of staying in loading", async () => {
+  const initial = saleFixture();
+  await render(initial);
+  expect(buttons()).toHaveLength(2);
+  const beforeReads = vi.mocked(fetch).mock.calls.length;
+  const incomingQuery = parseWorkspaceQuery({
+    ...initial.query,
+    search: "Incoming server filter",
+    status: "draft",
+    page: 2,
+    sort: "balance",
+    direction: "desc",
+  });
+  await render(saleFixture(incomingQuery, "list", 26));
+  await settle(260);
+  const reads = vi.mocked(fetch).mock.calls.slice(beforeReads);
+  for (const mode of ["list", "context"]) {
+    const read = reads.find(([input]) => requestInfo(input).mode === mode);
+    expect(read, `${mode} must recover the normalized same scope`).toBeTruthy();
+    expect(requestInfo(read![0]).query).toMatchObject({
+      projectId: initial.query.projectId,
+      buildingId: initial.query.buildingId,
+      locale: initial.query.locale,
+      status: "all",
+      search: "",
+      page: 1,
+      sort: "unit",
+      direction: "asc",
+    });
+  }
+  expect(buttons()).toHaveLength(2);
+  expect(host.textContent).not.toContain("正在读取出售房源");
+  expect(host.textContent).not.toContain("合同数据暂不可核验");
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(recordRequests()).toHaveLength(0);
+  expect(recordSalePaymentAtomic).not.toHaveBeenCalled();
+  expect(addFlexibleInstallment).not.toHaveBeenCalled();
+});
 it("keeps draft and historical records reachable through one visible deep-linked search without new scope reads", async () => {
   const query = parseWorkspaceQuery({
     projectId: workspaceProject,

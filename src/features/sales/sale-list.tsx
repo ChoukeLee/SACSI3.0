@@ -308,7 +308,14 @@ export function SaleList({
         sort: "unit",
         direction: "asc",
       });
-  }, [workspace.enabled, workspace.change, requestedProjectId, activeBuildingId, locale]);
+  }, [
+    workspace.enabled,
+    workspace.change,
+    initialWorkspace,
+    requestedProjectId,
+    activeBuildingId,
+    locale,
+  ]);
 
   const unitMap = useMemo(() => new Map(units.map((u) => [u.id, u])), [units]);
   const roomContext = workspace.contextData;
