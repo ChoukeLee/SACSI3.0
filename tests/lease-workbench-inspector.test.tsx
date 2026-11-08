@@ -94,12 +94,24 @@ async function render(overrides: Partial<LeaseWorkbenchInspectorProps> = {}) {
   return props;
 }
 async function tab(name: string) {
+  if (
+    name === "收付款" &&
+    ![...host.querySelectorAll('[role="tab"]')].some((el) => el.textContent === name)
+  )
+    name = "记录";
   const button = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
     (item) => item.textContent === name,
   );
   if (!button) throw new Error(`Missing tab: ${name}`);
   await act(async () => button.click());
   return button;
+}
+async function viewPayment(paymentId: string) {
+  const button = host.querySelector<HTMLButtonElement>(
+    'tr[data-lease-payment-id="' + paymentId + '"] button',
+  );
+  expect(button).toBeTruthy();
+  if (button!.getAttribute("aria-expanded") !== "true") await act(async () => button!.click());
 }
 function fact(name: string) {
   return [...host.querySelectorAll("dt")].find((item) => item.textContent === name)
@@ -113,6 +125,10 @@ function disclosure(label: string) {
 }
 
 async function openDisclosure(label: string) {
+  if (label === "租期与登记资料") {
+    await tab("资料");
+    return;
+  }
   const details = disclosure(label);
   expect(details).toBeTruthy();
   if (!details!.open) await act(async () => details!.querySelector("summary")!.click());
@@ -132,6 +148,59 @@ function isVisibleByDisclosure(element: Element) {
 }
 
 describe("LeaseWorkbenchInspector single contract dossier", () => {
+  it("keeps same-room history inside its section and navigates all four tabs by keyboard", async () => {
+    const choose = vi.fn();
+    await render({
+      historyContent: (
+        <section>
+          <h3>本房租赁历史</h3>
+          <button onClick={choose}>选择另一登记租赁</button>
+        </section>
+      ),
+    });
+    expect(host.textContent).not.toContain("本房租赁历史");
+    const overview = host.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]')!;
+    await act(async () =>
+      overview.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true })),
+    );
+    expect(document.activeElement?.textContent).toBe("历史");
+    expect(host.textContent).toContain("本房租赁历史");
+    expect(host.querySelectorAll("details")).toHaveLength(1);
+    await act(async () =>
+      [...host.querySelectorAll<HTMLButtonElement>("button")]
+        .find((el) => el.textContent === "选择另一登记租赁")!
+        .click(),
+    );
+    expect(choose).toHaveBeenCalledTimes(1);
+    await act(async () =>
+      (document.activeElement as HTMLButtonElement).dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Home", bubbles: true }),
+      ),
+    );
+    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("概览");
+    expect(host.textContent).not.toContain("本房租赁历史");
+  });
+
+  it("reveals one payment source at a time without invoking any operation", async () => {
+    const manage = vi.fn();
+    await render({
+      initialSection: "finance",
+      actions: <button onClick={manage}>办理租赁</button>,
+      payments: [
+        payment({ id: "first", notes: "FIRST-SOURCE" }),
+        payment({ id: "second", notes: "SECOND-SOURCE" }),
+      ],
+    });
+    expect(host.querySelectorAll("tr[data-lease-payment-id]")).toHaveLength(2);
+    expect(host.textContent).not.toContain("FIRST-SOURCE");
+    await viewPayment("first");
+    expect(host.textContent).toContain("FIRST-SOURCE");
+    await viewPayment("second");
+    expect(host.textContent).toContain("SECOND-SOURCE");
+    expect(host.textContent).not.toContain("FIRST-SOURCE");
+    expect(manage).not.toHaveBeenCalled();
+  });
+
   it("keeps the default overview read-only and requires explicit disclosure for permitted operations", async () => {
     const manage = vi.fn();
     const correct = vi.fn();
@@ -141,8 +210,10 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       collectionHref: "/leases/lease-1/collect",
     });
     expect([...host.querySelectorAll('[role="tab"]')].map((item) => item.textContent)).toEqual([
-      "概况",
-      "收支明细",
+      "概览",
+      "收付款",
+      "资料",
+      "历史",
     ]);
     const more = disclosure("更多操作")!;
     expect(more.open).toBe(false);
@@ -150,16 +221,16 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       expect(isVisibleByDisclosure(action)).toBe(false);
     }
     const view = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
-      (item) => item.textContent === "查看收支明细",
+      (item) => item.textContent === "查看收付款",
     );
-    expect(view).toBeUndefined();
+    expect(view).toBeTruthy();
     expect(
       [...host.querySelectorAll("button")]
         .filter(isVisibleByDisclosure)
-        .every((item) => item.getAttribute("role") === "tab"),
+        .every((item) => item.getAttribute("role") === "tab" || item.textContent === "查看收付款"),
     ).toBe(true);
-    await tab("收支明细");
-    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("收支明细");
+    await tab("收付款");
+    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("收付款");
     expect(manage).not.toHaveBeenCalled();
     expect(correct).not.toHaveBeenCalled();
     expect(props.onPrint).not.toHaveBeenCalled();
@@ -201,12 +272,12 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       ],
     });
     expect(host.querySelectorAll('[aria-label="原币租金账务"]')).toHaveLength(0);
-    await tab("收支明细");
+    await tab("收付款");
     expect(host.querySelectorAll('[aria-label="原币租金账务"]')).toHaveLength(1);
-    expect(host.querySelectorAll("ol li")).toHaveLength(1);
+    expect(host.querySelectorAll("tr[data-lease-payment-id], ol li")).toHaveLength(1);
     expect(host.textContent).toContain("2,200");
     expect(host.textContent).toContain("USD");
-    await tab("概况");
+    await tab("概览");
     expect(host.querySelectorAll('[aria-label="原币租金账务"]')).toHaveLength(0);
   });
 
@@ -286,13 +357,13 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect(host.textContent).toContain("TEST-PHONE");
     await openDisclosure("租期与登记资料");
     expect(fact("实际结束")).toBe("2026-10-01");
-    await tab("收支明细");
+    await tab("收付款");
     expect(host.textContent).toContain("不与后续租客合并");
     expect(fact("其中已逾期")).toBe("60 XOF");
     expect(fact("已录经营收款")).toBe("40 XOF");
     expect(host.textContent).not.toContain("999,999");
-    await tab("收支明细");
-    expect(host.querySelectorAll("ol li")).toHaveLength(1);
+    await tab("收付款");
+    expect(host.querySelectorAll("tr[data-lease-payment-id], ol li")).toHaveLength(1);
     expect(host.textContent).toContain("以下为这次租赁的已登记收付款");
   });
 
@@ -309,16 +380,18 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       collectionHref: href,
       payments: [payment({ amount: 120000 })],
     });
+    await tab("概览");
     expect(fact("月租金")).toContain("120,000");
     expect(fact("租金已交至（登记）")).toBe("2026-09-30");
-    expect(disclosure("租期与登记资料")?.open).toBe(false);
-    expect(disclosure("租期与登记资料")?.textContent).toContain("纸质合同不影响");
+    expect(host.textContent).not.toContain("纸质合同不影响");
+    await tab("资料");
+    expect(host.textContent).toContain("纸质合同不影响");
     const collection = host.querySelector('a[href="' + href + '"]')!;
     expect(isVisibleByDisclosure(collection)).toBe(false);
     await openDisclosure("更多操作");
     expect(host.querySelector('a[href="' + href + '"]')).not.toBeNull();
     expect(isVisibleByDisclosure(collection)).toBe(true);
-    await tab("收支明细");
+    await tab("收付款");
     expect(fact("已录经营收款")).toContain("120,000");
   });
 
@@ -349,6 +422,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
         attachment_url: null,
       },
     });
+    await tab("概览");
     expect(fact("月租金")).toContain("USD");
     await openDisclosure("租期与登记资料");
     expect(fact("登记押金")).toBe("原币押金待核");
@@ -429,6 +503,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       });
       expect(host.textContent).toContain("生效中");
       expect(host.textContent).not.toContain("已终止");
+      await tab("资料");
       expect(fact("登记租期")).toBe(`2026-01-01 → ${label}`);
       expect(fact("实际结束")).toBeUndefined();
     },
@@ -439,7 +514,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       receivables: [receivable({ amount_xof: 100, paid_amount_xof: 100, status: "paid" })],
     });
     expect(fact("租金已交至（登记）")).toBe("2026-09-30");
-    await tab("收支明细");
+    await tab("收付款");
     expect(fact("其中已逾期")).toBe("0 XOF");
     expect(fact("应收已核销")).toBe("100 XOF");
   });
@@ -463,7 +538,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
         receivable({ id: "unrelated", source_id: "another-contract", amount_xof: 999999 }),
       ],
     });
-    await tab("收支明细");
+    await tab("收付款");
     expect(fact("应收已核销")).toBe("140 XOF");
     expect(fact("其中已逾期")).toBe("0 XOF");
     expect(fact("最早未结到期")).toBe("2026-10-19");
@@ -484,7 +559,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       ],
       receivables: [receivable({ management_status: "historical_pending" })],
     });
-    await tab("收支明细");
+    await tab("收付款");
     expect(host.textContent).toContain("未有已核应收，不代表没有欠款");
     expect(fact("应收已核销")).toBe("—");
     expect(fact("已录押金实收")).toBe("暂无已核记录");
@@ -503,7 +578,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
         count: 4,
       },
     });
-    await tab("收支明细");
+    await tab("收付款");
     expect(host.textContent).toContain("400 XOF");
     expect(fact("其中已逾期")).toBe("300 XOF");
     expect(fact("应收已核销")).toBe("600 XOF");
@@ -514,15 +589,17 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     await render({
       payments: [payment({ recorded_by: "admin-account-id", receipt_no: "TEST-RECEIPT" })],
     });
-    await tab("收支明细");
+    await tab("收付款");
     expect(host.textContent).toContain("以下为这次租赁的已登记收付款");
+    await viewPayment("payment-1");
     expect(host.textContent).toContain("实收人: 待核对");
     expect(host.textContent).toContain("TEST-RECEIPT");
     expect(host.textContent).not.toContain("admin-account-id");
     await render({
       payments: [payment({ actual_collector: "已核实收人", recorded_by: "admin-account-id" })],
     });
-    await tab("收支明细");
+    await tab("收付款");
+    await viewPayment("payment-1");
     expect(host.textContent).toContain("实收人: 已核实收人");
   });
 
@@ -551,22 +628,23 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     await act(async () =>
       contractTab.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })),
     );
-    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("收支明细");
-    expect(document.activeElement?.textContent).toBe("收支明细");
+    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("收付款");
+    expect(document.activeElement?.textContent).toBe("收付款");
     expect(host.textContent).not.toContain("打开完整财务记录");
     await openDisclosure("更多操作");
     await clickText("打印登记合同");
     expect(props.onPrint).toHaveBeenCalledTimes(1);
     await render({ contract: { ...contract, id: "lease-2", contract_no: "TEST-LEASE-002" } });
-    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("概况");
+    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("概览");
   });
 
   it("localizes the French preview, missing data, and accessible labels", async () => {
     await render({ locale: "fr" });
     expect(host.querySelector('aside[aria-label="Dossier de location"]')).not.toBeNull();
     expect(host.textContent).toContain("Actif");
+    await tab("Informations");
     expect(host.textContent).toContain("Mensuel");
-    await tab("Encaissements et dépenses");
+    await tab("Paiements");
     expect(host.textContent).toContain("Aucune créance vérifiée");
     expect(host.textContent).not.toContain("0 XOF");
   });
@@ -592,14 +670,18 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
 
   it("keeps Excel rental records readable when formal contract dates are incomplete", async () => {
     await render({ contract: { ...contract, status: "draft", attachment_url: null } });
+    await tab("概览");
     expect(fact("月租金")).toContain("120,000");
     expect(fact("租金已交至（登记）")).toBe("2026-09-30");
+    await tab("资料");
     expect(fact("登记租期")).toBe("2026-01-01 → 2026-10-01");
     await openDisclosure("租期与登记资料");
     expect(host.textContent).toContain("未附纸质合同不影响查看已登记资料");
     await render({ contract: { ...contract, expected_end_confirmed: false } });
+    await tab("概览");
     expect(fact("月租金")).toContain("120,000");
     expect(fact("租金已交至（登记）")).toBe("2026-09-30");
+    await tab("资料");
     expect(fact("登记租期")).toBe("2026-01-01 → 待确认");
     expect(host.textContent).not.toContain("确认续租");
   });
@@ -650,8 +732,9 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect(fact("免租天数")).toBe("15");
     expect(fact("签约人")).toBe("Test signer");
     expect(fact("约定付款日")).toContain("5");
-    await tab("收支明细");
-    expect(host.querySelectorAll("ol li")).toHaveLength(8);
+    await tab("收付款");
+    expect(host.querySelectorAll("tr[data-lease-payment-id], ol li")).toHaveLength(8);
+    await viewPayment("history-7");
     expect(host.textContent).toContain("RECEIPT-7");
     expect(host.textContent).toContain("$250");
     expect(host.textContent).not.toContain("仅显示最近 6 笔");
@@ -659,7 +742,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
 
   it("opens the requested finance section without an intermediate dossier", async () => {
     await render({ initialSection: "finance", financeTools: <button>更正租金账期</button> });
-    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("收支明细");
+    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("收付款");
     await openDisclosure("更多操作");
     expect(disclosure("更多操作")?.textContent).toContain("更正租金账期");
     const correction = [...host.querySelectorAll("button")].find(
@@ -690,16 +773,20 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
         payment({ id: "refund", source_type: "lease_rent_refund", amount: 500 }),
       ],
     });
-    await tab("收支明细");
-    const amounts = [...host.querySelectorAll("ol li")].map(
-      (item) => item.querySelector(":scope > p")?.textContent,
+    await tab("收付款");
+    const amounts = [...host.querySelectorAll("tr[data-lease-payment-id], ol li")].map((item) =>
+      item.matches("tr")
+        ? item.querySelector("td:nth-child(3)")?.textContent
+        : item.querySelector(":scope > p")?.textContent,
     );
     expect(amounts).toContain("$50 USD");
     expect(amounts).toContain("200 XOF");
     expect(amounts).toContain("300 XOF");
     expect(amounts).toContain("+400 XOF");
     expect(amounts).toContain("−500 XOF");
+    await viewPayment("native-refund");
     expect(host.textContent).toContain("原币结算");
+    await viewPayment("offset");
     expect(host.textContent).toContain("非现金抵扣");
   });
 
@@ -729,13 +816,14 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       },
     };
     await render({
+      workArea: "cimac",
       contract: { ...contract, id: contractId, customer_id: customerId },
       payments: [shared],
       initialSection: "finance",
     });
     expect(fact("已录经营收款")).toBe("600,000 XOF");
-    await tab("收支明细");
-    expect(host.querySelectorAll("ol li")).toHaveLength(1);
+    await tab("收付款");
+    expect(host.querySelectorAll("tr[data-lease-payment-id], ol li")).toHaveLength(1);
     expect(host.textContent).toContain("客户总账 · 本合同分配");
     expect(host.textContent).toContain("+600,000 XOF");
     expect(host.textContent).toContain("ONE-ACTUAL-RECEIPT");
@@ -790,13 +878,14 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
         },
       };
       await render({
+        workArea: "cimac",
         contract: { ...contract, id: contractId, customer_id: customerId },
         payments: [original, child],
         initialSection: "finance",
       });
       expect(fact("已录经营收款")).toBe(kind === "refund" ? "600,000 XOF" : "0 XOF");
       if (kind === "refund") expect(fact("已录经营支出")).toBe("20,000 XOF");
-      await tab("收支明细");
+      await tab("收付款");
       expect(host.textContent).toContain("+600,000 XOF");
       expect(host.textContent).toContain(kind === "refund" ? "−20,000 XOF" : "−600,000 XOF");
       expect(host.textContent).not.toMatch(/\+[-−]|−-/);
@@ -808,7 +897,7 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       expect(host.textContent).not.toContain("640,000");
       expect(
         host.querySelector(`a[href*="#cimac-payment-${originalId}"]`)?.getAttribute("href"),
-      ).toContain(`customerId=${customerId}`);
+      ).toContain(`/cimac/customers/${customerId}?`);
     },
   );
 });

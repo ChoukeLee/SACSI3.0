@@ -9,6 +9,7 @@ import { formatMoney, paymentDisplay } from "@/lib/currency";
 import { NativeLeaseFinance } from "./native-lease-finance";
 import { getOriginalMonthlyRent, getRecordedOriginalPayment } from "./lease-display-model";
 import { getLeaseFinancialConfigBySourceType } from "./lease-financial-entry-types";
+import { LeaseRentalInspector } from "./lease-rental-inspector";
 
 import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowUpRight, Building2, CalendarDays, FileText, Printer, X } from "lucide-react";
@@ -60,6 +61,8 @@ export interface LeaseWorkbenchInspectorProps {
   onClose?: () => void;
   /** Supplied only to roles permitted to collect, for this exact active contract. */
   collectionHref?: string | null;
+  /** Same-room records supplied by the scope-checked controller, SACSI only. */
+  historyContent?: ReactNode;
 }
 
 type InspectorTab = "contract" | "finance" | "records";
@@ -75,6 +78,13 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 
 /** The single contract detail surface; operations open only their relevant form. */
 export function LeaseWorkbenchInspector(props: LeaseWorkbenchInspectorProps) {
+  if ((props.workArea ?? "sacsi") === "sacsi")
+    return (
+      <LeaseRentalInspector
+        key={`${props.contract?.id ?? "empty"}/${props.initialSection ?? "overview"}`}
+        {...props}
+      />
+    );
   return (
     <InspectorContent
       key={`${props.contract?.id ?? "empty"}/${props.initialSection ?? "overview"}`}

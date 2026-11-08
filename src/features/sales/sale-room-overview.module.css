@@ -102,8 +102,8 @@
   border: 0;
 }
 .record strong {
-  font-size: 0.8125rem;
-  font-weight: 550;
+  font-size: 0.875rem;
+  font-weight: 400;
 }
 .record small {
   display: block;
@@ -168,15 +168,15 @@
 }
 .roomHeading > strong {
   font-size: 1.25rem;
-  font-weight: 650;
+  font-weight: 600;
 }
 .roomHeading small {
   font-size: 0.75rem;
   color: hsl(var(--muted-foreground));
 }
 .buyer {
-  font-size: 0.875rem;
-  font-weight: 550;
+  font-size: 18px;
+  font-weight: 400;
   overflow-wrap: anywhere;
 }
 .fact {
@@ -193,7 +193,7 @@
 .fact > strong {
   text-align: right;
   overflow-wrap: anywhere;
-  font-weight: 500;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 .cardFooter {
@@ -208,7 +208,7 @@
 .cardStatus {
   padding: 0.2rem 0.4rem;
   border-radius: 0.25rem;
-  font-weight: 600;
+  font-weight: 400;
 }
 .detailHint {
   color: hsl(var(--muted-foreground));

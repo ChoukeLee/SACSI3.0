@@ -166,14 +166,14 @@
   text-decoration: underline;
 }
 .sub {
-  font-size: 11px;
+  font-size: 14px;
   color: hsl(var(--muted-foreground));
   line-height: 1.7;
   margin-top: 4px;
 }
 .money {
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
+  font-weight: 400;
 }
 .tableFooter {
   display: flex;
@@ -201,6 +201,7 @@
 .embeddedInspector {
   border: 0;
   border-radius: 0;
+  overflow: visible;
 }
 .secondaryDetails {
   margin-top: 1rem;
@@ -210,8 +211,8 @@
 }
 .secondaryDetails summary {
   cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 400;
 }
 .paymentSourceDetails {
   margin-top: 0.5rem;
@@ -276,8 +277,8 @@
   min-height: 300px;
 }
 .detail h3 {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
   margin-bottom: 8px;
 }
 .facts {
@@ -291,7 +292,7 @@
   gap: 14px;
   border-bottom: 1px solid hsl(var(--border) / 0.55);
   padding: 9px 0;
-  font-size: 12px;
+  font-size: 14px;
 }
 .facts dt {
   color: hsl(var(--muted-foreground));
@@ -306,7 +307,7 @@
   padding: 10px 12px;
   background: hsl(var(--muted) / 0.4);
   border-radius: 8px;
-  font-size: 11px;
+  font-size: 14px;
   color: hsl(var(--muted-foreground));
   line-height: 1.8;
 }
@@ -315,10 +316,11 @@
   border-top: 1px solid hsl(var(--border) / 0.55);
 }
 .scheduleHead {
+  font-weight: 400;
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.7;
 }
 .detailActions {
@@ -406,5 +408,161 @@
   .table th {
     padding-left: 8px;
     padding-right: 8px;
+  }
+}
+
+.embeddedInspector .detail {
+  padding: 20px 0 0;
+}
+.embeddedInspector .detailActions {
+  padding: 16px 0 0;
+}
+.inspector strong,
+.recordHistory strong {
+  font-weight: 400;
+}
+.detailSection {
+  min-width: 0;
+  margin-bottom: 24px;
+}
+.detailSection:last-child {
+  margin-bottom: 0;
+}
+.detailSection h3 {
+  margin: 0 0 12px;
+}
+.customerHero {
+  margin-bottom: 20px;
+}
+.customerHero h2,
+.customerName {
+  font-size: 18px;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.overviewMetrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.overviewMetrics > div {
+  min-width: 0;
+}
+.overviewMetrics dt {
+  color: hsl(var(--muted-foreground));
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+.overviewMetrics dd,
+.keyMoney {
+  font-size: 20px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.followup {
+  margin-top: 20px;
+  padding: 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 400;
+}
+.sourceText {
+  margin-top: 12px;
+  color: hsl(var(--muted-foreground));
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sourceLink {
+  color: var(--sale-accent);
+  font-size: 14px;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.paymentRecords {
+  margin-top: 20px;
+  min-width: 0;
+}
+.paymentFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.paymentFilters button {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: hsl(var(--muted-foreground));
+  font-size: 14px;
+  font-weight: 400;
+}
+.paymentFilters button[aria-pressed="true"] {
+  background: hsl(var(--muted) / 0.5);
+  border-color: hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+.paymentTable {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.paymentTable th,
+.paymentTable td {
+  padding: 10px 5px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid hsl(var(--border));
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.paymentTable th {
+  color: hsl(var(--muted-foreground));
+}
+.paymentTable th:first-child {
+  width: 24%;
+}
+.paymentTable th:nth-child(2) {
+  width: 29%;
+}
+.paymentTable th:nth-child(3) {
+  width: 32%;
+}
+.paymentTable th:last-child {
+  width: 15%;
+}
+.paymentTable small {
+  display: block;
+  margin-top: 4px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.paymentAmount {
+  font-variant-numeric: tabular-nums;
+}
+.paymentEvidence {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--muted) / 0.25);
+}
+.inspector button:focus-visible,
+.inspector a:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+@media (max-width: 419px) {
+  .overviewMetrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .paymentTable {
+    font-size: 13px;
   }
 }

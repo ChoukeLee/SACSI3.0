@@ -868,50 +868,54 @@ export function SaleList({
                 onAction={(action) => {
                   if (previewId) void openAction(previewId, action);
                 }}
+                historyContent={
+                  roomContextReady &&
+                  !workspace.roomContextLoading &&
+                  !workspace.roomContextError &&
+                  !preview.loading &&
+                  !preview.error ? (
+                    <section
+                      aria-label={locale === "zh" ? "本房出售历史" : "Historique des ventes du lot"}
+                    >
+                      <h3 className="mb-3 text-sm font-semibold">
+                        {locale === "zh" ? "本房出售历史" : "Historique des ventes du lot"}
+                      </h3>
+                      <div className={styles.recordHistory}>
+                        {roomOverview.records
+                          .filter(
+                            (row) =>
+                              row.unit.id ===
+                              roomOverview.records.find((record) => record.id === previewId)?.unit
+                                .id,
+                          )
+                          .map((record) => (
+                            <button
+                              key={record.id}
+                              type="button"
+                              data-sale-room-record-id={record.id}
+                              aria-pressed={record.id === previewId}
+                              disabled={saving}
+                              onClick={() => selectPreview(record.id)}
+                            >
+                              <strong>
+                                {record.customer?.name ??
+                                  (locale === "zh" ? "买方待登记" : "Acquéreur à compléter")}
+                              </strong>
+                              <span>
+                                {record.contract.signed_date ||
+                                  (locale === "zh"
+                                    ? "签约未登记"
+                                    : "Signature non renseignée")}{" "}
+                                · {t.contractStatus[record.contract.status]}
+                              </span>
+                            </button>
+                          ))}
+                      </div>
+                    </section>
+                  ) : null
+                }
                 onPrint={printContract}
               />
-              {roomContextReady &&
-              !workspace.roomContextLoading &&
-              !workspace.roomContextError &&
-              !preview.loading &&
-              !preview.error ? (
-                <details
-                  className={styles.secondaryDetails}
-                  aria-label={locale === "zh" ? "本房出售历史" : "Historique des ventes du lot"}
-                >
-                  <summary>
-                    {locale === "zh" ? "本房出售历史" : "Historique des ventes du lot"}
-                  </summary>
-                  <div className={styles.recordHistory}>
-                    {roomOverview.records
-                      .filter(
-                        (row) =>
-                          row.unit.id ===
-                          roomOverview.records.find((record) => record.id === previewId)?.unit.id,
-                      )
-                      .map((record) => (
-                        <button
-                          key={record.id}
-                          type="button"
-                          data-sale-room-record-id={record.id}
-                          aria-pressed={record.id === previewId}
-                          disabled={saving}
-                          onClick={() => selectPreview(record.id)}
-                        >
-                          <strong>
-                            {record.customer?.name ??
-                              (locale === "zh" ? "买方待登记" : "Acquéreur à compléter")}
-                          </strong>
-                          <span>
-                            {record.contract.signed_date ||
-                              (locale === "zh" ? "签约未登记" : "Signature non renseignée")}{" "}
-                            · {t.contractStatus[record.contract.status]}
-                          </span>
-                        </button>
-                      ))}
-                  </div>
-                </details>
-              ) : null}
             </div>
           </RightDrawer>
         ) : null}

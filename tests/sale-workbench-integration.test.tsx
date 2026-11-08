@@ -206,7 +206,7 @@ async function openDisclosure(label: string, within: ParentNode = inspector()!) 
   return summary!.parentElement as HTMLDetailsElement;
 }
 async function showFinance() {
-  await click(named("收支明细", inspector()!));
+  await click(named("收付款", inspector()!));
 }
 async function clickAction(label: string) {
   await openDisclosure("更多操作");
@@ -363,7 +363,7 @@ it.each(["zh", "fr"] as const)(
       ),
     ).toBeTruthy();
     expect(named(locale === "zh" ? "新增分期" : "Ajouter une échéance", inspector()!)).toBeTruthy();
-    await click(named(locale === "zh" ? "收支明细" : "Encaissements et dépenses", inspector()!));
+    await click(named(locale === "zh" ? "收付款" : "Paiements", inspector()!));
     expect(inspector()?.textContent).toContain(
       locale === "zh" ? "应收已核销" : "Créances rapprochées",
     );
@@ -454,7 +454,7 @@ it("opens a stable ID deep link without loading all contracts, even outside the 
   await settle();
   expect(recordRequests()).toHaveLength(1);
   expect(requestInfo(recordRequests()[0][0]).id).toBe(id);
-  await openDisclosure("合同登记资料");
+  await click(named("资料", inspector()!));
   expect(inspector()?.textContent).toContain("SYNTHETIC-SALE-0");
 });
 it("preserves a legacy contract bookmark while normalization is pending or fails and opens that record after a read retry", async () => {
@@ -837,7 +837,7 @@ it.each([
     await click(named("取消", dialog));
     await settle();
     expect(operationDialog()).toBeNull();
-    await openDisclosure("合同登记资料");
+    await click(named("资料", inspector()!));
     expect(inspector()?.textContent).toContain("SYNTHETIC-SALE-0");
     expect(new URL(window.location.href).searchParams.get("contract")).toBe(workspaceContract);
   },
@@ -1157,7 +1157,7 @@ it("keeps a former buyer's debt on its original record and never adds it to the 
   expect(inspector()?.textContent).toContain("Former buyer");
   await showFinance();
   expect(inspector()?.textContent).toContain("75,000 XOF");
-  await openDisclosure("本房出售历史", document.querySelector('[role="dialog"]')!);
+  await click(named("历史", inspector()!));
   await click(document.querySelector(`[data-sale-room-record-id="${workspaceContract}"]`));
   await settle();
   expect(requestInfo(recordRequests().at(-1)![0]).id).toBe(workspaceContract);

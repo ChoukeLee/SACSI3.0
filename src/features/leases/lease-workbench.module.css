@@ -394,3 +394,338 @@
     transition: none;
   }
 }
+
+.rentalInspector {
+  --lease-accent: #245cd3;
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+:global(.dark) .rentalInspector {
+  --lease-accent: #9abaff;
+}
+.rentalInspector strong,
+.rentalInspector b,
+.rentalInspector :global(.font-semibold),
+.rentalInspector :global(.font-medium) {
+  font-weight: 400;
+}
+.rentalStandaloneHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.rentalStandaloneHeader h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+.rentalStandaloneHeader button {
+  padding: 4px;
+  color: hsl(var(--muted-foreground));
+}
+.rentalPanel {
+  min-width: 0;
+  margin-top: 16px;
+}
+.rentalParty {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 3px;
+}
+.rentalParty > span {
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+}
+.rentalParty > strong {
+  font-size: 18px;
+  font-weight: 400;
+}
+.rentalParty .rentalState {
+  margin-top: 3px;
+  font-size: 12px;
+}
+.rentalFacts {
+  display: grid;
+}
+.rentalFacts > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid hsl(var(--border) / 0.55);
+  font-size: 14px;
+}
+.rentalFacts dt {
+  color: hsl(var(--muted-foreground));
+}
+.rentalFacts dd {
+  font-weight: 400;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.rentalFacts small {
+  display: block;
+  margin-top: 3px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.rentalSummary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.rentalSummary > div {
+  min-width: 0;
+}
+.rentalSummary > div + div {
+  border-left: 1px solid hsl(var(--border));
+  padding-left: 16px;
+}
+.rentalSummary dt {
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+}
+.rentalSummary dd {
+  margin-top: 5px;
+  font-size: 20px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.rentalAuxiliary {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+}
+.rentalAuxiliary > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 14px;
+}
+.rentalAuxiliary dt {
+  color: hsl(var(--muted-foreground));
+}
+.rentalAuxiliary dd {
+  font-weight: 400;
+  text-align: right;
+}
+.rentalSection + .rentalSection {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid hsl(var(--border));
+}
+.rentalSection h3 {
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.rentalNote {
+  margin: 8px 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+  line-height: 1.7;
+}
+.rentalOverdue,
+.rentalReview {
+  margin-top: 12px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 400;
+}
+.rentalOverdue {
+  color: #a5332d;
+  background: #fff1ef;
+}
+.rentalReview {
+  color: #885d1e;
+  background: #fff5e1;
+}
+.rentalError {
+  margin-top: 12px;
+  color: #ad423b;
+  font-size: 14px;
+  font-weight: 400;
+}
+.rentalLink {
+  display: inline-flex;
+  margin-top: 14px;
+  padding: 0;
+  color: var(--lease-accent);
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+}
+.rentalMore {
+  position: relative;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid hsl(var(--border));
+}
+.rentalMore > summary {
+  width: fit-content;
+  padding: 4px 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+}
+.rentalOperations {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  z-index: 6;
+  display: grid;
+  gap: 4px;
+  width: 260px;
+  max-width: 100%;
+  padding: 6px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--card));
+  box-shadow: 0 8px 24px #0000000f;
+}
+.rentalOperations button,
+.rentalOperations a {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+}
+.rentalOperations button:hover,
+.rentalOperations a:hover {
+  background: hsl(var(--muted) / 0.5);
+}
+.rentalOperations:disabled {
+  opacity: 0.55;
+}
+.rentalOperations:disabled button,
+.rentalOperations a[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+.rentalPayments {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+.rentalPayments th,
+.rentalPayments td {
+  padding: 9px 5px;
+  border-bottom: 1px solid hsl(var(--border) / 0.65);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.6;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.rentalPayments th {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.rentalPayments th:first-child,
+.rentalPayments td:first-child {
+  width: 98px;
+  padding-left: 0;
+  white-space: nowrap;
+}
+.rentalPayments th:nth-child(3),
+.rentalPayments td:nth-child(3) {
+  width: 30%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.rentalPayments th:last-child,
+.rentalPayments td:last-child {
+  width: 44px;
+  padding-right: 0;
+  text-align: right;
+}
+.rentalPayments button {
+  color: var(--lease-accent);
+  font-size: 12px;
+  font-weight: 400;
+}
+.rentalPayments button[aria-expanded="true"] {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.rentalEvidence {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--muted) / 0.25);
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.rentalEvidence > * + * {
+  margin-top: 7px;
+}
+.rentalEvidence a {
+  color: var(--lease-accent);
+}
+.rentalEmpty {
+  padding: 30px 20px;
+  text-align: center;
+}
+.rentalEmpty h2 {
+  font-size: 14px;
+  font-weight: 400;
+}
+.rentalEmpty p {
+  margin-top: 8px;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+}
+.rentalInspector button:focus-visible,
+.rentalInspector a:focus-visible,
+.rentalInspector summary:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 3px;
+}
+.rentalInspector .roomRecords {
+  margin-top: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.rentalInspector .roomRecords h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.rentalInspector .roomRecords strong,
+.rentalInspector .roomRecords button {
+  font-weight: 400;
+}
+:global(.dark) .rentalOverdue {
+  color: #ffc4bf;
+  background: #4b2221;
+}
+:global(.dark) .rentalReview {
+  color: #f5d498;
+  background: #42351f;
+}

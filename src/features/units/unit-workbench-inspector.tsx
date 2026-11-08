@@ -2,6 +2,7 @@
 
 import { useId, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { RecordDetailTabs } from "@/components/ui/record-detail-tabs";
 import { ArrowUpRight, Building2, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
@@ -95,7 +96,7 @@ export function UnitWorkbenchInspector({
         </header>
       ) : null}
       <div className={styles.detailBody}>
-        <InspectorTabs
+        <RecordDetailTabs
           id={tabsId}
           label={zh ? "房间详情" : "Détail de l’actif"}
           items={[
@@ -183,54 +184,6 @@ export function UnitWorkbenchInspector({
         </details>
       </div>
     </aside>
-  );
-}
-
-function InspectorTabs({
-  id,
-  label,
-  items,
-  value,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  items: { value: string; label: string }[];
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className={styles.inspectorTabs} role="tablist" aria-label={label}>
-      {items.map((item, index) => (
-        <button
-          key={item.value}
-          type="button"
-          role="tab"
-          id={id + "-tab-" + item.value}
-          aria-selected={value === item.value}
-          aria-controls={id + "-panel-" + item.value}
-          tabIndex={value === item.value ? 0 : -1}
-          onClick={() => onChange(item.value)}
-          onKeyDown={(event) => {
-            let target: number;
-            if (event.key === "ArrowRight") target = (index + 1) % items.length;
-            else if (event.key === "ArrowLeft") target = (index + items.length - 1) % items.length;
-            else if (event.key === "Home") target = 0;
-            else if (event.key === "End") target = items.length - 1;
-            else return;
-            event.preventDefault();
-            onChange(items[target].value);
-            const buttons =
-              event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
-                '[role="tab"]',
-              );
-            buttons?.[target]?.focus();
-          }}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
   );
 }
 

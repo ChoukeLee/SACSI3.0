@@ -234,10 +234,14 @@ function namedButton(text: string, within: ParentNode = host) {
 async function showFinance() {
   const inspector = preview();
   expect(inspector).toBeTruthy();
-  await click(namedButton("收支明细", inspector!) ?? namedButton("账务", inspector!));
+  await click(namedButton("收付款", inspector!) ?? namedButton("账务", inspector!));
 }
 
 async function openDossierDisclosure(label: string, within: ParentNode = preview()!) {
+  if (label === "租期与登记资料" || label === "本房租赁历史") {
+    await click(namedButton(label === "本房租赁历史" ? "历史" : "资料", preview()!));
+    return;
+  }
   const summary = [...within.querySelectorAll<HTMLElement>("summary")].find(
     (item) => item.textContent === label,
   );
@@ -494,6 +498,7 @@ it("opens focused deposit and move-out forms directly and returns to the same do
   await click(depositForm.querySelector('button[aria-label="Close"]'));
   await settle();
   expect(operationDialog()).toBeNull();
+  await click(namedButton("资料", preview()!));
   expect(preview()?.textContent).toContain("SYNTHETIC-0");
   await openDossierDisclosure("更多操作");
   const moveOut = [...preview()!.querySelectorAll("button")].find((button) =>

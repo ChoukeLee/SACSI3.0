@@ -43,6 +43,11 @@ async function tab(name: string) {
   expect(button).toBeTruthy();
   await act(async () => button!.click());
 }
+async function paymentSource(id: string) {
+  const row = host.querySelector(`[data-sale-payment-id="${id}"]`);
+  expect(row).toBeTruthy();
+  await act(async () => row!.querySelector<HTMLButtonElement>("button")!.click());
+}
 function fact(name: string) {
   return [...host.querySelectorAll("dt")].find((item) => item.textContent === name)
     ?.nextElementSibling?.textContent;
@@ -136,11 +141,13 @@ it("has a useful no-selection state without a phantom contract or amount", async
   expect(host.textContent).not.toContain("XOF");
   expect(host.querySelector("button")).toBeNull();
 });
-it("uses two read tabs with every permitted manual action hidden until more operations opens", async () => {
+it("uses four read tabs with every permitted manual action hidden until more operations opens", async () => {
   const props = await render({ canRecordFinance: true, canManage: true, canTerminate: true });
   expect([...host.querySelectorAll('[role="tab"]')].map((item) => item.textContent)).toEqual([
-    "概况",
-    "收支明细",
+    "概览",
+    "收付款",
+    "资料",
+    "历史",
   ]);
   const more = disclosure("更多操作")!;
   expect(more.open).toBe(false);
@@ -153,7 +160,7 @@ it("uses two read tabs with every permitted manual action hidden until more oper
           item.getAttribute("role") === "tab" || item.getAttribute("aria-label") === "关闭合同预览",
       ),
   ).toBe(true);
-  await tab("收支明细");
+  await tab("收付款");
   expect(props.onAction).not.toHaveBeenCalled();
   expect(props.onPrint).not.toHaveBeenCalled();
   expect(disclosure("更多操作")?.open).toBe(false);
@@ -162,7 +169,7 @@ it("leaves the outer drawer as the only close control in embedded mode", async (
   await render({ embedded: true });
   expect(host.querySelector('button[aria-label="关闭合同预览"]')).toBeNull();
   expect(host.querySelector("h2")?.textContent).toBe(saleFixture().customers[0].name);
-  expect(host.querySelector("header")?.textContent).not.toContain("SYNTHETIC-SALE-0");
+  expect(host.querySelector("header")).toBeNull();
   for (const patch of [{ loading: true }, { error: true }]) {
     await render({ ...patch, embedded: true });
     expect([...host.querySelectorAll("button")].some((item) => item.textContent === "关闭")).toBe(
@@ -205,7 +212,7 @@ it("separates recorded price, receivable applications and cash", async () => {
   ];
   await render({ data });
   expect(fact("登记总价")).toBe("1,000,000 XOF");
-  await tab("收支明细");
+  await tab("收付款");
   expect(fact("应收已核销")).toBe("200,000 XOF");
   expect(fact("经营收款")).toBe("500 XOF");
   expect(host.textContent).toContain("1 笔非现金变动");
@@ -255,13 +262,14 @@ it("retains the payment plan and does not call future installments overdue or al
   ];
   data.payments = [];
   await render({ data });
+  await tab("收付款");
   expect(host.textContent).toContain("付款计划");
   const future = [...host.querySelectorAll("div")].find((item) =>
     item.querySelector(":scope > p")?.textContent?.includes("2026-12-01"),
   );
   expect(future?.textContent).toContain("待付 / 未逾期");
   expect(future?.textContent).not.toContain("已逾期");
-  await tab("收支明细");
+  await tab("收付款");
   expect(fact("应收已核销")).toBe("200,000 XOF");
   expect(fact("经营收款")).toBe("暂无已核记录");
 });
@@ -277,10 +285,11 @@ it("retains original currency and leaves collector unknown instead of using reco
     }),
   ];
   await render({ data });
-  await tab("收支明细");
+  await tab("收付款");
   expect(fact("经营收款")).toBe("850 XOF");
   expect(host.textContent).toContain("¥10");
-  expect(host.textContent).toContain("实际收款人: 待核对");
+  await paymentSource(data.payments[0].id);
+  expect(fact("实际收款人")).toBe("待核对");
   expect(host.textContent).not.toContain("recording-user-id");
 });
 it("does not turn unknown prices or absence of verified receivables into zero debt", async () => {
@@ -297,7 +306,7 @@ it("does not turn unknown prices or absence of verified receivables into zero de
   };
   await render({ data });
   expect(fact("登记总价")).toBe("待核对");
-  await tab("收支明细");
+  await tab("收付款");
   expect(fact("已建应收未收")).toBe("暂无已核应收");
   expect(host.textContent).not.toContain("0 XOF");
 });
@@ -306,7 +315,7 @@ it("keeps a source-only native price and receipts separate from unknown bills an
   const props = await render({ data, canRecordFinance: true, canManage: true });
   expect(fact("登记总价")).toBe("¥720,000 CNY");
   expect(fact("登记余款（Excel）")).toBe("¥0 CNY");
-  expect(host.textContent).toContain("暂无已登记付款计划，不代表已付款");
+  expect(host.textContent).not.toContain("暂无已登记付款计划，不代表已付款");
   expect(host.textContent).not.toContain("0 XOF");
 
   await openDisclosure("更多操作");
@@ -320,11 +329,11 @@ it("keeps a source-only native price and receipts separate from unknown bills an
   expect(props.onAction).not.toHaveBeenCalled();
   expect(host.textContent).toContain("不支持手工西法收款或新增西法分期");
 
-  await openDisclosure("合同登记资料");
+  await tab("资料");
   expect(fact("签约日期")).toBe("未登记");
   expect(fact("登记总价")).toBe("¥720,000 CNY");
 
-  await tab("收支明细");
+  await tab("收付款");
   expect(fact("已建应收未收")).toBe("暂无已核应收");
   expect(fact("应收已核销")).toBe("—");
   const receiptHeading = [...host.querySelectorAll("h3")].find(
@@ -332,7 +341,7 @@ it("keeps a source-only native price and receipts separate from unknown bills an
   );
   expect(receiptHeading?.nextElementSibling?.textContent).toBe("¥720,000 CNY");
   expect(fact("西法经营收款")).toBe("暂无已核记录");
-  const articles = [...host.querySelectorAll("article")];
+  const articles = [...host.querySelectorAll("[data-sale-payment-id]")];
   expect(articles).toHaveLength(2);
   expect(articles.every((row) => row.textContent?.includes("原币房款实收 · 未折算西法"))).toBe(
     true,
@@ -355,13 +364,13 @@ it("excludes mismatched native purchase receipts and keeps XOF registration fees
     }),
   );
   await render({ data });
-  await tab("收支明细");
+  await tab("收付款");
   const receiptHeading = [...host.querySelectorAll("h3")].find(
     (heading) => heading.textContent === "房款原币实收",
   );
   expect(receiptHeading?.nextElementSibling?.textContent).toBe("¥700,000 CNY");
   expect(fact("西法经营收款")).toBe("300,000 XOF");
-  const articles = [...host.querySelectorAll("article")];
+  const articles = [...host.querySelectorAll("[data-sale-payment-id]")];
   const mismatched = articles.find((row) => row.textContent?.includes("¥20,000"));
   expect(mismatched?.textContent).toContain("原币登记待核 · 未折算西法");
   expect(mismatched?.textContent).not.toContain("原币房款实收");
@@ -371,6 +380,7 @@ it("excludes mismatched native purchase receipts and keeps XOF registration fees
 });
 it("links only explicit customer/asset IDs and carries the sanitized return scope", async () => {
   await render();
+  await tab("资料");
   const links = [...host.querySelectorAll<HTMLAnchorElement>("a")];
   expect(links).toHaveLength(2);
   const customer = new URL(links[0].href);
@@ -387,7 +397,7 @@ it("opens focused actions directly and preserves print and keyboard tabs", async
   await act(async () =>
     first.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })),
   );
-  expect(host.querySelector('[aria-selected="true"]')?.textContent).toBe("收支明细");
+  expect(host.querySelector('[aria-selected="true"]')?.textContent).toBe("收付款");
   await openDisclosure("更多操作");
   const find = (name: string) =>
     [...host.querySelectorAll<HTMLButtonElement>("button")].find((b) =>
@@ -431,8 +441,9 @@ it("retains every payment and its full notes in the single detail", async () => 
     }),
   );
   await render({ data });
-  await tab("收支明细");
-  expect(host.querySelectorAll("article")).toHaveLength(8);
+  await tab("收付款");
+  expect(host.querySelectorAll("[data-sale-payment-id]")).toHaveLength(8);
+  await paymentSource("payment-7");
   expect(host.textContent).toContain("receipt-7");
   expect(host.textContent).toContain("完整备注-7");
   expect(host.textContent).not.toContain("办理详情");
@@ -440,8 +451,9 @@ it("retains every payment and its full notes in the single detail", async () => 
 it("localizes the same read-only facts for French", async () => {
   await render({ locale: "fr" });
   expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("Aperçu");
-  await openDisclosure("Informations enregistrées du contrat");
+  await tab("Informations");
   expect(fact("Signature")).toBe("2026-01-01");
+  await tab("Paiements");
   expect(host.textContent).toContain("Plan de paiement");
 });
 
@@ -455,19 +467,20 @@ it.each(["zh", "fr"] as const)(
       title_certificate_no: "SYNTHETIC-LEGACY-TITLE",
     });
     await render({ data, locale, canRecordFinance: true, canManage: true, canTerminate: true });
-    await openDisclosure(locale === "zh" ? "合同登记资料" : "Informations enregistrées du contrat");
+    await tab(locale === "zh" ? "资料" : "Informations");
     await openDisclosure(locale === "zh" ? "更多操作" : "Autres opérations");
     expect(host.textContent).not.toMatch(/过户|产权证|transfert|titre foncier/i);
     expect(host.textContent).not.toContain("SYNTHETIC-LEGACY-TITLE");
     expect(host.textContent).not.toContain("2039-12-31");
     expect(fact(locale === "zh" ? "签约日期" : "Signature")).toBe("2026-01-01");
+    await tab(locale === "zh" ? "收付款" : "Paiements");
     expect(host.textContent).toContain(locale === "zh" ? "付款计划" : "Plan de paiement");
     const actions = host.querySelectorAll(
       '[aria-label="' + (locale === "zh" ? "办理此合同" : "Gérer ce contrat") + '"] button',
     );
     expect(actions).toHaveLength(3);
-    await tab(locale === "zh" ? "收支明细" : "Encaissements et dépenses");
-    expect(host.querySelectorAll("article")).toHaveLength(data.payments.length);
+    await tab(locale === "zh" ? "收付款" : "Paiements");
+    expect(host.querySelectorAll("[data-sale-payment-id]")).toHaveLength(data.payments.length);
     expect(host.textContent).not.toMatch(/过户|产权证|transfert|titre foncier/i);
   },
 );
@@ -539,17 +552,17 @@ it.each([0, null])(
     expect(host.textContent).toContain("按Excel登记");
     expect(fact("登记总价")).toContain("720,000");
     expect(fact("登记总价")).toContain("CNY");
-    expect(fact("房款原币实收")).toContain("720,000");
-    expect(fact("房款原币实收")).not.toContain("300,000");
+    expect(fact("累计房款入款")).toContain("720,000");
+    expect(fact("累计房款入款")).not.toContain("300,000");
     if (sourceBalance === 0) expect(fact("登记余款（Excel）")).toMatch(/0 CNY/);
     else {
       expect(fact("登记余款（Excel）")).toBeUndefined();
       expect(fact("已核未收")).toBe("暂无已核应收");
     }
-    expect(disclosure("合同登记资料")?.open).toBe(false);
-    await openDisclosure("合同登记资料");
+    expect(disclosure("更多操作")?.open).toBe(false);
+    await tab("资料");
     expect(fact("签约日期")).toBe("未登记");
-    await tab("收支明细");
+    await tab("收付款");
     expect(fact("已建应收未收")).toBe("暂无已核应收");
     expect(host.textContent).toContain("原币房款实收 · 未折算西法");
     expect(host.textContent).not.toMatch(/[12] 笔待核/);
@@ -589,7 +602,7 @@ it("keeps a managed unpaid balance ahead of an Excel zero balance", async () => 
   expect(props.onPrint).not.toHaveBeenCalled();
 });
 
-it("folds complete payment provenance while keeping the known collector visible and recording account distinct", async () => {
+it("keeps full payment provenance in one selected source panel and refreshes it from current data", async () => {
   const data = saleFixture(undefined, "detail", 1);
   data.payments = [
     payment({
@@ -608,31 +621,94 @@ it("folds complete payment provenance while keeping the known collector visible 
     }),
   ];
   await render({ data });
-  await tab("收支明细");
-  const articles = [...host.querySelectorAll("article")];
-  expect(articles).toHaveLength(2);
-  for (const article of articles) {
-    const details = article.querySelector("details")!;
-    expect(details.querySelector("summary")?.textContent).toBe("来源和登记信息");
-    expect(details.open).toBe(false);
-    expect(visible(details.querySelector("p")!)).toBe(false);
-  }
-  const known = articles.find((item) => item.textContent?.includes("完整来源原文-known"))!;
-  const collector = [...known.querySelectorAll("p")].find((item) =>
-    item.textContent?.includes("实际收款人: Synthetic collector"),
-  )!;
-  expect(visible(collector)).toBe(true);
-  const unknown = articles.find((item) => item.textContent?.includes("完整来源原文-unknown"))!;
-  const source = unknown.querySelector("details")!;
-  await act(async () => source.querySelector("summary")!.click());
-  expect(source.open).toBe(true);
-  expect(source.textContent).toContain("完整来源原文-unknown");
-  expect(source.textContent).toContain("SYSTEM-UNKNOWN");
-  expect(source.textContent).toContain("SOURCE-UNKNOWN");
-  expect(source.textContent).toContain("实际收款人: 待核对");
-  expect(source.textContent).toContain("录入账号: 已记录，见审计详情");
+  await tab("收付款");
+  expect(host.querySelectorAll("[data-sale-payment-id]")).toHaveLength(2);
+  expect(host.querySelectorAll("details")).toHaveLength(1);
+  expect(host.textContent).not.toContain("完整来源原文-unknown");
+  await paymentSource(data.payments[1].id);
+  expect(fact("实际收款人")).toBe("Synthetic collector");
+  expect(fact("收款人依据")).toBe("Synthetic receipt basis");
+  await paymentSource(data.payments[0].id);
+  const source = () => host.querySelector('[role="region"][aria-label="收付款依据"]')!;
+  expect(host.querySelectorAll('[aria-label="收付款依据"]')).toHaveLength(1);
+  expect(source().textContent).toContain("完整来源原文-unknown");
+  expect(source().textContent).not.toContain("完整来源原文-known");
+  expect(fact("内部凭证号")).toBe("SYSTEM-UNKNOWN");
+  expect(fact("外部凭证")).toBe("SOURCE-UNKNOWN");
+  expect(fact("实际收款人")).toBe("待核对");
+  expect(fact("录入账号")).toBe("已记录，见审计详情");
   expect(host.textContent).not.toContain("private-recording-id");
-  const basis = known.querySelector("details")!;
-  await act(async () => basis.querySelector("summary")!.click());
-  expect(basis.textContent).toContain("收款人依据: Synthetic receipt basis");
+  data.payments[0] = { ...data.payments[0], notes: "Fresh source text" };
+  await render({ data });
+  expect(source().textContent).toContain("Fresh source text");
+  expect(source().textContent).not.toContain("完整来源原文-unknown");
+  data.payments = data.payments.slice(1);
+  await render({ data });
+  expect(host.querySelector('[aria-label="收付款依据"]')).toBeNull();
+});
+
+it("preserves the finance deep link and resets tab and selected source when the selected record changes", async () => {
+  const data = saleFixture(undefined, "detail", 1);
+  data.payments = [payment({ notes: "First record evidence" })];
+  await render({ data, initialTab: "finance" });
+  expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("收付款");
+  await paymentSource(data.payments[0].id);
+  expect(host.textContent).toContain("First record evidence");
+  await tab("历史");
+  const nextId = "77777777-7777-4777-8777-777777777777";
+  const next = saleFixture(undefined, "detail", 1, nextId);
+  next.payments = [];
+  await render({ data: next, selectedId: nextId });
+  expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("概览");
+  expect(host.textContent).not.toContain("First record evidence");
+  await tab("收付款");
+  expect(host.querySelector('[aria-label="收付款依据"]')).toBeNull();
+  await render({ data, selectedId: workspaceContract });
+  expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("概览");
+  expect(host.querySelector('[aria-label="收付款依据"]')).toBeNull();
+});
+
+it("navigates four sections by keyboard and mounts only genuine supplied history in history", async () => {
+  const props = await render({ historyContent: <button>Actual older sale record</button> });
+  expect(host.textContent).not.toContain("Actual older sale record");
+  const key = async (name: string, value: string) => {
+    const button = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
+      (el) => el.textContent === name,
+    )!;
+    await act(async () =>
+      button.dispatchEvent(new KeyboardEvent("keydown", { key: value, bubbles: true })),
+    );
+  };
+  await key("概览", "End");
+  expect(document.activeElement?.textContent).toBe("历史");
+  expect(host.textContent).toContain("Actual older sale record");
+  expect(host.textContent).toContain("不是完整变更审计");
+  const active = host.querySelector('[role="tab"][aria-selected="true"]')!;
+  expect(host.querySelector('[role="tabpanel"]')?.id).toBe(active.getAttribute("aria-controls"));
+  await key("历史", "ArrowLeft");
+  expect(document.activeElement?.textContent).toBe("资料");
+  expect(host.textContent).not.toContain("Actual older sale record");
+  await key("资料", "Home");
+  expect(document.activeElement?.textContent).toBe("概览");
+  expect(props.onAction).not.toHaveBeenCalled();
+  expect(props.onPrint).not.toHaveBeenCalled();
+});
+
+it("keeps gross purchase receipts and explicit refunds separate without deriving a new balance or net price", async () => {
+  const data = saleFixture(undefined, "detail", 1);
+  data.payments = [
+    payment({ amount: 1000000 }),
+    payment({ id: "refund-id", source_type: "sale_refund", amount: 1000000 }),
+    payment({ id: "receipt-again", amount: 1000000 }),
+  ];
+  await render({ data });
+  expect(fact("累计房款入款")).toBe("2,000,000 XOF");
+  expect(fact("已录房款退款")).toBe("1,000,000 XOF");
+  expect(fact("已核未收")).toBe("800,000 XOF");
+  expect(fact("净收房款")).toBeUndefined();
+  await tab("收付款");
+  expect(host.querySelector('[data-sale-payment-id="refund-id"]')?.textContent).toContain(
+    "− 1,000,000 XOF",
+  );
+  expect(host.querySelectorAll("[data-sale-payment-id]")).toHaveLength(3);
 });

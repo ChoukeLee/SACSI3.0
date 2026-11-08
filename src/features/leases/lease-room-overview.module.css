@@ -160,7 +160,7 @@
   background: hsl(var(--muted));
   color: hsl(var(--muted-foreground));
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 400;
   text-align: right;
 }
 .available {
@@ -173,7 +173,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.875rem;
-  font-weight: 550;
+  font-weight: 400;
 }
 .fact {
   display: flex;
@@ -188,7 +188,7 @@
   flex-shrink: 0;
 }
 .fact > strong {
-  font-weight: 500;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
   text-align: right;
   overflow-wrap: anywhere;
@@ -211,7 +211,7 @@
   padding: 0.2rem 0.4rem;
   border-radius: 0.25rem;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.3;
   text-align: left;
 }
@@ -295,7 +295,7 @@
 .followupRow strong {
   display: block;
   font-size: 0.8125rem;
-  font-weight: 550;
+  font-weight: 400;
 }
 .followupRow small {
   display: block;
@@ -310,7 +310,7 @@
   justify-content: end;
   gap: 0.55rem;
   font-size: 0.8125rem;
-  font-weight: 550;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 .redText {

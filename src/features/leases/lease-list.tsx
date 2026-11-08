@@ -2227,6 +2227,62 @@ export function LeaseList({
                   />
                 ) : null
               }
+              historyContent={
+                workArea === "sacsi" &&
+                previewContract &&
+                roomContextReady &&
+                !workspace.roomContextLoading &&
+                !workspace.roomContextError &&
+                !preview.error &&
+                !preview.loading ? (
+                  <section
+                    className={styles.roomRecords}
+                    aria-label={
+                      locale === "zh" ? "本房租赁历史" : "Historique des locations du lot"
+                    }
+                  >
+                    <h3 className="mb-3 text-sm font-semibold">
+                      {locale === "zh" ? "本房租赁历史" : "Historique des locations du lot"}
+                    </h3>
+                    <p>
+                      {locale === "zh"
+                        ? "每次租赁分别保存。选择记录查看对应资料、已有收付款及账务。"
+                        : "Chaque location est conservée séparément. Sélectionnez un dossier pour consulter ses données, paiements et comptes."}
+                    </p>
+                    {leaseRecordRows
+                      .filter((row) => row.unit.id === previewContract.unit_id)
+                      .map((row) => (
+                        <button
+                          key={row.id}
+                          type="button"
+                          data-room-record-id={row.id}
+                          aria-pressed={row.id === previewId}
+                          disabled={saving}
+                          onClick={() => openDetail(row.id)}
+                        >
+                          <span>
+                            {row.customer?.name ??
+                              (locale === "zh" ? "租客待登记" : "Locataire à compléter")}
+                          </span>
+                          <small>
+                            {leaseRecordPeriodLabel(row.contract, locale)} ·{" "}
+                            {row.contract.status === "expired"
+                              ? locale === "zh"
+                                ? "已过期"
+                                : "Expiré"
+                              : row.historical
+                                ? locale === "zh"
+                                  ? "历史租赁"
+                                  : "Ancienne location"
+                                : locale === "zh"
+                                  ? "当前租赁"
+                                  : "Location actuelle"}
+                          </small>
+                        </button>
+                      ))}
+                  </section>
+                ) : null
+              }
               onPrint={() => {
                 if (previewId) void printById(previewId);
               }}
@@ -2237,58 +2293,7 @@ export function LeaseList({
               }
               onClose={closePreview}
             />
-            {workArea === "sacsi" &&
-            previewContract &&
-            roomContextReady &&
-            !workspace.roomContextLoading &&
-            !workspace.roomContextError &&
-            !preview.error &&
-            !preview.loading ? (
-              <details
-                className={styles.roomRecords}
-                aria-label={locale === "zh" ? "本房租赁历史" : "Historique des locations du lot"}
-              >
-                <summary>
-                  {locale === "zh" ? "本房租赁历史" : "Historique des locations du lot"}
-                </summary>
-                <p>
-                  {locale === "zh"
-                    ? "每次租赁分别保存。选择记录查看对应资料、已有收付款及账务。"
-                    : "Chaque location est conservée séparément. Sélectionnez un dossier pour consulter ses données, paiements et comptes."}
-                </p>
-                {leaseRecordRows
-                  .filter((row) => row.unit.id === previewContract.unit_id)
-                  .map((row) => (
-                    <button
-                      key={row.id}
-                      type="button"
-                      data-room-record-id={row.id}
-                      aria-pressed={row.id === previewId}
-                      disabled={saving}
-                      onClick={() => openDetail(row.id)}
-                    >
-                      <span>
-                        {row.customer?.name ??
-                          (locale === "zh" ? "租客待登记" : "Locataire à compléter")}
-                      </span>
-                      <small>
-                        {leaseRecordPeriodLabel(row.contract, locale)} ·{" "}
-                        {row.contract.status === "expired"
-                          ? locale === "zh"
-                            ? "已过期"
-                            : "Expiré"
-                          : row.historical
-                            ? locale === "zh"
-                              ? "历史租赁"
-                              : "Ancienne location"
-                            : locale === "zh"
-                              ? "当前租赁"
-                              : "Location actuelle"}
-                      </small>
-                    </button>
-                  ))}
-              </details>
-            ) : null}
+
             {previewId && preview.error && (
               <Button
                 className={styles.previewRetry}
