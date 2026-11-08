@@ -135,7 +135,7 @@ it("shows source-based rental facts without requiring paperwork and leaves rooms
   expect(host.querySelectorAll("[data-room-id]")).toHaveLength(1);
   const occupied = host.querySelector<HTMLButtonElement>(`[data-room-id='${sourceUnit.id}']`)!;
   expect(occupied.textContent).toContain("Synthetic guest");
-  expect(occupied.textContent).toContain("100");
+  expect(occupied.textContent).toContain("0.01 万西法");
   expect(occupied.textContent).toContain("2026-12-01");
   expect(occupied.textContent).toContain("租期待核");
   expect(occupied.textContent).not.toContain("资料待补");
