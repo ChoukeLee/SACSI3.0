@@ -65,6 +65,35 @@ it("keeps paperless registered tenants, rent and coverage visible without invent
   expect(row.attention).toBeNull();
 });
 
+it("suppresses only an unconfirmed past end date when the active lease has current coverage", () => {
+  const data = input();
+  const contract = data.contracts[0];
+  Object.assign(contract, {
+    expected_end_date: "2026-10-09",
+    expected_end_confirmed: false,
+    paid_through_date: "2027-01-09",
+  });
+  data.receivables = [bill({ due_date: "2027-01-10" })];
+
+  const [row] = buildLeaseRoomOverview(data);
+  expect(row.paidThrough).toBe("2027-01-09");
+  expect(row.reviewReasons).not.toContain("registered_period_needs_review");
+  expect(row.attention).toBeNull();
+
+  contract.expected_end_confirmed = true;
+  expect(buildLeaseRoomOverview(data)[0].reviewReasons).toContain("registered_period_needs_review");
+
+  contract.expected_end_confirmed = false;
+  contract.paid_through_date = "2026-11-06";
+  expect(buildLeaseRoomOverview(data)[0].reviewReasons).toContain("registered_period_needs_review");
+
+  contract.paid_through_date = data.today;
+  data.receivables = [bill({ due_date: "2026-11-06" })];
+  const [withArrears] = buildLeaseRoomOverview(data);
+  expect(withArrears.reviewReasons).not.toContain("registered_period_needs_review");
+  expect(withArrears.attention).toMatchObject({ kind: "overdue", dueDate: "2026-11-06" });
+});
+
 it("finds apartment rooms by building, room, tenant or lease reference", () => {
   const [row] = buildLeaseRoomOverview(input());
   expect(leaseRoomMatchesSearch(row, "sacsi11 101")).toBe(true);

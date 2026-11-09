@@ -343,7 +343,16 @@ export function buildLeaseRoomOverview(input: LeaseRoomOverviewInput): LeaseRoom
           occupancy = "unknown";
           reviews.push("commencement_unverified");
         }
-        if (date(contract.expected_end_date) && contract.expected_end_date < input.today)
+        const unconfirmedEndWithCurrentCoverage =
+          contract.status === "active" &&
+          contract.expected_end_confirmed === false &&
+          date(contract.paid_through_date) &&
+          contract.paid_through_date >= input.today;
+        if (
+          !unconfirmedEndWithCurrentCoverage &&
+          date(contract.expected_end_date) &&
+          contract.expected_end_date < input.today
+        )
           reviews.push("registered_period_needs_review");
       }
     }
