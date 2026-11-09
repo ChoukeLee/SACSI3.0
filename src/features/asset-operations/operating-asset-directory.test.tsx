@@ -446,8 +446,21 @@ it("restores the last operating location per viewer and category without a secon
 
   await renderCategory("land");
   expect(location().value).toBe("");
+  expect(cards()).toHaveLength(0);
+  const landSites = host.querySelector('[aria-label="经营场地"]')!;
+  expect(landSites.textContent).toContain("土地1 项资产");
+  await act(async () => landSites.querySelector("button")!.click());
+  expect(cards()).toHaveLength(1);
+  expect(cards()[0].textContent).toContain("国基土地");
+  expect(cards()[0].textContent).not.toMatch(/季租|本月实收|万西法/);
+  await act(async () => (cards()[0] as HTMLButtonElement).click());
+  expect(dialog().querySelector("h2")?.textContent).toBe("国基土地");
+
   await renderCategory("warehouse");
   expect(location().value).toBe("新仓库");
+  expect(cards()).toHaveLength(1);
+  await renderCategory("land");
+  expect(location().value).toBe("土地");
   expect(cards()).toHaveLength(1);
   await renderCategory("warehouse", "viewer-b");
   expect(location().value).toBe("");
@@ -536,12 +549,23 @@ it("shows warehouse site follow-up counts before opening compact cards and finan
   expect(siteButton("孵化园库房")?.textContent).toMatch(/待跟进\s*0\s*项/);
   expect(siteList()?.textContent).not.toContain("示例租户甲");
 
-  const filters = host.querySelector('[aria-label="长租状态筛选"]')!;
-  await clickButton(filters, "已逾期1");
+  const filters = host.querySelector<HTMLSelectElement>('select[aria-label="长租状态筛选"]')!;
+  const chooseStatus = async (value: string) =>
+    act(async () => {
+      filters.value = value;
+      filters.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  expect([...filters.options].map((option) => option.textContent)).toEqual([
+    "全部状态 · 4",
+    "已逾期 · 1",
+    "15天内应缴 · 1",
+    "待核事项 · 1",
+  ]);
+  await chooseStatus("overdue");
   expect(siteList()?.querySelectorAll("button")).toHaveLength(1);
   expect(siteButton("老仓库")).toBeDefined();
   expect(cards()).toHaveLength(0);
-  await clickButton(filters, "全部状态4");
+  await chooseStatus("all");
   await act(async () => siteButton("老仓库")!.click());
   expect(host.querySelector<HTMLSelectElement>('select[aria-label="选择场地"]')?.value).toBe(
     "老仓库",
@@ -558,7 +582,7 @@ it("shows warehouse site follow-up counts before opening compact cards and finan
     expect(card.textContent).not.toMatch(/参考月租|本月实收|万西法/);
   }
 
-  await clickButton(filters, "已逾期1");
+  await chooseStatus("overdue");
   expect(cards()).toHaveLength(1);
   await act(async () => cards()[0].click());
   const current = dialog();
@@ -572,7 +596,7 @@ it("shows warehouse site follow-up counts before opening compact cards and finan
   await act(async () =>
     current.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!.click(),
   );
-  await clickButton(filters, "全部状态2");
+  await chooseStatus("all");
   await clickButton(host, "返回全部场地");
   expect(cards()).toHaveLength(0);
   await act(async () => siteButton("新仓库")!.click());
@@ -624,7 +648,7 @@ it("shows only matching assets from all categories and keeps search as the apart
   expect(host.querySelector('[data-room-id], button[aria-haspopup="dialog"]')).toBeNull();
   await renderSearch("synthetic");
   expect(host.textContent).toContain("跨类别搜索结果2 项");
-  const warehouseMatch = host.querySelector('button[aria-haspopup="dialog"]');
+  const warehouseMatch = host.querySelector('button[aria-haspopup="dialog"]:not([data-room-id])');
   expect(warehouseMatch?.textContent).toContain("示例仓库");
   expect(warehouseMatch?.textContent).not.toMatch(/参考月租|本月实收/);
   expect(host.textContent).not.toContain("国基土地");
@@ -632,6 +656,7 @@ it("shows only matching assets from all categories and keeps search as the apart
   expect(host.querySelector("a[href='/leases?assetCategory=followup']")).not.toBeNull();
 
   const room = host.querySelector<HTMLButtonElement>("button[data-room-id]")!;
+  expect(room.textContent).not.toContain("月租");
   await act(async () => room.click());
   const next = new URL(navigation.push.mock.calls[0][0], "https://test.invalid");
   expect(next.searchParams.get("contract")).toBe(workspaceContract);

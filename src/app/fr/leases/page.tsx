@@ -52,7 +52,11 @@ export default async function FrenchLeasesPage({
         <LeaseBrowsePreference viewerId={browseViewerId} category={category} />
       ) : null}
       {category === "followup" ? (
-        <LeaseWorkbenchFrame locale="fr" action={<LeaseCollectionsBackLink locale="fr" />}>
+        <LeaseWorkbenchFrame
+          locale="fr"
+          view="collections"
+          action={<LeaseCollectionsBackLink locale="fr" />}
+        >
           <UnifiedLeaseCollectionsPage
             locale="fr"
             viewerId={user.id}

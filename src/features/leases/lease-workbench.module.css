@@ -5,6 +5,9 @@
   --lease-accent: #245cd3;
   --lease-accent-soft: #eef4ff;
 }
+.leaseHome {
+  gap: 14px;
+}
 .workbench :global(.bg-card) {
   background-color: hsl(var(--card));
 }
@@ -52,27 +55,41 @@
 .browseToolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 8px 10px;
   align-items: center;
   min-width: 0;
 }
-.browseSelect,
+.browseScope,
 .browseSearch,
 .browseAction {
   height: 40px;
   border: 1px solid hsl(var(--border));
-  border-radius: 8px;
+  border-radius: 7px;
   background: hsl(var(--card));
   font-size: 14px;
 }
-.browseSelect {
+.browseScope {
+  display: flex;
   max-width: 100%;
   min-width: 0;
-  padding: 0 12px;
+  align-items: stretch;
+}
+.browseScope select {
+  min-width: 0;
+  max-width: min(34vw, 13rem);
+  padding: 0 10px;
+  border-radius: 7px;
+  background: transparent;
+}
+.browseScope select + select {
+  border-left: 1px solid hsl(var(--border));
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 .browseSearch {
   display: flex;
-  flex: 1 1 220px;
+  flex: 1 1 12rem;
+  max-width: 29rem;
   align-items: stretch;
   min-width: 0;
 }
@@ -101,16 +118,31 @@
   padding: 0 12px;
   white-space: nowrap;
 }
+.collectionAction {
+  margin-inline-start: auto;
+  border-color: transparent;
+  background: var(--lease-accent-soft);
+  color: var(--lease-accent);
+  font-weight: 550;
+}
 .browseSearch button:hover,
 .browseAction:hover {
   color: var(--lease-accent);
 }
+.collectionAction:hover {
+  border-color: var(--lease-accent);
+}
 @media (max-width: 540px) {
-  .browseSelect {
+  .browseScope {
+    flex-basis: 100%;
+  }
+  .browseScope select {
     flex: 1 1 0;
+    max-width: none;
   }
   .browseSearch {
-    flex-basis: 100%;
+    flex-basis: 9rem;
+    max-width: none;
   }
 }
 .scopeProjects button {

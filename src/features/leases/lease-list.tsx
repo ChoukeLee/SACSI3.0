@@ -82,6 +82,7 @@ import {
   leaseRoomOccupancyLabel,
   leaseRoomFloorLabel,
   leaseRecordPeriodLabel,
+  type LeaseRoomFilter,
 } from "./lease-room-overview";
 import {
   buildLeaseRoomOverview,
@@ -341,6 +342,8 @@ export function LeaseList({
     };
   });
   const [scopeLoaded, setScopeLoaded] = useState(false);
+  const [browseFilter, setBrowseFilter] = useState<LeaseRoomFilter>("all");
+  const focusBrowseLocation = useRef(false);
   useEffect(() => {
     let canReadLegacy = false;
     if (workArea === "sacsi" && scopePreference?.cookieName) {
@@ -1643,7 +1646,10 @@ export function LeaseList({
           {canCreate ? (
             <Button
               size="sm"
-              className="bg-blue-600 text-white hover:bg-blue-700"
+              variant={workArea === "sacsi" ? "outline" : "default"}
+              className={
+                workArea === "cimac" ? "bg-blue-600 text-white hover:bg-blue-700" : undefined
+              }
               disabled={workspace.unavailable}
               onClick={() => {
                 void openNew();
@@ -1935,7 +1941,22 @@ export function LeaseList({
               key={roomScope}
               rows={roomOverviewRows}
               records={leaseRecordRows}
-              sharedBrowseToolbar={!!browseViewerId}
+              buildingBrowse={
+                browseViewerId
+                  ? {
+                      locations: projectBuildings,
+                      selectedId: activeBuildingId === ALL_BUILDINGS ? null : activeBuildingId,
+                      filter: browseFilter,
+                      onFilterChange: setBrowseFilter,
+                      focusOnNavigation: focusBrowseLocation,
+                      onSelect: (id) => {
+                        if (writePending()) return;
+                        focusBrowseLocation.current = true;
+                        changeBuilding(id ?? ALL_BUILDINGS);
+                      },
+                    }
+                  : undefined
+              }
               locale={locale}
               loading={
                 workspace.enabled &&

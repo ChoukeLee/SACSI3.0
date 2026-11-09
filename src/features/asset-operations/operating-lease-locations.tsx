@@ -1,47 +1,55 @@
-import { ArrowLeft, ChevronRight } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { ArrowLeft } from "lucide-react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { LeaseLocationIndex } from "@/features/leases/lease-browse-content";
+import type { Locale } from "@/lib/i18n";
 import type {
+  OperatingAssetCategory,
   OperatingAssetDirectoryAsset,
   OperatingAssetFollowUp,
 } from "./operating-asset-directory-model";
 import { followUpLabels, recordedTenant } from "./operating-asset-display";
-import styles from "./warehouse-lease-directory.module.css";
+import styles from "./operating-lease-locations.module.css";
 
-type Locale = "zh" | "fr";
-
-interface WarehouseSite {
+interface OperatingLeaseSite {
   id: string;
   name: string;
   count: number;
   followUpCount: number;
 }
 
-interface WarehouseRow {
+interface OperatingLeaseRow {
   asset: OperatingAssetDirectoryAsset;
   followUp: OperatingAssetFollowUp;
   attention: "overdue" | "upcoming" | "review" | null;
 }
 
-interface WarehouseLeaseDirectoryProps {
+interface OperatingLeaseLocationsProps {
   locale: Locale;
-  sites: readonly WarehouseSite[];
+  category: OperatingAssetCategory;
+  sites: readonly OperatingLeaseSite[];
   activeSite: string;
-  rows: readonly WarehouseRow[];
+  rows: readonly OperatingLeaseRow[];
   selectedAssetId: string | null;
+  statusFilter: ReactNode;
   onSelectSite: (site: string) => void;
   onSelectAsset: (id: string) => void;
 }
 
 function warehouseIdentifier(asset: OperatingAssetDirectoryAsset, siteName?: string) {
   const { displayName, displayGroup } = asset;
-  if (!siteName || siteName !== displayGroup || !displayName.startsWith(siteName)) {
+  if (
+    asset.category !== "warehouse" ||
+    !siteName ||
+    siteName !== displayGroup ||
+    !displayName.startsWith(siteName)
+  ) {
     return displayName;
   }
   const suffix = displayName.slice(displayGroup.length).replace(/^[\s·:：-]+/, "");
   return /^[a-z]?\d+(?:\.\d+)*(?:号)?$/i.test(suffix) ? suffix : displayName;
 }
 
-function statusLabel(row: WarehouseRow, locale: Locale) {
+function statusLabel(row: OperatingLeaseRow, locale: Locale) {
   const zh = locale === "zh";
   const { attention, followUp } = row;
   const days = followUp.daysUntilDue;
@@ -63,14 +71,14 @@ function statusLabel(row: WarehouseRow, locale: Locale) {
   return null;
 }
 
-export function WarehouseLeaseCard({
+export function OperatingLeaseCard({
   row,
   locale,
   siteName,
   selected,
   onSelect,
 }: {
-  row: WarehouseRow;
+  row: OperatingLeaseRow;
   locale: Locale;
   siteName?: string;
   selected: boolean;
@@ -134,30 +142,34 @@ export function WarehouseLeaseCard({
   );
 }
 
-export function WarehouseLeaseDirectory({
+export function OperatingLeaseLocations({
   locale,
+  category,
   sites,
   activeSite,
   rows,
   selectedAssetId,
+  statusFilter,
   onSelectSite,
   onSelectAsset,
-}: WarehouseLeaseDirectoryProps) {
+}: OperatingLeaseLocationsProps) {
   const zh = locale === "zh";
+  const warehouse = category === "warehouse";
   const heading = useRef<HTMLHeadingElement>(null);
-  const siteList = useRef<HTMLUListElement>(null);
   const focusOnNavigation = useRef(false);
-  const siteName = sites.find(({ id }) => id === activeSite)?.name ?? activeSite;
+  const activeLocation = sites.find(({ id }) => id === activeSite);
+  const siteName = activeLocation?.name ?? activeSite;
+  const headingText = activeSite ? siteName : zh ? "场地总览" : "Vue des sites";
   const empty = (
     <p className={styles.empty}>
-      {zh ? "没有符合条件的仓库。" : "Aucun entrepôt ne correspond aux critères."}
+      {zh ? "没有符合条件的资产。" : "Aucun actif ne correspond aux critères."}
     </p>
   );
 
   useEffect(() => {
     if (!focusOnNavigation.current) return;
     focusOnNavigation.current = false;
-    (activeSite ? heading : siteList).current?.focus({ preventScroll: true });
+    heading.current?.focus({ preventScroll: true });
   }, [activeSite]);
 
   function changeSite(site: string) {
@@ -165,48 +177,60 @@ export function WarehouseLeaseDirectory({
     onSelectSite(site);
   }
 
-  if (!activeSite) {
-    if (!sites.length) return empty;
-    return (
-      <ul
-        ref={siteList}
-        tabIndex={-1}
-        className={styles.sites}
-        aria-label={zh ? "仓库场地" : "Sites d’entrepôts"}
-      >
-        {sites.map((site) => (
-          <li key={site.id}>
-            <button type="button" className={styles.site} onClick={() => changeSite(site.id)}>
-              <span className={styles.siteIdentity}>
-                <strong>{site.name}</strong>
-                <span>{zh ? `${site.count} 项资产` : `${site.count} actifs`}</span>
-              </span>
-              <span className={styles.followUp} data-has-follow-up={site.followUpCount > 0}>
-                {zh ? `待跟进 ${site.followUpCount} 项` : `${site.followUpCount} à suivre`}
-              </span>
-              <ChevronRight size={16} aria-hidden="true" />
-            </button>
-          </li>
-        ))}
-      </ul>
-    );
-  }
-
   return (
-    <section aria-label={siteName}>
+    <section aria-label={headingText}>
       <header className={styles.siteHeading}>
-        <h2 ref={heading} tabIndex={-1}>
-          {siteName}
-        </h2>
-        <button type="button" className={styles.back} onClick={() => changeSite("")}>
-          <ArrowLeft size={15} aria-hidden="true" />
-          {zh ? "返回全部场地" : "Retour à tous les sites"}
-        </button>
+        <div className={styles.siteIdentity}>
+          {activeSite ? (
+            <button type="button" className={styles.back} onClick={() => changeSite("")}>
+              <ArrowLeft size={15} aria-hidden="true" />
+              {zh ? "返回全部场地" : "Retour à tous les sites"}
+            </button>
+          ) : null}
+          <h2 ref={heading} tabIndex={-1}>
+            {headingText}
+          </h2>
+          {activeLocation ? (
+            <span>{zh ? `${activeLocation.count} 项资产` : `${activeLocation.count} actifs`}</span>
+          ) : null}
+        </div>
+        {statusFilter}
       </header>
-      {rows.length ? (
-        <ul className={styles.cards} aria-label={zh ? "仓库卡片" : "Fiches des entrepôts"}>
+      {!activeSite && sites.length ? (
+        <LeaseLocationIndex
+          label={
+            warehouse
+              ? zh
+                ? "仓库场地"
+                : "Sites d’entrepôts"
+              : zh
+                ? "经营场地"
+                : "Sites d’exploitation"
+          }
+          locations={sites.map(({ id, name, count, followUpCount }) => ({
+            id,
+            name,
+            countLabel: zh ? `${count} 项资产` : `${count} actifs`,
+            followUpLabel: zh ? `待跟进 ${followUpCount} 项` : `${followUpCount} à suivre`,
+            hasFollowUp: followUpCount > 0,
+          }))}
+          onSelect={changeSite}
+        />
+      ) : rows.length ? (
+        <ul
+          className={styles.cards}
+          aria-label={
+            warehouse
+              ? zh
+                ? "仓库卡片"
+                : "Fiches des entrepôts"
+              : zh
+                ? "经营资产卡片"
+                : "Fiches des actifs d’exploitation"
+          }
+        >
           {rows.map((row) => (
-            <WarehouseLeaseCard
+            <OperatingLeaseCard
               key={row.asset.id}
               row={row}
               locale={locale}

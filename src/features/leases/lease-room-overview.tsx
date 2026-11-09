@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ArrowRight, CalendarClock, Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { ArrowLeft, ArrowRight, CalendarClock, Search } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { cn, floorSortValue, normalizeFloorLabel } from "@/lib/utils";
 import { formatPropertyMoney, propertyLeaseRentLabel } from "@/lib/property-money";
 import { nativeLease } from "@/lib/native-money";
+import { LeaseBrowseStatusFilter, LeaseLocationIndex } from "./lease-browse-content";
 import {
   leaseRoomMatchesSearch,
   type LeaseRecordAttention,
@@ -16,16 +17,30 @@ import styles from "./lease-room-overview.module.css";
 
 export type LeaseRoomFilter = "all" | "overdue" | "upcoming" | "review";
 
+type RoomFollowUp = Exclude<LeaseRoomFilter, "all">;
+type BuildingBrowse = {
+  locations: readonly { id: string; display_name: string; code: string }[];
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+  filter: LeaseRoomFilter;
+  onFilterChange: (filter: LeaseRoomFilter) => void;
+  focusOnNavigation: RefObject<boolean>;
+};
+
 function needsLeaseReview(row: Pick<LeaseRoomOverviewRow, "conflict" | "reviewReasons">) {
   return row.conflict || row.reviewReasons.includes("active_record_has_end");
 }
 
+function roomFollowUp(row: LeaseRoomOverviewRow, includePeriodReview = false): RoomFollowUp | null {
+  if (needsLeaseReview(row) || row.attention?.kind === "coverage") return "review";
+  if (row.attention) return row.attention.kind;
+  return includePeriodReview && row.reviewReasons.includes("registered_period_needs_review")
+    ? "review"
+    : null;
+}
+
 export function leaseRoomMatchesFilter(row: LeaseRoomOverviewRow, filter: LeaseRoomFilter) {
-  if (filter === "all") return true;
-  const review = needsLeaseReview(row);
-  return filter === "review"
-    ? review || row.attention?.kind === "coverage"
-    : !review && row.attention?.kind === filter;
+  return filter === "all" || roomFollowUp(row) === filter;
 }
 
 export function leaseRoomFloorLabel(unit: LeaseRoomOverviewRow["unit"], locale: Locale) {
@@ -222,6 +237,73 @@ function monthlyRent(row: LeaseRoomOverviewRow, locale: Locale) {
       : "À vérifier";
 }
 
+function CompactRoomCard({
+  row,
+  building,
+  locale,
+  selected,
+  disabled,
+  includePeriodReview,
+  onSelect,
+}: {
+  row: LeaseRoomOverviewRow;
+  building: string;
+  locale: Locale;
+  selected: boolean;
+  disabled: boolean;
+  includePeriodReview: boolean;
+  onSelect: (row: LeaseRoomOverviewRow) => void;
+}) {
+  const zh = locale === "zh";
+  const tenant = tenantLabel(row, zh);
+  const followUp = roomFollowUp(row, includePeriodReview);
+  const periodReview = row.reviewReasons.includes("registered_period_needs_review");
+  const attention = needsLeaseReview(row)
+    ? zh
+      ? "租赁资料待核"
+      : "Dossier à vérifier"
+    : (attentionLabel(row, zh) ?? (periodReview ? (zh ? "租期待核" : "Période à vérifier") : null));
+  const paidThroughLabel = zh ? "已交至" : "Payé au";
+  const paidThrough = row.contract ? (row.paidThrough ?? (zh ? "未登记" : "Non renseigné")) : "—";
+  const occupancy =
+    row.occupancy !== "leased" && !needsLeaseReview(row) ? occupancyLabel(row, zh) : null;
+
+  return (
+    <button
+      type="button"
+      data-room-id={row.unit.id}
+      data-follow-up={followUp ?? undefined}
+      className={styles.compactRoom}
+      disabled={disabled}
+      aria-label={[
+        `${building} ${row.unit.unit_no}`,
+        tenant,
+        occupancy,
+        `${paidThroughLabel} ${paidThrough}`,
+        attention,
+      ]
+        .filter(Boolean)
+        .join(" · ")}
+      aria-haspopup="dialog"
+      aria-pressed={selected}
+      onClick={() => onSelect(row)}
+    >
+      <span className={styles.compactIdentity}>
+        <strong>{row.unit.unit_no}</strong>
+        <span>{tenant}</span>
+        {occupancy ? <small>{occupancy}</small> : null}
+      </span>
+      <span className={styles.compactRoomFacts}>
+        <span className={styles.compactPaidThrough}>
+          {paidThroughLabel}{" "}
+          {row.paidThrough ? <time dateTime={paidThrough}>{paidThrough}</time> : paidThrough}
+        </span>
+        {attention ? <span className={styles.compactAttention}>{attention}</span> : null}
+      </span>
+    </button>
+  );
+}
+
 export function LeaseRoomOverview({
   rows,
   records,
@@ -230,7 +312,7 @@ export function LeaseRoomOverview({
   error,
   selectedUnitId,
   disabled = false,
-  sharedBrowseToolbar,
+  buildingBrowse,
   embedded,
   onSelectUnit,
   onSelectRecord,
@@ -243,7 +325,7 @@ export function LeaseRoomOverview({
   error: boolean;
   selectedUnitId?: string | null;
   disabled?: boolean;
-  sharedBrowseToolbar?: boolean;
+  buildingBrowse?: BuildingBrowse;
   embedded?: { search: string; filter: LeaseRoomFilter };
   onSelectUnit: (row: LeaseRoomOverviewRow) => void;
   onSelectRecord: (row: LeaseRecordOverviewRow) => void;
@@ -257,36 +339,50 @@ export function LeaseRoomOverview({
   const [history, setHistory] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
   const [historyStatus, setHistoryStatus] = useState("historical");
+  const browseHeading = useRef<HTMLHeadingElement>(null);
+  const navigationFocus = buildingBrowse?.focusOnNavigation;
+  const activeBuildingId = buildingBrowse?.selectedId;
+  useEffect(() => {
+    if (!navigationFocus?.current || loading || error) return;
+    navigationFocus.current = false;
+    browseHeading.current?.focus({ preventScroll: true });
+  }, [navigationFocus, activeBuildingId, loading, error]);
+
+  const compact = Boolean(buildingBrowse && !embedded);
+  const compactCards = compact || Boolean(embedded);
+  const buildingIndex = compact && !activeBuildingId;
   const showAllRooms = !!embedded;
-  const activeFilter = embedded?.filter ?? filter;
+  const activeFilter = embedded?.filter ?? buildingBrowse?.filter ?? filter;
   const activeSearch = embedded?.search ?? search;
   const rentalRows = useMemo(
     () =>
       showAllRooms ? rows : rows.filter((row) => row.contract !== null || needsLeaseReview(row)),
     [rows, showAllRooms],
   );
-  const counts = useMemo(
-    () => ({
-      all: rentalRows.length,
-      overdue: rentalRows.filter(
-        (row) => !needsLeaseReview(row) && row.attention?.kind === "overdue",
-      ).length,
-      upcoming: rentalRows.filter(
-        (row) => !needsLeaseReview(row) && row.attention?.kind === "upcoming",
-      ).length,
-      review: rentalRows.filter(
-        (row) => needsLeaseReview(row) || row.attention?.kind === "coverage",
-      ).length,
-    }),
-    [rentalRows],
-  );
+  const { counts, locationTotals } = useMemo(() => {
+    const counts = { all: rentalRows.length, overdue: 0, upcoming: 0, review: 0 };
+    const locationTotals = new Map<string, { count: number; followUp: number; matching: number }>();
+    for (const row of rentalRows) {
+      const status = roomFollowUp(row, compact);
+      if (status) counts[status]++;
+      if (!buildingIndex) continue;
+      const id = row.unit.building_id;
+      const totals = locationTotals.get(id) ?? { count: 0, followUp: 0, matching: 0 };
+      totals.count++;
+      if (status) totals.followUp++;
+      if (activeFilter === "all" || activeFilter === status) totals.matching++;
+      locationTotals.set(id, totals);
+    }
+    return { counts, locationTotals };
+  }, [rentalRows, compact, buildingIndex, activeFilter]);
   const filtered = useMemo(
     () =>
       rentalRows.filter(
         (row) =>
-          leaseRoomMatchesSearch(row, activeSearch) && leaseRoomMatchesFilter(row, activeFilter),
+          leaseRoomMatchesSearch(row, activeSearch) &&
+          (activeFilter === "all" || roomFollowUp(row, compact) === activeFilter),
       ),
-    [rentalRows, activeSearch, activeFilter],
+    [rentalRows, activeSearch, activeFilter, compact],
   );
   const floors = useMemo(() => {
     const groups = new Map<
@@ -299,7 +395,7 @@ export function LeaseRoomOverview({
         rows: LeaseRoomOverviewRow[];
       }
     >();
-    for (const row of filtered) {
+    for (const row of buildingIndex ? [] : filtered) {
       const floor = leaseRoomFloorLabel(row.unit, locale);
       const key = `${row.unit.building_id}/${floor}`;
       const group = groups.get(key) ?? {
@@ -324,7 +420,7 @@ export function LeaseRoomOverview({
           a.unit.unit_no.localeCompare(b.unit.unit_no, undefined, { numeric: true }),
         ),
       }));
-  }, [filtered, locale]);
+  }, [filtered, locale, buildingIndex]);
   const followupRows = useMemo(
     () =>
       records
@@ -369,6 +465,30 @@ export function LeaseRoomOverview({
     { key: "upcoming", label: text("15天内应缴", "Dû sous 15 jours") },
     { key: "review", label: text("待核事项", "À vérifier") },
   ];
+  const activeBuilding = buildingBrowse?.locations.find(({ id }) => id === activeBuildingId);
+  const historicalLocations =
+    buildingIndex && activeFilter === "all"
+      ? new Set(records.filter((row) => row.historical).map((row) => row.unit.building_id))
+      : undefined;
+  const buildingLocations = buildingIndex
+    ? (buildingBrowse?.locations ?? []).flatMap(({ id, display_name, code }) => {
+        const total = locationTotals.get(id);
+        if (!total?.matching && !historicalLocations?.has(id)) return [];
+        return [
+          {
+            id,
+            name: display_name || code,
+            countLabel: total
+              ? text(`${total.count} 间租赁房源`, `${total.count} lots en location`)
+              : text("仅历史租赁", "Historique uniquement"),
+            followUpLabel: total
+              ? text(`待跟进 ${total.followUp} 间`, `${total.followUp} à suivre`)
+              : "",
+            hasFollowUp: Boolean(total?.followUp),
+          },
+        ];
+      })
+    : [];
   if (error || loading)
     return (
       <section className={styles.unavailable} role={error ? "alert" : "status"} aria-busy={loading}>
@@ -397,10 +517,57 @@ export function LeaseRoomOverview({
     );
   return (
     <section
-      className={styles.overview}
+      className={cn(styles.overview, compactCards && styles.compactOverview)}
       aria-label={text("楼栋长租房源", "Locations par bâtiment")}
     >
-      {!embedded ? (
+      {compact && buildingBrowse ? (
+        <header className={styles.browseHeader}>
+          <div className={styles.browseTitle}>
+            {activeBuildingId ? (
+              <button
+                type="button"
+                className={styles.browseBack}
+                aria-label={text("返回全部楼栋", "Revenir à tous les bâtiments")}
+                disabled={disabled}
+                onClick={() => buildingBrowse.onSelect(null)}
+              >
+                <ArrowLeft size={16} aria-hidden="true" />
+                {text("全部楼栋", "Tous les bâtiments")}
+              </button>
+            ) : null}
+            <h2 ref={browseHeading} tabIndex={-1}>
+              {activeBuilding?.display_name ||
+                activeBuilding?.code ||
+                text("楼栋一览", "Bâtiments")}
+            </h2>
+            <span>{text(`${counts.all} 间租赁房源`, `${counts.all} lots en location`)}</span>
+          </div>
+          <div className={styles.browseActions}>
+            <LeaseBrowseStatusFilter
+              label={text("房源跟进筛选", "Filtres de suivi")}
+              value={activeFilter}
+              options={filters.map(({ key, label }) => ({
+                value: key,
+                label,
+                count: counts[key],
+              }))}
+              onChange={(value) => {
+                const choice = filters.find(({ key }) => key === value);
+                if (choice) buildingBrowse.onFilterChange(choice.key);
+              }}
+            />
+            <button
+              type="button"
+              className={styles.browseHistory}
+              aria-expanded={history}
+              onClick={() => setHistory((value) => !value)}
+            >
+              {text("查看历史", "Voir l’historique")}
+            </button>
+          </div>
+        </header>
+      ) : null}
+      {!embedded && !compact ? (
         <div className={styles.toolbar}>
           <div
             className={styles.filters}
@@ -424,32 +591,28 @@ export function LeaseRoomOverview({
             ))}
           </div>
           <div className={styles.tools}>
-            {!sharedBrowseToolbar ? (
-              <>
-                <label className={styles.search}>
-                  <Search size={15} aria-hidden="true" />
-                  <span className="sr-only">
-                    {text("搜索房号或租客", "Rechercher un lot ou locataire")}
-                  </span>
-                  <input
-                    type="search"
-                    placeholder={text("搜索房号或租客", "Lot ou locataire")}
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className={styles.followupButton}
-                  aria-expanded={followup}
-                  onClick={() => setFollowup((value) => !value)}
-                >
-                  <CalendarClock size={15} aria-hidden="true" />
-                  {text("收款跟进", "Suivi des loyers")}
-                  <span>{followupRows.length}</span>
-                </button>
-              </>
-            ) : null}
+            <label className={styles.search}>
+              <Search size={15} aria-hidden="true" />
+              <span className="sr-only">
+                {text("搜索房号或租客", "Rechercher un lot ou locataire")}
+              </span>
+              <input
+                type="search"
+                placeholder={text("搜索房号或租客", "Lot ou locataire")}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className={styles.followupButton}
+              aria-expanded={followup}
+              onClick={() => setFollowup((value) => !value)}
+            >
+              <CalendarClock size={15} aria-hidden="true" />
+              {text("收款跟进", "Suivi des loyers")}
+              <span>{followupRows.length}</span>
+            </button>
             <button
               type="button"
               className={styles.followupButton}
@@ -461,7 +624,7 @@ export function LeaseRoomOverview({
           </div>
         </div>
       ) : null}
-      {!embedded && !sharedBrowseToolbar && followup ? (
+      {!embedded && !compact && followup ? (
         <section
           className={styles.followup}
           aria-label={text("集中收款跟进", "Suivi des loyers regroupé")}
@@ -610,7 +773,15 @@ export function LeaseRoomOverview({
           ) : null}
         </section>
       ) : null}
-      {!floors.length ? (
+      {buildingIndex && buildingLocations.length && buildingBrowse ? (
+        <LeaseLocationIndex
+          label={text("长租楼栋", "Bâtiments en location")}
+          locations={buildingLocations}
+          onSelect={(id) => {
+            if (!disabled) buildingBrowse.onSelect(id);
+          }}
+        />
+      ) : !floors.length ? (
         embedded ? null : (
           <p className={styles.empty}>
             {rentalRows.length
@@ -628,20 +799,39 @@ export function LeaseRoomOverview({
         floors.map((floor) => (
           <section
             key={floor.key}
-            className={styles.floor}
+            className={cn(styles.floor, compactCards && styles.compactFloor)}
             aria-label={`${floor.building} ${floor.floor}`}
           >
             <header>
               <h2>
-                {floor.building}
-                <span>{floor.floor}</span>
+                {compact ? (
+                  floor.floor
+                ) : (
+                  <>
+                    {floor.building}
+                    <span>{floor.floor}</span>
+                  </>
+                )}
               </h2>
               <p>
                 {floor.rows.length} {text("间", "lots")}
               </p>
             </header>
-            <div className={styles.roomGrid}>
+            <div className={compactCards ? styles.compactRoomGrid : styles.roomGrid}>
               {floor.rows.map((row) => {
+                if (compactCards)
+                  return (
+                    <CompactRoomCard
+                      key={row.unit.id}
+                      row={row}
+                      building={floor.building}
+                      locale={locale}
+                      selected={selectedUnitId === row.unit.id}
+                      disabled={disabled}
+                      includePeriodReview={compact}
+                      onSelect={onSelectUnit}
+                    />
+                  );
                 const attention = attentionLabel(row, zh);
                 const periodReview =
                   !attention && row.reviewReasons.includes("registered_period_needs_review");

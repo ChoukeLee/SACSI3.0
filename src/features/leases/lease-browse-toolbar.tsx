@@ -75,34 +75,34 @@ export function LeaseBrowseToolbar({
       aria-label={zh ? "长租浏览工具栏" : "Outils de navigation des locations"}
       aria-busy={pending}
     >
-      <select
-        aria-label={zh ? "资产类别" : "Catégorie d’actifs"}
-        className={styles.browseSelect}
-        value={category}
-        onChange={(event) => switchCategory(event.target.value)}
-        disabled={pending}
-      >
-        {leaseBrowseCategories.map((option) => (
-          <option key={option} value={option}>
-            {leaseBrowseCategoryLabel(option, locale)}
-          </option>
-        ))}
-      </select>
-      {location ? (
+      <div className={styles.browseScope}>
         <select
-          aria-label={location.label}
-          className={styles.browseSelect}
-          value={location.value}
-          onChange={(event) => location.onChange(event.target.value)}
+          aria-label={zh ? "资产类别" : "Catégorie d’actifs"}
+          value={category}
+          onChange={(event) => switchCategory(event.target.value)}
           disabled={pending}
         >
-          {location.options.map(({ value, label }) => (
-            <option key={value} value={value}>
-              {label}
+          {leaseBrowseCategories.map((option) => (
+            <option key={option} value={option}>
+              {leaseBrowseCategoryLabel(option, locale)}
             </option>
           ))}
         </select>
-      ) : null}
+        {location ? (
+          <select
+            aria-label={location.label}
+            value={location.value}
+            onChange={(event) => location.onChange(event.target.value)}
+            disabled={pending}
+          >
+            {location.options.map(({ value, label }) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        ) : null}
+      </div>
       <form className={styles.browseSearch} onSubmit={searchAssets}>
         <input
           key={searchQuery ?? ""}
@@ -126,7 +126,11 @@ export function LeaseBrowseToolbar({
           {zh ? "返回分类" : "Revenir à la catégorie"}
         </Link>
       ) : null}
-      <Link className={styles.browseAction} href={leaseCollectionHref(locale)} prefetch={false}>
+      <Link
+        className={`${styles.browseAction} ${styles.collectionAction}`}
+        href={leaseCollectionHref(locale)}
+        prefetch={false}
+      >
         <CalendarClock size={16} aria-hidden="true" />
         {zh ? "收款跟进" : "Suivi des loyers"}
       </Link>

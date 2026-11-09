@@ -5,6 +5,7 @@ import { ArrowRight, CalendarClock, Search } from "lucide-react";
 import Link from "next/link";
 import { SegmentedControl } from "@/components/ui/operational";
 import { ApartmentDirectorySection } from "@/features/leases/apartment-directory-section";
+import { LeaseBrowseStatusFilter } from "@/features/leases/lease-browse-content";
 import { leaseBrowseCategoryLabel, leaseSearchHref } from "@/features/leases/lease-browse-model";
 import {
   LeaseBrowseToolbar,
@@ -40,7 +41,8 @@ import {
   recordedTenant,
   referenceRent,
 } from "./operating-asset-display";
-import { WarehouseLeaseCard, WarehouseLeaseDirectory } from "./warehouse-lease-directory";
+import { OperatingLeaseCard, OperatingLeaseLocations } from "./operating-lease-locations";
+import locationStyles from "./operating-lease-locations.module.css";
 import styles from "./operating-asset-directory.module.css";
 
 type Locale = "zh" | "fr";
@@ -58,10 +60,9 @@ type DirectoryRow = {
 type CollectionRow = DirectoryRow & { followUp: FollowUp & { status: FollowUpStatus } };
 
 const emptyEntries: OperatingAssetDirectoryEntry[] = [];
-const unassignedWarehouseSite = "__warehouse-unassigned__";
-
-function warehouseSiteId(asset: OperatingAssetDirectoryAsset) {
-  return asset.displayGroup.trim() ? asset.displayGroup : unassignedWarehouseSite;
+function leaseSiteId(asset: OperatingAssetDirectoryAsset) {
+  if (asset.displayGroup.trim()) return asset.displayGroup;
+  return asset.category === "warehouse" ? "__warehouse-unassigned__" : "__lease-site-unassigned__";
 }
 
 const cardFilters: { key: CardFilter; labels: [string, string] }[] = [
@@ -221,7 +222,8 @@ function OperatingAssetDirectoryView({
     return scoped;
   }, [category, data.assets, entriesByAsset, locale, today]);
   const showCollections = enableCollections && view === "collections";
-  const warehouseMode = Boolean(browseViewerId && category === "warehouse" && !showCollections);
+  const locationCategory =
+    browseViewerId && category !== "all" && !showCollections ? category : null;
   const activeSearch = browseViewerId ? (searchQuery ?? "").trim() : search;
   const isSearchView = Boolean(browseViewerId && category === "all");
   const emptySearch = isSearchView && !activeSearch;
@@ -232,19 +234,19 @@ function OperatingAssetDirectoryView({
     (Boolean(browseViewerId || collectionHref) || enableCollections || hasApartments);
   const thisMonth = assetReportPeriod("month", today.slice(0, 7));
   const groupOptions = new Map<string, string>();
-  const warehouseSites = new Map<
+  const locations = new Map<
     string,
     { id: string; name: string; count: number; followUpCount: number }
   >();
   if (hasApartments) groupOptions.set("apartment", zh ? "公寓" : "Appartements");
   for (const { asset, attention } of rows) {
-    if (warehouseMode) {
-      const id = warehouseSiteId(asset);
-      let site = warehouseSites.get(id);
+    if (locationCategory) {
+      const id = leaseSiteId(asset);
+      let site = locations.get(id);
       if (!site) {
         const name = asset.displayGroup.trim() || (zh ? "场地未登记" : "Site non renseigné");
         site = { id, name, count: 0, followUpCount: 0 };
-        warehouseSites.set(id, site);
+        locations.set(id, site);
         groupOptions.set(id, name);
       }
       site.count++;
@@ -268,8 +270,8 @@ function OperatingAssetDirectoryView({
     : rows.filter(
         ({ asset }) =>
           !activeGroup ||
-          (warehouseMode
-            ? warehouseSiteId(asset)
+          (locationCategory
+            ? leaseSiteId(asset)
             : category === "all"
               ? asset.category
               : asset.displayGroup) === activeGroup,
@@ -305,7 +307,7 @@ function OperatingAssetDirectoryView({
       ? visible.filter((row) => row.attention === cardFilter)
       : visible;
   const groups = new Map<string, DirectoryRow[]>();
-  if (!warehouseMode) {
+  if (!locationCategory) {
     for (const row of matchingRows) {
       const label = isSearchView
         ? leaseBrowseCategoryLabel(row.asset.category, locale)
@@ -318,8 +320,8 @@ function OperatingAssetDirectoryView({
     }
   }
   const matchingSiteIds =
-    warehouseMode && !activeGroup && cardFilter !== "all"
-      ? new Set(matchingRows.map(({ asset }) => warehouseSiteId(asset)))
+    locationCategory && !activeGroup && cardFilter !== "all"
+      ? new Set(matchingRows.map(({ asset }) => leaseSiteId(asset)))
       : undefined;
   const collectionRows = enableCollections
     ? visible.filter(
@@ -358,12 +360,24 @@ function OperatingAssetDirectoryView({
         returnTo={isSearchView ? leaseSearchHref(locale, browseCategory, activeSearch) : undefined}
       />
     ) : null;
-  const statusFilters = (
-    <div
-      className={leaseStyles.filters}
-      role="group"
-      aria-label={zh ? "长租状态筛选" : "Filtres de suivi des locations"}
-    >
+  const statusLabel = zh ? "长租状态筛选" : "Filtres de suivi des locations";
+  const browseStatusFilter = (
+    <LeaseBrowseStatusFilter
+      label={statusLabel}
+      value={cardFilter}
+      options={cardFilters.map(({ key, labels }) => ({
+        value: key,
+        label: key === "all" ? (zh ? "全部状态" : "Tous les statuts") : labels[lang],
+        count: counts[key],
+      }))}
+      onChange={(value) => {
+        const nextFilter = cardFilters.find(({ key }) => key === value);
+        if (nextFilter) setCardFilter(nextFilter.key);
+      }}
+    />
+  );
+  const legacyStatusFilters = (
+    <div className={leaseStyles.filters} role="group" aria-label={statusLabel}>
       {cardFilters.map(({ key, labels }) => (
         <button
           type="button"
@@ -375,7 +389,7 @@ function OperatingAssetDirectoryView({
             key === "overdue" && counts.overdue > 0 && leaseStyles.filterOverdue,
           )}
         >
-          {key === "all" && browseViewerId ? (zh ? "全部状态" : "Tous les statuts") : labels[lang]}
+          {labels[lang]}
           <span>{counts[key]}</span>
         </button>
       ))}
@@ -408,18 +422,14 @@ function OperatingAssetDirectoryView({
                   }
             }
           />
-          {!emptySearch ? (
-            <div className={leaseStyles.toolbar}>
-              {isSearchView ? (
-                <div className={styles.searchResultHeading}>
-                  <h2>{zh ? "跨类别搜索结果" : "Résultats toutes catégories"}</h2>
-                  <span>
-                    {zh ? `${counts[cardFilter]} 项` : `${counts[cardFilter]} résultat(s)`}
-                  </span>
-                </div>
-              ) : null}
-              {statusFilters}
-            </div>
+          {isSearchView && !emptySearch ? (
+            <header className={locationStyles.siteHeading}>
+              <div className={styles.searchResultHeading}>
+                <h2>{zh ? "跨类别搜索结果" : "Résultats toutes catégories"}</h2>
+                <span>{zh ? `${counts[cardFilter]} 项` : `${counts[cardFilter]} résultat(s)`}</span>
+              </div>
+              {browseStatusFilter}
+            </header>
           ) : null}
         </>
       ) : null}
@@ -449,7 +459,7 @@ function OperatingAssetDirectoryView({
       ) : null}
       {!browseViewerId ? (
         <div className={showLeaseToolbar ? leaseStyles.toolbar : styles.toolbar}>
-          {showLeaseToolbar ? statusFilters : null}
+          {showLeaseToolbar ? legacyStatusFilters : null}
           <div className={showLeaseToolbar ? leaseStyles.tools : styles.toolbar}>
             <label className={showLeaseToolbar ? leaseStyles.search : styles.search}>
               <Search size={15} aria-hidden="true" />
@@ -523,15 +533,17 @@ function OperatingAssetDirectoryView({
           onFilter={setFollowUpFilter}
           onSelect={setSelectedId}
         />
-      ) : warehouseMode ? (
-        <WarehouseLeaseDirectory
+      ) : locationCategory ? (
+        <OperatingLeaseLocations
           locale={locale}
-          sites={Array.from(warehouseSites.values()).filter(
+          category={locationCategory}
+          sites={Array.from(locations.values()).filter(
             ({ id }) => !matchingSiteIds || matchingSiteIds.has(id),
           )}
           activeSite={activeGroup}
           rows={activeGroup ? matchingRows : []}
           selectedAssetId={selected?.asset.id ?? null}
+          statusFilter={browseStatusFilter}
           onSelectSite={changeGroup}
           onSelectAsset={setSelectedId}
         />
@@ -546,10 +558,10 @@ function OperatingAssetDirectoryView({
                 <span>{zh ? `${assets.length} 项资产` : `${assets.length} actifs`}</span>
               </header>
             )}
-            <ul className={styles.cards}>
+            <ul className={isSearchView ? locationStyles.cards : styles.cards}>
               {assets.map((row) =>
-                isSearchView && row.asset.category === "warehouse" ? (
-                  <WarehouseLeaseCard
+                isSearchView ? (
+                  <OperatingLeaseCard
                     key={row.asset.id}
                     row={row}
                     locale={locale}
@@ -562,11 +574,6 @@ function OperatingAssetDirectoryView({
                     row={row}
                     period={thisMonth}
                     locale={locale}
-                    categoryLabel={
-                      browseViewerId
-                        ? leaseBrowseCategoryLabel(row.asset.category, locale)
-                        : undefined
-                    }
                     selected={selected?.asset.id === row.asset.id}
                     onSelect={() => setSelectedId(row.asset.id)}
                   />
@@ -775,14 +782,12 @@ function AssetDirectoryCard({
   row,
   period,
   locale,
-  categoryLabel,
   selected,
   onSelect,
 }: {
   row: DirectoryRow;
   period: ReturnType<typeof assetReportPeriod>;
   locale: Locale;
-  categoryLabel?: string;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -845,7 +850,7 @@ function AssetDirectoryCard({
               ? zh
                 ? "自用"
                 : "Usage propre"
-              : (categoryLabel ?? operatingAssetCategoryLabel(asset.category, locale))}
+              : operatingAssetCategoryLabel(asset.category, locale)}
           </span>
         </span>
         {tenant ? (
