@@ -1,0 +1,279 @@
+.directory {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.toolbar,
+.periodPicker,
+.periodPicker label,
+.receiptHeader,
+.receiptFilters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.search,
+.periodPicker input,
+.receiptFilters button {
+  min-height: 2.25rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  background: hsl(var(--card));
+  font-size: 0.8125rem;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 0.65rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.search input {
+  width: min(11rem, 50vw);
+  padding: 0.4rem 0;
+  background: transparent;
+  color: hsl(var(--foreground));
+  outline: none;
+}
+
+.search:focus-within,
+.card:focus-visible,
+.detailPanel:focus-visible,
+.detailPanel button:focus-visible,
+.detailPanel input:focus-visible,
+.detailPanel summary:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13.75rem), 1fr));
+  gap: 0.75rem;
+}
+
+.group > h2 {
+  margin: 0.35rem 0 0.6rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.card {
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+  width: 100%;
+  height: 100%;
+  padding: 0.85rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.65rem;
+  background: hsl(var(--card));
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.card:hover {
+  background: hsl(var(--muted) / 0.35);
+}
+
+.cardHeader,
+.cardFact {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.cardHeader {
+  align-items: start;
+  font-size: 0.9375rem;
+}
+
+.cardHeader svg {
+  flex: none;
+  color: hsl(var(--muted-foreground));
+}
+
+.cardCategory,
+.note,
+.source,
+.periodPicker,
+.receiptFacts dt {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+}
+
+.cardFact {
+  font-size: 0.8125rem;
+}
+
+.cardFact > :first-child {
+  color: hsl(var(--muted-foreground));
+}
+
+.cardFact > :last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  justify-self: start;
+  padding: 0.12rem 0.45rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.4rem;
+  background: hsl(var(--muted) / 0.35);
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.status[data-status="pending"] {
+  border-color: #ead6aa;
+  background: #fffbef;
+  color: #73531d;
+}
+
+.empty {
+  padding: 1rem;
+  border: 1px dashed hsl(var(--border));
+  border-radius: 0.65rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem;
+}
+
+.detailPanel {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}
+
+.periodPicker {
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+
+.periodPicker input {
+  padding: 0.25rem 0.45rem;
+  color: hsl(var(--foreground));
+}
+
+.detailSection {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.detailSection + .detailSection {
+  padding-top: 0.9rem;
+  border-top: 1px solid hsl(var(--border));
+}
+
+.detailSection h3 {
+  font-weight: 600;
+}
+
+.cashBasis {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.7rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+}
+
+.cashBasis h4,
+.currencyBlock > p {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+.currencyBlock > p {
+  margin-bottom: 0.25rem;
+}
+
+.cashFacts,
+.depositFacts {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.cashFacts > div,
+.depositFacts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.cashFacts dd,
+.depositFacts dd,
+.receiptFacts dd {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+.textButton {
+  justify-self: start;
+  min-height: 2rem;
+  border-radius: 0.3rem;
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.receiptFilters button {
+  padding: 0.35rem 0.65rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.receiptFilters button[aria-pressed="true"] {
+  border-color: hsl(var(--ring));
+  color: hsl(var(--foreground));
+}
+
+.receipts > li {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.receiptHeader {
+  justify-content: space-between;
+}
+
+.receiptFacts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.receiptFacts dt,
+.receiptFacts dd {
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.source,
+.assetSources {
+  overflow-wrap: anywhere;
+}
+
+.source summary {
+  cursor: pointer;
+}
+
+.source p {
+  margin: 0.35rem 0 0 0.85rem;
+  white-space: pre-wrap;
+}
+
+.assetSources {
+  display: grid;
+  gap: 0.35rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+}

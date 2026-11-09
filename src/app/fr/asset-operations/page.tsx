@@ -1,8 +1,8 @@
-import { AssetOperationsPage } from "@/features/asset-operations/asset-operations-page";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default function Page() {
-  return <AssetOperationsPage locale="fr" />;
+  redirect("/fr/units?assetView=maintenance");
 }

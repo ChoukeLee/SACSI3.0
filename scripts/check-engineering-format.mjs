@@ -617,6 +617,13 @@ const files = [
   "tests/operator-pending.test.ts",
   "tests/operator-permission-boundary.test.ts",
   "tests/operator-preview-route.test.ts",
+  "src/features/asset-operations/operating-asset-directory-model.ts",
+  "src/features/asset-operations/operating-asset-directory-model.test.ts",
+  "src/features/asset-operations/operating-asset-directory.module.css",
+  "src/features/asset-operations/operating-asset-directory.tsx",
+  "src/features/asset-operations/operating-asset-directory.test.tsx",
+  "src/features/asset-operations/operating-asset-page.tsx",
+  "tests/operating-asset-routes.test.tsx",
 ];
 let invalid = 0;
 for (const filepath of files) {

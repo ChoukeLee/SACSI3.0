@@ -19,7 +19,6 @@ const ROLE_KEYS: Partial<Record<UserRole, Set<string>>> = {
     "finance",
     "customers",
     "reports",
-    "assetOperations",
   ]),
   finance: new Set([
     "management",
@@ -30,7 +29,6 @@ const ROLE_KEYS: Partial<Record<UserRole, Set<string>>> = {
     "finance",
     "customers",
     "reports",
-    "assetOperations",
   ]),
   front_desk: new Set(["dailyRentals", "leases"]),
   rental_sales: new Set(["units", "dailyRentals", "leases", "sales", "customers"]),
