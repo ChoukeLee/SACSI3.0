@@ -168,7 +168,9 @@ function attentionAmount(
   if (!value || value.amount === null) return locale === "zh" ? "金额待核" : "Montant à vérifier";
   const currency = value.currency ?? "XOF";
   const label = formatPropertyMoney(value.amount, currency, locale);
-  return currency === "XOF" ? label : `${label} ${currency}`;
+  const amount = currency === "XOF" ? label : `${label} ${currency}`;
+  if (!value.amountIsEstimated) return amount;
+  return locale === "zh" ? `${amount}（含租金测算）` : `${amount} (estimation incluse)`;
 }
 
 function recordStatusLabel(row: LeaseRecordOverviewRow, zh: boolean) {

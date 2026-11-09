@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import {
+  buildLeaseRecordOverview,
   buildLeaseRoomOverview,
   decodeLeaseRoomReceivables,
   leaseRoomMatchesSearch,
@@ -65,7 +66,7 @@ it("keeps paperless registered tenants, rent and coverage visible without invent
   expect(row.attention).toBeNull();
 });
 
-it("suppresses only an unconfirmed past end date when the active lease has current coverage", () => {
+it("suppresses an unconfirmed past end date and keeps a confirmed one visible", () => {
   const data = input();
   const contract = data.contracts[0];
   Object.assign(contract, {
@@ -85,13 +86,113 @@ it("suppresses only an unconfirmed past end date when the active lease has curre
 
   contract.expected_end_confirmed = false;
   contract.paid_through_date = "2026-11-06";
-  expect(buildLeaseRoomOverview(data)[0].reviewReasons).toContain("registered_period_needs_review");
+  expect(buildLeaseRoomOverview(data)[0].reviewReasons).not.toContain(
+    "registered_period_needs_review",
+  );
 
   contract.paid_through_date = data.today;
   data.receivables = [bill({ due_date: "2026-11-06" })];
   const [withArrears] = buildLeaseRoomOverview(data);
   expect(withArrears.reviewReasons).not.toContain("registered_period_needs_review");
   expect(withArrears.attention).toMatchObject({ kind: "overdue", dueDate: "2026-11-06" });
+});
+
+it.each([
+  ["2026-10-01", "upcoming", 0, 60, false],
+  ["2026-10-02", "overdue", -1, 60, false],
+  ["2026-11-01", "overdue", -31, 60, false],
+  ["2026-11-10", "overdue", -40, 160, true],
+] as const)(
+  "projects overdue months after their due date on %s",
+  (today, kind, days, amount, estimated) => {
+    const data = input();
+    data.today = today;
+    data.contracts[0].paid_through_date = "2026-09-30";
+    data.receivables = [
+      bill({
+        due_date: "2026-10-01",
+        service_period_start: "2026-10-01",
+        service_period_end: "2026-10-31",
+        status: "partial",
+        paid_amount_xof: 40,
+      }),
+    ];
+
+    const [room] = buildLeaseRoomOverview(data);
+    const [record] = buildLeaseRecordOverview(data);
+    expect(room.attention).toMatchObject({ kind, days, amount, amountIsEstimated: estimated });
+    expect(record.attention).toEqual(room.attention);
+    expect(record.balances).toMatchObject([{ outstanding: 60 }]);
+  },
+);
+
+it("retains real fees and later rent balances without projecting rent for the same period", () => {
+  const data = input();
+  data.today = "2026-11-10";
+  data.contracts[0].paid_through_date = "2026-09-30";
+  data.receivables = [
+    bill({ due_date: "2026-10-01" }),
+    bill({
+      id: "next-rent",
+      due_date: "2026-11-07",
+      service_period_start: "2026-11-01",
+      service_period_end: "2026-11-30",
+      status: "partial",
+      paid_amount_xof: 30,
+    }),
+    bill({ id: "fee", due_date: "2026-10-01", category: "property_fee", amount_xof: 20 }),
+  ];
+  const [room] = buildLeaseRoomOverview(data);
+  expect(room.attention).toMatchObject({ kind: "overdue", amount: 190, amountIsEstimated: false });
+  expect(buildLeaseRecordOverview(data)[0].attention).toEqual(room.attention);
+});
+
+it("waits for a managed first-uncovered bill with a later due date and keeps ambiguous bills actual", () => {
+  const data = input();
+  data.today = "2026-11-24";
+  Object.assign(data.contracts[0], {
+    paid_through_date: "2026-11-23",
+    expected_end_date: "2026-09-30",
+    expected_end_confirmed: false,
+  });
+  const first = bill({
+    due_date: "2026-12-12",
+    service_period_start: "2026-11-24",
+    service_period_end: "2026-12-23",
+  });
+  data.receivables = [first];
+  expect(buildLeaseRoomOverview(data)[0].attention).toBeNull();
+  expect(buildLeaseRecordOverview(data)[0].attention).toBeNull();
+
+  data.today = "2027-01-13";
+  expect(buildLeaseRoomOverview(data)[0].attention).toMatchObject({
+    amount: 200,
+    amountIsEstimated: true,
+  });
+  data.receivables = [first, bill({ id: "unknown-period", due_date: "2027-01-16" })];
+  expect(buildLeaseRoomOverview(data)[0].attention).toMatchObject({
+    amount: 100,
+    amountIsEstimated: false,
+  });
+});
+
+it("uses the agreed payment day after a first due date shortened by February", () => {
+  const data = input();
+  Object.assign(data.contracts[0], {
+    payment_day: 31,
+    paid_through_date: "2026-02-27",
+  });
+  data.receivables = [bill({ due_date: "2026-02-28" })];
+  data.today = "2026-03-31";
+  expect(buildLeaseRoomOverview(data)[0].attention).toMatchObject({
+    amount: 100,
+    amountIsEstimated: false,
+  });
+  data.today = "2026-04-01";
+  expect(buildLeaseRoomOverview(data)[0].attention).toMatchObject({
+    amount: 200,
+    amountIsEstimated: true,
+  });
 });
 
 it("finds apartment rooms by building, room, tenant or lease reference", () => {

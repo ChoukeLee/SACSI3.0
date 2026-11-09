@@ -176,7 +176,12 @@ export function buildApartmentCollectionRows(
               : "Plusieurs devises · voir le détail"
             : formatPropertyMoney(bill.amount, bill.currency ?? "XOF", locale)
           : null,
-        amountLabel: apartmentAmountLabels[status][zh ? 0 : 1],
+        amountLabel:
+          bill?.amountIsEstimated && bill.amount !== null
+            ? zh
+              ? "逾期未收（含租金测算）"
+              : "Solde en retard, estimation incluse"
+            : apartmentAmountLabels[status][zh ? 0 : 1],
       },
     ];
   });

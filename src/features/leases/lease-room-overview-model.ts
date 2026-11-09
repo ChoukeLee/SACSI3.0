@@ -4,7 +4,12 @@ import type { WorkspaceUnit } from "@/features/contracts/workspace-model";
 import type { ContractReceivableSummary } from "@/features/contracts/contract-list-model";
 import type { LeaseBuilding } from "./project-scope";
 import { leaseTenantDisplayName } from "./lease-display-model";
-import { resolveLeaseAttention } from "./lease-receivable-summary";
+import {
+  addAnchoredUtcMonths,
+  addOneIsoDay,
+  countStartedLeasePeriods,
+  resolveLeaseAttention,
+} from "./lease-receivable-summary";
 
 export type LeaseRoomOccupancy =
   | "leased"
@@ -24,7 +29,7 @@ export interface LeaseRoomAttention {
   days: number | null;
   amount: number | null;
   currency?: CurrencyCode;
-  amountIsEstimated: false;
+  amountIsEstimated: boolean;
 }
 
 export interface LeaseRoomOverviewRow {
@@ -157,6 +162,162 @@ function noBillAttention(record: LeaseContractRow, today: string): LeaseRoomAtte
   return coverage(record, today);
 }
 
+type MonthlyRentAnchor = { currency: CurrencyCode; dueDate: string; additionalOverdue: number };
+
+/** Project only missing cycles after a managed first-uncovered rent bill. Actual bills stay authoritative. */
+function monthlyRentAnchor(
+  record: LeaseContractRow,
+  unit: WorkspaceUnit,
+  { today, receivables, contracts }: LeaseRoomOverviewInput,
+): MonthlyRentAnchor | null {
+  const paidThrough = record.paid_through_date;
+  const commencement = (record as LeaseContractRow & { commencement_state?: string })
+    .commencement_state;
+  if (
+    record.status !== "active" ||
+    record.payment_cycle !== "monthly" ||
+    record.actual_end_date ||
+    commencement === "not_started" ||
+    !date(paidThrough) ||
+    !date(record.start_date) ||
+    record.start_date > paidThrough ||
+    record.start_date > today ||
+    contracts.some(
+      (other) => other.id !== record.id && other.unit_id === unit.id && other.status === "active",
+    )
+  )
+    return null;
+
+  const firstUncovered = addOneIsoDay(paidThrough);
+  const confirmedEnd = record.expected_end_confirmed === true ? record.expected_end_date : null;
+  if (confirmedEnd !== null && (!date(confirmedEnd) || confirmedEnd < firstUncovered)) return null;
+
+  const currency = record.rent_currency ?? "XOF";
+  const monthlyRent = money(
+    currency === "XOF" ? record.monthly_rent_xof : record.monthly_rent_amount,
+  );
+  if (!["XOF", "CNY", "USD"].includes(currency) || monthlyRent === null || monthlyRent <= 0)
+    return null;
+
+  const rentRows = (receivables ?? []).filter(
+    (row) =>
+      row.source_type === "lease_contract" &&
+      row.source_id === record.id &&
+      row.category === "lease_rent",
+  );
+  const matching = rentRows.filter(
+    (row) =>
+      row.status !== "cancelled" &&
+      (row.service_period_start === firstUncovered ||
+        (row.service_period_start == null &&
+          row.service_period_end == null &&
+          row.due_date === firstUncovered)),
+  );
+  if (matching.length !== 1) return null;
+  const [firstBill] = matching;
+  const amount = money(nativeAmount(firstBill));
+  const paid = money(nativePaid(firstBill));
+  if (
+    firstBill.management_status !== "managed" ||
+    !["pending", "partial", "overdue"].includes(firstBill.status) ||
+    firstBill.currency !== currency ||
+    firstBill.unit_id !== unit.id ||
+    firstBill.building_id !== unit.building_id ||
+    firstBill.customer_id !== record.customer_id ||
+    !date(firstBill.due_date) ||
+    amount === null ||
+    paid === null ||
+    paid >= amount ||
+    (firstBill.service_period_start == null && amount > monthlyRent) ||
+    (firstBill.service_period_start != null &&
+      (!date(firstBill.service_period_end) || firstBill.service_period_end < firstUncovered))
+  )
+    return null;
+
+  const dueDate = firstBill.due_date;
+  const anchor = { currency, dueDate, additionalOverdue: 0 };
+  if (dueDate >= today) return anchor;
+
+  const paymentDay = record.payment_day;
+  const anchorDay =
+    Number.isInteger(paymentDay) &&
+    paymentDay >= 1 &&
+    paymentDay <= 31 &&
+    addAnchoredUtcMonths(dueDate, 0, paymentDay) === dueDate
+      ? paymentDay
+      : undefined;
+  const started = countStartedLeasePeriods(dueDate, today, anchorDay);
+  if (started < 2 || started > 600) return anchor;
+  const dueDates = Array.from({ length: started }, (_, index) =>
+    addAnchoredUtcMonths(dueDate, index, anchorDay),
+  ).filter((due) => due < today);
+  if (dueDates.length < 2) return anchor;
+
+  const expectedDueDates = new Set(dueDates);
+  const nextExpectedDue = addAnchoredUtcMonths(dueDate, dueDates.length, anchorDay);
+  // A later legacy bill without a period cannot be assigned safely if it uses a different day.
+  const hasAmbiguousBill = rentRows.some((row) => {
+    if (row.service_period_start != null || row.service_period_end != null)
+      return (
+        !date(row.service_period_start) ||
+        !date(row.service_period_end) ||
+        row.service_period_end < row.service_period_start
+      );
+    if (!date(row.due_date)) return true;
+    if (row.due_date <= dueDate || row.due_date >= nextExpectedDue) return false;
+    const amount = money(nativeAmount(row));
+    return (
+      row.currency !== currency ||
+      amount === null ||
+      amount > monthlyRent ||
+      !expectedDueDates.has(row.due_date)
+    );
+  });
+  if (hasAmbiguousBill) return anchor;
+
+  let missing = 0;
+  for (let index = 1; index < dueDates.length; index++) {
+    const serviceStart = addAnchoredUtcMonths(firstUncovered, index);
+    const nextServiceStart = addAnchoredUtcMonths(firstUncovered, index + 1);
+    if (confirmedEnd && nextServiceStart > addOneIsoDay(confirmedEnd)) break;
+    const existing = rentRows.some((row) =>
+      row.service_period_start && row.service_period_end
+        ? row.service_period_start < nextServiceStart && row.service_period_end >= serviceStart
+        : row.due_date === dueDates[index],
+    );
+    if (!existing) missing += 1;
+  }
+  const additionalOverdue = monthlyRent * missing;
+  return Number.isSafeInteger(additionalOverdue) ? { ...anchor, additionalOverdue } : anchor;
+}
+
+function monthlyBillingAttention(
+  record: LeaseContractRow,
+  today: string,
+  currency: CurrencyCode,
+  balance: { outstanding: number; overdue: number; nextDue: string | null },
+  anchor: MonthlyRentAnchor | null,
+): LeaseRoomAttention | null {
+  const additional = anchor?.currency === currency ? anchor.additionalOverdue : 0;
+  const additionalOverdue = Number.isSafeInteger(balance.outstanding + additional) ? additional : 0;
+  const resolved = resolveLeaseAttention({
+    today,
+    paidThroughDate: record.paid_through_date ?? null,
+    outstanding: (balance.outstanding + additionalOverdue) / 100,
+    overdue: (balance.overdue + additionalOverdue) / 100,
+    nextDue: balance.nextDue,
+  });
+  if (
+    resolved?.kind === "coverage" &&
+    anchor &&
+    (!balance.nextDue || balance.nextDue === anchor.dueDate)
+  )
+    return null;
+  return resolved && resolved.kind !== "coverage"
+    ? { ...resolved, currency, amountIsEstimated: additionalOverdue > 0 }
+    : resolved;
+}
+
 function billingAttention(
   record: LeaseContractRow,
   unit: WorkspaceUnit,
@@ -246,20 +407,11 @@ function billingAttention(
       group.nextDue = row.due_date;
     groups.set(currency, group);
   }
+  const anchor = monthlyRentAnchor(record, unit, input);
   const candidates: LeaseRoomAttention[] = [];
   for (const [currency, group] of groups) {
-    const resolved = resolveLeaseAttention({
-      today: input.today,
-      paidThroughDate: record.paid_through_date ?? null,
-      outstanding: group.outstanding / 100,
-      overdue: group.overdue / 100,
-      nextDue: group.nextDue,
-    });
-    if (!resolved) continue;
-    const attention: LeaseRoomAttention = {
-      ...resolved,
-      ...(resolved.kind !== "coverage" ? { currency } : {}),
-    };
+    const attention = monthlyBillingAttention(record, input.today, currency, group, anchor);
+    if (!attention) continue;
     if (attention.kind === "upcoming") {
       const through = new Date(`${input.today}T00:00:00Z`);
       through.setUTCDate(through.getUTCDate() + 15);
@@ -285,7 +437,7 @@ function billingAttention(
     first &&
     candidates.some((other) => other.kind === first.kind && other.currency !== first.currency)
   )
-    return { ...first, amount: null, currency: undefined };
+    return { ...first, amount: null, currency: undefined, amountIsEstimated: false };
   return first;
 }
 
@@ -343,13 +495,8 @@ export function buildLeaseRoomOverview(input: LeaseRoomOverviewInput): LeaseRoom
           occupancy = "unknown";
           reviews.push("commencement_unverified");
         }
-        const unconfirmedEndWithCurrentCoverage =
-          contract.status === "active" &&
-          contract.expected_end_confirmed === false &&
-          date(contract.paid_through_date) &&
-          contract.paid_through_date >= input.today;
         if (
-          !unconfirmedEndWithCurrentCoverage &&
+          contract.expected_end_confirmed !== false &&
           date(contract.expected_end_date) &&
           contract.expected_end_date < input.today
         )
@@ -548,6 +695,7 @@ function recordBilling(
       total.nextDue = balance.nextDue;
     currencies.set(balance.currency, total);
   }
+  const anchor = historical ? null : monthlyRentAnchor(record, unit, input);
   const candidates: LeaseRecordAttention[] = [];
   for (const [currency, total] of currencies) {
     if (!total.nextDue) continue;
@@ -564,13 +712,7 @@ function recordBilling(
         amountIsEstimated: false,
       });
     } else {
-      const resolved = resolveLeaseAttention({
-        today: input.today,
-        paidThroughDate: record.paid_through_date ?? null,
-        outstanding: total.outstanding / 100,
-        overdue: total.overdue / 100,
-        nextDue: total.nextDue,
-      });
+      const resolved = monthlyBillingAttention(record, input.today, currency, total, anchor);
       if (resolved) {
         if (resolved.kind === "upcoming") {
           const end = new Date(`${input.today}T00:00:00Z`);
@@ -584,7 +726,7 @@ function recordBilling(
               )
               .reduce((sum, row) => sum + row.balance, 0) / 100;
         }
-        candidates.push({ ...resolved, ...(resolved.kind !== "coverage" ? { currency } : {}) });
+        candidates.push(resolved);
       }
     }
   }
@@ -597,7 +739,7 @@ function recordBilling(
       (other) => other.kind === attention!.kind && other.currency !== attention!.currency,
     )
   )
-    attention = { ...attention, amount: null, currency: undefined };
+    attention = { ...attention, amount: null, currency: undefined, amountIsEstimated: false };
   if (attention) return { balances, attention };
   if (historical) {
     if (
