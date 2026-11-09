@@ -1,6 +1,5 @@
-import { ArrowLeft, ArrowRight } from "lucide-react";
-import { useEffect, useRef, type ReactNode } from "react";
-import { LeaseLocationIndex } from "@/features/leases/lease-browse-content";
+import { ArrowRight } from "lucide-react";
+import type { ReactNode } from "react";
 import type { Locale } from "@/lib/i18n";
 import { formatPropertyMoney } from "@/lib/property-money";
 import { assetSourceLabel, isAssetDate } from "./asset-operations-model";
@@ -77,12 +76,14 @@ export function OperatingLeaseCard({
   row,
   locale,
   siteName,
+  compactRow = false,
   selected,
   onSelect,
 }: {
   row: OperatingLeaseRow;
   locale: Locale;
   siteName?: string;
+  compactRow?: boolean;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -101,7 +102,14 @@ export function OperatingLeaseCard({
     : tenant?.names || (zh ? "租户未登记" : "Locataire non renseigné");
   const coverage = followUp.paidThrough;
   const pending = coverage?.status === "pending";
-  const status = statusLabel(row, locale);
+  const missingCoverage =
+    compactRow && !coverage && attention === "review" && followUp.reason === "paid_through_missing";
+  const status = missingCoverage
+    ? zh
+      ? "缴租日期待补"
+      : "Date de couverture à renseigner"
+    : statusLabel(row, locale);
+  const showQualifier = qualifier && !asset.leaseEvidence?.selfUse;
 
   return (
     <li>
@@ -110,6 +118,7 @@ export function OperatingLeaseCard({
         className={styles.card}
         aria-haspopup="dialog"
         aria-pressed={selected}
+        data-layout={compactRow ? "row" : undefined}
         data-status={attention ?? undefined}
         onClick={onSelect}
       >
@@ -121,22 +130,25 @@ export function OperatingLeaseCard({
             {identifier}
           </strong>
           <span className={styles.tenant}>
-            {qualifier && !asset.leaseEvidence?.selfUse ? <small>{qualifier} </small> : null}
+            {showQualifier && !compactRow ? <small>{qualifier} </small> : null}
             {tenantName}
+            {showQualifier && compactRow ? <small> {qualifier}</small> : null}
           </span>
         </span>
         <span className={styles.cardDetails}>
-          <span className={styles.coverage}>
-            {pending ? (zh ? "租金记载至" : "Loyer documenté au") : zh ? "已交至" : "Payé au"}{" "}
-            {coverage ? (
-              <time dateTime={coverage.date}>{coverage.date}</time>
-            ) : zh ? (
-              "未登记"
-            ) : (
-              "Non renseigné"
-            )}
-            {pending ? (zh ? " · 待核" : " · À vérifier") : null}
-          </span>
+          {missingCoverage ? null : (
+            <span className={styles.coverage}>
+              {pending ? (zh ? "租金记载至" : "Loyer documenté au") : zh ? "已交至" : "Payé au"}{" "}
+              {coverage ? (
+                <time dateTime={coverage.date}>{coverage.date}</time>
+              ) : zh ? (
+                "未登记"
+              ) : (
+                "Non renseigné"
+              )}
+              {pending ? (zh ? " · 待核" : " · À vérifier") : null}
+            </span>
+          )}
           {status ? <span className={styles.status}>{status}</span> : null}
         </span>
       </button>
@@ -335,72 +347,82 @@ export function OperatingLeaseLocations({
   onSelectAsset,
 }: OperatingLeaseLocationsProps) {
   const zh = locale === "zh";
-  const heading = useRef<HTMLHeadingElement>(null);
-  const focusOnNavigation = useRef(false);
   const activeLocation = sites.find(({ id }) => id === activeSite);
-  const siteName = activeLocation?.name ?? activeSite;
-  const headingText = activeSite ? siteName : zh ? "场地总览" : "Vue des sites";
+  const headingText = activeLocation?.name ?? (zh ? "场地总览" : "Vue des sites");
   const empty = (
     <p className={styles.empty}>
       {zh ? "没有符合条件的资产。" : "Aucun actif ne correspond aux critères."}
     </p>
   );
 
-  useEffect(() => {
-    if (!focusOnNavigation.current) return;
-    focusOnNavigation.current = false;
-    heading.current?.focus({ preventScroll: true });
-  }, [activeSite]);
-
-  function changeSite(site: string) {
-    focusOnNavigation.current = true;
-    onSelectSite(site);
-  }
-
   return (
     <section aria-label={headingText}>
       <header className={styles.siteHeading}>
-        <div className={styles.siteIdentity}>
-          {activeSite ? (
-            <button type="button" className={styles.back} onClick={() => changeSite("")}>
-              <ArrowLeft size={15} aria-hidden="true" />
-              {zh ? "返回全部场地" : "Retour à tous les sites"}
-            </button>
-          ) : null}
-          <h2 ref={heading} tabIndex={-1}>
-            {headingText}
-          </h2>
-          {activeLocation ? (
-            <span>{zh ? `${activeLocation.count} 项资产` : `${activeLocation.count} actifs`}</span>
-          ) : null}
+        <div className={styles.siteTitle}>
+          <p>{zh ? "按场地浏览" : "Parcourir par site"}</p>
+          <h2>{headingText}</h2>
         </div>
+        {activeLocation ? (
+          <div className={styles.siteSummary}>
+            <span>{zh ? `${activeLocation.count} 个单元` : `${activeLocation.count} unités`}</span>
+            <span data-follow-up={activeLocation.followUpCount > 0}>
+              {zh
+                ? `待跟进 ${activeLocation.followUpCount} 项`
+                : `${activeLocation.followUpCount} à suivre`}
+            </span>
+          </div>
+        ) : null}
         {statusFilter}
       </header>
-      {!activeSite && sites.length ? (
-        <LeaseLocationIndex
-          label={zh ? "分单元场地" : "Sites de location par unité"}
-          locations={sites.map(({ id, name, count, followUpCount }) => ({
-            id,
-            name,
-            countLabel: zh ? `${count} 项资产` : `${count} actifs`,
-            followUpLabel: zh ? `待跟进 ${followUpCount} 项` : `${followUpCount} à suivre`,
-            hasFollowUp: followUpCount > 0,
-          }))}
-          onSelect={changeSite}
-        />
-      ) : rows.length ? (
-        <ul className={styles.cards} aria-label={zh ? "出租单元卡片" : "Fiches des unités louées"}>
-          {rows.map((row) => (
-            <OperatingLeaseCard
-              key={row.asset.id}
-              row={row}
-              locale={locale}
-              siteName={siteName}
-              selected={selectedAssetId === row.asset.id}
-              onSelect={() => onSelectAsset(row.asset.id)}
-            />
-          ))}
-        </ul>
+      {activeLocation ? (
+        <div className={styles.siteLayout}>
+          <section
+            className={styles.siteRail}
+            aria-label={zh ? "分单元场地" : "Sites de location par unité"}
+          >
+            <h3>{zh ? "场地" : "Sites"}</h3>
+            <ul>
+              {sites.map(({ id, name, count, followUpCount }) => (
+                <li key={id}>
+                  <button
+                    type="button"
+                    aria-current={id === activeSite ? "true" : undefined}
+                    onClick={() => onSelectSite(id)}
+                  >
+                    <strong>{name}</strong>
+                    <small>
+                      {zh
+                        ? `${count} 个单元 · 待跟进 ${followUpCount} 项`
+                        : `${count} unités · ${followUpCount} à suivre`}
+                    </small>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section className={styles.siteUnits}>
+            <h3>
+              {zh ? `${activeLocation.name} · 出租单元` : `Unités louées · ${activeLocation.name}`}
+            </h3>
+            {rows.length ? (
+              <ul className={styles.unitRows} aria-label={zh ? "出租单元" : "Unités louées"}>
+                {rows.map((row) => (
+                  <OperatingLeaseCard
+                    key={row.asset.id}
+                    row={row}
+                    locale={locale}
+                    siteName={activeLocation.name}
+                    compactRow
+                    selected={selectedAssetId === row.asset.id}
+                    onSelect={() => onSelectAsset(row.asset.id)}
+                  />
+                ))}
+              </ul>
+            ) : (
+              empty
+            )}
+          </section>
+        </div>
       ) : (
         empty
       )}

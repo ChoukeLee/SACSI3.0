@@ -44,6 +44,109 @@
   text-underline-offset: 0.2em;
 }
 
+.siteTitle p,
+.siteSummary,
+.siteRail small {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+}
+
+.siteTitle h2 {
+  margin-top: 0.1rem;
+  font-size: 1.45rem;
+  line-height: 1.3;
+}
+
+.siteSummary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  margin-inline-start: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.siteSummary [data-follow-up="true"] {
+  color: var(--warehouse-attention-ink);
+}
+
+.siteLayout {
+  display: grid;
+  grid-template-columns: minmax(11rem, 0.72fr) minmax(0, 2.5fr);
+  align-items: start;
+  gap: 0.75rem;
+}
+
+.siteRail,
+.siteUnits {
+  min-width: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--card));
+}
+
+.siteRail {
+  padding: 0.65rem;
+}
+
+.siteRail h3,
+.siteUnits h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.siteRail h3 {
+  margin: 0.1rem 0.5rem 0.4rem;
+}
+
+.siteRail ul {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.siteRail li,
+.unitRows li {
+  min-width: 0;
+}
+
+.siteRail button {
+  display: grid;
+  width: 100%;
+  gap: 0.15rem;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.siteRail button strong {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.siteRail button:hover {
+  background: hsl(var(--muted) / 0.5);
+}
+
+.siteRail button[aria-current="true"] {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.siteUnits h3 {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+  overflow-wrap: anywhere;
+}
+
+.siteUnits .empty {
+  margin: 0.75rem 1rem;
+}
+
+.unitRows li + li {
+  border-top: 1px solid hsl(var(--border));
+}
+
 .cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
@@ -78,6 +181,7 @@
 }
 
 .back:focus-visible,
+.siteRail button:focus-visible,
 .card:focus-visible {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
@@ -124,6 +228,59 @@
   font-weight: 550;
 }
 
+.card[data-layout="row"] {
+  grid-template-columns: minmax(3rem, 0.22fr) minmax(0, 1fr) minmax(0, auto);
+  align-items: baseline;
+  min-height: 2.6875rem;
+  gap: 0.2rem 0.55rem;
+  padding: 0.55rem 1rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.card[data-layout="row"]:hover,
+.card[data-layout="row"][aria-pressed="true"] {
+  background: hsl(var(--accent) / 0.75);
+}
+
+.card[data-layout="row"]:focus-visible {
+  outline-offset: -2px;
+}
+
+.card[data-layout="row"] .identity {
+  display: contents;
+}
+
+.card[data-layout="row"] .tenant small {
+  margin-inline-start: 0.2rem;
+}
+
+.card[data-layout="row"] .cardDetails {
+  justify-content: flex-end;
+}
+
+@container operating-asset-directory (max-width: 44rem) {
+  .siteLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .siteRail ul {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  }
+}
+
+@container operating-asset-directory (max-width: 28rem) {
+  .card[data-layout="row"] {
+    grid-template-columns: minmax(3rem, 0.22fr) minmax(0, 1fr);
+  }
+
+  .card[data-layout="row"] .cardDetails {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}
+
 :is(.card, .wholeHeader)[data-status="overdue"] {
   --warehouse-attention-border: #e5afaa;
   --warehouse-attention-surface: #fff6f5;
@@ -138,7 +295,8 @@
   --warehouse-attention-ink: #325b9b;
 }
 
-:is(.card, .wholeHeader)[data-status="review"] {
+:is(.card, .wholeHeader)[data-status="review"],
+.siteSummary [data-follow-up="true"] {
   --warehouse-attention-border: #e2c995;
   --warehouse-attention-surface: #fffbef;
   --warehouse-attention-chip: #f8edcf;
@@ -159,7 +317,8 @@
   --warehouse-attention-ink: #bed6ff;
 }
 
-:global(.dark) :is(.card, .wholeHeader)[data-status="review"] {
+:global(.dark) :is(.card, .wholeHeader)[data-status="review"],
+:global(.dark) .siteSummary [data-follow-up="true"] {
   --warehouse-attention-border: #78623a;
   --warehouse-attention-surface: #362e22;
   --warehouse-attention-chip: #51412a;

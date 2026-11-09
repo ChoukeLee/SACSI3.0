@@ -441,28 +441,20 @@ it("restores the last multi-unit site while whole rentals open directly to their
         />,
       ),
     );
-  const location = () => host.querySelector<HTMLSelectElement>('select[aria-label="选择场地"]')!;
+  const siteList = () => host.querySelector('[aria-label="分单元场地"]');
+  const currentSite = () => siteList()?.querySelector('button[aria-current="true"]');
   const cards = () => host.querySelectorAll('button[aria-haspopup="dialog"]');
 
-  window.localStorage.setItem(`sacsi:lease-site:viewer-a:${projectId}:warehouse`, "老仓库");
   await renderCategory("multi-unit");
   const toolbar = host.querySelector('[aria-label="长租浏览工具栏"]')!;
-  expect(toolbar.querySelector("select")).not.toBeNull();
-  expect(toolbar.contains(location())).toBe(true);
-  expect(toolbar.querySelector("option[value='all']")).toBeNull();
+  expect(toolbar.querySelector("select")).toBeNull();
   expect(host.querySelectorAll('input[type="search"]')).toHaveLength(1);
-  expect(host.querySelector('select[aria-label="资产分组"]')).toBeNull();
-  expect(location().value).toBe("老仓库");
+  expect(currentSite()?.textContent).toContain("老仓库");
+  expect(siteList()?.querySelectorAll("button")).toHaveLength(2);
   expect(cards()).toHaveLength(1);
-  await act(async () => {
-    location().value = "";
-    location().dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  expect(cards()).toHaveLength(0);
-  expect(host.querySelector('[aria-label="分单元场地"]')?.textContent).toContain("老仓库");
 
   await renderCategory("whole");
-  expect(location()).toBeNull();
+  expect(siteList()).toBeNull();
   expect(cards()).toHaveLength(1);
   const picker = host.querySelector<HTMLSelectElement>("label select")!;
   await act(async () => {
@@ -492,26 +484,29 @@ it("restores the last multi-unit site while whole rentals open directly to their
   expect(factValues(detail, "物业类型")).toEqual(["土地及场地"]);
 
   await renderCategory("multi-unit");
-  expect(location().value).toBe("");
-
-  await act(async () => {
-    const selected = location();
-    selected.value = "新仓库";
-    selected.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  expect(currentSite()?.textContent).toContain("老仓库");
+  const newSite = [...siteList()!.querySelectorAll("button")].find((button) =>
+    button.textContent?.includes("新仓库"),
+  );
+  await act(async () => newSite!.click());
+  expect(currentSite()?.textContent).toContain("新仓库");
   expect(cards()).toHaveLength(1);
   expect(cards()[0].querySelector("strong")?.lastChild?.textContent).toBe("1号");
 
   await renderCategory("whole");
   await renderCategory("multi-unit");
-  expect(location().value).toBe("新仓库");
+  expect(currentSite()?.textContent).toContain("新仓库");
   expect(cards()).toHaveLength(1);
   await renderCategory("multi-unit", "viewer-b");
-  expect(location().value).toBe("");
-  expect(cards()).toHaveLength(0);
+  expect(currentSite()?.textContent).toContain("老仓库");
+  expect(cards()).toHaveLength(1);
+
+  window.localStorage.setItem(`sacsi:lease-site:viewer-c:${projectId}:warehouse`, "新仓库");
+  await renderCategory("multi-unit", "viewer-c");
+  expect(currentSite()?.textContent).toContain("新仓库");
 });
 
-it("shows warehouse site follow-up counts before opening compact cards and financial details", async () => {
+it("shows site counts alongside compact unit rows and keeps financial details accessible", async () => {
   const warehouse = (site: string, group: string, number: number) =>
     asset({
       id: `${group}-${number}`,
@@ -588,7 +583,9 @@ it("shows warehouse site follow-up counts before opening compact cards and finan
   const cards = () => [
     ...host.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="dialog"]'),
   ];
-  expect(cards()).toHaveLength(0);
+  expect(siteButton("老仓库")?.getAttribute("aria-current")).toBe("true");
+  expect(siteList()?.querySelectorAll("button")).toHaveLength(3);
+  expect(cards()).toHaveLength(2);
   expect(siteButton("老仓库")?.textContent).toMatch(/待跟进\s*2\s*项/);
   expect(siteButton("新仓库")?.textContent).toMatch(/待跟进\s*1\s*项/);
   expect(siteButton("孵化园库房")?.textContent).toMatch(/待跟进\s*0\s*项/);
@@ -601,20 +598,15 @@ it("shows warehouse site follow-up counts before opening compact cards and finan
       filters.dispatchEvent(new Event("change", { bubbles: true }));
     });
   expect([...filters.options].map((option) => option.textContent)).toEqual([
-    "全部状态 · 4",
+    "全部状态 · 2",
     "已逾期 · 1",
     "15天内应缴 · 1",
-    "待核事项 · 1",
+    "待核事项 · 0",
   ]);
   await chooseStatus("overdue");
-  expect(siteList()?.querySelectorAll("button")).toHaveLength(1);
-  expect(siteButton("老仓库")).toBeDefined();
-  expect(cards()).toHaveLength(0);
+  expect(siteList()?.querySelectorAll("button")).toHaveLength(3);
+  expect(cards()).toHaveLength(1);
   await chooseStatus("all");
-  await act(async () => siteButton("老仓库")!.click());
-  expect(host.querySelector<HTMLSelectElement>('select[aria-label="选择场地"]')?.value).toBe(
-    "老仓库",
-  );
   expect(cards().map((card) => card.querySelector("strong")?.lastChild?.textContent)).toEqual([
     "2号",
     "10号",
@@ -642,8 +634,6 @@ it("shows warehouse site follow-up counts before opening compact cards and finan
     current.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!.click(),
   );
   await chooseStatus("all");
-  await clickButton(host, "返回全部场地");
-  expect(cards()).toHaveLength(0);
   await act(async () => siteButton("新仓库")!.click());
   expect(cards()).toHaveLength(1);
   expect(cards()[0].textContent).toContain("待补资料");

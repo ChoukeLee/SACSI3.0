@@ -296,7 +296,11 @@ function OperatingAssetDirectoryView({
       groupOptions.set(asset.displayGroup, asset.displayGroup);
     }
   }
-  const activeGroup = groupOptions.has(selectedGroup) ? selectedGroup : "";
+  const activeGroup = groupOptions.has(selectedGroup)
+    ? selectedGroup
+    : locationMode
+      ? (locations.keys().next().value ?? "")
+      : "";
   let followUpHref = collectionHref;
   if (collectionHref && category === "all" && activeGroup) {
     const [pathname, query] = collectionHref.split("?");
@@ -361,10 +365,6 @@ function OperatingAssetDirectoryView({
       else groups.set(label, [row]);
     }
   }
-  const matchingSiteIds =
-    locationMode && !activeGroup && cardFilter !== "all"
-      ? new Set(matchingRows.map(({ asset }) => leaseSiteId(asset)))
-      : undefined;
   const collectionRows = enableCollections
     ? visible.filter(
         (row): row is CollectionRow => row.followUp.status !== "current" && row.hasLeaseEvidence,
@@ -446,24 +446,7 @@ function OperatingAssetDirectoryView({
     >
       {browseViewerId ? (
         <>
-          <LeaseBrowseToolbar
-            locale={locale}
-            category={browseCategory}
-            searchQuery={searchQuery}
-            location={
-              !locationMode
-                ? undefined
-                : {
-                    value: activeGroup,
-                    options: [
-                      { value: "", label: zh ? "全部场地" : "Tous les sites" },
-                      ...groupItems.slice(1),
-                    ],
-                    label: zh ? "选择场地" : "Choisir un site",
-                    onChange: changeGroup,
-                  }
-            }
-          />
+          <LeaseBrowseToolbar locale={locale} category={browseCategory} searchQuery={searchQuery} />
           {isSearchView && !emptySearch ? (
             <header className={locationStyles.siteHeading}>
               <div className={styles.searchResultHeading}>
@@ -578,11 +561,9 @@ function OperatingAssetDirectoryView({
       ) : locationMode ? (
         <OperatingLeaseLocations
           locale={locale}
-          sites={Array.from(locations.values()).filter(
-            ({ id }) => !matchingSiteIds || matchingSiteIds.has(id),
-          )}
+          sites={Array.from(locations.values())}
           activeSite={activeGroup}
-          rows={activeGroup ? matchingRows : []}
+          rows={matchingRows}
           selectedAssetId={selected?.asset.id ?? null}
           statusFilter={browseStatusFilter}
           onSelectSite={changeGroup}
