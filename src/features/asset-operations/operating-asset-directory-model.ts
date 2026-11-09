@@ -15,6 +15,11 @@ export interface OperatingAssetDirectoryAsset extends AssetOperationAsset {
   category: OperatingAssetCategory;
   displayName: string;
   displayGroup: string;
+  referenceRent: {
+    amountNative: number;
+    currency: CurrencyCode;
+    period: "month" | "quarter";
+  } | null;
 }
 
 type EntryWithBooking = AssetOperationEntry & { bookedAmountXof?: number | null };
@@ -46,10 +51,12 @@ export interface OperatingAssetDirectoryOptions {
 const GUOJI_SOURCE_KEY = "warehouse:guoji";
 const GUOJI_OLD_CLASSIFICATION = "用户于2026-11-09确认独立仓库";
 const GUOJI_CORRECTION = "用户更正为土地";
+const rentCutoffWorkbookSource =
+  "sha256:e3ed7762344e6e731633bd753702308c51c6a4d24559ee520065ab947d9b16c6|file:公寓、仓库租金截止日期等.xlsx|sheet:";
 // The user's confirmation covers the two workbook revisions used for the SACSI intake.
 const confirmedExcelSources = [
   "sha256:8e3b00f2bf83047118f3614e99cdb58b3d2d09538dcb3c602421153443e03164|file:出租公寓及仓库明细.xlsx|sheet:",
-  "sha256:e3ed7762344e6e731633bd753702308c51c6a4d24559ee520065ab947d9b16c6|file:公寓、仓库租金截止日期等.xlsx|sheet:",
+  rentCutoffWorkbookSource,
 ];
 
 function isConfirmedExcelSource(ref: string | null | undefined) {
@@ -77,6 +84,20 @@ function isGuojiLand(asset: AssetOperationAsset, sacsiProjectId?: string) {
   return (
     !!sacsiProjectId && asset.projectId === sacsiProjectId && asset.sourceKey === GUOJI_SOURCE_KEY
   );
+}
+
+function recordedRent(
+  asset: AssetOperationAsset,
+  guojiLand: boolean,
+): OperatingAssetDirectoryAsset["referenceRent"] {
+  if (asset.monthlyRentNative !== null && asset.rentCurrency !== null) {
+    return { amountNative: asset.monthlyRentNative, currency: asset.rentCurrency, period: "month" };
+  }
+  // B77 states the quarterly rent. F77, the monthly rent cell, is blank.
+  if (guojiLand && asset.sourceRefs.includes(`${rentCutoffWorkbookSource}老仓库等|range:A77:G77`)) {
+    return { amountNative: 25_000_000, currency: "XOF", period: "quarter" };
+  }
+  return null;
 }
 
 export function classifyOperatingAsset(
@@ -163,6 +184,7 @@ export function buildOperatingAssetDirectory(
         category: classifyOperatingAsset(asset, sacsiProjectId),
         displayName: guojiLand ? "国基土地" : asset.name,
         displayGroup: guojiLand ? "土地" : asset.group,
+        referenceRent: recordedRent(asset, guojiLand),
         sourceRefs: guojiLand
           ? [
               ...new Set([

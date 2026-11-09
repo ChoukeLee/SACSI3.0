@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { ChevronRight, Search } from "lucide-react";
+import { ArrowRight, Search } from "lucide-react";
 import { RightDrawer } from "@/components/ui/operational";
 import { RecordDetailTabs } from "@/components/ui/record-detail-tabs";
 import { formatPropertyMoney, formatPropertyXof } from "@/lib/property-money";
@@ -65,30 +65,38 @@ const entryStatusLabels: Record<OperatingAssetDirectoryEntry["status"], [string,
 const emptyEntries: OperatingAssetDirectoryEntry[] = [];
 
 function referenceRent(asset: OperatingAssetDirectoryAsset, locale: Locale) {
-  return asset.monthlyRentNative === null || asset.rentCurrency === null
-    ? locale === "zh"
-      ? "未登记"
-      : "Non renseigné"
-    : formatPropertyMoney(asset.monthlyRentNative, asset.rentCurrency, locale);
+  const zh = locale === "zh";
+  const rent = asset.referenceRent;
+  const quarterly = rent?.period === "quarter";
+  return {
+    label: quarterly
+      ? zh
+        ? "季租"
+        : "Loyer trimestriel"
+      : zh
+        ? "参考月租"
+        : "Loyer mensuel indicatif",
+    amount: rent
+      ? formatPropertyMoney(rent.amountNative, rent.currency, locale)
+      : zh
+        ? "未登记"
+        : "Non renseigné",
+  };
 }
 
-function latestRentCoverage(entries: OperatingAssetDirectoryEntry[], locale: Locale) {
-  let latest: OperatingAssetDirectoryEntry | undefined;
+function latestRentCoverage(entries: OperatingAssetDirectoryEntry[]) {
+  let latest: { date: string; status: "pending" | "verified" } | undefined;
   for (const entry of entries) {
     if (
       entry.status !== "voided" &&
       entry.kind === "income" &&
       entry.category === "rent" &&
       isAssetDate(entry.periodEnd) &&
-      (!latest?.periodEnd || entry.periodEnd > latest.periodEnd)
+      (!latest || entry.periodEnd > latest.date)
     )
-      latest = entry;
+      latest = { date: entry.periodEnd, status: entry.status };
   }
-  if (!latest) return null;
-  const status = entryStatusLabels[latest.status][locale === "zh" ? 0 : 1];
-  return locale === "zh"
-    ? `租金来源记载至 ${latest.periodEnd} · ${status}`
-    : `Loyer documenté jusqu’au ${latest.periodEnd} · ${status}`;
+  return latest;
 }
 
 function AssetCashSummary({
@@ -364,7 +372,11 @@ function OperatingAssetDetail({
   const period = assetReportPeriod("month", month);
   const cash = summarizeOperatingAssetCash([asset], entries, period);
   const historicalPending = entries.filter((entry) => entry.status === "pending").length;
-  const rentCoverage = latestRentCoverage(entries, locale);
+  const coverage = latestRentCoverage(entries);
+  const rentCoverage = coverage
+    ? `${zh ? "租金来源记载至" : "Loyer documenté jusqu’au"} ${coverage.date} · ${entryStatusLabels[coverage.status][zh ? 0 : 1]}`
+    : null;
+  const rent = referenceRent(asset, locale);
   const tabs = [
     { value: "overview", label: zh ? "概览" : "Aperçu" },
     { value: "receipts", label: zh ? "收付款" : "Flux" },
@@ -448,8 +460,8 @@ function OperatingAssetDetail({
                 </dd>
               </div>
               <div>
-                <dt>{zh ? "参考月租" : "Loyer mensuel indicatif"}</dt>
-                <dd>{referenceRent(asset, locale)}</dd>
+                <dt>{rent.label}</dt>
+                <dd>{rent.amount}</dd>
               </div>
               {rentCoverage ? (
                 <div>
@@ -569,6 +581,7 @@ function OperatingAssetDirectoryView({
                     entries={entries}
                     period={thisMonth}
                     locale={locale}
+                    selected={selected?.id === asset.id}
                     onSelect={() => setSelectedId(asset.id)}
                   />
                 );
@@ -606,36 +619,67 @@ function AssetDirectoryCard({
   entries,
   period,
   locale,
+  selected,
   onSelect,
 }: {
   asset: OperatingAssetDirectoryAsset;
   entries: OperatingAssetDirectoryEntry[];
   period: ReturnType<typeof assetReportPeriod>;
   locale: Locale;
+  selected: boolean;
   onSelect: () => void;
 }) {
   const zh = locale === "zh";
   const cash = summarizeOperatingAssetCash([asset], entries, period);
   const receipts = cash.originals.filter(({ income }) => income > 0);
   const pendingCount = entries.filter((entry) => entry.status === "pending").length;
-  const rentCoverage = latestRentCoverage(entries, locale);
+  const coverage = latestRentCoverage(entries);
+  const rent = referenceRent(asset, locale);
+  const needsReview = asset.verification === "pending" || pendingCount > 0;
+  const reviewLabel = pendingCount
+    ? zh
+      ? `${pendingCount} 笔历史流水待核`
+      : `${pendingCount} flux à vérifier`
+    : zh
+      ? "资料待核"
+      : "Fiche à vérifier";
   return (
     <li>
-      <button type="button" className={styles.card} aria-haspopup="dialog" onClick={onSelect}>
+      <button
+        type="button"
+        className={styles.card}
+        aria-haspopup="dialog"
+        aria-pressed={selected}
+        data-review={needsReview || undefined}
+        onClick={onSelect}
+      >
         <span className={styles.cardHeader}>
-          <span>{asset.displayName}</span>
-          <ChevronRight size={16} aria-hidden="true" />
-        </span>
-        <span className={styles.cardCategory}>
-          {operatingAssetCategoryLabel(asset.category, locale)}
-          {asset.verification === "pending" ? (zh ? " · 资料待核" : " · Fiche à vérifier") : ""}
+          <strong>{asset.displayName}</strong>
+          <span className={styles.cardCategory}>
+            {operatingAssetCategoryLabel(asset.category, locale)}
+          </span>
         </span>
         <span className={styles.cardFact}>
-          <span>{zh ? "参考月租" : "Loyer indicatif"}</span>
-          <span>{referenceRent(asset, locale)}</span>
+          <span>{rent.label}</span>
+          <span>{rent.amount}</span>
         </span>
         <span className={styles.cardFact}>
-          <span>{zh ? "本月已核实收" : "Encaissements vérifiés du mois"}</span>
+          <span>
+            {coverage?.status === "pending"
+              ? zh
+                ? "租金记载至"
+                : "Loyer documenté au"
+              : zh
+                ? "已交至"
+                : "Payé au"}
+          </span>
+          <span>
+            {coverage?.date ?? (zh ? "未登记" : "Non renseigné")}
+            {coverage?.status === "pending" ? (zh ? " · 待核" : " · À vérifier") : ""}
+          </span>
+        </span>
+        <span className={styles.cardFact}>
+          <span>{zh ? "本月实收" : "Encaissé ce mois"}</span>
           <span>
             {receipts.length
               ? receipts
@@ -646,12 +690,16 @@ function AssetDirectoryCard({
                 : "Aucun"}
           </span>
         </span>
-        {rentCoverage ? <span className={styles.note}>{rentCoverage}</span> : null}
-        {pendingCount > 0 ? (
-          <span className={styles.status} data-status="pending">
-            {zh ? `${pendingCount} 笔历史流水待核` : `${pendingCount} flux à vérifier`}
-          </span>
-        ) : null}
+        <span className={styles.cardFooter}>
+          {needsReview ? (
+            <span className={styles.status} data-status="pending">
+              {reviewLabel}
+            </span>
+          ) : (
+            <span className={styles.openHint}>{zh ? "查看资料" : "Voir le dossier"}</span>
+          )}
+          <ArrowRight size={14} aria-hidden="true" />
+        </span>
       </button>
     </li>
   );

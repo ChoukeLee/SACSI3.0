@@ -24,7 +24,7 @@ function asset(overrides: Partial<AssetOperationAsset> = {}): AssetOperationAsse
     name: "国基仓库（原表国基租金）",
     group: "独立仓库",
     verification: "pending",
-    sourceRefs: [`${workbook}|range:A77:I77`, "用户于2026-11-09确认独立仓库"],
+    sourceRefs: [`${workbook}|range:A77:G77`, "用户于2026-11-09确认独立仓库"],
     monthlyRentNative: null,
     rentCurrency: null,
     costCoverageThrough: null,
@@ -120,8 +120,12 @@ it("opens the same confirmed Guoji receipts from the directory card and the land
   expect(card?.textContent).toContain("国基土地");
   expect(card?.textContent).not.toContain("资料待核");
   expect(card?.textContent).not.toContain("历史流水待核");
-  expect(card?.textContent).toContain("租金来源记载至 2026-09-30 · 已确认");
+  expect(card?.textContent).toContain("季租2,500 万西法");
+  expect(card?.textContent).toContain("已交至2026-09-30");
+  expect(card?.textContent).toContain("查看资料");
+  expect(card?.textContent).not.toContain("月租");
   await act(async () => card!.click());
+  expect(card?.getAttribute("aria-pressed")).toBe("true");
 
   async function inspectHistory() {
     const current = dialog();
@@ -144,6 +148,8 @@ it("opens the same confirmed Guoji receipts from the directory card and the land
       juneSource,
     ]);
     expect(current.textContent).not.toContain("国基仓库");
+    await clickButton(current, "资料");
+    expect(factValues(current, "季租")).toEqual(["2,500 万西法"]);
   }
 
   await inspectHistory();

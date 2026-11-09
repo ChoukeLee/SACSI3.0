@@ -13,7 +13,7 @@ const projectId = "test-sacsi";
 const options = { sacsiProjectId: projectId, applyExcelConfirmation: true };
 const workbook =
   "sha256:e3ed7762344e6e731633bd753702308c51c6a4d24559ee520065ab947d9b16c6|file:公寓、仓库租金截止日期等.xlsx|sheet:老仓库等";
-const workbookSource = `${workbook}|range:A77:I77`;
+const workbookSource = `${workbook}|range:A77:G77`;
 const octoberSource = `${workbook}|cell:I77|event:1`;
 const juneSource = `${workbook}|range:H77`;
 
@@ -86,6 +86,7 @@ describe("operating asset directory", () => {
       category: "land",
       displayName: "国基土地",
       displayGroup: "土地",
+      referenceRent: { amountNative: 25_000_000, currency: "XOF", period: "quarter" },
       verification: "verified",
       sourceRefs: [workbookSource, "用户更正为土地"],
     });
@@ -120,6 +121,7 @@ describe("operating asset directory", () => {
     );
     expect(otherProject.assets[0]).toMatchObject({
       displayName: original.name,
+      referenceRent: null,
       verification: "pending",
     });
     expect(otherProject.assets[0].category).not.toBe("land");
