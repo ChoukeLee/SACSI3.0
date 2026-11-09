@@ -6,7 +6,10 @@ import type {
 } from "./asset-operations-model";
 import {
   buildOperatingAssetDirectory,
+  getOperatingAssetFollowUp,
+  hasOperatingAssetLeaseEvidence,
   summarizeOperatingAssetCash,
+  type OperatingAssetLeaseEvidence,
 } from "./operating-asset-directory-model";
 
 const projectId = "test-sacsi";
@@ -58,6 +61,138 @@ function entry(overrides: Partial<Entry> = {}): Entry {
 }
 
 describe("operating asset directory", () => {
+  it("uses matched Excel rates and verified cutoffs without manufacturing a payment date", () => {
+    const evidence = {
+      assetSourceRef: workbookSource,
+      paidThrough: { date: "2026-09-30", sourceRef: octoberSource },
+      outstanding: { amountNative: 30, currency: "CNY", sourceRef: juneSource },
+      rates: [
+        {
+          amountNative: 1_210_000,
+          currency: "XOF",
+          period: "month",
+          sourceRef: workbookSource,
+          effectiveFrom: "2026-11-01",
+          effectiveThrough: "2027-04-30",
+        },
+      ],
+    } satisfies OperatingAssetLeaseEvidence;
+    const snapshot: AssetOperationsData = {
+      projectId,
+      assets: [asset()],
+      entries: [],
+      canWrite: false,
+    };
+    const makeDirectory = (assetSourceRef: string, today: string) =>
+      buildOperatingAssetDirectory(snapshot, {
+        ...options,
+        today,
+        leaseEvidence: { "warehouse:guoji": { ...evidence, assetSourceRef } },
+      });
+    const directory = makeDirectory(workbookSource, "2026-11-09");
+    expect(directory.assets[0].referenceRent).toMatchObject({
+      amountNative: 1_210_000,
+      period: "month",
+    });
+    expect(getOperatingAssetFollowUp(directory.assets[0], [], "2026-11-09")).toMatchObject({
+      paidThrough: { date: "2026-09-30", sourceRef: octoberSource, status: "verified" },
+      dueDate: null,
+      outstanding: { amountNative: 30, currency: "CNY" },
+      status: "needs_evidence",
+      reason: "due_date_missing",
+    });
+    expect(makeDirectory("wrong source", "2026-11-09").assets[0].leaseEvidence).toBeNull();
+    expect(makeDirectory(workbookSource, "2027-05-01").assets[0].referenceRent).toBeNull();
+  });
+
+  it("only flags the 15-day window and overdue when an agreed due date and unpaid evidence are present", () => {
+    const sourceAsset = asset();
+    const snapshot: AssetOperationsData = {
+      projectId,
+      assets: [sourceAsset],
+      entries: [],
+      canWrite: false,
+    };
+    const makeAsset = (dueDate: string, unpaid?: boolean, selfUse?: boolean) =>
+      buildOperatingAssetDirectory(snapshot, {
+        ...options,
+        leaseEvidence: {
+          "warehouse:guoji": {
+            assetSourceRef: workbookSource,
+            paidThrough: { date: "2026-10-31", sourceRef: octoberSource },
+            nextPayment: { dueDate, sourceRef: juneSource, unpaid },
+            selfUse,
+          },
+        },
+      }).assets[0];
+    const today = "2026-11-09";
+    expect(getOperatingAssetFollowUp(makeAsset("2026-11-08", true), [], today)).toMatchObject({
+      status: "overdue",
+      daysUntilDue: -1,
+    });
+    expect(getOperatingAssetFollowUp(makeAsset("2026-11-09", true), [], today)).toMatchObject({
+      status: "upcoming",
+      daysUntilDue: 0,
+    });
+    expect(getOperatingAssetFollowUp(makeAsset("2026-11-24", true), [], today)).toMatchObject({
+      status: "upcoming",
+      daysUntilDue: 15,
+    });
+    expect(getOperatingAssetFollowUp(makeAsset("2026-11-25", true), [], today).status).toBe(
+      "current",
+    );
+    expect(getOperatingAssetFollowUp(makeAsset("2026-11-08"), [], today)).toMatchObject({
+      status: "needs_evidence",
+      reason: "unpaid_unconfirmed",
+    });
+    expect(hasOperatingAssetLeaseEvidence(makeAsset("2026-11-08", true, true), [])).toBe(false);
+  });
+
+  it("preserves the reviewed cutoff against older partial receipts and can use later verified coverage", () => {
+    const directory = buildOperatingAssetDirectory(
+      {
+        projectId,
+        assets: [asset()],
+        entries: [
+          entry({
+            id: "partial",
+            assetId: "land-id",
+            cashDate: "2026-10-30",
+            periodEnd: "2027-02-28",
+          }),
+          entry({
+            id: "newer",
+            assetId: "land-id",
+            cashDate: "2026-11-10",
+            periodEnd: "2027-01-31",
+          }),
+        ],
+        canWrite: false,
+      },
+      {
+        ...options,
+        leaseEvidence: {
+          "warehouse:guoji": {
+            assetSourceRef: workbookSource,
+            reviewedOn: "2026-11-09",
+            paidThrough: { date: "2026-09-30", sourceRef: octoberSource },
+          },
+        },
+      },
+    );
+    const [record] = directory.assets;
+    expect(
+      getOperatingAssetFollowUp(
+        record,
+        directory.entries.filter((item) => item.id === "partial"),
+        "2026-11-09",
+      ).paidThrough?.date,
+    ).toBe("2026-09-30");
+    expect(
+      getOperatingAssetFollowUp(record, directory.entries, "2026-11-11").paidThrough?.date,
+    ).toBe("2027-01-31");
+  });
+
   it("confirms Excel sources in the SACSI trial while retaining the original land evidence", () => {
     const original = asset();
     const originalReceipt = entry({

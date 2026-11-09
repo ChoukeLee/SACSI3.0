@@ -273,6 +273,10 @@
     {
       "file": "20261107232358_source_sale_registration_native_money.sql",
       "sha256": "2f9a9a986410080944f08e791f8db142599e5a22a995fdc422ed39dc60f51e58"
+    },
+    {
+      "file": "20261109184914_asset_operation_lease_evidence.sql",
+      "sha256": "4af659c75ed4011a819d6088ee5e17e603aa9325790e435070d56ddc1e26c422"
     }
   ],
   "excluded": [

@@ -11,15 +11,41 @@ import {
 export type OperatingAssetCategory =
   "warehouse" | "factory" | "commercial" | "land" | "office" | "dormitory" | "other";
 
+export interface OperatingAssetReferenceRent {
+  amountNative: number;
+  currency: CurrencyCode;
+  period: "month" | "quarter" | "year";
+  sourceRef?: string;
+  effectiveFrom?: string;
+  effectiveThrough?: string;
+}
+
+interface OperatingAssetOutstanding {
+  amountNative: number;
+  currency: CurrencyCode;
+  sourceRef: string;
+}
+
+export interface OperatingAssetLeaseEvidence {
+  assetSourceRef: string;
+  reviewedOn?: string;
+  referenceRent?: OperatingAssetReferenceRent;
+  rates?: readonly OperatingAssetReferenceRent[];
+  paidThrough?: { date: string; sourceRef: string };
+  nextPayment?: { dueDate: string; sourceRef: string; unpaid?: boolean };
+  outstanding?: OperatingAssetOutstanding;
+  notes?: readonly string[];
+  leaseListed?: boolean;
+  selfUse?: boolean;
+  blockReceiptCutoff?: boolean;
+}
+
 export interface OperatingAssetDirectoryAsset extends AssetOperationAsset {
   category: OperatingAssetCategory;
   displayName: string;
   displayGroup: string;
-  referenceRent: {
-    amountNative: number;
-    currency: CurrencyCode;
-    period: "month" | "quarter";
-  } | null;
+  referenceRent: OperatingAssetReferenceRent | null;
+  leaseEvidence: OperatingAssetLeaseEvidence | null;
 }
 
 type EntryWithBooking = AssetOperationEntry & { bookedAmountXof?: number | null };
@@ -46,6 +72,8 @@ export interface OperatingAssetDirectoryOptions {
   includeCanonical?: boolean;
   /** Apply the user's confirmation in the trial view. Maintenance uses stored status. */
   applyExcelConfirmation?: boolean;
+  leaseEvidence?: Readonly<Record<string, OperatingAssetLeaseEvidence>>;
+  today?: string;
 }
 
 const GUOJI_SOURCE_KEY = "warehouse:guoji";
@@ -89,7 +117,21 @@ function isGuojiLand(asset: AssetOperationAsset, sacsiProjectId?: string) {
 function recordedRent(
   asset: AssetOperationAsset,
   guojiLand: boolean,
+  evidence: OperatingAssetLeaseEvidence | null,
+  today?: string,
 ): OperatingAssetDirectoryAsset["referenceRent"] {
+  const coversToday = (rate: OperatingAssetReferenceRent) =>
+    !today ||
+    ((!rate.effectiveFrom || rate.effectiveFrom <= today) &&
+      (!rate.effectiveThrough || rate.effectiveThrough >= today));
+  if (evidence?.referenceRent || evidence?.rates?.length) {
+    return (
+      evidence.rates?.find(coversToday) ??
+      (evidence.referenceRent && coversToday(evidence.referenceRent)
+        ? evidence.referenceRent
+        : null)
+    );
+  }
   if (asset.monthlyRentNative !== null && asset.rentCurrency !== null) {
     return { amountNative: asset.monthlyRentNative, currency: asset.rentCurrency, period: "month" };
   }
@@ -165,6 +207,8 @@ export function buildOperatingAssetDirectory(
     includeCanonical = false,
     sacsiProjectId,
     applyExcelConfirmation = false,
+    leaseEvidence,
+    today,
   }: OperatingAssetDirectoryOptions = {},
 ): OperatingAssetDirectoryData {
   const confirmExcel = applyExcelConfirmation && snapshot.projectId === sacsiProjectId;
@@ -175,6 +219,10 @@ export function buildOperatingAssetDirectory(
     )
     .map((asset) => {
       const guojiLand = isGuojiLand(asset, sacsiProjectId);
+      const candidate =
+        confirmExcel && asset.sourceKey ? leaseEvidence?.[asset.sourceKey] : undefined;
+      const evidence =
+        candidate && asset.sourceRefs.includes(candidate.assetSourceRef) ? candidate : null;
       return {
         ...asset,
         verification:
@@ -184,7 +232,8 @@ export function buildOperatingAssetDirectory(
         category: classifyOperatingAsset(asset, sacsiProjectId),
         displayName: guojiLand ? "国基土地" : asset.name,
         displayGroup: guojiLand ? "土地" : asset.group,
-        referenceRent: recordedRent(asset, guojiLand),
+        referenceRent: recordedRent(asset, guojiLand, evidence, today),
+        leaseEvidence: evidence,
         sourceRefs: guojiLand
           ? [
               ...new Set([
@@ -214,6 +263,129 @@ export function buildOperatingAssetDirectory(
     })
     .sort((a, b) => (b.cashDate ?? "").localeCompare(a.cashDate ?? "") || a.id.localeCompare(b.id));
   return { projectId: snapshot.projectId, assets, entries, canWrite: snapshot.canWrite };
+}
+
+type RentCoverage = { date: string; sourceRef: string; status: "verified" | "pending" };
+
+export interface OperatingAssetFollowUp {
+  paidThrough: RentCoverage | null;
+  dueDate: string | null;
+  dueSourceRef: string | null;
+  outstanding: OperatingAssetOutstanding | null;
+  status: "overdue" | "upcoming" | "needs_evidence" | "current";
+  reason:
+    | "due_date_missing"
+    | "paid_through_missing"
+    | "unpaid_unconfirmed"
+    | "coverage_ended"
+    | "coverage_ending"
+    | "source_conflict"
+    | null;
+  daysUntilDue: number | null;
+}
+
+export function hasOperatingAssetLeaseEvidence(
+  asset: OperatingAssetDirectoryAsset,
+  entries: readonly OperatingAssetDirectoryEntry[],
+) {
+  const evidence = asset.leaseEvidence;
+  return (
+    !evidence?.selfUse &&
+    (!!(
+      evidence?.leaseListed ||
+      evidence?.paidThrough ||
+      evidence?.nextPayment ||
+      evidence?.outstanding
+    ) ||
+      entries.some(
+        (entry) =>
+          entry.assetId === asset.id &&
+          entry.status !== "voided" &&
+          entry.kind === "income" &&
+          entry.category === "rent",
+      ))
+  );
+}
+
+function rentCoverage(
+  asset: OperatingAssetDirectoryAsset,
+  entries: readonly OperatingAssetDirectoryEntry[],
+  today: string,
+): RentCoverage | null {
+  const evidence = asset.leaseEvidence;
+  const reviewedCutoff = evidence?.paidThrough;
+  let latest: RentCoverage | null =
+    reviewedCutoff && isAssetDate(reviewedCutoff.date)
+      ? { ...reviewedCutoff, status: "verified" }
+      : null;
+  const restrictFallback = latest !== null || evidence?.blockReceiptCutoff === true;
+  for (const entry of entries) {
+    if (
+      entry.assetId !== asset.id ||
+      entry.status === "voided" ||
+      entry.kind !== "income" ||
+      entry.category !== "rent" ||
+      !isAssetDate(entry.periodEnd) ||
+      !isAssetDate(entry.cashDate) ||
+      entry.cashDate > today ||
+      (restrictFallback && (!evidence?.reviewedOn || entry.cashDate <= evidence.reviewedOn))
+    )
+      continue;
+    if (
+      !latest ||
+      (latest.status === "pending" && entry.status === "verified") ||
+      (entry.status === latest.status && entry.periodEnd > latest.date)
+    ) {
+      latest = { date: entry.periodEnd, sourceRef: entry.sourceRef, status: entry.status };
+    }
+  }
+  return latest;
+}
+
+function daysBetween(from: string, to: string) {
+  return (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000;
+}
+
+export function getOperatingAssetFollowUp(
+  asset: OperatingAssetDirectoryAsset,
+  entries: readonly OperatingAssetDirectoryEntry[],
+  today: string,
+): OperatingAssetFollowUp {
+  const evidence = asset.leaseEvidence;
+  const paidThrough = rentCoverage(asset, entries, today);
+  const nextPayment = evidence?.nextPayment;
+  const dueDate = isAssetDate(nextPayment?.dueDate) ? nextPayment.dueDate : null;
+  const outstanding = evidence?.outstanding ?? null;
+  const daysUntilDue = dueDate ? daysBetween(today, dueDate) : null;
+  const facts = {
+    paidThrough,
+    dueDate,
+    dueSourceRef: dueDate ? (nextPayment?.sourceRef ?? null) : null,
+    outstanding,
+    daysUntilDue,
+  };
+  const needsEvidence = (
+    reason: NonNullable<OperatingAssetFollowUp["reason"]>,
+  ): OperatingAssetFollowUp => ({ ...facts, status: "needs_evidence", reason });
+
+  if (evidence?.selfUse) return { ...facts, status: "current", reason: null };
+  if (dueDate && daysUntilDue !== null && nextPayment?.unpaid === true) {
+    if (paidThrough?.status === "verified" && paidThrough.date >= dueDate) {
+      return needsEvidence("source_conflict");
+    }
+    if (daysUntilDue < 0) return { ...facts, status: "overdue", reason: null };
+    if (daysUntilDue <= 15) return { ...facts, status: "upcoming", reason: null };
+  }
+  if (outstanding && !dueDate) return needsEvidence("due_date_missing");
+  if (daysUntilDue !== null && daysUntilDue <= 15 && nextPayment?.unpaid !== true) {
+    return needsEvidence("unpaid_unconfirmed");
+  }
+  if (!paidThrough || paidThrough.status !== "verified")
+    return needsEvidence("paid_through_missing");
+  const coverageDays = daysBetween(today, paidThrough.date);
+  if (!dueDate && coverageDays < 0) return needsEvidence("coverage_ended");
+  if (!dueDate && coverageDays <= 15) return needsEvidence("coverage_ending");
+  return { ...facts, status: "current", reason: null };
 }
 
 export interface OperatingAssetCashAmounts {

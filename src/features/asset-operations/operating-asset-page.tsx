@@ -6,17 +6,24 @@ import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import { fetchAssetOperations } from "./asset-operations-server";
 import { OperatingAssetDirectory } from "./operating-asset-directory";
-import { buildOperatingAssetDirectory } from "./operating-asset-directory-model";
+import {
+  buildOperatingAssetDirectory,
+  hasOperatingAssetLeaseEvidence,
+  type OperatingAssetCategory,
+} from "./operating-asset-directory-model";
 
-const leaseCategories = ["warehouse", "factory", "commercial", "land"] as const;
-type LeaseCategory = (typeof leaseCategories)[number];
+const leaseCategories = ["warehouse", "factory", "commercial", "land", "dormitory"] as const;
+type LeaseAssetCategory = (typeof leaseCategories)[number];
+type LeaseCategory = LeaseAssetCategory | "followup";
 export type AssetOperatingView = "operations" | "maintenance";
 
-const categoryNames: Record<LeaseCategory, [string, string]> = {
+const collectionCategories: readonly OperatingAssetCategory[] = [...leaseCategories, "office"];
+const categoryNames: Record<LeaseAssetCategory, [string, string]> = {
   warehouse: ["仓库", "Entrepôts"],
   factory: ["厂房", "Bâtiments industriels"],
   commercial: ["商用物业", "Locaux commerciaux"],
   land: ["土地", "Terrains"],
+  dormitory: ["宿舍", "Dortoirs"],
 };
 
 export function canReadOperatingAssets(role: UserRole) {
@@ -24,6 +31,7 @@ export function canReadOperatingAssets(role: UserRole) {
 }
 
 export function parseLeaseAssetCategory(value: unknown): LeaseCategory | undefined {
+  if (value === "followup") return value;
   return leaseCategories.find((category) => category === value);
 }
 
@@ -93,6 +101,16 @@ export function OperatingAssetNavigation({
           {label}
         </Link>
       ))}
+      {area === "leases" ? (
+        <Link
+          href={`${base}?assetCategory=followup`}
+          prefetch={false}
+          aria-current={category === "followup" ? "page" : undefined}
+          className={`ml-auto rounded-md border px-3 py-1.5 text-sm transition-colors ${category === "followup" ? "border-primary/20 bg-primary/10 text-primary" : "border-border bg-card text-foreground hover:bg-muted"}`}
+        >
+          {zh ? "经营资产收款跟进" : "Suivi des encaissements des actifs"}
+        </Link>
+      ) : null}
       {area === "units" && view === "operations" ? (
         <Link
           href={`${base}?assetView=maintenance`}
@@ -119,32 +137,41 @@ export async function OperatingAssetDirectoryPage({
 }) {
   const zh = locale === "zh";
   try {
-    const source = await fetchAssetOperations();
+    const source = await fetchAssetOperations({ includeLeaseEvidence: true });
     if (project && project !== source.projectId && project.toUpperCase() !== "SACSI")
       throw new Error("AssetOperationsProjectUnavailable");
+    const today = new Date().toISOString().slice(0, 10);
     const data = buildOperatingAssetDirectory(source, {
       sacsiProjectId: source.projectId,
       applyExcelConfirmation: true,
+      today,
+      leaseEvidence: source.leaseEvidence,
     });
-    const withRentSource = new Set(
-      data.entries
-        .filter((entry) => entry.kind === "income" && entry.category === "rent" && !entry.voidedAt)
-        .map((entry) => entry.assetId),
-    );
-    const assets = data.assets.filter(
-      (asset) =>
-        !category ||
-        (asset.category === category &&
-          ((category !== "commercial" && category !== "land") || withRentSource.has(asset.id))),
-    );
+    const isFollowUp = category === "followup";
+    const assets = data.assets.filter((asset) => {
+      if (!category) return true;
+      if (isFollowUp)
+        return (
+          collectionCategories.includes(asset.category) &&
+          hasOperatingAssetLeaseEvidence(asset, data.entries)
+        );
+      return (
+        asset.category === category &&
+        (category === "warehouse" ||
+          category === "factory" ||
+          hasOperatingAssetLeaseEvidence(asset, data.entries))
+      );
+    });
     const ids = new Set(assets.map((asset) => asset.id));
     return (
       <OperatingAssetDirectory
         key={category ?? "all"}
         data={{ ...data, assets, entries: data.entries.filter((entry) => ids.has(entry.assetId)) }}
         locale={locale}
-        today={new Date().toISOString().slice(0, 10)}
-        category={category ?? "all"}
+        today={today}
+        category={isFollowUp ? "all" : (category ?? "all")}
+        enableCollections={!!category}
+        initialView={isFollowUp ? "collections" : "cards"}
         selectedAssetId={selectedAssetId && ids.has(selectedAssetId) ? selectedAssetId : null}
       />
     );

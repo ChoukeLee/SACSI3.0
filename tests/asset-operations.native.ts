@@ -282,6 +282,69 @@ it("does not grant direct mutation or anonymous access and blocks cross-project 
   await expect(write("create_entry", entry(asset))).rejects.toThrow("permission denied");
 });
 
+it("restricts reviewed lease evidence to authorized readers of the parent asset", async () => {
+  const f = await seed();
+  const asset = await catalog(f);
+  const foreign = await seed();
+  const foreignAsset = await catalog(foreign);
+  const finance = await seed("finance");
+  const sales = await seed("rental_sales");
+
+  await owner("update public.projects set access_mode='restricted' where id in ($1,$2)", [
+    f.project,
+    foreign.project,
+  ]);
+  for (const [project, actor] of [
+    [f.project, f.actor],
+    [f.project, finance.actor],
+    [f.project, sales.actor],
+    [foreign.project, foreign.actor],
+  ]) {
+    await db.query(
+      "insert into public.project_account_access(project_id,account_email,account_id) values($1,$2,$3)",
+      [project, `${actor}@test.invalid`, actor],
+    );
+  }
+
+  const evidence = {
+    assetSourceRef: row().sourceRefs[0],
+    paidThrough: { date: "2026-12-31", sourceRef: "Synthetic paid-through source" },
+  };
+  const batchId = randomUUID();
+  const insertEvidence = `insert into public.asset_operation_lease_evidence(asset_id,evidence,reviewed_on,batch_id)
+    values ($1,$2,'2026-11-09',$3)`;
+  await db.query(insertEvidence, [asset.id, evidence, batchId]);
+  await db.query(insertEvidence, [foreignAsset.id, evidence, batchId]);
+
+  const readEvidence = "select asset_id,evidence from public.asset_operation_lease_evidence";
+  for (const actor of [f.actor, finance.actor]) {
+    await login(actor);
+    expect((await db.query(readEvidence)).rows).toEqual([{ asset_id: asset.id, evidence }]);
+  }
+  await expect(
+    db.query(`${insertEvidence} on conflict do nothing`, [asset.id, evidence, batchId]),
+  ).rejects.toMatchObject({ code: "42501" });
+  await expect(
+    db.query("update public.asset_operation_lease_evidence set evidence=$2 where asset_id=$1", [
+      asset.id,
+      evidence,
+    ]),
+  ).rejects.toMatchObject({ code: "42501" });
+  await expect(
+    db.query("delete from public.asset_operation_lease_evidence where asset_id=$1", [asset.id]),
+  ).rejects.toMatchObject({ code: "42501" });
+  expect((await read(f.project)).entries).toEqual([]);
+
+  await login(foreign.actor);
+  expect((await db.query(readEvidence)).rows).toEqual([{ asset_id: foreignAsset.id, evidence }]);
+  await login(sales.actor);
+  expect((await db.query(readEvidence)).rows).toEqual([]);
+
+  await owner("select set_config('request.jwt.claims','{}',false)");
+  await db.query("set role anon");
+  await expect(db.query(readEvidence)).rejects.toMatchObject({ code: "42501" });
+});
+
 it("links a canonical payment once, validates its ledger and does not repost the original receipt", async () => {
   const f = await seed(),
     asset = await verified(f, { unitId: f.unit });

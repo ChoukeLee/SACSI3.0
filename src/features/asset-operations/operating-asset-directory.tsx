@@ -1,12 +1,14 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight, CalendarClock, Search } from "lucide-react";
 import { RightDrawer } from "@/components/ui/operational";
 import { RecordDetailTabs } from "@/components/ui/record-detail-tabs";
 import { formatPropertyMoney, formatPropertyXof } from "@/lib/property-money";
 import { assetReportPeriod, assetSourceLabel, isAssetDate } from "./asset-operations-model";
 import {
+  getOperatingAssetFollowUp,
+  hasOperatingAssetLeaseEvidence,
   summarizeOperatingAssetCash,
   type buildOperatingAssetDirectory,
   type OperatingAssetCategory,
@@ -18,6 +20,15 @@ import styles from "./operating-asset-directory.module.css";
 type Locale = "zh" | "fr";
 type CashSummary = ReturnType<typeof summarizeOperatingAssetCash>;
 type CashLine = NonNullable<CashSummary["bookedXof"]>;
+type FollowUp = ReturnType<typeof getOperatingAssetFollowUp>;
+type FollowUpStatus = Exclude<FollowUp["status"], "current">;
+type FollowUpFilter = "all" | FollowUpStatus;
+type DirectoryRow = {
+  asset: OperatingAssetDirectoryAsset;
+  entries: OperatingAssetDirectoryEntry[];
+  followUp: FollowUp;
+};
+type CollectionRow = DirectoryRow & { followUp: FollowUp & { status: FollowUpStatus } };
 
 const categoryLabels: Record<OperatingAssetCategory, [string, string]> = {
   warehouse: ["仓库", "Entrepôts"],
@@ -64,39 +75,51 @@ const entryStatusLabels: Record<OperatingAssetDirectoryEntry["status"], [string,
 
 const emptyEntries: OperatingAssetDirectoryEntry[] = [];
 
+const rentLabels = {
+  month: ["参考月租", "Loyer mensuel indicatif"],
+  quarter: ["季租", "Loyer trimestriel"],
+  year: ["年租", "Loyer annuel"],
+} as const;
+
+const followUpLabels: Record<FollowUpFilter, [string, string]> = {
+  all: ["全部跟进", "Tous les suivis"],
+  overdue: ["已逾期", "En retard"],
+  upcoming: ["15天内应缴", "Dû sous 15 jours"],
+  needs_evidence: ["待补资料", "Données à compléter"],
+};
+
+const followUpReasons: Record<NonNullable<FollowUp["reason"]>, [string, string]> = {
+  due_date_missing: ["付款日未登记", "Date d’échéance non renseignée"],
+  paid_through_missing: ["已交至未登记", "Date de couverture non renseignée"],
+  unpaid_unconfirmed: ["未收金额待确认", "Solde à confirmer"],
+  coverage_ended: ["已登记的租金覆盖已结束", "Période de loyer enregistrée terminée"],
+  coverage_ending: ["已登记的租金覆盖即将结束", "Fin prochaine de la période enregistrée"],
+  source_conflict: ["来源记录需核对", "Sources à rapprocher"],
+};
+
+const followUpPriority: Record<FollowUp["status"], number> = {
+  overdue: 0,
+  upcoming: 1,
+  needs_evidence: 2,
+  current: 3,
+};
+
+const nameCollators = {
+  zh: new Intl.Collator("zh-CN", { numeric: true, sensitivity: "base" }),
+  fr: new Intl.Collator("fr", { numeric: true, sensitivity: "base" }),
+};
+
 function referenceRent(asset: OperatingAssetDirectoryAsset, locale: Locale) {
   const zh = locale === "zh";
   const rent = asset.referenceRent;
-  const quarterly = rent?.period === "quarter";
   return {
-    label: quarterly
-      ? zh
-        ? "季租"
-        : "Loyer trimestriel"
-      : zh
-        ? "参考月租"
-        : "Loyer mensuel indicatif",
+    label: rentLabels[rent?.period ?? "month"][zh ? 0 : 1],
     amount: rent
       ? formatPropertyMoney(rent.amountNative, rent.currency, locale)
       : zh
         ? "未登记"
         : "Non renseigné",
   };
-}
-
-function latestRentCoverage(entries: OperatingAssetDirectoryEntry[]) {
-  let latest: { date: string; status: "pending" | "verified" } | undefined;
-  for (const entry of entries) {
-    if (
-      entry.status !== "voided" &&
-      entry.kind === "income" &&
-      entry.category === "rent" &&
-      isAssetDate(entry.periodEnd) &&
-      (!latest || entry.periodEnd > latest.date)
-    )
-      latest = { date: entry.periodEnd, status: entry.status };
-  }
-  return latest;
 }
 
 function AssetCashSummary({
@@ -354,17 +377,20 @@ function AssetReceiptList({
 function OperatingAssetDetail({
   asset,
   entries,
+  followUp,
   today,
   locale,
   onClose,
 }: {
   asset: OperatingAssetDirectoryAsset;
   entries: OperatingAssetDirectoryEntry[];
+  followUp: FollowUp;
   today: string;
   locale: Locale;
   onClose: () => void;
 }) {
   const zh = locale === "zh";
+  const lang = zh ? 0 : 1;
   const id = useId();
   const [tab, setTab] = useState("overview");
   const [month, setMonth] = useState(today.slice(0, 7));
@@ -372,9 +398,9 @@ function OperatingAssetDetail({
   const period = assetReportPeriod("month", month);
   const cash = summarizeOperatingAssetCash([asset], entries, period);
   const historicalPending = entries.filter((entry) => entry.status === "pending").length;
-  const coverage = latestRentCoverage(entries);
+  const coverage = followUp.paidThrough;
   const rentCoverage = coverage
-    ? `${zh ? "租金来源记载至" : "Loyer documenté jusqu’au"} ${coverage.date} · ${entryStatusLabels[coverage.status][zh ? 0 : 1]}`
+    ? `${zh ? "租金来源记载至" : "Loyer documenté jusqu’au"} ${coverage.date} · ${entryStatusLabels[coverage.status][lang]}`
     : null;
   const rent = referenceRent(asset, locale);
   const tabs = [
@@ -424,7 +450,16 @@ function OperatingAssetDetail({
                 {period.start} — {period.end}
               </span>
             </div>
-            {rentCoverage ? <p className={styles.note}>{rentCoverage}</p> : null}
+            {coverage && rentCoverage ? (
+              <p className={styles.note} title={assetSourceLabel(coverage.sourceRef)}>
+                {rentCoverage}
+              </p>
+            ) : null}
+            {followUp.dueDate ? (
+              <p className={styles.note}>
+                {zh ? "登记付款日" : "Échéance enregistrée"} {followUp.dueDate}
+              </p>
+            ) : null}
             <AssetCashSummary
               cash={cash}
               locale={locale}
@@ -463,13 +498,44 @@ function OperatingAssetDetail({
                 <dt>{rent.label}</dt>
                 <dd>{rent.amount}</dd>
               </div>
-              {rentCoverage ? (
+              {asset.referenceRent?.effectiveThrough ? (
                 <div>
-                  <dt>{zh ? "租客" : "Locataire"}</dt>
-                  <dd>{zh ? "未登记" : "Non renseigné"}</dd>
+                  <dt>{zh ? "该租金适用至" : "Loyer applicable jusqu’au"}</dt>
+                  <dd>{asset.referenceRent.effectiveThrough}</dd>
+                </div>
+              ) : null}
+              {asset.referenceRent?.sourceRef ? (
+                <div>
+                  <dt>{zh ? "租金依据" : "Source du loyer"}</dt>
+                  <dd>{assetSourceLabel(asset.referenceRent.sourceRef)}</dd>
+                </div>
+              ) : null}
+              {coverage ? (
+                <div>
+                  <dt>{zh ? "覆盖日期依据" : "Source de la couverture"}</dt>
+                  <dd>{assetSourceLabel(coverage.sourceRef)}</dd>
+                </div>
+              ) : null}
+              {followUp.dueSourceRef ? (
+                <div>
+                  <dt>{zh ? "付款日依据" : "Source de l’échéance"}</dt>
+                  <dd>{assetSourceLabel(followUp.dueSourceRef)}</dd>
+                </div>
+              ) : null}
+              {followUp.outstanding ? (
+                <div>
+                  <dt>{zh ? "原表余款依据" : "Source du solde enregistré"}</dt>
+                  <dd>{assetSourceLabel(followUp.outstanding.sourceRef)}</dd>
                 </div>
               ) : null}
             </dl>
+            {asset.leaseEvidence?.notes?.length ? (
+              <ul className={styles.assetSources}>
+                {asset.leaseEvidence.notes.map((note) => (
+                  <li key={note}>{note}</li>
+                ))}
+              </ul>
+            ) : null}
             {asset.sourceRefs.length ? (
               <ul className={styles.assetSources}>
                 {asset.sourceRefs.map((source) => (
@@ -492,12 +558,19 @@ interface OperatingAssetDirectoryProps {
   today: string;
   category: OperatingAssetCategory | "all";
   selectedAssetId?: string | null;
+  enableCollections?: boolean;
+  initialView?: "cards" | "collections";
 }
 
 export function OperatingAssetDirectory(props: OperatingAssetDirectoryProps) {
   return (
     <OperatingAssetDirectoryView
-      key={JSON.stringify([props.data.projectId, props.category, props.selectedAssetId])}
+      key={JSON.stringify([
+        props.data.projectId,
+        props.category,
+        props.selectedAssetId,
+        props.initialView,
+      ])}
       {...props}
     />
   );
@@ -509,9 +582,14 @@ function OperatingAssetDirectoryView({
   today,
   category,
   selectedAssetId,
+  enableCollections = false,
+  initialView = "cards",
 }: OperatingAssetDirectoryProps) {
   const zh = locale === "zh";
   const [search, setSearch] = useState("");
+  const [selectedGroup, setSelectedGroup] = useState("");
+  const [view, setView] = useState(initialView);
+  const [followUpFilter, setFollowUpFilter] = useState<FollowUpFilter>("all");
   const [selectedId, setSelectedId] = useState(selectedAssetId ?? null);
   const entriesByAsset = useMemo(() => {
     const grouped = new Map<string, OperatingAssetDirectoryEntry[]>();
@@ -529,23 +607,57 @@ function OperatingAssetDirectoryView({
     }
     return grouped;
   }, [data.entries]);
+  const rows = useMemo(() => {
+    const scoped = data.assets
+      .filter((asset) => category === "all" || asset.category === category)
+      .map((asset): DirectoryRow => {
+        const entries = entriesByAsset.get(asset.id) ?? emptyEntries;
+        return { asset, entries, followUp: getOperatingAssetFollowUp(asset, entries, today) };
+      });
+    if (category !== "all") {
+      scoped.sort((a, b) =>
+        nameCollators[locale].compare(a.asset.displayName, b.asset.displayName),
+      );
+    }
+    return scoped;
+  }, [category, data.assets, entriesByAsset, locale, today]);
+  const showCollections = enableCollections && view === "collections";
   const thisMonth = assetReportPeriod("month", today.slice(0, 7));
   const term = search.trim().toLocaleLowerCase();
-  const assetsInScope = data.assets.filter(
-    (asset) => category === "all" || asset.category === category,
-  );
-  const visible = assetsInScope.filter((asset) =>
-    [asset.displayName, asset.name, asset.code].some((value) =>
-      value.toLocaleLowerCase().includes(term),
-    ),
-  );
-  const groups = new Map<OperatingAssetCategory, OperatingAssetDirectoryAsset[]>();
-  for (const asset of visible) {
-    const group = groups.get(asset.category);
-    if (group) group.push(asset);
-    else groups.set(asset.category, [asset]);
+  const groupOptions = new Map<string, string>();
+  for (const { asset } of rows) {
+    if (category === "all" && showCollections) {
+      groupOptions.set(asset.category, operatingAssetCategoryLabel(asset.category, locale));
+    } else if (category !== "all" && asset.displayGroup) {
+      groupOptions.set(asset.displayGroup, asset.displayGroup);
+    }
   }
-  const selected = assetsInScope.find((asset) => asset.id === selectedId);
+  const visible = rows.filter(
+    ({ asset }) =>
+      (!groupOptions.has(selectedGroup) ||
+        (category === "all" ? asset.category : asset.displayGroup) === selectedGroup) &&
+      [asset.displayName, asset.name, asset.code, asset.displayGroup].some((value) =>
+        value.toLocaleLowerCase().includes(term),
+      ),
+  );
+  const groups = new Map<string, DirectoryRow[]>();
+  for (const row of visible) {
+    const label =
+      category === "all"
+        ? operatingAssetCategoryLabel(row.asset.category, locale)
+        : row.asset.displayGroup || operatingAssetCategoryLabel(category, locale);
+    const group = groups.get(label);
+    if (group) group.push(row);
+    else groups.set(label, [row]);
+  }
+  const collectionRows = enableCollections
+    ? visible.filter(
+        (row): row is CollectionRow =>
+          row.followUp.status !== "current" &&
+          hasOperatingAssetLeaseEvidence(row.asset, row.entries),
+      )
+    : [];
+  const selected = rows.find(({ asset }) => asset.id === selectedId);
 
   return (
     <section
@@ -566,26 +678,86 @@ function OperatingAssetDirectoryView({
         <span className={styles.note}>
           {zh ? `${visible.length} 项资产` : `${visible.length} actifs`}
         </span>
+        {groupOptions.size > 1 || enableCollections ? (
+          <div className={styles.toolbarTools}>
+            {groupOptions.size > 1 ? (
+              <select
+                aria-label={
+                  category === "all"
+                    ? zh
+                      ? "资产类别"
+                      : "Catégorie d’actifs"
+                    : zh
+                      ? "资产分组"
+                      : "Groupe d’actifs"
+                }
+                className={styles.groupSelect}
+                value={selectedGroup}
+                onChange={(event) => setSelectedGroup(event.target.value)}
+              >
+                <option value="">
+                  {category === "all"
+                    ? zh
+                      ? "全部类别"
+                      : "Toutes les catégories"
+                    : zh
+                      ? "全部分组"
+                      : "Tous les groupes"}
+                </option>
+                {Array.from(groupOptions, ([group, label]) => (
+                  <option key={group} value={group}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            {enableCollections ? (
+              <button
+                type="button"
+                className={styles.collectionToggle}
+                aria-pressed={showCollections}
+                onClick={() => setView(showCollections ? "cards" : "collections")}
+              >
+                <CalendarClock size={15} aria-hidden="true" />
+                {zh ? "收款跟进" : "Suivi des loyers"}
+                <span>{collectionRows.length}</span>
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
-      {visible.length ? (
+      {showCollections ? (
+        <AssetCollectionFollowUp
+          rows={collectionRows}
+          filter={followUpFilter}
+          locale={locale}
+          onFilter={setFollowUpFilter}
+          onSelect={setSelectedId}
+        />
+      ) : visible.length ? (
         Array.from(groups, ([group, assets]) => (
           <section key={group} className={styles.group}>
-            {category === "all" ? <h2>{operatingAssetCategoryLabel(group, locale)}</h2> : null}
+            {category === "all" ? (
+              <h2>{group}</h2>
+            ) : (
+              <header className={styles.groupHeading}>
+                <h2 className={styles.groupTitle}>{group}</h2>
+                <span>{zh ? `${assets.length} 项资产` : `${assets.length} actifs`}</span>
+              </header>
+            )}
             <ul className={styles.cards}>
-              {assets.map((asset) => {
-                const entries = entriesByAsset.get(asset.id) ?? emptyEntries;
-                return (
-                  <AssetDirectoryCard
-                    key={asset.id}
-                    asset={asset}
-                    entries={entries}
-                    period={thisMonth}
-                    locale={locale}
-                    selected={selected?.id === asset.id}
-                    onSelect={() => setSelectedId(asset.id)}
-                  />
-                );
-              })}
+              {assets.map(({ asset, entries, followUp }) => (
+                <AssetDirectoryCard
+                  key={asset.id}
+                  asset={asset}
+                  entries={entries}
+                  followUp={followUp}
+                  period={thisMonth}
+                  locale={locale}
+                  selected={selected?.asset.id === asset.id}
+                  onSelect={() => setSelectedId(asset.id)}
+                />
+              ))}
             </ul>
           </section>
         ))
@@ -602,9 +774,10 @@ function OperatingAssetDirectoryView({
       )}
       {selected ? (
         <OperatingAssetDetail
-          key={selected.id}
-          asset={selected}
-          entries={entriesByAsset.get(selected.id) ?? emptyEntries}
+          key={selected.asset.id}
+          asset={selected.asset}
+          entries={selected.entries}
+          followUp={selected.followUp}
           locale={locale}
           today={today}
           onClose={() => setSelectedId(null)}
@@ -614,9 +787,162 @@ function OperatingAssetDirectoryView({
   );
 }
 
+function AssetCollectionFollowUp({
+  rows,
+  filter,
+  locale,
+  onFilter,
+  onSelect,
+}: {
+  rows: CollectionRow[];
+  filter: FollowUpFilter;
+  locale: Locale;
+  onFilter: (filter: FollowUpFilter) => void;
+  onSelect: (assetId: string) => void;
+}) {
+  const zh = locale === "zh";
+  const lang = zh ? 0 : 1;
+  const counts = { all: rows.length, overdue: 0, upcoming: 0, needs_evidence: 0 };
+  for (const { followUp } of rows) {
+    counts[followUp.status]++;
+  }
+  const visible = rows
+    .filter(({ followUp }) => filter === "all" || filter === followUp.status)
+    .sort(
+      (a, b) =>
+        followUpPriority[a.followUp.status] - followUpPriority[b.followUp.status] ||
+        (a.followUp.status === "needs_evidence"
+          ? Number(Boolean(b.followUp.outstanding)) - Number(Boolean(a.followUp.outstanding))
+          : 0) ||
+        (a.followUp.dueDate ?? a.followUp.paidThrough?.date ?? "9999-12-31").localeCompare(
+          b.followUp.dueDate ?? b.followUp.paidThrough?.date ?? "9999-12-31",
+        ) ||
+        nameCollators[locale].compare(a.asset.displayName, b.asset.displayName),
+    );
+  const unregistered = zh ? "未登记" : "Non renseigné";
+  return (
+    <section
+      className={styles.collectionPanel}
+      aria-label={zh ? "集中收款跟进" : "Suivi des loyers regroupé"}
+    >
+      <header className={styles.collectionHeading}>
+        <h2>{zh ? "收款跟进" : "Suivi des loyers"}</h2>
+        <p className={styles.note}>
+          {zh
+            ? "根据已登记的付款日和未收金额跟进。租金覆盖日期和待补资料单独展示。"
+            : "Le suivi s’appuie sur les échéances et soldes enregistrés. Les périodes couvertes et les données à compléter sont indiquées séparément."}
+        </p>
+        <div
+          className={styles.collectionFilters}
+          role="group"
+          aria-label={zh ? "收款跟进筛选" : "Filtres de suivi"}
+        >
+          {(Object.keys(followUpLabels) as FollowUpFilter[]).map((key) => (
+            <button
+              type="button"
+              key={key}
+              aria-pressed={filter === key}
+              onClick={() => onFilter(key)}
+            >
+              {followUpLabels[key][lang]}
+              <span>{counts[key]}</span>
+            </button>
+          ))}
+        </div>
+      </header>
+      {visible.length ? (
+        <ul className={styles.collectionRows}>
+          {visible.map(({ asset, followUp }) => (
+            <li key={asset.id}>
+              <button
+                type="button"
+                className={styles.collectionRow}
+                aria-haspopup="dialog"
+                onClick={() => onSelect(asset.id)}
+              >
+                <span>
+                  <span>{asset.displayName}</span>
+                  <small>
+                    {asset.displayGroup || operatingAssetCategoryLabel(asset.category, locale)}
+                  </small>
+                </span>
+                <span>
+                  <span
+                    className={styles.status}
+                    data-status={followUp.status === "needs_evidence" ? "pending" : followUp.status}
+                  >
+                    {followUpLabels[followUp.status][lang]}
+                  </span>
+                  {followUp.reason ? <small>{followUpReasons[followUp.reason][lang]}</small> : null}
+                </span>
+                <span>
+                  <span
+                    title={
+                      followUp.dueSourceRef ? assetSourceLabel(followUp.dueSourceRef) : undefined
+                    }
+                  >
+                    {zh ? "付款日" : "Échéance"} {followUp.dueDate ?? unregistered}
+                  </span>
+                  <small
+                    title={
+                      followUp.paidThrough
+                        ? assetSourceLabel(followUp.paidThrough.sourceRef)
+                        : undefined
+                    }
+                  >
+                    {followUp.paidThrough?.status === "pending"
+                      ? zh
+                        ? "租金记载至"
+                        : "Loyer documenté au"
+                      : zh
+                        ? "已交至"
+                        : "Payé au"}{" "}
+                    {followUp.paidThrough?.date ?? unregistered}
+                  </small>
+                </span>
+                <span
+                  className={styles.collectionAmount}
+                  title={
+                    followUp.outstanding
+                      ? assetSourceLabel(followUp.outstanding.sourceRef)
+                      : undefined
+                  }
+                >
+                  {followUp.outstanding
+                    ? formatPropertyMoney(
+                        followUp.outstanding.amountNative,
+                        followUp.outstanding.currency,
+                        locale,
+                      )
+                    : unregistered}
+                  <small>
+                    {followUp.outstanding
+                      ? zh
+                        ? "原表余款"
+                        : "Solde enregistré"
+                      : zh
+                        ? "未收金额"
+                        : "Solde à recevoir"}
+                  </small>
+                </span>
+                <ArrowRight size={14} aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className={styles.collectionEmpty}>
+          {zh ? "当前筛选没有需要跟进的记录。" : "Aucun suivi dans cette sélection."}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function AssetDirectoryCard({
   asset,
   entries,
+  followUp,
   period,
   locale,
   selected,
@@ -624,25 +950,37 @@ function AssetDirectoryCard({
 }: {
   asset: OperatingAssetDirectoryAsset;
   entries: OperatingAssetDirectoryEntry[];
+  followUp: FollowUp;
   period: ReturnType<typeof assetReportPeriod>;
   locale: Locale;
   selected: boolean;
   onSelect: () => void;
 }) {
   const zh = locale === "zh";
+  const lang = zh ? 0 : 1;
   const cash = summarizeOperatingAssetCash([asset], entries, period);
   const receipts = cash.originals.filter(({ income }) => income > 0);
   const pendingCount = entries.filter((entry) => entry.status === "pending").length;
-  const coverage = latestRentCoverage(entries);
+  const coverage = followUp.paidThrough;
   const rent = referenceRent(asset, locale);
-  const needsReview = asset.verification === "pending" || pendingCount > 0;
+  const coverageReview =
+    followUp.reason === "coverage_ended" ||
+    followUp.reason === "coverage_ending" ||
+    followUp.reason === "source_conflict" ||
+    followUp.reason === "unpaid_unconfirmed" ||
+    followUp.outstanding !== null;
+  const needsReview = asset.verification === "pending" || pendingCount > 0 || coverageReview;
+  const paymentStatus =
+    followUp.status === "overdue" || followUp.status === "upcoming" ? followUp.status : null;
   const reviewLabel = pendingCount
     ? zh
       ? `${pendingCount} 笔历史流水待核`
       : `${pendingCount} flux à vérifier`
-    : zh
-      ? "资料待核"
-      : "Fiche à vérifier";
+    : coverageReview
+      ? followUpLabels.needs_evidence[lang]
+      : zh
+        ? "资料待核"
+        : "Fiche à vérifier";
   return (
     <li>
       <button
@@ -650,13 +988,18 @@ function AssetDirectoryCard({
         className={styles.card}
         aria-haspopup="dialog"
         aria-pressed={selected}
-        data-review={needsReview || undefined}
+        data-review={(needsReview && !paymentStatus) || undefined}
+        data-collection-status={paymentStatus ?? undefined}
         onClick={onSelect}
       >
         <span className={styles.cardHeader}>
           <strong>{asset.displayName}</strong>
           <span className={styles.cardCategory}>
-            {operatingAssetCategoryLabel(asset.category, locale)}
+            {asset.leaseEvidence?.selfUse
+              ? zh
+                ? "自用"
+                : "Usage propre"
+              : operatingAssetCategoryLabel(asset.category, locale)}
           </span>
         </span>
         <span className={styles.cardFact}>
@@ -691,14 +1034,19 @@ function AssetDirectoryCard({
           </span>
         </span>
         <span className={styles.cardFooter}>
-          {needsReview ? (
-            <span className={styles.status} data-status="pending">
-              {reviewLabel}
+          {paymentStatus || needsReview ? (
+            <span className={styles.status} data-status={paymentStatus ?? "pending"}>
+              {paymentStatus ? followUpLabels[paymentStatus][lang] : reviewLabel}
             </span>
           ) : (
             <span className={styles.openHint}>{zh ? "查看资料" : "Voir le dossier"}</span>
           )}
-          <ArrowRight size={14} aria-hidden="true" />
+          <span className={styles.cardAction}>
+            {paymentStatus || needsReview ? (
+              <span className={styles.openHint}>{zh ? "查看资料" : "Voir le dossier"}</span>
+            ) : null}
+            <ArrowRight size={14} aria-hidden="true" />
+          </span>
         </span>
       </button>
     </li>

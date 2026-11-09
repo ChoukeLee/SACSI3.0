@@ -5,7 +5,10 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { AssetOperationAsset, AssetOperationEntry } from "./asset-operations-model";
 import { OperatingAssetDirectory } from "./operating-asset-directory";
-import { buildOperatingAssetDirectory } from "./operating-asset-directory-model";
+import {
+  buildOperatingAssetDirectory,
+  type OperatingAssetDirectoryOptions,
+} from "./operating-asset-directory-model";
 
 const projectId = "test-sacsi";
 const today = "2026-11-09";
@@ -70,12 +73,18 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-function directory(assets: AssetOperationAsset[], entries: Entry[]) {
+function directory(
+  assets: AssetOperationAsset[],
+  entries: Entry[],
+  leaseEvidence?: OperatingAssetDirectoryOptions["leaseEvidence"],
+) {
   return buildOperatingAssetDirectory(
     { projectId, assets, entries, canWrite: false },
     {
       sacsiProjectId: projectId,
       applyExcelConfirmation: true,
+      leaseEvidence,
+      today,
     },
   );
 }
@@ -165,6 +174,97 @@ it("opens the same confirmed Guoji receipts from the directory card and the land
     ),
   );
   await inspectHistory();
+});
+
+it("separates registered late payments from missing evidence and keeps warehouse cards grouped", async () => {
+  const warehouse = (number: number, group: string) =>
+    asset({
+      id: `${group}-${number}`,
+      sourceKey: `${group}:${number}`,
+      name: `${group}${number}号`,
+      group,
+      sourceRefs: [`${workbook}|range:A${number}:G${number}`],
+      monthlyRentNative: 400000,
+      rentCurrency: "XOF",
+    });
+  const late = warehouse(2, "老仓库");
+  const upcoming = warehouse(10, "老仓库");
+  const missing = warehouse(1, "新仓库");
+  const vacant = warehouse(3, "新仓库");
+  const evidence = (item: AssetOperationAsset, dueDate: string, unpaid?: boolean) => ({
+    assetSourceRef: item.sourceRefs[0],
+    paidThrough: { date: "2026-10-31", sourceRef: item.sourceRefs[0] },
+    nextPayment: { dueDate, sourceRef: item.sourceRefs[0], unpaid },
+  });
+  const data = directory([upcoming, late, vacant, missing, asset()], [entry()], {
+    [late.sourceKey!]: {
+      ...evidence(late, "2026-11-07", true),
+      outstanding: { amountNative: 400000, currency: "XOF", sourceRef: late.sourceRefs[0] },
+    },
+    [upcoming.sourceKey!]: evidence(upcoming, "2026-11-22", true),
+    [missing.sourceKey!]: evidence(missing, "2026-11-10"),
+  });
+
+  await act(async () =>
+    root.render(
+      <OperatingAssetDirectory
+        data={data}
+        locale="zh"
+        today={today}
+        category="all"
+        initialView="collections"
+        enableCollections
+      />,
+    ),
+  );
+  const panel = host.querySelector('[aria-label="集中收款跟进"]')!;
+  expect(panel).not.toBeNull();
+  const rowTexts = () =>
+    [...panel.querySelectorAll('button[aria-haspopup="dialog"]')].map((row) => row.textContent);
+  expect(rowTexts()).toHaveLength(4);
+  expect(rowTexts().find((text) => text?.includes("国基土地"))).toContain("待补资料");
+  expect(panel.textContent).not.toContain("新仓库3号");
+
+  await clickButton(panel, "已逾期1");
+  expect(rowTexts()).toEqual([expect.stringContaining("老仓库2号")]);
+  expect(rowTexts()[0]).toContain("付款日 2026-11-07");
+  expect(rowTexts()[0]).toContain("40 万西法原表余款");
+  await clickButton(panel, "15天内应缴1");
+  expect(rowTexts()).toEqual([expect.stringContaining("老仓库10号")]);
+  await clickButton(panel, "待补资料2");
+  expect(rowTexts()).toEqual(
+    expect.arrayContaining([
+      expect.stringContaining("国基土地"),
+      expect.stringContaining("新仓库1号"),
+    ]),
+  );
+  const landRow = [
+    ...panel.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="dialog"]'),
+  ].find((row) => row.textContent?.includes("国基土地"));
+  await act(async () => landRow!.click());
+  expect(dialog().querySelector("h2")?.textContent).toBe("国基土地");
+
+  await act(async () =>
+    root.render(
+      <OperatingAssetDirectory
+        data={data}
+        locale="zh"
+        today={today}
+        category="warehouse"
+        enableCollections
+      />,
+    ),
+  );
+  const oldGroup = [...host.querySelectorAll("h2")]
+    .find((heading) => heading.textContent === "老仓库")
+    ?.closest("section");
+  expect([...oldGroup!.querySelectorAll("strong")].map((heading) => heading.textContent)).toEqual([
+    "老仓库2号",
+    "老仓库10号",
+  ]);
+  expect([...host.querySelectorAll("h2")].map((heading) => heading.textContent)).toContain(
+    "新仓库",
+  );
 });
 
 it("shows original currency and XOF book values separately for the same two cash movements", async () => {
