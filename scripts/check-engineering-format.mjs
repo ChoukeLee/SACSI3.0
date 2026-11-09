@@ -622,6 +622,8 @@ const files = [
   "src/features/asset-operations/operating-asset-directory.module.css",
   "src/features/asset-operations/operating-asset-directory.tsx",
   "src/features/asset-operations/operating-asset-directory.test.tsx",
+  "src/features/asset-operations/warehouse-lease-directory.module.css",
+  "src/features/asset-operations/warehouse-lease-directory.tsx",
   "src/features/asset-operations/operating-asset-page.tsx",
   "src/features/asset-operations/operating-asset-detail.module.css",
   "src/features/asset-operations/operating-asset-detail.tsx",

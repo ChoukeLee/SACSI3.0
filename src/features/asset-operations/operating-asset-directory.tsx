@@ -40,6 +40,7 @@ import {
   recordedTenant,
   referenceRent,
 } from "./operating-asset-display";
+import { WarehouseLeaseCard, WarehouseLeaseDirectory } from "./warehouse-lease-directory";
 import styles from "./operating-asset-directory.module.css";
 
 type Locale = "zh" | "fr";
@@ -57,6 +58,11 @@ type DirectoryRow = {
 type CollectionRow = DirectoryRow & { followUp: FollowUp & { status: FollowUpStatus } };
 
 const emptyEntries: OperatingAssetDirectoryEntry[] = [];
+const unassignedWarehouseSite = "__warehouse-unassigned__";
+
+function warehouseSiteId(asset: OperatingAssetDirectoryAsset) {
+  return asset.displayGroup.trim() ? asset.displayGroup : unassignedWarehouseSite;
+}
 
 const cardFilters: { key: CardFilter; labels: [string, string] }[] = [
   { key: "all", labels: ["全部资产", "Tous les actifs"] },
@@ -215,6 +221,7 @@ function OperatingAssetDirectoryView({
     return scoped;
   }, [category, data.assets, entriesByAsset, locale, today]);
   const showCollections = enableCollections && view === "collections";
+  const warehouseMode = Boolean(browseViewerId && category === "warehouse" && !showCollections);
   const activeSearch = browseViewerId ? (searchQuery ?? "").trim() : search;
   const isSearchView = Boolean(browseViewerId && category === "all");
   const emptySearch = isSearchView && !activeSearch;
@@ -225,9 +232,24 @@ function OperatingAssetDirectoryView({
     (Boolean(browseViewerId || collectionHref) || enableCollections || hasApartments);
   const thisMonth = assetReportPeriod("month", today.slice(0, 7));
   const groupOptions = new Map<string, string>();
+  const warehouseSites = new Map<
+    string,
+    { id: string; name: string; count: number; followUpCount: number }
+  >();
   if (hasApartments) groupOptions.set("apartment", zh ? "公寓" : "Appartements");
-  for (const { asset } of rows) {
-    if (category === "all" && (showCollections || hasApartments)) {
+  for (const { asset, attention } of rows) {
+    if (warehouseMode) {
+      const id = warehouseSiteId(asset);
+      let site = warehouseSites.get(id);
+      if (!site) {
+        const name = asset.displayGroup.trim() || (zh ? "场地未登记" : "Site non renseigné");
+        site = { id, name, count: 0, followUpCount: 0 };
+        warehouseSites.set(id, site);
+        groupOptions.set(id, name);
+      }
+      site.count++;
+      if (attention) site.followUpCount++;
+    } else if (category === "all" && (showCollections || hasApartments)) {
       groupOptions.set(asset.category, operatingAssetCategoryLabel(asset.category, locale));
     } else if (category !== "all" && asset.displayGroup) {
       groupOptions.set(asset.displayGroup, asset.displayGroup);
@@ -246,7 +268,11 @@ function OperatingAssetDirectoryView({
     : rows.filter(
         ({ asset }) =>
           !activeGroup ||
-          (category === "all" ? asset.category : asset.displayGroup) === activeGroup,
+          (warehouseMode
+            ? warehouseSiteId(asset)
+            : category === "all"
+              ? asset.category
+              : asset.displayGroup) === activeGroup,
       );
   const showApartments = hasApartments && (!activeGroup || activeGroup === "apartment");
   const matchingApartments = showApartments
@@ -274,18 +300,27 @@ function OperatingAssetDirectoryView({
       counts[key] += countableApartments.filter((row) => leaseRoomMatchesFilter(row, key)).length;
     }
   }
+  const matchingRows =
+    showLeaseToolbar && cardFilter !== "all"
+      ? visible.filter((row) => row.attention === cardFilter)
+      : visible;
   const groups = new Map<string, DirectoryRow[]>();
-  for (const row of visible) {
-    if (showLeaseToolbar && cardFilter !== "all" && row.attention !== cardFilter) continue;
-    const label = isSearchView
-      ? leaseBrowseCategoryLabel(row.asset.category, locale)
-      : category === "all"
-        ? operatingAssetCategoryLabel(row.asset.category, locale)
-        : row.asset.displayGroup || operatingAssetCategoryLabel(category, locale);
-    const group = groups.get(label);
-    if (group) group.push(row);
-    else groups.set(label, [row]);
+  if (!warehouseMode) {
+    for (const row of matchingRows) {
+      const label = isSearchView
+        ? leaseBrowseCategoryLabel(row.asset.category, locale)
+        : category === "all"
+          ? operatingAssetCategoryLabel(row.asset.category, locale)
+          : row.asset.displayGroup || operatingAssetCategoryLabel(category, locale);
+      const group = groups.get(label);
+      if (group) group.push(row);
+      else groups.set(label, [row]);
+    }
   }
+  const matchingSiteIds =
+    warehouseMode && !activeGroup && cardFilter !== "all"
+      ? new Set(matchingRows.map(({ asset }) => warehouseSiteId(asset)))
+      : undefined;
   const collectionRows = enableCollections
     ? visible.filter(
         (row): row is CollectionRow => row.followUp.status !== "current" && row.hasLeaseEvidence,
@@ -488,6 +523,18 @@ function OperatingAssetDirectoryView({
           onFilter={setFollowUpFilter}
           onSelect={setSelectedId}
         />
+      ) : warehouseMode ? (
+        <WarehouseLeaseDirectory
+          locale={locale}
+          sites={Array.from(warehouseSites.values()).filter(
+            ({ id }) => !matchingSiteIds || matchingSiteIds.has(id),
+          )}
+          activeSite={activeGroup}
+          rows={activeGroup ? matchingRows : []}
+          selectedAssetId={selected?.asset.id ?? null}
+          onSelectSite={changeGroup}
+          onSelectAsset={setSelectedId}
+        />
       ) : groups.size ? (
         Array.from(groups, ([group, assets]) => (
           <section key={group} className={styles.group}>
@@ -500,21 +547,31 @@ function OperatingAssetDirectoryView({
               </header>
             )}
             <ul className={styles.cards}>
-              {assets.map((row) => (
-                <AssetDirectoryCard
-                  key={row.asset.id}
-                  row={row}
-                  period={thisMonth}
-                  locale={locale}
-                  categoryLabel={
-                    browseViewerId
-                      ? leaseBrowseCategoryLabel(row.asset.category, locale)
-                      : undefined
-                  }
-                  selected={selected?.asset.id === row.asset.id}
-                  onSelect={() => setSelectedId(row.asset.id)}
-                />
-              ))}
+              {assets.map((row) =>
+                isSearchView && row.asset.category === "warehouse" ? (
+                  <WarehouseLeaseCard
+                    key={row.asset.id}
+                    row={row}
+                    locale={locale}
+                    selected={selected?.asset.id === row.asset.id}
+                    onSelect={() => setSelectedId(row.asset.id)}
+                  />
+                ) : (
+                  <AssetDirectoryCard
+                    key={row.asset.id}
+                    row={row}
+                    period={thisMonth}
+                    locale={locale}
+                    categoryLabel={
+                      browseViewerId
+                        ? leaseBrowseCategoryLabel(row.asset.category, locale)
+                        : undefined
+                    }
+                    selected={selected?.asset.id === row.asset.id}
+                    onSelect={() => setSelectedId(row.asset.id)}
+                  />
+                ),
+              )}
             </ul>
           </section>
         ))

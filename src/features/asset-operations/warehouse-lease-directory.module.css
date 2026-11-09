@@ -1,0 +1,211 @@
+.sites {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.65rem;
+  background: hsl(var(--card));
+}
+
+.sites > li + li {
+  border-top: 1px solid hsl(var(--border));
+}
+
+.site {
+  display: grid;
+  width: 100%;
+  min-height: 3.15rem;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: inherit;
+  text-align: left;
+}
+
+.siteIdentity,
+.identity,
+.cardDetails,
+.siteHeading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: 0.65rem;
+  row-gap: 0.2rem;
+  min-width: 0;
+}
+
+.siteIdentity strong,
+.siteHeading h2 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.siteIdentity > span,
+.followUp,
+.site > svg {
+  color: hsl(var(--muted-foreground));
+}
+
+.siteIdentity > span,
+.followUp {
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.followUp[data-has-follow-up="true"] {
+  color: hsl(var(--foreground));
+  font-weight: 550;
+}
+
+.siteHeading {
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2rem;
+  border-radius: 0.25rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+}
+
+.back:hover {
+  color: hsl(var(--foreground));
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
+  align-items: start;
+  gap: 0.55rem;
+}
+
+.cards > li {
+  min-width: 0;
+}
+
+.card {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 0.2rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--warehouse-attention-border, hsl(var(--border)));
+  border-radius: 0.5rem;
+  background: var(--warehouse-attention-surface, hsl(var(--card)));
+  color: hsl(var(--foreground));
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.card[aria-pressed="true"] {
+  border-color: hsl(var(--ring));
+}
+
+.site:hover,
+.card:not([data-status]):hover {
+  background: hsl(var(--muted) / 0.4);
+}
+
+.site:focus-visible,
+.back:focus-visible,
+.card:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+.identity strong {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tenant,
+.coverage {
+  min-width: 0;
+  font-size: 0.8125rem;
+}
+
+.tenant small,
+.coverage {
+  color: hsl(var(--muted-foreground));
+}
+
+.tenant small {
+  font-size: inherit;
+}
+
+.coverage time {
+  color: hsl(var(--foreground));
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cardDetails {
+  justify-content: space-between;
+  column-gap: 0.35rem;
+}
+
+.status {
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  background: var(--warehouse-attention-chip);
+  color: var(--warehouse-attention-ink);
+  font-size: 0.75rem;
+  font-weight: 550;
+}
+
+.card[data-status="overdue"] {
+  --warehouse-attention-border: #e5afaa;
+  --warehouse-attention-surface: #fff6f5;
+  --warehouse-attention-chip: #ffe6e3;
+  --warehouse-attention-ink: #97352f;
+}
+
+.card[data-status="upcoming"] {
+  --warehouse-attention-border: #b6cbe9;
+  --warehouse-attention-surface: #f5f8fe;
+  --warehouse-attention-chip: #e4efff;
+  --warehouse-attention-ink: #325b9b;
+}
+
+.card[data-status="review"] {
+  --warehouse-attention-border: #e2c995;
+  --warehouse-attention-surface: #fffbef;
+  --warehouse-attention-chip: #f8edcf;
+  --warehouse-attention-ink: #77501c;
+}
+
+:global(.dark) .card[data-status="overdue"] {
+  --warehouse-attention-border: #774740;
+  --warehouse-attention-surface: #392322;
+  --warehouse-attention-chip: #54302d;
+  --warehouse-attention-ink: #ffbbb4;
+}
+
+:global(.dark) .card[data-status="upcoming"] {
+  --warehouse-attention-border: #455d81;
+  --warehouse-attention-surface: #212d41;
+  --warehouse-attention-chip: #324666;
+  --warehouse-attention-ink: #bed6ff;
+}
+
+:global(.dark) .card[data-status="review"] {
+  --warehouse-attention-border: #78623a;
+  --warehouse-attention-surface: #362e22;
+  --warehouse-attention-chip: #51412a;
+  --warehouse-attention-ink: #f2d4a0;
+}
+
+.empty {
+  padding: 0.8rem 1rem;
+  border: 1px dashed hsl(var(--border));
+  border-radius: 0.5rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem;
+}

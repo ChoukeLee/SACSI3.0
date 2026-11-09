@@ -433,7 +433,8 @@ it("restores the last operating location per viewer and category without a secon
   expect(toolbar.querySelector("option[value='all']")).toBeNull();
   expect(host.querySelectorAll('input[type="search"]')).toHaveLength(1);
   expect(host.querySelector('select[aria-label="资产分组"]')).toBeNull();
-  expect(cards()).toHaveLength(2);
+  expect(cards()).toHaveLength(0);
+  expect(host.querySelector('[aria-label="仓库场地"]')?.textContent).toContain("老仓库");
 
   await act(async () => {
     const selected = location();
@@ -441,7 +442,7 @@ it("restores the last operating location per viewer and category without a secon
     selected.dispatchEvent(new Event("change", { bubbles: true }));
   });
   expect(cards()).toHaveLength(1);
-  expect(cards()[0].textContent).toContain("新仓库1号");
+  expect(cards()[0].querySelector("strong")?.lastChild?.textContent).toBe("1号");
 
   await renderCategory("land");
   expect(location().value).toBe("");
@@ -450,7 +451,135 @@ it("restores the last operating location per viewer and category without a secon
   expect(cards()).toHaveLength(1);
   await renderCategory("warehouse", "viewer-b");
   expect(location().value).toBe("");
-  expect(cards()).toHaveLength(2);
+  expect(cards()).toHaveLength(0);
+});
+
+it("shows warehouse site follow-up counts before opening compact cards and financial details", async () => {
+  const warehouse = (site: string, group: string, number: number) =>
+    asset({
+      id: `${group}-${number}`,
+      sourceKey: `${group}:${number}`,
+      name: `${site}${number}号`,
+      group,
+      verification: "verified",
+      sourceRefs: [`test.xlsx!${group}:${number}`],
+      monthlyRentNative: 400000,
+      rentCurrency: "XOF",
+    });
+  const overdue = warehouse("老仓库", "old_warehouse", 2);
+  const upcoming = warehouse("老仓库", "old_warehouse", 10);
+  const review = warehouse("新仓库", "new_warehouse", 1);
+  const normal = warehouse("孵化园库房", "孵化园库房", 1);
+  const evidence = (item: AssetOperationAsset, dueDate: string, name: string) => ({
+    assetSourceRef: item.sourceRefs[0],
+    paidThrough: { date: "2026-10-31", sourceRef: item.sourceRefs[0] },
+    nextPayment: { dueDate, sourceRef: item.sourceRefs[0], unpaid: true },
+    tenantEvidence: {
+      names: [name],
+      sourceRef: item.sourceRefs[0],
+      classification: "latest_source" as const,
+      scope: "asset" as const,
+    },
+  });
+  const data = directory(
+    [upcoming, overdue, review, normal],
+    [
+      entry({
+        assetId: overdue.id,
+        cashDate: "2026-11-05",
+        periodStart: "2026-10-01",
+        periodEnd: "2026-10-31",
+        amountNative: 300000,
+        verification: "verified",
+        sourceRef: "test.xlsx!I2",
+        description: "示例仓库收款",
+      }),
+      entry({
+        id: "warehouse-pending",
+        assetId: review.id,
+        cashDate: "2026-11-05",
+        periodStart: "2026-11-01",
+        periodEnd: "2026-11-30",
+        sourceRef: "test.xlsx!I1",
+        description: "待核示例收款",
+      }),
+    ],
+    {
+      [overdue.sourceKey!]: evidence(overdue, "2026-11-07", "示例租户甲"),
+      [upcoming.sourceKey!]: evidence(upcoming, "2026-11-22", "示例租户乙"),
+      [review.sourceKey!]: { assetSourceRef: review.sourceRefs[0], leaseListed: true },
+    },
+  );
+  await act(async () =>
+    root.render(
+      <OperatingAssetDirectory
+        data={data}
+        locale="zh"
+        today={today}
+        category="warehouse"
+        browseViewerId="viewer-a"
+      />,
+    ),
+  );
+
+  const siteList = () => host.querySelector('[aria-label="仓库场地"]');
+  const siteButton = (name: string) =>
+    [...(siteList()?.querySelectorAll("button") ?? [])].find((item) =>
+      item.textContent?.includes(name),
+    );
+  const cards = () => [
+    ...host.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="dialog"]'),
+  ];
+  expect(cards()).toHaveLength(0);
+  expect(siteButton("老仓库")?.textContent).toMatch(/待跟进\s*2\s*项/);
+  expect(siteButton("新仓库")?.textContent).toMatch(/待跟进\s*1\s*项/);
+  expect(siteButton("孵化园库房")?.textContent).toMatch(/待跟进\s*0\s*项/);
+  expect(siteList()?.textContent).not.toContain("示例租户甲");
+
+  const filters = host.querySelector('[aria-label="长租状态筛选"]')!;
+  await clickButton(filters, "已逾期1");
+  expect(siteList()?.querySelectorAll("button")).toHaveLength(1);
+  expect(siteButton("老仓库")).toBeDefined();
+  expect(cards()).toHaveLength(0);
+  await clickButton(filters, "全部状态4");
+  await act(async () => siteButton("老仓库")!.click());
+  expect(host.querySelector<HTMLSelectElement>('select[aria-label="选择场地"]')?.value).toBe(
+    "老仓库",
+  );
+  expect(cards().map((card) => card.querySelector("strong")?.lastChild?.textContent)).toEqual([
+    "2号",
+    "10号",
+  ]);
+  expect(cards()[0].textContent).toContain("示例租户甲");
+  expect(cards()[0].textContent).toMatch(/已交至\s*2026-10-31/);
+  expect(cards()[0].textContent).toMatch(/逾期\s*2\s*天/);
+  expect(cards()[1].textContent).toMatch(/13\s*天后应缴/);
+  for (const card of cards()) {
+    expect(card.textContent).not.toMatch(/参考月租|本月实收|万西法/);
+  }
+
+  await clickButton(filters, "已逾期1");
+  expect(cards()).toHaveLength(1);
+  await act(async () => cards()[0].click());
+  const current = dialog();
+  expect(current.querySelector("h2")?.textContent).toBe("老仓库2号");
+  expect(factValues(current, "参考月租")).toEqual(["40 万西法"]);
+  expect(factValues(current, "已核实收")).toContain("30 万西法");
+  await clickButton(current, "收付款");
+  expect(factValues(current, "收付日期")).toEqual(["2026-11-05"]);
+  expect(factValues(current, "原币金额")).toEqual(["30 万西法"]);
+
+  await act(async () =>
+    current.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!.click(),
+  );
+  await clickButton(filters, "全部状态2");
+  await clickButton(host, "返回全部场地");
+  expect(cards()).toHaveLength(0);
+  await act(async () => siteButton("新仓库")!.click());
+  expect(cards()).toHaveLength(1);
+  expect(cards()[0].textContent).toContain("待补资料");
+  expect(cards()[0].textContent).toMatch(/租金记载至\s*2026-11-30\s*· 待核/);
+  expect(cards()[0].textContent).not.toContain("逾期");
 });
 
 it("shows only matching assets from all categories and keeps search as the apartment detail return", async () => {
@@ -495,7 +624,9 @@ it("shows only matching assets from all categories and keeps search as the apart
   expect(host.querySelector('[data-room-id], button[aria-haspopup="dialog"]')).toBeNull();
   await renderSearch("synthetic");
   expect(host.textContent).toContain("跨类别搜索结果2 项");
-  expect(host.textContent).toContain("示例仓库");
+  const warehouseMatch = host.querySelector('button[aria-haspopup="dialog"]');
+  expect(warehouseMatch?.textContent).toContain("示例仓库");
+  expect(warehouseMatch?.textContent).not.toMatch(/参考月租|本月实收/);
   expect(host.textContent).not.toContain("国基土地");
   expect(host.querySelector('select[aria-label="选择场地"]')).toBeNull();
   expect(host.querySelector("a[href='/leases?assetCategory=followup']")).not.toBeNull();
