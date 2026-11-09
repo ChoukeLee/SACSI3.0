@@ -420,7 +420,12 @@ export function LeaseRentalInspector({
                 </p>
               ) : null}
             </section>
-            <RentalPaymentTable contract={contract} payments={ordered} locale={locale} />
+            <RentalPaymentTable
+              contract={contract}
+              payments={ordered}
+              locale={locale}
+              verifiedLegacyRentIds={receiptKinds.verifiedLegacyRentIds}
+            />
             <section className={styles.rentalSection}>
               <h3>{text("应收与付款安排", "Créances et échéances")}</h3>
               <NativeLeaseFinance
@@ -640,10 +645,12 @@ function RentalPaymentTable({
   contract,
   payments,
   locale,
+  verifiedLegacyRentIds,
 }: {
   contract: LeaseContractRow;
   payments: PaymentRow[];
   locale: Locale;
+  verifiedLegacyRentIds: ReadonlySet<string>;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const id = useId(),
@@ -656,7 +663,9 @@ function RentalPaymentTable({
     const line = classifyContractCashPayment(p),
       original = getRecordedOriginalPayment(p),
       display = propertyPaymentDisplay(p, locale),
-      config = getLeaseFinancialConfigBySourceType(p.source_type);
+      config = getLeaseFinancialConfigBySourceType(
+        verifiedLegacyRentIds.has(p.id) ? "lease_rent" : p.source_type,
+      );
     const label = allocation
       ? allocation.adjustmentKind === "refund"
         ? text("客户总账 · 本合同实际退款", "Compte client · remboursement réel de ce contrat")

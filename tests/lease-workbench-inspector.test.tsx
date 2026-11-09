@@ -365,6 +365,33 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect(host.querySelectorAll('[aria-label="原币租金账务"]')).toHaveLength(0);
   });
 
+  it("uses the verified rent purpose for legacy receipts in the payment table", async () => {
+    const legacy = payment({ source_type: "lease_contract", amount: 4_200_000 });
+    const ledger = {
+      id: "legacy-rent-ledger",
+      payment_id: legacy.id,
+      building_id: null,
+      unit_id: contract.unit_id,
+      entry_date: legacy.payment_date,
+      direction: "income" as const,
+      category: "lease_rent",
+      currency: "XOF" as const,
+      amount_xof: legacy.amount,
+      amount_cny: null,
+      description: null,
+      created_at: legacy.created_at,
+    };
+    const row = () => host.querySelector('tr[data-lease-payment-id="payment-1"]');
+    await render({ payments: [legacy], receiptLedger: [ledger] });
+    await tab("收付款");
+    expect(row()?.textContent).toContain("租金收入+420 万西法");
+    await viewPayment(legacy.id);
+    expect(host.querySelector('[aria-label="收付款依据"]')?.textContent).toContain("租金收入");
+
+    await render({ payments: [legacy], receiptLedger: [{ ...ledger, amount_xof: 1 }] });
+    expect(row()?.textContent).toContain("其他财务记录");
+  });
+
   it("keeps rent, deposits, fees and refunds separate in both the overview and payments tab", async () => {
     await render({
       payments: [
