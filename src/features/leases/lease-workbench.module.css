@@ -49,36 +49,82 @@
   background: hsl(var(--card));
   padding: 4px;
 }
-.categoryNavigation {
+.browseToolbar {
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 8px;
   align-items: center;
-  overflow-x: auto;
-  width: fit-content;
-  max-width: 100%;
-  padding: 4px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 9px;
-  background: hsl(var(--card));
+  min-width: 0;
 }
-.categoryNavigation a {
+.browseSelect,
+.browseSearch,
+.browseAction {
+  height: 40px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--card));
+  font-size: 14px;
+}
+.browseSelect {
+  max-width: 100%;
+  min-width: 0;
+  padding: 0 12px;
+}
+.browseSearch {
+  display: flex;
+  flex: 1 1 220px;
+  align-items: stretch;
+  min-width: 0;
+}
+.browseSearch:focus-within {
+  border-color: var(--lease-accent);
+}
+.browseSearch input {
+  flex: 1;
+  min-width: 0;
+  padding: 0 12px;
+  background: transparent;
+  outline: none;
+}
+.browseSearch button {
+  display: grid;
+  width: 38px;
+  flex-shrink: 0;
+  place-items: center;
+  color: hsl(var(--muted-foreground));
+}
+.browseAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
   white-space: nowrap;
 }
-.scopeProjects button,
-.categoryNavigation a {
+.browseSearch button:hover,
+.browseAction:hover {
+  color: var(--lease-accent);
+}
+@media (max-width: 540px) {
+  .browseSelect {
+    flex: 1 1 0;
+  }
+  .browseSearch {
+    flex-basis: 100%;
+  }
+}
+.scopeProjects button {
   padding: 7px 13px;
   border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
   color: hsl(var(--muted-foreground));
 }
-.scopeProjects button[aria-pressed="true"],
-.categoryNavigation a[aria-current="page"] {
+.scopeProjects button[aria-pressed="true"] {
   color: var(--lease-accent);
   background: var(--lease-accent-soft);
 }
-.scopeProjects button:hover,
-.categoryNavigation a:hover {
+.scopeProjects button:hover {
   color: var(--lease-accent);
 }
 .scopeBuildings {

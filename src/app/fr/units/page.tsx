@@ -31,9 +31,7 @@ export default async function FrenchUnitsPage({
 
   return (
     <>
-      {showOperatingAssets ? (
-        <OperatingAssetNavigation area="units" locale="fr" view={view} />
-      ) : null}
+      {showOperatingAssets ? <OperatingAssetNavigation locale="fr" view={view} /> : null}
       <Suspense fallback={<UnitWorkbenchSkeleton locale="fr" />}>
         {view === "maintenance" ? (
           <AssetOperationsPage locale="fr" />

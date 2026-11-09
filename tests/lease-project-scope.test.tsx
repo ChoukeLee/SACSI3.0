@@ -12,6 +12,10 @@ vi.mock("@/features/leases/actions", () => ({
 }));
 import { LeaseList } from "@/features/leases/lease-list";
 import {
+  leaseScopeCookieName,
+  leaseScopeStorageKey,
+} from "@/features/contracts/lease-scope-preference";
+import {
   groupLeaseBuildings,
   resolveBuildingScope,
   type LeaseBuilding,
@@ -78,11 +82,14 @@ afterEach(async () => {
   host.remove();
   vi.unstubAllGlobals();
 });
-async function render(initialProject?: string) {
+async function render(initialProject?: string, browseViewerId?: string) {
+  const cookieName = leaseScopeCookieName(browseViewerId);
   await act(async () =>
     root.render(
       <LeaseList
         initialProject={initialProject}
+        browseViewerId={browseViewerId}
+        scopePreference={cookieName ? { cookieName, serverResolved: false } : undefined}
         buildings={buildings}
         units={units}
         customers={customers}
@@ -171,6 +178,36 @@ it("supports the mobile building selector", async () => {
   });
   expect(host.textContent).toContain("客户c1");
   expect(host.textContent).not.toContain("客户c2");
+});
+
+it("combines apartment location with shared browsing and remembers the selected building", async () => {
+  const viewer = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  await render(undefined, viewer);
+  const toolbar = host.querySelector('[aria-label="长租浏览工具栏"]')!;
+  const select = toolbar.querySelector<HTMLSelectElement>('select[aria-label="选择楼栋"]')!;
+  expect(select.value).toBe("a11");
+  expect(toolbar.querySelector('[aria-label="资产类别"]')?.textContent).not.toContain("全部资产");
+  expect(host.querySelectorAll('input[type="search"]')).toHaveLength(1);
+  expect(toolbar.querySelector('a[href="/leases?assetCategory=followup"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="楼栋切换"]')).toBeNull();
+  expect(metric("查看历史")).toBe("查看历史");
+
+  await act(async () => {
+    select.value = "c2";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(host.textContent).toContain("客户c2");
+  expect(host.textContent).not.toContain("客户c1");
+  expect(
+    JSON.parse(localStorage.getItem(leaseScopeStorageKey(leaseScopeCookieName(viewer)))!).buildings
+      .c,
+  ).toBe("c2");
+
+  await act(async () => root.unmount());
+  root = createRoot(host);
+  await render(undefined, viewer);
+  expect(host.querySelector<HTMLSelectElement>('select[aria-label="选择楼栋"]')?.value).toBe("c2");
+  expect(host.querySelectorAll("[data-room-id]")).toHaveLength(1);
 });
 
 it("opens an explicit project link across all its buildings instead of restoring a different remembered project", async () => {

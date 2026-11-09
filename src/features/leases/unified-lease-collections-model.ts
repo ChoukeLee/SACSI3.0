@@ -8,26 +8,21 @@ import {
 import {
   followUpLabels,
   followUpReasons,
-  operatingAssetCategoryLabel,
   recordedTenant,
 } from "@/features/asset-operations/operating-asset-display";
 import { routeFor, type Locale } from "@/lib/i18n";
 import { formatPropertyMoney } from "@/lib/property-money";
 import { buildWorkbenchRecordHref } from "@/lib/workbench-links";
+import {
+  leaseBrowseCategories,
+  leaseBrowseCategoryLabel,
+  leaseCollectionHref,
+  type LeaseBrowseCategory,
+} from "./lease-browse-model";
 import type { LeaseRecordOverviewRow } from "./lease-room-overview-model";
 
-export const collectionCategories = [
-  "apartment",
-  "warehouse",
-  "factory",
-  "commercial",
-  "land",
-  "office",
-  "dormitory",
-  "other",
-] as const;
-
-type RecordCategory = (typeof collectionCategories)[number];
+export const collectionCategories = leaseBrowseCategories;
+type RecordCategory = LeaseBrowseCategory;
 export type CollectionCategory = "all" | RecordCategory;
 export type CollectionStatus = Exclude<keyof typeof followUpLabels, "all"> | "unsettled";
 
@@ -57,8 +52,7 @@ export function parseCollectionCategory(value: unknown): CollectionCategory {
 
 export function collectionCategoryLabel(category: CollectionCategory, locale: Locale) {
   if (category === "all") return locale === "zh" ? "全部类别" : "Toutes les catégories";
-  if (category === "apartment") return locale === "zh" ? "公寓" : "Appartements";
-  return operatingAssetCategoryLabel(category, locale);
+  return leaseBrowseCategoryLabel(category, locale);
 }
 
 export const collectionStatusLabels: Record<CollectionStatus | "all", [string, string]> = {
@@ -114,7 +108,7 @@ export function buildApartmentCollectionRows(
       locale,
       project: building?.project_id,
       building: unit.building_id,
-      returnTo: routeFor(locale, "/leases?assetCategory=followup&collectionCategory=apartment"),
+      returnTo: leaseCollectionHref(locale),
     });
     if (!href) return [];
 

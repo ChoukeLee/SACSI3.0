@@ -3,12 +3,18 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { buildLeaseRoomOverview } from "@/features/leases/lease-room-overview-model";
+import type { LeaseContractRow } from "@/types/database";
+import { workspaceContract, workspaceFixture } from "../../../tests/fixtures/contract-workspace";
 import type { AssetOperationAsset, AssetOperationEntry } from "./asset-operations-model";
 import { OperatingAssetDirectory } from "./operating-asset-directory";
 import {
   buildOperatingAssetDirectory,
   type OperatingAssetDirectoryOptions,
 } from "./operating-asset-directory-model";
+
+const navigation = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => navigation }));
 
 const projectId = "test-sacsi";
 const today = "2026-11-09";
@@ -70,6 +76,8 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
+  window.localStorage.clear();
+  navigation.push.mockClear();
   vi.unstubAllGlobals();
 });
 
@@ -392,6 +400,111 @@ it("separates registered late payments from missing evidence and keeps warehouse
     combinedSearch.dispatchEvent(new Event("input", { bubbles: true }));
   });
   expect(host.textContent).toContain("未找到符合条件的资产。");
+});
+
+it("restores the last operating location per viewer and category without a second scope row", async () => {
+  const data = directory(
+    [
+      asset(),
+      asset({ id: "old", sourceKey: "old:1", name: "老仓库1号", group: "old_warehouse" }),
+      asset({ id: "new", sourceKey: "new:1", name: "新仓库1号", group: "new_warehouse" }),
+    ],
+    [],
+  );
+  const renderCategory = async (category: "land" | "warehouse", viewerId = "viewer-a") =>
+    act(async () =>
+      root.render(
+        <OperatingAssetDirectory
+          data={data}
+          locale="zh"
+          today={today}
+          category={category}
+          browseViewerId={viewerId}
+        />,
+      ),
+    );
+  const location = () => host.querySelector<HTMLSelectElement>('select[aria-label="选择场地"]')!;
+  const cards = () => host.querySelectorAll('button[aria-haspopup="dialog"]');
+
+  await renderCategory("warehouse");
+  const toolbar = host.querySelector('[aria-label="长租浏览工具栏"]')!;
+  expect(toolbar.querySelector("select")).not.toBeNull();
+  expect(toolbar.contains(location())).toBe(true);
+  expect(toolbar.querySelector("option[value='all']")).toBeNull();
+  expect(host.querySelectorAll('input[type="search"]')).toHaveLength(1);
+  expect(host.querySelector('select[aria-label="资产分组"]')).toBeNull();
+  expect(cards()).toHaveLength(2);
+
+  await act(async () => {
+    const selected = location();
+    selected.value = "新仓库";
+    selected.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(cards()).toHaveLength(1);
+  expect(cards()[0].textContent).toContain("新仓库1号");
+
+  await renderCategory("land");
+  expect(location().value).toBe("");
+  await renderCategory("warehouse");
+  expect(location().value).toBe("新仓库");
+  expect(cards()).toHaveLength(1);
+  await renderCategory("warehouse", "viewer-b");
+  expect(location().value).toBe("");
+  expect(cards()).toHaveLength(2);
+});
+
+it("shows only matching assets from all categories and keeps search as the apartment detail return", async () => {
+  const fixture = workspaceFixture();
+  const apartmentRows = buildLeaseRoomOverview({
+    units: fixture.units,
+    contracts: fixture.contracts as LeaseContractRow[],
+    customers: fixture.customers,
+    buildings: fixture.buildings,
+    today,
+  });
+  const data = directory(
+    [
+      asset(),
+      asset({
+        id: "warehouse",
+        name: "示例仓库",
+        sourceKey: "old:1",
+        group: "old_warehouse",
+        code: "SYNTHETIC-W",
+      }),
+    ],
+    [],
+  );
+  const renderSearch = async (searchQuery: string) =>
+    act(async () =>
+      root.render(
+        <OperatingAssetDirectory
+          data={data}
+          locale="zh"
+          today={today}
+          category="all"
+          browseViewerId="viewer-a"
+          apartmentRows={apartmentRows}
+          searchCategory="warehouse"
+          searchQuery={searchQuery}
+        />,
+      ),
+    );
+
+  await renderSearch(" ");
+  expect(host.querySelector('[data-room-id], button[aria-haspopup="dialog"]')).toBeNull();
+  await renderSearch("synthetic");
+  expect(host.textContent).toContain("跨类别搜索结果2 项");
+  expect(host.textContent).toContain("示例仓库");
+  expect(host.textContent).not.toContain("国基土地");
+  expect(host.querySelector('select[aria-label="选择场地"]')).toBeNull();
+  expect(host.querySelector("a[href='/leases?assetCategory=followup']")).not.toBeNull();
+
+  const room = host.querySelector<HTMLButtonElement>("button[data-room-id]")!;
+  await act(async () => room.click());
+  const next = new URL(navigation.push.mock.calls[0][0], "https://test.invalid");
+  expect(next.searchParams.get("contract")).toBe(workspaceContract);
+  expect(next.searchParams.get("returnTo")).toBe("/leases?assetCategory=warehouse&q=synthetic");
 });
 
 it("shows original currency and XOF book values separately for the same two cash movements", async () => {

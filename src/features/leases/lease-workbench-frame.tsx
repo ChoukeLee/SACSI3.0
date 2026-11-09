@@ -1,18 +1,18 @@
 import type { ReactNode } from "react";
-import type { Locale } from "@/lib/i18n";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { routeFor, type Locale } from "@/lib/i18n";
 import { OperationalPage } from "@/components/ui/operational";
 import styles from "./lease-workbench.module.css";
 
 export function LeaseWorkbenchFrame({
   locale,
   workArea = "sacsi",
-  navigation,
   action,
   children,
 }: {
   locale: Locale;
   workArea?: "sacsi" | "cimac";
-  navigation?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
 }) {
@@ -42,8 +42,16 @@ export function LeaseWorkbenchFrame({
       }
       action={action}
     >
-      {navigation}
       {children}
     </OperationalPage>
+  );
+}
+
+export function LeaseCollectionsBackLink({ locale }: { locale: Locale }) {
+  return (
+    <Link className={styles.browseAction} href={routeFor(locale, "/leases")} prefetch={false}>
+      <ArrowLeft size={16} aria-hidden="true" />
+      {locale === "zh" ? "返回长租" : "Revenir aux locations"}
+    </Link>
   );
 }

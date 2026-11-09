@@ -628,6 +628,8 @@ const files = [
   "src/features/asset-operations/operating-asset-display.ts",
   "src/features/leases/apartment-directory-section.tsx",
   "src/features/leases/lease-workbench-frame.tsx",
+  "src/features/leases/lease-browse-model.ts",
+  "src/features/leases/lease-browse-toolbar.tsx",
   "src/features/leases/unified-lease-collections-model.ts",
   "src/features/leases/unified-lease-collections-model.test.ts",
   "src/features/leases/unified-lease-collections-page.tsx",

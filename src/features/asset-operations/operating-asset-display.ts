@@ -22,6 +22,17 @@ export function operatingAssetCategoryLabel(category: OperatingAssetCategory, lo
   return categoryLabels[category][locale === "zh" ? 0 : 1];
 }
 
+export function operatingAssetMatchesSearch(asset: OperatingAssetDirectoryAsset, search: string) {
+  const term = search.trim().toLocaleLowerCase();
+  return [
+    asset.displayName,
+    asset.name,
+    asset.code,
+    asset.displayGroup,
+    ...(asset.leaseEvidence?.tenantEvidence?.names ?? []),
+  ].some((value) => value.toLocaleLowerCase().includes(term));
+}
+
 const rentLabels = {
   month: ["参考月租", "Loyer mensuel indicatif"],
   quarter: ["季租", "Loyer trimestriel"],

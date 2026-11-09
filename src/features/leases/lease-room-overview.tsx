@@ -1,16 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { ArrowRight, CalendarClock, Search } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { cn, floorSortValue, normalizeFloorLabel } from "@/lib/utils";
 import { formatPropertyMoney, propertyLeaseRentLabel } from "@/lib/property-money";
 import { nativeLease } from "@/lib/native-money";
-import type {
-  LeaseRecordAttention,
-  LeaseRecordOverviewRow,
-  LeaseRoomOverviewRow,
+import {
+  leaseRoomMatchesSearch,
+  type LeaseRecordAttention,
+  type LeaseRecordOverviewRow,
+  type LeaseRoomOverviewRow,
 } from "./lease-room-overview-model";
 import styles from "./lease-room-overview.module.css";
 
@@ -26,12 +26,6 @@ export function leaseRoomMatchesFilter(row: LeaseRoomOverviewRow, filter: LeaseR
   return filter === "review"
     ? review || row.attention?.kind === "coverage"
     : !review && row.attention?.kind === filter;
-}
-
-export function leaseRoomMatchesSearch(row: LeaseRoomOverviewRow, search: string) {
-  return `${row.unit.unit_no} ${row.unit.code} ${row.building?.display_name ?? ""} ${row.customer?.name ?? ""}`
-    .toLocaleLowerCase()
-    .includes(search.trim().toLocaleLowerCase());
 }
 
 export function leaseRoomFloorLabel(unit: LeaseRoomOverviewRow["unit"], locale: Locale) {
@@ -236,7 +230,7 @@ export function LeaseRoomOverview({
   error,
   selectedUnitId,
   disabled = false,
-  collectionHref,
+  sharedBrowseToolbar,
   embedded,
   onSelectUnit,
   onSelectRecord,
@@ -249,7 +243,7 @@ export function LeaseRoomOverview({
   error: boolean;
   selectedUnitId?: string | null;
   disabled?: boolean;
-  collectionHref?: string;
+  sharedBrowseToolbar?: boolean;
   embedded?: { search: string; filter: LeaseRoomFilter };
   onSelectUnit: (row: LeaseRoomOverviewRow) => void;
   onSelectRecord: (row: LeaseRecordOverviewRow) => void;
@@ -430,36 +424,32 @@ export function LeaseRoomOverview({
             ))}
           </div>
           <div className={styles.tools}>
-            <label className={styles.search}>
-              <Search size={15} aria-hidden="true" />
-              <span className="sr-only">
-                {text("搜索房号或租客", "Rechercher un lot ou locataire")}
-              </span>
-              <input
-                type="search"
-                placeholder={text("搜索房号或租客", "Lot ou locataire")}
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </label>
-            {collectionHref ? (
-              <Link href={collectionHref} prefetch={false} className={styles.followupButton}>
-                <CalendarClock size={15} aria-hidden="true" />
-                {text("收款跟进", "Suivi des loyers")}
-                <span>{followupRows.length}</span>
-              </Link>
-            ) : (
-              <button
-                type="button"
-                className={styles.followupButton}
-                aria-expanded={followup}
-                onClick={() => setFollowup((value) => !value)}
-              >
-                <CalendarClock size={15} aria-hidden="true" />
-                {text("收款跟进", "Suivi des loyers")}
-                <span>{followupRows.length}</span>
-              </button>
-            )}
+            {!sharedBrowseToolbar ? (
+              <>
+                <label className={styles.search}>
+                  <Search size={15} aria-hidden="true" />
+                  <span className="sr-only">
+                    {text("搜索房号或租客", "Rechercher un lot ou locataire")}
+                  </span>
+                  <input
+                    type="search"
+                    placeholder={text("搜索房号或租客", "Lot ou locataire")}
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className={styles.followupButton}
+                  aria-expanded={followup}
+                  onClick={() => setFollowup((value) => !value)}
+                >
+                  <CalendarClock size={15} aria-hidden="true" />
+                  {text("收款跟进", "Suivi des loyers")}
+                  <span>{followupRows.length}</span>
+                </button>
+              </>
+            ) : null}
             <button
               type="button"
               className={styles.followupButton}
@@ -471,7 +461,7 @@ export function LeaseRoomOverview({
           </div>
         </div>
       ) : null}
-      {!embedded && !collectionHref && followup ? (
+      {!embedded && !sharedBrowseToolbar && followup ? (
         <section
           className={styles.followup}
           aria-label={text("集中收款跟进", "Suivi des loyers regroupé")}

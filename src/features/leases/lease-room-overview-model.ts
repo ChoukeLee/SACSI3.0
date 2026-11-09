@@ -39,6 +39,21 @@ export interface LeaseRoomOverviewRow {
   reviewReasons: string[];
 }
 
+export function leaseRoomMatchesSearch(row: LeaseRoomOverviewRow, search: string) {
+  const terms = search.trim().toLocaleLowerCase().split(/\s+/);
+  const searchable = [
+    row.unit.unit_no,
+    row.unit.code,
+    row.building?.display_name,
+    row.building?.code,
+    row.customer?.name,
+    row.contract?.contract_no,
+  ]
+    .join(" ")
+    .toLocaleLowerCase();
+  return terms.every((term) => searchable.includes(term));
+}
+
 export interface LeaseRoomOverviewInput {
   units: readonly WorkspaceUnit[];
   contracts: readonly LeaseContractRow[];

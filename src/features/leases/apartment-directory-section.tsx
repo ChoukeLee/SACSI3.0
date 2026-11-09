@@ -12,15 +12,16 @@ export function ApartmentDirectorySection({
   filter,
   locale,
   unavailable = false,
+  returnTo = routeFor(locale, "/leases"),
 }: {
   rows: LeaseRoomOverviewRow[];
   search: string;
   filter: LeaseRoomFilter;
   locale: Locale;
   unavailable?: boolean;
+  returnTo?: string;
 }) {
   const router = useRouter();
-  const returnTo = routeFor(locale, "/leases?assetCategory=all");
 
   return (
     <LeaseRoomOverview
@@ -35,6 +36,7 @@ export function ApartmentDirectorySection({
           ? buildWorkbenchRecordHref({
               workspace: "leases",
               id: row.contract.id,
+              project: row.building?.project_id,
               building: row.unit.building_id,
               locale,
               returnTo,

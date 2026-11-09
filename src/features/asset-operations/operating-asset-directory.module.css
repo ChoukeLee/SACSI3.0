@@ -103,6 +103,24 @@
   color: hsl(var(--muted-foreground));
 }
 
+.searchResultHeading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.65rem;
+}
+
+.searchResultHeading > h2 {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.searchResultHeading > span {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .groupSelect {
   max-width: 100%;
   padding: 0.35rem 0.6rem;

@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import {
   buildLeaseRoomOverview,
   decodeLeaseRoomReceivables,
+  leaseRoomMatchesSearch,
   type LeaseRoomOverviewInput,
 } from "./lease-room-overview-model";
 import {
@@ -62,6 +63,14 @@ it("keeps paperless registered tenants, rent and coverage visible without invent
   expect(row.paidThrough).toBe("2026-12-31");
   expect(row.occupancy).toBe("leased");
   expect(row.attention).toBeNull();
+});
+
+it("finds apartment rooms by building, room, tenant or lease reference", () => {
+  const [row] = buildLeaseRoomOverview(input());
+  expect(leaseRoomMatchesSearch(row, "sacsi11 101")).toBe(true);
+  expect(leaseRoomMatchesSearch(row, " Synthetic guest ")).toBe(true);
+  expect(leaseRoomMatchesSearch(row, "synthetic-0")).toBe(true);
+  expect(leaseRoomMatchesSearch(row, "sacsi11 102")).toBe(false);
 });
 
 it.each([undefined, []] as const)(

@@ -68,9 +68,7 @@ it("keeps a historical native-currency debt and links to its original contract",
   const target = new URL(row.href, "https://example.test");
   expect(target.pathname).toBe("/fr/leases");
   expect(target.searchParams.get("contract")).toBe(record.contract.id);
-  expect(target.searchParams.get("returnTo")).toBe(
-    "/fr/leases?assetCategory=followup&collectionCategory=apartment",
-  );
+  expect(target.searchParams.get("returnTo")).toBe("/fr/leases?assetCategory=followup");
 });
 
 it("lists an explicit warehouse balance with missing due date as evidence, not overdue", () => {

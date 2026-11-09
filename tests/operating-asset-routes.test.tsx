@@ -1,5 +1,4 @@
 import { Children, isValidElement, type ReactNode } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import LeasesPage from "@/app/leases/page";
 import FrenchLeasesPage from "@/app/fr/leases/page";
@@ -19,6 +18,7 @@ import {
 const mocks = vi.hoisted(() => ({
   fetchAssetOperations: vi.fn(),
   getCurrentUser: vi.fn(),
+  cookieGet: vi.fn(),
   redirectLegacyCimac: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(path);
@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.getCurrentUser }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: mocks.cookieGet }) }));
 vi.mock("@/features/cimac/cimac-legacy-redirect", () => ({
   redirectLegacyCimac: mocks.redirectLegacyCimac,
 }));
@@ -70,6 +71,7 @@ describe("operating assets are available through the existing workspaces", () =>
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getCurrentUser.mockResolvedValue({ id: "viewer", role: "admin" });
+    mocks.cookieGet.mockReturnValue(undefined);
   });
 
   it("passes the same operating asset selection to the shared directory from both routes", async () => {
@@ -104,11 +106,40 @@ describe("operating assets are available through the existing workspaces", () =>
   });
 
   it.each([
-    { locale: "zh", page: LeasesPage, path: "/leases" },
-    { locale: "fr", page: FrenchLeasesPage, path: "/fr/leases" },
+    { locale: "zh", page: LeasesPage },
+    { locale: "fr", page: FrenchLeasesPage },
   ] as const)(
-    "exposes the $locale shared follow-up and all asset categories",
-    async ({ locale, page, path }) => {
+    "defaults to apartments and restores only valid $locale browse preferences",
+    async ({ locale, page }) => {
+      const open = (params = {}) => page({ searchParams: Promise.resolve(params) });
+      const first = await open();
+      expect(findProps(first, OperatingAssetDirectoryPage)).toBeUndefined();
+
+      mocks.cookieGet.mockReturnValue({ value: "warehouse" });
+      const remembered = await open();
+      expect(mocks.cookieGet).toHaveBeenCalledWith("sacsi_lease_category_v1_viewer");
+      expect(findProps(remembered, OperatingAssetDirectoryPage)).toMatchObject({
+        category: "warehouse",
+        locale,
+      });
+      const retired = await open({ assetCategory: "all", q: "  " });
+      expect(findProps(retired, OperatingAssetDirectoryPage)).toMatchObject({
+        category: "warehouse",
+      });
+      for (const params of [
+        { assetCategory: "apartment" },
+        { project: "SACSI", building: assetId, contract: assetId },
+      ]) {
+        expect(findProps(await open(params), OperatingAssetDirectoryPage)).toBeUndefined();
+      }
+      const search = await open({ assetCategory: "warehouse", q: "  国基  " });
+      expect(findProps(search, OperatingAssetDirectoryPage)).toMatchObject({
+        category: undefined,
+        searchCategory: "warehouse",
+        searchQuery: "国基",
+        locale,
+      });
+
       const followup = await page({
         searchParams: Promise.resolve({
           assetCategory: "followup",
@@ -126,22 +157,9 @@ describe("operating assets are available through the existing workspaces", () =>
         category: "dormitory",
         locale,
       });
-      const navigation = renderToStaticMarkup(
-        <OperatingAssetNavigation area="leases" locale={locale} category="followup" />,
-      );
-      for (const category of [
-        "all",
-        "warehouse",
-        "factory",
-        "commercial",
-        "office",
-        "land",
-        "dormitory",
-        "other",
-      ]) {
-        expect(navigation).toContain(`href="${path}?assetCategory=${category}"`);
-      }
-      expect(navigation).not.toContain("assetCategory=followup");
+      expect(
+        findProps(await open({ assetCategory: "followup" }), UnifiedLeaseCollectionsPage),
+      ).toMatchObject({ initialCategory: "all", locale });
     },
   );
 
@@ -193,17 +211,21 @@ describe("operating assets are available through the existing workspaces", () =>
       ],
     });
 
-    const all = await OperatingAssetDirectoryPage({
+    const search = await OperatingAssetDirectoryPage({
       locale: "zh",
-      category: "all",
+      searchCategory: "apartment",
+      searchQuery: "TEST-01",
+      viewerId: "viewer",
       selectedAssetId: "no-receipt",
     });
-    expect(all).toMatchObject({
+    expect(search).toMatchObject({
       props: {
         category: "all",
         enableCollections: true,
         initialView: "cards",
-        collectionHref: "/leases?assetCategory=followup&collectionCategory=all",
+        browseViewerId: "viewer",
+        searchCategory: "apartment",
+        searchQuery: "TEST-01",
         selectedAssetId: "no-receipt",
         apartmentRows: [],
         data: {

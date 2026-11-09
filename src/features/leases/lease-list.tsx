@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef, useCallback, type ReactNode } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { buildWorkbenchRecordHref, safeWorkbenchReturnTo } from "@/lib/workbench-links";
@@ -33,6 +33,7 @@ import { RoomBoard } from "@/components/room-board";
 import { RoomLegend } from "@/components/room-legend";
 import { EmptyState } from "@/components/empty-state";
 import { RightDrawer, SegmentedControl, controlClass } from "@/components/ui/operational";
+import { LeaseBrowseToolbar } from "./lease-browse-toolbar";
 import { LeaseWorkbenchFrame } from "./lease-workbench-frame";
 import type { RoomVisualStatus } from "@/lib/status-styles";
 import type {
@@ -129,8 +130,7 @@ interface LeaseListProps {
   initialCustomer?: string;
   initialCustomerName?: string;
   returnTo?: string;
-  categoryNavigation?: ReactNode;
-  collectionHref?: string;
+  browseViewerId?: string;
   scopePreference?: LeaseScopePreference;
   contracts: LeaseContractRow[];
   units: LeaseUnitRow[];
@@ -199,8 +199,7 @@ export function LeaseList({
   initialCustomer,
   initialCustomerName,
   returnTo,
-  categoryNavigation,
-  collectionHref,
+  browseViewerId,
   scopePreference,
   contracts: initialContracts,
   units: initialUnits,
@@ -454,6 +453,7 @@ export function LeaseList({
           ? "科建建材城"
           : "CIMAC"
         : p?.name || (locale === "zh" ? "未归属项目" : "Projet non affecté");
+  const allBuildingsLabel = locale === "zh" ? "全部楼栋" : "Tous les bâtiments";
   const scopeLabel = `${projectLabel(project)} · ${activeBuildingId === ALL_BUILDINGS ? (locale === "zh" ? "全部楼栋合计" : "Tous les bâtiments") : (projectBuildings.find((b) => b.id === activeBuildingId)?.display_name ?? "")}`;
   const printer = useContractPrinter(
     workspace.query ? workspaceQueryKey(workspace.query) : `${project?.id}/${activeBuildingId}`,
@@ -501,6 +501,25 @@ export function LeaseList({
         ...current,
         buildings: { ...current.buildings, [project.id]: id },
       }));
+    closeScopePanel();
+  };
+  const changeBrowseLocation = (value: string) => {
+    if (projects.length <= 1) {
+      changeBuilding(value);
+      return;
+    }
+    if (writePending()) return;
+    const next = projects.find(
+      (item) => value === `project:${item.id}` || item.buildings.some(({ id }) => id === value),
+    );
+    if (!next) return;
+    setScope((current) => ({
+      projectId: next.id,
+      buildings: {
+        ...current.buildings,
+        [next.id]: value === `project:${next.id}` ? ALL_BUILDINGS : value,
+      },
+    }));
     closeScopePanel();
   };
 
@@ -1619,7 +1638,6 @@ export function LeaseList({
     <LeaseWorkbenchFrame
       locale={locale}
       workArea={workArea}
-      navigation={categoryNavigation}
       action={
         <>
           {canCreate ? (
@@ -1678,62 +1696,91 @@ export function LeaseList({
               : " · Ce compte ne peut pas créer de contrat. Confiez la suite au service location ou à un administrateur. Aucun contrat ni frais n’est créé ici."}
         </p>
       ) : null}
-      <section
-        className={styles.scopeRow}
-        aria-label={locale === "zh" ? "项目与楼栋" : "Projet et bâtiment"}
-      >
-        <div className={styles.scopeFields}>
-          {workArea !== "cimac" && (
-            <nav
-              className={styles.scopeProjects}
-              aria-label={locale === "zh" ? "项目切换" : "Choix du projet"}
-            >
-              {projects.map((p) => (
-                <button
-                  type="button"
-                  key={p.id}
-                  aria-pressed={project?.id === p.id}
-                  onClick={() => changeProject(p.id)}
-                >
-                  {projectLabel(p)}
-                </button>
-              ))}
-            </nav>
-          )}
-          <div className={styles.scopeBuildings}>
-            <span className={styles.scopeLabel}>{locale === "zh" ? "楼栋" : "Bâtiment"}</span>
-            <select
-              aria-label={locale === "zh" ? "选择楼栋" : "Choisir un bâtiment"}
-              className={`${controlClass} min-w-0 flex-1 sm:hidden`}
-              value={activeBuildingId}
-              onChange={(e) => changeBuilding(e.target.value)}
-            >
-              <option value={ALL_BUILDINGS}>
-                {locale === "zh" ? "全部楼栋" : "Tous les bâtiments"}
-              </option>
-              {projectBuildings.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.display_name || b.code}
-                </option>
-              ))}
-            </select>
-            <SegmentedControl
-              value={activeBuildingId}
-              onChange={changeBuilding}
-              className="hidden min-w-0 sm:inline-flex"
-              ariaLabel={locale === "zh" ? "楼栋切换" : "Choix du bâtiment"}
-              items={[
-                {
-                  value: ALL_BUILDINGS,
-                  label: locale === "zh" ? "全部楼栋" : "Tous les bâtiments",
-                },
-                ...projectBuildings.map((b) => ({ value: b.id, label: b.display_name || b.code })),
-              ]}
-            />
+      {workArea === "sacsi" && browseViewerId ? (
+        <LeaseBrowseToolbar
+          locale={locale}
+          category="apartment"
+          location={{
+            label: locale === "zh" ? "选择楼栋" : "Choisir un bâtiment",
+            value:
+              activeBuildingId === ALL_BUILDINGS && project && projects.length > 1
+                ? `project:${project.id}`
+                : activeBuildingId,
+            options: projects.flatMap((item) => [
+              {
+                value: projects.length > 1 ? `project:${item.id}` : ALL_BUILDINGS,
+                label:
+                  projects.length > 1
+                    ? `${projectLabel(item)} · ${allBuildingsLabel}`
+                    : allBuildingsLabel,
+              },
+              ...item.buildings.map((building) => ({
+                value: building.id,
+                label: building.display_name || building.code,
+              })),
+            ]),
+            onChange: changeBrowseLocation,
+          }}
+        />
+      ) : (
+        <section
+          className={styles.scopeRow}
+          aria-label={locale === "zh" ? "项目与楼栋" : "Projet et bâtiment"}
+        >
+          <div className={styles.scopeFields}>
+            {workArea !== "cimac" && (
+              <nav
+                className={styles.scopeProjects}
+                aria-label={locale === "zh" ? "项目切换" : "Choix du projet"}
+              >
+                {projects.map((p) => (
+                  <button
+                    type="button"
+                    key={p.id}
+                    aria-pressed={project?.id === p.id}
+                    onClick={() => changeProject(p.id)}
+                  >
+                    {projectLabel(p)}
+                  </button>
+                ))}
+              </nav>
+            )}
+            <div className={styles.scopeBuildings}>
+              <span className={styles.scopeLabel}>{locale === "zh" ? "楼栋" : "Bâtiment"}</span>
+              <select
+                aria-label={locale === "zh" ? "选择楼栋" : "Choisir un bâtiment"}
+                className={`${controlClass} min-w-0 flex-1 sm:hidden`}
+                value={activeBuildingId}
+                onChange={(e) => changeBuilding(e.target.value)}
+              >
+                <option value={ALL_BUILDINGS}>{allBuildingsLabel}</option>
+                {projectBuildings.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.display_name || b.code}
+                  </option>
+                ))}
+              </select>
+              <SegmentedControl
+                value={activeBuildingId}
+                onChange={changeBuilding}
+                className="hidden min-w-0 sm:inline-flex"
+                ariaLabel={locale === "zh" ? "楼栋切换" : "Choix du bâtiment"}
+                items={[
+                  {
+                    value: ALL_BUILDINGS,
+                    label: allBuildingsLabel,
+                  },
+                  ...projectBuildings.map((b) => ({
+                    value: b.id,
+                    label: b.display_name || b.code,
+                  })),
+                ]}
+              />
+            </div>
           </div>
-        </div>
-        <p className={styles.scopeCaption}>{scopeLabel}</p>
-      </section>
+          <p className={styles.scopeCaption}>{scopeLabel}</p>
+        </section>
+      )}
 
       {/* ── Summary stats ── */}
       {workArea === "cimac" && (
@@ -1888,7 +1935,7 @@ export function LeaseList({
               key={roomScope}
               rows={roomOverviewRows}
               records={leaseRecordRows}
-              collectionHref={collectionHref}
+              sharedBrowseToolbar={!!browseViewerId}
               locale={locale}
               loading={
                 workspace.enabled &&
