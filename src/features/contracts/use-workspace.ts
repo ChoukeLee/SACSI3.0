@@ -11,6 +11,18 @@ import {
 const merge = <T extends { id: string }>(...lists: (T[] | undefined)[]) => [
   ...new Map(lists.flatMap((rows) => rows ?? []).map((row) => [row.id, row])).values(),
 ];
+const roomQuery = (query: WorkspaceQuery): WorkspaceQuery => ({
+  ...query,
+  status: "all",
+  search: "",
+  page: 1,
+});
+const completeRoomContext = (data: WorkspaceData) =>
+  Array.isArray(data.roomReceivables) &&
+  (data.kind === "lease" ||
+    (Array.isArray(data.roomPayments) &&
+      Array.isArray(data.roomSchedules) &&
+      !!data.roomFinanceCounts));
 export function useContractWorkspace(
   initial: WorkspaceData | undefined,
   workArea: "sacsi" | "cimac" = "sacsi",
@@ -23,29 +35,46 @@ export function useContractWorkspace(
     [loading, setLoading] = useState(false),
     [specialLoading, setSpecialLoading] = useState(false),
     [error, setError] = useState(false),
+    [roomContextLoading, setRoomContextLoading] = useState(false),
+    [roomContextError, setRoomContextError] = useState(false),
     [revision, setRevision] = useState(0);
   const queryRef = useRef(query);
   queryRef.current = query;
   const initialRef = useRef(initial),
     seenInitial = useRef(initial),
-    activeScope = useRef<{ insight: boolean } | null>(null);
+    activeScope = useRef<{ insight: boolean } | null>(null),
+    activeRoomContext = useRef(false),
+    roomRequest = useRef(0),
+    roomFlight = useRef<{
+      key: string;
+      generation: number;
+      request: number;
+      promise: Promise<WorkspaceData>;
+    } | null>(null);
   const initialConsumed = useRef(false),
     scopeGeneration = useRef(0),
     detailId = useRef<string | undefined>(undefined),
     specialRequest = useRef(0);
   const read = useCallback(
-    async (q: WorkspaceQuery, mode: WorkspaceMode = "list", id?: string, signal?: AbortSignal) => {
+    async (
+      q: WorkspaceQuery,
+      mode: WorkspaceMode = "list",
+      id?: string,
+      signal?: AbortSignal,
+      roomOverview = false,
+    ) => {
       if (!initial) throw new WorkspaceReadError();
       const search = new URLSearchParams(Object.entries(q).map(([k, v]) => [k, String(v)]));
       search.set("mode", mode);
       if (workArea === "cimac") search.set("workspace", workArea);
       if (id) search.set("contractId", id);
+      if (roomOverview) search.set("roomOverview", "1");
       const response = await fetch(`/api/contracts/${initial.kind}?${search}`, {
         cache: "no-store",
         signal,
       });
       if (!response.ok) throw new WorkspaceReadError(response.status);
-      return decodeWorkspace(await response.json(), initial.kind, q, mode, id);
+      return decodeWorkspace(await response.json(), initial.kind, q, mode, id, roomOverview);
     },
     [initial?.kind, workArea],
   );
@@ -62,11 +91,14 @@ export function useContractWorkspace(
     let active = true;
     const generation = ++scopeGeneration.current;
     specialRequest.current++;
+    roomRequest.current++;
     setLoading(true);
     setSpecialLoading(false);
     setError(false);
     setScopeData(undefined);
     setContextData(undefined);
+    setRoomContextLoading(activeRoomContext.current);
+    setRoomContextError(false);
     setDetailData(undefined);
     detailId.current = undefined;
     const scopeQuery = { ...query };
@@ -81,8 +113,11 @@ export function useContractWorkspace(
         activeScope.current
           ? read(scopeQuery, "scope", undefined, controller.signal)
           : Promise.resolve(undefined),
+        activeRoomContext.current
+          ? read(roomQuery(query), "context", undefined, controller.signal, true)
+          : Promise.resolve(undefined),
       ])
-        .then(([data, scope]) => {
+        .then(([data, scope, context]) => {
           if (active && generation === scopeGeneration.current) {
             const last = Math.max(1, Math.ceil(data.total / 25));
             if (query.page > last) {
@@ -91,12 +126,16 @@ export function useContractWorkspace(
             }
             setPageData(data);
             setScopeData(scope);
+            setContextData(context);
+            setRoomContextLoading(false);
             setLoading(false);
           }
         })
         .catch(() => {
           if (active && generation === scopeGeneration.current) {
             setError(true);
+            setRoomContextError(activeRoomContext.current);
+            setRoomContextLoading(false);
             setLoading(false);
           }
         });
@@ -117,6 +156,11 @@ export function useContractWorkspace(
         q.status = initial?.kind === "lease" ? "all" : q.status;
         q.page = 1;
       }
+      if (mode === "context" && initial?.kind === "lease") {
+        q.search = "";
+        q.status = "all";
+        q.page = 1;
+      }
       const generation = scopeGeneration.current,
         request = ++specialRequest.current;
       setSpecialLoading(true);
@@ -134,7 +178,14 @@ export function useContractWorkspace(
           throw new WorkspaceReadError();
         if (mode === "detail") setDetailData(data);
         else if (mode === "scope") setScopeData(data);
-        else if (mode === "context") setContextData(data);
+        else if (mode === "context")
+          setContextData((current) =>
+            current &&
+            completeRoomContext(current) &&
+            workspaceQueryKey(current.query) === workspaceQueryKey(data.query)
+              ? current
+              : data,
+          );
         return data;
       } catch (e) {
         if (generation === scopeGeneration.current && request === specialRequest.current)
@@ -152,11 +203,14 @@ export function useContractWorkspace(
     const id = detailId.current;
     const generation = ++scopeGeneration.current;
     ++specialRequest.current;
+    ++roomRequest.current;
     setLoading(true);
     setSpecialLoading(false);
     setError(false);
     setScopeData(undefined);
     setContextData(undefined);
+    setRoomContextLoading(activeRoomContext.current);
+    setRoomContextError(false);
     setDetailData(undefined);
     const scopeQuery = { ...q };
     if (activeScope.current?.insight) {
@@ -165,10 +219,13 @@ export function useContractWorkspace(
       scopeQuery.page = 1;
     }
     try {
-      const [page, detail, scope] = await Promise.all([
+      const [page, detail, scope, context] = await Promise.all([
         read(q),
         id ? read(q, "detail", id) : Promise.resolve(undefined),
         activeScope.current ? read(scopeQuery, "scope") : Promise.resolve(undefined),
+        activeRoomContext.current
+          ? read(roomQuery(q), "context", undefined, undefined, true)
+          : Promise.resolve(undefined),
       ]);
       if (generation !== scopeGeneration.current) return false;
       const last = Math.max(1, Math.ceil(page.total / 25));
@@ -179,11 +236,15 @@ export function useContractWorkspace(
       setPageData(page);
       setDetailData(detail);
       setScopeData(scope);
+      setContextData(context);
+      setRoomContextLoading(false);
       setLoading(false);
       return true;
     } catch {
       if (generation === scopeGeneration.current) {
         setError(true);
+        setRoomContextError(activeRoomContext.current);
+        setRoomContextLoading(false);
         setLoading(false);
       }
       return false;
@@ -202,6 +263,8 @@ export function useContractWorkspace(
       scopeGeneration.current++;
       specialRequest.current++;
       activeScope.current = null;
+      activeRoomContext.current = false;
+      roomRequest.current++;
       detailId.current = undefined;
       initialConsumed.current = false;
       setQuery(initial.query);
@@ -209,6 +272,8 @@ export function useContractWorkspace(
       setScopeData(undefined);
       setDetailData(undefined);
       setContextData(undefined);
+      setRoomContextLoading(false);
+      setRoomContextError(false);
       setSpecialLoading(false);
       setLoading(false);
       setError(false);
@@ -242,10 +307,16 @@ export function useContractWorkspace(
               ...contextData?.summaries,
               ...detailData?.summaries,
             },
-            accruals: { ...pageData.accruals, ...scopeData?.accruals, ...detailData?.accruals },
+            accruals: {
+              ...pageData.accruals,
+              ...scopeData?.accruals,
+              ...contextData?.accruals,
+              ...detailData?.accruals,
+            },
             attentionDue: {
               ...pageData.attentionDue,
               ...scopeData?.attentionDue,
+              ...contextData?.attentionDue,
               ...detailData?.attentionDue,
             },
           }
@@ -265,17 +336,65 @@ export function useContractWorkspace(
     activeScope.current = null;
     setScopeData(undefined);
   }, []);
+  const ensureRoomContext = useCallback(async () => {
+    const q = queryRef.current;
+    if (!q || !initial) throw new WorkspaceReadError();
+    activeRoomContext.current = true;
+    const expected = roomQuery(q);
+    if (
+      contextData &&
+      completeRoomContext(contextData) &&
+      workspaceQueryKey(contextData.query) === workspaceQueryKey(expected)
+    )
+      return contextData;
+    const key = workspaceQueryKey(expected);
+    if (
+      roomFlight.current?.key === key &&
+      roomFlight.current.generation === scopeGeneration.current
+    )
+      return roomFlight.current.promise;
+    const generation = scopeGeneration.current,
+      request = ++roomRequest.current;
+    setRoomContextLoading(true);
+    setRoomContextError(false);
+    const promise = (async () => {
+      try {
+        const data = await read(expected, "context", undefined, undefined, true);
+        if (generation !== scopeGeneration.current || request !== roomRequest.current)
+          throw new WorkspaceReadError();
+        setContextData(data);
+        return data;
+      } catch (failure) {
+        if (generation === scopeGeneration.current && request === roomRequest.current)
+          setRoomContextError(true);
+        throw failure;
+      } finally {
+        if (request === roomRequest.current) setRoomContextLoading(false);
+        if (roomFlight.current?.request === request) roomFlight.current = null;
+      }
+    })();
+    roomFlight.current = { key, generation, request, promise };
+    return promise;
+  }, [contextData, initial?.kind, read]);
+  const closeRoomContext = useCallback(() => {
+    activeRoomContext.current = false;
+  }, []);
   return {
     enabled: Boolean(initial),
     data: merged,
     pageData,
     scopeData,
     detailData,
+    contextData,
     query,
     change,
     ensure,
     refresh,
     closeScope,
+    ensureRoomContext,
+    closeRoomContext,
+    roomContextLoading,
+    roomContextError,
     retry: () => setRevision((v) => v + 1),
     loading: loading || specialLoading,
     error,

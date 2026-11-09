@@ -1,15 +1,13 @@
 "use client";
 
+import { formatPropertyXof, formatPropertyMoney } from "@/lib/property-money";
+
 import { DollarSign, Eye, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
-import {
-  formatContractXof,
-  type ContractReceivableSummary,
-} from "@/features/contracts/contract-list-model";
+import type { ContractReceivableSummary } from "@/features/contracts/contract-list-model";
 import { dictionaries, type Locale } from "@/lib/i18n";
-import { formatMoney } from "@/lib/currency";
 import { contractStatusVariant } from "@/lib/status-styles";
 import type { SaleContractRow, UnitRow, CustomerRow } from "@/types/database";
 import { saleRegisteredPrice } from "./sale-workbench-model";
@@ -34,7 +32,7 @@ export function SaleWorkbenchRooms({
 }) {
   const zh = locale === "zh",
     text = (chinese: string, french: string) => (zh ? chinese : french),
-    money = (value: number) => formatContractXof(value, locale);
+    money = (value: number) => formatPropertyXof(value, locale);
   if (!groups.length) return <EmptyState title={dictionaries[locale].sales.empty} />;
   return (
     <div className="space-y-4">
@@ -87,7 +85,7 @@ export function SaleWorkbenchRooms({
                       ? text("金额待核实", "Montant à vérifier")
                       : price.currency === "XOF"
                         ? money(price.amount)
-                        : `${formatMoney(price.amount, price.currency, locale)} ${price.currency}`}
+                        : `${formatPropertyMoney(price.amount, price.currency, locale)} ${price.currency}`}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {text("应收未收", "Créances restantes")}:{" "}

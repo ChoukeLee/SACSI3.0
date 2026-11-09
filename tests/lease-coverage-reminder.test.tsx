@@ -70,8 +70,12 @@ beforeEach(() => {
     vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input), "http://test.invalid");
       const mode = url.searchParams.get("mode") as WorkspaceMode;
+      const roomOverview = url.searchParams.has("roomOverview");
       url.searchParams.delete("mode");
-      return Response.json(data(mode, parseWorkspaceQuery(Object.fromEntries(url.searchParams))));
+      url.searchParams.delete("roomOverview");
+      const value = data(mode, parseWorkspaceQuery(Object.fromEntries(url.searchParams)));
+      if (roomOverview) value.roomReceivables = [];
+      return Response.json(value);
     }),
   );
   host = document.createElement("div");
@@ -113,30 +117,40 @@ async function click(button: Element | undefined) {
 }
 it("keeps settled stale coverage as reachable verification work, without another payable or negative upcoming days", async () => {
   await render();
-  expect(fetch).not.toHaveBeenCalled();
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain("roomOverview=1");
+  expect(host.querySelector("[data-room-id]")?.textContent).toContain("缴费待核");
   await click(
-    [...host.querySelectorAll("button")].find((button) => button.textContent?.includes("覆盖核对")),
+    [...host.querySelectorAll("button")].find((button) =>
+      button.textContent?.startsWith("收款跟进"),
+    ),
   );
-  const drawer = document.querySelector('[role="dialog"]');
-  expect(drawer).not.toBeNull();
-  expect(drawer?.textContent).toContain("覆盖待确认 · 非欠款判定");
-  expect(drawer?.textContent).toContain("金额不推算");
-  expect(drawer?.textContent).toContain("登记覆盖至");
-  expect(drawer?.textContent).not.toContain("-19天后应缴");
-  expect(drawer?.textContent).not.toContain("600,000 XOF");
+  const followup = host.querySelector('[aria-label="集中收款跟进"]');
+  expect(followup).not.toBeNull();
+  expect(followup?.textContent).toContain("缴费待核");
+  expect(followup?.textContent).toContain("金额待核");
+  expect(followup?.textContent).toContain("查看资料核对");
+  expect(host.querySelector("[data-room-id]")?.textContent).toContain("2026-09-30");
+  expect(followup?.textContent).not.toContain("-19天后应缴");
+  expect(followup?.textContent).not.toMatch(/600,000 XOF|60\s*万西法/);
   expect(fetch).toHaveBeenCalledTimes(1);
 });
 it("does not include the fully settled stale coverage in upcoming collectible reminders", async () => {
   await render();
   await click(
-    [...host.querySelectorAll("button")].find((button) => button.textContent?.includes("覆盖核对")),
-  );
-  const drawer = document.querySelector('[role="dialog"]')!;
-  await click(
-    [...drawer.querySelectorAll("button")].find((button) =>
+    [...host.querySelectorAll("button")].find((button) =>
       button.textContent?.startsWith("15天内应缴"),
     ),
   );
-  expect(drawer.textContent).toContain("当前没有需要跟进的合同");
-  expect(drawer.textContent).not.toContain("600,000 XOF");
+  expect(host.querySelectorAll("[data-room-id]")).toHaveLength(0);
+  await click(
+    [...host.querySelectorAll("button")].find((button) =>
+      button.textContent?.startsWith("收款跟进"),
+    ),
+  );
+  const followup = host.querySelector('[aria-label="集中收款跟进"]')!;
+  expect(followup.querySelectorAll("[data-followup-record-id]")).toHaveLength(1);
+  expect(followup.textContent).toContain("缴费待核");
+  expect(followup.textContent).not.toContain("天内应缴");
+  expect(followup.textContent).not.toMatch(/600,000 XOF|60\s*万西法/);
 });

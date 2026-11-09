@@ -267,3 +267,51 @@ it("performs business-context reads without mutation of unit, contract, payment 
   await readUnitBusinessContext(client(), f.unit, 1);
   expect(await snapshot()).toEqual(before);
 });
+
+it("reads every authorized floor asset beyond one thousand while keeping legacy list pages bounded", async () => {
+  await db.query("reset role");
+  const inserted = await db.query(
+    `insert into units(id,building_id,code,unit_no,floor_label,status,occupancy_verified,construction_status)
+     select gen_random_uuid(),$1,'SYNTHETIC-FLOOR-'||n,(n+1000)::text,
+       ((n%10)+1)::text||'F','available',n%2=0,'operational'
+     from generate_series(1,1001) n returning id`,
+    [f.building],
+  );
+  try {
+    await db.query("set role authenticated");
+    const floor = await readUnitWorkbench(client(), {
+      project: f.project,
+      building: f.building,
+      page: "99",
+    });
+    expect(floor.query).toMatchObject({ view: "floor", page: 1 });
+    expect(floor.total).toBe(1003);
+    expect(floor.rows).toHaveLength(1003);
+    expect(new Set(floor.rows.map((row) => row.unit.id)).size).toBe(1003);
+    expect(floor.rows.every((row) => row.unit.building_id === f.building)).toBe(true);
+    expect(floor.rows.some((row) => row.unit.id === f.hiddenUnit)).toBe(false);
+    expect(floor.rows.find((row) => row.unit.id === f.unit)?.position).toMatchObject({
+      ownership: "sold",
+      daily_occupied: true,
+      lease_occupied: true,
+    });
+    expect(floor.rows.some((row) => row.unit.occupancy_verified === false)).toBe(true);
+
+    const list = await readUnitWorkbench(client(), {
+      project: f.project,
+      building: f.building,
+      view: "list",
+      page: "2",
+    });
+    expect(list.query).toMatchObject({ view: "list", page: 2 });
+    expect(list.rows).toHaveLength(50);
+    expect(list.total).toBe(1003);
+  } finally {
+    await db.query("reset role");
+    await db.query("delete from units where building_id=$1 and id=any($2::uuid[])", [
+      f.building,
+      inserted.rows.map((row) => row.id),
+    ]);
+    await db.query("set role authenticated");
+  }
+});

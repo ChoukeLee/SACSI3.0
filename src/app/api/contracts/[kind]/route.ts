@@ -28,29 +28,39 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       const mode = search.get("mode") ?? "list",
         id = search.get("contractId") ?? undefined;
       const workArea = search.get("workspace") ?? "sacsi";
+      const roomOverview = search.get("roomOverview");
       if (workArea === "cimac" && !["admin", "boss", "finance", "rental_sales"].includes(user.role))
         throw new WorkspaceReadError(403);
       search.delete("mode");
       search.delete("contractId");
       search.delete("workspace");
+      search.delete("roomOverview");
       if (
         (workArea !== "sacsi" && workArea !== "cimac") ||
         (workArea === "cimac" && kind !== "lease") ||
         !["list", "scope", "detail", "context"].includes(mode) ||
+        (roomOverview !== null && (roomOverview !== "1" || mode !== "context")) ||
         (mode === "detail" ? !id || !/^[0-9a-f-]{36}$/i.test(id) : Boolean(id))
       )
         throw new WorkspaceReadError(400);
       const query = parseWorkspaceQuery(Object.fromEntries(search));
-      const data = await timing.measure("database", async () =>
-        readWorkspace(
-          await createClient(),
+      if (
+        roomOverview === "1" &&
+        (query.status !== "all" || query.search !== "" || query.page !== 1)
+      )
+        throw new WorkspaceReadError(400);
+      const data = await timing.measure("database", async () => {
+        const client = await createClient();
+        const args = [
+          client,
           kind as WorkspaceKind,
           query,
           mode as WorkspaceMode,
           id,
           workArea,
-        ),
-      );
+        ] as const;
+        return roomOverview === "1" ? readWorkspace(...args, true) : readWorkspace(...args);
+      });
       return timing.measure("response", () => Response.json(data, { headers }));
     } catch (error) {
       const failure = error instanceof WorkspaceReadError ? error : new WorkspaceReadError();

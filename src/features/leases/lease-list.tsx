@@ -23,6 +23,7 @@ import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
 import { cn, normalizeFloorLabel, floorSortValue } from "@/lib/utils";
 import { nativeLease, leaseRentLabel } from "@/lib/native-money";
+import { formatPropertyXof, propertyLeaseRentLabel } from "@/lib/property-money";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,6 +80,17 @@ import { ContractListControls } from "@/features/contracts/contract-table";
 import { LeaseWorkbenchTable } from "./lease-workbench-table";
 import { LeaseWorkbenchInspector } from "./lease-workbench-inspector";
 import { useLeaseWorkbenchPreview } from "./use-lease-workbench-preview";
+import {
+  LeaseRoomOverview,
+  leaseRoomOccupancyLabel,
+  leaseRoomFloorLabel,
+  leaseRecordPeriodLabel,
+} from "./lease-room-overview";
+import {
+  buildLeaseRoomOverview,
+  buildLeaseRecordOverview,
+  type LeaseRoomOverviewRow,
+} from "./lease-room-overview-model";
 import styles from "./lease-workbench.module.css";
 import {
   buildContractReceivableSummaries,
@@ -211,9 +223,19 @@ export function LeaseList({
   const payments = workspace.data?.payments ?? initialPayments;
   const receivables = workspace.data?.receivables ?? initialReceivables;
   const t = dictionaries[locale].leases;
-  const formatXof = (amount: number) => formatContractXof(amount, locale);
+  const formatXof = (amount: number) =>
+    workArea === "cimac" ? formatContractXof(amount, locale) : formatPropertyXof(amount, locale);
+  const formatRent = (contract: LeaseContractRow) =>
+    workArea === "cimac"
+      ? leaseRentLabel(contract, locale)
+      : propertyLeaseRentLabel(contract, locale);
   const [statusFilter, setStatusFilter] = useState<string>("current");
-  const [contractView, setContractView] = useState<"table" | "rooms">("table");
+  const [contractView, setContractView] = useState<"table" | "rooms">(
+    workArea === "sacsi" ? "rooms" : "table",
+  );
+  const [assetSelection, setAssetSelection] = useState<{ unitId: string; scope: string } | null>(
+    null,
+  );
   const [search, setSearch] = useState("");
   const [statFilter, setStatFilter] = useState<LeaseStatFilter | null>(null);
   const [panel, setPanel] = useState<PanelType>(null);
@@ -445,6 +467,7 @@ export function LeaseList({
     setSelectedId(null);
     setFUnitId("");
     setError("");
+    setAssetSelection(null);
   };
   useEffect(() => {
     if (!workspace.enabled || !scopeLoaded) return;
@@ -502,6 +525,88 @@ export function LeaseList({
   const buildingMap = useMemo(() => new Map(buildings.map((b) => [b.id, b])), [buildings]);
 
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const roomScope = `${project?.id ?? ""}/${activeBuildingId}`;
+  const roomContext = workspace.contextData;
+  const roomContextReady =
+    !workspace.enabled ||
+    Boolean(
+      roomContext &&
+      Array.isArray(roomContext.roomReceivables) &&
+      roomContext.query.projectId === (project?.id ?? "") &&
+      roomContext.query.buildingId ===
+        (activeBuildingId === ALL_BUILDINGS ? "" : activeBuildingId) &&
+      roomContext.query.status === "all" &&
+      !roomContext.query.search,
+    );
+  useEffect(() => {
+    if (
+      workArea !== "sacsi" ||
+      contractView !== "rooms" ||
+      !workspace.enabled ||
+      !scopeLoaded ||
+      !workspace.query ||
+      workspace.query.projectId !== project?.id ||
+      workspace.query.buildingId !== (activeBuildingId === ALL_BUILDINGS ? "" : activeBuildingId) ||
+      roomContextReady ||
+      workspace.roomContextLoading ||
+      workspace.roomContextError
+    )
+      return;
+    void workspace.ensureRoomContext().catch(() => undefined);
+  }, [
+    workArea,
+    contractView,
+    workspace.enabled,
+    scopeLoaded,
+    workspace.query?.projectId,
+    workspace.query?.buildingId,
+    project?.id,
+    activeBuildingId,
+    roomContextReady,
+    workspace.roomContextLoading,
+    workspace.roomContextError,
+    workspace.ensureRoomContext,
+  ]);
+  const roomOverview = useMemo(() => {
+    if (workspace.enabled && !roomContextReady) return { rooms: [], records: [] };
+    const source = workspace.enabled ? roomContext : undefined;
+    const allowed = new Set(
+      projectBuildings
+        .filter(
+          (building) => activeBuildingId === ALL_BUILDINGS || building.id === activeBuildingId,
+        )
+        .map((building) => building.id),
+    );
+    const input = {
+      units: (source?.units ?? initialUnits).filter((unit) => allowed.has(unit.building_id)),
+      contracts: (source?.contracts ?? initialContracts) as LeaseContractRow[],
+      customers: source?.customers ?? initialCustomers,
+      buildings,
+      today: source?.today ?? todayStr,
+      summaries: source?.summaries,
+      attentionDue: source?.attentionDue,
+      receivables: source?.roomReceivables ?? (workspace.enabled ? undefined : initialReceivables),
+    };
+    return { rooms: buildLeaseRoomOverview(input), records: buildLeaseRecordOverview(input) };
+  }, [
+    workspace.enabled,
+    roomContextReady,
+    roomContext,
+    initialUnits,
+    initialContracts,
+    initialCustomers,
+    initialReceivables,
+    buildings,
+    projectBuildings,
+    activeBuildingId,
+    todayStr,
+  ]);
+  const roomOverviewRows = roomOverview.rooms;
+  const leaseRecordRows = roomOverview.records;
+  const selectedAssetRow =
+    assetSelection?.scope === roomScope
+      ? (roomOverviewRows.find((row) => row.unit.id === assetSelection.unitId) ?? null)
+      : null;
 
   const filteredByStatus = useMemo(
     () =>
@@ -549,11 +654,16 @@ export function LeaseList({
               : undefined,
             amountXof:
               Number(contract.monthly_rent_xof) > 0 ? Number(contract.monthly_rent_xof) : null,
-            nativeAmountLabel: nativeLease(contract) ? leaseRentLabel(contract, locale) : undefined,
+            nativeAmountLabel: nativeLease(contract) ? formatRent(contract) : undefined,
             nativeBalanceLabel: nativeLease(contract)
               ? `${contract.rent_currency} · ${locale === "zh" ? "原币账务另列" : "voir le détail en devise"}`
               : undefined,
-            amountDetail: `${locale === "zh" ? "每月" : "par mois"} · ${contract.rent_currency ?? "XOF"}`,
+            amountDetail:
+              workArea === "sacsi" && !nativeLease(contract)
+                ? locale === "zh"
+                  ? "每月"
+                  : "par mois"
+                : `${locale === "zh" ? "每月" : "par mois"} · ${contract.rent_currency ?? "XOF"}`,
             balanceXof: summary.count ? summary.outstanding : null,
             balanceDetail: summary.count
               ? summary.overdue > 0
@@ -618,7 +728,7 @@ export function LeaseList({
   // Keep the selected identity through a fresh read's transient loading state.
   // It must change immediately when the user closes or selects another dossier.
   const operationTargetId =
-    contractView === "table" && panel === null
+    (contractView === "table" || workArea === "sacsi") && panel === null
       ? (linkedPreviewId ??
         (previewSelection?.scope === previewScope &&
         previewSelection.page === workspace.pageData &&
@@ -628,7 +738,7 @@ export function LeaseList({
       : null;
   actionSelectionRef.current = operationTargetId ? `${previewScope}/${operationTargetId}` : "";
   const previewId =
-    !workspace.unavailable && panel === null && contractView === "table"
+    !workspace.unavailable && panel === null && (contractView === "table" || workArea === "sacsi")
       ? (linkedPreviewId ??
         (previewSelection?.scope === previewScope &&
         previewSelection.page === workspace.pageData &&
@@ -655,6 +765,13 @@ export function LeaseList({
   const previewUnit = previewUnits?.find((row) => row.id === previewContract?.unit_id) ?? null;
   const previewCustomer =
     previewCustomers?.find((row) => row.id === previewContract?.customer_id) ?? null;
+  const previewRecordContext = leaseRecordRows.find((row) => row.id === previewId);
+  const previewTitleUnit = previewUnit ?? previewRecordContext?.unit;
+  const previewDrawerTitle = previewTitleUnit
+    ? `${buildingMap.get(previewTitleUnit.building_id)?.display_name ?? "—"} · ${previewTitleUnit.unit_no}`
+    : locale === "zh"
+      ? "租赁资料"
+      : "Dossier de location";
   const previewPayments = workspace.enabled ? (preview.data?.payments ?? []) : payments;
   const previewReceivables = workspace.enabled ? (preview.data?.receivables ?? []) : receivables;
   const selectPreview = (
@@ -667,7 +784,8 @@ export function LeaseList({
     actionSelectionRef.current = `${previewScope}/${id}`;
     setLinkedPreviewDismissed(true);
     setDetailSection(section);
-    setContractView("table");
+    if (workArea === "cimac") setContractView("table");
+    setAssetSelection(null);
     setPanel(null);
     setSelectedId(null);
     setError("");
@@ -709,6 +827,7 @@ export function LeaseList({
     setLinkedPreviewDismissed(true);
     setPreviewSelection(null);
     setSelectedId(null);
+    setAssetSelection(null);
   };
   const closeOperation = () => {
     if (writePending()) return;
@@ -933,16 +1052,19 @@ export function LeaseList({
     setFStatus("draft");
     setError("");
   };
-  const openNew = async () => {
+  const openNew = async (unitId?: string) => {
     if (!canCreate || writePending()) return;
     const request = ++actionRequestRef.current;
     const requestedCustomer = initialCustomer;
     setPreviewSelection(null);
+    setAssetSelection(null);
     let creationCustomers = customers;
+    let creationUnits = units;
     if (workspace.enabled) {
       try {
         const context = await workspace.ensure("context");
         creationCustomers = context.customers;
+        creationUnits = context.units;
       } catch {
         return;
       }
@@ -961,11 +1083,21 @@ export function LeaseList({
       return;
     }
     resetNewForm(requestedCustomer);
+    if (unitId && creationUnits.some((unit) => unit.id === unitId)) setFUnitId(unitId);
     setPanel("new");
     setSelectedId(null);
   };
   const openDetail = (id: string, section: "overview" | "finance" = "overview") => {
     selectPreview(id, section, true);
+  };
+  const selectRoom = (row: LeaseRoomOverviewRow) => {
+    if (writePending()) return;
+    if (row.contract) openDetail(row.contract.id);
+    else {
+      closePreview();
+      setPanel(null);
+      setAssetSelection({ unitId: row.unit.id, scope: roomScope });
+    }
   };
   const prepareOperation = async (
     id: string,
@@ -1278,6 +1410,12 @@ export function LeaseList({
     actionRequestRef.current += 1;
     setLinkedPreviewDismissed(true);
     setPreviewSelection(null);
+    setAssetSelection(null);
+    setPanel(null);
+    if (workArea === "sacsi") {
+      setContractView(value);
+      return;
+    }
     if (workspace.enabled && value === "rooms") {
       try {
         await workspace.ensure("scope");
@@ -1375,7 +1513,9 @@ export function LeaseList({
         <h2>
           {contractView === "table"
             ? locale === "zh"
-              ? "合同列表"
+              ? workArea === "sacsi"
+                ? "租赁明细"
+                : "合同列表"
               : "Liste des contrats"
             : locale === "zh"
               ? "楼层房源"
@@ -1390,19 +1530,41 @@ export function LeaseList({
           {locale === "zh" ? "份合同" : "contrats"}
         </span>
       </div>
-      <ContractListControls
-        locale={locale}
-        query={search}
-        onQueryChange={(value) => {
-          if (writePending()) return;
-          actionRequestRef.current += 1;
-          setLinkedPreviewDismissed(true);
-          setPreviewSelection(null);
-          setSearch(value);
-        }}
-        view={contractView}
-        onViewChange={changeView}
-      />
+      {workArea === "sacsi" ? (
+        <label className={styles.recordSearch}>
+          <span className="sr-only">
+            {locale === "zh" ? "搜索租赁记录" : "Rechercher une location"}
+          </span>
+          <input
+            type="search"
+            value={search}
+            placeholder={
+              locale === "zh" ? "搜索房号、租客或记录编号" : "Lot, locataire ou référence"
+            }
+            onChange={(event) => {
+              if (writePending()) return;
+              actionRequestRef.current += 1;
+              setLinkedPreviewDismissed(true);
+              setPreviewSelection(null);
+              setSearch(event.target.value);
+            }}
+          />
+        </label>
+      ) : (
+        <ContractListControls
+          locale={locale}
+          query={search}
+          onQueryChange={(value) => {
+            if (writePending()) return;
+            actionRequestRef.current += 1;
+            setLinkedPreviewDismissed(true);
+            setPreviewSelection(null);
+            setSearch(value);
+          }}
+          view={contractView}
+          onViewChange={changeView}
+        />
+      )}
       <div className={styles.statusRow}>
         <SegmentedControl
           value={statusFilter}
@@ -1440,7 +1602,13 @@ export function LeaseList({
             {locale === "zh" ? "覆盖核对" : "Vérifier la couverture"}
           </Button>
           <span className={styles.scopeCaption}>
-            {locale === "zh" ? "金额统一以 XOF 展示" : "Montants en XOF"}
+            {workArea === "cimac"
+              ? locale === "zh"
+                ? "金额统一以 XOF 展示"
+                : "Montants en XOF"
+              : locale === "zh"
+                ? "西法金额以万西法展示，其他币种保留原币"
+                : "XOF par 10 000 ; autres devises conservées"}
           </span>
         </div>
       </div>
@@ -1450,33 +1618,51 @@ export function LeaseList({
   return (
     <OperationalPage
       className={styles.workbench}
-      eyebrow={workArea === "cimac" ? "CIMAC · CONTRACTS" : "LEASE WORKSPACE"}
+      eyebrow={
+        workArea === "cimac"
+          ? "CIMAC · CONTRACTS"
+          : locale === "zh"
+            ? "SACSI · 租赁管理"
+            : "SACSI · Locations"
+      }
       title={
         workArea === "cimac"
           ? locale === "zh"
             ? "合同与履约"
             : "Contrats et exécution"
           : locale === "zh"
-            ? "长租工作台"
-            : "Espace location"
+            ? "长租房源"
+            : "Locations longue durée"
       }
       description={
-        locale === "zh"
-          ? "合同、应收与收款，在同一个工作区核对。"
-          : "Contrats, créances et encaissements réunis pour vérification."
+        workArea === "sacsi"
+          ? locale === "zh"
+            ? "按楼栋查看当前租赁的房间、租客、月租与已交至；选房查看资料并办理。"
+            : "Locations actuelles, locataires, loyers et paiements par bâtiment. Choisissez un lot pour consulter son dossier et agir."
+          : locale === "zh"
+            ? "合同、应收与收款，在同一个工作区核对。"
+            : "Contrats, créances et encaissements réunis pour vérification."
       }
       action={
-        canCreate ? (
-          <Button
-            size="sm"
-            className="bg-blue-600 text-white hover:bg-blue-700"
-            disabled={workspace.unavailable}
-            onClick={openNew}
-          >
-            <Plus className="h-4 w-4" />
-            {t.form.newContract}
-          </Button>
-        ) : undefined
+        <>
+          {canCreate ? (
+            <Button
+              size="sm"
+              className="bg-blue-600 text-white hover:bg-blue-700"
+              disabled={workspace.unavailable}
+              onClick={() => {
+                void openNew();
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              {workArea === "sacsi"
+                ? locale === "zh"
+                  ? "登记租赁"
+                  : "Enregistrer une location"
+                : t.form.newContract}
+            </Button>
+          ) : null}
+        </>
       }
     >
       {safeReturnTo && (
@@ -1506,7 +1692,9 @@ export function LeaseList({
           </strong>
           {canCreate
             ? locale === "zh"
-              ? " · 点击“新建合同”继续填写房号和条款；提交后才建立合同，收费另行办理。"
+              ? workArea === "sacsi"
+                ? " · 点击“登记租赁”填写房号与租赁资料；收款另行办理。"
+                : " · 点击“新建合同”继续填写房号和条款；提交后才建立合同，收费另行办理。"
               : ` · Cliquez « ${t.form.newContract} » pour préciser le bien et les clauses. Le contrat est créé après soumission ; l’encaissement est distinct.`
             : locale === "zh"
               ? " · 当前账号没有建约权限，请交由租售账号或管理员继续。这里不会创建合同或收费。"
@@ -1571,42 +1759,44 @@ export function LeaseList({
       </section>
 
       {/* ── Summary stats ── */}
-      <section
-        className={styles.summaryStrip}
-        aria-label={locale === "zh" ? "项目与楼栋经营摘要" : "Synthèse du périmètre"}
-      >
-        {statBlocks.map((b) => (
-          <button
-            type="button"
-            key={b.key}
-            className={styles.summaryItem}
-            disabled={workspace.unavailable}
-            aria-pressed={panel === "insight" && statFilter === b.key}
-            onClick={() => {
-              void openInsight(b.key);
-            }}
-          >
-            <span className={styles.summaryLabel}>{b.label}</span>
-            <span className={styles.summaryValue}>
-              {workspace.unavailable ? "—" : b.value.replace(/\sXOF$/, "")}
-              {b.value.endsWith("XOF") && !workspace.unavailable && (
-                <span className={styles.summaryUnit}> XOF</span>
-              )}
-            </span>
-            <span className={styles.summaryHint}>
-              {workspace.unavailable
-                ? locale === "zh"
-                  ? "读取中或暂不可核验"
-                  : "Lecture en cours ou indisponible"
-                : panel === "insight" && statFilter === b.key
+      {workArea === "cimac" && (
+        <section
+          className={styles.summaryStrip}
+          aria-label={locale === "zh" ? "项目与楼栋经营摘要" : "Synthèse du périmètre"}
+        >
+          {statBlocks.map((b) => (
+            <button
+              type="button"
+              key={b.key}
+              className={styles.summaryItem}
+              disabled={workspace.unavailable}
+              aria-pressed={panel === "insight" && statFilter === b.key}
+              onClick={() => {
+                void openInsight(b.key);
+              }}
+            >
+              <span className={styles.summaryLabel}>{b.label}</span>
+              <span className={styles.summaryValue}>
+                {workspace.unavailable ? "—" : b.value.replace(/\sXOF$/, "")}
+                {b.value.endsWith("XOF") && !workspace.unavailable && (
+                  <span className={styles.summaryUnit}> XOF</span>
+                )}
+              </span>
+              <span className={styles.summaryHint}>
+                {workspace.unavailable
                   ? locale === "zh"
-                    ? "明细已打开"
-                    : "Détail ouvert"
-                  : b.hint}
-            </span>
-          </button>
-        ))}
-      </section>
+                    ? "读取中或暂不可核验"
+                    : "Lecture en cours ou indisponible"
+                  : panel === "insight" && statFilter === b.key
+                    ? locale === "zh"
+                      ? "明细已打开"
+                      : "Détail ouvert"
+                    : b.hint}
+              </span>
+            </button>
+          ))}
+        </section>
+      )}
 
       {printer.error && (
         <p role="alert" className="text-sm text-destructive">
@@ -1621,22 +1811,42 @@ export function LeaseList({
           {error}
         </p>
       ) : null}
-      <div className={cn(styles.workspaceGrid, contractView === "rooms" && styles.roomsWorkspace)}>
+      {workArea === "sacsi" && writeConfirmed && (workspace.error || workspace.roomContextError) ? (
+        <p role="status" className={styles.unavailable}>
+          {locale === "zh"
+            ? "上一笔操作已确认成功，请勿重复提交。这里只需重试读取最新数据。"
+            : "La dernière opération est confirmée. Ne la soumettez pas de nouveau ; actualisez uniquement les données."}
+        </p>
+      ) : null}
+      <div
+        className={cn(
+          styles.workspaceGrid,
+          (contractView === "rooms" || workArea === "sacsi") && styles.roomsWorkspace,
+        )}
+      >
         <section
           className="min-w-0"
-          aria-label={locale === "zh" ? "合同查询区" : "Recherche de contrats"}
+          aria-label={
+            workArea === "sacsi"
+              ? locale === "zh"
+                ? "房源与租赁资料"
+                : "Lots et locations"
+              : locale === "zh"
+                ? "合同查询区"
+                : "Recherche de contrats"
+          }
         >
-          {(contractView === "rooms" || workspace.unavailable) && (
+          {workArea === "cimac" && (contractView === "rooms" || workspace.unavailable) && (
             <div className={styles.roomsToolbar}>{listToolbar}</div>
           )}
-          {workspace.enabled && (
+          {workspace.enabled && workArea === "cimac" && (
             <p className="sr-only">
               {locale === "zh"
                 ? "汇总范围：当前项目与楼栋全部合同，不随搜索、状态或分页截断。"
                 : "Synthèse : tous les contrats du projet et bâtiment, indépendante de la recherche, du statut et des pages."}
             </p>
           )}
-          {workspace.unavailable && (
+          {workspace.unavailable && workArea === "cimac" && (
             <div role="status" className={styles.unavailable}>
               {workspace.error && writeConfirmed && (
                 <p>
@@ -1659,8 +1869,9 @@ export function LeaseList({
               )}
             </div>
           )}
-          {!workspace.unavailable && contractView === "table" && (
+          {workArea === "cimac" && !workspace.unavailable && contractView === "table" && (
             <LeaseWorkbenchTable
+              workArea={workArea}
               toolbar={listToolbar}
               pagination={
                 workspace.pagination
@@ -1695,8 +1906,37 @@ export function LeaseList({
             />
           )}
 
-          {/* ── Contract matrix (BusinessRoomCard) ── */}
-          {!workspace.unavailable &&
+          {workArea === "sacsi" && contractView === "rooms" ? (
+            <LeaseRoomOverview
+              key={roomScope}
+              rows={roomOverviewRows}
+              records={leaseRecordRows}
+              locale={locale}
+              loading={
+                workspace.enabled &&
+                (!roomContextReady || workspace.roomContextLoading) &&
+                !workspace.roomContextError &&
+                !workspace.error
+              }
+              error={workspace.enabled && (workspace.roomContextError || workspace.error)}
+              selectedUnitId={
+                selectedAssetRow?.unit.id ??
+                (previewId
+                  ? roomOverviewRows.find((row) => row.contract?.id === previewId)?.unit.id
+                  : null)
+              }
+              disabled={saving}
+              onSelectUnit={selectRoom}
+              onSelectRecord={(row) => openDetail(row.id)}
+              onRetry={() => {
+                if (workspace.error) workspace.retry();
+                else void workspace.ensureRoomContext().catch(() => undefined);
+              }}
+            />
+          ) : null}
+          {/* ── Existing CIMAC contract matrix ── */}
+          {workArea === "cimac" &&
+            !workspace.unavailable &&
             contractView === "rooms" &&
             (groupedContracts.length === 0 ? (
               <EmptyState title={t.empty} />
@@ -1915,16 +2155,25 @@ export function LeaseList({
               ))
             ))}
 
-          <p className={styles.summaryExplanation}>
-            {locale === "zh"
-              ? "上方摘要覆盖当前项目与楼栋的全部合同，不随搜索、状态或分页截断。月租规模不是实收；15 天内跟进仅含明确未结账单，不等于合同到期。覆盖待确认另行核对，不推算为应缴。"
-              : "La synthèse couvre tous les contrats du périmètre, sans limitation de recherche, statut ou page. Le loyer mensuel n’est pas un encaissement ; le suivi sous 15 jours porte sur les créances ouvertes vérifiées, pas sur les fins de bail. La couverture à confirmer est vérifiée séparément, sans dette présumée."}
-          </p>
+          {workArea === "cimac" && (
+            <p className={styles.summaryExplanation}>
+              {locale === "zh"
+                ? "上方摘要覆盖当前项目与楼栋的全部合同，不随搜索、状态或分页截断。月租规模不是实收；15 天内跟进仅含明确未结账单，不等于合同到期。覆盖待确认另行核对，不推算为应缴。"
+                : "La synthèse couvre tous les contrats du périmètre, sans limitation de recherche, statut ou page. Le loyer mensuel n’est pas un encaissement ; le suivi sous 15 jours porte sur les créances ouvertes vérifiées, pas sur les fins de bail. La couverture à confirmer est vérifiée séparément, sans dette présumée."}
+            </p>
+          )}
         </section>
-        {contractView === "table" && (
-          <div className={styles.inspectorColumn} ref={previewColumnRef} tabIndex={-1}>
+        {((workArea === "cimac" && contractView === "table") ||
+          (workArea === "sacsi" && previewId)) && (
+          <LeasePreviewSurface
+            overlay={workArea === "sacsi"}
+            title={previewDrawerTitle}
+            onClose={closePreview}
+            previewRef={previewColumnRef}
+          >
             <LeaseWorkbenchInspector
               workArea={workArea}
+              embedded={workArea === "sacsi"}
               contract={previewContract}
               unit={previewUnit}
               customer={previewCustomer}
@@ -1937,6 +2186,7 @@ export function LeaseList({
                   : null
               }
               payments={previewPayments}
+              receiptLedger={workspace.enabled ? preview.data?.leaseReceiptLedger : undefined}
               receivables={previewReceivables}
               locale={locale}
               today={workspace.pageData?.today ?? todayStr}
@@ -1955,7 +2205,13 @@ export function LeaseList({
                         disabled={saving}
                       >
                         <Plus aria-hidden="true" />
-                        {locale === "zh" ? "押金 / 其他收支" : "Dépôt / autres écritures"}
+                        {workArea === "sacsi"
+                          ? locale === "zh"
+                            ? "登记押金/其他收支"
+                            : "Saisir dépôt / autres écritures"
+                          : locale === "zh"
+                            ? "押金 / 其他收支"
+                            : "Dépôt / autres écritures"}
                       </Button>
                     ) : null}
                     {canActivate && previewContract.status === "draft" ? (
@@ -1990,6 +2246,62 @@ export function LeaseList({
                   />
                 ) : null
               }
+              historyContent={
+                workArea === "sacsi" &&
+                previewContract &&
+                roomContextReady &&
+                !workspace.roomContextLoading &&
+                !workspace.roomContextError &&
+                !preview.error &&
+                !preview.loading ? (
+                  <section
+                    className={styles.roomRecords}
+                    aria-label={
+                      locale === "zh" ? "本房租赁历史" : "Historique des locations du lot"
+                    }
+                  >
+                    <h3 className="mb-3 text-sm font-semibold">
+                      {locale === "zh" ? "本房租赁历史" : "Historique des locations du lot"}
+                    </h3>
+                    <p>
+                      {locale === "zh"
+                        ? "每次租赁分别保存。选择记录查看对应资料、已有收付款及账务。"
+                        : "Chaque location est conservée séparément. Sélectionnez un dossier pour consulter ses données, paiements et comptes."}
+                    </p>
+                    {leaseRecordRows
+                      .filter((row) => row.unit.id === previewContract.unit_id)
+                      .map((row) => (
+                        <button
+                          key={row.id}
+                          type="button"
+                          data-room-record-id={row.id}
+                          aria-pressed={row.id === previewId}
+                          disabled={saving}
+                          onClick={() => openDetail(row.id)}
+                        >
+                          <span>
+                            {row.customer?.name ??
+                              (locale === "zh" ? "租客待登记" : "Locataire à compléter")}
+                          </span>
+                          <small>
+                            {leaseRecordPeriodLabel(row.contract, locale)} ·{" "}
+                            {row.contract.status === "expired"
+                              ? locale === "zh"
+                                ? "已过期"
+                                : "Expiré"
+                              : row.historical
+                                ? locale === "zh"
+                                  ? "历史租赁"
+                                  : "Ancienne location"
+                                : locale === "zh"
+                                  ? "当前租赁"
+                                  : "Location actuelle"}
+                          </small>
+                        </button>
+                      ))}
+                  </section>
+                ) : null
+              }
               onPrint={() => {
                 if (previewId) void printById(previewId);
               }}
@@ -2000,6 +2312,7 @@ export function LeaseList({
               }
               onClose={closePreview}
             />
+
             {previewId && preview.error && (
               <Button
                 className={styles.previewRetry}
@@ -2010,9 +2323,78 @@ export function LeaseList({
                 {locale === "zh" ? "重试预览" : "Réessayer l'aperçu"}
               </Button>
             )}
-          </div>
+          </LeasePreviewSurface>
         )}
       </div>
+
+      {workArea === "sacsi" && selectedAssetRow && panel === null && !workspace.unavailable ? (
+        <RightDrawer
+          open
+          title={`${selectedAssetRow.building?.display_name ?? ""} · ${selectedAssetRow.unit.unit_no}`}
+          subtitle={locale === "zh" ? "房源资料" : "Dossier du lot"}
+          onClose={() => setAssetSelection(null)}
+        >
+          <dl className={styles.assetFacts}>
+            <div>
+              <dt>{locale === "zh" ? "使用状态" : "État d’utilisation"}</dt>
+              <dd>{leaseRoomOccupancyLabel(selectedAssetRow, locale)}</dd>
+            </div>
+            <div>
+              <dt>{locale === "zh" ? "楼层" : "Étage"}</dt>
+              <dd>{leaseRoomFloorLabel(selectedAssetRow.unit, locale)}</dd>
+            </div>
+            <div>
+              <dt>{locale === "zh" ? "面积" : "Surface"}</dt>
+              <dd>
+                {selectedAssetRow.unit.area_sqm == null
+                  ? "—"
+                  : `${selectedAssetRow.unit.area_sqm} m²`}
+              </dd>
+            </div>
+            <div>
+              <dt>{locale === "zh" ? "户型" : "Disposition"}</dt>
+              <dd>{selectedAssetRow.unit.layout || "—"}</dd>
+            </div>
+          </dl>
+          <p className={styles.assetNote}>
+            {selectedAssetRow.conflict
+              ? locale === "zh"
+                ? "同一房源有多条待核租赁记录，请逐条查看，暂不自动选择租客或累计欠款。"
+                : "Plusieurs locations sont à vérifier. Consultez-les séparément ; aucun locataire ni solde n’est choisi automatiquement."
+              : locale === "zh"
+                ? "当前没有可确认的在用租赁。房源状态按已登记资料显示；可继续查看历史记录。"
+                : "Aucune location en cours n’est confirmée. L’état suit les données enregistrées ; l’historique reste consultable."}
+          </p>
+          {selectedAssetRow.records.length ? (
+            <section className={styles.assetRecords}>
+              <h2>{locale === "zh" ? "已有租赁记录" : "Locations enregistrées"}</h2>
+              {selectedAssetRow.records.map((record) => (
+                <button type="button" key={record.id} onClick={() => openDetail(record.id)}>
+                  <strong>
+                    {customers.find((customer) => customer.id === record.customer_id)?.name ??
+                      (locale === "zh" ? "租客待登记" : "Locataire à compléter")}
+                  </strong>
+                  <span>{leaseRecordPeriodLabel(record, locale)}</span>
+                  <span>
+                    {t.contractStatus[record.status]} · {formatRent(record)}
+                  </span>
+                </button>
+              ))}
+            </section>
+          ) : null}
+          {canCreate && availableUnits.some((unit) => unit.id === selectedAssetRow.unit.id) ? (
+            <Button
+              className="mt-5 w-full"
+              onClick={() => {
+                void openNew(selectedAssetRow.unit.id);
+              }}
+            >
+              <Plus className="size-4" />
+              {locale === "zh" ? "登记租赁" : "Enregistrer une location"}
+            </Button>
+          ) : null}
+        </RightDrawer>
+      ) : null}
 
       {/* ── KPI insight panel ── */}
       {!workspace.unavailable &&
@@ -2465,7 +2847,16 @@ export function LeaseList({
 
       {/* ── New Contract Panel ── */}
       {!workspace.unavailable && panel === "new" && (
-        <PanelShell onClose={closeOperation} title={t.form.newContract}>
+        <PanelShell
+          onClose={closeOperation}
+          title={
+            workArea === "sacsi"
+              ? locale === "zh"
+                ? "登记租赁"
+                : "Enregistrer une location"
+              : t.form.newContract
+          }
+        >
           {/* form fields same as before, using shadcn tokens */}
           {/* kept compact */}
           <div className="space-y-4">
@@ -3008,6 +3399,34 @@ function ActionBtn({
 }
 
 // ── Shared panel shell ──
+function LeasePreviewSurface({
+  overlay,
+  title,
+  onClose,
+  previewRef,
+  children,
+}: {
+  overlay: boolean;
+  title: string;
+  onClose: () => void;
+  previewRef: React.RefObject<HTMLDivElement | null>;
+  children: React.ReactNode;
+}) {
+  if (overlay)
+    return (
+      <RightDrawer open width="wide" title={title} onClose={onClose}>
+        <div ref={previewRef} tabIndex={-1}>
+          {children}
+        </div>
+      </RightDrawer>
+    );
+  return (
+    <div className={styles.inspectorColumn} ref={previewRef} tabIndex={-1}>
+      {children}
+    </div>
+  );
+}
+
 function PanelShell({
   onClose,
   title,

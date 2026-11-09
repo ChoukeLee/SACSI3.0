@@ -1,24 +1,23 @@
 "use client";
 
-import { useId, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Building2, Search } from "lucide-react";
+import { RightDrawer } from "@/components/ui/operational";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries, routeFor } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import { safeWorkbenchReturnTo } from "@/lib/workbench-links";
 import { UnitWorkbenchInspector } from "./unit-workbench-inspector";
 import {
   unitWorkbenchHref,
-  UNIT_WORKBENCH_PAGE_SIZE,
   type UnitWorkbenchData,
   type UnitWorkbenchFilter,
   type UnitWorkbenchQuery,
   type UnitWorkbenchRecord,
 } from "./unit-workbench-model";
-import { UnitFloorIndex, UnitWorkbenchRow } from "./unit-workbench-table";
+import { UnitFloorIndex } from "./unit-workbench-table";
 import styles from "./unit-workbench.module.css";
 
 const UnitConditionDrawer = dynamic(() =>
@@ -35,22 +34,31 @@ export function UnitWorkbench({
   canEdit: boolean;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
-  const selectionKey = `${JSON.stringify(data.query)}:${data.rows.map((row) => `${row.unit.id}:${row.unit.updated_at}`).join(",")}:${data.selected?.unit.updated_at ?? ""}`;
-  const [selection, setSelection] = useState<{ key: string; record: UnitWorkbenchRecord | null }>({
+  const { query, building } = data;
+  const floorReady = query.view === "floor";
+  const selectionKey = JSON.stringify(query);
+  const [selection, setSelection] = useState<{ key: string; id: string | null }>({
     key: selectionKey,
-    record: data.selected,
+    id: data.selected?.unit.id ?? null,
   });
-  const selected = selection.key === selectionKey ? selection.record : data.selected;
+  const selectedId =
+    selection.key === selectionKey ? selection.id : (data.selected?.unit.id ?? null);
+  const currentRecord =
+    data.rows.find((row) => row.unit.id === selectedId) ??
+    (data.selected?.unit.id === selectedId ? data.selected : null);
+  const selected =
+    floorReady && !data.scopeUnavailable && currentRecord?.unit.building_id === building?.id
+      ? currentRecord
+      : null;
   const [conditionTarget, setConditionTarget] = useState<string | null>(null);
-  const selectedVersion = selected ? `${selected.unit.id}:${selected.unit.updated_at}` : null;
-  const inspectorRef = useRef<HTMLDivElement>(null);
-  const inspectorId = useId();
+  const selectedVersion = selected
+    ? `${selectionKey}:${selected.unit.id}:${selected.unit.updated_at}`
+    : null;
+  const conditionOpen = Boolean(selected && canEdit && selectedVersion === conditionTarget);
+  const filterForm = useRef<HTMLFormElement>(null);
   const zh = locale === "zh";
   const t = dictionaries[locale].units;
-  const { query, building } = data;
   const projects = [
     ...new Map(
       data.buildings.map((row) => [row.project_id, { id: row.project_id, name: row.project_name }]),
@@ -59,60 +67,87 @@ export function UnitWorkbench({
   const projectBuildings = data.buildings.filter(
     (row) => row.project_id === (building?.project_id ?? query.project),
   );
-  const sourceHref = `${pathname}${searchParams.size ? `?${searchParams}` : ""}`;
   const returnHref = safeWorkbenchReturnTo(query.returnTo);
-  const focusInspector = (unitId: string) => {
-    if (
-      typeof window === "undefined" ||
-      typeof window.matchMedia !== "function" ||
-      typeof window.requestAnimationFrame !== "function" ||
-      !window.matchMedia("(max-width: 1199px)").matches
-    )
-      return;
-    window.requestAnimationFrame(() => {
-      const target = inspectorRef.current;
-      // A later selection or scope change must not focus the previous asset.
-      if (!target || target.dataset.unitId !== unitId) return;
-      target.focus({ preventScroll: true });
-      if (typeof target.scrollIntoView === "function")
-        target.scrollIntoView({
-          block: "start",
-          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-            ? "auto"
-            : "smooth",
-        });
-    });
-  };
+  const sourceHref = unitWorkbenchHref(locale, query, {
+    view: "floor",
+    page: 1,
+    unit: selected?.unit.id ?? "",
+  });
+  const canonicalHref = unitWorkbenchHref(locale, query, { view: "floor", page: 1 });
+
+  useEffect(() => {
+    if (!floorReady && building && !data.scopeUnavailable)
+      startTransition(() => router.replace(canonicalHref, { scroll: false }));
+  }, [floorReady, building?.id, data.scopeUnavailable, canonicalHref, router]);
+  useEffect(() => {
+    setConditionTarget(null);
+  }, [selectionKey]);
+  useEffect(() => {
+    if (!canEdit) setConditionTarget(null);
+  }, [canEdit]);
+
   const navigate = (patch: Partial<UnitWorkbenchQuery>) => {
-    setSelection({ key: selectionKey, record: null });
+    setSelection({ key: selectionKey, id: null });
     setConditionTarget(null);
     startTransition(() =>
-      router.push(unitWorkbenchHref(locale, query, { unit: "", page: 1, ...patch }), {
-        scroll: false,
-      }),
+      router.push(
+        unitWorkbenchHref(locale, query, {
+          ...patch,
+          view: "floor",
+          page: 1,
+          unit: "",
+        }),
+        { scroll: false },
+      ),
     );
   };
   const select = (record: UnitWorkbenchRecord | null) => {
-    setSelection({ key: selectionKey, record });
+    if (pending || !floorReady) return;
+    setSelection({ key: selectionKey, id: record?.unit.id ?? null });
     setConditionTarget(null);
     window.history.replaceState(
-      null,
+      window.history.state,
       "",
-      unitWorkbenchHref(locale, query, { unit: record?.unit.id ?? "" }),
+      unitWorkbenchHref(locale, query, {
+        view: "floor",
+        page: 1,
+        unit: record?.unit.id ?? "",
+      }),
     );
-    if (record) focusInspector(record.unit.id);
   };
-  const pageCount = Math.max(1, Math.ceil(data.total / UNIT_WORKBENCH_PAGE_SIZE));
+  const formQuery = (): Partial<UnitWorkbenchQuery> => {
+    const values = filterForm.current ? new FormData(filterForm.current) : null;
+    return {
+      q: String(values?.get("q") ?? query.q),
+      floor: String(values?.get("floor") ?? query.floor),
+      kind: String(values?.get("kind") ?? query.kind),
+      business: String(values?.get("business") ?? query.business),
+      filter: String(values?.get("filter") ?? query.filter) as UnitWorkbenchFilter,
+    };
+  };
+  const categories: [UnitWorkbenchFilter, string][] = [
+    ["all", zh ? "全部资产" : "Tous les actifs"],
+    ["occupied", zh ? "使用中" : "En usage"],
+    ["unoccupied", zh ? "暂无租住记录" : "Sans bail ni séjour"],
+    ["attention", zh ? "需关注" : "À examiner"],
+  ];
+  const extraFilters: [UnitWorkbenchFilter, string][] = [
+    ["sold", zh ? "已售" : "Vendus"],
+    ["maintenance", zh ? "维修中" : "Maintenance"],
+    ["locked", zh ? "封锁" : "Bloqués"],
+    ["cleaning", zh ? "待保洁" : "À nettoyer"],
+  ];
+
   return (
-    <div className={styles.workbench} data-unit-workbench aria-busy={pending}>
+    <div className={styles.workbench} data-unit-workbench aria-busy={pending || !floorReady}>
       <header className={styles.heading}>
         <div>
-          <p className={styles.eyebrow}>ASSET DIRECTORY</p>
-          <h1>{zh ? "资产目录" : "Répertoire des actifs"}</h1>
+          <p className={styles.eyebrow}>ASSET OVERVIEW</p>
+          <h1>{zh ? "资产总览" : "Vue des actifs"}</h1>
           <p className={styles.subtitle}>
             {zh
-              ? "以一套房、一间商铺为入口，分开看权属、占用与运行条件。"
-              : "Un actif à la fois : propriété, occupation et état opérationnel, séparément."}
+              ? "按楼层查看全部资产，选择房间查看资料。"
+              : "Tous les actifs par étage. Sélectionnez un lot pour consulter son dossier."}
           </p>
         </div>
         <div className={styles.scope}>
@@ -120,6 +155,7 @@ export function UnitWorkbench({
             {zh ? "项目" : "Projet"}
             <select
               aria-label={zh ? "资产项目" : "Projet des actifs"}
+              disabled={pending}
               value={building?.project_id ?? query.project}
               onChange={(event) =>
                 navigate({
@@ -147,6 +183,7 @@ export function UnitWorkbench({
             {zh ? "楼栋 / 分区" : "Bâtiment / zone"}
             <select
               aria-label={zh ? "资产楼栋" : "Bâtiment des actifs"}
+              disabled={pending}
               value={building?.id ?? ""}
               onChange={(event) =>
                 navigate({
@@ -203,143 +240,88 @@ export function UnitWorkbench({
               : "Vérifiez la configuration et vos autorisations."}
           </p>
         </div>
+      ) : !floorReady ? (
+        <div className={styles.empty} role="status">
+          <h3>{zh ? "正在读取完整楼层房源…" : "Chargement de tous les actifs par étage…"}</h3>
+        </div>
       ) : (
         <>
-          <div
-            className={styles.summary}
-            aria-label={zh ? "当前楼栋资产汇总" : "Synthèse du bâtiment"}
-          >
-            <Metric
-              label={zh ? "楼栋资产" : "Actifs du bâtiment"}
-              value={data.scopeTotal}
-              caption={building.display_name}
-            />
-            <Metric
-              label={zh ? "明确业务占用" : "Occupation métier explicite"}
-              value={data.summary.occupied}
-              caption={
-                zh ? "日租入住或生效长租，按资产去重" : "Séjour ou bail actif, sans doublons"
-              }
-            />
-            <Metric
-              label={zh ? "需要关注" : "À examiner"}
-              value={data.summary.attention}
-              caption={
-                zh
-                  ? "维修、封锁、待保洁或状态待核实"
-                  : "Maintenance, blocage, nettoyage ou vérification"
-              }
-              warn
-            />
-            <Metric
-              label={zh ? "状态待核实" : "État à vérifier"}
-              value={data.summary.unverified}
-              caption={zh ? "不计作明确空置或可出租" : "Non considéré comme vacant ou prêt à louer"}
-              warn={data.summary.unverified > 0}
-            />
-          </div>
-          <p className={styles.note}>
-            {zh
-              ? "汇总为当前楼栋全部资产，不随下方筛选变化。权属、实际占用、运行条件独立记录；未知不等于空置，无占用不等于可出租。"
-              : "Synthèse de tout le bâtiment, indépendante des filtres ci-dessous. Propriété, occupation et état sont distincts ; inconnu ne signifie pas vacant, ni sans occupation prêt à louer."}
-            {building.project_code === "CIMAC"
-              ? zh
-                ? " CIMAC 只租不卖。"
-                : " CIMAC : location uniquement."
-              : ""}
-          </p>
-          {selected ? (
-            <div className={styles.jumpDetail}>
-              <button
-                type="button"
-                className={styles.secondary}
-                aria-controls={inspectorId}
-                onClick={() => focusInspector(selected.unit.id)}
-              >
-                {zh ? "查看选中资产详情" : "Voir le détail de l’actif sélectionné"}
-              </button>
+          <section className={styles.list} aria-label={zh ? "楼层资产总览" : "Actifs par étage"}>
+            <div className={styles.listHeading}>
+              <h2>{building.display_name}</h2>
+              <span className={styles.counter}>
+                {data.total} / {data.scopeTotal} {zh ? "项资产" : "actifs"}
+              </span>
             </div>
-          ) : null}
-          <div className={cn(styles.layout, pending && styles.pending)}>
-            <section className={styles.list} aria-label={zh ? "资产清单" : "Liste des actifs"}>
-              <div className={styles.listHeading}>
-                <h2>{zh ? "资产清单" : "Liste des actifs"}</h2>
-                <span className={styles.counter}>
-                  {data.total} / {data.scopeTotal} {zh ? "项" : "actifs"}
-                </span>
+            <form
+              key={JSON.stringify(query)}
+              ref={filterForm}
+              method="get"
+              action={routeFor(locale, "/units")}
+              onSubmit={(event) => {
+                event.preventDefault();
+                navigate(formQuery());
+              }}
+            >
+              <input type="hidden" name="project" value={query.project} />
+              <input type="hidden" name="building" value={query.building} />
+              <input type="hidden" name="view" value="floor" />
+              {query.returnTo ? (
+                <input type="hidden" name="returnTo" value={query.returnTo} />
+              ) : null}
+              <div className={styles.toolbar}>
+                <label className={styles.search}>
+                  <Search aria-hidden="true" />
+                  <input
+                    type="search"
+                    name="q"
+                    aria-label={zh ? "搜索资产编号或楼层" : "Rechercher un numéro ou étage"}
+                    placeholder={zh ? "房号、资产编号或楼层" : "N° d’actif ou étage"}
+                    defaultValue={query.q}
+                    maxLength={120}
+                    disabled={pending}
+                  />
+                </label>
+                <button type="submit" className={styles.secondary} disabled={pending}>
+                  {zh ? "搜索" : "Rechercher"}
+                </button>
               </div>
-              <form method="get" action={routeFor(locale, "/units")}>
-                <input type="hidden" name="project" value={query.project} />
-                <input type="hidden" name="building" value={query.building} />
-                {query.returnTo ? (
-                  <input type="hidden" name="returnTo" value={query.returnTo} />
-                ) : null}
-                {query.view === "floor" ? <input type="hidden" name="view" value="floor" /> : null}
-                <div className={styles.toolbar}>
-                  <label className={styles.search}>
-                    <Search aria-hidden="true" />
-                    <input
-                      type="search"
-                      name="q"
-                      aria-label={zh ? "搜索资产编号或楼层" : "Rechercher un numéro ou étage"}
-                      placeholder={zh ? "房号、资产编号或楼层" : "N° d’actif ou étage"}
-                      defaultValue={query.q}
-                      maxLength={120}
-                    />
-                  </label>
-                  <div
-                    className={styles.viewSwitch}
-                    aria-label={zh ? "资产视图" : "Affichage des actifs"}
+              <div
+                className={styles.categories}
+                role="group"
+                aria-label={zh ? "资产分类" : "Catégories des actifs"}
+              >
+                {categories.map(([filter, label]) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    disabled={pending}
+                    aria-pressed={query.filter === filter}
+                    className={filter === "attention" ? styles.attentionFilter : undefined}
+                    onClick={() => navigate({ ...formQuery(), filter })}
                   >
-                    {(
-                      [
-                        ["list", zh ? "清单" : "Liste"],
-                        ["floor", zh ? "楼层" : "Étages"],
-                      ] as const
-                    ).map(([view, label]) => (
-                      <button
-                        key={view}
-                        type="button"
-                        aria-pressed={query.view === view}
-                        onClick={() => navigate({ view })}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <details
+                className={styles.filterDetails}
+                open={Boolean(
+                  query.floor ||
+                  query.kind ||
+                  query.business ||
+                  extraFilters.some(([filter]) => filter === query.filter),
+                )}
+              >
+                <summary>{zh ? "更多筛选" : "Autres filtres"}</summary>
                 <div className={styles.filters}>
-                  <label>
-                    {zh ? "状态维度" : "Dimension d’état"}
-                    <select
-                      name="filter"
-                      aria-label={zh ? "资产状态筛选" : "Filtrer par état"}
-                      defaultValue={query.filter}
-                    >
-                      {(
-                        [
-                          ["all", zh ? "全部资产" : "Tous les actifs"],
-                          ["occupied", zh ? "明确业务占用" : "Occupation explicite"],
-                          ["unoccupied", zh ? "核实无当前占用" : "Sans occupation vérifiée"],
-                          ["attention", zh ? "需要关注" : "À examiner"],
-                          ["sold", zh ? "已售（业务口径）" : "Vendu (métier)"],
-                          ["maintenance", zh ? "维修中" : "Maintenance"],
-                          ["locked", zh ? "封锁" : "Bloqué"],
-                          ["cleaning", zh ? "待保洁" : "À nettoyer"],
-                        ] satisfies [UnitWorkbenchFilter, string][]
-                      ).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
                   <label>
                     {zh ? "楼层" : "Étage"}
                     <select
                       name="floor"
                       aria-label={zh ? "资产楼层" : "Étage des actifs"}
                       defaultValue={query.floor}
+                      disabled={pending}
                     >
                       <option value="">{zh ? "全部楼层" : "Tous les étages"}</option>
                       {data.floors.map((floor) => (
@@ -355,6 +337,7 @@ export function UnitWorkbench({
                       name="kind"
                       aria-label={zh ? "资产类型" : "Type d’actif"}
                       defaultValue={query.kind}
+                      disabled={pending}
                     >
                       <option value="">{zh ? "全部类型" : "Tous les types"}</option>
                       {(["apartment", "parking", "storefront", "office", "warehouse"] as const).map(
@@ -372,6 +355,7 @@ export function UnitWorkbench({
                       name="business"
                       aria-label={zh ? "资产业务配置" : "Activité des actifs"}
                       defaultValue={query.business}
+                      disabled={pending}
                     >
                       <option value="">{zh ? "全部配置" : "Toutes"}</option>
                       {(
@@ -387,137 +371,115 @@ export function UnitWorkbench({
                       ))}
                     </select>
                   </label>
-                  <button type="submit" className={styles.secondary}>
-                    {zh ? "筛选" : "Filtrer"}
+                  <label>
+                    {zh ? "其他状态" : "Autres états"}
+                    <select
+                      name="filter"
+                      aria-label={zh ? "资产状态筛选" : "Filtrer par état"}
+                      defaultValue={query.filter}
+                      disabled={pending}
+                    >
+                      {categories
+                        .filter(([filter]) => filter === "all" || filter === query.filter)
+                        .map(([filter, label]) => (
+                          <option key={filter} value={filter}>
+                            {label}
+                          </option>
+                        ))}
+                      {extraFilters.map(([filter, label]) => (
+                        <option key={filter} value={filter}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button type="submit" className={styles.secondary} disabled={pending}>
+                    {zh ? "应用筛选" : "Appliquer"}
                   </button>
                 </div>
-              </form>
-              {!data.rows.length ? (
-                <div className={styles.empty}>
-                  <Building2 size={26} />
-                  <h3>{zh ? "当前条件下没有资产" : "Aucun actif pour ces filtres"}</h3>
-                  <p>
-                    {zh
-                      ? "请核对楼栋与筛选；不表示整个项目没有资产。"
-                      : "Vérifiez le bâtiment et les filtres ; le projet peut contenir d’autres actifs."}
-                  </p>
-                </div>
-              ) : query.view === "floor" ? (
-                <UnitFloorIndex
-                  rows={data.rows}
-                  locale={locale}
-                  selectedId={selected?.unit.id ?? null}
-                  onSelect={select}
-                />
-              ) : (
-                <table className={styles.table} data-unit-workbench-table>
-                  <colgroup>
-                    <col style={{ width: "28%" }} />
-                    <col style={{ width: "21%" }} />
-                    <col style={{ width: "25%" }} />
-                    <col style={{ width: "26%" }} />
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      {[
-                        zh ? "资产 / 业务" : "Actif / activité",
-                        zh ? "权属" : "Propriété",
-                        zh ? "实际占用" : "Occupation",
-                        zh ? "运行条件" : "État opérationnel",
-                      ].map((label) => (
-                        <th key={label} scope="col">
-                          {label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.rows.map((record) => (
-                      <UnitWorkbenchRow
-                        key={record.unit.id}
-                        record={record}
-                        locale={locale}
-                        selected={selected?.unit.id === record.unit.id}
-                        onSelect={() => select(record)}
-                        allowsSale={building.allows_sale}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              )}
-              <footer className={styles.footer}>
-                <span>
-                  {data.total
-                    ? `${(query.page - 1) * UNIT_WORKBENCH_PAGE_SIZE + 1}–${Math.min(query.page * UNIT_WORKBENCH_PAGE_SIZE, data.total)} / ${data.total}`
-                    : "0 / 0"}
-                  {query.view === "floor"
-                    ? zh
-                      ? " · 仅当前分页，非建筑平面图"
-                      : " · Page actuelle, pas un plan"
-                    : ""}
-                </span>
-                <div className={styles.pages}>
-                  <span>
-                    {query.page} / {pageCount}
-                  </span>
-                  {query.page > 1 ? (
-                    <Link
-                      className={styles.secondary}
-                      href={unitWorkbenchHref(locale, query, { page: query.page - 1, unit: "" })}
-                      onClick={() => {
-                        setSelection({ key: selectionKey, record: null });
-                        setConditionTarget(null);
-                      }}
-                      prefetch={false}
-                    >
-                      {zh ? "上一页" : "Précédent"}
-                    </Link>
-                  ) : null}
-                  {query.page < pageCount ? (
-                    <Link
-                      className={styles.secondary}
-                      href={unitWorkbenchHref(locale, query, { page: query.page + 1, unit: "" })}
-                      onClick={() => {
-                        setSelection({ key: selectionKey, record: null });
-                        setConditionTarget(null);
-                      }}
-                      prefetch={false}
-                    >
-                      {zh ? "下一页" : "Suivant"}
-                    </Link>
-                  ) : null}
-                </div>
-              </footer>
-            </section>
-            <div
-              ref={inspectorRef}
-              id={inspectorId}
-              className={styles.inspectorTarget}
-              tabIndex={-1}
-              role="region"
-              aria-label={zh ? "选中资产详情区域" : "Détail de l’actif sélectionné"}
-              data-unit-id={selected?.unit.id ?? ""}
-            >
-              {data.selectedUnavailable && !selected ? (
-                <div role="alert" className={styles.callout}>
+              </details>
+            </form>
+            <p className={styles.scopeNote}>
+              {zh
+                ? "买方、租客和收款按业务分别显示；房屋使用情况以核实记录为准。"
+                : "Acquéreurs, locataires et encaissements sont présentés par activité ; l’usage du bien repose sur les informations vérifiées."}
+              {building.project_code === "CIMAC"
+                ? zh
+                  ? " CIMAC只租不卖。"
+                  : " CIMAC : location uniquement."
+                : ""}
+            </p>
+            {!data.rows.length ? (
+              <div className={styles.empty}>
+                <Building2 size={26} />
+                <h3>{zh ? "当前条件下没有资产" : "Aucun actif pour ces filtres"}</h3>
+                <p>
                   {zh
-                    ? "指定资产不存在、不可见或与当前范围不符，未自动选中其他资产。"
-                    : "Actif introuvable, non visible ou hors périmètre. Aucun autre actif n’est sélectionné."}
-                </div>
-              ) : null}
+                    ? "请核对楼栋与筛选；不表示整个项目没有资产。"
+                    : "Vérifiez le bâtiment et les filtres ; le projet peut contenir d’autres actifs."}
+                </p>
+              </div>
+            ) : (
+              <UnitFloorIndex
+                rows={data.rows}
+                locale={locale}
+                buildingName={building.display_name}
+                selectedId={selected?.unit.id ?? null}
+                onSelect={select}
+                disabled={pending}
+              />
+            )}
+          </section>
+          {data.selectedUnavailable && !selected ? (
+            <p role="alert" className={styles.callout}>
+              {zh
+                ? "指定资产不存在、不可见或与当前范围不符，未自动选中其他资产。"
+                : "Actif introuvable, non visible ou hors périmètre. Aucun autre actif n’est sélectionné."}
+            </p>
+          ) : null}
+          {selected && !conditionOpen ? (
+            <RightDrawer
+              open
+              width="wide"
+              className={styles.assetDrawer}
+              badge={
+                <span className={styles.drawerMarks}>
+                  {selected.position?.ownership === "sold" ? (
+                    <small className={styles.soldMark}>{zh ? "已售" : "Vendu"}</small>
+                  ) : null}
+                  {selected.position?.lease_occupied ? (
+                    <small className={styles.rentedMark}>{zh ? "在租" : "Loué"}</small>
+                  ) : null}
+                  {selected.position?.daily_occupied ? (
+                    <small className={styles.rentedMark}>
+                      {zh ? "日租入住" : "Séjour en cours"}
+                    </small>
+                  ) : null}
+                </span>
+              }
+              title={
+                <span className={styles.drawerTitle}>
+                  {building.display_name} · {selected.unit.unit_no}
+                </span>
+              }
+              onClose={() => select(null)}
+            >
               <UnitWorkbenchInspector
-                key={selected?.unit.id ?? "empty"}
+                key={`${selected.unit.id}:${selected.unit.updated_at}`}
                 record={selected}
                 building={building}
                 locale={locale}
-                canEdit={canEdit}
+                canEdit={canEdit && !pending}
+                embedded
                 returnTo={sourceHref}
                 onClose={() => select(null)}
-                onManage={() => setConditionTarget(selectedVersion)}
+                onManage={() => {
+                  if (!pending && canEdit && selectedVersion) setConditionTarget(selectedVersion);
+                }}
               />
-            </div>
-          </div>
-          {selected && selectedVersion === conditionTarget && canEdit ? (
+            </RightDrawer>
+          ) : null}
+          {selected && conditionOpen && selectedVersion === conditionTarget && canEdit ? (
             <UnitConditionDrawer
               key={`${selected.unit.id}:${selected.unit.updated_at}`}
               unit={selected.unit}
@@ -534,25 +496,6 @@ export function UnitWorkbench({
           ) : null}
         </>
       )}
-    </div>
-  );
-}
-function Metric({
-  label,
-  value,
-  caption,
-  warn,
-}: {
-  label: string;
-  value: number;
-  caption: string;
-  warn?: boolean;
-}) {
-  return (
-    <div className={styles.metric}>
-      <label>{label}</label>
-      <strong className={warn ? styles.warn : undefined}>{value}</strong>
-      <small>{caption}</small>
     </div>
   );
 }

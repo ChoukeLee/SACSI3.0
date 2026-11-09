@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { leaseRentLabel } from "@/lib/native-money";
+import { leaseRentLabel, nativeLease } from "@/lib/native-money";
 import {
   paymentBelongsToContract,
   readCimacContractAllocation,
@@ -9,6 +9,7 @@ import { formatMoney, paymentDisplay } from "@/lib/currency";
 import { NativeLeaseFinance } from "./native-lease-finance";
 import { getOriginalMonthlyRent, getRecordedOriginalPayment } from "./lease-display-model";
 import { getLeaseFinancialConfigBySourceType } from "./lease-financial-entry-types";
+import { LeaseRentalInspector } from "./lease-rental-inspector";
 
 import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowUpRight, Building2, CalendarDays, FileText, Printer, X } from "lucide-react";
@@ -28,6 +29,7 @@ import { cn } from "@/lib/utils";
 import type {
   CustomerRow,
   LeaseContractRow,
+  LedgerEntryRow,
   PaymentRow,
   ReceivableRow,
   UnitRow,
@@ -35,12 +37,15 @@ import type {
 
 export interface LeaseWorkbenchInspectorProps {
   workArea?: "sacsi" | "cimac";
+  /** SACSI is already framed and closable by its parent drawer. */
+  embedded?: boolean;
   contract: LeaseContractRow | null;
   unit?: UnitRow | null;
   customer?: CustomerRow | null;
   buildingLabel?: string;
   summary?: ContractReceivableSummary | null;
   payments: PaymentRow[];
+  receiptLedger?: LedgerEntryRow[];
   receivables: ReceivableRow[];
   locale: Locale;
   today: string;
@@ -58,6 +63,8 @@ export interface LeaseWorkbenchInspectorProps {
   onClose?: () => void;
   /** Supplied only to roles permitted to collect, for this exact active contract. */
   collectionHref?: string | null;
+  /** Same-room records supplied by the scope-checked controller, SACSI only. */
+  historyContent?: ReactNode;
 }
 
 type InspectorTab = "contract" | "finance" | "records";
@@ -73,6 +80,13 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 
 /** The single contract detail surface; operations open only their relevant form. */
 export function LeaseWorkbenchInspector(props: LeaseWorkbenchInspectorProps) {
+  if ((props.workArea ?? "sacsi") === "sacsi")
+    return (
+      <LeaseRentalInspector
+        key={`${props.contract?.id ?? "empty"}/${props.initialSection ?? "overview"}`}
+        {...props}
+      />
+    );
   return (
     <InspectorContent
       key={`${props.contract?.id ?? "empty"}/${props.initialSection ?? "overview"}`}
@@ -83,6 +97,7 @@ export function LeaseWorkbenchInspector(props: LeaseWorkbenchInspectorProps) {
 
 function InspectorContent({
   workArea = "sacsi",
+  embedded = false,
   contract,
   unit,
   customer,
@@ -109,12 +124,22 @@ function InspectorContent({
   const id = useId();
   const zh = locale === "zh";
   const text = (chinese: string, french: string) => (zh ? chinese : french);
+  const rentalRecord = workArea === "sacsi";
+  const embeddedRental = rentalRecord && embedded;
+  const previewLabel = rentalRecord
+    ? text("租赁资料", "Dossier de location")
+    : text("合同预览", "Aperçu du contrat");
   const money = (value: number | null | undefined) => formatContractXof(value, locale);
-  const tabs: { id: InspectorTab; label: string }[] = [
-    { id: "contract", label: text("合同", "Contrat") },
-    { id: "finance", label: text("账务", "Finances") },
-    { id: "records", label: text("记录", "Écritures") },
-  ];
+  const tabs: { id: InspectorTab; label: string }[] = rentalRecord
+    ? [
+        { id: "contract", label: text("概况", "Aperçu") },
+        { id: "finance", label: text("收支明细", "Encaissements et dépenses") },
+      ]
+    : [
+        { id: "contract", label: text("合同", "Contrat") },
+        { id: "finance", label: text("账务", "Finances") },
+        { id: "records", label: text("记录", "Écritures") },
+      ];
 
   function moveTab(event: KeyboardEvent<HTMLButtonElement>, current: InspectorTab) {
     const position = tabs.findIndex((item) => item.id === current);
@@ -134,9 +159,12 @@ function InspectorContent({
   if (!contract || error || loading) {
     return (
       <aside
-        aria-label={text("合同预览", "Aperçu du contrat")}
+        aria-label={previewLabel}
         aria-busy={loading}
-        className="min-w-0 rounded-2xl border border-border/75 bg-card p-6"
+        className={cn(
+          "min-w-0 bg-card p-6",
+          !embeddedRental && "rounded-2xl border border-border/75",
+        )}
       >
         <div className="flex min-h-64 flex-col items-center justify-center text-center">
           <div className="mb-4 rounded-2xl bg-blue-50 p-3 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
@@ -147,28 +175,44 @@ function InspectorContent({
             role={error ? "alert" : loading ? "status" : undefined}
           >
             {error
-              ? text("合同暂时无法核验", "Contrat momentanément indisponible")
+              ? rentalRecord
+                ? text("租赁资料暂时无法读取", "Dossier momentanément indisponible")
+                : text("合同暂时无法核验", "Contrat momentanément indisponible")
               : loading
-                ? text("正在读取合同…", "Chargement du contrat…")
-                : text("选一份合同，展开工作", "Choisissez un contrat")}
+                ? rentalRecord
+                  ? text("正在读取租赁资料…", "Chargement de la location…")
+                  : text("正在读取合同…", "Chargement du contrat…")
+                : rentalRecord
+                  ? text("选择房间，查看租赁与收支", "Choisissez un lot")
+                  : text("选一份合同，展开工作", "Choisissez un contrat")}
           </h2>
           <p className="mt-2 max-w-64 text-xs leading-6 text-muted-foreground">
             {error
               ? text(
-                  "未展示旧合同与旧金额，请重新选择或稍后重试。",
-                  "Aucun ancien contrat ou montant n’est affiché. Réessayez après avoir sélectionné le contrat.",
+                  "未展示上一条记录与旧金额，请重新选择或稍后重试。",
+                  "Aucun ancien dossier ou montant n’est affiché. Sélectionnez à nouveau le dossier ou réessayez.",
                 )
               : loading
                 ? text(
                     "核对租期与实时账务后再显示预览。",
                     "Vérification de la location et des écritures avant affichage.",
                   )
-                : text(
-                    "选择一份合同，在这里查看完整资料、核对账务并直接办理。",
-                    "Sélectionnez un contrat pour consulter son dossier, ses écritures et les opérations disponibles ici.",
-                  )}
+                : rentalRecord
+                  ? text(
+                      "查看已登记的租客、租金、交租日期和收付款，纸质合同资料可以后补。",
+                      "Consultez l’occupant, le loyer, les dates et les écritures enregistrées. Le bail papier peut être ajouté plus tard.",
+                    )
+                  : text(
+                      "选择一份合同，在这里查看完整资料、核对账务并直接办理。",
+                      "Sélectionnez un contrat pour consulter son dossier, ses écritures et les opérations disponibles ici.",
+                    )}
           </p>
         </div>
+        {rentalRecord && operationError ? (
+          <p role="alert" className="mt-3 text-sm text-red-700">
+            {operationError}
+          </p>
+        ) : null}
       </aside>
     );
   }
@@ -198,6 +242,11 @@ function InspectorContent({
         classifyContractCashPayment(payment).kind === "excluded",
     );
   const endKnown = !!contract.expected_end_date && contract.expected_end_confirmed !== false;
+  const historicalRental =
+    rentalRecord &&
+    (contract.status === "terminated" ||
+      contract.status === "expired" ||
+      (!!contract.actual_end_date && contract.actual_end_date <= today));
   const endLabel = !endKnown
     ? text("待确认", "À confirmer")
     : contract.expected_end_date >= "2099-01-01"
@@ -228,7 +277,7 @@ function InspectorContent({
             "Vérifiez les justificatifs et le rapprochement dans les onglets Finances et Écritures avant toute opération.",
           ),
         }
-      : contract.status === "draft" || !contract.start_date || !endKnown
+      : !rentalRecord && (contract.status === "draft" || !contract.start_date || !endKnown)
         ? {
             title: text("核实合同资料", "Vérifier les informations du contrat"),
             detail: text(
@@ -237,6 +286,7 @@ function InspectorContent({
             ),
           }
         : contract.status === "active" &&
+            endKnown &&
             contract.expected_end_date < "2099-01-01" &&
             contract.expected_end_date <= addIsoDays(today, 30)
           ? {
@@ -247,63 +297,145 @@ function InspectorContent({
               ),
             }
           : {
-              title: text("查看合同与账务", "Consulter le contrat et les écritures"),
-              detail: text(
-                "合同、账务和完整收支记录集中在这里；办理入口只显示当前身份有权执行的操作。",
-                "Contrat, finances et écritures complètes sont réunis ici. Seules les opérations autorisées sont proposées.",
-              ),
+              title: rentalRecord
+                ? text("查看租赁与收支", "Consulter la location et les écritures")
+                : text("查看合同与账务", "Consulter le contrat et les écritures"),
+              detail: rentalRecord
+                ? text(
+                    "按已登记资料查看租客、租金和收付款。纸质合同可后补；付款安排或金额有疑问时再核对对应资料。",
+                    "Consultez les informations et écritures enregistrées. Le bail papier peut être ajouté plus tard ; vérifiez séparément les échéances ou montants incertains.",
+                  )
+                : text(
+                    "合同、账务和完整收支记录集中在这里；办理入口只显示当前身份有权执行的操作。",
+                    "Contrat, finances et écritures complètes sont réunis ici. Seules les opérations autorisées sont proposées.",
+                  ),
             };
 
+  const collectionAction =
+    contract.status === "active" && collectionHref ? (
+      <Link
+        href={collectionHref}
+        aria-disabled={busy || undefined}
+        tabIndex={busy ? -1 : undefined}
+        onClick={(event) => {
+          if (busy) event.preventDefault();
+        }}
+        className={cn(
+          "flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
+          rentalRecord
+            ? "border border-border hover:bg-muted"
+            : "bg-blue-600 text-white hover:bg-blue-700 focus-visible:outline-blue-600",
+        )}
+      >
+        {rentalRecord
+          ? text("手工登记租金/物业费", "Saisir manuellement loyer / charges")
+          : text("登记实际收款", "Enregistrer un encaissement")}
+        <ArrowUpRight className="size-4" aria-hidden="true" />
+      </Link>
+    ) : null;
+  const printAction = (
+    <Button
+      type="button"
+      variant="ghost"
+      className="min-h-10 w-full text-xs"
+      onClick={onPrint}
+      disabled={loading || busy}
+    >
+      <Printer aria-hidden="true" />
+      {rentalRecord
+        ? text("打印登记合同", "Imprimer le contrat enregistré")
+        : text("合同 / 打印", "Contrat / Imprimer")}
+    </Button>
+  );
+  const permittedActions = actions ? (
+    <div className="grid gap-2" aria-label={text("合同办理", "Opérations du contrat")}>
+      {actions}
+    </div>
+  ) : null;
   return (
     <aside
-      aria-label={text("合同预览", "Aperçu du contrat")}
+      aria-label={previewLabel}
       aria-busy={loading}
-      className="min-w-0 overflow-hidden rounded-2xl border border-border/75 bg-card"
+      className={cn(
+        "min-w-0 overflow-hidden bg-card",
+        !embeddedRental && "rounded-2xl border border-border/75",
+      )}
     >
       <div className="border-b border-blue-100/80 bg-blue-50/65 px-5 pb-4 pt-5 dark:border-blue-900/50 dark:bg-blue-950/25">
-        <div className="mb-4 flex items-start justify-between gap-2">
-          <span className="text-[11px] font-medium tracking-[0.1em] text-blue-600 dark:text-blue-300">
-            {text("合同档案", "DOSSIER DU CONTRAT")}
-          </span>
-          {onClose ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="-mr-2 -mt-2 size-8"
-              aria-label={text("关闭预览", "Fermer l’aperçu")}
-              onClick={onClose}
-              disabled={busy}
-            >
-              <X aria-hidden="true" />
-            </Button>
-          ) : null}
-        </div>
+        {!embeddedRental ? (
+          <div className="mb-4 flex items-start justify-between gap-2">
+            <span className="text-[11px] font-medium tracking-[0.1em] text-blue-600 dark:text-blue-300">
+              {rentalRecord
+                ? text("租赁资料", "DOSSIER DE LOCATION")
+                : text("合同档案", "DOSSIER DU CONTRAT")}
+            </span>
+            {onClose ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="-mr-2 -mt-2 size-8"
+                aria-label={text("关闭预览", "Fermer l’aperçu")}
+                onClick={onClose}
+                disabled={busy}
+              >
+                <X aria-hidden="true" />
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="break-words text-xl font-semibold tracking-tight">
-              {unit?.unit_no ?? text("房源待核对", "Lot à vérifier")}
-            </h2>
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Building2 className="size-3.5 shrink-0" aria-hidden="true" />
-              <span className="break-words">
-                {buildingLabel || text("楼栋待核对", "Immeuble à vérifier")}
-              </span>
-            </p>
+            {embeddedRental ? (
+              <>
+                <h2 className="break-words text-lg font-semibold">
+                  {customer?.name || text("租客待登记", "Locataire à compléter")}
+                </h2>
+                {customer?.phone ? (
+                  <p className="mt-1 text-sm text-muted-foreground">{customer.phone}</p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <h2 className="break-words text-xl font-semibold tracking-tight">
+                  {unit?.unit_no ?? text("房源待核对", "Lot à vérifier")}
+                </h2>
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Building2 className="size-3.5 shrink-0" aria-hidden="true" />
+                  <span className="break-words">
+                    {buildingLabel || text("楼栋待核对", "Immeuble à vérifier")}
+                  </span>
+                </p>
+              </>
+            )}
           </div>
           <span className="shrink-0 rounded-full border border-border/70 bg-card px-2.5 py-1 text-[11px] font-medium">
             {status}
           </span>
         </div>
-        <p className="mt-4 break-words text-sm font-medium">
-          {customer?.name || text("客户资料待补充", "Client à compléter")}
-        </p>
-        <p className="mt-1 break-all text-xs text-muted-foreground">{contract.contract_no}</p>
+        {!embeddedRental ? (
+          <p className="mt-4 break-words text-sm font-medium">
+            {customer?.name || text("客户资料待补充", "Client à compléter")}
+          </p>
+        ) : null}
+        {rentalRecord && !embeddedRental && customer?.phone ? (
+          <p className="mt-1 break-words text-xs text-muted-foreground">
+            {text("联系电话：", "Téléphone : ")}
+            {customer.phone}
+          </p>
+        ) : null}
+        {!rentalRecord ? (
+          <p className="mt-1 break-all text-xs text-muted-foreground">{contract.contract_no}</p>
+        ) : null}
       </div>
 
       <div
         role="tablist"
-        aria-label={text("合同预览内容", "Détails de l’aperçu")}
-        className="grid grid-cols-3 border-b px-4"
+        aria-label={
+          rentalRecord
+            ? text("租赁资料内容", "Détails de la location")
+            : text("合同预览内容", "Détails de l’aperçu")
+        }
+        className={cn("grid border-b px-4", rentalRecord ? "grid-cols-2" : "grid-cols-3")}
       >
         {tabs.map((item) => (
           <button
@@ -334,82 +466,184 @@ function InspectorContent({
         aria-labelledby={`${id}-tab-${tab}`}
         className="min-h-72 px-5 py-4"
       >
-        <NativeLeaseFinance
-          contract={contract}
-          payments={contractPayments}
-          receivables={contractReceivables}
-          locale={locale}
-          today={today}
-        />
-        {tab === "contract" ? (
-          <>
-            <div className="flex items-center gap-2 text-xs font-semibold">
-              <CalendarDays className="size-4 text-muted-foreground" aria-hidden="true" />
-              {text("租约信息", "Conditions de location")}
-            </div>
-            <dl className="mt-2 divide-y divide-border/60">
-              <Fact label={text("起租日期", "Début")}>
-                {contract.start_date || text("待确认", "À confirmer")}
-              </Fact>
-              <Fact label={text("预计到期", "Fin prévue")}>{endLabel}</Fact>
-              {contract.expected_end_date >= "2099-01-01" ? (
-                <Fact label={text("原登记日期", "Date enregistrée")}>
-                  {contract.expected_end_date}
-                </Fact>
-              ) : null}
-              {contract.actual_end_date ? (
-                <Fact label={text("实际结束", "Fin réelle")}>{contract.actual_end_date}</Fact>
-              ) : null}
-              <Fact label={text("月租金", "Loyer mensuel")}>
-                {leaseRentLabel(contract, locale)}
-                {originalMonthlyRent ? (
-                  <p className="mt-1 text-xs font-normal text-muted-foreground">
-                    {text("原币约 ", "Devise d’origine env. ")}
-                    {formatMoney(originalMonthlyRent.amount, originalMonthlyRent.currency, locale)}/
-                    {text("月", "mois")}
-                  </p>
-                ) : null}
-              </Fact>
-              <Fact label={text("支付周期", "Règlement")}>{cycle}</Fact>
-              <Fact label={text("约定付款日", "Jour de règlement")}>
-                {contract.payment_day
-                  ? `${contract.payment_day}${text(" 号", " du mois")}`
-                  : text("待确认", "À confirmer")}
-              </Fact>
-              <Fact label={text("登记覆盖至", "Couverture enregistrée jusqu’au")}>
-                {contract.paid_through_date || text("未登记", "Non renseigné")}
-              </Fact>
-              <Fact label={text("约定押金", "Caution contractuelle")}>
-                {money(contract.deposit_amount_xof)}
-              </Fact>
-              <Fact label={text("押金登记状态", "Indicateur de caution")}>
-                {contract.deposit_received
-                  ? text("标记已收，须核凭证", "Indiquée reçue, justificatif à vérifier")
-                  : text("未标记实收", "Réception non indiquée")}
-              </Fact>
-              {contract.rent_free_days > 0 ? (
-                <Fact label={text("免租天数", "Jours de franchise")}>
-                  {contract.rent_free_days}
-                </Fact>
-              ) : null}
-              {contract.signer_name ? (
-                <Fact label={text("签约人", "Signataire")}>{contract.signer_name}</Fact>
-              ) : null}
-            </dl>
-            <p className="mt-3 rounded-lg bg-muted/45 px-3 py-2.5 text-xs leading-5 text-muted-foreground">
-              {text(
-                "合同到期不等于已退租；约定押金不等于实收或可退金额。登记覆盖日不等于当前欠款；实收核销与覆盖确认分别核对。",
-                "La fin prévue ne confirme pas une sortie. La caution prévue n’est ni un encaissement ni un montant remboursable. La couverture enregistrée ne prouve pas un impayé actuel ; encaissement et couverture sont distincts.",
-              )}
-            </p>
-          </>
-        ) : loading ? (
-          <p role="status" className="py-8 text-center text-sm text-muted-foreground">
-            {text("正在读取本合同账务…", "Chargement des écritures…")}
+        {rentalRecord && tab === "finance" && historicalRental ? (
+          <p className="mb-3 text-xs text-muted-foreground">
+            {text(
+              "本页仅核对这次历史租赁的收支，不与后续租客合并。",
+              "Ces écritures concernent uniquement cette ancienne location, séparément des locataires suivants.",
+            )}
           </p>
-        ) : tab === "finance" ? (
+        ) : null}
+        {!rentalRecord || tab === "finance" ? (
+          <NativeLeaseFinance
+            contract={contract}
+            payments={contractPayments}
+            receivables={contractReceivables}
+            locale={locale}
+            today={today}
+          />
+        ) : null}
+        {tab === "contract" ? (
+          rentalRecord ? (
+            <>
+              <dl className="divide-y divide-border/60">
+                <Fact label={text("月租金", "Loyer mensuel")}>
+                  {leaseRentLabel(contract, locale)}
+                  {originalMonthlyRent ? (
+                    <p className="mt-1 text-xs font-normal text-muted-foreground">
+                      {text("原币约 ", "Devise d’origine env. ")}
+                      {formatMoney(
+                        originalMonthlyRent.amount,
+                        originalMonthlyRent.currency,
+                        locale,
+                      )}
+                      /{text("月", "mois")}
+                    </p>
+                  ) : null}
+                </Fact>
+                <Fact label={text("租金已交至（登记）", "Loyer couvert jusqu’au (enregistré)")}>
+                  {contract.paid_through_date || text("未登记", "Non renseigné")}
+                </Fact>
+                <Fact label={text("登记租期", "Période enregistrée")}>
+                  {contract.start_date || text("起租待补", "Début à compléter")} → {endLabel}
+                </Fact>
+                {contract.actual_end_date ? (
+                  <Fact label={text("实际结束", "Fin réelle")}>{contract.actual_end_date}</Fact>
+                ) : null}
+              </dl>
+              <details className="mt-4 rounded-lg border border-border/70 px-3 py-2.5 text-sm">
+                <summary className="cursor-pointer font-medium">
+                  {text("租期与登记资料", "Période et informations enregistrées")}
+                </summary>
+                <dl className="mt-2 divide-y divide-border/60">
+                  <Fact label={text("支付周期", "Règlement")}>{cycle}</Fact>
+                  <Fact label={text("约定付款日", "Jour de règlement")}>
+                    {contract.payment_day
+                      ? contract.payment_day + text(" 号", " du mois")
+                      : text("待确认", "À confirmer")}
+                  </Fact>
+                  <Fact label={text("登记押金", "Caution enregistrée")}>
+                    {nativeLease(contract) && Number(contract.deposit_amount_xof) === 0
+                      ? text("原币押金待核", "Caution en devise à vérifier")
+                      : money(contract.deposit_amount_xof)}
+                  </Fact>
+                  <Fact label={text("押金登记状态", "Indicateur de caution")}>
+                    {contract.deposit_received
+                      ? text("标记已收，须核凭证", "Indiquée reçue, justificatif à vérifier")
+                      : text("未标记实收", "Réception non indiquée")}
+                  </Fact>
+                  {contract.rent_free_days > 0 ? (
+                    <Fact label={text("免租天数", "Jours de franchise")}>
+                      {contract.rent_free_days}
+                    </Fact>
+                  ) : null}
+                  <Fact label={text("记录编号", "Référence")}>
+                    {contract.contract_no || text("未填写", "Non renseignée")}
+                  </Fact>
+                  <Fact label={text("签约人", "Signataire")}>
+                    {contract.signer_name || text("未登记", "Non renseigné")}
+                  </Fact>
+                  <Fact label={text("合同附件", "Pièce jointe")}>
+                    {contract.attachment_url
+                      ? text("已有登记", "Référencée")
+                      : text("未登记", "Non renseignée")}
+                  </Fact>
+                </dl>
+                <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                  {text(
+                    "登记已交至、押金标记不等于实收。租期到期不代表已搬离；未附纸质合同不影响查看已登记资料。",
+                    "La couverture et l’indicateur de caution ne prouvent pas un encaissement. La fin prévue ne confirme pas un départ ; l’absence de bail papier ne masque pas les données enregistrées.",
+                  )}
+                </p>
+              </details>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 text-xs font-semibold">
+                <CalendarDays className="size-4 text-muted-foreground" aria-hidden="true" />
+                {text("租约信息", "Conditions de location")}
+              </div>
+              <dl className="mt-2 divide-y divide-border/60">
+                <Fact label={text("起租日期", "Début")}>
+                  {contract.start_date || text("待确认", "À confirmer")}
+                </Fact>
+                <Fact label={text("预计到期", "Fin prévue")}>{endLabel}</Fact>
+                {!rentalRecord && contract.expected_end_date >= "2099-01-01" ? (
+                  <Fact label={text("原登记日期", "Date enregistrée")}>
+                    {contract.expected_end_date}
+                  </Fact>
+                ) : null}
+                {contract.actual_end_date ? (
+                  <Fact label={text("实际结束", "Fin réelle")}>{contract.actual_end_date}</Fact>
+                ) : null}
+                <Fact label={text("月租金", "Loyer mensuel")}>
+                  {leaseRentLabel(contract, locale)}
+                  {originalMonthlyRent ? (
+                    <p className="mt-1 text-xs font-normal text-muted-foreground">
+                      {text("原币约 ", "Devise d’origine env. ")}
+                      {formatMoney(
+                        originalMonthlyRent.amount,
+                        originalMonthlyRent.currency,
+                        locale,
+                      )}
+                      /{text("月", "mois")}
+                    </p>
+                  ) : null}
+                </Fact>
+                <Fact label={text("支付周期", "Règlement")}>{cycle}</Fact>
+                <Fact label={text("约定付款日", "Jour de règlement")}>
+                  {contract.payment_day
+                    ? `${contract.payment_day}${text(" 号", " du mois")}`
+                    : text("待确认", "À confirmer")}
+                </Fact>
+                <Fact
+                  label={
+                    rentalRecord
+                      ? text("租金已交至（登记）", "Loyer couvert jusqu’au (enregistré)")
+                      : text("登记覆盖至", "Couverture enregistrée jusqu’au")
+                  }
+                >
+                  {contract.paid_through_date || text("未登记", "Non renseigné")}
+                </Fact>
+                <Fact
+                  label={
+                    rentalRecord
+                      ? text("登记押金", "Caution enregistrée")
+                      : text("约定押金", "Caution contractuelle")
+                  }
+                >
+                  {rentalRecord &&
+                  nativeLease(contract) &&
+                  Number(contract.deposit_amount_xof) === 0
+                    ? text("原币押金待核", "Caution en devise à vérifier")
+                    : money(contract.deposit_amount_xof)}
+                </Fact>
+                <Fact label={text("押金登记状态", "Indicateur de caution")}>
+                  {contract.deposit_received
+                    ? text("标记已收，须核凭证", "Indiquée reçue, justificatif à vérifier")
+                    : text("未标记实收", "Réception non indiquée")}
+                </Fact>
+                {contract.rent_free_days > 0 ? (
+                  <Fact label={text("免租天数", "Jours de franchise")}>
+                    {contract.rent_free_days}
+                  </Fact>
+                ) : null}
+                {!rentalRecord && contract.signer_name ? (
+                  <Fact label={text("签约人", "Signataire")}>{contract.signer_name}</Fact>
+                ) : null}
+              </dl>
+              <p className="mt-3 rounded-lg bg-muted/45 px-3 py-2.5 text-xs leading-5 text-muted-foreground">
+                {text(
+                  "合同到期不等于已退租；约定押金不等于实收或可退金额。登记覆盖日不等于当前欠款；实收核销与覆盖确认分别核对。",
+                  "La fin prévue ne confirme pas une sortie. La caution prévue n’est ni un encaissement ni un montant remboursable. La couverture enregistrée ne prouve pas un impayé actuel ; encaissement et couverture sont distincts.",
+                )}
+              </p>
+            </>
+          )
+        ) : null}
+        {tab === "finance" ? (
           <>
-            {financeTools ? (
+            {!rentalRecord && financeTools ? (
               <div
                 className="mb-4 flex flex-wrap gap-2"
                 aria-label={text("账务办理", "Opérations financières")}
@@ -505,13 +739,24 @@ function InspectorContent({
               </p>
             ) : null}
           </>
-        ) : (
+        ) : null}
+        {tab === "records" || (rentalRecord && tab === "finance") ? (
           <>
+            {rentalRecord ? (
+              <h3 className="mb-2 mt-5 border-t pt-4 text-sm font-semibold">
+                {text("收付款流水", "Écritures de paiement")}
+              </h3>
+            ) : null}
             <p className="mb-3 text-xs leading-5 text-muted-foreground">
-              {text(
-                "本合同完整财务记录，不等于完整操作审计；操作身份以审计日志为准。",
-                "Toutes les écritures financières du contrat, pas un journal d’audit complet. L’identité de l’opérateur se vérifie dans l’audit.",
-              )}
+              {rentalRecord
+                ? text(
+                    "以下为这次租赁的已登记收付款。",
+                    "Paiements enregistrés pour cette location.",
+                  )
+                : text(
+                    "本合同完整财务记录，不等于完整操作审计；操作身份以审计日志为准。",
+                    "Toutes les écritures financières du contrat, pas un journal d’audit complet. L’identité de l’opérateur se vérifie dans l’audit.",
+                  )}
             </p>
             {orderedPayments.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
@@ -646,51 +891,48 @@ function InspectorContent({
               )}
             </p>
           </>
-        )}
+        ) : null}
       </div>
 
-      <div className="space-y-2 border-t bg-muted/15 p-4">
-        {contract.status === "active" && collectionHref ? (
-          <Link
-            href={collectionHref}
-            aria-disabled={busy || undefined}
-            tabIndex={busy ? -1 : undefined}
-            onClick={(event) => {
-              if (busy) event.preventDefault();
-            }}
-            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-          >
-            {text("登记实际收款", "Enregistrer un encaissement")}
-            <ArrowUpRight className="size-4" aria-hidden="true" />
-          </Link>
-        ) : null}
-        <section aria-label={text("建议下一步", "Prochaine étape suggérée")} className="pb-2">
-          <h3 className="text-[11px] font-medium text-muted-foreground">
-            {text("建议下一步", "Prochaine étape suggérée")}
-          </h3>
-          <p className="mt-1.5 text-[13px] font-medium leading-5">{suggestion.title}</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">{suggestion.detail}</p>
-        </section>
-        {operationError ? (
-          <p role="alert" className="text-xs text-red-700">
+      <div className={cn("border-t bg-muted/15 p-4", rentalRecord ? "space-y-3" : "space-y-2")}>
+        {rentalRecord && operationError ? (
+          <p role="alert" className="text-sm text-red-700">
             {operationError}
           </p>
         ) : null}
-        {actions ? (
-          <div className="grid gap-2" aria-label={text("合同办理", "Opérations du contrat")}>
-            {actions}
-          </div>
-        ) : null}
-        <Button
-          type="button"
-          variant="ghost"
-          className="min-h-10 w-full text-xs"
-          onClick={onPrint}
-          disabled={loading || busy}
-        >
-          <Printer aria-hidden="true" />
-          {text("合同 / 打印", "Contrat / Imprimer")}
-        </Button>
+        {rentalRecord ? (
+          <>
+            <details className="rounded-lg border border-border/70 px-3 py-2.5 text-sm">
+              <summary className="cursor-pointer font-medium">
+                {text("更多操作", "Autres opérations")}
+              </summary>
+              <fieldset disabled={busy} className="mt-3 grid gap-2">
+                {collectionAction}
+                {permittedActions}
+                {financeTools}
+                {printAction}
+              </fieldset>
+            </details>
+          </>
+        ) : (
+          <>
+            {collectionAction}
+            <section aria-label={text("建议下一步", "Prochaine étape suggérée")} className="pb-2">
+              <h3 className="text-[11px] font-medium text-muted-foreground">
+                {text("建议下一步", "Prochaine étape suggérée")}
+              </h3>
+              <p className="mt-1.5 text-[13px] font-medium leading-5">{suggestion.title}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">{suggestion.detail}</p>
+            </section>
+            {operationError ? (
+              <p role="alert" className="text-xs text-red-700">
+                {operationError}
+              </p>
+            ) : null}
+            {permittedActions}
+            {printAction}
+          </>
+        )}
       </div>
     </aside>
   );

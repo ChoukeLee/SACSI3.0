@@ -308,8 +308,7 @@ export function printSaleContractDoc(data: DocumentRecord, locale: Locale) {
       ${(data.amountXof - data.paidAmountXof) > 0 ? `<tr><td class="lbl" style="color:#dc2626">${L.outstanding}</td><td class="val" style="color:#dc2626;font-weight:700">${formatXof(data.amountXof - data.paidAmountXof)}</td></tr>` : ""}
     </table>
     <p style="font-size:10px;color:#64748b;margin-top:6px">
-      ${statusBadge(data.status, L.statusLabels, locale)} ·
-      ${(locale === "zh" ? "过户" : "Transfert")}: ${statusDisplayLabel(String(c.transfer_status ?? ""), locale)}
+      ${statusBadge(data.status, L.statusLabels, locale)}
     </p>
     ${sigBlock(L.signTenant, L.signStaff)}
     <div class="footer">${L.company} · ${L.building} · ${new Date().toLocaleDateString()}</div>`;

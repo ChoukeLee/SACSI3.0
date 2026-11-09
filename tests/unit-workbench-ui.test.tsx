@@ -3,14 +3,20 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UnitWorkbench } from "@/features/units/unit-workbench";
+import type {
+  UnitBusinessReceipt,
+  UnitBusinessSummary,
+} from "@/features/units/unit-business-summary-model";
 import {
   parseUnitWorkbenchQuery,
+  UNIT_WORKBENCH_PAGE_SIZE,
   type UnitWorkbenchData,
   type UnitWorkbenchRecord,
 } from "@/features/units/unit-workbench-model";
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
+  replace: vi.fn(),
   refresh: vi.fn(),
   audit: vi.fn(),
   params: new URLSearchParams(),
@@ -35,8 +41,11 @@ vi.mock("next/link", () => ({
 vi.mock("next/dynamic", () => ({
   default:
     () =>
-    ({ unit }: { unit: { id: string } }) => (
-      <div data-condition-target={unit.id}>原运行条件操作</div>
+    ({ unit, onClose }: { unit: { id: string }; onClose: () => void }) => (
+      <div role="dialog" aria-label="运行条件维护">
+        <div data-condition-target={unit.id}>原运行条件操作</div>
+        <button onClick={onClose}>取消维护</button>
+      </div>
     ),
 }));
 vi.mock("@/features/units/actions", () => ({ getUnitAuditLogs: mocks.audit }));
@@ -105,9 +114,62 @@ function data(): UnitWorkbenchData {
     selected: null,
     selectedUnavailable: false,
     floors: ["1F", "2F"],
-    total: 123,
-    scopeTotal: 300,
-    summary: { occupied: 120, attention: 40, unverified: 9 },
+    total: 2,
+    scopeTotal: 2,
+    summary: { occupied: 1, attention: 2, unverified: 1 },
+  };
+}
+function business(unitId = uuid(100)): UnitBusinessSummary {
+  const party = {
+    unitId,
+    status: "active",
+    historical: false,
+    sourceRef: "Synthetic source",
+    reviewReasons: [],
+    recentReceipts: [],
+    receiptCount: 0,
+  };
+  return {
+    status: "ready",
+    today: "2026-11-08",
+    daily: [],
+    reviewReasons: [],
+    sales: [
+      {
+        ...party,
+        recordId: uuid(600),
+        customerId: uuid(700),
+        customerName: "Synthetic buyer Alpha",
+        signedDate: null,
+        total: { currency: "XOF", amount: 1000000 },
+        received: [{ currency: "XOF", amount: 600000 }],
+        balance: { basis: "verified_bills", amounts: [{ currency: "XOF", amount: 400000 }] },
+        agencyReceived: [{ currency: "XOF", amount: 30000 }],
+        otherReceived: [],
+        refundPaid: [],
+      },
+    ],
+    leases: [
+      {
+        ...party,
+        recordId: uuid(601),
+        customerId: uuid(701),
+        customerName: "Synthetic tenant Alpha",
+        occupancy: "leased",
+        monthlyRent: { currency: "USD", amount: 1000 },
+        rentReceived: [{ currency: "USD", amount: 2000 }],
+        dueUnpaid: [{ currency: "USD", amount: 500 }],
+        rentUnpaid: [{ currency: "USD", amount: 1000 }],
+        paidThrough: "2026-12-31",
+        startDate: "2026-01-01",
+        nextDue: "2026-11-01",
+        overdue: [{ currency: "USD", amount: 500 }],
+        depositReceived: [{ currency: "USD", amount: 1500 }],
+        agencyReceived: [{ currency: "USD", amount: 200 }],
+        otherReceived: [],
+        refundPaid: [],
+      },
+    ],
   };
 }
 let host: HTMLDivElement, root: Root, fetcher: ReturnType<typeof vi.fn>;
@@ -133,115 +195,96 @@ const render = async (value = data(), canEdit = false, locale: "zh" | "fr" = "zh
 const click = async (element: Element) =>
   act(async () => element.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 const button = (text: string) =>
-  [...host.querySelectorAll("button")].find((item) => item.textContent?.trim() === text)!;
+  [...document.querySelectorAll("button")].find((item) => item.textContent?.trim() === text)!;
 const selectFirst = async () => click(host.querySelector('[aria-label="查看资产 101"]')!);
+const drawer = () => document.querySelector('[role="dialog"]');
+const card = (id: string) => host.querySelector(`[data-unit-card-id="${id}"]`);
+const inspectorTab = (label: string) =>
+  [...(drawer()?.querySelectorAll('[role="tab"]') ?? [])].find(
+    (item) => item.textContent?.trim() === label,
+  )!;
+const openTab = async (label: string) => click(inspectorTab(label));
+async function openHistory(label: "业务记录" | "变更记录") {
+  await openTab("历史");
+  await click(button(label));
+}
+async function openDetails(label: string) {
+  const details = [...document.querySelectorAll("details")].find(
+    (item) => item.querySelector(":scope > summary")?.textContent === label,
+  );
+  expect(details).toBeTruthy();
+  if (!details!.open) await click(details!.querySelector("summary")!);
+  await act(async () => details!.dispatchEvent(new Event("toggle")));
+  return details!;
+}
+async function openMaintenance() {
+  await openDetails("更多操作");
+  await click(button("核对 / 修改运行条件"));
+}
 
 describe("asset directory UI", () => {
   it.each([false, true])(
-    "focuses and scrolls the selected asset on narrow screens, respecting reduced motion %s",
+    "opens one focused asset drawer on narrow screens with reduced motion %s",
     async (reducedMotion) => {
-      const frames: FrameRequestCallback[] = [];
-      const frame = vi.fn((callback: FrameRequestCallback) => {
-        frames.push(callback);
-        return frames.length;
-      });
-      vi.stubGlobal("requestAnimationFrame", frame);
       vi.stubGlobal(
         "matchMedia",
         vi.fn((query: string) => ({
+          media: query,
           matches:
             query === "(max-width: 1199px)" ||
             (query === "(prefers-reduced-motion: reduce)" && reducedMotion),
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
         })),
       );
       await render();
-      const target = host.querySelector('[aria-label="选中资产详情区域"]') as HTMLDivElement;
-      const focus = vi.spyOn(target, "focus");
-      target.scrollIntoView = vi.fn();
       await selectFirst();
-      expect(focus).not.toHaveBeenCalled();
-      expect(frame).toHaveBeenCalledOnce();
-      await act(async () => frames[0](0));
-      expect(focus).toHaveBeenCalledWith({ preventScroll: true });
-      expect(document.activeElement).toBe(target);
-      expect(target.scrollIntoView).toHaveBeenCalledWith({
-        block: "start",
-        behavior: reducedMotion ? "auto" : "smooth",
-      });
+      expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+      expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')).toBeTruthy();
+      expect(drawer()?.contains(document.activeElement)).toBe(true);
+      expect(drawer()?.querySelectorAll('button[aria-label="Close"]')).toHaveLength(1);
+      expect(drawer()?.querySelector('[aria-label="关闭资产档案"]')).toBeNull();
+      expect(fetcher).not.toHaveBeenCalled();
+      expect(mocks.audit).not.toHaveBeenCalled();
     },
   );
-  it("does not reposition the desktop inspector or automatically steal focus for an SSR deep link", async () => {
-    const frame = vi.fn();
-    vi.stubGlobal("requestAnimationFrame", frame);
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn(() => ({ matches: false })),
-    );
+  it("opens the exact server-selected deep link in one drawer without reading unrelated business or history", async () => {
+    const value = data();
+    value.selected = value.rows[1];
+    value.query.unit = value.selected.unit.id;
+    await render(value);
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(drawer()?.querySelector('[aria-label="资产 102 的档案"]')).toBeTruthy();
+    expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
+    expect(card(uuid(101))?.getAttribute("aria-pressed")).toBe("true");
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
+  it("keeps an authorized exact deep link outside the visible floor results instead of opening the first card", async () => {
+    const value = data();
+    value.query.floor = "1F";
+    value.selected = row(98, { unit: { ...row(98).unit, floor_label: "9F" } });
+    value.query.unit = value.selected.unit.id;
+    await render(value);
+    expect(card(value.selected.unit.id)).toBeNull();
+    expect(drawer()?.querySelector('[aria-label="资产 199 的档案"]')).toBeTruthy();
+    expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("does not reopen an explicitly closed detail after a same-scope refresh of the same version", async () => {
     const value = data();
     value.selected = value.rows[0];
     value.query.unit = value.selected.unit.id;
     await render(value);
-    const target = host.querySelector('[aria-label="选中资产详情区域"]') as HTMLDivElement;
-    const focus = vi.spyOn(target, "focus");
-    expect(button("查看选中资产详情")).toBeTruthy();
-    expect(frame).not.toHaveBeenCalled();
-    await selectFirst();
-    expect(frame).not.toHaveBeenCalled();
-    expect(focus).not.toHaveBeenCalled();
-  });
-  it("gives a narrow-screen deep link an explicit detail jump without automatic focus on refresh", async () => {
-    const frames: FrameRequestCallback[] = [];
-    vi.stubGlobal(
-      "requestAnimationFrame",
-      vi.fn((callback: FrameRequestCallback) => {
-        frames.push(callback);
-        return frames.length;
-      }),
-    );
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn((query: string) => ({ matches: query === "(max-width: 1199px)" })),
-    );
-    const value = data();
-    value.selected = value.rows[0];
-    value.query.unit = value.selected.unit.id;
-    await render(value);
-    const target = host.querySelector('[aria-label="选中资产详情区域"]') as HTMLDivElement;
-    target.scrollIntoView = vi.fn();
-    expect(frames).toHaveLength(0);
-    const jump = button("查看选中资产详情");
-    expect(jump.getAttribute("aria-controls")).toBe(target.id);
-    await click(jump);
-    await act(async () => frames[0](0));
-    expect(document.activeElement).toBe(target);
-    expect(target.scrollIntoView).toHaveBeenCalledOnce();
-  });
-  it("does not focus a stale animation-frame target after a project change clears selection", async () => {
-    const frames: FrameRequestCallback[] = [];
-    vi.stubGlobal(
-      "requestAnimationFrame",
-      vi.fn((callback: FrameRequestCallback) => {
-        frames.push(callback);
-        return frames.length;
-      }),
-    );
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn(() => ({ matches: true })),
-    );
-    await render();
-    const target = host.querySelector('[aria-label="选中资产详情区域"]') as HTMLDivElement;
-    const focus = vi.spyOn(target, "focus");
-    target.scrollIntoView = vi.fn();
-    await selectFirst();
-    const projectSelect = host.querySelector('[aria-label="资产项目"]') as HTMLSelectElement;
-    await act(async () => {
-      projectSelect.value = otherProject;
-      projectSelect.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-    await act(async () => frames[0](0));
-    expect(focus).not.toHaveBeenCalled();
-    expect(target.scrollIntoView).not.toHaveBeenCalled();
+    await click(drawer()!.querySelector('button[aria-label="Close"]')!);
+    expect(drawer()).toBeNull();
+    await render({ ...value, rows: [...value.rows] });
+    expect(drawer()).toBeNull();
+    expect(document.querySelector("[data-condition-target]")).toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
   });
   it.each(["actual", "expected"] as const)(
     "labels the %s business end date instead of presenting every date as an actual departure",
@@ -275,9 +318,11 @@ describe("asset directory UI", () => {
       );
       await render();
       await selectFirst();
-      await click(button("业务关联"));
-      expect(host.textContent).toContain(`${kind === "actual" ? "实际" : "预计"} 2026-09-15`);
-      const contractLink = host.querySelector(`a[href^="/leases?contract=${uuid(900)}"]`);
+      await openHistory("业务记录");
+      expect(document.body.textContent).toContain(
+        `${kind === "actual" ? "实际" : "预计"} 2026-09-15`,
+      );
+      const contractLink = document.querySelector(`a[href^="/leases?contract=${uuid(900)}"]`);
       expect(contractLink).not.toBeNull();
       expect(
         new URL(contractLink!.getAttribute("href")!, "https://example.invalid").searchParams.get(
@@ -286,37 +331,86 @@ describe("asset directory UI", () => {
       ).toBe(building);
     },
   );
-  it("shows a compact four-column catalogue with full-building summary and no eager detail/history calls", async () => {
+  it("defaults to full-range floor cards without opening or eagerly reading an asset detail", async () => {
     await render();
-    expect(host.querySelector("h1")?.textContent).toBe("资产目录");
-    expect(host.querySelectorAll("th")).toHaveLength(4);
-    expect(host.querySelectorAll("tbody tr")).toHaveLength(2);
-    expect(host.textContent).toContain("300");
-    expect(host.textContent).toContain("123 / 300");
-    expect(host.textContent).toContain("选一项资产");
-    expect(host.textContent).toContain("不随下方筛选变化");
+    expect(host.querySelector("h1")?.textContent).toBe("资产总览");
+    expect(host.querySelector("table")).toBeNull();
+    expect(host.querySelectorAll("[data-unit-card-id]")).toHaveLength(2);
+    expect(drawer()).toBeNull();
+    expect(mocks.replace).not.toHaveBeenCalled();
     expect(fetcher).not.toHaveBeenCalled();
     expect(mocks.audit).not.toHaveBeenCalled();
   });
+  it("navigates the four inspector tabs by keyboard and keeps overview and payments free of history reads", async () => {
+    fetcher.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          unitId: uuid(100),
+          buildingId: building,
+          projectId: project,
+          total: 0,
+          page: 1,
+          relations: [],
+        }),
+      ),
+    );
+    await render();
+    await selectFirst();
+    expect([...drawer()!.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent)).toEqual([
+      "概览",
+      "收付款",
+      "资料",
+      "历史",
+    ]);
+    const key = async (label: string, value: string) =>
+      act(async () =>
+        inspectorTab(label).dispatchEvent(
+          new KeyboardEvent("keydown", { key: value, bubbles: true }),
+        ),
+      );
+    await act(async () => (inspectorTab("概览") as HTMLElement).focus());
+    await key("概览", "ArrowRight");
+    expect(inspectorTab("收付款").getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(inspectorTab("收付款"));
+    expect(inspectorTab("概览").getAttribute("tabindex")).toBe("-1");
+    expect(drawer()?.querySelector('[role="tabpanel"]')?.id).toBe(
+      inspectorTab("收付款").getAttribute("aria-controls"),
+    );
+    await key("收付款", "ArrowLeft");
+    expect(inspectorTab("概览").getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(inspectorTab("概览"));
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
+    await key("概览", "End");
+    expect(inspectorTab("历史").getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(inspectorTab("历史"));
+    await key("历史", "Home");
+    expect(inspectorTab("概览").getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(inspectorTab("概览"));
+  });
   it("preserves concurrent sold, leased and cleaning conditions, leaving unknown occupancy unknown", async () => {
     await render();
-    expect(host.querySelector("tbody")?.textContent).toContain("已售");
-    expect(host.querySelector("tbody")?.textContent).toContain("长租占用");
-    expect(host.querySelector("tbody")?.textContent).toContain("待保洁");
-    expect(host.querySelector("tbody")?.textContent).toContain("占用待核实");
-    expect(host.querySelector("tbody")?.textContent).not.toContain("可出租");
+    expect(card(uuid(100))?.textContent).toContain("已售");
+    expect(card(uuid(100))?.textContent).toContain("长租占用");
+    expect(card(uuid(100))?.textContent).toContain("维修中");
+    expect(card(uuid(101))?.textContent).toContain("待核");
+    expect(card(uuid(101))?.textContent).not.toMatch(/无当前占用|可出租|空置/);
+    await selectFirst();
+    await openTab("资料");
+    expect(drawer()?.textContent).toContain("待保洁");
   });
   it("selects the exact asset, updates its stable URL and does not read business/history until requested", async () => {
     await render();
     await selectFirst();
-    expect(host.querySelector('[aria-label="资产 101 的档案"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="资产 101 的档案"]')).not.toBeNull();
     expect(new URL(window.location.href).searchParams.get("unit")).toBe(uuid(100));
-    expect(host.textContent).toContain("已售（业务口径）");
-    expect(host.textContent).toContain("业务配置待核对；不推定默认价格");
+    expect(drawer()?.textContent).toContain("已售");
+    await openTab("资料");
+    expect(drawer()?.textContent).toContain("业务配置待核对；不推定默认价格");
     expect(fetcher).not.toHaveBeenCalled();
     expect(mocks.audit).not.toHaveBeenCalled();
-    await click(host.querySelector('[aria-label="关闭资产档案"]')!);
-    expect(host.textContent).toContain("选一项资产");
+    await click(drawer()!.querySelector('button[aria-label="Close"]')!);
+    expect(drawer()).toBeNull();
   });
   it("does not fabricate a default tariff or hide an explicitly configured zero tariff", async () => {
     const value = data();
@@ -331,24 +425,351 @@ describe("asset directory UI", () => {
     ];
     await render(value);
     await selectFirst();
-    expect(host.querySelector('[aria-label="资产 101 的档案"]')?.textContent).toContain("0 XOF");
-    expect(host.textContent).not.toContain("XOF XOF");
-    expect(host.textContent).toContain("未配置价格");
+    await openTab("资料");
+    expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')?.textContent).toContain(
+      "0万西法",
+    );
+    expect(drawer()?.textContent).not.toContain("XOF XOF");
+    expect(drawer()?.textContent).toContain("未配置价格");
+  });
+  it("keeps the buyer and tenant of one sold-and-leased room together without borrowing another room's party or currency", async () => {
+    const value = data();
+    value.rows[0].business = business();
+    const nextRoom = business(uuid(101));
+    nextRoom.sales = [];
+    nextRoom.leases = [
+      {
+        ...nextRoom.leases[0],
+        recordId: uuid(602),
+        customerId: uuid(702),
+        customerName: "Synthetic tenant Beta",
+      },
+    ];
+    value.rows[1].business = nextRoom;
+    await render(value);
+    expect(card(uuid(100))?.textContent).toContain("Synthetic buyer Alpha");
+    expect(card(uuid(100))?.textContent).toContain("Synthetic tenant Alpha");
+    expect(card(uuid(100))?.textContent).not.toContain("Synthetic tenant Beta");
+    expect(card(uuid(101))?.textContent).toContain("Synthetic tenant Beta");
+    expect(card(uuid(101))?.textContent).not.toContain("Synthetic buyer Alpha");
+    expect(card(uuid(100))?.textContent).toContain("60万西法");
+    expect(card(uuid(100))?.textContent).toContain("2,000");
+    expect(card(uuid(100))?.textContent).toContain("USD");
+    expect(card(uuid(100))?.textContent).toContain("2026-12-31");
+    expect(card(uuid(100))?.textContent).not.toContain("1,500");
+    await selectFirst();
+    expect(drawer()?.textContent).toContain("Synthetic buyer Alpha");
+    expect(drawer()?.textContent).toContain("Synthetic tenant Alpha");
+    expect(drawer()?.textContent).not.toContain("Synthetic tenant Beta");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("refreshes selected money and paid-through facts when only the business summary changes", async () => {
+    const value = data();
+    value.rows[0].business = business();
+    await render(value);
+    await selectFirst();
+    expect(drawer()?.textContent).toContain("2,000");
+    expect(drawer()?.textContent).toContain("2026-12-31");
+    const next = data();
+    next.rows[0].business = business();
+    next.rows[0].business.leases[0].rentReceived = [{ currency: "USD", amount: 3000 }];
+    next.rows[0].business.leases[0].paidThrough = "2027-01-31";
+    expect(next.rows[0].unit.updated_at).toBe(value.rows[0].unit.updated_at);
+    await render(next);
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')).toBeTruthy();
+    expect(drawer()?.textContent).toContain("3,000");
+    expect(drawer()?.textContent).toContain("2027-01-31");
+    expect(drawer()?.textContent).not.toContain("2,000");
+    expect(drawer()?.textContent).not.toContain("2026-12-31");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("keeps the financial overview separate from filtered receipts and displays one selected source without mixing rooms", async () => {
+    const value = data();
+    const summary = business();
+    summary.sales = [];
+    const lease = summary.leases[0];
+    Object.assign(lease, {
+      monthlyRent: { currency: "XOF", amount: 650000 },
+      rentReceived: [{ currency: "XOF", amount: 5200000 }],
+      dueUnpaid: [{ currency: "XOF", amount: 650000 }],
+      rentUnpaid: [{ currency: "XOF", amount: 650000 }],
+      overdue: [{ currency: "XOF", amount: 650000 }],
+      overdueDueDate: "2026-11-07",
+      paidThrough: "2026-11-06",
+      depositReceived: [{ currency: "XOF", amount: 1300000 }],
+      agencyReceived: [{ currency: "XOF", amount: 650000 }],
+      refundPaid: [{ currency: "XOF", amount: 325000 }],
+    });
+    const receipt = (
+      n: number,
+      kind: UnitBusinessReceipt["kind"],
+      amount: number,
+    ): UnitBusinessReceipt => ({
+      id: uuid(800 + n),
+      recordId: lease.recordId,
+      unitId: lease.unitId,
+      role: "lease",
+      kind,
+      direction: kind === "refund" ? "out" : "in",
+      date: "2026-11-01",
+      amount: { currency: "XOF", amount },
+      sourceRef: `Synthetic source ${n}`,
+    });
+    lease.recentReceipts = [
+      receipt(1, "rent", 1950000),
+      receipt(2, "rent", 1950000),
+      receipt(3, "rent", 1300000),
+      receipt(4, "deposit", 1300000),
+      receipt(5, "agency", 650000),
+      receipt(6, "refund", 325000),
+      { ...receipt(7, "rent", 999999), unitId: uuid(101), sourceRef: "Wrong room provenance" },
+      { ...receipt(8, "rent", 888888), recordId: uuid(999), sourceRef: "Wrong record provenance" },
+    ];
+    lease.receiptCount = 6;
+    value.rows[0].business = summary;
+    await render(value);
+    await selectFirst();
+    const section = drawer()!.querySelector('[aria-label="租客与租金"]')!;
+    const metric = (label: string) =>
+      [...section.querySelectorAll("div")].find(
+        (el) =>
+          el.querySelector(":scope > span")?.textContent === label &&
+          el.querySelector(":scope > strong"),
+      )!;
+    expect(inspectorTab("概览").getAttribute("aria-selected")).toBe("true");
+    expect(drawer()?.querySelectorAll("details")).toHaveLength(1);
+    expect(metric("累计已收租金").textContent).toContain("520万西法");
+    expect(metric("当前到期未收").textContent).toContain("65万西法");
+    expect(metric("累计已收租金").textContent).not.toContain("130万西法");
+    expect(section.textContent).toContain("2026-11-07 应付");
+    expect(section.textContent).toContain("逾期1天");
+    expect(section.textContent).toContain("租金已交至登记2026-11-06");
+    expect(section.textContent).toContain("另收押金130万西法");
+    expect(section.textContent).toContain("另收中介费65万西法");
+    expect(section.textContent).toContain("已退金额32.5万西法");
+    expect(drawer()?.querySelector("[data-unit-receipt-id]")).toBeNull();
+    await openTab("收付款");
+    expect(drawer()?.querySelector("table")).toBeTruthy();
+    expect(drawer()?.querySelectorAll("[data-unit-receipt-id]")).toHaveLength(6);
+    expect(drawer()?.querySelector(`[data-unit-receipt-id="${uuid(807)}"]`)).toBeNull();
+    expect(drawer()?.querySelector(`[data-unit-receipt-id="${uuid(808)}"]`)).toBeNull();
+    expect(drawer()?.querySelector(`[data-unit-receipt-id="${uuid(801)}"]`)?.textContent).toContain(
+      "租金",
+    );
+    expect(drawer()?.querySelector(`[data-unit-receipt-id="${uuid(801)}"]`)?.textContent).toContain(
+      "2026-11-01",
+    );
+    expect(drawer()?.querySelector(`[data-unit-receipt-id="${uuid(806)}"]`)?.textContent).toContain(
+      "− 32.5万西法",
+    );
+    const receiptRow = (n: number) =>
+      drawer()!.querySelector(`[data-unit-receipt-id="${uuid(800 + n)}"]`)!;
+    const evidence = () => drawer()?.querySelector('[role="region"][aria-label="收付款依据"]');
+    expect(evidence()).toBeNull();
+    await click(receiptRow(1).querySelector('button[aria-label^="查看依据"]')!);
+    expect(evidence()?.textContent).toContain("Synthetic source 1");
+    await click(receiptRow(2).querySelector('button[aria-label^="查看依据"]')!);
+    expect(drawer()?.querySelectorAll('[role="region"][aria-label="收付款依据"]')).toHaveLength(1);
+    expect(evidence()?.textContent).toContain("Synthetic source 2");
+    expect(evidence()?.textContent).not.toContain("Synthetic source 1");
+    lease.recentReceipts = lease.recentReceipts.map((row) =>
+      row.id === uuid(802) ? { ...row, sourceRef: "Fresh source 2" } : row,
+    );
+    await render({ ...value, rows: [...value.rows] });
+    expect(inspectorTab("收付款").getAttribute("aria-selected")).toBe("true");
+    expect(evidence()?.textContent).toContain("Fresh source 2");
+    expect(evidence()?.textContent).not.toContain("Synthetic source 2");
+    await click(button("租金"));
+    expect(drawer()?.querySelectorAll("[data-unit-receipt-id]")).toHaveLength(3);
+    expect(evidence()).toBeNull();
+    expect(drawer()?.querySelector(`[data-unit-receipt-id="${uuid(804)}"]`)).toBeNull();
+    await click(button("其他收支"));
+    expect(drawer()?.querySelectorAll("[data-unit-receipt-id]")).toHaveLength(3);
+    expect(drawer()?.querySelector(`[data-unit-receipt-id="${uuid(801)}"]`)).toBeNull();
+    expect(receiptRow(4).textContent).toContain("押金");
+    expect(receiptRow(5).textContent).toContain("中介费收款");
+    expect(receiptRow(6).textContent).toContain("退款");
+    await click(button("全部"));
+    expect(drawer()?.querySelectorAll("[data-unit-receipt-id]")).toHaveLength(6);
+    const leaseLink = [...drawer()!.querySelectorAll("a")].find((link) => {
+      const href = new URL(link.href);
+      return href.pathname === "/leases" && href.searchParams.get("contract") === lease.recordId;
+    });
+    expect(leaseLink).toBeTruthy();
+    expect(new URL(leaseLink!.href).searchParams.get("building")).toBe(building);
+    expect(new URL(leaseLink!.href).searchParams.get("project")).toBe(project);
+    expect(drawer()?.textContent).not.toContain("Wrong room provenance");
+    expect(drawer()?.textContent).not.toContain("Wrong record provenance");
+    expect(drawer()?.querySelectorAll("details")).toHaveLength(1);
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
+    await click(drawer()!.querySelector('button[aria-label="Close"]')!);
+    await click(host.querySelector('[aria-label="查看资产 102"]')!);
+    expect(inspectorTab("概览").getAttribute("aria-selected")).toBe("true");
+    expect(drawer()?.querySelector('[role="region"][aria-label="收付款依据"]')).toBeNull();
+    expect(drawer()?.textContent).not.toContain("Fresh source 2");
+  });
+  it.each(["XOF", "CNY"] as const)(
+    "shows net %s purchase cash independently of gross and source zero, keeping an unknown net unknown",
+    async (currency) => {
+      const value = data();
+      const summary = business();
+      summary.leases = [];
+      const sale = summary.sales[0];
+      const net = currency === "XOF" ? 1000000 : 720000;
+      sale.total = { currency, amount: net };
+      sale.received = [{ currency, amount: net * 2 }];
+      sale.refundPaid = [{ currency, amount: net }];
+      sale.netReceived = [{ currency, amount: net }];
+      sale.balance = { basis: "registered", amounts: [{ currency, amount: 0 }] };
+      value.rows[0].business = summary;
+      await render(value);
+      await selectFirst();
+      const metric = () =>
+        [...drawer()!.querySelectorAll("div")].find(
+          (el) =>
+            el.querySelector(":scope > span")?.textContent === "净收房款" &&
+            el.querySelector(":scope > strong"),
+        )!;
+      expect(metric().textContent).toContain(currency === "XOF" ? "100万西法" : "720,000CNY");
+      expect(metric().textContent).not.toContain(currency === "XOF" ? "200万西法" : "1,440,000CNY");
+      expect(drawer()?.textContent).toContain("累计房款入款");
+      expect(drawer()?.textContent).toContain("来源登记余款为零");
+      expect(drawer()?.textContent).not.toContain("已核房款账单已结清");
+      sale.netReceived = null;
+      await render({ ...value, rows: [...value.rows] });
+      expect(metric().querySelector("strong")?.textContent).toBe("待核");
+      expect(fetcher).not.toHaveBeenCalled();
+    },
+  );
+  it("keeps missing money and an unavailable business read distinct from a zero balance", async () => {
+    const value = data();
+    const unknown = business();
+    unknown.sales[0].total = null;
+    unknown.sales[0].received = null;
+    unknown.sales[0].balance = { basis: "unknown", amounts: null };
+    unknown.leases[0].monthlyRent = null;
+    unknown.leases[0].rentReceived = null;
+    unknown.leases[0].rentUnpaid = null;
+    unknown.leases[0].dueUnpaid = null;
+    value.rows[0].business = unknown;
+    value.rows[1].business = {
+      status: "unavailable",
+      today: "2026-11-08",
+      sales: [],
+      leases: [],
+      daily: [],
+      reviewReasons: ["Synthetic read denied"],
+    };
+    await render(value);
+    const zeroMoney =
+      /(?:^|[^\d,])0\s*(?:XOF|USD|CNY|万西法)|(?:XOF|USD|CNY|万西法)\s*0(?:[^\d]|$)/;
+    expect(card(uuid(100))?.textContent).toContain("待核");
+    expect(card(uuid(100))?.textContent).not.toMatch(zeroMoney);
+    expect(card(uuid(101))?.textContent).not.toMatch(zeroMoney);
+    await selectFirst();
+    expect(drawer()?.textContent).not.toMatch(zeroMoney);
+    expect(drawer()?.textContent).not.toContain("已结清");
+  });
+  it.each([
+    ["2026-11-08", "今日应缴"],
+    ["2026-11-23", "15天内应缴"],
+    ["2026-11-24", null],
+  ])(
+    "uses a verified next due date %s for its reminder while keeping registered paid-through separate",
+    async (nextDue, label) => {
+      const value = data();
+      value.rows[0].position = {
+        ...value.rows[0].position!,
+        operational_condition: "normal",
+        cleaning_pending: false,
+      };
+      const summary = business();
+      summary.sales = [];
+      summary.leases[0].overdue = [];
+      summary.leases[0].nextDue = nextDue;
+      summary.leases[0].paidThrough = "2027-12-31";
+      value.rows[0].business = summary;
+      await render(value);
+      const warning = host.querySelector(`[id="asset-attention-${uuid(100)}"]`);
+      if (label) expect(warning?.textContent).toBe(label);
+      else expect(warning).toBeNull();
+      expect(card(uuid(100))?.textContent).toContain("2027-12-31");
+      expect(warning?.textContent ?? "").not.toContain("逾期");
+    },
+  );
+  it("prioritizes overdue rent ahead of an upcoming reminder and a locked condition ahead of both", async () => {
+    const value = data();
+    value.rows[0].position = {
+      ...value.rows[0].position!,
+      operational_condition: "normal",
+      cleaning_pending: false,
+    };
+    value.rows[0].business = business();
+    value.rows[0].business.leases[0].nextDue = "2026-11-09";
+    await render(value);
+    expect(host.querySelector(`[id="asset-attention-${uuid(100)}"]`)?.textContent).toContain(
+      "逾期",
+    );
+    value.rows[0].position.operational_condition = "locked";
+    await render({ ...value, rows: [...value.rows] });
+    expect(host.querySelector(`[id="asset-attention-${uuid(100)}"]`)?.textContent).toBe("封锁");
+  });
+  it("does not turn a nearby due date with an unknown due amount into a confirmed payment reminder", async () => {
+    const value = data();
+    value.rows[0].position = {
+      ...value.rows[0].position!,
+      operational_condition: "normal",
+      cleaning_pending: false,
+    };
+    const summary = business();
+    summary.sales = [];
+    summary.leases[0].overdue = null;
+    summary.leases[0].dueUnpaid = null;
+    summary.leases[0].nextDue = "2026-11-09";
+    value.rows[0].business = summary;
+    await render(value);
+    expect(host.querySelector(`[id="asset-attention-${uuid(100)}"]`)).toBeNull();
+    expect(card(uuid(100))?.textContent).toContain("待核");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("marks only a known positive purchase balance for follow-up and never calls it overdue", async () => {
+    for (const basis of ["verified_bills", "registered", "unknown"] as const) {
+      const value = data();
+      value.rows[0].position = {
+        ...value.rows[0].position!,
+        operational_condition: "normal",
+        cleaning_pending: false,
+      };
+      const summary = business();
+      summary.leases = [];
+      summary.sales[0].balance = {
+        basis,
+        amounts: basis === "unknown" ? null : [{ currency: "XOF", amount: 400000 }],
+      };
+      value.rows[0].business = summary;
+      await render(value);
+      const warning = host.querySelector(`[id="asset-attention-${uuid(100)}"]`);
+      if (basis === "unknown") expect(warning).toBeNull();
+      else expect(warning?.textContent).toBe("余款待跟进");
+      expect(warning?.textContent ?? "").not.toContain("逾期");
+    }
   });
   it("immediately clears selected record and status editor when the project changes before the server response", async () => {
     await render(data(), true);
     await selectFirst();
-    await click(button("核对 / 修改运行条件"));
+    await openMaintenance();
     expect(
-      host.querySelector("[data-condition-target]")?.getAttribute("data-condition-target"),
+      document.querySelector("[data-condition-target]")?.getAttribute("data-condition-target"),
     ).toBe(uuid(100));
     const projectSelect = host.querySelector('[aria-label="资产项目"]') as HTMLSelectElement;
     await act(async () => {
       projectSelect.value = otherProject;
       projectSelect.dispatchEvent(new Event("change", { bubbles: true }));
     });
-    expect(host.querySelector("[data-condition-target]")).toBeNull();
-    expect(host.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
+    expect(document.querySelector("[data-condition-target]")).toBeNull();
+    expect(document.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
     expect(mocks.push).toHaveBeenCalledWith(expect.stringContaining(`project=${otherProject}`), {
       scroll: false,
     });
@@ -359,17 +780,66 @@ describe("asset directory UI", () => {
   it("does not carry an open operation into a different server-selected asset or version", async () => {
     await render(data(), true);
     await selectFirst();
-    await click(button("核对 / 修改运行条件"));
+    await openMaintenance();
     expect(
-      host.querySelector("[data-condition-target]")?.getAttribute("data-condition-target"),
+      document.querySelector("[data-condition-target]")?.getAttribute("data-condition-target"),
     ).toBe(uuid(100));
     const next = data();
     next.selected = { ...row(1), unit: { ...row(1).unit, updated_at: "2026-10-20T12:00:00Z" } };
     next.query.unit = next.selected.unit.id;
     await render(next, true);
-    expect(host.querySelector('[aria-label="资产 102 的档案"]')).not.toBeNull();
-    expect(host.querySelector("[data-condition-target]")).toBeNull();
+    expect(document.querySelector('[aria-label="资产 102 的档案"]')).not.toBeNull();
+    expect(inspectorTab("概览").getAttribute("aria-selected")).toBe("true");
+    expect(document.querySelector("[data-condition-target]")).toBeNull();
   });
+  it("keeps maintenance behind more actions and returns from its single dialog to the selected asset", async () => {
+    await render(data(), true);
+    await selectFirst();
+    const initialMore = [...document.querySelectorAll("details")].find(
+      (item) => item.querySelector(":scope > summary")?.textContent === "更多操作",
+    )!;
+    expect(initialMore.open).toBe(false);
+    const more = await openDetails("更多操作");
+    expect(document.querySelector("[data-condition-target]")).toBeNull();
+    expect(more.open).toBe(true);
+    await click(button("核对 / 修改运行条件"));
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(document.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
+    expect(
+      document.querySelector("[data-condition-target]")?.getAttribute("data-condition-target"),
+    ).toBe(uuid(100));
+    await click(button("取消维护"));
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')).toBeTruthy();
+    expect(document.querySelector("[data-condition-target]")).toBeNull();
+  });
+  it.each(["permission", "version"] as const)(
+    "clears a maintenance dialog after a %s change without leaving the selected detail hidden",
+    async (change) => {
+      await render(data(), true);
+      await selectFirst();
+      await openMaintenance();
+      expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+      const next = data();
+      next.selected = next.rows[0];
+      next.query.unit = next.selected.unit.id;
+      if (change === "version") {
+        next.selected = {
+          ...next.selected,
+          unit: { ...next.selected.unit, updated_at: "2026-10-20T12:00:00Z" },
+        };
+        next.rows[0] = next.selected;
+      }
+      await render(next, change !== "permission");
+      expect(document.querySelector("[data-condition-target]")).toBeNull();
+      expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+      expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')).toBeTruthy();
+      if (change === "permission") {
+        await openDetails("更多操作");
+        expect(button("核对 / 修改运行条件")).toBeUndefined();
+      }
+    },
+  );
   it("binds selection to scope/result props and does not retain the previous asset on a new scope", async () => {
     await render();
     await selectFirst();
@@ -379,50 +849,124 @@ describe("asset directory UI", () => {
     next.building = next.buildings[1];
     next.rows = [];
     await render(next);
-    expect(host.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
-    expect(host.textContent).toContain("选一项资产");
+    expect(document.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
+    expect(drawer()).toBeNull();
   });
   it("retains invalid scope/selection distinctions rather than selecting an arbitrary first row", async () => {
     const value = data();
     value.selectedUnavailable = true;
     await render(value);
     expect(host.textContent).toContain("指定资产不存在、不可见或与当前范围不符");
-    expect(host.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
+    expect(document.querySelector('[aria-label="资产 101 的档案"]')).toBeNull();
     await render({ ...data(), scopeUnavailable: true, building: null });
     expect(host.textContent).toContain("指定的项目或楼栋不可用");
     expect(host.querySelector("table")).toBeNull();
+    expect(host.querySelectorAll("[data-unit-card-id]")).toHaveLength(0);
+    expect(drawer()).toBeNull();
   });
-  it("uses a labeled paginated floor index rather than claiming an architectural floor plan", async () => {
+  it("renders every filtered room across floors beyond the legacy page size without inventing a tenant or rent", async () => {
     const value = data();
-    value.query.view = "floor";
+    value.rows = Array.from({ length: UNIT_WORKBENCH_PAGE_SIZE + 3 }, (_, index) =>
+      row(index, {
+        unit: { ...row(index).unit, floor_label: index < 30 ? "1F" : "2F" },
+      }),
+    );
+    value.rows[1] = row(1, { position: null, unit: { ...row(1).unit, occupancy_verified: false } });
+    value.rows[2] = row(2, {
+      unit: { ...row(2).unit, status: "available" },
+      position: {
+        ownership: "unspecified",
+        operational_condition: "normal",
+        daily_occupied: false,
+        lease_occupied: false,
+        cleaning_pending: false,
+        daily_enabled: false,
+        lease_enabled: false,
+      },
+    });
+    value.total = value.rows.length;
+    value.scopeTotal = value.rows.length;
     await render(value);
     expect(host.querySelector("table")).toBeNull();
-    expect(host.textContent).toContain("仅当前分页，房号排列不表示真实空间位置");
-    expect(host.querySelector('[data-unknown="true"]')).not.toBeNull();
+    const cards = [...host.querySelectorAll("[data-unit-card-id]")];
+    expect(cards).toHaveLength(UNIT_WORKBENCH_PAGE_SIZE + 3);
+    expect(new Set(cards.map((item) => item.getAttribute("data-unit-card-id"))).size).toBe(
+      cards.length,
+    );
+    expect(card(value.rows.at(-1)!.unit.id)).toBeTruthy();
+    expect(host.textContent).toContain("1F");
+    expect(host.textContent).toContain("2F");
+    expect(card(uuid(100))?.textContent).toContain("已售");
+    expect(card(uuid(100))?.textContent).toContain("长租占用");
+    expect(card(uuid(101))?.textContent).not.toMatch(/无当前占用|可出租|空置/);
+    expect(card(uuid(102))?.textContent).not.toMatch(/租客|XOF|CNY|USD|可出租/);
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
+  it("normalizes a legacy paginated list link without presenting that partial page as the full floor view", async () => {
+    const value = data();
+    value.query.view = "list";
+    value.query.page = 3;
+    value.selected = value.rows[0];
+    value.query.unit = value.selected.unit.id;
+    value.query.returnTo = `/leases?contract=${uuid(900)}`;
+    value.total = 123;
+    await render(value);
+    expect(mocks.replace).toHaveBeenCalledOnce();
+    const href = new URL(mocks.replace.mock.calls[0][0], "https://example.invalid");
+    expect(href.searchParams.get("view")).not.toBe("list");
+    expect(href.searchParams.get("page")).toBeNull();
+    expect(href.searchParams.get("unit")).toBe(uuid(100));
+    expect(href.searchParams.get("returnTo")).toBe(value.query.returnTo);
+    expect(host.querySelectorAll("[data-unit-card-id]")).toHaveLength(0);
+    const next = data();
+    next.selected = next.rows[0];
+    next.query.unit = uuid(100);
+    next.query.returnTo = value.query.returnTo;
+    await render(next);
+    expect(host.querySelectorAll("[data-unit-card-id]")).toHaveLength(2);
+    expect(drawer()?.querySelector('[aria-label="资产 101 的档案"]')).toBeTruthy();
   });
   it("gates state actions to existing admin permission and hides sale setup for CIMAC", async () => {
     const value = data();
     value.building = value.buildings[1];
     value.query.building = otherBuilding;
     value.query.project = otherProject;
+    value.rows = value.rows.map((record) => ({
+      ...record,
+      unit: { ...record.unit, building_id: otherBuilding },
+    }));
     await render(value);
     await selectFirst();
     expect(button("核对 / 修改运行条件")).toBeUndefined();
-    expect(host.textContent).toContain("CIMAC 只租不卖");
+    await openTab("资料");
+    expect(drawer()?.textContent).toContain("CIMAC 只租不卖");
     expect(host.querySelector('select[name="business"] option[value="sale"]')).toBeNull();
   });
   it("uses the existing status audit service only after opening history and shows explicit failures", async () => {
+    fetcher.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          unitId: uuid(100),
+          buildingId: building,
+          projectId: project,
+          total: 0,
+          page: 1,
+          relations: [],
+        }),
+      ),
+    );
     mocks.audit.mockRejectedValueOnce(new Error("offline"));
     await render();
     await selectFirst();
-    await click(button("状态历史"));
+    await openHistory("变更记录");
     expect(mocks.audit).toHaveBeenCalledExactlyOnceWith(uuid(100));
-    expect(host.textContent).toContain("状态历史读取失败");
-    expect(host.textContent).not.toContain("暂无可见的状态变更记录");
+    expect(document.body.textContent).toContain("状态历史读取失败");
+    expect(document.body.textContent).not.toContain("暂无可见的状态变更记录");
     await click(button("重试"));
-    expect(host.textContent).toContain("暂无可见的状态变更记录");
+    expect(document.body.textContent).toContain("暂无可见的状态变更记录");
   });
-  it("requests exact-scoped relations only when the business tab opens and distinguishes guest/agent links", async () => {
+  it("requests exact-scoped relations only when business records expand and distinguishes guest/agent links", async () => {
     fetcher.mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -452,14 +996,14 @@ describe("asset directory UI", () => {
     );
     await render();
     await selectFirst();
-    await click(button("业务关联"));
+    await openHistory("业务记录");
     expect(fetcher).toHaveBeenCalledOnce();
     expect(fetcher.mock.calls[0][0]).toContain(`unit=${uuid(100)}`);
     expect(fetcher.mock.calls[0][0]).toContain(`building=${building}`);
     expect(fetcher.mock.calls[0][0]).toContain(`project=${project}`);
-    expect(host.textContent).toContain("实际住客 · Guest Alice");
-    expect(host.textContent).toContain("代订 / 经办 · Agent Bob");
-    const links = [...host.querySelectorAll("a")];
+    expect(document.body.textContent).toContain("实际住客 · Guest Alice");
+    expect(document.body.textContent).toContain("代订 / 经办 · Agent Bob");
+    const links = [...document.querySelectorAll("a")];
     expect(links.some((link) => link.href.includes(`customer=${uuid(901)}`))).toBe(true);
     expect(links.some((link) => link.href.includes(`customer=${uuid(902)}`))).toBe(true);
   });
@@ -472,7 +1016,8 @@ describe("asset directory UI", () => {
     );
     await render();
     await selectFirst();
-    await click(button("业务关联"));
+    await openHistory("业务记录");
+    await click(drawer()!.querySelector('button[aria-label="Close"]')!);
     await click(host.querySelector('[aria-label="查看资产 102"]')!);
     await act(async () =>
       resolve(
@@ -488,8 +1033,9 @@ describe("asset directory UI", () => {
         ),
       ),
     );
-    expect(host.querySelector('[aria-label="资产 102 的档案"]')).not.toBeNull();
-    expect(host.textContent).not.toContain("合同与入住关系 · 0");
+    expect(document.querySelector('[aria-label="资产 102 的档案"]')).not.toBeNull();
+    expect(document.body.textContent).not.toContain("租售与入住记录 · 0");
+    expect(inspectorTab("概览").getAttribute("aria-selected")).toBe("true");
   });
   it("rejects external return links while preserving a safe source and exact complete profile link", async () => {
     const value = data();
@@ -499,13 +1045,26 @@ describe("asset directory UI", () => {
     value.query.returnTo = `/sales?contract=${uuid(900)}`;
     await render(value);
     await selectFirst();
-    expect(host.querySelector('a[href^="/sales?"]')).not.toBeNull();
-    expect(host.querySelector(`a[href^="/units/${uuid(100)}?returnTo="]`)).not.toBeNull();
+    expect(document.querySelector('a[href^="/sales?"]')).not.toBeNull();
+    await openDetails("更多操作");
+    expect(document.querySelector(`a[href^="/units/${uuid(100)}?returnTo="]`)).not.toBeNull();
   });
   it("renders the same workbench in French without granting editing", async () => {
     await render(data(), false, "fr");
-    expect(host.querySelector("h1")?.textContent).toBe("Répertoire des actifs");
+    expect(host.querySelector("h1")?.textContent).toBe("Vue des actifs");
     expect(host.querySelector('[aria-label="Voir l’actif 101"]')).not.toBeNull();
     expect(host.querySelector("form")?.getAttribute("action")).toBe("/fr/units");
+    await click(host.querySelector('[aria-label="Voir l’actif 101"]')!);
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(drawer()?.querySelector('[aria-label="Dossier de 101"]')).toBeTruthy();
+    expect([...drawer()!.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent)).toEqual([
+      "Aperçu",
+      "Paiements",
+      "Informations",
+      "Historique",
+    ]);
+    const more = await openDetails("Autres opérations");
+    expect(more.querySelectorAll("button")).toHaveLength(0);
+    expect(document.querySelector("[data-condition-target]")).toBeNull();
   });
 });

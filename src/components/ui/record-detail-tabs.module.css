@@ -1,0 +1,35 @@
+.tabs {
+  position: sticky;
+  top: -20px;
+  z-index: 5;
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  margin: -20px -20px 0;
+  padding: 20px 20px 0;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  scrollbar-width: thin;
+}
+.tabs button {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 10px 0;
+  border-bottom: 2px solid transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 14px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.tabs button[aria-selected="true"] {
+  border-bottom-color: #245cd3;
+  color: #245cd3;
+}
+.tabs button:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: -3px;
+}
+:global(.dark) .tabs button[aria-selected="true"] {
+  border-bottom-color: #9abaff;
+  color: #9abaff;
+}

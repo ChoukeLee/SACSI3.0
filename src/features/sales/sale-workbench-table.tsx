@@ -1,10 +1,11 @@
 "use client";
 
+import { formatPropertyXof } from "@/lib/property-money";
+
 import { useMemo, useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  formatContractXof,
   sortContractRows,
   type ContractTableRow,
   type ContractSort,
@@ -52,7 +53,7 @@ export function SaleWorkbenchTable({
   const visible = pagination ? rows : sorted.slice((page - 1) * size, page * size);
   const text = (chinese: string, french: string) => (zh ? chinese : french);
   const money = (value: number | null) =>
-    value === null ? text("未核", "À vérifier") : formatContractXof(value, locale);
+    value === null ? text("未核", "À vérifier") : formatPropertyXof(value, locale);
   const changePage = (value: number) => {
     onNavigate?.();
     if (pagination) pagination.onPageChange(value);
@@ -67,8 +68,8 @@ export function SaleWorkbenchTable({
       <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2.5">
         <span className={styles.note}>
           {text(
-            "选中合同，核对分期、实收与过户",
-            "Sélectionnez un contrat pour vérifier ses échéances et son transfert",
+            "选中出售记录，核对分期与实收",
+            "Sélectionnez une vente pour vérifier ses échéances et ses paiements",
           )}
         </span>
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -113,8 +114,8 @@ export function SaleWorkbenchTable({
       <table className={styles.table}>
         <caption className="sr-only">
           {text(
-            "出售合同，所有汇总金额均为 XOF。选中合同后读取其详情。",
-            "Contrats de vente, montants de synthèse en XOF. Les détails sont chargés à la sélection.",
+            "出售合同，西法按万西法显示，其他币种按原币。选中合同后读取其详情。",
+            "Contrats de vente : XOF par unités de 10 000, autres devises en monnaie originale. Les détails sont chargés à la sélection.",
           )}
         </caption>
         <thead>

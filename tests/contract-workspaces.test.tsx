@@ -74,17 +74,26 @@ const lease = {
 const receivable = (source_type: string, source_id: string) =>
   ({
     id: "r",
+    building_id: "b",
+    unit_id: "u",
+    customer_id: "c",
     source_type,
     source_id,
+    category: source_type === "sale_contract" ? "sale_lump_sum" : "lease_rent",
     amount_xof: 1000000,
     paid_amount_xof: 200000,
     due_date: "2026-01-01",
     status: "partial",
     management_status: "managed",
+    currency: "XOF",
+    amount_native: null,
+    paid_amount_native: null,
   }) as ReceivableRow;
 const payment = (source_id: string, source_type: string, amount = 1200000) =>
   ({
     id: source_type,
+    unit_id: "u",
+    customer_id: "c",
     source_id,
     source_type,
     amount,
@@ -92,6 +101,9 @@ const payment = (source_id: string, source_type: string, amount = 1200000) =>
     currency: "XOF",
     exchange_rate_to_xof: 1,
     payment_method: "cash",
+    native_settlement: false,
+    request_kind: null,
+    reversal_of_payment_id: null,
   }) as PaymentRow;
 let root: Root;
 let host: HTMLDivElement;
@@ -107,33 +119,28 @@ afterEach(async () => {
   host.remove();
   vi.unstubAllGlobals();
 });
-function summaryValue(label: string) {
-  const card = [...host.querySelectorAll("button")].find((button) =>
-    button.textContent?.startsWith(label),
-  );
-  return card?.textContent;
-}
 async function openCustomer() {
-  await act(async () =>
-    (host.querySelector("tbody td:nth-child(2) button") as HTMLButtonElement).click(),
+  const room = host.querySelector<HTMLButtonElement>("[data-room-id], [data-sale-room-id]");
+  expect(room).toBeTruthy();
+  await act(async () => room!.click());
+  const inspector = document.querySelector(
+    'aside[aria-label="租赁资料"], aside[aria-label="出售合同履约详情"], aside[aria-label="Détails du contrat de vente"]',
   );
-  // A table selection opens the authoritative Inspector, not another full-detail dialog.
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
-  const inspector = host.querySelector(
-    '[aria-label="出售合同履约详情"], [aria-label="Détails du contrat de vente"], [aria-label="合同预览"]',
-  )!;
   expect(inspector).not.toBeNull();
-  return inspector;
+  return inspector!;
 }
 async function openFinance(inspector: Element) {
   const finance = [...inspector.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
-    (button) => /^(账务|Finances|付款事实|Paiements)$/.test(button.textContent ?? ""),
+    (button) =>
+      /^(收付款|收支明细|Encaissements et dépenses|账务|Finances|付款事实|Paiements)$/.test(
+        button.textContent ?? "",
+      ),
   );
   expect(finance).toBeTruthy();
   await act(async () => finance!.click());
 }
 
-it("sale default table keeps full identity and separates allocated receivables from recorded cash", async () => {
+it("sale default cards and their detail keep full identity and separate allocated receivables from recorded cash", async () => {
   await act(async () =>
     root.render(
       <SaleList
@@ -152,15 +159,26 @@ it("sale default table keeps full identity and separates allocated receivables f
       />,
     ),
   );
-  expect(host.querySelector("table")).toBeTruthy();
-  expect(summaryValue("到期未收")).toContain("800,000 XOF");
-  expect(host.querySelector("tbody")?.textContent).toContain("应收未收 800,000 XOF");
-  expect(host.textContent).toContain(sale.contract_no);
+  const room = host.querySelector("[data-sale-room-id]");
+  expect(room?.textContent).toContain("503");
+  expect(room?.textContent).toContain(customers[0].name);
+  expect(room?.textContent).toContain("80 万西法");
+  expect(host.querySelector("table")).toBeNull();
+  expect(host.textContent).not.toContain("列表核对");
   const dialog = await openCustomer();
-  expect(dialog.textContent).toContain("应收已核销200,000 XOF");
+  expect(dialog.textContent).toContain(customers[0].name);
+  const registration = [...dialog.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
+    (item) => item.textContent === "资料",
+  )!;
+  expect(registration).toBeTruthy();
+  await act(async () => registration.click());
+  expect(dialog.textContent).toContain(sale.contract_no);
+  expect(dialog.textContent).toContain("2026-01-01");
   await openFinance(dialog);
-  expect(dialog.textContent).toContain("经营收款1,200,000 XOF");
-  expect(dialog.querySelector('[role="tabpanel"]')?.textContent).not.toContain("300,000 XOF"); // Contract commission flags are not cash evidence.
+  expect(dialog.textContent).toContain("已建应收未收80 万西法");
+  expect(dialog.textContent).toContain("应收已核销20 万西法");
+  expect(dialog.textContent).toContain("经营收款120 万西法");
+  expect(dialog.querySelector('[role="tabpanel"]')?.textContent).not.toContain("30 万西法"); // Contract commission flags are not cash evidence.
 });
 
 it("sale missing managed obligations remains unknown instead of treating cash or contract total as allocation", async () => {
@@ -179,21 +197,73 @@ it("sale missing managed obligations remains unknown instead of treating cash or
       />,
     ),
   );
-  expect(summaryValue("Dû impayé")).toContain("—");
-  expect(host.textContent).toContain("Aucune créance vérifiée");
+  expect(host.querySelector("table")).toBeNull();
+  expect(host.querySelector("[data-sale-room-id]")?.textContent).toContain("RestantÀ vérifier");
   expect(host.textContent).not.toContain("万");
   const dialog = await openCustomer();
+  await openFinance(dialog);
   expect(dialog.textContent).toContain("Aucune créance vérifiée");
 });
 
-it("lease financial details keep refundable deposits outside operating income", async () => {
+it("keeps a no-sale CIMAC project read-only even when sale action capabilities are present", async () => {
+  const projectId = "11111111-1111-4111-8111-111111111111";
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  await act(async () =>
+    root.render(
+      <SaleList
+        contracts={[sale]}
+        schedules={[]}
+        units={units}
+        customers={customers}
+        payments={[]}
+        receivables={[]}
+        buildings={[
+          {
+            ...buildings[0],
+            code: "CIMAC1",
+            project_id: projectId,
+            project: { id: projectId, code: "CIMAC", display_name: "CIMAC", allows_sale: false },
+          },
+        ]}
+        initialProject={projectId}
+        noSaleProject
+        locale="zh"
+        canCreate
+        canRecordFinance
+        canManage
+        canTerminate
+      />,
+    ),
+  );
+  expect(host.textContent).toContain("当前项目不开展出售业务");
+  expect(host.textContent).toContain("CIMAC 只租不卖");
+  expect(host.querySelector("[data-sale-room-id], table")).toBeNull();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(host.textContent).not.toContain("登记收款");
+  expect(host.textContent).not.toContain("新增分期");
+  expect(fetch).not.toHaveBeenCalled();
+  const links = [...host.querySelectorAll<HTMLAnchorElement>("a")];
+  expect(links.some((link) => link.getAttribute("href") === `/units?project=${projectId}`)).toBe(
+    true,
+  );
+  expect(links.some((link) => link.getAttribute("href") === `/leases?project=${projectId}`)).toBe(
+    true,
+  );
+});
+
+it("lease payment details separate rent and deposits within the selected contract", async () => {
   await act(async () =>
     root.render(
       <LeaseList
         contracts={[lease]}
         units={units}
         customers={customers}
-        payments={[payment("lease", "lease_rent"), payment("lease", "lease_deposit", 3000000)]}
+        payments={[
+          payment("lease", "lease_rent"),
+          payment("lease", "lease_deposit", 3000000),
+          { ...payment("other-lease", "lease_rent", 9900000), id: "other-lease-rent" },
+        ]}
         receivables={[receivable("lease_contract", "lease")]}
         buildings={buildings}
         locale="zh"
@@ -204,7 +274,9 @@ it("lease financial details keep refundable deposits outside operating income", 
   );
   const dialog = await openCustomer();
   await openFinance(dialog);
-  expect(dialog.textContent).toContain("已录经营收款1,200,000 XOF");
-  expect(dialog.textContent).toContain("已录押金实收3,000,000 XOF");
-  expect(dialog.textContent).not.toContain("已录经营收款4,200,000 XOF");
+  expect(dialog.textContent).toContain("已收租金120 万西法");
+  expect(dialog.textContent).toContain("另收押金300 万西法");
+  expect(dialog.textContent).not.toContain("已录经营收款");
+  expect(dialog.textContent).not.toContain("已收租金420 万西法");
+  expect(dialog.textContent).not.toContain("990 万西法");
 });

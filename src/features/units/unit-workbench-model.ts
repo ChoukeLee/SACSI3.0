@@ -2,6 +2,7 @@ import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import type { UnitBusinessFlagRow, UnitRow } from "@/types/database";
 import type { UnitPosition } from "./operational-position";
+import type { UnitBusinessSummary } from "./unit-business-summary-model";
 
 export const UNIT_WORKBENCH_PAGE_SIZE = 50;
 export const unitWorkbenchUuid =
@@ -34,10 +35,12 @@ export interface UnitWorkbenchRecord {
   unit: UnitRow;
   position: UnitPosition | null;
   flags: UnitBusinessFlagRow[];
+  business?: UnitBusinessSummary;
 }
 export interface UnitWorkbenchPositionRecord {
   unit: Pick<UnitRow, "occupancy_verified" | "construction_status">;
   position: UnitPosition | null;
+  business?: UnitBusinessSummary;
 }
 export interface UnitWorkbenchData {
   query: UnitWorkbenchQuery;
@@ -68,6 +71,7 @@ const filters: UnitWorkbenchFilter[] = [
 export function parseUnitWorkbenchQuery(input: UnitWorkbenchSearch): UnitWorkbenchQuery {
   const requestedPage = one(input.page, 8);
   const unit = typeof input.unit === "string" ? input.unit.trim() : "";
+  const view = input.view === "list" ? "list" : "floor";
   return {
     project: one(input.project, 80),
     building: one(input.building, 80),
@@ -82,8 +86,11 @@ export function parseUnitWorkbenchQuery(input: UnitWorkbenchSearch): UnitWorkben
     business: ["daily_rental", "long_lease", "sale"].includes(one(input.business))
       ? one(input.business)
       : "",
-    view: input.view === "floor" ? "floor" : "list",
-    page: /^\d+$/.test(requestedPage) ? Math.max(1, Math.min(Number(requestedPage), 100000)) : 1,
+    view,
+    page:
+      view === "list" && /^\d+$/.test(requestedPage)
+        ? Math.max(1, Math.min(Number(requestedPage), 100000))
+        : 1,
     unit: unitWorkbenchUuid.test(unit) ? unit : "",
     returnTo: one(input.returnTo, 2048),
   };
@@ -107,8 +114,8 @@ export function unitWorkbenchHref(
   ] as const)
     if (next[key]) params.set(key, next[key]);
   if (next.filter !== "all") params.set("filter", next.filter);
-  if (next.view !== "list") params.set("view", next.view);
-  if (next.page > 1) params.set("page", String(next.page));
+  if (next.view === "list") params.set("view", next.view);
+  if (next.view === "list" && next.page > 1) params.set("page", String(next.page));
   return routeFor(locale, `/units${params.size ? `?${params}` : ""}`);
 }
 export function unitOccupancyVerified(record: UnitWorkbenchPositionRecord): boolean {
@@ -121,7 +128,7 @@ export function unitOccupancyText(record: UnitWorkbenchPositionRecord, locale: L
   if (record.position?.daily_occupied) return zh ? "日租实际入住" : "Séjour effectif";
   if (record.position?.lease_occupied) return zh ? "长租占用" : "Bail actif";
   if (!unitOccupancyVerified(record)) return zh ? "占用待核实" : "Occupation à vérifier";
-  return zh ? "无当前占用" : "Sans occupation actuelle";
+  return zh ? "暂无在租或日租入住记录" : "Aucun bail actif ni séjour en cours";
 }
 export function unitNeedsVerification(record: UnitWorkbenchPositionRecord): boolean {
   return (
@@ -138,7 +145,27 @@ export function matchesUnitWorkbenchFilter(
   if (filter === "all") return true;
   if (filter === "attention")
     return (
+      (record.business?.reviewReasons.length ?? 0) > 0 ||
+      record.business?.leases.some((lease) =>
+        lease.overdue?.some((amount) => amount.amount > 0),
+      ) === true ||
+      record.business?.sales.some(
+        (sale) =>
+          ["verified_bills", "registered"].includes(sale.balance.basis) &&
+          sale.balance.amounts?.some((amount) => amount.amount > 0),
+      ) === true ||
+      record.business?.leases.some(
+        (lease) =>
+          lease.dueUnpaid !== null &&
+          lease.nextDue !== null &&
+          lease.nextDue >= record.business!.today &&
+          lease.nextDue <=
+            new Date(Date.parse(record.business!.today + "T00:00:00Z") + 15 * 86400000)
+              .toISOString()
+              .slice(0, 10),
+      ) === true ||
       unitNeedsVerification(record) ||
+      !!(position?.daily_occupied && position.lease_occupied) ||
       !!position?.cleaning_pending ||
       position?.operational_condition === "maintenance" ||
       position?.operational_condition === "locked"

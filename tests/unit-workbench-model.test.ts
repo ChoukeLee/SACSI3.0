@@ -36,6 +36,7 @@ describe("asset workbench query and independent state dimensions", () => {
   });
   it("defaults and bounds untrusted query fields without inventing prices or selection", () => {
     const query = parseUnitWorkbenchQuery({
+      view: "list",
       page: "999999999",
       unit: "not-a-uuid",
       kind: "invalid",
@@ -53,7 +54,7 @@ describe("asset workbench query and independent state dimensions", () => {
     expect(query.business).toBe("sale");
   });
   it.each(["0", "-1", "NaN", "Infinity", "1.4"])("defaults malformed page %s", (page) =>
-    expect(parseUnitWorkbenchQuery({ page }).page).toBe(1),
+    expect(parseUnitWorkbenchQuery({ view: "list", page }).page).toBe(1),
   );
   it("keeps stable UUID selection, encoded filters and French scope links", () => {
     const href = unitWorkbenchHref(
@@ -65,8 +66,30 @@ describe("asset workbench query and independent state dimensions", () => {
     expect(url.pathname).toBe("/fr/units");
     expect(url.searchParams.get("unit")).toBe(id);
     expect(url.searchParams.get("q")).toBe("A & B");
-    expect(url.searchParams.get("page")).toBe("2");
-    expect(url.searchParams.get("view")).toBe("floor");
+    expect(url.searchParams.get("page")).toBeNull();
+    expect(url.searchParams.get("view")).toBeNull();
+  });
+  it("defaults to the complete floor scope while preserving explicitly paged legacy list links", () => {
+    expect(parseUnitWorkbenchQuery({ page: "3" })).toMatchObject({ view: "floor", page: 1 });
+    expect(parseUnitWorkbenchQuery({ view: "invalid", page: "3" })).toMatchObject({
+      view: "floor",
+      page: 1,
+    });
+    const legacy = parseUnitWorkbenchQuery({
+      view: "list",
+      page: "3",
+      unit: id,
+      project,
+      building,
+    });
+    expect(legacy).toMatchObject({ view: "list", page: 3 });
+    const href = new URL(unitWorkbenchHref("zh", legacy), "https://example.invalid");
+    expect(href.searchParams.get("view")).toBe("list");
+    expect(href.searchParams.get("page")).toBe("3");
+    const floor = new URL(unitWorkbenchHref("zh", legacy, { view: "floor" }), href);
+    expect(floor.searchParams.get("view")).toBeNull();
+    expect(floor.searchParams.get("page")).toBeNull();
+    expect(floor.searchParams.get("unit")).toBe(id);
   });
   it("allows sold, occupied and cleaning states on the same asset", () => {
     const row = record();
@@ -75,6 +98,20 @@ describe("asset workbench query and independent state dimensions", () => {
     expect(matchesUnitWorkbenchFilter(row, "cleaning")).toBe(true);
     expect(matchesUnitWorkbenchFilter(row, "unoccupied")).toBe(false);
     expect(matchesUnitWorkbenchFilter(row, "attention")).toBe(true);
+  });
+  it("keeps verified simultaneous lease and daily occupancy visible in attention without calling it vacant", () => {
+    const row = record({
+      position: {
+        ...record().position!,
+        daily_occupied: true,
+        lease_occupied: true,
+        cleaning_pending: false,
+      },
+    });
+    expect(unitNeedsVerification(row)).toBe(false);
+    expect(matchesUnitWorkbenchFilter(row, "attention")).toBe(true);
+    expect(matchesUnitWorkbenchFilter(row, "occupied")).toBe(true);
+    expect(matchesUnitWorkbenchFilter(row, "unoccupied")).toBe(false);
   });
   it("does not turn unknown occupancy or a missing projection into vacancy", () => {
     const emptyPosition = {

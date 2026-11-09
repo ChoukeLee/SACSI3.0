@@ -36,3 +36,30 @@ export function formatXofExact(
     return "—";
   return `${new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "fr-FR", { maximumFractionDigits: 2 }).format(Number(value))} XOF`;
 }
+
+/** Display-only scale: six decimal places in 10,000 XOF preserve XOF cents. */
+export function formatXofWanExact(
+  value: number | string | null | undefined,
+  locale: "zh" | "fr" = "zh",
+  withUnit = true,
+) {
+  const amount = value == null ? null : decimal(value);
+  if (!amount) return "—";
+  const magnitude = amount.coefficient < BigInt(0) ? -amount.coefficient : amount.coefficient;
+  const shift = amount.scale + 4 - 6;
+  const divisor = shift > 0 ? BigInt(10) ** BigInt(shift) : BigInt(1);
+  const numerator = shift < 0 ? magnitude * BigInt(10) ** BigInt(-shift) : magnitude;
+  const scaled = (numerator + divisor / BigInt(2)) / divisor;
+  const precision = BigInt(1_000_000);
+  const formatter = new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "fr-FR");
+  const integer = formatter.format(scaled / precision);
+  const fraction = String(scaled % precision)
+    .padStart(6, "0")
+    .replace(/0+$/, "");
+  const separator =
+    formatter.formatToParts(1.1).find((part) => part.type === "decimal")?.value ?? ".";
+  const sign = amount.coefficient < BigInt(0) && scaled !== BigInt(0) ? "−" : "";
+  const unit = locale === "zh" ? "万西法" : "× 10 000 XOF";
+  const number = `${sign}${integer}${fraction ? separator + fraction : ""}`;
+  return withUnit ? `${number} ${unit}` : number;
+}

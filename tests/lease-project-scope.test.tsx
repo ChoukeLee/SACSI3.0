@@ -106,7 +106,7 @@ function metric(label: string) {
     ?.textContent;
 }
 
-it("scopes buildings, contract cards and statistics together; remembers each project's building", async () => {
+it("scopes buildings, rental cards and rental counts together; remembers each project's building", async () => {
   await render();
   expect(host.querySelector('nav[aria-label="楼栋切换"]')?.textContent).not.toContain("第一栋");
   expect(host.textContent).toContain("客户a11");
@@ -116,16 +116,16 @@ it("scopes buildings, contract cards and statistics together; remembers each pro
   expect(host.textContent).toContain("客户c1");
   expect(host.textContent).toContain("客户c2");
   expect(host.textContent).not.toContain("客户a11");
-  expect(metric("生效合同")).toContain("2");
-  expect(host.querySelectorAll("tbody tr")).toHaveLength(2); // Default list preserves distinct buildings for identical room numbers.
-  const floorView = [...host.querySelectorAll("button")].find(
-    (button) => button.textContent === "楼层房源",
-  )!;
-  await act(async () => floorView.click());
-  expect(host.querySelectorAll("h3")).toHaveLength(2); // Optional floor view also keeps the buildings separated.
+  expect(host.querySelectorAll("[data-room-id]")).toHaveLength(2);
+  expect(metric("全部租赁")).toBe("全部租赁2");
+  expect(host.querySelector("table")).toBeNull();
+  expect(host.textContent).not.toContain("明细核对");
+  expect(host.querySelector('[aria-label="第一栋 1F"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="第二栋 1F"]')).not.toBeNull();
   await clickNav("楼栋切换", "第二栋");
   expect(host.textContent).not.toContain("客户c1");
-  expect(metric("生效合同")).toContain("1");
+  expect(host.querySelectorAll("[data-room-id]")).toHaveLength(1);
+  expect(metric("全部租赁")).toBe("全部租赁1");
   await clickNav("项目切换", "公寓项目");
   await clickNav("项目切换", "科建建材城");
   expect(host.textContent).not.toContain("客户c1");
@@ -138,7 +138,7 @@ it("limits new-contract options to selected project and building, with building 
   await clickNav("项目切换", "科建建材城");
   await clickNav("楼栋切换", "第二栋");
   const button = [...host.querySelectorAll("button")].find((b) =>
-    b.textContent?.includes("新建合同"),
+    b.textContent?.includes("登记租赁"),
   )!;
   await act(async () => button.click());
   const dialog = document.querySelector('[role="dialog"]')!;
@@ -182,5 +182,6 @@ it("opens an explicit project link across all its buildings instead of restoring
   expect(host.textContent).toContain("客户c1");
   expect(host.textContent).toContain("客户c2");
   expect(host.textContent).not.toContain("客户a11");
-  expect(metric("生效合同")).toContain("2");
+  expect(host.querySelectorAll("[data-room-id]")).toHaveLength(2);
+  expect(metric("全部租赁")).toBe("全部租赁2");
 });

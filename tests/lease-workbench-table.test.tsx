@@ -109,6 +109,23 @@ it("sorts local rows, leaves unknown amounts last, and reports only the visible 
   expect(host.querySelector("tbody tr:last-child [data-col='amount']")?.textContent).toBe("未核");
 });
 
+it("scales only SACSI read amounts while keeping CIMAC figures and native labels unchanged", async () => {
+  const row = { ...rows[1], nativeBalanceLabel: "USD · 原币账务另列" };
+  await act(async () => root.render(<LeaseWorkbenchTable {...props({ rows: [row] })} />));
+  expect(host.querySelector('[data-col="amount"]')?.parentElement).toBeTruthy();
+  expect(host.querySelector('tbody [data-col="amount"]')?.textContent).toBe("1 万西法");
+  expect(host.querySelector('tbody [data-col="balance"]')?.textContent).toContain(
+    "USD · 原币账务另列",
+  );
+  await act(async () =>
+    root.render(<LeaseWorkbenchTable {...props({ rows: [row], workArea: "cimac" })} />),
+  );
+  expect(host.querySelector('tbody [data-col="amount"]')?.textContent).toBe("10,000 XOF");
+  expect(host.querySelector('tbody [data-col="balance"]')?.textContent).toContain(
+    "USD · 原币账务另列",
+  );
+});
+
 it("does not locally reorder or truncate a server page and delegates all sort controls", async () => {
   const onPageChange = vi.fn();
   const onSortChange = vi.fn();
@@ -163,7 +180,7 @@ it("renders French empty state and a width-adaptive table without an imposed min
   );
   expect(host.textContent).toContain("Aucun contrat");
   expect(host.textContent).toContain("Créances restantes");
-  expect(host.textContent).not.toContain("0 FCFA");
+  expect(host.textContent).not.toMatch(/\b0\s*(?:FCFA|万西法)/);
   expect(host.querySelector("table")?.className).not.toContain("min-w-");
   expect(host.querySelector("style")?.textContent).toContain("@container lease-contracts");
   expect(host.querySelectorAll("select option")).toHaveLength(12);

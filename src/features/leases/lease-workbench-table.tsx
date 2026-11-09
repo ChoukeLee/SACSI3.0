@@ -12,12 +12,14 @@ import {
   type ContractTableRow,
 } from "@/features/contracts/contract-list-model";
 import type { Locale } from "@/lib/i18n";
+import { formatPropertyXof } from "@/lib/property-money";
 import { contractStatusVariant } from "@/lib/status-styles";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 25;
 
 export interface LeaseWorkbenchTableProps {
+  workArea?: "sacsi" | "cimac";
   rows: ContractTableRow[];
   locale: Locale;
   amountLabel: string;
@@ -106,6 +108,7 @@ const TABLE_STYLES = `
 `;
 
 export function LeaseWorkbenchTable({
+  workArea = "sacsi",
   rows,
   locale,
   amountLabel,
@@ -173,7 +176,13 @@ export function LeaseWorkbenchTable({
   }
 
   const formatAmount = (amount: number | null) =>
-    amount === null ? (zh ? "未核" : "À vérifier") : formatContractXof(amount, locale);
+    amount === null
+      ? zh
+        ? "未核"
+        : "À vérifier"
+      : workArea === "cimac"
+        ? formatContractXof(amount, locale)
+        : formatPropertyXof(amount, locale);
 
   return (
     <section
@@ -184,9 +193,13 @@ export function LeaseWorkbenchTable({
       {toolbar ? <div className="border-b border-border p-3">{toolbar}</div> : null}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2.5">
         <p className="text-xs leading-5 text-muted-foreground">
-          {zh
-            ? "点击房号或客户，在同一档案查看合同并办理"
-            : "Lot ou client : un dossier unique pour consulter et agir"}
+          {workArea === "sacsi"
+            ? zh
+              ? "租赁记录；西法金额以万西法展示，其他币种保留原币。"
+              : "Locations ; XOF par 10 000, autres devises conservées."
+            : zh
+              ? "点击房号或客户，在同一档案查看合同并办理"
+              : "Lot ou client : un dossier unique pour consulter et agir"}
         </p>
         <label className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
           <span>{zh ? "排序" : "Trier"}</span>
@@ -215,9 +228,13 @@ export function LeaseWorkbenchTable({
       </div>
       <table className="w-full border-collapse text-left text-xs">
         <caption className="sr-only">
-          {zh
-            ? "合同列表；金额单位为 XOF。点击列标题排序，点击客户查看完整合同。"
-            : "Contrats, montants en XOF. Trier avec les en-têtes et ouvrir le contrat via le nom du client."}
+          {workArea === "sacsi"
+            ? zh
+              ? "租赁记录；西法金额单位为万西法，其他币种保留原币。点击列标题排序。"
+              : "Locations ; XOF par 10 000, autres devises conservées. Trier avec les en-têtes."
+            : zh
+              ? "合同列表；金额单位为 XOF。点击列标题排序，点击客户查看完整合同。"
+              : "Contrats, montants en XOF. Trier avec les en-têtes et ouvrir le contrat via le nom du client."}
         </caption>
         <thead className="border-b border-border bg-muted/35 text-muted-foreground">
           <tr>
@@ -410,7 +427,13 @@ export function LeaseWorkbenchTable({
             {zh ? "份合同" : "contrats"}
           </p>
           <p className="mt-1 text-[11px] leading-4">
-            {zh ? "金额 XOF · 月租不是实收" : "Montants XOF · loyer ≠ encaissements"}
+            {workArea === "sacsi"
+              ? zh
+                ? "金额 万西法 · 原币另列 · 月租不是实收"
+                : "XOF par 10 000 · devises séparées · loyer ≠ encaissements"
+              : zh
+                ? "金额 XOF · 月租不是实收"
+                : "Montants XOF · loyer ≠ encaissements"}
           </p>
         </div>
         <div className="flex items-center gap-2">

@@ -35,7 +35,7 @@ describe("core UI architecture", () => {
     expect(sidebar.indexOf('key: "leases"')).toBeLessThan(sidebar.indexOf('key: "dailyRentals"'));
   });
 
-  it("uses table-and-inspector workbenches while preserving the shared business drawers", () => {
+  it("uses operating workspaces and inspectors while preserving the shared business drawers", () => {
     const lease = read("src/features/leases/lease-list.tsx");
     const sale = read("src/features/sales/sale-list.tsx");
     const units = read("src/features/units/unit-list.tsx");
@@ -55,11 +55,17 @@ describe("core UI architecture", () => {
     expect(lease).toContain("onSelect={selectPreview}");
     expect(lease).toContain("onOpen={openDetail}");
     expect(sale).toContain("<OperationalPage");
-    expect(sale).toContain("<SaleWorkbenchSummary");
-    expect(sale).toContain("<SaleWorkbenchTable");
+    expect(sale).toContain("<SaleRoomOverview");
+    expect(sale).toContain("onSelectRecord={(row) => selectPreview(row.id)}");
+    expect(sale).not.toContain("<SaleWorkbenchSummary");
+    expect(sale).not.toContain("<SaleWorkbenchTable");
+    expect(sale).not.toContain("列表核对");
     expect(sale).toContain("<SaleWorkbenchInspector");
     expect(sale).toContain("<RightDrawer");
     expect(assets).toContain("<UnitWorkbenchInspector");
+    expect(assets).toContain("<UnitFloorIndex");
+    expect(assets).toContain("<RightDrawer");
+    expect(assets).not.toContain("inspectorRef");
     expect(assets).toContain("UnitConditionDrawer");
     expect(assets).not.toContain("<RoomBoard");
     expect(customers).toContain("<CustomerWorkbenchInspector");
@@ -79,6 +85,22 @@ describe("core UI architecture", () => {
     expect(operational).toContain("<Dialog.Content");
     expect(operational).toContain("onCloseAutoFocus");
     expect(operational).toContain("top-12");
+  });
+
+  it("keeps transfer fields and operations out of live sale views while preserving financial actions", () => {
+    for (const path of [
+      "src/features/sales/sale-list.tsx",
+      "src/features/sales/sale-workbench-inspector.tsx",
+      "src/features/sales/sale-room-overview.tsx",
+    ]) {
+      expect(read(path), path).not.toMatch(
+        /transfer_status|transfer_date|sale-action-transfer|updateTransferStatus/,
+      );
+    }
+    const list = read("src/features/sales/sale-list.tsx");
+    expect(list).toContain("recordSalePaymentAtomic");
+    expect(list).toContain("addFlexibleInstallment");
+    expect(list).toContain("terminateSaleContract");
   });
 
   it("has one active long-lease implementation and no independent occupancy page", () => {

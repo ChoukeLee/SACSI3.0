@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from "react";
+import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ refresh: vi.fn(), activate: vi.fn() }));
@@ -34,6 +35,7 @@ import {
 import { parseWorkspaceQuery, type WorkspaceData } from "../src/features/contracts/workspace-model";
 import type { LeaseContractRow, SaleContractRow } from "../src/types/database";
 import { dictionaries } from "../src/lib/i18n";
+import { saleFixture as saleWorkspaceFixture } from "./fixtures/sale-workbench";
 import {
   leaseScopeCookieName,
   leaseScopeStorageKey,
@@ -50,23 +52,38 @@ const pause = () =>
       setTimeout(resolve, 15);
     });
   });
-const render = (
+const render = async (
   data: WorkspaceData,
   locale: "zh" | "fr" = "zh",
   initialProject: string | null = data.query.projectId,
   scopePreference?: LeaseScopePreference,
-) =>
-  root.render(
-    <LeaseLazyView
-      key={scopePreference?.cookieName}
-      {...data}
-      contracts={data.contracts as LeaseContractRow[]}
-      workspace={data}
-      locale={locale}
-      initialProject={initialProject ?? undefined}
-      scopePreference={scopePreference}
-    />,
+  workArea: "sacsi" | "cimac" = "sacsi",
+) => {
+  await act(async () =>
+    flushSync(() =>
+      root.render(
+        <LeaseLazyView
+          key={scopePreference?.cookieName}
+          {...data}
+          contracts={data.contracts as LeaseContractRow[]}
+          workspace={data}
+          locale={locale}
+          initialProject={initialProject ?? undefined}
+          scopePreference={scopePreference}
+          workArea={workArea}
+        />,
+      ),
+    ),
   );
+};
+function recordRequests() {
+  return vi
+    .mocked(fetch)
+    .mock.calls.filter(
+      ([input]) =>
+        new URL(String(input), "http://local.invalid").searchParams.get("mode") !== "context",
+    );
+}
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   localStorage.clear();
@@ -80,10 +97,33 @@ beforeEach(() => {
     vi.fn(async (input: string) => {
       const raw = Object.fromEntries(new URL(input, "http://local.invalid").searchParams),
         mode = raw.mode as WorkspaceData["mode"];
+      const room = raw.roomOverview === "1";
       delete raw.mode;
       delete raw.contractId;
+      delete raw.roomOverview;
+      delete raw.workspace;
       const q = parseWorkspaceQuery(raw);
-      return Response.json(workspaceFixture({ total: 26 }, q, mode));
+      if (String(input).includes("/api/contracts/sale")) {
+        const data = saleWorkspaceFixture(q, mode, 26);
+        return Response.json({
+          ...data,
+          ...(room
+            ? {
+                roomReceivables: [],
+                roomPayments: [],
+                roomSchedules: [],
+                roomFinanceCounts: { receivables: 0, payments: 0, schedules: 0 },
+              }
+            : {}),
+        });
+      }
+      return Response.json(
+        workspaceFixture(
+          { total: 26, ...(mode === "context" ? { roomReceivables: [] } : {}) },
+          q,
+          mode,
+        ),
+      );
     }),
   );
 });
@@ -93,9 +133,12 @@ afterEach(async () => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
-it("renders actual unchanged lease table with full-scope stats and reads the next DB page", async () => {
-  await act(async () => render(workspaceFixture({ total: 26 })));
-  expect(fetch).not.toHaveBeenCalled();
+it("retains the CIMAC contract table with full-scope stats and reads the next DB page", async () => {
+  const data = workspaceFixture({ total: 26 });
+  data.buildings[0].code = "CIMAC";
+  data.buildings[0].project!.code = "CIMAC";
+  await act(async () => render(data, "zh", workspaceProject, undefined, "cimac"));
+  expect(recordRequests()).toHaveLength(0);
   expect(host.textContent).toContain("1–25 / 26");
   expect(host.textContent).toContain("5,100");
   const next = [...host.querySelectorAll("button")].find((b) => b.textContent === "下一页")!;
@@ -103,7 +146,7 @@ it("renders actual unchanged lease table with full-scope stats and reads the nex
   await pause();
   expect(host.textContent).toContain("26–26 / 26");
   expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
-  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(recordRequests()).toHaveLength(1);
 });
 it.each(["zh", "fr"] as const)(
   "uses the original no-preference default building SSR result without another initial read (%s)",
@@ -114,8 +157,8 @@ it.each(["zh", "fr"] as const)(
     );
     await act(async () => render(data, locale, null, { cookieName, serverResolved: false }));
     await pause();
-    expect(fetch).not.toHaveBeenCalled();
-    expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
+    expect(recordRequests()).toHaveLength(0);
+    expect(host.querySelectorAll("[data-room-id]")).toHaveLength(1);
     expect(host.textContent).toContain("Synthetic 11");
   },
 );
@@ -134,11 +177,11 @@ it("migrates legacy localStorage once, then trusts the newly validated SSR cooki
   await act(async () => render(data, "zh", null, { cookieName, serverResolved: false }));
   await pause();
   await pause();
-  expect(fetch).toHaveBeenCalledTimes(1);
-  const url = new URL(vi.mocked(fetch).mock.calls[0][0] as string, "http://local.invalid");
+  expect(recordRequests()).toHaveLength(1);
+  const url = new URL(recordRequests()[0][0] as string, "http://local.invalid");
   expect(url.searchParams.get("buildingId")).toBe("");
   expect(url.searchParams.get("projectId")).toBe(data.query.projectId);
-  expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ cache: "no-store" });
+  expect(recordRequests()[0][1]).toMatchObject({ cache: "no-store" });
   expect(
     JSON.parse(localStorage.getItem(leaseScopeStorageKey(cookieName))!).buildings[
       data.query.projectId
@@ -158,7 +201,7 @@ it("migrates legacy localStorage once, then trusts the newly validated SSR cooki
     render(workspaceFixture(), "zh", null, { cookieName, serverResolved: true }),
   );
   await pause();
-  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(recordRequests()).toHaveLength(1);
   expect(host.textContent).toContain("全部楼栋合计");
 });
 it("does not re-read a matching saved all scope or override an explicit project link with a saved building", async () => {
@@ -172,7 +215,7 @@ it("does not re-read a matching saved all scope or override an explicit project 
   );
   await act(async () => render(data, "zh", null, { cookieName, serverResolved: true }));
   await pause();
-  expect(fetch).not.toHaveBeenCalled();
+  expect(recordRequests()).toHaveLength(0);
   localStorage.setItem(
     "lease-project-scope",
     JSON.stringify({
@@ -184,7 +227,7 @@ it("does not re-read a matching saved all scope or override an explicit project 
   root = createRoot(host);
   await act(async () => render(data));
   await pause();
-  expect(fetch).not.toHaveBeenCalled();
+  expect(recordRequests()).toHaveLength(0);
 });
 it.each(["", workspaceBuilding])(
   "initializes from the validated SSR scope instead of the opposite stale local preference (%s)",
@@ -202,7 +245,7 @@ it.each(["", workspaceBuilding])(
     );
     await act(async () => render(data, "zh", null, { cookieName, serverResolved: true }));
     await pause();
-    expect(fetch).not.toHaveBeenCalled();
+    expect(recordRequests()).toHaveLength(0);
     expect(
       JSON.parse(localStorage.getItem(leaseScopeStorageKey(cookieName))!).buildings[
         workspaceProject
@@ -222,7 +265,7 @@ it("synchronizes a new SSR scope on same-route navigation without restoring the 
   );
   await act(async () => render(next, "zh", null, preference));
   await pause();
-  expect(fetch).not.toHaveBeenCalled();
+  expect(recordRequests()).toHaveLength(0);
   expect(
     JSON.parse(localStorage.getItem(leaseScopeStorageKey(cookieName))!).buildings[workspaceProject],
   ).toBe(workspaceBuilding);
@@ -248,7 +291,7 @@ it("does not import the first viewer's claimed legacy preference into a differen
     render(data, "zh", null, { cookieName: secondCookieName, serverResolved: false }),
   );
   await pause();
-  expect(fetch).not.toHaveBeenCalled();
+  expect(recordRequests()).toHaveLength(0);
   expect(
     JSON.parse(localStorage.getItem(leaseScopeStorageKey(secondCookieName))!).buildings[
       workspaceProject
@@ -280,7 +323,7 @@ it("remounts the real lease view on same-root viewer replacement without carryin
     render(next, "zh", null, { cookieName: secondCookieName, serverResolved: false }),
   );
   await pause();
-  expect(fetch).not.toHaveBeenCalled();
+  expect(recordRequests()).toHaveLength(0);
   const memory = JSON.parse(localStorage.getItem(leaseScopeStorageKey(secondCookieName))!);
   expect(memory.buildings).toEqual({ [workspaceProject]: workspaceBuilding });
 });
@@ -297,7 +340,7 @@ it("still applies a new verified SSR scope when localStorage is unavailable", as
     );
     await act(async () => render(next, "zh", null, preference));
     await pause();
-    expect(fetch).not.toHaveBeenCalled();
+    expect(recordRequests()).toHaveLength(0);
     expect((host.querySelector('select[aria-label="选择楼栋"]') as HTMLSelectElement).value).toBe(
       workspaceBuilding,
     );
@@ -306,7 +349,7 @@ it("still applies a new verified SSR scope when localStorage is unavailable", as
   }
 });
 it.each(["zh", "fr"] as const)(
-  "keeps sale default-building and explicit-project initial SSR scopes without duplicate requests (%s)",
+  "normalizes sale SSR reads once without losing the default building or explicit project scope (%s)",
   async (locale) => {
     for (const explicit of [false, true]) {
       const query = parseWorkspaceQuery({
@@ -324,6 +367,7 @@ it.each(["zh", "fr"] as const)(
         transfer_status: "not_started",
         transfer_date: null,
       });
+      const callsBefore = vi.mocked(fetch).mock.calls.length;
       await act(async () =>
         root.render(
           <SaleList
@@ -336,8 +380,31 @@ it.each(["zh", "fr"] as const)(
         ),
       );
       await pause();
-      expect(fetch).not.toHaveBeenCalled();
-      expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
+      const requests = vi
+        .mocked(fetch)
+        .mock.calls.slice(callsBefore)
+        .map(([input]) => new URL(String(input), "http://local.invalid"));
+      expect(
+        requests.map((url) => url.searchParams.get("mode")).sort(),
+        requests.map((url) => url.href).join("\n"),
+      ).toEqual(["context", "list"]);
+      for (const url of requests) {
+        expect(url.pathname).toBe("/api/contracts/sale");
+        expect(url.searchParams.get("projectId")).toBe(query.projectId);
+        expect(url.searchParams.get("buildingId")).toBe(query.buildingId);
+        expect(url.searchParams.get("status")).toBe("all");
+        expect(url.searchParams.get("search") ?? "").toBe("");
+        expect(url.searchParams.get("page")).toBe("1");
+        expect(url.searchParams.get("sort")).toBe("unit");
+        expect(url.searchParams.get("direction")).toBe("asc");
+      }
+      expect(
+        requests
+          .find((url) => url.searchParams.get("mode") === "context")
+          ?.searchParams.get("roomOverview"),
+      ).toBe("1");
+      expect(host.querySelectorAll("[data-sale-room-id]")).toHaveLength(1);
+      expect(host.querySelector("tbody")).toBeNull();
       await act(async () => root.unmount());
       root = createRoot(host);
     }
@@ -351,17 +418,23 @@ it("never repeats a confirmed successful mutation when the following data refres
       mode = raw.mode as WorkspaceData["mode"];
     delete raw.mode;
     delete raw.contractId;
+    delete raw.roomOverview;
+    delete raw.workspace;
     if (mocks.activate.mock.calls.length) return new Response("", { status: 503 });
     const data = workspaceFixture({}, parseWorkspaceQuery(raw), mode);
     (data.contracts[0] as LeaseContractRow).status = "draft";
+    if (mode === "context") data.roomReceivables = [];
     return Response.json(data);
   });
   await act(async () => render(initial));
-  const customer = [...host.querySelectorAll("button")].find(
-    (b) => b.textContent === "Synthetic guest",
-  )!;
+  const customer = host.querySelector<HTMLButtonElement>("[data-room-id]")!;
   await act(async () => customer.click());
   await pause();
+  const more = [...document.querySelectorAll("summary")].find(
+    (item) => item.textContent === "更多操作",
+  )!;
+  expect(more).toBeTruthy();
+  await act(async () => more.click());
   const activate = [...document.querySelectorAll("button")].find(
     (b) => b.textContent === dictionaries.zh.leases.form.activateContract,
   )!;
@@ -378,10 +451,12 @@ it("keeps disabled historical units readable but excludes a daily-only available
     { business_type: "long_lease", is_enabled: false, default_price_xof: null },
   ];
   await act(async () => render(initial));
-  expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
+  expect(host.querySelectorAll("[data-room-id]")).toHaveLength(1);
   vi.mocked(fetch).mockImplementation(async (input: any) => {
     const raw = Object.fromEntries(new URL(String(input), "http://local.invalid").searchParams);
     delete raw.mode;
+    delete raw.roomOverview;
+    delete raw.workspace;
     const data = workspaceFixture({ total: 0 }, parseWorkspaceQuery(raw), "context");
     data.units[0].status = "available";
     data.units[0].unit_business_flags = [
@@ -391,12 +466,12 @@ it("keeps disabled historical units readable but excludes a daily-only available
     return Response.json(data);
   });
   const create = [...host.querySelectorAll("button")].find((b) =>
-    b.textContent?.includes(dictionaries.zh.leases.form.newContract),
+    b.textContent?.includes("登记租赁"),
   )!;
   await act(async () => create.click());
   await pause();
   expect(document.querySelector(`option[value="${workspaceUnit}"]`)).toBeNull();
-  expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
+  expect(host.querySelectorAll("[data-room-id]")).toHaveLength(1);
 });
 it.each(["zh", "fr"] as const)(
   "keeps CIMAC draft dates explicitly unknown in the real list, room and detail views (%s)",
@@ -423,10 +498,12 @@ it.each(["zh", "fr"] as const)(
         mode = raw.mode as WorkspaceData["mode"];
       delete raw.mode;
       delete raw.contractId;
+      delete raw.roomOverview;
+      delete raw.workspace;
       return Response.json(makeData(parseWorkspaceQuery(raw), mode));
     });
     const pending = locale === "zh" ? "待确认" : "À confirmer";
-    await act(async () => render(makeData(), locale));
+    await act(async () => render(makeData(), locale, workspaceProject, undefined, "cimac"));
     expect(host.textContent).toContain(
       `${pending} → ${locale === "zh" ? "期限待确认" : "Fin à confirmer"}`,
     );

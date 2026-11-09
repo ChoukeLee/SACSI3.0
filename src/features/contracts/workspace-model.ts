@@ -1,6 +1,7 @@
 import type {
   CustomerRow,
   LeaseContractRow,
+  LedgerEntryRow,
   PaymentRow,
   ReceivableRow,
   SaleContractRow,
@@ -15,6 +16,8 @@ import {
   decodeCimacLeaseCollectionProjection,
 } from "./cimac-contract-allocation";
 import { isCimacProtectedPayment } from "@/features/finance/cimac-payment-kinds";
+import { decodeLeaseRoomReceivables } from "@/features/leases/lease-room-overview-model";
+import { decodeSaleRoomFinance } from "@/features/sales/sale-room-overview-model";
 export type WorkspaceKind = "lease" | "sale";
 export type WorkspaceMode = "list" | "scope" | "detail" | "context";
 export type WorkspaceContract = LeaseContractRow | SaleContractRow;
@@ -69,11 +72,17 @@ export interface WorkspaceData {
   receivables: ReceivableRow[];
   schedules: SalePaymentScheduleRow[];
   paymentCount: number;
+  /** Exact selected legacy receipts only; absent means purpose evidence was not read. */
+  leaseReceiptLedger?: LedgerEntryRow[];
   receivableCount: number;
   scheduleCount: number;
   summaries: Record<string, ContractReceivableSummary & { dueOutstanding: number }>;
   accruals: Record<string, LeaseOverdueResolution | null>;
   attentionDue: Record<string, string | null>;
+  roomReceivables?: ReceivableRow[];
+  roomPayments?: PaymentRow[];
+  roomSchedules?: SalePaymentScheduleRow[];
+  roomFinanceCounts?: { payments: number; receivables: number; schedules: number };
 }
 export class WorkspaceReadError extends Error {
   constructor(public status = 503) {
@@ -195,6 +204,7 @@ export function decodeWorkspace(
   query: WorkspaceQuery,
   mode: WorkspaceMode,
   contractId?: string,
+  roomOverview = false,
 ): WorkspaceData {
   const data = object(value);
   if (
@@ -346,12 +356,48 @@ export function decodeWorkspace(
         throw new WorkspaceReadError();
     } else {
       decimal(c.total_amount_xof, true);
-      const sourceRegistration =
-        c.registration_basis === "source_record" &&
-        typeof c.source_reference === "string" &&
-        c.source_reference.trim().length > 0;
-      date(c.signed_date, sourceRegistration);
+      date(c.signed_date, true);
       date(c.transfer_date, true);
+      const basis = c.registration_basis ?? "contract";
+      const currency = c.sale_currency ?? "XOF";
+      if (
+        !["contract", "source_record"].includes(String(basis)) ||
+        (c.signed_date === null &&
+          (basis !== "source_record" ||
+            typeof c.source_reference !== "string" ||
+            !c.source_reference.trim())) ||
+        (c.source_reference !== undefined &&
+          c.source_reference !== null &&
+          typeof c.source_reference !== "string") ||
+        !["XOF", "USD", "CNY"].includes(String(currency))
+      )
+        throw new WorkspaceReadError();
+      if (currency === "XOF") {
+        if (c.total_amount_native != null) throw new WorkspaceReadError();
+      } else {
+        decimal(c.total_amount_native);
+        if (
+          Number(c.total_amount_native) <= 0 ||
+          Number(c.total_amount_xof) !== 0 ||
+          c.total_amount_xof === null
+        )
+          throw new WorkspaceReadError();
+      }
+      if (c.source_balance_native != null || c.source_balance_reference != null) {
+        decimal(c.source_balance_native);
+        const balance = Number(c.source_balance_native);
+        if (
+          basis !== "source_record" ||
+          typeof c.source_reference !== "string" ||
+          !c.source_reference.trim() ||
+          typeof c.source_balance_reference !== "string" ||
+          !c.source_balance_reference.trim() ||
+          balance < 0 ||
+          !Number.isSafeInteger(Math.round(balance * 100)) ||
+          Math.abs(Math.round(balance * 100) / 100 - balance) >= 0.0000001
+        )
+          throw new WorkspaceReadError();
+      }
       if (
         typeof c.payment_plan_type !== "string" ||
         typeof c.transfer_status !== "string" ||
@@ -405,6 +451,19 @@ export function decodeWorkspace(
         throw new WorkspaceReadError();
       decimal(payment.amount);
       if (payment.exchange_rate_to_xof !== null) decimal(payment.exchange_rate_to_xof);
+      if (kind === "sale" && payment.native_settlement === true) {
+        const contract = contracts.find((row) => row.id === contractId) as
+          SaleContractRow | undefined;
+        if (
+          payment.source_type !== "sale_contract" ||
+          !["USD", "CNY"].includes(payment.currency) ||
+          payment.currency !== (contract?.sale_currency ?? "XOF") ||
+          payment.unit_id !== contract?.unit_id ||
+          payment.customer_id !== contract?.customer_id ||
+          payment.exchange_rate_to_xof !== null
+        )
+          throw new WorkspaceReadError();
+      }
       date(payment.payment_date);
       if (typeof payment.currency !== "string") throw new WorkspaceReadError();
       const p = payment as unknown as Record<string, unknown>;
@@ -447,6 +506,84 @@ export function decodeWorkspace(
       (row) => row.status !== "cancelled" && (row.management_status ?? "managed") === "managed",
     );
     if (managed.length !== object(summaries[contractId!]).count) throw new WorkspaceReadError();
+  }
+  if (data.leaseReceiptLedger !== undefined) {
+    if (kind !== "lease" || mode !== "detail" || !Array.isArray(data.leaseReceiptLedger))
+      throw new WorkspaceReadError();
+    const contract = contracts.find((row) => row.id === contractId);
+    const unit = contract && units.get(contract.unit_id);
+    // The server's explicit work-area boundary authorizes this read. Nested project
+    // metadata is optional; selected unit/project/payment fences remain mandatory.
+    if (!contract || !unit || buildings.get(unit.building_id)?.project?.code === "CIMAC")
+      throw new WorkspaceReadError();
+    const paymentIds = new Set(
+      (data.payments as PaymentRow[])
+        .filter((row) => row.source_id === contract.id && row.source_type === "lease_contract")
+        .map((row) => row.id),
+    );
+    const seen = new Set<string>();
+    for (const value of data.leaseReceiptLedger) {
+      const row = object(value);
+      if (
+        typeof row.id !== "string" ||
+        !uuid.test(row.id) ||
+        seen.has(row.id) ||
+        typeof row.payment_id !== "string" ||
+        !paymentIds.has(row.payment_id) ||
+        (row.unit_id !== null && row.unit_id !== unit.id) ||
+        (row.building_id !== null && row.building_id !== unit.building_id) ||
+        !["income", "expense", "liability_in", "liability_out"].includes(String(row.direction)) ||
+        typeof row.category !== "string" ||
+        typeof row.created_at !== "string" ||
+        !Number.isFinite(Date.parse(row.created_at))
+      )
+        throw new WorkspaceReadError();
+      seen.add(row.id);
+      date(row.entry_date, true);
+      for (const key of ["amount_xof", "amount_native", "amount_cny"]) decimal(row[key], true);
+      nullableText(row.currency);
+      nullableText(row.description);
+    }
+  }
+  if (
+    roomOverview &&
+    (mode !== "context" ||
+      query.status !== "all" ||
+      query.search !== "" ||
+      query.page !== 1 ||
+      data.roomReceivables === undefined)
+  )
+    throw new WorkspaceReadError();
+  if (data.roomReceivables !== undefined) {
+    if (mode !== "context") throw new WorkspaceReadError();
+    try {
+      if (kind === "lease") {
+        data.roomReceivables = decodeLeaseRoomReceivables(
+          data.roomReceivables,
+          contracts as LeaseContractRow[],
+          data.units as WorkspaceUnit[],
+        );
+      } else {
+        const finance = decodeSaleRoomFinance(
+          {
+            payments: data.roomPayments,
+            receivables: data.roomReceivables,
+            schedules: data.roomSchedules,
+          },
+          contracts as SaleContractRow[],
+          data.units as WorkspaceUnit[],
+        );
+        const counts = object(data.roomFinanceCounts);
+        for (const key of ["payments", "receivables", "schedules"] as const)
+          if (!Number.isSafeInteger(counts[key]) || counts[key] !== finance[key].length)
+            throw new WorkspaceReadError();
+        data.roomPayments = finance.payments;
+        data.roomReceivables = finance.receivables;
+        data.roomSchedules = finance.schedules;
+      }
+    } catch {
+      throw new WorkspaceReadError();
+    }
   }
   return data as unknown as WorkspaceData;
 }

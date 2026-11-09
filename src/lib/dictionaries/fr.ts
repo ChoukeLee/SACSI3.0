@@ -65,7 +65,7 @@ export const frDict = {
         ["Lots de l'immeuble 11", "Appartements, parkings, activites et statuts", "72 lots + parking", "/units"],
         ["Location journaliere", "21 chambres, reservation, arrivee, depart, menage", "40 000 FCFA/nuit", "/daily-rentals"],
         ["Location longue duree", "Contrats, loyers dus, cautions, sortie", "Prix par typologie", "/leases"],
-        ["Vente", "Contrats de vente, paiements, transfert", "Lots + parkings", "/sales"]
+        ["Vente", "Acquéreurs, paiements et suivi des encaissements", "Lots + parkings", "/sales"]
       ]
     },
     units: {
@@ -375,11 +375,6 @@ export const frDict = {
         fixed_installment: "Echeancier fixe",
         flexible_installment: "Echeancier libre"
       },
-      transferStatus: {
-        not_started: "Non commence",
-        in_progress: "En cours",
-        completed: "Termine"
-      },
       form: {
         newContract: "Nouveau contrat de vente",
         editContract: "Modifier contrat",
@@ -390,9 +385,6 @@ export const frDict = {
         totalAmount: "Prix total",
         paymentPlan: "Mode de paiement",
         numInstallments: "Nombre d'echeances",
-        transferDate: "Date transfert",
-        transferStatus: "Statut transfert",
-        titleCertificateNo: "N° titre foncier",
         agencyCompany: "Agence",
         agentName: "Agent",
         agencyCommission: "Commission agence",
@@ -404,7 +396,6 @@ export const frDict = {
         contractNoRequired: "Le numero de contrat est obligatoire",
         statusLabel: "Statut",
         addSchedule: "Ajouter",
-        updateTransfer: "MAJ transfert",
       },
       installment: {
         title: "Echeancier de paiement",

@@ -201,6 +201,8 @@ export interface SaleContractRow {
   source_reference?: string | null;
   sale_currency?: CurrencyCode;
   total_amount_native?: number | null;
+  source_balance_native?: number | null;
+  source_balance_reference?: string | null;
   transfer_date: string | null;
   transfer_status: string;
   title_certificate_no: string | null;

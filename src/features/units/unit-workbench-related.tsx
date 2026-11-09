@@ -95,7 +95,7 @@ export function UnitBusinessRelations({
   return (
     <section className={styles.section}>
       <h3>
-        {zh ? "合同与入住关系" : "Contrats et séjours"} · {data.total}
+        {zh ? "租售与入住记录" : "Locations, ventes et séjours"} · {data.total}
       </h3>
       <p className={styles.note}>
         {zh
@@ -146,7 +146,7 @@ export function UnitBusinessRelations({
                 : "Locataire"
               : row.type === "sale"
                 ? zh
-                  ? "合同买方"
+                  ? "买方"
                   : "Acquéreur"
                 : zh
                   ? "实际住客"
@@ -157,11 +157,11 @@ export function UnitBusinessRelations({
                 <span>
                   {row.type === "lease"
                     ? zh
-                      ? "长租合同"
+                      ? "长租记录"
                       : "Bail"
                     : row.type === "sale"
                       ? zh
-                        ? "出售合同"
+                        ? "出售记录"
                         : "Vente"
                       : zh
                         ? "日租订单"
@@ -190,7 +190,7 @@ export function UnitBusinessRelations({
               <div className={styles.actions}>
                 {contractLink ? (
                   <Link className={styles.inlineLink} href={contractLink} prefetch={false}>
-                    {zh ? "打开合同" : "Ouvrir le contrat"}
+                    {zh ? "查看业务记录" : "Consulter le dossier"}
                     <ArrowUpRight size={11} />
                   </Link>
                 ) : null}

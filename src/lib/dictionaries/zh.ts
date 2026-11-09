@@ -65,7 +65,7 @@ export const zhDict = {
         ["11#房源总览", "主楼、车库、业务属性和房态管理", "72户 + 车库", "/units"],
         ["日租业务", "21间固定日租房、预订、入住、退房、保洁", "40,000 FCFA/晚", "/daily-rentals"],
         ["长租业务", "合同、应收、押金、退租结算", "按户型定价", "/leases"],
-        ["出售业务", "出售合同、分期收款、过户跟进", "房源 + 车位", "/sales"]
+        ["出售业务", "买方、房款收支与收款跟进", "房源 + 车位", "/sales"]
       ]
     },
     units: {
@@ -375,11 +375,6 @@ export const zhDict = {
         fixed_installment: "固定期数分期",
         flexible_installment: "灵活期数分期"
       },
-      transferStatus: {
-        not_started: "未过户",
-        in_progress: "过户中",
-        completed: "已完成"
-      },
       form: {
         newContract: "新建出售合同",
         editContract: "编辑合同",
@@ -390,9 +385,6 @@ export const zhDict = {
         totalAmount: "合同总价",
         paymentPlan: "付款方式",
         numInstallments: "分期期数",
-        transferDate: "过户日期",
-        transferStatus: "过户状态",
-        titleCertificateNo: "产权证号",
         agencyCompany: "中介公司",
         agentName: "经纪人",
         agencyCommission: "中介佣金",
@@ -404,7 +396,6 @@ export const zhDict = {
         contractNoRequired: "请输入合同编号",
         statusLabel: "状态",
         addSchedule: "添加",
-        updateTransfer: "更新过户状态",
       },
       installment: {
         title: "分期付款计划",
