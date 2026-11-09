@@ -3,6 +3,7 @@ import type { CurrencyCode } from "@/types/domain";
 import type { WorkspaceUnit } from "@/features/contracts/workspace-model";
 import type { ContractReceivableSummary } from "@/features/contracts/contract-list-model";
 import type { LeaseBuilding } from "./project-scope";
+import { leaseTenantDisplayName } from "./lease-display-model";
 import { resolveLeaseAttention } from "./lease-receivable-summary";
 
 export type LeaseRoomOccupancy =
@@ -47,6 +48,7 @@ export function leaseRoomMatchesSearch(row: LeaseRoomOverviewRow, search: string
     row.building?.display_name,
     row.building?.code,
     row.customer?.name,
+    leaseTenantDisplayName(row.unit, row.customer?.name),
     row.contract?.contract_no,
   ]
     .join(" ")

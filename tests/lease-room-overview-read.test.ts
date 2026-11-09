@@ -4,6 +4,7 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 import { readWorkspace } from "@/features/contracts/workspace-service";
 import { parseWorkspaceQuery } from "@/features/contracts/workspace-model";
+import { leaseTenantDisplayName } from "@/features/leases/lease-display-model";
 import {
   workspaceFixture,
   workspaceContract,
@@ -108,4 +109,26 @@ it("keeps ordinary form context free of room billing reads", async () => {
   const result = await readWorkspace(db as never, "lease", query, "context");
   expect(result.roomReceivables).toBeUndefined();
   expect(db.from).not.toHaveBeenCalled();
+});
+
+it("projects the confirmed 511 tenant label from its own lease while preserving source identity", async () => {
+  const db = client([]);
+  const source = workspaceFixture({}, query, "context");
+  source.buildings[0].code = "SACSI4";
+  source.units[0].unit_no = "511";
+  source.customers[0].name = "林荣俤2";
+  db.rpc.mockResolvedValue({ data: source, error: null });
+
+  const result = await readWorkspace(db as never, "lease", query, "context");
+  expect(leaseTenantDisplayName(result.units[0], result.customers[0].name)).toBe("林荣俤");
+  expect(leaseTenantDisplayName(result.units[0], "其他租客")).toBe("其他租客");
+  expect(result.customers[0]).toMatchObject({ id: workspaceCustomer, name: "林荣俤2" });
+  expect(result.contracts[0]).toMatchObject({
+    customer_id: workspaceCustomer,
+    unit_id: workspaceUnit,
+  });
+
+  source.units[0].unit_no = "512";
+  const unrelated = await readWorkspace(db as never, "lease", query, "context");
+  expect(unrelated.units[0].leaseTenantDisplay).toBeUndefined();
 });

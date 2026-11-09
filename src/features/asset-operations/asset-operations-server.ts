@@ -63,6 +63,25 @@ function readRent(value: unknown): OperatingAssetReferenceRent {
   };
 }
 
+// The numbered variants in these two sheets distinguish units held by one tenant.
+const oldWarehouseTenantAliases = new Map([
+  ["宋留成1", "宋留成"],
+  ["宋留成2", "宋留成"],
+  ["宋留成3", "宋留成"],
+  ["宋留成4", "宋留成"],
+  ["宋留成5", "宋留成"],
+  ["宋留成6", "宋留成"],
+  ["谢立新Niang2", "谢立新Niang"],
+  ["谢立新Niang3", "谢立新Niang"],
+  ["小庄1", "小庄"],
+  ["小庄2", "小庄"],
+  ["小庄3", "小庄"],
+]);
+const newWarehouseTenantAliases = new Map([
+  ["孙章阳1", "孙章阳"],
+  ["孙章阳2", "孙章阳"],
+]);
+
 function readTenantEvidence(value: unknown): OperatingAssetTenantEvidence | undefined {
   if (!isRecord(value)) return undefined;
   const { names, sourceRef, classification, scope, asOfSourceDate } = value;
@@ -77,16 +96,19 @@ function readTenantEvidence(value: unknown): OperatingAssetTenantEvidence | unde
   )
     return undefined;
   const sourceNames = names.map((name) => name.trim());
-  const numberedName = /^宋留成[1-6]$/;
-  const hasConfirmedAlias =
-    isConfirmedExcelSource(sourceRef) &&
-    /\|sheet:老仓库(?:等)?\|/.test(sourceRef) &&
-    sourceNames.some((name) => numberedName.test(name));
+  const aliases = isConfirmedExcelSource(sourceRef)
+    ? /\|sheet:老仓库(?:等)?\|/.test(sourceRef)
+      ? oldWarehouseTenantAliases
+      : /\|sheet:新仓库\|/.test(sourceRef)
+        ? newWarehouseTenantAliases
+        : undefined
+    : undefined;
+  const displayNames = sourceNames.some((name) => aliases?.has(name))
+    ? [...new Set(sourceNames.map((name) => aliases?.get(name) ?? name))]
+    : undefined;
   return {
     names: sourceNames,
-    displayNames: hasConfirmedAlias
-      ? [...new Set(sourceNames.map((name) => name.replace(numberedName, "宋留成")))]
-      : undefined,
+    displayNames,
     sourceRef,
     classification,
     scope,

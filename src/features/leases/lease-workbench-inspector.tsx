@@ -23,6 +23,7 @@ import {
   classifyContractCashPayment,
   summarizeContractCash,
 } from "@/features/contracts/contract-cash-model";
+import type { WorkspaceUnit } from "@/features/contracts/workspace-model";
 import { addIsoDays } from "@/features/finance/metrics";
 import { dictionaries, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -32,7 +33,6 @@ import type {
   LedgerEntryRow,
   PaymentRow,
   ReceivableRow,
-  UnitRow,
 } from "@/types/database";
 
 export interface LeaseWorkbenchInspectorProps {
@@ -40,7 +40,7 @@ export interface LeaseWorkbenchInspectorProps {
   /** SACSI is already framed and closable by its parent drawer. */
   embedded?: boolean;
   contract: LeaseContractRow | null;
-  unit?: UnitRow | null;
+  unit?: WorkspaceUnit | null;
   customer?: CustomerRow | null;
   buildingLabel?: string;
   summary?: ContractReceivableSummary | null;

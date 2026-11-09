@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { buildWorkbenchRecordHref, safeWorkbenchReturnTo } from "@/lib/workbench-links";
 import { buildLeaseCollectionHref } from "./lease-collection-links";
+import { leaseTenantDisplayName } from "./lease-display-model";
 import { LeaseRentPeriodCorrection } from "./lease-rent-period-correction";
 import { leaseRequestIdentity, clearLeaseRequestIdentity } from "./lease-request-identity";
 import {
@@ -2326,7 +2327,7 @@ export function LeaseList({
                           onClick={() => openDetail(row.id)}
                         >
                           <span>
-                            {row.customer?.name ??
+                            {leaseTenantDisplayName(row.unit, row.customer?.name) ??
                               (locale === "zh" ? "租客待登记" : "Locataire à compléter")}
                           </span>
                           <small>

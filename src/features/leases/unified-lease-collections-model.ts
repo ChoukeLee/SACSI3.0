@@ -24,6 +24,7 @@ import {
   parseLeaseBrowseCategory,
   type LeaseBrowseCategory,
 } from "./lease-browse-model";
+import { leaseTenantDisplayName } from "./lease-display-model";
 import type { LeaseRecordOverviewRow } from "./lease-room-overview-model";
 
 type RecordCategory = LeaseBrowseCategory;
@@ -122,6 +123,8 @@ export function buildApartmentCollectionRows(
   const zh = locale === "zh";
   return records.flatMap((record) => {
     const { attention, building, contract, customer, paidThrough, unit } = record;
+    const sourceName = customer?.name;
+    const tenant = leaseTenantDisplayName(unit, sourceName);
     const needsReview = record.conflict || record.reviewReasons.includes("active_record_has_end");
     if (!attention && !needsReview) return [];
     const href = buildWorkbenchRecordHref({
@@ -154,8 +157,12 @@ export function buildApartmentCollectionRows(
         category: "apartment",
         name: unit.unit_no,
         group: building?.display_name || building?.code || undefined,
-        tenant: customer?.name ?? undefined,
-        keywords: [unit.code, contract.contract_no].filter((value): value is string => !!value),
+        tenant,
+        keywords: [
+          unit.code,
+          contract.contract_no,
+          tenant !== sourceName ? sourceName : undefined,
+        ].filter((value): value is string => !!value),
         href,
         status,
         statusLabel: timingLabel(status, bill?.days, zh),

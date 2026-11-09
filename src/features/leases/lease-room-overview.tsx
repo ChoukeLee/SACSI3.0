@@ -7,6 +7,7 @@ import { cn, floorSortValue, normalizeFloorLabel } from "@/lib/utils";
 import { formatPropertyMoney, propertyLeaseRentLabel } from "@/lib/property-money";
 import { nativeLease } from "@/lib/native-money";
 import { LeaseBrowseStatusFilter, LeaseLocationIndex } from "./lease-browse-content";
+import { leaseTenantDisplayName } from "./lease-display-model";
 import {
   leaseRoomMatchesSearch,
   type LeaseRecordAttention,
@@ -102,13 +103,14 @@ export function leaseRoomOccupancyLabel(row: LeaseRoomOverviewRow, locale: Local
 }
 
 function tenantLabel(
-  row: Pick<LeaseRoomOverviewRow, "conflict" | "reviewReasons" | "contract" | "customer">,
+  row: Pick<LeaseRoomOverviewRow, "conflict" | "reviewReasons" | "contract" | "customer" | "unit">,
   zh: boolean,
 ) {
   if (row.conflict) return zh ? "多条租赁记录待核" : "Plusieurs locations à vérifier";
   if (row.reviewReasons.includes("active_record_has_end"))
     return zh ? "租赁状态待核" : "Statut locatif à vérifier";
-  if (row.customer?.name) return row.customer.name;
+  const tenant = leaseTenantDisplayName(row.unit, row.customer?.name);
+  if (tenant) return tenant;
   return row.contract
     ? zh
       ? "租客待登记"
@@ -191,6 +193,7 @@ function recordSearchText(row: LeaseRecordOverviewRow) {
     row.unit.code,
     row.building?.display_name,
     row.customer?.name,
+    leaseTenantDisplayName(row.unit, row.customer?.name),
     row.contract.contract_no,
     row.contract.start_date,
     row.contract.expected_end_date,
@@ -659,7 +662,8 @@ export function LeaseRoomOverview({
                       {row.building?.display_name} · {row.unit.unit_no}
                     </strong>
                     <small>
-                      {row.customer?.name ?? text("租客待登记", "Locataire à compléter")}
+                      {leaseTenantDisplayName(row.unit, row.customer?.name) ??
+                        text("租客待登记", "Locataire à compléter")}
                       {row.customer?.phone ? ` · ${row.customer.phone}` : ""}
                     </small>
                     <small>
@@ -752,13 +756,16 @@ export function LeaseRoomOverview({
                 disabled={disabled}
                 className={styles.followupRow}
                 onClick={() => onSelectRecord(row)}
-                aria-label={`${text("查看租赁记录", "Voir la location")} ${row.building?.display_name ?? ""} ${row.unit.unit_no} · ${row.customer?.name ?? "—"} · ${row.contract.start_date || "—"}`}
+                aria-label={`${text("查看租赁记录", "Voir la location")} ${row.building?.display_name ?? ""} ${row.unit.unit_no} · ${leaseTenantDisplayName(row.unit, row.customer?.name) ?? "—"} · ${row.contract.start_date || "—"}`}
               >
                 <span>
                   <strong>
                     {row.building?.display_name} · {row.unit.unit_no}
                   </strong>
-                  <small>{row.customer?.name ?? text("租客待登记", "Locataire à compléter")}</small>
+                  <small>
+                    {leaseTenantDisplayName(row.unit, row.customer?.name) ??
+                      text("租客待登记", "Locataire à compléter")}
+                  </small>
                 </span>
                 <span>
                   <strong>{recordStatusLabel(row, zh)}</strong>

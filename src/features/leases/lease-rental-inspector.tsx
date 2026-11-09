@@ -22,7 +22,11 @@ import {
 import { nativeLease, nativeReceivableSummary } from "@/lib/native-money";
 import { dictionaries, type Locale } from "@/lib/i18n";
 import type { PaymentRow, LeaseContractRow, ReceivableRow } from "@/types/database";
-import { getOriginalMonthlyRent, getRecordedOriginalPayment } from "./lease-display-model";
+import {
+  getOriginalMonthlyRent,
+  getRecordedOriginalPayment,
+  leaseTenantDisplayName,
+} from "./lease-display-model";
 import { getLeaseFinancialConfigBySourceType } from "./lease-financial-entry-types";
 import { NativeLeaseFinance } from "./native-lease-finance";
 import { summarizeLeaseReceiptKinds } from "./lease-receipt-summary";
@@ -305,7 +309,10 @@ export function LeaseRentalInspector({
           <>
             <div className={styles.rentalParty}>
               <span>{text("租客", "Locataire")}</span>
-              <strong>{customer?.name || text("租客待登记", "Locataire à compléter")}</strong>
+              <strong>
+                {leaseTenantDisplayName(unit, customer?.name) ||
+                  text("租客待登记", "Locataire à compléter")}
+              </strong>
               {customer?.phone ? <span>{customer.phone}</span> : null}
               <span className={styles.rentalState}>{status}</span>
             </div>

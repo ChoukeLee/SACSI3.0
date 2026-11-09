@@ -1,5 +1,14 @@
 import { nativeLease } from "@/lib/native-money";
+import type { WorkspaceUnit } from "@/features/contracts/workspace-model";
 import type { LeaseContractRow, PaymentRow } from "@/types/database";
+
+export function leaseTenantDisplayName(
+  unit: Pick<WorkspaceUnit, "leaseTenantDisplay"> | null | undefined,
+  sourceName: string | null | undefined,
+) {
+  const alias = unit?.leaseTenantDisplay;
+  return alias && alias.sourceName === sourceName ? alias.displayName : (sourceName ?? undefined);
+}
 
 /** Preserve the recorded source currency, without guessing a present exchange rate. */
 export function getRecordedOriginalPayment(payment: PaymentRow) {

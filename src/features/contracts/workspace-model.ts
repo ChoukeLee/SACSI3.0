@@ -22,6 +22,8 @@ export type WorkspaceKind = "lease" | "sale";
 export type WorkspaceMode = "list" | "scope" | "detail" | "context";
 export type WorkspaceContract = LeaseContractRow | SaleContractRow;
 export type WorkspaceUnit = UnitRow & {
+  /** Scoped display alias for an evidenced lease tenant. */
+  leaseTenantDisplay?: { sourceName: string; displayName: string };
   unit_business_flags?: {
     business_type: "daily_rental" | "long_lease" | "sale";
     is_enabled: boolean;

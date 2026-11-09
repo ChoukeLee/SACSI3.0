@@ -32,6 +32,9 @@ import {
   leaseScopeCookieName,
   validatedLeaseScope,
 } from "./lease-scope-preference";
+
+const confirmedLeaseTenantAlias = { sourceName: "林荣俤2", displayName: "林荣俤" };
+
 export async function readWorkspace(
   client: Pick<SupabaseClient, "rpc"> & Partial<Pick<SupabaseClient, "from">>,
   kind: WorkspaceKind,
@@ -232,9 +235,35 @@ export async function readWorkspace(
       throw new WorkspaceReadError();
     }
   }
-  return kind === "lease"
-    ? { ...decoded, units: decoded.units.map(projectLeaseWorkspaceUnit) }
-    : decoded;
+  if (kind !== "lease") return decoded;
+  const building = decoded.buildings.find(
+    (row) => row.code === "SACSI4" && row.project?.code === "SACSI",
+  );
+  const aliasUnit =
+    building &&
+    decoded.units.find((unit) => unit.building_id === building.id && unit.unit_no === "511");
+  const aliasUnitId =
+    aliasUnit &&
+    decoded.contracts.some(
+      (contract) =>
+        contract.unit_id === aliasUnit.id &&
+        decoded.customers.some(
+          (customer) =>
+            customer.id === contract.customer_id &&
+            customer.name === confirmedLeaseTenantAlias.sourceName,
+        ),
+    )
+      ? aliasUnit.id
+      : undefined;
+  return {
+    ...decoded,
+    units: decoded.units.map((unit) => {
+      const projected = projectLeaseWorkspaceUnit(unit);
+      return unit.id === aliasUnitId
+        ? { ...projected, leaseTenantDisplay: confirmedLeaseTenantAlias }
+        : projected;
+    }),
+  };
 }
 export async function initialWorkspace(
   kind: WorkspaceKind,
