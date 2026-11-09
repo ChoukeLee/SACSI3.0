@@ -11,7 +11,7 @@ import type {
 } from "./operating-asset-directory-model";
 import {
   followUpLabels,
-  latestVerifiedRentReceipt,
+  latestTwoVerifiedRentReceipts,
   operatingLeaseLocation,
   recordedTenant,
   referenceRent,
@@ -144,109 +144,183 @@ export function OperatingLeaseCard({
   );
 }
 
-export function OperatingWholeLeaseCard({
+export function OperatingWholeLeaseOverview({
   row,
   locale,
   today,
-  selected,
-  onSelect,
+  onOpenDetail,
 }: {
   row: OperatingLeaseRow & { entries: readonly OperatingAssetDirectoryEntry[] };
   locale: Locale;
   today: string;
-  selected: boolean;
-  onSelect: () => void;
+  onOpenDetail: () => void;
 }) {
   const { asset, attention, entries, followUp } = row;
   const zh = locale === "zh";
   const missing = zh ? "未登记" : "Non renseigné";
   const location = operatingLeaseLocation(asset);
   const tenant = recordedTenant(asset, locale);
+  const selfUse = asset.leaseEvidence?.selfUse;
   const rent = referenceRent(asset, locale);
   const coverage = followUp.paidThrough;
-  const pending = coverage?.status === "pending";
-  const receipt = latestVerifiedRentReceipt(entries, today);
-  const period =
-    receipt &&
-    isAssetDate(receipt.periodStart) &&
-    isAssetDate(receipt.periodEnd) &&
-    receipt.periodStart <= receipt.periodEnd
-      ? `${receipt.periodStart} — ${receipt.periodEnd}`
-      : null;
+  const receipts = latestTwoVerifiedRentReceipts(entries, today);
   const status = statusLabel(row, locale);
 
   return (
-    <li>
-      <button
-        type="button"
-        className={styles.wholeCard}
-        aria-haspopup="dialog"
-        aria-pressed={selected}
-        data-status={attention ?? undefined}
-        onClick={onSelect}
-      >
-        <span className={styles.wholeHeader}>
-          <span className={styles.wholeIdentity}>
-            {location ? <small>{location}</small> : null}
-            <strong>{asset.displayName}</strong>
-          </span>
-          {status ? <span className={styles.status}>{status}</span> : null}
-          <ArrowRight size={16} aria-hidden="true" />
-        </span>
-        <span className={styles.wholeFacts}>
-          <span>
-            <small>{tenant?.label ?? (zh ? "登记租户" : "Locataire enregistré")}</small>
-            <span>
-              {asset.leaseEvidence?.selfUse
-                ? zh
-                  ? "自用"
-                  : "Usage propre"
-                : tenant?.names || missing}
-            </span>
-          </span>
-          <span>
-            <small>{rent.label}</small>
-            <span>{rent.amount}</span>
-          </span>
-          <span>
-            <small>
-              {pending
+    <article className={styles.wholeOverview} aria-label={asset.displayName}>
+      <header className={styles.wholeHeader} data-status={attention ?? undefined}>
+        <div>
+          <p className={styles.wholeMuted}>
+            {location ? <>{location} · </> : null}
+            {zh ? "租赁概况" : "Aperçu de la location"}
+          </p>
+          <h3>{asset.displayName}</h3>
+        </div>
+        {status ? <span className={styles.status}>{status}</span> : null}
+      </header>
+      <div className={styles.wholePanels}>
+        <section className={styles.wholePanel} aria-label={zh ? "租户资料" : "Locataire"}>
+          <h4>{zh ? "租户资料" : "Locataire"}</h4>
+          <div className={styles.wholeTenant}>
+            <p>{selfUse ? (zh ? "自用" : "Usage propre") : tenant?.names || asset.name}</p>
+            {selfUse ? null : (
+              <p className={styles.wholeMuted}>
+                {tenant?.label ??
+                  (zh ? "资产名称 · 系统租户未登记" : "Nom de l’actif · Locataire non renseigné")}
+              </p>
+            )}
+          </div>
+          <dl className={styles.wholeFacts}>
+            <div>
+              <dt>{rent.label}</dt>
+              <dd>{rent.amount}</dd>
+            </div>
+            <div>
+              <dt>{zh ? "下一约定付款日" : "Prochaine échéance convenue"}</dt>
+              <dd>
+                {followUp.dueDate ? (
+                  <time dateTime={followUp.dueDate}>{followUp.dueDate}</time>
+                ) : (
+                  missing
+                )}
+              </dd>
+            </div>
+          </dl>
+        </section>
+        <section className={styles.wholePanel} aria-label={zh ? "付款进度" : "Suivi des paiements"}>
+          <header className={styles.wholeProgressHeading}>
+            <h4>{zh ? "付款进度" : "Suivi des paiements"}</h4>
+            {coverage?.status === "verified" ? (
+              <span className={styles.wholeConfirmed}>
+                {zh ? "缴租截止已确认" : "Couverture confirmée"}
+              </span>
+            ) : null}
+          </header>
+          <p className={styles.wholeCutoff}>
+            <span className={styles.wholeMuted}>
+              {coverage?.status === "pending"
                 ? zh
                   ? "租金记载至 · 待核"
                   : "Loyer documenté au · À vérifier"
                 : zh
                   ? "已交至"
                   : "Payé au"}
-            </small>
+            </span>
             {coverage ? (
               <time dateTime={coverage.date}>{coverage.date}</time>
             ) : (
               <span>{missing}</span>
             )}
-          </span>
-          <span>
-            <small>{zh ? "下一约定付款日" : "Prochaine échéance convenue"}</small>
-            {followUp.dueDate ? (
-              <time dateTime={followUp.dueDate}>{followUp.dueDate}</time>
-            ) : (
-              <span>{missing}</span>
-            )}
-          </span>
-        </span>
-        {receipt ? (
-          <span className={styles.wholeReceipt} title={assetSourceLabel(receipt.sourceRef)}>
-            <small>{zh ? "最近确认收租" : "Dernier loyer confirmé"}</small>
-            <strong>{formatPropertyMoney(receipt.amountNative, receipt.currency, locale)}</strong>
-            <time dateTime={receipt.cashDate}>{receipt.cashDate}</time>
-            {period ? (
-              <span>
-                {zh ? "覆盖" : "Période"} {period}
-              </span>
-            ) : null}
-          </span>
+          </p>
+          {receipts.length ? (
+            <div className={styles.wholeReceipts}>
+              {[...receipts].reverse().map((receipt, index) => (
+                <WholeLeaseReceipt
+                  key={receipt.id}
+                  receipt={receipt}
+                  locale={locale}
+                  latest={index === receipts.length - 1}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className={styles.wholeMuted}>
+              {zh ? "暂无已确认的租金收款。" : "Aucun encaissement de loyer confirmé."}
+            </p>
+          )}
+        </section>
+      </div>
+      <footer className={styles.wholeFooter}>
+        {coverage ? (
+          <p className={styles.wholeMuted}>
+            {zh ? "缴租截止依据" : "Source de la couverture"} ·{" "}
+            {assetSourceLabel(coverage.sourceRef)}
+          </p>
         ) : null}
-      </button>
-    </li>
+        <button type="button" className={styles.back} aria-haspopup="dialog" onClick={onOpenDetail}>
+          {zh ? "查看流水与资产档案" : "Voir les opérations et la fiche de l’actif"}
+          <ArrowRight size={15} aria-hidden="true" />
+        </button>
+      </footer>
+    </article>
+  );
+}
+
+function WholeLeaseReceipt({
+  receipt,
+  locale,
+  latest,
+}: {
+  receipt: OperatingAssetDirectoryEntry & { cashDate: string };
+  locale: Locale;
+  latest: boolean;
+}) {
+  const zh = locale === "zh";
+  const { periodStart, periodEnd } = receipt;
+  const original = formatPropertyMoney(receipt.amountNative, receipt.currency, locale);
+  const booked =
+    receipt.currency !== "XOF" && receipt.bookedAmountXof !== null
+      ? formatPropertyMoney(receipt.bookedAmountXof, "XOF", locale)
+      : null;
+
+  return (
+    <div
+      className={styles.wholeReceipt}
+      data-latest={latest ? "true" : undefined}
+      title={assetSourceLabel(receipt.sourceRef)}
+    >
+      <p className={styles.wholeMuted}>
+        {latest
+          ? zh
+            ? "最近一笔租金"
+            : "Dernier loyer reçu"
+          : zh
+            ? "上一笔租金"
+            : "Loyer précédent"}
+      </p>
+      {booked ? (
+        <>
+          <p>
+            {zh ? "西法记账额" : "Montant comptabilisé"} {booked}
+          </p>
+          <p>
+            {zh ? "原币实收" : "Reçu en devise"} {original}
+          </p>
+        </>
+      ) : (
+        <p>{original}</p>
+      )}
+      <p className={styles.wholeMuted}>
+        {zh ? "收款" : "Reçu le"} <time dateTime={receipt.cashDate}>{receipt.cashDate}</time>
+      </p>
+      {isAssetDate(periodStart) && isAssetDate(periodEnd) && periodStart <= periodEnd ? (
+        <p className={styles.wholeMuted}>
+          {zh ? "覆盖" : "Période"} <time dateTime={periodStart}>{periodStart}</time>
+          {" — "}
+          <time dateTime={periodEnd}>{periodEnd}</time>
+        </p>
+      ) : null}
+    </div>
   );
 }
 

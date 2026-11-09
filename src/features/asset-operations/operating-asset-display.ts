@@ -50,14 +50,16 @@ export function operatingLeaseLocation(
     : undefined;
 }
 
-export function latestVerifiedRentReceipt(
+function findLatestVerifiedRentReceipt(
   entries: readonly OperatingAssetDirectoryEntry[],
   today: string,
+  excludedId?: string,
 ) {
   let latest: (OperatingAssetDirectoryEntry & { cashDate: string }) | undefined;
   for (const entry of entries) {
     const date = entry.cashDate;
     if (
+      entry.id === excludedId ||
       entry.status !== "verified" ||
       entry.voidedAt ||
       entry.kind !== "income" ||
@@ -74,6 +76,23 @@ export function latestVerifiedRentReceipt(
     }
   }
   return latest;
+}
+
+export function latestVerifiedRentReceipt(
+  entries: readonly OperatingAssetDirectoryEntry[],
+  today: string,
+) {
+  return findLatestVerifiedRentReceipt(entries, today);
+}
+
+export function latestTwoVerifiedRentReceipts(
+  entries: readonly OperatingAssetDirectoryEntry[],
+  today: string,
+) {
+  const latest = findLatestVerifiedRentReceipt(entries, today);
+  if (!latest) return [];
+  const previous = findLatestVerifiedRentReceipt(entries, today, latest.id);
+  return previous ? [latest, previous] : [latest];
 }
 
 export function operatingAssetMatchesSearch(asset: OperatingAssetDirectoryAsset, search: string) {

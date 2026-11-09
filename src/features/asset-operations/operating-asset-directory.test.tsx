@@ -408,8 +408,25 @@ it("restores the last multi-unit site while whole rentals open directly to their
       asset(),
       asset({ id: "old", sourceKey: "old:1", name: "老仓库1号", group: "old_warehouse" }),
       asset({ id: "new", sourceKey: "new:1", name: "新仓库1号", group: "new_warehouse" }),
+      asset({ id: "other-whole", sourceKey: "office:other", name: "独立办公室", group: "办公室" }),
     ],
-    [entry()],
+    [
+      entry(),
+      entry({
+        id: "older-rent",
+        amountNative: 50000000,
+        cashDate: "2026-06-30",
+        periodStart: "2026-01-01",
+        periodEnd: "2026-06-30",
+        sourceRef: juneSource,
+      }),
+      entry({
+        id: "newer-deposit",
+        kind: "deposit_in",
+        category: "deposit",
+        cashDate: "2026-11-01",
+      }),
+    ],
   );
   const renderCategory = async (leaseCategory: "multi-unit" | "whole", viewerId = "viewer-a") =>
     act(async () =>
@@ -447,11 +464,27 @@ it("restores the last multi-unit site while whole rentals open directly to their
   await renderCategory("whole");
   expect(location()).toBeNull();
   expect(cards()).toHaveLength(1);
-  expect(cards()[0].textContent).toContain("国基土地");
-  expect(cards()[0].textContent).toContain("下一约定付款日未登记");
-  expect(cards()[0].textContent).toContain("最近确认收租2,500 万西法");
-  expect(cards()[0].textContent).not.toContain("土地及场地");
-  await act(async () => (cards()[0] as HTMLButtonElement).click());
+  const picker = host.querySelector<HTMLSelectElement>("label select")!;
+  await act(async () => {
+    picker.value = "other-whole";
+    picker.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(host.querySelector("article h3")?.textContent).toBe("独立办公室");
+  expect(host.querySelector('[aria-label="付款进度"]')?.textContent).toContain(
+    "暂无已确认的租金收款",
+  );
+  await act(async () => {
+    picker.value = "test-land-id";
+    picker.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  const tenantPanel = host.querySelector('[aria-label="租户资料"]')!;
+  const paymentPanel = host.querySelector('[aria-label="付款进度"]')!;
+  expect(factValues(tenantPanel, "下一约定付款日")).toEqual(["未登记"]);
+  expect(paymentPanel.textContent).toContain("已交至2026-09-30");
+  expect(paymentPanel.textContent).toContain("上一笔租金5,000 万西法");
+  expect(paymentPanel.textContent).toContain("最近一笔租金2,500 万西法");
+  expect(paymentPanel.textContent).not.toContain("2026-11-01");
+  await clickButton(host, "查看流水与资产档案");
   const detail = dialog();
   expect(detail.querySelector("h2")?.textContent).toBe("国基土地");
   expect(detail.textContent).not.toContain("土地及场地");
