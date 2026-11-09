@@ -1,0 +1,65 @@
+.party > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.7rem;
+}
+
+.party dt,
+.rentSummary dt {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+}
+
+.party dd {
+  min-width: 0;
+  font-size: 1.125rem;
+  overflow-wrap: anywhere;
+}
+
+.rentSummary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  background: hsl(var(--muted) / 0.38);
+}
+
+.rentSummary > div {
+  padding: 0.65rem 0.8rem;
+}
+
+.rentSummary > div + div {
+  border-inline-start: 1px solid hsl(var(--border));
+}
+
+.rentSummary dd {
+  margin-top: 0.25rem;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.attention {
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.35rem;
+  background: #fff7e7;
+  color: #73531d;
+  font-size: 0.8125rem;
+}
+
+.attention[data-status="overdue"] {
+  background: #fff0ee;
+  color: #a73732;
+}
+
+:global(.dark) .attention {
+  background: #362e22;
+  color: #f2d4a0;
+}
+
+:global(.dark) .attention[data-status="overdue"] {
+  background: #392322;
+  color: #ffbbb4;
+}

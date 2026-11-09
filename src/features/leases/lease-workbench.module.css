@@ -49,18 +49,36 @@
   background: hsl(var(--card));
   padding: 4px;
 }
-.scopeProjects button {
+.categoryNavigation {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  overflow-x: auto;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 9px;
+  background: hsl(var(--card));
+}
+.categoryNavigation a {
+  white-space: nowrap;
+}
+.scopeProjects button,
+.categoryNavigation a {
   padding: 7px 13px;
   border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
   color: hsl(var(--muted-foreground));
 }
-.scopeProjects button[aria-pressed="true"] {
+.scopeProjects button[aria-pressed="true"],
+.categoryNavigation a[aria-current="page"] {
   color: var(--lease-accent);
   background: var(--lease-accent-soft);
 }
-.scopeProjects button:hover {
+.scopeProjects button:hover,
+.categoryNavigation a:hover {
   color: var(--lease-accent);
 }
 .scopeBuildings {

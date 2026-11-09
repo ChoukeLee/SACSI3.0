@@ -623,6 +623,15 @@ const files = [
   "src/features/asset-operations/operating-asset-directory.tsx",
   "src/features/asset-operations/operating-asset-directory.test.tsx",
   "src/features/asset-operations/operating-asset-page.tsx",
+  "src/features/asset-operations/operating-asset-detail.module.css",
+  "src/features/asset-operations/operating-asset-detail.tsx",
+  "src/features/asset-operations/operating-asset-display.ts",
+  "src/features/leases/apartment-directory-section.tsx",
+  "src/features/leases/lease-workbench-frame.tsx",
+  "src/features/leases/unified-lease-collections-model.ts",
+  "src/features/leases/unified-lease-collections-model.test.ts",
+  "src/features/leases/unified-lease-collections-page.tsx",
+  "src/features/leases/unified-lease-collections.tsx",
   "tests/operating-asset-routes.test.tsx",
 ];
 let invalid = 0;

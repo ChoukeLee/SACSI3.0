@@ -1,12 +1,16 @@
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { LeaseLazyView } from "@/features/leases/lease-lazy-view";
 import { loadLeaseWorkspace } from "@/features/leases/lease-workspace-data";
+import { LeaseWorkbenchFrame } from "@/features/leases/lease-workbench-frame";
+import { UnifiedLeaseCollectionsPage } from "@/features/leases/unified-lease-collections-page";
+import { parseCollectionCategory } from "@/features/leases/unified-lease-collections-model";
 import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
 import { redirectLegacyCimac } from "@/features/cimac/cimac-legacy-redirect";
 import {
   canReadOperatingAssets,
+  leaseCollectionHref,
   OperatingAssetDirectoryPage,
   OperatingAssetNavigation,
   parseLeaseAssetCategory,
@@ -22,6 +26,7 @@ export default async function FrenchLeasesPage({
     contract?: string | string[];
     returnTo?: string | string[];
     assetCategory?: string | string[];
+    collectionCategory?: string | string[];
     operatingAsset?: string | string[];
   }>;
 }) {
@@ -35,36 +40,48 @@ export default async function FrenchLeasesPage({
   await redirectLegacyCimac("leases", params, "fr");
   const showAssetCategories = canReadOperatingAssets(user.role);
   const category = showAssetCategories ? parseLeaseAssetCategory(params.assetCategory) : undefined;
+  const navigation = showAssetCategories ? (
+    <OperatingAssetNavigation area="leases" locale="fr" category={category} />
+  ) : null;
 
   return (
-    <>
-      {showAssetCategories ? (
-        <OperatingAssetNavigation area="leases" locale="fr" category={category} />
-      ) : null}
-      <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
-        {category ? (
-          <OperatingAssetDirectoryPage
-            locale="fr"
-            category={category}
-            project={params.project}
-            selectedAssetId={parseOperatingAssetId(params.operatingAsset)}
-          />
-        ) : (
-          <FrenchLeasesData
-            viewerId={user.id}
-            initialProject={params.project}
-            initialBuilding={typeof params.building === "string" ? params.building : undefined}
-            initialContract={typeof params.contract === "string" ? params.contract : undefined}
-            returnTo={typeof params.returnTo === "string" ? params.returnTo : undefined}
-            canCreate={user.role === "admin" || user.role === "rental_sales"}
-            canRecordFinance={user.role === "admin" || user.role === "finance"}
-            canCorrectRentPeriod={user.role === "admin"}
-            canActivate={user.role === "admin" || user.role === "rental_sales"}
-            canMoveOut={user.role === "admin" || user.role === "finance"}
-          />
-        )}
-      </Suspense>
-    </>
+    <Suspense fallback={<OperationalPageSkeleton kind="records" rows={8} />}>
+      {category ? (
+        <LeaseWorkbenchFrame locale="fr" navigation={navigation}>
+          {category === "followup" ? (
+            <UnifiedLeaseCollectionsPage
+              locale="fr"
+              viewerId={user.id}
+              project={params.project}
+              initialCategory={parseCollectionCategory(params.collectionCategory)}
+            />
+          ) : (
+            <OperatingAssetDirectoryPage
+              locale="fr"
+              category={category}
+              project={params.project}
+              viewerId={user.id}
+              selectedAssetId={parseOperatingAssetId(params.operatingAsset)}
+            />
+          )}
+        </LeaseWorkbenchFrame>
+      ) : (
+        <FrenchLeasesData
+          viewerId={user.id}
+          initialProject={params.project}
+          initialBuilding={typeof params.building === "string" ? params.building : undefined}
+          initialContract={typeof params.contract === "string" ? params.contract : undefined}
+          returnTo={typeof params.returnTo === "string" ? params.returnTo : undefined}
+          categoryNavigation={navigation}
+          collectionHref={showAssetCategories ? leaseCollectionHref("fr", "apartment") : undefined}
+          canCreate={user.role === "admin" || user.role === "rental_sales"}
+          canRecordFinance={user.role === "admin" || user.role === "finance"}
+          canCorrectRentPeriod={user.role === "admin"}
+          canActivate={user.role === "admin" || user.role === "rental_sales"}
+          canMoveOut={user.role === "admin" || user.role === "finance"}
+        />
+      )}
+    </Suspense>
   );
 }
 
@@ -74,6 +91,8 @@ async function FrenchLeasesData({
   initialBuilding,
   initialContract,
   returnTo,
+  categoryNavigation,
+  collectionHref,
   canCreate,
   canRecordFinance,
   canCorrectRentPeriod,
@@ -85,6 +104,8 @@ async function FrenchLeasesData({
   initialBuilding?: string;
   initialContract?: string;
   returnTo?: string;
+  categoryNavigation?: ReactNode;
+  collectionHref?: string;
   canCreate: boolean;
   canRecordFinance: boolean;
   canCorrectRentPeriod: boolean;
@@ -100,6 +121,8 @@ async function FrenchLeasesData({
       initialBuilding={initialBuilding}
       initialContract={initialContract}
       returnTo={returnTo}
+      categoryNavigation={categoryNavigation}
+      collectionHref={collectionHref}
       locale="fr"
       canCreate={canCreate}
       canRecordFinance={canRecordFinance}

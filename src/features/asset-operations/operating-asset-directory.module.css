@@ -4,8 +4,22 @@
   container: operating-asset-directory / inline-size;
 }
 
+.directory[data-lease-view="true"] {
+  gap: 1.25rem;
+}
+
+.groupScope {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.groupScope .groupMobile {
+  display: none;
+}
+
 .toolbar,
-.toolbarTools,
 .periodPicker,
 .periodPicker label,
 .receiptHeader,
@@ -15,10 +29,6 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 0.65rem;
-}
-
-.toolbarTools {
-  margin-inline-start: auto;
 }
 
 .search,
@@ -325,6 +335,28 @@
   line-height: 1.3;
 }
 
+.cardTenant {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  min-height: 1.2rem;
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
+.cardTenant > :first-child {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.cardTenant > :last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .cardFact > :first-child {
   flex-shrink: 0;
   max-width: 55%;
@@ -513,6 +545,16 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .groupScope .groupDesktop {
+    display: none;
+  }
+
+  .groupScope .groupMobile {
+    display: block;
+    min-width: 0;
+    flex: 1 1 9rem;
+  }
+
   .collectionRow {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     gap: 0.45rem 0.75rem;
@@ -527,10 +569,6 @@
 @container operating-asset-directory (max-width: 459px) {
   .cards {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .toolbarTools {
-    margin-inline-start: 0;
   }
 }
 

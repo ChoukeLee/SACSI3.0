@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { ArrowRight, CalendarClock, Search } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { cn, floorSortValue, normalizeFloorLabel } from "@/lib/utils";
@@ -13,10 +14,24 @@ import type {
 } from "./lease-room-overview-model";
 import styles from "./lease-room-overview.module.css";
 
-type Filter = "all" | "overdue" | "upcoming" | "review";
+export type LeaseRoomFilter = "all" | "overdue" | "upcoming" | "review";
 
 function needsLeaseReview(row: Pick<LeaseRoomOverviewRow, "conflict" | "reviewReasons">) {
   return row.conflict || row.reviewReasons.includes("active_record_has_end");
+}
+
+export function leaseRoomMatchesFilter(row: LeaseRoomOverviewRow, filter: LeaseRoomFilter) {
+  if (filter === "all") return true;
+  const review = needsLeaseReview(row);
+  return filter === "review"
+    ? review || row.attention?.kind === "coverage"
+    : !review && row.attention?.kind === filter;
+}
+
+export function leaseRoomMatchesSearch(row: LeaseRoomOverviewRow, search: string) {
+  return `${row.unit.unit_no} ${row.unit.code} ${row.building?.display_name ?? ""} ${row.customer?.name ?? ""}`
+    .toLocaleLowerCase()
+    .includes(search.trim().toLocaleLowerCase());
 }
 
 export function leaseRoomFloorLabel(unit: LeaseRoomOverviewRow["unit"], locale: Locale) {
@@ -221,6 +236,8 @@ export function LeaseRoomOverview({
   error,
   selectedUnitId,
   disabled = false,
+  collectionHref,
+  embedded,
   onSelectUnit,
   onSelectRecord,
   onRetry,
@@ -232,21 +249,27 @@ export function LeaseRoomOverview({
   error: boolean;
   selectedUnitId?: string | null;
   disabled?: boolean;
+  collectionHref?: string;
+  embedded?: { search: string; filter: LeaseRoomFilter };
   onSelectUnit: (row: LeaseRoomOverviewRow) => void;
   onSelectRecord: (row: LeaseRecordOverviewRow) => void;
   onRetry: () => void;
 }) {
   const zh = locale === "zh";
   const text = (chinese: string, french: string) => (zh ? chinese : french);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<LeaseRoomFilter>("all");
   const [search, setSearch] = useState("");
   const [followup, setFollowup] = useState(false);
   const [history, setHistory] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
   const [historyStatus, setHistoryStatus] = useState("historical");
+  const showAllRooms = !!embedded;
+  const activeFilter = embedded?.filter ?? filter;
+  const activeSearch = embedded?.search ?? search;
   const rentalRows = useMemo(
-    () => rows.filter((row) => row.contract !== null || needsLeaseReview(row)),
-    [rows],
+    () =>
+      showAllRooms ? rows : rows.filter((row) => row.contract !== null || needsLeaseReview(row)),
+    [rows, showAllRooms],
   );
   const counts = useMemo(
     () => ({
@@ -263,26 +286,13 @@ export function LeaseRoomOverview({
     }),
     [rentalRows],
   );
-  const searched = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    return !query
-      ? rentalRows
-      : rentalRows.filter((row) =>
-          `${row.unit.unit_no} ${row.unit.code} ${row.building?.display_name ?? ""} ${row.customer?.name ?? ""}`
-            .toLocaleLowerCase()
-            .includes(query),
-        );
-  }, [rentalRows, search]);
   const filtered = useMemo(
     () =>
-      searched.filter(
+      rentalRows.filter(
         (row) =>
-          filter === "all" ||
-          (filter === "review"
-            ? needsLeaseReview(row) || row.attention?.kind === "coverage"
-            : !needsLeaseReview(row) && row.attention?.kind === filter),
+          leaseRoomMatchesSearch(row, activeSearch) && leaseRoomMatchesFilter(row, activeFilter),
       ),
-    [searched, filter],
+    [rentalRows, activeSearch, activeFilter],
   );
   const floors = useMemo(() => {
     const groups = new Map<
@@ -359,7 +369,7 @@ export function LeaseRoomOverview({
         (!query || recordSearchText(row).includes(query)),
     );
   }, [records, historySearch, historyStatus]);
-  const filters: { key: Filter; label: string }[] = [
+  const filters: { key: LeaseRoomFilter; label: string }[] = [
     { key: "all", label: text("全部租赁", "Toutes les locations") },
     { key: "overdue", label: text("已逾期", "En retard") },
     { key: "upcoming", label: text("15天内应缴", "Dû sous 15 jours") },
@@ -396,62 +406,72 @@ export function LeaseRoomOverview({
       className={styles.overview}
       aria-label={text("楼栋长租房源", "Locations par bâtiment")}
     >
-      <div className={styles.toolbar}>
-        <div
-          className={styles.filters}
-          role="group"
-          aria-label={text("房源跟进筛选", "Filtres de suivi")}
-        >
-          {filters.map((item) => (
+      {!embedded ? (
+        <div className={styles.toolbar}>
+          <div
+            className={styles.filters}
+            role="group"
+            aria-label={text("房源跟进筛选", "Filtres de suivi")}
+          >
+            {filters.map((item) => (
+              <button
+                type="button"
+                key={item.key}
+                aria-pressed={filter === item.key}
+                onClick={() => setFilter(item.key)}
+                className={cn(
+                  filter === item.key && styles.activeFilter,
+                  item.key === "overdue" && counts.overdue > 0 && styles.filterOverdue,
+                )}
+              >
+                {item.label}
+                <span>{counts[item.key]}</span>
+              </button>
+            ))}
+          </div>
+          <div className={styles.tools}>
+            <label className={styles.search}>
+              <Search size={15} aria-hidden="true" />
+              <span className="sr-only">
+                {text("搜索房号或租客", "Rechercher un lot ou locataire")}
+              </span>
+              <input
+                type="search"
+                placeholder={text("搜索房号或租客", "Lot ou locataire")}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+            {collectionHref ? (
+              <Link href={collectionHref} prefetch={false} className={styles.followupButton}>
+                <CalendarClock size={15} aria-hidden="true" />
+                {text("收款跟进", "Suivi des loyers")}
+                <span>{followupRows.length}</span>
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className={styles.followupButton}
+                aria-expanded={followup}
+                onClick={() => setFollowup((value) => !value)}
+              >
+                <CalendarClock size={15} aria-hidden="true" />
+                {text("收款跟进", "Suivi des loyers")}
+                <span>{followupRows.length}</span>
+              </button>
+            )}
             <button
               type="button"
-              key={item.key}
-              aria-pressed={filter === item.key}
-              onClick={() => setFilter(item.key)}
-              className={cn(
-                filter === item.key && styles.activeFilter,
-                item.key === "overdue" && counts.overdue > 0 && styles.filterOverdue,
-              )}
+              className={styles.followupButton}
+              aria-expanded={history}
+              onClick={() => setHistory((value) => !value)}
             >
-              {item.label}
-              <span>{counts[item.key]}</span>
+              {text("查看历史", "Voir l’historique")}
             </button>
-          ))}
+          </div>
         </div>
-        <div className={styles.tools}>
-          <label className={styles.search}>
-            <Search size={15} aria-hidden="true" />
-            <span className="sr-only">
-              {text("搜索房号或租客", "Rechercher un lot ou locataire")}
-            </span>
-            <input
-              type="search"
-              placeholder={text("搜索房号或租客", "Lot ou locataire")}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </label>
-          <button
-            type="button"
-            className={styles.followupButton}
-            aria-expanded={followup}
-            onClick={() => setFollowup((value) => !value)}
-          >
-            <CalendarClock size={15} aria-hidden="true" />
-            {text("收款跟进", "Suivi des loyers")}
-            <span>{followupRows.length}</span>
-          </button>
-          <button
-            type="button"
-            className={styles.followupButton}
-            aria-expanded={history}
-            onClick={() => setHistory((value) => !value)}
-          >
-            {text("查看历史", "Voir l’historique")}
-          </button>
-        </div>
-      </div>
-      {followup ? (
+      ) : null}
+      {!embedded && !collectionHref && followup ? (
         <section
           className={styles.followup}
           aria-label={text("集中收款跟进", "Suivi des loyers regroupé")}
@@ -517,7 +537,7 @@ export function LeaseRoomOverview({
           )}
         </section>
       ) : null}
-      {history ? (
+      {!embedded && history ? (
         <section
           className={styles.followup}
           aria-label={text("租赁记录查询", "Recherche de locations")}
@@ -601,17 +621,19 @@ export function LeaseRoomOverview({
         </section>
       ) : null}
       {!floors.length ? (
-        <p className={styles.empty}>
-          {rentalRows.length
-            ? text(
-                "没有符合筛选条件的当前租赁。",
-                "Aucune location actuelle ne correspond aux filtres.",
-              )
-            : text(
-                "当前楼栋暂无当前租赁；可展开“查看历史”查阅此前租赁。",
-                "Aucune location actuelle dans ce bâtiment. Ouvrez l’historique pour consulter les anciennes locations.",
-              )}
-        </p>
+        embedded ? null : (
+          <p className={styles.empty}>
+            {rentalRows.length
+              ? text(
+                  "没有符合筛选条件的当前租赁。",
+                  "Aucune location actuelle ne correspond aux filtres.",
+                )
+              : text(
+                  "当前楼栋暂无当前租赁；可展开“查看历史”查阅此前租赁。",
+                  "Aucune location actuelle dans ce bâtiment. Ouvrez l’historique pour consulter les anciennes locations.",
+                )}
+          </p>
+        )
       ) : (
         floors.map((floor) => (
           <section

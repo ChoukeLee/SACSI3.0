@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { buildWorkbenchRecordHref, safeWorkbenchReturnTo } from "@/lib/workbench-links";
@@ -32,12 +32,8 @@ import { RoomCard } from "@/components/room-card";
 import { RoomBoard } from "@/components/room-board";
 import { RoomLegend } from "@/components/room-legend";
 import { EmptyState } from "@/components/empty-state";
-import {
-  OperationalPage,
-  RightDrawer,
-  SegmentedControl,
-  controlClass,
-} from "@/components/ui/operational";
+import { RightDrawer, SegmentedControl, controlClass } from "@/components/ui/operational";
+import { LeaseWorkbenchFrame } from "./lease-workbench-frame";
 import type { RoomVisualStatus } from "@/lib/status-styles";
 import type {
   LeaseContractRow,
@@ -133,6 +129,8 @@ interface LeaseListProps {
   initialCustomer?: string;
   initialCustomerName?: string;
   returnTo?: string;
+  categoryNavigation?: ReactNode;
+  collectionHref?: string;
   scopePreference?: LeaseScopePreference;
   contracts: LeaseContractRow[];
   units: LeaseUnitRow[];
@@ -201,6 +199,8 @@ export function LeaseList({
   initialCustomer,
   initialCustomerName,
   returnTo,
+  categoryNavigation,
+  collectionHref,
   scopePreference,
   contracts: initialContracts,
   units: initialUnits,
@@ -1616,33 +1616,10 @@ export function LeaseList({
   );
 
   return (
-    <OperationalPage
-      className={styles.workbench}
-      eyebrow={
-        workArea === "cimac"
-          ? "CIMAC · CONTRACTS"
-          : locale === "zh"
-            ? "SACSI · 租赁管理"
-            : "SACSI · Locations"
-      }
-      title={
-        workArea === "cimac"
-          ? locale === "zh"
-            ? "合同与履约"
-            : "Contrats et exécution"
-          : locale === "zh"
-            ? "长租房源"
-            : "Locations longue durée"
-      }
-      description={
-        workArea === "sacsi"
-          ? locale === "zh"
-            ? "按楼栋查看当前租赁的房间、租客、月租与已交至；选房查看资料并办理。"
-            : "Locations actuelles, locataires, loyers et paiements par bâtiment. Choisissez un lot pour consulter son dossier et agir."
-          : locale === "zh"
-            ? "合同、应收与收款，在同一个工作区核对。"
-            : "Contrats, créances et encaissements réunis pour vérification."
-      }
+    <LeaseWorkbenchFrame
+      locale={locale}
+      workArea={workArea}
+      navigation={categoryNavigation}
       action={
         <>
           {canCreate ? (
@@ -1911,6 +1888,7 @@ export function LeaseList({
               key={roomScope}
               rows={roomOverviewRows}
               records={leaseRecordRows}
+              collectionHref={collectionHref}
               locale={locale}
               loading={
                 workspace.enabled &&
@@ -3335,7 +3313,7 @@ export function LeaseList({
           </fieldset>
         </PanelShell>
       )}
-    </OperationalPage>
+    </LeaseWorkbenchFrame>
   );
 }
 

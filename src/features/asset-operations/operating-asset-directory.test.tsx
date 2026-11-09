@@ -159,6 +159,10 @@ it("opens the same confirmed Guoji receipts from the directory card and the land
     expect(current.textContent).not.toContain("国基仓库");
     await clickButton(current, "资料");
     expect(factValues(current, "季租")).toEqual(["2,500 万西法"]);
+    await clickButton(current, "历史");
+    expect(current.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("历史");
+    expect(current.textContent).toContain("2026-07-01 — 2026-09-30");
+    expect(current.textContent).toContain("2026-01-01 — 2026-06-30");
   }
 
   await inspectHistory();
@@ -174,6 +178,33 @@ it("opens the same confirmed Guoji receipts from the directory card and the land
     ),
   );
   await inspectHistory();
+});
+
+it("only shows confirmed, completed rent periods as operating asset history", async () => {
+  const data = directory(
+    [asset()],
+    [
+      entry({ id: "pending", sourceRef: "unreviewed source" }),
+      entry({ id: "voided", voidedAt: today }),
+      entry({ id: "future", periodEnd: "2027-02-28" }),
+      entry({ id: "nonrent", category: "property_fee" }),
+    ],
+  );
+  await act(async () =>
+    root.render(
+      <OperatingAssetDirectory
+        data={data}
+        locale="zh"
+        today={today}
+        category="land"
+        selectedAssetId="test-land-id"
+      />,
+    ),
+  );
+  const current = dialog();
+  await clickButton(current, "历史");
+  expect(current.textContent).toContain("暂无带有明确期间的已确认历史租金流水。");
+  expect(current.querySelectorAll("li")).toHaveLength(0);
 });
 
 it("separates registered late payments from missing evidence and keeps warehouse cards grouped", async () => {
@@ -280,6 +311,7 @@ it("separates registered late payments from missing evidence and keeps warehouse
         today={today}
         category="warehouse"
         enableCollections
+        collectionHref="/leases?assetCategory=followup&collectionCategory=warehouse"
       />,
     ),
   );
@@ -294,7 +326,35 @@ it("separates registered late payments from missing evidence and keeps warehouse
     "老仓库",
     "新仓库",
   ]);
-  const lateCard = [...oldGroup!.querySelectorAll("button")].find((card) =>
+  const filters = host.querySelector('[aria-label="长租状态筛选"]')!;
+  expect([...filters.querySelectorAll("button")].map((button) => button.textContent)).toEqual([
+    "全部资产4",
+    "已逾期1",
+    "15天内应缴1",
+    "待核事项1",
+  ]);
+  expect(host.querySelector("a[href*='collectionCategory=warehouse']")?.textContent).toBe(
+    "收款跟进",
+  );
+  await clickButton(filters, "已逾期1");
+  expect(host.querySelectorAll('button[aria-haspopup="dialog"]')).toHaveLength(1);
+  expect(host.textContent).toContain("逾期 2 天");
+  const scope = host.querySelector<HTMLSelectElement>('select[aria-label="资产分组"]')!;
+  await act(async () => {
+    scope.value = "新仓库";
+    scope.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(filters.textContent).toContain("已逾期0");
+  expect(host.querySelectorAll('button[aria-haspopup="dialog"]')).toHaveLength(0);
+  await act(async () => {
+    scope.value = "";
+    scope.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await clickButton(filters, "全部资产4");
+  const currentOldGroup = [...host.querySelectorAll("h2")]
+    .find((heading) => heading.textContent === "老仓库")
+    ?.closest("section");
+  const lateCard = [...currentOldGroup!.querySelectorAll("button")].find((card) =>
     card.textContent?.includes("老仓库2号"),
   );
   expect(lateCard?.textContent).toContain("历史合租租户示例租户甲、示例租户乙");
@@ -304,6 +364,34 @@ it("separates registered late payments from missing evidence and keeps warehouse
   await clickButton(tenantDetail, "资料");
   expect(factValues(tenantDetail, "租户记录日期")).toEqual(["2026-10-31"]);
   expect(factValues(tenantDetail, "租户依据")[0]).toContain("C2");
+
+  await act(async () =>
+    root.render(
+      <OperatingAssetDirectory
+        data={data}
+        locale="zh"
+        today={today}
+        category="all"
+        collectionHref="/leases?assetCategory=followup"
+        apartmentRows={[]}
+      />,
+    ),
+  );
+  const categoryScope = host.querySelector<HTMLSelectElement>('select[aria-label="资产类别"]')!;
+  await act(async () => {
+    categoryScope.value = "land";
+    categoryScope.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(host.querySelector("a[href*='collectionCategory=land']")?.textContent).toBe("收款跟进");
+  const combinedSearch = host.querySelector<HTMLInputElement>('input[type="search"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(
+      combinedSearch,
+      "不存在的示例名称",
+    );
+    combinedSearch.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  expect(host.textContent).toContain("未找到符合条件的资产。");
 });
 
 it("shows original currency and XOF book values separately for the same two cash movements", async () => {

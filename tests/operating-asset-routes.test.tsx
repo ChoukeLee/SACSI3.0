@@ -6,6 +6,7 @@ import FrenchLeasesPage from "@/app/fr/leases/page";
 import UnitsPage from "@/app/units/page";
 import LegacyOperationsPage from "@/app/asset-operations/page";
 import LegacyFrenchOperationsPage from "@/app/fr/asset-operations/page";
+import { UnifiedLeaseCollectionsPage } from "@/features/leases/unified-lease-collections-page";
 import type {
   AssetOperationAsset,
   AssetOperationEntry,
@@ -31,6 +32,10 @@ vi.mock("@/features/cimac/cimac-legacy-redirect", () => ({
 }));
 vi.mock("@/features/leases/lease-lazy-view", () => ({ LeaseLazyView: () => null }));
 vi.mock("@/features/leases/lease-workspace-data", () => ({ loadLeaseWorkspace: vi.fn() }));
+vi.mock("@/features/leases/unified-lease-collections-page", () => ({
+  UnifiedLeaseCollectionsPage: () => null,
+  loadApartmentLeaseOverview: async () => ({ rows: [], unavailable: false }),
+}));
 vi.mock("@/features/units/unit-workbench-workspace", () => ({
   UnitWorkbenchWorkspace: () => null,
   UnitWorkbenchSkeleton: () => null,
@@ -48,7 +53,10 @@ vi.mock("@/features/asset-operations/operating-asset-directory", () => ({
 const assetId = "00000000-0000-4000-8000-000000000001";
 function findProps(
   tree: ReactNode,
-  target: typeof OperatingAssetDirectoryPage | typeof OperatingAssetNavigation,
+  target:
+    | typeof OperatingAssetDirectoryPage
+    | typeof OperatingAssetNavigation
+    | typeof UnifiedLeaseCollectionsPage,
 ): Record<string, unknown> | undefined {
   for (const child of Children.toArray(tree)) {
     if (!isValidElement<{ children?: ReactNode }>(child)) continue;
@@ -89,6 +97,7 @@ describe("operating assets are available through the existing workspaces", () =>
       searchParams: Promise.resolve({ assetView: "operations", operatingAsset: assetId }),
     });
     expect(findProps(leases, OperatingAssetDirectoryPage)).toBeUndefined();
+    expect(findProps(leases, UnifiedLeaseCollectionsPage)).toBeUndefined();
     expect(findProps(leases, OperatingAssetNavigation)).toBeUndefined();
     expect(findProps(units, OperatingAssetDirectoryPage)).toBeUndefined();
     expect(findProps(units, OperatingAssetNavigation)).toBeUndefined();
@@ -98,14 +107,19 @@ describe("operating assets are available through the existing workspaces", () =>
     { locale: "zh", page: LeasesPage, path: "/leases" },
     { locale: "fr", page: FrenchLeasesPage, path: "/fr/leases" },
   ] as const)(
-    "exposes the $locale collection and dormitory routes",
+    "exposes the $locale shared follow-up and all asset categories",
     async ({ locale, page, path }) => {
-      const followup = await page({ searchParams: Promise.resolve({ assetCategory: "followup" }) });
+      const followup = await page({
+        searchParams: Promise.resolve({
+          assetCategory: "followup",
+          collectionCategory: "warehouse",
+        }),
+      });
       const dormitory = await page({
         searchParams: Promise.resolve({ assetCategory: "dormitory" }),
       });
-      expect(findProps(followup, OperatingAssetDirectoryPage)).toMatchObject({
-        category: "followup",
+      expect(findProps(followup, UnifiedLeaseCollectionsPage)).toMatchObject({
+        initialCategory: "warehouse",
         locale,
       });
       expect(findProps(dormitory, OperatingAssetDirectoryPage)).toMatchObject({
@@ -115,12 +129,23 @@ describe("operating assets are available through the existing workspaces", () =>
       const navigation = renderToStaticMarkup(
         <OperatingAssetNavigation area="leases" locale={locale} category="followup" />,
       );
-      expect(navigation).toContain(`href="${path}?assetCategory=followup"`);
-      expect(navigation).toContain(`href="${path}?assetCategory=dormitory"`);
+      for (const category of [
+        "all",
+        "warehouse",
+        "factory",
+        "commercial",
+        "office",
+        "land",
+        "dormitory",
+        "other",
+      ]) {
+        expect(navigation).toContain(`href="${path}?assetCategory=${category}"`);
+      }
+      expect(navigation).not.toContain("assetCategory=followup");
     },
   );
 
-  it("opens the collection view with only supplemental assets with rental evidence", async () => {
+  it("includes assets with incomplete rental evidence in the shared directory and avoids duplicating linked units", async () => {
     const projectId = "test-sacsi";
     const warehouse: AssetOperationAsset = {
       id: assetId,
@@ -168,20 +193,24 @@ describe("operating assets are available through the existing workspaces", () =>
       ],
     });
 
-    const followup = await OperatingAssetDirectoryPage({
+    const all = await OperatingAssetDirectoryPage({
       locale: "zh",
-      category: "followup",
+      category: "all",
       selectedAssetId: "no-receipt",
     });
-    expect(followup).toMatchObject({
+    expect(all).toMatchObject({
       props: {
         category: "all",
         enableCollections: true,
-        initialView: "collections",
-        selectedAssetId: null,
+        initialView: "cards",
+        collectionHref: "/leases?assetCategory=followup&collectionCategory=all",
+        selectedAssetId: "no-receipt",
+        apartmentRows: [],
         data: {
-          assets: [expect.objectContaining({ id: assetId })],
-          entries: [expect.objectContaining({ id: "receipt" })],
+          assets: [assetId, "no-receipt", "voided-only"].map((id) =>
+            expect.objectContaining({ id }),
+          ),
+          entries: ["receipt", "voided-receipt"].map((id) => expect.objectContaining({ id })),
         },
       },
     });
