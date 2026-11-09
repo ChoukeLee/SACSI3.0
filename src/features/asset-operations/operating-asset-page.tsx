@@ -122,7 +122,10 @@ export async function OperatingAssetDirectoryPage({
     const source = await fetchAssetOperations();
     if (project && project !== source.projectId && project.toUpperCase() !== "SACSI")
       throw new Error("AssetOperationsProjectUnavailable");
-    const data = buildOperatingAssetDirectory(source, { sacsiProjectId: source.projectId });
+    const data = buildOperatingAssetDirectory(source, {
+      sacsiProjectId: source.projectId,
+      applyExcelConfirmation: true,
+    });
     const withRentSource = new Set(
       data.entries
         .filter((entry) => entry.kind === "income" && entry.category === "rent" && !entry.voidedAt)

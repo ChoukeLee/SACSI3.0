@@ -10,7 +10,12 @@ import {
 } from "./operating-asset-directory-model";
 
 const projectId = "test-sacsi";
-const options = { sacsiProjectId: projectId };
+const options = { sacsiProjectId: projectId, applyExcelConfirmation: true };
+const workbook =
+  "sha256:e3ed7762344e6e731633bd753702308c51c6a4d24559ee520065ab947d9b16c6|file:公寓、仓库租金截止日期等.xlsx|sheet:老仓库等";
+const workbookSource = `${workbook}|range:A77:I77`;
+const octoberSource = `${workbook}|cell:I77|event:1`;
+const juneSource = `${workbook}|range:H77`;
 
 function asset(overrides: Partial<AssetOperationAsset> = {}): AssetOperationAsset {
   return {
@@ -22,7 +27,7 @@ function asset(overrides: Partial<AssetOperationAsset> = {}): AssetOperationAsse
     name: "国基仓库（原表国基租金）",
     group: "独立仓库",
     verification: "pending",
-    sourceRefs: ["test.xlsx!A77:G77", "用户于2026-11-09确认独立仓库"],
+    sourceRefs: [workbookSource, "用户于2026-11-09确认独立仓库"],
     monthlyRentNative: null,
     rentCurrency: null,
     costCoverageThrough: null,
@@ -53,14 +58,14 @@ function entry(overrides: Partial<Entry> = {}): Entry {
 }
 
 describe("operating asset directory", () => {
-  it("shows the corrected SACSI land category on the same source asset and preserves the original evidence", () => {
+  it("confirms Excel sources in the SACSI trial while retaining the original land evidence", () => {
     const original = asset();
     const originalReceipt = entry({
       id: "land-source",
       assetId: original.id,
       cashDate: "2026-10-02",
       amountNative: 25000000,
-      sourceRef: "test.xlsx!I77",
+      sourceRef: octoberSource,
       description: "原表为国基仓库租金。后续领取按原记录另核。",
       verification: "pending",
     });
@@ -81,65 +86,159 @@ describe("operating asset directory", () => {
       category: "land",
       displayName: "国基土地",
       displayGroup: "土地",
-      sourceRefs: ["test.xlsx!A77:G77", "用户更正为土地"],
+      verification: "verified",
+      sourceRefs: [workbookSource, "用户更正为土地"],
     });
     expect(directory.entries).toEqual([
       expect.objectContaining({
         ...originalReceipt,
+        verification: "verified",
+        status: "verified",
         description: "国基土地租金。后续领取按原记录另核。",
       }),
     ]);
     expect(original.sourceRefs).toContain("用户于2026-11-09确认独立仓库");
     expect(originalReceipt.description).toContain("原表为国基仓库租金。");
+    expect(original.verification).toBe("pending");
+    expect(originalReceipt.verification).toBe("pending");
     expect(directory.canWrite).toBe(false);
-    expect(
-      buildOperatingAssetDirectory(snapshot, { ...options, includeCanonical: true }).assets,
-    ).toEqual(expect.arrayContaining([expect.objectContaining({ id: "canonical-id" })]));
+    const maintenance = buildOperatingAssetDirectory(snapshot, {
+      sacsiProjectId: projectId,
+      includeCanonical: true,
+    });
+    expect(maintenance.assets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: original.id, verification: "pending" }),
+        expect.objectContaining({ id: "canonical-id" }),
+      ]),
+    );
+    expect(maintenance.entries[0]).toMatchObject({ verification: "pending", status: "pending" });
 
     const otherProject = buildOperatingAssetDirectory(
       { ...snapshot, projectId: "other-project", assets: [asset({ projectId: "other-project" })] },
       options,
     );
-    expect(otherProject.assets[0]).toMatchObject({ displayName: original.name });
+    expect(otherProject.assets[0]).toMatchObject({
+      displayName: original.name,
+      verification: "pending",
+    });
     expect(otherProject.assets[0].category).not.toBe("land");
+    expect(otherProject.entries[0]).toMatchObject({ verification: "pending", status: "pending" });
   });
 
-  it("limits the monthly cash view by receipt date while keeping the whole pending history", () => {
+  it("counts the confirmed Guoji receipts in their original cash months", () => {
     const directory = buildOperatingAssetDirectory(
       {
         projectId,
         canWrite: false,
         assets: [asset()],
         entries: [
-          entry({ id: "november", assetId: "land-id", verification: "pending" }),
           entry({
             id: "october",
             assetId: "land-id",
             cashDate: "2026-10-02",
+            amountNative: 25000000,
             periodStart: "2026-07-01",
-            periodEnd: "2026-11-30",
+            periodEnd: "2026-09-30",
+            sourceRef: octoberSource,
             verification: "pending",
           }),
           entry({
             id: "june",
             assetId: "land-id",
             cashDate: "2026-06-30",
+            amountNative: 50000000,
+            periodStart: "2026-01-01",
+            periodEnd: "2026-06-30",
+            sourceRef: juneSource,
             verification: "pending",
           }),
         ],
       },
       options,
     );
-    const current = summarizeOperatingAssetCash(directory.assets, directory.entries, {
+    const october = summarizeOperatingAssetCash(directory.assets, directory.entries, {
+      start: "2026-10-01",
+      end: "2026-10-31",
+    });
+    const november = summarizeOperatingAssetCash(directory.assets, directory.entries, {
       start: "2026-11-01",
       end: "2026-11-30",
     });
     const all = summarizeOperatingAssetCash(directory.assets, directory.entries);
-    expect(current).toMatchObject({ pendingEntryCount: 1, verifiedEntryCount: 0, originals: [] });
-    expect(all).toMatchObject({ pendingEntryCount: 3, verifiedEntryCount: 0, originals: [] });
-    expect(directory.entries.map((item) => item.id)).toEqual(
-      expect.arrayContaining(["november", "october", "june"]),
+    expect(october).toMatchObject({
+      pendingEntryCount: 0,
+      verifiedEntryCount: 1,
+      originals: [{ currency: "XOF", income: 25000000, entryCount: 1 }],
+      bookedXof: { income: 25000000, entryCount: 1 },
+    });
+    expect(november).toMatchObject({ pendingEntryCount: 0, verifiedEntryCount: 0, originals: [] });
+    expect(all).toMatchObject({
+      pendingEntryCount: 0,
+      verifiedEntryCount: 2,
+      originals: [{ currency: "XOF", income: 75000000, entryCount: 2 }],
+    });
+    expect(directory.entries.map((item) => item.id)).toEqual(["october", "june"]);
+  });
+
+  it("keeps manual and voided records separate and never infers cash timing from a period", () => {
+    const manual = asset({
+      id: "manual-asset",
+      sourceKey: "manual:shop",
+      name: "手工资产",
+      sourceRefs: ["手工登记"],
+    });
+    const directory = buildOperatingAssetDirectory(
+      {
+        projectId,
+        canWrite: false,
+        assets: [asset(), manual],
+        entries: [
+          entry({
+            id: "manual",
+            assetId: "land-id",
+            verification: "pending",
+            sourceRef: "test.xlsx!A2",
+          }),
+          entry({
+            id: "voided",
+            assetId: "land-id",
+            sourceRef: juneSource,
+            verification: "pending",
+            voidedAt: "2026-11-09T09:00:00Z",
+          }),
+          entry({
+            id: "undated",
+            assetId: "land-id",
+            cashDate: null,
+            periodStart: "2026-01-01",
+            periodEnd: "2026-12-31",
+            sourceRef: octoberSource,
+            verification: "pending",
+          }),
+        ],
+      },
+      options,
     );
+    const november = summarizeOperatingAssetCash(directory.assets, directory.entries, {
+      start: "2026-11-01",
+      end: "2026-11-30",
+    });
+
+    expect(directory.assets.find(({ id }) => id === manual.id)?.verification).toBe("pending");
+    expect(directory.entries).toEqual([
+      expect.objectContaining({ id: "manual", status: "pending", verification: "pending" }),
+      expect.objectContaining({ id: "voided", status: "voided" }),
+      expect.objectContaining({ id: "undated", status: "verified", cashDate: null }),
+    ]);
+    expect(november).toMatchObject({
+      pendingEntryCount: 1,
+      verifiedEntryCount: 0,
+      voidedEntryCount: 1,
+      undatedEntryCount: 1,
+      originals: [],
+      bookedXof: null,
+    });
   });
 
   it("counts original and booked amounts in separate views without duplicating a receipt", () => {

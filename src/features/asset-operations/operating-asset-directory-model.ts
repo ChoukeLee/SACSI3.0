@@ -39,11 +39,23 @@ export interface OperatingAssetDirectoryOptions {
   sacsiProjectId?: string;
   /** Source maintenance can retain supplemental records linked to a unit. */
   includeCanonical?: boolean;
+  /** Apply the user's confirmation in the trial view. Maintenance uses stored status. */
+  applyExcelConfirmation?: boolean;
 }
 
 const GUOJI_SOURCE_KEY = "warehouse:guoji";
 const GUOJI_OLD_CLASSIFICATION = "用户于2026-11-09确认独立仓库";
 const GUOJI_CORRECTION = "用户更正为土地";
+// The user's confirmation covers the two workbook revisions used for the SACSI intake.
+const confirmedExcelSources = [
+  "sha256:8e3b00f2bf83047118f3614e99cdb58b3d2d09538dcb3c602421153443e03164|file:出租公寓及仓库明细.xlsx|sheet:",
+  "sha256:e3ed7762344e6e731633bd753702308c51c6a4d24559ee520065ab947d9b16c6|file:公寓、仓库租金截止日期等.xlsx|sheet:",
+];
+
+function isConfirmedExcelSource(ref: string | null | undefined) {
+  return !!ref && confirmedExcelSources.some((source) => ref.startsWith(source));
+}
+
 const categoryRules: readonly [OperatingAssetCategory, RegExp][] = [
   ["land", /土地|地块|地塊|用地|\b(?:land|terrain)\b/],
   ["dormitory", /宿舍|\b(?:dormitory|dorm|dortoir)\b/],
@@ -128,8 +140,13 @@ function scopedEntries(
 /** Keep the full source history for the displayed assets. Report dates are a separate concern. */
 export function buildOperatingAssetDirectory(
   snapshot: DirectorySnapshot,
-  { includeCanonical = false, sacsiProjectId }: OperatingAssetDirectoryOptions = {},
+  {
+    includeCanonical = false,
+    sacsiProjectId,
+    applyExcelConfirmation = false,
+  }: OperatingAssetDirectoryOptions = {},
 ): OperatingAssetDirectoryData {
+  const confirmExcel = applyExcelConfirmation && snapshot.projectId === sacsiProjectId;
   const assets = snapshot.assets
     .filter(
       (asset) =>
@@ -139,6 +156,10 @@ export function buildOperatingAssetDirectory(
       const guojiLand = isGuojiLand(asset, sacsiProjectId);
       return {
         ...asset,
+        verification:
+          confirmExcel && asset.sourceRefs.some(isConfirmedExcelSource)
+            ? ("verified" as const)
+            : asset.verification,
         category: classifyOperatingAsset(asset, sacsiProjectId),
         displayName: guojiLand ? "国基土地" : asset.name,
         displayGroup: guojiLand ? "土地" : asset.group,
@@ -156,9 +177,13 @@ export function buildOperatingAssetDirectory(
   const entries = scopedEntries(assetMap, snapshot.entries)
     .map((entry) => {
       const asset = assetMap.get(entry.assetId)!;
+      const confirmedEntry =
+        confirmExcel && !entry.voidedAt && isConfirmedExcelSource(entry.sourceRef)
+          ? { ...entry, verification: "verified" as const }
+          : entry;
       return {
-        ...entry,
-        status: entryStatus(asset, entry),
+        ...confirmedEntry,
+        status: entryStatus(asset, confirmedEntry),
         bookedAmountXof: bookedXof(entry),
         description: isGuojiLand(asset, sacsiProjectId)
           ? entry.description.replace(/^原表为国基仓库租金。/, "国基土地租金。")

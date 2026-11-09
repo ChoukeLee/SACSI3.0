@@ -58,7 +58,7 @@ const receiptCategoryLabels: Partial<
 
 const entryStatusLabels: Record<OperatingAssetDirectoryEntry["status"], [string, string]> = {
   pending: ["待核", "À vérifier"],
-  verified: ["已核", "Vérifié"],
+  verified: ["已确认", "Confirmé"],
   voided: ["已作废", "Annulé"],
 };
 
@@ -67,8 +67,8 @@ const emptyEntries: OperatingAssetDirectoryEntry[] = [];
 function referenceRent(asset: OperatingAssetDirectoryAsset, locale: Locale) {
   return asset.monthlyRentNative === null || asset.rentCurrency === null
     ? locale === "zh"
-      ? "待核"
-      : "À vérifier"
+      ? "未登记"
+      : "Non renseigné"
     : formatPropertyMoney(asset.monthlyRentNative, asset.rentCurrency, locale);
 }
 
@@ -439,7 +439,13 @@ function OperatingAssetDetail({
             <dl className={styles.depositFacts}>
               <div>
                 <dt>{zh ? "登记状态" : "État de vérification"}</dt>
-                <dd>{entryStatusLabels[asset.verification][zh ? 0 : 1]}</dd>
+                <dd>
+                  {asset.verification === "verified"
+                    ? zh
+                      ? "已核实"
+                      : "Vérifié"
+                    : entryStatusLabels.pending[zh ? 0 : 1]}
+                </dd>
               </div>
               <div>
                 <dt>{zh ? "参考月租" : "Loyer mensuel indicatif"}</dt>
@@ -448,7 +454,7 @@ function OperatingAssetDetail({
               {rentCoverage ? (
                 <div>
                   <dt>{zh ? "租客" : "Locataire"}</dt>
-                  <dd>{zh ? "待核" : "À vérifier"}</dd>
+                  <dd>{zh ? "未登记" : "Non renseigné"}</dd>
                 </div>
               ) : null}
             </dl>

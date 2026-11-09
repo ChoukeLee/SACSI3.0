@@ -9,6 +9,10 @@ import { buildOperatingAssetDirectory } from "./operating-asset-directory-model"
 
 const projectId = "test-sacsi";
 const today = "2026-11-09";
+const workbook =
+  "sha256:e3ed7762344e6e731633bd753702308c51c6a4d24559ee520065ab947d9b16c6|file:公寓、仓库租金截止日期等.xlsx|sheet:老仓库等";
+const octoberSource = `${workbook}|cell:I77|event:1`;
+const juneSource = `${workbook}|range:H77`;
 
 function asset(overrides: Partial<AssetOperationAsset> = {}): AssetOperationAsset {
   return {
@@ -20,7 +24,7 @@ function asset(overrides: Partial<AssetOperationAsset> = {}): AssetOperationAsse
     name: "国基仓库（原表国基租金）",
     group: "独立仓库",
     verification: "pending",
-    sourceRefs: ["test.xlsx!A77:G77", "用户于2026-11-09确认独立仓库"],
+    sourceRefs: [`${workbook}|range:A77:I77`, "用户于2026-11-09确认独立仓库"],
     monthlyRentNative: null,
     rentCurrency: null,
     costCoverageThrough: null,
@@ -44,7 +48,7 @@ function entry(overrides: Partial<Entry> = {}): Entry {
     periodEnd: "2026-09-30",
     verification: "pending",
     recognitionMethod: "unallocated",
-    sourceRef: "test.xlsx!I77",
+    sourceRef: octoberSource,
     description: "原表为国基仓库租金。后续领取按原记录另核。",
     ...overrides,
   };
@@ -71,6 +75,7 @@ function directory(assets: AssetOperationAsset[], entries: Entry[]) {
     { projectId, assets, entries, canWrite: false },
     {
       sacsiProjectId: projectId,
+      applyExcelConfirmation: true,
     },
   );
 }
@@ -93,7 +98,7 @@ function factValues(scope: ParentNode, name: string) {
     .map((item) => item.nextElementSibling?.textContent);
 }
 
-it("opens the same corrected land detail from the directory card and the land-category selection", async () => {
+it("opens the same confirmed Guoji receipts from the directory card and the land category", async () => {
   const data = directory(
     [asset()],
     [
@@ -104,7 +109,7 @@ it("opens the same corrected land detail from the directory card and the land-ca
         cashDate: "2026-06-30",
         periodStart: "2026-01-01",
         periodEnd: "2026-06-30",
-        sourceRef: "test.xlsx!H77",
+        sourceRef: juneSource,
       }),
     ],
   );
@@ -113,26 +118,30 @@ it("opens the same corrected land detail from the directory card and the land-ca
   );
   const card = host.querySelector<HTMLButtonElement>('button[aria-haspopup="dialog"]');
   expect(card?.textContent).toContain("国基土地");
-  expect(card?.textContent).toContain("2 笔历史流水待核");
-  expect(card?.textContent).toContain("租金来源记载至 2026-09-30 · 待核");
+  expect(card?.textContent).not.toContain("资料待核");
+  expect(card?.textContent).not.toContain("历史流水待核");
+  expect(card?.textContent).toContain("租金来源记载至 2026-09-30 · 已确认");
   await act(async () => card!.click());
 
   async function inspectHistory() {
     const current = dialog();
     expect(current.querySelector("h2")?.textContent).toBe("国基土地");
-    expect(current.textContent).toContain("本期 0 笔，全部历史 2 笔");
-    expect(current.textContent).toContain("租金来源记载至 2026-09-30 · 待核");
+    expect(current.textContent).not.toContain("来源待核");
+    expect(current.textContent).toContain("租金来源记载至 2026-09-30 · 已确认");
     expect(current.textContent).toContain("原币实收与支出");
     expect(current.textContent).toContain("本期暂无已核经营记账额。");
     expect(current.textContent).not.toContain("逾期");
     expect(factValues(current, "已核实收")).toEqual([]);
-    await clickButton(current, "查看待核流水");
+    await clickButton(current, "收付款");
     expect(current.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("收付款");
     expect(factValues(current, "收付日期")).toEqual(["2026-10-02", "2026-06-30"]);
     expect(factValues(current, "原币金额")).toEqual(["2,500 万西法", "5,000 万西法"]);
+    expect(
+      [...current.querySelectorAll('[data-status="verified"]')].map((item) => item.textContent),
+    ).toEqual(["已确认", "已确认"]);
     expect([...current.querySelectorAll("summary")].map((item) => item.title)).toEqual([
-      "test.xlsx!I77",
-      "test.xlsx!H77",
+      octoberSource,
+      juneSource,
     ]);
     expect(current.textContent).not.toContain("国基仓库");
   }
