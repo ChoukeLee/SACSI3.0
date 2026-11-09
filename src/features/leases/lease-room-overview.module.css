@@ -61,9 +61,10 @@
 }
 .compactRoom {
   display: grid;
+  container: lease-room-card / inline-size;
   min-width: 0;
-  min-height: 4.2rem;
-  align-content: center;
+  grid-template-rows: 1.375rem auto;
+  align-content: start;
   gap: 0.25rem;
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--lease-room-border, hsl(var(--border)));
@@ -71,7 +72,6 @@
   background: var(--lease-room-surface, hsl(var(--card)));
   color: hsl(var(--foreground));
   text-align: left;
-  overflow-wrap: anywhere;
 }
 .compactRoom:hover,
 .compactRoom[aria-pressed="true"] {
@@ -81,18 +81,29 @@
   cursor: not-allowed;
   opacity: 0.6;
 }
-.compactIdentity,
-.compactRoomFacts {
+.compactIdentity {
   display: flex;
   min-width: 0;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.15rem 0.55rem;
+  align-items: center;
+  gap: 0.45rem;
+}
+.compactIdentity strong,
+.compactIdentity > span,
+.compactIdentity small,
+.compactPaidThrough,
+.compactAttention {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .compactIdentity strong {
+  max-inline-size: 40%;
   font-size: 0.9375rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+.compactIdentity > span {
+  flex: 1 1 auto;
 }
 .compactIdentity > span,
 .compactPaidThrough {
@@ -105,10 +116,26 @@
   color: hsl(var(--muted-foreground));
 }
 .compactIdentity small {
+  max-inline-size: 40%;
+  flex: none;
   font-size: 0.75rem;
 }
 .compactRoomFacts {
-  justify-content: space-between;
+  display: grid;
+  min-width: 0;
+  grid-template: var(--lease-room-facts, repeat(2, 1.375rem) / minmax(0, 1fr));
+  align-items: center;
+  column-gap: 0.35rem;
+}
+@container lease-room-card (min-width: 13rem) {
+  .compactRoomFacts:lang(zh) {
+    --lease-room-facts: 1.375rem / minmax(0, 1fr) fit-content(45%);
+  }
+}
+@container lease-room-card (min-width: 15rem) {
+  .compactRoomFacts {
+    --lease-room-facts: 1.375rem / minmax(0, 1fr) fit-content(45%);
+  }
 }
 .compactPaidThrough time {
   color: hsl(var(--foreground));
@@ -116,12 +143,15 @@
   white-space: nowrap;
 }
 .compactAttention {
+  max-inline-size: 100%;
+  justify-self: start;
   padding: 0.1rem 0.35rem;
   border-radius: 0.25rem;
   background: var(--lease-room-badge, hsl(var(--muted)));
   color: var(--lease-room-ink, hsl(var(--muted-foreground)));
   font-size: 0.75rem;
   font-weight: 550;
+  line-height: 1rem;
 }
 .compactRoom[data-follow-up="overdue"] {
   --lease-room-border: #e5afaa;

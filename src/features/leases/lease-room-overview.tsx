@@ -274,6 +274,7 @@ function CompactRoomCard({
       data-room-id={row.unit.id}
       data-follow-up={followUp ?? undefined}
       className={styles.compactRoom}
+      lang={locale}
       disabled={disabled}
       aria-label={[
         `${building} ${row.unit.unit_no}`,
@@ -289,16 +290,20 @@ function CompactRoomCard({
       onClick={() => onSelect(row)}
     >
       <span className={styles.compactIdentity}>
-        <strong>{row.unit.unit_no}</strong>
-        <span>{tenant}</span>
-        {occupancy ? <small>{occupancy}</small> : null}
+        <strong title={row.unit.unit_no}>{row.unit.unit_no}</strong>
+        <span title={tenant}>{tenant}</span>
+        {occupancy ? <small title={occupancy}>{occupancy}</small> : null}
       </span>
       <span className={styles.compactRoomFacts}>
-        <span className={styles.compactPaidThrough}>
+        <span className={styles.compactPaidThrough} title={`${paidThroughLabel} ${paidThrough}`}>
           {paidThroughLabel}{" "}
           {row.paidThrough ? <time dateTime={paidThrough}>{paidThrough}</time> : paidThrough}
         </span>
-        {attention ? <span className={styles.compactAttention}>{attention}</span> : null}
+        {attention ? (
+          <span className={styles.compactAttention} title={attention}>
+            {attention}
+          </span>
+        ) : null}
       </span>
     </button>
   );
