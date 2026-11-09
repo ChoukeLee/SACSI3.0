@@ -1,4 +1,4 @@
-import { assetSourceLabel } from "@/features/asset-operations/asset-operations-model";
+import { assetSourceLabel, isAssetDate } from "@/features/asset-operations/asset-operations-model";
 import {
   getOperatingAssetFollowUp,
   hasOperatingAssetLeaseEvidence,
@@ -8,20 +8,22 @@ import {
 import {
   followUpLabels,
   followUpReasons,
+  latestVerifiedRentReceipt,
+  operatingLeaseLocation,
   recordedTenant,
 } from "@/features/asset-operations/operating-asset-display";
 import { routeFor, type Locale } from "@/lib/i18n";
 import { formatPropertyMoney } from "@/lib/property-money";
 import { buildWorkbenchRecordHref } from "@/lib/workbench-links";
 import {
-  leaseBrowseCategories,
+  classifyOperatingLeaseMode,
   leaseBrowseCategoryLabel,
   leaseCollectionHref,
+  parseLeaseBrowseCategory,
   type LeaseBrowseCategory,
 } from "./lease-browse-model";
 import type { LeaseRecordOverviewRow } from "./lease-room-overview-model";
 
-export const collectionCategories = leaseBrowseCategories;
 type RecordCategory = LeaseBrowseCategory;
 export type CollectionCategory = "all" | RecordCategory;
 export type CollectionStatus = Exclude<keyof typeof followUpLabels, "all"> | "unsettled";
@@ -30,11 +32,12 @@ export interface UnifiedLeaseCollectionRow {
   id: string;
   category: RecordCategory;
   name: string;
-  group: string;
+  group?: string;
   tenant?: string;
   keywords: readonly string[];
   href: string;
   status: CollectionStatus;
+  statusLabel?: string;
   reason?: string;
   dueDate: string | null;
   dueSource?: string;
@@ -44,14 +47,20 @@ export interface UnifiedLeaseCollectionRow {
   amount: string | null;
   amountLabel: string;
   amountSource?: string;
+  latestReceipt?: {
+    date: string;
+    amount: string;
+    periodStart?: string;
+    periodEnd?: string;
+  };
 }
 
 export function parseCollectionCategory(value: unknown): CollectionCategory {
-  return collectionCategories.find((category) => category === value) ?? "all";
+  return parseLeaseBrowseCategory(value) ?? "all";
 }
 
 export function collectionCategoryLabel(category: CollectionCategory, locale: Locale) {
-  if (category === "all") return locale === "zh" ? "全部类别" : "Toutes les catégories";
+  if (category === "all") return locale === "zh" ? "汇总三类" : "Synthèse des trois modes";
   return leaseBrowseCategoryLabel(category, locale);
 }
 
@@ -60,8 +69,19 @@ export const collectionStatusLabels: Record<CollectionStatus | "all", [string, s
   overdue: followUpLabels.overdue,
   upcoming: followUpLabels.upcoming,
   unsettled: ["历史待结清", "Ancien solde à régler"],
-  needs_evidence: followUpLabels.needs_evidence,
+  needs_evidence: ["资料待补", "Données à compléter"],
 };
+
+function timingLabel(status: CollectionStatus, days: number | null | undefined, zh: boolean) {
+  if (days == null) return undefined;
+  if (status === "overdue")
+    return zh ? `逾期 ${Math.abs(days)} 天` : `Retard de ${Math.abs(days)} j`;
+  if (status === "upcoming") {
+    if (days === 0) return zh ? "今日应缴" : "Dû aujourd’hui";
+    return zh ? `${days} 天内应缴` : `Dû sous ${days} j`;
+  }
+  return undefined;
+}
 
 const apartmentAmountLabels: Record<CollectionStatus, [string, string]> = {
   overdue: ["逾期未收", "Solde en retard"],
@@ -131,12 +151,12 @@ export function buildApartmentCollectionRows(
         id: `apartment:${contract.id}`,
         category: "apartment",
         name: unit.unit_no,
-        group:
-          building?.display_name || building?.code || collectionCategoryLabel("apartment", locale),
+        group: building?.display_name || building?.code || undefined,
         tenant: customer?.name ?? undefined,
         keywords: [unit.code, contract.contract_no].filter((value): value is string => !!value),
         href,
         status,
+        statusLabel: timingLabel(status, bill?.days, zh),
         reason,
         dueDate: bill?.dueDate ?? null,
         paidThrough,
@@ -168,25 +188,40 @@ export function buildOperatingCollectionRows(
   return data.assets.flatMap((asset) => {
     const entries = entriesByAsset.get(asset.id) ?? [];
     if (!hasOperatingAssetLeaseEvidence(asset, entries)) return [];
-    const { status, reason, dueDate, dueSourceRef, paidThrough, outstanding } =
+    const category = classifyOperatingLeaseMode(asset);
+    const { status, reason, dueDate, dueSourceRef, paidThrough, outstanding, daysUntilDue } =
       getOperatingAssetFollowUp(asset, entries, today);
-    if (status === "current") return [];
+    // A missing next date on a prepaid whole lease is a record to complete. The source
+    // coverage, due date and any unpaid balance retain their independent meanings.
+    const awaitingPaymentDate =
+      category === "whole" && !dueDate && paidThrough?.status === "verified";
+    if (status === "current" && !awaitingPaymentDate) return [];
+    const collectionStatus = status === "current" ? "needs_evidence" : status;
+    const latestReceipt =
+      category === "whole" && !dueDate ? latestVerifiedRentReceipt(entries, today) : undefined;
     const tenant = recordedTenant(asset, locale);
     const query = new URLSearchParams({
-      assetCategory: asset.category,
+      assetCategory: category,
       operatingAsset: asset.id,
     });
     return [
       {
         id: `asset:${asset.id}`,
-        category: asset.category,
+        category,
         name: asset.displayName,
-        group: asset.displayGroup || collectionCategoryLabel(asset.category, locale),
+        group: operatingLeaseLocation(asset),
         tenant: tenant ? `${tenant.label} ${tenant.names}` : undefined,
         keywords: [asset.code, asset.name],
         href: routeFor(locale, `/leases?${query}`),
-        status,
-        reason: reason ? followUpReasons[reason][zh ? 0 : 1] : undefined,
+        status: collectionStatus,
+        statusLabel: timingLabel(collectionStatus, daysUntilDue, zh),
+        reason: reason
+          ? followUpReasons[reason][zh ? 0 : 1]
+          : awaitingPaymentDate
+            ? zh
+              ? "下期付款日待补"
+              : "Prochaine échéance à compléter"
+            : undefined,
         dueDate,
         dueSource: dueSourceRef ? assetSourceLabel(dueSourceRef) : undefined,
         paidThrough: paidThrough?.date ?? null,
@@ -203,6 +238,20 @@ export function buildOperatingCollectionRows(
             ? "未收金额"
             : "Solde à recevoir",
         amountSource: outstanding ? assetSourceLabel(outstanding.sourceRef) : undefined,
+        latestReceipt: latestReceipt
+          ? {
+              date: latestReceipt.cashDate,
+              amount: formatPropertyMoney(
+                latestReceipt.amountNative,
+                latestReceipt.currency,
+                locale,
+              ),
+              periodStart: isAssetDate(latestReceipt.periodStart)
+                ? latestReceipt.periodStart
+                : undefined,
+              periodEnd: isAssetDate(latestReceipt.periodEnd) ? latestReceipt.periodEnd : undefined,
+            }
+          : undefined,
       },
     ];
   });

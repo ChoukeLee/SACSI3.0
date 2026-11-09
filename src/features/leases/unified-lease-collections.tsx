@@ -4,12 +4,10 @@ import { ArrowRight, Search } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import type { Locale } from "@/lib/i18n";
-import { LeaseBrowseStatusFilter } from "./lease-browse-content";
+import { LeaseBrowseStatusFilter, LeaseModeSelector } from "./lease-browse-content";
 import {
-  collectionCategories,
   collectionCategoryLabel,
   collectionStatusLabels,
-  parseCollectionCategory,
   sortCollectionRows,
   type CollectionCategory,
   type CollectionStatus,
@@ -41,7 +39,7 @@ export function UnifiedLeaseCollections({
     (row) =>
       (category === "all" || row.category === category) &&
       (!query ||
-        [row.name, row.group, row.tenant ?? "", ...row.keywords].some((value) =>
+        [row.name, row.group ?? "", row.tenant ?? "", ...row.keywords].some((value) =>
           value.toLocaleLowerCase(locale).includes(query),
         )),
   );
@@ -76,19 +74,33 @@ export function UnifiedLeaseCollections({
       className={styles.workspace}
       aria-label={zh ? "集中收款跟进" : "Suivi des loyers regroupé"}
     >
-      <div className={styles.toolbar}>
-        <select
-          className={styles.category}
-          aria-label={zh ? "资产类别" : "Catégorie d’actifs"}
-          value={category}
-          onChange={(event) => setCategory(parseCollectionCategory(event.target.value))}
+      <div className={styles.scopeBar}>
+        <LeaseModeSelector
+          locale={locale}
+          value={category === "all" ? null : category}
+          onChange={setCategory}
+        />
+        <button
+          className={styles.overview}
+          type="button"
+          aria-pressed={category === "all"}
+          onClick={() => setCategory("all")}
         >
-          {(["all", ...collectionCategories] as const).map((key) => (
-            <option key={key} value={key}>
-              {collectionCategoryLabel(key, locale)}
-            </option>
-          ))}
-        </select>
+          {category === "all"
+            ? collectionCategoryLabel("all", locale)
+            : zh
+              ? "返回汇总"
+              : "Retour à la synthèse"}
+        </button>
+      </div>
+      <div className={styles.toolbar}>
+        <span className={styles.resultCount} aria-live="polite">
+          {scopeUnavailable
+            ? "—"
+            : zh
+              ? `${visible.length} 项跟进`
+              : `${visible.length} dossier(s) à suivre`}
+        </span>
         <LeaseBrowseStatusFilter
           label={zh ? "收款状态" : "Statut du suivi"}
           value={filter}
@@ -141,40 +153,57 @@ export function UnifiedLeaseCollections({
                   <li key={row.id}>
                     <Link href={row.href} prefetch={false} className={styles.row}>
                       <span className={styles.identity}>
-                        <small>
-                          {row.group === categoryLabel
-                            ? row.group
-                            : `${categoryLabel} · ${row.group}`}
-                        </small>
+                        <small>{[categoryLabel, row.group].filter(Boolean).join(" · ")}</small>
                         <span className={styles.party}>
                           <strong>{row.name}</strong>
                           {row.tenant ? <span>{row.tenant}</span> : null}
                         </span>
-                        {row.reason ? <small>{row.reason}</small> : null}
                       </span>
-                      <span className={styles.dates}>
-                        <span title={row.dueSource}>
-                          <small>{zh ? "付款日" : "Échéance"}</small>
-                          {row.dueDate ?? unregistered}
-                        </span>
-                        <span title={row.paidThroughSource}>
-                          <small>
-                            {row.coveragePending
-                              ? zh
-                                ? "租金记载至"
-                                : "Loyer documenté au"
-                              : zh
-                                ? "已交至"
-                                : "Payé au"}
-                          </small>
-                          {row.paidThrough ?? unregistered}
-                        </span>
+                      <span className={styles.field} title={row.paidThroughSource}>
+                        <small>
+                          {row.coveragePending
+                            ? zh
+                              ? "租金记载至"
+                              : "Loyer documenté au"
+                            : zh
+                              ? "已交至"
+                              : "Payé au"}
+                        </small>
+                        {row.paidThrough ? (
+                          <time dateTime={row.paidThrough}>{row.paidThrough}</time>
+                        ) : (
+                          unregistered
+                        )}
                       </span>
-                      <span className={styles.amount} title={row.amountSource}>
+                      <span className={styles.field} title={row.dueSource}>
+                        <small>{zh ? "约定付款日" : "Échéance prévue"}</small>
+                        {row.dueDate ? (
+                          <time dateTime={row.dueDate}>{row.dueDate}</time>
+                        ) : (
+                          unregistered
+                        )}
+                      </span>
+                      <span className={styles.field} title={row.amountSource}>
                         <small>{row.amountLabel}</small>
                         <span>{row.amount ?? unregistered}</span>
                       </span>
+                      <span className={styles.rowStatus} data-status={row.status}>
+                        {row.reason ?? row.statusLabel ?? collectionStatusLabels[row.status][lang]}
+                      </span>
                       <ArrowRight size={14} aria-hidden="true" />
+                      {row.latestReceipt ? (
+                        <span className={styles.receipt}>
+                          <small>{zh ? "已确认收款" : "Encaissement confirmé"}</small>
+                          <time dateTime={row.latestReceipt.date}>{row.latestReceipt.date}</time>
+                          <span>{row.latestReceipt.amount}</span>
+                          {row.latestReceipt.periodStart && row.latestReceipt.periodEnd ? (
+                            <small>
+                              {zh ? "覆盖" : "Période"} {row.latestReceipt.periodStart}{" "}
+                              {zh ? "至" : "au"} {row.latestReceipt.periodEnd}
+                            </small>
+                          ) : null}
+                        </span>
+                      ) : null}
                     </Link>
                   </li>
                 );

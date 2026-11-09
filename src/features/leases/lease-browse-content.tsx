@@ -1,5 +1,43 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
+import type { Locale } from "@/lib/i18n";
+import {
+  leaseBrowseCategories,
+  leaseBrowseCategoryLabel,
+  type LeaseBrowseCategory,
+} from "./lease-browse-model";
 import styles from "./lease-browse-content.module.css";
+
+export function LeaseModeSelector({
+  locale,
+  value,
+  onChange,
+  disabled,
+}: {
+  locale: Locale;
+  value: LeaseBrowseCategory | null;
+  onChange: (value: LeaseBrowseCategory) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div
+      className={styles.modes}
+      role="group"
+      aria-label={locale === "zh" ? "出租方式" : "Modes de location"}
+    >
+      {leaseBrowseCategories.map((mode) => (
+        <button
+          key={mode}
+          type="button"
+          aria-pressed={value === mode}
+          disabled={disabled}
+          onClick={() => onChange(mode)}
+        >
+          {leaseBrowseCategoryLabel(mode, locale)}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 interface LeaseLocation {
   id: string;

@@ -631,6 +631,7 @@ const files = [
   "src/features/leases/apartment-directory-section.tsx",
   "src/features/leases/lease-workbench-frame.tsx",
   "src/features/leases/lease-browse-model.ts",
+  "src/features/leases/lease-browse-model.test.ts",
   "src/features/leases/lease-browse-toolbar.tsx",
   "src/features/leases/lease-browse-content.tsx",
   "src/features/leases/lease-browse-content.module.css",

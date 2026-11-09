@@ -6,7 +6,11 @@ import Link from "next/link";
 import { SegmentedControl } from "@/components/ui/operational";
 import { ApartmentDirectorySection } from "@/features/leases/apartment-directory-section";
 import { LeaseBrowseStatusFilter } from "@/features/leases/lease-browse-content";
-import { leaseBrowseCategoryLabel, leaseSearchHref } from "@/features/leases/lease-browse-model";
+import {
+  classifyOperatingLeaseMode,
+  leaseBrowseCategoryLabel,
+  leaseSearchHref,
+} from "@/features/leases/lease-browse-model";
 import {
   LeaseBrowseToolbar,
   type LeaseBrowseCategory,
@@ -38,10 +42,15 @@ import {
   followUpReasons,
   operatingAssetCategoryLabel,
   operatingAssetMatchesSearch,
+  operatingLeaseLocation,
   recordedTenant,
   referenceRent,
 } from "./operating-asset-display";
-import { OperatingLeaseCard, OperatingLeaseLocations } from "./operating-lease-locations";
+import {
+  OperatingLeaseCard,
+  OperatingLeaseLocations,
+  OperatingWholeLeaseCard,
+} from "./operating-lease-locations";
 import locationStyles from "./operating-lease-locations.module.css";
 import styles from "./operating-asset-directory.module.css";
 
@@ -61,8 +70,7 @@ type CollectionRow = DirectoryRow & { followUp: FollowUp & { status: FollowUpSta
 
 const emptyEntries: OperatingAssetDirectoryEntry[] = [];
 function leaseSiteId(asset: OperatingAssetDirectoryAsset) {
-  if (asset.displayGroup.trim()) return asset.displayGroup;
-  return asset.category === "warehouse" ? "__warehouse-unassigned__" : "__lease-site-unassigned__";
+  return operatingLeaseLocation(asset) ?? "__lease-site-unassigned__";
 }
 
 const cardFilters: { key: CardFilter; labels: [string, string] }[] = [
@@ -89,6 +97,7 @@ interface OperatingAssetDirectoryProps {
   data: ReturnType<typeof buildOperatingAssetDirectory>;
   today: string;
   category: OperatingAssetCategory | "all";
+  leaseCategory?: Exclude<LeaseBrowseCategory, "apartment">;
   selectedAssetId?: string | null;
   enableCollections?: boolean;
   initialView?: "cards" | "collections";
@@ -106,6 +115,7 @@ export function OperatingAssetDirectory(props: OperatingAssetDirectoryProps) {
       key={JSON.stringify([
         props.data.projectId,
         props.category,
+        props.leaseCategory,
         props.selectedAssetId,
         props.initialView,
         props.browseViewerId,
@@ -121,6 +131,7 @@ function OperatingAssetDirectoryView({
   data,
   today,
   category,
+  leaseCategory,
   selectedAssetId,
   enableCollections = false,
   initialView = "cards",
@@ -140,17 +151,35 @@ function OperatingAssetDirectoryView({
   const [followUpFilter, setFollowUpFilter] = useState<FollowUpFilter>("all");
   const [selectedId, setSelectedId] = useState(selectedAssetId ?? null);
   const groupStorageKey =
-    browseViewerId && category !== "all"
-      ? `sacsi:lease-site:${browseViewerId}:${data.projectId}:${category}`
+    browseViewerId && leaseCategory === "multi-unit"
+      ? `sacsi:lease-site:${browseViewerId}:${data.projectId}:${leaseCategory}`
       : null;
+  const selectedAssetSite =
+    selectedAssetId && groupStorageKey
+      ? data.assets.find((asset) => asset.id === selectedAssetId)
+      : undefined;
+  const initialSite = selectedAssetSite ? leaseSiteId(selectedAssetSite) : undefined;
   useEffect(() => {
     if (!groupStorageKey) return;
+    if (initialSite) {
+      setSelectedGroup(initialSite);
+      return;
+    }
     try {
-      setSelectedGroup(localStorage.getItem(groupStorageKey) ?? "");
+      const saved = localStorage.getItem(groupStorageKey);
+      const legacy =
+        saved === null
+          ? localStorage.getItem(`sacsi:lease-site:${browseViewerId}:${data.projectId}:warehouse`)
+          : null;
+      setSelectedGroup(
+        saved ??
+          (legacy === "__warehouse-unassigned__" ? "__lease-site-unassigned__" : legacy) ??
+          "",
+      );
     } catch {
       // Keep the default location when browser storage is unavailable.
     }
-  }, [groupStorageKey]);
+  }, [browseViewerId, data.projectId, groupStorageKey, initialSite]);
   function changeGroup(group: string) {
     setSelectedGroup(group);
     if (!groupStorageKey) return;
@@ -178,7 +207,11 @@ function OperatingAssetDirectoryView({
   }, [data.entries]);
   const rows = useMemo(() => {
     const scoped = data.assets
-      .filter((asset) => category === "all" || asset.category === category)
+      .filter((asset) =>
+        leaseCategory
+          ? classifyOperatingLeaseMode(asset) === leaseCategory
+          : category === "all" || asset.category === category,
+      )
       .map((asset): DirectoryRow => {
         const entries = entriesByAsset.get(asset.id) ?? emptyEntries;
         const followUp = getOperatingAssetFollowUp(asset, entries, today);
@@ -187,7 +220,11 @@ function OperatingAssetDirectoryView({
         const review =
           asset.verification === "pending" ||
           pendingEntries > 0 ||
-          (hasLeaseEvidence && followUp.status === "needs_evidence");
+          (hasLeaseEvidence &&
+            (followUp.status === "needs_evidence" ||
+              (browseViewerId &&
+                classifyOperatingLeaseMode(asset) === "whole" &&
+                !followUp.dueDate)));
         return {
           asset,
           entries,
@@ -202,7 +239,7 @@ function OperatingAssetDirectoryView({
                 : null,
         };
       });
-    if (category !== "all") {
+    if (leaseCategory || category !== "all") {
       const warehouseOrder = new Map([
         ["老仓库", 0],
         ["新仓库", 1],
@@ -210,7 +247,7 @@ function OperatingAssetDirectoryView({
       ]);
       scoped.sort((a, b) => {
         const groupOrder =
-          category === "warehouse"
+          leaseCategory === "multi-unit" || category === "warehouse"
             ? (warehouseOrder.get(a.asset.displayGroup) ?? 3) -
               (warehouseOrder.get(b.asset.displayGroup) ?? 3)
             : 0;
@@ -220,14 +257,14 @@ function OperatingAssetDirectoryView({
       });
     }
     return scoped;
-  }, [category, data.assets, entriesByAsset, locale, today]);
+  }, [browseViewerId, category, data.assets, entriesByAsset, leaseCategory, locale, today]);
   const showCollections = enableCollections && view === "collections";
-  const locationCategory =
-    browseViewerId && category !== "all" && !showCollections ? category : null;
+  const locationMode = !!browseViewerId && leaseCategory === "multi-unit" && !showCollections;
+  const wholeMode = !!browseViewerId && leaseCategory === "whole" && !showCollections;
   const activeSearch = browseViewerId ? (searchQuery ?? "").trim() : search;
-  const isSearchView = Boolean(browseViewerId && category === "all");
+  const isSearchView = !!browseViewerId && !leaseCategory;
   const emptySearch = isSearchView && !activeSearch;
-  const browseCategory = category === "all" ? (searchCategory ?? "apartment") : category;
+  const browseCategory = leaseCategory ?? searchCategory ?? "apartment";
   const hasApartments = !emptySearch && (apartmentRows !== undefined || apartmentUnavailable);
   const showLeaseToolbar =
     !showCollections &&
@@ -240,18 +277,18 @@ function OperatingAssetDirectoryView({
   >();
   if (hasApartments) groupOptions.set("apartment", zh ? "公寓" : "Appartements");
   for (const { asset, attention } of rows) {
-    if (locationCategory) {
+    if (locationMode) {
       const id = leaseSiteId(asset);
       let site = locations.get(id);
       if (!site) {
-        const name = asset.displayGroup.trim() || (zh ? "场地未登记" : "Site non renseigné");
+        const name = operatingLeaseLocation(asset) ?? (zh ? "场地未登记" : "Site non renseigné");
         site = { id, name, count: 0, followUpCount: 0 };
         locations.set(id, site);
         groupOptions.set(id, name);
       }
       site.count++;
       if (attention) site.followUpCount++;
-    } else if (category === "all" && (showCollections || hasApartments)) {
+    } else if (!browseViewerId && category === "all" && (showCollections || hasApartments)) {
       groupOptions.set(asset.category, operatingAssetCategoryLabel(asset.category, locale));
     } else if (category !== "all" && asset.displayGroup) {
       groupOptions.set(asset.displayGroup, asset.displayGroup);
@@ -270,7 +307,7 @@ function OperatingAssetDirectoryView({
     : rows.filter(
         ({ asset }) =>
           !activeGroup ||
-          (locationCategory
+          (locationMode
             ? leaseSiteId(asset)
             : category === "all"
               ? asset.category
@@ -307,10 +344,10 @@ function OperatingAssetDirectoryView({
       ? visible.filter((row) => row.attention === cardFilter)
       : visible;
   const groups = new Map<string, DirectoryRow[]>();
-  if (!locationCategory) {
+  if (!locationMode && !wholeMode) {
     for (const row of matchingRows) {
       const label = isSearchView
-        ? leaseBrowseCategoryLabel(row.asset.category, locale)
+        ? leaseBrowseCategoryLabel(classifyOperatingLeaseMode(row.asset), locale)
         : category === "all"
           ? operatingAssetCategoryLabel(row.asset.category, locale)
           : row.asset.displayGroup || operatingAssetCategoryLabel(category, locale);
@@ -320,7 +357,7 @@ function OperatingAssetDirectoryView({
     }
   }
   const matchingSiteIds =
-    locationCategory && !activeGroup && cardFilter !== "all"
+    locationMode && !activeGroup && cardFilter !== "all"
       ? new Set(matchingRows.map(({ asset }) => leaseSiteId(asset)))
       : undefined;
   const collectionRows = enableCollections
@@ -409,7 +446,7 @@ function OperatingAssetDirectoryView({
             category={browseCategory}
             searchQuery={searchQuery}
             location={
-              isSearchView
+              !locationMode
                 ? undefined
                 : {
                     value: activeGroup,
@@ -533,10 +570,9 @@ function OperatingAssetDirectoryView({
           onFilter={setFollowUpFilter}
           onSelect={setSelectedId}
         />
-      ) : locationCategory ? (
+      ) : locationMode ? (
         <OperatingLeaseLocations
           locale={locale}
-          category={locationCategory}
           sites={Array.from(locations.values()).filter(
             ({ id }) => !matchingSiteIds || matchingSiteIds.has(id),
           )}
@@ -547,6 +583,34 @@ function OperatingAssetDirectoryView({
           onSelectSite={changeGroup}
           onSelectAsset={setSelectedId}
         />
+      ) : wholeMode ? (
+        <section aria-label={leaseBrowseCategoryLabel("whole", locale)}>
+          <header className={locationStyles.siteHeading}>
+            <div className={locationStyles.siteIdentity}>
+              <h2>{leaseBrowseCategoryLabel("whole", locale)}</h2>
+              <span>{zh ? `${matchingRows.length} 项资产` : `${matchingRows.length} actifs`}</span>
+            </div>
+            {browseStatusFilter}
+          </header>
+          {matchingRows.length ? (
+            <ul className={locationStyles.wholeCards}>
+              {matchingRows.map((row) => (
+                <OperatingWholeLeaseCard
+                  key={row.asset.id}
+                  row={row}
+                  locale={locale}
+                  today={today}
+                  selected={selected?.asset.id === row.asset.id}
+                  onSelect={() => setSelectedId(row.asset.id)}
+                />
+              ))}
+            </ul>
+          ) : (
+            <p className={styles.empty}>
+              {zh ? "暂无符合条件的资产。" : "Aucun actif ne correspond aux critères."}
+            </p>
+          )}
+        </section>
       ) : groups.size ? (
         Array.from(groups, ([group, assets]) => (
           <section key={group} className={styles.group}>
@@ -605,6 +669,7 @@ function OperatingAssetDirectoryView({
           followUp={selected.followUp}
           locale={locale}
           today={today}
+          leaseView={!!browseViewerId}
           onClose={() => setSelectedId(null)}
         />
       ) : null}

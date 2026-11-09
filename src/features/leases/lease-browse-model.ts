@@ -2,25 +2,56 @@ import { routeFor, type Locale } from "@/lib/i18n";
 
 const categoryLabels = {
   apartment: ["公寓", "Appartements"],
-  warehouse: ["仓库", "Entrepôts"],
-  factory: ["厂房", "Bâtiments industriels"],
-  commercial: ["商用物业", "Locaux commerciaux"],
-  office: ["办公", "Bureaux"],
-  land: ["土地", "Terrains"],
-  dormitory: ["宿舍", "Dortoirs"],
-  other: ["其他资产", "Autres biens"],
+  "multi-unit": ["分单元出租", "Location par unité"],
+  whole: ["整体出租", "Location intégrale"],
 } as const;
 
 export type LeaseBrowseCategory = keyof typeof categoryLabels;
+export type OperatingLeaseMode = Exclude<LeaseBrowseCategory, "apartment">;
 export const leaseBrowseCategories = Object.keys(categoryLabels) as LeaseBrowseCategory[];
 export const leaseSearchLimit = 100;
+
+const separateUnitSites = new Set([
+  "old_warehouse",
+  "new_warehouse",
+  "老仓库",
+  "新仓库",
+  "孵化园库房",
+]);
+
+/** These inventory scopes contain separately identified bays, even when one tenant rents several. */
+export function classifyOperatingLeaseMode(asset: {
+  group: string;
+  sourceKey?: string | null;
+}): OperatingLeaseMode {
+  return separateUnitSites.has(asset.group.trim()) ||
+    /^(?:old|new)_warehouse:/.test(asset.sourceKey ?? "")
+    ? "multi-unit"
+    : "whole";
+}
 
 export function leaseBrowseCategoryLabel(category: LeaseBrowseCategory, locale: Locale) {
   return categoryLabels[category][locale === "zh" ? 0 : 1];
 }
 
 export function parseLeaseBrowseCategory(value: unknown): LeaseBrowseCategory | undefined {
-  return leaseBrowseCategories.find((category) => category === value);
+  switch (value) {
+    case "apartment":
+    case "multi-unit":
+    case "whole":
+      return value;
+    case "warehouse":
+      return "multi-unit";
+    case "factory":
+    case "commercial":
+    case "office":
+    case "land":
+    case "dormitory":
+    case "other":
+      return "whole";
+    default:
+      return undefined;
+  }
 }
 
 export function normalizeLeaseSearch(value: unknown) {

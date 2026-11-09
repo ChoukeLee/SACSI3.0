@@ -194,7 +194,12 @@ it("combines apartment location with shared browsing and remembers the selected 
   const toolbar = host.querySelector('[aria-label="长租浏览工具栏"]')!;
   const select = toolbar.querySelector<HTMLSelectElement>('select[aria-label="选择楼栋"]')!;
   expect(select.value).toBe("a11");
-  expect(toolbar.querySelector('[aria-label="资产类别"]')?.textContent).not.toContain("全部资产");
+  expect(
+    Array.from(
+      toolbar.querySelectorAll('[aria-label="出租方式"] button'),
+      (entry) => entry.textContent,
+    ),
+  ).toEqual(["公寓", "分单元出租", "整体出租"]);
   expect(host.querySelectorAll('input[type="search"]')).toHaveLength(1);
   expect(toolbar.querySelector('a[href="/leases?assetCategory=followup"]')).not.toBeNull();
   expect(host.querySelector('[aria-label="楼栋切换"]')).toBeNull();

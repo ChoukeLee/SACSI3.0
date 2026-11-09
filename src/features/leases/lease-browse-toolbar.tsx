@@ -5,15 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Search } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
+import { LeaseModeSelector } from "./lease-browse-content";
 import {
-  leaseBrowseCategories,
-  leaseBrowseCategoryLabel,
   leaseBrowseCookieName,
   leaseBrowseHref,
   leaseCollectionHref,
   leaseSearchHref,
   leaseSearchLimit,
-  parseLeaseBrowseCategory,
   type LeaseBrowseCategory,
 } from "./lease-browse-model";
 import styles from "./lease-workbench.module.css";
@@ -55,10 +53,9 @@ export function LeaseBrowseToolbar({
   const zh = locale === "zh";
   const searchLabel = zh ? "跨类别搜索" : "Rechercher dans toutes les catégories";
 
-  function switchCategory(value: string) {
-    const next = parseLeaseBrowseCategory(value);
-    if (!next) return;
-    startTransition(() => router.push(leaseBrowseHref(locale, next)));
+  function switchCategory(value: LeaseBrowseCategory) {
+    if (value === category) return;
+    startTransition(() => router.push(leaseBrowseHref(locale, value)));
   }
 
   function searchAssets(event: FormEvent<HTMLFormElement>) {
@@ -75,34 +72,27 @@ export function LeaseBrowseToolbar({
       aria-label={zh ? "长租浏览工具栏" : "Outils de navigation des locations"}
       aria-busy={pending}
     >
-      <div className={styles.browseScope}>
+      <LeaseModeSelector
+        locale={locale}
+        value={category}
+        onChange={switchCategory}
+        disabled={pending}
+      />
+      {location ? (
         <select
-          aria-label={zh ? "资产类别" : "Catégorie d’actifs"}
-          value={category}
-          onChange={(event) => switchCategory(event.target.value)}
+          className={styles.browseLocation}
+          aria-label={location.label}
+          value={location.value}
+          onChange={(event) => location.onChange(event.target.value)}
           disabled={pending}
         >
-          {leaseBrowseCategories.map((option) => (
-            <option key={option} value={option}>
-              {leaseBrowseCategoryLabel(option, locale)}
+          {location.options.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
             </option>
           ))}
         </select>
-        {location ? (
-          <select
-            aria-label={location.label}
-            value={location.value}
-            onChange={(event) => location.onChange(event.target.value)}
-            disabled={pending}
-          >
-            {location.options.map(({ value, label }) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        ) : null}
-      </div>
+      ) : null}
       <form className={styles.browseSearch} onSubmit={searchAssets}>
         <input
           key={searchQuery ?? ""}

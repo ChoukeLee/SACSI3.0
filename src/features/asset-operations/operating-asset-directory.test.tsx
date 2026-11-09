@@ -402,23 +402,24 @@ it("separates registered late payments from missing evidence and keeps warehouse
   expect(host.textContent).toContain("未找到符合条件的资产。");
 });
 
-it("restores the last operating location per viewer and category without a second scope row", async () => {
+it("restores the last multi-unit site while whole rentals open directly to their overview", async () => {
   const data = directory(
     [
       asset(),
       asset({ id: "old", sourceKey: "old:1", name: "老仓库1号", group: "old_warehouse" }),
       asset({ id: "new", sourceKey: "new:1", name: "新仓库1号", group: "new_warehouse" }),
     ],
-    [],
+    [entry()],
   );
-  const renderCategory = async (category: "land" | "warehouse", viewerId = "viewer-a") =>
+  const renderCategory = async (leaseCategory: "multi-unit" | "whole", viewerId = "viewer-a") =>
     act(async () =>
       root.render(
         <OperatingAssetDirectory
           data={data}
           locale="zh"
           today={today}
-          category={category}
+          category="all"
+          leaseCategory={leaseCategory}
           browseViewerId={viewerId}
         />,
       ),
@@ -426,15 +427,39 @@ it("restores the last operating location per viewer and category without a secon
   const location = () => host.querySelector<HTMLSelectElement>('select[aria-label="选择场地"]')!;
   const cards = () => host.querySelectorAll('button[aria-haspopup="dialog"]');
 
-  await renderCategory("warehouse");
+  window.localStorage.setItem(`sacsi:lease-site:viewer-a:${projectId}:warehouse`, "老仓库");
+  await renderCategory("multi-unit");
   const toolbar = host.querySelector('[aria-label="长租浏览工具栏"]')!;
   expect(toolbar.querySelector("select")).not.toBeNull();
   expect(toolbar.contains(location())).toBe(true);
   expect(toolbar.querySelector("option[value='all']")).toBeNull();
   expect(host.querySelectorAll('input[type="search"]')).toHaveLength(1);
   expect(host.querySelector('select[aria-label="资产分组"]')).toBeNull();
+  expect(location().value).toBe("老仓库");
+  expect(cards()).toHaveLength(1);
+  await act(async () => {
+    location().value = "";
+    location().dispatchEvent(new Event("change", { bubbles: true }));
+  });
   expect(cards()).toHaveLength(0);
-  expect(host.querySelector('[aria-label="仓库场地"]')?.textContent).toContain("老仓库");
+  expect(host.querySelector('[aria-label="分单元场地"]')?.textContent).toContain("老仓库");
+
+  await renderCategory("whole");
+  expect(location()).toBeNull();
+  expect(cards()).toHaveLength(1);
+  expect(cards()[0].textContent).toContain("国基土地");
+  expect(cards()[0].textContent).toContain("下一约定付款日未登记");
+  expect(cards()[0].textContent).toContain("最近确认收租2,500 万西法");
+  expect(cards()[0].textContent).not.toContain("土地及场地");
+  await act(async () => (cards()[0] as HTMLButtonElement).click());
+  const detail = dialog();
+  expect(detail.querySelector("h2")?.textContent).toBe("国基土地");
+  expect(detail.textContent).not.toContain("土地及场地");
+  await clickButton(detail, "资产档案");
+  expect(factValues(detail, "物业类型")).toEqual(["土地及场地"]);
+
+  await renderCategory("multi-unit");
+  expect(location().value).toBe("");
 
   await act(async () => {
     const selected = location();
@@ -444,25 +469,11 @@ it("restores the last operating location per viewer and category without a secon
   expect(cards()).toHaveLength(1);
   expect(cards()[0].querySelector("strong")?.lastChild?.textContent).toBe("1号");
 
-  await renderCategory("land");
-  expect(location().value).toBe("");
-  expect(cards()).toHaveLength(0);
-  const landSites = host.querySelector('[aria-label="经营场地"]')!;
-  expect(landSites.textContent).toContain("土地1 项资产");
-  await act(async () => landSites.querySelector("button")!.click());
-  expect(cards()).toHaveLength(1);
-  expect(cards()[0].textContent).toContain("国基土地");
-  expect(cards()[0].textContent).not.toMatch(/季租|本月实收|万西法/);
-  await act(async () => (cards()[0] as HTMLButtonElement).click());
-  expect(dialog().querySelector("h2")?.textContent).toBe("国基土地");
-
-  await renderCategory("warehouse");
+  await renderCategory("whole");
+  await renderCategory("multi-unit");
   expect(location().value).toBe("新仓库");
   expect(cards()).toHaveLength(1);
-  await renderCategory("land");
-  expect(location().value).toBe("土地");
-  expect(cards()).toHaveLength(1);
-  await renderCategory("warehouse", "viewer-b");
+  await renderCategory("multi-unit", "viewer-b");
   expect(location().value).toBe("");
   expect(cards()).toHaveLength(0);
 });
@@ -529,13 +540,14 @@ it("shows warehouse site follow-up counts before opening compact cards and finan
         data={data}
         locale="zh"
         today={today}
-        category="warehouse"
+        category="all"
+        leaseCategory="multi-unit"
         browseViewerId="viewer-a"
       />,
     ),
   );
 
-  const siteList = () => host.querySelector('[aria-label="仓库场地"]');
+  const siteList = () => host.querySelector('[aria-label="分单元场地"]');
   const siteButton = (name: string) =>
     [...(siteList()?.querySelectorAll("button") ?? [])].find((item) =>
       item.textContent?.includes(name),
@@ -638,7 +650,7 @@ it("shows only matching assets from all categories and keeps search as the apart
           category="all"
           browseViewerId="viewer-a"
           apartmentRows={apartmentRows}
-          searchCategory="warehouse"
+          searchCategory="multi-unit"
           searchQuery={searchQuery}
         />,
       ),
@@ -660,7 +672,7 @@ it("shows only matching assets from all categories and keeps search as the apart
   await act(async () => room.click());
   const next = new URL(navigation.push.mock.calls[0][0], "https://test.invalid");
   expect(next.searchParams.get("contract")).toBe(workspaceContract);
-  expect(next.searchParams.get("returnTo")).toBe("/leases?assetCategory=warehouse&q=synthetic");
+  expect(next.searchParams.get("returnTo")).toBe("/leases?assetCategory=multi-unit&q=synthetic");
 });
 
 it("shows original currency and XOF book values separately for the same two cash movements", async () => {

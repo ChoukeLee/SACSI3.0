@@ -6,6 +6,7 @@ import type { UserRole } from "@/lib/auth";
 import type { Locale } from "@/lib/i18n";
 import { routeFor } from "@/lib/i18n";
 import {
+  classifyOperatingLeaseMode,
   leaseBrowseCookieName,
   resolveLeaseBrowseView,
   type LeaseBrowseCategory,
@@ -124,17 +125,25 @@ export async function OperatingAssetDirectoryPage({
       today,
       leaseEvidence: source.leaseEvidence,
     });
+    const selectedAsset = selectedAssetId
+      ? data.assets.find((asset) => asset.id === selectedAssetId)
+      : undefined;
+    const leaseCategory =
+      category && selectedAsset ? classifyOperatingLeaseMode(selectedAsset) : category;
     const assets = search
       ? data.assets.filter((asset) => operatingAssetMatchesSearch(asset, search))
-      : data.assets.filter((asset) => !category || asset.category === category);
+      : data.assets.filter(
+          (asset) => !leaseCategory || classifyOperatingLeaseMode(asset) === leaseCategory,
+        );
     const ids = new Set(assets.map((asset) => asset.id));
     return (
       <OperatingAssetDirectory
-        key={search ? `search:${browseCategory}:${search}` : (category ?? "assets")}
+        key={search ? `search:${browseCategory}:${search}` : (leaseCategory ?? "assets")}
         data={{ ...data, assets, entries: data.entries.filter((entry) => ids.has(entry.assetId)) }}
         locale={locale}
         today={today}
-        category={category ?? "all"}
+        category="all"
+        leaseCategory={leaseCategory}
         enableCollections={!!browseCategory}
         initialView="cards"
         browseViewerId={browseCategory ? viewerId : undefined}

@@ -400,6 +400,7 @@ export function OperatingAssetDetail({
   followUp,
   today,
   locale,
+  leaseView = false,
   onClose,
 }: {
   asset: OperatingAssetDirectoryAsset;
@@ -407,6 +408,7 @@ export function OperatingAssetDetail({
   followUp: OperatingAssetFollowUp;
   today: string;
   locale: Locale;
+  leaseView?: boolean;
   onClose: () => void;
 }) {
   const zh = locale === "zh";
@@ -447,7 +449,16 @@ export function OperatingAssetDetail({
   const tabs = [
     { value: "overview", label: zh ? "概览" : "Aperçu" },
     { value: "receipts", label: zh ? "收付款" : "Paiements" },
-    { value: "sources", label: zh ? "资料" : "Informations" },
+    {
+      value: "sources",
+      label: zh
+        ? leaseView
+          ? "资产档案"
+          : "资料"
+        : leaseView
+          ? "Fiche de l’actif"
+          : "Informations",
+    },
     { value: "history", label: zh ? "历史" : "Historique" },
   ];
   const showReceipts = (pending: boolean) => {
@@ -461,7 +472,7 @@ export function OperatingAssetDetail({
       open
       width="wide"
       title={asset.displayName}
-      subtitle={operatingAssetCategoryLabel(asset.category, locale)}
+      subtitle={leaseView ? undefined : operatingAssetCategoryLabel(asset.category, locale)}
       onClose={onClose}
     >
       <RecordDetailTabs
@@ -584,6 +595,12 @@ export function OperatingAssetDetail({
           <section className={styles.detailSection}>
             <h3>{zh ? "资产登记" : "Fiche de l’actif"}</h3>
             <dl className={styles.depositFacts}>
+              {leaseView ? (
+                <div>
+                  <dt>{zh ? "物业类型" : "Type de bien"}</dt>
+                  <dd>{operatingAssetCategoryLabel(asset.category, locale)}</dd>
+                </div>
+              ) : null}
               <div>
                 <dt>{zh ? "登记状态" : "État de vérification"}</dt>
                 <dd>

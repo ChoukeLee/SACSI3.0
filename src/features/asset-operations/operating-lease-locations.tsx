@@ -1,13 +1,21 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { LeaseLocationIndex } from "@/features/leases/lease-browse-content";
 import type { Locale } from "@/lib/i18n";
+import { formatPropertyMoney } from "@/lib/property-money";
+import { assetSourceLabel, isAssetDate } from "./asset-operations-model";
 import type {
-  OperatingAssetCategory,
   OperatingAssetDirectoryAsset,
+  OperatingAssetDirectoryEntry,
   OperatingAssetFollowUp,
 } from "./operating-asset-directory-model";
-import { followUpLabels, recordedTenant } from "./operating-asset-display";
+import {
+  followUpLabels,
+  latestVerifiedRentReceipt,
+  operatingLeaseLocation,
+  recordedTenant,
+  referenceRent,
+} from "./operating-asset-display";
 import styles from "./operating-lease-locations.module.css";
 
 interface OperatingLeaseSite {
@@ -25,7 +33,6 @@ interface OperatingLeaseRow {
 
 interface OperatingLeaseLocationsProps {
   locale: Locale;
-  category: OperatingAssetCategory;
   sites: readonly OperatingLeaseSite[];
   activeSite: string;
   rows: readonly OperatingLeaseRow[];
@@ -35,14 +42,9 @@ interface OperatingLeaseLocationsProps {
   onSelectAsset: (id: string) => void;
 }
 
-function warehouseIdentifier(asset: OperatingAssetDirectoryAsset, siteName?: string) {
+function siteUnitIdentifier(asset: OperatingAssetDirectoryAsset, siteName?: string) {
   const { displayName, displayGroup } = asset;
-  if (
-    asset.category !== "warehouse" ||
-    !siteName ||
-    siteName !== displayGroup ||
-    !displayName.startsWith(siteName)
-  ) {
+  if (!siteName || siteName !== displayGroup || !displayName.startsWith(siteName)) {
     return displayName;
   }
   const suffix = displayName.slice(displayGroup.length).replace(/^[\s·:：-]+/, "");
@@ -86,7 +88,7 @@ export function OperatingLeaseCard({
 }) {
   const { asset, attention, followUp } = row;
   const zh = locale === "zh";
-  const identifier = warehouseIdentifier(asset, siteName);
+  const identifier = siteUnitIdentifier(asset, siteName);
   const tenant = recordedTenant(asset, locale);
   const qualifier =
     tenant && (tenant.evidence.scope === "group" || tenant.evidence.classification === "historical")
@@ -142,9 +144,114 @@ export function OperatingLeaseCard({
   );
 }
 
+export function OperatingWholeLeaseCard({
+  row,
+  locale,
+  today,
+  selected,
+  onSelect,
+}: {
+  row: OperatingLeaseRow & { entries: readonly OperatingAssetDirectoryEntry[] };
+  locale: Locale;
+  today: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const { asset, attention, entries, followUp } = row;
+  const zh = locale === "zh";
+  const missing = zh ? "未登记" : "Non renseigné";
+  const location = operatingLeaseLocation(asset);
+  const tenant = recordedTenant(asset, locale);
+  const rent = referenceRent(asset, locale);
+  const coverage = followUp.paidThrough;
+  const pending = coverage?.status === "pending";
+  const receipt = latestVerifiedRentReceipt(entries, today);
+  const period =
+    receipt &&
+    isAssetDate(receipt.periodStart) &&
+    isAssetDate(receipt.periodEnd) &&
+    receipt.periodStart <= receipt.periodEnd
+      ? `${receipt.periodStart} — ${receipt.periodEnd}`
+      : null;
+  const status = statusLabel(row, locale);
+
+  return (
+    <li>
+      <button
+        type="button"
+        className={styles.wholeCard}
+        aria-haspopup="dialog"
+        aria-pressed={selected}
+        data-status={attention ?? undefined}
+        onClick={onSelect}
+      >
+        <span className={styles.wholeHeader}>
+          <span className={styles.wholeIdentity}>
+            {location ? <small>{location}</small> : null}
+            <strong>{asset.displayName}</strong>
+          </span>
+          {status ? <span className={styles.status}>{status}</span> : null}
+          <ArrowRight size={16} aria-hidden="true" />
+        </span>
+        <span className={styles.wholeFacts}>
+          <span>
+            <small>{tenant?.label ?? (zh ? "登记租户" : "Locataire enregistré")}</small>
+            <span>
+              {asset.leaseEvidence?.selfUse
+                ? zh
+                  ? "自用"
+                  : "Usage propre"
+                : tenant?.names || missing}
+            </span>
+          </span>
+          <span>
+            <small>{rent.label}</small>
+            <span>{rent.amount}</span>
+          </span>
+          <span>
+            <small>
+              {pending
+                ? zh
+                  ? "租金记载至 · 待核"
+                  : "Loyer documenté au · À vérifier"
+                : zh
+                  ? "已交至"
+                  : "Payé au"}
+            </small>
+            {coverage ? (
+              <time dateTime={coverage.date}>{coverage.date}</time>
+            ) : (
+              <span>{missing}</span>
+            )}
+          </span>
+          <span>
+            <small>{zh ? "下一约定付款日" : "Prochaine échéance convenue"}</small>
+            {followUp.dueDate ? (
+              <time dateTime={followUp.dueDate}>{followUp.dueDate}</time>
+            ) : (
+              <span>{missing}</span>
+            )}
+          </span>
+        </span>
+        {receipt ? (
+          <span className={styles.wholeReceipt} title={assetSourceLabel(receipt.sourceRef)}>
+            <small>{zh ? "最近确认收租" : "Dernier loyer confirmé"}</small>
+            <strong>{formatPropertyMoney(receipt.amountNative, receipt.currency, locale)}</strong>
+            <time dateTime={receipt.cashDate}>{receipt.cashDate}</time>
+            {period ? (
+              <span>
+                {zh ? "覆盖" : "Période"} {period}
+              </span>
+            ) : null}
+          </span>
+        ) : null}
+      </button>
+    </li>
+  );
+}
+
 export function OperatingLeaseLocations({
   locale,
-  category,
   sites,
   activeSite,
   rows,
@@ -154,7 +261,6 @@ export function OperatingLeaseLocations({
   onSelectAsset,
 }: OperatingLeaseLocationsProps) {
   const zh = locale === "zh";
-  const warehouse = category === "warehouse";
   const heading = useRef<HTMLHeadingElement>(null);
   const focusOnNavigation = useRef(false);
   const activeLocation = sites.find(({ id }) => id === activeSite);
@@ -198,15 +304,7 @@ export function OperatingLeaseLocations({
       </header>
       {!activeSite && sites.length ? (
         <LeaseLocationIndex
-          label={
-            warehouse
-              ? zh
-                ? "仓库场地"
-                : "Sites d’entrepôts"
-              : zh
-                ? "经营场地"
-                : "Sites d’exploitation"
-          }
+          label={zh ? "分单元场地" : "Sites de location par unité"}
           locations={sites.map(({ id, name, count, followUpCount }) => ({
             id,
             name,
@@ -217,18 +315,7 @@ export function OperatingLeaseLocations({
           onSelect={changeSite}
         />
       ) : rows.length ? (
-        <ul
-          className={styles.cards}
-          aria-label={
-            warehouse
-              ? zh
-                ? "仓库卡片"
-                : "Fiches des entrepôts"
-              : zh
-                ? "经营资产卡片"
-                : "Fiches des actifs d’exploitation"
-          }
-        >
+        <ul className={styles.cards} aria-label={zh ? "出租单元卡片" : "Fiches des unités louées"}>
           {rows.map((row) => (
             <OperatingLeaseCard
               key={row.asset.id}

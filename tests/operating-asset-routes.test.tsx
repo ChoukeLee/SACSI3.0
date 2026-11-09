@@ -82,7 +82,7 @@ describe("operating assets are available through the existing workspaces", () =>
       searchParams: Promise.resolve({ assetView: "operations", operatingAsset: assetId }),
     });
     expect(findProps(leases, OperatingAssetDirectoryPage)).toMatchObject({
-      category: "land",
+      category: "whole",
       selectedAssetId: assetId,
     });
     expect(findProps(units, OperatingAssetDirectoryPage)).toMatchObject({
@@ -119,12 +119,12 @@ describe("operating assets are available through the existing workspaces", () =>
       const remembered = await open();
       expect(mocks.cookieGet).toHaveBeenCalledWith("sacsi_lease_category_v1_viewer");
       expect(findProps(remembered, OperatingAssetDirectoryPage)).toMatchObject({
-        category: "warehouse",
+        category: "multi-unit",
         locale,
       });
       const retired = await open({ assetCategory: "all", q: "  " });
       expect(findProps(retired, OperatingAssetDirectoryPage)).toMatchObject({
-        category: "warehouse",
+        category: "multi-unit",
       });
       for (const params of [
         { assetCategory: "apartment" },
@@ -135,7 +135,7 @@ describe("operating assets are available through the existing workspaces", () =>
       const search = await open({ assetCategory: "warehouse", q: "  国基  " });
       expect(findProps(search, OperatingAssetDirectoryPage)).toMatchObject({
         category: undefined,
-        searchCategory: "warehouse",
+        searchCategory: "multi-unit",
         searchQuery: "国基",
         locale,
       });
@@ -150,11 +150,11 @@ describe("operating assets are available through the existing workspaces", () =>
         searchParams: Promise.resolve({ assetCategory: "dormitory" }),
       });
       expect(findProps(followup, UnifiedLeaseCollectionsPage)).toMatchObject({
-        initialCategory: "warehouse",
+        initialCategory: "multi-unit",
         locale,
       });
       expect(findProps(dormitory, OperatingAssetDirectoryPage)).toMatchObject({
-        category: "dormitory",
+        category: "whole",
         locale,
       });
       expect(
@@ -172,13 +172,21 @@ describe("operating assets are available through the existing workspaces", () =>
       sourceKey: "test-warehouse",
       code: "TEST-01",
       name: "Warehouse 1",
-      group: "Warehouse",
+      group: "old_warehouse",
       verification: "verified",
       sourceRefs: [],
       monthlyRentNative: null,
       rentCurrency: null,
       costCoverageThrough: null,
       updatedAt: "2026-11-09T00:00:00Z",
+    };
+    const wholeAsset = {
+      ...warehouse,
+      id: "whole-asset",
+      code: "TEST-WHOLE",
+      name: "Standalone warehouse",
+      sourceKey: "test-standalone",
+      group: "Independent site",
     };
     const receipt: AssetOperationEntry = {
       id: "receipt",
@@ -203,6 +211,7 @@ describe("operating assets are available through the existing workspaces", () =>
         { ...warehouse, id: "canonical", unitId: "canonical-unit" },
         { ...warehouse, id: "no-receipt" },
         { ...warehouse, id: "voided-only" },
+        wholeAsset,
       ],
       entries: [
         receipt,
@@ -237,15 +246,34 @@ describe("operating assets are available through the existing workspaces", () =>
       },
     });
 
-    const directory = await OperatingAssetDirectoryPage({ locale: "zh", category: "warehouse" });
+    const directory = await OperatingAssetDirectoryPage({
+      locale: "zh",
+      category: "multi-unit",
+      viewerId: "viewer",
+    });
     expect(directory).toMatchObject({
       props: {
+        leaseCategory: "multi-unit",
         initialView: "cards",
         data: {
           assets: [assetId, "no-receipt", "voided-only"].map((id) =>
             expect.objectContaining({ id }),
           ),
         },
+      },
+    });
+
+    const legacySelection = await OperatingAssetDirectoryPage({
+      locale: "zh",
+      category: "multi-unit",
+      viewerId: "viewer",
+      selectedAssetId: wholeAsset.id,
+    });
+    expect(legacySelection).toMatchObject({
+      props: {
+        leaseCategory: "whole",
+        selectedAssetId: wholeAsset.id,
+        data: { assets: [expect.objectContaining({ id: wholeAsset.id })] },
       },
     });
   });

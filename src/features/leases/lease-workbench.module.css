@@ -59,7 +59,7 @@
   align-items: center;
   min-width: 0;
 }
-.browseScope,
+.browseLocation,
 .browseSearch,
 .browseAction {
   height: 40px;
@@ -68,23 +68,10 @@
   background: hsl(var(--card));
   font-size: 14px;
 }
-.browseScope {
-  display: flex;
-  max-width: 100%;
-  min-width: 0;
-  align-items: stretch;
-}
-.browseScope select {
+.browseLocation {
   min-width: 0;
   max-width: min(34vw, 13rem);
   padding: 0 10px;
-  border-radius: 7px;
-  background: transparent;
-}
-.browseScope select + select {
-  border-left: 1px solid hsl(var(--border));
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
 }
 .browseSearch {
   display: flex;
@@ -133,11 +120,8 @@
   border-color: var(--lease-accent);
 }
 @media (max-width: 540px) {
-  .browseScope {
-    flex-basis: 100%;
-  }
-  .browseScope select {
-    flex: 1 1 0;
+  .browseLocation {
+    flex: 1 1 7rem;
     max-width: none;
   }
   .browseSearch {

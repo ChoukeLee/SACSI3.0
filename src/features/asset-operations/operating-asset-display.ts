@@ -1,7 +1,9 @@
 import { formatPropertyMoney } from "@/lib/property-money";
+import { isAssetDate } from "./asset-operations-model";
 import type {
   OperatingAssetCategory,
   OperatingAssetDirectoryAsset,
+  OperatingAssetDirectoryEntry,
   OperatingAssetFollowUp,
 } from "./operating-asset-directory-model";
 
@@ -20,6 +22,54 @@ const categoryLabels: Record<OperatingAssetCategory, [string, string]> = {
 
 export function operatingAssetCategoryLabel(category: OperatingAssetCategory, locale: Locale) {
   return categoryLabels[category][locale === "zh" ? 0 : 1];
+}
+
+const genericLocationLabels = new Set(
+  [
+    ...Object.keys(categoryLabels),
+    ...Object.values(categoryLabels).flat(),
+    "仓储",
+    "厂房",
+    "商铺",
+    "商用物业",
+    "土地",
+    "办公",
+    "其他资产",
+    "其他经营场地",
+  ].map((label) => label.toLocaleLowerCase()),
+);
+
+export function operatingLeaseLocation(asset: Pick<OperatingAssetDirectoryAsset, "displayGroup">) {
+  const label = asset.displayGroup.trim();
+  return label && !genericLocationLabels.has(label.normalize("NFKC").toLocaleLowerCase())
+    ? label
+    : undefined;
+}
+
+export function latestVerifiedRentReceipt(
+  entries: readonly OperatingAssetDirectoryEntry[],
+  today: string,
+) {
+  let latest: (OperatingAssetDirectoryEntry & { cashDate: string }) | undefined;
+  for (const entry of entries) {
+    const date = entry.cashDate;
+    if (
+      entry.status !== "verified" ||
+      entry.voidedAt ||
+      entry.kind !== "income" ||
+      entry.category !== "rent" ||
+      !entry.sourceRef.trim() ||
+      !isAssetDate(date) ||
+      date > today ||
+      !Number.isFinite(entry.amountNative) ||
+      entry.amountNative <= 0
+    )
+      continue;
+    if (!latest || date > latest.cashDate || (date === latest.cashDate && entry.id < latest.id)) {
+      latest = { ...entry, cashDate: date };
+    }
+  }
+  return latest;
 }
 
 export function operatingAssetMatchesSearch(asset: OperatingAssetDirectoryAsset, search: string) {

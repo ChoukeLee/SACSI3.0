@@ -1,3 +1,43 @@
+.modes {
+  display: inline-flex;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--card));
+}
+
+.modes button {
+  min-height: 32px;
+  padding: 4px 12px;
+  border-radius: 5px;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem;
+}
+
+.modes button[aria-pressed="true"] {
+  color: var(--lease-accent);
+  background: var(--lease-accent-soft);
+  font-weight: 600;
+}
+
+.modes button:hover:not(:disabled, [aria-pressed="true"]) {
+  background: hsl(var(--muted) / 0.5);
+  color: hsl(var(--foreground));
+}
+
+.modes button:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 1px;
+}
+
+.modes button:disabled {
+  opacity: 0.65;
+}
+
 .locations {
   margin: 0;
   padding: 0;
