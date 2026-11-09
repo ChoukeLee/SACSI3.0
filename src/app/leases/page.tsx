@@ -30,6 +30,7 @@ export default async function LeasesPage({
     assetCategory?: string | string[];
     collectionCategory?: string | string[];
     operatingAsset?: string | string[];
+    operatingLeaseGroup?: string | string[];
     q?: string | string[];
   }>;
 }) {
@@ -83,6 +84,11 @@ export default async function LeasesPage({
             project={params.project}
             viewerId={user.id}
             selectedAssetId={parseOperatingAssetId(params.operatingAsset)}
+            selectedLeaseGroup={
+              typeof params.operatingLeaseGroup === "string"
+                ? params.operatingLeaseGroup
+                : undefined
+            }
           />
         </LeaseWorkbenchFrame>
       ) : (

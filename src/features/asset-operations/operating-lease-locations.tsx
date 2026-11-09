@@ -1,5 +1,6 @@
 import { ArrowRight } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import type { Locale } from "@/lib/i18n";
 import { formatPropertyMoney } from "@/lib/property-money";
 import { assetSourceLabel, isAssetDate } from "./asset-operations-model";
@@ -25,6 +26,7 @@ interface OperatingLeaseSite {
 }
 
 interface OperatingLeaseRow {
+  key?: string;
   asset: OperatingAssetDirectoryAsset;
   followUp: OperatingAssetFollowUp;
   attention: "overdue" | "upcoming" | "review" | null;
@@ -37,6 +39,7 @@ interface OperatingLeaseLocationsProps {
   rows: readonly OperatingLeaseRow[];
   selectedAssetId: string | null;
   statusFilter: ReactNode;
+  statusKey: string;
   onSelectSite: (site: string) => void;
   onSelectAsset: (id: string) => void;
 }
@@ -47,6 +50,8 @@ function siteUnitIdentifier(asset: OperatingAssetDirectoryAsset, siteName?: stri
     return displayName;
   }
   const suffix = displayName.slice(displayGroup.length).replace(/^[\s·:：-]+/, "");
+  const partition = /^([a-z]?\d+(?:\.\d+)*号)[\s·—–-]+(\d+(?:\.\d+)?)\s*㎡分区$/i.exec(suffix);
+  if (partition) return `${partition[1]} · ${partition[2]}㎡`;
   return /^[a-z]?\d+(?:\.\d+)*(?:号)?$/i.test(suffix) ? suffix : displayName;
 }
 
@@ -91,11 +96,12 @@ export function OperatingLeaseCard({
   const zh = locale === "zh";
   const identifier = siteUnitIdentifier(asset, siteName);
   const tenant = recordedTenant(asset, locale);
+  const selfUse = asset.leaseEvidence?.selfUse;
   const qualifier =
     tenant && (tenant.evidence.scope === "group" || tenant.evidence.classification === "historical")
       ? tenant.label
       : null;
-  const tenantName = asset.leaseEvidence?.selfUse
+  const tenantName = selfUse
     ? zh
       ? "自用"
       : "Usage propre"
@@ -109,7 +115,8 @@ export function OperatingLeaseCard({
       ? "缴租日期待补"
       : "Date de couverture à renseigner"
     : statusLabel(row, locale);
-  const showQualifier = qualifier && !asset.leaseEvidence?.selfUse;
+  const showQualifier = qualifier && !selfUse;
+  const tenantTitle = showQualifier ? `${tenantName} · ${qualifier}` : tenantName;
 
   return (
     <li>
@@ -123,20 +130,27 @@ export function OperatingLeaseCard({
         onClick={onSelect}
       >
         <span className={styles.identity}>
-          <strong>
+          <strong
+            className={styles.unitIdentifier}
+            title={compactRow ? asset.displayName : undefined}
+          >
             {identifier !== asset.displayName ? (
-              <span className="sr-only">{asset.displayGroup} · </span>
-            ) : null}
-            {identifier}
+              <>
+                <span className="sr-only">{asset.displayName}</span>
+                <span aria-hidden="true">{identifier}</span>
+              </>
+            ) : (
+              identifier
+            )}
           </strong>
-          <span className={styles.tenant}>
+          <span className={styles.tenant} title={compactRow ? tenantTitle : undefined}>
             {showQualifier && !compactRow ? <small>{qualifier} </small> : null}
             {tenantName}
             {showQualifier && compactRow ? <small> {qualifier}</small> : null}
           </span>
         </span>
         <span className={styles.cardDetails}>
-          {missingCoverage ? null : (
+          {missingCoverage || (compactRow && selfUse) ? null : (
             <span className={styles.coverage}>
               {pending ? (zh ? "租金记载至" : "Loyer documenté au") : zh ? "已交至" : "Payé au"}{" "}
               {coverage ? (
@@ -343,6 +357,7 @@ export function OperatingLeaseLocations({
   rows,
   selectedAssetId,
   statusFilter,
+  statusKey,
   onSelectSite,
   onSelectAsset,
 }: OperatingLeaseLocationsProps) {
@@ -356,7 +371,7 @@ export function OperatingLeaseLocations({
   );
 
   return (
-    <section aria-label={headingText}>
+    <section className={styles.siteBrowse} aria-label={headingText}>
       <header className={styles.siteHeading}>
         <div className={styles.siteTitle}>
           <p>{zh ? "按场地浏览" : "Parcourir par site"}</p>
@@ -400,29 +415,91 @@ export function OperatingLeaseLocations({
               ))}
             </ul>
           </section>
-          <section className={styles.siteUnits}>
-            <h3>
-              {zh ? `${activeLocation.name} · 出租单元` : `Unités louées · ${activeLocation.name}`}
-            </h3>
-            {rows.length ? (
-              <ul className={styles.unitRows} aria-label={zh ? "出租单元" : "Unités louées"}>
-                {rows.map((row) => (
-                  <OperatingLeaseCard
-                    key={row.asset.id}
-                    row={row}
-                    locale={locale}
-                    siteName={activeLocation.name}
-                    compactRow
-                    selected={selectedAssetId === row.asset.id}
-                    onSelect={() => onSelectAsset(row.asset.id)}
-                  />
-                ))}
-              </ul>
-            ) : (
-              empty
-            )}
-          </section>
+          <OperatingLeaseUnitList
+            key={`${activeSite}:${statusKey}`}
+            locale={locale}
+            siteName={activeLocation.name}
+            rows={rows}
+            selectedAssetId={selectedAssetId}
+            onSelectAsset={onSelectAsset}
+            empty={empty}
+          />
         </div>
+      ) : (
+        empty
+      )}
+    </section>
+  );
+}
+
+const unitsPerPage = 15;
+
+function OperatingLeaseUnitList({
+  locale,
+  siteName,
+  rows,
+  selectedAssetId,
+  onSelectAsset,
+  empty,
+}: Pick<OperatingLeaseLocationsProps, "locale" | "rows" | "selectedAssetId" | "onSelectAsset"> & {
+  siteName: string;
+  empty: ReactNode;
+}) {
+  const zh = locale === "zh";
+  const [requestedPage, setPage] = useState(0);
+  const pageCount = Math.ceil(rows.length / unitsPerPage);
+  const page = Math.min(requestedPage, Math.max(0, pageCount - 1));
+  const first = page * unitsPerPage;
+  const end = Math.min(first + unitsPerPage, rows.length);
+
+  return (
+    <section className={styles.siteUnits}>
+      <header className={styles.unitHeader}>
+        <h3>{zh ? `${siteName} · 出租单元` : `Unités louées · ${siteName}`}</h3>
+        {pageCount > 1 ? (
+          <nav
+            className={styles.unitPages}
+            aria-label={zh ? "出租单元分页" : "Pagination des unités"}
+          >
+            <span aria-live="polite">{`${first + 1}–${end} / ${rows.length}`}</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={page === 0}
+              onClick={() => setPage(page - 1)}
+            >
+              {zh ? "上一页" : "Précédent"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={page >= pageCount - 1}
+              onClick={() => setPage(page + 1)}
+            >
+              {zh ? "下一页" : "Suivant"}
+            </Button>
+          </nav>
+        ) : null}
+      </header>
+      {rows.length ? (
+        <ul className={styles.unitRows} aria-label={zh ? "出租单元" : "Unités louées"}>
+          {rows.slice(first, end).map((row) => {
+            const rowKey = row.key ?? row.asset.id;
+            return (
+              <OperatingLeaseCard
+                key={rowKey}
+                row={row}
+                locale={locale}
+                siteName={siteName}
+                compactRow
+                selected={selectedAssetId === rowKey}
+                onSelect={() => onSelectAsset(rowKey)}
+              />
+            );
+          })}
+        </ul>
       ) : (
         empty
       )}

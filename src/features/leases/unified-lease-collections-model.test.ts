@@ -234,3 +234,119 @@ it("keeps the incubator dormitory's grouped record in multi-unit follow-up", () 
     },
   ]);
 });
+
+it("replaces the incubator dormitory follow-up with four groups and isolates receipts", () => {
+  const name = "孵化园配套宿舍（四组明细）";
+  const dormitory: OperatingAssetDirectoryAsset = {
+    ...operatingAsset,
+    category: "dormitory",
+    group: "宿舍",
+    displayGroup: "宿舍",
+    name,
+    displayName: name,
+    leaseEvidence: {
+      assetSourceRef: "source!A1",
+      paidThrough: { date: "2027-10-31", sourceRef: "source!B1" },
+      outstanding: { amountNative: 500_000, currency: "XOF", sourceRef: "source!C1" },
+    },
+    leaseGroups: [
+      {
+        key: "row-17",
+        label: "宿舍 · 3间",
+        sourceRef: "source!A17",
+        receiptSourceRef: "source!I17:K17",
+      },
+      {
+        key: "row-23",
+        label: "宿舍 · 4间",
+        sourceRef: "source!A23",
+        receiptSourceRef: "source!I23:K23",
+      },
+      {
+        key: "row-29",
+        label: "宿舍 · 6间",
+        sourceRef: "source!A29",
+        receiptSourceRef: "source!I29:K29",
+      },
+      {
+        key: "row-43",
+        label: "308宿舍 · 1间",
+        sourceRef: "source!A43",
+        receiptSourceRef: "source!I43:K43",
+      },
+    ],
+  };
+  const receipt: OperatingAssetDirectoryData["entries"][number] = {
+    id: "receipt-17",
+    assetId: dormitory.id,
+    kind: "income",
+    category: "rent",
+    amountNative: 300_000,
+    currency: "XOF",
+    cashDate: "2026-09-01",
+    periodStart: "2026-09-01",
+    periodEnd: "2026-11-30",
+    recognitionMethod: "unallocated",
+    verification: "verified",
+    status: "verified",
+    bookedAmountXof: 300_000,
+    sourceRef: "source!I17:K17",
+    description: "",
+  };
+  const rows = buildOperatingCollectionRows(
+    {
+      projectId: dormitory.projectId,
+      canWrite: false,
+      assets: [dormitory],
+      entries: [
+        receipt,
+        {
+          ...receipt,
+          id: "receipt-23",
+          amountNative: 400_000,
+          bookedAmountXof: 400_000,
+          cashDate: "2026-10-01",
+          periodStart: "2026-10-01",
+          periodEnd: "2026-12-31",
+          sourceRef: "source!I23:K23",
+        },
+        {
+          ...receipt,
+          id: "receipt-unassigned",
+          cashDate: "2026-11-08",
+          periodEnd: "2027-10-31",
+          sourceRef: "source!I1:K1",
+        },
+      ],
+    },
+    today,
+    "zh",
+  );
+  expect(
+    rows.map(({ id, category, group, status, amount }) => ({
+      id,
+      category,
+      group,
+      status,
+      amount,
+    })),
+  ).toEqual(
+    ["row-17", "row-23", "row-29", "row-43"].map((key) => ({
+      id: `asset:${dormitory.id}:${key}`,
+      category: "multi-unit",
+      group: "孵化园宿舍",
+      status: "needs_evidence",
+      amount: null,
+    })),
+  );
+  expect(rows.map((row) => row.paidThrough)).toEqual(["2026-11-30", "2026-12-31", null, null]);
+  expect(rows.map((row) => row.latestReceipt?.date)).toEqual([
+    "2026-09-01",
+    "2026-10-01",
+    undefined,
+    undefined,
+  ]);
+  const target = new URL(rows[1].href, "https://example.test");
+  expect(target.searchParams.get("operatingAsset")).toBe(dormitory.id);
+  expect(target.searchParams.get("operatingLeaseGroup")).toBe("row-23");
+});

@@ -49,12 +49,21 @@ export interface OperatingAssetLeaseEvidence {
   blockReceiptCutoff?: boolean;
 }
 
+export interface OperatingAssetLeaseGroup {
+  key: string;
+  label: string;
+  sourceRef: string;
+  receiptSourceRef: string;
+  tenantEvidence?: OperatingAssetTenantEvidence;
+}
+
 export interface OperatingAssetDirectoryAsset extends AssetOperationAsset {
   category: OperatingAssetCategory;
   displayName: string;
   displayGroup: string;
   referenceRent: OperatingAssetReferenceRent | null;
   leaseEvidence: OperatingAssetLeaseEvidence | null;
+  leaseGroups?: readonly OperatingAssetLeaseGroup[];
 }
 
 type EntryWithBooking = AssetOperationEntry & { bookedAmountXof?: number | null };

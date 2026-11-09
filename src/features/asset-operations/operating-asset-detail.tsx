@@ -401,6 +401,7 @@ export function OperatingAssetDetail({
   today,
   locale,
   leaseView = false,
+  leaseGroup = false,
   onClose,
 }: {
   asset: OperatingAssetDirectoryAsset;
@@ -409,6 +410,7 @@ export function OperatingAssetDetail({
   today: string;
   locale: Locale;
   leaseView?: boolean;
+  leaseGroup?: boolean;
   onClose: () => void;
 }) {
   const zh = locale === "zh";
@@ -494,7 +496,13 @@ export function OperatingAssetDetail({
             <section className={styles.detailSection}>
               <dl className={drawerStyles.party}>
                 <div>
-                  <dt>{tenant?.label ?? (zh ? "登记租户" : "Locataire enregistré")}</dt>
+                  <dt>
+                    {leaseGroup
+                      ? zh
+                        ? "原表租户"
+                        : "Locataire indiqué dans la source"
+                      : (tenant?.label ?? (zh ? "登记租户" : "Locataire enregistré"))}
+                  </dt>
                   <dd>{tenant?.names ?? (zh ? "未登记" : "Non renseigné")}</dd>
                 </div>
               </dl>
@@ -506,7 +514,15 @@ export function OperatingAssetDetail({
               </dl>
               <dl className={drawerStyles.rentSummary}>
                 <div>
-                  <dt>{zh ? "累计已收租金（按资产）" : "Loyers reçus cumulés (actif)"}</dt>
+                  <dt>
+                    {leaseGroup
+                      ? zh
+                        ? "累计已收租金（本组）"
+                        : "Loyers reçus cumulés (groupe)"
+                      : zh
+                        ? "累计已收租金（按资产）"
+                        : "Loyers reçus cumulés (actif)"}
+                  </dt>
                   <dd>
                     {rentCash.originals.length
                       ? rentCash.originals

@@ -104,6 +104,10 @@ export function operatingAssetMatchesSearch(asset: OperatingAssetDirectoryAsset,
     asset.displayGroup,
     operatingLeaseLocation(asset) ?? "",
     ...(asset.leaseEvidence?.tenantEvidence?.names ?? []),
+    ...(asset.leaseGroups?.flatMap(({ label, tenantEvidence }) => [
+      label,
+      ...(tenantEvidence?.names ?? []),
+    ]) ?? []),
   ].some((value) => value.toLocaleLowerCase().includes(term));
 }
 

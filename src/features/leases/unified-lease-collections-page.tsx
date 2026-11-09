@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { fetchAssetOperations } from "@/features/asset-operations/asset-operations-server";
 import { buildOperatingAssetDirectory } from "@/features/asset-operations/operating-asset-directory-model";
+import { withIncubatorDormitoryLeaseGroups } from "@/features/asset-operations/operating-lease-groups-server";
 import { parseWorkspaceQuery, WorkspaceReadError } from "@/features/contracts/workspace-model";
 import { readWorkspace } from "@/features/contracts/workspace-service";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
@@ -131,12 +132,14 @@ export async function UnifiedLeaseCollectionsPage({
     (!apartment?.projectId || apartment.projectId === source.projectId);
   const operatingRows = validSource
     ? buildOperatingCollectionRows(
-        buildOperatingAssetDirectory(source, {
-          sacsiProjectId: source.projectId,
-          applyExcelConfirmation: true,
-          today,
-          leaseEvidence: source.leaseEvidence,
-        }),
+        withIncubatorDormitoryLeaseGroups(
+          buildOperatingAssetDirectory(source, {
+            sacsiProjectId: source.projectId,
+            applyExcelConfirmation: true,
+            today,
+            leaseEvidence: source.leaseEvidence,
+          }),
+        ),
         today,
         locale,
       )

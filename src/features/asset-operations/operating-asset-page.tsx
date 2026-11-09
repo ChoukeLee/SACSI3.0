@@ -18,6 +18,7 @@ import { fetchAssetOperations } from "./asset-operations-server";
 import { OperatingAssetDirectory } from "./operating-asset-directory";
 import { operatingAssetMatchesSearch } from "./operating-asset-display";
 import { buildOperatingAssetDirectory } from "./operating-asset-directory-model";
+import { withIncubatorDormitoryLeaseGroups } from "./operating-lease-groups-server";
 
 type LeaseAssetCategory = Exclude<LeaseBrowseCategory, "apartment">;
 export type AssetOperatingView = "operations" | "maintenance";
@@ -95,6 +96,7 @@ export async function OperatingAssetDirectoryPage({
   locale,
   category,
   selectedAssetId,
+  selectedLeaseGroup,
   project,
   viewerId,
   searchQuery,
@@ -103,6 +105,7 @@ export async function OperatingAssetDirectoryPage({
   locale: Locale;
   category?: LeaseAssetCategory;
   selectedAssetId?: string;
+  selectedLeaseGroup?: string;
   project?: string;
   viewerId?: string;
   searchQuery?: string;
@@ -119,15 +122,19 @@ export async function OperatingAssetDirectoryPage({
     if (project && project !== source.projectId && project.toUpperCase() !== "SACSI")
       throw new Error("AssetOperationsProjectUnavailable");
     const today = new Date().toISOString().slice(0, 10);
-    const data = buildOperatingAssetDirectory(source, {
+    const directory = buildOperatingAssetDirectory(source, {
       sacsiProjectId: source.projectId,
       applyExcelConfirmation: true,
       today,
       leaseEvidence: source.leaseEvidence,
     });
+    const data = browseCategory ? withIncubatorDormitoryLeaseGroups(directory) : directory;
     const selectedAsset = selectedAssetId
       ? data.assets.find((asset) => asset.id === selectedAssetId)
       : undefined;
+    const matchedLeaseGroup = selectedAsset?.leaseGroups?.find(
+      ({ key }) => key === selectedLeaseGroup,
+    );
     const leaseCategory =
       category && selectedAsset ? classifyOperatingLeaseMode(selectedAsset) : category;
     const assets = search
@@ -151,7 +158,12 @@ export async function OperatingAssetDirectoryPage({
         searchCategory={searchCategory}
         apartmentRows={apartment?.rows.filter((row) => leaseRoomMatchesSearch(row, search ?? ""))}
         apartmentUnavailable={apartment?.unavailable}
-        selectedAssetId={selectedAssetId && ids.has(selectedAssetId) ? selectedAssetId : null}
+        selectedAssetId={
+          selectedAssetId && ids.has(selectedAssetId) && (!selectedLeaseGroup || matchedLeaseGroup)
+            ? selectedAssetId
+            : null
+        }
+        selectedLeaseGroup={matchedLeaseGroup?.key}
       />
     );
   } catch (error) {

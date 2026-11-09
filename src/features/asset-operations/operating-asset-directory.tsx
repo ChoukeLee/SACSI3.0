@@ -52,6 +52,7 @@ import {
   OperatingLeaseLocations,
   OperatingWholeLeaseOverview,
 } from "./operating-lease-locations";
+import { operatingLeaseViews } from "./operating-lease-groups";
 import locationStyles from "./operating-lease-locations.module.css";
 import styles from "./operating-asset-directory.module.css";
 
@@ -60,6 +61,8 @@ type FollowUp = ReturnType<typeof getOperatingAssetFollowUp>;
 type FollowUpStatus = Exclude<FollowUp["status"], "current">;
 type FollowUpFilter = "all" | FollowUpStatus;
 type DirectoryRow = {
+  key: string;
+  groupKey?: string;
   asset: OperatingAssetDirectoryAsset;
   entries: OperatingAssetDirectoryEntry[];
   followUp: FollowUp;
@@ -93,6 +96,37 @@ const nameCollators = {
   fr: new Intl.Collator("fr", { numeric: true, sensitivity: "base" }),
 };
 
+function directoryRow(
+  view: Pick<DirectoryRow, "key" | "groupKey" | "asset" | "entries">,
+  today: string,
+  leaseBrowse: boolean,
+): DirectoryRow {
+  const { asset, entries } = view;
+  const followUp = getOperatingAssetFollowUp(asset, entries, today);
+  const hasLeaseEvidence = hasOperatingAssetLeaseEvidence(asset, entries);
+  const pendingEntries = entries.filter((entry) => entry.status === "pending").length;
+  const review =
+    asset.verification === "pending" ||
+    pendingEntries > 0 ||
+    (hasLeaseEvidence &&
+      (followUp.status === "needs_evidence" ||
+        (leaseBrowse &&
+          (classifyOperatingLeaseMode(asset) === "whole" || isIncubatorDormitory(asset)) &&
+          !followUp.dueDate)));
+  return {
+    ...view,
+    followUp,
+    hasLeaseEvidence,
+    pendingEntries,
+    attention:
+      followUp.status === "overdue" || followUp.status === "upcoming"
+        ? followUp.status
+        : review
+          ? "review"
+          : null,
+  };
+}
+
 interface OperatingAssetDirectoryProps {
   locale: Locale;
   data: ReturnType<typeof buildOperatingAssetDirectory>;
@@ -100,6 +134,7 @@ interface OperatingAssetDirectoryProps {
   category: OperatingAssetCategory | "all";
   leaseCategory?: Exclude<LeaseBrowseCategory, "apartment">;
   selectedAssetId?: string | null;
+  selectedLeaseGroup?: string;
   enableCollections?: boolean;
   initialView?: "cards" | "collections";
   collectionHref?: string;
@@ -118,6 +153,7 @@ export function OperatingAssetDirectory(props: OperatingAssetDirectoryProps) {
         props.category,
         props.leaseCategory,
         props.selectedAssetId,
+        props.selectedLeaseGroup,
         props.initialView,
         props.browseViewerId,
         props.searchQuery,
@@ -134,6 +170,7 @@ function OperatingAssetDirectoryView({
   category,
   leaseCategory,
   selectedAssetId,
+  selectedLeaseGroup,
   enableCollections = false,
   initialView = "cards",
   collectionHref,
@@ -150,7 +187,11 @@ function OperatingAssetDirectoryView({
   const [cardFilter, setCardFilter] = useState<CardFilter>("all");
   const [view, setView] = useState(initialView);
   const [followUpFilter, setFollowUpFilter] = useState<FollowUpFilter>("all");
-  const [selectedId, setSelectedId] = useState(selectedAssetId ?? null);
+  const [selectedId, setSelectedId] = useState(
+    selectedAssetId && selectedLeaseGroup
+      ? `${selectedAssetId}:${selectedLeaseGroup}`
+      : (selectedAssetId ?? null),
+  );
   const [wholeAssetId, setWholeAssetId] = useState(selectedAssetId ?? "");
   const groupStorageKey =
     browseViewerId && leaseCategory === "multi-unit"
@@ -214,32 +255,12 @@ function OperatingAssetDirectoryView({
           ? classifyOperatingLeaseMode(asset) === leaseCategory
           : category === "all" || asset.category === category,
       )
-      .map((asset): DirectoryRow => {
+      .flatMap((asset) => {
         const entries = entriesByAsset.get(asset.id) ?? emptyEntries;
-        const followUp = getOperatingAssetFollowUp(asset, entries, today);
-        const hasLeaseEvidence = hasOperatingAssetLeaseEvidence(asset, entries);
-        const pendingEntries = entries.filter((entry) => entry.status === "pending").length;
-        const review =
-          asset.verification === "pending" ||
-          pendingEntries > 0 ||
-          (hasLeaseEvidence &&
-            (followUp.status === "needs_evidence" ||
-              (browseViewerId &&
-                (classifyOperatingLeaseMode(asset) === "whole" || isIncubatorDormitory(asset)) &&
-                !followUp.dueDate)));
-        return {
-          asset,
-          entries,
-          followUp,
-          hasLeaseEvidence,
-          pendingEntries,
-          attention:
-            followUp.status === "overdue" || followUp.status === "upcoming"
-              ? followUp.status
-              : review
-                ? "review"
-                : null,
-        };
+        const views = browseViewerId
+          ? operatingLeaseViews(asset, entries)
+          : [{ key: asset.id, asset, entries }];
+        return views.map((view) => directoryRow(view, today, !!browseViewerId));
       });
     if (leaseCategory || category !== "all") {
       const warehouseOrder = new Map([
@@ -390,7 +411,20 @@ function OperatingAssetDirectoryView({
     { value: "", label: allGroupsLabel },
     ...Array.from(groupOptions, ([value, label]) => ({ value, label })),
   ];
-  const selected = emptySearch ? undefined : rows.find(({ asset }) => asset.id === selectedId);
+  const selected = emptySearch
+    ? undefined
+    : (rows.find(({ key }) => key === selectedId) ??
+      (selectedAssetSite?.id === selectedId && selectedAssetSite?.leaseGroups?.length
+        ? directoryRow(
+            {
+              key: selectedAssetSite.id,
+              asset: selectedAssetSite,
+              entries: entriesByAsset.get(selectedAssetSite.id) ?? emptyEntries,
+            },
+            today,
+            true,
+          )
+        : undefined));
   const apartmentContent =
     !showCollections && showApartmentContent ? (
       <ApartmentDirectorySection
@@ -564,7 +598,8 @@ function OperatingAssetDirectoryView({
           sites={Array.from(locations.values())}
           activeSite={activeGroup}
           rows={matchingRows}
-          selectedAssetId={selected?.asset.id ?? null}
+          selectedAssetId={selected?.key ?? null}
+          statusKey={cardFilter}
           statusFilter={browseStatusFilter}
           onSelectSite={changeGroup}
           onSelectAsset={setSelectedId}
@@ -621,20 +656,20 @@ function OperatingAssetDirectoryView({
               {assets.map((row) =>
                 isSearchView ? (
                   <OperatingLeaseCard
-                    key={row.asset.id}
+                    key={row.key}
                     row={row}
                     locale={locale}
-                    selected={selected?.asset.id === row.asset.id}
-                    onSelect={() => setSelectedId(row.asset.id)}
+                    selected={selected?.key === row.key}
+                    onSelect={() => setSelectedId(row.key)}
                   />
                 ) : (
                   <AssetDirectoryCard
-                    key={row.asset.id}
+                    key={row.key}
                     row={row}
                     period={thisMonth}
                     locale={locale}
-                    selected={selected?.asset.id === row.asset.id}
-                    onSelect={() => setSelectedId(row.asset.id)}
+                    selected={selected?.key === row.key}
+                    onSelect={() => setSelectedId(row.key)}
                   />
                 ),
               )}
@@ -658,7 +693,8 @@ function OperatingAssetDirectoryView({
       )}
       {selected ? (
         <OperatingAssetDetail
-          key={selected.asset.id}
+          key={selected.key}
+          leaseGroup={!!selected.groupKey}
           asset={selected.asset}
           entries={selected.entries}
           followUp={selected.followUp}
@@ -737,15 +773,15 @@ function AssetCollectionFollowUp({
       </header>
       {visible.length ? (
         <ul className={styles.collectionRows}>
-          {visible.map(({ asset, followUp }) => {
+          {visible.map(({ key, asset, followUp }) => {
             const tenant = recordedTenant(asset, locale);
             return (
-              <li key={asset.id}>
+              <li key={key}>
                 <button
                   type="button"
                   className={styles.collectionRow}
                   aria-haspopup="dialog"
-                  onClick={() => onSelect(asset.id)}
+                  onClick={() => onSelect(key)}
                 >
                   <span>
                     <span>{asset.displayName}</span>

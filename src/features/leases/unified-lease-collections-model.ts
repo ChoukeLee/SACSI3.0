@@ -12,6 +12,7 @@ import {
   operatingLeaseLocation,
   recordedTenant,
 } from "@/features/asset-operations/operating-asset-display";
+import { operatingLeaseViews } from "@/features/asset-operations/operating-lease-groups";
 import { routeFor, type Locale } from "@/lib/i18n";
 import { formatPropertyMoney } from "@/lib/property-money";
 import { buildWorkbenchRecordHref } from "@/lib/workbench-links";
@@ -186,8 +187,10 @@ export function buildOperatingCollectionRows(
     if (list) list.push(entry);
     else entriesByAsset.set(entry.assetId, [entry]);
   }
-  return data.assets.flatMap((asset) => {
-    const entries = entriesByAsset.get(asset.id) ?? [];
+  const views = data.assets.flatMap((asset) =>
+    operatingLeaseViews(asset, entriesByAsset.get(asset.id) ?? []),
+  );
+  return views.flatMap(({ key, groupKey, asset, entries }) => {
     if (!hasOperatingAssetLeaseEvidence(asset, entries)) return [];
     const category = classifyOperatingLeaseMode(asset);
     const { status, reason, dueDate, dueSourceRef, paidThrough, outstanding, daysUntilDue } =
@@ -204,9 +207,10 @@ export function buildOperatingCollectionRows(
       assetCategory: category,
       operatingAsset: asset.id,
     });
+    if (groupKey) query.set("operatingLeaseGroup", groupKey);
     return [
       {
-        id: `asset:${asset.id}`,
+        id: `asset:${key}`,
         category,
         name: asset.displayName,
         group: operatingLeaseLocation(asset),

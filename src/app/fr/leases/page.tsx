@@ -30,6 +30,7 @@ export default async function FrenchLeasesPage({
     assetCategory?: string | string[];
     collectionCategory?: string | string[];
     operatingAsset?: string | string[];
+    operatingLeaseGroup?: string | string[];
     q?: string | string[];
   }>;
 }) {
@@ -74,6 +75,11 @@ export default async function FrenchLeasesPage({
             project={params.project}
             viewerId={user.id}
             selectedAssetId={parseOperatingAssetId(params.operatingAsset)}
+            selectedLeaseGroup={
+              typeof params.operatingLeaseGroup === "string"
+                ? params.operatingLeaseGroup
+                : undefined
+            }
           />
         </LeaseWorkbenchFrame>
       ) : (
