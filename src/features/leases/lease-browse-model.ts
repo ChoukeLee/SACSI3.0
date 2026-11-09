@@ -10,6 +10,7 @@ export type LeaseBrowseCategory = keyof typeof categoryLabels;
 export type OperatingLeaseMode = Exclude<LeaseBrowseCategory, "apartment">;
 export const leaseBrowseCategories = Object.keys(categoryLabels) as LeaseBrowseCategory[];
 export const leaseSearchLimit = 100;
+export const incubatorDormitorySite = "孵化园宿舍";
 
 const separateUnitSites = new Set([
   "old_warehouse",
@@ -19,13 +20,22 @@ const separateUnitSites = new Set([
   "孵化园库房",
 ]);
 
-/** These inventory scopes contain separately identified bays, even when one tenant rents several. */
+export function isIncubatorDormitory(asset: { group: string; name?: string }) {
+  return (
+    asset.group.trim() === incubatorDormitorySite ||
+    asset.name?.trim() === "孵化园配套宿舍（四组明细）"
+  );
+}
+
+/** Includes the existing grouped dormitory record and sites with individually identified bays. */
 export function classifyOperatingLeaseMode(asset: {
   group: string;
+  name?: string;
   sourceKey?: string | null;
 }): OperatingLeaseMode {
   return separateUnitSites.has(asset.group.trim()) ||
-    /^(?:old|new)_warehouse:/.test(asset.sourceKey ?? "")
+    /^(?:old|new)_warehouse:/.test(asset.sourceKey ?? "") ||
+    isIncubatorDormitory(asset)
     ? "multi-unit"
     : "whole";
 }

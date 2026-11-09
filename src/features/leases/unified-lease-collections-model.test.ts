@@ -6,6 +6,7 @@ import type {
   OperatingAssetDirectoryData,
 } from "@/features/asset-operations/operating-asset-directory-model";
 import { workspaceFixture } from "../../../tests/fixtures/contract-workspace";
+import { operatingAssetMatchesSearch } from "@/features/asset-operations/operating-asset-display";
 import { buildLeaseRecordOverview } from "./lease-room-overview-model";
 import {
   buildApartmentCollectionRows,
@@ -198,4 +199,38 @@ it("shows a prepaid whole lease with a missing next date and its confirmed recei
   const target = new URL(row.href, "https://example.test");
   expect(target.searchParams.get("assetCategory")).toBe("whole");
   expect(target.searchParams.get("operatingAsset")).toBe(wholeAsset.id);
+});
+
+it("keeps the incubator dormitory's grouped record in multi-unit follow-up", () => {
+  const name = "孵化园配套宿舍（四组明细）";
+  const dormitory: OperatingAssetDirectoryAsset = {
+    ...operatingAsset,
+    category: "dormitory",
+    group: "宿舍",
+    displayGroup: "宿舍",
+    name,
+    displayName: name,
+    leaseEvidence: {
+      assetSourceRef: "source!A1",
+      paidThrough: { date: "2026-11-30", sourceRef: "source!B1" },
+    },
+  };
+  expect(operatingAssetMatchesSearch(dormitory, "孵化园宿舍")).toBe(true);
+  expect(
+    buildOperatingCollectionRows(
+      { projectId: dormitory.projectId, canWrite: false, assets: [dormitory], entries: [] },
+      today,
+      "zh",
+    ),
+  ).toMatchObject([
+    {
+      category: "multi-unit",
+      group: "孵化园宿舍",
+      name,
+      status: "needs_evidence",
+      paidThrough: "2026-11-30",
+      dueDate: null,
+      amount: null,
+    },
+  ]);
 });

@@ -1,4 +1,5 @@
 import { formatPropertyMoney } from "@/lib/property-money";
+import { incubatorDormitorySite, isIncubatorDormitory } from "@/features/leases/lease-browse-model";
 import { isAssetDate } from "./asset-operations-model";
 import type {
   OperatingAssetCategory,
@@ -39,7 +40,10 @@ const genericLocationLabels = new Set(
   ].map((label) => label.toLocaleLowerCase()),
 );
 
-export function operatingLeaseLocation(asset: Pick<OperatingAssetDirectoryAsset, "displayGroup">) {
+export function operatingLeaseLocation(
+  asset: Pick<OperatingAssetDirectoryAsset, "displayGroup" | "group" | "name">,
+) {
+  if (isIncubatorDormitory(asset)) return incubatorDormitorySite;
   const label = asset.displayGroup.trim();
   return label && !genericLocationLabels.has(label.normalize("NFKC").toLocaleLowerCase())
     ? label
@@ -79,6 +83,7 @@ export function operatingAssetMatchesSearch(asset: OperatingAssetDirectoryAsset,
     asset.name,
     asset.code,
     asset.displayGroup,
+    operatingLeaseLocation(asset) ?? "",
     ...(asset.leaseEvidence?.tenantEvidence?.names ?? []),
   ].some((value) => value.toLocaleLowerCase().includes(term));
 }

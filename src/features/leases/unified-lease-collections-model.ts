@@ -17,6 +17,7 @@ import { formatPropertyMoney } from "@/lib/property-money";
 import { buildWorkbenchRecordHref } from "@/lib/workbench-links";
 import {
   classifyOperatingLeaseMode,
+  isIncubatorDormitory,
   leaseBrowseCategoryLabel,
   leaseCollectionHref,
   parseLeaseBrowseCategory,
@@ -191,14 +192,13 @@ export function buildOperatingCollectionRows(
     const category = classifyOperatingLeaseMode(asset);
     const { status, reason, dueDate, dueSourceRef, paidThrough, outstanding, daysUntilDue } =
       getOperatingAssetFollowUp(asset, entries, today);
-    // A missing next date on a prepaid whole lease is a record to complete. The source
-    // coverage, due date and any unpaid balance retain their independent meanings.
+    const tracksNextPaymentDate = category === "whole" || isIncubatorDormitory(asset);
     const awaitingPaymentDate =
-      category === "whole" && !dueDate && paidThrough?.status === "verified";
+      tracksNextPaymentDate && !dueDate && paidThrough?.status === "verified";
     if (status === "current" && !awaitingPaymentDate) return [];
     const collectionStatus = status === "current" ? "needs_evidence" : status;
     const latestReceipt =
-      category === "whole" && !dueDate ? latestVerifiedRentReceipt(entries, today) : undefined;
+      tracksNextPaymentDate && !dueDate ? latestVerifiedRentReceipt(entries, today) : undefined;
     const tenant = recordedTenant(asset, locale);
     const query = new URLSearchParams({
       assetCategory: category,

@@ -8,6 +8,7 @@ import { ApartmentDirectorySection } from "@/features/leases/apartment-directory
 import { LeaseBrowseStatusFilter } from "@/features/leases/lease-browse-content";
 import {
   classifyOperatingLeaseMode,
+  isIncubatorDormitory,
   leaseBrowseCategoryLabel,
   leaseSearchHref,
 } from "@/features/leases/lease-browse-model";
@@ -223,7 +224,7 @@ function OperatingAssetDirectoryView({
           (hasLeaseEvidence &&
             (followUp.status === "needs_evidence" ||
               (browseViewerId &&
-                classifyOperatingLeaseMode(asset) === "whole" &&
+                (classifyOperatingLeaseMode(asset) === "whole" || isIncubatorDormitory(asset)) &&
                 !followUp.dueDate)));
         return {
           asset,

@@ -23,7 +23,11 @@ it("presents three lease modes and classifies only separately identified sites a
   expect(classifyOperatingLeaseMode({ group: "老仓库等", sourceKey: "warehouse:guoji" })).toBe(
     "whole",
   );
-  expect(classifyOperatingLeaseMode({ group: "孵化园宿舍" })).toBe("whole");
+  expect(classifyOperatingLeaseMode({ group: "孵化园宿舍" })).toBe("multi-unit");
+  expect(classifyOperatingLeaseMode({ group: "宿舍", name: "孵化园配套宿舍（四组明细）" })).toBe(
+    "multi-unit",
+  );
+  expect(classifyOperatingLeaseMode({ group: "宿舍", name: "老公司宿舍" })).toBe("whole");
   expect(classifyOperatingLeaseMode({ group: "VALLON" })).toBe("whole");
 });
 
