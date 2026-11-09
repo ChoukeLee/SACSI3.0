@@ -79,6 +79,10 @@ export interface OperatingAssetDirectoryOptions {
 const GUOJI_SOURCE_KEY = "warehouse:guoji";
 const GUOJI_OLD_CLASSIFICATION = "用户于2026-11-09确认独立仓库";
 const GUOJI_CORRECTION = "用户更正为土地";
+const catalogGroupLabels = new Map([
+  ["old_warehouse", "老仓库"],
+  ["new_warehouse", "新仓库"],
+]);
 const rentCutoffWorkbookSource =
   "sha256:e3ed7762344e6e731633bd753702308c51c6a4d24559ee520065ab947d9b16c6|file:公寓、仓库租金截止日期等.xlsx|sheet:";
 // The user's confirmation covers the two workbook revisions used for the SACSI intake.
@@ -231,7 +235,7 @@ export function buildOperatingAssetDirectory(
             : asset.verification,
         category: classifyOperatingAsset(asset, sacsiProjectId),
         displayName: guojiLand ? "国基土地" : asset.name,
-        displayGroup: guojiLand ? "土地" : asset.group,
+        displayGroup: guojiLand ? "土地" : (catalogGroupLabels.get(asset.group) ?? asset.group),
         referenceRent: recordedRent(asset, guojiLand, evidence, today),
         leaseEvidence: evidence,
         sourceRefs: guojiLand

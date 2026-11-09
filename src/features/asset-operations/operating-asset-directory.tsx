@@ -615,9 +615,21 @@ function OperatingAssetDirectoryView({
         return { asset, entries, followUp: getOperatingAssetFollowUp(asset, entries, today) };
       });
     if (category !== "all") {
-      scoped.sort((a, b) =>
-        nameCollators[locale].compare(a.asset.displayName, b.asset.displayName),
-      );
+      const warehouseOrder = new Map([
+        ["老仓库", 0],
+        ["新仓库", 1],
+        ["孵化园库房", 2],
+      ]);
+      scoped.sort((a, b) => {
+        const groupOrder =
+          category === "warehouse"
+            ? (warehouseOrder.get(a.asset.displayGroup) ?? 3) -
+              (warehouseOrder.get(b.asset.displayGroup) ?? 3)
+            : 0;
+        return (
+          groupOrder || nameCollators[locale].compare(a.asset.displayName, b.asset.displayName)
+        );
+      });
     }
     return scoped;
   }, [category, data.assets, entriesByAsset, locale, today]);
@@ -873,7 +885,11 @@ function AssetCollectionFollowUp({
                   >
                     {followUpLabels[followUp.status][lang]}
                   </span>
-                  {followUp.reason ? <small>{followUpReasons[followUp.reason][lang]}</small> : null}
+                  {followUp.reason &&
+                  followUp.reason !== "due_date_missing" &&
+                  followUp.reason !== "paid_through_missing" ? (
+                    <small>{followUpReasons[followUp.reason][lang]}</small>
+                  ) : null}
                 </span>
                 <span>
                   <span

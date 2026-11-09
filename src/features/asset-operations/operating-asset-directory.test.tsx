@@ -182,7 +182,7 @@ it("separates registered late payments from missing evidence and keeps warehouse
       id: `${group}-${number}`,
       sourceKey: `${group}:${number}`,
       name: `${group}${number}号`,
-      group,
+      group: group === "老仓库" ? "old_warehouse" : "new_warehouse",
       sourceRefs: [`${workbook}|range:A${number}:G${number}`],
       monthlyRentNative: 400000,
       rentCurrency: "XOF",
@@ -262,9 +262,10 @@ it("separates registered late payments from missing evidence and keeps warehouse
     "老仓库2号",
     "老仓库10号",
   ]);
-  expect([...host.querySelectorAll("h2")].map((heading) => heading.textContent)).toContain(
+  expect([...host.querySelectorAll("h2")].map((heading) => heading.textContent)).toEqual([
+    "老仓库",
     "新仓库",
-  );
+  ]);
 });
 
 it("shows original currency and XOF book values separately for the same two cash movements", async () => {
