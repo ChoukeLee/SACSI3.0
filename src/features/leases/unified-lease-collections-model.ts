@@ -215,7 +215,11 @@ export function buildOperatingCollectionRows(
         name: asset.displayName,
         group: operatingLeaseLocation(asset),
         tenant: tenant ? `${tenant.label} ${tenant.names}` : undefined,
-        keywords: [asset.code, asset.name],
+        keywords: [
+          asset.code,
+          asset.name,
+          ...(tenant?.evidence.displayNames ? tenant.evidence.names : []),
+        ],
         href: routeFor(locale, `/leases?${query}`),
         status: collectionStatus,
         statusLabel: timingLabel(collectionStatus, daysUntilDue, zh),

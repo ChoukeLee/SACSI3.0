@@ -5,10 +5,11 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import type { CurrencyCode } from "@/types/domain";
 import { isAssetDate, type AssetOperationsData } from "./asset-operations-model";
-import type {
-  OperatingAssetLeaseEvidence,
-  OperatingAssetReferenceRent,
-  OperatingAssetTenantEvidence,
+import {
+  isConfirmedExcelSource,
+  type OperatingAssetLeaseEvidence,
+  type OperatingAssetReferenceRent,
+  type OperatingAssetTenantEvidence,
 } from "./operating-asset-directory-model";
 
 type AssetSourceIdentity = {
@@ -75,8 +76,17 @@ function readTenantEvidence(value: unknown): OperatingAssetTenantEvidence | unde
     (asOfSourceDate != null && !isAssetDate(asOfSourceDate))
   )
     return undefined;
+  const sourceNames = names.map((name) => name.trim());
+  const numberedName = /^宋留成[1-6]$/;
+  const hasConfirmedAlias =
+    isConfirmedExcelSource(sourceRef) &&
+    /\|sheet:老仓库(?:等)?\|/.test(sourceRef) &&
+    sourceNames.some((name) => numberedName.test(name));
   return {
-    names: names.map((name) => name.trim()),
+    names: sourceNames,
+    displayNames: hasConfirmedAlias
+      ? [...new Set(sourceNames.map((name) => name.replace(numberedName, "宋留成")))]
+      : undefined,
     sourceRef,
     classification,
     scope,

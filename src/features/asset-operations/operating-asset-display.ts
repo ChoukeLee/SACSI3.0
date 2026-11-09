@@ -148,7 +148,7 @@ export function recordedTenant(asset: OperatingAssetDirectoryAsset, locale: Loca
   return {
     evidence,
     label: tenantLabels[evidence.scope][evidence.classification][zh ? 0 : 1],
-    names: evidence.names.join(zh ? "、" : ", "),
+    names: (evidence.displayNames ?? evidence.names).join(zh ? "、" : ", "),
   };
 }
 

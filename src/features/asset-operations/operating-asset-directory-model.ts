@@ -28,6 +28,7 @@ interface OperatingAssetOutstanding {
 
 export interface OperatingAssetTenantEvidence {
   names: readonly string[];
+  displayNames?: readonly string[];
   sourceRef: string;
   classification: "latest_source" | "historical";
   scope: "asset" | "group";
@@ -109,7 +110,7 @@ const confirmedExcelSources = [
   rentCutoffWorkbookSource,
 ];
 
-function isConfirmedExcelSource(ref: string | null | undefined) {
+export function isConfirmedExcelSource(ref: string | null | undefined) {
   return !!ref && confirmedExcelSources.some((source) => ref.startsWith(source));
 }
 
