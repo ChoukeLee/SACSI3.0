@@ -200,8 +200,23 @@ it("separates registered late payments from missing evidence and keeps warehouse
     [late.sourceKey!]: {
       ...evidence(late, "2026-11-07", true),
       outstanding: { amountNative: 400000, currency: "XOF", sourceRef: late.sourceRefs[0] },
+      tenantEvidence: {
+        names: ["示例租户甲", "示例租户乙"],
+        sourceRef: `${workbook}|cell:C2`,
+        classification: "historical",
+        scope: "group",
+        asOfSourceDate: "2026-10-31",
+      },
     },
-    [upcoming.sourceKey!]: evidence(upcoming, "2026-11-22", true),
+    [upcoming.sourceKey!]: {
+      ...evidence(upcoming, "2026-11-22", true),
+      tenantEvidence: {
+        names: ["示例公司"],
+        sourceRef: `${workbook}|cell:C10`,
+        classification: "latest_source",
+        scope: "asset",
+      },
+    },
     [missing.sourceKey!]: evidence(missing, "2026-11-10"),
   });
 
@@ -225,12 +240,25 @@ it("separates registered late payments from missing evidence and keeps warehouse
   expect(rowTexts().find((text) => text?.includes("国基土地"))).toContain("待补资料");
   expect(panel.textContent).not.toContain("新仓库3号");
 
+  const search = host.querySelector<HTMLInputElement>('input[type="search"]')!;
+  const searchByTenant = async (value: string) =>
+    act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(
+        search,
+        value,
+      );
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  await searchByTenant("示例租户乙");
+  expect(rowTexts()).toEqual([expect.stringContaining("历史合租租户 示例租户甲、示例租户乙")]);
+  await searchByTenant("");
+
   await clickButton(panel, "已逾期1");
   expect(rowTexts()).toEqual([expect.stringContaining("老仓库2号")]);
   expect(rowTexts()[0]).toContain("付款日 2026-11-07");
   expect(rowTexts()[0]).toContain("40 万西法原表余款");
   await clickButton(panel, "15天内应缴1");
-  expect(rowTexts()).toEqual([expect.stringContaining("老仓库10号")]);
+  expect(rowTexts()).toEqual([expect.stringContaining("登记租户 示例公司")]);
   await clickButton(panel, "待补资料2");
   expect(rowTexts()).toEqual(
     expect.arrayContaining([
@@ -266,6 +294,16 @@ it("separates registered late payments from missing evidence and keeps warehouse
     "老仓库",
     "新仓库",
   ]);
+  const lateCard = [...oldGroup!.querySelectorAll("button")].find((card) =>
+    card.textContent?.includes("老仓库2号"),
+  );
+  expect(lateCard?.textContent).toContain("历史合租租户示例租户甲、示例租户乙");
+  await act(async () => lateCard!.click());
+  const tenantDetail = dialog();
+  expect(factValues(tenantDetail, "历史合租租户")).toEqual(["示例租户甲、示例租户乙"]);
+  await clickButton(tenantDetail, "资料");
+  expect(factValues(tenantDetail, "租户记录日期")).toEqual(["2026-10-31"]);
+  expect(factValues(tenantDetail, "租户依据")[0]).toContain("C2");
 });
 
 it("shows original currency and XOF book values separately for the same two cash movements", async () => {

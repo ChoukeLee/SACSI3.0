@@ -169,6 +169,10 @@
   font-size: 0.75rem;
 }
 
+.collectionRow .collectionTenant {
+  color: hsl(var(--foreground));
+}
+
 .collectionRow > svg {
   color: hsl(var(--muted-foreground));
 }
@@ -428,6 +432,11 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
   font-weight: 400;
+}
+
+.depositFacts dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .textButton {

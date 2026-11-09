@@ -81,6 +81,28 @@ const rentLabels = {
   year: ["年租", "Loyer annuel"],
 } as const;
 
+const tenantLabels = {
+  asset: {
+    latest_source: ["登记租户", "Locataire enregistré"],
+    historical: ["历史租户", "Ancien locataire"],
+  },
+  group: {
+    latest_source: ["合租登记", "Locataires du groupe"],
+    historical: ["历史合租租户", "Anciens locataires du groupe"],
+  },
+} as const;
+
+function recordedTenant(asset: OperatingAssetDirectoryAsset, locale: Locale) {
+  const evidence = asset.leaseEvidence?.tenantEvidence;
+  if (!evidence) return null;
+  const zh = locale === "zh";
+  return {
+    evidence,
+    label: tenantLabels[evidence.scope][evidence.classification][zh ? 0 : 1],
+    names: evidence.names.join(zh ? "、" : ", "),
+  };
+}
+
 const followUpLabels: Record<FollowUpFilter, [string, string]> = {
   all: ["全部跟进", "Tous les suivis"],
   overdue: ["已逾期", "En retard"],
@@ -403,6 +425,7 @@ function OperatingAssetDetail({
     ? `${zh ? "租金来源记载至" : "Loyer documenté jusqu’au"} ${coverage.date} · ${entryStatusLabels[coverage.status][lang]}`
     : null;
   const rent = referenceRent(asset, locale);
+  const tenant = recordedTenant(asset, locale);
   const tabs = [
     { value: "overview", label: zh ? "概览" : "Aperçu" },
     { value: "receipts", label: zh ? "收付款" : "Flux" },
@@ -433,6 +456,14 @@ function OperatingAssetDetail({
       >
         {tab === "overview" ? (
           <>
+            {tenant ? (
+              <dl className={styles.depositFacts}>
+                <div>
+                  <dt>{tenant.label}</dt>
+                  <dd>{tenant.names}</dd>
+                </div>
+              </dl>
+            ) : null}
             <div className={styles.periodPicker}>
               <label>
                 {zh ? "收付月份" : "Mois des flux"}
@@ -498,6 +529,24 @@ function OperatingAssetDetail({
                 <dt>{rent.label}</dt>
                 <dd>{rent.amount}</dd>
               </div>
+              {tenant ? (
+                <>
+                  <div>
+                    <dt>{tenant.label}</dt>
+                    <dd>{tenant.names}</dd>
+                  </div>
+                  {tenant.evidence.asOfSourceDate ? (
+                    <div>
+                      <dt>{zh ? "租户记录日期" : "Date d’enregistrement du locataire"}</dt>
+                      <dd>{tenant.evidence.asOfSourceDate}</dd>
+                    </div>
+                  ) : null}
+                  <div>
+                    <dt>{zh ? "租户依据" : "Source du locataire"}</dt>
+                    <dd>{assetSourceLabel(tenant.evidence.sourceRef)}</dd>
+                  </div>
+                </>
+              ) : null}
               {asset.referenceRent?.effectiveThrough ? (
                 <div>
                   <dt>{zh ? "该租金适用至" : "Loyer applicable jusqu’au"}</dt>
@@ -648,9 +697,13 @@ function OperatingAssetDirectoryView({
     ({ asset }) =>
       (!groupOptions.has(selectedGroup) ||
         (category === "all" ? asset.category : asset.displayGroup) === selectedGroup) &&
-      [asset.displayName, asset.name, asset.code, asset.displayGroup].some((value) =>
-        value.toLocaleLowerCase().includes(term),
-      ),
+      [
+        asset.displayName,
+        asset.name,
+        asset.code,
+        asset.displayGroup,
+        ...(asset.leaseEvidence?.tenantEvidence?.names ?? []),
+      ].some((value) => value.toLocaleLowerCase().includes(term)),
   );
   const groups = new Map<string, DirectoryRow[]>();
   for (const row of visible) {
@@ -682,7 +735,7 @@ function OperatingAssetDirectoryView({
           <input
             type="search"
             aria-label={zh ? "搜索经营资产" : "Rechercher un actif"}
-            placeholder={zh ? "搜索名称或编号" : "Nom ou numéro"}
+            placeholder={zh ? "搜索名称、编号或租户" : "Nom, numéro ou locataire"}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -864,87 +917,97 @@ function AssetCollectionFollowUp({
       </header>
       {visible.length ? (
         <ul className={styles.collectionRows}>
-          {visible.map(({ asset, followUp }) => (
-            <li key={asset.id}>
-              <button
-                type="button"
-                className={styles.collectionRow}
-                aria-haspopup="dialog"
-                onClick={() => onSelect(asset.id)}
-              >
-                <span>
-                  <span>{asset.displayName}</span>
-                  <small>
-                    {asset.displayGroup || operatingAssetCategoryLabel(asset.category, locale)}
-                  </small>
-                </span>
-                <span>
-                  <span
-                    className={styles.status}
-                    data-status={followUp.status === "needs_evidence" ? "pending" : followUp.status}
-                  >
-                    {followUpLabels[followUp.status][lang]}
+          {visible.map(({ asset, followUp }) => {
+            const tenant = recordedTenant(asset, locale);
+            return (
+              <li key={asset.id}>
+                <button
+                  type="button"
+                  className={styles.collectionRow}
+                  aria-haspopup="dialog"
+                  onClick={() => onSelect(asset.id)}
+                >
+                  <span>
+                    <span>{asset.displayName}</span>
+                    <small>
+                      {asset.displayGroup || operatingAssetCategoryLabel(asset.category, locale)}
+                    </small>
+                    {tenant ? (
+                      <small className={styles.collectionTenant}>
+                        {tenant.label} {tenant.names}
+                      </small>
+                    ) : null}
                   </span>
-                  {followUp.reason &&
-                  followUp.reason !== "due_date_missing" &&
-                  followUp.reason !== "paid_through_missing" ? (
-                    <small>{followUpReasons[followUp.reason][lang]}</small>
-                  ) : null}
-                </span>
-                <span>
-                  <span
-                    title={
-                      followUp.dueSourceRef ? assetSourceLabel(followUp.dueSourceRef) : undefined
-                    }
-                  >
-                    {zh ? "付款日" : "Échéance"} {followUp.dueDate ?? unregistered}
+                  <span>
+                    <span
+                      className={styles.status}
+                      data-status={
+                        followUp.status === "needs_evidence" ? "pending" : followUp.status
+                      }
+                    >
+                      {followUpLabels[followUp.status][lang]}
+                    </span>
+                    {followUp.reason &&
+                    followUp.reason !== "due_date_missing" &&
+                    followUp.reason !== "paid_through_missing" ? (
+                      <small>{followUpReasons[followUp.reason][lang]}</small>
+                    ) : null}
                   </span>
-                  <small
+                  <span>
+                    <span
+                      title={
+                        followUp.dueSourceRef ? assetSourceLabel(followUp.dueSourceRef) : undefined
+                      }
+                    >
+                      {zh ? "付款日" : "Échéance"} {followUp.dueDate ?? unregistered}
+                    </span>
+                    <small
+                      title={
+                        followUp.paidThrough
+                          ? assetSourceLabel(followUp.paidThrough.sourceRef)
+                          : undefined
+                      }
+                    >
+                      {followUp.paidThrough?.status === "pending"
+                        ? zh
+                          ? "租金记载至"
+                          : "Loyer documenté au"
+                        : zh
+                          ? "已交至"
+                          : "Payé au"}{" "}
+                      {followUp.paidThrough?.date ?? unregistered}
+                    </small>
+                  </span>
+                  <span
+                    className={styles.collectionAmount}
                     title={
-                      followUp.paidThrough
-                        ? assetSourceLabel(followUp.paidThrough.sourceRef)
+                      followUp.outstanding
+                        ? assetSourceLabel(followUp.outstanding.sourceRef)
                         : undefined
                     }
                   >
-                    {followUp.paidThrough?.status === "pending"
-                      ? zh
-                        ? "租金记载至"
-                        : "Loyer documenté au"
-                      : zh
-                        ? "已交至"
-                        : "Payé au"}{" "}
-                    {followUp.paidThrough?.date ?? unregistered}
-                  </small>
-                </span>
-                <span
-                  className={styles.collectionAmount}
-                  title={
-                    followUp.outstanding
-                      ? assetSourceLabel(followUp.outstanding.sourceRef)
-                      : undefined
-                  }
-                >
-                  {followUp.outstanding
-                    ? formatPropertyMoney(
-                        followUp.outstanding.amountNative,
-                        followUp.outstanding.currency,
-                        locale,
-                      )
-                    : unregistered}
-                  <small>
                     {followUp.outstanding
-                      ? zh
-                        ? "原表余款"
-                        : "Solde enregistré"
-                      : zh
-                        ? "未收金额"
-                        : "Solde à recevoir"}
-                  </small>
-                </span>
-                <ArrowRight size={14} aria-hidden="true" />
-              </button>
-            </li>
-          ))}
+                      ? formatPropertyMoney(
+                          followUp.outstanding.amountNative,
+                          followUp.outstanding.currency,
+                          locale,
+                        )
+                      : unregistered}
+                    <small>
+                      {followUp.outstanding
+                        ? zh
+                          ? "原表余款"
+                          : "Solde enregistré"
+                        : zh
+                          ? "未收金额"
+                          : "Solde à recevoir"}
+                    </small>
+                  </span>
+                  <ArrowRight size={14} aria-hidden="true" />
+                </button>
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <p className={styles.collectionEmpty}>
@@ -979,6 +1042,7 @@ function AssetDirectoryCard({
   const pendingCount = entries.filter((entry) => entry.status === "pending").length;
   const coverage = followUp.paidThrough;
   const rent = referenceRent(asset, locale);
+  const tenant = recordedTenant(asset, locale);
   const coverageReview =
     followUp.reason === "coverage_ended" ||
     followUp.reason === "coverage_ending" ||
@@ -1018,6 +1082,12 @@ function AssetDirectoryCard({
               : operatingAssetCategoryLabel(asset.category, locale)}
           </span>
         </span>
+        {tenant ? (
+          <span className={styles.cardFact}>
+            <span>{tenant.label}</span>
+            <span>{tenant.names}</span>
+          </span>
+        ) : null}
         <span className={styles.cardFact}>
           <span>{rent.label}</span>
           <span>{rent.amount}</span>

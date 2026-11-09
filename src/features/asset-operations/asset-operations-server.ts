@@ -8,6 +8,7 @@ import { isAssetDate, type AssetOperationsData } from "./asset-operations-model"
 import type {
   OperatingAssetLeaseEvidence,
   OperatingAssetReferenceRent,
+  OperatingAssetTenantEvidence,
 } from "./operating-asset-directory-model";
 
 type AssetSourceIdentity = {
@@ -61,6 +62,28 @@ function readRent(value: unknown): OperatingAssetReferenceRent {
   };
 }
 
+function readTenantEvidence(value: unknown): OperatingAssetTenantEvidence | undefined {
+  if (!isRecord(value)) return undefined;
+  const { names, sourceRef, classification, scope, asOfSourceDate } = value;
+  if (
+    !Array.isArray(names) ||
+    !names.length ||
+    !names.every(isText) ||
+    !isText(sourceRef) ||
+    (classification !== "latest_source" && classification !== "historical") ||
+    (scope !== "asset" && scope !== "group") ||
+    (asOfSourceDate != null && !isAssetDate(asOfSourceDate))
+  )
+    return undefined;
+  return {
+    names: names.map((name) => name.trim()),
+    sourceRef,
+    classification,
+    scope,
+    asOfSourceDate: asOfSourceDate ?? undefined,
+  };
+}
+
 function readLeaseEvidence(value: unknown, reviewedOn: unknown): OperatingAssetLeaseEvidence {
   if (!isRecord(value) || !isAssetDate(reviewedOn))
     throw new Error("AssetOperationsReadUnavailable");
@@ -78,6 +101,7 @@ function readLeaseEvidence(value: unknown, reviewedOn: unknown): OperatingAssetL
     referenceRent: referenceRent == null ? undefined : readRent(referenceRent),
     rates: rates?.map(readRent),
     outstanding: outstanding == null ? undefined : readAmount(outstanding),
+    tenantEvidence: readTenantEvidence(value.tenantEvidence),
     notes: notes ?? undefined,
     leaseListed: value.leaseListed === true,
     selfUse: value.selfUse === true,

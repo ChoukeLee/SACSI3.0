@@ -26,6 +26,14 @@ interface OperatingAssetOutstanding {
   sourceRef: string;
 }
 
+export interface OperatingAssetTenantEvidence {
+  names: readonly string[];
+  sourceRef: string;
+  classification: "latest_source" | "historical";
+  scope: "asset" | "group";
+  asOfSourceDate?: string;
+}
+
 export interface OperatingAssetLeaseEvidence {
   assetSourceRef: string;
   reviewedOn?: string;
@@ -34,6 +42,7 @@ export interface OperatingAssetLeaseEvidence {
   paidThrough?: { date: string; sourceRef: string };
   nextPayment?: { dueDate: string; sourceRef: string; unpaid?: boolean };
   outstanding?: OperatingAssetOutstanding;
+  tenantEvidence?: OperatingAssetTenantEvidence;
   notes?: readonly string[];
   leaseListed?: boolean;
   selfUse?: boolean;
