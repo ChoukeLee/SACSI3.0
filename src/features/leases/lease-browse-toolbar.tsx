@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Search } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
-import { LeaseModeSelector } from "./lease-browse-content";
 import {
+  leaseBrowseCategories,
+  leaseBrowseCategoryLabel,
   leaseBrowseCookieName,
   leaseBrowseHref,
   leaseCollectionHref,
@@ -39,7 +40,7 @@ export function LeaseBrowseToolbar({
   searchQuery,
 }: {
   locale: Locale;
-  category: LeaseBrowseCategory;
+  category: LeaseBrowseCategory | "followup";
   location?: {
     value: string;
     options: { value: string; label: string }[];
@@ -53,13 +54,9 @@ export function LeaseBrowseToolbar({
   const zh = locale === "zh";
   const searchLabel = zh ? "跨类别搜索" : "Rechercher dans toutes les catégories";
 
-  function switchCategory(value: LeaseBrowseCategory) {
-    if (value === category) return;
-    startTransition(() => router.push(leaseBrowseHref(locale, value)));
-  }
-
   function searchAssets(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (category === "followup") return;
     const query = new FormData(event.currentTarget).get("q");
     if (typeof query !== "string" || (!query.trim() && !searchQuery)) return;
     startTransition(() => router.push(leaseSearchHref(locale, category, query)));
@@ -72,12 +69,29 @@ export function LeaseBrowseToolbar({
       aria-label={zh ? "长租浏览工具栏" : "Outils de navigation des locations"}
       aria-busy={pending}
     >
-      <LeaseModeSelector
-        locale={locale}
-        value={category}
-        onChange={switchCategory}
-        disabled={pending}
-      />
+      <nav
+        className={styles.browseNavigation}
+        aria-label={zh ? "长租工作台" : "Espace des locations"}
+      >
+        {leaseBrowseCategories.map((mode) => (
+          <Link
+            key={mode}
+            href={leaseBrowseHref(locale, mode)}
+            prefetch={false}
+            aria-current={category === mode && !searchQuery ? "page" : undefined}
+          >
+            {leaseBrowseCategoryLabel(mode, locale)}
+          </Link>
+        ))}
+        <Link
+          href={leaseCollectionHref(locale)}
+          prefetch={false}
+          aria-current={category === "followup" ? "page" : undefined}
+        >
+          <CalendarClock size={16} aria-hidden="true" />
+          {zh ? "收款跟进" : "Suivi des loyers"}
+        </Link>
+      </nav>
       {location ? (
         <select
           className={styles.browseLocation}
@@ -93,21 +107,23 @@ export function LeaseBrowseToolbar({
           ))}
         </select>
       ) : null}
-      <form className={styles.browseSearch} onSubmit={searchAssets}>
-        <input
-          key={searchQuery ?? ""}
-          type="search"
-          name="q"
-          aria-label={searchLabel}
-          placeholder={zh ? "搜索房号、资产名称或租户" : "Lot, nom du bien ou locataire"}
-          defaultValue={searchQuery}
-          maxLength={leaseSearchLimit}
-        />
-        <button type="submit" aria-label={searchLabel} title={searchLabel} disabled={pending}>
-          <Search size={16} aria-hidden="true" />
-        </button>
-      </form>
-      {searchQuery ? (
+      {category !== "followup" ? (
+        <form className={styles.browseSearch} onSubmit={searchAssets}>
+          <input
+            key={searchQuery ?? ""}
+            type="search"
+            name="q"
+            aria-label={searchLabel}
+            placeholder={zh ? "搜索房号、资产名称或租户" : "Lot, nom du bien ou locataire"}
+            defaultValue={searchQuery}
+            maxLength={leaseSearchLimit}
+          />
+          <button type="submit" aria-label={searchLabel} title={searchLabel} disabled={pending}>
+            <Search size={16} aria-hidden="true" />
+          </button>
+        </form>
+      ) : null}
+      {searchQuery && category !== "followup" ? (
         <Link
           className={styles.browseAction}
           href={leaseBrowseHref(locale, category)}
@@ -116,14 +132,6 @@ export function LeaseBrowseToolbar({
           {zh ? "返回分类" : "Revenir à la catégorie"}
         </Link>
       ) : null}
-      <Link
-        className={`${styles.browseAction} ${styles.collectionAction}`}
-        href={leaseCollectionHref(locale)}
-        prefetch={false}
-      >
-        <CalendarClock size={16} aria-hidden="true" />
-        {zh ? "收款跟进" : "Suivi des loyers"}
-      </Link>
     </div>
   );
 }

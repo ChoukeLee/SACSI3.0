@@ -726,10 +726,13 @@ it("shows site counts alongside compact unit rows and keeps financial details ac
     });
   expect([...filters.options].map((option) => option.textContent)).toEqual([
     "全部状态 · 2",
+    "需跟进 · 2",
     "已逾期 · 1",
     "15天内应缴 · 1",
     "待核事项 · 0",
   ]);
+  await chooseStatus("followup");
+  expect(cards()).toHaveLength(2);
   await chooseStatus("overdue");
   expect(siteList()?.querySelectorAll("button")).toHaveLength(3);
   expect(cards()).toHaveLength(1);

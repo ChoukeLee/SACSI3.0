@@ -17,14 +17,15 @@ import {
 import styles from "./lease-room-overview.module.css";
 
 export type LeaseRoomFilter = "all" | "overdue" | "upcoming" | "review";
+export type LeaseBuildingFilter = LeaseRoomFilter | "followup";
 
 type RoomFollowUp = Exclude<LeaseRoomFilter, "all">;
 type BuildingBrowse = {
   locations: readonly { id: string; display_name: string; code: string }[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  filter: LeaseRoomFilter;
-  onFilterChange: (filter: LeaseRoomFilter) => void;
+  filter: LeaseBuildingFilter;
+  onFilterChange: (filter: LeaseBuildingFilter) => void;
   focusOnNavigation: RefObject<boolean>;
 };
 
@@ -42,6 +43,10 @@ function roomFollowUp(row: LeaseRoomOverviewRow, includePeriodReview = false): R
 
 export function leaseRoomMatchesFilter(row: LeaseRoomOverviewRow, filter: LeaseRoomFilter) {
   return filter === "all" || roomFollowUp(row) === filter;
+}
+
+function matchesBrowseFilter(status: RoomFollowUp | null, filter: LeaseBuildingFilter) {
+  return filter === "all" || (filter === "followup" ? status !== null : filter === status);
 }
 
 export function leaseRoomFloorLabel(unit: LeaseRoomOverviewRow["unit"], locale: Locale) {
@@ -380,7 +385,7 @@ export function LeaseRoomOverview({
       const totals = locationTotals.get(id) ?? { count: 0, followUp: 0, matching: 0 };
       totals.count++;
       if (status) totals.followUp++;
-      if (activeFilter === "all" || activeFilter === status) totals.matching++;
+      if (matchesBrowseFilter(status, activeFilter)) totals.matching++;
       locationTotals.set(id, totals);
     }
     return { counts, locationTotals };
@@ -390,7 +395,7 @@ export function LeaseRoomOverview({
       rentalRows.filter(
         (row) =>
           leaseRoomMatchesSearch(row, activeSearch) &&
-          (activeFilter === "all" || roomFollowUp(row, compact) === activeFilter),
+          matchesBrowseFilter(roomFollowUp(row, compact), activeFilter),
       ),
     [rentalRows, activeSearch, activeFilter, compact],
   );
@@ -475,6 +480,7 @@ export function LeaseRoomOverview({
     { key: "upcoming", label: text("15天内应缴", "Dû sous 15 jours") },
     { key: "review", label: text("待核事项", "À vérifier") },
   ];
+  const followUpCount = counts.overdue + counts.upcoming + counts.review;
   const activeBuilding = buildingBrowse?.locations.find(({ id }) => id === activeBuildingId);
   const historicalLocations =
     buildingIndex && activeFilter === "all"
@@ -527,45 +533,53 @@ export function LeaseRoomOverview({
     );
   return (
     <section
-      className={cn(styles.overview, compactCards && styles.compactOverview)}
+      className={cn(
+        styles.overview,
+        compactCards && styles.compactOverview,
+        compact && styles.apartmentBrowse,
+      )}
       aria-label={text("楼栋长租房源", "Locations par bâtiment")}
     >
       {compact && buildingBrowse ? (
-        <header className={styles.browseHeader}>
-          <div className={styles.browseTitle}>
-            {activeBuildingId ? (
+        <div className={styles.browseControls}>
+          {activeBuildingId ? (
+            <nav
+              className={styles.browseBuildings}
+              aria-label={text("楼栋切换", "Choix du bâtiment")}
+            >
               <button
                 type="button"
-                className={styles.browseBack}
                 aria-label={text("返回全部楼栋", "Revenir à tous les bâtiments")}
                 disabled={disabled}
                 onClick={() => buildingBrowse.onSelect(null)}
               >
-                <ArrowLeft size={16} aria-hidden="true" />
+                <ArrowLeft size={14} aria-hidden="true" />
                 {text("全部楼栋", "Tous les bâtiments")}
               </button>
-            ) : null}
-            <h2 ref={browseHeading} tabIndex={-1}>
-              {activeBuilding?.display_name ||
-                activeBuilding?.code ||
-                text("楼栋一览", "Bâtiments")}
-            </h2>
-            <span>{text(`${counts.all} 间租赁房源`, `${counts.all} lots en location`)}</span>
-          </div>
-          <div className={styles.browseActions}>
-            <LeaseBrowseStatusFilter
-              label={text("房源跟进筛选", "Filtres de suivi")}
-              value={activeFilter}
-              options={filters.map(({ key, label }) => ({
-                value: key,
-                label,
-                count: counts[key],
-              }))}
-              onChange={(value) => {
-                const choice = filters.find(({ key }) => key === value);
-                if (choice) buildingBrowse.onFilterChange(choice.key);
-              }}
-            />
+              {buildingBrowse.locations.map(({ id, display_name, code }) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-current={id === activeBuildingId ? "true" : undefined}
+                  disabled={disabled}
+                  onClick={() => {
+                    if (id !== activeBuildingId) buildingBrowse.onSelect(id);
+                  }}
+                >
+                  {display_name || code}
+                </button>
+              ))}
+            </nav>
+          ) : null}
+          <header className={styles.browseHeader}>
+            <div className={styles.browseTitle}>
+              <h2 ref={browseHeading} tabIndex={-1}>
+                {activeBuilding?.display_name ||
+                  activeBuilding?.code ||
+                  text("楼栋一览", "Bâtiments")}
+              </h2>
+              <span>{text(`${counts.all} 间租赁房源`, `${counts.all} lots en location`)}</span>
+            </div>
             <button
               type="button"
               className={styles.browseHistory}
@@ -574,8 +588,57 @@ export function LeaseRoomOverview({
             >
               {text("查看历史", "Voir l’historique")}
             </button>
+          </header>
+          <div className={styles.browseActions}>
+            <div
+              className={styles.browseFilters}
+              role="group"
+              aria-label={text("租赁筛选", "Filtres des locations")}
+            >
+              <button
+                type="button"
+                aria-pressed={activeFilter === "all"}
+                onClick={() => buildingBrowse.onFilterChange("all")}
+              >
+                {text("全部租赁", "Toutes les locations")} <span>{counts.all}</span>
+              </button>
+              <button
+                type="button"
+                aria-pressed={activeFilter !== "all"}
+                onClick={() => buildingBrowse.onFilterChange("followup")}
+              >
+                {text("需跟进", "À suivre")} <span>{followUpCount}</span>
+              </button>
+            </div>
+            {activeFilter !== "all" ? (
+              <LeaseBrowseStatusFilter
+                label={text("房源跟进筛选", "Filtres de suivi")}
+                value={activeFilter}
+                options={[
+                  {
+                    value: "followup",
+                    label: text("全部跟进", "Tous les suivis"),
+                    count: followUpCount,
+                  },
+                  ...filters
+                    .filter(({ key }) => key !== "all")
+                    .map(({ key, label }) => ({
+                      value: key,
+                      label,
+                      count: counts[key],
+                    })),
+                ]}
+                onChange={(value) => {
+                  if (value === "followup") buildingBrowse.onFilterChange(value);
+                  else {
+                    const choice = filters.find(({ key }) => key !== "all" && key === value);
+                    if (choice) buildingBrowse.onFilterChange(choice.key);
+                  }
+                }}
+              />
+            ) : null}
           </div>
-        </header>
+        </div>
       ) : null}
       {!embedded && !compact ? (
         <div className={styles.toolbar}>

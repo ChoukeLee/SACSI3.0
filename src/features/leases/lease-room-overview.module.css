@@ -6,9 +6,15 @@
 .compactOverview {
   gap: 0.95rem;
 }
+.browseControls {
+  display: grid;
+  gap: 0.6rem;
+}
 .browseHeader,
 .browseTitle,
-.browseActions {
+.browseActions,
+.browseBuildings,
+.browseFilters {
   display: flex;
   min-width: 0;
   flex-wrap: wrap;
@@ -17,10 +23,9 @@
 }
 .browseHeader {
   justify-content: space-between;
-  padding-block: 0.15rem;
 }
 .browseTitle h2 {
-  font-size: 1rem;
+  font-size: 1.125rem;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
@@ -29,25 +34,50 @@
   font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
 }
-.browseBack,
+.browseBuildings {
+  gap: 0.35rem;
+}
+.browseFilters {
+  gap: 0.4rem;
+}
+.browseBuildings button,
+.browseFilters button,
 .browseHistory {
   display: inline-flex;
   min-height: 2rem;
   align-items: center;
   gap: 0.35rem;
+  border: 1px solid hsl(var(--border));
   border-radius: 0.375rem;
-  padding: 0.35rem 0.45rem;
+  padding: 0.25rem 0.55rem;
+  background: hsl(var(--card));
   color: hsl(var(--muted-foreground));
   font-size: 0.8125rem;
 }
-.browseBack:hover,
+.browseBuildings button:hover,
+.browseFilters button:hover,
 .browseHistory:hover,
+.browseBuildings button[aria-current="true"],
+.browseFilters button[aria-pressed="true"],
 .browseHistory[aria-expanded="true"] {
-  background: hsl(var(--muted) / 0.65);
-  color: hsl(var(--foreground));
+  border-color: transparent;
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
 }
-.browseBack:disabled {
+.browseBuildings button:disabled {
   opacity: 0.6;
+}
+.browseFilters button span {
+  font-variant-numeric: tabular-nums;
+}
+.apartmentBrowse .compactRoom {
+  border: 1px solid hsl(var(--border));
+  border-inline-start: 3px solid var(--lease-room-ink, transparent);
+  background: hsl(var(--card));
+}
+.apartmentBrowse .compactRoom:hover,
+.apartmentBrowse .compactRoom[aria-pressed="true"] {
+  border-color: hsl(var(--ring) / 0.72);
 }
 .compactFloor > header {
   margin-bottom: 0.5rem;
@@ -575,6 +605,9 @@
   }
 }
 @media (pointer: coarse) {
+  .browseBuildings button,
+  .browseFilters button,
+  .browseHistory,
   .filters button,
   .followupButton,
   .search {

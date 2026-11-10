@@ -12,7 +12,11 @@ import {
   type LeaseRecordOverviewRow,
   type LeaseRoomOverviewRow,
 } from "./lease-room-overview-model";
-import { LeaseRoomOverview, leaseRoomFloorLabel } from "./lease-room-overview";
+import {
+  LeaseRoomOverview,
+  leaseRoomFloorLabel,
+  type LeaseBuildingFilter,
+} from "./lease-room-overview";
 
 let host: HTMLDivElement;
 let root: Root;
@@ -128,6 +132,81 @@ function button(text: string) {
   expect(match).toBeDefined();
   return match!;
 }
+
+it("browses apartment buildings and filters rooms that need follow-up", async () => {
+  const [review] = rows();
+  const building = fixture.buildings[0];
+  const second = { ...building, id: "second-building", display_name: "示例二号楼" };
+  const quiet = {
+    ...review,
+    unit: { ...review.unit, id: "quiet-room", unit_no: "102" },
+    attention: null,
+    reviewReasons: [],
+  };
+  const secondRoom = {
+    ...quiet,
+    building: second,
+    unit: { ...quiet.unit, id: "second-room", building_id: second.id },
+  };
+  const selectBuilding = vi.fn();
+  const filterChange = vi.fn();
+  const selectRoom = vi.fn();
+  const navigationFocus = { current: false };
+  async function renderBrowse(selectedId: string | null, filter: LeaseBuildingFilter) {
+    await act(async () =>
+      root.render(
+        <LeaseRoomOverview
+          rows={selectedId ? [review, quiet] : [review, quiet, secondRoom]}
+          records={[]}
+          locale="zh"
+          loading={false}
+          error={false}
+          buildingBrowse={{
+            locations: [building, second],
+            selectedId,
+            onSelect: selectBuilding,
+            filter,
+            onFilterChange: filterChange,
+            focusOnNavigation: navigationFocus,
+          }}
+          onSelectUnit={selectRoom}
+          onSelectRecord={vi.fn()}
+          onRetry={vi.fn()}
+        />,
+      ),
+    );
+  }
+
+  await renderBrowse(null, "all");
+  const index = host.querySelector('[aria-label="长租楼栋"]')!;
+  expect(index.querySelectorAll("button")).toHaveLength(2);
+  expect(index.textContent).toContain("待跟进 1 间");
+  await act(async () => button("需跟进").click());
+  expect(filterChange).toHaveBeenLastCalledWith("followup");
+  await renderBrowse(null, "followup");
+  expect(index.querySelectorAll("button")).toHaveLength(1);
+  await act(async () => index.querySelector("button")!.click());
+  expect(selectBuilding).toHaveBeenLastCalledWith(building.id);
+
+  navigationFocus.current = true;
+  await renderBrowse(building.id, "followup");
+  const switches = host.querySelector('[aria-label="楼栋切换"]')!;
+  expect(switches.querySelector('[aria-current="true"]')?.textContent).toBe(building.display_name);
+  expect(document.activeElement?.tagName).toBe("H2");
+  expect(host.querySelectorAll("[data-room-id]")).toHaveLength(1);
+  const details = host.querySelector<HTMLSelectElement>('[aria-label="房源跟进筛选"]')!;
+  expect([...details.options].map(({ value }) => value)).toEqual([
+    "followup",
+    "overdue",
+    "upcoming",
+    "review",
+  ]);
+  await act(async () => host.querySelector<HTMLButtonElement>("[data-room-id]")!.click());
+  expect(selectRoom).toHaveBeenLastCalledWith(review);
+  await act(async () => button("示例二号楼").click());
+  expect(selectBuilding).toHaveBeenLastCalledWith(second.id);
+  expect(button("查看历史")).toBeDefined();
+});
 
 it("shows source-based rental facts without requiring paperwork and leaves rooms without a current rental out", async () => {
   const value = rows();

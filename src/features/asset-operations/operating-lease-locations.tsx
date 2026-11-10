@@ -81,14 +81,14 @@ export function OperatingLeaseCard({
   row,
   locale,
   siteName,
-  compactRow = false,
+  compact = false,
   selected,
   onSelect,
 }: {
   row: OperatingLeaseRow;
   locale: Locale;
   siteName?: string;
-  compactRow?: boolean;
+  compact?: boolean;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -109,7 +109,7 @@ export function OperatingLeaseCard({
   const coverage = followUp.paidThrough;
   const pending = coverage?.status === "pending";
   const missingCoverage =
-    compactRow && !coverage && attention === "review" && followUp.reason === "paid_through_missing";
+    compact && !coverage && attention === "review" && followUp.reason === "paid_through_missing";
   const status = missingCoverage
     ? zh
       ? "缴租日期待补"
@@ -125,15 +125,12 @@ export function OperatingLeaseCard({
         className={styles.card}
         aria-haspopup="dialog"
         aria-pressed={selected}
-        data-layout={compactRow ? "row" : undefined}
+        data-layout={compact ? "unit" : undefined}
         data-status={attention ?? undefined}
         onClick={onSelect}
       >
         <span className={styles.identity}>
-          <strong
-            className={styles.unitIdentifier}
-            title={compactRow ? asset.displayName : undefined}
-          >
+          <strong title={compact ? asset.displayName : undefined}>
             {identifier !== asset.displayName ? (
               <>
                 <span className="sr-only">{asset.displayName}</span>
@@ -143,14 +140,15 @@ export function OperatingLeaseCard({
               identifier
             )}
           </strong>
-          <span className={styles.tenant} title={compactRow ? tenantTitle : undefined}>
-            {showQualifier && !compactRow ? <small>{qualifier} </small> : null}
+          {compact ? <ArrowRight size={15} aria-hidden="true" /> : null}
+          <span className={styles.tenant} title={compact ? tenantTitle : undefined}>
+            {showQualifier && !compact ? <small>{qualifier} </small> : null}
             {tenantName}
-            {showQualifier && compactRow ? <small> {qualifier}</small> : null}
+            {showQualifier && compact ? <small> {qualifier}</small> : null}
           </span>
         </span>
         <span className={styles.cardDetails}>
-          {missingCoverage || (compactRow && selfUse) ? null : (
+          {missingCoverage || (compact && selfUse) ? null : (
             <span className={styles.coverage}>
               {pending ? (zh ? "租金记载至" : "Loyer documenté au") : zh ? "已交至" : "Payé au"}{" "}
               {coverage ? (
@@ -625,7 +623,7 @@ export function OperatingLeaseLocations({
 }: OperatingLeaseLocationsProps) {
   const zh = locale === "zh";
   const activeLocation = sites.find(({ id }) => id === activeSite);
-  const headingText = activeLocation?.name ?? (zh ? "场地总览" : "Vue des sites");
+  const headingText = zh ? "租赁场地" : "Sites de location";
   const empty = (
     <p className={styles.empty}>
       {zh ? "没有符合条件的资产。" : "Aucun actif ne correspond aux critères."}
@@ -633,50 +631,43 @@ export function OperatingLeaseLocations({
   );
 
   return (
-    <section className={styles.siteBrowse} aria-label={headingText}>
+    <section aria-label={headingText}>
       <header className={styles.siteHeading}>
-        <div className={styles.siteTitle}>
-          <p>{zh ? "按场地浏览" : "Parcourir par site"}</p>
+        <div className={styles.siteIdentity}>
           <h2>{headingText}</h2>
+          <span>{zh ? `${sites.length} 处场地` : `${sites.length} sites`}</span>
         </div>
-        {activeLocation ? (
-          <div className={styles.siteSummary}>
-            <span>{zh ? `${activeLocation.count} 个单元` : `${activeLocation.count} unités`}</span>
-            <span data-follow-up={activeLocation.followUpCount > 0}>
-              {zh
-                ? `待跟进 ${activeLocation.followUpCount} 项`
-                : `${activeLocation.followUpCount} à suivre`}
-            </span>
-          </div>
-        ) : null}
-        {statusFilter}
       </header>
+      {sites.length ? (
+        <ul
+          className={styles.siteChoices}
+          aria-label={zh ? "分单元场地" : "Sites de location par unité"}
+        >
+          {sites.map(({ id, name, count, followUpCount }) => (
+            <li key={id}>
+              <button
+                type="button"
+                aria-current={id === activeSite ? "true" : undefined}
+                onClick={() => onSelectSite(id)}
+              >
+                <strong>{name}</strong>
+                <small>
+                  {zh ? `${count} 个单元` : `${count} unités`} ·{" "}
+                  <span data-follow-up={followUpCount > 0}>
+                    {zh ? `待跟进 ${followUpCount} 项` : `${followUpCount} à suivre`}
+                  </span>
+                </small>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {activeLocation ? (
-        <div className={styles.siteLayout}>
-          <section
-            className={styles.siteRail}
-            aria-label={zh ? "分单元场地" : "Sites de location par unité"}
-          >
-            <h3>{zh ? "场地" : "Sites"}</h3>
-            <ul>
-              {sites.map(({ id, name, count, followUpCount }) => (
-                <li key={id}>
-                  <button
-                    type="button"
-                    aria-current={id === activeSite ? "true" : undefined}
-                    onClick={() => onSelectSite(id)}
-                  >
-                    <strong>{name}</strong>
-                    <small>
-                      {zh
-                        ? `${count} 个单元 · 待跟进 ${followUpCount} 项`
-                        : `${count} unités · ${followUpCount} à suivre`}
-                    </small>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
+        <section className={styles.siteUnits}>
+          <h3 className={styles.unitHeading}>
+            {zh ? `${activeLocation.name} · 出租单元` : `Unités louées · ${activeLocation.name}`}
+          </h3>
+          <div className={styles.unitFilter}>{statusFilter}</div>
           <OperatingLeaseUnitList
             key={`${activeSite}:${statusKey}`}
             locale={locale}
@@ -686,7 +677,7 @@ export function OperatingLeaseLocations({
             onSelectAsset={onSelectAsset}
             empty={empty}
           />
-        </div>
+        </section>
       ) : (
         empty
       )}
@@ -715,38 +706,35 @@ function OperatingLeaseUnitList({
   const end = Math.min(first + unitsPerPage, rows.length);
 
   return (
-    <section className={styles.siteUnits}>
-      <header className={styles.unitHeader}>
-        <h3>{zh ? `${siteName} · 出租单元` : `Unités louées · ${siteName}`}</h3>
-        {pageCount > 1 ? (
-          <nav
-            className={styles.unitPages}
-            aria-label={zh ? "出租单元分页" : "Pagination des unités"}
+    <>
+      {pageCount > 1 ? (
+        <nav
+          className={styles.unitPages}
+          aria-label={zh ? "出租单元分页" : "Pagination des unités"}
+        >
+          <span aria-live="polite">{`${first + 1}–${end} / ${rows.length}`}</span>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={page === 0}
+            onClick={() => setPage(page - 1)}
           >
-            <span aria-live="polite">{`${first + 1}–${end} / ${rows.length}`}</span>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={page === 0}
-              onClick={() => setPage(page - 1)}
-            >
-              {zh ? "上一页" : "Précédent"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={page >= pageCount - 1}
-              onClick={() => setPage(page + 1)}
-            >
-              {zh ? "下一页" : "Suivant"}
-            </Button>
-          </nav>
-        ) : null}
-      </header>
+            {zh ? "上一页" : "Précédent"}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={page >= pageCount - 1}
+            onClick={() => setPage(page + 1)}
+          >
+            {zh ? "下一页" : "Suivant"}
+          </Button>
+        </nav>
+      ) : null}
       {rows.length ? (
-        <ul className={styles.unitRows} aria-label={zh ? "出租单元" : "Unités louées"}>
+        <ul className={styles.unitGrid} aria-label={zh ? "出租单元" : "Unités louées"}>
           {rows.slice(first, end).map((row) => {
             const rowKey = row.key ?? row.asset.id;
             return (
@@ -755,7 +743,7 @@ function OperatingLeaseUnitList({
                 row={row}
                 locale={locale}
                 siteName={siteName}
-                compactRow
+                compact
                 selected={selectedAssetId === rowKey}
                 onSelect={() => onSelectAsset(rowKey)}
               />
@@ -765,6 +753,6 @@ function OperatingLeaseUnitList({
       ) : (
         empty
       )}
-    </section>
+    </>
   );
 }

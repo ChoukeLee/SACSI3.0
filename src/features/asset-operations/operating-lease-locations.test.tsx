@@ -63,6 +63,7 @@ it("pages each site, resets on filters and keeps partition labels and tenant nam
   ];
   const next = [unit("新仓库", "new-1", "1号", "新仓库租户")];
   const onSelectAsset = vi.fn();
+  const onSelectSite = vi.fn();
   const host = document.createElement("div");
   const root = createRoot(host);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -72,15 +73,15 @@ it("pages each site, resets on filters and keeps partition labels and tenant nam
         <OperatingLeaseLocations
           locale="zh"
           sites={[
-            { id: "old", name: "老仓库", count: old.length, followUpCount: 0 },
+            { id: "old", name: "老仓库", count: old.length, followUpCount: 2 },
             { id: "new", name: "新仓库", count: next.length, followUpCount: 0 },
           ]}
           activeSite={activeSite}
           rows={activeSite === "old" ? old : next}
           selectedAssetId={null}
-          statusFilter={null}
+          statusFilter={<select aria-label="长租状态筛选" />}
           statusKey={statusKey}
-          onSelectSite={() => {}}
+          onSelectSite={onSelectSite}
           onSelectAsset={onSelectAsset}
         />,
       ),
@@ -95,6 +96,14 @@ it("pages each site, resets on filters and keeps partition labels and tenant nam
 
   try {
     await render();
+    const sites = host.querySelector('[aria-label="分单元场地"]')!;
+    const statusFilter = host.querySelector('select[aria-label="长租状态筛选"]');
+    expect(sites.querySelector('[aria-current="true"]')?.textContent).toContain(
+      "18 个单元 · 待跟进 2 项",
+    );
+    expect(sites.querySelectorAll("button")).toHaveLength(2);
+    await act(async () => sites.querySelectorAll("button")[1].click());
+    expect(onSelectSite).toHaveBeenCalledWith("new");
     expect(rows()).toHaveLength(15);
     expect(host.querySelector('[aria-live="polite"]')?.textContent).toBe("1–15 / 18");
     expect(pageButton("上一页").disabled).toBe(true);
@@ -116,6 +125,7 @@ it("pages each site, resets on filters and keeps partition labels and tenant nam
     expect(onSelectAsset).toHaveBeenCalledWith("48-600");
 
     await render("old", "review");
+    expect(host.querySelector('select[aria-label="长租状态筛选"]')).toBe(statusFilter);
     expect(rows()).toHaveLength(15);
     await act(async () => pageButton("下一页").click());
     await render("new", "review");

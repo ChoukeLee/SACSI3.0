@@ -83,7 +83,7 @@ import {
   leaseRoomOccupancyLabel,
   leaseRoomFloorLabel,
   leaseRecordPeriodLabel,
-  type LeaseRoomFilter,
+  type LeaseBuildingFilter,
 } from "./lease-room-overview";
 import {
   buildLeaseRoomOverview,
@@ -343,7 +343,7 @@ export function LeaseList({
     };
   });
   const [scopeLoaded, setScopeLoaded] = useState(false);
-  const [browseFilter, setBrowseFilter] = useState<LeaseRoomFilter>("all");
+  const [browseFilter, setBrowseFilter] = useState<LeaseBuildingFilter>("all");
   const focusBrowseLocation = useRef(false);
   useEffect(() => {
     let canReadLegacy = false;
@@ -508,10 +508,6 @@ export function LeaseList({
     closeScopePanel();
   };
   const changeBrowseLocation = (value: string) => {
-    if (projects.length <= 1) {
-      changeBuilding(value);
-      return;
-    }
     if (writePending()) return;
     const next = projects.find(
       (item) => value === `project:${item.id}` || item.buildings.some(({ id }) => id === value),
@@ -1707,27 +1703,28 @@ export function LeaseList({
         <LeaseBrowseToolbar
           locale={locale}
           category="apartment"
-          location={{
-            label: locale === "zh" ? "选择楼栋" : "Choisir un bâtiment",
-            value:
-              activeBuildingId === ALL_BUILDINGS && project && projects.length > 1
-                ? `project:${project.id}`
-                : activeBuildingId,
-            options: projects.flatMap((item) => [
-              {
-                value: projects.length > 1 ? `project:${item.id}` : ALL_BUILDINGS,
-                label:
-                  projects.length > 1
-                    ? `${projectLabel(item)} · ${allBuildingsLabel}`
-                    : allBuildingsLabel,
-              },
-              ...item.buildings.map((building) => ({
-                value: building.id,
-                label: building.display_name || building.code,
-              })),
-            ]),
-            onChange: changeBrowseLocation,
-          }}
+          location={
+            projects.length > 1
+              ? {
+                  label: locale === "zh" ? "选择项目或楼栋" : "Choisir un projet ou un bâtiment",
+                  value:
+                    activeBuildingId === ALL_BUILDINGS && project
+                      ? `project:${project.id}`
+                      : activeBuildingId,
+                  options: projects.flatMap((item) => [
+                    {
+                      value: `project:${item.id}`,
+                      label: `${projectLabel(item)} · ${allBuildingsLabel}`,
+                    },
+                    ...item.buildings.map((building) => ({
+                      value: building.id,
+                      label: building.display_name || building.code,
+                    })),
+                  ]),
+                  onChange: changeBrowseLocation,
+                }
+              : undefined
+          }
         />
       ) : (
         <section

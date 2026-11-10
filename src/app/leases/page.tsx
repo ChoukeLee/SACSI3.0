@@ -2,12 +2,9 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { LeaseLazyView } from "@/features/leases/lease-lazy-view";
-import { LeaseBrowsePreference } from "@/features/leases/lease-browse-toolbar";
+import { LeaseBrowsePreference, LeaseBrowseToolbar } from "@/features/leases/lease-browse-toolbar";
 import { loadLeaseWorkspace } from "@/features/leases/lease-workspace-data";
-import {
-  LeaseCollectionsBackLink,
-  LeaseWorkbenchFrame,
-} from "@/features/leases/lease-workbench-frame";
+import { LeaseWorkbenchFrame } from "@/features/leases/lease-workbench-frame";
 import { UnifiedLeaseCollectionsPage } from "@/features/leases/unified-lease-collections-page";
 import { parseCollectionCategory } from "@/features/leases/unified-lease-collections-model";
 import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
@@ -62,11 +59,8 @@ export default async function LeasesPage({
         <LeaseBrowsePreference viewerId={browseViewerId} category={category} />
       ) : null}
       {category === "followup" ? (
-        <LeaseWorkbenchFrame
-          locale="zh"
-          view="collections"
-          action={<LeaseCollectionsBackLink locale="zh" />}
-        >
+        <LeaseWorkbenchFrame locale="zh">
+          <LeaseBrowseToolbar locale="zh" category="followup" />
           <UnifiedLeaseCollectionsPage
             locale="zh"
             viewerId={user.id}

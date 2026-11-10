@@ -4,7 +4,6 @@ import { ArrowRight, Search } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import type { Locale } from "@/lib/i18n";
-import { LeaseBrowseStatusFilter, LeaseModeSelector } from "./lease-browse-content";
 import {
   collectionCategoryLabel,
   collectionStatusLabels,
@@ -15,8 +14,23 @@ import {
 } from "./unified-lease-collections-model";
 import styles from "./unified-lease-collections.module.css";
 
-const statuses = ["overdue", "upcoming", "unsettled", "needs_evidence"] as const;
-type StatusFilter = "all" | CollectionStatus;
+const scopes = ["all", "apartment", "multi-unit", "whole"] as const;
+const statuses = [
+  "all",
+  "overdue",
+  "upcoming",
+  "unsettled",
+  "undated_balance",
+  "needs_evidence",
+] as const;
+type DisplayStatus = CollectionStatus | "undated_balance";
+type StatusFilter = "all" | DisplayStatus;
+
+function displayStatus(row: UnifiedLeaseCollectionRow): DisplayStatus {
+  return row.status === "needs_evidence" && row.amount !== null && row.dueDate === null
+    ? "undated_balance"
+    : row.status;
+}
 
 export function UnifiedLeaseCollections({
   rows,
@@ -48,18 +62,20 @@ export function UnifiedLeaseCollections({
     overdue: 0,
     upcoming: 0,
     unsettled: 0,
+    undated_balance: 0,
     needs_evidence: 0,
   };
-  for (const row of candidates) counts[row.status]++;
+  for (const row of candidates) counts[displayStatus(row)]++;
   const visible = sortCollectionRows(
-    candidates.filter((row) => filter === "all" || row.status === filter),
+    candidates.filter((row) => filter === "all" || displayStatus(row) === filter),
     locale,
   );
-  const groups = new Map<CollectionStatus, UnifiedLeaseCollectionRow[]>();
+  const groups = new Map<DisplayStatus, UnifiedLeaseCollectionRow[]>();
   for (const row of visible) {
-    const group = groups.get(row.status);
+    const status = displayStatus(row);
+    const group = groups.get(status);
     if (group) group.push(row);
-    else groups.set(row.status, [row]);
+    else groups.set(status, [row]);
   }
   const scopeUnavailable =
     category === "apartment"
@@ -68,32 +84,18 @@ export function UnifiedLeaseCollections({
         ? unavailable.apartments && unavailable.operatingAssets
         : unavailable.operatingAssets;
   const unregistered = zh ? "未登记" : "Non renseigné";
+  const labels = {
+    ...collectionStatusLabels,
+    undated_balance: ["待收 · 付款日待补", "Solde dû · échéance à renseigner"],
+  };
 
   return (
     <section
       className={styles.workspace}
       aria-label={zh ? "集中收款跟进" : "Suivi des loyers regroupé"}
     >
-      <div className={styles.scopeBar}>
-        <LeaseModeSelector
-          locale={locale}
-          value={category === "all" ? null : category}
-          onChange={setCategory}
-        />
-        <button
-          className={styles.overview}
-          type="button"
-          aria-pressed={category === "all"}
-          onClick={() => setCategory("all")}
-        >
-          {category === "all"
-            ? collectionCategoryLabel("all", locale)
-            : zh
-              ? "返回汇总"
-              : "Retour à la synthèse"}
-        </button>
-      </div>
-      <div className={styles.toolbar}>
+      <header className={styles.heading}>
+        <h2>{zh ? "收款跟进" : "Suivi des loyers"}</h2>
         <span className={styles.resultCount} aria-live="polite">
           {scopeUnavailable
             ? "—"
@@ -101,29 +103,58 @@ export function UnifiedLeaseCollections({
               ? `${visible.length} 项跟进`
               : `${visible.length} dossier(s) à suivre`}
         </span>
-        <LeaseBrowseStatusFilter
-          label={zh ? "收款状态" : "Statut du suivi"}
-          value={filter}
-          options={["all" as const, ...statuses].map((value) => ({
-            value,
-            label: collectionStatusLabels[value][lang],
-            count: scopeUnavailable ? null : counts[value],
-          }))}
-          onChange={(value) => {
-            const status = statuses.find((key) => key === value);
-            setFilter(status ?? "all");
-          }}
-        />
-        <label className={styles.search}>
-          <Search size={16} aria-hidden="true" />
-          <input
-            type="search"
-            aria-label={zh ? "搜索收款跟进" : "Rechercher un suivi"}
-            placeholder={zh ? "搜索房号、资产名称或租户" : "Lot, nom du bien ou locataire"}
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </label>
+      </header>
+      <div className={styles.controls}>
+        <div className={styles.scopeBar}>
+          <label className={styles.scope}>
+            <span>{zh ? "资产范围" : "Périmètre"}</span>
+            <select
+              value={category}
+              onChange={(event) => {
+                const next = scopes.find((scope) => scope === event.target.value);
+                if (next) setCategory(next);
+              }}
+            >
+              {scopes.map((scope) => (
+                <option key={scope} value={scope}>
+                  {scope === "all"
+                    ? zh
+                      ? "全部资产"
+                      : "Tous les actifs"
+                    : collectionCategoryLabel(scope, locale)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={styles.search}>
+            <Search size={16} aria-hidden="true" />
+            <input
+              type="search"
+              aria-label={zh ? "搜索收款跟进" : "Rechercher un suivi"}
+              placeholder={zh ? "搜索房号、资产名称或租户" : "Lot, nom du bien ou locataire"}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
+        </div>
+        <div className={styles.toolbar}>
+          <div
+            className={styles.filters}
+            role="group"
+            aria-label={zh ? "收款状态" : "Statut du suivi"}
+          >
+            {statuses.map((status) => (
+              <button
+                key={status}
+                type="button"
+                aria-pressed={filter === status}
+                onClick={() => setFilter(status)}
+              >
+                {labels[status][lang]} <span>{scopeUnavailable ? "—" : counts[status]}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
       {unavailable.apartments ? (
         <p role="alert" className={styles.notice}>
@@ -136,81 +167,81 @@ export function UnifiedLeaseCollections({
         </p>
       ) : null}
       {groups.size ? (
-        Array.from(groups, ([status, items]) => (
-          <section
-            className={styles.group}
-            key={status}
-            aria-labelledby={`lease-collection-${status}`}
-          >
-            <header className={styles.groupHeading} data-status={status}>
-              <h2 id={`lease-collection-${status}`}>{collectionStatusLabels[status][lang]}</h2>
-              <span>{zh ? `${items.length} 项` : `${items.length} dossier(s)`}</span>
-            </header>
-            <ul className={styles.rows}>
-              {items.map((row) => {
-                const categoryLabel = collectionCategoryLabel(row.category, locale);
-                return (
-                  <li key={row.id}>
-                    <Link href={row.href} prefetch={false} className={styles.row}>
-                      <span className={styles.identity}>
-                        <small>{[categoryLabel, row.group].filter(Boolean).join(" · ")}</small>
-                        <span className={styles.party}>
-                          <strong>{row.name}</strong>
-                          {row.tenant ? <span>{row.tenant}</span> : null}
+        [...groups.entries()]
+          .sort(([first], [second]) => statuses.indexOf(first) - statuses.indexOf(second))
+          .map(([status, items]) => (
+            <section
+              className={styles.group}
+              key={status}
+              aria-labelledby={`lease-collection-${status}`}
+            >
+              <header className={styles.groupHeading} data-status={status}>
+                <h3 id={`lease-collection-${status}`}>{labels[status][lang]}</h3>
+                <span>{zh ? `${items.length} 项` : `${items.length} dossier(s)`}</span>
+              </header>
+              <ul className={styles.rows}>
+                {items.map((row) => {
+                  const categoryLabel = collectionCategoryLabel(row.category, locale);
+                  return (
+                    <li key={row.id}>
+                      <Link href={row.href} prefetch={false} className={styles.row}>
+                        <span className={styles.identity}>
+                          <small>{[categoryLabel, row.group].filter(Boolean).join(" · ")}</small>
+                          <span className={styles.party}>
+                            <strong>{row.name}</strong>
+                            {row.tenant ? <span>{row.tenant}</span> : null}
+                          </span>
+                          <small className={styles.coverage} title={row.paidThroughSource}>
+                            {row.coveragePending
+                              ? zh
+                                ? "租金记载至"
+                                : "Loyer documenté au"
+                              : zh
+                                ? "已交至"
+                                : "Payé au"}{" "}
+                            {row.paidThrough ? (
+                              <time dateTime={row.paidThrough}>{row.paidThrough}</time>
+                            ) : (
+                              unregistered
+                            )}
+                          </small>
                         </span>
-                      </span>
-                      <span className={styles.field} title={row.paidThroughSource}>
-                        <small>
-                          {row.coveragePending
-                            ? zh
-                              ? "租金记载至"
-                              : "Loyer documenté au"
-                            : zh
-                              ? "已交至"
-                              : "Payé au"}
-                        </small>
-                        {row.paidThrough ? (
-                          <time dateTime={row.paidThrough}>{row.paidThrough}</time>
-                        ) : (
-                          unregistered
-                        )}
-                      </span>
-                      <span className={styles.field} title={row.dueSource}>
-                        <small>{zh ? "约定付款日" : "Échéance prévue"}</small>
-                        {row.dueDate ? (
-                          <time dateTime={row.dueDate}>{row.dueDate}</time>
-                        ) : (
-                          unregistered
-                        )}
-                      </span>
-                      <span className={styles.field} title={row.amountSource}>
-                        <small>{row.amountLabel}</small>
-                        <span>{row.amount ?? unregistered}</span>
-                      </span>
-                      <span className={styles.rowStatus} data-status={row.status}>
-                        {row.reason ?? row.statusLabel ?? collectionStatusLabels[row.status][lang]}
-                      </span>
-                      <ArrowRight size={14} aria-hidden="true" />
-                      {row.latestReceipt ? (
-                        <span className={styles.receipt}>
-                          <small>{zh ? "已确认收款" : "Encaissement confirmé"}</small>
-                          <time dateTime={row.latestReceipt.date}>{row.latestReceipt.date}</time>
-                          <span>{row.latestReceipt.amount}</span>
-                          {row.latestReceipt.periodStart && row.latestReceipt.periodEnd ? (
-                            <small>
-                              {zh ? "覆盖" : "Période"} {row.latestReceipt.periodStart}{" "}
-                              {zh ? "至" : "au"} {row.latestReceipt.periodEnd}
-                            </small>
-                          ) : null}
+                        <span className={styles.field} title={row.amountSource}>
+                          <small>{row.amountLabel}</small>
+                          <span>{row.amount ?? unregistered}</span>
                         </span>
-                      ) : null}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        ))
+                        <span className={styles.field} title={row.dueSource}>
+                          <small>{zh ? "约定付款日" : "Échéance prévue"}</small>
+                          {row.dueDate ? (
+                            <time dateTime={row.dueDate}>{row.dueDate}</time>
+                          ) : (
+                            unregistered
+                          )}
+                        </span>
+                        <span className={styles.rowStatus} data-status={status}>
+                          {row.reason ?? row.statusLabel ?? labels[status][lang]}
+                        </span>
+                        <ArrowRight size={14} aria-hidden="true" />
+                        {row.latestReceipt ? (
+                          <span className={styles.receipt}>
+                            <small>{zh ? "已确认收款" : "Encaissement confirmé"}</small>
+                            <time dateTime={row.latestReceipt.date}>{row.latestReceipt.date}</time>
+                            <span>{row.latestReceipt.amount}</span>
+                            {row.latestReceipt.periodStart && row.latestReceipt.periodEnd ? (
+                              <small>
+                                {zh ? "覆盖" : "Période"} {row.latestReceipt.periodStart}{" "}
+                                {zh ? "至" : "au"} {row.latestReceipt.periodEnd}
+                              </small>
+                            ) : null}
+                          </span>
+                        ) : null}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))
       ) : (
         <p className={styles.notice}>
           {scopeUnavailable

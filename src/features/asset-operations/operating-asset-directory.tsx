@@ -57,6 +57,7 @@ import locationStyles from "./operating-lease-locations.module.css";
 import styles from "./operating-asset-directory.module.css";
 
 type Locale = "zh" | "fr";
+type DirectoryFilter = CardFilter | "followup";
 type FollowUp = ReturnType<typeof getOperatingAssetFollowUp>;
 type FollowUpStatus = Exclude<FollowUp["status"], "current">;
 type FollowUpFilter = "all" | FollowUpStatus;
@@ -184,7 +185,7 @@ function OperatingAssetDirectoryView({
   const lang = zh ? 0 : 1;
   const [search, setSearch] = useState("");
   const [selectedGroup, setSelectedGroup] = useState("");
-  const [cardFilter, setCardFilter] = useState<CardFilter>("all");
+  const [cardFilter, setCardFilter] = useState<DirectoryFilter>("all");
   const [view, setView] = useState(initialView);
   const [followUpFilter, setFollowUpFilter] = useState<FollowUpFilter>("all");
   const [selectedId, setSelectedId] = useState(
@@ -343,21 +344,26 @@ function OperatingAssetDirectoryView({
   const matchingApartments = showApartments
     ? (apartmentRows?.filter((row) => leaseRoomMatchesSearch(row, activeSearch)) ?? [])
     : [];
+  const apartmentFilter = cardFilter === "followup" ? "all" : cardFilter;
   const visibleApartmentCount = matchingApartments.filter((row) =>
-    leaseRoomMatchesFilter(row, cardFilter),
+    leaseRoomMatchesFilter(row, apartmentFilter),
   ).length;
   const showApartmentContent =
     showApartments && (apartmentUnavailable || visibleApartmentCount > 0);
   const visible = scoped.filter(({ asset }) => operatingAssetMatchesSearch(asset, activeSearch));
   const countableRows = isSearchView ? visible : scoped;
-  const counts: Record<CardFilter, number> = {
+  const counts: Record<DirectoryFilter, number> = {
     all: countableRows.length,
+    followup: 0,
     overdue: 0,
     upcoming: 0,
     review: 0,
   };
   for (const { attention } of countableRows) {
-    if (attention) counts[attention]++;
+    if (attention) {
+      counts[attention]++;
+      counts.followup++;
+    }
   }
   if (showApartments && apartmentRows) {
     const countableApartments = isSearchView ? matchingApartments : apartmentRows;
@@ -367,7 +373,9 @@ function OperatingAssetDirectoryView({
   }
   const matchingRows =
     showLeaseToolbar && cardFilter !== "all"
-      ? visible.filter((row) => row.attention === cardFilter)
+      ? visible.filter((row) =>
+          cardFilter === "followup" ? row.attention !== null : row.attention === cardFilter,
+        )
       : visible;
   const groups = new Map<string, DirectoryRow[]>();
   if (!locationMode && !wholeMode) {
@@ -426,25 +434,33 @@ function OperatingAssetDirectoryView({
       <ApartmentDirectorySection
         rows={apartmentRows ?? []}
         search={activeSearch}
-        filter={cardFilter}
+        filter={apartmentFilter}
         locale={locale}
         unavailable={apartmentUnavailable}
         returnTo={isSearchView ? leaseSearchHref(locale, browseCategory, activeSearch) : undefined}
       />
     ) : null;
   const statusLabel = zh ? "长租状态筛选" : "Filtres de suivi des locations";
+  const statusOptions = cardFilters.map(({ key, labels }) => ({
+    value: key as DirectoryFilter,
+    label: key === "all" ? (zh ? "全部状态" : "Tous les statuts") : labels[lang],
+    count: counts[key],
+  }));
+  if (locationMode) {
+    statusOptions.splice(1, 0, {
+      value: "followup",
+      label: zh ? "需跟进" : "À suivre",
+      count: counts.followup,
+    });
+  }
   const browseStatusFilter = (
     <LeaseBrowseStatusFilter
       label={statusLabel}
       value={cardFilter}
-      options={cardFilters.map(({ key, labels }) => ({
-        value: key,
-        label: key === "all" ? (zh ? "全部状态" : "Tous les statuts") : labels[lang],
-        count: counts[key],
-      }))}
+      options={statusOptions}
       onChange={(value) => {
-        const nextFilter = cardFilters.find(({ key }) => key === value);
-        if (nextFilter) setCardFilter(nextFilter.key);
+        const nextFilter = statusOptions.find((option) => option.value === value);
+        if (nextFilter) setCardFilter(nextFilter.value);
       }}
     />
   );
