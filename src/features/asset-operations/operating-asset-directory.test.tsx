@@ -445,7 +445,7 @@ it("separates registered late payments from missing evidence and keeps warehouse
   expect(host.textContent).toContain("未找到符合条件的资产。");
 });
 
-it("restores the last multi-unit site while whole rentals open directly to their overview", async () => {
+it("restores the last multi-unit site and opens whole rental cards and deep links", async () => {
   const data = directory(
     [
       asset(),
@@ -471,7 +471,11 @@ it("restores the last multi-unit site while whole rentals open directly to their
       }),
     ],
   );
-  const renderCategory = async (leaseCategory: "multi-unit" | "whole", viewerId = "viewer-a") =>
+  const renderCategory = async (
+    leaseCategory: "multi-unit" | "whole",
+    viewerId = "viewer-a",
+    selectedAssetId?: string,
+  ) =>
     act(async () =>
       root.render(
         <OperatingAssetDirectory
@@ -481,6 +485,7 @@ it("restores the last multi-unit site while whole rentals open directly to their
           category="all"
           leaseCategory={leaseCategory}
           browseViewerId={viewerId}
+          selectedAssetId={selectedAssetId}
         />,
       ),
     );
@@ -498,23 +503,30 @@ it("restores the last multi-unit site while whole rentals open directly to their
 
   await renderCategory("whole");
   expect(siteList()).toBeNull();
-  expect(cards()).toHaveLength(1);
-  const picker = host.querySelector<HTMLSelectElement>("label select")!;
-  await act(async () => {
-    picker.value = "other-whole";
-    picker.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  expect(host.querySelector("article h3")?.textContent).toBe("独立办公室");
+  expect(host.querySelector("select")).toBeNull();
+  const wholeCards = () => [
+    ...host.querySelectorAll<HTMLButtonElement>('ul[aria-label="整体出租资产"] button'),
+  ];
+  expect(wholeCards()).toHaveLength(2);
+  const wholeCard = (name: string) =>
+    wholeCards().find((card) => card.textContent?.includes(name))!;
+  await act(async () => wholeCard("独立办公室").click());
+  expect(host.querySelector("article h2")?.textContent).toBe("独立办公室");
   expect(host.querySelector('[aria-label="付款进度"]')?.textContent).toContain(
     "暂无已确认的租金收款",
   );
+  expect(document.activeElement?.textContent).toBe("返回整体出租");
   await act(async () => {
-    picker.value = "test-land-id";
-    picker.dispatchEvent(new Event("change", { bubbles: true }));
+    document.activeElement?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
   });
+  expect(document.activeElement).toBe(wholeCard("独立办公室"));
+  await act(async () => wholeCard("国基土地").click());
   const tenantPanel = host.querySelector('[aria-label="租户资料"]')!;
   const paymentPanel = host.querySelector('[aria-label="付款进度"]')!;
-  expect(factValues(tenantPanel, "下一约定付款日")).toEqual(["未登记"]);
+  expect(tenantPanel.textContent).toContain("未登记");
+  expect(factValues(paymentPanel, "付款日")).toEqual(["未登记"]);
   expect(paymentPanel.textContent).toContain("已交至2026-09-30");
   expect(paymentPanel.textContent).toContain("上一笔租金5,000 万西法");
   expect(paymentPanel.textContent).toContain("最近一笔租金2,500 万西法");
@@ -525,6 +537,10 @@ it("restores the last multi-unit site while whole rentals open directly to their
   expect(detail.textContent).not.toContain("土地及场地");
   await clickButton(detail, "资产档案");
   expect(factValues(detail, "物业类型")).toEqual(["土地及场地"]);
+
+  await renderCategory("whole", "viewer-a", "test-land-id");
+  expect(host.querySelector("article h2")?.textContent).toBe("国基土地");
+  expect(dialog().querySelector("h2")?.textContent).toBe("国基土地");
 
   await renderCategory("multi-unit");
   expect(currentSite()?.textContent).toContain("老仓库");
@@ -547,6 +563,74 @@ it("restores the last multi-unit site while whole rentals open directly to their
   window.localStorage.setItem(`sacsi:lease-site:viewer-c:${projectId}:warehouse`, "新仓库");
   await renderCategory("multi-unit", "viewer-c");
   expect(currentSite()?.textContent).toContain("新仓库");
+});
+
+it("counts actionable whole rentals and keeps the selected filter after closing the overview", async () => {
+  const keys = ["quiet", "late", "balance", "ending", "missing", "conflict", "pending"];
+  const assets = keys.map((key) =>
+    asset({
+      id: key,
+      name: key === "quiet" ? "VALLON 示例超市" : key,
+      sourceKey: key === "quiet" ? "vallon:quiet" : `office:${key}`,
+      group: "办公室",
+      sourceRefs: [key === "quiet" ? `${workbook}|sheet:VALLON|range:A1` : key],
+      verification: "verified",
+    }),
+  );
+  const evidence = (key: string, paidDate?: string, dueDate?: string) => ({
+    assetSourceRef: assets.find(({ id }) => id === key)!.sourceRefs[0],
+    leaseListed: true,
+    ...(paidDate ? { paidThrough: { date: paidDate, sourceRef: key } } : {}),
+    ...(dueDate ? { nextPayment: { dueDate, sourceRef: key, unpaid: true } } : {}),
+  });
+  const data = directory(
+    assets,
+    [entry({ assetId: "pending", verification: "pending", sourceRef: "待核收款" })],
+    {
+      "vallon:quiet": evidence("quiet", "2027-02-28"),
+      "office:late": evidence("late", "2026-10-31", "2026-11-01"),
+      "office:balance": {
+        ...evidence("balance", "2027-02-28"),
+        outstanding: { currency: "CNY", amountNative: 1500, sourceRef: "付款日未约定" },
+      },
+      "office:ending": evidence("ending", "2026-11-25"),
+      "office:missing": evidence("missing"),
+      "office:conflict": evidence("conflict", "2026-11-10", "2026-11-01"),
+      "office:pending": evidence("pending", "2027-02-28"),
+    },
+  );
+  await act(async () =>
+    root.render(
+      <OperatingAssetDirectory
+        data={data}
+        locale="zh"
+        today="2026-11-10"
+        category="all"
+        leaseCategory="whole"
+        browseViewerId="viewer-a"
+      />,
+    ),
+  );
+  const wholeCards = () => [
+    ...host.querySelectorAll<HTMLButtonElement>('ul[aria-label="整体出租资产"] button'),
+  ];
+  const wholeCard = (name: string) =>
+    wholeCards().find((card) => card.querySelector("strong")?.textContent === name)!;
+  expect(wholeCards()).toHaveLength(7);
+  expect(wholeCard("VALLON 示例超市").dataset.tone).toBe("normal");
+  expect(wholeCard("VALLON 示例超市").textContent).toContain("原表经营名 示例超市");
+  expect(wholeCard("ending").textContent).toContain("缴租覆盖剩 15 天");
+  expect(wholeCard("conflict").textContent).toContain("资料待核");
+  expect(wholeCard("pending").textContent).toContain("资料待核");
+  await clickButton(host, "需跟进 6");
+  expect(wholeCards()).toHaveLength(6);
+  await act(async () => wholeCard("balance").click());
+  const paymentPanel = host.querySelector('[aria-label="付款进度"]')!;
+  expect(factValues(paymentPanel, "付款日")).toEqual(["未约定"]);
+  expect(factValues(paymentPanel, "待收租金")).toEqual(["¥1,500"]);
+  await clickButton(host, "返回整体出租");
+  expect(wholeCards()).toHaveLength(6);
+  expect(document.activeElement).toBe(wholeCard("balance"));
 });
 
 it("shows site counts alongside compact unit rows and keeps financial details accessible", async () => {

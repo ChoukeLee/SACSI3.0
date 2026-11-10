@@ -50,7 +50,7 @@ import {
 import {
   OperatingLeaseCard,
   OperatingLeaseLocations,
-  OperatingWholeLeaseOverview,
+  OperatingWholeLeases,
 } from "./operating-lease-locations";
 import { operatingLeaseViews } from "./operating-lease-groups";
 import locationStyles from "./operating-lease-locations.module.css";
@@ -192,7 +192,6 @@ function OperatingAssetDirectoryView({
       ? `${selectedAssetId}:${selectedLeaseGroup}`
       : (selectedAssetId ?? null),
   );
-  const [wholeAssetId, setWholeAssetId] = useState(selectedAssetId ?? "");
   const groupStorageKey =
     browseViewerId && leaseCategory === "multi-unit"
       ? `sacsi:lease-site:${browseViewerId}:${data.projectId}:${leaseCategory}`
@@ -370,9 +369,6 @@ function OperatingAssetDirectoryView({
     showLeaseToolbar && cardFilter !== "all"
       ? visible.filter((row) => row.attention === cardFilter)
       : visible;
-  const wholeAsset = wholeMode
-    ? (matchingRows.find(({ asset }) => asset.id === wholeAssetId) ?? matchingRows[0])
-    : undefined;
   const groups = new Map<string, DirectoryRow[]>();
   if (!locationMode && !wholeMode) {
     for (const row of matchingRows) {
@@ -605,42 +601,13 @@ function OperatingAssetDirectoryView({
           onSelectAsset={setSelectedId}
         />
       ) : wholeMode ? (
-        <section aria-label={leaseBrowseCategoryLabel("whole", locale)}>
-          <header className={locationStyles.siteHeading}>
-            <div className={locationStyles.siteIdentity}>
-              <h2>{leaseBrowseCategoryLabel("whole", locale)}</h2>
-              <span>{zh ? `${matchingRows.length} 项资产` : `${matchingRows.length} actifs`}</span>
-            </div>
-            {browseStatusFilter}
-          </header>
-          {wholeAsset ? (
-            <>
-              <label className={locationStyles.wholePicker}>
-                <span>{zh ? "查看资产" : "Choisir un actif"}</span>
-                <select
-                  value={wholeAsset.asset.id}
-                  onChange={(event) => setWholeAssetId(event.target.value)}
-                >
-                  {matchingRows.map(({ asset }) => (
-                    <option key={asset.id} value={asset.id}>
-                      {asset.displayName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <OperatingWholeLeaseOverview
-                row={wholeAsset}
-                locale={locale}
-                today={today}
-                onOpenDetail={() => setSelectedId(wholeAsset.asset.id)}
-              />
-            </>
-          ) : (
-            <p className={styles.empty}>
-              {zh ? "暂无符合条件的资产。" : "Aucun actif ne correspond aux critères."}
-            </p>
-          )}
-        </section>
+        <OperatingWholeLeases
+          rows={visible}
+          locale={locale}
+          today={today}
+          initialAssetId={selectedAssetId}
+          onOpenDetail={setSelectedId}
+        />
       ) : groups.size ? (
         Array.from(groups, ([group, assets]) => (
           <section key={group} className={styles.group}>

@@ -1,5 +1,5 @@
-import { ArrowRight } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import type { Locale } from "@/lib/i18n";
 import { formatPropertyMoney } from "@/lib/property-money";
@@ -170,72 +170,314 @@ export function OperatingLeaseCard({
   );
 }
 
-export function OperatingWholeLeaseOverview({
+type WholeLeaseRow = OperatingLeaseRow & {
+  entries: readonly OperatingAssetDirectoryEntry[];
+  hasLeaseEvidence: boolean;
+  pendingEntries: number;
+};
+
+type WholeLeaseBadge = { tone: "late" | "due" | "check" | "normal"; label: string };
+
+function wholeTenant(asset: OperatingAssetDirectoryAsset, locale: Locale) {
+  const zh = locale === "zh";
+  if (asset.leaseEvidence?.selfUse) return { name: zh ? "自用" : "Usage propre", basis: null };
+  const tenant = recordedTenant(asset, locale);
+  if (tenant) return { name: tenant.names, basis: tenant.label };
+  const operatingName =
+    asset.sourceKey?.startsWith("vallon:") &&
+    asset.sourceRefs.some((ref) => ref.includes("|sheet:VALLON|"))
+      ? asset.name.replace(/^VALLON\s+/i, "").trim()
+      : "";
+  return operatingName
+    ? { name: operatingName, basis: zh ? "原表经营名" : "Nom commercial dans la source" }
+    : { name: zh ? "未登记" : "Non renseigné", basis: null };
+}
+
+function wholePaymentDateMissing(row: WholeLeaseRow, locale: Locale) {
+  const noAgreement = [
+    row.followUp.outstanding?.sourceRef,
+    ...(row.asset.leaseEvidence?.notes ?? []),
+  ].some((source) => source && /付款日未约定|未约定付款日/.test(source));
+  if (locale === "zh") return noAgreement ? "未约定" : "未登记";
+  return noAgreement ? "Non convenue" : "Non renseignée";
+}
+
+function wholeLeaseBadge(row: WholeLeaseRow, today: string, locale: Locale): WholeLeaseBadge {
+  const zh = locale === "zh";
+  const { asset, followUp, hasLeaseEvidence, pendingEntries } = row;
+  const balance = followUp.outstanding;
+  const amount = balance
+    ? formatPropertyMoney(balance.amountNative, balance.currency, locale)
+    : null;
+  if (followUp.status === "overdue") {
+    const label = zh ? "逾期" : "En retard";
+    return { tone: "late", label: amount ? `${label} · ${amount}` : label };
+  }
+  if (amount && !followUp.dueDate) {
+    const label = zh ? "待收" : "À recevoir";
+    return { tone: "due", label: `${label} ${amount} · ${wholePaymentDateMissing(row, locale)}` };
+  }
+  if (followUp.status === "upcoming") {
+    const label = statusLabel(row, locale) ?? followUpLabels.upcoming[zh ? 0 : 1];
+    return { tone: "due", label: amount ? `${label} · ${amount}` : label };
+  }
+  if (followUp.reason === "coverage_ending" && followUp.paidThrough) {
+    const days = (Date.parse(followUp.paidThrough.date) - Date.parse(today)) / 86_400_000;
+    return {
+      tone: "due",
+      label: zh ? `缴租覆盖剩 ${days} 天` : `Couverture restante de ${days} j`,
+    };
+  }
+  if (
+    asset.verification === "pending" ||
+    pendingEntries > 0 ||
+    (hasLeaseEvidence && followUp.status === "needs_evidence")
+  ) {
+    const missingCoverage = followUp.reason === "paid_through_missing";
+    return {
+      tone: "check",
+      label: missingCoverage
+        ? zh
+          ? "缴至待核"
+          : "Couverture à vérifier"
+        : zh
+          ? "资料待核"
+          : "Données à vérifier",
+    };
+  }
+  return {
+    tone: "normal",
+    label: asset.leaseEvidence?.selfUse
+      ? zh
+        ? "自用"
+        : "Usage propre"
+      : followUp.paidThrough
+        ? zh
+          ? "租金已覆盖"
+          : "Loyer couvert"
+        : zh
+          ? "租赁未登记"
+          : "Location non renseignée",
+  };
+}
+
+export function OperatingWholeLeases({
+  rows,
+  locale,
+  today,
+  initialAssetId,
+  onOpenDetail,
+}: {
+  rows: readonly WholeLeaseRow[];
+  locale: Locale;
+  today: string;
+  initialAssetId?: string | null;
+  onOpenDetail: (assetId: string) => void;
+}) {
+  const zh = locale === "zh";
+  const [needsFollowUp, setNeedsFollowUp] = useState(false);
+  const [activeId, setActiveId] = useState(initialAssetId ?? null);
+  const back = useRef<HTMLButtonElement>(null);
+  const filters = useRef<HTMLButtonElement>(null);
+  const cards = useRef(new Map<string, HTMLButtonElement>());
+  const focusAfterChange = useRef<string | null>(null);
+  const summaries = rows.map((row) => ({ row, badge: wholeLeaseBadge(row, today, locale) }));
+  const active = summaries.find(({ row }) => row.asset.id === activeId);
+  const attention = summaries.filter(({ badge }) => badge.tone !== "normal");
+  const visible = needsFollowUp ? attention : summaries;
+
+  useEffect(() => {
+    const target = focusAfterChange.current;
+    if (!target) return;
+    focusAfterChange.current = null;
+    if (target === "back") back.current?.focus();
+    else (cards.current.get(target) ?? filters.current)?.focus();
+  }, [activeId]);
+
+  function returnToDirectory() {
+    focusAfterChange.current = activeId;
+    setActiveId(null);
+  }
+
+  if (active) {
+    return (
+      <section
+        aria-label={zh ? "整体出租详情" : "Détail de la location entière"}
+        onKeyDown={(event) => {
+          if (event.key !== "Escape") return;
+          event.preventDefault();
+          returnToDirectory();
+        }}
+      >
+        <button ref={back} type="button" className={styles.wholeBack} onClick={returnToDirectory}>
+          <ArrowLeft size={15} aria-hidden="true" />
+          {zh ? "返回整体出租" : "Retour aux locations entières"}
+        </button>
+        <OperatingWholeLeaseOverview
+          row={active.row}
+          badge={active.badge}
+          locale={locale}
+          today={today}
+          onOpenDetail={() => onOpenDetail(active.row.asset.id)}
+        />
+      </section>
+    );
+  }
+
+  return (
+    <section aria-label={zh ? "整体出租" : "Location entière"}>
+      <header className={styles.siteHeading}>
+        <div className={styles.siteIdentity}>
+          <h2>{zh ? "整体出租" : "Location entière"}</h2>
+          <span>{zh ? `${rows.length} 项资产` : `${rows.length} actifs`}</span>
+        </div>
+      </header>
+      <div
+        className={styles.wholeFilters}
+        role="group"
+        aria-label={zh ? "跟进筛选" : "Filtres de suivi"}
+      >
+        <button
+          ref={filters}
+          type="button"
+          aria-pressed={!needsFollowUp}
+          onClick={() => setNeedsFollowUp(false)}
+        >
+          {zh ? "全部资产" : "Tous les actifs"} <span>{rows.length}</span>
+        </button>
+        <button type="button" aria-pressed={needsFollowUp} onClick={() => setNeedsFollowUp(true)}>
+          {zh ? "需跟进" : "À suivre"} <span>{attention.length}</span>
+        </button>
+      </div>
+      <p aria-live="polite" className="sr-only">
+        {zh ? `显示 ${visible.length} 项资产` : `${visible.length} actifs affichés`}
+      </p>
+      {visible.length ? (
+        <ul
+          className={styles.wholeGrid}
+          aria-label={zh ? "整体出租资产" : "Actifs loués en entier"}
+        >
+          {visible.map(({ row, badge }) => {
+            const { asset, followUp } = row;
+            const tenant = wholeTenant(asset, locale);
+            const coverage = followUp.paidThrough;
+            const tenantLabel =
+              tenant.basis && !asset.leaseEvidence?.tenantEvidence
+                ? tenant.basis
+                : zh
+                  ? "租户"
+                  : "Locataire";
+            return (
+              <li key={asset.id}>
+                <button
+                  type="button"
+                  className={styles.wholeCard}
+                  data-tone={badge.tone}
+                  ref={(element) => {
+                    if (element) cards.current.set(asset.id, element);
+                    else cards.current.delete(asset.id);
+                  }}
+                  onClick={() => {
+                    focusAfterChange.current = "back";
+                    setActiveId(asset.id);
+                  }}
+                >
+                  <span className={styles.wholeCardTitle}>
+                    <strong>{asset.displayName}</strong>
+                    <ArrowRight size={15} aria-hidden="true" />
+                  </span>
+                  <span className={styles.wholeCardTenant}>
+                    {tenantLabel} {tenant.name}
+                  </span>
+                  <span className={styles.wholeCardFoot}>
+                    <span className={styles.coverage}>
+                      {coverage?.status === "pending"
+                        ? zh
+                          ? "租金记载至"
+                          : "Loyer documenté au"
+                        : zh
+                          ? "已交至"
+                          : "Payé au"}{" "}
+                      {coverage ? (
+                        <time dateTime={coverage.date}>{coverage.date}</time>
+                      ) : zh ? (
+                        "未登记"
+                      ) : (
+                        "Non renseigné"
+                      )}
+                    </span>
+                    <span className={styles.wholeBadge} data-tone={badge.tone}>
+                      {badge.label}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className={styles.empty}>
+          {zh ? "暂无符合条件的资产。" : "Aucun actif ne correspond aux critères."}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function OperatingWholeLeaseOverview({
   row,
+  badge,
   locale,
   today,
   onOpenDetail,
 }: {
-  row: OperatingLeaseRow & { entries: readonly OperatingAssetDirectoryEntry[] };
+  row: WholeLeaseRow;
+  badge: WholeLeaseBadge;
   locale: Locale;
   today: string;
   onOpenDetail: () => void;
 }) {
-  const { asset, attention, entries, followUp } = row;
+  const { asset, entries, followUp } = row;
   const zh = locale === "zh";
   const missing = zh ? "未登记" : "Non renseigné";
   const location = operatingLeaseLocation(asset);
-  const tenant = recordedTenant(asset, locale);
-  const selfUse = asset.leaseEvidence?.selfUse;
+  const tenant = wholeTenant(asset, locale);
   const rent = referenceRent(asset, locale);
   const coverage = followUp.paidThrough;
   const receipts = latestTwoVerifiedRentReceipts(entries, today);
-  const status = statusLabel(row, locale);
+  const outstanding = followUp.outstanding;
 
   return (
     <article className={styles.wholeOverview} aria-label={asset.displayName}>
-      <header className={styles.wholeHeader} data-status={attention ?? undefined}>
+      <header className={styles.wholeHeader}>
         <div>
           <p className={styles.wholeMuted}>
             {location ? <>{location} · </> : null}
             {zh ? "租赁概况" : "Aperçu de la location"}
           </p>
-          <h3>{asset.displayName}</h3>
+          <h2>{asset.displayName}</h2>
         </div>
-        {status ? <span className={styles.status}>{status}</span> : null}
+        <span className={styles.wholeBadge} data-tone={badge.tone}>
+          {badge.label}
+        </span>
       </header>
       <div className={styles.wholePanels}>
         <section className={styles.wholePanel} aria-label={zh ? "租户资料" : "Locataire"}>
-          <h4>{zh ? "租户资料" : "Locataire"}</h4>
+          <h3>{zh ? "租户资料" : "Locataire"}</h3>
           <div className={styles.wholeTenant}>
-            <p>{selfUse ? (zh ? "自用" : "Usage propre") : tenant?.names || asset.name}</p>
-            {selfUse ? null : (
-              <p className={styles.wholeMuted}>
-                {tenant?.label ??
-                  (zh ? "资产名称 · 系统租户未登记" : "Nom de l’actif · Locataire non renseigné")}
-              </p>
-            )}
+            <p>{tenant.name}</p>
+            {tenant.basis ? <p className={styles.wholeMuted}>{tenant.basis}</p> : null}
           </div>
           <dl className={styles.wholeFacts}>
             <div>
               <dt>{rent.label}</dt>
               <dd>{rent.amount}</dd>
             </div>
-            <div>
-              <dt>{zh ? "下一约定付款日" : "Prochaine échéance convenue"}</dt>
-              <dd>
-                {followUp.dueDate ? (
-                  <time dateTime={followUp.dueDate}>{followUp.dueDate}</time>
-                ) : (
-                  missing
-                )}
-              </dd>
-            </div>
           </dl>
         </section>
         <section className={styles.wholePanel} aria-label={zh ? "付款进度" : "Suivi des paiements"}>
           <header className={styles.wholeProgressHeading}>
-            <h4>{zh ? "付款进度" : "Suivi des paiements"}</h4>
+            <h3>{zh ? "付款进度" : "Suivi des paiements"}</h3>
             {coverage?.status === "verified" ? (
               <span className={styles.wholeConfirmed}>
                 {zh ? "缴租截止已确认" : "Couverture confirmée"}
@@ -258,6 +500,26 @@ export function OperatingWholeLeaseOverview({
               <span>{missing}</span>
             )}
           </p>
+          <dl className={styles.wholeFacts}>
+            <div>
+              <dt>{zh ? "付款日" : "Échéance"}</dt>
+              <dd>
+                {followUp.dueDate ? (
+                  <time dateTime={followUp.dueDate}>{followUp.dueDate}</time>
+                ) : (
+                  wholePaymentDateMissing(row, locale)
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>{zh ? "待收租金" : "Loyer à recevoir"}</dt>
+              <dd>
+                {outstanding
+                  ? formatPropertyMoney(outstanding.amountNative, outstanding.currency, locale)
+                  : missing}
+              </dd>
+            </div>
+          </dl>
           {receipts.length ? (
             <div className={styles.wholeReceipts}>
               {[...receipts].reverse().map((receipt, index) => (
