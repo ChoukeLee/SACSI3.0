@@ -9,6 +9,7 @@ import {
   isConfirmedExcelSource,
   type OperatingAssetBillingGroup,
   type OperatingAssetLeaseEvidence,
+  type OperatingAssetLeaseGroup,
   type OperatingAssetReferenceRent,
   type OperatingAssetTenantEvidence,
 } from "./operating-asset-directory-model";
@@ -132,6 +133,54 @@ function readTenantEvidence(value: unknown): OperatingAssetTenantEvidence | unde
   };
 }
 
+function readLeaseGroups(value: unknown): OperatingAssetLeaseGroup[] | undefined {
+  if (!Array.isArray(value) || !value.length) return undefined;
+  const groups: OperatingAssetLeaseGroup[] = [];
+  const keys = new Set<string>();
+  for (const group of value) {
+    if (!isRecord(group)) return undefined;
+    const {
+      key,
+      label,
+      sourceRef,
+      receiptSourceRef,
+      receiptSourceRefs,
+      warehouseSourceKey,
+      paidRoomCount,
+      notes,
+    } = group;
+    if (
+      !isText(key) ||
+      keys.has(key) ||
+      !isText(label) ||
+      !isText(sourceRef) ||
+      !isText(receiptSourceRef) ||
+      (receiptSourceRefs != null &&
+        (!Array.isArray(receiptSourceRefs) || !receiptSourceRefs.every(isText))) ||
+      (warehouseSourceKey != null && !isText(warehouseSourceKey)) ||
+      (paidRoomCount != null &&
+        (typeof paidRoomCount !== "number" ||
+          !Number.isSafeInteger(paidRoomCount) ||
+          paidRoomCount <= 0)) ||
+      (notes != null && (!Array.isArray(notes) || !notes.every(isText)))
+    )
+      return undefined;
+    keys.add(key);
+    groups.push({
+      key,
+      label,
+      sourceRef,
+      receiptSourceRef,
+      receiptSourceRefs: receiptSourceRefs ?? undefined,
+      tenantEvidence: readTenantEvidence(group.tenantEvidence),
+      warehouseSourceKey: warehouseSourceKey ?? undefined,
+      paidRoomCount: paidRoomCount ?? undefined,
+      notes: notes ?? undefined,
+    });
+  }
+  return groups;
+}
+
 function readLeaseEvidence(value: unknown, reviewedOn: unknown): OperatingAssetLeaseEvidence {
   if (!isRecord(value) || !isAssetDate(reviewedOn))
     throw new Error("AssetOperationsReadUnavailable");
@@ -151,6 +200,7 @@ function readLeaseEvidence(value: unknown, reviewedOn: unknown): OperatingAssetL
     outstanding: outstanding == null ? undefined : readAmount(outstanding),
     tenantEvidence: readTenantEvidence(value.tenantEvidence),
     billingGroup: readBillingGroup(value.billingGroup),
+    leaseGroups: readLeaseGroups(value.leaseGroups),
     notes: notes ?? undefined,
     leaseListed: value.leaseListed === true,
     selfUse: value.selfUse === true,

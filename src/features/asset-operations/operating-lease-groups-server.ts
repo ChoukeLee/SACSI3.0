@@ -37,21 +37,43 @@ const dormitoryLeaseGroups = dormitoryRows.map<OperatingAssetLeaseGroup>(
 export function withIncubatorDormitoryLeaseGroups(
   data: OperatingAssetDirectoryData,
 ): OperatingAssetDirectoryData {
+  const warehouses = new Map(
+    data.assets
+      .filter(
+        (asset) =>
+          asset.projectId === data.projectId && asset.category === "warehouse" && asset.sourceKey,
+      )
+      .map((asset) => [asset.sourceKey, asset]),
+  );
   return {
     ...data,
-    assets: data.assets.map((asset) =>
-      asset.sourceKey === "incubator:dormitory" &&
-      asset.name === dormitoryName &&
-      dormitoryLeaseGroups.every(({ sourceRef }) => asset.sourceRefs.includes(sourceRef))
+    assets: data.assets.map((asset) => {
+      if (asset.projectId !== data.projectId || asset.sourceKey !== "incubator:dormitory")
+        return asset;
+      const registered = asset.leaseEvidence?.leaseGroups;
+      if (registered?.length) {
+        return {
+          ...asset,
+          leaseGroups: registered.map((group) => {
+            const warehouse = warehouses.get(group.warehouseSourceKey);
+            return warehouse
+              ? { ...group, linkedWarehouse: { code: warehouse.code, name: warehouse.name } }
+              : group;
+          }),
+        };
+      }
+      return asset.name === dormitoryName &&
+        dormitoryLeaseGroups.every(({ sourceRef }) => asset.sourceRefs.includes(sourceRef))
         ? { ...asset, leaseGroups: dormitoryLeaseGroups }
-        : asset,
-    ),
+        : asset;
+    }),
   };
 }
 
 export function projectOperatingLeaseGroups(data: OperatingAssetDirectoryData, today: string) {
+  const directory = withIncubatorDormitoryLeaseGroups(data);
   const billingGroups = new Map<string, OperatingAssetDirectoryAsset[]>();
-  for (const asset of data.assets) {
+  for (const asset of directory.assets) {
     const group = asset.leaseEvidence?.billingGroup;
     if (!group || asset.projectId !== data.projectId) continue;
     const members = billingGroups.get(group.primarySourceKey);
@@ -100,7 +122,7 @@ export function projectOperatingLeaseGroups(data: OperatingAssetDirectoryData, t
   }
 
   if (!primaryViews.size) {
-    return { data: withIncubatorDormitoryLeaseGroups(data), primaryByMemberId };
+    return { data: directory, primaryByMemberId };
   }
 
   const primaryEntryIds = new Set(
@@ -116,11 +138,11 @@ export function projectOperatingLeaseGroups(data: OperatingAssetDirectoryData, t
       primaryId ? { ...entry, assetId: primaryId, billingMemberAssetId: entry.assetId } : entry,
     ];
   });
-  const assets = data.assets
+  const assets = directory.assets
     .filter(({ id }) => !primaryByMemberId.has(id))
     .map((asset) => primaryViews.get(asset.id) ?? asset);
   return {
-    data: withIncubatorDormitoryLeaseGroups({ ...data, assets, entries }),
+    data: { ...directory, assets, entries },
     primaryByMemberId,
   };
 }

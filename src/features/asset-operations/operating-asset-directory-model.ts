@@ -51,6 +51,7 @@ export interface OperatingAssetLeaseEvidence {
   outstanding?: OperatingAssetOutstanding;
   tenantEvidence?: OperatingAssetTenantEvidence;
   billingGroup?: OperatingAssetBillingGroup;
+  leaseGroups?: readonly OperatingAssetLeaseGroup[];
   notes?: readonly string[];
   leaseListed?: boolean;
   selfUse?: boolean;
@@ -62,7 +63,12 @@ export interface OperatingAssetLeaseGroup {
   label: string;
   sourceRef: string;
   receiptSourceRef: string;
+  receiptSourceRefs?: readonly string[];
   tenantEvidence?: OperatingAssetTenantEvidence;
+  warehouseSourceKey?: string;
+  paidRoomCount?: number;
+  notes?: readonly string[];
+  linkedWarehouse?: Pick<AssetOperationAsset, "code" | "name">;
 }
 
 export interface OperatingAssetDirectoryAsset extends AssetOperationAsset {
@@ -72,6 +78,8 @@ export interface OperatingAssetDirectoryAsset extends AssetOperationAsset {
   referenceRent: OperatingAssetReferenceRent | null;
   leaseEvidence: OperatingAssetLeaseEvidence | null;
   leaseGroups?: readonly OperatingAssetLeaseGroup[];
+  linkedWarehouse?: OperatingAssetLeaseGroup["linkedWarehouse"];
+  paidRoomCount?: number;
   searchAliases?: readonly string[];
 }
 

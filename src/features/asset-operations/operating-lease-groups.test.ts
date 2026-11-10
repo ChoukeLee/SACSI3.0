@@ -126,6 +126,103 @@ describe("incubator dormitory lease groups", () => {
       { key: asset.id, asset: partialAsset, entries },
     ]);
   });
+
+  it("projects registered groups with independent tenants, warehouse links and multiple receipts", () => {
+    const registered = {
+      ...asset,
+      leaseEvidence: {
+        ...asset.leaseEvidence!,
+        leaseGroups: [
+          {
+            key: "row-29",
+            label: "宿舍 · 6间",
+            sourceRef: `${workbook}A29:D29`,
+            receiptSourceRef: `${workbook}I29:K29`,
+            receiptSourceRefs: ["renewal"],
+            warehouseSourceKey: "incubator:b01",
+            paidRoomCount: 6,
+            notes: ["历史原表记晨光宿舍。"],
+            tenantEvidence: {
+              names: ["付晓勇"],
+              sourceRef: "已审核",
+              classification: "latest_source" as const,
+              scope: "asset" as const,
+            },
+          },
+          {
+            key: "row-43",
+            label: "308宿舍 · 1间",
+            sourceRef: `${workbook}A43:D43`,
+            receiptSourceRef: `${workbook}I43:K43`,
+            paidRoomCount: 1,
+            tenantEvidence: {
+              names: ["郭鹏"],
+              sourceRef: `${workbook}B43`,
+              classification: "latest_source" as const,
+              scope: "asset" as const,
+            },
+          },
+          {
+            key: "row-17",
+            label: "宿舍 · 3间",
+            sourceRef: `${workbook}A17:D17`,
+            receiptSourceRef: `${workbook}I17:K17`,
+            warehouseSourceKey: "incubator:b01",
+          },
+        ],
+      },
+    };
+    const warehouse: OperatingAssetDirectoryAsset = {
+      ...asset,
+      id: "B01",
+      sourceKey: "incubator:b01",
+      code: "SACSI-INC-B01",
+      name: "孵化园 B01",
+      category: "warehouse",
+      leaseEvidence: {
+        assetSourceRef: "warehouse",
+        tenantEvidence: {
+          names: ["仓库新租户"],
+          sourceRef: "warehouse",
+          classification: "latest_source",
+          scope: "asset",
+        },
+      },
+    };
+    const renewal = { ...receipt(29), id: "renewal", sourceRef: "renewal" };
+    const entries = [renewal, receipt(29), renewal, receipt(43), receipt(17), receipt(23)];
+    const { data } = projectOperatingLeaseGroups(
+      { projectId: asset.projectId, assets: [registered, warehouse], entries, canWrite: false },
+      "2026-11-10",
+    );
+    const [projected] = data.assets;
+    const [linked, independent, unknown] = operatingLeaseViews(projected, data.entries);
+    expect(linked).toMatchObject({
+      key: "dorm:row-29",
+      asset: {
+        linkedWarehouse: { code: warehouse.code, name: warehouse.name },
+        paidRoomCount: 6,
+        referenceRent: null,
+        leaseEvidence: {
+          tenantEvidence: { names: ["付晓勇"] },
+          notes: ["历史原表记晨光宿舍。"],
+        },
+      },
+      entries: [renewal, receipt(29)],
+    });
+    expect(independent.asset.linkedWarehouse).toBeUndefined();
+    expect(independent.asset.leaseEvidence?.tenantEvidence?.names).toEqual(["郭鹏"]);
+    expect(independent.entries).toEqual([receipt(43)]);
+    expect(unknown.asset.linkedWarehouse?.code).toBe(warehouse.code);
+    expect(unknown.asset.leaseEvidence?.tenantEvidence).toBeUndefined();
+    expect(unknown.entries).toEqual([receipt(17)]);
+    expect(
+      getOperatingAssetFollowUp(linked.asset, linked.entries, "2026-11-10").dueDate,
+    ).toBeNull();
+    expect(operatingAssetMatchesSearch(projected, warehouse.code)).toBe(true);
+    expect(operatingAssetMatchesSearch(linked.asset, warehouse.code)).toBe(true);
+    expect(operatingAssetMatchesSearch(independent.asset, warehouse.code)).toBe(false);
+  });
 });
 
 describe("warehouse billing groups", () => {

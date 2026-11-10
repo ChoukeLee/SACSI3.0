@@ -231,6 +231,9 @@ export function buildOperatingCollectionRows(
           asset.code,
           asset.name,
           ...(asset.searchAliases ?? []),
+          ...(asset.linkedWarehouse
+            ? [asset.linkedWarehouse.code, asset.linkedWarehouse.name]
+            : []),
           ...(tenant?.evidence.displayNames ? tenant.evidence.names : []),
         ],
         href: routeFor(locale, `/leases?${query}`),

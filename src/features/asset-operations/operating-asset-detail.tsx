@@ -496,17 +496,23 @@ export function OperatingAssetDetail({
             <section className={styles.detailSection}>
               <dl className={drawerStyles.party}>
                 <div>
-                  <dt>
-                    {leaseGroup
-                      ? zh
-                        ? "原表租户"
-                        : "Locataire indiqué dans la source"
-                      : (tenant?.label ?? (zh ? "登记租户" : "Locataire enregistré"))}
-                  </dt>
+                  <dt>{tenant?.label ?? (zh ? "登记租户" : "Locataire enregistré")}</dt>
                   <dd>{tenant?.names ?? (zh ? "未登记" : "Non renseigné")}</dd>
                 </div>
               </dl>
               <dl className={styles.depositFacts}>
+                {asset.linkedWarehouse ? (
+                  <div>
+                    <dt>{zh ? "关联库房" : "Entrepôt associé"}</dt>
+                    <dd title={asset.linkedWarehouse.code}>{asset.linkedWarehouse.name}</dd>
+                  </div>
+                ) : null}
+                {asset.paidRoomCount != null ? (
+                  <div>
+                    <dt>{zh ? "额外收费间数" : "Chambres supplémentaires payantes"}</dt>
+                    <dd>{asset.paidRoomCount}</dd>
+                  </div>
+                ) : null}
                 <div>
                   <dt>{rent.label}</dt>
                   <dd>{rent.amount}</dd>
