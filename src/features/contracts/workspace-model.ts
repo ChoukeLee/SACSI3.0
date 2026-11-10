@@ -187,6 +187,7 @@ const paymentTypes = {
     "lease_rent_refund",
     "lease_other_income",
     "lease_other_expense",
+    "lease_duplicate_void",
   ],
   sale: [
     "sale",

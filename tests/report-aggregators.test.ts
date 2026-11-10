@@ -76,7 +76,7 @@ describe("aggregateByCategory", () => {
   });
 });
 
-it("keeps a sale's internal offset out of cash aggregates without removing the original receipt", () => {
+it("keeps internal offsets and void duplicates out of cash aggregates", () => {
   const rows = [
     entry({ id: "receipt", building_id: "b1", category: "sale", amount_xof: 20_000_000 }),
     entry({
@@ -85,11 +85,31 @@ it("keeps a sale's internal offset out of cash aggregates without removing the o
       category: "sale_internal_offset",
       amount_xof: 20_000_000,
     }),
+    entry({
+      id: "lease-offset",
+      building_id: "b1",
+      direction: "expense",
+      category: "lease_internal_offset",
+      amount_xof: 10_000_000,
+    }),
+    entry({
+      id: "lease-duplicate",
+      building_id: "b1",
+      category: "lease_duplicate_void",
+      amount_xof: 20_000_000,
+    }),
   ];
 
-  expect(aggregatePnlMonthly(rows, ["2026-08"]).income).toEqual([20_000_000]);
-  expect(aggregatePnlByBuilding(rows, [], [])[0].income).toBe(20_000_000);
+  expect(aggregatePnlMonthly(rows, ["2026-08"])).toMatchObject({
+    income: [20_000_000],
+    expense: [0],
+  });
+  expect(aggregatePnlByBuilding(rows, [], [])[0]).toMatchObject({
+    income: 20_000_000,
+    expense: 0,
+  });
   expect(aggregateByCategory(rows, "income")).toEqual([{ label: "sale", value: 20_000_000 }]);
+  expect(aggregateByCategory(rows, "expense")).toEqual([]);
 });
 
 describe("monthRange", () => {

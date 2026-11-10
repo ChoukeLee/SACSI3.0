@@ -9,6 +9,7 @@ export interface ContractCashLine {
   amountXof: number | null;
   reason?:
     | "non_cash_offset"
+    | "voided_duplicate"
     | "invalid_amount"
     | "missing_historical_rate"
     | "currency_rate_mismatch"
@@ -43,6 +44,8 @@ const EXPENSE_TYPES = new Set([
 
 /** Contract cash projection only. No note guessing, FX defaults, or allocation inference. */
 export function classifyContractCashPayment(payment: PaymentRow): ContractCashLine {
+  if (payment.source_type === "lease_duplicate_void")
+    return { kind: "excluded", amountXof: null, reason: "voided_duplicate" };
   if (isCimacProtectedPayment(payment.source_type)) {
     const allocation = readCimacContractAllocation(payment);
     return allocation
@@ -95,7 +98,7 @@ export function summarizeContractCash(payments: PaymentRow[]) {
     const line = classifyContractCashPayment(payment);
     if (line.kind === "excluded") {
       if (line.reason === "non_cash_offset") nonCashCount++;
-      else excludedCount++;
+      else if (line.reason !== "voided_duplicate") excludedCount++;
     } else {
       // Aggregate two-decimal minor units so 0.1 + 0.2 never leaks a floating
       // remainder into the read model. Individual conversion uses SQL precision.

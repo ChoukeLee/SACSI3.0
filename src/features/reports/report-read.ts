@@ -2,7 +2,7 @@ import type { FinanceFilters, FinanceReadResult } from "@/features/finance/finan
 import {
   directionDisplayLabel,
   financialBusinessLabel,
-  isInternalSaleOffset,
+  isNonCashLedgerCategory,
   statusDisplayLabel,
 } from "@/lib/display-labels";
 
@@ -223,7 +223,7 @@ export function reportCsv(result: FinanceReadResult, locale: "zh" | "fr" = "zh")
             const value = row[column];
             if (column === "direction")
               return cell(
-                isInternalSaleOffset(row.category)
+                isNonCashLedgerCategory(row.category)
                   ? "non_cash"
                   : directionDisplayLabel(String(value ?? ""), locale),
               );

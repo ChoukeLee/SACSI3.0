@@ -1,4 +1,4 @@
-import { isInternalSaleOffset } from "@/lib/display-labels";
+import { isNonCashLedgerCategory } from "@/lib/display-labels";
 import type { NativeCurrencySummary } from "@/lib/native-money";
 export type FinanceKind = "ledger" | "receivables";
 export type FinanceFilters = Record<string, string>;
@@ -127,7 +127,9 @@ export function financeCsv(result: FinanceReadResult) {
       ...result.rows.map((row) =>
         columns
           .map((key) =>
-            cell(key === "direction" && isInternalSaleOffset(row.category) ? "non_cash" : row[key]),
+            cell(
+              key === "direction" && isNonCashLedgerCategory(row.category) ? "non_cash" : row[key],
+            ),
           )
           .join(","),
       ),

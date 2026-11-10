@@ -285,6 +285,10 @@
     {
       "file": "20261110003530_verified_sacsi11_monthly_rent_schedule.sql",
       "sha256": "8815e4b8b65ba823f9e5ec119228ba786e9f3c7286a63a1adf1b89b77d1b0ef7"
+    },
+    {
+      "file": "20261110010134_lease_internal_offset_reporting.sql",
+      "sha256": "918b6ffef7a24d8a18079abb4ce03900c8fd4a9cd870e72fb07a933ef9ca2199"
     }
   ],
   "excluded": [

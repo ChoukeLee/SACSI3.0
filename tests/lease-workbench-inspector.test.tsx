@@ -403,7 +403,13 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
         payment({ id: "other", source_type: "lease_other_income", amount: 250000 }),
         payment({ id: "other-paid", source_type: "lease_other_expense", amount: 25000 }),
         payment({ id: "rent-refund", source_type: "lease_rent_refund", amount: 100000 }),
-        payment({ id: "offset", payment_method: "offset", amount: 9000000 }),
+        payment({
+          id: "offset",
+          source_type: "lease_other_expense",
+          payment_method: "offset",
+          amount: 9000000,
+        }),
+        payment({ id: "void", source_type: "lease_duplicate_void", amount: 990000 }),
         payment({ id: "another-contract", source_id: "another-contract", amount: 99000000 }),
       ],
     });
@@ -424,7 +430,13 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       expect(fact("已录押金实退")).toBeUndefined();
       expect(host.textContent).not.toContain("9,900 万西法");
     }
-    expect(host.querySelectorAll("tr[data-lease-payment-id]")).toHaveLength(9);
+    expect(host.querySelectorAll("tr[data-lease-payment-id]")).toHaveLength(10);
+    expect(host.querySelector('tr[data-lease-payment-id="offset"]')?.textContent).toContain(
+      "内部抵扣",
+    );
+    expect(host.querySelector('tr[data-lease-payment-id="void"]')?.textContent).toContain(
+      "重复登记已作废",
+    );
   });
 
   it("derives rent-only totals from fresh records and never carries them to another rental or read failure", async () => {

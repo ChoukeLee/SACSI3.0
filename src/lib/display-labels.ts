@@ -24,6 +24,9 @@ const BUSINESS_LABELS: Record<string, Labels> = {
   lease_furniture_income: { zh: "家具费收入", fr: "Revenu mobilier" },
   lease_other_income: { zh: "长租其他收入", fr: "Autre revenu locatif" },
   lease_other_expense: { zh: "长租其他支出", fr: "Autre dépense locative" },
+  lease_internal_offset: { zh: "内部抵扣", fr: "Compensation interne" },
+  lease_unapplied_receipt: { zh: "待分配租赁收款", fr: "Encaissement locatif à affecter" },
+  lease_duplicate_void: { zh: "重复登记已作废", fr: "Écriture en double annulée" },
   property_fee: { zh: "物业费", fr: "Charges de copropriété" },
   sale: { zh: "出售房款", fr: "Paiement du bien" },
   sale_contract: { zh: "出售房款", fr: "Paiement du bien" },
@@ -37,6 +40,7 @@ const BUSINESS_LABELS: Record<string, Labels> = {
   parking_fee: { zh: "车位款", fr: "Paiement parking" },
   sale_transfer_tax: { zh: "过户税", fr: "Taxe de transfert" },
   sale_deposit_refund: { zh: "出售定金退款", fr: "Remboursement d'acompte" },
+  sale_refund: { zh: "购房款退款", fr: "Remboursement du prix de vente" },
   sale_furniture: { zh: "出售家具费", fr: "Mobilier de vente" },
   sale_furniture_income: { zh: "出售家具费收入", fr: "Revenu mobilier de vente" },
   sale_non_cash_consideration: { zh: "非现金结算", fr: "Règlement non monétaire" },
@@ -148,8 +152,12 @@ export function statusDisplayLabel(status: string | null | undefined, locale: Lo
   return locale === "zh" ? "未知状态" : "Statut inconnu";
 }
 
-export function isInternalSaleOffset(category: unknown) {
-  return category === "sale_internal_offset";
+export function isNonCashLedgerCategory(category: unknown) {
+  return (
+    category === "sale_internal_offset" ||
+    category === "lease_internal_offset" ||
+    category === "lease_duplicate_void"
+  );
 }
 
 export function directionDisplayLabel(
@@ -157,7 +165,8 @@ export function directionDisplayLabel(
   locale: Locale,
   category?: unknown,
 ) {
-  if (isInternalSaleOffset(category)) return locale === "zh" ? "非现金" : "Non monétaire";
+  if (category === "lease_duplicate_void") return locale === "zh" ? "作废" : "Annulé";
+  if (isNonCashLedgerCategory(category)) return locale === "zh" ? "非现金" : "Non monétaire";
   const labels = DIRECTION_LABELS[direction ?? ""];
   if (labels) return pick(labels, locale);
   return locale === "zh" ? "其他收支" : "Autre flux";
