@@ -448,6 +448,8 @@ export function OperatingAssetDetail({
         : followUpLabels[followUp.status][lang]
       : null;
   const outstanding = followUp.outstanding;
+  const schedule = asset.monthlyRentSchedule;
+  const scheduledPeriods = followUp.scheduledPeriods;
   const tabs = [
     { value: "overview", label: zh ? "概览" : "Aperçu" },
     { value: "receipts", label: zh ? "收付款" : "Paiements" },
@@ -542,13 +544,23 @@ export function OperatingAssetDetail({
                   </dd>
                 </div>
                 <div>
-                  <dt>{zh ? "原表登记未收" : "Solde enregistré dans la source"}</dt>
+                  <dt>
+                    {schedule
+                      ? zh
+                        ? "到期未收"
+                        : "Loyers échus restant dus"
+                      : zh
+                        ? "原表登记未收"
+                        : "Solde enregistré dans la source"}
+                  </dt>
                   <dd title={outstanding ? assetSourceLabel(outstanding.sourceRef) : undefined}>
                     {outstanding
                       ? formatPropertyMoney(outstanding.amountNative, outstanding.currency, locale)
-                      : zh
-                        ? "未登记"
-                        : "Non renseigné"}
+                      : schedule
+                        ? formatPropertyMoney(0, schedule.currency, locale)
+                        : zh
+                          ? "未登记"
+                          : "Non renseigné"}
                   </dd>
                 </div>
               </dl>
@@ -567,7 +579,7 @@ export function OperatingAssetDetail({
                   {zh ? "租金已交至未登记" : "Date de couverture du loyer non renseignée"}
                 </p>
               ) : null}
-              {followUp.dueDate ? (
+              {followUp.dueDate && !scheduledPeriods ? (
                 <p className={styles.note}>
                   {zh ? "登记付款日" : "Échéance enregistrée"} {followUp.dueDate}
                 </p>
@@ -580,6 +592,22 @@ export function OperatingAssetDetail({
                 {zh ? "查看收付款" : "Voir les paiements"}
               </button>
             </section>
+            {schedule && scheduledPeriods?.length ? (
+              <section className={styles.detailSection}>
+                <h3>{zh ? "按月应收租金" : "Loyers mensuels à recevoir"}</h3>
+                <dl className={styles.depositFacts}>
+                  {scheduledPeriods.map(({ dueDate, end, outstandingNative }) => (
+                    <div key={dueDate}>
+                      <dt>
+                        {dueDate} — {end}
+                        {dueDate > today ? (zh ? " · 未到期" : " · À échoir") : null}
+                      </dt>
+                      <dd>{formatPropertyMoney(outstandingNative, schedule.currency, locale)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            ) : null}
             <div className={styles.periodPicker}>
               <label>
                 {zh ? "收付月份" : "Mois des flux"}
@@ -681,7 +709,15 @@ export function OperatingAssetDetail({
               ) : null}
               {followUp.outstanding ? (
                 <div>
-                  <dt>{zh ? "原表余款依据" : "Source du solde enregistré"}</dt>
+                  <dt>
+                    {schedule
+                      ? zh
+                        ? "应收租金依据"
+                        : "Justificatif du loyer dû"
+                      : zh
+                        ? "原表余款依据"
+                        : "Source du solde enregistré"}
+                  </dt>
                   <dd>{assetSourceLabel(followUp.outstanding.sourceRef)}</dd>
                 </div>
               ) : null}

@@ -126,7 +126,11 @@ export function referenceRent(asset: OperatingAssetDirectoryAsset, locale: Local
   const zh = locale === "zh";
   const rent = asset.referenceRent;
   return {
-    label: rentLabels[rent?.period ?? "month"][zh ? 0 : 1],
+    label: asset.monthlyRentSchedule
+      ? zh
+        ? "月租"
+        : "Loyer mensuel"
+      : rentLabels[rent?.period ?? "month"][zh ? 0 : 1],
     amount: rent
       ? formatPropertyMoney(rent.amountNative, rent.currency, locale)
       : zh

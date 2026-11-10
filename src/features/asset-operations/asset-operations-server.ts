@@ -147,6 +147,7 @@ function readLeaseGroups(value: unknown): OperatingAssetLeaseGroup[] | undefined
       receiptSourceRefs,
       warehouseSourceKey,
       paidRoomCount,
+      monthlySchedule,
       notes,
     } = group;
     if (
@@ -175,10 +176,21 @@ function readLeaseGroups(value: unknown): OperatingAssetLeaseGroup[] | undefined
       tenantEvidence: readTenantEvidence(group.tenantEvidence),
       warehouseSourceKey: warehouseSourceKey ?? undefined,
       paidRoomCount: paidRoomCount ?? undefined,
+      monthlySchedule: readMonthlySchedule(monthlySchedule),
       notes: notes ?? undefined,
     });
   }
   return groups;
+}
+
+function readMonthlySchedule(value: unknown): OperatingAssetLeaseGroup["monthlySchedule"] {
+  if (!isRecord(value) || !isAssetDate(value.firstDueDate) || !value.firstDueDate.endsWith("-01"))
+    return undefined;
+  try {
+    return { firstDueDate: value.firstDueDate, rentPerRoom: readAmount(value.rentPerRoom) };
+  } catch {
+    return undefined;
+  }
 }
 
 function readLeaseEvidence(value: unknown, reviewedOn: unknown): OperatingAssetLeaseEvidence {

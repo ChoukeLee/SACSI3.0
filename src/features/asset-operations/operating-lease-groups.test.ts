@@ -341,3 +341,123 @@ describe("warehouse billing groups", () => {
     expect(projectOperatingLeaseGroups({ ...snapshot, assets }, today).data.assets).toEqual(assets);
   });
 });
+
+describe("scheduled dormitory rent", () => {
+  const sourceRef = "用户确认从2026年12月起每间15万西法";
+  const parent: OperatingAssetDirectoryAsset = {
+    ...asset,
+    leaseGroups: rows.map((row, index) => ({
+      key: `row-${row}`,
+      label: `宿舍 · ${row}`,
+      sourceRef: `${workbook}A${row}:D${row}`,
+      receiptSourceRef: `${workbook}I${row}:K${row}`,
+      receiptSourceRefs: [
+        "december",
+        "december-remainder",
+        "january",
+        "february",
+        "bundle",
+        "partial",
+      ],
+      paidRoomCount: [3, 4, 6, 1][index],
+      monthlySchedule: {
+        firstDueDate: "2026-12-01",
+        rentPerRoom: { amountNative: 150_000, currency: "XOF", sourceRef },
+      },
+    })),
+  };
+  const snapshot = {
+    projectId: parent.projectId,
+    assets: [parent],
+    entries: rows.map(receipt),
+    canWrite: false,
+  };
+
+  it("creates four balances independently and changes status at the 15-day and due-date boundaries", () => {
+    expect(buildOperatingCollectionRows(snapshot, "2026-11-10", "zh")).toEqual([]);
+    expect(buildOperatingCollectionRows(snapshot, "2026-11-15", "zh")).toEqual([]);
+    const upcoming = buildOperatingCollectionRows(snapshot, "2026-11-16", "zh");
+    expect(
+      upcoming.map(({ dueDate, status, amountLabel }) => [dueDate, status, amountLabel]),
+    ).toEqual(Array.from({ length: 4 }, () => ["2026-12-01", "upcoming", "即将应收"]));
+    expect(upcoming.map(({ amount }) => amount)).toEqual([
+      "45 万西法",
+      "60 万西法",
+      "90 万西法",
+      "15 万西法",
+    ]);
+    expect(buildOperatingCollectionRows(snapshot, "2026-12-01", "zh")[0]).toMatchObject({
+      status: "upcoming",
+      statusLabel: "今日应缴",
+      amountLabel: "到期未收",
+    });
+    expect(buildOperatingCollectionRows(snapshot, "2026-12-02", "zh")[0]).toMatchObject({
+      status: "overdue",
+      amount: "45 万西法",
+      amountLabel: "到期未收",
+    });
+    const [first] = operatingLeaseViews(parent, snapshot.entries);
+    expect(first.asset.referenceRent).toMatchObject({ amountNative: 450_000, currency: "XOF" });
+    expect(getOperatingAssetFollowUp(first.asset, first.entries, "2026-11-10")).toMatchObject({
+      status: "current",
+      dueDate: "2026-12-01",
+      outstanding: null,
+      scheduledPeriods: [{ dueDate: "2026-12-01", end: "2026-12-31", outstandingNative: 450_000 }],
+    });
+  });
+
+  it("uses confirmed payments only, deducts partial receipts and does not skip an unpaid month", () => {
+    function payment(ref: string, start: string, end: string, amountNative: number) {
+      return {
+        ...receipt(17),
+        id: ref,
+        sourceRef: ref,
+        periodStart: start,
+        periodEnd: end,
+        cashDate: "2026-12-02",
+        amountNative,
+        bookedAmountXof: amountNative,
+      };
+    }
+    const entries: OperatingAssetDirectoryEntry[] = [
+      receipt(17),
+      payment("december", "2026-12-01", "2026-12-31", 150_000),
+      payment("january", "2027-01-01", "2027-01-31", 450_000),
+      {
+        ...payment("february", "2027-02-01", "2027-02-28", 450_000),
+        sourceVerification: "pending",
+      },
+      payment("bundle", "2026-12-01", "2027-01-31", 450_000),
+      payment("partial", "2026-12-01", "2026-12-15", 450_000),
+    ];
+    let [first] = operatingLeaseViews(parent, entries);
+    expect(getOperatingAssetFollowUp(first.asset, first.entries, "2027-02-02")).toMatchObject({
+      status: "overdue",
+      paidThrough: { date: "2026-11-30" },
+      dueDate: "2026-12-01",
+      outstanding: { amountNative: 750_000, currency: "XOF", sourceRef },
+      scheduledPeriods: [
+        { dueDate: "2026-12-01", end: "2026-12-31", outstandingNative: 300_000 },
+        { dueDate: "2027-02-01", end: "2027-02-28", outstandingNative: 450_000 },
+        { dueDate: "2027-03-01", end: "2027-03-31", outstandingNative: 450_000 },
+      ],
+    });
+
+    [first] = operatingLeaseViews(parent, [
+      receipt(17),
+      payment("bundle", "2026-12-01", "2027-01-31", 900_000),
+      {
+        ...payment("february", "2027-02-01", "2027-02-28", 450_000),
+        currency: "CNY",
+        amountNative: 50_000,
+      },
+    ]);
+    expect(getOperatingAssetFollowUp(first.asset, first.entries, "2027-02-02")).toMatchObject({
+      status: "current",
+      paidThrough: { date: "2027-02-28" },
+      dueDate: "2027-03-01",
+      outstanding: null,
+      scheduledPeriods: [{ dueDate: "2027-03-01", end: "2027-03-31", outstandingNative: 450_000 }],
+    });
+  });
+});

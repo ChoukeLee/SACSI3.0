@@ -1,5 +1,6 @@
 import type { CurrencyCode } from "@/types/domain";
 import {
+  assetReportPeriod,
   isAssetDate,
   type AssetOperationAsset,
   type AssetOperationEntry,
@@ -24,6 +25,10 @@ interface OperatingAssetOutstanding {
   amountNative: number;
   currency: CurrencyCode;
   sourceRef: string;
+}
+
+export interface OperatingAssetMonthlyRentSchedule extends OperatingAssetOutstanding {
+  firstDueDate: string;
 }
 
 export interface OperatingAssetTenantEvidence {
@@ -67,6 +72,7 @@ export interface OperatingAssetLeaseGroup {
   tenantEvidence?: OperatingAssetTenantEvidence;
   warehouseSourceKey?: string;
   paidRoomCount?: number;
+  monthlySchedule?: { firstDueDate: string; rentPerRoom: OperatingAssetOutstanding };
   notes?: readonly string[];
   linkedWarehouse?: Pick<AssetOperationAsset, "code" | "name">;
 }
@@ -80,6 +86,7 @@ export interface OperatingAssetDirectoryAsset extends AssetOperationAsset {
   leaseGroups?: readonly OperatingAssetLeaseGroup[];
   linkedWarehouse?: OperatingAssetLeaseGroup["linkedWarehouse"];
   paidRoomCount?: number;
+  monthlyRentSchedule?: OperatingAssetMonthlyRentSchedule;
   searchAliases?: readonly string[];
 }
 
@@ -90,6 +97,7 @@ export interface OperatingAssetDirectoryEntry extends AssetOperationEntry {
   status: OperatingAssetEntryStatus;
   bookedAmountXof: number | null;
   billingMemberAssetId?: string;
+  sourceVerification?: AssetOperationEntry["verification"];
 }
 
 export interface OperatingAssetDirectoryData extends AssetOperationsData {
@@ -228,9 +236,9 @@ function entryStatus(
     : "pending";
 }
 
-function scopedEntries(
+function scopedEntries<Entry extends EntryWithBooking>(
   assets: ReadonlyMap<string, AssetOperationAsset>,
-  entries: readonly EntryWithBooking[],
+  entries: readonly Entry[],
 ) {
   const seen = new Set<string>();
   return entries.filter((entry) => {
@@ -294,6 +302,9 @@ export function buildOperatingAssetDirectory(
           : entry;
       return {
         ...confirmedEntry,
+        ...(confirmedEntry.verification !== entry.verification
+          ? { sourceVerification: entry.verification }
+          : {}),
         status: entryStatus(asset, confirmedEntry),
         bookedAmountXof: bookedXof(entry),
         description: isGuojiLand(asset, sacsiProjectId)
@@ -307,11 +318,18 @@ export function buildOperatingAssetDirectory(
 
 type RentCoverage = { date: string; sourceRef: string; status: "verified" | "pending" };
 
+interface ScheduledRentPeriod {
+  dueDate: string;
+  end: string;
+  outstandingNative: number;
+}
+
 export interface OperatingAssetFollowUp {
   paidThrough: RentCoverage | null;
   dueDate: string | null;
   dueSourceRef: string | null;
   outstanding: OperatingAssetOutstanding | null;
+  scheduledPeriods?: readonly ScheduledRentPeriod[];
   status: "overdue" | "upcoming" | "needs_evidence" | "current";
   reason:
     | "due_date_missing"
@@ -387,16 +405,112 @@ function daysBetween(from: string, to: string) {
   return (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000;
 }
 
+function scheduledRentFollowUp(
+  asset: OperatingAssetDirectoryAsset,
+  entries: readonly OperatingAssetDirectoryEntry[],
+  today: string,
+  schedule: OperatingAssetMonthlyRentSchedule,
+) {
+  const { firstDueDate, amountNative, currency, sourceRef } = schedule;
+  const monthlyAmount = minorUnits(amountNative);
+  if (!monthlyAmount || !isAssetDate(firstDueDate) || !firstDueDate.endsWith("-01")) return null;
+  const zero = BigInt(0);
+
+  let paidThrough = rentCoverage(
+    asset,
+    entries.filter((entry) => entry.periodEnd && entry.periodEnd < firstDueDate),
+    today,
+  );
+  const receipts = scopedEntries(new Map([[asset.id, asset]]), entries)
+    .flatMap((entry) => {
+      const { periodStart, periodEnd, cashDate } = entry;
+      if (
+        entry.billingMemberAssetId ||
+        entry.status !== "verified" ||
+        (entry.sourceVerification ?? entry.verification) !== "verified" ||
+        entry.kind !== "income" ||
+        entry.category !== "rent" ||
+        !isAssetDate(cashDate) ||
+        cashDate > today ||
+        !isAssetDate(periodStart) ||
+        !isAssetDate(periodEnd) ||
+        periodStart < firstDueDate ||
+        periodEnd < periodStart
+      )
+        return [];
+      const amount = minorUnits(
+        currency === "XOF"
+          ? bookedXof(entry)
+          : entry.currency === currency
+            ? entry.amountNative
+            : null,
+      );
+      if (!amount) return [];
+      const first = assetReportPeriod("month", periodStart.slice(0, 7));
+      const last = assetReportPeriod("month", periodEnd.slice(0, 7));
+      if (periodStart !== first.start || periodEnd !== last.end) return [];
+      const months =
+        (Number(periodEnd.slice(0, 4)) - Number(periodStart.slice(0, 4))) * 12 +
+        Number(periodEnd.slice(5, 7)) -
+        Number(periodStart.slice(5, 7)) +
+        1;
+      // A bundled payment with a different amount needs an explicit allocation.
+      if (months > 1 && amount !== monthlyAmount * BigInt(months)) return [];
+      return [{ periodStart, periodEnd, sourceRef: entry.sourceRef, remaining: amount }];
+    })
+    .sort((a, b) => a.periodEnd.localeCompare(b.periodEnd));
+
+  const periods: ScheduledRentPeriod[] = [];
+  let dueAmount = zero;
+  const cursor = new Date(`${firstDueDate}T00:00:00Z`);
+  for (;;) {
+    const dueDate = cursor.toISOString().slice(0, 10);
+    if (!isAssetDate(dueDate)) break;
+    const { end } = assetReportPeriod("month", dueDate.slice(0, 7));
+    let unpaid = monthlyAmount;
+    let paymentSource = sourceRef;
+    for (const receipt of receipts) {
+      // Only allocate to full months named on the receipt, using each amount once.
+      if (receipt.periodStart > dueDate || receipt.periodEnd < end || receipt.remaining === zero)
+        continue;
+      const applied = receipt.remaining < unpaid ? receipt.remaining : unpaid;
+      receipt.remaining -= applied;
+      unpaid -= applied;
+      paymentSource = receipt.sourceRef;
+      if (unpaid === zero) break;
+    }
+    if (unpaid > zero) {
+      periods.push({ dueDate, end, outstandingNative: Number(unpaid) / 100 });
+      if (dueDate > today) break;
+      dueAmount += unpaid;
+    } else if (!periods.length) {
+      // Advance only through consecutive settled months.
+      paidThrough = { date: end, sourceRef: paymentSource, status: "verified" };
+    }
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+  if (!periods.length || !Number.isSafeInteger(Number(dueAmount))) return null;
+  return {
+    paidThrough,
+    nextPayment: { dueDate: periods[0].dueDate, sourceRef, unpaid: true },
+    outstanding:
+      dueAmount > zero ? { amountNative: Number(dueAmount) / 100, currency, sourceRef } : null,
+    periods,
+  };
+}
+
 export function getOperatingAssetFollowUp(
   asset: OperatingAssetDirectoryAsset,
   entries: readonly OperatingAssetDirectoryEntry[],
   today: string,
 ): OperatingAssetFollowUp {
   const evidence = asset.leaseEvidence;
-  const paidThrough = rentCoverage(asset, entries, today);
-  const nextPayment = evidence?.nextPayment;
+  const schedule = asset.monthlyRentSchedule;
+  const scheduled = schedule ? scheduledRentFollowUp(asset, entries, today, schedule) : null;
+  const paidThrough = scheduled ? scheduled.paidThrough : rentCoverage(asset, entries, today);
+  const nextPayment = scheduled ? scheduled.nextPayment : evidence?.nextPayment;
   const dueDate = isAssetDate(nextPayment?.dueDate) ? nextPayment.dueDate : null;
-  const outstanding = evidence?.outstanding ?? null;
+  const outstanding = scheduled ? scheduled.outstanding : (evidence?.outstanding ?? null);
   const daysUntilDue = dueDate ? daysBetween(today, dueDate) : null;
   const facts = {
     paidThrough,
@@ -404,6 +518,7 @@ export function getOperatingAssetFollowUp(
     dueSourceRef: dueDate ? (nextPayment?.sourceRef ?? null) : null,
     outstanding,
     daysUntilDue,
+    ...(scheduled ? { scheduledPeriods: scheduled.periods } : {}),
   };
   const needsEvidence = (
     reason: NonNullable<OperatingAssetFollowUp["reason"]>,
@@ -416,6 +531,7 @@ export function getOperatingAssetFollowUp(
     }
     if (daysUntilDue < 0) return { ...facts, status: "overdue", reason: null };
     if (daysUntilDue <= 15) return { ...facts, status: "upcoming", reason: null };
+    if (scheduled) return { ...facts, status: "current", reason: null };
   }
   if (outstanding && !dueDate) return needsEvidence("due_date_missing");
   if (daysUntilDue !== null && daysUntilDue <= 15 && nextPayment?.unpaid !== true) {

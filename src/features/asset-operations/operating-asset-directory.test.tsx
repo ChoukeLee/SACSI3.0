@@ -115,6 +115,49 @@ function factValues(scope: ParentNode, name: string) {
     .map((item) => item.nextElementSibling?.textContent);
 }
 
+it("shows the next dormitory rent period without adding it to the due balance", async () => {
+  const dormitory = asset({
+    id: "dormitory",
+    sourceKey: "incubator:dormitory",
+    name: "孵化园配套宿舍（四组明细）",
+    group: "配套宿舍",
+    verification: "verified",
+  });
+  const data = directory([dormitory], []);
+  data.assets[0].leaseGroups = [
+    {
+      key: "row-17",
+      label: "宿舍 · 3间",
+      sourceRef: "租赁组资料",
+      receiptSourceRef: "历史来源",
+      paidRoomCount: 3,
+      monthlySchedule: {
+        firstDueDate: "2026-12-01",
+        rentPerRoom: { amountNative: 150000, currency: "XOF", sourceRef: "用户确认" },
+      },
+    },
+  ];
+  await act(async () =>
+    root.render(
+      <OperatingAssetDirectory
+        data={data}
+        locale="zh"
+        today="2026-11-10"
+        category="all"
+        leaseCategory="multi-unit"
+        browseViewerId="viewer-a"
+      />,
+    ),
+  );
+  const card = host.querySelector<HTMLButtonElement>('button[aria-haspopup="dialog"]');
+  expect(card?.textContent).not.toContain("待补资料");
+  await act(async () => card!.click());
+  const detail = dialog();
+  expect(factValues(detail, "月租")).toEqual(["45 万西法"]);
+  expect(factValues(detail, "到期未收")).toEqual(["0 万西法"]);
+  expect(factValues(detail, "2026-12-01 — 2026-12-31 · 未到期")).toEqual(["45 万西法"]);
+});
+
 it("opens the same confirmed Guoji receipts from the directory card and the land category", async () => {
   const data = directory(
     [asset()],

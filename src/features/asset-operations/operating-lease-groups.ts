@@ -41,7 +41,16 @@ export function operatingLeaseViews(
     else rentEntriesByGroup.set(key, [entry]);
   }
   return leaseGroups.map((group) => {
-    const { sourceRef, tenantEvidence, linkedWarehouse, paidRoomCount, notes } = group;
+    const { sourceRef, tenantEvidence, linkedWarehouse, paidRoomCount, monthlySchedule, notes } =
+      group;
+    const monthlyRentSchedule =
+      monthlySchedule && paidRoomCount
+        ? {
+            ...monthlySchedule.rentPerRoom,
+            firstDueDate: monthlySchedule.firstDueDate,
+            amountNative: monthlySchedule.rentPerRoom.amountNative * paidRoomCount,
+          }
+        : undefined;
     const receipts = rentEntriesByGroup.get(group.key) ?? [];
     return {
       key: `${asset.id}:${group.key}`,
@@ -52,11 +61,20 @@ export function operatingLeaseViews(
         sourceRefs: tenantEvidence ? [sourceRef, tenantEvidence.sourceRef] : [sourceRef],
         monthlyRentNative: null,
         rentCurrency: null,
-        referenceRent: null,
+        referenceRent: monthlyRentSchedule
+          ? {
+              amountNative: monthlyRentSchedule.amountNative,
+              currency: monthlyRentSchedule.currency,
+              period: "month",
+              sourceRef: monthlyRentSchedule.sourceRef,
+              effectiveFrom: monthlyRentSchedule.firstDueDate,
+            }
+          : null,
         costCoverageThrough: null,
         leaseEvidence: { assetSourceRef: sourceRef, leaseListed: true, tenantEvidence, notes },
         linkedWarehouse,
         paidRoomCount,
+        monthlyRentSchedule,
       },
       entries: receipts,
     };

@@ -205,8 +205,27 @@ export function buildOperatingCollectionRows(
   return views.flatMap(({ key, groupKey, asset, entries }) => {
     if (!hasOperatingAssetLeaseEvidence(asset, entries)) return [];
     const category = classifyOperatingLeaseMode(asset);
-    const { status, reason, dueDate, dueSourceRef, paidThrough, outstanding, daysUntilDue } =
-      getOperatingAssetFollowUp(asset, entries, today);
+    const {
+      status,
+      reason,
+      dueDate,
+      dueSourceRef,
+      paidThrough,
+      outstanding,
+      daysUntilDue,
+      scheduledPeriods,
+    } = getOperatingAssetFollowUp(asset, entries, today);
+    const schedule = asset.monthlyRentSchedule;
+    const firstScheduledPeriod = scheduledPeriods?.[0];
+    const amount =
+      outstanding ??
+      (schedule && firstScheduledPeriod
+        ? {
+            amountNative: firstScheduledPeriod.outstandingNative,
+            currency: schedule.currency,
+            sourceRef: schedule.sourceRef,
+          }
+        : null);
     const tracksNextPaymentDate = category === "whole" || isIncubatorDormitory(asset);
     const awaitingPaymentDate =
       tracksNextPaymentDate && !dueDate && paidThrough?.status === "verified";
@@ -251,17 +270,23 @@ export function buildOperatingCollectionRows(
         paidThrough: paidThrough?.date ?? null,
         paidThroughSource: paidThrough ? assetSourceLabel(paidThrough.sourceRef) : undefined,
         coveragePending: paidThrough?.status === "pending",
-        amount: outstanding
-          ? formatPropertyMoney(outstanding.amountNative, outstanding.currency, locale)
-          : null,
-        amountLabel: outstanding
-          ? zh
-            ? "原表余款"
-            : "Solde enregistré"
-          : zh
-            ? "未收金额"
-            : "Solde à recevoir",
-        amountSource: outstanding ? assetSourceLabel(outstanding.sourceRef) : undefined,
+        amount: amount ? formatPropertyMoney(amount.amountNative, amount.currency, locale) : null,
+        amountLabel: firstScheduledPeriod
+          ? outstanding
+            ? zh
+              ? "到期未收"
+              : "Loyers échus restant dus"
+            : zh
+              ? "即将应收"
+              : "Loyer à échoir"
+          : outstanding
+            ? zh
+              ? "原表余款"
+              : "Solde enregistré"
+            : zh
+              ? "未收金额"
+              : "Solde à recevoir",
+        amountSource: amount ? assetSourceLabel(amount.sourceRef) : undefined,
         latestReceipt: latestReceipt
           ? {
               date: latestReceipt.cashDate,
