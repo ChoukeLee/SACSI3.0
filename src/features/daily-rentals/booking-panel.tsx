@@ -62,6 +62,7 @@ import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
 import { shouldShowAdvanceReservationPayment } from "./daily-rental-policy";
 import { notifyDailyDataChanged } from "./daily-read-invalidation";
 import { DailyCustomerSelect } from "./daily-customer-select";
+import { BookingNotesEditor } from "./booking-notes-editor";
 import { businessDate } from "./receipt-analysis-query";
 
 interface BookingPanelProps {
@@ -1077,6 +1078,15 @@ export function BookingPanel({
                 </div>
               </section>
 
+              <div className="border-b border-border pb-4">
+                <BookingNotesEditor
+                  booking={booking}
+                  buildingId={selectedUnit?.building_id}
+                  locale={locale}
+                  readOnly={readOnly}
+                />
+              </div>
+
               <section className="border-b border-border pb-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-foreground">
@@ -1270,12 +1280,6 @@ export function BookingPanel({
                     .replace("{nights}", String(billing.nights))
                     .replace("{gross}", formatXof(billing.grossAmount))}
                 </div>
-              )}
-
-              {booking.notes && (
-                <p className="text-xs text-muted-foreground">
-                  {locale === "zh" ? "备注" : "Note"}: {booking.notes}
-                </p>
               )}
 
               {/* Cleaning task summary. Open cleaning actions are rendered by the primary action block below. */}

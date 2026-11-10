@@ -273,6 +273,10 @@
     {
       "file": "20261107232358_source_sale_registration_native_money.sql",
       "sha256": "2f9a9a986410080944f08e791f8db142599e5a22a995fdc422ed39dc60f51e58"
+    },
+    {
+      "file": "20261110163000_daily_booking_notes.sql",
+      "sha256": "61aa148a42a53d44308440009fc9139a2965a9ceedb433f6cf55c58ca8845cec"
     }
   ],
   "excluded": [
