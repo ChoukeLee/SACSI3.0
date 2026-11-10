@@ -19,6 +19,7 @@ import { buildWorkbenchRecordHref, safeWorkbenchReturnTo } from "@/lib/workbench
 import { cn, formatXof } from "@/lib/utils";
 import { paymentDisplay } from "@/lib/currency";
 import { ProfileAuditTimeline } from "@/features/profiles/audit-timeline";
+import { BookingNotesEditor } from "@/features/daily-rentals/booking-notes-editor";
 import {
   computeFinanceMetrics,
   isManagedReceivable,
@@ -47,13 +48,14 @@ type UnitProfileProps = {
   data: UnitProfileData;
   locale: Locale;
   returnTo?: string;
+  canEditDailyNotes?: boolean;
 };
 
 export function UnitProfileView(props: UnitProfileProps) {
   return <UnitProfile key={props.data.unit.id} {...props} />;
 }
 
-function UnitProfile({ data, locale, returnTo }: UnitProfileProps) {
+function UnitProfile({ data, locale, returnTo, canEditDailyNotes = false }: UnitProfileProps) {
   const [tab, setTab] = useState<Tab>("overview");
   const zh = locale === "zh";
   const unit = data.unit;
@@ -360,6 +362,7 @@ function UnitProfile({ data, locale, returnTo }: UnitProfileProps) {
                       zh ? "金额" : "Montant",
                       zh ? "订单付款" : "Paiement de réservation",
                       zh ? "状态" : "Statut",
+                      zh ? "备注" : "Note",
                       "",
                     ].map((label) => (
                       <th key={label} className="px-4 py-3 text-left text-xs text-muted-foreground">
@@ -391,6 +394,14 @@ function UnitProfile({ data, locale, returnTo }: UnitProfileProps) {
                         <Badge variant={dailyTone(row.status)}>
                           {statusDisplayLabel(row.status, locale)}
                         </Badge>
+                      </td>
+                      <td className="min-w-48 px-4 py-3 align-top">
+                        <BookingNotesEditor
+                          booking={row}
+                          buildingId={unit.building_id}
+                          locale={locale}
+                          readOnly={!canEditDailyNotes}
+                        />
                       </td>
                       <td className="px-4 py-3 text-right">
                         <Button asChild size="sm" variant="ghost">

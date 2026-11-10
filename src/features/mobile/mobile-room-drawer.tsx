@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { notifyDailyDataChanged } from "@/features/daily-rentals/daily-read-invalidation";
+import { BookingNotesEditor } from "@/features/daily-rentals/booking-notes-editor";
 import { useRouter } from "next/navigation";
 import {
   X,
@@ -361,11 +362,22 @@ export function MobileRoomDrawer({
               </div>
             )}
 
-            {/* Notes */}
+            {room.booking && (
+              <div className="rounded-xl border border-border bg-card p-3.5 shadow-xs">
+                <BookingNotesEditor
+                  booking={room.booking}
+                  buildingId={room.unit.building_id}
+                  locale={locale}
+                  readOnly={readOnly}
+                />
+              </div>
+            )}
             <div className="rounded-xl border border-border bg-card p-3.5 shadow-xs">
-              <p className="mb-1 text-xs font-medium text-muted-foreground">{t.drawer.notes}</p>
-              <p className="text-xs text-foreground/70">
-                {room.unit.notes || room.booking?.notes || t.drawer.noNotes}
+              <p className="mb-1 text-xs font-medium text-muted-foreground">
+                {locale === "zh" ? "房源备注" : "Note du logement"}
+              </p>
+              <p className="whitespace-pre-wrap break-words text-xs text-foreground/70">
+                {room.unit.notes || t.drawer.noNotes}
               </p>
             </div>
 
