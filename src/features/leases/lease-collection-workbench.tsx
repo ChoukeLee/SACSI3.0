@@ -517,8 +517,8 @@ function CollectionContent({
               </div>
               <p className={styles.hint}>
                 {text(
-                  `已确认 ${receipt.paymentIds.length} 条收款记录；${receipt.paidThroughBefore === receipt.paidThroughAfter ? "登记覆盖日期未变更" : "登记覆盖日期已按本次核实的完整账期同步"}。下期账单安排待确认，本次未生成新应收。`,
-                  `${receipt.paymentIds.length} écriture(s) confirmée(s). ${receipt.paidThroughBefore === receipt.paidThroughAfter ? "La couverture enregistrée n’a pas changé" : "La couverture enregistrée a été mise à jour selon les périodes complètes vérifiées"}. Les prochaines créances restent à vérifier ; aucune nouvelle créance n’a été créée.`,
+                  `已确认 ${receipt.paymentIds.length} 条收款记录；${receipt.paidThroughBefore === receipt.paidThroughAfter ? "登记覆盖日期未变更" : "登记覆盖日期已按本次核实的完整账期同步"}。${receipt.nextRentReceivableId ? "已生成下一期租金账单。" : "下期账单安排待确认，本次未生成新应收。"}`,
+                  `${receipt.paymentIds.length} écriture(s) confirmée(s). ${receipt.paidThroughBefore === receipt.paidThroughAfter ? "La couverture enregistrée n’a pas changé" : "La couverture enregistrée a été mise à jour selon les périodes complètes vérifiées"}. ${receipt.nextRentReceivableId ? "La prochaine créance de loyer a été créée." : "Les prochaines créances restent à vérifier ; aucune nouvelle créance n’a été créée."}`,
                 )}
               </p>
             </div>
@@ -1043,10 +1043,10 @@ function CollectionContent({
               <p className={styles.boundary}>
                 {text(
                   syncPaidThrough
-                    ? "本次登记实收并核销所选应收，并按你明确勾选的完整账期同步登记覆盖日期；不新增账单，也不自动换汇。"
+                    ? "本次登记实收并核销所选应收，按已确认的完整账期更新覆盖日期。符合排账条件时会生成下一期租金账单。"
                     : "本次仅登记实收并核销所选应收，登记覆盖日期不变；不新增账单，也不自动换汇。",
                   syncPaidThrough
-                    ? "Cette opération enregistre le paiement, rapproche les créances choisies et met à jour la couverture selon les périodes complètes expressément choisies. Aucune nouvelle créance ni conversion de devises."
+                    ? "Cette opération enregistre le paiement, rapproche les créances choisies et met à jour la couverture selon les périodes complètes confirmées. La prochaine créance de loyer est créée si les conditions sont remplies."
                     : "Cette opération enregistre le paiement et rapproche les créances choisies sans changer la couverture. Aucune nouvelle créance ni conversion de devises.",
                 )}
               </p>

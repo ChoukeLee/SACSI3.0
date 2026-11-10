@@ -147,6 +147,28 @@ it("retains real fees and later rent balances without projecting rent for the sa
   expect(buildLeaseRecordOverview(data)[0].attention).toEqual(room.attention);
 });
 
+it.each([
+  ["cancelled", "excluded", 200, true],
+  ["cancelled", "managed", 100, false],
+  ["pending", "excluded", 100, false],
+] as const)(
+  "handles a later %s/%s rent bill when projecting monthly arrears",
+  (status, management_status, amount, amountIsEstimated) => {
+    const data = input();
+    data.today = "2026-11-10";
+    data.contracts[0].paid_through_date = "2026-09-30";
+    data.receivables = [
+      bill({ due_date: "2026-10-01" }),
+      bill({ id: "previous-plan", due_date: "2026-11-01", status, management_status }),
+    ];
+    const [room] = buildLeaseRoomOverview(data);
+    const [record] = buildLeaseRecordOverview(data);
+    expect(room.attention).toMatchObject({ kind: "overdue", amount, amountIsEstimated });
+    expect(record.attention).toEqual(room.attention);
+    expect(record.balances).toMatchObject([{ outstanding: 100 }]);
+  },
+);
+
 it("waits for a managed first-uncovered bill with a later due date and keeps ambiguous bills actual", () => {
   const data = input();
   data.today = "2026-11-24";

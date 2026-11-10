@@ -253,6 +253,9 @@ export function decodeLeaseCollectionReceipt(
     paidThroughBefore: result.paidThroughBefore as string | null,
     paidThroughAfter: result.paidThroughAfter as string | null,
     ...(coverage ? { coverage } : {}),
+    ...(result.nextRentReceivableId === undefined
+      ? {}
+      : { nextRentReceivableId: identifier(result.nextRentReceivableId) }),
     referenceNos: result.referenceNos as string[],
     paymentIds: result.paymentIds as string[],
     allocations,

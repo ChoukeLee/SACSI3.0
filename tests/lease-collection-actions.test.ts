@@ -298,6 +298,7 @@ it("sends opt-in coverage without deriving a date from money and accepts only th
   const result = success({
     paidThroughAfter: "2026-09-30",
     coverage: { throughDate: "2026-09-30", receivableIds: [id(3)] },
+    nextRentReceivableId: id(6),
   });
   mocks.rpc.mockResolvedValue({ data: result, error: null });
   expect(await recordLeaseCollection(input({ coverage: coverage() }))).toEqual(result);
@@ -324,6 +325,7 @@ it.each([
 it.each([
   { paidThroughBefore: undefined },
   { paidThroughAfter: undefined },
+  { nextRentReceivableId: "invalid" },
   { paidThroughAfter: "2026-09-30" },
   {
     paidThroughAfter: "2026-09-30",

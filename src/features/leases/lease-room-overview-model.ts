@@ -203,7 +203,8 @@ function monthlyRentAnchor(
     (row) =>
       row.source_type === "lease_contract" &&
       row.source_id === record.id &&
-      row.category === "lease_rent",
+      row.category === "lease_rent" &&
+      !(row.status === "cancelled" && row.management_status === "excluded"),
   );
   const matching = rentRows.filter(
     (row) =>
