@@ -7,6 +7,7 @@ import type { CurrencyCode } from "@/types/domain";
 import { isAssetDate, type AssetOperationsData } from "./asset-operations-model";
 import {
   isConfirmedExcelSource,
+  type OperatingAssetBillingGroup,
   type OperatingAssetLeaseEvidence,
   type OperatingAssetReferenceRent,
   type OperatingAssetTenantEvidence,
@@ -61,6 +62,21 @@ function readRent(value: unknown): OperatingAssetReferenceRent {
     effectiveFrom: effectiveFrom ?? undefined,
     effectiveThrough: effectiveThrough ?? undefined,
   };
+}
+
+function readBillingGroup(value: unknown): OperatingAssetBillingGroup | undefined {
+  if (!isRecord(value)) return undefined;
+  const { primarySourceKey, label, monthlyRent } = value;
+  if (!isText(primarySourceKey) || !isText(label)) return undefined;
+  try {
+    const rent = readRent(monthlyRent);
+    if (rent.period === "month") {
+      return { primarySourceKey: primarySourceKey.trim(), label: label.trim(), monthlyRent: rent };
+    }
+  } catch {
+    // Optional billing metadata must not prevent ordinary asset reads.
+  }
+  return undefined;
 }
 
 // The numbered variants in these two sheets distinguish units held by one tenant.
@@ -134,6 +150,7 @@ function readLeaseEvidence(value: unknown, reviewedOn: unknown): OperatingAssetL
     rates: rates?.map(readRent),
     outstanding: outstanding == null ? undefined : readAmount(outstanding),
     tenantEvidence: readTenantEvidence(value.tenantEvidence),
+    billingGroup: readBillingGroup(value.billingGroup),
     notes: notes ?? undefined,
     leaseListed: value.leaseListed === true,
     selfUse: value.selfUse === true,

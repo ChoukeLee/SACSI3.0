@@ -230,6 +230,7 @@ export function buildOperatingCollectionRows(
         keywords: [
           asset.code,
           asset.name,
+          ...(asset.searchAliases ?? []),
           ...(tenant?.evidence.displayNames ? tenant.evidence.names : []),
         ],
         href: routeFor(locale, `/leases?${query}`),

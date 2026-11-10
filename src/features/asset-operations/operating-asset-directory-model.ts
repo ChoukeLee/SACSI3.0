@@ -35,6 +35,12 @@ export interface OperatingAssetTenantEvidence {
   asOfSourceDate?: string;
 }
 
+export interface OperatingAssetBillingGroup {
+  primarySourceKey: string;
+  label: string;
+  monthlyRent: OperatingAssetReferenceRent;
+}
+
 export interface OperatingAssetLeaseEvidence {
   assetSourceRef: string;
   reviewedOn?: string;
@@ -44,6 +50,7 @@ export interface OperatingAssetLeaseEvidence {
   nextPayment?: { dueDate: string; sourceRef: string; unpaid?: boolean };
   outstanding?: OperatingAssetOutstanding;
   tenantEvidence?: OperatingAssetTenantEvidence;
+  billingGroup?: OperatingAssetBillingGroup;
   notes?: readonly string[];
   leaseListed?: boolean;
   selfUse?: boolean;
@@ -65,6 +72,7 @@ export interface OperatingAssetDirectoryAsset extends AssetOperationAsset {
   referenceRent: OperatingAssetReferenceRent | null;
   leaseEvidence: OperatingAssetLeaseEvidence | null;
   leaseGroups?: readonly OperatingAssetLeaseGroup[];
+  searchAliases?: readonly string[];
 }
 
 type EntryWithBooking = AssetOperationEntry & { bookedAmountXof?: number | null };
@@ -73,6 +81,7 @@ export type OperatingAssetEntryStatus = "pending" | "verified" | "voided";
 export interface OperatingAssetDirectoryEntry extends AssetOperationEntry {
   status: OperatingAssetEntryStatus;
   bookedAmountXof: number | null;
+  billingMemberAssetId?: string;
 }
 
 export interface OperatingAssetDirectoryData extends AssetOperationsData {
@@ -345,6 +354,7 @@ function rentCoverage(
   for (const entry of entries) {
     if (
       entry.assetId !== asset.id ||
+      entry.billingMemberAssetId ||
       entry.status === "voided" ||
       entry.kind !== "income" ||
       entry.category !== "rent" ||

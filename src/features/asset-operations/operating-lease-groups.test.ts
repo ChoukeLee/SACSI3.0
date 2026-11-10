@@ -1,11 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   getOperatingAssetFollowUp,
+  summarizeOperatingAssetCash,
   type OperatingAssetDirectoryAsset,
   type OperatingAssetDirectoryEntry,
 } from "./operating-asset-directory-model";
-import { withIncubatorDormitoryLeaseGroups } from "./operating-lease-groups-server";
+import { operatingAssetMatchesSearch } from "./operating-asset-display";
+import {
+  projectOperatingLeaseGroups,
+  withIncubatorDormitoryLeaseGroups,
+} from "./operating-lease-groups-server";
 import { operatingLeaseViews } from "./operating-lease-groups";
+import { buildOperatingCollectionRows } from "../leases/unified-lease-collections-model";
 
 vi.mock("server-only", () => ({}));
 
@@ -119,5 +125,122 @@ describe("incubator dormitory lease groups", () => {
     expect(operatingLeaseViews(directory.assets[0], entries)).toEqual([
       { key: asset.id, asset: partialAsset, entries },
     ]);
+  });
+});
+
+describe("warehouse billing groups", () => {
+  const today = "2026-11-10";
+  const sourceRef = `${workbook}D3:N3`;
+  const billingGroup = {
+    primarySourceKey: "incubator:a01",
+    label: "A01、A02",
+    monthlyRent: {
+      period: "month",
+      currency: "XOF",
+      amountNative: 6_450_000,
+      effectiveFrom: "2026-11-01",
+      sourceRef,
+    },
+  } as const;
+  function warehouse(unit: string): OperatingAssetDirectoryAsset {
+    return {
+      ...asset,
+      id: unit,
+      sourceKey: `incubator:${unit.toLowerCase()}`,
+      code: `SACSI-INC-${unit}`,
+      name: `孵化园 ${unit}`,
+      displayName: `孵化园 ${unit}`,
+      group: "孵化园库房",
+      displayGroup: "孵化园库房",
+      category: "warehouse",
+      leaseEvidence: {
+        assetSourceRef: sourceRef,
+        reviewedOn: "2026-11-01",
+        leaseListed: true,
+        billingGroup,
+        tenantEvidence: {
+          names: ["彭力松"],
+          sourceRef,
+          classification: "latest_source",
+          scope: "group",
+        },
+        ...(unit === "A01"
+          ? {
+              outstanding: { amountNative: 6_450_000, currency: "XOF", sourceRef },
+              nextPayment: { dueDate: "2026-11-01", sourceRef, unpaid: true },
+              paidThrough: { date: "2026-10-31", sourceRef },
+            }
+          : {}),
+      },
+    };
+  }
+
+  it("projects a single bill and keeps member receipts and search terms without duplicating rent", () => {
+    const primary = warehouse("A01");
+    const member = warehouse("A02");
+    const historical = { ...receipt(17), assetId: primary.id };
+    const memberReceipt = {
+      ...receipt(23),
+      assetId: member.id,
+      cashDate: "2026-11-09",
+      periodEnd: "2026-11-30",
+    };
+    const snapshot = {
+      projectId: asset.projectId,
+      assets: [primary, member, asset],
+      entries: [{ ...historical, assetId: member.id }, historical, memberReceipt],
+      canWrite: false,
+    };
+    const { data, primaryByMemberId } = projectOperatingLeaseGroups(snapshot, today);
+    const [billingAsset, dormitory] = data.assets;
+
+    expect(snapshot.assets.map(({ id }) => id)).toEqual(["A01", "A02", asset.id]);
+    expect(snapshot.entries[2].assetId).toBe(member.id);
+    expect(primaryByMemberId.get(member.id)).toBe(primary.id);
+    expect(billingAsset.id).toBe(primary.id);
+    expect(billingAsset.displayName).toContain("A01、A02");
+    expect(billingAsset.referenceRent).toBe(billingGroup.monthlyRent);
+    expect(operatingAssetMatchesSearch(billingAsset, member.code)).toBe(true);
+    expect(dormitory.leaseGroups).toHaveLength(4);
+    expect(data.entries).toEqual([
+      historical,
+      { ...memberReceipt, assetId: primary.id, billingMemberAssetId: member.id },
+    ]);
+    expect(summarizeOperatingAssetCash([billingAsset], data.entries).bookedXof?.income).toBe(
+      900_000,
+    );
+    const collections = buildOperatingCollectionRows(data, today, "zh").filter(({ id }) =>
+      id.includes("A0"),
+    );
+    expect(collections).toEqual([
+      expect.objectContaining({
+        id: "asset:A01",
+        paidThrough: "2026-10-31",
+        status: "overdue",
+        amount: "645 万西法",
+        keywords: expect.arrayContaining([member.code]),
+      }),
+    ]);
+  });
+
+  it("preserves units when another project or a separate balance prevents a valid group", () => {
+    const primary = warehouse("A01");
+    const member = warehouse("A02");
+    const snapshot = {
+      projectId: asset.projectId,
+      assets: [primary, { ...member, projectId: "other" }],
+      entries: [],
+      canWrite: false,
+    };
+    expect(projectOperatingLeaseGroups(snapshot, today).data.assets).toEqual(snapshot.assets);
+    const withBalance = {
+      ...member,
+      leaseEvidence: {
+        ...member.leaseEvidence!,
+        outstanding: { amountNative: 100, currency: "CNY" as const, sourceRef },
+      },
+    };
+    const assets = [primary, withBalance];
+    expect(projectOperatingLeaseGroups({ ...snapshot, assets }, today).data.assets).toEqual(assets);
   });
 });

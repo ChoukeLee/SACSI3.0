@@ -103,6 +103,7 @@ export function operatingAssetMatchesSearch(asset: OperatingAssetDirectoryAsset,
     asset.code,
     asset.displayGroup,
     operatingLeaseLocation(asset) ?? "",
+    ...(asset.searchAliases ?? []),
     ...(asset.leaseEvidence?.tenantEvidence?.names ?? []),
     ...(asset.leaseGroups?.flatMap(({ label, tenantEvidence }) => [
       label,

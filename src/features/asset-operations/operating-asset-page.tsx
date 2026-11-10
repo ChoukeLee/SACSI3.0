@@ -18,7 +18,7 @@ import { fetchAssetOperations } from "./asset-operations-server";
 import { OperatingAssetDirectory } from "./operating-asset-directory";
 import { operatingAssetMatchesSearch } from "./operating-asset-display";
 import { buildOperatingAssetDirectory } from "./operating-asset-directory-model";
-import { withIncubatorDormitoryLeaseGroups } from "./operating-lease-groups-server";
+import { projectOperatingLeaseGroups } from "./operating-lease-groups-server";
 
 type LeaseAssetCategory = Exclude<LeaseBrowseCategory, "apartment">;
 export type AssetOperatingView = "operations" | "maintenance";
@@ -128,9 +128,13 @@ export async function OperatingAssetDirectoryPage({
       today,
       leaseEvidence: source.leaseEvidence,
     });
-    const data = browseCategory ? withIncubatorDormitoryLeaseGroups(directory) : directory;
-    const selectedAsset = selectedAssetId
-      ? data.assets.find((asset) => asset.id === selectedAssetId)
+    const projection = browseCategory ? projectOperatingLeaseGroups(directory, today) : undefined;
+    const data = projection?.data ?? directory;
+    const resolvedAssetId = selectedAssetId
+      ? (projection?.primaryByMemberId.get(selectedAssetId) ?? selectedAssetId)
+      : undefined;
+    const selectedAsset = resolvedAssetId
+      ? data.assets.find((asset) => asset.id === resolvedAssetId)
       : undefined;
     const matchedLeaseGroup = selectedAsset?.leaseGroups?.find(
       ({ key }) => key === selectedLeaseGroup,
@@ -159,8 +163,8 @@ export async function OperatingAssetDirectoryPage({
         apartmentRows={apartment?.rows.filter((row) => leaseRoomMatchesSearch(row, search ?? ""))}
         apartmentUnavailable={apartment?.unavailable}
         selectedAssetId={
-          selectedAssetId && ids.has(selectedAssetId) && (!selectedLeaseGroup || matchedLeaseGroup)
-            ? selectedAssetId
+          resolvedAssetId && ids.has(resolvedAssetId) && (!selectedLeaseGroup || matchedLeaseGroup)
+            ? resolvedAssetId
             : null
         }
         selectedLeaseGroup={matchedLeaseGroup?.key}

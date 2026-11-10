@@ -1,6 +1,7 @@
 import "server-only";
 
 import type {
+  OperatingAssetDirectoryAsset,
   OperatingAssetDirectoryData,
   OperatingAssetLeaseGroup,
 } from "./operating-asset-directory-model";
@@ -45,5 +46,81 @@ export function withIncubatorDormitoryLeaseGroups(
         ? { ...asset, leaseGroups: dormitoryLeaseGroups }
         : asset,
     ),
+  };
+}
+
+export function projectOperatingLeaseGroups(data: OperatingAssetDirectoryData, today: string) {
+  const billingGroups = new Map<string, OperatingAssetDirectoryAsset[]>();
+  for (const asset of data.assets) {
+    const group = asset.leaseEvidence?.billingGroup;
+    if (!group || asset.projectId !== data.projectId) continue;
+    const members = billingGroups.get(group.primarySourceKey);
+    if (members) members.push(asset);
+    else billingGroups.set(group.primarySourceKey, [asset]);
+  }
+
+  const primaryByMemberId = new Map<string, string>();
+  const primaryViews = new Map<string, OperatingAssetDirectoryAsset>();
+  for (const [primarySourceKey, assets] of billingGroups) {
+    const primary = assets.find(({ sourceKey }) => sourceKey === primarySourceKey);
+    const group = primary?.leaseEvidence?.billingGroup;
+    const tenant = primary?.leaseEvidence?.tenantEvidence;
+    if (!primary || !group || tenant?.scope !== "group" || assets.length < 2) continue;
+
+    const members = assets.filter(({ id }) => id !== primary.id);
+    if (
+      assets.some(
+        ({ unitId, category, group: assetGroup }) =>
+          unitId !== null || category !== "warehouse" || assetGroup !== primary.group,
+      ) ||
+      members.some(({ leaseEvidence }) => {
+        const memberTenant = leaseEvidence?.tenantEvidence;
+        return (
+          leaseEvidence?.outstanding != null ||
+          leaseEvidence?.nextPayment != null ||
+          leaseEvidence?.billingGroup?.label !== group.label ||
+          memberTenant?.scope !== "group" ||
+          memberTenant.names.join("\n") !== tenant.names.join("\n")
+        );
+      })
+    )
+      continue;
+
+    const { monthlyRent } = group;
+    const activeRate =
+      (!monthlyRent.effectiveFrom || monthlyRent.effectiveFrom <= today) &&
+      (!monthlyRent.effectiveThrough || monthlyRent.effectiveThrough >= today);
+    primaryViews.set(primary.id, {
+      ...primary,
+      displayName: `${primary.displayGroup} · ${group.label}`,
+      referenceRent: activeRate ? monthlyRent : null,
+      searchAliases: members.flatMap(({ code, name, displayName }) => [code, name, displayName]),
+    });
+    for (const member of members) primaryByMemberId.set(member.id, primary.id);
+  }
+
+  if (!primaryViews.size) {
+    return { data: withIncubatorDormitoryLeaseGroups(data), primaryByMemberId };
+  }
+
+  const primaryEntryIds = new Set(
+    data.entries.filter(({ assetId }) => primaryViews.has(assetId)).map(({ id }) => id),
+  );
+  const seen = new Set<string>();
+  const entries = data.entries.flatMap((entry) => {
+    const primaryId = primaryByMemberId.get(entry.assetId);
+    if (!primaryId && !primaryViews.has(entry.assetId)) return [entry];
+    if (seen.has(entry.id) || (primaryId && primaryEntryIds.has(entry.id))) return [];
+    seen.add(entry.id);
+    return [
+      primaryId ? { ...entry, assetId: primaryId, billingMemberAssetId: entry.assetId } : entry,
+    ];
+  });
+  const assets = data.assets
+    .filter(({ id }) => !primaryByMemberId.has(id))
+    .map((asset) => primaryViews.get(asset.id) ?? asset);
+  return {
+    data: withIncubatorDormitoryLeaseGroups({ ...data, assets, entries }),
+    primaryByMemberId,
   };
 }
