@@ -40,6 +40,7 @@ const BUSINESS_LABELS: Record<string, Labels> = {
   sale_furniture: { zh: "出售家具费", fr: "Mobilier de vente" },
   sale_furniture_income: { zh: "出售家具费收入", fr: "Revenu mobilier de vente" },
   sale_non_cash_consideration: { zh: "非现金结算", fr: "Règlement non monétaire" },
+  sale_internal_offset: { zh: "内部抵扣", fr: "Compensation interne" },
   manual: { zh: "手工应收", fr: "Créance manuelle" },
   other: { zh: "其他应收", fr: "Autre créance" },
   other_income: { zh: "其他收入", fr: "Autre revenu" },
@@ -147,7 +148,16 @@ export function statusDisplayLabel(status: string | null | undefined, locale: Lo
   return locale === "zh" ? "未知状态" : "Statut inconnu";
 }
 
-export function directionDisplayLabel(direction: string | null | undefined, locale: Locale) {
+export function isInternalSaleOffset(category: unknown) {
+  return category === "sale_internal_offset";
+}
+
+export function directionDisplayLabel(
+  direction: string | null | undefined,
+  locale: Locale,
+  category?: unknown,
+) {
+  if (isInternalSaleOffset(category)) return locale === "zh" ? "非现金" : "Non monétaire";
   const labels = DIRECTION_LABELS[direction ?? ""];
   if (labels) return pick(labels, locale);
   return locale === "zh" ? "其他收支" : "Autre flux";

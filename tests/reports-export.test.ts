@@ -12,7 +12,7 @@ vi.mock("@/lib/supabase/server", () => ({
 
 import { GET } from "@/app/api/reports/export/route";
 import { reportCsv } from "@/features/reports/report-read";
-import type { FinanceReadResult } from "@/features/finance/finance-read";
+import { financeCsv, type FinanceReadResult } from "@/features/finance/finance-read";
 
 const projectId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const entryId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -235,6 +235,21 @@ describe("financial checking complete export", () => {
 });
 
 describe("localized financial export safety", () => {
+  it("retains internal settlements as non-cash rows in both exports", () => {
+    const result = ledger({
+      total: 2,
+      rows: [
+        { ...ledgerRow, category: "sale", amount_xof: 14_000_000 },
+        { ...ledgerRow, id: "offset", category: "sale_internal_offset", amount_xof: 20_000_000 },
+      ],
+    });
+
+    expect(financeCsv(result)).toContain('"income","sale","14000000"');
+    expect(financeCsv(result)).toContain('"non_cash","sale_internal_offset","20000000"');
+    expect(reportCsv(result)).toContain('"non_cash","内部抵扣","20000000"');
+    expect(reportCsv(result, "fr")).toContain('"non_cash","Compensation interne","20000000"');
+  });
+
   it("retains numeric precision, quotes and source IDs without executing spreadsheet formula text", () => {
     const csv = reportCsv(
       ledger({

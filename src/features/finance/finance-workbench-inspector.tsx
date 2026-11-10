@@ -197,7 +197,9 @@ function InspectorContent({
         </p>
         <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">
           {financialBusinessLabel(record.category, locale)}
-          {record.direction ? ` · ${directionDisplayLabel(record.direction, locale)}` : ""}
+          {record.direction
+            ? ` · ${directionDisplayLabel(record.direction, locale, record.category)}`
+            : ""}
         </p>
       </header>
 

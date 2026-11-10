@@ -76,6 +76,22 @@ describe("aggregateByCategory", () => {
   });
 });
 
+it("keeps a sale's internal offset out of cash aggregates without removing the original receipt", () => {
+  const rows = [
+    entry({ id: "receipt", building_id: "b1", category: "sale", amount_xof: 20_000_000 }),
+    entry({
+      id: "offset",
+      building_id: "b1",
+      category: "sale_internal_offset",
+      amount_xof: 20_000_000,
+    }),
+  ];
+
+  expect(aggregatePnlMonthly(rows, ["2026-08"]).income).toEqual([20_000_000]);
+  expect(aggregatePnlByBuilding(rows, [], [])[0].income).toBe(20_000_000);
+  expect(aggregateByCategory(rows, "income")).toEqual([{ label: "sale", value: 20_000_000 }]);
+});
+
 describe("monthRange", () => {
   it("generates ascending months", () => {
     expect(monthRange("2026-08", 3)).toEqual(["2026-06", "2026-07", "2026-08"]);
