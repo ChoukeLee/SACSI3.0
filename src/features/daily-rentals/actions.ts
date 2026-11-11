@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireRole, type CurrentUser } from "@/lib/auth";
+import { getCurrentUser, hasPermission, requireRole, type CurrentUser } from "@/lib/auth";
 import type { CleaningTaskRow, DailyBookingRow, PaymentRow, ReceivableRow, UnitRow } from "@/types/database";
 import type { UnitStatus } from "@/types/domain";
 import {
@@ -446,8 +446,11 @@ export async function voidErroneousCheckin(bookingId: string, reason: string): P
 }
 
 export async function cancelBooking(bookingId: string): Promise<DailyActionResult> {
-  const user = await guardWrite();
   try {
+    const user = await getCurrentUser();
+    if (!user || !hasPermission(user, "daily_rentals:write")) {
+      return { success: false, error: "dailyCancelPermissionDenied" };
+    }
     // Keep the user's authenticated session. The database RPC and cancellation
     // trigger both use that identity for authorization and auditing.
     const supabase = await createClient();

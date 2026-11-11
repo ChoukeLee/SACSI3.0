@@ -169,6 +169,22 @@ export function formatDailyRentalError(message: string | null | undefined, local
       zh: "只有入住中的订单可以办理退房。",
       fr: "Seuls les sejours en cours peuvent etre clotures.",
     },
+    dailyCancelPermissionDenied: {
+      zh: "当前账号没有取消日租预订的权限。",
+      fr: "Votre compte ne peut pas annuler les réservations journalières.",
+    },
+    bookingNotFound: {
+      zh: "未找到可操作的订单，请刷新后重试。",
+      fr: "Réservation introuvable ou inaccessible. Actualisez puis réessayez.",
+    },
+    bookingHasPayments: {
+      zh: "这笔预订还有收款金额待核对，请先核对收款和退款记录再取消。",
+      fr: "Des montants encaissés restent à vérifier. Vérifiez les paiements et les remboursements avant d’annuler.",
+    },
+    dailyCancelFailed: {
+      zh: "取消预订失败，请刷新订单后重试。",
+      fr: "Échec de l’annulation. Actualisez la réservation puis réessayez.",
+    },
     bookingCannotBeCancelled: {
       zh: "该订单当前状态不能取消。",
       fr: "Cette reservation ne peut pas etre annulee dans son etat actuel.",

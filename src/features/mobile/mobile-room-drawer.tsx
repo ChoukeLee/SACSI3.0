@@ -4,6 +4,8 @@ import { useState, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { notifyDailyDataChanged } from "@/features/daily-rentals/daily-read-invalidation";
 import { BookingNotesEditor } from "@/features/daily-rentals/booking-notes-editor";
+import { formatDailyRentalError } from "@/features/daily-rentals/booking-presentation";
+import { allowCancelBooking } from "@/features/daily-rentals/daily-rental-policy";
 import { useRouter } from "next/navigation";
 import {
   X,
@@ -17,6 +19,7 @@ import {
   Unlock,
   CalendarPlus,
   DoorOpen,
+  UserX,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { dictionaries } from "@/lib/i18n";
@@ -28,6 +31,7 @@ import { ConfirmDialog } from "./confirm-dialog";
 import type { RoomState } from "./room-state";
 import type { UnitStatus } from "@/types/domain";
 import {
+  cancelBooking,
   checkOut,
   recordSupplementaryPayment,
   completeCleaning,
@@ -113,17 +117,20 @@ export function MobileRoomDrawer({
   const router = useRouter();
   const [action, setAction] = useState<DrawerAction>(null);
   const [loading, setLoading] = useState(false);
+  const [cancellationBookingId, setCancellationBookingId] = useState<string | null>(null);
+  const [cancellationError, setCancellationError] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [extendDate, setExtendDate] = useState("");
   const [phoneCopied, setPhoneCopied] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  const refreshRoom = () => {
+    notifyDailyDataChanged(room?.unit.building_id);
+    router.refresh();
+  };
   const { pendingLabel, runOptimisticOperation } = useOptimisticOperation({
     setBusy: setLoading,
-    onRefresh: () => {
-      notifyDailyDataChanged(room?.unit.building_id);
-      router.refresh();
-    },
+    onRefresh: refreshRoom,
     onError: () => notifyDailyDataChanged(room?.unit.building_id),
     reportBackgroundOperation: (label, state) => {
       if (state === "failed") notifyDailyDataChanged(room?.unit.building_id);
@@ -134,6 +141,8 @@ export function MobileRoomDrawer({
   const resetState = useCallback(() => {
     setAction(null);
     setLoading(false);
+    setCancellationBookingId(null);
+    setCancellationError(null);
     setPaymentAmount("");
     setExtendDate("");
     setShowMore(false);
@@ -164,6 +173,37 @@ export function MobileRoomDrawer({
     room.displayStatus === "occupied" || room.displayStatus === "checking_out_today";
   const isCleaning = room.displayStatus === "cleaning";
   const isAvailable = room.displayStatus === "available";
+  const booking = room.booking;
+  const cancellableBooking = booking && allowCancelBooking(booking).allowed ? booking : null;
+  const hasKnownPayments = room.totalPaid !== 0 || Number(booking?.prepaid_amount_xof ?? 0) !== 0;
+  const cancelReservationLabel = locale === "zh" ? "取消预订" : "Annuler la réservation";
+
+  const confirmCancellation = async () => {
+    if (
+      readOnly ||
+      loading ||
+      hasKnownPayments ||
+      !cancellableBooking ||
+      cancellableBooking.id !== cancellationBookingId
+    )
+      return;
+    setLoading(true);
+    setCancellationError(null);
+    try {
+      const result = await cancelBooking(cancellableBooking.id);
+      if (!result.success) {
+        setCancellationError(formatDailyRentalError(result.error, locale));
+        return;
+      }
+    } catch {
+      setCancellationError(formatDailyRentalError(null, locale));
+      return;
+    } finally {
+      setLoading(false);
+    }
+    handleClose();
+    refreshRoom();
+  };
 
   const handleCopyPhone = async () => {
     if (room.customer?.phone) {
@@ -444,6 +484,29 @@ export function MobileRoomDrawer({
 
             {/* Primary actions */}
             <div className="space-y-2" hidden={readOnly}>
+              {cancellableBooking &&
+                (hasKnownPayments ? (
+                  <p className="rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+                    {formatDailyRentalError("bookingHasPayments", locale)}
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => {
+                      setAction(null);
+                      setCancellationError(null);
+                      setCancellationBookingId(cancellableBooking.id);
+                    }}
+                    className="flex min-h-[44px] w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-accentRed-600 active:bg-muted/50 disabled:opacity-50"
+                  >
+                    <span className="flex items-center gap-2">
+                      <UserX className="h-4 w-4" />
+                      {cancelReservationLabel}
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/60" />
+                  </button>
+                ))}
               {isOccupied && (
                 <>
                   <button
@@ -548,6 +611,30 @@ export function MobileRoomDrawer({
       </div>
 
       {/* Confirmation dialogs */}
+      <ConfirmDialog
+        open={!readOnly && cancellationBookingId !== null && cancellationBookingId === booking?.id}
+        onClose={() => {
+          setCancellationBookingId(null);
+          setCancellationError(null);
+        }}
+        onConfirm={confirmCancellation}
+        title={cancelReservationLabel}
+        description={
+          locale === "zh"
+            ? "取消后将释放这笔预订占用的日期。"
+            : "Les dates bloquées par cette réservation seront libérées."
+        }
+        confirmLabel={locale === "zh" ? "确认取消预订" : "Confirmer l’annulation"}
+        locale={locale}
+        loading={loading}
+        confirmDisabled={!cancellableBooking || hasKnownPayments}
+      >
+        {cancellationError && (
+          <p className="text-sm text-accentRed-600" role="alert">
+            {cancellationError}
+          </p>
+        )}
+      </ConfirmDialog>
       <ConfirmDialog
         open={!readOnly && action?.type === "checkout"}
         onClose={() => setAction(null)}
