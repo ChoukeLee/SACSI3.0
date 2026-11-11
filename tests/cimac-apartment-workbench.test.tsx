@@ -313,26 +313,29 @@ describe("CIMAC apartment workbench", () => {
     ).toBe("true");
   });
 
-  it("calculates rent, two-month deposit, six-month prepayment and an entire year of fees independently of actual accounts", async () => {
+  it("calculates rent, two-month deposit, three-month prepayment and an entire year of fees independently of actual accounts", async () => {
     await render();
     const fees = () => host.querySelector("#apartment-room-fees")!.textContent;
     expect(fees()).toContain("月租35万 XOF");
     expect(fees()).toContain("押金 · 2个月70万 XOF");
-    expect(fees()).toContain("预付租金 · 6个月210万 XOF");
+    expect(fees()).toContain("预付租金 · 3个月105万 XOF");
     expect(fees()).toContain("物业费 · 每月3万 XOF");
     expect(fees()).toContain("物业费 · 一年36万 XOF");
     expect(host.querySelector('[data-testid="apartment-initial-total"]')?.textContent).toBe(
-      "316万 XOF",
+      "211万 XOF",
     );
     await click(room("216"));
     expect(fees()).toContain("月租60万 XOF");
     expect(fees()).toContain("押金 · 2个月120万 XOF");
-    expect(fees()).toContain("预付租金 · 6个月360万 XOF");
+    expect(fees()).toContain("预付租金 · 3个月180万 XOF");
     expect(fees()).toContain("物业费 · 每月4万 XOF");
     expect(fees()).toContain("物业费 · 一年48万 XOF");
     expect(host.querySelector('[data-testid="apartment-initial-total"]')?.textContent).toBe(
-      "528万 XOF",
+      "348万 XOF",
     );
+    expect(host.textContent).toContain("原币 XOF · 押二付三 · 物业年缴");
+    expect(host.textContent).toContain("2个月押金 + 3个月租金 + 完整1年物业费");
+    expect(host.textContent).not.toContain("6个月");
     expect(host.textContent).toContain("收费测算，不代表应收或已收款");
     expect(host.textContent).toContain("待确认，不套用商铺年度");
     expect(host.textContent).toContain("折算方式待确认");
@@ -506,7 +509,14 @@ describe("CIMAC apartment workbench", () => {
       host
         .querySelector('[data-testid="apartment-initial-total"]')
         ?.textContent?.replace(/\s/g, " "),
-    ).toBe("5 280 000 XOF");
+    ).toBe("3 480 000 XOF");
+    const feeText = host.querySelector("#apartment-room-fees")!.textContent!.replace(/\s/g, " ");
+    expect(feeText).toContain("Dépôt · 2 mois1 200 000 XOF");
+    expect(feeText).toContain("Loyer prépayé · 3 mois1 800 000 XOF");
+    expect(feeText).toContain("Charges · année480 000 XOF");
+    expect(feeText).toContain("Dépôt 2 mois + loyer 3 mois + charges d’une année entière");
+    expect(host.textContent).toContain("XOF · dépôt 2 mois · loyer 3 mois · charges annuelles");
+    expect(host.textContent).not.toContain("6 mois");
     expect(host.textContent).toContain("Prorata à confirmer");
     expect(host.querySelector("#apartment-room-info")?.textContent).toContain(
       "Résident réelÀ compléter",
@@ -516,6 +526,18 @@ describe("CIMAC apartment workbench", () => {
     expect(link.searchParams.get("returnTo")).toBe(
       "/fr/cimac/apartments?floor=2&room=216&tab=fees",
     );
+    await click(room("201"));
+    const oneBedroomFees = host
+      .querySelector("#apartment-room-fees")!
+      .textContent!.replace(/\s/g, " ");
+    expect(oneBedroomFees).toContain("Dépôt · 2 mois700 000 XOF");
+    expect(oneBedroomFees).toContain("Loyer prépayé · 3 mois1 050 000 XOF");
+    expect(oneBedroomFees).toContain("Charges · année360 000 XOF");
+    expect(
+      host
+        .querySelector('[data-testid="apartment-initial-total"]')
+        ?.textContent?.replace(/\s/g, " "),
+    ).toBe("2 110 000 XOF");
   });
 
   it("supports keyboard tab navigation without a network transition", async () => {

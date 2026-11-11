@@ -104,6 +104,20 @@ beforeEach(() => {
   wrongCount = false;
 });
 describe("apartment RLS-scoped read and quote boundary", () => {
+  it("applies current three-month quotes while preserving original six-month initialization evidence", async () => {
+    const originalProfiles = structuredClone(tables.cimac_apartment_profiles);
+    const data = await readCimacApartments(client, scope);
+    expect(data.rooms.every((room) => room.rentPrepayMonths === 3)).toBe(true);
+    expect(tables.cimac_apartment_profiles).toEqual(originalProfiles);
+    expect(originalProfiles.every((row) => row.rent_prepay_months === 6)).toBe(true);
+  });
+  it.each([3, 5])(
+    "rejects drift in the original initialization terms: %s months",
+    async (months) => {
+      tables.cimac_apartment_profiles[0].rent_prepay_months = months;
+      await expect(readCimacApartments(client, scope)).rejects.toMatchObject({ status: 503 });
+    },
+  );
   it("loads 64 registered records in four bounded queries and leaves occupancy unknown", async () => {
     const data = await readCimacApartments(client, scope);
     expect(data.registeredCount).toBe(64);
@@ -123,6 +137,7 @@ describe("apartment RLS-scoped read and quote boundary", () => {
     let data = await readCimacApartments(client, scope);
     expect(data.schemaAvailable).toBe(false);
     expect(data.registeredCount).toBe(0);
+    expect(data.rooms.every((room) => room.rentPrepayMonths === 3)).toBe(true);
     expect(
       data.rooms.every((r) => r.unitId === null && !r.registered && r.occupancyState === "unknown"),
     ).toBe(true);
@@ -131,6 +146,7 @@ describe("apartment RLS-scoped read and quote boundary", () => {
     data = await readCimacApartments(client, scope);
     expect(data.schemaAvailable).toBe(true);
     expect(data.registeredCount).toBe(0);
+    expect(data.rooms.every((room) => room.rentPrepayMonths === 3)).toBe(true);
     expect(calls).toHaveLength(2);
   });
   it("does not turn ACL failures or network failures into a false empty inventory", async () => {

@@ -8,6 +8,20 @@ export const cimacApartmentEastSuffixes = [1, 3, 5, 7, 9, 10, 12, 13, 15] as con
 export const cimacApartmentWestSuffixes = [2, 4, 6, 8, 11, 14, 16] as const;
 export const cimacApartmentTwoBedroomSuffixes = [11, 15, 16] as const;
 
+/** Immutable 2026-11-02 initialization evidence, not today's payment requirement. */
+export const cimacApartmentInitialReferenceTerms = {
+  depositMonths: 2,
+  rentPrepayMonths: 6,
+  propertyPrepayMonths: 12,
+} as const;
+
+/** User-confirmed 2026-11-11 quotation policy; existing contracts and charges are independent. */
+export const cimacApartmentCurrentReferenceTerms = {
+  depositMonths: 2,
+  rentPrepayMonths: 3,
+  propertyPrepayMonths: 12,
+} as const;
+
 export interface CimacApartmentPlan {
   unitNo: string;
   floor: CimacApartmentFloor;
@@ -17,7 +31,7 @@ export interface CimacApartmentPlan {
   monthlyRentXof: number;
   monthlyPropertyFeeXof: number;
   depositMonths: 2;
-  rentPrepayMonths: 6;
+  rentPrepayMonths: typeof cimacApartmentCurrentReferenceTerms.rentPrepayMonths;
   propertyPrepayMonths: 12;
 }
 export interface CimacApartmentRoom extends CimacApartmentPlan {
@@ -62,9 +76,7 @@ export function cimacApartmentPlan(): CimacApartmentPlan[] {
         facing: cimacApartmentEastSuffixes.some((n) => n === suffix) ? "east" : "west",
         monthlyRentXof: bedrooms === 1 ? 350000 : 600000,
         monthlyPropertyFeeXof: bedrooms === 1 ? 30000 : 40000,
-        depositMonths: 2,
-        rentPrepayMonths: 6,
-        propertyPrepayMonths: 12,
+        ...cimacApartmentCurrentReferenceTerms,
       };
     }),
   );

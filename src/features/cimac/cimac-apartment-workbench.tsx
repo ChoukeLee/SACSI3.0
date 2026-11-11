@@ -13,6 +13,7 @@ import {
   cimacApartmentEastSuffixes,
   cimacApartmentFees,
   cimacApartmentFloors,
+  cimacApartmentCurrentReferenceTerms,
   cimacApartmentWestSuffixes,
   type CimacApartmentData,
   type CimacApartmentFloor,
@@ -672,8 +673,18 @@ function ApartmentWorkbench({ data, locale, initialQuery, canInitialize }: Props
                 <dl className={styles.facts}>
                   {[
                     [zh ? "月租" : "Loyer mensuel", selected.monthlyRentXof],
-                    [zh ? "押金 · 2个月" : "Dépôt · 2 mois", fees.depositXof],
-                    [zh ? "预付租金 · 6个月" : "Loyer prépayé · 6 mois", fees.prepaidRentXof],
+                    [
+                      zh
+                        ? `押金 · ${selected.depositMonths}个月`
+                        : `Dépôt · ${selected.depositMonths} mois`,
+                      fees.depositXof,
+                    ],
+                    [
+                      zh
+                        ? `预付租金 · ${selected.rentPrepayMonths}个月`
+                        : `Loyer prépayé · ${selected.rentPrepayMonths} mois`,
+                      fees.prepaidRentXof,
+                    ],
                     [zh ? "物业费 · 每月" : "Charges · mois", selected.monthlyPropertyFeeXof],
                     [zh ? "物业费 · 一年" : "Charges · année", fees.annualPropertyFeeXof],
                   ].map(([label, amount]) => (
@@ -692,8 +703,8 @@ function ApartmentWorkbench({ data, locale, initialQuery, canInitialize }: Props
                   </strong>
                   <small>
                     {zh
-                      ? "2个月押金 + 6个月租金 + 完整1年物业费"
-                      : "Dépôt 2 mois + loyer 6 mois + charges d’une année entière"}
+                      ? `${selected.depositMonths}个月押金 + ${selected.rentPrepayMonths}个月租金 + 完整1年物业费`
+                      : `Dépôt ${selected.depositMonths} mois + loyer ${selected.rentPrepayMonths} mois + charges d’une année entière`}
                   </small>
                 </div>
               </div>
@@ -750,8 +761,8 @@ function ApartmentWorkbench({ data, locale, initialQuery, canInitialize }: Props
           <h2>{zh ? "收费规则" : "Règles tarifaires"}</h2>
           <span className={styles.label}>
             {zh
-              ? "原币 XOF · 押二付六 · 物业年缴"
-              : "XOF · dépôt 2 mois · loyer 6 mois · charges annuelles"}
+              ? "原币 XOF · 押二付三 · 物业年缴"
+              : `XOF · dépôt ${cimacApartmentCurrentReferenceTerms.depositMonths} mois · loyer ${cimacApartmentCurrentReferenceTerms.rentPrepayMonths} mois · charges annuelles`}
           </span>
         </div>
         <div
@@ -766,10 +777,14 @@ function ApartmentWorkbench({ data, locale, initialQuery, canInitialize }: Props
                 <th scope="col">{zh ? "户型" : "Type"}</th>
                 <th scope="col">{zh ? "月租" : "Loyer / mois"}</th>
                 <th scope="col" className={styles.optionalColumn}>
-                  {zh ? "押金 / 2个月" : "Dépôt / 2 mois"}
+                  {zh
+                    ? `押金 / ${cimacApartmentCurrentReferenceTerms.depositMonths}个月`
+                    : `Dépôt / ${cimacApartmentCurrentReferenceTerms.depositMonths} mois`}
                 </th>
                 <th scope="col" className={styles.optionalColumn}>
-                  {zh ? "预付 / 6个月" : "Prépayé / 6 mois"}
+                  {zh
+                    ? `预付 / ${cimacApartmentCurrentReferenceTerms.rentPrepayMonths}个月`
+                    : `Prépayé / ${cimacApartmentCurrentReferenceTerms.rentPrepayMonths} mois`}
                 </th>
                 <th scope="col">{zh ? "物业 / 年" : "Charges / an"}</th>
                 <th scope="col">{zh ? "标准首期" : "Premier versement estimé"}</th>

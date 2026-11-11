@@ -32,19 +32,20 @@ describe("confirmed CIMAC apartment catalogue", () => {
     const rooms = cimacApartmentPlan();
     expect(cimacApartmentFees(rooms[0])).toEqual({
       depositXof: 700000,
-      prepaidRentXof: 2100000,
+      prepaidRentXof: 1050000,
       annualPropertyFeeXof: 360000,
-      standardInitialTotalXof: 3160000,
+      standardInitialTotalXof: 2110000,
     });
     expect(cimacApartmentFees(rooms[10])).toEqual({
       depositXof: 1200000,
-      prepaidRentXof: 3600000,
+      prepaidRentXof: 1800000,
       annualPropertyFeeXof: 480000,
-      standardInitialTotalXof: 5280000,
+      standardInitialTotalXof: 3480000,
     });
     expect(rooms[0]).not.toHaveProperty("occupant");
     expect(rooms[0]).not.toHaveProperty("startDate");
     expect(rooms[0]).not.toHaveProperty("paidAmount");
+    expect(rooms.every((room) => room.rentPrepayMonths === 3)).toBe(true);
   });
   it("does not share mutable catalogue rows across calls", () => {
     const a = cimacApartmentPlan();

@@ -11,6 +11,7 @@ import {
 } from "./cimac-apartment-reservation-model";
 import {
   cimacApartmentPlan,
+  cimacApartmentInitialReferenceTerms,
   type CimacApartmentData,
   type CimacApartmentPlan,
   type CimacApartmentRoom,
@@ -46,7 +47,6 @@ const columns: [string, keyof CimacApartmentPlan][] = [
   ["monthly_rent_xof", "monthlyRentXof"],
   ["monthly_property_fee_xof", "monthlyPropertyFeeXof"],
   ["deposit_months", "depositMonths"],
-  ["rent_prepay_months", "rentPrepayMonths"],
   ["property_prepay_months", "propertyPrepayMonths"],
 ];
 function exactRows(result: {
@@ -118,6 +118,9 @@ export async function readCimacApartments(
       !plan ||
       profilesByNumber.has(number) ||
       profile.facing !== plan.facing ||
+      // Profiles preserve the original audited initialization; today's quote is in plan.
+      String(profile.rent_prepay_months) !==
+        String(cimacApartmentInitialReferenceTerms.rentPrepayMonths) ||
       columns.some(
         ([field, key]) => profile[field] === null || String(profile[field]) !== String(plan[key]),
       )
