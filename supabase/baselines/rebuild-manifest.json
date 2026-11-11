@@ -293,6 +293,22 @@
     {
       "file": "20261110085444_verified_sacsi7_monthly_rent_schedule.sql",
       "sha256": "91c5290d5f638fe09b98944b9933ec8dd909c2a741a1190a90048d11426f550b"
+    },
+    {
+      "file": "20261110161157_asset_operation_booked_xof.sql",
+      "sha256": "9175e5a33647e7d9f8aa066d348edef41197fd05d0232e9d61c0afe2a44e8a6a"
+    },
+    {
+      "file": "20261110163000_daily_booking_notes.sql",
+      "sha256": "61aa148a42a53d44308440009fc9139a2965a9ceedb433f6cf55c58ca8845cec"
+    },
+    {
+      "file": "20261111084851_repair_daily_reservation_cancellation.sql",
+      "sha256": "2f94c0a82a644ab6ce964f38a7388207ebf4ae0bb923240647ecbde89100620c"
+    },
+    {
+      "file": "20261111105200_daily_cancel_refunded_reservations.sql",
+      "sha256": "9548ef1e3ca17ef8192a23f4bd2970b87a2f64e09ceb1d6d52126801029c8a98"
     }
   ],
   "excluded": [

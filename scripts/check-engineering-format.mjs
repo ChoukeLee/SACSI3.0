@@ -4,6 +4,10 @@ import * as prettier from "prettier";
 // A reviewed, explicit adoption scope. Legacy files are added when refactored;
 // this avoids burying meaningful business changes under a repository-wide reflow.
 const files = [
+  "src/features/daily-rentals/booking-notes-action.ts",
+  "src/features/daily-rentals/booking-notes-editor.tsx",
+  "tests/booking-notes-editor.test.tsx",
+  "tests/daily-booking-notes.native.ts",
   "src/app/api/operator/v1/cimac-apartment-reservations/query/route.ts",
   "src/app/api/operator/v1/cimac-apartment-reservations/execute/route.ts",
   "src/app/api/operator/v1/cimac-apartment-reservations/status/route.ts",

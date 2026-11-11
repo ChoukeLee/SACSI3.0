@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { UnitProfileView } from "@/features/units/unit-profile-view";
 import { fetchUnitProfile } from "@/features/units/unit-profile-service";
 import { redirectLegacyCimac } from "@/features/cimac/cimac-legacy-redirect";
@@ -25,6 +25,7 @@ export default async function FrenchUnitProfilePage({
     <UnitProfileView
       data={profile}
       locale="fr"
+      canEditDailyNotes={hasPermission(user, "daily_rentals:write")}
       returnTo={typeof query?.returnTo === "string" ? query.returnTo : undefined}
     />
   );

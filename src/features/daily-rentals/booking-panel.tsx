@@ -37,6 +37,7 @@ import { unitBuildingLabel } from "@/lib/unit-building-label";
 import { printDailyReceipt } from "@/features/print";
 import { calculateBilling } from "./billing";
 import {
+  allowCancelBooking,
   getDailyLodgingBusinessType,
   getPrimaryDailyAction,
   type DailyLodgingBusinessType,
@@ -62,6 +63,7 @@ import { ConfirmDialog } from "@/features/mobile/confirm-dialog";
 import { shouldShowAdvanceReservationPayment } from "./daily-rental-policy";
 import { notifyDailyDataChanged } from "./daily-read-invalidation";
 import { DailyCustomerSelect } from "./daily-customer-select";
+import { BookingNotesEditor } from "./booking-notes-editor";
 import { businessDate } from "./receipt-analysis-query";
 
 interface BookingPanelProps {
@@ -155,6 +157,7 @@ export function BookingPanel({
   const [changedCheckOutDate, setChangedCheckOutDate] = useState("");
   const [actionError, setActionError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; amount: number } | null>(null);
+  const [cancelBookingId, setCancelBookingId] = useState<string | null>(null);
   const [reversalReason, setReversalReason] = useState("");
   const [showAdvancedActions, setShowAdvancedActions] = useState(false);
   const [activeAdvancedTask, setActiveAdvancedTask] = useState<AdvancedTask>(null);
@@ -223,6 +226,8 @@ export function BookingPanel({
     [payments, booking],
   );
   const totalPaid = bookingPayments.reduce((s, p) => s + Number(p.amount), 0);
+  const canCancelBooking = !!booking && !readOnly && allowCancelBooking(booking).allowed;
+  const cancellationHasPayments = totalPaid !== 0 || Number(booking?.prepaid_amount_xof ?? 0) !== 0;
   const actualRefunds = bookingPayments.filter((p) => p.request_kind === "daily_refund");
   const reversedPaymentIds = useMemo(
     () => new Set(bookingPayments.map((payment) => payment.reversal_of_payment_id).filter(Boolean)),
@@ -582,9 +587,17 @@ export function BookingPanel({
     }
   };
 
-  // ── Backfill handler ──
   const handleCancelBooking = async () => {
-    await runPanelAction(() => cancelBooking(booking!.id), { closeOnSuccess: true });
+    if (
+      !booking ||
+      booking.id !== cancelBookingId ||
+      !canCancelBooking ||
+      cancellationHasPayments ||
+      saving
+    )
+      return;
+    setCancelBookingId(null);
+    await runPanelAction(() => cancelBooking(booking.id), { closeOnSuccess: true });
   };
 
   const handleCompleteCleaning = async () => {
@@ -1077,6 +1090,15 @@ export function BookingPanel({
                 </div>
               </section>
 
+              <div className="border-b border-border pb-4">
+                <BookingNotesEditor
+                  booking={booking}
+                  buildingId={selectedUnit?.building_id}
+                  locale={locale}
+                  readOnly={readOnly}
+                />
+              </div>
+
               <section className="border-b border-border pb-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-foreground">
@@ -1272,12 +1294,6 @@ export function BookingPanel({
                 </div>
               )}
 
-              {booking.notes && (
-                <p className="text-xs text-muted-foreground">
-                  {locale === "zh" ? "备注" : "Note"}: {booking.notes}
-                </p>
-              )}
-
               {/* Cleaning task summary. Open cleaning actions are rendered by the primary action block below. */}
               {effectiveCleaningTask &&
                 (effectiveCleaningTask.is_completed ||
@@ -1389,16 +1405,6 @@ export function BookingPanel({
                           <Check />
                           {t.booking.confirmBooking}
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="lg"
-                          onClick={handleCancelBooking}
-                          disabled={saving}
-                          className="w-full justify-center border-accentRed-200 font-semibold text-accentRed-600 hover:border-accentRed-300 hover:bg-accentRed-50 hover:text-accentRed-700"
-                        >
-                          <UserX />
-                          {t.booking.cancelBooking}
-                        </Button>
                       </div>
                     )}
 
@@ -1440,16 +1446,6 @@ export function BookingPanel({
                         >
                           <LogIn />
                           {t.booking.checkIn}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="lg"
-                          onClick={handleCancelBooking}
-                          disabled={saving}
-                          className="w-full justify-center border-accentRed-200 font-semibold text-accentRed-600 hover:border-accentRed-300 hover:bg-accentRed-50 hover:text-accentRed-700"
-                        >
-                          <UserX />
-                          {t.booking.cancelBooking}
                         </Button>
                         {booking.checkout_mode === "fixed" &&
                           (activeAdvancedTask === "changeCheckout" ? (
@@ -2145,6 +2141,26 @@ export function BookingPanel({
                               : "Aucune action disponible"}
                       </div>
                     )}
+                    {canCancelBooking && (
+                      <div className="space-y-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="lg"
+                          onClick={() => setCancelBookingId(booking.id)}
+                          disabled={saving || cancellationHasPayments}
+                          className="w-full justify-center border-accentRed-200 font-semibold text-accentRed-600 hover:border-accentRed-300 hover:bg-accentRed-50 hover:text-accentRed-700"
+                        >
+                          <UserX />
+                          {t.booking.cancelBooking}
+                        </Button>
+                        {cancellationHasPayments && (
+                          <p className="text-xs text-muted-foreground">
+                            {formatError("bookingHasPayments")}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </section>
               )}
@@ -2157,6 +2173,22 @@ export function BookingPanel({
           )}
         </div>
       </RightDrawer>
+
+      <ConfirmDialog
+        open={canCancelBooking && booking?.id === cancelBookingId && !cancellationHasPayments}
+        onClose={() => setCancelBookingId(null)}
+        onConfirm={() => void handleCancelBooking()}
+        title={locale === "zh" ? "取消这笔预订？" : "Annuler cette réservation ?"}
+        description={
+          locale === "zh"
+            ? "取消后，这笔预订将释放房间占用，应收也会标为已取消。"
+            : "La réservation libérera le créneau de la chambre et la créance sera annulée."
+        }
+        confirmLabel={locale === "zh" ? "确认取消预订" : "Confirmer l’annulation"}
+        cancelLabel={locale === "zh" ? "保留预订" : "Garder la réservation"}
+        locale={locale}
+        confirmDisabled={saving}
+      />
 
       <ConfirmDialog
         open={deleteTarget !== null}

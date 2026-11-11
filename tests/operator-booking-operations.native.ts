@@ -504,7 +504,7 @@ it.each(['parent_missing','parent_same_alias','parent_other_actor','parent_other
  if(scenario==='parent_same_alias')q=revision(f,{requestId:f.parent.requestId,correctsRequestId:f.parent.requestId.toUpperCase()});
  if(scenario==='parent_other_actor'){const another=await seed();await owner('update private.operator_booking_operations set actor_id=$1 where id=$2',[another.actor,f.parentId]);}
  if(scenario==='parent_other_booking')q=revision({...f,booking:randomUUID()});
- if(scenario==='after_changed')await owner("update daily_bookings set notes='later edit' where id=$1",[f.booking]);
+ if(scenario==='after_changed')await owner("update daily_bookings set ota_source='later edit' where id=$1",[f.booking]);
  if(scenario==='receipts_changed')await owner("update payments set notes='later edit' where source_id=$1",[f.booking]);
  if(scenario==='beyond_original')q=revision(f,{actualCheckOut:f.today});
  if(scenario==='not_extending')q=revision(f,{actualCheckOut:f.short});
@@ -514,6 +514,17 @@ it.each(['parent_missing','parent_same_alias','parent_other_actor','parent_other
  if(scenario==='source_injection')q=revision(f,{actor_id:f.actor});
  const before=await correctionState(f);await login(f.actor);
  await expect(preview(q)).rejects.toThrow();expect(await correctionState(f)).toEqual(before);
+});
+it('accepts a fresh revision preview after a notes edit and rejects an older prepared snapshot',async()=>{
+ const f=await completedShortCorrection(),q=revision(f),d=await draft(q);
+ const note=(await db.query("select public.update_daily_booking_notes_rpc($1,$2,null,'Updated independently') v",[f.booking,f.unit])).rows[0].v;
+ expect(note).toEqual({status:'saved',notes:'Updated independently'});
+ await expect(confirm(d.id)).rejects.toThrow('operationChanged');
+ const latest=await preview(q);
+ expect(latest.plan).toMatchObject({correctsRequestId:f.parent.requestId,totalAfter:80000});
+ const replacement=await draft(q,d.id);
+ expect(await confirm(replacement.id)).toMatchObject({status:'completed',verified:true});
+ expect((await correctionState(f)).booking.notes).toBe('Updated independently');
 });
 it('detects historical daily and long-lease conflicts in the restored night, and ignores cancelled stays',async()=>{
  const f=await completedShortCorrection(),other=randomUUID();
