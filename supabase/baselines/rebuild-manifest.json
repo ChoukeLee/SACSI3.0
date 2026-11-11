@@ -277,6 +277,10 @@
     {
       "file": "20261110163000_daily_booking_notes.sql",
       "sha256": "61aa148a42a53d44308440009fc9139a2965a9ceedb433f6cf55c58ca8845cec"
+    },
+    {
+      "file": "20261111084851_repair_daily_reservation_cancellation.sql",
+      "sha256": "2f94c0a82a644ab6ce964f38a7388207ebf4ae0bb923240647ecbde89100620c"
     }
   ],
   "excluded": [
