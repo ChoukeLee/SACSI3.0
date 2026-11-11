@@ -808,6 +808,104 @@ describe("asset directory UI", () => {
       expect(warning?.textContent ?? "").not.toContain("逾期");
     }
   });
+  it("keeps sale arrangement notes away from the buyer identity and uses a neutral card action", async () => {
+    const value = data();
+    value.rows[0].position = {
+      ...value.rows[0].position!,
+      lease_occupied: false,
+      operational_condition: "normal",
+      cleaning_pending: false,
+    };
+    value.rows[0].unit.occupancy_verified = false;
+    const summary = business();
+    summary.leases = [];
+    summary.sales[0].balance = { basis: "unknown", amounts: null };
+    summary.sales[0].reviewReasons = ["payment_arrangement_requires_review"];
+    summary.reviewReasons = [...summary.sales[0].reviewReasons];
+    value.rows[0].business = summary;
+    await render(value);
+    expect(card(uuid(100))?.textContent).toContain("Synthetic buyer Alpha");
+    expect(card(uuid(100))?.textContent).toContain("查看出售款明细");
+    expect(card(uuid(100))?.textContent).not.toContain("待核");
+    expect(card(uuid(100))?.querySelector('[title="付款安排未明确"]')).toBeNull();
+    await selectFirst();
+    expect(drawer()?.textContent).toContain("付款安排未明确");
+    expect(drawer()?.textContent).not.toContain("房款本金账单结清");
+  });
+  it("names an actual sale cash difference while preserving operational conflicts", async () => {
+    const value = data();
+    value.rows[0].position = {
+      ...value.rows[0].position!,
+      lease_occupied: false,
+      operational_condition: "normal",
+      cleaning_pending: false,
+    };
+    const summary = business();
+    summary.leases = [];
+    summary.sales[0].reviewReasons = ["registered_balance_bill_conflict"];
+    summary.reviewReasons = [...summary.sales[0].reviewReasons];
+    value.rows[0].business = summary;
+    await render(value);
+    expect(card(uuid(100))?.textContent).toContain("房款记录有差异");
+    expect(card(uuid(100))?.textContent).not.toContain("买方Synthetic buyer Alpha待核");
+    await selectFirst();
+    expect(drawer()?.textContent).toContain("登记余款与账单有差异");
+    value.rows[0].position.operational_condition = "locked";
+    await render({ ...value, rows: [...value.rows] });
+    expect(card(uuid(100))?.textContent).toContain("封锁");
+  });
+  it("limits a settled sale label to verified purchase principal rather than every room charge", async () => {
+    const value = data();
+    value.rows[0].position = {
+      ...value.rows[0].position!,
+      lease_occupied: false,
+      operational_condition: "normal",
+      cleaning_pending: false,
+    };
+    const summary = business();
+    summary.leases = [];
+    summary.sales[0].balance = { basis: "verified_bills", amounts: [] };
+    value.rows[0].business = summary;
+    await render(value);
+    expect(card(uuid(100))?.textContent).toContain("房款本金账单结清");
+    await selectFirst();
+    expect(drawer()?.textContent).toContain("本金账单结清");
+    expect(drawer()?.textContent).toContain("不含车位等其他款项");
+  });
+  it("shows registered pending sale money separately and never calls the whole sale settled or overdue", async () => {
+    const value = data();
+    value.rows[0].position = {
+      ...value.rows[0].position!,
+      lease_occupied: false,
+      operational_condition: "normal",
+      cleaning_pending: false,
+    };
+    const summary = business();
+    summary.leases = [];
+    summary.sales[0].balance = { basis: "verified_bills", amounts: [] };
+    summary.sales[0].pendingBalanceNative = [{ currency: "XOF", amount: 9000000 }];
+    summary.sales[0].pendingBalanceSources = [
+      {
+        id: uuid(980),
+        category: "other",
+        title: "车位登记尾款",
+        amount: 9000000,
+        currency: "XOF",
+        notes: "房款已结清，车位尾款已确认待收，未约定付款日",
+        paymentDateUnspecified: true,
+      },
+    ];
+    value.rows[0].business = summary;
+    await render(value);
+    expect(card(uuid(100))?.textContent).toContain("登记待收出售款");
+    expect(card(uuid(100))?.textContent).toContain("900万西法");
+    expect(card(uuid(100))?.textContent).not.toMatch(/逾期|本金账单结清/);
+    await selectFirst();
+    expect(drawer()?.textContent).toContain("历史登记余额，含车位等款项");
+    expect(drawer()?.textContent).not.toContain("本金账单结清");
+    await openDetails("登记待收依据");
+    expect(drawer()?.textContent).toContain("车位尾款已确认待收");
+  });
   it("immediately clears selected record and status editor when the project changes before the server response", async () => {
     await render(data(), true);
     await selectFirst();

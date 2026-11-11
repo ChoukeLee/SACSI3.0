@@ -136,7 +136,7 @@ export async function readUnitBusinessSummaries(
         "receivables",
         contractIds,
         "source_id",
-        "id,building_id,unit_id,customer_id,source_type,source_id,category,title,due_date,amount_xof,paid_amount_xof,amount_native,paid_amount_native,currency,status,management_status,service_period_start,service_period_end,service_period_source,created_at,updated_at",
+        "id,building_id,unit_id,customer_id,source_type,source_id,category,title,due_date,amount_xof,paid_amount_xof,amount_native,paid_amount_native,currency,status,management_status,notes,service_period_start,service_period_end,service_period_source,created_at,updated_at",
       ),
       scopedRows<SalePaymentScheduleRow>(
         client,

@@ -21,6 +21,7 @@ import type { PaymentRow, SaleContractRow } from "@/types/database";
 import { saleScheduleReceivable, saleScheduleState } from "./sale-workbench-model";
 import {
   buildSalePurchaseReceiptSummary,
+  buildSalePendingBalanceSummary,
   buildSaleRecordOverview,
   saleRegisteredPrice,
   saleRegisteredBalance,
@@ -232,6 +233,11 @@ function ScopedSaleWorkbenchInspector({
   const recs = data.receivables.filter(
     (row) => row.source_type === "sale_contract" && row.source_id === contract.id,
   );
+  const pending = unit ? buildSalePendingBalanceSummary(contract, unit, recs) : null;
+  const pendingAmounts = pending?.pendingBalanceNative ?? [];
+  const pendingDateUnspecified = pending?.pendingBalanceSources.length
+    ? pending.pendingBalanceSources.every((source) => source.paymentDateUnspecified)
+    : false;
   const nativeBillRecord =
     nativeSale && unit
       ? buildSaleRecordOverview({
@@ -302,11 +308,13 @@ function ScopedSaleWorkbenchInspector({
   const overdue = nativeSale
     ? nativeOverdueAmounts.some((row) => row.amount > 0)
     : known && summary.overdue > 0;
-  const followup = formalKnown
-    ? nativeSale
-      ? nativeBillRecord?.outstandingNative?.some((row) => row.amount > 0)
-      : summary.outstanding > 0
-    : !!registeredBalance && registeredBalance.amount > 0;
+  const followup =
+    pendingAmounts.length > 0 ||
+    (formalKnown
+      ? nativeSale
+        ? nativeBillRecord?.outstandingNative?.some((row) => row.amount > 0)
+        : summary.outstanding > 0
+      : !!registeredBalance && registeredBalance.amount > 0);
   const stateLabels: Record<string, string> = {
     paid: text("已核销", "Rapprochée"),
     overdue: text("已逾期", "En retard"),
@@ -389,31 +397,42 @@ function ScopedSaleWorkbenchInspector({
               ) : null}
               <Fact
                 label={
-                  !formalKnown && registeredBalance
-                    ? text("登记余款（Excel）", "Solde enregistré (Excel)")
-                    : text("已核未收", "Créances vérifiées restantes")
+                  pendingAmounts.length
+                    ? text("登记待收出售款", "Solde de vente enregistré")
+                    : !formalKnown && registeredBalance
+                      ? text("登记余款（Excel）", "Solde enregistré (Excel)")
+                      : text("已核未收", "Créances vérifiées restantes")
                 }
               >
-                {formalKnown
-                  ? formalBalanceLabel
-                  : registeredBalance
-                    ? originalMoney(registeredBalance)
-                    : text("暂无已核应收", "Aucune créance vérifiée")}
+                {pendingAmounts.length
+                  ? pendingAmounts.map(originalMoney).join(" · ")
+                  : formalKnown
+                    ? formalBalanceLabel
+                    : registeredBalance
+                      ? originalMoney(registeredBalance)
+                      : text("暂无已核应收", "Aucune créance vérifiée")}
               </Fact>
             </dl>
             {overdue || followup ? (
               <p className={cn(styles.followup, overdue && styles.alert)}>
-                {overdue
-                  ? text("已有已核逾期款，需跟进。", "Créances vérifiées en retard à suivre.")
-                  : formalKnown
+                {pendingAmounts.length
+                  ? pendingDateUnspecified
                     ? text(
-                        "有已核未结清款，按明确应付日期跟进。",
-                        "Solde vérifié à suivre selon les échéances enregistrées.",
+                        "登记待收，未约定付款日。",
+                        "Solde enregistré, date de paiement non convenue.",
                       )
-                    : text(
-                        "有来源登记余款，付款安排待核。",
-                        "Solde enregistré ; modalités à vérifier.",
-                      )}
+                    : text("登记待收，付款安排待补。", "Solde enregistré, modalités à compléter.")
+                  : overdue
+                    ? text("已有已核逾期款，需跟进。", "Créances vérifiées en retard à suivre.")
+                    : formalKnown
+                      ? text(
+                          "有已核未结清款，按明确应付日期跟进。",
+                          "Solde vérifié à suivre selon les échéances enregistrées.",
+                        )
+                      : text(
+                          "有来源登记余款，付款安排待核。",
+                          "Solde enregistré ; modalités à vérifier.",
+                        )}
               </p>
             ) : null}
             <p className={styles.callout}>
@@ -422,6 +441,25 @@ function ScopedSaleWorkbenchInspector({
                 "Les encaissements bruts ne déduisent pas les remboursements. Prix, mouvements réels et créances restent distincts ; l’absence de créance vérifiée ne prouve pas l’absence de dette.",
               )}
             </p>
+            {pending?.pendingBalanceSources.length ? (
+              <details className={styles.secondaryDetails}>
+                <summary>{text("登记待收依据", "Justificatifs du solde enregistré")}</summary>
+                <p className={styles.sourceText}>
+                  {text(
+                    "原历史登记账单余额，含车位等出售相关款；与已核管理应收分别列示，旧日期不作为约定付款日。",
+                    "Soldes d’anciennes écritures, y compris les frais liés à la vente ; distincts des créances gérées. Les anciennes dates ne valent pas accord de paiement.",
+                  )}
+                </p>
+                {pending.pendingBalanceSources.map((source) => (
+                  <div key={source.id} className={styles.sourceText}>
+                    <p>
+                      {source.title} · {originalMoney(source)}
+                    </p>
+                    {source.notes ? <p>{source.notes}</p> : null}
+                  </div>
+                ))}
+              </details>
+            ) : null}
           </>
         ) : tab === "payments" ? (
           <>

@@ -421,6 +421,30 @@
 .cardReview {
   color: hsl(var(--muted-foreground));
 }
+.cardPendingBalance {
+  display: block;
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 400;
+}
+.cardPendingBalance > span:first-child {
+  display: block;
+  margin-bottom: 3px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.pendingSources {
+  margin-top: 10px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.pendingSources summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.pendingSources p {
+  margin-top: 8px;
+}
 .cardPaidThrough time {
   font-weight: 400;
   font-variant-numeric: tabular-nums;

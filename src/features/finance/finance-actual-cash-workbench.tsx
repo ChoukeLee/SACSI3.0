@@ -13,6 +13,31 @@ import { FinanceManualEntry } from "./finance-manual-entry";
 import { FinanceWorkbenchInspector } from "./finance-workbench-inspector";
 import styles from "./finance-actual-cash.module.css";
 
+const operatingCategoryLabels: Record<string, [string, string]> = {
+  rent: ["租金", "Loyer"],
+  property_fee: ["物业费", "Charges immobilières"],
+  maintenance: ["维修", "Entretien"],
+  utilities: ["水电", "Eau et électricité"],
+  cleaning: ["保洁", "Nettoyage"],
+  security: ["安保", "Sécurité"],
+  payroll: ["工资", "Salaires"],
+  tax: ["税费", "Taxes"],
+  commission: ["佣金", "Commission"],
+  insurance: ["保险", "Assurance"],
+  other: ["其他", "Autre"],
+};
+
+/** Source fingerprints remain available separately; the first read is the business note. */
+function businessDescription(description: string) {
+  const sourceAt = description.search(/(?:sha256\s*[:：=]|\b(?:file|sheet|cell)\s*[:：=])/i);
+  if (sourceAt < 0) return description.trim();
+  return description
+    .slice(0, sourceAt)
+    .replace(/(?:来源|source)\s*[:：=]?\s*$/i, "")
+    .replace(/[\s|;；·,，]+$/, "")
+    .trim();
+}
+
 export function FinanceActualCashWorkbench({
   actualCash: data,
   actualCashUnavailable,
@@ -33,6 +58,7 @@ export function FinanceActualCashWorkbench({
   const prefix = locale === "fr" ? "/fr" : "";
   const money = (amount: number, currency = "XOF") => formatPropertyMoney(amount, currency, locale);
   const selected = data?.rows.find((row) => row.id === selectedId) ?? null;
+  const selectedNote = selected ? businessDescription(selected.description) : "";
   const currentMonth = query.filters.dateFrom?.slice(0, 7) || today.slice(0, 7);
   const selectedBuilding = buildings.find((building) => building.id === query.filters.buildingId);
   const cashHref = (patch: Record<string, string | undefined>) => {
@@ -46,10 +72,16 @@ export function FinanceActualCashWorkbench({
     projectId: query.filters.projectId || "",
     kind: "ledger",
   });
-  const label = (row: FinanceActualCashRow) =>
-    row.category === "payment_bundle"
-      ? text("合并收付款 · 分项见详情", "Paiement groupé · détail disponible")
-      : financialBusinessLabel(row.category, locale);
+  const label = (row: FinanceActualCashRow) => {
+    if (/(?:deposit|caution)/i.test(row.category) && row.kind === "deposit_in")
+      return text("押金收入", "Dépôt reçu");
+    if (/(?:deposit|caution)/i.test(row.category) && row.kind === "deposit_out")
+      return text("退还押金", "Dépôt remboursé");
+    if (row.category === "payment_bundle")
+      return text("合并收付款 · 分项见详情", "Paiement groupé · détail disponible");
+    const category = operatingCategoryLabels[row.category];
+    return category ? category[zh ? 0 : 1] : financialBusinessLabel(row.category, locale);
+  };
   const rows = (data?.rows ?? []).filter((row) => {
     const matchDirection =
       direction === "all" ||
@@ -375,8 +407,12 @@ export function FinanceActualCashWorkbench({
                 <dd>{label(selected)}</dd>
               </div>
             </dl>
-            {selected.description ? (
-              <p className={styles.description}>{selected.description}</p>
+            {selectedNote ? <p className={styles.description}>{selectedNote}</p> : null}
+            {selected.description.trim() !== selectedNote ? (
+              <details className={styles.proof}>
+                <summary>{text("来源与原文", "Source et texte intégral")}</summary>
+                <p className={styles.sourceText}>{selected.description}</p>
+              </details>
             ) : null}
             {selected.ledgerId ? (
               <details className={styles.proof}>

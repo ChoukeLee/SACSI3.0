@@ -13,7 +13,7 @@
   gap: 12px;
 }
 .scopeLine {
-  margin-bottom: 18px;
+  margin-bottom: 12px;
   color: hsl(var(--muted-foreground));
   font-size: 12px;
 }
@@ -92,7 +92,7 @@
   justify-content: space-between;
   gap: 14px;
   padding: 17px 18px;
-  min-height: 104px;
+  min-height: 90px;
 }
 .followRow:hover {
   background: hsl(var(--muted) / 0.45);

@@ -151,8 +151,9 @@ export function matchesUnitWorkbenchFilter(
       ) === true ||
       record.business?.sales.some(
         (sale) =>
-          ["verified_bills", "registered"].includes(sale.balance.basis) &&
-          sale.balance.amounts?.some((amount) => amount.amount > 0),
+          (["verified_bills", "registered"].includes(sale.balance.basis) &&
+            sale.balance.amounts?.some((amount) => amount.amount > 0)) ||
+          sale.pendingBalanceNative?.some((amount) => amount.amount > 0),
       ) === true ||
       record.business?.leases.some(
         (lease) =>

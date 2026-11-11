@@ -412,6 +412,8 @@ function PartyHero({
         : null;
     const positive = knownBalance?.some((value) => value.amount > 0);
     const settled = knownBalance !== null && knownBalance.every((value) => value.amount === 0);
+    const pendingBalance = sale.pendingBalanceNative?.filter((value) => value.amount > 0) ?? [];
+    const showPendingAsBalance = !positive && pendingBalance.length > 0;
     return (
       <>
         {sale.signedDate ? (
@@ -443,23 +445,35 @@ function PartyHero({
             }
           />
           <HeroMetric
-            label={zh ? "未收房款" : "Solde du prix"}
-            values={knownBalance}
+            label={
+              showPendingAsBalance
+                ? zh
+                  ? "登记待收出售款"
+                  : "Solde de vente enregistré"
+                : zh
+                  ? "未收房款"
+                  : "Solde du prix"
+            }
+            values={showPendingAsBalance ? pendingBalance : knownBalance}
             locale={locale}
             alert={!!positive}
-            empty={zh ? "账单结清" : "Factures soldées"}
+            empty={zh ? "本金账单结清" : "Créances du prix du bien soldées"}
             note={
-              sale.balance.basis === "verified_bills"
+              showPendingAsBalance
                 ? zh
-                  ? "已核房款账单"
-                  : "Créances vérifiées du prix"
-                : sale.balance.basis === "registered"
+                  ? "历史登记余额，含车位等款项"
+                  : "Solde historique, pouvant inclure parking et frais"
+                : sale.balance.basis === "verified_bills"
                   ? zh
-                    ? "来源登记余款"
-                    : "Solde enregistré dans la source"
-                  : zh
-                    ? "余额依据待核"
-                    : "Solde à vérifier"
+                    ? "已核房款本金账单，不含车位等其他款项"
+                    : "Créances vérifiées du prix du bien, hors parking et autres frais"
+                  : sale.balance.basis === "registered"
+                    ? zh
+                      ? "来源登记余款"
+                      : "Solde enregistré dans la source"
+                    : zh
+                      ? "余额依据待核"
+                      : "Solde à vérifier"
             }
           />
         </div>
@@ -469,11 +483,39 @@ function PartyHero({
             <UnitAmountValue values={sale.total ? [sale.total] : null} locale={locale} />
           </strong>
         </div>
+        {pendingBalance.length > 0 ? (
+          <>
+            {!showPendingAsBalance ? (
+              <div className={styles.totalLine}>
+                <span>{zh ? "登记待收出售款" : "Solde de vente enregistré"}</span>
+                <strong>
+                  <UnitAmountValue values={pendingBalance} locale={locale} />
+                </strong>
+              </div>
+            ) : null}
+            <p className={styles.note}>
+              {zh
+                ? "登记待收与已核房款本金分开列示，未按历史账单日期判断逾期。"
+                : "Solde enregistré distinct des créances vérifiées du prix ; les anciennes dates ne déterminent pas un retard."}
+            </p>
+            {sale.pendingBalanceSources?.length ? (
+              <details className={styles.pendingSources}>
+                <summary>{zh ? "登记待收依据" : "Justificatifs du solde enregistré"}</summary>
+                {sale.pendingBalanceSources.map((source) => (
+                  <p key={source.id}>
+                    {source.title}
+                    {source.notes ? ` · ${source.notes}` : ""}
+                  </p>
+                ))}
+              </details>
+            ) : null}
+          </>
+        ) : null}
         {positive ? (
           <div className={cn(styles.paymentBanner, styles.reviewBanner)}>
             {zh ? "余款待跟进" : "Solde à suivre"}
           </div>
-        ) : settled && sale.balance.basis === "registered" ? (
+        ) : settled && !pendingBalance.length && sale.balance.basis === "registered" ? (
           <div className={cn(styles.paymentBanner, styles.reviewBanner)}>
             {zh ? "来源登记余款为零。" : "La source indique un solde nul."}
           </div>

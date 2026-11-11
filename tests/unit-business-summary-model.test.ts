@@ -178,6 +178,35 @@ const input = (patch: Partial<Input> = {}): Input => ({
 const money = (amount: number, currency: "XOF" | "CNY" | "USD" = "XOF") => ({ currency, amount });
 
 describe("asset business financial summaries", () => {
+  it("keeps a historical parking balance outside verified purchase principal while retaining its source", () => {
+    const sold = sale();
+    const result = buildUnitBusinessSummaries(
+      input({
+        sales: [sold],
+        receivables: [
+          bill(1, sold, { amount_xof: 1000000, paid_amount_xof: 1000000, status: "paid" }),
+          bill(2, sold, {
+            category: "other",
+            title: "Synthetic parking balance",
+            amount_xof: 9000000,
+            paid_amount_xof: 0,
+            management_status: "historical_pending",
+            notes: "房款已结清，车位尾款已确认待收，未约定付款日",
+          }),
+        ],
+      }),
+    )[unit().id].sales[0];
+    expect(result.balance).toEqual({ basis: "verified_bills", amounts: [] });
+    expect(result.pendingBalanceNative).toEqual([money(9000000)]);
+    expect(result.pendingBalanceSources).toEqual([
+      expect.objectContaining({
+        category: "other",
+        title: "Synthetic parking balance",
+        notes: "房款已结清，车位尾款已确认待收，未约定付款日",
+        paymentDateUnspecified: true,
+      }),
+    ]);
+  });
   it("keeps buyer and tenant on their exact room and separates cash, bill allocations, deposits and commissions", () => {
     const sold = sale(),
       rented = lease();

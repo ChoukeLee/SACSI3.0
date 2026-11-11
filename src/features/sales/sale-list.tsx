@@ -794,7 +794,6 @@ export function SaleList({
         </div>
       )}
       <SaleRoomOverview
-        key={(requestedProjectId ?? "") + "/" + activeBuildingId}
         rows={roomOverview.rows}
         records={roomOverview.records}
         locale={locale}

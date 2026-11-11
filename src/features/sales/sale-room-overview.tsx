@@ -14,6 +14,12 @@ type AttentionFilter = "all" | "overdue" | "upcoming" | "review";
 
 function knownBalance(record: SaleRecordOverviewRow) {
   if (
+    record.pendingBalanceNative?.length &&
+    record.outstandingNative == null &&
+    !record.registeredBalance
+  )
+    return record.pendingBalanceNative;
+  if (
     record.registeredBalance &&
     record.registeredBalance.amount > 0 &&
     !record.outstandingNative?.length
@@ -23,13 +29,29 @@ function knownBalance(record: SaleRecordOverviewRow) {
 }
 
 function hasOutstanding(record: SaleRecordOverviewRow) {
-  return knownBalance(record)?.some((value) => value.amount > 0) === true;
+  return (
+    knownBalance(record)?.some((value) => value.amount > 0) === true ||
+    record.pendingBalanceNative?.some((value) => value.amount > 0) === true
+  );
 }
 
 function hasClearedBalance(row: SaleRoomOverviewRow) {
-  if (!row.record || needsReview(row)) return false;
+  if (!row.record || needsReview(row) || hasOutstanding(row.record)) return false;
   const values = knownBalance(row.record);
   return values !== null && values.every((value) => value.amount === 0);
+}
+
+function hasMaterialReview(record: SaleRecordOverviewRow) {
+  return (
+    record.conflict ||
+    record.reviewReasons.some(
+      (reason) =>
+        !["historical_balance_requires_review", "payment_arrangement_requires_review"].includes(
+          reason,
+        ),
+    ) ||
+    (record.attention?.kind === "review" && !record.reviewReasons.length)
+  );
 }
 
 function needsReview(row: SaleRoomOverviewRow) {
@@ -66,6 +88,16 @@ function amounts(values: SaleRecordOverviewRow["receivedNative"], locale: Locale
 function attentionLabel(record: SaleRecordOverviewRow, locale: Locale) {
   const zh = locale === "zh",
     value = record.attention;
+  if (record.pendingBalanceNative?.length && hasMaterialReview(record))
+    return zh ? "出售资料待核" : "Vente à vérifier";
+  if (record.pendingBalanceNative?.length && !record.conflict)
+    return record.pendingBalanceSources?.every((source) => source.paymentDateUnspecified)
+      ? zh
+        ? "登记待收 · 未约定付款日"
+        : "Solde enregistré · date non convenue"
+      : zh
+        ? "登记待收 · 付款安排待补"
+        : "Solde enregistré · modalités à compléter";
   if (value?.kind === "overdue") return zh ? "已逾期" : "En retard";
   if (value?.kind === "upcoming")
     return value.days === 0
@@ -372,15 +404,28 @@ export function SaleRoomOverview({
                 </small>
               </>
             ) : (
-              <small>
-                {record.attention?.amounts.length
-                  ? amounts(record.attention.amounts, locale)
-                  : hasOutstanding(record)
-                    ? amounts(knownBalance(record)!, locale)
-                    : record.attention
-                      ? text("金额待核", "Montant à vérifier")
-                      : ""}
-              </small>
+              <>
+                <small>
+                  {record.attention?.amounts.length
+                    ? amounts(record.attention.amounts, locale)
+                    : knownBalance(record)?.some((value) => value.amount > 0)
+                      ? amounts(knownBalance(record)!, locale)
+                      : record.pendingBalanceNative?.length
+                        ? `${text("登记待收出售款", "Solde de vente enregistré")} ${amounts(record.pendingBalanceNative, locale)}`
+                        : record.attention
+                          ? text("金额待核", "Montant à vérifier")
+                          : ""}
+                </small>
+                {record.pendingBalanceNative?.length &&
+                (record.attention?.amounts.length ||
+                  (knownBalance(record) !== record.pendingBalanceNative &&
+                    knownBalance(record)?.some((value) => value.amount > 0))) ? (
+                  <small>
+                    {text("登记待收出售款", "Solde de vente enregistré")}{" "}
+                    {amounts(record.pendingBalanceNative, locale)}
+                  </small>
+                ) : null}
+              </>
             )}
           </span>
           <ArrowRight size={15} aria-hidden="true" />
@@ -587,7 +632,15 @@ export function SaleRoomOverview({
             {floor.rows.map((row) => {
               const record = row.record;
               const attention = record ? attentionLabel(record, locale) : null;
-              const cardAttention = needsReview(row) ? text("待核", "À vérifier") : attention;
+              const cardAttention = record?.pendingBalanceNative?.length
+                ? attention
+                : needsReview(row)
+                  ? text("待核", "À vérifier")
+                  : attention;
+              const pendingBalanceShown =
+                record?.pendingBalanceNative?.length &&
+                record.outstandingNative == null &&
+                !record.registeredBalance;
               const registeredBalanceShown =
                 record?.registeredBalance &&
                 (record.outstandingNative == null ||
@@ -652,28 +705,41 @@ export function SaleRoomOverview({
                     <span>{text("未收", "Restant")}</span>
                     <strong
                       title={
-                        registeredBalanceShown
-                          ? `${text("Excel登记余款，不等同于已核应收；依据：", "Solde enregistré dans Excel, distinct des créances vérifiées ; source : ")}${record!.registeredBalance!.sourceRef}`
-                          : record?.outstandingNative == null
-                            ? text(
-                                "现有资料不足，未据总价减已收推算余款。",
-                                "Données insuffisantes ; aucun solde déduit du prix moins les encaissements.",
-                              )
-                            : text(
-                                "仅已核账单的未收余额，不代表全部房款余款。",
-                                "Solde des seules créances vérifiées, distinct du reste du prix du bien.",
-                              )
+                        pendingBalanceShown
+                          ? text(
+                              "既有历史登记账单余额，含车位等出售相关款；不作为已核管理应收，旧日期不作为付款约定。",
+                              "Soldes d’anciennes écritures, y compris les frais liés à la vente ; ni créances gérées ni dates de paiement convenues.",
+                            )
+                          : registeredBalanceShown
+                            ? `${text("Excel登记余款，不等同于已核应收；依据：", "Solde enregistré dans Excel, distinct des créances vérifiées ; source : ")}${record!.registeredBalance!.sourceRef}`
+                            : record?.outstandingNative == null
+                              ? text(
+                                  "现有资料不足，未据总价减已收推算余款。",
+                                  "Données insuffisantes ; aucun solde déduit du prix moins les encaissements.",
+                                )
+                              : text(
+                                  "仅已核账单的未收余额，不代表全部房款余款。",
+                                  "Solde des seules créances vérifiées, distinct du reste du prix du bien.",
+                                )
                       }
                     >
-                      {registeredBalanceShown
-                        ? `${amounts([record!.registeredBalance!], locale)}${text("（登记）", " (enregistré)")}`
-                        : record?.outstandingNative == null
-                          ? text("待核", "À vérifier")
-                          : record.outstandingNative.length
-                            ? `${amounts(record.outstandingNative, locale)}${text("（账单）", " (factures)")}`
-                            : text("账单结清", "Factures soldées")}
+                      {pendingBalanceShown
+                        ? `${amounts(record!.pendingBalanceNative!, locale)}${text("（登记待收）", " (enregistré)")}`
+                        : registeredBalanceShown
+                          ? `${amounts([record!.registeredBalance!], locale)}${text("（登记）", " (enregistré)")}`
+                          : record?.outstandingNative == null
+                            ? text("待核", "À vérifier")
+                            : record.outstandingNative.length
+                              ? `${amounts(record.outstandingNative, locale)}${text("（账单）", " (factures)")}`
+                              : text("账单结清", "Factures soldées")}
                     </strong>
                   </span>
+                  {record?.pendingBalanceNative?.length && !pendingBalanceShown ? (
+                    <span className={styles.fact}>
+                      <span>{text("登记待收出售款", "Solde de vente enregistré")}</span>
+                      <strong>{amounts(record.pendingBalanceNative, locale)}</strong>
+                    </span>
+                  ) : null}
                   <span className={styles.cardFooter}>
                     <span
                       className={cn(
@@ -684,11 +750,16 @@ export function SaleRoomOverview({
                             ? styles.overdueStatus
                             : record?.attention?.kind === "upcoming"
                               ? styles.upcomingStatus
-                              : record?.attention?.kind === "review" || record?.reviewReasons.length
-                                ? styles.reviewStatus
-                                : record && hasOutstanding(record)
-                                  ? styles.upcomingStatus
-                                  : null,
+                              : record?.pendingBalanceNative?.length
+                                ? hasMaterialReview(record)
+                                  ? styles.reviewStatus
+                                  : styles.upcomingStatus
+                                : record?.attention?.kind === "review" ||
+                                    record?.reviewReasons.length
+                                  ? styles.reviewStatus
+                                  : record && hasOutstanding(record)
+                                    ? styles.upcomingStatus
+                                    : null,
                       )}
                     >
                       {row.conflict

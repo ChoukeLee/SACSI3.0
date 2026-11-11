@@ -118,3 +118,56 @@ it("keeps cash failure unavailable and retains the original all-date ledger rout
   expect(history.getAttribute("href")).toContain("kind=ledger");
   expect(history.getAttribute("href")).not.toContain("dateFrom");
 });
+it.each([
+  ["zh", "deposit_in", "押金收入"],
+  ["zh", "deposit_out", "退还押金"],
+  ["fr", "deposit_in", "Dépôt reçu"],
+  ["fr", "deposit_out", "Dépôt remboursé"],
+] as const)(
+  "labels operating deposits and keeps the source fingerprint collapsed in %s %s",
+  async (locale, kind, expectedLabel) => {
+    const source = props();
+    const description =
+      "B05 已收到两个月押金；sha256:" +
+      "a".repeat(64) +
+      ":file:租金截止表.xlsx:sheet:孵化园:cell:D35";
+    source.actualCash!.rows = [
+      {
+        ...source.actualCash!.rows[0],
+        id: "operation:b05",
+        category: "deposit",
+        kind,
+        cashDirection: kind === "deposit_in" ? "in" : "out",
+        assetLabel: "孵化园 B05",
+        amountNative: 63840,
+        currency: "CNY",
+        ledgerId: null,
+        paymentId: null,
+        operatingAssetId: "b05",
+        description,
+      },
+    ];
+    await act(async () => root.render(<FinanceActualCashWorkbench {...source} locale={locale} />));
+    expect(host.querySelector("tbody")?.textContent).toContain(expectedLabel);
+    expect(host.querySelector("tbody")?.textContent).not.toContain("其他业务");
+    await act(async () => host.querySelector<HTMLButtonElement>("tbody button")!.click());
+    const aside = host.querySelector("aside")!;
+    const proof = [...aside.querySelectorAll<HTMLDetailsElement>("details")].find(
+      (detail) =>
+        detail.querySelector("summary")?.textContent ===
+        (locale === "zh" ? "来源与原文" : "Source et texte intégral"),
+    )!;
+    expect(proof.open).toBe(false);
+    expect(proof.textContent).toContain(description);
+    expect(
+      [...aside.querySelectorAll("p")]
+        .filter((note) => !note.closest("details"))
+        .map((note) => note.textContent),
+    ).toContain("B05 已收到两个月押金");
+    expect(
+      [...aside.querySelectorAll("p")]
+        .filter((note) => !note.closest("details"))
+        .some((note) => note.textContent?.includes("sha256")),
+    ).toBe(false);
+  },
+);

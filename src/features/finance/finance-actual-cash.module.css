@@ -347,6 +347,13 @@
   color: #285dd5;
   margin-bottom: 14px;
 }
+.sourceText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+  line-height: 1.7;
+}
 @media (max-width: 760px) {
   .toolbar .search {
     flex-basis: 100%;

@@ -150,7 +150,10 @@ async function render(
   data = saleFixture(),
   initialContract?: string,
   capabilities: Partial<
-    Pick<ComponentProps<typeof SaleList>, "canRecordFinance" | "canManage" | "canTerminate">
+    Pick<
+      ComponentProps<typeof SaleList>,
+      "canRecordFinance" | "canManage" | "canTerminate" | "initialFollowup"
+    >
   > = {},
   locale: "zh" | "fr" = "zh",
 ) {
@@ -758,6 +761,29 @@ it("ignores an aborted old detail response returned by the transport after a new
   expect(inspector()?.textContent).toContain("65.4321 万西法");
   expect(inspector()?.textContent).not.toContain("12.3456 万西法");
 });
+it("consumes the initial tail-follow-up intent and preserves a user's filter across building changes", async () => {
+  window.history.replaceState({}, "", "/sales?saleFollowup=unpaid");
+  await render(saleFixture(), undefined, { initialFollowup: true });
+  const filter = (label: string) =>
+    [...host.querySelectorAll<HTMLButtonElement>("button")].find((entry) =>
+      entry.textContent?.startsWith(label),
+    )!;
+  expect(filter("待收尾款").getAttribute("aria-pressed")).toBe("true");
+  await click(filter("全部出售"));
+  await render(
+    saleFixture(
+      parseWorkspaceQuery({
+        projectId: workspaceProject,
+        buildingId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      }),
+    ),
+    undefined,
+    { initialFollowup: true },
+  );
+  expect(filter("全部出售").getAttribute("aria-pressed")).toBe("true");
+  expect(new URL(window.location.href).searchParams.get("saleFollowup")).toBeNull();
+});
+
 it("clears preview and drawer before a changed scope request returns", async () => {
   await render();
   await click(buttons()[0]);

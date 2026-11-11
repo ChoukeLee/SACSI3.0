@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SaleWorkbenchInspector } from "@/features/sales/sale-workbench-inspector";
 import { saleFixture } from "./fixtures/sale-workbench";
 import { workspaceContract } from "./fixtures/contract-workspace";
-import type { PaymentRow, SaleContractRow } from "@/types/database";
+import type { PaymentRow, SaleContractRow, ReceivableRow } from "@/types/database";
 
 let host: HTMLDivElement, root: Root;
 beforeEach(() => {
@@ -48,6 +48,50 @@ async function paymentSource(id: string) {
   expect(row).toBeTruthy();
   await act(async () => row!.querySelector<HTMLButtonElement>("button")!.click());
 }
+it("shows registered historical sale and parking balances without promoting the old date to overdue", async () => {
+  const data = saleFixture(undefined, "detail", 1);
+  const contract = data.contracts[0] as SaleContractRow;
+  const unit = data.units.find((entry) => entry.id === contract.unit_id)!;
+  data.receivables = [
+    {
+      id: "77777777-7777-4777-8777-777777777777",
+      source_type: "sale_contract",
+      source_id: contract.id,
+      unit_id: unit.id,
+      building_id: unit.building_id,
+      customer_id: contract.customer_id,
+      category: "sale_lump_sum",
+      title: "出售及车位登记款",
+      currency: "XOF",
+      amount_xof: 115000000,
+      paid_amount_xof: 106000000,
+      amount_native: null,
+      paid_amount_native: null,
+      due_date: "2023-01-01",
+      status: "overdue",
+      management_status: "historical_pending",
+      notes: "【车位尾款已确认待收】用户确认未约定付款日。source-private-hash",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+    } as ReceivableRow,
+  ];
+  await render({ data });
+  expect(fact("登记待收出售款")).toBe("900 万西法");
+  expect(host.textContent).toContain("登记待收，未约定付款日");
+  const evidence = disclosure("登记待收依据")!;
+  expect(evidence.open).toBe(false);
+  expect(evidence.textContent).toContain("source-private-hash");
+  expect(
+    [...host.querySelectorAll("p")]
+      .filter(visible)
+      .some((entry) => entry.textContent?.includes("source-private-hash")),
+  ).toBe(false);
+  expect(
+    [...host.querySelectorAll("p")]
+      .filter(visible)
+      .some((entry) => entry.textContent?.includes("已有已核逾期款")),
+  ).toBe(false);
+});
 function fact(name: string) {
   return [...host.querySelectorAll("dt")].find((item) => item.textContent === name)
     ?.nextElementSibling?.textContent;

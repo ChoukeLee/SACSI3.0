@@ -17,6 +17,13 @@ export interface SaleCurrencyAmount {
 export interface SaleRegisteredBalance extends SaleCurrencyAmount {
   sourceRef: string;
 }
+export interface SalePendingBalanceSource extends SaleCurrencyAmount {
+  id: string;
+  category: string;
+  title: string;
+  notes: string | null;
+  paymentDateUnspecified: boolean;
+}
 export interface SaleRecordAttention {
   kind: "overdue" | "upcoming" | "review" | "unsettled";
   dueDate: string | null;
@@ -35,6 +42,9 @@ export interface SaleRecordOverviewRow {
   priceXof: number | null;
   priceNative?: SaleCurrencyAmount | null;
   registeredBalance?: SaleRegisteredBalance | null;
+  /** Existing historical-pending bill balances, not managed principal or an agreed due date. */
+  pendingBalanceNative?: SaleCurrencyAmount[];
+  pendingBalanceSources?: SalePendingBalanceSource[];
   receivedNative: SaleCurrencyAmount[];
   outstandingNative: SaleCurrencyAmount[] | null;
   attention: SaleRecordAttention | null;
@@ -103,6 +113,60 @@ function totals(rows: { currency: CurrencyCode; amount: number }[]): SaleCurrenc
   return [...values]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([currency, amount]) => ({ currency, amount: amount / 100 }));
+}
+
+/** Preserve stored bill balances without turning old imported dates into payment agreements. */
+export function buildSalePendingBalanceSummary(
+  contract: SaleContractRow,
+  unit: WorkspaceUnit,
+  receivables: readonly ReceivableRow[],
+) {
+  const sources: SalePendingBalanceSource[] = [];
+  const ids = new Set<string>();
+  for (const row of receivables) {
+    if (
+      row.source_type !== "sale_contract" ||
+      row.source_id !== contract.id ||
+      row.management_status !== "historical_pending" ||
+      row.status === "cancelled"
+    )
+      continue;
+    if (ids.has(row.id)) return { pendingBalanceNative: [], pendingBalanceSources: [] };
+    ids.add(row.id);
+    const native = row.currency !== "XOF";
+    const amount = cents(native ? row.amount_native : row.amount_xof);
+    const paid = cents(native ? row.paid_amount_native : row.paid_amount_xof);
+    if (
+      !["pending", "partial", "paid", "overdue"].includes(row.status) ||
+      !currencies.includes(row.currency) ||
+      amount === null ||
+      paid === null ||
+      paid > amount ||
+      (row.status === "paid" && paid !== amount) ||
+      (row.unit_id !== null && row.unit_id !== unit.id) ||
+      (row.building_id !== null && row.building_id !== unit.building_id) ||
+      (row.customer_id !== null && row.customer_id !== contract.customer_id)
+    )
+      continue;
+    if (amount === paid) continue;
+    const notes = typeof row.notes === "string" ? row.notes : null;
+    sources.push({
+      id: row.id,
+      category: row.category,
+      title: row.title,
+      currency: row.currency as CurrencyCode,
+      amount: (amount - paid) / 100,
+      notes,
+      paymentDateUnspecified:
+        !!notes && /尾款付款安排未约定|未约定付款日|暂无付款日|暂无明确付款日/.test(notes),
+    });
+  }
+  return {
+    pendingBalanceNative: totals(
+      sources.map((source) => ({ currency: source.currency, amount: cents(source.amount)! })),
+    ),
+    pendingBalanceSources: sources,
+  };
 }
 
 /** Registered total, independent of receipts and receivable allocations. */
@@ -458,6 +522,7 @@ export function buildSaleRecordOverview(input: SaleRoomOverviewInput): SaleRecor
     if (contract.signed_date && contract.signed_date > input.today)
       reviewReasons.push("future_registered_record");
     const financial = finance(contract, unit, historical, input, reviewReasons);
+    const pendingBalance = buildSalePendingBalanceSummary(contract, unit, input.receivables ?? []);
     return [
       {
         id: contract.id,
@@ -471,6 +536,7 @@ export function buildSaleRecordOverview(input: SaleRoomOverviewInput): SaleRecor
         priceNative: saleRegisteredPrice(contract),
         registeredBalance,
         ...financial,
+        ...pendingBalance,
         reviewReasons: [...new Set(reviewReasons)],
       },
     ];

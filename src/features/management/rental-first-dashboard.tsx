@@ -80,7 +80,7 @@ export function RentalFirstDashboard({
         </header>
         {list.length ? (
           <ul className={styles.followList}>
-            {list.slice(0, 3).map((row) => (
+            {list.slice(0, 2).map((row) => (
               <li key={row.id}>
                 <Link href={row.href} prefetch={false} className={styles.followRow}>
                   <span className={styles.party}>
@@ -110,7 +110,7 @@ export function RentalFirstDashboard({
               : text("当前没有此类租金跟进。", "Aucun loyer à suivre dans cette catégorie.")}
           </p>
         )}
-        {list.length > 3 ? (
+        {list.length > 2 ? (
           <Link
             className={styles.moreLink}
             href={`${followup}#lease-collection-${status}`}
@@ -155,7 +155,11 @@ export function RentalFirstDashboard({
       ) : null}
       <section aria-label={text("月度实际收支", "Encaissements et dépenses du mois")}>
         <div className={styles.cashHeading}>
-          <h2>{text("月度收支", "Flux du mois")}</h2>
+          <h2>
+            {data.month === today.slice(0, 7)
+              ? text("本月收支", "Flux du mois")
+              : text("月度收支", "Flux mensuels")}
+          </h2>
           <form action={routeFor(locale, "/management")} method="get" className={styles.period}>
             <input type="hidden" name="project" value={projectId} />
             <label>
