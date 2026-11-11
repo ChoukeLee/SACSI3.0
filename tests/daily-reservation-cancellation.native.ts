@@ -296,10 +296,26 @@ it.each([
 
 it("keeps pending cleaning and cancels only the reservation's receivable", async () => {
   const f = await seed({ role: "front_desk", unitStatus: "cleaning_pending" });
+  const otherBooking = randomUUID();
+  const otherReceivable = randomUUID();
+  await db.query(
+    `insert into public.daily_bookings
+      (id,unit_id,customer_id,booking_agent_id,check_in,check_out,nightly_price_xof,total_amount_xof,final_amount_xof,status)
+     values($1,$2,$3,$3,current_date+2,current_date+3,40000,40000,40000,'confirmed')`,
+    [otherBooking, f.unit, f.customer],
+  );
+  await db.query(
+    `insert into public.receivables
+      (id,building_id,unit_id,customer_id,source_type,source_id,category,title,due_date,amount_xof)
+     values($1,$2,$3,$4,'daily_booking',$5,'daily_rental','Next reservation',current_date+2,40000)`,
+    [otherReceivable, f.building, f.unit, f.customer, otherBooking],
+  );
   await db.query("insert into public.cleaning_tasks(unit_id,is_completed) values($1,false)", [
     f.unit,
   ]);
   const before = await state(f);
+  const other = { ...f, booking: otherBooking, receivable: otherReceivable };
+  const otherBefore = await state(other);
   await login(f.actor);
   await cancel(f);
   const after = await state(f);
@@ -310,4 +326,7 @@ it("keeps pending cleaning and cancels only the reservation's receivable", async
     audit: [{ metadata: { next_status: "cleaning_pending" } }],
   });
   expect(after.cleaning).toEqual(before.cleaning);
+  const otherAfter = await state(other);
+  expect(otherAfter.booking).toEqual(otherBefore.booking);
+  expect(otherAfter.receivable).toEqual(otherBefore.receivable);
 });
