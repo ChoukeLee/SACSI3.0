@@ -1,3 +1,4 @@
+import { isNonCashLedgerCategory } from "@/lib/display-labels";
 import type { LedgerEntryRow, BuildingRow, UnitRow } from "@/types/database";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -18,6 +19,7 @@ export function aggregatePnlMonthly(entries: LedgerEntryRow[], months: string[])
   const income = months.map(() => 0);
   const expense = months.map(() => 0);
   for (const e of entries) {
+    if (isNonCashLedgerCategory(e.category)) continue;
     const idx = months.indexOf(e.entry_date.slice(0, 7));
     if (idx < 0) continue;
     if (e.direction === "income") income[idx] += Number(e.amount_xof);
@@ -44,6 +46,7 @@ export function aggregatePnlByBuilding(
   const map = new Map<string | null, { income: number; expense: number }>();
 
   for (const e of entries) {
+    if (isNonCashLedgerCategory(e.category)) continue;
     const bid = e.building_id ?? (e.unit_id ? (unitBuilding.get(e.unit_id) ?? null) : null);
     const g = map.get(bid) ?? { income: 0, expense: 0 };
     if (e.direction === "income") g.income += Number(e.amount_xof);
@@ -73,7 +76,7 @@ export function aggregateByCategory(
 ): CategoryBreakdown[] {
   const map = new Map<string, number>();
   for (const e of entries) {
-    if (e.direction !== direction) continue;
+    if (e.direction !== direction || isNonCashLedgerCategory(e.category)) continue;
     map.set(e.category, (map.get(e.category) ?? 0) + Number(e.amount_xof));
   }
   return [...map.entries()]

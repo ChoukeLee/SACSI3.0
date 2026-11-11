@@ -3,6 +3,222 @@
   gap: 1.25rem;
   container: lease-room-overview / inline-size;
 }
+.compactOverview {
+  gap: 0.95rem;
+}
+.browseControls {
+  display: grid;
+  gap: 0.6rem;
+}
+.browseHeader,
+.browseTitle,
+.browseActions,
+.browseBuildings,
+.browseFilters {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.75rem;
+}
+.browseHeader {
+  justify-content: space-between;
+}
+.browseTitle h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.browseTitle > span {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+.browseBuildings {
+  gap: 0.35rem;
+}
+.browseFilters {
+  gap: 0.4rem;
+}
+.browseBuildings button,
+.browseFilters button,
+.browseHistory {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.55rem;
+  background: hsl(var(--card));
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+}
+.browseBuildings button:hover,
+.browseFilters button:hover,
+.browseHistory:hover,
+.browseBuildings button[aria-current="true"],
+.browseFilters button[aria-pressed="true"],
+.browseHistory[aria-expanded="true"] {
+  border-color: transparent;
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+.browseBuildings button:disabled {
+  opacity: 0.6;
+}
+.browseFilters button span {
+  font-variant-numeric: tabular-nums;
+}
+.apartmentBrowse .compactRoom {
+  border: 1px solid hsl(var(--border));
+  border-inline-start: 3px solid var(--lease-room-ink, transparent);
+  background: hsl(var(--card));
+}
+.apartmentBrowse .compactRoom:hover,
+.apartmentBrowse .compactRoom[aria-pressed="true"] {
+  border-color: hsl(var(--ring) / 0.72);
+}
+.compactFloor > header {
+  margin-bottom: 0.5rem;
+  padding: 0.45rem 0.1rem;
+  border-bottom: 1px solid hsl(var(--border) / 0.8);
+}
+.compactRoomGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
+  gap: 0.55rem;
+}
+.compactRoom {
+  display: grid;
+  container: lease-room-card / inline-size;
+  min-width: 0;
+  grid-template-rows: 1.375rem auto;
+  align-content: start;
+  gap: 0.25rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--lease-room-border, hsl(var(--border)));
+  border-radius: 0.5rem;
+  background: var(--lease-room-surface, hsl(var(--card)));
+  color: hsl(var(--foreground));
+  text-align: left;
+}
+.compactRoom:hover,
+.compactRoom[aria-pressed="true"] {
+  border-color: hsl(var(--ring) / 0.72);
+}
+.compactRoom:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.compactIdentity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.45rem;
+}
+.compactIdentity strong,
+.compactIdentity > span,
+.compactIdentity small,
+.compactPaidThrough,
+.compactAttention {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.compactIdentity strong {
+  max-inline-size: 40%;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.compactIdentity > span {
+  flex: 1 1 auto;
+}
+.compactIdentity > span,
+.compactPaidThrough {
+  min-width: 0;
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+.compactIdentity small,
+.compactPaidThrough {
+  color: hsl(var(--muted-foreground));
+}
+.compactIdentity small {
+  max-inline-size: 40%;
+  flex: none;
+  font-size: 0.75rem;
+}
+.compactRoomFacts {
+  display: grid;
+  min-width: 0;
+  grid-template: var(--lease-room-facts, repeat(2, 1.375rem) / minmax(0, 1fr));
+  align-items: center;
+  column-gap: 0.35rem;
+}
+@container lease-room-card (min-width: 13rem) {
+  .compactRoomFacts:lang(zh) {
+    --lease-room-facts: 1.375rem / minmax(0, 1fr) fit-content(45%);
+  }
+}
+@container lease-room-card (min-width: 15rem) {
+  .compactRoomFacts {
+    --lease-room-facts: 1.375rem / minmax(0, 1fr) fit-content(45%);
+  }
+}
+.compactPaidThrough time {
+  color: hsl(var(--foreground));
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.compactAttention {
+  max-inline-size: 100%;
+  justify-self: start;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  background: var(--lease-room-badge, hsl(var(--muted)));
+  color: var(--lease-room-ink, hsl(var(--muted-foreground)));
+  font-size: 0.75rem;
+  font-weight: 550;
+  line-height: 1rem;
+}
+.compactRoom[data-follow-up="overdue"] {
+  --lease-room-border: #e5afaa;
+  --lease-room-surface: #fff6f5;
+  --lease-room-badge: #ffe6e3;
+  --lease-room-ink: #97352f;
+}
+.compactRoom[data-follow-up="upcoming"] {
+  --lease-room-border: #b6cbe9;
+  --lease-room-surface: #f5f8fe;
+  --lease-room-badge: #e4efff;
+  --lease-room-ink: #325b9b;
+}
+.compactRoom[data-follow-up="review"] {
+  --lease-room-border: #e2c995;
+  --lease-room-surface: #fffbef;
+  --lease-room-badge: #f8edcf;
+  --lease-room-ink: #77501c;
+}
+:global(.dark) .compactRoom[data-follow-up="overdue"] {
+  --lease-room-border: #774740;
+  --lease-room-surface: #392322;
+  --lease-room-badge: #54302d;
+  --lease-room-ink: #ffbbb4;
+}
+:global(.dark) .compactRoom[data-follow-up="upcoming"] {
+  --lease-room-border: #455d81;
+  --lease-room-surface: #212d41;
+  --lease-room-badge: #324666;
+  --lease-room-ink: #bed6ff;
+}
+:global(.dark) .compactRoom[data-follow-up="review"] {
+  --lease-room-border: #78623a;
+  --lease-room-surface: #362e22;
+  --lease-room-badge: #51412a;
+  --lease-room-ink: #f2d4a0;
+}
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -389,6 +605,9 @@
   }
 }
 @media (pointer: coarse) {
+  .browseBuildings button,
+  .browseFilters button,
+  .browseHistory,
   .filters button,
   .followupButton,
   .search {

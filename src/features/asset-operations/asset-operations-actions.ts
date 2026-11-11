@@ -65,6 +65,10 @@ async function submit(
     return { ok: false, error: "assetOperationResultUnknown", rejected: false };
   revalidatePath("/asset-operations");
   revalidatePath("/fr/asset-operations");
+  revalidatePath("/units");
+  revalidatePath("/fr/units");
+  revalidatePath("/leases");
+  revalidatePath("/fr/leases");
   const data = result.data.data;
   return {
     ok: true,

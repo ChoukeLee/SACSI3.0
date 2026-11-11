@@ -93,10 +93,13 @@ function daysInUtcMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 }
 
-function addAnchoredUtcMonths(date: string, months: number): string {
+export function addAnchoredUtcMonths(date: string, months: number, anchorDay?: number): string {
   const [year, month, day] = date.split("-").map(Number);
   const target = new Date(Date.UTC(year, month - 1 + months, 1));
-  const targetDay = Math.min(day, daysInUtcMonth(target.getUTCFullYear(), target.getUTCMonth()));
+  const targetDay = Math.min(
+    anchorDay ?? day,
+    daysInUtcMonth(target.getUTCFullYear(), target.getUTCMonth()),
+  );
   target.setUTCDate(targetDay);
   return target.toISOString().slice(0, 10);
 }
@@ -105,13 +108,18 @@ function addAnchoredUtcMonths(date: string, months: number): string {
  * Count every rent period that has started, using the first uncovered day as
  * the monthly anchor. A partly elapsed period counts as a full period.
  */
-export function countStartedLeasePeriods(firstUncoveredDate: string, throughDate: string): number {
+export function countStartedLeasePeriods(
+  firstUncoveredDate: string,
+  throughDate: string,
+  anchorDay?: number,
+): number {
   if (firstUncoveredDate > throughDate) return 0;
 
   const [startYear, startMonth] = firstUncoveredDate.split("-").map(Number);
   const [throughYear, throughMonth] = throughDate.split("-").map(Number);
   let monthOffset = (throughYear - startYear) * 12 + (throughMonth - startMonth);
-  if (addAnchoredUtcMonths(firstUncoveredDate, monthOffset) > throughDate) monthOffset -= 1;
+  if (addAnchoredUtcMonths(firstUncoveredDate, monthOffset, anchorDay) > throughDate)
+    monthOffset -= 1;
   return Math.max(0, monthOffset + 1);
 }
 

@@ -445,7 +445,7 @@ export function ReportsView({ data, locale }: { data: ReportWorkspaceData; local
                             </span>
                             <span className={styles.rowSecondary}>
                               {ledger
-                                ? directionDisplayLabel(String(row.direction), locale)
+                                ? directionDisplayLabel(String(row.direction), locale, row.category)
                                 : statusDisplayLabel(String(row.status), locale)}
                             </span>
                           </td>

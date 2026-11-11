@@ -6,6 +6,7 @@ import {
 
 export interface LeaseReceiptSummary {
   rentReceived: UnitBusinessMoney[] | null;
+  verifiedLegacyRentIds: ReadonlySet<string>;
   depositReceived: UnitBusinessMoney[] | null;
   depositReturned: UnitBusinessMoney[] | null;
   agencyReceived: UnitBusinessMoney[] | null;
@@ -47,6 +48,11 @@ export function summarizeLeaseReceiptKinds(
   };
   return {
     rentReceived,
+    verifiedLegacyRentIds: new Set(
+      cash.rows
+        .filter((row) => row.kind === "rent" && sourceTypes.get(row.id) === "lease_contract")
+        .map((row) => row.id),
+    ),
     depositReceived: cash.total("deposit"),
     depositReturned: bySource("lease_deposit_refund"),
     agencyReceived: cash.total("agency"),

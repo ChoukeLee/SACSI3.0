@@ -51,6 +51,7 @@ describe("lease receipts use the asset cash categories", () => {
     const result = summarizeLeaseReceiptKinds(contract, rows);
     expect(result).toEqual({
       rentReceived: [{ currency: "XOF", amount: 5200000 }],
+      verifiedLegacyRentIds: new Set(),
       depositReceived: [{ currency: "XOF", amount: 1300000 }],
       depositReturned: [{ currency: "XOF", amount: 260000 }],
       agencyReceived: [{ currency: "XOF", amount: 650000 }],

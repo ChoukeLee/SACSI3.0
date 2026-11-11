@@ -365,6 +365,33 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
     expect(host.querySelectorAll('[aria-label="原币租金账务"]')).toHaveLength(0);
   });
 
+  it("uses the verified rent purpose for legacy receipts in the payment table", async () => {
+    const legacy = payment({ source_type: "lease_contract", amount: 4_200_000 });
+    const ledger = {
+      id: "legacy-rent-ledger",
+      payment_id: legacy.id,
+      building_id: null,
+      unit_id: contract.unit_id,
+      entry_date: legacy.payment_date,
+      direction: "income" as const,
+      category: "lease_rent",
+      currency: "XOF" as const,
+      amount_xof: legacy.amount,
+      amount_cny: null,
+      description: null,
+      created_at: legacy.created_at,
+    };
+    const row = () => host.querySelector('tr[data-lease-payment-id="payment-1"]');
+    await render({ payments: [legacy], receiptLedger: [ledger] });
+    await tab("收付款");
+    expect(row()?.textContent).toContain("租金收入+420 万西法");
+    await viewPayment(legacy.id);
+    expect(host.querySelector('[aria-label="收付款依据"]')?.textContent).toContain("租金收入");
+
+    await render({ payments: [legacy], receiptLedger: [{ ...ledger, amount_xof: 1 }] });
+    expect(row()?.textContent).toContain("其他财务记录");
+  });
+
   it("keeps rent, deposits, fees and refunds separate in both the overview and payments tab", async () => {
     await render({
       payments: [
@@ -376,7 +403,13 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
         payment({ id: "other", source_type: "lease_other_income", amount: 250000 }),
         payment({ id: "other-paid", source_type: "lease_other_expense", amount: 25000 }),
         payment({ id: "rent-refund", source_type: "lease_rent_refund", amount: 100000 }),
-        payment({ id: "offset", payment_method: "offset", amount: 9000000 }),
+        payment({
+          id: "offset",
+          source_type: "lease_other_expense",
+          payment_method: "offset",
+          amount: 9000000,
+        }),
+        payment({ id: "void", source_type: "lease_duplicate_void", amount: 990000 }),
         payment({ id: "another-contract", source_id: "another-contract", amount: 99000000 }),
       ],
     });
@@ -397,7 +430,13 @@ describe("LeaseWorkbenchInspector single contract dossier", () => {
       expect(fact("已录押金实退")).toBeUndefined();
       expect(host.textContent).not.toContain("9,900 万西法");
     }
-    expect(host.querySelectorAll("tr[data-lease-payment-id]")).toHaveLength(9);
+    expect(host.querySelectorAll("tr[data-lease-payment-id]")).toHaveLength(10);
+    expect(host.querySelector('tr[data-lease-payment-id="offset"]')?.textContent).toContain(
+      "内部抵扣",
+    );
+    expect(host.querySelector('tr[data-lease-payment-id="void"]')?.textContent).toContain(
+      "重复登记已作废",
+    );
   });
 
   it("derives rent-only totals from fresh records and never carries them to another rental or read failure", async () => {

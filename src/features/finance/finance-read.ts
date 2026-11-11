@@ -1,3 +1,4 @@
+import { isNonCashLedgerCategory } from "@/lib/display-labels";
 import type { NativeCurrencySummary } from "@/lib/native-money";
 export type FinanceKind = "ledger" | "receivables";
 export type FinanceFilters = Record<string, string>;
@@ -123,7 +124,15 @@ export function financeCsv(result: FinanceReadResult) {
     "\uFEFF" +
     [
       columns.join(","),
-      ...result.rows.map((row) => columns.map((key) => cell(row[key])).join(",")),
+      ...result.rows.map((row) =>
+        columns
+          .map((key) =>
+            cell(
+              key === "direction" && isNonCashLedgerCategory(row.category) ? "non_cash" : row[key],
+            ),
+          )
+          .join(","),
+      ),
     ].join("\r\n")
   );
 }

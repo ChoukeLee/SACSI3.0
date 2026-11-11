@@ -46,6 +46,7 @@ export interface LeaseCollectionSuccess {
   paidThroughBefore: string | null;
   paidThroughAfter: string | null;
   coverage?: { throughDate: string; receivableIds: string[] };
+  nextRentReceivableId?: string;
   idempotent?: boolean;
 }
 

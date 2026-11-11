@@ -12,6 +12,10 @@ vi.mock("@/features/leases/actions", () => ({
 }));
 import { LeaseList } from "@/features/leases/lease-list";
 import {
+  leaseScopeCookieName,
+  leaseScopeStorageKey,
+} from "@/features/contracts/lease-scope-preference";
+import {
   groupLeaseBuildings,
   resolveBuildingScope,
   type LeaseBuilding,
@@ -40,6 +44,13 @@ const buildings: LeaseBuilding[] = [
     project_id: "a",
     project: { id: "a", code: "SACSI", display_name: "公寓" },
   },
+  {
+    id: "a7",
+    code: "SACSI7",
+    display_name: "7#公寓",
+    project_id: "a",
+    project: { id: "a", code: "SACSI", display_name: "公寓" },
+  },
 ];
 const units = buildings.map((b) => ({
   id: b.id,
@@ -57,12 +68,13 @@ const contracts = buildings.map((b, i) => ({
   id: b.id,
   unit_id: b.id,
   customer_id: b.id,
-  status: "active",
+  status: b.id === "a7" ? "terminated" : "active",
   start_date: "2026-01-01",
   expected_end_date: "2029-01-01",
   monthly_rent_xof: (i + 1) * 1000000,
   deposit_amount_xof: 3000000,
   paid_through_date: "2028-12-31",
+  ...(b.id === "a7" ? { actual_end_date: "2026-02-01" } : {}),
 })) as LeaseContractRow[];
 let root: Root;
 let host: HTMLDivElement;
@@ -78,11 +90,14 @@ afterEach(async () => {
   host.remove();
   vi.unstubAllGlobals();
 });
-async function render(initialProject?: string) {
+async function render(initialProject?: string, browseViewerId?: string) {
+  const cookieName = leaseScopeCookieName(browseViewerId);
   await act(async () =>
     root.render(
       <LeaseList
         initialProject={initialProject}
+        browseViewerId={browseViewerId}
+        scopePreference={cookieName ? { cookieName, serverResolved: false } : undefined}
         buildings={buildings}
         units={units}
         customers={customers}
@@ -171,6 +186,78 @@ it("supports the mobile building selector", async () => {
   });
   expect(host.textContent).toContain("客户c1");
   expect(host.textContent).not.toContain("客户c2");
+});
+
+it("combines apartment location with shared browsing and remembers the selected building", async () => {
+  const viewer = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  await render(undefined, viewer);
+  const toolbar = host.querySelector('[aria-label="长租浏览工具栏"]')!;
+  const select = toolbar.querySelector<HTMLSelectElement>('select[aria-label="选择项目或楼栋"]')!;
+  expect(select.value).toBe("a11");
+  expect(
+    Array.from(
+      toolbar.querySelectorAll('[aria-label="长租工作台"] a'),
+      (entry) => entry.textContent,
+    ),
+  ).toEqual(["公寓", "分单元出租", "整体出租", "收款跟进"]);
+  expect(host.querySelectorAll('input[type="search"]')).toHaveLength(1);
+  expect(toolbar.querySelector('a[href="/leases?assetCategory=followup"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="楼栋切换"] [aria-current="true"]')?.textContent).toBe(
+    "11#公寓",
+  );
+  expect(metric("查看历史")).toBe("查看历史");
+  const room = host.querySelector<HTMLButtonElement>('[data-room-id="a11"]')!;
+  expect(room.textContent).toContain("客户a11");
+  expect(room.querySelector("time")?.dateTime).toBe("2028-12-31");
+  expect(room.textContent).not.toMatch(/月租|万西法/);
+  expect(metric("全部租赁")).toBe("全部租赁 1");
+  expect(host.querySelector('select[aria-label="房源跟进筛选"]')).toBeNull();
+
+  const back = host.querySelector<HTMLButtonElement>('button[aria-label="返回全部楼栋"]')!;
+  await act(async () => back.click());
+  expect(host.querySelectorAll("[data-room-id]")).toHaveLength(0);
+  const index = host.querySelector('[aria-label="长租楼栋"]')!;
+  expect(index.textContent).toContain("11#公寓");
+  expect(index.textContent).toContain("1 间租赁房源");
+  expect(index.textContent).not.toContain("第二栋");
+  const historical = Array.from(index.querySelectorAll("button")).find((item) =>
+    item.textContent?.includes("7#公寓"),
+  )!;
+  expect(historical.textContent).toContain("仅历史租赁");
+  await act(async () => historical.click());
+  const history = Array.from(host.querySelectorAll("button")).find(
+    (item) => item.textContent === "查看历史",
+  )!;
+  await act(async () => history.click());
+  expect(host.querySelector('[aria-label="租赁记录查询"]')?.textContent).toContain("客户a7");
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('button[aria-label="返回全部楼栋"]')!.click(),
+  );
+  const building = Array.from(
+    host.querySelectorAll<HTMLButtonElement>('[aria-label="长租楼栋"] button'),
+  ).find((item) => item.textContent?.includes("11#公寓"))!;
+  await act(async () => building.click());
+  expect(host.querySelector('[data-room-id="a11"]')).not.toBeNull();
+  expect(document.activeElement?.textContent).toBe("11#公寓");
+
+  await act(async () => {
+    select.value = "c2";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(host.textContent).toContain("客户c2");
+  expect(host.textContent).not.toContain("客户c1");
+  expect(
+    JSON.parse(localStorage.getItem(leaseScopeStorageKey(leaseScopeCookieName(viewer)))!).buildings
+      .c,
+  ).toBe("c2");
+
+  await act(async () => root.unmount());
+  root = createRoot(host);
+  await render(undefined, viewer);
+  expect(host.querySelector<HTMLSelectElement>('select[aria-label="选择项目或楼栋"]')?.value).toBe(
+    "c2",
+  );
+  expect(host.querySelectorAll("[data-room-id]")).toHaveLength(1);
 });
 
 it("opens an explicit project link across all its buildings instead of restoring a different remembered project", async () => {

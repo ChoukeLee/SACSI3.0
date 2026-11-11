@@ -135,7 +135,7 @@ export function FinanceWorkbenchTable({
                     </span>
                     <span className={styles.cellSub}>
                       {ledger
-                        ? directionDisplayLabel(String(row.direction), locale)
+                        ? directionDisplayLabel(String(row.direction), locale, row.category)
                         : `${text("登记应收", "Dû enregistré")} ${money(value.amount)}`}
                     </span>
                     {ledger && String(row.direction).startsWith("liability") && (

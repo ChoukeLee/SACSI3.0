@@ -5,6 +5,7 @@ import type { CurrentUser, UserRole } from "@/lib/auth";
 // Data readers are synthetic; the real route guards and permission matrix run.
 const state = vi.hoisted(() => ({ user: null as CurrentUser | null, reads: vi.fn() }));
 vi.mock("server-only", () => ({}));
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock("@/lib/auth", async (original) => ({
   ...(await original<typeof import("@/lib/auth")>()),
   getCurrentUser: async () => state.user,

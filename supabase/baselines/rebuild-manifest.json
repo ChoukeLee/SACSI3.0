@@ -275,6 +275,30 @@
       "sha256": "2f9a9a986410080944f08e791f8db142599e5a22a995fdc422ed39dc60f51e58"
     },
     {
+      "file": "20261109184914_asset_operation_lease_evidence.sql",
+      "sha256": "4af659c75ed4011a819d6088ee5e17e603aa9325790e435070d56ddc1e26c422"
+    },
+    {
+      "file": "20261110001416_sale_internal_offset_reporting.sql",
+      "sha256": "317e5eee89e6dbe2e8176d7ad77b25a9f34ec57170cc980106f00dc35b42ed1d"
+    },
+    {
+      "file": "20261110003530_verified_sacsi11_monthly_rent_schedule.sql",
+      "sha256": "8815e4b8b65ba823f9e5ec119228ba786e9f3c7286a63a1adf1b89b77d1b0ef7"
+    },
+    {
+      "file": "20261110010134_lease_internal_offset_reporting.sql",
+      "sha256": "918b6ffef7a24d8a18079abb4ce03900c8fd4a9cd870e72fb07a933ef9ca2199"
+    },
+    {
+      "file": "20261110085444_verified_sacsi7_monthly_rent_schedule.sql",
+      "sha256": "91c5290d5f638fe09b98944b9933ec8dd909c2a741a1190a90048d11426f550b"
+    },
+    {
+      "file": "20261110161157_asset_operation_booked_xof.sql",
+      "sha256": "9175e5a33647e7d9f8aa066d348edef41197fd05d0232e9d61c0afe2a44e8a6a"
+    },
+    {
       "file": "20261110163000_daily_booking_notes.sql",
       "sha256": "61aa148a42a53d44308440009fc9139a2965a9ceedb433f6cf55c58ca8845cec"
     },

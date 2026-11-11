@@ -20,9 +20,14 @@ import {
   propertyPaymentDisplay,
 } from "@/lib/property-money";
 import { nativeLease, nativeReceivableSummary } from "@/lib/native-money";
+import { financialBusinessLabel } from "@/lib/display-labels";
 import { dictionaries, type Locale } from "@/lib/i18n";
 import type { PaymentRow, LeaseContractRow, ReceivableRow } from "@/types/database";
-import { getOriginalMonthlyRent, getRecordedOriginalPayment } from "./lease-display-model";
+import {
+  getOriginalMonthlyRent,
+  getRecordedOriginalPayment,
+  leaseTenantDisplayName,
+} from "./lease-display-model";
 import { getLeaseFinancialConfigBySourceType } from "./lease-financial-entry-types";
 import { NativeLeaseFinance } from "./native-lease-finance";
 import { summarizeLeaseReceiptKinds } from "./lease-receipt-summary";
@@ -305,7 +310,10 @@ export function LeaseRentalInspector({
           <>
             <div className={styles.rentalParty}>
               <span>{text("租客", "Locataire")}</span>
-              <strong>{customer?.name || text("租客待登记", "Locataire à compléter")}</strong>
+              <strong>
+                {leaseTenantDisplayName(unit, customer?.name) ||
+                  text("租客待登记", "Locataire à compléter")}
+              </strong>
               {customer?.phone ? <span>{customer.phone}</span> : null}
               <span className={styles.rentalState}>{status}</span>
             </div>
@@ -413,7 +421,12 @@ export function LeaseRentalInspector({
                 </p>
               ) : null}
             </section>
-            <RentalPaymentTable contract={contract} payments={ordered} locale={locale} />
+            <RentalPaymentTable
+              contract={contract}
+              payments={ordered}
+              locale={locale}
+              verifiedLegacyRentIds={receiptKinds.verifiedLegacyRentIds}
+            />
             <section className={styles.rentalSection}>
               <h3>{text("应收与付款安排", "Créances et échéances")}</h3>
               <NativeLeaseFinance
@@ -633,10 +646,12 @@ function RentalPaymentTable({
   contract,
   payments,
   locale,
+  verifiedLegacyRentIds,
 }: {
   contract: LeaseContractRow;
   payments: PaymentRow[];
   locale: Locale;
+  verifiedLegacyRentIds: ReadonlySet<string>;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const id = useId(),
@@ -649,24 +664,34 @@ function RentalPaymentTable({
     const line = classifyContractCashPayment(p),
       original = getRecordedOriginalPayment(p),
       display = propertyPaymentDisplay(p, locale),
-      config = getLeaseFinancialConfigBySourceType(p.source_type);
-    const label = allocation
-      ? allocation.adjustmentKind === "refund"
-        ? text("客户总账 · 本合同实际退款", "Compte client · remboursement réel de ce contrat")
-        : allocation.adjustmentKind === "reversal"
-          ? text(
-              "客户总账 · 本合同错误收款冲正（非现金）",
-              "Compte client · contrepassation d’erreur (hors caisse)",
-            )
-          : text("客户总账 · 本合同分配", "Compte client · part de ce contrat")
-      : config
-        ? text(config.labelZh, config.labelFr)
-        : p.source_type === "lease_deposit_deduction"
-          ? text("押金扣款", "Retenue sur dépôt")
-          : p.source_type === "lease_rent_refund"
-            ? text("租金退款", "Remboursement de loyer")
-            : (categories[p.source_type as keyof typeof categories] ??
-              text("其他财务记录", "Autre écriture"));
+      config = getLeaseFinancialConfigBySourceType(
+        verifiedLegacyRentIds.has(p.id) ? "lease_rent" : p.source_type,
+      );
+    const nonCashCategory =
+      p.source_type === "lease_duplicate_void"
+        ? p.source_type
+        : p.source_type === "lease_other_expense" && p.payment_method === "offset"
+          ? "lease_internal_offset"
+          : null;
+    const label = nonCashCategory
+      ? financialBusinessLabel(nonCashCategory, locale)
+      : allocation
+        ? allocation.adjustmentKind === "refund"
+          ? text("客户总账 · 本合同实际退款", "Compte client · remboursement réel de ce contrat")
+          : allocation.adjustmentKind === "reversal"
+            ? text(
+                "客户总账 · 本合同错误收款冲正（非现金）",
+                "Compte client · contrepassation d’erreur (hors caisse)",
+              )
+            : text("客户总账 · 本合同分配", "Compte client · part de ce contrat")
+        : config
+          ? text(config.labelZh, config.labelFr)
+          : p.source_type === "lease_deposit_deduction"
+            ? text("押金扣款", "Retenue sur dépôt")
+            : p.source_type === "lease_rent_refund"
+              ? text("租金退款", "Remboursement de loyer")
+              : (categories[p.source_type as keyof typeof categories] ??
+                text("其他财务记录", "Autre écriture"));
     const sign =
       allocation?.adjustmentKind || line.kind === "expense" || line.kind === "deposit_out"
         ? "−"
@@ -763,11 +788,13 @@ function RentalPaymentTable({
           ) : null}
           {detail.line.kind === "excluded" ? (
             <p>
-              {selected.native_settlement
-                ? detail.display.secondary
-                : detail.line.reason === "non_cash_offset"
-                  ? text("非现金抵扣，不计入现金", "Compensation hors caisse")
-                  : text("待核对，不计入现金", "À vérifier, exclu du cash")}
+              {detail.line.reason === "voided_duplicate"
+                ? text("重复登记已作废，保留原记录。", "Écriture en double annulée et conservée.")
+                : selected.native_settlement
+                  ? detail.display.secondary
+                  : detail.line.reason === "non_cash_offset"
+                    ? text("非现金抵扣，不计入现金", "Compensation hors caisse")
+                    : text("待核对，不计入现金", "À vérifier, exclu du cash")}
             </p>
           ) : detail.display.secondary || detail.original ? (
             <p>

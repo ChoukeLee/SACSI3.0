@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 const root = resolve(__dirname, "..");
 const ledger = readFileSync(resolve(root, "src/features/leases/lease-list.tsx"), "utf8");
+const frame = readFileSync(resolve(root, "src/features/leases/lease-workbench-frame.tsx"), "utf8");
 const loader = readFileSync(resolve(root, "src/features/leases/lease-lazy-view.tsx"), "utf8");
 const preview = readFileSync(
   resolve(root, "src/features/leases/use-lease-workbench-preview.ts"),
@@ -26,7 +27,8 @@ const migration = readFileSync(
 
 describe("lease ledger rules", () => {
   it("uses the selected workbench without replacing the shared page or full contract drawer", () => {
-    expect(ledger).toContain("<OperationalPage");
+    expect(frame).toContain("<OperationalPage");
+    expect(ledger).toContain("<LeaseWorkbenchFrame");
     expect(ledger).toContain("<LeaseWorkbenchTable");
     expect(ledger).toContain("<LeaseWorkbenchInspector");
     expect(ledger).toContain("<RightDrawer");

@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { fetchAssetOperations } from "./asset-operations-server";
 import { assetReportPeriod } from "./asset-operations-model";
 import { AssetOperationsWorkspace } from "./asset-operations-workspace";
+import { buildOperatingAssetDirectory } from "./operating-asset-directory-model";
 
 export async function AssetOperationsPage({ locale }: { locale: "zh" | "fr" }) {
   const user = await getCurrentUser();
@@ -28,9 +29,21 @@ export async function AssetOperationsPage({ locale }: { locale: "zh" | "fr" }) {
       </section>
     );
   }
+  const directory = buildOperatingAssetDirectory(data, {
+    includeCanonical: true,
+    sacsiProjectId: data.projectId,
+  });
   return (
     <AssetOperationsWorkspace
-      data={data}
+      data={{
+        ...data,
+        assets: directory.assets.map((asset) => ({
+          ...asset,
+          name: asset.displayName,
+          group: asset.displayGroup,
+        })),
+        entries: directory.entries,
+      }}
       locale={locale}
       today={today}
       initialPeriod={assetReportPeriod("month", today.slice(0, 7))}

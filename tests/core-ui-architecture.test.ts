@@ -37,13 +37,15 @@ describe("core UI architecture", () => {
 
   it("uses operating workspaces and inspectors while preserving the shared business drawers", () => {
     const lease = read("src/features/leases/lease-list.tsx");
+    const leaseFrame = read("src/features/leases/lease-workbench-frame.tsx");
     const sale = read("src/features/sales/sale-list.tsx");
     const units = read("src/features/units/unit-list.tsx");
     const assets = read("src/features/units/unit-workbench.tsx");
     const customers = read("src/features/customers/customer-workbench.tsx");
     const dailyPanel = read("src/features/daily-rentals/booking-panel.tsx");
 
-    expect(lease).toContain("<OperationalPage");
+    expect(leaseFrame).toContain("<OperationalPage");
+    expect(lease).toContain("<LeaseWorkbenchFrame");
     expect(lease).toContain("<RightDrawer");
     expect(lease).toContain("<LeaseWorkbenchTable");
     expect(lease).toContain("<LeaseWorkbenchInspector");

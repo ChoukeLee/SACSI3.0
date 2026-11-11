@@ -43,8 +43,7 @@ type NavKey =
   | "sales"
   | "finance"
   | "customers"
-  | "reports"
-  | "assetOperations";
+  | "reports";
 
 interface NavItem {
   key: NavKey;
@@ -70,7 +69,6 @@ const groups: NavGroup[] = [
       { key: "sales", href: "/sales", icon: Building2 },
       { key: "finance", href: "/finance", icon: WalletCards, activeMatch: "/finance" },
       { key: "units", href: "/units", icon: Building2, activeMatch: "/units" },
-      { key: "assetOperations", href: "/asset-operations", icon: ChartNoAxesCombined },
       {
         key: "dailyRentals",
         href: "/daily-rentals",

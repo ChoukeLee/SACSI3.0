@@ -655,6 +655,12 @@ describe("independent lease collection workbench", () => {
   });
 
   it("only submits the optional coverage proof after an explicit checkbox confirmation", async () => {
+    record.mockImplementationOnce(async (input) => {
+      const result = success(input);
+      return result.success
+        ? { ...result, nextRentReceivableId: "10000000-0000-4000-8000-000000000009" }
+        : result;
+    });
     await render();
     await validDraft();
     await click(checkbox("同时更新租金登记覆盖日期"));
@@ -674,6 +680,7 @@ describe("independent lease collection workbench", () => {
     )?.nextElementSibling;
     expect(after?.textContent).toBe("2026-09-30");
     expect(host.textContent).toContain("登记覆盖日期已按本次核实的完整账期同步");
+    expect(host.textContent).toContain("已生成下一期租金账单");
   });
 
   it("removes coverage opt-in whenever the allocation is edited", async () => {
