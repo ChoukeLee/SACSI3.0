@@ -79,13 +79,49 @@ function roomFacing(room: CimacApartmentRoom, locale: Locale) {
       : "Ouest";
 }
 
-function occupancyLabel(room: CimacApartmentRoom, locale: Locale) {
-  if (!room.registered) return locale === "zh" ? "未建档" : "Fiche à créer";
-  if (room.reservation?.status === "reserved") return locale === "zh" ? "已预留" : "Réservé";
-  if (room.occupancyState === "occupied") return locale === "zh" ? "业务占用" : "Occupation métier";
+function isDeliverable(room: CimacApartmentRoom) {
+  return (
+    room.registered &&
+    room.constructionStatus === "operational" &&
+    room.operationalCondition === "normal"
+  );
+}
+
+function deliveryLabel(room: CimacApartmentRoom, locale: Locale) {
+  const zh = locale === "zh";
+  if (!room.registered) return zh ? "资料待补充" : "À compléter";
+  if (room.operationalCondition === "locked") return zh ? "暂停交付" : "Livraison suspendue";
+  if (room.operationalCondition === "maintenance") return zh ? "维护中" : "En maintenance";
+  if (isDeliverable(room)) return zh ? "可交付" : "Livrable";
+  if (!room.constructionStatus || ["operational", "unverified"].includes(room.constructionStatus))
+    return zh ? "资料待补充" : "À compléter";
+  return constructionLabel(room.constructionStatus, locale);
+}
+
+function reservationLabel(
+  room: CimacApartmentRoom,
+  schemaAvailable: boolean | undefined,
+  locale: Locale,
+) {
+  const zh = locale === "zh";
+  if (!room.registered || schemaAvailable !== true) return zh ? "资料待补充" : "À compléter";
+  return room.reservation?.status === "reserved"
+    ? zh
+      ? "已预订"
+      : "Réservé"
+    : zh
+      ? "暂无预订"
+      : "Non réservé";
+}
+
+function businessRelationLabel(room: CimacApartmentRoom, locale: Locale) {
+  const zh = locale === "zh";
+  if (!room.registered) return zh ? "资料待补充" : "À compléter";
+  if (room.occupancyState === "occupied")
+    return zh ? "存在占用业务" : "Activité d’occupation existante";
   if (room.occupancyState === "unoccupied")
-    return locale === "zh" ? "无当前业务占用" : "Sans occupation métier actuelle";
-  return locale === "zh" ? "业务占用待核" : "Occupation métier à vérifier";
+    return zh ? "已核实无占用业务" : "Absence confirmée d’activité d’occupation";
+  return zh ? "资料待补充" : "À compléter";
 }
 
 function money(value: number, locale: Locale) {
@@ -99,38 +135,59 @@ function RoomButton({
   selected,
   locale,
   onSelect,
+  reservationSchemaAvailable,
   mobile = false,
 }: {
   room: CimacApartmentRoom;
   selected: boolean;
   locale: Locale;
   onSelect: (room: CimacApartmentRoom) => void;
+  reservationSchemaAvailable?: boolean;
   mobile?: boolean;
 }) {
   const type = locale === "zh" ? (room.bedrooms === 1 ? "一室" : "两室") : `${room.bedrooms} ch.`;
-  const reservation = room.reservation?.status === "reserved" ? room.reservation : null;
+  const zh = locale === "zh";
+  const reservation =
+    room.registered &&
+    reservationSchemaAvailable === true &&
+    room.reservation?.status === "reserved"
+      ? room.reservation
+      : null;
+  const delivery = deliveryLabel(room, locale);
+  const booking = reservationLabel(room, reservationSchemaAvailable, locale);
+  const stay = zh ? "资料待补充" : "À compléter";
   return (
     <button
       type="button"
       className={`${styles.room} ${room.bedrooms === 2 ? styles.twoBedrooms : ""} ${mobile ? styles.mobileRoom : ""} ${reservation ? styles.reservedRoom : ""}`}
       data-room={room.unitNo}
       aria-pressed={selected}
-      aria-label={`${room.unitNo} · ${roomType(room, locale)} · ${roomFacing(room, locale)} · ${occupancyLabel(room, locale)}${reservation ? ` · ${reservation.reserverName}` : ""}`}
+      aria-label={`${room.unitNo} · ${roomType(room, locale)} · ${roomFacing(room, locale)} · ${zh ? "交付" : "Livraison"}：${delivery} · ${zh ? "预订" : "Réservation"}：${booking}${reservation ? ` · ${reservation.reserverName}` : ""} · ${zh ? "实际入住" : "Séjour réel"}：${stay}`}
       onClick={() => onSelect(room)}
     >
-      <strong>{room.unitNo}</strong>
+      <span className={styles.roomIdentity}>
+        <strong>{room.unitNo}</strong>
+        <span className={styles.roomCaption}>{type}</span>
+      </span>
       {reservation ? (
-        <>
-          <span className={styles.roomName} title={reservation.reserverName}>
-            {reservation.reserverName}
+        <span className={styles.roomName} title={reservation.reserverName}>
+          {reservation.reserverName}
+        </span>
+      ) : null}
+      <span className={styles.roomStates}>
+        {[
+          [zh ? "交付" : "Livr.", delivery, isDeliverable(room) ? styles.deliveryReady : ""],
+          [zh ? "预订" : "Réserv.", booking, reservation ? styles.bookingKnown : ""],
+          [zh ? "入住" : "Séjour", stay, ""],
+        ].map(([label, value, tone]) => (
+          <span className={styles.roomState} key={label}>
+            <span>{label}</span>
+            <span className={tone} title={value}>
+              {value}
+            </span>
           </span>
-          <span className={styles.roomCaption}>
-            {type} · {locale === "zh" ? "预留" : "Réservé"}
-          </span>
-        </>
-      ) : (
-        <span>{type}</span>
-      )}
+        ))}
+      </span>
     </button>
   );
 }
@@ -196,15 +253,22 @@ function ApartmentWorkbench({ data, locale, initialQuery, canInitialize }: Props
   const roomsBySuffix = new Map(floorRooms.map((room) => [room.suffix, room]));
   const oneBedroomCount = data.rooms.filter((room) => room.bedrooms === 1).length;
   const twoBedroomCount = data.rooms.filter((room) => room.bedrooms === 2).length;
-  const knownOccupancyCount = data.rooms.filter(
-    (room) => room.registered && room.occupancyState !== "unknown",
-  ).length;
-  const unknownOccupancyCount = data.rooms.length - knownOccupancyCount;
+  const deliverableCount = data.rooms.filter(isDeliverable).length;
+  const reservationKnownCount =
+    data.reservationSchemaAvailable === true
+      ? data.rooms.filter((room) => room.registered).length
+      : 0;
   const reservationCount = data.rooms.filter(
-    (room) => room.reservation?.status === "reserved",
+    (room) =>
+      room.registered &&
+      data.reservationSchemaAvailable === true &&
+      room.reservation?.status === "reserved",
   ).length;
   const floorReservationCount = floorRooms.filter(
-    (room) => room.reservation?.status === "reserved",
+    (room) =>
+      room.registered &&
+      data.reservationSchemaAvailable === true &&
+      room.reservation?.status === "reserved",
   ).length;
   const floorTwoBedroomCount = floorRooms.filter((room) => room.bedrooms === 2).length;
   const canCreateCatalogue = canInitialize && data.schemaAvailable && data.registeredCount === 0;
@@ -212,7 +276,11 @@ function ApartmentWorkbench({ data, locale, initialQuery, canInitialize }: Props
   const oneBedroom = data.rooms.find((room) => room.bedrooms === 1);
   const twoBedroom = data.rooms.find((room) => room.bedrooms === 2);
   const selectedReservation =
-    selected?.reservation?.status === "reserved" ? selected.reservation : null;
+    selected?.registered &&
+    data.reservationSchemaAvailable === true &&
+    selected.reservation?.status === "reserved"
+      ? selected.reservation
+      : null;
 
   async function initialize() {
     if (!canCreateCatalogue || guard.current || saved) return;
@@ -265,6 +333,7 @@ function ApartmentWorkbench({ data, locale, initialQuery, canInitialize }: Props
         room={room}
         selected={room.unitNo === selected?.unitNo}
         locale={locale}
+        reservationSchemaAvailable={data.reservationSchemaAvailable}
         onSelect={chooseRoom}
         mobile={mobile}
       />
@@ -302,7 +371,7 @@ function ApartmentWorkbench({ data, locale, initialQuery, canInitialize }: Props
 
       <section className={styles.stats} aria-label={zh ? "已确认房间清单" : "Inventaire confirmé"}>
         <div className={styles.stat}>
-          <span className={styles.label}>{zh ? "已确认房间清单" : "Appartements confirmés"}</span>
+          <span className={styles.label}>{zh ? "房间总数" : "Total des logements"}</span>
           <strong className={styles.statNumber}>
             {data.rooms.length}
             <small>{zh ? "套" : "logements"}</small>
@@ -310,45 +379,66 @@ function ApartmentWorkbench({ data, locale, initialQuery, canInitialize }: Props
           <span className={styles.statNote}>
             {zh ? "2—5层 · 每层16套" : "Étages 2–5 · 16 par étage"}
           </span>
-          {data.reservationSchemaAvailable ? (
-            <span className={styles.statNote}>
-              {zh
-                ? `已预留 ${reservationCount} 套 · 未付款`
-                : `${reservationCount} réservés · non payés`}
-            </span>
-          ) : null}
-        </div>
-        <div className={styles.stat}>
-          <span className={styles.label}>{zh ? "一室一厅" : "1 chambre + séjour"}</span>
-          <strong className={styles.statNumber}>
-            {oneBedroomCount}
-            <small>{zh ? "套" : "logements"}</small>
-          </strong>
-          <span className={styles.statNote}>{zh ? "35万 XOF / 月" : "350 000 XOF / mois"}</span>
-        </div>
-        <div className={styles.stat}>
-          <span className={styles.label}>{zh ? "两室" : "2 chambres"}</span>
-          <strong className={styles.statNumber}>
-            {twoBedroomCount}
-            <small>{zh ? "套" : "logements"}</small>
-          </strong>
-          <span className={styles.statNote}>{zh ? "60万 XOF / 月" : "600 000 XOF / mois"}</span>
-        </div>
-        <div className={styles.stat}>
-          <span className={styles.label}>{zh ? "业务占用资料" : "Occupation métier"}</span>
-          <strong className={styles.occupancyValue}>
-            {knownOccupancyCount === 0
-              ? zh
-                ? "待补充"
-                : "À compléter"
-              : zh
-                ? `${knownOccupancyCount}套状态已核`
-                : `${knownOccupancyCount} états vérifiés`}
-          </strong>
           <span className={styles.statNote}>
             {zh
-              ? `${unknownOccupancyCount}套待核 · 不等于空房`
-              : `${unknownOccupancyCount} à vérifier, sans présumer la vacance`}
+              ? `${oneBedroomCount}套一室一厅 / ${twoBedroomCount}套两室`
+              : `${oneBedroomCount} × 1 ch. / ${twoBedroomCount} × 2 ch.`}
+          </span>
+        </div>
+        <div className={styles.stat} data-testid="apartment-delivery-summary">
+          <span className={styles.label}>{zh ? "交付条件" : "Conditions de livraison"}</span>
+          <strong className={styles.statNumber}>
+            {deliverableCount}
+            <small>{zh ? "套可交付" : "livrables"}</small>
+          </strong>
+          <span className={styles.statNote}>
+            {deliverableCount === data.rooms.length
+              ? zh
+                ? "建设及运行条件已满足"
+                : "Conditions du bâti et d’exploitation réunies"
+              : zh
+                ? `${data.rooms.length - deliverableCount}套待处理或补充资料`
+                : `${data.rooms.length - deliverableCount} à traiter ou compléter`}
+          </span>
+        </div>
+        <div className={styles.stat} data-testid="apartment-reservation-summary">
+          <span className={styles.label}>{zh ? "预订情况" : "Réservations"}</span>
+          {reservationKnownCount > 0 ? (
+            <>
+              <strong className={styles.statNumber}>
+                {reservationCount}
+                <small>{zh ? "套已预订" : "réservés"}</small>
+              </strong>
+              <span className={styles.statNote}>
+                {zh
+                  ? `${reservationKnownCount - reservationCount}套暂无预订`
+                  : `${reservationKnownCount - reservationCount} non réservés`}
+              </span>
+              {reservationKnownCount < data.rooms.length ? (
+                <span className={styles.statNote}>
+                  {zh
+                    ? `${data.rooms.length - reservationKnownCount}套预订资料待补充`
+                    : `${data.rooms.length - reservationKnownCount} réservations à compléter`}
+                </span>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <strong className={styles.summaryValue}>{zh ? "待补充" : "À compléter"}</strong>
+              <span className={styles.statNote}>
+                {zh ? "预订资料尚未完整读取" : "Données de réservation incomplètes"}
+              </span>
+            </>
+          )}
+        </div>
+        <div className={styles.stat} data-testid="apartment-stay-summary">
+          <span className={styles.label}>{zh ? "实际入住" : "Séjours réels"}</span>
+          <strong className={styles.statNumber}>
+            {data.rooms.length}
+            <small>{zh ? "套资料待补充" : "à compléter"}</small>
+          </strong>
+          <span className={styles.statNote}>
+            {zh ? "实际住户与入住日期" : "Résidents réels et dates d’entrée"}
           </span>
         </div>
       </section>
@@ -374,8 +464,8 @@ function ApartmentWorkbench({ data, locale, initialQuery, canInitialize }: Props
                   ? "房号、户型及收费已确认，资产记录尚未建立。"
                   : "Numéros, types et tarifs confirmés ; fiches d’actifs non créées."
                 : zh
-                  ? "建档不等于已交付、已入住或已收款。"
-                  : "Une fiche ne prouve ni livraison, ni séjour, ni encaissement."}
+                  ? "交付条件、预订和实际入住分别记录。"
+                  : "Livraison, réservation et séjour réel sont suivis séparément."}
           </p>
         </div>
         {canCreateCatalogue ? (
@@ -452,7 +542,7 @@ function ApartmentWorkbench({ data, locale, initialQuery, canInitialize }: Props
             {data.reservationSchemaAvailable ? (
               <span className={styles.reservationSummary}>
                 {zh
-                  ? `本层预留 ${floorReservationCount} 套`
+                  ? `本层预订 ${floorReservationCount} 套`
                   : `${floorReservationCount} réservés à cet étage`}
               </span>
             ) : null}
@@ -549,12 +639,25 @@ function ApartmentWorkbench({ data, locale, initialQuery, canInitialize }: Props
                   </p>
                 ) : null}
               </div>
-              <span
-                className={`${styles.badge} ${selectedReservation ? styles.reservedBadge : ""}`}
-              >
-                {occupancyLabel(selected, locale)}
-              </span>
             </div>
+            <dl className={styles.detailStates} aria-label={zh ? "房间状态" : "États du logement"}>
+              <div>
+                <dt>{zh ? "交付条件" : "Conditions de livraison"}</dt>
+                <dd className={isDeliverable(selected) ? styles.deliveryReady : ""}>
+                  {deliveryLabel(selected, locale)}
+                </dd>
+              </div>
+              <div>
+                <dt>{zh ? "预订情况" : "Réservation"}</dt>
+                <dd className={selectedReservation ? styles.bookingKnown : ""}>
+                  {reservationLabel(selected, data.reservationSchemaAvailable, locale)}
+                </dd>
+              </div>
+              <div>
+                <dt>{zh ? "实际入住" : "Séjour réel"}</dt>
+                <dd>{zh ? "资料待补充" : "À compléter"}</dd>
+              </div>
+            </dl>
             <div
               className={styles.detailTabs}
               role="tablist"
@@ -610,24 +713,12 @@ function ApartmentWorkbench({ data, locale, initialQuery, canInitialize }: Props
                         <dt>{zh ? "租期" : "Durée"}</dt>
                         <dd>{zh ? "待定" : "À préciser"}</dd>
                       </div>
-                      <div className={styles.fact}>
-                        <dt>{zh ? "业务占用" : "Occupation métier"}</dt>
-                        <dd>
-                          {selected.occupancyState === "occupied"
-                            ? zh
-                              ? "存在业务占用，需核对"
-                              : "Occupation existante, à vérifier"
-                            : selected.occupancyState === "unoccupied"
-                              ? zh
-                                ? "无当前业务占用"
-                                : "Sans occupation métier actuelle"
-                              : zh
-                                ? "待核实"
-                                : "À vérifier"}
-                        </dd>
-                      </div>
                     </>
                   ) : null}
+                  <div className={styles.fact}>
+                    <dt>{zh ? "关联业务" : "Activités liées"}</dt>
+                    <dd>{businessRelationLabel(selected, locale)}</dd>
+                  </div>
                   <div className={styles.fact}>
                     <dt>{zh ? "实际住户" : "Résident réel"}</dt>
                     <dd>{zh ? "待补充" : "À compléter"}</dd>
@@ -710,17 +801,13 @@ function ApartmentWorkbench({ data, locale, initialQuery, canInitialize }: Props
               </div>
             </div>
             <p className={styles.detailFoot}>
-              {selectedReservation && tab === "room"
+              {tab === "room"
                 ? zh
-                  ? "预留不等于已入住；住户、合同和账务分别登记。"
-                  : "La réservation ne constitue pas un séjour ; résident, contrat et comptabilité restent distincts."
-                : tab === "fees"
-                  ? zh
-                    ? "收费测算，不代表应收或已收款。"
-                    : "Estimation uniquement, ni créance ni encaissement."
-                  : zh
-                    ? "占用状态不代替实际住户资料，不推断已交付或已开业。"
-                    : "L’occupation métier ne remplace pas les données du résident et ne prouve ni livraison ni ouverture."}
+                  ? "交付条件、预订与实际入住分别记录。"
+                  : "Livraison, réservation et séjour réel sont suivis séparément."
+                : zh
+                  ? "收费测算，不代表应收或已收款。"
+                  : "Estimation uniquement, ni créance ni encaissement."}
             </p>
             {canInitialize &&
             data.reservationSchemaAvailable &&
