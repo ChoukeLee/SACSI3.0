@@ -48,6 +48,7 @@ interface SaleListProps {
   initialProject?: string;
   initialContract?: string;
   returnTo?: string;
+  initialFollowup?: boolean;
   noSaleProject?: boolean;
   contracts: SaleContractRow[];
   schedules: SalePaymentScheduleRow[];
@@ -75,6 +76,7 @@ export function SaleList({
   initialProject,
   initialContract,
   returnTo,
+  initialFollowup = false,
   noSaleProject = false,
   contracts: initialContracts,
   schedules: initialSchedules,
@@ -740,11 +742,10 @@ export function SaleList({
   return (
     <OperationalPage
       className={styles.workbench}
-      eyebrow="SALES WORKSPACE"
-      title={locale === "zh" ? "出售房源" : "Lots en vente"}
+      title={locale === "zh" ? "出售" : "Ventes"}
       description={
         locale === "zh"
-          ? "按楼栋查看买方、已录房款与付款计划；选择房间核对资料。"
+          ? "按楼栋看房款，单独跟进未收尾款。"
           : "Acquéreurs, paiements et échéances par bâtiment. Choisissez un lot pour vérifier son dossier."
       }
       action={
@@ -808,6 +809,7 @@ export function SaleList({
           setStatusFilter(value);
         }}
         initialRecordsOpen={statusFilter !== "current"}
+        initialFollowup={initialFollowup}
         onBrowseChange={closePreview}
         loading={
           workspace.enabled &&

@@ -4,6 +4,19 @@ import * as prettier from "prettier";
 // A reviewed, explicit adoption scope. Legacy files are added when refactored;
 // this avoids burying meaningful business changes under a repository-wide reflow.
 const files = [
+  "src/features/management/rental-first-dashboard.tsx",
+  "src/features/management/rental-first-dashboard.module.css",
+  "src/features/management/rental-first-data.ts",
+  "src/features/units/asset-browse-navigation.tsx",
+  "src/features/finance/finance-actual-cash-model.ts",
+  "src/features/finance/finance-actual-cash-server.ts",
+  "src/features/finance/finance-actual-cash-workbench.tsx",
+  "src/features/finance/finance-actual-cash.module.css",
+  "tests/rental-first-dashboard.test.tsx",
+  "tests/rental-first-data.test.ts",
+  "tests/finance-actual-cash-model.test.ts",
+  "tests/finance-actual-cash-server.test.ts",
+  "tests/finance-actual-cash-workbench.test.tsx",
   "src/features/daily-rentals/booking-notes-action.ts",
   "src/features/daily-rentals/booking-notes-editor.tsx",
   "tests/booking-notes-editor.test.tsx",

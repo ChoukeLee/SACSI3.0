@@ -142,72 +142,79 @@ export function UnitWorkbench({
     <div className={styles.workbench} data-unit-workbench aria-busy={pending || !floorReady}>
       <header className={styles.heading}>
         <div>
-          <p className={styles.eyebrow}>ASSET OVERVIEW</p>
-          <h1>{zh ? "资产总览" : "Vue des actifs"}</h1>
+          <h1>{zh ? "资产" : "Actifs"}</h1>
           <p className={styles.subtitle}>
             {zh
-              ? "按楼层查看全部资产，选择房间查看资料。"
-              : "Tous les actifs par étage. Sélectionnez un lot pour consulter son dossier."}
+              ? "按楼栋与楼层查看完整资产，点开查看客户与收支。"
+              : "Les actifs par bâtiment et étage. Ouvrez un lot pour ses clients et paiements."}
           </p>
         </div>
-        <div className={styles.scope}>
-          <label>
-            {zh ? "项目" : "Projet"}
-            <select
-              aria-label={zh ? "资产项目" : "Projet des actifs"}
-              disabled={pending}
-              value={building?.project_id ?? query.project}
-              onChange={(event) =>
-                navigate({
-                  project: event.target.value,
-                  building: "",
-                  q: "",
-                  floor: "",
-                  kind: "",
-                  business: "",
-                  filter: "all",
-                })
-              }
-            >
-              <option value="" disabled>
-                {zh ? "选择项目" : "Choisir un projet"}
-              </option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
+        {projects.length > 1 ? (
+          <div className={styles.scope}>
+            <label>
+              {zh ? "项目" : "Projet"}
+              <select
+                aria-label={zh ? "资产项目" : "Projet des actifs"}
+                disabled={pending}
+                value={building?.project_id ?? query.project}
+                onChange={(event) =>
+                  navigate({
+                    project: event.target.value,
+                    building: "",
+                    q: "",
+                    floor: "",
+                    kind: "",
+                    business: "",
+                    filter: "all",
+                  })
+                }
+              >
+                <option value="" disabled>
+                  {zh ? "选择项目" : "Choisir un projet"}
                 </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            {zh ? "楼栋 / 分区" : "Bâtiment / zone"}
-            <select
-              aria-label={zh ? "资产楼栋" : "Bâtiment des actifs"}
-              disabled={pending}
-              value={building?.id ?? ""}
-              onChange={(event) =>
-                navigate({
-                  building: event.target.value,
-                  q: "",
-                  floor: "",
-                  kind: "",
-                  business: "",
-                  filter: "all",
-                })
-              }
-            >
-              <option value="" disabled>
-                {zh ? "选择楼栋" : "Choisir un bâtiment"}
-              </option>
-              {projectBuildings.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.display_name || row.code}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        ) : null}
       </header>
+      {projectBuildings.length ? (
+        <section
+          aria-label={zh ? "资产楼栋浏览" : "Bâtiments des actifs"}
+          className={styles.buildingIndex}
+        >
+          {projectBuildings.map((row) => (
+            <button
+              key={row.id}
+              type="button"
+              disabled={pending}
+              aria-pressed={building?.id === row.id}
+              onClick={() =>
+                navigate({
+                  building: row.id,
+                  q: "",
+                  floor: "",
+                  kind: "",
+                  business: "",
+                  filter: "all",
+                })
+              }
+            >
+              <Building2 size={17} aria-hidden="true" />
+              <span>{row.display_name || row.code}</span>
+              {building?.id === row.id ? (
+                <small>
+                  {data.scopeTotal} {zh ? "项资产" : "actifs"}
+                </small>
+              ) : null}
+            </button>
+          ))}
+        </section>
+      ) : null}
       {returnHref ? (
         <div>
           <Link className={styles.inlineLink} href={returnHref} prefetch={false}>

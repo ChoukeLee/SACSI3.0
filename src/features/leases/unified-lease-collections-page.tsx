@@ -108,16 +108,14 @@ export function loadApartmentLeaseOverview({
   return readApartmentLeaseOverview(locale, project, viewerId);
 }
 
-export async function UnifiedLeaseCollectionsPage({
+export async function loadUnifiedLeaseCollections({
   locale,
   project,
   viewerId,
-  initialCategory = "all",
 }: {
   locale: Locale;
   project?: string;
   viewerId?: string;
-  initialCategory?: CollectionCategory;
 }) {
   const [apartments, operating] = await Promise.allSettled([
     loadApartmentLeaseOverview({ locale, project, viewerId }),
@@ -145,13 +143,32 @@ export async function UnifiedLeaseCollectionsPage({
         locale,
       )
     : [];
+  return {
+    today,
+    rows: [...buildApartmentCollectionRows(apartment?.records ?? [], locale), ...operatingRows],
+    unavailable: { apartments: apartment?.unavailable !== false, operatingAssets: !validSource },
+  };
+}
+
+export async function UnifiedLeaseCollectionsPage({
+  locale,
+  project,
+  viewerId,
+  initialCategory = "all",
+}: {
+  locale: Locale;
+  project?: string;
+  viewerId?: string;
+  initialCategory?: CollectionCategory;
+}) {
+  const data = await loadUnifiedLeaseCollections({ locale, project, viewerId });
   return (
     <UnifiedLeaseCollections
       key={initialCategory}
-      rows={[...buildApartmentCollectionRows(apartment?.records ?? [], locale), ...operatingRows]}
+      rows={data.rows}
       locale={locale}
       initialCategory={initialCategory}
-      unavailable={{ apartments: apartment?.unavailable !== false, operatingAssets: !validSource }}
+      unavailable={data.unavailable}
     />
   );
 }

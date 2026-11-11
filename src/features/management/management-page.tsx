@@ -7,6 +7,7 @@ import { getProjects } from "@/app/management/management-data";
 import { OperationalPageSkeleton } from "@/components/operational-page-skeleton";
 import { getOperatingSnapshot } from "./operating-data";
 import { OperatingDashboard } from "./operating-dashboard";
+import { loadRentalHomeData } from "./rental-first-data";
 import styles from "./operating.module.css";
 
 export async function ManagementPageContent({
@@ -14,7 +15,7 @@ export async function ManagementPageContent({
   params,
 }: {
   locale: Locale;
-  params: { project?: string };
+  params: { project?: string; month?: string };
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -47,15 +48,20 @@ export async function ManagementPageContent({
           <div className={styles.eyebrow}>
             {zh ? "经营总览" : "Pilotage de l’activité"} · {project.code}
           </div>
-          <h1>{zh ? "SACSI 经营驾驶舱" : "SACSI · pilotage"}</h1>
+          <h1>{zh ? "租赁经营" : "Activité locative"}</h1>
           <p>
             {zh
-              ? "长租、出售与资产经营，先看全局，再处理具体事项"
-              : "Locations, ventes et actifs : une vue d’ensemble, puis les actions"}
+              ? "先处理租金，再看月度收支。"
+              : "Suivre les loyers, puis les encaissements et dépenses du mois."}
           </p>
         </div>
       </header>
-      <nav className={styles.context} aria-label={zh ? "项目范围" : "Périmètre du projet"}>
+      <nav
+        className={styles.context}
+        aria-label={zh ? "项目范围" : "Périmètre du projet"}
+        hidden={projects.length <= 1}
+        style={projects.length <= 1 ? { display: "none" } : undefined}
+      >
         {projects.map((item) => (
           <Link
             key={item.id}
@@ -76,6 +82,8 @@ export async function ManagementPageContent({
           allowsDaily={project.allows_daily_rental}
           locale={locale}
           financeMode={user.role === "finance"}
+          viewerId={user.id}
+          month={params.month}
         />
       </Suspense>
     </main>
@@ -87,6 +95,8 @@ export async function DashboardSection(props: {
   allowsDaily: boolean;
   locale: Locale;
   financeMode: boolean;
+  viewerId?: string;
+  month?: string;
 }) {
   let snapshot: Awaited<ReturnType<typeof getOperatingSnapshot>>;
   try {
@@ -97,7 +107,16 @@ export async function DashboardSection(props: {
     unstable_rethrow(error);
     return <ManagementSectionUnavailable locale={props.locale} projectId={props.projectId} />;
   }
-  return <OperatingDashboard snapshot={snapshot} {...props} />;
+  const rentalPriority = props.viewerId
+    ? await loadRentalHomeData({
+        projectId: props.projectId,
+        viewerId: props.viewerId,
+        locale: props.locale,
+        today: snapshot.asOf ?? new Date().toISOString().slice(0, 10),
+        requestedMonth: props.month,
+      })
+    : undefined;
+  return <OperatingDashboard snapshot={snapshot} {...props} rentalPriority={rentalPriority} />;
 }
 function ManagementSectionUnavailable({
   locale,

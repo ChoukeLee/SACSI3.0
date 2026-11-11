@@ -30,7 +30,7 @@
 .filters button[aria-pressed="true"] {
   border-color: hsl(var(--border));
   color: hsl(var(--foreground));
-  font-weight: 600;
+  font-weight: 400;
 }
 .filters button.overdueFilter {
   color: #ad423b;
@@ -76,7 +76,7 @@
 .panel h2,
 .floor h2 {
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 500;
 }
 .panel header p {
   margin-top: 0.35rem;
@@ -132,18 +132,19 @@
 }
 .cards {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.85rem;
 }
 .card {
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
-  padding: 0.85rem 1rem;
+  gap: 0.5rem;
+  padding: 1rem;
   min-width: 0;
+  min-height: 244px;
   text-align: left;
   border: 1px solid hsl(var(--border));
-  border-top: 3px solid hsl(var(--border));
+  border-top: 2px solid hsl(var(--border));
   border-radius: 0.65rem;
   background: hsl(var(--card));
 }
@@ -154,7 +155,8 @@
 .card.reviewCard {
   border-top-color: #a89a75;
 }
-.card.upcomingCard {
+.card.upcomingCard,
+.card.unpaidCard {
   border-top-color: #c69c49;
 }
 .card.overdueCard {
@@ -168,16 +170,48 @@
 }
 .roomHeading > strong {
   font-size: 1.25rem;
-  font-weight: 600;
+  font-weight: 500;
 }
 .roomHeading small {
   font-size: 0.75rem;
   color: hsl(var(--muted-foreground));
 }
 .buyer {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 400;
   overflow-wrap: anywhere;
+}
+.buyerFact {
+  justify-content: flex-start;
+  margin-bottom: 0.4rem;
+}
+.roomHeading small.soldStatus {
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.3rem;
+  color: #245cd3;
+  background: #eef4ff;
+}
+.advancedFilters {
+  position: relative;
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+}
+.advancedFilters summary {
+  cursor: pointer;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.25rem;
+}
+.advancedFilters > .filters {
+  position: absolute;
+  z-index: 4;
+  top: 100%;
+  left: 0;
+  width: 270px;
+  padding: 0.65rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.65rem;
+  background: hsl(var(--card));
+  box-shadow: 0 8px 24px hsl(var(--foreground) / 0.08);
 }
 .fact {
   display: flex;
@@ -242,6 +276,10 @@
 :global(.dark) .reviewStatus {
   color: #d6cbb4;
   background: #39352b;
+}
+:global(.dark) .roomHeading small.soldStatus {
+  color: #9abaff;
+  background: #202f48;
 }
 .overdueText {
   color: #ad423b;

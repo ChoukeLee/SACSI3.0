@@ -1,11 +1,13 @@
 import "server-only";
 
 import Link from "next/link";
+import { unstable_rethrow } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import { parseFinanceRead } from "./finance-read";
 import { CimacExportActions } from "./cimac-export-actions";
 import { FinanceWorkbench } from "./finance-workbench";
+import { getFinanceActualCash } from "./finance-actual-cash-server";
 import {
   decodeFinanceWorkbenchRead,
   financeWorkbenchKey,
@@ -28,8 +30,24 @@ export async function FinanceWorkspace({
   viewerId?: string;
   workArea?: "sacsi" | "cimac";
 }) {
+  const cashView =
+    workArea === "sacsi" &&
+    (params.view === "cash" ||
+      (!params.view &&
+        !params.kind &&
+        Object.keys(params).every((key) =>
+          ["projectId", "buildingId", "dateFrom", "dateTo"].includes(key),
+        )));
+  const today = new Date().toISOString().slice(0, 10);
   const query = parseFinanceRead(params);
-  const mode = financeWorkbenchMode(params, query.kind);
+  if (cashView && !query.filters.dateFrom && !query.filters.dateTo) {
+    query.filters.dateFrom = `${today.slice(0, 7)}-01`;
+    query.filters.dateTo = today;
+  }
+  const mode = financeWorkbenchMode(
+    params.view === "cash" && cashView ? { ...params, view: undefined } : params,
+    query.kind,
+  );
   const client = await createClient();
   const [allBuildings, allProjects] = await Promise.all([
     fetchAllPages<FinanceBuildingOption>(
@@ -74,7 +92,21 @@ export async function FinanceWorkspace({
     );
   }
   let result = null;
-  if (mode !== "reconciliation") {
+  let actualCash = null;
+  let actualCashUnavailable = false;
+  if (cashView) {
+    try {
+      actualCash = await getFinanceActualCash({
+        projectId: project.id,
+        buildingId: query.filters.buildingId,
+        dateFrom: query.filters.dateFrom || `${today.slice(0, 7)}-01`,
+        dateTo: query.filters.dateTo || today,
+      });
+    } catch (error) {
+      unstable_rethrow(error);
+      actualCashUnavailable = true;
+    }
+  } else if (mode !== "reconciliation") {
     const report = await client.rpc("finance_read_rpc", {
       p_kind: query.kind,
       p_filters: query.filters,
@@ -92,6 +124,9 @@ export async function FinanceWorkspace({
       query={query}
       mode={mode}
       result={result}
+      cashView={cashView}
+      actualCash={actualCash}
+      actualCashUnavailable={actualCashUnavailable}
       projects={projects}
       buildings={buildings}
       reconciliation={
@@ -99,7 +134,7 @@ export async function FinanceWorkspace({
       }
       locale={locale}
       canWrite={canWrite}
-      today={new Date().toISOString().slice(0, 10)}
+      today={today}
       workArea={workArea}
       projectLocked
       reconciliationPending

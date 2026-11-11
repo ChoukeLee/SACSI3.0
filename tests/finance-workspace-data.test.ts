@@ -2,9 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
 import type { FinanceWorkbenchProps } from "@/features/finance/finance-workbench";
 const mock = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), metadataError: false }));
+const cash = vi.hoisted(() => ({ read: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => mock }));
 vi.mock("@/features/finance/finance-workbench", () => ({ FinanceWorkbench: () => null }));
+vi.mock("@/features/finance/finance-actual-cash-server", () => ({
+  getFinanceActualCash: cash.read,
+}));
 vi.mock("@/features/finance/cimac-customer-workbench", () => ({
   CimacCustomerWorkbench: () => null,
 }));
@@ -22,6 +26,7 @@ const report = {
 };
 beforeEach(() => {
   vi.clearAllMocks();
+  cash.read.mockResolvedValue({ rows: [], incomeXof: 0, expenseXof: 0 });
   mock.metadataError = false;
   mock.from.mockImplementation((table: string) => ({
     select: () => ({
@@ -56,6 +61,19 @@ async function load(
   })) as ReactElement<FinanceWorkbenchProps>;
 }
 describe("finance server read path", () => {
+  it("opens the SACSI default as actual cash for the current month without changing explicit ledger reads", async () => {
+    const page = await load({});
+    const today = new Date().toISOString().slice(0, 10);
+    expect(page.props.cashView).toBe(true);
+    expect(cash.read).toHaveBeenCalledWith({
+      projectId: project,
+      buildingId: undefined,
+      dateFrom: `${today.slice(0, 7)}-01`,
+      dateTo: today,
+    });
+    expect(mock.rpc).not.toHaveBeenCalled();
+    expect(page.props.result).toBeNull();
+  });
   it.each([true, false])(
     "explicit ledger does not fetch all units or run a reconciliation scan, write=%s",
     async (canWrite) => {

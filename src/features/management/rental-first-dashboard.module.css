@@ -1,0 +1,280 @@
+.workspace {
+  min-width: 0;
+  color: hsl(var(--foreground));
+  font-size: 14px;
+}
+.scopeLine,
+.cashHeading,
+.followHeading,
+.period {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.scopeLine {
+  margin-bottom: 18px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.scopeLine a,
+.period a,
+.saleContent a,
+.moreLink {
+  color: #315fdf;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+:global(.dark) .workspace {
+  --home-link: #a6bdff;
+}
+:global(.dark) .scopeLine a,
+:global(.dark) .period a,
+:global(.dark) .saleContent a,
+:global(.dark) .moreLink {
+  color: var(--home-link);
+}
+.priority {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.panel,
+.cashCard {
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--card));
+  min-width: 0;
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+}
+.followHeading {
+  padding: 17px 18px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.workspace h2 {
+  font-size: 16px;
+  font-weight: 500;
+}
+.followHeading h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.followHeading a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.panel:first-child h2 svg {
+  color: #bd5154;
+}
+.panel:nth-child(2) h2 svg {
+  color: #a87927;
+}
+.followList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.followList li + li {
+  border-top: 1px solid hsl(var(--border));
+}
+.followRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 17px 18px;
+  min-height: 104px;
+}
+.followRow:hover {
+  background: hsl(var(--muted) / 0.45);
+}
+.party {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.assetName {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.tenant {
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.timing {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+.rowAmount {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  align-items: flex-end;
+  font-weight: 400;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.rowAmount small {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+.rowAmount svg {
+  color: hsl(var(--muted-foreground));
+}
+.empty {
+  padding: 28px 18px;
+  font-size: 13px;
+  color: hsl(var(--muted-foreground));
+}
+.moreLink {
+  font-size: 12px;
+  padding: 10px 18px;
+  border-top: 1px solid hsl(var(--border));
+  margin-top: auto;
+}
+.cashHeading {
+  margin: 24px 0 13px;
+  flex-wrap: wrap;
+}
+.period {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+.period input,
+.period button {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 7px;
+  padding: 7px 10px;
+  min-height: 36px;
+  font: inherit;
+  color: inherit;
+}
+.cashGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.cashCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 19px;
+}
+.label,
+.note {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  font-weight: 400;
+}
+p.note {
+  margin-top: 13px;
+  line-height: 1.65;
+}
+.cashValue {
+  font-size: 23px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.originals {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  margin-top: 14px;
+}
+.originals summary,
+.saleSection summary {
+  cursor: pointer;
+}
+.originals dl {
+  margin-top: 10px;
+}
+.originals dl > div {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 7px;
+}
+.saleSection {
+  margin-top: 25px;
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 18px;
+}
+.saleSection summary {
+  font-size: 14px;
+  font-weight: 400;
+}
+.saleSection summary span {
+  margin-left: 12px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.saleContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding-top: 16px;
+  font-size: 13px;
+}
+.saleContent p {
+  color: hsl(var(--muted-foreground));
+}
+.saleContent a {
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .priority {
+    gap: 12px;
+  }
+  .followRow {
+    padding: 15px;
+    gap: 8px;
+  }
+  .rowAmount {
+    font-size: 13px;
+  }
+}
+@media (max-width: 720px) {
+  .priority,
+  .cashGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .followRow {
+    min-height: 90px;
+  }
+  .saleContent {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .cashValue {
+    font-size: 21px;
+  }
+}
+@media (max-width: 420px) {
+  .followRow {
+    flex-wrap: wrap;
+  }
+  .rowAmount {
+    flex-direction: row;
+    align-items: center;
+    white-space: normal;
+  }
+  .followHeading {
+    padding: 15px;
+  }
+  .period {
+    justify-content: flex-start;
+  }
+}

@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { Building2 } from "lucide-react";
 import { OperationalPage, SegmentedControl } from "@/components/ui/operational";
 import { ContractListControls } from "@/features/contracts/contract-table";
 import type { Locale } from "@/lib/i18n";
@@ -65,27 +66,38 @@ export function SaleWorkbenchScope({
           </label>
         ) : null}
         {!noSaleProject ? (
-          <label>
-            {zh ? "楼栋" : "Bâtiment"}
-            <select
-              aria-label={zh ? "出售楼栋" : "Bâtiment des ventes"}
-              value={buildingId}
-              onChange={(event) => onBuilding(event.target.value)}
+          <div
+            className={styles.buildingChoices}
+            role="group"
+            aria-label={zh ? "出售楼栋" : "Bâtiment des ventes"}
+          >
+            <button
+              type="button"
+              className={styles.buildingChoice}
+              aria-pressed={!buildingId}
+              onClick={() => onBuilding("")}
             >
-              <option value="">{zh ? "全部楼栋" : "Tous les bâtiments"}</option>
-              {buildings
-                .filter(
-                  (row) =>
-                    (!projectId || row.project_id === projectId) &&
-                    row.project?.allows_sale !== false,
-                )
-                .map((building) => (
-                  <option key={building.id} value={building.id}>
-                    {building.display_name || building.code}
-                  </option>
-                ))}
-            </select>
-          </label>
+              <Building2 size={15} aria-hidden="true" />
+              {zh ? "全部楼栋" : "Tous les bâtiments"}
+            </button>
+            {buildings
+              .filter(
+                (row) =>
+                  (!projectId || row.project_id === projectId) &&
+                  row.project?.allows_sale !== false,
+              )
+              .map((building) => (
+                <button
+                  type="button"
+                  key={building.id}
+                  className={styles.buildingChoice}
+                  aria-pressed={buildingId === building.id}
+                  onClick={() => onBuilding(building.id)}
+                >
+                  {building.display_name || building.code}
+                </button>
+              ))}
+          </div>
         ) : null}
       </div>
       {returnTo ? (
@@ -99,8 +111,8 @@ export function SaleWorkbenchScope({
       ) : (
         <span className={styles.scopeHint}>
           {zh
-            ? "合同价、现金收款与应收核销分开核对"
-            : "Prix, encaissements et rapprochements distincts"}
+            ? "按楼层浏览，打开房卡查看付款记录"
+            : "Parcourez les étages et ouvrez les paiements du lot"}
         </span>
       )}
     </div>

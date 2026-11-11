@@ -40,6 +40,7 @@ async function SalesData({
       {...data}
       key={JSON.stringify(params)}
       locale={locale}
+      initialFollowup={params.saleFollowup === "unpaid"}
       canCreate={canOperateSales}
       canRecordFinance={role === "admin" || role === "finance"}
       canManage={canOperateSales}

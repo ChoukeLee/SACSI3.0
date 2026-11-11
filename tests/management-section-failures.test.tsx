@@ -1,10 +1,18 @@
 import React, { isValidElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ user: vi.fn(), projects: vi.fn(), snapshot: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  user: vi.fn(),
+  projects: vi.fn(),
+  snapshot: vi.fn(),
+  rentalHome: vi.fn(),
+}));
 vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.user }));
 vi.mock("@/app/management/management-data", () => ({ getProjects: mocks.projects }));
 vi.mock("@/features/management/operating-data", () => ({ getOperatingSnapshot: mocks.snapshot }));
+vi.mock("@/features/management/rental-first-data", () => ({
+  loadRentalHomeData: mocks.rentalHome,
+}));
 vi.mock("@/features/management/operating-dashboard", () => ({
   OperatingDashboard: () => <section>OPERATING_SECTION_OK</section>,
 }));
@@ -28,6 +36,12 @@ beforeEach(() => {
     { id: projectId, code: "SACSI", allows_sale: true, allows_daily_rental: true },
   ]);
   mocks.snapshot.mockResolvedValue({ projectId });
+  mocks.rentalHome.mockResolvedValue({
+    rows: [],
+    unavailable: { apartments: false, operatingAssets: false },
+    cash: null,
+    month: "2026-11",
+  });
 });
 
 /** Resolve the async dashboard section without bypassing page scope/redirects. */
@@ -53,7 +67,7 @@ describe("SACSI dashboard isolation and unavailable states", () => {
       mocks.snapshot.mockRejectedValue(new Error("statement_timeout secret-db-host private-query"));
       const page = await ManagementPageContent({ locale, params: {} });
       const html = renderToStaticMarkup(await resolveServerSections(page));
-      expect(html).toContain(locale === "zh" ? "SACSI 经营驾驶舱" : "SACSI · pilotage");
+      expect(html).toContain(locale === "zh" ? "租赁经营" : "Activité locative");
       expect(html).toContain(locale === "zh" ? "项目范围" : "Périmètre du projet");
       expect(html).toContain(
         locale === "zh" ? "经营汇总暂不可用" : "Synthèse temporairement indisponible",

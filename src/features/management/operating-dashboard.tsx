@@ -5,6 +5,7 @@ import { routeFor, type Locale } from "@/lib/i18n";
 import type { OperatingSnapshot } from "./operating-snapshot";
 import { OperatingTrend } from "./operating-trend";
 import styles from "./operating.module.css";
+import { RentalFirstDashboard, type RentalHomeData } from "./rental-first-dashboard";
 
 export function OperatingDashboard({
   snapshot: data,
@@ -12,13 +13,26 @@ export function OperatingDashboard({
   allowsSale = true,
   allowsDaily = true,
   financeMode = false,
+  rentalPriority,
 }: {
   snapshot: OperatingSnapshot;
   locale: Locale;
   allowsSale?: boolean;
   allowsDaily?: boolean;
   financeMode?: boolean;
+  rentalPriority?: RentalHomeData;
 }) {
+  if (rentalPriority) {
+    return (
+      <RentalFirstDashboard
+        data={rentalPriority}
+        locale={locale}
+        today={data.asOf}
+        projectId={data.projectId}
+        allowsSale={allowsSale}
+      />
+    );
+  }
   const zh = locale === "zh";
   const format = new Intl.NumberFormat(zh ? "zh-CN" : "fr-FR", { maximumFractionDigits: 2 });
   const amount = (value: number) => format.format(value);

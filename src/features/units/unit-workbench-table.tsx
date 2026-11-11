@@ -352,7 +352,6 @@ function UnitCardBusiness({ record, locale }: { record: UnitWorkbenchRecord; loc
           data-unit-sale-record-id={party.recordId}
         >
           <UnitPartyHeading party={party} role="sale" locale={locale} />
-          <UnitPartyMoney sale={party} locale={locale} />
         </span>
       ))}
       {summary.leases.map((party) => (
@@ -362,8 +361,17 @@ function UnitCardBusiness({ record, locale }: { record: UnitWorkbenchRecord; loc
           data-unit-lease-record-id={party.recordId}
         >
           <UnitPartyHeading party={party} role="lease" locale={locale} />
-          <UnitPartyMoney lease={party} locale={locale} />
-          <UnitPaidThrough party={party} locale={locale} />
+          <span className={styles.cardPaidThrough}>
+            <span>{zh ? "已交至" : "Payé jusqu’au"}</span>
+            <time dateTime={party.paidThrough ?? undefined}>
+              {party.paidThrough || (zh ? "待核" : "À vérifier")}
+            </time>
+          </span>
+          {party.monthlyRent === null || party.dueUnpaid === null ? (
+            <span className={styles.cardReview}>
+              {zh ? "收付款资料待核" : "Paiements à vérifier"}
+            </span>
+          ) : null}
         </span>
       ))}
       {summary.daily.map((party) => (
@@ -451,27 +459,47 @@ export function UnitFloorIndex({
                         {position?.ownership === "sold" ? (
                           <small className={styles.soldMark}>{zh ? "已售" : "Vendu"}</small>
                         ) : null}
-                        {warning ? (
-                          <small
-                            id={`asset-attention-${unit.id}`}
-                            className={cn(
-                              styles.attentionMark,
-                              warning.critical && styles.criticalMark,
-                            )}
-                          >
-                            {warning.label}
-                          </small>
+                        {position?.lease_occupied ? (
+                          <small className={styles.rentedMark}>{zh ? "在租" : "Loué"}</small>
+                        ) : position?.daily_occupied ? (
+                          <small className={styles.rentedMark}>{zh ? "日租入住" : "Séjour"}</small>
                         ) : null}
                       </span>
                     </span>
                     <strong className={styles.roomNumber}>{unit.unit_no}</strong>
                     <span id={`asset-use-${unit.id}`} className={styles.assetUse}>
-                      {unitOccupancyText(record, locale)}
+                      {position?.ownership === "sold" &&
+                      !position.lease_occupied &&
+                      !position.daily_occupied &&
+                      record.business?.sales.length
+                        ? null
+                        : unitOccupancyText(record, locale)}
                     </span>
                     <UnitCardBusiness record={record} locale={locale} />
                     <span className={styles.assetCardFooter}>
-                      <span className={styles.detailHint}>
-                        {zh ? "查看详情" : "Voir les détails"}
+                      <span
+                        id={warning ? `asset-attention-${unit.id}` : undefined}
+                        className={cn(
+                          styles.detailHint,
+                          warning && styles.attentionMark,
+                          warning?.critical && styles.criticalMark,
+                        )}
+                      >
+                        {warning
+                          ? warning.label
+                          : record.business?.status === "ready" &&
+                              record.business.sales.length > 0 &&
+                              record.business.sales.every(
+                                (party) =>
+                                  party.balance.basis === "verified_bills" &&
+                                  party.balance.amounts?.length === 0,
+                              )
+                            ? zh
+                              ? "房款账单结清"
+                              : "Créances du prix soldées"
+                            : zh
+                              ? "查看详情"
+                              : "Voir les détails"}
                       </span>
                       <ArrowRight size={15} aria-hidden="true" />
                     </span>

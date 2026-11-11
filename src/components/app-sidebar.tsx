@@ -67,8 +67,8 @@ const groups: NavGroup[] = [
       { key: "management", href: "/management", icon: LayoutDashboard },
       { key: "leases", href: "/leases", icon: FileSignature },
       { key: "sales", href: "/sales", icon: Building2 },
-      { key: "finance", href: "/finance", icon: WalletCards, activeMatch: "/finance" },
       { key: "units", href: "/units", icon: Building2, activeMatch: "/units" },
+      { key: "finance", href: "/finance", icon: WalletCards, activeMatch: "/finance" },
       {
         key: "dailyRentals",
         href: "/daily-rentals",
