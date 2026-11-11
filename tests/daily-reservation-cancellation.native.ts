@@ -26,6 +26,7 @@ beforeAll(async () => {
   baselineState = await state(baselineFixture);
   expect(baselineState).toEqual(before);
   await db.query(applicationMigrationSql(migration));
+  await db.query(applicationMigrationSql("20261111105200_daily_cancel_refunded_reservations.sql"));
 }, 45_000);
 afterAll(async () => {
   await cluster?.close();
@@ -329,4 +330,52 @@ it("keeps pending cleaning and cancels only the reservation's receivable", async
   const otherAfter = await state(other);
   expect(otherAfter.booking).toEqual(otherBefore.booking);
   expect(otherAfter.receivable).toEqual(otherBefore.receivable);
+});
+
+it("records an entire batch of actual refunds, with rollback and duplicate protection", async () => {
+  const rooms = [await seed(), await seed(), await seed()];
+  rooms.sort((a, b) => a.booking.localeCompare(b.booking));
+  for (const room of rooms.slice(0, 2)) {
+    await seedPayment(room, 40000);
+    await db.query("select public.daily_sync_booking_finance_tx($1)", [room.booking]);
+  }
+  const requestId = randomUUID();
+  const run = async () =>
+    (
+      await db.query(
+        "select public.operator_cancel_refunded_reservations($1,$2,40000,current_date,'cash') result",
+        [requestId, rooms.map((room) => room.booking)],
+      )
+    ).rows[0].result;
+  const before = await state(rooms[0]);
+  await login(rooms[0].actor);
+  await expect(run()).rejects.toThrow("operationRefundReviewRequired");
+  expect(await state(rooms[0])).toEqual(before);
+
+  await db.query("select set_config('request.jwt.claims','{}',false)");
+  await seedPayment(rooms[2], 40000);
+  await db.query("select public.daily_sync_booking_finance_tx($1)", [rooms[2].booking]);
+  await login(rooms[0].actor);
+  expect(await run()).toMatchObject({ status: "completed", verified: true, requestId });
+  const status = await db.query(
+    "select public.operator_cancel_refunded_reservations_status($1) result",
+    [requestId],
+  );
+  expect(status.rows[0].result).toMatchObject({
+    status: "completed_previously",
+    verified: false,
+    requestId,
+  });
+  expect(await run()).toMatchObject({ status: "completed_previously", requestId });
+  for (const room of rooms) {
+    const after = await state(room);
+    expect(after.booking).toMatchObject({ status: "cancelled", prepaid_amount_xof: 0 });
+    expect(after.receivable).toMatchObject({ status: "cancelled", paid_amount_xof: 0 });
+    expect(
+      after.payments
+        .map((payment: { amount: number }) => payment.amount)
+        .sort((a: number, b: number) => a - b),
+    ).toEqual([-40000, 40000]);
+    expect(after.ledger).toHaveLength(2);
+  }
 });
