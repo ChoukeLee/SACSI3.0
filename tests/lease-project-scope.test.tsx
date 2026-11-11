@@ -192,25 +192,26 @@ it("combines apartment location with shared browsing and remembers the selected 
   const viewer = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   await render(undefined, viewer);
   const toolbar = host.querySelector('[aria-label="长租浏览工具栏"]')!;
-  const select = toolbar.querySelector<HTMLSelectElement>('select[aria-label="选择楼栋"]')!;
+  const select = toolbar.querySelector<HTMLSelectElement>('select[aria-label="选择项目或楼栋"]')!;
   expect(select.value).toBe("a11");
   expect(
     Array.from(
-      toolbar.querySelectorAll('[aria-label="出租方式"] button'),
+      toolbar.querySelectorAll('[aria-label="长租工作台"] a'),
       (entry) => entry.textContent,
     ),
-  ).toEqual(["公寓", "分单元出租", "整体出租"]);
+  ).toEqual(["公寓", "分单元出租", "整体出租", "收款跟进"]);
   expect(host.querySelectorAll('input[type="search"]')).toHaveLength(1);
   expect(toolbar.querySelector('a[href="/leases?assetCategory=followup"]')).not.toBeNull();
-  expect(host.querySelector('[aria-label="楼栋切换"]')).toBeNull();
+  expect(host.querySelector('[aria-label="楼栋切换"] [aria-current="true"]')?.textContent).toBe(
+    "11#公寓",
+  );
   expect(metric("查看历史")).toBe("查看历史");
   const room = host.querySelector<HTMLButtonElement>('[data-room-id="a11"]')!;
   expect(room.textContent).toContain("客户a11");
   expect(room.querySelector("time")?.dateTime).toBe("2028-12-31");
   expect(room.textContent).not.toMatch(/月租|万西法/);
-  expect(host.querySelector('select[aria-label="房源跟进筛选"]')?.textContent).toContain(
-    "全部租赁 · 1",
-  );
+  expect(metric("全部租赁")).toBe("全部租赁 1");
+  expect(host.querySelector('select[aria-label="房源跟进筛选"]')).toBeNull();
 
   const back = host.querySelector<HTMLButtonElement>('button[aria-label="返回全部楼栋"]')!;
   await act(async () => back.click());
@@ -253,7 +254,9 @@ it("combines apartment location with shared browsing and remembers the selected 
   await act(async () => root.unmount());
   root = createRoot(host);
   await render(undefined, viewer);
-  expect(host.querySelector<HTMLSelectElement>('select[aria-label="选择楼栋"]')?.value).toBe("c2");
+  expect(host.querySelector<HTMLSelectElement>('select[aria-label="选择项目或楼栋"]')?.value).toBe(
+    "c2",
+  );
   expect(host.querySelectorAll("[data-room-id]")).toHaveLength(1);
 });
 
