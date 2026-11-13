@@ -1,6 +1,11 @@
 import type { CurrencyCode } from "@/types/domain";
 import type { OwnerSettlement } from "./owner-settlement-model";
 import {
+  summarizeOwnerRentAccount,
+  type OwnerRentAccount,
+  type OwnerRentSummary,
+} from "./owner-rent-account-model";
+import {
   assetReportPeriod,
   isAssetDate,
   type AssetOperationAsset,
@@ -63,6 +68,7 @@ export interface OperatingAssetLeaseEvidence {
   selfUse?: boolean;
   blockReceiptCutoff?: boolean;
   ownerSettlement?: OwnerSettlement;
+  ownerRentAccount?: OwnerRentAccount;
 }
 
 export interface OperatingAssetLeaseGroup {
@@ -327,6 +333,7 @@ interface ScheduledRentPeriod {
 }
 
 export interface OperatingAssetFollowUp {
+  ownerRent?: OwnerRentSummary | null;
   paidThrough: RentCoverage | null;
   dueDate: string | null;
   dueSourceRef: string | null;
@@ -525,6 +532,34 @@ export function getOperatingAssetFollowUp(
   const needsEvidence = (
     reason: NonNullable<OperatingAssetFollowUp["reason"]>,
   ): OperatingAssetFollowUp => ({ ...facts, status: "needs_evidence", reason });
+
+  if (evidence?.ownerRentAccount) {
+    const ownerRent =
+      evidence.ownerSettlement &&
+      evidence.ownerRentAccount.wholeMonthlyRentNative === asset.monthlyRentNative &&
+      asset.rentCurrency === "XOF"
+        ? summarizeOwnerRentAccount(
+            evidence.ownerRentAccount,
+            evidence.ownerSettlement,
+            entries,
+            asset.id,
+            today,
+          )
+        : null;
+    if (!ownerRent)
+      return { ...facts, ownerRent: null, status: "needs_evidence", reason: "source_conflict" };
+    return {
+      ...facts,
+      ownerRent,
+      status:
+        ownerRent.arrearsNative > 0
+          ? ownerRent.firstUnpaidDate === today
+            ? "upcoming"
+            : "overdue"
+          : "current",
+      reason: null,
+    };
+  }
 
   if (evidence?.selfUse) return { ...facts, status: "current", reason: null };
   if (dueDate && daysUntilDue !== null && nextPayment?.unpaid === true) {

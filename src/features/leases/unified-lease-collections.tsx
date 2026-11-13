@@ -192,14 +192,22 @@ export function UnifiedLeaseCollections({
                             {row.tenant ? <span>{row.tenant}</span> : null}
                           </span>
                           <small className={styles.coverage} title={row.paidThroughSource}>
-                            {row.coveragePending
+                            {row.ownerSettledThrough
                               ? zh
-                                ? "租金记载至"
-                                : "Loyer documenté au"
-                              : zh
-                                ? "已交至"
-                                : "Payé au"}{" "}
-                            {row.paidThrough ? (
+                                ? "业主分账已结至"
+                                : "Quote-part réglée au"
+                              : row.coveragePending
+                                ? zh
+                                  ? "租金记载至"
+                                  : "Loyer documenté au"
+                                : zh
+                                  ? "已交至"
+                                  : "Payé au"}{" "}
+                            {row.ownerSettledThrough ? (
+                              <time dateTime={row.ownerSettledThrough}>
+                                {row.ownerSettledThrough}
+                              </time>
+                            ) : row.paidThrough ? (
                               <time dateTime={row.paidThrough}>{row.paidThrough}</time>
                             ) : (
                               unregistered

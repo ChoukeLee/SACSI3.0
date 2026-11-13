@@ -454,6 +454,8 @@ export function OperatingAssetDetail({
         : followUpLabels[followUp.status][lang]
       : null;
   const outstanding = followUp.outstanding;
+  const hasOwnerAccount = !!asset.leaseEvidence?.ownerRentAccount;
+  const ownerRent = followUp.ownerRent;
   const schedule = asset.monthlyRentSchedule;
   const scheduledPeriods = followUp.scheduledPeriods;
   const tabs = [
@@ -531,44 +533,68 @@ export function OperatingAssetDetail({
               <dl className={drawerStyles.rentSummary}>
                 <div>
                   <dt>
-                    {leaseGroup
+                    {hasOwnerAccount
                       ? zh
-                        ? "累计已收租金（本组）"
-                        : "Loyers reçus cumulés (groupe)"
-                      : zh
-                        ? "累计已收租金（按资产）"
-                        : "Loyers reçus cumulés (actif)"}
+                        ? "业主累计实收"
+                        : "Total reçu par le propriétaire"
+                      : leaseGroup
+                        ? zh
+                          ? "累计已收租金（本组）"
+                          : "Loyers reçus cumulés (groupe)"
+                        : zh
+                          ? "累计已收租金（按资产）"
+                          : "Loyers reçus cumulés (actif)"}
                   </dt>
                   <dd>
-                    {rentCash.originals.length
-                      ? rentCash.originals
-                          .map(({ income, currency }) =>
-                            formatPropertyMoney(income, currency, locale),
-                          )
-                          .join(" · ")
-                      : zh
-                        ? "暂无已确认流水"
-                        : "Aucun flux confirmé"}
+                    {hasOwnerAccount
+                      ? ownerRent
+                        ? formatPropertyMoney(ownerRent.cumulativeActualNative, "XOF", locale)
+                        : zh
+                          ? "待核"
+                          : "À vérifier"
+                      : rentCash.originals.length
+                        ? rentCash.originals
+                            .map(({ income, currency }) =>
+                              formatPropertyMoney(income, currency, locale),
+                            )
+                            .join(" · ")
+                        : zh
+                          ? "暂无已确认流水"
+                          : "Aucun flux confirmé"}
                   </dd>
                 </div>
                 <div>
                   <dt>
-                    {schedule
+                    {hasOwnerAccount
                       ? zh
-                        ? "到期未收"
-                        : "Loyers échus restant dus"
-                      : zh
-                        ? "原表登记未收"
-                        : "Solde enregistré dans la source"}
+                        ? `业主到期未结（截至 ${today}）`
+                        : `Solde du propriétaire au ${today}`
+                      : schedule
+                        ? zh
+                          ? "到期未收"
+                          : "Loyers échus restant dus"
+                        : zh
+                          ? "原表登记未收"
+                          : "Solde enregistré dans la source"}
                   </dt>
                   <dd title={outstanding ? assetSourceLabel(outstanding.sourceRef) : undefined}>
-                    {outstanding
-                      ? formatPropertyMoney(outstanding.amountNative, outstanding.currency, locale)
-                      : schedule
-                        ? formatPropertyMoney(0, schedule.currency, locale)
+                    {hasOwnerAccount
+                      ? ownerRent
+                        ? formatPropertyMoney(ownerRent.arrearsNative, "XOF", locale)
                         : zh
-                          ? "未登记"
-                          : "Non renseigné"}
+                          ? "待核"
+                          : "À vérifier"
+                      : outstanding
+                        ? formatPropertyMoney(
+                            outstanding.amountNative,
+                            outstanding.currency,
+                            locale,
+                          )
+                        : schedule
+                          ? formatPropertyMoney(0, schedule.currency, locale)
+                          : zh
+                            ? "未登记"
+                            : "Non renseigné"}
                   </dd>
                 </div>
               </dl>
@@ -576,6 +602,12 @@ export function OperatingAssetDetail({
                 <p className={drawerStyles.attention} data-status={followUp.status}>
                   {attention}
                   {followUp.reason ? ` · ${followUpReasons[followUp.reason][lang]}` : ""}
+                </p>
+              ) : null}
+              {hasOwnerAccount && ownerRent ? (
+                <p className={styles.note}>
+                  {zh ? "业主分账已结至" : "Quote-part réglée au"} {ownerRent.settledThrough} ·{" "}
+                  {zh ? "租客付款进度单独保留" : "Suivi du locataire conservé séparément"}
                 </p>
               ) : null}
               {coverage && rentCoverage ? (
@@ -646,6 +678,8 @@ export function OperatingAssetDetail({
             <OwnerSettlementSection
               assetId={asset.id}
               settlement={asset.leaseEvidence?.ownerSettlement}
+              account={asset.leaseEvidence?.ownerRentAccount}
+              accountSummary={followUp.ownerRent}
               canWrite={canWrite && ownerSettlementEnabled}
               today={today}
               locale={locale}

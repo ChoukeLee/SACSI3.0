@@ -45,6 +45,7 @@ export interface UnifiedLeaseCollectionRow {
   dueDate: string | null;
   dueSource?: string;
   paidThrough: string | null;
+  ownerSettledThrough?: string;
   paidThroughSource?: string;
   coveragePending?: boolean;
   amount: string | null;
@@ -202,7 +203,7 @@ export function buildOperatingCollectionRows(
   const views = data.assets.flatMap((asset) =>
     operatingLeaseViews(asset, entriesByAsset.get(asset.id) ?? []),
   );
-  return views.flatMap(({ key, groupKey, asset, entries }) => {
+  return views.flatMap<UnifiedLeaseCollectionRow>(({ key, groupKey, asset, entries }) => {
     if (!hasOperatingAssetLeaseEvidence(asset, entries)) return [];
     const category = classifyOperatingLeaseMode(asset);
     const {
@@ -214,7 +215,35 @@ export function buildOperatingCollectionRows(
       outstanding,
       daysUntilDue,
       scheduledPeriods,
+      ownerRent,
     } = getOperatingAssetFollowUp(asset, entries, today);
+    if (asset.leaseEvidence?.ownerRentAccount) {
+      if (ownerRent?.arrearsNative === 0) return [];
+      const account = asset.leaseEvidence.ownerRentAccount;
+      const query = new URLSearchParams({ assetCategory: category, operatingAsset: asset.id });
+      return [
+        {
+          id: `asset:${key}`,
+          category,
+          name: asset.displayName,
+          group: operatingLeaseLocation(asset),
+          tenant: `${zh ? "业主" : "Propriétaire"} ${account.ownerName}`,
+          keywords: [asset.code, asset.name, account.ownerName],
+          href: routeFor(locale, `/leases?${query}`),
+          status: status === "current" ? "needs_evidence" : status,
+          reason: zh
+            ? "业主应分账按自然月统计，进入当月即计一期；租客付款进度另核。"
+            : "Quote-part par mois civil, mois courant inclus ; suivi du locataire distinct.",
+          dueDate: ownerRent?.firstUnpaidDate ?? null,
+          dueSource: assetSourceLabel(account.rateSourceRef),
+          paidThrough: null,
+          ownerSettledThrough: ownerRent?.settledThrough,
+          amount: ownerRent ? formatPropertyMoney(ownerRent.arrearsNative, "XOF", locale) : null,
+          amountLabel: zh ? "业主到期未结" : "Solde du propriétaire",
+          amountSource: assetSourceLabel(account.rateSourceRef),
+        },
+      ];
+    }
     const schedule = asset.monthlyRentSchedule;
     const firstScheduledPeriod = scheduledPeriods?.[0];
     const amount =

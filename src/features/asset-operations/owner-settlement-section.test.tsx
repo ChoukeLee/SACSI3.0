@@ -81,7 +81,7 @@ async function submit(form: HTMLFormElement) {
 
 it("shows owner cash and the separate settlement period without giving a read-only user a write button", async () => {
   await render(false);
-  expect(host.textContent).toContain("现金实收500 万西法");
+  expect(host.textContent).toContain("本次实收500 万西法");
   expect(host.textContent).toContain("本次分账结清期");
   expect(host.textContent).toContain("租客付款进度和其他期间待核款项分别保留");
   expect(host.querySelector("button")).toBeNull();
