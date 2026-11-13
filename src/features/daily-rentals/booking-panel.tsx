@@ -158,6 +158,7 @@ export function BookingPanel({
   const [actionError, setActionError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; amount: number } | null>(null);
   const [cancelBookingId, setCancelBookingId] = useState<string | null>(null);
+  const cancelBookingButton = useRef<HTMLButtonElement>(null);
   const [reversalReason, setReversalReason] = useState("");
   const [showAdvancedActions, setShowAdvancedActions] = useState(false);
   const [activeAdvancedTask, setActiveAdvancedTask] = useState<AdvancedTask>(null);
@@ -228,6 +229,9 @@ export function BookingPanel({
   const totalPaid = bookingPayments.reduce((s, p) => s + Number(p.amount), 0);
   const canCancelBooking = !!booking && !readOnly && allowCancelBooking(booking).allowed;
   const cancellationHasPayments = totalPaid !== 0 || Number(booking?.prepaid_amount_xof ?? 0) !== 0;
+  const confirmingCancellation =
+    canCancelBooking && booking.id === cancelBookingId && !cancellationHasPayments;
+  const cancellationTitle = locale === "zh" ? "取消这笔预订？" : "Annuler cette réservation ?";
   const actualRefunds = bookingPayments.filter((p) => p.request_kind === "daily_refund");
   const reversedPaymentIds = useMemo(
     () => new Set(bookingPayments.map((payment) => payment.reversal_of_payment_id).filter(Boolean)),
@@ -2147,7 +2151,9 @@ export function BookingPanel({
                           type="button"
                           variant="outline"
                           size="lg"
+                          ref={cancelBookingButton}
                           onClick={() => setCancelBookingId(booking.id)}
+                          aria-expanded={confirmingCancellation}
                           disabled={saving || cancellationHasPayments}
                           className="w-full justify-center border-accentRed-200 font-semibold text-accentRed-600 hover:border-accentRed-300 hover:bg-accentRed-50 hover:text-accentRed-700"
                         >
@@ -2158,6 +2164,43 @@ export function BookingPanel({
                           <p className="text-xs text-muted-foreground">
                             {formatError("bookingHasPayments")}
                           </p>
+                        )}
+                        {confirmingCancellation && (
+                          <div
+                            role="group"
+                            aria-label={cancellationTitle}
+                            className="space-y-3 rounded-lg border border-accentRed-200 p-3"
+                          >
+                            <div className="space-y-1">
+                              <p className="text-sm font-semibold">{cancellationTitle}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {locale === "zh"
+                                  ? "取消后，这笔预订将释放房间占用，应收也会标为已取消。"
+                                  : "La réservation libérera le créneau de la chambre et la créance sera annulée."}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                autoFocus
+                                onClick={() => {
+                                  setCancelBookingId(null);
+                                  cancelBookingButton.current?.focus();
+                                }}
+                              >
+                                {locale === "zh" ? "保留预订" : "Garder la réservation"}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                onClick={() => void handleCancelBooking()}
+                                disabled={saving}
+                              >
+                                {locale === "zh" ? "确认取消预订" : "Confirmer l’annulation"}
+                              </Button>
+                            </div>
+                          </div>
                         )}
                       </div>
                     )}
@@ -2173,22 +2216,6 @@ export function BookingPanel({
           )}
         </div>
       </RightDrawer>
-
-      <ConfirmDialog
-        open={canCancelBooking && booking?.id === cancelBookingId && !cancellationHasPayments}
-        onClose={() => setCancelBookingId(null)}
-        onConfirm={() => void handleCancelBooking()}
-        title={locale === "zh" ? "取消这笔预订？" : "Annuler cette réservation ?"}
-        description={
-          locale === "zh"
-            ? "取消后，这笔预订将释放房间占用，应收也会标为已取消。"
-            : "La réservation libérera le créneau de la chambre et la créance sera annulée."
-        }
-        confirmLabel={locale === "zh" ? "确认取消预订" : "Confirmer l’annulation"}
-        cancelLabel={locale === "zh" ? "保留预订" : "Garder la réservation"}
-        locale={locale}
-        confirmDisabled={saving}
-      />
 
       <ConfirmDialog
         open={deleteTarget !== null}

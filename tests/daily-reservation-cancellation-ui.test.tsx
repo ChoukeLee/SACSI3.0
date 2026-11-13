@@ -128,7 +128,9 @@ async function click(label: string) {
 }
 
 function confirmation() {
-  return document.querySelector('[role="dialog"][aria-labelledby="mobile-confirm-title"]');
+  return document.querySelector(
+    '[role="dialog"] [role="group"][aria-label="取消这笔预订？"], [role="dialog"][aria-labelledby="mobile-confirm-title"]',
+  );
 }
 
 it("offers one desktop cancellation action for pending and confirmed reservations even with a room block", async () => {
@@ -201,6 +203,14 @@ it.each(["desktop", "mobile"] as const)(
     await click("取消预订");
     expect(confirmation()).not.toBeNull();
     expect(cancelBooking).not.toHaveBeenCalled();
+    if (surface === "desktop") {
+      expect(confirmation()?.contains(buttons("确认取消预订")[0])).toBe(true);
+      expect(document.activeElement).toBe(buttons("保留预订")[0]);
+      await click("保留预订");
+      expect(confirmation()).toBeNull();
+      expect(document.activeElement).toBe(buttons("取消预订")[0]);
+      await click("取消预订");
+    }
 
     const nextBooking = { ...booking, id: "another-booking" };
     await renderBooking(nextBooking);
