@@ -13,6 +13,65 @@ import {
   type OwnerSettlementContextResult,
   type OwnerSettlementResult,
 } from "./owner-settlement-model";
+import {
+  parseOwnerRentBackfillInput,
+  verifyOwnerRentBackfillResult,
+  type OwnerRentBackfillResult,
+} from "./owner-rent-account-model";
+
+export async function backfillOwnerRentHistory(
+  input: unknown,
+  requestId: string,
+): Promise<OwnerRentBackfillResult> {
+  const actor = await requireRole("admin", "finance");
+  let payload;
+  try {
+    if (!isOwnerSettlementId(requestId)) throw new Error("invalidOwnerRentHistory");
+    payload = parseOwnerRentBackfillInput(input, new Date().toISOString().slice(0, 10));
+  } catch {
+    return { ok: false, error: "invalidOwnerRentHistory", rejected: true };
+  }
+  try {
+    const supabase = await createClient();
+    const result = await supabase.rpc("asset_operations_backfill_owner_rent_history_rpc", {
+      p_input: payload,
+      p_request_id: requestId,
+    });
+    if (result.error) {
+      const rejected = /^(P0001|42501|22[0-9A-Z]{3}|23[0-9A-Z]{3})$/.test(result.error.code ?? "");
+      const business = ownerSettlementBusinessErrors.includes(result.error.message);
+      return {
+        ok: false,
+        error: rejected && business ? result.error.message : "assetOperationResultUnknown",
+        rejected: rejected && business,
+      };
+    }
+    const verified = verifyOwnerRentBackfillResult(result.data, payload, requestId, actor.id);
+    for (const path of [
+      "/asset-operations",
+      "/fr/asset-operations",
+      "/units",
+      "/fr/units",
+      "/leases",
+      "/fr/leases",
+      "/finance",
+      "/fr/finance",
+      "/management",
+      "/fr/management",
+      "/reports",
+      "/fr/reports",
+    ])
+      revalidatePath(path);
+    return { ok: true, ...verified };
+  } catch {
+    captureOperationFailure({
+      operation: "asset_operations_owner_history",
+      requestId,
+      code: "result_unknown",
+    });
+    return { ok: false, error: "assetOperationResultUnknown", rejected: false };
+  }
+}
 
 export async function getOwnerSettlementContext(
   assetId: string,

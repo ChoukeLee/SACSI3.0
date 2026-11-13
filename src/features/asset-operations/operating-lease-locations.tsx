@@ -203,6 +203,17 @@ function wholePaymentDateMissing(row: WholeLeaseRow, locale: Locale) {
 function wholeLeaseBadge(row: WholeLeaseRow, today: string, locale: Locale): WholeLeaseBadge {
   const zh = locale === "zh";
   const { asset, followUp, hasLeaseEvidence, pendingEntries } = row;
+  if (asset.leaseEvidence?.ownerRentAccount) {
+    const owner = followUp.ownerRent;
+    if (!owner)
+      return { tone: "check", label: zh ? "业主账户待核" : "Compte du propriétaire à vérifier" };
+    if (owner.arrearsNative > 0)
+      return {
+        tone: followUp.status === "upcoming" ? "due" : "late",
+        label: `${zh ? "业主到期未结" : "Solde du propriétaire"} ${formatPropertyMoney(owner.arrearsNative, "XOF", locale)}`,
+      };
+    return { tone: "normal", label: zh ? "业主本期已结清" : "Quote-part du propriétaire à jour" };
+  }
   const balance = followUp.outstanding;
   const amount = balance
     ? formatPropertyMoney(balance.amountNative, balance.currency, locale)
@@ -358,7 +369,12 @@ export function OperatingWholeLeases({
           {visible.map(({ row, badge }) => {
             const { asset, followUp } = row;
             const tenant = wholeTenant(asset, locale);
-            const coverage = followUp.paidThrough;
+            const ownerAccount = !!asset.leaseEvidence?.ownerRentAccount;
+            const coverage = ownerAccount
+              ? followUp.ownerRent
+                ? { date: followUp.ownerRent.settledThrough, status: "verified" }
+                : null
+              : followUp.paidThrough;
             const tenantLabel =
               tenant.basis && !asset.leaseEvidence?.tenantEvidence
                 ? tenant.basis
@@ -389,13 +405,17 @@ export function OperatingWholeLeases({
                   </span>
                   <span className={styles.wholeCardFoot}>
                     <span className={styles.coverage}>
-                      {coverage?.status === "pending"
+                      {ownerAccount
                         ? zh
-                          ? "租金记载至"
-                          : "Loyer documenté au"
-                        : zh
-                          ? "已交至"
-                          : "Payé au"}{" "}
+                          ? "业主分账已结至"
+                          : "Quote-part réglée au"
+                        : coverage?.status === "pending"
+                          ? zh
+                            ? "租金记载至"
+                            : "Loyer documenté au"
+                          : zh
+                            ? "已交至"
+                            : "Payé au"}{" "}
                       {coverage ? (
                         <time dateTime={coverage.date}>{coverage.date}</time>
                       ) : zh ? (
@@ -444,6 +464,67 @@ function OperatingWholeLeaseOverview({
   const coverage = followUp.paidThrough;
   const receipts = latestTwoVerifiedRentReceipts(entries, today);
   const outstanding = followUp.outstanding;
+
+  if (asset.leaseEvidence?.ownerRentAccount) {
+    const owner = followUp.ownerRent;
+    const account = asset.leaseEvidence.ownerRentAccount;
+    const pending = zh ? "待核" : "À vérifier";
+    const money = (value: number) => formatPropertyMoney(value, "XOF", locale);
+    return (
+      <article className={styles.wholeOverview} aria-label={asset.displayName}>
+        <header className={styles.wholeHeader}>
+          <h2>{asset.displayName}</h2>
+          <span className={styles.wholeBadge} data-tone={badge.tone}>
+            {badge.label}
+          </span>
+        </header>
+        <div className={styles.wholePanels}>
+          <section className={styles.wholePanel}>
+            <h3>{zh ? "业主租金账户" : "Compte de loyer du propriétaire"}</h3>
+            <p>
+              {account.ownerName} · {account.shareBps / 100}%
+            </p>
+            <dl className={styles.wholeFacts}>
+              <div>
+                <dt>{zh ? "业主每月应分账" : "Quote-part mensuelle"}</dt>
+                <dd>{owner ? money(owner.monthlyOwnerRentNative) : pending}</dd>
+              </div>
+              <div>
+                <dt>{zh ? "业主累计实收" : "Total effectivement reçu"}</dt>
+                <dd>{owner ? money(owner.cumulativeActualNative) : pending}</dd>
+              </div>
+              <div>
+                <dt>{zh ? "业主分账已结至" : "Quote-part réglée au"}</dt>
+                <dd>{owner?.settledThrough ?? pending}</dd>
+              </div>
+              <div>
+                <dt>
+                  {zh ? `业主到期未结（截至 ${today}）` : `Solde du propriétaire au ${today}`}
+                </dt>
+                <dd>{owner ? money(owner.arrearsNative) : pending}</dd>
+              </div>
+            </dl>
+            <p className={styles.wholeMuted}>
+              {zh
+                ? "按完整自然月计，进入当月即计一期；历史实收及已核销结余不重复抵扣。租客付款进度单独保留。"
+                : "Mois civils entiers, mois courant inclus. Les anciens encaissements et crédits utilisés ne sont pas déduits deux fois. Le suivi du locataire reste séparé."}
+            </p>
+          </section>
+        </div>
+        <footer className={styles.wholeFooter}>
+          <button
+            type="button"
+            className={styles.back}
+            aria-haspopup="dialog"
+            onClick={onOpenDetail}
+          >
+            {zh ? "查看业主历史收款与逐月未结" : "Voir les encaissements et soldes mensuels"}
+            <ArrowRight size={15} aria-hidden="true" />
+          </button>
+        </footer>
+      </article>
+    );
+  }
 
   return (
     <article className={styles.wholeOverview} aria-label={asset.displayName}>

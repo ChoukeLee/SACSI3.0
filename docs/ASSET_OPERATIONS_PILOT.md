@@ -94,6 +94,12 @@ CSV使用当前筛选的资产、类别及期间，包含原币、收付日、�
 
 操作沿用本人管理员或财务会话、项目权限、记录版本校验、固定请求幂等和审计。若当前资产尚待核，本次对已确认资产及参考月租的核实与分账收款在一个事务中完成；这不生成租客合同、入住或新的租客应收。
 
+历史分账收款可按原付款日期、实际收到的原币金额及原始单元格来源补录。缺失的收款方式保留为“未记录”。每笔补录只新增业主实际收到的款项，不新增整厂等值、结余或此前已保存的收款。历史来源原文保留，经过确认的推算更正写入补录说明。
+
+启用业主欠款统计后，“业主累计实收”按明确关联的历史收款和分账收款汇总；“业主到期未结”从最近一次已核分账结清月份的下月起算，按整厂月租乘以业主份额计算，进入当月即计完整一期。期末结余按份额换算后只抵扣一次，已用于结清旧期间的历史实收不再扣减后续欠款。计算随当前日期变化，始终标明业主、份额、月应收、结清日期和统计截止日。
+
+统计依据与租客付款截止、租客应收保持独立。缺失依据、关联收款冲突或月租不一致时显示待核，不把缺失值显示为零。历史收款补录在同一事务内校验资产及依据版本、来源重复、固定请求身份和审计，并保护已关联的收款不被单独作废。
+
 ## 自动验证
 
 在仓库根目录、安装依赖后运行：
@@ -102,6 +108,8 @@ CSV使用当前筛选的资产、类别及期间，包含原币、收付日、�
 npx vitest run src/features/asset-operations/asset-operations-model.test.ts src/features/asset-operations/asset-operations-workspace.test.tsx src/features/asset-operations/asset-operations-interaction.test.tsx
 npx vitest run src/features/asset-operations/asset-operations-intake-model.test.ts src/features/asset-operations/asset-operations-intake.test.tsx
 npx vitest run --config vitest.postgres.config.ts tests/asset-operations.native.ts
+npx vitest run src/features/asset-operations/owner-rent-account-model.test.ts
+npx vitest run --config vitest.postgres.config.ts tests/asset-owner-history.native.ts
 npm run typecheck
 npm run lint
 git diff --check

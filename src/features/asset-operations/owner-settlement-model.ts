@@ -325,6 +325,34 @@ export function verifyOwnerSettlementResult(
 }
 
 const messages: Record<string, [string, string]> = {
+  invalidOwnerRentHistory: [
+    "请逐笔填写历史收款原日期、原币金额、方式及来源，按日期递增排列。",
+    "Renseignez les encaissements historiques, leurs montants, modes et sources, par date croissante.",
+  ],
+  ownerRentAccountAlreadyRecorded: [
+    "业主历史账户已经登记，请核对原记录，勿重复录入。",
+    "L’historique est déjà enregistré ; vérifiez l’original sans le recréer.",
+  ],
+  ownerHistoryReceiptCollision: [
+    "存在相同日期和金额的收款，请核对已有流水。",
+    "Un encaissement de même date et montant existe déjà.",
+  ],
+  ownerHistoryOrderConflict: [
+    "历史日期应严格递增，且不得晚于最近一次业主收款日。",
+    "Les dates doivent être strictement croissantes et ne pas dépasser le dernier encaissement.",
+  ],
+  ownerRentAccountAnchorConflict: [
+    "业主结算锚点已变化，请重新读取并核对。",
+    "Le règlement de référence a changé ; rechargez et vérifiez.",
+  ],
+  ownerRentAccountHistoryConflict: [
+    "业主历史依据或收款引用不一致，请核对原记录。",
+    "L’historique ou les références de paiement ne concordent pas.",
+  ],
+  ownerRentAccountRateConflict: [
+    "业主股比或月租依据不一致，请核对租金标准。",
+    "La quote-part ou le loyer mensuel ne concorde pas avec la source.",
+  ],
   ownerSettlementContextUnavailable: [
     "暂时无法读取结算依据，请稍后重新读取。",
     "Impossible de charger les données du règlement. Réessayez.",

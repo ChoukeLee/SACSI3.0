@@ -15,6 +15,12 @@ import {
 } from "./owner-settlement-model";
 import styles from "./operating-asset-directory.module.css";
 import detailStyles from "./operating-asset-detail.module.css";
+import {
+  OwnerRentAccountFacts,
+  OwnerRentHistoryForm,
+  ownerRentMethodLabel,
+} from "./owner-rent-history";
+import type { OwnerRentAccount, OwnerRentSummary } from "./owner-rent-account-model";
 
 function wholeValue(data: FormData, name: string) {
   const value = data.get(name);
@@ -69,9 +75,11 @@ function SettlementFacts({
           </dd>
         </div>
         <div>
-          <dt>{zh ? "现金实收" : "Encaissement effectif"}</dt>
+          <dt>{zh ? "本次实收" : "Encaissement effectif"}</dt>
           <dd>
             {money(s.receiptAmountNative)} · {s.cashDate}
+            {" · "}
+            {ownerRentMethodLabel(s.paymentMethod, locale)}
           </dd>
         </div>
         <div>
@@ -108,6 +116,8 @@ function SettlementFacts({
 export function OwnerSettlementSection({
   assetId,
   settlement,
+  account,
+  accountSummary,
   canWrite,
   today,
   locale,
@@ -115,6 +125,8 @@ export function OwnerSettlementSection({
 }: {
   assetId: string;
   settlement?: OwnerSettlement;
+  account?: OwnerRentAccount;
+  accountSummary?: OwnerRentSummary | null;
   canWrite: boolean;
   today: string;
   locale: Locale;
@@ -133,10 +145,14 @@ export function OwnerSettlementSection({
   const attemptRef = useRef<typeof pending>(null);
   const inFlight = useRef(false);
   const [unknown, setUnknown] = useState(false);
+  const [historyActive, setHistoryActive] = useState(false);
   const [preview, setPreview] = useState<
     (ReturnType<typeof ownerSettlementPreview> & { input: OwnerSettlementInput }) | null
   >(null);
-  const displayed = saved ?? (context ? context.previousSettlement : settlement);
+  const accountAwaitingRefresh = !!account && !!saved && saved.entryId !== settlement?.entryId;
+  const displayed = account
+    ? settlement
+    : (saved ?? (context ? context.previousSettlement : settlement));
   const money = (amount: number) => formatPropertyMoney(amount, "XOF", locale);
 
   async function open() {
@@ -216,15 +232,33 @@ export function OwnerSettlementSection({
           {zh ? "暂无业主分账结算记录。" : "Aucun règlement enregistré."}
         </p>
       )}
+      {account ? (
+        <OwnerRentAccountFacts account={account} summary={accountSummary} locale={locale} />
+      ) : null}
       <p className={styles.note}>
         {zh
           ? "本节登记业主实收及结余核销；租客付款进度和其他期间待核款项分别保留。"
           : "Cette section documente l’encaissement du propriétaire et l’utilisation du crédit. Le suivi des paiements du locataire et les autres soldes à vérifier sont conservés séparément."}
       </p>
-      {saved ? <p role="status">{zh ? "业主分账结算已登记。" : "Règlement enregistré."}</p> : null}
+      {saved ? (
+        <p role="status">
+          {accountAwaitingRefresh
+            ? zh
+              ? "业主分账结算已登记，账户正在刷新；当前摘要仍为刷新前数据。"
+              : "Règlement enregistré. Le compte est en cours d’actualisation ; le résumé précédent reste affiché."
+            : zh
+              ? "业主分账结算已登记。"
+              : "Règlement enregistré."}
+        </p>
+      ) : null}
       {error ? <p role="alert">{ownerSettlementError(error, zh)}</p> : null}
       {canWrite && !context ? (
-        <button type="button" className={styles.textButton} disabled={busy} onClick={open}>
+        <button
+          type="button"
+          className={styles.textButton}
+          disabled={busy || historyActive}
+          onClick={open}
+        >
           {busy
             ? zh
               ? "读取中…"
@@ -393,6 +427,16 @@ export function OwnerSettlementSection({
             ) : null}
           </div>
         </form>
+      ) : null}
+      {!account && canWrite && displayed ? (
+        <OwnerRentHistoryForm
+          assetId={assetId}
+          today={today}
+          locale={locale}
+          disabled={busy || !!context}
+          onActiveChange={setHistoryActive}
+          onUnresolvedChange={onUnresolvedChange}
+        />
       ) : null}
     </section>
   );

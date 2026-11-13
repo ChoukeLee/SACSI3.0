@@ -7,7 +7,16 @@ import {
   ownerRequestId,
   ownerResult,
 } from "../../../tests/fixtures/owner-settlement";
-import { getOwnerSettlementContext, recordOwnerSettlement } from "./owner-settlement-actions";
+import {
+  backfillOwnerRentHistory,
+  getOwnerSettlementContext,
+  recordOwnerSettlement,
+} from "./owner-settlement-actions";
+import {
+  historyRequestId,
+  ownerRentUiInput,
+  ownerRentUiResult,
+} from "../../../tests/fixtures/owner-rent-ui";
 
 const mocks = vi.hoisted(() => ({
   rpc: vi.fn(),
@@ -28,6 +37,64 @@ beforeEach(() => {
   mocks.role.mockResolvedValue({ id: ownerActorId, role: "finance" });
 });
 afterEach(() => vi.useRealTimers());
+
+it("writes the bounded historical account through the session RPC and verifies exact receipts and actor", async () => {
+  mocks.rpc.mockResolvedValue({ data: ownerRentUiResult(), error: null });
+  expect(await backfillOwnerRentHistory(ownerRentUiInput(), historyRequestId)).toMatchObject({
+    ok: true,
+    account: { requestId: historyRequestId },
+    idempotent: false,
+  });
+  expect(mocks.role).toHaveBeenCalledWith("admin", "finance");
+  expect(mocks.rpc).toHaveBeenCalledWith("asset_operations_backfill_owner_rent_history_rpc", {
+    p_input: ownerRentUiInput(),
+    p_request_id: historyRequestId,
+  });
+  expect(mocks.revalidate).toHaveBeenCalledWith("/reports");
+  mocks.revalidate.mockClear();
+  const changed = ownerRentUiResult();
+  changed.data.ownerRentAccount.history[0].amountNative = 1;
+  mocks.rpc.mockResolvedValue({ data: changed, error: null });
+  expect(await backfillOwnerRentHistory(ownerRentUiInput(), historyRequestId)).toEqual({
+    ok: false,
+    error: "assetOperationResultUnknown",
+    rejected: false,
+  });
+  expect(mocks.revalidate).not.toHaveBeenCalled();
+});
+
+it("rejects malformed history before dispatch and preserves uncertain historical results for original-ID retry", async () => {
+  expect(
+    await backfillOwnerRentHistory(
+      { ...ownerRentUiInput(), arbitrarySql: "select 1" },
+      historyRequestId,
+    ),
+  ).toMatchObject({ ok: false, rejected: true });
+  expect(mocks.rpc).not.toHaveBeenCalled();
+  mocks.rpc.mockResolvedValueOnce({
+    data: null,
+    error: { code: "P0001", message: "ownerHistoryReceiptCollision" },
+  });
+  expect(await backfillOwnerRentHistory(ownerRentUiInput(), historyRequestId)).toMatchObject({
+    ok: false,
+    error: "ownerHistoryReceiptCollision",
+    rejected: true,
+  });
+  mocks.rpc.mockResolvedValueOnce({
+    data: null,
+    error: { code: "P0001", message: "requestIdConflict" },
+  });
+  expect(await backfillOwnerRentHistory(ownerRentUiInput(), historyRequestId)).toMatchObject({
+    ok: false,
+    rejected: false,
+  });
+  mocks.rpc.mockRejectedValueOnce(new Error("private credential"));
+  expect(await backfillOwnerRentHistory(ownerRentUiInput(), historyRequestId)).toEqual({
+    ok: false,
+    error: "assetOperationResultUnknown",
+    rejected: false,
+  });
+});
 
 it("reads fresh context with the authenticated account and checks the exact target", async () => {
   mocks.rpc.mockResolvedValue({ data: ownerContext(), error: null });

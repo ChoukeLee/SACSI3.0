@@ -113,6 +113,7 @@ function directoryRow(
       (followUp.status === "needs_evidence" ||
         (leaseBrowse &&
           (classifyOperatingLeaseMode(asset) === "whole" || isIncubatorDormitory(asset)) &&
+          !followUp.ownerRent &&
           !followUp.dueDate)));
   return {
     ...view,
@@ -754,8 +755,16 @@ function AssetCollectionFollowUp({
         (a.followUp.status === "needs_evidence"
           ? Number(Boolean(b.followUp.outstanding)) - Number(Boolean(a.followUp.outstanding))
           : 0) ||
-        (a.followUp.dueDate ?? a.followUp.paidThrough?.date ?? "9999-12-31").localeCompare(
-          b.followUp.dueDate ?? b.followUp.paidThrough?.date ?? "9999-12-31",
+        (
+          a.followUp.ownerRent?.firstUnpaidDate ??
+          a.followUp.dueDate ??
+          a.followUp.paidThrough?.date ??
+          "9999-12-31"
+        ).localeCompare(
+          b.followUp.ownerRent?.firstUnpaidDate ??
+            b.followUp.dueDate ??
+            b.followUp.paidThrough?.date ??
+            "9999-12-31",
         ) ||
         nameCollators[locale].compare(a.asset.displayName, b.asset.displayName),
     );
@@ -794,6 +803,49 @@ function AssetCollectionFollowUp({
         <ul className={styles.collectionRows}>
           {visible.map(({ key, asset, followUp }) => {
             const tenant = recordedTenant(asset, locale);
+            if (asset.leaseEvidence?.ownerRentAccount) {
+              const owner = followUp.ownerRent;
+              return (
+                <li key={key}>
+                  <button
+                    type="button"
+                    className={styles.collectionRow}
+                    aria-haspopup="dialog"
+                    onClick={() => onSelect(key)}
+                  >
+                    <span>
+                      <span>{asset.displayName}</span>
+                      <small>
+                        {zh ? "业主" : "Propriétaire"}{" "}
+                        {asset.leaseEvidence.ownerRentAccount.ownerName}
+                      </small>
+                    </span>
+                    <span className={styles.status} data-status={followUp.status}>
+                      {followUpLabels[followUp.status][lang]}
+                    </span>
+                    <span>
+                      <span>
+                        {zh ? "业主首期未结" : "Première échéance non réglée"}{" "}
+                        {owner?.firstUnpaidDate ?? unregistered}
+                      </span>
+                      <small>
+                        {zh ? "业主分账已结至" : "Quote-part réglée au"}{" "}
+                        {owner?.settledThrough ?? unregistered}
+                      </small>
+                    </span>
+                    <span className={styles.collectionAmount}>
+                      {owner
+                        ? formatPropertyMoney(owner.arrearsNative, "XOF", locale)
+                        : zh
+                          ? "待核"
+                          : "À vérifier"}
+                      <small>{zh ? "业主到期未结" : "Solde du propriétaire"}</small>
+                    </span>
+                    <ArrowRight size={14} aria-hidden="true" />
+                  </button>
+                </li>
+              );
+            }
             return (
               <li key={key}>
                 <button

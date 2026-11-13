@@ -114,3 +114,12 @@
   border-radius: 0.35rem;
   padding: 0.5rem 0.75rem;
 }
+
+.historyRow {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.35rem;
+  padding: 0.75rem;
+}
