@@ -3,6 +3,22 @@
   gap: 0.8rem;
   container: operating-asset-directory / inline-size;
 }
+.assetOverviewHeading {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 18px;
+}
+.assetOverviewHeading h1 {
+  color: hsl(var(--foreground));
+  font-size: 22px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+.assetOverviewHeading p {
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+  line-height: 1.7;
+}
 
 .directory[data-lease-view="true"] {
   gap: 1.25rem;

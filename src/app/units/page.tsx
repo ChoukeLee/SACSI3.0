@@ -9,9 +9,12 @@ import type { UnitWorkbenchSearch } from "@/features/units/unit-workbench-model"
 import { redirectLegacyCimac } from "@/features/cimac/cimac-legacy-redirect";
 import { AssetOperationsPage } from "@/features/asset-operations/asset-operations-page";
 import {
+  AssetBrowseNavigation,
+  parseAssetBrowseCategory,
+} from "@/features/units/asset-browse-navigation";
+import {
   canReadOperatingAssets,
   OperatingAssetDirectoryPage,
-  OperatingAssetNavigation,
   parseAssetOperatingView,
   parseOperatingAssetId,
 } from "@/features/asset-operations/operating-asset-page";
@@ -28,16 +31,28 @@ export default async function UnitsPage({
   await redirectLegacyCimac("units", params, "zh");
   const showOperatingAssets = canReadOperatingAssets(user.role);
   const view = showOperatingAssets ? parseAssetOperatingView(params.assetView) : undefined;
+  const category = showOperatingAssets
+    ? parseAssetBrowseCategory(params.assetCategory, view === "operations")
+    : "apartment";
 
   return (
     <>
-      {showOperatingAssets ? <OperatingAssetNavigation locale="zh" view={view} /> : null}
+      <AssetBrowseNavigation
+        locale="zh"
+        category={category}
+        canReadOperatingAssets={showOperatingAssets}
+        maintenance={view === "maintenance"}
+        project={typeof params.project === "string" ? params.project : undefined}
+      />
       <Suspense fallback={<UnitWorkbenchSkeleton locale="zh" />}>
         {view === "maintenance" ? (
           <AssetOperationsPage locale="zh" />
-        ) : view === "operations" ? (
+        ) : category !== "apartment" ? (
           <OperatingAssetDirectoryPage
             locale="zh"
+            category={category}
+            assetBrowse
+            viewerId={user.id}
             project={typeof params.project === "string" ? params.project : undefined}
             selectedAssetId={parseOperatingAssetId(params.operatingAsset)}
           />

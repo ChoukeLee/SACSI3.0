@@ -92,6 +92,7 @@ async function render(
     onSearchChange?: (value: string) => void;
     recordStatus?: string;
     initialRecordsOpen?: boolean;
+    initialFollowup?: boolean;
     onBrowseChange?: () => void;
     locale?: "zh" | "fr";
   } = {},
@@ -111,6 +112,7 @@ async function render(
         onSearchChange={state.onSearchChange}
         recordStatus={state.recordStatus}
         initialRecordsOpen={state.initialRecordsOpen}
+        initialFollowup={state.initialFollowup}
         onBrowseChange={state.onBrowseChange}
       />,
     ),
@@ -176,6 +178,158 @@ it("keeps current cards separate from historical balances and opens the exact ol
   );
   expect(selected).toHaveBeenLastCalledWith(cleared);
 });
+
+it("opens undated source balances in the independent tail-payment view without calling them overdue", async () => {
+  const undated: SaleRecordOverviewRow = {
+    ...current,
+    registeredBalance: { currency: "XOF", amount: 120000000, sourceRef: "workbook!K12" },
+    outstandingNative: null,
+    attention: null,
+    nextDue: null,
+  };
+  await render([{ ...room, record: undated, records: [undated] }], [undated], {
+    initialFollowup: true,
+  });
+  expect(button("待收尾款").getAttribute("aria-pressed")).toBe("true");
+  const card = host.querySelector("[data-sale-room-id]")!;
+  expect(card.textContent).toContain("待收 · 未约定付款日");
+  expect(card.textContent).not.toContain("已逾期");
+  expect(fact(card, "未收")).toBe("12,000 万西法（登记）");
+  expect(host.querySelector('[data-sale-followup-record-id="current"]')?.textContent).toContain(
+    "12,000 万西法",
+  );
+  await act(async () => button("已结清").click());
+  expect(host.querySelectorAll("[data-sale-room-id]")).toHaveLength(0);
+});
+
+it("does not treat unknown balances or conflicting source balances as settled", async () => {
+  const sourceOpen: SaleRecordOverviewRow = {
+    ...current,
+    registeredBalance: { currency: "XOF", amount: 9000000, sourceRef: "workbook!K8" },
+    outstandingNative: [],
+    attention: null,
+    nextDue: null,
+  };
+  await render([{ ...room, record: sourceOpen, records: [sourceOpen] }], [sourceOpen]);
+  expect(fact(host.querySelector("[data-sale-room-id]")!, "未收")).toBe("900 万西法（登记）");
+  expect(button("待收尾款").textContent).toContain("1");
+  await act(async () => button("已结清").click());
+  expect(host.querySelectorAll("[data-sale-room-id]")).toHaveLength(0);
+  const unknown = { ...current, outstandingNative: null, attention: null, nextDue: null };
+  await render([{ ...room, record: unknown, records: [unknown] }], [unknown]);
+  expect(host.querySelectorAll("[data-sale-room-id]")).toHaveLength(0);
+});
+it("shows stored historical sale balances as registered tails without using the old imported due date", async () => {
+  const pending: SaleRecordOverviewRow = {
+    ...current,
+    outstandingNative: null,
+    pendingBalanceNative: [{ currency: "XOF", amount: 120000000 }],
+    pendingBalanceSources: [
+      {
+        id: "source-bill",
+        category: "sale_lump_sum",
+        title: "905 出售款",
+        currency: "XOF",
+        amount: 120000000,
+        notes: "金额已核，尾款付款安排未约定",
+        paymentDateUnspecified: true,
+      },
+    ],
+    attention: { kind: "review", dueDate: null, days: null, amounts: [] },
+    reviewReasons: ["historical_balance_requires_review"],
+    nextDue: null,
+  };
+  await render([{ ...room, record: pending, records: [pending] }], [pending], {
+    initialFollowup: true,
+  });
+  const card = host.querySelector("[data-sale-room-id]")!;
+  expect(fact(card, "未收")).toBe("12,000 万西法（登记待收）");
+  expect(card.textContent).toContain("登记待收 · 未约定付款日");
+  expect(card.textContent).not.toContain("已逾期");
+  expect(host.querySelector('[data-sale-followup-record-id="current"]')?.textContent).toContain(
+    "12,000 万西法",
+  );
+  await act(async () => button("全部出售").click());
+  await render(
+    [
+      {
+        ...room,
+        unit: { ...room.unit, building_id: "other-building" },
+        record: pending,
+        records: [pending],
+      },
+    ],
+    [pending],
+    { initialFollowup: true },
+  );
+  expect(button("全部出售").getAttribute("aria-pressed")).toBe("true");
+});
+
+it("keeps parking registration amounts separate when the recorded purchase balance is already zero", async () => {
+  const parking: SaleRecordOverviewRow = {
+    ...current,
+    outstandingNative: null,
+    registeredBalance: { currency: "XOF", amount: 0, sourceRef: "workbook!principal" },
+    pendingBalanceNative: [{ currency: "XOF", amount: 9000000 }],
+    pendingBalanceSources: [
+      {
+        id: "parking-bill",
+        category: "sale_lump_sum",
+        title: "车位登记款",
+        currency: "XOF",
+        amount: 9000000,
+        notes: "车位尾款，未约定付款日",
+        paymentDateUnspecified: true,
+      },
+    ],
+    attention: { kind: "review", dueDate: null, days: null, amounts: [] },
+    reviewReasons: ["historical_balance_requires_review"],
+    nextDue: null,
+  };
+  await render([{ ...room, record: parking, records: [parking] }], [parking], {
+    initialFollowup: true,
+  });
+  const card = host.querySelector("[data-sale-room-id]")!;
+  expect(fact(card, "未收")).toBe("0 万西法（登记）");
+  expect(fact(card, "登记待收出售款")).toBe("900 万西法");
+  expect(button("待收尾款").textContent).toContain("1");
+  expect(card.textContent).toContain("未约定付款日");
+  expect(host.querySelector('[data-sale-followup-record-id="current"]')?.textContent).toContain(
+    "900 万西法",
+  );
+  await act(async () => button("已结清").click());
+  expect(host.querySelector("[data-sale-room-id]")).toBeNull();
+});
+
+it.each(["billing_data_conflict", "cash_record_requires_review"])(
+  "does not hide a real %s behind a known historical registration amount",
+  async (reason) => {
+    const pending: SaleRecordOverviewRow = {
+      ...current,
+      outstandingNative: null,
+      pendingBalanceNative: [{ currency: "XOF", amount: 9000000 }],
+      pendingBalanceSources: [
+        {
+          id: "pending-bill",
+          category: "sale_lump_sum",
+          title: "出售登记款",
+          currency: "XOF",
+          amount: 9000000,
+          notes: "未约定付款日",
+          paymentDateUnspecified: true,
+        },
+      ],
+      attention: { kind: "review", dueDate: null, days: null, amounts: [] },
+      reviewReasons: ["historical_balance_requires_review", reason],
+      nextDue: null,
+    };
+    await render([{ ...room, record: pending, records: [pending] }], [pending]);
+    const card = host.querySelector("[data-sale-room-id]")!;
+    expect(card.textContent).toContain("出售资料待核");
+    expect(fact(card, "未收")).toBe("900 万西法（登记待收）");
+    expect(card.textContent).not.toContain("登记待收 · 未约定付款日");
+  },
+);
 
 it("uses one visible search for room cards, history and collection follow-up", async () => {
   const browse = vi.fn();

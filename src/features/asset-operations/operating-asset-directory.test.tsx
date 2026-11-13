@@ -115,6 +115,57 @@ function factValues(scope: ParentNode, name: string) {
     .map((item) => item.nextElementSibling?.textContent);
 }
 
+it("uses the asset browse shell without a lease toolbar and retains self-use or unleased units", async () => {
+  const buildings = [
+    asset({
+      id: "warehouse-1",
+      sourceKey: "old_warehouse:1",
+      name: "老仓库1号",
+      group: "老仓库",
+      verification: "verified",
+    }),
+    asset({
+      id: "warehouse-2",
+      sourceKey: "old_warehouse:2",
+      name: "老仓库2号",
+      group: "老仓库",
+      verification: "verified",
+    }),
+    asset({
+      id: "warehouse-3",
+      sourceKey: "old_warehouse:3",
+      name: "老仓库3号",
+      group: "老仓库",
+      verification: "verified",
+    }),
+  ];
+  const data = directory(buildings, [], {
+    "old_warehouse:2": { assetSourceRef: buildings[1].sourceRefs[0], selfUse: true },
+  });
+  await act(async () =>
+    root.render(
+      <OperatingAssetDirectory
+        data={data}
+        locale="zh"
+        today={today}
+        category="all"
+        leaseCategory="multi-unit"
+        assetBrowse
+      />,
+    ),
+  );
+  expect(host.querySelector("h1")?.textContent).toBe("资产");
+  expect(host.querySelector('[aria-label="长租浏览工具栏"]')).toBeNull();
+  expect(host.querySelectorAll('input[type="search"]')).toHaveLength(1);
+  expect(host.querySelector('[aria-label="分单元场地"]')).not.toBeNull();
+  const cards = [...host.querySelectorAll('button[aria-haspopup="dialog"]')];
+  expect(cards).toHaveLength(3);
+  expect(cards.map((card) => card.textContent).join(" ")).toContain("自用");
+  expect(cards.map((card) => card.textContent).join(" ")).toContain("老仓库3号");
+  expect(cards.some((card) => card.textContent?.includes("已交至 未登记"))).toBe(true);
+  expect(host.querySelector('[aria-label="资产类别"]')).toBeNull();
+});
+
 it("shows the next dormitory rent period without adding it to the due balance", async () => {
   const dormitory = asset({
     id: "dormitory",

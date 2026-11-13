@@ -175,6 +175,35 @@ it("keeps existing plans without verified balances and historical-pending balanc
     outstandingNative: null,
   });
 });
+it("exposes stored historical sale balances separately without restoring their old due dates", () => {
+  const d = input();
+  d.receivables = [
+    bill({
+      management_status: "historical_pending",
+      due_date: "2023-04-20",
+      status: "overdue",
+      amount_xof: 115000000,
+      paid_amount_xof: 106000000,
+      notes:
+        "【车位尾款已确认待收】房款已结清；车位余900万。用户确认未约定付款日，旧日期仅供追溯。",
+    }),
+  ];
+  const result = buildSaleRecordOverview(d)[0];
+  expect(result.pendingBalanceNative).toEqual([{ currency: "XOF", amount: 9000000 }]);
+  expect(result.pendingBalanceSources?.[0]).toMatchObject({
+    amount: 9000000,
+    paymentDateUnspecified: true,
+    category: "sale_installment",
+  });
+  expect(result.pendingBalanceSources?.[0]).not.toHaveProperty("dueDate");
+  expect(result.outstandingNative).toBeNull();
+  expect(result.attention).toMatchObject({ kind: "review", dueDate: null });
+  expect(d.receivables[0].management_status).toBe("historical_pending");
+  d.receivables[0].notes = "历史账单，付款安排尚待补充";
+  expect(buildSaleRecordOverview(d)[0].pendingBalanceSources?.[0].paymentDateUnspecified).toBe(
+    false,
+  );
+});
 it("ignores cancelled/excluded obligations and never counts the schedule a second time", () => {
   const d = input();
   d.receivables = [

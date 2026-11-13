@@ -101,6 +101,7 @@ export async function OperatingAssetDirectoryPage({
   viewerId,
   searchQuery,
   searchCategory,
+  assetBrowse = false,
 }: {
   locale: Locale;
   category?: LeaseAssetCategory;
@@ -110,6 +111,7 @@ export async function OperatingAssetDirectoryPage({
   viewerId?: string;
   searchQuery?: string;
   searchCategory?: LeaseBrowseCategory;
+  assetBrowse?: boolean;
 }) {
   const zh = locale === "zh";
   const browseCategory = searchCategory ?? category;
@@ -155,7 +157,8 @@ export async function OperatingAssetDirectoryPage({
         today={today}
         category="all"
         leaseCategory={leaseCategory}
-        enableCollections={!!browseCategory}
+        enableCollections={!!browseCategory && !assetBrowse}
+        assetBrowse={assetBrowse}
         initialView="cards"
         browseViewerId={browseCategory ? viewerId : undefined}
         searchQuery={search}
@@ -182,7 +185,7 @@ export async function OperatingAssetDirectoryPage({
       throw error;
     return (
       <>
-        {browseCategory && viewerId ? (
+        {browseCategory && viewerId && !assetBrowse ? (
           <LeaseBrowseToolbar locale={locale} category={browseCategory} searchQuery={search} />
         ) : null}
         <p role="alert" className="rounded-md border bg-card p-4 text-sm text-muted-foreground">

@@ -144,6 +144,7 @@ interface OperatingAssetDirectoryProps {
   browseViewerId?: string;
   searchQuery?: string;
   searchCategory?: LeaseBrowseCategory;
+  assetBrowse?: boolean;
 }
 
 export function OperatingAssetDirectory(props: OperatingAssetDirectoryProps) {
@@ -158,6 +159,7 @@ export function OperatingAssetDirectory(props: OperatingAssetDirectoryProps) {
         props.initialView,
         props.browseViewerId,
         props.searchQuery,
+        props.assetBrowse,
       ])}
       {...props}
     />
@@ -180,6 +182,7 @@ function OperatingAssetDirectoryView({
   browseViewerId,
   searchQuery,
   searchCategory,
+  assetBrowse = false,
 }: OperatingAssetDirectoryProps) {
   const zh = locale === "zh";
   const lang = zh ? 0 : 1;
@@ -195,7 +198,7 @@ function OperatingAssetDirectoryView({
   );
   const groupStorageKey =
     browseViewerId && leaseCategory === "multi-unit"
-      ? `sacsi:lease-site:${browseViewerId}:${data.projectId}:${leaseCategory}`
+      ? `sacsi:${assetBrowse ? "asset" : "lease"}-site:${browseViewerId}:${data.projectId}:${leaseCategory}`
       : null;
   const selectedAssetSite =
     selectedAssetId && groupStorageKey
@@ -257,9 +260,10 @@ function OperatingAssetDirectoryView({
       )
       .flatMap((asset) => {
         const entries = entriesByAsset.get(asset.id) ?? emptyEntries;
-        const views = browseViewerId
-          ? operatingLeaseViews(asset, entries)
-          : [{ key: asset.id, asset, entries }];
+        const views =
+          browseViewerId || assetBrowse
+            ? operatingLeaseViews(asset, entries)
+            : [{ key: asset.id, asset, entries }];
         return views.map((view) => directoryRow(view, today, !!browseViewerId));
       });
     if (leaseCategory || category !== "all") {
@@ -280,16 +284,28 @@ function OperatingAssetDirectoryView({
       });
     }
     return scoped;
-  }, [browseViewerId, category, data.assets, entriesByAsset, leaseCategory, locale, today]);
+  }, [
+    assetBrowse,
+    browseViewerId,
+    category,
+    data.assets,
+    entriesByAsset,
+    leaseCategory,
+    locale,
+    today,
+  ]);
   const showCollections = enableCollections && view === "collections";
-  const locationMode = !!browseViewerId && leaseCategory === "multi-unit" && !showCollections;
-  const wholeMode = !!browseViewerId && leaseCategory === "whole" && !showCollections;
-  const activeSearch = browseViewerId ? (searchQuery ?? "").trim() : search;
-  const isSearchView = !!browseViewerId && !leaseCategory;
+  const locationMode =
+    !!(browseViewerId || assetBrowse) && leaseCategory === "multi-unit" && !showCollections;
+  const wholeMode =
+    !!(browseViewerId || assetBrowse) && leaseCategory === "whole" && !showCollections;
+  const activeSearch = browseViewerId && !assetBrowse ? (searchQuery ?? "").trim() : search;
+  const isSearchView = !!browseViewerId && !assetBrowse && !leaseCategory;
   const emptySearch = isSearchView && !activeSearch;
   const browseCategory = leaseCategory ?? searchCategory ?? "apartment";
   const hasApartments = !emptySearch && (apartmentRows !== undefined || apartmentUnavailable);
   const showLeaseToolbar =
+    !assetBrowse &&
     !showCollections &&
     (Boolean(browseViewerId || collectionHref) || enableCollections || hasApartments);
   const thisMonth = assetReportPeriod("month", today.slice(0, 7));
@@ -372,7 +388,7 @@ function OperatingAssetDirectoryView({
     }
   }
   const matchingRows =
-    showLeaseToolbar && cardFilter !== "all"
+    (showLeaseToolbar || assetBrowse) && cardFilter !== "all"
       ? visible.filter((row) =>
           cardFilter === "followup" ? row.attention !== null : row.attention === cardFilter,
         )
@@ -440,7 +456,13 @@ function OperatingAssetDirectoryView({
         returnTo={isSearchView ? leaseSearchHref(locale, browseCategory, activeSearch) : undefined}
       />
     ) : null;
-  const statusLabel = zh ? "长租状态筛选" : "Filtres de suivi des locations";
+  const statusLabel = assetBrowse
+    ? zh
+      ? "资产状态筛选"
+      : "Filtres des actifs"
+    : zh
+      ? "长租状态筛选"
+      : "Filtres de suivi des locations";
   const statusOptions = cardFilters.map(({ key, labels }) => ({
     value: key as DirectoryFilter,
     label: key === "all" ? (zh ? "全部状态" : "Tous les statuts") : labels[lang],
@@ -490,7 +512,17 @@ function OperatingAssetDirectoryView({
       data-lease-view={showLeaseToolbar || undefined}
       aria-label={zh ? "经营资产目录" : "Répertoire des actifs"}
     >
-      {browseViewerId ? (
+      {assetBrowse ? (
+        <header className={styles.assetOverviewHeading}>
+          <h1>{zh ? "资产" : "Actifs"}</h1>
+          <p>
+            {zh
+              ? "完整家底：按场地查看资产、客户与收支。"
+              : "Tous les actifs, leurs clients et leurs paiements, par site."}
+          </p>
+        </header>
+      ) : null}
+      {browseViewerId && !assetBrowse ? (
         <>
           <LeaseBrowseToolbar locale={locale} category={browseCategory} searchQuery={searchQuery} />
           {isSearchView && !emptySearch ? (
@@ -528,7 +560,7 @@ function OperatingAssetDirectoryView({
           </select>
         </div>
       ) : null}
-      {!browseViewerId ? (
+      {!browseViewerId || assetBrowse ? (
         <div className={showLeaseToolbar ? leaseStyles.toolbar : styles.toolbar}>
           {showLeaseToolbar ? legacyStatusFilters : null}
           <div className={showLeaseToolbar ? leaseStyles.tools : styles.toolbar}>
@@ -547,7 +579,7 @@ function OperatingAssetDirectoryView({
                 {zh ? `${visible.length} 项资产` : `${visible.length} actifs`}
               </span>
             )}
-            {!showLeaseToolbar && groupOptions.size > 1 ? (
+            {!showLeaseToolbar && !assetBrowse && groupOptions.size > 1 ? (
               <select
                 aria-label={groupLabel}
                 className={styles.groupSelect}
@@ -618,7 +650,7 @@ function OperatingAssetDirectoryView({
         />
       ) : wholeMode ? (
         <OperatingWholeLeases
-          rows={visible}
+          rows={assetBrowse ? matchingRows : visible}
           locale={locale}
           today={today}
           initialAssetId={selectedAssetId}
@@ -683,7 +715,7 @@ function OperatingAssetDirectoryView({
           followUp={selected.followUp}
           locale={locale}
           today={today}
-          leaseView={!!browseViewerId}
+          leaseView={!!browseViewerId || assetBrowse}
           onClose={() => setSelectedId(null)}
         />
       ) : null}

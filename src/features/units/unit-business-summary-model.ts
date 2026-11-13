@@ -10,7 +10,11 @@ import type {
   SalePaymentScheduleRow,
 } from "@/types/database";
 import type { UnitWorkbenchBuilding } from "./unit-workbench-model";
-import { buildSaleRecordOverview } from "@/features/sales/sale-room-overview-model";
+import {
+  buildSaleRecordOverview,
+  buildSalePendingBalanceSummary,
+  type SalePendingBalanceSource,
+} from "@/features/sales/sale-room-overview-model";
 import { buildLeaseRecordOverview } from "@/features/leases/lease-room-overview-model";
 import { historicalXofAmount } from "@/lib/financial-amount";
 
@@ -58,6 +62,9 @@ export interface UnitSaleBrief extends UnitBusinessParty {
   /** Recorded purchase receipts minus explicit same-currency refunds, never FX or price-minus-cash. */
   netReceived?: UnitBusinessMoney[] | null;
   balance: UnitBusinessBalance;
+  /** Historical registered sale balance, potentially including parking and fees; never principal management debt. */
+  pendingBalanceNative?: UnitBusinessMoney[];
+  pendingBalanceSources?: SalePendingBalanceSource[];
   agencyReceived: UnitBusinessMoney[] | null;
   otherReceived: UnitBusinessMoney[] | null;
   refundPaid: UnitBusinessMoney[] | null;
@@ -448,6 +455,7 @@ export function buildUnitBusinessSummaries(
       received,
       netReceived: net.values,
       balance,
+      ...buildSalePendingBalanceSummary(original, row.unit, input.receivables),
       agencyReceived: cash.total("agency"),
       otherReceived: cash.total("other"),
       refundPaid: refunded,

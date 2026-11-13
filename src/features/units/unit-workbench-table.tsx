@@ -40,8 +40,13 @@ function hasSaleBalance(party: UnitSaleBrief) {
     party.balance.amounts?.some((value) => value.amount > 0)
   );
 }
+function hasPendingSaleBalance(party: UnitSaleBrief) {
+  return party.pendingBalanceNative?.some((value) => value.amount > 0) === true;
+}
 
-function attention(record: UnitWorkbenchRecord, locale: Locale) {
+type AssetCardAttention = { label: string; critical: boolean; informational?: boolean };
+
+function attention(record: UnitWorkbenchRecord, locale: Locale): AssetCardAttention | null {
   const zh = locale === "zh",
     position = record.position;
   if (position?.daily_occupied && position.lease_occupied)
@@ -70,12 +75,50 @@ function attention(record: UnitWorkbenchRecord, locale: Locale) {
               : "Dû sous 15 jours",
         critical: false,
       };
+    const saleReasons = record.business.sales.flatMap((party) => party.reviewReasons);
+    if (
+      saleReasons.some((reason) =>
+        [
+          "registered_balance_bill_conflict",
+          "cash_exceeds_registered_price",
+          "refund_currency_or_amount_requires_review",
+          "cash_party_mismatch",
+          "cash_ledger_mismatch",
+          "billing_data_conflict",
+          "installment_bill_conflict",
+        ].includes(reason),
+      )
+    )
+      return { label: zh ? "房款记录有差异" : "Écart dans les écritures du prix", critical: false };
+    if (saleReasons.includes("duplicate_cash_record"))
+      return { label: zh ? "收款重复待核" : "Doublon d’encaissement à vérifier", critical: false };
+    if (saleReasons.includes("cash_reversal_requires_review"))
+      return { label: zh ? "收款含冲正记录" : "Encaissement avec annulation", critical: false };
+    if (
+      saleReasons.some((reason) =>
+        ["cash_data_requires_review", "cash_record_requires_review"].includes(reason),
+      )
+    )
+      return { label: zh ? "收款资料待核" : "Données d’encaissement à vérifier", critical: false };
+    if (record.business.sales.some(hasPendingSaleBalance))
+      return { label: zh ? "登记待收出售款" : "Solde de vente enregistré", critical: false };
     if (record.business.sales.some(hasSaleBalance))
       return { label: zh ? "余款待跟进" : "Solde à suivre", critical: false };
   }
   if (position?.operational_condition === "maintenance")
     return { label: conditionLabel("maintenance", locale), critical: false };
   if (position?.cleaning_pending) return { label: zh ? "待保洁" : "À nettoyer", critical: false };
+  if (
+    record.business?.status === "ready" &&
+    record.business.sales.length &&
+    !record.business.leases.length &&
+    (record.business.reviewReasons.length || unitNeedsVerification(record))
+  )
+    return {
+      label: zh ? "查看出售款明细" : "Voir le détail de la vente",
+      critical: false,
+      informational: true,
+    };
   if (unitNeedsVerification(record) || record.business?.reviewReasons.length)
     return { label: zh ? "待核实" : "À vérifier", critical: false };
   return null;
@@ -84,12 +127,24 @@ function attention(record: UnitWorkbenchRecord, locale: Locale) {
 export function unitReviewText(reasons: readonly string[], locale: Locale) {
   const labels: Record<string, [string, string]> = {
     price_requires_review: ["登记价格待核", "Prix enregistré à vérifier"],
-    payment_arrangement_requires_review: ["付款安排待核", "Échéancier à vérifier"],
+    payment_arrangement_requires_review: ["付款安排未明确", "Échéancier non précisé"],
     registered_balance_bill_conflict: [
       "登记余款与账单有差异",
       "Écart entre solde enregistré et créances",
     ],
     cash_record_requires_review: ["收款资料待核", "Encaissements à vérifier"],
+    cash_data_requires_review: [
+      "收款日期、币种或金额资料需核对",
+      "Date, devise ou montant du paiement à vérifier",
+    ],
+    registered_balance_requires_review: [
+      "登记余款依据待补",
+      "Justificatif du solde enregistré à compléter",
+    ],
+    historical_balance_requires_review: [
+      "历史登记余额未纳入管理应收",
+      "Solde historique enregistré hors créances gérées",
+    ],
     cash_exceeds_registered_price: [
       "已录房款超过登记总价，需核对来源",
       "Les encaissements enregistrés dépassent le prix enregistré ; sources à vérifier",
@@ -103,6 +158,21 @@ export function unitReviewText(reasons: readonly string[], locale: Locale) {
       "Plusieurs dossiers actuels à vérifier séparément",
     ],
     registered_period_needs_review: ["登记租期待核", "Période locative enregistrée à vérifier"],
+    cash_party_mismatch: [
+      "收款关联客户或房号存在差异",
+      "Écart de client ou de lot dans le paiement",
+    ],
+    cash_ledger_mismatch: ["收款与分录存在差异", "Écart entre paiement et écritures"],
+    billing_data_conflict: ["账单资料存在差异", "Écart dans les données de créance"],
+    installment_bill_conflict: ["分期安排与账单存在差异", "Écart entre échéancier et créance"],
+    duplicate_cash_record: [
+      "存在重复收款记录，需核对来源",
+      "Encaissement en double ; source à vérifier",
+    ],
+    cash_reversal_requires_review: [
+      "收款包含冲正记录，需查看具体处理",
+      "Encaissement annulé ; voir le traitement détaillé",
+    ],
   };
   return [
     ...new Set(
@@ -170,7 +240,7 @@ export function UnitPartyHeading({
               : ""}
       </span>
       <strong>{party.customerName || (zh ? "姓名待核" : "Identité à vérifier")}</strong>
-      {party.reviewReasons.length ? (
+      {role === "lease" && party.reviewReasons.length ? (
         <small className={styles.partyReview} title={unitReviewText(party.reviewReasons, locale)}>
           {zh ? "待核" : "À vérifier"}
         </small>
@@ -268,8 +338,8 @@ export function UnitPartyMoney({
               empty={
                 sale.balance.basis === "verified_bills"
                   ? zh
-                    ? "账单结清"
-                    : "Factures soldées"
+                    ? "本金账单结清"
+                    : "Créances du prix du bien soldées"
                   : zh
                     ? "待核"
                     : "À vérifier"
@@ -352,7 +422,12 @@ function UnitCardBusiness({ record, locale }: { record: UnitWorkbenchRecord; loc
           data-unit-sale-record-id={party.recordId}
         >
           <UnitPartyHeading party={party} role="sale" locale={locale} />
-          <UnitPartyMoney sale={party} locale={locale} />
+          {hasPendingSaleBalance(party) ? (
+            <span className={styles.cardPendingBalance}>
+              <span>{zh ? "登记待收出售款" : "Solde de vente enregistré"}</span>
+              <UnitAmountValue values={party.pendingBalanceNative ?? []} locale={locale} />
+            </span>
+          ) : null}
         </span>
       ))}
       {summary.leases.map((party) => (
@@ -362,8 +437,17 @@ function UnitCardBusiness({ record, locale }: { record: UnitWorkbenchRecord; loc
           data-unit-lease-record-id={party.recordId}
         >
           <UnitPartyHeading party={party} role="lease" locale={locale} />
-          <UnitPartyMoney lease={party} locale={locale} />
-          <UnitPaidThrough party={party} locale={locale} />
+          <span className={styles.cardPaidThrough}>
+            <span>{zh ? "已交至" : "Payé jusqu’au"}</span>
+            <time dateTime={party.paidThrough ?? undefined}>
+              {party.paidThrough || (zh ? "待核" : "À vérifier")}
+            </time>
+          </span>
+          {party.monthlyRent === null || party.dueUnpaid === null ? (
+            <span className={styles.cardReview}>
+              {zh ? "收付款资料待核" : "Paiements à vérifier"}
+            </span>
+          ) : null}
         </span>
       ))}
       {summary.daily.map((party) => (
@@ -431,7 +515,7 @@ export function UnitFloorIndex({
                     data-unit-card-id={unit.id}
                     className={cn(
                       styles.assetCard,
-                      warning && styles.attentionCard,
+                      warning && !warning.informational && styles.attentionCard,
                       warning?.critical && styles.criticalCard,
                     )}
                     disabled={disabled}
@@ -451,27 +535,48 @@ export function UnitFloorIndex({
                         {position?.ownership === "sold" ? (
                           <small className={styles.soldMark}>{zh ? "已售" : "Vendu"}</small>
                         ) : null}
-                        {warning ? (
-                          <small
-                            id={`asset-attention-${unit.id}`}
-                            className={cn(
-                              styles.attentionMark,
-                              warning.critical && styles.criticalMark,
-                            )}
-                          >
-                            {warning.label}
-                          </small>
+                        {position?.lease_occupied ? (
+                          <small className={styles.rentedMark}>{zh ? "在租" : "Loué"}</small>
+                        ) : position?.daily_occupied ? (
+                          <small className={styles.rentedMark}>{zh ? "日租入住" : "Séjour"}</small>
                         ) : null}
                       </span>
                     </span>
                     <strong className={styles.roomNumber}>{unit.unit_no}</strong>
                     <span id={`asset-use-${unit.id}`} className={styles.assetUse}>
-                      {unitOccupancyText(record, locale)}
+                      {position?.ownership === "sold" &&
+                      !position.lease_occupied &&
+                      !position.daily_occupied &&
+                      record.business?.sales.length
+                        ? null
+                        : unitOccupancyText(record, locale)}
                     </span>
                     <UnitCardBusiness record={record} locale={locale} />
                     <span className={styles.assetCardFooter}>
-                      <span className={styles.detailHint}>
-                        {zh ? "查看详情" : "Voir les détails"}
+                      <span
+                        id={warning ? `asset-attention-${unit.id}` : undefined}
+                        className={cn(
+                          styles.detailHint,
+                          warning && !warning.informational && styles.attentionMark,
+                          warning?.critical && styles.criticalMark,
+                        )}
+                      >
+                        {warning
+                          ? warning.label
+                          : record.business?.status === "ready" &&
+                              record.business.sales.length > 0 &&
+                              record.business.sales.every(
+                                (party) =>
+                                  !hasPendingSaleBalance(party) &&
+                                  party.balance.basis === "verified_bills" &&
+                                  party.balance.amounts?.length === 0,
+                              )
+                            ? zh
+                              ? "房款本金账单结清"
+                              : "Créances du prix du bien soldées"
+                            : zh
+                              ? "查看详情"
+                              : "Voir les détails"}
                       </span>
                       <ArrowRight size={15} aria-hidden="true" />
                     </span>

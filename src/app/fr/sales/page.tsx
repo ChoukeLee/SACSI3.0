@@ -32,6 +32,7 @@ async function FrenchSalesData({ params, role }: { params: SaleSearchParams; rol
       {...data}
       key={JSON.stringify(params)}
       locale="fr"
+      initialFollowup={params.saleFollowup === "unpaid"}
       canCreate={canOperateSales}
       canRecordFinance={role === "admin" || role === "finance"}
       canManage={canOperateSales}

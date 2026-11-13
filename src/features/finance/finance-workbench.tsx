@@ -26,6 +26,8 @@ import {
 } from "./finance-workbench-model";
 import styles from "./finance-workbench.module.css";
 import { NativeCurrencySummaryPanel } from "@/components/native-currency-summary";
+import { FinanceActualCashWorkbench } from "./finance-actual-cash-workbench";
+import type { FinanceActualCashSnapshot } from "./finance-actual-cash-model";
 
 export interface FinanceWorkbenchProps {
   scopeKey: string;
@@ -43,9 +45,20 @@ export interface FinanceWorkbenchProps {
   projectLocked?: boolean;
   reconciliationPending?: boolean;
   companyReconciliation?: boolean;
+  cashView?: boolean;
+  actualCash?: FinanceActualCashSnapshot | null;
+  actualCashUnavailable?: boolean;
 }
 
-export function FinanceWorkbench({
+export function FinanceWorkbench(props: FinanceWorkbenchProps) {
+  return props.cashView && props.workArea !== "cimac" ? (
+    <FinanceActualCashWorkbench {...props} />
+  ) : (
+    <FinanceCheckingWorkbench {...props} />
+  );
+}
+
+function FinanceCheckingWorkbench({
   scopeKey,
   query,
   mode,

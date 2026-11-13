@@ -3,6 +3,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UnitWorkbench } from "@/features/units/unit-workbench";
+import { AssetBrowseNavigation } from "@/features/units/asset-browse-navigation";
 import type {
   UnitBusinessReceipt,
   UnitBusinessSummary,
@@ -223,6 +224,54 @@ async function openMaintenance() {
 }
 
 describe("asset directory UI", () => {
+  it("keeps apartment, individual-unit and whole-property assets in one authorized navigation", async () => {
+    await act(async () =>
+      root.render(<AssetBrowseNavigation locale="zh" category="multi-unit" project={project} />),
+    );
+    const navigation = host.querySelector('[aria-label="资产浏览"]')!;
+    const links = [...navigation.querySelectorAll("a")];
+    expect(links.map((link) => link.textContent)).toEqual([
+      "公寓",
+      "分单元出租",
+      "整体出租",
+      "来源维护",
+    ]);
+    expect(links[1].getAttribute("aria-current")).toBe("page");
+    expect(new URL(links[1].href).searchParams.get("assetCategory")).toBe("multi-unit");
+    expect(new URL(links[1].href).searchParams.get("assetView")).toBe("operations");
+    expect(new URL(links[1].href).searchParams.get("project")).toBe(project);
+    await act(async () =>
+      root.render(<AssetBrowseNavigation locale="fr" canReadOperatingAssets={false} />),
+    );
+    expect(host.querySelectorAll("a")).toHaveLength(1);
+    expect(host.querySelector("a")?.getAttribute("href")).toBe("/fr/units?assetCategory=apartment");
+  });
+  it("shows buildings directly and switches one building without carrying the old room or filters", async () => {
+    const value = data();
+    const nextBuilding = {
+      ...value.buildings[0],
+      id: uuid(5),
+      code: "SACSI11",
+      display_name: "11#公寓",
+    };
+    value.buildings.push(nextBuilding);
+    value.query.q = "旧条件";
+    value.query.unit = uuid(100);
+    await render(value);
+    expect(host.querySelector('[aria-label="资产楼栋"]')).toBeNull();
+    const index = host.querySelector('[aria-label="资产楼栋浏览"]')!;
+    expect(index.querySelectorAll("button")).toHaveLength(2);
+    const next = [...index.querySelectorAll("button")].find((item) =>
+      item.textContent?.includes("11#公寓"),
+    )!;
+    await click(next);
+    const href = new URL(mocks.push.mock.calls.at(-1)![0], "https://sacsi.invalid");
+    expect(href.searchParams.get("building")).toBe(nextBuilding.id);
+    expect(href.searchParams.has("unit")).toBe(false);
+    expect(href.searchParams.has("q")).toBe(false);
+    expect(href.searchParams.has("filter")).toBe(false);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
   it.each([false, true])(
     "opens one focused asset drawer on narrow screens with reduced motion %s",
     async (reducedMotion) => {
@@ -333,7 +382,7 @@ describe("asset directory UI", () => {
   );
   it("defaults to full-range floor cards without opening or eagerly reading an asset detail", async () => {
     await render();
-    expect(host.querySelector("h1")?.textContent).toBe("资产总览");
+    expect(host.querySelector("h1")?.textContent).toBe("资产");
     expect(host.querySelector("table")).toBeNull();
     expect(host.querySelectorAll("[data-unit-card-id]")).toHaveLength(2);
     expect(drawer()).toBeNull();
@@ -452,15 +501,18 @@ describe("asset directory UI", () => {
     expect(card(uuid(100))?.textContent).not.toContain("Synthetic tenant Beta");
     expect(card(uuid(101))?.textContent).toContain("Synthetic tenant Beta");
     expect(card(uuid(101))?.textContent).not.toContain("Synthetic buyer Alpha");
-    expect(card(uuid(100))?.textContent).toContain("60万西法");
-    expect(card(uuid(100))?.textContent).toContain("2,000");
-    expect(card(uuid(100))?.textContent).toContain("USD");
+    expect(card(uuid(100))?.textContent).not.toContain("60万西法");
+    expect(card(uuid(100))?.textContent).not.toContain("2,000");
+    expect(card(uuid(100))?.textContent).not.toContain("USD");
     expect(card(uuid(100))?.textContent).toContain("2026-12-31");
     expect(card(uuid(100))?.textContent).not.toContain("1,500");
     await selectFirst();
     expect(drawer()?.textContent).toContain("Synthetic buyer Alpha");
     expect(drawer()?.textContent).toContain("Synthetic tenant Alpha");
     expect(drawer()?.textContent).not.toContain("Synthetic tenant Beta");
+    expect(drawer()?.textContent).toContain("60万西法");
+    expect(drawer()?.textContent).toContain("2,000");
+    expect(drawer()?.textContent).toContain("USD");
     expect(fetcher).not.toHaveBeenCalled();
   });
   it("refreshes selected money and paid-through facts when only the business summary changes", async () => {
@@ -755,6 +807,104 @@ describe("asset directory UI", () => {
       else expect(warning?.textContent).toBe("余款待跟进");
       expect(warning?.textContent ?? "").not.toContain("逾期");
     }
+  });
+  it("keeps sale arrangement notes away from the buyer identity and uses a neutral card action", async () => {
+    const value = data();
+    value.rows[0].position = {
+      ...value.rows[0].position!,
+      lease_occupied: false,
+      operational_condition: "normal",
+      cleaning_pending: false,
+    };
+    value.rows[0].unit.occupancy_verified = false;
+    const summary = business();
+    summary.leases = [];
+    summary.sales[0].balance = { basis: "unknown", amounts: null };
+    summary.sales[0].reviewReasons = ["payment_arrangement_requires_review"];
+    summary.reviewReasons = [...summary.sales[0].reviewReasons];
+    value.rows[0].business = summary;
+    await render(value);
+    expect(card(uuid(100))?.textContent).toContain("Synthetic buyer Alpha");
+    expect(card(uuid(100))?.textContent).toContain("查看出售款明细");
+    expect(card(uuid(100))?.textContent).not.toContain("待核");
+    expect(card(uuid(100))?.querySelector('[title="付款安排未明确"]')).toBeNull();
+    await selectFirst();
+    expect(drawer()?.textContent).toContain("付款安排未明确");
+    expect(drawer()?.textContent).not.toContain("房款本金账单结清");
+  });
+  it("names an actual sale cash difference while preserving operational conflicts", async () => {
+    const value = data();
+    value.rows[0].position = {
+      ...value.rows[0].position!,
+      lease_occupied: false,
+      operational_condition: "normal",
+      cleaning_pending: false,
+    };
+    const summary = business();
+    summary.leases = [];
+    summary.sales[0].reviewReasons = ["registered_balance_bill_conflict"];
+    summary.reviewReasons = [...summary.sales[0].reviewReasons];
+    value.rows[0].business = summary;
+    await render(value);
+    expect(card(uuid(100))?.textContent).toContain("房款记录有差异");
+    expect(card(uuid(100))?.textContent).not.toContain("买方Synthetic buyer Alpha待核");
+    await selectFirst();
+    expect(drawer()?.textContent).toContain("登记余款与账单有差异");
+    value.rows[0].position.operational_condition = "locked";
+    await render({ ...value, rows: [...value.rows] });
+    expect(card(uuid(100))?.textContent).toContain("封锁");
+  });
+  it("limits a settled sale label to verified purchase principal rather than every room charge", async () => {
+    const value = data();
+    value.rows[0].position = {
+      ...value.rows[0].position!,
+      lease_occupied: false,
+      operational_condition: "normal",
+      cleaning_pending: false,
+    };
+    const summary = business();
+    summary.leases = [];
+    summary.sales[0].balance = { basis: "verified_bills", amounts: [] };
+    value.rows[0].business = summary;
+    await render(value);
+    expect(card(uuid(100))?.textContent).toContain("房款本金账单结清");
+    await selectFirst();
+    expect(drawer()?.textContent).toContain("本金账单结清");
+    expect(drawer()?.textContent).toContain("不含车位等其他款项");
+  });
+  it("shows registered pending sale money separately and never calls the whole sale settled or overdue", async () => {
+    const value = data();
+    value.rows[0].position = {
+      ...value.rows[0].position!,
+      lease_occupied: false,
+      operational_condition: "normal",
+      cleaning_pending: false,
+    };
+    const summary = business();
+    summary.leases = [];
+    summary.sales[0].balance = { basis: "verified_bills", amounts: [] };
+    summary.sales[0].pendingBalanceNative = [{ currency: "XOF", amount: 9000000 }];
+    summary.sales[0].pendingBalanceSources = [
+      {
+        id: uuid(980),
+        category: "other",
+        title: "车位登记尾款",
+        amount: 9000000,
+        currency: "XOF",
+        notes: "房款已结清，车位尾款已确认待收，未约定付款日",
+        paymentDateUnspecified: true,
+      },
+    ];
+    value.rows[0].business = summary;
+    await render(value);
+    expect(card(uuid(100))?.textContent).toContain("登记待收出售款");
+    expect(card(uuid(100))?.textContent).toContain("900万西法");
+    expect(card(uuid(100))?.textContent).not.toMatch(/逾期|本金账单结清/);
+    await selectFirst();
+    expect(drawer()?.textContent).toContain("历史登记余额，含车位等款项");
+    expect(drawer()?.textContent).not.toContain("本金账单结清");
+    await openDetails("登记待收依据");
+    expect(drawer()?.textContent).toContain("车位尾款已确认待收");
   });
   it("immediately clears selected record and status editor when the project changes before the server response", async () => {
     await render(data(), true);
@@ -1051,7 +1201,7 @@ describe("asset directory UI", () => {
   });
   it("renders the same workbench in French without granting editing", async () => {
     await render(data(), false, "fr");
-    expect(host.querySelector("h1")?.textContent).toBe("Vue des actifs");
+    expect(host.querySelector("h1")?.textContent).toBe("Actifs");
     expect(host.querySelector('[aria-label="Voir l’actif 101"]')).not.toBeNull();
     expect(host.querySelector("form")?.getAttribute("action")).toBe("/fr/units");
     await click(host.querySelector('[aria-label="Voir l’actif 101"]')!);

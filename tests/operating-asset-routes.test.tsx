@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import LeasesPage from "@/app/leases/page";
 import FrenchLeasesPage from "@/app/fr/leases/page";
 import UnitsPage from "@/app/units/page";
+import FrenchUnitsPage from "@/app/fr/units/page";
+import { AssetBrowseNavigation } from "@/features/units/asset-browse-navigation";
 import LegacyOperationsPage from "@/app/asset-operations/page";
 import LegacyFrenchOperationsPage from "@/app/fr/asset-operations/page";
 import { UnifiedLeaseCollectionsPage } from "@/features/leases/unified-lease-collections-page";
@@ -57,6 +59,7 @@ function findProps(
   target:
     | typeof OperatingAssetDirectoryPage
     | typeof OperatingAssetNavigation
+    | typeof AssetBrowseNavigation
     | typeof UnifiedLeaseCollectionsPage,
 ): Record<string, unknown> | undefined {
   for (const child of Children.toArray(tree)) {
@@ -73,6 +76,40 @@ describe("operating assets are available through the existing workspaces", () =>
     mocks.getCurrentUser.mockResolvedValue({ id: "viewer", role: "admin" });
     mocks.cookieGet.mockReturnValue(undefined);
   });
+
+  it.each([
+    { locale: "zh", page: UnitsPage },
+    { locale: "fr", page: FrenchUnitsPage },
+  ] as const)(
+    "opens three asset browse categories in $locale while keeping maintenance secondary",
+    async ({ locale, page }) => {
+      const whole = await page({ searchParams: Promise.resolve({ assetCategory: "whole" }) });
+      expect(findProps(whole, OperatingAssetDirectoryPage)).toMatchObject({
+        category: "whole",
+        assetBrowse: true,
+        viewerId: "viewer",
+        locale,
+      });
+      expect(findProps(whole, AssetBrowseNavigation)).toMatchObject({
+        category: "whole",
+        canReadOperatingAssets: true,
+        maintenance: false,
+      });
+      const apartment = await page({
+        searchParams: Promise.resolve({ assetCategory: "apartment", assetView: "operations" }),
+      });
+      expect(findProps(apartment, OperatingAssetDirectoryPage)).toBeUndefined();
+      mocks.getCurrentUser.mockResolvedValue({ id: "viewer", role: "rental_sales" });
+      const limited = await page({
+        searchParams: Promise.resolve({ assetCategory: "whole", assetView: "operations" }),
+      });
+      expect(findProps(limited, OperatingAssetDirectoryPage)).toBeUndefined();
+      expect(findProps(limited, AssetBrowseNavigation)).toMatchObject({
+        category: "apartment",
+        canReadOperatingAssets: false,
+      });
+    },
+  );
 
   it("passes the same operating asset selection to the shared directory from both routes", async () => {
     const leases = await LeasesPage({

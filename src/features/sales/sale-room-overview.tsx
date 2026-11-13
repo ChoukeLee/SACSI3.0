@@ -9,7 +9,50 @@ import type { Locale } from "@/lib/i18n";
 import type { SaleRecordOverviewRow, SaleRoomOverviewRow } from "./sale-room-overview-model";
 import styles from "./sale-room-overview.module.css";
 
-type Filter = "all" | "overdue" | "upcoming" | "review";
+type Filter = "all" | "unpaid" | "settled";
+type AttentionFilter = "all" | "overdue" | "upcoming" | "review";
+
+function knownBalance(record: SaleRecordOverviewRow) {
+  if (
+    record.pendingBalanceNative?.length &&
+    record.outstandingNative == null &&
+    !record.registeredBalance
+  )
+    return record.pendingBalanceNative;
+  if (
+    record.registeredBalance &&
+    record.registeredBalance.amount > 0 &&
+    !record.outstandingNative?.length
+  )
+    return [record.registeredBalance];
+  return record.outstandingNative ?? (record.registeredBalance ? [record.registeredBalance] : null);
+}
+
+function hasOutstanding(record: SaleRecordOverviewRow) {
+  return (
+    knownBalance(record)?.some((value) => value.amount > 0) === true ||
+    record.pendingBalanceNative?.some((value) => value.amount > 0) === true
+  );
+}
+
+function hasClearedBalance(row: SaleRoomOverviewRow) {
+  if (!row.record || needsReview(row) || hasOutstanding(row.record)) return false;
+  const values = knownBalance(row.record);
+  return values !== null && values.every((value) => value.amount === 0);
+}
+
+function hasMaterialReview(record: SaleRecordOverviewRow) {
+  return (
+    record.conflict ||
+    record.reviewReasons.some(
+      (reason) =>
+        !["historical_balance_requires_review", "payment_arrangement_requires_review"].includes(
+          reason,
+        ),
+    ) ||
+    (record.attention?.kind === "review" && !record.reviewReasons.length)
+  );
+}
 
 function needsReview(row: SaleRoomOverviewRow) {
   return (
@@ -45,6 +88,16 @@ function amounts(values: SaleRecordOverviewRow["receivedNative"], locale: Locale
 function attentionLabel(record: SaleRecordOverviewRow, locale: Locale) {
   const zh = locale === "zh",
     value = record.attention;
+  if (record.pendingBalanceNative?.length && hasMaterialReview(record))
+    return zh ? "出售资料待核" : "Vente à vérifier";
+  if (record.pendingBalanceNative?.length && !record.conflict)
+    return record.pendingBalanceSources?.every((source) => source.paymentDateUnspecified)
+      ? zh
+        ? "登记待收 · 未约定付款日"
+        : "Solde enregistré · date non convenue"
+      : zh
+        ? "登记待收 · 付款安排待补"
+        : "Solde enregistré · modalités à compléter";
   if (value?.kind === "overdue") return zh ? "已逾期" : "En retard";
   if (value?.kind === "upcoming")
     return value.days === 0
@@ -57,6 +110,14 @@ function attentionLabel(record: SaleRecordOverviewRow, locale: Locale) {
   if (value?.kind === "unsettled") return zh ? "历史待结清" : "Ancien solde à régler";
   if (record.conflict || value?.kind === "review" || record.reviewReasons.length)
     return zh ? "出售资料待核" : "Vente à vérifier";
+  if (hasOutstanding(record))
+    return record.nextDue
+      ? zh
+        ? "待收尾款"
+        : "Solde à recevoir"
+      : zh
+        ? "待收 · 未约定付款日"
+        : "Solde · date non convenue";
   return null;
 }
 
@@ -104,6 +165,7 @@ export function SaleRoomOverview({
   recordStatus,
   onRecordStatusChange,
   initialRecordsOpen = false,
+  initialFollowup = false,
   onBrowseChange,
   onSelectRecord,
   onRetry,
@@ -120,15 +182,17 @@ export function SaleRoomOverview({
   recordStatus?: string;
   onRecordStatusChange?: (value: string) => void;
   initialRecordsOpen?: boolean;
+  initialFollowup?: boolean;
   onBrowseChange?: () => void;
   onSelectRecord: (record: SaleRecordOverviewRow) => void;
   onRetry: () => void;
 }) {
   const text = (zh: string, fr: string) => (locale === "zh" ? zh : fr);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<Filter>(initialFollowup ? "unpaid" : "all");
+  const [attentionFilter, setAttentionFilter] = useState<AttentionFilter>("all");
   const [localSearch, setLocalSearch] = useState("");
   const search = controlledSearch ?? localSearch;
-  const [followup, setFollowup] = useState(false);
+  const [followup, setFollowup] = useState(initialFollowup);
   const [history, setHistory] = useState(initialRecordsOpen);
   const [localHistoryStatus, setLocalHistoryStatus] = useState("all");
   const historyStatus = recordStatus ?? localHistoryStatus;
@@ -146,6 +210,9 @@ export function SaleRoomOverview({
   const counts = useMemo(
     () => ({
       all: currentRows.length,
+      unpaid: currentRows.filter((row) => !row.conflict && row.record && hasOutstanding(row.record))
+        .length,
+      settled: currentRows.filter(hasClearedBalance).length,
       overdue: currentRows.filter(
         (row) => !row.conflict && row.record?.attention?.kind === "overdue",
       ).length,
@@ -167,16 +234,20 @@ export function SaleRoomOverview({
                 searchText(record).includes(search.trim().toLocaleLowerCase()),
             )) &&
           (filter === "all" ||
-            (filter === "review"
+            (filter === "unpaid"
+              ? !row.conflict && !!row.record && hasOutstanding(row.record)
+              : hasClearedBalance(row))) &&
+          (attentionFilter === "all" ||
+            (attentionFilter === "review"
               ? needsReview(row)
-              : !row.conflict && row.record?.attention?.kind === filter)),
+              : !row.conflict && row.record?.attention?.kind === attentionFilter)),
       ),
-    [currentRows, search, filter],
+    [currentRows, search, filter, attentionFilter],
   );
   const followupRows = useMemo(
     () =>
       records
-        .filter((row) => row.attention || row.conflict)
+        .filter((row) => row.attention || row.conflict || hasOutstanding(row))
         .filter(
           (row) => !search.trim() || searchText(row).includes(search.trim().toLocaleLowerCase()),
         )
@@ -253,6 +324,11 @@ export function SaleRoomOverview({
   const conflict = currentRows.find((row) => row.unit.id === conflictUnitId && row.conflict);
   const filters: { key: Filter; label: string }[] = [
     { key: "all", label: text("全部出售", "Toutes les ventes") },
+    { key: "unpaid", label: text("待收尾款", "Soldes à recevoir") },
+    { key: "settled", label: text("已结清", "Soldées") },
+  ];
+  const attentionFilters: { key: AttentionFilter; label: string }[] = [
+    { key: "all", label: text("全部状态", "Tous les états") },
     { key: "overdue", label: text("已逾期", "En retard") },
     { key: "upcoming", label: text("15天内应付", "Dû sous 15 jours") },
     { key: "review", label: text("待核事项", "À vérifier") },
@@ -328,13 +404,28 @@ export function SaleRoomOverview({
                 </small>
               </>
             ) : (
-              <small>
-                {record.attention?.amounts.length
-                  ? amounts(record.attention.amounts, locale)
-                  : record.attention
-                    ? text("金额待核", "Montant à vérifier")
-                    : ""}
-              </small>
+              <>
+                <small>
+                  {record.attention?.amounts.length
+                    ? amounts(record.attention.amounts, locale)
+                    : knownBalance(record)?.some((value) => value.amount > 0)
+                      ? amounts(knownBalance(record)!, locale)
+                      : record.pendingBalanceNative?.length
+                        ? `${text("登记待收出售款", "Solde de vente enregistré")} ${amounts(record.pendingBalanceNative, locale)}`
+                        : record.attention
+                          ? text("金额待核", "Montant à vérifier")
+                          : ""}
+                </small>
+                {record.pendingBalanceNative?.length &&
+                (record.attention?.amounts.length ||
+                  (knownBalance(record) !== record.pendingBalanceNative &&
+                    knownBalance(record)?.some((value) => value.amount > 0))) ? (
+                  <small>
+                    {text("登记待收出售款", "Solde de vente enregistré")}{" "}
+                    {amounts(record.pendingBalanceNative, locale)}
+                  </small>
+                ) : null}
+              </>
             )}
           </span>
           <ArrowRight size={15} aria-hidden="true" />
@@ -361,13 +452,18 @@ export function SaleRoomOverview({
               key={item.key}
               disabled={busy}
               aria-pressed={filter === item.key}
-              className={cn(
-                item.key === "overdue" && styles.overdueFilter,
-                item.key === "upcoming" && styles.upcomingFilter,
-              )}
+              title={
+                item.key === "settled"
+                  ? text(
+                      "已登记余款为零或已核账单结清；各房卡保留对应依据。",
+                      "Solde enregistré nul ou factures vérifiées soldées ; la base reste indiquée par lot.",
+                    )
+                  : undefined
+              }
               onClick={() => {
                 browse();
                 setFilter(item.key);
+                setAttentionFilter("all");
               }}
             >
               {item.label}
@@ -375,6 +471,35 @@ export function SaleRoomOverview({
             </button>
           ))}
         </div>
+        <details className={styles.advancedFilters}>
+          <summary>{text("更多筛选", "Autres filtres")}</summary>
+          <div
+            className={styles.filters}
+            role="group"
+            aria-label={text("出售付款状态", "État des paiements")}
+          >
+            {attentionFilters.map((item) => (
+              <button
+                type="button"
+                key={item.key}
+                disabled={busy}
+                aria-pressed={attentionFilter === item.key}
+                className={cn(
+                  item.key === "overdue" && styles.overdueFilter,
+                  item.key === "upcoming" && styles.upcomingFilter,
+                )}
+                onClick={() => {
+                  browse();
+                  setFilter("all");
+                  setAttentionFilter(item.key);
+                }}
+              >
+                {item.label}
+                <span>{counts[item.key === "all" ? "all" : item.key]}</span>
+              </button>
+            ))}
+          </div>
+        </details>
         <div className={styles.tools}>
           <label className={styles.search}>
             <Search size={15} aria-hidden="true" />
@@ -507,11 +632,19 @@ export function SaleRoomOverview({
             {floor.rows.map((row) => {
               const record = row.record;
               const attention = record ? attentionLabel(record, locale) : null;
-              const cardAttention =
-                attention &&
-                !["overdue", "upcoming", "unsettled"].includes(record?.attention?.kind ?? "")
+              const cardAttention = record?.pendingBalanceNative?.length
+                ? attention
+                : needsReview(row)
                   ? text("待核", "À vérifier")
                   : attention;
+              const pendingBalanceShown =
+                record?.pendingBalanceNative?.length &&
+                record.outstandingNative == null &&
+                !record.registeredBalance;
+              const registeredBalanceShown =
+                record?.registeredBalance &&
+                (record.outstandingNative == null ||
+                  (!record.outstandingNative.length && record.registeredBalance.amount > 0));
               return (
                 <button
                   type="button"
@@ -526,6 +659,7 @@ export function SaleRoomOverview({
                   }
                   className={cn(
                     styles.card,
+                    record && hasOutstanding(record) && styles.unpaidCard,
                     needsReview(row) && styles.reviewCard,
                     record?.attention?.kind === "overdue" && !row.conflict && styles.overdueCard,
                     record?.attention?.kind === "upcoming" && !row.conflict && styles.upcomingCard,
@@ -535,9 +669,11 @@ export function SaleRoomOverview({
                     <strong>{row.unit.unit_no}</strong>
                     {record?.contract.status === "draft" ? (
                       <small>{text("草稿", "Brouillon")}</small>
+                    ) : record && !row.conflict ? (
+                      <small className={styles.soldStatus}>{text("已售", "Vendu")}</small>
                     ) : null}
                   </span>
-                  <span className={styles.fact}>
+                  <span className={cn(styles.fact, styles.buyerFact)}>
                     <span>{text("买方", "Acquéreur")}</span>
                     <strong className={styles.buyer}>
                       {row.conflict
@@ -569,28 +705,41 @@ export function SaleRoomOverview({
                     <span>{text("未收", "Restant")}</span>
                     <strong
                       title={
-                        record?.outstandingNative == null
-                          ? record?.registeredBalance
-                            ? `${text("Excel登记余款，不等同于已核应收；依据：", "Solde enregistré dans Excel, distinct des créances vérifiées ; source : ")}${record.registeredBalance.sourceRef}`
-                            : text(
-                                "现有资料不足，未据总价减已收推算余款。",
-                                "Données insuffisantes ; aucun solde déduit du prix moins les encaissements.",
-                              )
-                          : text(
-                              "仅已核账单的未收余额，不代表全部房款余款。",
-                              "Solde des seules créances vérifiées, distinct du reste du prix du bien.",
+                        pendingBalanceShown
+                          ? text(
+                              "既有历史登记账单余额，含车位等出售相关款；不作为已核管理应收，旧日期不作为付款约定。",
+                              "Soldes d’anciennes écritures, y compris les frais liés à la vente ; ni créances gérées ni dates de paiement convenues.",
                             )
+                          : registeredBalanceShown
+                            ? `${text("Excel登记余款，不等同于已核应收；依据：", "Solde enregistré dans Excel, distinct des créances vérifiées ; source : ")}${record!.registeredBalance!.sourceRef}`
+                            : record?.outstandingNative == null
+                              ? text(
+                                  "现有资料不足，未据总价减已收推算余款。",
+                                  "Données insuffisantes ; aucun solde déduit du prix moins les encaissements.",
+                                )
+                              : text(
+                                  "仅已核账单的未收余额，不代表全部房款余款。",
+                                  "Solde des seules créances vérifiées, distinct du reste du prix du bien.",
+                                )
                       }
                     >
-                      {record?.outstandingNative == null
-                        ? record?.registeredBalance
-                          ? `${amounts([record.registeredBalance], locale)}${text("（登记）", " (enregistré)")}`
-                          : text("待核", "À vérifier")
-                        : record.outstandingNative.length
-                          ? `${amounts(record.outstandingNative, locale)}${text("（账单）", " (factures)")}`
-                          : text("账单结清", "Factures soldées")}
+                      {pendingBalanceShown
+                        ? `${amounts(record!.pendingBalanceNative!, locale)}${text("（登记待收）", " (enregistré)")}`
+                        : registeredBalanceShown
+                          ? `${amounts([record!.registeredBalance!], locale)}${text("（登记）", " (enregistré)")}`
+                          : record?.outstandingNative == null
+                            ? text("待核", "À vérifier")
+                            : record.outstandingNative.length
+                              ? `${amounts(record.outstandingNative, locale)}${text("（账单）", " (factures)")}`
+                              : text("账单结清", "Factures soldées")}
                     </strong>
                   </span>
+                  {record?.pendingBalanceNative?.length && !pendingBalanceShown ? (
+                    <span className={styles.fact}>
+                      <span>{text("登记待收出售款", "Solde de vente enregistré")}</span>
+                      <strong>{amounts(record.pendingBalanceNative, locale)}</strong>
+                    </span>
+                  ) : null}
                   <span className={styles.cardFooter}>
                     <span
                       className={cn(
@@ -601,9 +750,16 @@ export function SaleRoomOverview({
                             ? styles.overdueStatus
                             : record?.attention?.kind === "upcoming"
                               ? styles.upcomingStatus
-                              : record?.attention?.kind === "review" || record?.reviewReasons.length
-                                ? styles.reviewStatus
-                                : null,
+                              : record?.pendingBalanceNative?.length
+                                ? hasMaterialReview(record)
+                                  ? styles.reviewStatus
+                                  : styles.upcomingStatus
+                                : record?.attention?.kind === "review" ||
+                                    record?.reviewReasons.length
+                                  ? styles.reviewStatus
+                                  : record && hasOutstanding(record)
+                                    ? styles.upcomingStatus
+                                    : null,
                       )}
                     >
                       {row.conflict
