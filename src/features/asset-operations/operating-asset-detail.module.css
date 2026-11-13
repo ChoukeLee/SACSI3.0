@@ -63,3 +63,54 @@
   background: #392322;
   color: #ffbbb4;
 }
+
+.settlementForm {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.settlementFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+}
+
+.settlementFields label {
+  display: grid;
+  align-content: start;
+  gap: 0.3rem;
+  min-width: 0;
+  font-size: 0.8125rem;
+}
+
+.settlementFields input,
+.settlementFields select,
+.settlementFields textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.35rem;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  padding: 0.5rem;
+}
+
+.settlementFields textarea {
+  min-height: 5rem;
+}
+
+.settlementButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.settlementButtons button {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.35rem;
+  padding: 0.5rem 0.75rem;
+}

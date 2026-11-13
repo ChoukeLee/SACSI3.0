@@ -1,4 +1,5 @@
 import type { CurrencyCode } from "@/types/domain";
+import type { OwnerSettlement } from "./owner-settlement-model";
 import {
   assetReportPeriod,
   isAssetDate,
@@ -61,6 +62,7 @@ export interface OperatingAssetLeaseEvidence {
   leaseListed?: boolean;
   selfUse?: boolean;
   blockReceiptCutoff?: boolean;
+  ownerSettlement?: OwnerSettlement;
 }
 
 export interface OperatingAssetLeaseGroup {
