@@ -15,6 +15,10 @@ import {
 
 const navigation = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => navigation }));
+vi.mock("./owner-settlement-actions", () => ({
+  getOwnerSettlementContext: vi.fn(),
+  recordOwnerSettlement: vi.fn(),
+}));
 
 const projectId = "test-sacsi";
 const today = "2026-11-09";

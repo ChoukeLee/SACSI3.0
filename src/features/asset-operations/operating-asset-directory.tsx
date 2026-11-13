@@ -716,6 +716,10 @@ function OperatingAssetDirectoryView({
           locale={locale}
           today={today}
           leaseView={!!browseViewerId || assetBrowse}
+          canWrite={data.canWrite}
+          ownerSettlementEnabled={
+            !selected.groupKey && classifyOperatingLeaseMode(selected.asset) === "whole"
+          }
           onClose={() => setSelectedId(null)}
         />
       ) : null}

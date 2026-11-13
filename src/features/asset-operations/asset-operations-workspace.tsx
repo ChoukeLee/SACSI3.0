@@ -26,6 +26,7 @@ import type { AssetOperationEntry } from "./asset-operations-model";
 import type { CurrencyCode } from "@/types/domain";
 import { AssetFinanceImport, AssetTermsEditor } from "./asset-operations-intake";
 import styles from "./asset-operations-workspace.module.css";
+import { ownerSettlementError } from "./owner-settlement-model";
 
 type Locale = "zh" | "fr";
 
@@ -268,9 +269,11 @@ function EntryVerification({
       if (result.ok) router.refresh();
       else
         setError(
-          zh
-            ? "未确认。请刷新并核对资产、凭证和记录版本。"
-            : "Non confirmé. Actualisez puis vérifiez l’actif, la pièce et la version.",
+          result.error === "ownerSettlementReceiptLinked"
+            ? ownerSettlementError(result.error, zh)
+            : zh
+              ? "未确认。请刷新并核对资产、凭证和记录版本。"
+              : "Non confirmé. Actualisez puis vérifiez l’actif, la pièce et la version.",
         );
     } catch {
       setError(

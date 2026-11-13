@@ -309,6 +309,10 @@
     {
       "file": "20261111105200_daily_cancel_refunded_reservations.sql",
       "sha256": "9548ef1e3ca17ef8192a23f4bd2970b87a2f64e09ceb1d6d52126801029c8a98"
+    },
+    {
+      "file": "20261113112455_asset_operations_owner_settlement.sql",
+      "sha256": "624453cf55175414ce934ec683795f65bcbae38e9f1f7ba7b37deab9accb388c"
     }
   ],
   "excluded": [

@@ -22,6 +22,7 @@ import {
 } from "./operating-asset-display";
 import styles from "./operating-asset-directory.module.css";
 import drawerStyles from "./operating-asset-detail.module.css";
+import { OwnerSettlementSection } from "./owner-settlement-section";
 
 type CashSummary = ReturnType<typeof summarizeOperatingAssetCash>;
 type CashLine = NonNullable<CashSummary["bookedXof"]>;
@@ -402,6 +403,8 @@ export function OperatingAssetDetail({
   locale,
   leaseView = false,
   leaseGroup = false,
+  ownerSettlementEnabled = false,
+  canWrite = false,
   onClose,
 }: {
   asset: OperatingAssetDirectoryAsset;
@@ -411,6 +414,8 @@ export function OperatingAssetDetail({
   locale: Locale;
   leaseView?: boolean;
   leaseGroup?: boolean;
+  ownerSettlementEnabled?: boolean;
+  canWrite?: boolean;
   onClose: () => void;
 }) {
   const zh = locale === "zh";
@@ -419,6 +424,7 @@ export function OperatingAssetDetail({
   const [tab, setTab] = useState("overview");
   const [month, setMonth] = useState(today.slice(0, 7));
   const [pendingOnly, setPendingOnly] = useState(false);
+  const [ownerUnresolved, setOwnerUnresolved] = useState(false);
   const period = assetReportPeriod("month", month);
   const cash = summarizeOperatingAssetCash([asset], entries, period);
   const historicalPending = entries.filter((entry) => entry.status === "pending").length;
@@ -477,7 +483,9 @@ export function OperatingAssetDetail({
       width="wide"
       title={asset.displayName}
       subtitle={leaseView ? undefined : operatingAssetCategoryLabel(asset.category, locale)}
-      onClose={onClose}
+      onClose={() => {
+        if (!ownerUnresolved) onClose();
+      }}
     >
       <RecordDetailTabs
         id={id}
@@ -632,6 +640,18 @@ export function OperatingAssetDetail({
               onShowEntries={() => showReceipts(true)}
             />
           </>
+        ) : null}
+        {ownerSettlementEnabled || asset.leaseEvidence?.ownerSettlement ? (
+          <div hidden={tab !== "overview"}>
+            <OwnerSettlementSection
+              assetId={asset.id}
+              settlement={asset.leaseEvidence?.ownerSettlement}
+              canWrite={canWrite && ownerSettlementEnabled}
+              today={today}
+              locale={locale}
+              onUnresolvedChange={setOwnerUnresolved}
+            />
+          </div>
         ) : null}
         {tab === "receipts" ? (
           <AssetReceiptList

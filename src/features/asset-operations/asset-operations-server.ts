@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import type { CurrencyCode } from "@/types/domain";
 import { isAssetDate, type AssetOperationsData } from "./asset-operations-model";
+import { readOwnerSettlement } from "./owner-settlement-model";
 import {
   isConfirmedExcelSource,
   type OperatingAssetBillingGroup,
@@ -217,6 +218,8 @@ function readLeaseEvidence(value: unknown, reviewedOn: unknown): OperatingAssetL
     leaseListed: value.leaseListed === true,
     selfUse: value.selfUse === true,
     blockReceiptCutoff: value.blockReceiptCutoff === true,
+    ownerSettlement:
+      value.ownerSettlement == null ? undefined : readOwnerSettlement(value.ownerSettlement),
   };
   if (paidThrough != null) {
     if (!isRecord(paidThrough) || !isAssetDate(paidThrough.date) || !isText(paidThrough.sourceRef))
