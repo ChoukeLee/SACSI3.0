@@ -32,6 +32,10 @@ vi.mock("@/features/cimac/cimac-apartment-reservation-actions", () => ({
   executeCimacApartmentReservations: vi.fn(),
   checkCimacApartmentReservationStatus: vi.fn(),
 }));
+vi.mock("@/features/cimac/cimac-apartment-paid-actions", () => ({
+  executeApartmentPaidReceipt: vi.fn(),
+  checkApartmentPaidStatus: vi.fn(),
+}));
 vi.mock("@/features/cimac/cimac-profile-operations", () => ({
   CimacCustomerProfileOperation: () => null,
   CimacAssetConditionOperation: () => null,

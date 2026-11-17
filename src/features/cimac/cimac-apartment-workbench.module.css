@@ -898,3 +898,32 @@
     animation: none;
   }
 }
+.paidFields {
+  display: grid;
+  gap: 12px;
+}
+.paidFields label {
+  display: grid;
+  gap: 5px;
+}
+.paidFields :is(input:not([type="checkbox"]), select, textarea) {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px;
+  border: 1px solid var(--ap-border);
+  border-radius: 6px;
+}
+.paidRoomChoices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.paidRoomChoices label {
+  display: flex;
+  align-items: center;
+}
+.paidReview {
+  display: grid;
+  gap: 10px;
+  overflow-wrap: anywhere;
+}

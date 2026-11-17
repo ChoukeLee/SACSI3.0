@@ -317,6 +317,97 @@ describe("verified correction selected-record context", () => {
   });
 });
 describe("selected finance record read", () => {
+  const apartmentFixture = (sourceType: "cimac_apartment_rent" | "cimac_apartment_deposit") => {
+    const rent = sourceType === "cimac_apartment_rent";
+    data.buildings[0].project_id = CIMAC_PROJECT_ID;
+    Object.assign(data.ledger_entries[0], {
+      direction: rent ? "income" : "liability_in",
+      category: rent ? "lease_rent" : "lease_deposit",
+      currency: "XOF",
+      amount_native: null,
+    });
+    Object.assign(data.payments[0], {
+      source_type: sourceType,
+      payment_method: "cash",
+      amount: "5000",
+      currency: "XOF",
+      native_settlement: false,
+      exchange_rate_to_xof: 1,
+      payment_date: data.ledger_entries[0].entry_date,
+    });
+    data.cimac_apartment_paid_reservations = [
+      {
+        id: ids.contract,
+        unit_id: ids.unit,
+        building_id: ids.building,
+        customer_id: ids.customer,
+        status: "paid_reserved",
+        rent_payment_id: rent ? ids.payment : ids.otherUnit,
+        deposit_payment_id: rent ? ids.otherUnit : ids.payment,
+        rent_amount_xof: "5000",
+        deposit_amount_xof: "5000",
+      },
+    ];
+  };
+  it.each(["cimac_apartment_rent", "cimac_apartment_deposit"] as const)(
+    "resolves %s only through its exact paid reservation and opens B17 without creating a lease",
+    async (sourceType) => {
+      apartmentFixture(sourceType);
+      const result = await readFinanceRecordContext(client, query);
+      expect(result).toMatchObject({
+        paymentMethod: "cash",
+        customer: { id: ids.customer, label: "历史合同客户" },
+        source: {
+          type: sourceType,
+          id: ids.contract,
+          label: "B17 · 公寓已付款预订",
+          href: "/cimac/apartments",
+          linkKind: "workspace",
+        },
+        period: null,
+      });
+      expect(
+        calls.some((call) =>
+          ["lease_contracts", "sale_contracts", "daily_bookings"].includes(call.table),
+        ),
+      ).toBe(false);
+    },
+  );
+  it.each([
+    "hidden",
+    "unit",
+    "building",
+    "customer",
+    "payment",
+    "category",
+    "direction",
+    "amount",
+    "native",
+    "project",
+  ])("does not guess paid-reservation context for contradictory %s evidence", async (kind) => {
+    apartmentFixture("cimac_apartment_deposit");
+    const reservation = data.cimac_apartment_paid_reservations[0];
+    if (kind === "hidden") data.cimac_apartment_paid_reservations = [];
+    if (kind === "unit") reservation.unit_id = ids.otherUnit;
+    if (kind === "building") reservation.building_id = ids.otherBuilding;
+    if (kind === "customer") reservation.customer_id = ids.otherUnit;
+    if (kind === "payment") reservation.deposit_payment_id = ids.otherUnit;
+    if (kind === "category") data.ledger_entries[0].category = "lease_rent";
+    if (kind === "direction") data.ledger_entries[0].direction = "income";
+    if (kind === "amount") reservation.deposit_amount_xof = "4999";
+    if (kind === "native") data.payments[0].native_settlement = true;
+    if (kind === "project") data.buildings[0].project_id = ids.project;
+    const result = await readFinanceRecordContext(client, query);
+    expect(result.amountXof).toBe(5000);
+    expect(result.source).toBeNull();
+    expect(result.customer).toBeNull();
+    expect(result.paymentMethod).toBeNull();
+    expect(
+      calls.some((call) =>
+        ["lease_contracts", "sale_contracts", "daily_bookings"].includes(call.table),
+      ),
+    ).toBe(false);
+  });
   it("reads exact IDs, retains ledger date and liabilities, never calls RPC or scans all pages", async () => {
     const result = await readFinanceRecordContext(client, query);
     expect(result).toMatchObject({

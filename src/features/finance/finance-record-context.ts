@@ -1,4 +1,5 @@
 import type { FinanceKind } from "./finance-read";
+import { CIMAC_PROJECT_ID } from "./cimac-export-model";
 
 export interface FinanceRecordContext {
   kind: FinanceKind;
@@ -140,7 +141,12 @@ export function decodeFinanceRecordContext(value: unknown): FinanceRecordContext
       if (linkKind !== null && linkKind !== "workspace") throw unavailable();
       if ((href === null) !== (linkKind === null)) throw unavailable();
       // There is no supported direct-record deep link. Only fixed workspace routes are allowed.
-      if (href && !/^\/(?:leases|sales)\?project=[0-9a-f-]{36}$/i.test(href)) throw unavailable();
+      if (
+        href &&
+        href !== "/cimac/apartments" &&
+        !/^\/(?:leases|sales)\?project=[0-9a-f-]{36}$/i.test(href)
+      )
+        throw unavailable();
       return {
         type: text(item.type, 100),
         id: nullable(item.id, id),
@@ -185,8 +191,12 @@ export function decodeFinanceRecordContext(value: unknown): FinanceRecordContext
   )
     throw unavailable();
   if (result.source?.href) {
-    const route =
-      result.source.type === "lease_contract"
+    const apartmentReservation = ["cimac_apartment_rent", "cimac_apartment_deposit"].includes(
+      result.source.type,
+    );
+    const route = apartmentReservation
+      ? "/cimac/apartments"
+      : result.source.type === "lease_contract"
         ? "/leases"
         : result.source.type === "sale_contract"
           ? "/sales"
@@ -195,7 +205,9 @@ export function decodeFinanceRecordContext(value: unknown): FinanceRecordContext
       !route ||
       !result.source.id ||
       !result.building?.projectId ||
-      result.source.href !== `${route}?project=${result.building.projectId}`
+      (apartmentReservation
+        ? result.building.projectId !== CIMAC_PROJECT_ID || result.source.href !== route
+        : result.source.href !== `${route}?project=${result.building.projectId}`)
     )
       throw unavailable();
   }

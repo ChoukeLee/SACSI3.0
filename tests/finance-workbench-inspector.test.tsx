@@ -7,6 +7,7 @@ import {
   type FinanceWorkbenchInspectorProps,
 } from "@/features/finance/finance-workbench-inspector";
 import type { FinanceRecordContext } from "@/features/finance/finance-record-context";
+import { CIMAC_PROJECT_ID } from "@/features/finance/cimac-export-model";
 
 vi.mock("@/features/finance/payment-context-panel", () => ({
   PaymentContextPanel: (props: { paymentId: string; canWrite: boolean }) => (
@@ -145,6 +146,38 @@ async function click(label: string) {
 }
 
 describe("FinanceWorkbenchInspector selected-record facts", () => {
+  it.each(["zh", "fr"] as const)(
+    "opens a paid apartment reservation in B17 rather than a contract workspace in %s",
+    async (locale) => {
+      fetchMock.mockImplementation(async (url: string) =>
+        response(
+          url.includes("/payment-context/")
+            ? payment
+            : {
+                ...context,
+                building: { ...context.building, projectId: CIMAC_PROJECT_ID },
+                source: {
+                  type: "cimac_apartment_rent",
+                  id: sourceId,
+                  label: "B17 · 公寓已付款预订",
+                  href: "/cimac/apartments",
+                  linkKind: "workspace",
+                },
+              },
+        ),
+      );
+      await render({ workArea: "cimac", locale });
+      expect(host.querySelector("a")?.getAttribute("href")).toBe(
+        `${locale === "fr" ? "/fr" : ""}/cimac/apartments`,
+      );
+      expect(host.textContent).toContain(
+        locale === "zh"
+          ? "进入 B17 公寓工作台查看付款预订。"
+          : "Ouvre l’espace des appartements B17 pour consulter la réservation payée.",
+      );
+      expect(host.textContent).not.toContain("不会直接打开指定合同");
+    },
+  );
   it("keeps an owner settlement distinct from tenant deposits and operating costs", async () => {
     fetchMock.mockImplementation(async () =>
       response({

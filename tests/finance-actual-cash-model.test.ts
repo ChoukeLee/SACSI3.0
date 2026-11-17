@@ -62,6 +62,45 @@ function operations(overrides: Record<string, unknown> = {}) {
   } as unknown as OperatingAssetDirectoryData;
 }
 describe("actual cash proof and identity", () => {
+  it("counts one paid apartment receipt's room allocations without treating deposits as rent", () => {
+    const payments = ["201", "202", "203"].flatMap((room) =>
+      [
+        { source_type: "cimac_apartment_rent", amount: 1050000 },
+        { source_type: "cimac_apartment_deposit", amount: 700000 },
+      ].map((part) => ({
+        ...payment,
+        ...part,
+        id: `${room}:${part.source_type}`,
+        unit_id: room,
+        source_id: `paid-reservation-${room}`,
+        payment_date: "2026-11-17",
+      })),
+    );
+    const entries = payments.map((p) => ({
+      ...ledger[0],
+      id: `ledger:${p.id}`,
+      payment_id: p.id,
+      unit_id: p.unit_id,
+      unit_label: p.unit_id,
+      building_label: "建材城17栋公寓",
+      entry_date: p.payment_date,
+      direction: p.source_type === "cimac_apartment_rent" ? "income" : "liability_in",
+      category: p.source_type === "cimac_apartment_rent" ? "lease_rent" : "lease_deposit",
+      amount_xof: p.amount,
+    }));
+    const report = buildFinanceActualCash({ ...scope, ledger: entries, payments });
+    expect(report.rows).toHaveLength(6);
+    expect(report).toMatchObject({
+      incomeXof: 3150000,
+      rentIncomeXof: 3150000,
+      depositInXof: 2100000,
+      unverifiedLedgerCount: 0,
+      unknownBookedCount: 0,
+    });
+    expect(report.nativeTotals).toEqual([{ currency: "XOF", incoming: 5250000, outgoing: 0 }]);
+    // Rent is received in November even though its agreed rental period starts in January.
+    expect(report.rows.every((row) => row.date === "2026-11-17")).toBe(true);
+  });
   it("counts a payment linked to rent and deposit entries once while keeping their amounts separate", () => {
     const report = buildFinanceActualCash({ ...scope, ledger, payments: [payment] });
     expect(report.rows).toHaveLength(1);

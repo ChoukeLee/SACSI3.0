@@ -4,6 +4,7 @@ vi.mock("server-only", () => ({}));
 import { readCimacApartments } from "@/features/cimac/cimac-apartment-read";
 import { cimacApartmentPlan } from "@/features/cimac/cimac-apartment-model";
 import type { CimacWorkspaceScope } from "@/features/cimac/cimac-workspace-types";
+import { paidResult } from "./fixtures/cimac-apartment-paid";
 
 type Row = Record<string, unknown>;
 const id = (n: number) => `71000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -13,6 +14,7 @@ let tables: Record<string, Row[]>,
   errors: Record<string, { code: string }>,
   calls: { table: string; fields: string; filters: [string, unknown][] }[],
   wrongCount: boolean;
+let paidRaw: unknown, paidReadError: { code: string } | null;
 const scope: CimacWorkspaceScope = {
   project: { id: project, code: "CIMAC", displayName: "Synthetic park" },
   buildings: [
@@ -61,6 +63,9 @@ const position = (index: number): Row => ({
   lease_occupied: false,
 });
 const client = {
+  async rpc() {
+    return { data: paidRaw, error: paidReadError };
+  },
   from(table: string) {
     const call = { table, fields: "", filters: [] as [string, unknown][] };
     calls.push(call);
@@ -102,8 +107,60 @@ beforeEach(() => {
   errors = {};
   calls = [];
   wrongCount = false;
+  paidRaw = { buildingId: building, receipts: [], reservations: [] };
+  paidReadError = null;
 });
 describe("apartment RLS-scoped read and quote boundary", () => {
+  it("preserves unknown paid register when its RPC is unavailable, rather than claiming no paid reservations", async () => {
+    paidReadError = { code: "PGRST202" };
+    const data = await readCimacApartments(client, scope);
+    expect(data.paidReservationSchemaAvailable).toBe(false);
+    expect(data.reservationSchemaAvailable).toBe(true);
+    expect(data.rooms.every((r) => r.paidReservation === null)).toBe(true);
+  });
+  it("fails the whole paid projection closed if a later room conflicts with an unpaid hold", async () => {
+    const v = paidResult().data.verification;
+    const receipt = { ...v.receipt, project_id: project, building_id: building };
+    const reservations = v.reservations.map((r, i) => ({
+      ...r,
+      building_id: building,
+      unit_id: id(10 + i),
+    }));
+    paidRaw = { buildingId: building, receipts: [receipt], reservations };
+    tables.cimac_apartment_reservations = [
+      {
+        id: id(100),
+        unit_id: id(11),
+        building_id: building,
+        reserver_name: "Other synthetic holder",
+        status: "reserved",
+        payment_status: "unpaid",
+        updated_at: "2026-11-02T00:00:00Z",
+      },
+    ];
+    const data = await readCimacApartments(client, scope);
+    expect(data.paidReservationSchemaAvailable).toBe(false);
+    expect(data.rooms.every((r) => r.paidReservation === null)).toBe(true);
+  });
+  it("reads each paid room amount without turning the agreed dates into actual occupancy", async () => {
+    const v = paidResult().data.verification;
+    paidRaw = {
+      buildingId: building,
+      receipts: [{ ...v.receipt, project_id: project, building_id: building }],
+      reservations: v.reservations.map((r, i) => ({
+        ...r,
+        building_id: building,
+        unit_id: id(10 + i),
+      })),
+    };
+    const data = await readCimacApartments(client, scope);
+    expect(data.paidReservationSchemaAvailable).toBe(true);
+    expect(data.rooms[0].paidReservation).toMatchObject({
+      totalAmountXof: 1750000,
+      paidPeriodEnd: "2027-03-31",
+    });
+    expect(data.rooms[0].occupancyState).toBe("unknown");
+  });
   it("applies current three-month quotes while preserving original six-month initialization evidence", async () => {
     const originalProfiles = structuredClone(tables.cimac_apartment_profiles);
     const data = await readCimacApartments(client, scope);

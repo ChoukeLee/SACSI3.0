@@ -686,6 +686,20 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
     payment.unit_id = unitId;
     payment.source_id = nullableId(payment, "source_id");
     payment.source_type = text(payment.source_type);
+    if (
+      ["cimac_apartment_rent", "cimac_apartment_deposit"].includes(String(payment.source_type)) &&
+      (!payment.source_id ||
+        references
+          .get(key)!
+          .some(
+            (row) =>
+              row.direction !==
+                (payment.source_type === "cimac_apartment_rent" ? "income" : "liability_in") ||
+              row.category !==
+                (payment.source_type === "cimac_apartment_rent" ? "lease_rent" : "lease_deposit"),
+          ))
+    )
+      return fail();
     payment.amount =
       payment.source_type === "cimac_customer_reversal"
         ? signedAmount(payment.amount)
@@ -993,9 +1007,12 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
         return (
           !special ||
           (checkedQuery.view === "deposits" &&
-            ["lease_deposit", "lease_deposit_refund", "lease_deposit_deduction"].includes(
-              String(type),
-            )) ||
+            [
+              "lease_deposit",
+              "lease_deposit_refund",
+              "lease_deposit_deduction",
+              "cimac_apartment_deposit",
+            ].includes(String(type))) ||
           (checkedQuery.view === "refunds" && type === "lease_deposit_refund") ||
           (checkedQuery.view === "property-fee-payments" &&
             (type === "property_fee" ||
@@ -1082,7 +1099,9 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
                           "登记押金退款，不推导对应哪张原押金收据",
                           "Remboursement de dépôt enregistré, sans déduire le reçu d’origine",
                         )
-                      : payment.source_type === "lease_deposit"
+                      : ["lease_deposit", "cimac_apartment_deposit"].includes(
+                            String(payment.source_type),
+                          )
                         ? at(
                             "登记押金收入，不代表当前余额或可退额",
                             "Dépôt reçu enregistré, pas un solde actuel ni un montant remboursable",
