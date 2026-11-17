@@ -321,6 +321,10 @@
     {
       "file": "20261117181959_cimac_b17_paid_apartment_reservations.sql",
       "sha256": "c14b0e3832f97a4d76f2b7d9c18009c4fa93507c2a4de5e96932a6a24f7801de"
+    },
+    {
+      "file": "20261117195243_cimac_materialize_reserved_contracts.sql",
+      "sha256": "153ee2146f94ca4301a5062470bbb0bcf64e9e0907922cf822058ca051b318b2"
     }
   ],
   "excluded": [
