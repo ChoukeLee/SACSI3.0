@@ -4,9 +4,13 @@ import type { ApartmentPaidReservation } from "./cimac-apartment-paid-model";
 
 export const cimacApartmentFloors = [2, 3, 4, 5] as const;
 export type CimacApartmentFloor = (typeof cimacApartmentFloors)[number];
+/** Immutable 2026-11-02 database codes, not current compass labels. */
 export type CimacApartmentFacing = "east" | "west";
 export const cimacApartmentEastSuffixes = [1, 3, 5, 7, 9, 10, 12, 13, 15] as const;
 export const cimacApartmentWestSuffixes = [2, 4, 6, 8, 11, 14, 16] as const;
+/** User-corrected 2026-11-17 plan: 201 northwest, 216 southeast; west to east. */
+export const cimacApartmentNorthSuffixes = cimacApartmentEastSuffixes;
+export const cimacApartmentSouthSuffixes = cimacApartmentWestSuffixes;
 export const cimacApartmentTwoBedroomSuffixes = [11, 15, 16] as const;
 
 /** Immutable 2026-11-02 initialization evidence, not today's payment requirement. */

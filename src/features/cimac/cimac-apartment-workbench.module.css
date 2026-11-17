@@ -424,7 +424,8 @@
   color: var(--ap-muted);
   font-size: 11px;
 }
-.mobilePlan {
+.mobilePlan,
+.mobileOrientation {
   display: none;
 }
 .detail {
@@ -811,6 +812,13 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr);
     gap: 6px;
+  }
+  .mobileOrientation {
+    display: block;
+    color: var(--ap-muted);
+    font-size: 11px;
+    text-align: right;
+    margin-bottom: 4px;
   }
   .mobileSide {
     color: var(--ap-muted);

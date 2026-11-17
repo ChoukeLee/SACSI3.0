@@ -11,11 +11,11 @@ import { initializeCimacApartments } from "./cimac-apartment-actions";
 import { CimacApartmentReservationForm } from "./cimac-apartment-reservation-form";
 import { CimacApartmentPaidForm } from "./cimac-apartment-paid-form";
 import {
-  cimacApartmentEastSuffixes,
+  cimacApartmentNorthSuffixes,
   cimacApartmentFees,
   cimacApartmentFloors,
   cimacApartmentCurrentReferenceTerms,
-  cimacApartmentWestSuffixes,
+  cimacApartmentSouthSuffixes,
   type CimacApartmentData,
   type CimacApartmentFloor,
   type CimacApartmentQuery,
@@ -31,7 +31,7 @@ interface Props {
   canRecordPaid?: boolean;
 }
 
-const westRows: Readonly<Record<number, number>> = {
+const southRows: Readonly<Record<number, number>> = {
   0: 2,
   1: 4,
   2: 6,
@@ -71,14 +71,19 @@ function roomType(room: CimacApartmentRoom, locale: Locale) {
       : "2 chambres";
 }
 
-function roomFacing(room: CimacApartmentRoom, locale: Locale) {
-  return locale === "zh"
-    ? room.facing === "east"
-      ? "东侧"
-      : "西侧"
-    : room.facing === "east"
-      ? "Est"
-      : "Ouest";
+function roomPosition(room: CimacApartmentRoom, locale: Locale) {
+  const zh = locale === "zh";
+  if (room.suffix === 1) return zh ? "西北侧" : "Nord-ouest";
+  if (room.suffix === 15) return zh ? "东北侧" : "Nord-est";
+  if (room.suffix === 2) return zh ? "西南侧" : "Sud-ouest";
+  if (room.suffix === 16) return zh ? "东南侧" : "Sud-est";
+  return cimacApartmentNorthSuffixes.some((suffix) => suffix === room.suffix)
+    ? zh
+      ? "北侧"
+      : "Nord"
+    : zh
+      ? "南侧"
+      : "Sud";
 }
 
 function isDeliverable(room: CimacApartmentRoom) {
@@ -176,7 +181,7 @@ function RoomButton({
       className={`${styles.room} ${room.bedrooms === 2 ? styles.twoBedrooms : ""} ${mobile ? styles.mobileRoom : ""} ${reserverName ? styles.reservedRoom : ""}`}
       data-room={room.unitNo}
       aria-pressed={selected}
-      aria-label={`${room.unitNo} · ${roomType(room, locale)} · ${roomFacing(room, locale)} · ${zh ? "交付" : "Livraison"}：${delivery} · ${zh ? "预订" : "Réservation"}：${booking}${reserverName ? ` · ${reserverName}` : ""} · ${zh ? "实际入住" : "Séjour réel"}：${stay}`}
+      aria-label={`${room.unitNo} · ${roomType(room, locale)} · ${roomPosition(room, locale)} · ${zh ? "交付" : "Livraison"}：${delivery} · ${zh ? "预订" : "Réservation"}：${booking}${reserverName ? ` · ${reserverName}` : ""} · ${zh ? "实际入住" : "Séjour réel"}：${stay}`}
       onClick={() => onSelect(room)}
     >
       <span className={styles.roomIdentity}>
@@ -580,43 +585,56 @@ function ApartmentWorkbench({
             </div>
           </div>
           <div className={styles.plan}>
-            <div className={styles.desktopPlan} data-testid="apartment-desktop-plan">
+            <div
+              className={styles.desktopPlan}
+              data-testid="apartment-desktop-plan"
+              aria-label={
+                zh
+                  ? "上北下南、左西右东的房间分布"
+                  : "Nord en haut, sud en bas ; ouest à gauche, est à droite"
+              }
+            >
               <div className={styles.sideCaption}>
-                <strong>{zh ? "东侧" : "Est"}</strong>
-                <span>
-                  {zh ? "1701所在商铺排的上方" : "Au-dessus de la rangée du commerce 1701"}
-                </span>
+                <strong>{zh ? "北侧" : "Nord"}</strong>
+                <span>{zh ? "西 ← → 东" : "Ouest ← → Est"}</span>
               </div>
               <div className={styles.roomRow}>
-                {cimacApartmentEastSuffixes.map((suffix) => renderRoom(suffix))}
+                {cimacApartmentNorthSuffixes.map((suffix) => renderRoom(suffix))}
               </div>
               <div className={styles.corridor}>{zh ? "公共走廊" : "Couloir commun"}</div>
               <div className={styles.roomRow}>
-                {cimacApartmentWestSuffixes.slice(0, 4).map((suffix) => renderRoom(suffix))}
+                {cimacApartmentSouthSuffixes.slice(0, 4).map((suffix) => renderRoom(suffix))}
                 <Core locale={locale} />
-                {cimacApartmentWestSuffixes.slice(4).map((suffix) => renderRoom(suffix))}
+                {cimacApartmentSouthSuffixes.slice(4).map((suffix) => renderRoom(suffix))}
               </div>
               <div className={styles.sideCaption}>
-                <strong>{zh ? "西侧" : "Ouest"}</strong>
-                <span>{zh ? "尾号02所在排" : "Rangée des numéros finissant par 02"}</span>
+                <strong>{zh ? "南侧" : "Sud"}</strong>
+                <span>{zh ? "西 ← → 东" : "Ouest ← → Est"}</span>
               </div>
             </div>
+            <p className={styles.mobileOrientation}>
+              {zh ? "西端在上 · 东端在下" : "Ouest en haut · Est en bas"}
+            </p>
             <div
               className={styles.mobilePlan}
               data-testid="apartment-mobile-plan"
-              aria-label={zh ? "西侧在左、东侧在右的房间分布" : "Ouest à gauche, est à droite"}
+              aria-label={
+                zh
+                  ? "南侧在左、北侧在右，上西下东的房间分布"
+                  : "Sud à gauche, nord à droite ; ouest en haut, est en bas"
+              }
             >
-              <div className={styles.mobileSide}>{zh ? "西侧" : "Ouest"}</div>
+              <div className={styles.mobileSide}>{zh ? "南侧" : "Sud"}</div>
               <div />
-              <div className={styles.mobileSide}>{zh ? "东侧" : "Est"}</div>
+              <div className={styles.mobileSide}>{zh ? "北侧" : "Nord"}</div>
               <div className={styles.mobileCorridor}>{zh ? "公共走廊" : "Couloir"}</div>
-              {cimacApartmentEastSuffixes.map((suffix, index) => (
-                <div key={`east-${suffix}`} style={{ gridRow: index + 2, gridColumn: 3 }}>
+              {cimacApartmentNorthSuffixes.map((suffix, index) => (
+                <div key={`north-${suffix}`} style={{ gridRow: index + 2, gridColumn: 3 }}>
                   {renderRoom(suffix, true)}
                 </div>
               ))}
-              {Object.entries(westRows).map(([index, suffix]) => (
-                <div key={`west-${suffix}`} style={{ gridRow: Number(index) + 2, gridColumn: 1 }}>
+              {Object.entries(southRows).map(([index, suffix]) => (
+                <div key={`south-${suffix}`} style={{ gridRow: Number(index) + 2, gridColumn: 1 }}>
                   {renderRoom(suffix, true)}
                 </div>
               ))}
@@ -647,8 +665,8 @@ function ApartmentWorkbench({
               <div>
                 <p className={styles.label}>
                   {zh
-                    ? `17栋 · ${selected.floor}层 · ${roomFacing(selected, locale)}`
-                    : `Bâtiment 17 · Étage ${selected.floor} · ${roomFacing(selected, locale)}`}
+                    ? `17栋 · ${selected.floor}层 · ${roomPosition(selected, locale)}`
+                    : `Bâtiment 17 · Étage ${selected.floor} · ${roomPosition(selected, locale)}`}
                 </p>
                 <h2 className={styles.detailRoom} data-testid="apartment-selected-number">
                   {selected.unitNo}
@@ -1016,7 +1034,7 @@ function ApartmentWorkbench({
       </p>
       <p className={styles.srOnly} aria-live="polite">
         {selected
-          ? `${selected.unitNo} · ${roomType(selected, locale)} · ${roomFacing(selected, locale)}`
+          ? `${selected.unitNo} · ${roomType(selected, locale)} · ${roomPosition(selected, locale)}`
           : ""}
       </p>
     </div>

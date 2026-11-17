@@ -438,7 +438,7 @@ describe("CIMAC apartment workbench", () => {
     expect(mocks.initialize).not.toHaveBeenCalled();
   });
 
-  it("places nine rooms east and seven west with the core between 208 and 211", async () => {
+  it("places nine rooms north and seven south with the core between 208 and 211", async () => {
     await render();
     const rows = [...plan().querySelectorAll("div")].filter((item) =>
       [...item.children].some((child) => child.hasAttribute("data-room")),
@@ -464,8 +464,8 @@ describe("CIMAC apartment workbench", () => {
       "214",
       "216",
     ]);
-    expect(room("210").getAttribute("aria-label")).toContain("东侧");
-    expect(room("211").getAttribute("aria-label")).toContain("西侧");
+    expect(room("210").getAttribute("aria-label")).toContain("北侧");
+    expect(room("211").getAttribute("aria-label")).toContain("南侧");
     await click(room("216"));
     expect(selectedNumber()).toBe("216");
     expect(room("216").getAttribute("aria-pressed")).toBe("true");
@@ -475,6 +475,56 @@ describe("CIMAC apartment workbench", () => {
         ?.getAttribute("aria-pressed"),
     ).toBe("true");
   });
+
+  it.each(["zh", "fr"] as const)(
+    "keeps the northwest 01 and southeast 16 positions correct on all four floors in %s",
+    async (locale) => {
+      const zh = locale === "zh";
+      await render({ locale, initialQuery: { floor: 2, suffix: 1, tab: "room" } });
+      expect(plan().getAttribute("aria-label")).toBe(
+        zh
+          ? "上北下南、左西右东的房间分布"
+          : "Nord en haut, sud en bas ; ouest à gauche, est à droite",
+      );
+      const mobile = host.querySelector('[data-testid="apartment-mobile-plan"]')!;
+      expect(mobile.getAttribute("aria-label")).toBe(
+        zh
+          ? "南侧在左、北侧在右，上西下东的房间分布"
+          : "Sud à gauche, nord à droite ; ouest en haut, est en bas",
+      );
+      for (const floor of [2, 3, 4, 5]) {
+        await click(button(zh ? `${floor}层` : `Étage ${floor}`));
+        const corners = [
+          ["01", zh ? "西北侧" : "Nord-ouest"],
+          ["02", zh ? "西南侧" : "Sud-ouest"],
+          ["15", zh ? "东北侧" : "Nord-est"],
+          ["16", zh ? "东南侧" : "Sud-est"],
+        ];
+        for (const [suffix, position] of corners) {
+          const number = `${floor}${suffix}`;
+          expect(room(number).getAttribute("aria-label")).toContain(position);
+          expect(
+            mobile.querySelector(`[data-room="${number}"]`)?.getAttribute("aria-label"),
+          ).toContain(position);
+          await click(room(number));
+          const detail = host.querySelector(
+            zh ? '[aria-label="选中房间详情"]' : '[aria-label="Détails du logement sélectionné"]',
+          )!;
+          expect(detail.textContent).toContain(position);
+        }
+        const northwest = mobile.querySelector(`[data-room="${floor}01"]`)!.parentElement!;
+        const southeast = mobile.querySelector(`[data-room="${floor}16"]`)!.parentElement!;
+        expect(northwest.style.gridRow).toBe("2");
+        expect(northwest.style.gridColumn).toBe("3");
+        expect(southeast.style.gridRow).toBe("10");
+        expect(southeast.style.gridColumn).toBe("1");
+      }
+      expect(host.textContent).not.toContain("1701所在商铺排的上方");
+      expect(host.textContent).not.toContain("尾号02所在排");
+      expect(mocks.initialize).not.toHaveBeenCalled();
+      expect(mocks.executeReservation).not.toHaveBeenCalled();
+    },
+  );
 
   it("calculates rent, two-month deposit, three-month prepayment and an entire year of fees independently of actual accounts", async () => {
     await render();
@@ -687,7 +737,7 @@ describe("CIMAC apartment workbench", () => {
     await render({ data, locale: "fr", initialQuery: { floor: 2, suffix: 16, tab: "fees" } });
     expect(host.querySelector("h1")?.textContent).toBe("Bâtiment 17 · Appartements");
     expect(button("Étage 2").getAttribute("aria-pressed")).toBe("true");
-    expect(room("216").getAttribute("aria-label")).toContain("2 chambres · Ouest");
+    expect(room("216").getAttribute("aria-label")).toContain("2 chambres · Sud-est");
     expect(
       host
         .querySelector('[data-testid="apartment-initial-total"]')
