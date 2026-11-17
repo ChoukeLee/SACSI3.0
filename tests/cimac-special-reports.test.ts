@@ -294,6 +294,49 @@ describe("complete structured property-fee receivables", () => {
 
 describe("CIMAC evidenced cash special reports", () => {
   it.each(["zh", "fr"] as const)(
+    "includes paid apartment deposits and keeps their rent separate in %s",
+    (locale) => {
+      const data = base();
+      addPayment(data, "cimac_apartment_deposit", 2);
+      addPayment(data, "cimac_apartment_rent", 4);
+      Object.assign(data.ledger[1], { direction: "income", category: "lease_rent" });
+      const deposits = cimacExportCsv(data, query("deposits", locale));
+      expect(deposits.split("\r\n")).toHaveLength(2);
+      expect(deposits).toContain('"cimac_apartment_deposit"');
+      expect(deposits).toContain('"SOURCE-2"');
+      expect(deposits).not.toContain('"cimac_apartment_rent"');
+      expect(deposits).not.toContain("登记物业费收款");
+      for (const view of ["ledger", "payments"] as const) {
+        const all = cimacExportCsv(data, query(view, locale));
+        expect(all).toContain('"cimac_apartment_deposit"');
+        expect(all).toContain('"cimac_apartment_rent"');
+      }
+    },
+  );
+  it.each(["ledger", "payments", "deposits"] as const)(
+    "rejects paid apartment source/category contradictions in %s",
+    (view) => {
+      for (const sourceType of ["cimac_apartment_rent", "cimac_apartment_deposit"]) {
+        const data = base();
+        addPayment(data, sourceType, 2);
+        const rent = sourceType === "cimac_apartment_rent";
+        Object.assign(data.ledger[0], {
+          direction: rent ? "liability_in" : "income",
+          category: rent ? "lease_rent" : "lease_deposit",
+        });
+        expect(() => cimacExportCsv(data, query(view))).toThrow();
+        Object.assign(data.ledger[0], {
+          direction: rent ? "income" : "liability_in",
+          category: rent ? "lease_deposit" : "lease_rent",
+        });
+        expect(() => cimacExportCsv(data, query(view))).toThrow();
+        Object.assign(data.ledger[0], { category: rent ? "lease_rent" : "lease_deposit" });
+        data.payments[0].source_id = null;
+        expect(() => cimacExportCsv(data, query(view))).toThrow();
+      }
+    },
+  );
+  it.each(["zh", "fr"] as const)(
     "separates received/refunded/deducted deposits from property fees in %s",
     (locale) => {
       const data = cashBundle();

@@ -1,5 +1,6 @@
 import type { UnitConstructionStatus } from "@/types/domain";
 import type { CimacApartmentReservation } from "./cimac-apartment-reservation-model";
+import type { ApartmentPaidReservation } from "./cimac-apartment-paid-model";
 
 export const cimacApartmentFloors = [2, 3, 4, 5] as const;
 export type CimacApartmentFloor = (typeof cimacApartmentFloors)[number];
@@ -43,6 +44,7 @@ export interface CimacApartmentRoom extends CimacApartmentPlan {
   areaSqm: number | null;
   unitUpdatedAt?: string | null;
   reservation?: CimacApartmentReservation | null;
+  paidReservation?: ApartmentPaidReservation | null;
 }
 export interface CimacApartmentData {
   projectId: string;
@@ -52,6 +54,7 @@ export interface CimacApartmentData {
   registeredCount: number;
   schemaAvailable: boolean;
   reservationSchemaAvailable?: boolean;
+  paidReservationSchemaAvailable?: boolean;
 }
 export interface CimacApartmentQuery {
   floor: CimacApartmentFloor;

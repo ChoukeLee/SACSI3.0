@@ -27,6 +27,10 @@ export async function CimacApartmentsPage({
         locale={locale}
         initialQuery={initialQuery}
         canInitialize={user.role === "admin" && hasPermission(user, "units:write")}
+        canRecordPaid={
+          (["admin", "finance"] as string[]).includes(user.role) &&
+          hasPermission(user, "finance:write")
+        }
       />
     );
   } catch (error) {

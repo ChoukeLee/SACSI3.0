@@ -317,6 +317,10 @@
     {
       "file": "20261113120436_asset_owner_rent_history_account.sql",
       "sha256": "6c49cf9de244e08e064b04b11292dea8a34d55e0990ed0d7a06631b3ed133a54"
+    },
+    {
+      "file": "20261117181959_cimac_b17_paid_apartment_reservations.sql",
+      "sha256": "c14b0e3832f97a4d76f2b7d9c18009c4fa93507c2a4de5e96932a6a24f7801de"
     }
   ],
   "excluded": [

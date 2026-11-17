@@ -15,6 +15,8 @@ const BUSINESS_LABELS: Record<string, Labels> = {
   lease_contract: { zh: "长租租金", fr: "Loyer longue durée" },
   lease_rent: { zh: "长租租金", fr: "Loyer longue durée" },
   lease_deposit: { zh: "长租押金", fr: "Dépôt de location" },
+  cimac_apartment_rent: { zh: "公寓预订租金", fr: "Loyer de réservation d’appartement" },
+  cimac_apartment_deposit: { zh: "公寓预订押金", fr: "Dépôt de réservation d’appartement" },
   lease_deposit_refund: { zh: "押金退还", fr: "Remboursement du dépôt" },
   lease_deposit_deduction: { zh: "押金扣款", fr: "Retenue sur dépôt" },
   lease_rent_refund: { zh: "租金退款", fr: "Remboursement du loyer" },

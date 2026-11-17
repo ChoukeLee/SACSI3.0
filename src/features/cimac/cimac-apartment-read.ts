@@ -16,8 +16,9 @@ import {
   type CimacApartmentPlan,
   type CimacApartmentRoom,
 } from "./cimac-apartment-model";
+import { readApartmentPaidRows } from "./cimac-apartment-paid-model";
 
-type Client = Pick<SupabaseClient, "from">;
+type Client = Pick<SupabaseClient, "from" | "rpc">;
 type Row = Record<string, unknown>;
 const fail = (): never => {
   throw new CimacWorkspaceReadError();
@@ -80,11 +81,13 @@ export async function readCimacApartments(
     areaSqm: null,
     unitUpdatedAt: null,
     reservation: null,
+    paidReservation: null,
   }));
   const data = (
     rooms: CimacApartmentRoom[],
     schemaAvailable = true,
     reservationSchemaAvailable = false,
+    paidReservationSchemaAvailable = false,
   ): CimacApartmentData => ({
     projectId: scope.project.id,
     buildingId: building.id,
@@ -92,6 +95,7 @@ export async function readCimacApartments(
     rooms,
     schemaAvailable,
     reservationSchemaAvailable,
+    paidReservationSchemaAvailable,
     registeredCount: rooms.filter((r) => r.registered).length,
   });
   const result = await client
@@ -243,5 +247,27 @@ export async function readCimacApartments(
             : "unoccupied",
     };
   });
-  return data(rooms, true, reservationSchemaAvailable);
+  let paidAvailable = false;
+  try {
+    const { data: paidRaw, error } = await client.rpc("cimac_apartment_paid_receipts_read_rpc", {
+      p_building_id: building.id,
+    });
+    if (!error) {
+      const paid = readApartmentPaidRows(
+        paidRaw,
+        scope.project.id,
+        building.id,
+        new Map(rooms.filter((r) => r.unitId).map((r) => [r.unitId!, r.unitNo])),
+      );
+      if (rooms.some((room) => room.unitId && paid.has(room.unitId) && room.reservation))
+        return fail();
+      for (const room of rooms) {
+        room.paidReservation = room.unitId ? (paid.get(room.unitId) ?? null) : null;
+      }
+      paidAvailable = true;
+    }
+  } catch {
+    /* Preserve an explicit unknown state; never allow another hold from an unreadable paid register. */
+  }
+  return data(rooms, true, reservationSchemaAvailable, paidAvailable);
 }

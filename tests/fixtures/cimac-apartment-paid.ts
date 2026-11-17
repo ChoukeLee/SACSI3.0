@@ -1,0 +1,171 @@
+import type { ApartmentPaidRequest } from "@/features/cimac/cimac-apartment-paid-model";
+import type { CimacWorkspaceScope } from "@/features/cimac/cimac-workspace-types";
+export const paidId = (n: number) => `a7000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+export const paidActor = paidId(1),
+  paidProject = paidId(2),
+  paidBuilding = paidId(3),
+  paidCustomer = paidId(4),
+  paidReceipt = paidId(5);
+export const paidStamp = "2026-11-01T00:00:00.123456+00:00";
+export const paidScope: CimacWorkspaceScope = {
+  project: { id: paidProject, code: "CIMAC", displayName: "Test park" },
+  buildings: [
+    {
+      id: paidBuilding,
+      code: "CIMAC-B17",
+      name: "Test B17",
+      isActive: true,
+      constructionStatus: null,
+    },
+  ],
+};
+export function paidInput(): ApartmentPaidRequest {
+  return {
+    requestId: paidId(6),
+    originalInstruction:
+      "Register one explicitly paid receipt for three test apartments, without actual occupancy.",
+    customerName: "测试客户甲",
+    agreementStartDate: "2027-01-01",
+    agreementEndDate: "2028-12-31",
+    paidPeriodStart: "2027-01-01",
+    paidPeriodEnd: "2027-03-31",
+    paymentDate: "2026-11-10",
+    paymentMethod: "cash",
+    currency: "XOF",
+    sourceRef: "Synthetic receipt document",
+    externalReceiptNo: "TEST-RECEIPT-01",
+    reason: "Explicitly received deposit and first quarter; actual entry remains unknown.",
+    totalAmountXof: 5250000,
+    rooms: [0, 1, 2].map((i) => ({
+      unitId: paidId(10 + i),
+      expectedUnitUpdatedAt: paidStamp,
+      expectedHoldId: null,
+      expectedHoldUpdatedAt: null,
+      monthlyRentXof: 350000,
+      depositMonths: 2,
+      rentPrepayMonths: 3,
+      depositAmountXof: 700000,
+      rentAmountXof: 1050000,
+    })),
+  };
+}
+export const paidNos = () => new Map([0, 1, 2].map((i) => [paidId(10 + i), String(201 + i)]));
+export function paidResult() {
+  const input = paidInput();
+  const reservations = input.rooms.map((r, i) => ({
+    id: paidId(20 + i),
+    receipt_id: paidReceipt,
+    unit_id: r.unitId,
+    building_id: paidBuilding,
+    customer_id: paidCustomer,
+    status: "paid_reserved",
+    agreement_start_date: input.agreementStartDate,
+    agreement_end_date: input.agreementEndDate,
+    paid_period_start: input.paidPeriodStart,
+    paid_period_end: input.paidPeriodEnd,
+    monthly_rent_xof: r.monthlyRentXof,
+    deposit_months: 2,
+    rent_prepay_months: 3,
+    deposit_amount_xof: r.depositAmountXof,
+    rent_amount_xof: r.rentAmountXof,
+    deposit_payment_id: paidId(30 + i * 2),
+    rent_payment_id: paidId(31 + i * 2),
+    recorded_by: paidActor,
+    recorded_at: paidStamp,
+  }));
+  const payments = input.rooms.flatMap((r, i) =>
+    ["deposit", "rent"].map((kind, j) => ({
+      id: paidId(30 + i * 2 + j),
+      customer_id: paidCustomer,
+      unit_id: r.unitId,
+      source_id: reservations[i].id,
+      source_type: `cimac_apartment_${kind}`,
+      payment_date: input.paymentDate,
+      amount: kind === "deposit" ? r.depositAmountXof : r.rentAmountXof,
+      currency: "XOF",
+      native_settlement: false,
+      exchange_rate_to_xof: 1,
+      payment_method: input.paymentMethod,
+      request_id: i === 0 && j === 0 ? input.requestId : paidId(90 + i * 2 + j),
+      request_kind: "cimac_apartment_paid",
+      external_receipt_no: input.externalReceiptNo,
+      receipt_no: `WB-CIMAC-B17-L-${201 + i}-${input.paymentDate.replaceAll("-", "")}-${kind === "deposit" ? "DEP" : "RENT"}-01`,
+      recorded_by: paidActor,
+    })),
+  );
+  const ledger = payments.map((p, i) => ({
+    id: paidId(40 + i),
+    building_id: paidBuilding,
+    unit_id: p.unit_id,
+    payment_id: p.id,
+    entry_date: p.payment_date,
+    direction: i % 2 === 0 ? "liability_in" : "income",
+    category: i % 2 === 0 ? "lease_deposit" : "lease_rent",
+    amount_xof: p.amount,
+    currency: "XOF",
+    amount_native: null,
+    amount_cny: null,
+  }));
+  return {
+    success: true,
+    idempotent: false,
+    data: {
+      requestId: input.requestId,
+      actorId: paidActor,
+      projectId: paidProject,
+      buildingId: paidBuilding,
+      customerId: paidCustomer,
+      receiptId: paidReceipt,
+      reservationIds: reservations.map((r) => r.id),
+      paymentIds: payments.map((p) => p.id),
+      ledgerIds: ledger.map((l) => l.id),
+      request: input,
+      verification: {
+        receipt: {
+          id: paidReceipt,
+          request_id: input.requestId,
+          project_id: paidProject,
+          building_id: paidBuilding,
+          customer_id: paidCustomer,
+          customer_name: input.customerName,
+          payment_date: input.paymentDate,
+          payment_method: input.paymentMethod,
+          currency: "XOF",
+          total_amount_xof: input.totalAmountXof,
+          source_ref: input.sourceRef,
+          external_receipt_no: input.externalReceiptNo,
+          reason: input.reason,
+          notes: null,
+          recorded_by: paidActor,
+          recorded_at: paidStamp,
+        },
+        reservations,
+        payments,
+        ledger,
+        customer: { id: paidCustomer, name: input.customerName },
+        units: input.rooms.map((r, i) => ({
+          id: r.unitId,
+          building_id: paidBuilding,
+          code: `CIMAC-B17-${201 + i}`,
+          kind: "apartment",
+          asset_subtype: "apartment",
+          updated_at: paidStamp,
+          construction_status: "operational",
+          occupancy_verified: false,
+          status: "available",
+          operational_condition: "normal",
+        })),
+        profiles: input.rooms.map((r) => ({
+          unit_id: r.unitId,
+          building_id: paidBuilding,
+          monthly_rent_xof: r.monthlyRentXof,
+        })),
+        unpaidReservations: [],
+        leases: [],
+        dailyBookings: [],
+        sales: [],
+        businessFlags: [],
+      },
+    },
+  };
+}

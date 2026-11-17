@@ -125,6 +125,9 @@ function InspectorContent({
   }
 
   const { record, payment } = data;
+  const apartmentReservation = ["cimac_apartment_rent", "cimac_apartment_deposit"].includes(
+    record.source?.type ?? "",
+  );
   const customerCollection = [
     "cimac_customer_collection",
     "cimac_customer_refund",
@@ -388,12 +391,16 @@ function InspectorContent({
               </a>
               <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
                 {text(
-                  workArea === "cimac" && record.source?.type === "lease_contract"
-                    ? "按已核验的原合同编号打开建材城合同工作台，不改变合同或账务。"
-                    : "进入对应业务工作台后，按上述房源或编号查找，不会直接打开指定合同。",
-                  workArea === "cimac" && record.source?.type === "lease_contract"
-                    ? "Ouvre le contrat CIMAC vérifié sans modifier le contrat ni ses écritures."
-                    : "Dans l'espace métier, recherchez le lot ou l'identifiant ci-dessus ; le contrat précis ne s'ouvre pas automatiquement.",
+                  apartmentReservation
+                    ? "进入 B17 公寓工作台查看付款预订。"
+                    : workArea === "cimac" && record.source?.type === "lease_contract"
+                      ? "按已核验的原合同编号打开建材城合同工作台，不改变合同或账务。"
+                      : "进入对应业务工作台后，按上述房源或编号查找，不会直接打开指定合同。",
+                  apartmentReservation
+                    ? "Ouvre l’espace des appartements B17 pour consulter la réservation payée."
+                    : workArea === "cimac" && record.source?.type === "lease_contract"
+                      ? "Ouvre le contrat CIMAC vérifié sans modifier le contrat ni ses écritures."
+                      : "Dans l'espace métier, recherchez le lot ou l'identifiant ci-dessus ; le contrat précis ne s'ouvre pas automatiquement.",
                 )}
               </p>
             </>

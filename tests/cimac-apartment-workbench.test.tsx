@@ -25,6 +25,10 @@ vi.mock("@/features/cimac/cimac-apartment-reservation-actions", () => ({
   executeCimacApartmentReservations: mocks.executeReservation,
   checkCimacApartmentReservationStatus: mocks.checkReservation,
 }));
+vi.mock("@/features/cimac/cimac-apartment-paid-actions", () => ({
+  executeApartmentPaidReceipt: vi.fn(),
+  checkApartmentPaidStatus: vi.fn(),
+}));
 
 let host: HTMLDivElement;
 let root: Root;
@@ -45,6 +49,7 @@ function fixture(): CimacApartmentData {
     })),
     registeredCount: 0,
     schemaAvailable: true,
+    paidReservationSchemaAvailable: true,
   };
 }
 
@@ -114,6 +119,63 @@ afterEach(async () => {
 });
 
 describe("CIMAC apartment workbench", () => {
+  it("does not claim no reservation or permit another hold when the paid register is unknown", async () => {
+    const data = fixture();
+    data.reservationSchemaAvailable = true;
+    data.paidReservationSchemaAvailable = false;
+    data.registeredCount = 64;
+    data.rooms = data.rooms.map((r) => ({
+      ...r,
+      registered: true,
+      unitId: `synthetic-${r.unitNo}`,
+      unitUpdatedAt: "2026-11-01T00:00:00Z",
+      constructionStatus: "operational",
+      operationalCondition: "normal",
+    }));
+    await render({ data });
+    expect(room("201").getAttribute("aria-label")).toContain("预订：资料待补充");
+    expect(host.textContent).not.toContain("暂无预订");
+    expect(host.textContent).not.toContain("登记房间预留");
+    expect(host.textContent).toContain("已付预订资料尚未核实");
+  });
+  it("shows paid reservation and paid-through independently and removes unpaid cancel controls", async () => {
+    const data = fixture();
+    data.reservationSchemaAvailable = true;
+    data.registeredCount = 64;
+    data.rooms = data.rooms.map((r) => ({
+      ...r,
+      registered: true,
+      unitId: `synthetic-${r.unitNo}`,
+      unitUpdatedAt: "2026-11-01T00:00:00Z",
+      constructionStatus: "operational",
+      operationalCondition: "normal",
+    }));
+    data.rooms[0].paidReservation = {
+      receiptId: "receipt",
+      reservationId: "paid",
+      customerName: "测试客户甲",
+      agreementStartDate: "2027-01-01",
+      agreementEndDate: "2028-12-31",
+      paidPeriodStart: "2027-01-01",
+      paidPeriodEnd: "2027-03-31",
+      paymentDate: "2026-11-10",
+      paymentMethod: "cash",
+      monthlyRentXof: 350000,
+      depositAmountXof: 700000,
+      rentAmountXof: 1050000,
+      totalAmountXof: 1750000,
+      sourceRef: "Test source",
+      externalReceiptNo: null,
+    };
+    await render({ data, initialQuery: { floor: 2, suffix: 1, tab: "room" } });
+    expect(room("201").getAttribute("aria-label")).toContain("已付预订");
+    expect(host.textContent).toContain("2027-03-31");
+    expect(host.textContent).toContain("2028-12-31");
+    expect(host.textContent).not.toContain("取消预留");
+    expect(host.textContent).not.toContain("登记房间预留");
+    expect(host.textContent).toContain("实际入住");
+    expect(host.textContent).toContain("资料待补充");
+  });
   it("shows delivery, booking and actual stay independently for a ready 64-room catalogue", async () => {
     const data = fixture();
     data.reservationSchemaAvailable = true;

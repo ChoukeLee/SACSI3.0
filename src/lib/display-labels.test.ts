@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { currencyDisplayLabel, financialBusinessLabel, knownFinancialBusinessCodes, statusDisplayLabel } from "./display-labels";
+import {
+  currencyDisplayLabel,
+  financialBusinessLabel,
+  knownFinancialBusinessCodes,
+  statusDisplayLabel,
+} from "./display-labels";
 
 describe("display labels", () => {
   it("covers every currently supported financial code without exposing identifiers", () => {
@@ -12,6 +17,17 @@ describe("display labels", () => {
   it("uses safe localized fallbacks for unknown database values", () => {
     expect(financialBusinessLabel("future_business_code", "zh")).toBe("其他业务");
     expect(statusDisplayLabel("future_status", "zh")).toBe("未知状态");
+  });
+
+  it("names paid apartment reservation receipts without implying a lease or occupancy", () => {
+    expect(financialBusinessLabel("cimac_apartment_rent", "zh")).toBe("公寓预订租金");
+    expect(financialBusinessLabel("cimac_apartment_deposit", "zh")).toBe("公寓预订押金");
+    expect(financialBusinessLabel("cimac_apartment_rent", "fr")).toBe(
+      "Loyer de réservation d’appartement",
+    );
+    expect(financialBusinessLabel("cimac_apartment_deposit", "fr")).toBe(
+      "Dépôt de réservation d’appartement",
+    );
   });
 
   it("shows ISO codes in currency fields", () => {

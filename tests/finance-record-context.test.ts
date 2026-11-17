@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CIMAC_PROJECT_ID } from "@/features/finance/cimac-export-model";
 import {
   decodeFinanceRecordContext,
   parseFinanceRecordContextQuery,
@@ -106,6 +107,41 @@ describe("finance record context boundary", () => {
       ).toThrow();
     }
   });
+  it.each(["cimac_apartment_rent", "cimac_apartment_deposit"])(
+    "allows %s only to the fixed CIMAC apartment workspace",
+    (type) => {
+      const apartment = {
+        ...record,
+        building: { id, label: "17#公寓", projectId: CIMAC_PROJECT_ID },
+        source: {
+          type,
+          id,
+          label: "公寓已付款预订",
+          href: "/cimac/apartments",
+          linkKind: "workspace",
+        },
+      };
+      expect(decodeFinanceRecordContext(apartment).source?.href).toBe("/cimac/apartments");
+      expect(() =>
+        decodeFinanceRecordContext({
+          ...apartment,
+          building: { ...apartment.building, projectId: id },
+        }),
+      ).toThrow();
+      expect(() =>
+        decodeFinanceRecordContext({
+          ...apartment,
+          source: { ...apartment.source, href: `/leases?project=${CIMAC_PROJECT_ID}` },
+        }),
+      ).toThrow();
+      expect(() =>
+        decodeFinanceRecordContext({
+          ...apartment,
+          source: { ...apartment.source, href: `/cimac/apartments?reservation=${id}` },
+        }),
+      ).toThrow();
+    },
+  );
   it("only accepts exact single kind/id parameters", () => {
     expect(parseFinanceRecordContextQuery(new URLSearchParams({ kind: "ledger", id }))).toEqual({
       kind: "ledger",
