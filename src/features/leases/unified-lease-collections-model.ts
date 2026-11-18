@@ -43,6 +43,7 @@ export interface UnifiedLeaseCollectionRow {
   statusLabel?: string;
   reason?: string;
   dueDate: string | null;
+  dueDateLabel?: string;
   dueSource?: string;
   paidThrough: string | null;
   ownerSettledThrough?: string;
@@ -139,7 +140,8 @@ export function buildApartmentCollectionRows(
     if (!href) return [];
 
     // A coverage review can carry an as-of date in the original model. It is not a payment date.
-    const bill = attention && attention.kind !== "coverage" ? attention : null;
+    const coverageReminder = attention?.kind === "upcoming" && attention.basis === "paid_through";
+    const bill = attention && attention.kind !== "coverage" && !coverageReminder ? attention : null;
     const status: CollectionStatus =
       !attention || attention.kind === "coverage" ? "needs_evidence" : attention.kind;
     const reason =
@@ -166,9 +168,28 @@ export function buildApartmentCollectionRows(
         ].filter((value): value is string => !!value),
         href,
         status,
-        statusLabel: timingLabel(status, bill?.days, zh),
+        statusLabel: coverageReminder
+          ? attention.days === 0
+            ? zh
+              ? "今日缴租到期"
+              : "Couverture jusqu’à aujourd’hui"
+            : zh
+              ? `${attention.days}天后缴租到期`
+              : `Fin de couverture dans ${attention.days} j`
+          : timingLabel(status, bill?.days, zh),
         reason,
-        dueDate: bill?.dueDate ?? null,
+        dueDate: coverageReminder ? attention.dueDate : (bill?.dueDate ?? null),
+        ...(coverageReminder
+          ? {
+              dueDateLabel: zh ? "缴租到期日" : "Fin de couverture du loyer",
+              dueSource: zh
+                ? "租赁资料中的已交至日期；下期账单待核"
+                : "Date « Payé au » enregistrée ; prochaine facture à vérifier",
+              paidThroughSource: zh
+                ? "租赁资料登记的租金已交至日期"
+                : "Date de couverture du loyer enregistrée",
+            }
+          : {}),
         paidThrough,
         amount: bill
           ? bill.amount === null
@@ -177,8 +198,11 @@ export function buildApartmentCollectionRows(
               : "Plusieurs devises · voir le détail"
             : formatPropertyMoney(bill.amount, bill.currency ?? "XOF", locale)
           : null,
-        amountLabel:
-          bill?.amountIsEstimated && bill.amount !== null
+        amountLabel: coverageReminder
+          ? zh
+            ? "下期账单待核"
+            : "Prochaine facture à vérifier"
+          : bill?.amountIsEstimated && bill.amount !== null
             ? zh
               ? "逾期未收（含租金测算）"
               : "Solde en retard, estimation incluse"

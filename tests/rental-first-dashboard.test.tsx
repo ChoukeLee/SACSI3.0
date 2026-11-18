@@ -148,6 +148,29 @@ it("retains the source amounts and separate currencies, including rental-related
   expect(host.textContent).toContain("租赁相关费用");
 });
 
+it.each(["zh", "fr"] as const)(
+  "shows a %s paid-through expiry without inventing a collectible amount",
+  (locale) => {
+    const reminder = row("coverage-expiry", {
+      name: "702",
+      status: "upcoming",
+      statusLabel: locale === "zh" ? "12天后缴租到期" : "Fin de couverture dans 12 j",
+      dueDate: "2026-11-30",
+      dueDateLabel: locale === "zh" ? "缴租到期日" : "Fin de couverture du loyer",
+      paidThrough: "2026-11-30",
+      amount: null,
+      amountLabel: locale === "zh" ? "下期账单待核" : "Prochaine facture à vérifier",
+    });
+    const host = render(data({ rows: [reminder] }), { locale });
+    const link = host.querySelector('a[href="/leases?contract=coverage-expiry"]')!;
+    expect(link.textContent).toContain(reminder.statusLabel);
+    expect(link.textContent).toContain(reminder.amountLabel);
+    expect(link.textContent).not.toMatch(
+      /金额待补|Montant à compléter|多币种|Plusieurs devises|0.*XOF/,
+    );
+  },
+);
+
 it("marks partial collection reads instead of presenting a complete empty or zero dashboard", () => {
   const host = render(
     data({ rows: [], unavailable: { apartments: true, operatingAssets: false }, cash: null }),

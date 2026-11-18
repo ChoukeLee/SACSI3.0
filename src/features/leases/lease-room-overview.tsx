@@ -135,6 +135,14 @@ function attentionLabel(
   if (needsLeaseReview(row) && (!attention || attention.kind === "coverage"))
     return zh ? "租赁资料待核" : "Dossier à vérifier";
   if (!attention) return null;
+  if (attention.kind === "upcoming" && attention.basis === "paid_through")
+    return attention.days === 0
+      ? zh
+        ? "今日缴租到期"
+        : "Couverture jusqu’à aujourd’hui"
+      : zh
+        ? `${attention.days}天后缴租到期`
+        : `Fin de couverture dans ${attention.days} j`;
   if (attention.kind === "unsettled") return zh ? "历史待结清" : "Ancien solde à régler";
   if (attention.kind === "overdue")
     return attention.days === null
@@ -168,6 +176,8 @@ function attentionAmount(
   const value = row.attention;
   if (needsLeaseReview(row) && (!value || value.kind === "coverage"))
     return locale === "zh" ? "查看资料核对" : "Vérifier le dossier";
+  if (value?.kind === "upcoming" && value.basis === "paid_through")
+    return locale === "zh" ? "下期账单待核" : "Prochaine facture à vérifier";
   if (value && value.kind !== "coverage" && value.amount === null)
     return locale === "zh" ? "多币种 · 查看明细" : "Plusieurs devises · voir le détail";
   if (!value || value.amount === null) return locale === "zh" ? "金额待核" : "Montant à vérifier";
@@ -740,7 +750,11 @@ export function LeaseRoomOverview({
                   </span>
                   <span
                     className={
-                      row.attention?.kind === "overdue" ? styles.redText : styles.amberText
+                      row.attention?.kind === "overdue"
+                        ? styles.redText
+                        : row.attention?.kind === "upcoming"
+                          ? styles.blueText
+                          : styles.amberText
                     }
                   >
                     <strong>{attentionLabel(row, zh)}</strong>

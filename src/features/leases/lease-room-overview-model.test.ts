@@ -239,7 +239,14 @@ it.each([undefined, []] as const)(
         contract_no: "",
       });
       expect(buildLeaseRoomOverview(data)[0].attention).toBeNull();
-      for (const through of ["2026-11-22", "2026-11-06", null]) {
+      Object.assign(data.contracts[0], { paid_through_date: "2026-11-22" });
+      expect(buildLeaseRoomOverview(data)[0].attention).toMatchObject({
+        kind: "upcoming",
+        basis: "paid_through",
+        amount: null,
+        days: 15,
+      });
+      for (const through of ["2026-11-06", null]) {
         Object.assign(data.contracts[0], { paid_through_date: through });
         expect(buildLeaseRoomOverview(data)[0].attention).toMatchObject({
           kind: "coverage",

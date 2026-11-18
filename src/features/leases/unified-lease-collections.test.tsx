@@ -67,3 +67,46 @@ it("separates a confirmed balance without a payment date from records awaiting v
     vi.unstubAllGlobals();
   }
 });
+
+it("labels an apartment coverage date without presenting it as an agreed payment date or payable amount", async () => {
+  const host = document.createElement("div");
+  const root = createRoot(host);
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const row: UnifiedLeaseCollectionRow = {
+    id: "coverage-expiry",
+    category: "apartment",
+    name: "702",
+    keywords: [],
+    href: "/leases?contract=coverage-expiry",
+    status: "upcoming",
+    statusLabel: "12天后缴租到期",
+    dueDate: "2026-11-30",
+    dueDateLabel: "缴租到期日",
+    dueSource: "租赁资料中的已交至日期；下期账单待核",
+    paidThrough: "2026-11-30",
+    paidThroughSource: "租赁资料登记的租金已交至日期",
+    amount: null,
+    amountLabel: "下期账单待核",
+  };
+  try {
+    await act(async () =>
+      root.render(
+        <UnifiedLeaseCollections
+          rows={[row]}
+          locale="zh"
+          initialCategory="apartment"
+          unavailable={{ apartments: false, operatingAssets: false }}
+        />,
+      ),
+    );
+    const link = host.querySelector(`a[href="${row.href}"]`)!;
+    expect(link.textContent).toContain("缴租到期日2026-11-30");
+    expect(link.textContent).toContain("12天后缴租到期");
+    expect(link.textContent).toContain("下期账单待核");
+    expect(link.textContent).not.toMatch(/约定付款日|多币种|0\s*(?:XOF|万西法)/);
+    expect(link.querySelector('[title="租赁资料中的已交至日期；下期账单待核"]')).not.toBeNull();
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

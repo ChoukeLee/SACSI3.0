@@ -93,7 +93,10 @@ export function RentalFirstDashboard({
                     </span>
                   </span>
                   <span className={styles.rowAmount}>
-                    {row.amount ?? text("金额待补", "Montant à compléter")}
+                    {row.amount ??
+                      (row.dueDateLabel
+                        ? row.amountLabel
+                        : text("金额待补", "Montant à compléter"))}
                     {/测算|estimation/i.test(row.amountLabel) ? (
                       <small>{text("含租金测算", "Estimation incluse")}</small>
                     ) : null}

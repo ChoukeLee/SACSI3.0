@@ -435,7 +435,7 @@
   border-top-color: #d1655f;
 }
 .upcomingRoom {
-  border-top-color: #cba457;
+  border-top-color: #6b99d2;
 }
 .selectedRoom {
   border-color: #6b99d2;
@@ -446,8 +446,8 @@
   background: #fff0ee;
 }
 .upcomingAttention {
-  color: #8c6526;
-  background: #fff7e7;
+  color: #325b9b;
+  background: #e4efff;
 }
 .reviewAttention {
   color: #76684c;
@@ -534,6 +534,19 @@
 }
 .amberText {
   color: #92713c;
+}
+.blueText {
+  color: #325b9b;
+}
+:global(.dark) .upcomingRoom {
+  border-top-color: #455d81;
+}
+:global(.dark) .upcomingAttention {
+  background: #324666;
+  color: #bed6ff;
+}
+:global(.dark) .blueText {
+  color: #bed6ff;
 }
 .empty,
 .unavailable {

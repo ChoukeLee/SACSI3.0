@@ -16,6 +16,7 @@ import {
   LeaseRoomOverview,
   leaseRoomFloorLabel,
   type LeaseBuildingFilter,
+  type LeaseRoomFilter,
 } from "./lease-room-overview";
 
 let host: HTMLDivElement;
@@ -89,6 +90,8 @@ async function render(
     onRetry?: () => void;
     records?: LeaseRecordOverviewRow[];
     onSelectRecord?: (record: LeaseRecordOverviewRow) => void;
+    embedded?: { search: string; filter: LeaseRoomFilter };
+    locale?: "zh" | "fr";
   } = {},
 ) {
   await act(async () =>
@@ -114,7 +117,8 @@ async function render(
             })),
           )
         }
-        locale="zh"
+        locale={state.locale ?? "zh"}
+        embedded={state.embedded}
         loading={state.loading ?? false}
         error={state.error ?? false}
         onSelectUnit={onSelect}
@@ -397,6 +401,46 @@ it("filters payment attention and opens a same-scope follow-up list without turn
   await act(async () => button("待核事项").click());
   expect(host.querySelectorAll("[data-room-id]")).toHaveLength(1);
   expect(host.querySelector("[data-room-id='review']")?.textContent).toContain("缴费待核");
+});
+
+it("shows paid-through expiry consistently on expanded, compact and follow-up views without a payable amount", async () => {
+  const [first] = rows();
+  const value: LeaseRoomOverviewRow = {
+    ...first,
+    paidThrough: "2026-11-30",
+    reviewReasons: [],
+    attention: {
+      kind: "upcoming",
+      basis: "paid_through",
+      dueDate: "2026-11-30",
+      days: 12,
+      amount: null,
+      amountIsEstimated: false,
+    },
+  };
+  await render([value]);
+  const card = host.querySelector(`[data-room-id="${value.unit.id}"]`)!;
+  expect(card.textContent).toContain("12天后缴租到期");
+  expect(card.textContent).not.toContain("12 天内应缴");
+  expect(card.className).toContain("upcomingRoom");
+  await act(async () => button("收款跟进").click());
+  const followup = host.querySelector('[aria-label="集中收款跟进"]')!;
+  expect(followup.textContent).toContain("12天后缴租到期");
+  expect(followup.textContent).toContain("下期账单待核");
+  expect(followup.textContent).not.toMatch(/多币种|0\s*(?:XOF|万西法)/);
+  await render([value], vi.fn(), { embedded: { search: "", filter: "upcoming" } });
+  const compact = host.querySelector(`[data-room-id="${value.unit.id}"]`)!;
+  expect(compact.getAttribute("data-follow-up")).toBe("upcoming");
+  expect(compact.textContent).toContain("12天后缴租到期");
+  await render([{ ...value, attention: { ...value.attention!, days: 0 } }], vi.fn(), {
+    embedded: { search: "", filter: "upcoming" },
+  });
+  expect(host.querySelector("[data-room-id]")?.textContent).toContain("今日缴租到期");
+  expect(host.querySelector("[data-room-id]")?.textContent).not.toContain("今日应缴");
+  await render([value], vi.fn(), { locale: "fr" });
+  expect(host.querySelector("[data-room-id]")?.textContent).toContain(
+    "Fin de couverture dans 12 j",
+  );
 });
 
 it("hides stale cards on loading or a failed read and exposes an explicit retry", async () => {

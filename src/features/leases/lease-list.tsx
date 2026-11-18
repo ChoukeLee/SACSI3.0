@@ -88,6 +88,7 @@ import {
 import {
   buildLeaseRoomOverview,
   buildLeaseRecordOverview,
+  resolveApartmentPaidThroughReminder,
   type LeaseRoomOverviewRow,
 } from "./lease-room-overview-model";
 import styles from "./lease-workbench.module.css";
@@ -915,6 +916,10 @@ export function LeaseList({
   const leaseAttention = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     const buildingMap = new Map(buildings.map((building) => [building.id, building]));
+    const activeCounts = new Map<string, number>();
+    for (const contract of filteredByBuilding)
+      if (contract.status === "active")
+        activeCounts.set(contract.unit_id, (activeCounts.get(contract.unit_id) ?? 0) + 1);
     const rows = filteredByBuilding.flatMap((contract) => {
       if (contract.status !== "active") return [];
       const unit = unitMap.get(contract.unit_id);
@@ -930,15 +935,24 @@ export function LeaseList({
       );
       const summary = summarizeLeaseReceivables(related, today);
       const projected = workspace.data?.summaries[contract.id];
-      const attention = resolveLeaseAttention({
+      const outstanding = projected?.outstanding ?? summary.outstanding;
+      const billAttention = resolveLeaseAttention({
         today,
         paidThroughDate: contract.paid_through_date ?? null,
-        outstanding: projected?.outstanding ?? summary.outstanding,
+        outstanding,
         overdue: projected?.overdue ?? summary.overdue,
         nextDue: workspace.enabled
           ? (workspace.data?.attentionDue[contract.id] ?? null)
           : summary.earliestOutstandingDue,
       });
+      const reminder =
+        activeCounts.get(unit.id) === 1 &&
+        (!billAttention || (billAttention.kind === "coverage" && outstanding === 0))
+          ? resolveApartmentPaidThroughReminder(contract, unit, today)
+          : null;
+      const attention = reminder
+        ? { ...reminder, kind: "upcoming" as const, days: reminder.days ?? 0 }
+        : billAttention;
       if (!attention) return [];
       const building = buildingMap.get(unit.building_id);
       return [
@@ -948,6 +962,7 @@ export function LeaseList({
           customer,
           buildingName: building?.display_name || building?.code || "-",
           ...attention,
+          basis: reminder?.basis,
           paidThrough: contract.paid_through_date,
         },
       ];
@@ -2496,7 +2511,11 @@ export function LeaseList({
                         statFilter === "overdue" ? "text-red-700" : "text-amber-700",
                       )}
                     >
-                      {formatXof(noticeRows.reduce((sum, row) => sum + row.amount, 0))}
+                      {noticeRows.length > 0 && noticeRows.every((row) => row.amount === null)
+                        ? locale === "zh"
+                          ? "下期账单待核"
+                          : "Prochaine facture à vérifier"
+                        : formatXof(noticeRows.reduce((sum, row) => sum + (row.amount ?? 0), 0))}
                     </p>
                   </div>
                   {noticeRows.length === 0 ? (
@@ -2522,16 +2541,28 @@ export function LeaseList({
                                   {row.buildingName} · {row.unit.unit_no}
                                 </span>
                                 <Badge
-                                  variant={row.kind === "overdue" ? "destructive" : "warning"}
-                                  className="h-5 px-2 text-[10px]"
+                                  variant={row.kind === "overdue" ? "destructive" : "outline"}
+                                  className={cn(
+                                    "h-5 px-2 text-[10px]",
+                                    row.kind === "upcoming" &&
+                                      "border-blue-200 bg-blue-50 text-blue-700",
+                                  )}
                                 >
-                                  {row.kind === "overdue"
-                                    ? row.amountIsEstimated
-                                      ? locale === "zh"
-                                        ? "合同累计"
-                                        : "Calcul contrat"
-                                      : `${locale === "zh" ? "逾期" : "Retard"} ${Math.abs(row.days)}${locale === "zh" ? "天" : "j"}`
-                                    : `${row.days}${locale === "zh" ? "天后应缴" : "j"}`}
+                                  {row.basis === "paid_through"
+                                    ? locale === "zh"
+                                      ? row.days === 0
+                                        ? "今日缴租到期"
+                                        : `${row.days}天后缴租到期`
+                                      : row.days === 0
+                                        ? "Couverture à terme aujourd’hui"
+                                        : `Couverture : ${row.days} j`
+                                    : row.kind === "overdue"
+                                      ? row.amountIsEstimated
+                                        ? locale === "zh"
+                                          ? "合同累计"
+                                          : "Calcul contrat"
+                                        : `${locale === "zh" ? "逾期" : "Retard"} ${Math.abs(row.days)}${locale === "zh" ? "天" : "j"}`
+                                      : `${row.days}${locale === "zh" ? "天后应缴" : "j"}`}
                                 </Badge>
                               </div>
                               <p className="mt-1 truncate text-[13px] font-medium text-foreground">
@@ -2545,22 +2576,37 @@ export function LeaseList({
                                 row.kind === "overdue" ? "text-red-700" : "text-amber-700",
                               )}
                             >
-                              {formatXof(row.amount)}
+                              {row.basis === "paid_through"
+                                ? locale === "zh"
+                                  ? "下期账单待核"
+                                  : "Prochaine facture à vérifier"
+                                : formatXof(row.amount ?? 0)}
                             </p>
                           </div>
                           <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1.5">
                               <CalendarClock className="h-3.5 w-3.5" />
-                              {locale === "zh" ? "应缴日" : "Échéance"} {row.dueDate}
+                              {row.basis === "paid_through"
+                                ? locale === "zh"
+                                  ? "缴租到期日"
+                                  : "Fin de couverture"
+                                : locale === "zh"
+                                  ? "应缴日"
+                                  : "Échéance"}{" "}
+                              {row.dueDate}
                             </span>
                             <span className="text-right">
-                              {row.kind === "upcoming"
+                              {row.basis === "paid_through"
                                 ? locale === "zh"
-                                  ? "本合同未结总额（含未来期）"
-                                  : "Solde total du contrat, échéances futures incluses"
-                                : locale === "zh"
-                                  ? "已核实逾期余额"
-                                  : "Solde échu vérifié"}
+                                  ? "按已交至日期提醒"
+                                  : "Rappel de couverture enregistrée"
+                                : row.kind === "upcoming"
+                                  ? locale === "zh"
+                                    ? "本合同未结总额（含未来期）"
+                                    : "Solde total du contrat, échéances futures incluses"
+                                  : locale === "zh"
+                                    ? "已核实逾期余额"
+                                    : "Solde échu vérifié"}
                             </span>
                             <span>
                               {locale === "zh" ? "登记覆盖至" : "Couverture enregistrée"}{" "}
@@ -2578,7 +2624,13 @@ export function LeaseList({
                             className="mt-3 w-full"
                             onClick={() => openDetail(row.contract.id)}
                           >
-                            {locale === "zh" ? "查看合同并收款" : "Voir et encaisser"}
+                            {row.basis === "paid_through"
+                              ? locale === "zh"
+                                ? "查看合同并核对下期账单"
+                                : "Voir et vérifier la prochaine facture"
+                              : locale === "zh"
+                                ? "查看合同并收款"
+                                : "Voir et encaisser"}
                             <ChevronRight className="h-3.5 w-3.5" />
                           </Button>
                         </div>
@@ -2773,8 +2825,8 @@ export function LeaseList({
             />
             <p className="text-xs leading-relaxed text-muted-foreground">
               {locale === "zh"
-                ? "收费提醒只取已建、已核实应收的未收余额。登记覆盖日期过期或缺失，只列为覆盖待确认，不据此推算另一笔应缴款。"
-                : "Les rappels d’encaissement reposent uniquement sur les créances vérifiées ouvertes. Une couverture ancienne ou manquante doit être vérifiée, sans inventer un nouveau montant à payer."}
+                ? "公寓按已交至日期提前15天提醒。未建下期账单时提示待核；应缴金额仍取已建、已核实账单的未收余额。"
+                : "Les appartements sont signalés 15 jours avant la fin de couverture. La prochaine facture reste à vérifier si elle manque ; seuls les soldes des créances vérifiées sont exigibles."}
             </p>
             {attentionRows.length === 0 ? (
               <EmptyState
@@ -2799,16 +2851,33 @@ export function LeaseList({
                             {row.buildingName} · {row.unit.unit_no}
                           </span>
                           <Badge
-                            variant={row.kind === "overdue" ? "destructive" : "warning"}
-                            className="h-5 px-2 text-[10px]"
+                            variant={
+                              row.kind === "overdue"
+                                ? "destructive"
+                                : row.kind === "upcoming"
+                                  ? "outline"
+                                  : "warning"
+                            }
+                            className={cn(
+                              "h-5 px-2 text-[10px]",
+                              row.kind === "upcoming" && "border-blue-200 bg-blue-50 text-blue-700",
+                            )}
                           >
-                            {row.kind === "coverage"
+                            {row.basis === "paid_through"
                               ? locale === "zh"
-                                ? "覆盖待确认 · 非欠款判定"
-                                : "Couverture à vérifier · dette non présumée"
-                              : row.kind === "overdue"
-                                ? `${locale === "zh" ? "逾期" : "Retard"} ${Math.abs(row.days)}${locale === "zh" ? "天" : "j"}`
-                                : `${row.days}${locale === "zh" ? "天后应缴" : "j"}`}
+                                ? row.days === 0
+                                  ? "今日缴租到期"
+                                  : `${row.days}天后缴租到期`
+                                : row.days === 0
+                                  ? "Couverture à terme aujourd’hui"
+                                  : `Couverture : ${row.days} j`
+                              : row.kind === "coverage"
+                                ? locale === "zh"
+                                  ? "覆盖待确认 · 非欠款判定"
+                                  : "Couverture à vérifier · dette non présumée"
+                                : row.kind === "overdue"
+                                  ? `${locale === "zh" ? "逾期" : "Retard"} ${Math.abs(row.days)}${locale === "zh" ? "天" : "j"}`
+                                  : `${row.days}${locale === "zh" ? "天后应缴" : "j"}`}
                           </Badge>
                         </div>
                         <p className="mt-1 truncate text-[13px] font-medium text-foreground">
@@ -2822,39 +2891,51 @@ export function LeaseList({
                           row.kind === "overdue" ? "text-red-700" : "text-amber-700",
                         )}
                       >
-                        {row.amount === null
+                        {row.basis === "paid_through"
                           ? locale === "zh"
-                            ? "金额不推算"
-                            : "Aucun montant présumé"
-                          : formatXof(row.amount)}
+                            ? "下期账单待核"
+                            : "Prochaine facture à vérifier"
+                          : row.amount === null
+                            ? locale === "zh"
+                              ? "金额不推算"
+                              : "Aucun montant présumé"
+                            : formatXof(row.amount)}
                       </p>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
                         <CalendarClock className="h-3.5 w-3.5" />
-                        {row.kind === "coverage"
+                        {row.basis === "paid_through"
                           ? locale === "zh"
-                            ? "登记覆盖至"
-                            : "Couverture enregistrée"
-                          : locale === "zh"
-                            ? "应缴日"
-                            : "Échéance"}{" "}
+                            ? "缴租到期日"
+                            : "Fin de couverture"
+                          : row.kind === "coverage"
+                            ? locale === "zh"
+                              ? "登记覆盖至"
+                              : "Couverture enregistrée"
+                            : locale === "zh"
+                              ? "应缴日"
+                              : "Échéance"}{" "}
                         {row.kind === "coverage"
                           ? row.paidThrough || (locale === "zh" ? "待确认" : "À vérifier")
                           : row.dueDate}
                       </span>
                       <span className="text-right">
-                        {row.kind === "coverage"
+                        {row.basis === "paid_through"
                           ? locale === "zh"
-                            ? "核对服务账期与收款关联"
-                            : "Vérifier les périodes et paiements"
-                          : row.kind === "upcoming"
+                            ? "按已交至日期提醒"
+                            : "Rappel de couverture enregistrée"
+                          : row.kind === "coverage"
                             ? locale === "zh"
-                              ? "本合同未结总额（含未来期）"
-                              : "Solde total du contrat, échéances futures incluses"
-                            : locale === "zh"
-                              ? "已核实逾期余额"
-                              : "Solde échu vérifié"}
+                              ? "核对服务账期与收款关联"
+                              : "Vérifier les périodes et paiements"
+                            : row.kind === "upcoming"
+                              ? locale === "zh"
+                                ? "本合同未结总额（含未来期）"
+                                : "Solde total du contrat, échéances futures incluses"
+                              : locale === "zh"
+                                ? "已核实逾期余额"
+                                : "Solde échu vérifié"}
                       </span>
                       <span>
                         {locale === "zh" ? "登记覆盖至" : "Couverture enregistrée"}{" "}
@@ -2872,13 +2953,17 @@ export function LeaseList({
                       className="mt-3 w-full"
                       onClick={() => openDetail(row.contract.id)}
                     >
-                      {row.kind === "coverage"
+                      {row.basis === "paid_through"
                         ? locale === "zh"
-                          ? "查看合同并核对覆盖"
-                          : "Voir et vérifier la couverture"
-                        : locale === "zh"
-                          ? "查看合同并收款"
-                          : "Voir et encaisser"}
+                          ? "查看合同并核对下期账单"
+                          : "Voir et vérifier la prochaine facture"
+                        : row.kind === "coverage"
+                          ? locale === "zh"
+                            ? "查看合同并核对覆盖"
+                            : "Voir et vérifier la couverture"
+                          : locale === "zh"
+                            ? "查看合同并收款"
+                            : "Voir et encaisser"}
                       <ChevronRight className="h-3.5 w-3.5" />
                     </Button>
                   </div>

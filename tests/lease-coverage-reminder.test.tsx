@@ -5,14 +5,18 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { LeaseList } from "@/features/leases/lease-list";
 import {
   parseWorkspaceQuery,
+  type WorkspaceData,
   type WorkspaceMode,
   type WorkspaceQuery,
 } from "@/features/contracts/workspace-model";
-import type { LeaseContractRow } from "@/types/database";
+import type { LeaseContractRow, ReceivableRow } from "@/types/database";
 import {
+  workspaceBuilding,
   workspaceContract,
+  workspaceCustomer,
   workspaceFixture,
   workspaceProject,
+  workspaceUnit,
 } from "./fixtures/contract-workspace";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -26,6 +30,7 @@ vi.mock("@/features/leases/actions", () => ({
 vi.mock("@/features/print", () => ({ printLeaseContract: vi.fn(), printSaleContract: vi.fn() }));
 
 let host: HTMLDivElement, root: Root;
+let customizeData: (value: WorkspaceData) => void;
 function data(
   mode: WorkspaceMode = "list",
   query: WorkspaceQuery = parseWorkspaceQuery({ projectId: workspaceProject }),
@@ -58,9 +63,11 @@ function data(
     overdueContracts: 0,
     dueSoon: 0,
   };
+  customizeData?.(value);
   return value;
 }
 beforeEach(() => {
+  customizeData = () => undefined;
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-20T12:00:00Z"));
@@ -74,7 +81,7 @@ beforeEach(() => {
       url.searchParams.delete("mode");
       url.searchParams.delete("roomOverview");
       const value = data(mode, parseWorkspaceQuery(Object.fromEntries(url.searchParams)));
-      if (roomOverview) value.roomReceivables = [];
+      if (roomOverview) value.roomReceivables ??= [];
       return Response.json(value);
     }),
   );
@@ -88,8 +95,7 @@ afterEach(async () => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
-async function render() {
-  const value = data();
+async function render(value = data()) {
   await act(async () =>
     root.render(
       <LeaseList
@@ -153,4 +159,81 @@ it("does not include the fully settled stale coverage in upcoming collectible re
   expect(followup.textContent).toContain("缴费待核");
   expect(followup.textContent).not.toContain("天内应缴");
   expect(followup.textContent).not.toMatch(/600,000 XOF|60\s*万西法/);
+});
+
+function currentPaidThrough(value: WorkspaceData, paidThrough: string) {
+  Object.assign(value.contracts[0], {
+    paid_through_date: paidThrough,
+    commencement_state: "started",
+  });
+  const previousPaidBill = {
+    id: "77777777-7777-4777-8777-777777777777",
+    source_type: "lease_contract",
+    source_id: workspaceContract,
+    unit_id: workspaceUnit,
+    building_id: workspaceBuilding,
+    customer_id: workspaceCustomer,
+    category: "lease_rent",
+    currency: "XOF",
+    amount_xof: 600000,
+    paid_amount_xof: 600000,
+    amount_native: null,
+    paid_amount_native: null,
+    due_date: "2026-09-01",
+    status: "paid",
+    management_status: "managed",
+    service_period_start: null,
+    service_period_end: null,
+    title: "Synthetic settled previous rent",
+    created_at: "2026-09-01T00:00:00Z",
+    updated_at: "2026-09-01T00:00:00Z",
+  } as ReceivableRow;
+  if (value.mode === "context") value.roomReceivables = [previousPaidBill];
+  if (value.mode === "detail") {
+    value.receivables = [previousPaidBill];
+    value.receivableCount = 1;
+  }
+}
+
+it("shows a paid-through reminder on the room and collection follow-up when only settled old bills exist", async () => {
+  customizeData = (value) => currentPaidThrough(value, "2026-10-31");
+  await render(data());
+  const card = host.querySelector("[data-room-id]");
+  expect(card, host.textContent ?? "").not.toBeNull();
+  expect(card?.textContent).toContain("2026-10-31");
+  expect(card?.textContent).toContain("11天后缴租到期");
+  expect(card?.textContent).not.toContain("应缴");
+
+  await click(
+    [...host.querySelectorAll("button")].find((button) =>
+      button.textContent?.startsWith("收款跟进"),
+    ),
+  );
+  const followup = host.querySelector('[aria-label="集中收款跟进"]')!;
+  expect(followup.querySelectorAll("[data-followup-record-id]")).toHaveLength(1);
+  expect(followup.textContent).toContain("11天后缴租到期");
+  expect(followup.textContent).toContain("下期账单待核");
+  expect(followup.textContent).toContain("2026-10-31");
+  expect(followup.textContent).not.toContain("应缴");
+  expect(followup.textContent).not.toMatch(/600,000|60\.00\s*万|0\.00\s*万|0\s*XOF/);
+});
+
+it("does not include a paid-through date 16 days away in the upcoming collection filter", async () => {
+  customizeData = (value) => currentPaidThrough(value, "2026-11-05");
+  await render(data());
+  expect(host.querySelector("[data-room-id]"), host.textContent ?? "").not.toBeNull();
+  expect(host.querySelector("[data-room-id]")?.textContent).toContain("2026-11-05");
+  expect(host.querySelector("[data-room-id]")?.textContent).not.toContain("缴租到期");
+  await click(
+    [...host.querySelectorAll("button")].find((button) =>
+      button.textContent?.startsWith("15天内应缴"),
+    ),
+  );
+  expect(host.querySelectorAll("[data-room-id]")).toHaveLength(0);
+  await click(
+    [...host.querySelectorAll("button")].find((button) =>
+      button.textContent?.startsWith("收款跟进"),
+    ),
+  );
+  expect(host.querySelectorAll("[data-followup-record-id]")).toHaveLength(0);
 });

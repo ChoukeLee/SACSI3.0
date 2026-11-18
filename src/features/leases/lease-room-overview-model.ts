@@ -25,6 +25,8 @@ export type LeaseRoomOccupancy =
 
 export interface LeaseRoomAttention {
   kind: "overdue" | "upcoming" | "coverage";
+  /** A recorded rent-coverage cutoff is a reminder, not an unpaid bill. */
+  basis?: "paid_through";
   dueDate: string;
   days: number | null;
   amount: number | null;
@@ -122,6 +124,43 @@ function date(value: unknown): value is string {
     Number.isFinite(Date.parse(`${value}T00:00:00Z`)) &&
     new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value
   );
+}
+
+/** Remind about current apartment coverage without creating or pricing a bill. */
+export function resolveApartmentPaidThroughReminder(
+  record: LeaseContractRow,
+  unit: WorkspaceUnit,
+  today: string,
+): LeaseRoomAttention | null {
+  const apartment =
+    unit.asset_subtype === "apartment" || (!unit.asset_subtype && unit.kind === "apartment");
+  const commencement = (record as LeaseContractRow & { commencement_state?: string })
+    .commencement_state;
+  if (
+    !apartment ||
+    record.status !== "active" ||
+    record.actual_end_date ||
+    commencement === "not_started" ||
+    commencement === "pending_project_opening" ||
+    !date(today) ||
+    !date(record.start_date) ||
+    record.start_date > today ||
+    !date(record.paid_through_date) ||
+    record.paid_through_date < record.start_date
+  )
+    return null;
+  const days =
+    (Date.parse(`${record.paid_through_date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) /
+    86400000;
+  if (days < 0 || days > 15) return null;
+  return {
+    kind: "upcoming",
+    basis: "paid_through",
+    dueDate: record.paid_through_date,
+    days,
+    amount: null,
+    amountIsEstimated: false,
+  };
 }
 
 function money(value: unknown): number | null {
@@ -517,7 +556,15 @@ export function buildLeaseRoomOverview(input: LeaseRoomOverviewInput): LeaseRoom
     if (!conflict && condition === "locked") occupancy = "locked";
     const paidThrough =
       contract && date(contract.paid_through_date) ? contract.paid_through_date : null;
-    const attention = contract ? billingAttention(contract, unit, input, reviews) : null;
+    const billAttention = contract ? billingAttention(contract, unit, input, reviews) : null;
+    const attention =
+      contract &&
+      reviews.every((reason) => reason === "registered_period_needs_review") &&
+      (!billAttention ||
+        (billAttention.kind === "coverage" &&
+          !((input.summaries?.[contract.id]?.outstanding ?? 0) > 0)))
+        ? (resolveApartmentPaidThroughReminder(contract, unit, input.today) ?? billAttention)
+        : billAttention;
     return {
       unit,
       building: buildings.get(unit.building_id) ?? null,
@@ -782,6 +829,15 @@ export function buildLeaseRecordOverview(input: LeaseRoomOverviewInput): LeaseRe
       if (historical && date(record.actual_end_date) && record.actual_end_date > input.today)
         reviews.push("record_status_end_conflict");
       const financial = recordBilling(record, unit, historical, input, reviews);
+      const attention =
+        ownsRoomState &&
+        !historical &&
+        reviews.every((reason) => reason === "registered_period_needs_review") &&
+        (!financial.attention ||
+          (financial.attention.kind === "coverage" &&
+            !((input.summaries?.[record.id]?.outstanding ?? 0) > 0)))
+          ? (resolveApartmentPaidThroughReminder(record, unit, input.today) ?? financial.attention)
+          : financial.attention;
       const occupancy: LeaseRoomOccupancy = historical
         ? "unknown"
         : conflict
@@ -801,7 +857,7 @@ export function buildLeaseRecordOverview(input: LeaseRoomOverviewInput): LeaseRe
           customer: customers.get(record.customer_id) ?? null,
           historical,
           occupancy,
-          attention: financial.attention,
+          attention,
           paidThrough: date(record.paid_through_date) ? record.paid_through_date : null,
           conflict,
           reviewReasons: [...new Set(reviews)],
