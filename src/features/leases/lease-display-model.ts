@@ -2,6 +2,29 @@ import { nativeLease } from "@/lib/native-money";
 import type { WorkspaceUnit } from "@/features/contracts/workspace-model";
 import type { LeaseContractRow, PaymentRow } from "@/types/database";
 
+/** Use the recorded coverage cutoff for every apartment rent reminder badge. */
+export function apartmentRentReminderLabel(
+  attention: {
+    kind: string;
+    basis?: "paid_through";
+    days: number | null;
+    rentReminder?: { paidThrough: string; days: number };
+  } | null,
+  zh: boolean,
+): string | null {
+  if (attention?.kind !== "upcoming") return null;
+  const days =
+    attention.rentReminder?.days ?? (attention.basis === "paid_through" ? attention.days : null);
+  if (days === null) return null;
+  return days === 0
+    ? zh
+      ? "今日缴租到期"
+      : "Couverture jusqu’à aujourd’hui"
+    : zh
+      ? `${days}天后缴租到期`
+      : `Fin de couverture dans ${days} j`;
+}
+
 export function leaseTenantDisplayName(
   unit: Pick<WorkspaceUnit, "leaseTenantDisplay"> | null | undefined,
   sourceName: string | null | undefined,

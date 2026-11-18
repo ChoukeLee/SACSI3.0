@@ -127,6 +127,61 @@ it("keeps a paid-through reminder due today distinct from a real bill due today"
   expect(bill.dueDateLabel).toBeUndefined();
 });
 
+it.each(["zh", "fr"] as const)(
+  "uses one %s paid-through countdown for billed and unbilled apartments while retaining real bill details",
+  (locale) => {
+    const [record] = apartmentRecords();
+    const base = {
+      ...record,
+      paidThrough: "2026-11-30",
+      attention: {
+        kind: "upcoming" as const,
+        dueDate: "2026-11-30",
+        days: 12,
+        amount: null,
+        amountIsEstimated: false,
+      },
+    };
+    const records = [
+      {
+        ...base,
+        unit: { ...base.unit, unit_no: "702" },
+        attention: { ...base.attention, basis: "paid_through" as const },
+      },
+      {
+        ...base,
+        contract: { ...base.contract, id: "20000000-0000-4000-8000-000000000002" },
+        unit: { ...base.unit, unit_no: "705" },
+        attention: {
+          ...base.attention,
+          dueDate: "2026-12-01",
+          days: 13,
+          amount: 650000,
+          currency: "XOF" as const,
+          rentReminder: { paidThrough: "2026-11-30", days: 12 },
+        },
+      },
+    ];
+    const before = structuredClone(records);
+    const [unbilled, billed] = buildApartmentCollectionRows(records, locale);
+    const label = locale === "zh" ? "12天后缴租到期" : "Fin de couverture dans 12 j";
+    expect(unbilled.statusLabel).toBe(label);
+    expect(billed.statusLabel).toBe(label);
+    expect(unbilled.amount).toBeNull();
+    expect(unbilled.amountLabel).toBe(
+      locale === "zh" ? "下期账单待核" : "Prochaine facture à vérifier",
+    );
+    expect(billed).toMatchObject({
+      dueDate: "2026-12-01",
+      paidThrough: "2026-11-30",
+      amount: formatPropertyMoney(650000, "XOF", locale),
+      amountLabel: locale === "zh" ? "近期应缴" : "Échéances proches",
+    });
+    expect(billed.dueDateLabel).toBeUndefined();
+    expect(records).toEqual(before);
+  },
+);
+
 it("keeps a historical native-currency debt and links to its original contract", () => {
   const [record] = apartmentRecords();
   const [row] = buildApartmentCollectionRows(

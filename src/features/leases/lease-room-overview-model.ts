@@ -27,6 +27,8 @@ export interface LeaseRoomAttention {
   kind: "overdue" | "upcoming" | "coverage";
   /** A recorded rent-coverage cutoff is a reminder, not an unpaid bill. */
   basis?: "paid_through";
+  /** Apartment reminder timing is separate from the bill's payment date and balance. */
+  rentReminder?: { paidThrough: string; days: number };
   dueDate: string;
   days: number | null;
   amount: number | null;
@@ -161,6 +163,21 @@ export function resolveApartmentPaidThroughReminder(
     amount: null,
     amountIsEstimated: false,
   };
+}
+
+function currentApartmentReminder(
+  record: LeaseContractRow,
+  unit: WorkspaceUnit,
+  input: LeaseRoomOverviewInput,
+  reviews: readonly string[],
+) {
+  if (
+    !reviews.every((reason) => reason === "registered_period_needs_review") ||
+    input.contracts.filter((other) => other.unit_id === unit.id && other.status === "active")
+      .length !== 1
+  )
+    return null;
+  return resolveApartmentPaidThroughReminder(record, unit, input.today);
 }
 
 function money(value: unknown): number | null {
@@ -337,16 +354,35 @@ function monthlyBillingAttention(
   currency: CurrencyCode,
   balance: { outstanding: number; overdue: number; nextDue: string | null },
   anchor: MonthlyRentAnchor | null,
+  reminder: LeaseRoomAttention | null,
 ): LeaseRoomAttention | null {
   const additional = anchor?.currency === currency ? anchor.additionalOverdue : 0;
   const additionalOverdue = Number.isSafeInteger(balance.outstanding + additional) ? additional : 0;
-  const resolved = resolveLeaseAttention({
+  let resolved = resolveLeaseAttention({
     today,
     paidThroughDate: record.paid_through_date ?? null,
     outstanding: (balance.outstanding + additionalOverdue) / 100,
     overdue: (balance.overdue + additionalOverdue) / 100,
     nextDue: balance.nextDue,
   });
+  // A bill one day after coverage ends must not delay the 15-day coverage reminder.
+  // Keep the bill's original date and amount; only the reminder clock uses coverage.
+  if (
+    !resolved &&
+    reminder &&
+    balance.outstanding > 0 &&
+    balance.overdue === 0 &&
+    date(balance.nextDue) &&
+    balance.nextDue === addOneIsoDay(reminder.dueDate)
+  )
+    resolved = {
+      kind: "upcoming",
+      dueDate: balance.nextDue,
+      days:
+        (Date.parse(`${balance.nextDue}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000,
+      amount: balance.outstanding / 100,
+      amountIsEstimated: false,
+    };
   if (
     resolved?.kind === "coverage" &&
     anchor &&
@@ -385,13 +421,18 @@ function billingAttention(
       summary.count > 0 &&
       ((record.rent_currency ?? "XOF") === "XOF" || summary.outstanding > 0 || summary.overdue > 0)
     ) {
-      const resolved = resolveLeaseAttention({
-        today: input.today,
-        paidThroughDate: record.paid_through_date ?? null,
-        outstanding: summary.outstanding,
-        overdue: summary.overdue,
-        nextDue: summary.nextDue,
-      });
+      const resolved = monthlyBillingAttention(
+        record,
+        input.today,
+        "XOF",
+        {
+          outstanding: summary.outstanding * 100,
+          overdue: summary.overdue * 100,
+          nextDue: summary.nextDue,
+        },
+        null,
+        currentApartmentReminder(record, unit, input, reviews),
+      );
       return resolved && resolved.kind !== "coverage" ? { ...resolved, currency: "XOF" } : resolved;
     }
     return noBillAttention(record, input.today);
@@ -450,12 +491,19 @@ function billingAttention(
   const anchor = monthlyRentAnchor(record, unit, input);
   const candidates: LeaseRoomAttention[] = [];
   for (const [currency, group] of groups) {
-    const attention = monthlyBillingAttention(record, input.today, currency, group, anchor);
+    const attention = monthlyBillingAttention(
+      record,
+      input.today,
+      currency,
+      group,
+      anchor,
+      currentApartmentReminder(record, unit, input, reviews),
+    );
     if (!attention) continue;
     if (attention.kind === "upcoming") {
       const through = new Date(`${input.today}T00:00:00Z`);
       through.setUTCDate(through.getUTCDate() + 15);
-      const end = through.toISOString().slice(0, 10);
+      const end = [through.toISOString().slice(0, 10), attention.dueDate].sort()[1];
       // Amounts outside the reminder window do not inflate the imminent bill.
       attention.amount =
         rows
@@ -557,14 +605,22 @@ export function buildLeaseRoomOverview(input: LeaseRoomOverviewInput): LeaseRoom
     const paidThrough =
       contract && date(contract.paid_through_date) ? contract.paid_through_date : null;
     const billAttention = contract ? billingAttention(contract, unit, input, reviews) : null;
+    const reminder =
+      contract && reviews.every((reason) => reason === "registered_period_needs_review")
+        ? resolveApartmentPaidThroughReminder(contract, unit, input.today)
+        : null;
     const attention =
-      contract &&
-      reviews.every((reason) => reason === "registered_period_needs_review") &&
-      (!billAttention ||
-        (billAttention.kind === "coverage" &&
-          !((input.summaries?.[contract.id]?.outstanding ?? 0) > 0)))
-        ? (resolveApartmentPaidThroughReminder(contract, unit, input.today) ?? billAttention)
-        : billAttention;
+      reminder && billAttention?.kind === "upcoming"
+        ? {
+            ...billAttention,
+            rentReminder: { paidThrough: reminder.dueDate, days: reminder.days! },
+          }
+        : reminder &&
+            (!billAttention ||
+              (billAttention.kind === "coverage" &&
+                !((input.summaries?.[contract!.id]?.outstanding ?? 0) > 0)))
+          ? reminder
+          : billAttention;
     return {
       unit,
       building: buildings.get(unit.building_id) ?? null,
@@ -760,12 +816,19 @@ function recordBilling(
         amountIsEstimated: false,
       });
     } else {
-      const resolved = monthlyBillingAttention(record, input.today, currency, total, anchor);
+      const resolved = monthlyBillingAttention(
+        record,
+        input.today,
+        currency,
+        total,
+        anchor,
+        currentApartmentReminder(record, unit, input, reviews),
+      );
       if (resolved) {
         if (resolved.kind === "upcoming") {
           const end = new Date(`${input.today}T00:00:00Z`);
           end.setUTCDate(end.getUTCDate() + 15);
-          const through = end.toISOString().slice(0, 10);
+          const through = [end.toISOString().slice(0, 10), resolved.dueDate].sort()[1];
           resolved.amount =
             payable
               .filter(
@@ -829,15 +892,24 @@ export function buildLeaseRecordOverview(input: LeaseRoomOverviewInput): LeaseRe
       if (historical && date(record.actual_end_date) && record.actual_end_date > input.today)
         reviews.push("record_status_end_conflict");
       const financial = recordBilling(record, unit, historical, input, reviews);
-      const attention =
+      const reminder =
         ownsRoomState &&
         !historical &&
-        reviews.every((reason) => reason === "registered_period_needs_review") &&
-        (!financial.attention ||
-          (financial.attention.kind === "coverage" &&
-            !((input.summaries?.[record.id]?.outstanding ?? 0) > 0)))
-          ? (resolveApartmentPaidThroughReminder(record, unit, input.today) ?? financial.attention)
-          : financial.attention;
+        reviews.every((reason) => reason === "registered_period_needs_review")
+          ? resolveApartmentPaidThroughReminder(record, unit, input.today)
+          : null;
+      const attention =
+        reminder && financial.attention?.kind === "upcoming"
+          ? {
+              ...financial.attention,
+              rentReminder: { paidThrough: reminder.dueDate, days: reminder.days! },
+            }
+          : reminder &&
+              (!financial.attention ||
+                (financial.attention.kind === "coverage" &&
+                  !((input.summaries?.[record.id]?.outstanding ?? 0) > 0)))
+            ? reminder
+            : financial.attention;
       const occupancy: LeaseRoomOccupancy = historical
         ? "unknown"
         : conflict

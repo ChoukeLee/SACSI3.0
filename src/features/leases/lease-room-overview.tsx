@@ -7,7 +7,7 @@ import { cn, floorSortValue, normalizeFloorLabel } from "@/lib/utils";
 import { formatPropertyMoney, propertyLeaseRentLabel } from "@/lib/property-money";
 import { nativeLease } from "@/lib/native-money";
 import { LeaseBrowseStatusFilter, LeaseLocationIndex } from "./lease-browse-content";
-import { leaseTenantDisplayName } from "./lease-display-model";
+import { apartmentRentReminderLabel, leaseTenantDisplayName } from "./lease-display-model";
 import {
   leaseRoomMatchesSearch,
   type LeaseRecordAttention,
@@ -135,14 +135,8 @@ function attentionLabel(
   if (needsLeaseReview(row) && (!attention || attention.kind === "coverage"))
     return zh ? "租赁资料待核" : "Dossier à vérifier";
   if (!attention) return null;
-  if (attention.kind === "upcoming" && attention.basis === "paid_through")
-    return attention.days === 0
-      ? zh
-        ? "今日缴租到期"
-        : "Couverture jusqu’à aujourd’hui"
-      : zh
-        ? `${attention.days}天后缴租到期`
-        : `Fin de couverture dans ${attention.days} j`;
+  const rentReminder = apartmentRentReminderLabel(attention, zh);
+  if (rentReminder) return rentReminder;
   if (attention.kind === "unsettled") return zh ? "历史待结清" : "Ancien solde à régler";
   if (attention.kind === "overdue")
     return attention.days === null
