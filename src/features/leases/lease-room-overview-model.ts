@@ -560,7 +560,9 @@ export function buildLeaseRoomOverview(input: LeaseRoomOverviewInput): LeaseRoom
     const attention =
       contract &&
       reviews.every((reason) => reason === "registered_period_needs_review") &&
-      (!billAttention || billAttention.kind === "coverage")
+      (!billAttention ||
+        (billAttention.kind === "coverage" &&
+          !((input.summaries?.[contract.id]?.outstanding ?? 0) > 0)))
         ? (resolveApartmentPaidThroughReminder(contract, unit, input.today) ?? billAttention)
         : billAttention;
     return {
@@ -831,7 +833,9 @@ export function buildLeaseRecordOverview(input: LeaseRoomOverviewInput): LeaseRe
         ownsRoomState &&
         !historical &&
         reviews.every((reason) => reason === "registered_period_needs_review") &&
-        (!financial.attention || financial.attention.kind === "coverage")
+        (!financial.attention ||
+          (financial.attention.kind === "coverage" &&
+            !((input.summaries?.[record.id]?.outstanding ?? 0) > 0)))
           ? (resolveApartmentPaidThroughReminder(record, unit, input.today) ?? financial.attention)
           : financial.attention;
       const occupancy: LeaseRoomOccupancy = historical

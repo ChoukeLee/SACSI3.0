@@ -93,6 +93,25 @@ function expectPaidThroughReminder(value: LeaseRoomOverviewInput, days = 12) {
   expect(record.balances).toEqual([]);
 }
 
+it("keeps a positive billing balance with an unknown due date in review", () => {
+  const value = input();
+  value.receivables = undefined;
+  value.summaries = {
+    [workspaceContract]: {
+      total: 650000,
+      paid: 0,
+      outstanding: 650000,
+      overdue: 650000,
+      nextDue: null,
+      count: 1,
+    },
+  };
+  const result = rows(value);
+  expect(result.room.attention?.kind).toBe("coverage");
+  expect(result.record.attention?.kind).toBe("coverage");
+  expect(result.room.attention?.basis).toBeUndefined();
+});
+
 it("reminds from the registered paid-through date even when no next bill exists", () => {
   const value = input();
   const before = structuredClone(value);
