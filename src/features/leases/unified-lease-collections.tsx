@@ -219,7 +219,9 @@ export function UnifiedLeaseCollections({
                           <span>{row.amount ?? unregistered}</span>
                         </span>
                         <span className={styles.field} title={row.dueSource}>
-                          <small>{zh ? "约定付款日" : "Échéance prévue"}</small>
+                          <small>
+                            {row.dueDateLabel ?? (zh ? "约定付款日" : "Échéance prévue")}
+                          </small>
                           {row.dueDate ? (
                             <time dateTime={row.dueDate}>{row.dueDate}</time>
                           ) : (

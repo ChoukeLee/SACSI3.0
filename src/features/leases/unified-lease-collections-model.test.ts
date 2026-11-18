@@ -66,6 +66,67 @@ it("keeps apartment coverage review separate from payment dates", () => {
   ]);
 });
 
+it.each(["zh", "fr"] as const)(
+  "keeps a %s paid-through reminder separate from a payable amount and due-date agreement",
+  (locale) => {
+    const [record] = apartmentRecords();
+    const [row] = buildApartmentCollectionRows(
+      [
+        {
+          ...record,
+          paidThrough: "2026-11-30",
+          attention: {
+            kind: "upcoming",
+            basis: "paid_through",
+            dueDate: "2026-11-30",
+            days: 12,
+            amount: null,
+            amountIsEstimated: false,
+          },
+        },
+      ],
+      locale,
+    );
+    expect(row).toMatchObject({
+      status: "upcoming",
+      statusLabel: locale === "zh" ? "12天后缴租到期" : "Fin de couverture dans 12 j",
+      dueDate: "2026-11-30",
+      dueDateLabel: locale === "zh" ? "缴租到期日" : "Fin de couverture du loyer",
+      paidThrough: "2026-11-30",
+      amount: null,
+      amountLabel: locale === "zh" ? "下期账单待核" : "Prochaine facture à vérifier",
+    });
+    expect(row.dueSource).toContain(locale === "zh" ? "已交至" : "Payé au");
+    expect(row.paidThroughSource).toContain(locale === "zh" ? "已交至" : "couverture");
+    expect(JSON.stringify(row)).not.toMatch(/多币种|Plusieurs devises|0 XOF/);
+  },
+);
+
+it("keeps a paid-through reminder due today distinct from a real bill due today", () => {
+  const [record] = apartmentRecords();
+  const attention = {
+    kind: "upcoming" as const,
+    dueDate: "2026-11-30",
+    days: 0,
+    amount: null,
+    amountIsEstimated: false,
+  };
+  const [reminder] = buildApartmentCollectionRows(
+    [{ ...record, attention: { ...attention, basis: "paid_through" } }],
+    "zh",
+  );
+  expect(reminder.statusLabel).toBe("今日缴租到期");
+  expect(reminder.amount).toBeNull();
+  const [bill] = buildApartmentCollectionRows(
+    [{ ...record, attention: { ...attention, amount: 650000, currency: "XOF" } }],
+    "zh",
+  );
+  expect(bill.statusLabel).toBe("今日应缴");
+  expect(bill.amount).toBe(formatPropertyMoney(650000, "XOF", "zh"));
+  expect(bill.amountLabel).toBe("近期应缴");
+  expect(bill.dueDateLabel).toBeUndefined();
+});
+
 it("keeps a historical native-currency debt and links to its original contract", () => {
   const [record] = apartmentRecords();
   const [row] = buildApartmentCollectionRows(
