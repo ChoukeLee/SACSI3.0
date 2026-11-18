@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import type { LeaseContractRow, ReceivableRow } from "@/types/database";
+import { apartmentRentReminderLabel } from "@/features/leases/lease-display-model";
 import {
   buildLeaseRecordOverview,
   buildLeaseRoomOverview,
@@ -110,6 +111,8 @@ it("keeps a positive billing balance with an unknown due date in review", () => 
   expect(result.room.attention?.kind).toBe("coverage");
   expect(result.record.attention?.kind).toBe("coverage");
   expect(result.room.attention?.basis).toBeUndefined();
+  expect(result.room.attention?.rentReminder).toBeUndefined();
+  expect(result.record.attention?.rentReminder).toBeUndefined();
 });
 
 it("reminds from the registered paid-through date even when no next bill exists", () => {
@@ -208,9 +211,10 @@ it.each(["SACSI3", "SACSI5", "SACSI6", "SACSI7", "SACSI11"])(
   },
 );
 
-it("keeps the actual next bill's due date and amount ahead of the coverage reminder", () => {
+it("uses the apartment coverage countdown while preserving the real next bill's due date and amount", () => {
   const value = input();
   value.receivables = [bill()];
+  const before = structuredClone(value);
   const { room, record } = rows(value);
   expect(room.attention).toMatchObject({
     kind: "upcoming",
@@ -219,10 +223,133 @@ it("keeps the actual next bill's due date and amount ahead of the coverage remin
     amount: 650000,
     currency: "XOF",
     amountIsEstimated: false,
+    rentReminder: { paidThrough: "2026-11-30", days: 12 },
   });
   expect(room.attention?.basis).not.toBe("paid_through");
+  expect(apartmentRentReminderLabel(room.attention!, true)).toBe("12天后缴租到期");
+  const noBill = rows(input());
+  expect(apartmentRentReminderLabel(noBill.room.attention!, true)).toBe(
+    apartmentRentReminderLabel(room.attention!, true),
+  );
   expect(record.attention).toEqual(room.attention);
   expect(record.balances).toMatchObject([{ outstanding: 650000 }]);
+  expect(value).toEqual(before);
+});
+
+it("starts the apartment reminder 15 days before coverage ends even when the real bill is due in 16 days", () => {
+  const value = input();
+  value.today = "2026-11-15";
+  value.receivables = [bill()];
+  const { room, record } = rows(value);
+  expect(room.attention).toMatchObject({
+    kind: "upcoming",
+    dueDate: "2026-12-01",
+    days: 16,
+    amount: 650000,
+    currency: "XOF",
+    amountIsEstimated: false,
+    rentReminder: { paidThrough: "2026-11-30", days: 15 },
+  });
+  expect(room.attention?.basis).toBeUndefined();
+  expect(apartmentRentReminderLabel(room.attention!, true)).toBe("15天后缴租到期");
+  expect(record.attention).toEqual(room.attention);
+  expect(record.balances).toMatchObject([{ outstanding: 650000 }]);
+});
+
+it("does not start the real bill reminder when apartment coverage is still 16 days away", () => {
+  const value = input();
+  value.today = "2026-11-14";
+  value.receivables = [bill()];
+  const { room, record } = rows(value);
+  expect(room.attention).toBeNull();
+  expect(record.attention).toBeNull();
+});
+
+it.each(["detailed", "summary"] as const)(
+  "does not count a distant January bill as an imminent apartment amount in a %s read",
+  (mode) => {
+    const value = input();
+    if (mode === "detailed") value.receivables = [bill({ due_date: "2027-01-01" })];
+    else {
+      delete value.receivables;
+      value.summaries = {
+        [workspaceContract]: {
+          total: 650000,
+          paid: 0,
+          outstanding: 650000,
+          overdue: 0,
+          nextDue: "2027-01-01",
+          count: 1,
+          dueOutstanding: 0,
+        },
+      };
+    }
+    const before = structuredClone(value);
+    const { room, record } = rows(value);
+    expect(room.attention).toEqual({
+      kind: "upcoming",
+      basis: "paid_through",
+      dueDate: "2026-11-30",
+      days: 12,
+      amount: null,
+      amountIsEstimated: false,
+    });
+    expect(record.attention).toEqual(room.attention);
+    expect(apartmentRentReminderLabel(room.attention!, true)).toBe("12天后缴租到期");
+    if (mode === "detailed")
+      expect(record.balances).toMatchObject([
+        { outstanding: 650000, nextDue: "2027-01-01", currency: "XOF" },
+      ]);
+    expect(value).toEqual(before);
+  },
+);
+
+it.each([
+  ["2026-11-15", 16, 15],
+  ["2026-11-18", 13, 12],
+] as const)(
+  "keeps real summary-only bill facts and adds the coverage countdown on %s",
+  (today, billDays, reminderDays) => {
+    const value = input();
+    value.today = today;
+    delete value.receivables;
+    value.summaries = {
+      [workspaceContract]: {
+        total: 650000,
+        paid: 0,
+        outstanding: 650000,
+        overdue: 0,
+        nextDue: "2026-12-01",
+        count: 1,
+        dueOutstanding: 0,
+      },
+    };
+    const { room, record } = rows(value);
+    expect(room.attention).toMatchObject({
+      kind: "upcoming",
+      dueDate: "2026-12-01",
+      days: billDays,
+      amount: 650000,
+      currency: "XOF",
+      rentReminder: { paidThrough: "2026-11-30", days: reminderDays },
+    });
+    expect(record.attention).toEqual(room.attention);
+  },
+);
+
+it("labels the last covered day as today while preserving tomorrow's actual bill deadline", () => {
+  const value = input();
+  value.today = "2026-11-30";
+  value.receivables = [bill()];
+  const { room, record } = rows(value);
+  expect(room.attention).toMatchObject({
+    dueDate: "2026-12-01",
+    days: 1,
+    amount: 650000,
+    rentReminder: { paidThrough: "2026-11-30", days: 0 },
+  });
+  expect(apartmentRentReminderLabel(room.attention!, true)).toBe("今日缴租到期");
+  expect(record.attention).toEqual(room.attention);
 });
 
 it("does not hide an actual overdue bill behind an upcoming coverage date", () => {
@@ -236,8 +363,44 @@ it("does not hide an actual overdue bill behind an upcoming coverage date", () =
     amount: 650000,
   });
   expect(room.attention?.basis).not.toBe("paid_through");
+  expect(room.attention?.rentReminder).toBeUndefined();
   expect(record.attention).toEqual(room.attention);
 });
+
+it.each(["USD", "CNY"] as const)(
+  "preserves the %s amount of a real bill while attaching the same apartment coverage countdown",
+  (currency) => {
+    const value = input();
+    Object.assign(value.contracts[0], {
+      rent_currency: currency,
+      monthly_rent_amount: 3200,
+      monthly_rent_xof: 1987654,
+    });
+    value.receivables = [
+      bill({
+        currency,
+        amount_native: 3200,
+        paid_amount_native: 0,
+        amount_xof: 1987654,
+        paid_amount_xof: 0,
+      }),
+    ];
+    const before = structuredClone(value);
+    const { room, record } = rows(value);
+    expect(room.attention).toMatchObject({
+      kind: "upcoming",
+      dueDate: "2026-12-01",
+      days: 13,
+      amount: 3200,
+      currency,
+      rentReminder: { paidThrough: "2026-11-30", days: 12 },
+    });
+    expect(apartmentRentReminderLabel(room.attention!, true)).toBe("12天后缴租到期");
+    expect(record.attention).toEqual(room.attention);
+    expect(record.balances).toMatchObject([{ outstanding: 3200, currency }]);
+    expect(value).toEqual(before);
+  },
+);
 
 it.each(["USD", "CNY"] as const)(
   "reminds for %s rent without inventing a balance or converting its currency",
@@ -299,6 +462,39 @@ it.each([
   const { room, record } = rows(value);
   expect(room.attention?.basis).not.toBe("paid_through");
   expect(record.attention?.basis).not.toBe("paid_through");
+  expect(room.attention?.rentReminder).toBeUndefined();
+  expect(record.attention?.rentReminder).toBeUndefined();
+});
+
+it("does not add a coverage countdown to real bill attention during an active-rental conflict", () => {
+  const value = input();
+  value.receivables = [bill()];
+  value.contracts = [
+    value.contracts[0],
+    { ...value.contracts[0], id: "99999999-9999-4999-8999-999999999999" },
+  ];
+  const { room, record } = rows(value);
+  expect(room.conflict).toBe(true);
+  expect(record.conflict).toBe(true);
+  expect(room.attention?.rentReminder).toBeUndefined();
+  expect(record.attention?.rentReminder).toBeUndefined();
+});
+
+it("does not use coverage to bring a 16-day bill into the reminder window during an active-rental conflict", () => {
+  const value = input();
+  value.today = "2026-11-15";
+  value.receivables = [bill()];
+  value.contracts = [
+    value.contracts[0],
+    { ...value.contracts[0], id: "99999999-9999-4999-8999-999999999999" },
+  ];
+  const { room, record } = rows(value);
+  expect(room.conflict).toBe(true);
+  expect(record.conflict).toBe(true);
+  expect(room.attention?.kind).not.toBe("upcoming");
+  expect(record.attention?.kind).not.toBe("upcoming");
+  expect(room.attention?.rentReminder).toBeUndefined();
+  expect(record.attention?.rentReminder).toBeUndefined();
 });
 
 it("keeps a multiple-active-record conflict for review instead of choosing a coverage date", () => {

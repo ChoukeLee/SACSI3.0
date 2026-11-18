@@ -443,6 +443,62 @@ it("shows paid-through expiry consistently on expanded, compact and follow-up vi
   );
 });
 
+it("shows the same rent countdown for billed and unbilled apartments without hiding the actual bill date or amount", async () => {
+  const [first] = rows();
+  const unbilled: LeaseRoomOverviewRow = {
+    ...first,
+    unit: { ...first.unit, id: "unbilled-702", unit_no: "702" },
+    paidThrough: "2026-11-30",
+    reviewReasons: [],
+    attention: {
+      kind: "upcoming",
+      basis: "paid_through",
+      dueDate: "2026-11-30",
+      days: 12,
+      amount: null,
+      amountIsEstimated: false,
+    },
+  };
+  const billed: LeaseRoomOverviewRow = {
+    ...unbilled,
+    unit: { ...first.unit, id: "billed-705", unit_no: "705" },
+    attention: {
+      kind: "upcoming",
+      dueDate: "2026-12-01",
+      days: 13,
+      amount: 650000,
+      amountIsEstimated: false,
+      currency: "XOF",
+      rentReminder: { paidThrough: "2026-11-30", days: 12 },
+    },
+  };
+  await render([unbilled, billed]);
+  for (const id of ["unbilled-702", "billed-705"])
+    expect(host.querySelector(`[data-room-id="${id}"]`)?.textContent).toContain("12天后缴租到期");
+  expect(host.textContent).not.toContain("13 天内应缴");
+  await act(async () => button("收款跟进").click());
+  const followup = host.querySelector('[aria-label="集中收款跟进"]')!;
+  const bill = [...followup.querySelectorAll("button")].find((row) =>
+    row.textContent?.includes("705"),
+  )!;
+  const reminder = [...followup.querySelectorAll("button")].find((row) =>
+    row.textContent?.includes("702"),
+  )!;
+  expect(bill.textContent).toContain("12天后缴租到期");
+  expect(bill.textContent).toContain("2026-12-01");
+  expect(bill.textContent).toMatch(/65(?:\.00)?\s*万/);
+  expect(bill.textContent).not.toContain("下期账单待核");
+  expect(reminder.textContent).toContain("下期账单待核");
+  await render([unbilled, billed], vi.fn(), {
+    embedded: { search: "", filter: "upcoming" },
+  });
+  expect(host.querySelectorAll('[data-room-id][data-follow-up="upcoming"]')).toHaveLength(2);
+  for (const card of host.querySelectorAll("[data-room-id]")) {
+    expect(card.textContent).toContain("12天后缴租到期");
+    expect(card.textContent).not.toContain("13 天内应缴");
+  }
+});
+
 it("hides stale cards on loading or a failed read and exposes an explicit retry", async () => {
   const retry = vi.fn();
   await render(rows(), vi.fn(), { loading: true });

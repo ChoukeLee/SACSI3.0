@@ -24,7 +24,7 @@ import {
   parseLeaseBrowseCategory,
   type LeaseBrowseCategory,
 } from "./lease-browse-model";
-import { leaseTenantDisplayName } from "./lease-display-model";
+import { apartmentRentReminderLabel, leaseTenantDisplayName } from "./lease-display-model";
 import type { LeaseRecordOverviewRow } from "./lease-room-overview-model";
 
 type RecordCategory = LeaseBrowseCategory;
@@ -168,15 +168,8 @@ export function buildApartmentCollectionRows(
         ].filter((value): value is string => !!value),
         href,
         status,
-        statusLabel: coverageReminder
-          ? attention.days === 0
-            ? zh
-              ? "今日缴租到期"
-              : "Couverture jusqu’à aujourd’hui"
-            : zh
-              ? `${attention.days}天后缴租到期`
-              : `Fin de couverture dans ${attention.days} j`
-          : timingLabel(status, bill?.days, zh),
+        statusLabel:
+          apartmentRentReminderLabel(attention, zh) ?? timingLabel(status, bill?.days, zh),
         reason,
         dueDate: coverageReminder ? attention.dueDate : (bill?.dueDate ?? null),
         ...(coverageReminder

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { buildWorkbenchRecordHref, safeWorkbenchReturnTo } from "@/lib/workbench-links";
 import { buildLeaseCollectionHref } from "./lease-collection-links";
-import { leaseTenantDisplayName } from "./lease-display-model";
+import { apartmentRentReminderLabel, leaseTenantDisplayName } from "./lease-display-model";
 import { LeaseRentPeriodCorrection } from "./lease-rent-period-correction";
 import { leaseRequestIdentity, clearLeaseRequestIdentity } from "./lease-request-identity";
 import {
@@ -64,6 +64,7 @@ import {
 } from "./lease-financial-entry-types";
 import {
   isOverdueReceivable,
+  addOneIsoDay,
   resolveLeaseAttention,
   resolveLeaseOverdue,
   summarizeLeaseReceivables,
@@ -936,21 +937,39 @@ export function LeaseList({
       const summary = summarizeLeaseReceivables(related, today);
       const projected = workspace.data?.summaries[contract.id];
       const outstanding = projected?.outstanding ?? summary.outstanding;
-      const billAttention = resolveLeaseAttention({
+      const nextDue = workspace.enabled
+        ? (workspace.data?.attentionDue[contract.id] ?? null)
+        : summary.earliestOutstandingDue;
+      const overdue = projected?.overdue ?? summary.overdue;
+      let billAttention = resolveLeaseAttention({
         today,
         paidThroughDate: contract.paid_through_date ?? null,
         outstanding,
-        overdue: projected?.overdue ?? summary.overdue,
-        nextDue: workspace.enabled
-          ? (workspace.data?.attentionDue[contract.id] ?? null)
-          : summary.earliestOutstandingDue,
+        overdue,
+        nextDue,
       });
       const reminder =
-        activeCounts.get(unit.id) === 1 &&
-        (!billAttention || (billAttention.kind === "coverage" && outstanding === 0))
+        activeCounts.get(unit.id) === 1
           ? resolveApartmentPaidThroughReminder(contract, unit, today)
           : null;
-      const attention = reminder
+      if (
+        !billAttention &&
+        reminder &&
+        outstanding > 0 &&
+        overdue === 0 &&
+        nextDue &&
+        nextDue === addOneIsoDay(reminder.dueDate)
+      )
+        billAttention = {
+          kind: "upcoming",
+          dueDate: nextDue,
+          days: (Date.parse(`${nextDue}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000,
+          amount: outstanding,
+          amountIsEstimated: false,
+        };
+      const coverageOnly =
+        reminder && (!billAttention || (billAttention.kind === "coverage" && outstanding === 0));
+      const attention = coverageOnly
         ? { ...reminder, kind: "upcoming" as const, days: reminder.days ?? 0 }
         : billAttention;
       if (!attention) return [];
@@ -962,7 +981,11 @@ export function LeaseList({
           customer,
           buildingName: building?.display_name || building?.code || "-",
           ...attention,
-          basis: reminder?.basis,
+          basis: coverageOnly ? reminder.basis : undefined,
+          rentReminder:
+            reminder && attention.kind === "upcoming"
+              ? { paidThrough: reminder.dueDate, days: reminder.days! }
+              : undefined,
           paidThrough: contract.paid_through_date,
         },
       ];
@@ -2548,21 +2571,14 @@ export function LeaseList({
                                       "border-blue-200 bg-blue-50 text-blue-700",
                                   )}
                                 >
-                                  {row.basis === "paid_through"
-                                    ? locale === "zh"
-                                      ? row.days === 0
-                                        ? "今日缴租到期"
-                                        : `${row.days}天后缴租到期`
-                                      : row.days === 0
-                                        ? "Couverture à terme aujourd’hui"
-                                        : `Couverture : ${row.days} j`
-                                    : row.kind === "overdue"
+                                  {apartmentRentReminderLabel(row, locale === "zh") ??
+                                    (row.kind === "overdue"
                                       ? row.amountIsEstimated
                                         ? locale === "zh"
                                           ? "合同累计"
                                           : "Calcul contrat"
                                         : `${locale === "zh" ? "逾期" : "Retard"} ${Math.abs(row.days)}${locale === "zh" ? "天" : "j"}`
-                                      : `${row.days}${locale === "zh" ? "天后应缴" : "j"}`}
+                                      : `${row.days}${locale === "zh" ? "天后应缴" : "j"}`)}
                                 </Badge>
                               </div>
                               <p className="mt-1 truncate text-[13px] font-medium text-foreground">
@@ -2863,21 +2879,14 @@ export function LeaseList({
                               row.kind === "upcoming" && "border-blue-200 bg-blue-50 text-blue-700",
                             )}
                           >
-                            {row.basis === "paid_through"
-                              ? locale === "zh"
-                                ? row.days === 0
-                                  ? "今日缴租到期"
-                                  : `${row.days}天后缴租到期`
-                                : row.days === 0
-                                  ? "Couverture à terme aujourd’hui"
-                                  : `Couverture : ${row.days} j`
-                              : row.kind === "coverage"
+                            {apartmentRentReminderLabel(row, locale === "zh") ??
+                              (row.kind === "coverage"
                                 ? locale === "zh"
                                   ? "覆盖待确认 · 非欠款判定"
                                   : "Couverture à vérifier · dette non présumée"
                                 : row.kind === "overdue"
                                   ? `${locale === "zh" ? "逾期" : "Retard"} ${Math.abs(row.days)}${locale === "zh" ? "天" : "j"}`
-                                  : `${row.days}${locale === "zh" ? "天后应缴" : "j"}`}
+                                  : `${row.days}${locale === "zh" ? "天后应缴" : "j"}`)}
                           </Badge>
                         </div>
                         <p className="mt-1 truncate text-[13px] font-medium text-foreground">

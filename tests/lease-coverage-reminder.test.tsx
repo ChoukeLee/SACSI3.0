@@ -193,6 +193,7 @@ function currentPaidThrough(value: WorkspaceData, paidThrough: string) {
     value.receivables = [previousPaidBill];
     value.receivableCount = 1;
   }
+  return previousPaidBill;
 }
 
 it("shows a paid-through reminder on the room and collection follow-up when only settled old bills exist", async () => {
@@ -236,4 +237,58 @@ it("does not include a paid-through date 16 days away in the upcoming collection
     ),
   );
   expect(host.querySelectorAll("[data-followup-record-id]")).toHaveLength(0);
+});
+
+it("uses the same apartment countdown with a real bill while retaining its amount and actual payment deadline", async () => {
+  customizeData = (value) => {
+    const previousPaidBill = currentPaidThrough(value, "2026-10-31");
+    const upcomingBill = {
+      ...previousPaidBill,
+      id: "88888888-8888-4888-8888-888888888888",
+      due_date: "2026-11-01",
+      paid_amount_xof: 0,
+      status: "pending",
+      title: "Synthetic actual next rent bill",
+    } as ReceivableRow;
+    value.summaries[workspaceContract] = {
+      total: 1200000,
+      paid: 600000,
+      outstanding: 600000,
+      overdue: 0,
+      nextDue: "2026-11-01",
+      count: 2,
+      dueOutstanding: 0,
+    };
+    value.attentionDue[workspaceContract] = "2026-11-01";
+    Object.assign(value.stats, {
+      total: 1200000,
+      rent: 600000,
+      received: 600000,
+      outstanding: 600000,
+      dueSoon: 1,
+    });
+    if (value.mode === "context") value.roomReceivables = [previousPaidBill, upcomingBill];
+    if (value.mode === "detail") {
+      value.receivables = [previousPaidBill, upcomingBill];
+      value.receivableCount = 2;
+    }
+  };
+  await render(data());
+  const card = host.querySelector("[data-room-id]");
+  expect(card, host.textContent ?? "").not.toBeNull();
+  expect(card?.textContent).toContain("11天后缴租到期");
+  expect(card?.textContent).not.toMatch(/12\s*天(?:内应缴|后应缴)/);
+
+  await click(
+    [...host.querySelectorAll("button")].find((button) =>
+      button.textContent?.startsWith("收款跟进"),
+    ),
+  );
+  const followup = host.querySelector('[aria-label="集中收款跟进"]')!;
+  expect(followup.querySelectorAll("[data-followup-record-id]")).toHaveLength(1);
+  expect(followup.textContent).toContain("11天后缴租到期");
+  expect(followup.textContent).toContain("2026-11-01");
+  expect(followup.textContent).toMatch(/600,000|60(?:\.00)?\s*万/);
+  expect(followup.textContent).not.toContain("下期账单待核");
+  expect(followup.textContent).not.toMatch(/12\s*天(?:内应缴|后应缴)/);
 });
