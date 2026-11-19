@@ -22,6 +22,7 @@ import {
 } from "@/features/cimac/cimac-apartment-paid-actions";
 import { ApartmentPaidError } from "@/features/cimac/cimac-apartment-paid-model";
 import { paidActor, paidInput, paidScope } from "./fixtures/cimac-apartment-paid";
+import { combinedInput } from "./fixtures/cimac-apartment-paid-v2";
 beforeEach(() => {
   vi.resetAllMocks();
   deps.user.mockResolvedValue({ id: paidActor, role: "admin" });
@@ -37,6 +38,23 @@ beforeEach(() => {
   });
 });
 describe("paid apartment server actions", () => {
+  it("forwards the exact v2 property and old-hold request through the authenticated service", async () => {
+    const input = combinedInput();
+    expect(await executeApartmentPaidReceipt(input)).toMatchObject({ success: true });
+    expect(deps.execute).toHaveBeenCalledWith(
+      { rpc: "real session client" },
+      paidScope,
+      paidActor,
+      input,
+    );
+  });
+  it("reports an atomic hold-version rejection as rejected so the caller can refresh", async () => {
+    deps.execute.mockRejectedValue(new ApartmentPaidError("CimacApartmentPaidHoldChanged", 409));
+    const result = await executeApartmentPaidReceipt(combinedInput());
+    expect(result).toMatchObject({ success: false, outcome: "rejected" });
+    expect(deps.revalidate).not.toHaveBeenCalled();
+    expect(JSON.stringify(result)).not.toContain("CimacApartmentPaidHoldChanged");
+  });
   it.each(["admin", "finance"])(
     "permits explicitly authorised %s with the actual session client",
     async (role) => {

@@ -167,7 +167,10 @@ export function decodeFinanceRecordContext(value: unknown): FinanceRecordContext
   if (
     result.kind === "ledger" &&
     (result.paidAmountXof !== null ||
-      result.period !== null ||
+      (result.period !== null &&
+        !["cimac_apartment_rent", "cimac_apartment_property_fee"].includes(
+          result.source?.type ?? "",
+        )) ||
       result.status !== null ||
       result.managementStatus !== null)
   )
@@ -191,9 +194,11 @@ export function decodeFinanceRecordContext(value: unknown): FinanceRecordContext
   )
     throw unavailable();
   if (result.source?.href) {
-    const apartmentReservation = ["cimac_apartment_rent", "cimac_apartment_deposit"].includes(
-      result.source.type,
-    );
+    const apartmentReservation = [
+      "cimac_apartment_rent",
+      "cimac_apartment_deposit",
+      "cimac_apartment_property_fee",
+    ].includes(result.source.type);
     const route = apartmentReservation
       ? "/cimac/apartments"
       : result.source.type === "lease_contract"

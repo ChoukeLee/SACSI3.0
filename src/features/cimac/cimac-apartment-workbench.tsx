@@ -750,7 +750,15 @@ function ApartmentWorkbench({
                     <>
                       <div className={styles.fact}>
                         <dt>{zh ? "预订付款" : "Paiement"}</dt>
-                        <dd>{zh ? "已收押金及首季租金" : "Dépôt et premier trimestre reçus"}</dd>
+                        <dd>
+                          {selectedPaid.propertyFeeAmountXof != null
+                            ? zh
+                              ? "已收押金、首季租金及物业费"
+                              : "Dépôt, premier trimestre et charges reçus"
+                            : zh
+                              ? "已收押金及首季租金"
+                              : "Dépôt et premier trimestre reçus"}
+                        </dd>
                       </div>
                       <div className={styles.fact}>
                         <dt>{zh ? "约定租期" : "Période convenue"}</dt>
@@ -769,6 +777,26 @@ function ApartmentWorkbench({
                       <div className={styles.fact}>
                         <dt>{zh ? "已收租金" : "Loyer reçu"}</dt>
                         <dd>{money(selectedPaid.rentAmountXof, locale)}</dd>
+                      </div>
+                      <div className={styles.fact}>
+                        <dt>{zh ? "已收物业费" : "Charges reçues"}</dt>
+                        <dd>
+                          {selectedPaid.propertyFeeAmountXof == null
+                            ? zh
+                              ? "未登记"
+                              : "Non enregistré"
+                            : money(selectedPaid.propertyFeeAmountXof, locale)}
+                        </dd>
+                      </div>
+                      <div className={styles.fact}>
+                        <dt>{zh ? "物业费已付期间" : "Période des charges payées"}</dt>
+                        <dd>
+                          {selectedPaid.propertyPeriodStart && selectedPaid.propertyPeriodEnd
+                            ? `${selectedPaid.propertyPeriodStart} — ${selectedPaid.propertyPeriodEnd}`
+                            : zh
+                              ? "未登记"
+                              : "Non enregistrée"}
+                        </dd>
                       </div>
                       <div className={styles.fact}>
                         <dt>{zh ? "本房实收合计" : "Total reçu pour ce logement"}</dt>
@@ -1013,8 +1041,8 @@ function ApartmentWorkbench({
             <dt>{zh ? "物业年度起止" : "Année des charges"}</dt>
             <dd>
               {zh
-                ? "待确认，不套用商铺年度。"
-                : "À confirmer, sans appliquer l’année des commerces."}
+                ? "按各合同及收据确认，不套用商铺年度；已登记收款的期间见房间资料。"
+                : "Selon le contrat et le reçu de chaque logement, sans appliquer l’année des commerces ; les périodes enregistrées figurent dans sa fiche."}
             </dd>
             <dt>{zh ? "首年不足一年" : "Première année incomplète"}</dt>
             <dd>{zh ? "折算方式待确认。" : "Prorata à confirmer."}</dd>

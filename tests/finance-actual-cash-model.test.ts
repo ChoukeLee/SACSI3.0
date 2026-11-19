@@ -62,6 +62,51 @@ function operations(overrides: Record<string, unknown> = {}) {
   } as unknown as OperatingAssetDirectoryData;
 }
 describe("actual cash proof and identity", () => {
+  it("keeps combined apartment receipt rent, annual charges and deposit liability separate", () => {
+    const parts = [
+      {
+        source_type: "cimac_apartment_rent",
+        amount: 1050000,
+        direction: "income",
+        category: "lease_rent",
+      },
+      {
+        source_type: "cimac_apartment_deposit",
+        amount: 700000,
+        direction: "liability_in",
+        category: "lease_deposit",
+      },
+      {
+        source_type: "cimac_apartment_property_fee",
+        amount: 360000,
+        direction: "income",
+        category: "property_fee",
+      },
+    ];
+    const payments = parts.map((p) => ({
+      ...payment,
+      id: p.source_type,
+      source_type: p.source_type,
+      amount: p.amount,
+    }));
+    const entries = parts.map((p) => ({
+      ...ledger[0],
+      id: `ledger:${p.source_type}`,
+      payment_id: p.source_type,
+      direction: p.direction,
+      category: p.category,
+      amount_xof: p.amount,
+    }));
+    const report = buildFinanceActualCash({ ...scope, ledger: entries, payments });
+    expect(report).toMatchObject({
+      incomeXof: 1410000,
+      rentIncomeXof: 1050000,
+      depositInXof: 700000,
+      unverifiedLedgerCount: 0,
+    });
+    expect(report.nativeTotals).toEqual([{ currency: "XOF", incoming: 2110000, outgoing: 0 }]);
+    expect(report.rows).toHaveLength(3);
+  });
   it("counts one paid apartment receipt's room allocations without treating deposits as rent", () => {
     const payments = ["201", "202", "203"].flatMap((room) =>
       [

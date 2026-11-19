@@ -58,6 +58,32 @@ const query = (view: "ledger" | "payments" = "ledger", locale: "zh" | "fr" = "zh
   locale,
 });
 
+it("exports combined apartment annual charges in the property-fee view once, and rejects a rent-category mismatch", () => {
+  const data = bundle();
+  Object.assign(data.payments[0], {
+    source_type: "cimac_apartment_property_fee",
+    amount: 360000,
+    currency: "XOF",
+    exchange_rate_to_xof: 1,
+    reversal_of_payment_id: null,
+    payment_method: "cash",
+  });
+  Object.assign(data.ledger[0], {
+    direction: "income",
+    category: "property_fee",
+    amount_xof: 360000,
+    currency: "XOF",
+    amount_native: null,
+  });
+  const csv = cimacExportCsv(data, { view: "property-fee-payments", locale: "zh" });
+  expect(csv.split("\r\n")).toHaveLength(2);
+  expect(csv).toContain('"360000"');
+  expect(csv).toContain("现金");
+  expect(csv).not.toContain("PRIVATE_");
+  data.ledger[0].category = "lease_rent";
+  expect(() => cimacExportCsv(data, { view: "property-fee-payments", locale: "zh" })).toThrow();
+});
+
 describe("CIMAC export strict query", () => {
   it("defaults only omitted view and locale", () => {
     expect(parseCimacExportQuery(new URLSearchParams())).toEqual(query());

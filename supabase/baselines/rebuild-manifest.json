@@ -325,6 +325,10 @@
     {
       "file": "20261117195243_cimac_materialize_reserved_contracts.sql",
       "sha256": "153ee2146f94ca4301a5062470bbb0bcf64e9e0907922cf822058ca051b318b2"
+    },
+    {
+      "file": "20261119115407_cimac_apartment_combined_receipts.sql",
+      "sha256": "0f80f36ba3c258266c8d6ad47660ccd4d46d839f1216d999972031563d773c09"
     }
   ],
   "excluded": [

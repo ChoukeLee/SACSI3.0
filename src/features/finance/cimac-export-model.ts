@@ -687,16 +687,22 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
     payment.source_id = nullableId(payment, "source_id");
     payment.source_type = text(payment.source_type);
     if (
-      ["cimac_apartment_rent", "cimac_apartment_deposit"].includes(String(payment.source_type)) &&
+      ["cimac_apartment_rent", "cimac_apartment_deposit", "cimac_apartment_property_fee"].includes(
+        String(payment.source_type),
+      ) &&
       (!payment.source_id ||
         references
           .get(key)!
           .some(
             (row) =>
               row.direction !==
-                (payment.source_type === "cimac_apartment_rent" ? "income" : "liability_in") ||
+                (payment.source_type === "cimac_apartment_deposit" ? "liability_in" : "income") ||
               row.category !==
-                (payment.source_type === "cimac_apartment_rent" ? "lease_rent" : "lease_deposit"),
+                (payment.source_type === "cimac_apartment_property_fee"
+                  ? "property_fee"
+                  : payment.source_type === "cimac_apartment_rent"
+                    ? "lease_rent"
+                    : "lease_deposit"),
           ))
     )
       return fail();
@@ -1015,7 +1021,7 @@ export function cimacExportCsv(bundle: CimacExportBundle, query: CimacExportQuer
             ].includes(String(type))) ||
           (checkedQuery.view === "refunds" && type === "lease_deposit_refund") ||
           (checkedQuery.view === "property-fee-payments" &&
-            (type === "property_fee" ||
+            (["property_fee", "cimac_apartment_property_fee"].includes(String(type)) ||
               (isCimacProtectedPayment(String(type)) && propertyProof.get(key)?.hasFee)))
         );
       })

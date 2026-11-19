@@ -125,9 +125,11 @@ function InspectorContent({
   }
 
   const { record, payment } = data;
-  const apartmentReservation = ["cimac_apartment_rent", "cimac_apartment_deposit"].includes(
-    record.source?.type ?? "",
-  );
+  const apartmentReservation = [
+    "cimac_apartment_rent",
+    "cimac_apartment_deposit",
+    "cimac_apartment_property_fee",
+  ].includes(record.source?.type ?? "");
   const customerCollection = [
     "cimac_customer_collection",
     "cimac_customer_refund",

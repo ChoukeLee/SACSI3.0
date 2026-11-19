@@ -8,15 +8,19 @@ export type ApartmentPaymentMethod = "cash" | "bank_transfer" | "check" | "other
 export interface ApartmentPaidRoomInput {
   unitId: string;
   expectedUnitUpdatedAt: string;
-  expectedHoldId: null;
-  expectedHoldUpdatedAt: null;
+  expectedHoldId: string | null;
+  expectedHoldUpdatedAt: string | null;
   monthlyRentXof: number;
   depositMonths: 2;
   rentPrepayMonths: 3;
   depositAmountXof: number;
   rentAmountXof: number;
+  propertyFeeAmountXof?: number;
+  propertyPeriodStart?: string;
+  propertyPeriodEnd?: string;
 }
 export interface ApartmentPaidRequest {
+  schemaVersion?: 2;
   requestId: string;
   originalInstruction: string;
   customerName: string;
@@ -46,6 +50,9 @@ export interface ApartmentPaidReservation {
   monthlyRentXof: number;
   depositAmountXof: number;
   rentAmountXof: number;
+  propertyFeeAmountXof?: number | null;
+  propertyPeriodStart?: string | null;
+  propertyPeriodEnd?: string | null;
   totalAmountXof: number;
   sourceRef: string;
   externalReceiptNo: string | null;
@@ -75,6 +82,13 @@ export function paidQuarterEnd(start: string) {
   if (!paidDate(start) || !start.endsWith("-01")) return "";
   const date = new Date(`${start}T00:00:00Z`);
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 3, 0))
+    .toISOString()
+    .slice(0, 10);
+}
+export function paidAnnualEnd(start: string) {
+  if (!paidDate(start) || !start.endsWith("-01")) return "";
+  const date = new Date(`${start}T00:00:00Z`);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 12, 0))
     .toISOString()
     .slice(0, 10);
 }
@@ -120,7 +134,7 @@ export function parseApartmentPaidRequest(raw: unknown): ApartmentPaidRequest {
         "totalAmountXof",
         "rooms",
       ],
-      ["externalReceiptNo"],
+      ["externalReceiptNo", "schemaVersion"],
     ) ||
     !apartmentUuid(raw.requestId) ||
     !paidText(raw.originalInstruction, 4000) ||
@@ -129,6 +143,7 @@ export function parseApartmentPaidRequest(raw: unknown): ApartmentPaidRequest {
     !paidText(raw.sourceRef, 500) ||
     !paidText(raw.reason, 2000) ||
     (Object.hasOwn(raw, "externalReceiptNo") && !paidText(raw.externalReceiptNo, 100)) ||
+    (Object.hasOwn(raw, "schemaVersion") && raw.schemaVersion !== 2) ||
     !paidDate(raw.agreementStartDate) ||
     !paidDate(raw.agreementEndDate) ||
     !paidDate(raw.paidPeriodStart) ||
@@ -158,7 +173,9 @@ export function parseApartmentPaidRequest(raw: unknown): ApartmentPaidRequest {
       ).getUTCDate()
   )
     return invalid();
-  const seen = new Set<string>();
+  const v2 = raw.schemaVersion === 2;
+  const seen = new Set<string>(),
+    seenHolds = new Set<string>();
   const rooms = raw.rooms.map((r): ApartmentPaidRoomInput => {
     if (
       !apartmentObject(r) ||
@@ -172,34 +189,59 @@ export function parseApartmentPaidRequest(raw: unknown): ApartmentPaidRequest {
         "rentPrepayMonths",
         "depositAmountXof",
         "rentAmountXof",
+        ...(v2 ? ["propertyFeeAmountXof", "propertyPeriodStart", "propertyPeriodEnd"] : []),
       ]) ||
       !apartmentUuid(r.unitId) ||
       seen.has(r.unitId.toLowerCase()) ||
       !apartmentTimestamp(r.expectedUnitUpdatedAt) ||
-      r.expectedHoldId !== null ||
-      r.expectedHoldUpdatedAt !== null ||
+      (!v2 && (r.expectedHoldId !== null || r.expectedHoldUpdatedAt !== null)) ||
+      (v2 &&
+        !(
+          (r.expectedHoldId === null && r.expectedHoldUpdatedAt === null) ||
+          (apartmentUuid(r.expectedHoldId) &&
+            apartmentTimestamp(r.expectedHoldUpdatedAt) &&
+            !seenHolds.has(r.expectedHoldId.toLowerCase()))
+        )) ||
       ![350000, 600000].includes(r.monthlyRentXof as number) ||
       r.depositMonths !== 2 ||
       r.rentPrepayMonths !== 3 ||
       r.depositAmountXof !== Number(r.monthlyRentXof) * 2 ||
-      r.rentAmountXof !== Number(r.monthlyRentXof) * 3
+      r.rentAmountXof !== Number(r.monthlyRentXof) * 3 ||
+      (v2 &&
+        (!paidMoney(r.propertyFeeAmountXof) ||
+          r.propertyFeeAmountXof <= 0 ||
+          !paidDate(r.propertyPeriodStart) ||
+          !paidDate(r.propertyPeriodEnd) ||
+          r.propertyPeriodStart !== raw.agreementStartDate ||
+          r.propertyPeriodEnd !== paidAnnualEnd(r.propertyPeriodStart)))
     )
       return invalid();
     seen.add(r.unitId.toLowerCase());
+    if (typeof r.expectedHoldId === "string") seenHolds.add(r.expectedHoldId.toLowerCase());
     return {
       unitId: r.unitId.toLowerCase(),
       expectedUnitUpdatedAt: r.expectedUnitUpdatedAt,
-      expectedHoldId: null,
-      expectedHoldUpdatedAt: null,
+      expectedHoldId: typeof r.expectedHoldId === "string" ? r.expectedHoldId.toLowerCase() : null,
+      expectedHoldUpdatedAt: r.expectedHoldUpdatedAt as string | null,
       monthlyRentXof: r.monthlyRentXof as number,
       depositMonths: 2,
       rentPrepayMonths: 3,
       depositAmountXof: r.depositAmountXof as number,
       rentAmountXof: r.rentAmountXof as number,
+      ...(v2
+        ? {
+            propertyFeeAmountXof: r.propertyFeeAmountXof as number,
+            propertyPeriodStart: r.propertyPeriodStart as string,
+            propertyPeriodEnd: r.propertyPeriodEnd as string,
+          }
+        : {}),
     };
   });
   if (
-    rooms.reduce((sum, r) => sum + r.depositAmountXof + r.rentAmountXof, 0) !== raw.totalAmountXof
+    rooms.reduce(
+      (sum, r) => sum + r.depositAmountXof + r.rentAmountXof + (r.propertyFeeAmountXof ?? 0),
+      0,
+    ) !== raw.totalAmountXof
   )
     return invalid();
   return {
@@ -320,8 +362,31 @@ export function readApartmentPaidRows(
       r.deposit_payment_id === r.rent_payment_id
     )
       return paidFail();
+    const propertyValues = [
+      r.property_fee_amount_xof,
+      r.property_period_start,
+      r.property_period_end,
+      r.property_payment_id,
+    ];
+    const hasProperty = propertyValues.some((value) => value !== null && value !== undefined);
+    if (
+      hasProperty &&
+      (!paidMoney(r.property_fee_amount_xof) ||
+        r.property_fee_amount_xof <= 0 ||
+        !paidDate(r.property_period_start) ||
+        !paidDate(r.property_period_end) ||
+        r.property_period_start !== r.agreement_start_date ||
+        r.property_period_end !== paidAnnualEnd(r.property_period_start) ||
+        !paidRowUuid(r.property_payment_id) ||
+        r.property_payment_id === r.deposit_payment_id ||
+        r.property_payment_id === r.rent_payment_id)
+    )
+      return paidFail();
     childIds.add(r.id as string);
-    const total = Number(r.deposit_amount_xof) + Number(r.rent_amount_xof);
+    const total =
+      Number(r.deposit_amount_xof) +
+      Number(r.rent_amount_xof) +
+      (hasProperty ? Number(r.property_fee_amount_xof) : 0);
     sums.set(receiptId, sums.get(receiptId)! + total);
     result.set(unitId, {
       receiptId,
@@ -336,6 +401,9 @@ export function readApartmentPaidRows(
       monthlyRentXof: r.monthly_rent_xof as number,
       depositAmountXof: r.deposit_amount_xof as number,
       rentAmountXof: r.rent_amount_xof as number,
+      propertyFeeAmountXof: hasProperty ? (r.property_fee_amount_xof as number) : null,
+      propertyPeriodStart: hasProperty ? (r.property_period_start as string) : null,
+      propertyPeriodEnd: hasProperty ? (r.property_period_end as string) : null,
       totalAmountXof: total,
       sourceRef: parent.source_ref as string,
       externalReceiptNo: parent.external_receipt_no as string | null,
@@ -350,6 +418,85 @@ function numericEqual(value: unknown, n: number) {
     /^\d+(?:\.\d+)?$/.test(String(value)) &&
     Number(value) === n
   );
+}
+/** Preserve PostgreSQL microseconds when comparing SDK and RPC timestamp spellings. */
+function instant(value: unknown): bigint | null {
+  if (!apartmentTimestamp(value)) return null;
+  const fraction = /T\d{2}:\d{2}:\d{2}(?:\.(\d{1,6}))?/.exec(value)?.[1] ?? "";
+  return BigInt(Date.parse(value)) * BigInt(1000) + BigInt(fraction.padEnd(6, "0").slice(3));
+}
+function holdHistory(value: unknown, targetIds: Set<string>, buildingId: string) {
+  const map = indexed(rows(value, 10000));
+  for (const row of map.values()) {
+    if (
+      !targetIds.has(String(row.unit_id)) ||
+      row.building_id !== buildingId ||
+      !paidText(row.reserver_name, 200) ||
+      /[\u0000-\u001f\u007f]/.test(row.reserver_name) ||
+      !["reserved", "cancelled"].includes(String(row.status)) ||
+      row.payment_status !== "unpaid" ||
+      !paidRowUuid(row.created_by) ||
+      !paidRowUuid(row.updated_by) ||
+      !apartmentTimestamp(row.created_at) ||
+      !apartmentTimestamp(row.updated_at) ||
+      typeof row.last_reason !== "string" ||
+      !row.last_reason.trim() ||
+      row.last_reason.length > 2000 ||
+      (row.status === "reserved"
+        ? row.cancelled_at !== null
+        : !apartmentTimestamp(row.cancelled_at))
+    )
+      return paidFail();
+  }
+  return map;
+}
+function verifyHoldConversion(
+  v: Row,
+  input: ApartmentPaidRequest,
+  actorId: string,
+  buildingId: string,
+) {
+  const targetIds = new Set(input.rooms.map((r) => r.unitId));
+  const before = holdHistory(v.unpaidReservationsBefore, targetIds, buildingId);
+  const after = holdHistory(v.unpaidReservations, targetIds, buildingId);
+  if (before.size !== after.size || [...before.keys()].some((id) => !after.has(id)))
+    return paidFail();
+  const expected = new Set<string>();
+  for (const room of input.rooms) {
+    const active = [...before.values()].filter(
+      (r) => r.unit_id === room.unitId && r.status === "reserved",
+    );
+    if (room.expectedHoldId === null) {
+      if (active.length) return paidFail();
+      continue;
+    }
+    if (
+      expected.has(room.expectedHoldId) ||
+      active.length !== 1 ||
+      active[0].id !== room.expectedHoldId ||
+      instant(active[0].updated_at) !== instant(room.expectedHoldUpdatedAt)
+    )
+      return paidFail();
+    expected.add(room.expectedHoldId);
+    const old = active[0],
+      next = after.get(room.expectedHoldId)!;
+    const changed = new Set(["status", "updated_at", "updated_by", "cancelled_at", "last_reason"]);
+    const retained = (row: Row) =>
+      Object.fromEntries(Object.entries(row).filter(([key]) => !changed.has(key)));
+    if (
+      next.status !== "cancelled" ||
+      next.updated_by !== actorId ||
+      next.last_reason !== input.reason ||
+      !apartmentTimestamp(next.updated_at) ||
+      !apartmentTimestamp(next.cancelled_at) ||
+      instant(next.updated_at)! < instant(old.updated_at)! ||
+      instant(next.cancelled_at)! < instant(old.updated_at)! ||
+      !paidEqual(retained(old), retained(next))
+    )
+      return paidFail();
+  }
+  for (const [id, old] of before)
+    if (!expected.has(id) && !paidEqual(old, after.get(id))) return paidFail();
 }
 /** Reconcile raw financial rows, catalog scope and request echo; never trust a returned verified flag. */
 export function verifyApartmentPaidResult(
@@ -381,9 +528,11 @@ export function verifyApartmentPaidResult(
     return paidFail();
   const v = d.verification,
     n = input.rooms.length,
+    v2 = input.schemaVersion === 2,
+    splitCount = v2 ? 3 : 2,
     reservationIds = uniqueIds(d.reservationIds, n),
-    paymentIds = uniqueIds(d.paymentIds, n * 2),
-    ledgerIds = uniqueIds(d.ledgerIds, n * 2);
+    paymentIds = uniqueIds(d.paymentIds, n * splitCount),
+    ledgerIds = uniqueIds(d.ledgerIds, n * splitCount);
   if (
     !apartmentObject(v.receipt) ||
     v.receipt.id !== d.receiptId ||
@@ -415,8 +564,8 @@ export function verifyApartmentPaidResult(
     profiles = indexed(rows(v.profiles, 64), "unit_id");
   if (
     paid.size !== n ||
-    payments.size !== n * 2 ||
-    ledger.size !== n * 2 ||
+    payments.size !== n * splitCount ||
+    ledger.size !== n * splitCount ||
     units.size !== n ||
     profiles.size !== n
   )
@@ -449,20 +598,42 @@ export function verifyApartmentPaidResult(
       Number(profile.monthly_rent_xof) !== expected.monthlyRentXof
     )
       return paidFail();
+    if (
+      v2
+        ? !numericEqual(
+            profile.monthly_property_fee_xof,
+            Number(profile.monthly_property_fee_xof),
+          ) ||
+          !paidMoney(Number(profile.monthly_property_fee_xof)) ||
+          Number(profile.monthly_property_fee_xof) <= 0 ||
+          expected.propertyFeeAmountXof !== Number(profile.monthly_property_fee_xof) * 12 ||
+          r.property_fee_amount_xof !== expected.propertyFeeAmountXof ||
+          r.property_period_start !== expected.propertyPeriodStart ||
+          r.property_period_end !== expected.propertyPeriodEnd ||
+          p.propertyFeeAmountXof !== expected.propertyFeeAmountXof
+        : p.propertyFeeAmountXof !== null
+    )
+      return paidFail();
     for (const [kind, offset] of [
       ["deposit", 0],
       ["rent", 1],
+      ...(v2 ? [["property_fee", 2] as const] : []),
     ] as const) {
-      const payment = payments.get(paymentIds[index * 2 + offset]),
-        entry = ledger.get(ledgerIds[index * 2 + offset]),
-        value = kind === "deposit" ? expected.depositAmountXof : expected.rentAmountXof;
+      const payment = payments.get(paymentIds[index * splitCount + offset]),
+        entry = ledger.get(ledgerIds[index * splitCount + offset]),
+        value =
+          kind === "deposit"
+            ? expected.depositAmountXof
+            : kind === "rent"
+              ? expected.rentAmountXof
+              : expected.propertyFeeAmountXof!;
       const reference = new RegExp(
-        `^WB-CIMAC-B17-L-${unitNos.get(expected.unitId)}-${input.paymentDate.replaceAll("-", "")}-${kind === "deposit" ? "DEP" : "RENT"}-\\d{2,}$`,
+        `^WB-CIMAC-B17-L-${unitNos.get(expected.unitId)}-${input.paymentDate.replaceAll("-", "")}-${kind === "deposit" ? "DEP" : kind === "rent" ? "RENT" : "PROP"}-\\d{2,}$`,
       );
       if (
         !payment ||
         !entry ||
-        r[`${kind}_payment_id`] !== payment.id ||
+        r[kind === "property_fee" ? "property_payment_id" : `${kind}_payment_id`] !== payment.id ||
         payment.customer_id !== d.customerId ||
         payment.unit_id !== expected.unitId ||
         payment.source_id !== r.id ||
@@ -485,7 +656,12 @@ export function verifyApartmentPaidResult(
         entry.unit_id !== expected.unitId ||
         entry.entry_date !== input.paymentDate ||
         entry.direction !== (kind === "deposit" ? "liability_in" : "income") ||
-        entry.category !== (kind === "deposit" ? "lease_deposit" : "lease_rent") ||
+        entry.category !==
+          (kind === "deposit"
+            ? "lease_deposit"
+            : kind === "rent"
+              ? "lease_rent"
+              : "property_fee") ||
         entry.currency !== "XOF" ||
         entry.amount_native !== null ||
         entry.amount_cny !== null ||
@@ -495,6 +671,7 @@ export function verifyApartmentPaidResult(
     }
   }
   const targetIds = new Set(input.rooms.map((r) => r.unitId));
+  if (v2) verifyHoldConversion(v, input, actorId, buildingId);
   for (const r of rows(v.unpaidReservations, 10000))
     if (!targetIds.has(String(r.unit_id)) || r.status === "reserved") return paidFail();
   for (const key of ["leases", "dailyBookings", "sales"]) {

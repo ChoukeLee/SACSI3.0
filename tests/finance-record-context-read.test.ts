@@ -317,6 +317,47 @@ describe("verified correction selected-record context", () => {
   });
 });
 describe("selected finance record read", () => {
+  it("shows annual apartment charges from the exact paid-reservation payment without turning them into rent", async () => {
+    data.buildings[0].project_id = CIMAC_PROJECT_ID;
+    Object.assign(data.ledger_entries[0], {
+      direction: "income",
+      category: "property_fee",
+      currency: "XOF",
+      amount_native: null,
+    });
+    Object.assign(data.payments[0], {
+      source_type: "cimac_apartment_property_fee",
+      payment_method: "cash",
+      amount: "5000",
+      currency: "XOF",
+      native_settlement: false,
+      exchange_rate_to_xof: 1,
+      payment_date: data.ledger_entries[0].entry_date,
+    });
+    data.cimac_apartment_paid_reservations = [
+      {
+        id: ids.contract,
+        unit_id: ids.unit,
+        building_id: ids.building,
+        customer_id: ids.customer,
+        status: "paid_reserved",
+        property_payment_id: ids.payment,
+        property_fee_amount_xof: "5000",
+        property_period_start: "2027-01-01",
+        property_period_end: "2027-12-31",
+      },
+    ];
+    const result = await readFinanceRecordContext(client, query);
+    expect(result).toMatchObject({
+      paymentMethod: "cash",
+      source: { type: "cimac_apartment_property_fee", href: "/cimac/apartments" },
+      period: { start: "2027-01-01", end: "2027-12-31" },
+    });
+    data.cimac_apartment_paid_reservations[0].property_payment_id = ids.otherUnit;
+    const invalid = await readFinanceRecordContext(client, query);
+    expect(invalid.source).toBeNull();
+    expect(invalid.customer).toBeNull();
+  });
   const apartmentFixture = (sourceType: "cimac_apartment_rent" | "cimac_apartment_deposit") => {
     const rent = sourceType === "cimac_apartment_rent";
     data.buildings[0].project_id = CIMAC_PROJECT_ID;

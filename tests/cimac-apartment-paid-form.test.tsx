@@ -32,11 +32,11 @@ function rooms(): CimacApartmentRoom[] {
     paidReservation: null,
   }));
 }
-async function render() {
+async function render(value = rooms()) {
   await act(async () =>
     root.render(
       <CimacApartmentPaidForm
-        rooms={rooms()}
+        rooms={value}
         selectedUnitId={input.rooms[0].unitId}
         projectId={paidProject}
         buildingId={paidBuilding}
@@ -61,13 +61,15 @@ function fill(name: string, value: string) {
   )!;
   el.value = value;
 }
-async function review(total = "5250000") {
+async function review(total = "5250000", includePropertyFee = false) {
   await click("登记已收押租");
   await act(async () => {
-    for (const el of [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].slice(
-      1,
-    ))
+    for (const el of [
+      ...host.querySelectorAll<HTMLInputElement>('fieldset input[type="checkbox"]'),
+    ].slice(1))
       el.click();
+    if (includePropertyFee)
+      host.querySelector<HTMLInputElement>('[name="includePropertyFee"]')!.click();
   });
   fill("customerName", input.customerName);
   fill("agreementStartDate", input.agreementStartDate);
@@ -125,6 +127,58 @@ describe("paid receipt review and recovery UI", () => {
     expect(host.querySelector('[role="alert"]')).not.toBeNull();
     expect(mocks.execute).not.toHaveBeenCalled();
     expect(host.textContent).not.toContain("确认登记已收押租");
+  });
+  it("reviews annual property fees and converts only the exact selected unpaid holds with the same receipt", async () => {
+    const value = rooms();
+    value[0].reservation = {
+      id: "a7000000-0000-4000-8000-000000000700",
+      reserverName: "原预订人",
+      status: "reserved",
+      paymentStatus: "unpaid",
+      updatedAt: paidStamp,
+    };
+    await render(value);
+    await review("6330000", true);
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(host.textContent).toContain("360,000 XOF（36万）");
+    expect(host.textContent).toContain("2027-01-01 — 2027-12-31");
+    expect(host.textContent).toContain(`原预订人 → ${input.customerName}`);
+    expect(host.textContent).toContain("原记录保留");
+    expect(host.textContent).toContain("6,330,000 XOF（633万）");
+    await click("确认登记已收押租");
+    expect(mocks.execute).toHaveBeenCalledOnce();
+    const actual = mocks.execute.mock.calls[0][0];
+    expect(actual).toMatchObject({ schemaVersion: 2, totalAmountXof: 6330000 });
+    expect(actual.rooms[0]).toMatchObject({
+      expectedHoldId: value[0].reservation.id,
+      expectedHoldUpdatedAt: paidStamp,
+      propertyFeeAmountXof: 360000,
+      propertyPeriodStart: "2027-01-01",
+      propertyPeriodEnd: "2027-12-31",
+    });
+    expect(actual.rooms[1]).toMatchObject({ expectedHoldId: null, expectedHoldUpdatedAt: null });
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+  });
+  it("does not manufacture an unconfirmed property fee to convert an unpaid hold", async () => {
+    const value = rooms();
+    value[0].reservation = {
+      id: "a7000000-0000-4000-8000-000000000700",
+      reserverName: "原预订人",
+      status: "reserved",
+      paymentStatus: "unpaid",
+      updatedAt: paidStamp,
+    };
+    await render(value);
+    await review();
+    expect(host.querySelector('[role="alert"]')).not.toBeNull();
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(host.textContent).not.toContain("确认登记已收押租");
+  });
+  it("rejects a receipt total that omits a selected annual property fee", async () => {
+    await render();
+    await review("5250000", true);
+    expect(host.querySelector('[role="alert"]')).not.toBeNull();
+    expect(mocks.execute).not.toHaveBeenCalled();
   });
   it("retains an identical payload and request ID after uncertainty, with no financial or customer data stored in the browser", async () => {
     mocks.execute
